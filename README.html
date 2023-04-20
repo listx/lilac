@@ -1,0 +1,2109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lilac</title>
+<meta name="author" content="Linus Arver" />
+<meta name="generator" content="Org Mode" />
+<style>
+  #content { max-width: 60em; margin: auto; }
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #e6e6e6;
+    border-radius: 3px;
+    background-color: #f2f2f2;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    padding: 3px;
+    color: #555;
+    background-color: #f2f2f299;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-authinfo::before { content: 'Authinfo'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { }
+</style>
+<link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="misc.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">Lilac</h1>
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h-Introduction">1. Introduction</a></li>
+<li><a href="#h-Motivation">2. Motivation</a></li>
+<li><a href="#h-Usage">3. Usage</a>
+<ul>
+<li><a href="#h-Source-code-blocks--monoblocks-and-polyblocks">3.1. Source code blocks: monoblocks and polyblocks</a></li>
+</ul>
+</li>
+<li><a href="#h-How-Lilac-uses-LP">4. How Lilac uses LP</a></li>
+<li><a href="#h-Weaving--generating-the-docs">5. Weaving (generating the docs)</a>
+<ul>
+<li><a href="#h-Emacs-customizations-for-HTML-export--lilac-el">5.1. Emacs customizations for HTML export (lilac.el)</a>
+<ul>
+<li><a href="#h-Toplevel-publishing-function---lilac-publish-">5.1.1. Toplevel publishing function (<code>lilac-publish</code>)</a>
+<ul>
+<li><a href="#h-Modify-the-Org-buffer">5.1.1.1. Modify the Org buffer</a></li>
+<li><a href="#h-Modify-the-HTML">5.1.1.2. Modify the HTML</a></li>
+<li><a href="#h-Miscellaneous-export-settings">5.1.1.3. Miscellaneous export settings</a></li>
+</ul>
+</li>
+<li><a href="#h-Org-modifications">5.1.2. Org modifications</a>
+<ul>
+<li><a href="#h-Automatic-captions-for-Noweb-source-code-blocks">5.1.2.1. Automatic captions for Noweb source code blocks</a></li>
+<li><a href="#h-Human-readable-UIDs--Headings--aka-headlines">5.1.2.2. Human-readable UIDs (Headings, aka headlines)</a></li>
+<li><a href="#h-Give-polyblocks-a----name-------field--HTML-ID">5.1.2.3. Give polyblocks a <code>#+name: ...</code> field (HTML ID)</a></li>
+</ul>
+</li>
+<li><a href="#h-HTML-modifications">5.1.3. HTML modifications</a>
+<ul>
+<li><a href="#h-Use-human-readable-HTML-IDs-for-source-code-links">5.1.3.1. Use human-readable HTML IDs for source code links</a></li>
+<li><a href="#h-Pretty-source-code-captions">5.1.3.2. Pretty source code captions</a></li>
+<li><a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">5.1.3.3. Link noweb references (link to child block from parent block)</a></li>
+<li><a href="#h-Custom-Noweb-delimiters">5.1.3.4. Custom Noweb delimiters</a></li>
+</ul>
+</li>
+<li><a href="#h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">5.1.4. Autogenerate CSS for syntax highlighting of source code blocks</a></li>
+<li><a href="#h-Fix-non-determinism">5.1.5. Fix non-determinism</a>
+<ul>
+<li><a href="#h-Do-not-insert-current-time-as-HTML-comment">5.1.5.1. Do not insert current time as HTML comment</a></li>
+<li><a href="#h-Do-not-insert-current-Org-mode-version">5.1.5.2. Do not insert current Org mode version</a></li>
+<li><a href="#h-Do-not-use-random-numbers-for-the-HTML--id--attribute">5.1.5.3. Do not use random numbers for the HTML "id" attribute</a></li>
+</ul>
+</li>
+<li><a href="#h-Misc-settings">5.1.6. Misc settings</a>
+<ul>
+<li><a href="#h-Use-HTML5-export--not-XML--to-un-break-MathJax">5.1.6.1. Use HTML5 export, not XML (to un-break MathJax)</a></li>
+</ul>
+</li>
+<li><a href="#h-Automatically-link-headlines--h2-to-h6">5.1.7. Automatically link headlines (h2 to h6)</a></li>
+<li><a href="#h-Imports">5.1.8. Imports</a></li>
+<li><a href="#h-Performance-optimizations">5.1.9. Performance optimizations</a>
+<ul>
+<li><a href="#h-Profiling">5.1.9.1. Profiling</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h-Additional--hand-tweaked--CSS">5.2. Additional (hand-tweaked) CSS</a>
+<ul>
+<li><a href="#h-Source-code-block-body">5.2.1. Source code block body</a></li>
+<li><a href="#h-Source-code-block-captions">5.2.2. Source code block captions</a></li>
+<li><a href="#h-Links-to-child-source-block-from-parent">5.2.3. Links to child source block from parent</a></li>
+</ul>
+</li>
+<li><a href="#h-Create--lilac-theme--file">5.3. Create <code>lilac.theme</code> file</a></li>
+<li><a href="#h-Ignore-woven-HTML-from--git-diff">5.4. Ignore woven HTML from <code>git diff</code></a>
+<ul>
+<li><a href="#h-git-add--p">5.4.1. <code>git add -p</code></a></li>
+</ul>
+</li>
+<li><a href="#h-gitignore">5.5. gitignore</a></li>
+</ul>
+</li>
+<li><a href="#h-Tangling--generating-the-source-code">6. Tangling (generating the source code)</a></li>
+<li><a href="#h-Development-environment--Nix-shell">7. Development environment (Nix shell)</a></li>
+<li><a href="#h-Glossary">8. Glossary</a></li>
+<li><a href="#h-References">9. References</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-h-Introduction" class="outline-2">
+<h2 id="h-Introduction"><span class="section-number-2">1.</span> Introduction</h2>
+<div class="outline-text-2" id="text-h-Introduction">
+<p>
+<i>Lilac</i> is an addon for Emacs Org mode to make <a href="https://en.wikipedia.org/wiki/Literate_programming">Literate Programming</a> (LP) using Noweb-style <a href="#citeproc_bib_item_1">[1]</a> references easy. It comes in two parts:
+</p>
+
+<ol class="org-ol">
+<li><code>lilac.el</code>: to be loaded and used when <i>weaving</i> <a href="#citeproc_bib_item_2">[2, p. 98]</a> and <i>tangling</i> <a href="#citeproc_bib_item_2">[2, p. 98]</a> from your own Org mode files (which use Noweb references), and</li>
+<li><code>lilac.theme</code>: to be sourced by your Org mode files to use Lilac's customized HTML export.</li>
+</ol>
+
+<p>
+This document itself reuses the <code>lilac.theme</code> file, which gives you a preview (if you are viewing the HTML output) of what weaving with Lilac looks like.
+</p>
+</div>
+</div>
+
+<div id="outline-container-h-Motivation" class="outline-2">
+<h2 id="h-Motivation"><span class="section-number-2">2.</span> Motivation</h2>
+<div class="outline-text-2" id="text-h-Motivation">
+<p>
+Lilac was created mainly because the existing Org mode features around Noweb references were lacking in features. There seems to have been a great deal of effort to make <i>tangling</i> (extracting source code from source code blocks) work well, but not much has been done around <i>weaving</i>, where I think most of the difficulties lie (because making output look good to a human (weaving) is much more difficult than making output look good to a computer (tangling)).
+</p>
+
+<p>
+Probably the biggest feature of Lilac is that it frees you from having to write a custom <code>#+caption: ...</code> text for every source code block. And Lilac also automatically links child blocks and parent blocks together (something that Org mode leaves out entirely). Lilac also automatically adds link anchors to all source code blocks as well as headlines, making it easier to link to different parts of an Org file while browsing it.
+</p>
+
+<p>
+Lilac also comes with some minor adjustments to make HTML generation deterministic (you may be surprised that Org mode by default creates random UIDs for every HTML export invocation). This makes it VCS and CI-friendly because you don't get meaningless diffs. Speaking of CI-friendliness, Lilac was designed to be run from outside of Emacs by default (and not interactively).
+</p>
+</div>
+</div>
+
+<div id="outline-container-h-Usage" class="outline-2">
+<h2 id="h-Usage"><span class="section-number-2">3.</span> Usage</h2>
+<div class="outline-text-2" id="text-h-Usage">
+<p>
+First create an Org mode file that uses LP. Then either clone this repo or add it as a submodule to your project. The point is to get the <code>lilac.el</code> (and its dependencies, themselves submodules) and <code>lilac.theme</code> (and associated CSS/JavaScript files) available locally. Then for the Org mode file you are using, you can load <code>lilac.el</code> and run <code>(lilac-publish)</code> to generate the HTML file, or run <code>(org-babel-tangle)</code> to generate the source code from it.
+</p>
+
+<p>
+You can use this Org file (the file you are reading) as a reference.
+</p>
+</div>
+
+<div id="outline-container-h-Source-code-blocks--monoblocks-and-polyblocks" class="outline-3">
+<h3 id="h-Source-code-blocks--monoblocks-and-polyblocks"><span class="section-number-3">3.1.</span> Source code blocks: monoblocks and polyblocks</h3>
+<div class="outline-text-3" id="text-h-Source-code-blocks--monoblocks-and-polyblocks">
+<p>
+Lilac makes using Noweb-style references in source code blocks easy. In default Org mode, Noweb-style references must be enclosed in double angle brackets <code>&lt;&lt;</code> and <code>&gt;&gt;</code>. While this works, it's problematic because it can mean different things syntactically based on the source code language. Your source code block's language might think that the angle brackets are operators or keywords and colorize them differently, for example. This results in an inconsistent experience.
+</p>
+
+<p>
+Instead, Lilac expects Noweb-style references, in the form <code>__NREF__foo</code> (where the "NREF" stands for "Noweb reference"). Then you are free to name your child block with this same <code>__NREF__foo</code> name. This is better because now you can search for this word <code>__NREF__foo</code> in your raw Org mode document and you'll instantly be able to see where it is used. Contrast this with the default Org mode behavior where you'll have to search for <code>&lt;&lt;foo&gt;</code> and <code>foo</code> separately.
+</p>
+
+<p>
+In the example below, the <code>parent-block</code> refers to 2 other child blocks for its definition.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Sample Org-mode Noweb-style references</label><span class="lilac-caption-link-symbol"><a href="#anonymous-1">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-1"><span class="org-org-meta-line">#+name: parent-block</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
+<span class="org-org-block">__NREF__child-block-1</span>
+<span class="org-org-block">__NREF__child-block-2</span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+...
+
+<span class="org-org-meta-line">#+name: __NREF__child-block-1</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"I am child 1"</span></span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+...
+
+<span class="org-org-meta-line">#+header: :noweb-ref __NREF__child-block-2</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> -n </span><span class="org-org-block"><span class="org-string">"I am "</span></span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+<span class="org-org-meta-line">#+header: :noweb-ref __NREF__child-block-2</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"child 2"</span></span>
+<span class="org-org-block-end-line">#+end_src</span>
+</pre></div></div><p>
+This example illustrates the two ways to define a child block: either as a single code block with <code>#+name: __NREF__foo</code>, or as multiple blocks with <code>#+header: :noweb-ref __NREF__foo</code>. Lilac calls them <a href="#org0000000">monoblocks</a> and <a href="#org0000002">polyblocks</a> respectively. Polyblocks are concatenated together in the order they appear in the overall Org file; this final concatenated version is what gets inserted into the Noweb reference in the parent block.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-How-Lilac-uses-LP" class="outline-2">
+<h2 id="h-How-Lilac-uses-LP"><span class="section-number-2">4.</span> How Lilac uses LP</h2>
+<div class="outline-text-2" id="text-h-How-Lilac-uses-LP">
+<p>
+All source code is generated by <i>tangling</i> this (<code>README.org</code>) Org file. This file is the single source of truth for basically everything. Some misc things like COPYRIGHT and LICENSE do not come from this file, but they are exceptions.
+</p>
+
+<p>
+Tangling is done by loading this file into Emacs and then running <code>(org-babel-tangle)</code>. This Org file is also the source of truth for the <i>woven</i> HTML documentation (<code>README.html</code>), and similarly the HTML is generated by invoking <code>(lilac-publish)</code>. The outputs of both tangling and weaving are checked into version control.
+</p>
+
+<p>
+The <code>Makefile</code> in this repo is used as the main "driver" for both tangling and weaving.
+</p>
+</div>
+</div>
+
+<div id="outline-container-h-Weaving--generating-the-docs" class="outline-2">
+<h2 id="h-Weaving--generating-the-docs"><span class="section-number-2">5.</span> Weaving (generating the docs)</h2>
+<div class="outline-text-2" id="text-h-Weaving--generating-the-docs">
+<p>
+Weaving is conceptually simpler than tangling because there is no extra step &#x2014; the output is an HTML page and that is something that we can use directly (unlike program source code, which may require additional compilation into a binary, depending on the language). We also limit ourselves to only HTML for simplicity (in particular, we don't have to worry about page breaks).
+</p>
+
+<p>
+However, most of the code in <a href="lilac.el"><code>lilac.el</code></a> have to do with weaving because the default infrastructure that ships with Org mode is too rigid for our needs. For example, we make heavy use of Noweb-style <a href="#citeproc_bib_item_1">[1]</a> references, but also add in extensive HTML links to allow the reader to jump around code easily because Org does not cross-link these references by default.
+</p>
+
+<p>
+Weaving currently requires the following dependencies:
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Dependency</th>
+<th scope="col" class="org-left">Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><a href="https://www.gnu.org/software/make/">GNU Make</a></td>
+<td class="org-left">to run "make"</td>
+</tr>
+
+<tr>
+<td class="org-left"><a href="https://www.gnu.org/software/emacs/">GNU Emacs</a></td>
+<td class="org-left">for tangling and weaving</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Note that all of the above can be brought in by using the <a href="https://github.com/NixOS/nix">Nix package manager</a>.
+</p>
+
+<p>
+We have a top-level <code>Makefile</code> so that we can run some <code>make</code> commands on the command line (instead of needing to invoke emacs directly).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Makefile</label><span class="lilac-caption-link-symbol"><a href="#Makefile">&#x1f517;</a></span></div><pre class="src src-makefile" id="Makefile"><span class="org-variable-name">PROJ_ROOT</span> := $(<span class="org-variable-name">shell</span> git rev-parse --show-toplevel)
+<span class="org-variable-name">PROCS</span> := $(<span class="org-variable-name">shell</span> nproc)
+define run_emacs
+        emacs $(<span class="org-variable-name">2</span>) --quick --batch --kill --load $(<span class="org-variable-name">PROJ_ROOT</span>)/lilac.el --eval=<span class="org-string">"$(</span><span class="org-string"><span class="org-variable-name">1</span></span><span class="org-string">)"</span>
+endef
+
+<span class="org-makefile-targets">all</span>: test weave
+<span class="org-makefile-targets">.PHONY</span>: all
+
+<span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-tangle">Makefile-tangle</a></span>
+
+<span class="org-makefile-targets">weave</span>: build-html
+
+<span class="org-makefile-targets">build-html</span>: README.html
+<span class="org-makefile-targets">.PHONY</span>: build-html
+
+<span class="org-makefile-targets">README.html</span>: README.org citations.bib
+        $(<span class="org-variable-name">call</span> run_emacs,(batch-org-gen-css-and-exit \"README.org\"),)
+        $(<span class="org-variable-name">call</span> run_emacs,(lilac-publish),README.org)
+        sed -i <span class="org-string">'s/.csl-left-margin{float: left; padding-right: 1em/.csl-left-margin{float: left; padding-right: 1em/'</span> README.html
+        sed -i <span class="org-string">'s/.csl-right-inline{margin: 0 0 0 2em/.csl-right-inline{margin: 0 0 0 2em/'</span> README.html
+
+<span class="org-makefile-targets">test</span>: tangle
+<span class="org-makefile-space">        #</span><span class="org-comment-delimiter"> </span><span class="org-comment">TODO: Add unit tests</span>
+<span class="org-makefile-targets">.PHONY</span>: test
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Enter development environment.</span>
+<span class="org-makefile-targets">shell</span>:
+        nix-shell --pure
+</pre></div></div>
+</div>
+
+<div id="outline-container-h-Emacs-customizations-for-HTML-export--lilac-el" class="outline-3">
+<h3 id="h-Emacs-customizations-for-HTML-export--lilac-el"><span class="section-number-3">5.1.</span> Emacs customizations for HTML export (lilac.el)</h3>
+<div class="outline-text-3" id="text-h-Emacs-customizations-for-HTML-export--lilac-el">
+<p>
+The default Org mode defaults present two major problems:
+</p>
+
+<ol class="org-ol">
+<li>nondeterminism, and</li>
+<li>lack of cross-linking across Noweb references.</li>
+</ol>
+
+<p>
+Nondeterminism is problematic for us because it results in a different HTML file every time we run <code>org-babel-tangle</code>, <i>even if the Org files have not changed</i>. This is taken care of in Section <a href="#h-Fix-non-determinism">5.1.5</a>.
+</p>
+
+<p>
+We define "cross-linking" to mean the act of linking to a child source code block whenever we reference it from a parent source code block, and vice versa. These links manifest themselves as blue and green boxes in this document.
+</p>
+
+<p>
+The reason why cross-linking is so important is because the source code blocks are interleaved with prose. And the order of code presented may not match the order of code in the tangled output. And sometimes the reader may just want to jump to a source code block just to see its implementation right away instead of waiting for the prose to catch up to it. Cross-linking makes it easier to navigate by source code blocks. Cross-linking is implemented in <a href="#h-HTML-modifications">5.1.3</a>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.el</label><span class="lilac-caption-link-symbol"><a href="#lilac-el">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="lilac-el"><span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-performance-optimization">lilac_dot_el-performance-optimization</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-imports">lilac_dot_el-imports</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-fix-nondeterminism">lilac_dot_el-fix-nondeterminism</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac_dot_el-lilac-publish</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-autogenerate-css">lilac_dot_el-autogenerate-css</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-misc">lilac_dot_el-misc</a></span>
+</pre></div></div>
+</div>
+
+<div id="outline-container-h-Toplevel-publishing-function---lilac-publish-" class="outline-4">
+<h4 id="h-Toplevel-publishing-function---lilac-publish-"><span class="section-number-4">5.1.1.</span> Toplevel publishing function (<code>lilac-publish</code>)</h4>
+<div class="outline-text-4" id="text-h-Toplevel-publishing-function---lilac-publish-">
+<p>
+The toplevel function is <code>lilac-publish</code>. This actually publishes twice, with <code>lilac-publish-1</code> and <code>lilac-publish-2</code>. The reason we publish twice is because we need to examine the HTML output twice in order to build up a database of parent/child source code block links (which is then used to link between these parent/child source code blocks).
+</p>
+
+<p>
+Also note that we do some modifications to the Org buffer directly before exporting to HTML. The main reason is so that the source code blocks that are named <code>__NREF__...</code> get an automatic <code>#+caption: ...</code> text to go along with it (because for these Noweb-style blocks, the captions should always look uniform).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish"><span class="org-comment-delimiter">; </span><span class="org-comment">This optimization can be used to crudely speed up weaving time by disabling</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">fontification (no syntax highlighting of source code blocks).</span>
+(<span class="org-keyword">if</span> (getenv <span class="org-string">"LILAC_LP_QUICK"</span>)
+    (<span class="org-keyword">progn</span>
+      (message <span class="org-string">"LILAC_LP_QUICK set; invoking some cost-cutting measures"</span>)
+      (advice-add 'org-html-fontify-code <span class="org-builtin">:around</span> #'lilac-disable-syntax-highlighting)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish</span> ()
+  (<span class="org-keyword">interactive</span>)
+  (lilac-publish-1)
+  (clrhash lilac-polyblock-names-totals)
+  (lilac-publish-2))
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">This is here solely to populate the lilac-child-HTML_ID-hash-table.</span>
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish-1</span> ()
+  (<span class="org-keyword">let</span> (
+        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-org">lilac-publish-modify-org</a></span>
+        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-HTML-1">lilac-publish-modify-HTML-1</a></span>
+        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-use-css">lilac-publish-use-css</a></span>)
+    (org-html-export-to-html)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish-2</span> ()
+  (<span class="org-keyword">let</span> (
+        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-org">lilac-publish-modify-org</a></span>
+        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-HTML-2">lilac-publish-modify-HTML-2</a></span>
+        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-use-css">lilac-publish-use-css</a></span>)
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">Debugging</span>
+    <span class="org-comment-delimiter">;</span><span class="org-comment">(message "lilac-child-HTML_ID-hash-table: %s" lilac-child-HTML_ID-hash-table)</span>
+    <span class="org-comment-delimiter">;</span><span class="org-comment">(message "lilac-org_id-human_id-hash-table: %s" lilac-org_id-human_id-hash-table)</span>
+    (org-html-export-to-html)))
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Modify Org buffer</span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-headlines">UID-for-all-headlines</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-polyblocks">UID-for-all-polyblocks</a></span>
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Modify HTML</span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-html-filter-src-blocks">lilac-html-filter-src-blocks</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-prettify-source-code-captions">lilac-prettify-source-code-captions</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-human-readable-src-block-ids">lilac-human-readable-src-block-ids</a></span>
+</pre></div></div>
+</div>
+
+<div id="outline-container-h-Modify-the-Org-buffer" class="outline-5">
+<h5 id="h-Modify-the-Org-buffer"><span class="section-number-5">5.1.1.1.</span> Modify the Org buffer</h5>
+<div class="outline-text-5" id="text-h-Modify-the-Org-buffer">
+<p>
+Here we modify the Org mode buffer, by using <code>org-export-before-parsing-hook</code>. This takes a list of functions that are free to modify the Org mode buffer before each Org element in the buffer gets converted into HTML.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-org</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-org">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-org">(org-export-before-parsing-hook
+ '(lilac-noweb-source-code-block-captions
+   lilac-UID-for-all-headlines
+   lilac-UID-for-all-polyblocks))
+</pre></div></div><p>
+As for the actual modifications, see:
+</p>
+
+<ul class="org-ul">
+<li><code>lilac-noweb-source-code-block-captions</code>: <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">5.1.2.1</a></li>
+<li><code>lilac-UID-for-all-headlines</code>: <a href="#h-Human-readable-UIDs--Headings--aka-headlines">5.1.2.2</a></li>
+<li><code>lilac-UID-for-all-polyblocks</code>: <a href="#h-Give-polyblocks-a----name-------field--HTML-ID">5.1.2.3</a></li>
+</ul>
+
+<p>
+In brief, the <code>lilac-UID-for-all-*</code> functions make it so that the links to headlines and source code blocks are both deterministic and human-readable. The <code>lilac-noweb-source-code-block-captions</code> function
+</p>
+</div>
+</div>
+
+<div id="outline-container-h-Modify-the-HTML" class="outline-5">
+<h5 id="h-Modify-the-HTML"><span class="section-number-5">5.1.1.2.</span> Modify the HTML</h5>
+<div class="outline-text-5" id="text-h-Modify-the-HTML">
+<p>
+This is useful for adding in final tweaks to the HTML that is difficult to accomplish at the Org-mode buffer level.
+</p>
+
+<p>
+Phase 1: In the first phase, we use the generated HTML data to populate the <code>child-HTML_ID-hash-table</code>. This data structure is used to link to child blocks from parent blocks.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-HTML-1</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-HTML-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-HTML-1">(org-export-filter-src-block-functions
+ '(lilac-populate-child-HTML_ID-hash-table
+   lilac-populate-org_id-human_id-hash-table))
+</pre></div></div><p>
+Phase 2: In this phase we perform the linking from parent blocks to child blocks.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-HTML-2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-HTML-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-HTML-2">(org-export-filter-src-block-functions
+ '(lilac-link-to-children-from-parent-body
+   lilac-prettify-source-code-captions))
+(org-export-filter-final-output-functions
+ '(lilac-replace-org_ids-with-human_ids))
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Miscellaneous-export-settings" class="outline-5">
+<h5 id="h-Miscellaneous-export-settings"><span class="section-number-5">5.1.1.3.</span> Miscellaneous export settings</h5>
+<div class="outline-text-5" id="text-h-Miscellaneous-export-settings">
+<p>
+Do not hardcode colors into the HTML. Instead refer to CSS class names, to be stylized by an external CSS file.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-use-css</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-use-css">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-use-css">(org-html-htmlize-output-type 'css)
+</pre></div></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Org-modifications" class="outline-4">
+<h4 id="h-Org-modifications"><span class="section-number-4">5.1.2.</span> Org modifications</h4>
+<div class="outline-text-4" id="text-h-Org-modifications">
+</div>
+
+<div id="outline-container-h-Automatic-captions-for-Noweb-source-code-blocks" class="outline-5">
+<h5 id="h-Automatic-captions-for-Noweb-source-code-blocks"><span class="section-number-5">5.1.2.1.</span> Automatic captions for Noweb source code blocks</h5>
+<div class="outline-text-5" id="text-h-Automatic-captions-for-Noweb-source-code-blocks">
+<p>
+For the parent/child source code blocks, we simply build these up by having blocks named <code>#+name: __NREF__foo</code> or <code>#+header: :noweb-ref __NREF__foo</code>. Each of these blocks can also reference other blocks by having a line <code>__NREF__bar</code> inside its body. When defining such blocks, we really don't want to define the <code>#+caption: ...</code> part manually because it gets tedious rather quickly. Yet we still have to have these <code>#+caption: ...</code> bits (<i>for every <code>__NREF__...</code> block!</i>) because that's the only way that Org's HTML exporter knows how to label these blocks.
+</p>
+
+<p>
+The code in this section automatically generates <code>#+caption: ...</code> text for these <code>__NREF__...</code> blocks.
+</p>
+
+<p>
+We want each <code>#+caption: ...</code> text to have the following items:
+</p>
+
+<ol class="org-ol">
+<li><a href="#coderef-NSCB_NAME" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_NAME');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_NAME');"><code>NSCB_NAME</code></a>: name of the Noweb source code block,</li>
+<li><a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a>: an indicator to show whether this block is broken up over multiple blocks, and</li>
+<li><a href="#coderef-NSCB_LINK_TO_PARENT" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINK_TO_PARENT');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINK_TO_PARENT');"><code>NSCB_LINK_TO_PARENT</code></a>: a link back up to a parent block (if any) where this block is used.</li>
+</ol>
+
+<p>
+<i>NSCB</i> here means <i>Noweb source code block</i>. We loop through every source code block and insert a (<code>#+caption: ...</code>) text into the buffer. This modified buffer (with the three bits of information from above) is what is sent down the pipeline for final export to HTML (i.e., the buffer modification does not affect the actual buffer (<code>*.org</code> file)).
+</p>
+
+<p>
+So assume that we already have the smart captions in a sorted <a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Association-Lists.html">association list</a> (aka alist), where the KEY is the integer buffer position where this caption should be inserted, and the VALUE is the caption itself (a string), like this:
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Caption locations</label><span class="lilac-caption-link-symbol"><a href="#anonymous-4">&#x1f517;</a></span></div><pre class="src src-elisp" id="anonymous-4">'((153  . <span class="org-string">"#+caption: ..."</span>)
+  (384  . <span class="org-string">"#+caption: ..."</span>)
+  (555  . <span class="org-string">"#+caption: ..."</span>)
+  (684  . <span class="org-string">"#+caption: ..."</span>)
+  (1051 . <span class="org-string">"#+caption: ..."</span>))
+</pre></div></div><p>
+We can use the KEY to go to that buffer position and insert the caption. However the insertion operation mutates the buffer. This means if we perform the insertions top-to-bottom, the subsequent KEY values will become obsolete. The trick then is to just do the insertions in reverse order (bottom-to-top), so that the remaining KEY values remain valid. This is what we do below, where <code>smart-captions</code> is an alist like the one just described.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">smart-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-noweb-source-code-block-captions</span> (_backend)
+  (<span class="org-keyword">let*</span> ((parent-blocks
+           <span class="lilac-child-link-from-parent"><a href="#__NREF__parent-blocks">parent-blocks</a></span>)
+         (child-parent-hash-table
+           <span class="lilac-child-link-from-parent"><a href="#__NREF__child-parent-hash-table">child-parent-hash-table</a></span>)
+         (all-src-blocks
+           <span class="lilac-child-link-from-parent"><a href="#__NREF__all-src-blocks">all-src-blocks</a></span>)
+         (smart-captions
+           <span class="lilac-child-link-from-parent"><a href="#__NREF__smart-captions">smart-captions</a></span>))
+    (<span class="org-keyword">cl-loop</span> for smart-caption in (reverse smart-captions) do
+      (<span class="org-keyword">let</span> ((pos (car smart-caption))
+            (caption (cdr smart-caption)))
+        (goto-char pos)
+        (insert caption)))))
+
+<span class="lilac-child-link-from-parent"><a href="#__NREF__smart-source-code-block-captions-helpers">smart-source-code-block-captions-helpers</a></span>
+</pre></div></div><p>
+(We'll get to the helper functions <code>smart-source-code-block-captions-helpers</code> later as they obscure the big picture.)
+</p>
+
+<p>
+Now we just have to construct <code>smart-captions</code>. The main difficulty is the construction of <a href="#coderef-NSCB_LINK_TO_PARENT" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINK_TO_PARENT');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINK_TO_PARENT');"><code>NSCB_LINK_TO_PARENT</code></a>, so most of the code will be concerned about child-parent associations.
+</p>
+
+<p>
+Why do we even need these source code blocks to link back to their parents? The point is to make things easier to navigate. For example, if we have
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Sample Org-mode Noweb-style references</label><span class="lilac-caption-link-symbol"><a href="#anonymous-5">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-5"><span class="org-org-meta-line">#+name: parent-block</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
+<span class="org-org-block">__NREF__child-block-1</span>
+<span class="org-org-block">__NREF__child-block-2</span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+...
+
+<span class="org-org-meta-line">#+name: __NREF__child-block-1</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"I am child 1"</span></span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+...
+
+<span class="org-org-meta-line">#+header: :noweb-ref __NREF__child-block-2</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> -n </span><span class="org-org-block"><span class="org-string">"I am "</span></span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+<span class="org-org-meta-line">#+header: :noweb-ref __NREF__child-block-2</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"child 2"</span></span>
+<span class="org-org-block-end-line">#+end_src</span>
+</pre></div></div><p>
+and we export this to HTML, ideally we would want both <code>__NREF__child-block-1</code> and each of the <code>__NREF__child-block-2</code> blocks to include an HTML link back up to <code>parent-block</code>. This would make it easier to skim the document and not get too lost (any time you are looking at any particular source code block, you would be able to just click on the link back to the parent (if there is one) to see a higher-level view).
+</p>
+
+<p>
+The key idea here is to build a hash table (<code>child-parent-hash-table</code>) where the KEY is a child source code block and the VALUE is the parent block. Then in order to construct <a href="#coderef-NSCB_LINK_TO_PARENT" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINK_TO_PARENT');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINK_TO_PARENT');"><code>NSCB_LINK_TO_PARENT</code></a> we just do a lookup against this hash table to find the parent (if any).
+</p>
+
+<p>
+The first thing we need is a list of parent source code blocks. We consider a source code block a parent block if it has any Noweb references within its body.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">parent-blocks</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__parent-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__parent-blocks"><span class="org-comment-delimiter">;; </span><span class="org-comment">parent-blocks is a let* binding, not a function call.</span>
+(org-element-map (org-element-parse-buffer) 'src-block
+  (<span class="org-keyword">lambda</span> (src-block)
+     (<span class="org-keyword">if</span> (lilac-is-parent-block src-block) src-block)))
+</pre></div></div><p>
+Then we construct the <code>child-parent-hash-table</code>. For each parent block, we get all of its children (<code>child-names</code>), and use this data to construct a child-parent association:
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">child-parent-hash-table</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__child-parent-hash-table">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__child-parent-hash-table">(<span class="org-keyword">let</span> ((hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal)))
+  (mapc
+   (<span class="org-keyword">lambda</span> (parent-block)
+    (<span class="org-keyword">let*</span> ((parent-name (org-element-property <span class="org-builtin">:name</span> parent-block))
+           (parent-body (org-element-property <span class="org-builtin">:value</span> parent-block))
+           (child-names (lilac-get-noweb-children parent-body)))
+      (mapc (<span class="org-keyword">lambda</span> (child-name) (puthash child-name parent-name hash-table)) child-names)))
+   parent-blocks)
+  hash-table)
+</pre></div></div><p>
+Now that we have the child-parent associations, we have to look at all source code blocks and check if
+</p>
+
+<ol class="org-ol">
+<li>this source code block's name shows up at all in <code>child-parent-hash-table</code>, and if so</li>
+<li>add a link to the parent (<a href="#coderef-NSCB_LINK_TO_PARENT" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINK_TO_PARENT');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINK_TO_PARENT');"><code>NSCB_LINK_TO_PARENT</code></a>).</li>
+</ol>
+
+<p>
+Let's grab all source code blocks:
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__UID-for-all-polyblocks">all-src-blocks</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__all-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__all-src-blocks">(org-element-map (org-element-parse-buffer) 'src-block 'identity)
+</pre></div></div><p>
+And now we can finally construct <code>smart-captions</code>:
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__smart-captions">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-captions">(-remove 'null
+  (<span class="org-keyword">cl-loop</span> for src-block in all-src-blocks collect
+    (<span class="org-keyword">let*</span> ((child (lilac-get-src-block-name src-block))
+           (child-name (car child))
+<span id="coderef-NSCB_NAME" class="coderef-off">           (NSCB_NAME (format <span class="org-string">"=%s= "</span> child-name))</span>
+<span id="coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef-off">           (NSCB_POLYBLOCK_INDICATOR (car (cdr child)))</span>
+           (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
+           (polyblock-counter-incremented (puthash child-name (+ 1 polyblock-counter) lilac-polyblock-names-totals))
+           (parent (gethash child-name child-parent-hash-table))
+           (pos (org-element-property <span class="org-builtin">:begin</span> src-block))
+<span id="coderef-NSCB_LINK_TO_PARENT" class="coderef-off">           (NSCB_LINK_TO_PARENT</span>
+            (<span class="org-keyword">if</span> parent (format <span class="org-string">" [[%s][PARENT]]"</span> parent) <span class="org-string">""</span>))
+           (smart-caption
+            (concat
+              <span class="org-string">"#+caption: "</span>
+              NSCB_NAME
+              NSCB_POLYBLOCK_INDICATOR
+              NSCB_LINK_TO_PARENT
+              <span class="org-string">"\n"</span>)))
+      (<span class="org-keyword">when</span> parent (cons pos smart-caption)))))
+</pre></div></div><p>
+We used some helper functions up in <a href="#__NREF__smart-source-code-block-captions"><code>__NREF__smart-source-code-block-captions</code></a>; let's examine them now.
+</p>
+
+<p>
+<code>lilac-is-parent-block</code> checks whether a source code block is a parent (contains noweb references to other child blocks in the form <code>__NREF__child-name</code>).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(1/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-is-parent-block</span> (src-block)
+  (<span class="org-keyword">let</span> ((body (org-element-property <span class="org-builtin">:value</span> src-block)))
+    (lilac-get-noweb-children body)))
+</pre></div></div><p>
+<code>lilac-get-noweb-children</code> extracts all Noweb references in the form "<code>__NREF__foo</code>" from a given multiline string, returning a list of all such references. This function expects at most 1 Noweb reference per line. The return type is a list of strings.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(2/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-noweb-children</span> (s)
+  (<span class="org-keyword">let*</span> ((lines (split-string s <span class="org-string">"\n"</span>))
+         (refs (-remove 'null
+                 (mapcar
+                  (<span class="org-keyword">lambda</span> (line)
+                   (<span class="org-keyword">if</span> (string-match (lilac-nref-rx nil) line)
+                       (match-string-no-properties 1 line)))
+                  lines))))
+    refs))
+</pre></div></div><p>
+<code>lilac-get-noweb-ref-polyblock-name</code> gets the string <code>__NREF__foo</code> in a <code>#+header: :noweb-ref __NREF__foo</code> line for a source code block.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(3/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-3">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-noweb-ref-polyblock-name</span> (source-code-block)
+  (<span class="org-keyword">let*</span> ((headers (org-element-property <span class="org-builtin">:header</span> source-code-block))
+         (noweb-ref-name
+          (nth 0
+           (-remove 'null
+            (mapcar
+             (<span class="org-keyword">lambda</span> (header)
+               (<span class="org-keyword">if</span> (string-match <span class="org-string">":noweb-ref </span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">.+</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">"</span> header)
+                   (match-string-no-properties 1 header)))
+             headers)))))
+    noweb-ref-name))
+</pre></div></div><p>
+Note that a child source block can have two ways of defining its name. The first is with the direct <code>#+name: __NREF__foo</code> style (<a href="#org0000000">monoblock</a>), and the second way is with a line like <code>#+header: :noweb-ref __NREF__foo</code> (<a href="#org0000002">polyblock</a>). Here <code>lilac-get-src-block-name</code> grabs the name of a (child) source code block, taking into account these two styles. For polyblock names, we mark it as such with a <code>(polyblock)</code> string, which is used later for the <a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(4/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-4">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-name</span> (src-block)
+  (<span class="org-keyword">let*</span> ((name-direct (org-element-property <span class="org-builtin">:name</span> src-block))
+         (name-indirect (lilac-get-noweb-ref-polyblock-name src-block)))
+    (<span class="org-keyword">if</span> name-direct
+        `(,name-direct <span class="org-string">""</span>)
+        `(,name-indirect <span class="org-string">"(polyblock)"</span>))))
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Human-readable-UIDs--Headings--aka-headlines" class="outline-5">
+<h5 id="h-Human-readable-UIDs--Headings--aka-headlines"><span class="section-number-5">5.1.2.2.</span> Human-readable UIDs (Headings, aka headlines)</h5>
+<div class="outline-text-5" id="text-h-Human-readable-UIDs--Headings--aka-headlines">
+<p>
+By default Org does a terrible job of naming HTML <code>id</code> fields for headings. By default it uses a randomly-generated number. In <a href="#h-Do-not-use-random-numbers-for-the-HTML--id--attribute">5.1.5.3</a> we tweak this behavior to use a deterministic, incrementing number starting from 0. However while this solution gets rid of the nondeterminism, it still results in human-unfriendly <code>id</code> attributes because they are all numeric (e.g. <code>org00000a1</code>, <code>org00000f3</code>, etc).
+</p>
+
+<p>
+For headings, we can do better because in practice they already mostly have unique contents, which should work most of the time to act as an <code>id</code>. In other words, we want all headings to have HTML IDs that are patterned after their contents. This way we can have IDs like <code>some-heading-name-1</code> (where the trailing <code>-1</code> is only used to disambiguate against another heading of the same name) instead of <code>org00000a1</code> (numeric hex).
+</p>
+
+<p>
+For each heading, we insert a <code>CUSTOM_ID</code> property. This makes Org refer to this <code>CUSTOM_ID</code> instead of the numeric <code>org...</code> link names. We append this headline property just below every headline we find in the buffer. The actual construction of the <code>CUSTOM_ID</code> (<code>headline-UID</code> in the code below) is done by <code>lilac-get-unique-id</code>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">UID-for-all-headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__UID-for-all-headlines">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__UID-for-all-headlines">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-UID-for-all-headlines</span> (_backend)
+  (<span class="org-keyword">let*</span> ((all-headlines
+           (org-element-map (org-element-parse-buffer) 'headline 'identity))
+
+         (headline-uid-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
+         (headline-UIDs
+           (-remove 'null
+             (<span class="org-keyword">cl-loop</span> for headline in all-headlines collect
+               (<span class="org-keyword">let*</span> ((headline-UID (lilac-get-unique-id headline headline-uid-hash-table))
+                      <span class="org-comment-delimiter">;; </span><span class="org-comment">Get the position just after the headline (just underneath it).</span>
+                      (pos (<span class="org-keyword">progn</span>
+                             (goto-char (org-element-property <span class="org-builtin">:begin</span> headline))
+                             (re-search-forward <span class="org-string">"\n"</span>))))
+                 (cons pos (concat
+                            <span class="org-string">":PROPERTIES:\n"</span>
+                            <span class="org-string">":CUSTOM_ID: "</span> headline-UID <span class="org-string">"\n"</span>
+                            <span class="org-string">":END:\n"</span>)))))))
+    <span class="org-comment-delimiter">; </span><span class="org-comment">(message "custom ID insertions: %s" headline-UIDs)</span>
+    (<span class="org-keyword">cl-loop</span> for pos-insertion in (reverse headline-UIDs) do
+        (<span class="org-keyword">let</span> ((pos (car pos-insertion))
+              (insertion (cdr pos-insertion)))
+            (goto-char pos)
+            (insert insertion)))))
+
+<span class="lilac-child-link-from-parent"><a href="#__NREF__get-unique-id">get-unique-id</a></span>
+</pre></div></div><p>
+<code>lilac-get-unique-id</code> converts a given headline to its canonical form (every non-word character converted to a dash) and performs a lookup against the hash table. If the entry exists, it looks up a <code>entry-N</code> value in a loop with <code>N</code> increasing until it sees that no such key exists (at which point we know that we have a unique ID).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__UID-for-all-headlines">get-unique-id</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__get-unique-id">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__get-unique-id">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-unique-id</span> (headline hash-table)
+  (<span class="org-keyword">let*</span> ((name (org-element-property <span class="org-builtin">:raw-value</span> headline))
+         (disambiguation-number 0)
+         (key (concat <span class="org-string">"h-"</span> (lilac-normalize-string name)))
+         (val (gethash key hash-table)))
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">Discard the key if a value already exists. This drives up the</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">disambiguation number.</span>
+    (<span class="org-keyword">while</span> val
+      (<span class="org-keyword">setq</span> disambiguation-number (+ 1 disambiguation-number))
+      (<span class="org-keyword">setq</span> key (concat <span class="org-string">"h-"</span>
+                        (lilac-normalize-string
+                         (format <span class="org-string">"%s-%s"</span> name disambiguation-number))))
+      (<span class="org-keyword">setq</span> val (gethash key hash-table)))
+    (puthash key t hash-table)
+    key))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-normalize-string</span> (s)
+  (string-trim
+    (replace-regexp-in-string <span class="org-string">"[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">A-Za-z0-9]"</span> <span class="org-string">"-"</span> s)
+    <span class="org-string">"-"</span>
+    <span class="org-string">"-"</span>))
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Give-polyblocks-a----name-------field--HTML-ID" class="outline-5">
+<h5 id="h-Give-polyblocks-a----name-------field--HTML-ID"><span class="section-number-5">5.1.2.3.</span> Give polyblocks a <code>#+name: ...</code> field (HTML ID)</h5>
+<div class="outline-text-5" id="text-h-Give-polyblocks-a----name-------field--HTML-ID">
+<p>
+Only source code blocks that have a <code>#+name: ...</code> field (org name field) get an HTML ID (org ID) assigned to it. The problem with polyblocks is that they are not assigned an org name field by default.
+</p>
+
+<p>
+Of course, we still want all polyblock to have an HTML ID, which can then be extracted by <a href="#coderef-lilac-get-src-block-HTML_ID" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-lilac-get-src-block-HTML_ID');" onmouseout="CodeHighlightOff(this, 'coderef-lilac-get-src-block-HTML_ID');"><code>lilac-get-src-block-HTML_ID</code></a> to build up the <code>child-HTML_ID-hash-table</code> in <a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">5.1.3.3</a>. If we don't do this then parent source code blocks won't be able to link to the polyblock at all.
+</p>
+
+<p>
+(Monoblocks with a <code>#+name: ...</code> field get a unique HTML ID assigned to it in the form <code>orgN</code> where <code>N</code> is a hexadecimal number. By default Org generates a random number for <code>N</code>, but we use a simple counter that increments, starting from 0 (see <a href="#h-Do-not-use-random-numbers-for-the-HTML--id--attribute">5.1.5.3</a>).)
+</p>
+
+<p>
+What we can do is inject a <code>#+name: ___polyblock-N</code> line (where <code>N</code> is an incrementing number) into the beginning of the source code section of all polyblocks. Then we can construct an HTML link to any polyblock.
+</p>
+
+<p>
+Note that we only name the first polyblock in the set of polyblocks that share the same Noweb reference name (<code>__NREF__foo</code>). This is so that we link to the first polyblock child from the parent block (because the assumption is that we will want to start reading about this set of polyblocks beginning with the first block).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">UID-for-all-polyblocks</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__UID-for-all-polyblocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__UID-for-all-polyblocks">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-UID-for-all-polyblocks</span> (_)
+  (<span class="org-keyword">let*</span> ((all-src-blocks
+           <span class="lilac-child-link-from-parent"><a href="#__NREF__all-src-blocks">all-src-blocks</a></span>)
+         (polyblock-id 0)
+         (noweb-ref-last <span class="org-string">""</span>)
+         (polyblock-UIDs
+           (-remove 'null
+             (<span class="org-keyword">cl-loop</span> for src-block in all-src-blocks collect
+               (<span class="org-keyword">let*</span> ((noweb-ref (lilac-get-noweb-ref-polyblock-name src-block))
+                      (is-polyblock
+                       (<span class="org-keyword">and</span>
+                         noweb-ref
+                         (not (org-element-property <span class="org-builtin">:name</span> src-block))))
+                      (pos (org-element-property <span class="org-builtin">:begin</span> src-block))
+                      (name-field-with-uid (format <span class="org-string">"#+name: ___polyblock-%s\n"</span> polyblock-id)))
+                 (<span class="org-keyword">when</span> (<span class="org-keyword">and</span>
+                         is-polyblock
+                         (not (string= noweb-ref noweb-ref-last)))
+                   (<span class="org-keyword">setq</span> noweb-ref-last noweb-ref)
+                   (<span class="org-keyword">setq</span> polyblock-id (+ 1 polyblock-id))
+                   (cons pos name-field-with-uid)))))))
+    (<span class="org-keyword">cl-loop</span> for polyblock-UID in (reverse polyblock-UIDs) do
+        (<span class="org-keyword">let</span> ((pos (car polyblock-UID))
+              (name-field-with-uid (cdr polyblock-UID)))
+            (goto-char pos)
+            (insert name-field-with-uid)))))
+</pre></div></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-HTML-modifications" class="outline-4">
+<h4 id="h-HTML-modifications"><span class="section-number-4">5.1.3.</span> HTML modifications</h4>
+<div class="outline-text-4" id="text-h-HTML-modifications">
+</div>
+
+<div id="outline-container-h-Use-human-readable-HTML-IDs-for-source-code-links" class="outline-5">
+<h5 id="h-Use-human-readable-HTML-IDs-for-source-code-links"><span class="section-number-5">5.1.3.1.</span> Use human-readable HTML IDs for source code links</h5>
+<div class="outline-text-5" id="text-h-Use-human-readable-HTML-IDs-for-source-code-links">
+<p>
+Recall that there are 2 types of source code blocks: <a href="#org0000000">monoblocks</a> and <a href="#org0000002">polyblocks</a>.
+</p>
+
+<p>
+Polyblocks do get a name field attached to them during the <a href="#h-Give-polyblocks-a----name-------field--HTML-ID">Org modification stage</a>, in the format <code>___polyblock-N</code>. These names are for HTML link generation only, because the user won't see them &#x2014; they will instead just see <code>org000012</code> or some such. In fact, all monoblocks are also given these random-looking (and unstable) <code>org...</code> HTML IDs.
+</p>
+
+<p>
+And therein lies the problem: if a user decides to bookmark a particular source code block, whether a monoblock or polyblock, they will link to an <code>org...</code>-style ID and chances are that this link will break over time.
+</p>
+
+<p>
+This is exactly the same problem we have for headlines. For headlines we solved the problem with a <a href="#h-Human-readable-UIDs--Headings--aka-headlines">hash table</a>, and we need to do the same thing here. The major difference, though, is that unlike headlines which can accept a <code>CUSTOM_ID</code> Org property, source code blocks have no such facility. So instead of modifying the buffer (as we do for headlines), we have to modify the final HTML output instead.
+</p>
+
+<p>
+The solution is to simply look at all source code block links, then modify the <code>id=...</code> part so that it looks like a more human-readable ID. We can extract the human-readable ID by looking at the smart captions inside the <code>&lt;label&gt;...&lt;/label&gt;</code> area for both monoblocks and polyblocks. And then it's just a matter of doing a basic search-and-replace across the entire buffer (HTML file).
+</p>
+
+<p>
+We have to do a search-and-replace across the entire file because we may also have manual links to source code blocks (although &#x2014; maybe it's just not worth it because we can't refer to polyblocks anyway by name).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-human-readable-src-block-ids</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-human-readable-src-block-ids">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-human-readable-src-block-ids"><span class="org-comment-delimiter">; </span><span class="org-comment">Define a global hash table for mapping Org-mode-generated ids (that look like "org00012") for source code blocks to a more human-readable ID.</span>
+(<span class="org-keyword">setq</span> lilac-org_id-human_id-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-populate-org_id-human_id-hash-table</span> (src-block-html backend info)
+  (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
+    (<span class="org-keyword">let*</span> ((block-name (lilac-get-src-block-name-from-html src-block-html))
+           (orgid (lilac-get-src-block-HTML_ID src-block-html)))
+      (<span class="org-keyword">when</span> orgid
+        (puthash orgid block-name lilac-org_id-human_id-hash-table))
+      src-block-html)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-replace-org_ids-with-human_ids</span> (entire-html backend info)
+  (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
+    (<span class="org-keyword">let</span> ((html-oneline (lilac-to-single-line entire-html)))
+      (maphash
+       (<span class="org-keyword">lambda</span> (k v)
+        (<span class="org-keyword">when</span> (<span class="org-keyword">and</span> k v)
+         (<span class="org-keyword">setq</span> html-oneline
+               (replace-regexp-in-string
+                (rx-to-string `(<span class="org-keyword">and</span> <span class="org-string">" id="</span> (* (not <span class="org-string">"\""</span>)) <span class="org-string">"\""</span> ,k <span class="org-string">"\""</span>))
+                (format <span class="org-string">" id=\"%s\""</span> v) html-oneline))
+         (<span class="org-keyword">setq</span> html-oneline
+               (replace-regexp-in-string
+                (rx-to-string `(<span class="org-keyword">and</span> <span class="org-string">" href="</span> (* (not <span class="org-string">"\""</span>)) <span class="org-string">"\"#"</span> ,k <span class="org-string">"\""</span>))
+                (format <span class="org-string">" href=\"#%s\""</span> v) html-oneline))))
+       lilac-org_id-human_id-hash-table)
+      (lilac-to-multi-line html-oneline))))
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Pretty-source-code-captions" class="outline-5">
+<h5 id="h-Pretty-source-code-captions"><span class="section-number-5">5.1.3.2.</span> Pretty source code captions</h5>
+<div class="outline-text-5" id="text-h-Pretty-source-code-captions">
+<p>
+Here there are basically 3 things we have to keep track of:
+</p>
+
+<ol class="org-ol">
+<li>the outer <code>&lt;div&gt;</code> that encloses the entire source code block,</li>
+<li>the <code>&lt;label&gt;</code>, if any (it may not exist), and</li>
+<li>the <code>&lt;pre&gt;</code> content.</li>
+</ol>
+
+<p>
+We only care about source code blocks with a <code>&lt;label&gt;</code> because that determines whether we have a "Listing: &#x2026;" or not. We just need to save the 3 bits of information, and then:
+</p>
+
+<ol class="org-ol">
+<li>print the outer <code>&lt;div ...&gt;</code>,</li>
+<li>print the <code>&lt;pre&gt;</code> content, and</li>
+<li>print the <code>&lt;label&gt;</code> content but as a <code>&lt;div&gt;</code>.</li>
+</ol>
+
+<p>
+For the last step, we want to additionally parse the inner "Listing N &#x2026; PARENT-link" text and transform it with reordering and also additional metadata information such as <code>&lt;span class="..."&gt;</code> tags.
+</p>
+
+<p>
+We also save the <code>NSCB_POLYBLOCK_INDICATOR</code> with the <code>polyblock-indicator</code> variable and display it.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-prettify-source-code-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions">(<span class="org-keyword">setq</span> lilac-polyblock-names (make-hash-table <span class="org-builtin">:test</span> 'equal))
+(<span class="org-keyword">setq</span> lilac-polyblock-names-totals (make-hash-table <span class="org-builtin">:test</span> 'equal))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-prettify-source-code-captions</span> (src-block-html backend info)
+  (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">Break up source block into 3 subparts --- the leading &lt;div ...&gt;, the &lt;label ...&gt;&lt;/label&gt; (if any) and</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">&lt;pre ...&gt;&lt;/pre&gt;.</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">Then run the linkifying logic against only the body, and then return the</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">original label and new body.</span>
+    (<span class="org-keyword">let*</span> ((div-caption-body (lilac-get-source-block-html-parts-without-newlines src-block-html))
+           (leading-div (nth 0 div-caption-body))
+           (body (nth 2 div-caption-body))
+           (pre-id-match
+             (string-match
+               (rx-to-string
+                 '(and
+                       <span class="org-string">"&lt;pre "</span>
+                       (* (not <span class="org-string">"&gt;"</span>))
+                       <span class="org-string">"id=\""</span>
+                       (group (+ (not <span class="org-string">"\""</span>)))))
+               body))
+           (pre-id
+             (<span class="org-keyword">if</span> pre-id-match
+                 (match-string-no-properties 1 body)
+                 <span class="org-string">"#deadlink"</span>))
+           (body-with-newlines
+            (lilac-to-multi-line body))
+           (caption (nth 1 div-caption-body))
+           (caption-parts
+             (<span class="org-keyword">let*</span> ((caption-match
+                      (string-match <span class="org-string">"&lt;label [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+&gt;</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">.*?</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&lt;/label&gt;"</span> caption)))
+               (<span class="org-keyword">if</span> caption-match
+                   (match-string-no-properties 1 caption)
+                   <span class="org-string">""</span>)))
+           (source-block-name-match
+             (string-match
+               (rx-to-string
+                 '(and
+                       <span class="org-string">"&lt;code&gt;"</span>
+                       (group (+ (not <span class="org-string">"&lt;"</span>)))
+                       <span class="org-string">"&lt;/code&gt;"</span>))
+               caption-parts))
+           <span class="org-comment-delimiter">;; </span><span class="org-comment">A source code block is anonymous if: (1) it does not have a "#+name: ..." line, or (2) it does not have a "#+header: :noweb-ref ..." line.</span>
+           (source-block-name
+             (<span class="org-keyword">if</span> source-block-name-match
+                 (match-string-no-properties 1 caption-parts)
+                 <span class="org-string">"anonymous"</span>))
+           <span class="org-comment-delimiter">;; </span><span class="org-comment">This is just used for the side effect of recording the</span>
+           <span class="org-comment-delimiter">;; </span><span class="org-comment">source-block-name, to be used for the fallback-id.</span>
+           (source-block-counter (gethash source-block-name lilac-polyblock-names 0))
+           (source-block-counter-incremented (puthash source-block-name (+ 1 source-block-counter) lilac-polyblock-names))
+           (source-block-name-styled
+             (<span class="org-keyword">cond</span> ((string-prefix-p <span class="org-string">"__NREF__"</span> source-block-name)
+                    (concat
+                      <span class="org-string">"&lt;span class=\"lilac-caption-source-code-block-name\"&gt;"</span>
+                      (string-remove-prefix <span class="org-string">"__NREF__"</span> source-block-name)
+                      <span class="org-string">"&lt;/span&gt;"</span>))
+                   (t
+                    (concat
+                      <span class="org-string">"&lt;span class=\"lilac-caption-source-code-block-name\"&gt;"</span>
+                      <span class="org-string">"&amp;#x1f4c4; "</span>
+                      source-block-name
+                      <span class="org-string">"&lt;/span&gt;"</span>))))
+           (polyblock-chain-total (gethash source-block-name lilac-polyblock-names-totals 0))
+           (polyblock-chain-location (<span class="org-keyword">if</span> (= polyblock-chain-total 0) <span class="org-string">""</span> (format <span class="org-string">"(%s/%s) "</span> source-block-counter-incremented polyblock-chain-total)))
+           (polyblock-indicator
+             (<span class="org-keyword">if</span> (string-match <span class="org-string">"</span><span class="org-string"><span class="org-warning">\</span></span><span class="org-string">(polyblock</span><span class="org-string"><span class="org-warning">\</span></span><span class="org-string">)"</span> caption-parts)
+                 polyblock-chain-location <span class="org-string">""</span>))
+           (parent-id-match
+             (string-match
+               (rx-to-string
+                 '(and
+                       <span class="org-string">" &lt;a href=\""</span>
+                       (group (+ (not <span class="org-string">"\""</span>)))))
+               caption-parts))
+           (parent-id
+             (<span class="org-keyword">if</span> parent-id-match
+                 (format <span class="org-string">"&lt;span class=\"lilac-caption-parent-link\"&gt;&lt;a href=\"%s\"&gt;%s&lt;/a&gt;&lt;/span&gt;"</span>
+                   (match-string-no-properties 1 caption-parts) (string-remove-prefix <span class="org-string">"__NREF__"</span> source-block-name))
+                 <span class="org-string">""</span>))
+           <span class="org-comment-delimiter">;; </span><span class="org-comment">For polyblocks, only the first (head) block gets an id field for a</span>
+           <span class="org-comment-delimiter">;; </span><span class="org-comment">&lt;pre&gt; tag. The rest (tail) don't have this field so they would</span>
+           <span class="org-comment-delimiter">;; </span><span class="org-comment">normally get assigned a deadlink. To avoid this, use a counter for</span>
+           <span class="org-comment-delimiter">;; </span><span class="org-comment">the parent-id, because this parent-id is shared across all</span>
+           <span class="org-comment-delimiter">;; </span><span class="org-comment">polyblocks. Then use this with the parent-id to generate an</span>
+           <span class="org-comment-delimiter">;; </span><span class="org-comment">alternate, fallback-id. This way the tail polyblocks get assigned</span>
+           <span class="org-comment-delimiter">;; </span><span class="org-comment">a unique (meaningful) ID and not just "##deadlink".</span>
+           (fallback-id
+             (<span class="org-keyword">if</span> (string= pre-id <span class="org-string">"#deadlink"</span>)
+                 (format <span class="org-string">"%s-%s"</span> source-block-name source-block-counter-incremented)
+                 pre-id))
+           (pre-tag-match
+             (string-match
+               (rx-to-string
+                 '(and
+                       <span class="org-string">"&lt;pre "</span>
+                       (group (* (not <span class="org-string">"&gt;"</span>)))
+                       <span class="org-string">"&gt;"</span>))
+               body))
+           (pre-tag-entire (match-string-no-properties 0 body))
+           (pre-tag-contents (match-string-no-properties 1 body))
+           (body-with-replaced-pre
+             (<span class="org-keyword">if</span> pre-id-match
+                 body-with-newlines
+                 (string-replace pre-tag-entire
+                                 (concat <span class="org-string">"&lt;pre "</span> pre-tag-contents
+                                         (format <span class="org-string">" id=\"%s\""</span> fallback-id) <span class="org-string">"&gt;"</span>) <span class="org-warning">body-with-newlines)))</span>
+           (link-symbol
+             (format <span class="org-string">"&lt;span class=\"lilac-caption-link-symbol\"&gt;&lt;a href=\"#%s\"&gt;&amp;#x1f517;&lt;/a&gt;&lt;/span&gt;"</span>
+               fallback-id))
+           (caption-without-listing-prefix (replace-regexp-in-string <span class="org-string">"&lt;span.+?span&gt;"</span> <span class="org-string">""</span> caption))
+           (caption-text
+            (<span class="org-keyword">if</span> (s-blank? parent-id)
+                (concat
+                  <span class="org-string">"&lt;div class=\"lilac-caption\"&gt;"</span>
+                    caption-without-listing-prefix
+                    link-symbol
+                  <span class="org-string">"&lt;/div&gt;"</span>)
+                (concat
+                  <span class="org-string">"&lt;div class=\"lilac-caption\"&gt;"</span>
+                    parent-id
+                    polyblock-indicator
+                    link-symbol
+                  <span class="org-string">"&lt;/div&gt;"</span>)))
+           )
+      (<span class="org-keyword">if</span> (s-blank? caption)
+       src-block-html
+       (concat
+        leading-div
+          <span class="org-string">"&lt;div class=\"lilac-pre-with-caption\"&gt;"</span>
+            caption-text
+            body-with-replaced-pre
+          <span class="org-string">"&lt;/div&gt;"</span>
+        <span class="org-string">"&lt;/div&gt;"</span>)))))
+
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-get-source-block-html-parts-without-newlines">lilac-get-source-block-html-parts-without-newlines</a></span>
+</pre></div></div><p>
+This is a helper function to parse the HTML output for a source code block.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions">lilac-get-source-block-html-parts-without-newlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-get-source-block-html-parts-without-newlines">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-get-source-block-html-parts-without-newlines">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-source-block-html-parts-without-newlines</span> (src-block-html)
+    (<span class="org-keyword">let*</span> ((one-line (lilac-to-single-line src-block-html))
+           (leading-div
+             (<span class="org-keyword">let</span> ((div-match
+                    (string-match <span class="org-string">"&lt;div [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+&gt;"</span> one-line)))
+               (match-string-no-properties 0 one-line)))
+           (caption
+             (<span class="org-keyword">let*</span> ((caption-match
+                      (string-match <span class="org-string">"&lt;label [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+&gt;.*?&lt;/label&gt;"</span> one-line)))
+               (<span class="org-keyword">if</span> caption-match
+                   (match-string-no-properties 0 one-line)
+                   <span class="org-string">""</span>)))
+           (body (<span class="org-keyword">progn</span> (string-match <span class="org-string">"&lt;pre [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+&gt;.*?&lt;/pre&gt;"</span> one-line)
+                        (match-string-no-properties 0 one-line))))
+      `(,leading-div ,caption ,body)))
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Link-noweb-references--link-to-child-block-from-parent-block" class="outline-5">
+<h5 id="h-Link-noweb-references--link-to-child-block-from-parent-block"><span class="section-number-5">5.1.3.3.</span> Link noweb references (link to child block from parent block)</h5>
+<div class="outline-text-5" id="text-h-Link-noweb-references--link-to-child-block-from-parent-block">
+<p>
+Consider the following code:
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Sample Org-mode Noweb-style references</label><span class="lilac-caption-link-symbol"><a href="#anonymous-6">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-6"><span class="org-org-meta-line">#+name: parent-block</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
+<span class="org-org-block">__NREF__child-block-1</span>
+<span class="org-org-block">__NREF__child-block-2</span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+...
+
+<span class="org-org-meta-line">#+name: __NREF__child-block-1</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"I am child 1"</span></span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+...
+
+<span class="org-org-meta-line">#+header: :noweb-ref __NREF__child-block-2</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> -n </span><span class="org-org-block"><span class="org-string">"I am "</span></span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+<span class="org-org-meta-line">#+header: :noweb-ref __NREF__child-block-2</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"child 2"</span></span>
+<span class="org-org-block-end-line">#+end_src</span>
+</pre></div></div><p>
+What we want to do is to make the <code>__NREF__child-block-1</code> and <code>__NREF__child-block-2</code> references inside <code>parent-block</code> to link to their definitions, so that the reader can just click on them to go to see how they're defined. Unfortunately Org mode doesn't do this by default so we have to do this ourselves.
+</p>
+
+<p>
+In the case of <code>__NREF__child-block-2</code>, it is defined in multiple blocks so we would want to link to the very first block.
+</p>
+
+<p>
+We cannot use a <code>org-export-before-parsing-hook</code> like we did in <a href="#__NREF__lilac-publish-modify-org"><code>__NREF__lilac-publish-modify-org</code></a> because at that stage of processing, we are dealing with Org mode syntax. Any modifications we make to the parent source code block will be treated as text upon HTML export. Thankfully Org mode allows customizations on generated HTML through the <code>org-export-filter-src-block-functions</code> variable. This variable is analogous to <code>org-export-before-parsing-hook</code>, but operates at the HTML level (not at the Org syntax level) for source code blocks, which is exactly what we need.
+</p>
+
+<p>
+So we have to craft valid HTML links (not Org links) to the child source code blocks. For this we need the actual <code>id</code> part of the HTML <code>&lt;pre&gt;...</code> block that will hold the source code. That is, the algorithm should be something like:
+</p>
+
+<ol class="org-ol">
+<li>for every parent source code block,</li>
+<li>for every child block (noweb) referenced in the body, insert an HTML link to the child block (lookup in <code>child-HTML_ID-hash-table</code>).</li>
+</ol>
+
+<p>
+The only thing remaining is the construction of <code>child-HTML_ID-hash-table</code>. We can construct this by mapping through all source code blocks and getting the name which can be just drawn from the <code>&lt;label ...&gt;</code> HTML tag, thanks to the smart captions we inserted for all child blocks earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">5.1.2.1</a>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-html-filter-src-blocks</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-html-filter-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-html-filter-src-blocks"><span class="org-comment-delimiter">; </span><span class="org-comment">Define a global hash table for mapping child source block names to their HTML IDs.</span>
+(<span class="org-keyword">setq</span> lilac-child-HTML_ID-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-populate-child-HTML_ID-hash-table</span> (src-block-html backend info)
+  (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
+    (<span class="org-keyword">let*</span> ((child-name (lilac-get-src-block-name-from-html src-block-html))
+           (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html)))
+      (<span class="org-keyword">if</span> child-HTML_ID <span class="org-comment-delimiter">; </span><span class="org-comment">Skip blocks that lack an HTML ID, such as non-head polyblocks.</span>
+        (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
+      <span class="org-comment-delimiter">; </span><span class="org-comment">Return src-block-html as-is (no modifications).</span>
+      src-block-html)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-name-from-html</span> (src-block-html)
+  (<span class="org-keyword">let*</span> ((match-nref (string-match
+                      (concat
+                       <span class="org-string">"&lt;label.+?&lt;code&gt;"</span>
+                       (lilac-nref-rx nil)
+                       <span class="org-string">"&lt;/code&gt;"</span>)
+                      src-block-html))
+         (match-raw (<span class="org-keyword">if</span> (not match-nref)
+                        (string-match
+                         (rx-to-string
+                          '(and
+                            <span class="org-string">"&lt;label"</span>
+                            (+ (not <span class="org-string">"&gt;"</span>))
+                            <span class="org-string">"&gt;"</span>
+                            (group (*? anychar))
+                            <span class="org-string">"&lt;/label&gt;"</span>))
+                         src-block-html)))
+         (matched-contents (match-string-no-properties 1 src-block-html)))
+    (<span class="org-keyword">if</span> match-nref
+        matched-contents
+        (<span class="org-keyword">if</span> match-raw
+            (lilac-clean-up-match-raw matched-contents)))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-clean-up-match-raw</span> (s)
+  (<span class="org-keyword">let*</span> ((normalized (lilac-normalize-string s))
+         (rx (rx-to-string
+                '(and
+                  <span class="org-string">"Listing-"</span>
+                  (+ (any digit))
+                  (+ <span class="org-string">"-"</span>)
+                  <span class="org-string">"span"</span>
+                  (* <span class="org-string">"-"</span>)
+                  (group (+ anychar)))))
+         (match (string-match rx normalized)))
+    (<span class="org-keyword">if</span> match
+        (match-string-no-properties 1 normalized)
+        normalized)))
+
+<span id="coderef-lilac-get-src-block-HTML_ID" class="coderef-off">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-HTML_ID</span> (src-block-html)</span>
+  (<span class="org-keyword">let</span> ((match (string-match <span class="org-string">"&lt;pre [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+?id=\"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">\"]+</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">\"&gt;"</span> src-block-html)))
+    (<span class="org-keyword">if</span> match (match-string-no-properties 1 src-block-html))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-link-to-children-from-parent-body</span> (src-block-html backend info)
+  (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">Break up source block into 3 subparts --- the leading &lt;div ...&gt;, the &lt;label ...&gt;&lt;/label&gt; (if any) and</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">&lt;pre ...&gt;&lt;/pre&gt;.</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">Then run the linkifying logic against only the body, and then return the</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">original label and new body.</span>
+    (<span class="org-keyword">let*</span> ((div-caption-body (lilac-get-source-block-html-parts-without-newlines src-block-html))
+           (leading-div (nth 0 div-caption-body))
+           (caption (nth 1 div-caption-body))
+           (body (nth 2 div-caption-body))
+           (body-linkified-without-newlines
+            (replace-regexp-in-string
+             (lilac-nref-rx nil)
+             (<span class="org-keyword">lambda</span> (child-name-text)
+                 (<span class="org-keyword">let*</span> ((HTML_ID (gethash child-name-text lilac-child-HTML_ID-hash-table)))
+                  (<span class="org-keyword">if</span> HTML_ID
+                      (concat <span class="org-string">"&lt;span class=\"lilac-child-link-from-parent\"&gt;&lt;a href=\"#"</span> HTML_ID <span class="org-string">"\"&gt;"</span>
+                              (string-remove-prefix <span class="org-string">"__NREF__"</span> child-name-text)
+                              <span class="org-string">"&lt;/a&gt;&lt;/span&gt;"</span>)
+                      child-name-text)))
+             body))
+           (body-linkified-with-newlines
+            (lilac-to-multi-line body-linkified-without-newlines)))
+      (concat leading-div caption body-linkified-with-newlines <span class="org-string">"&lt;/div&gt;"</span>))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-to-single-line</span> (s)
+  (replace-regexp-in-string <span class="org-string">"\n"</span> <span class="org-string">"&lt;&lt;&lt;NEWLINE&gt;&gt;&gt;"</span> s))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-to-multi-line</span> (s)
+  (replace-regexp-in-string <span class="org-string">"&lt;&lt;&lt;NEWLINE&gt;&gt;&gt;"</span> <span class="org-string">"\n"</span> s))
+
+<span class="lilac-child-link-from-parent"><a href="#__NREF__custom-noweb-delimiters">custom-noweb-delimiters</a></span>
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Custom-Noweb-delimiters" class="outline-5">
+<h5 id="h-Custom-Noweb-delimiters"><span class="section-number-5">5.1.3.4.</span> Custom Noweb delimiters</h5>
+<div class="outline-text-5" id="text-h-Custom-Noweb-delimiters">
+<p>
+Note that we need to evaluate this lisp code if we want to run <code>C-c C-v t</code> to tangle code blocks properly in an interactive manner from an Emacs editing session.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-html-filter-src-blocks">custom-noweb-delimiters</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__custom-noweb-delimiters">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__custom-noweb-delimiters">(<span class="org-keyword">setq</span> org-babel-noweb-wrap-start <span class="org-string">"__NREF__"</span>)
+(<span class="org-keyword">setq</span> org-babel-noweb-wrap-end <span class="org-string">""</span>)
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-nref-rx</span> (match-optional-params)
+  (rx-to-string
+   (lilac-nref-rx-primitive match-optional-params)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-nref-rx-primitive</span> (match-optional-params)
+  (<span class="org-keyword">if</span> match-optional-params
+   `(group
+           <span class="org-string">"__NREF__"</span>
+          (any alpha) <span class="org-comment-delimiter">;; </span><span class="org-comment">Noweb reference must start with a letter...</span>
+          <span class="org-comment-delimiter">;; </span><span class="org-comment">...and must be followed by letters,numbers,dashes,underscores,periods...</span>
+          (* (<span class="org-keyword">or</span> (any alnum) <span class="org-string">"-"</span> <span class="org-string">"_"</span> <span class="org-string">"."</span>))
+          <span class="org-comment-delimiter">;; </span><span class="org-comment">...and may terminate with a "(...)" where the "..." may be an empty string, or some other argument.</span>
+          (* (<span class="org-keyword">or</span> <span class="org-string">"()"</span>
+                 (<span class="org-keyword">and</span> <span class="org-string">"("</span>
+                      (* (not <span class="org-string">")"</span>))
+                      <span class="org-string">")"</span>))))
+   `(group
+          <span class="org-string">"__NREF__"</span>
+          (any alpha)
+          (* (<span class="org-keyword">or</span> (any alnum) <span class="org-string">"-"</span> <span class="org-string">"_"</span> <span class="org-string">"."</span>)))))
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Customize noweb delimiters. Unlike traditional &lt;&lt; and &gt;&gt; delimiters, we just use the "__NREF__" prefix as our only delimiter. This has the advantage of being encoded the same way into HTML, which makes our HTML modifications easier and more consistent across different source code languages.</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">See https://emacs.stackexchange.com/a/73720/13006.</span>
+(<span class="org-keyword">defun</span> <span class="org-function-name">org-babel-noweb-wrap</span> (<span class="org-type">&amp;optional</span> regexp)
+  <span class="org-doc">"Return regexp matching a Noweb reference.</span>
+
+<span class="org-doc">Match any reference, or only those matching REGEXP, if non-nil.</span>
+<span class="org-doc">When matching, reference is stored in match group 1."</span>
+  (lilac-nref-rx t))
+</pre></div></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks" class="outline-4">
+<h4 id="h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks"><span class="section-number-4">5.1.4.</span> Autogenerate CSS for syntax highlighting of source code blocks</h4>
+<div class="outline-text-4" id="text-h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">
+<p>
+See <a href="https://emacs.stackexchange.com/questions/31439/how-to-get-colored-syntax-highlighting-of-code-blocks-in-asynchronous-org-mode-e">https://emacs.stackexchange.com/questions/31439/how-to-get-colored-syntax-highlighting-of-code-blocks-in-asynchronous-org-mode-e</a>, specifically <a href="https://emacs.stackexchange.com/a/36759">https://emacs.stackexchange.com/a/36759</a>.
+</p>
+
+<p>
+Generate <code>syntax-highlighting.css</code> and quit emacs. This function is designed to be run from the command line on a fresh emacs instance (dedicated OS process). Unfortunately, by itself it is almost useless (see <a href="#__NREF__enable-syntax-highlighting-from-batch-mode"><code>__NREF__enable-syntax-highlighting-from-batch-mode</code></a>).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-autogenerate-css</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-autogenerate-css">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-autogenerate-css">(<span class="org-keyword">defun</span> <span class="org-function-name">batch-org-gen-css-and-exit</span> (org-file)
+  (find-file org-file)
+  (font-lock-flush)
+  (font-lock-fontify-buffer)
+  (org-html-htmlize-generate-css)
+  (<span class="org-keyword">with-current-buffer</span> <span class="org-string">"*html*"</span>
+    (write-file <span class="org-string">"syntax-highlighting.css"</span>))
+  (kill-emacs))
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Without this, batch-org-gen-css-and-exit produces a near-empty CSS file.</span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__enable-syntax-highlighting-from-batch-mode">enable-syntax-highlighting-from-batch-mode</a></span>
+</pre></div></div><p>
+Sadly, <code>batch-org-gen-css-and-exit</code> by itself generates a near-blank CSS file. So we have to use code from <a href="https://emacs.stackexchange.com/questions/38437/org-mode-batch-export-missing-syntax-highlighting">https://emacs.stackexchange.com/questions/38437/org-mode-batch-export-missing-syntax-highlighting</a>:
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-autogenerate-css">enable-syntax-highlighting-from-batch-mode</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__enable-syntax-highlighting-from-batch-mode">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__enable-syntax-highlighting-from-batch-mode">(<span class="org-keyword">require</span> '<span class="org-constant">font-lock</span>)
+(<span class="org-keyword">require</span> '<span class="org-constant">subr-x</span>) <span class="org-comment-delimiter">;; </span><span class="org-comment">for `</span><span class="org-comment"><span class="org-constant">when-let</span></span><span class="org-comment">'</span>
+
+(<span class="org-keyword">unless</span> (boundp 'maximal-integer)
+  (<span class="org-keyword">defconst</span> <span class="org-variable-name">maximal-integer</span> (lsh -1 -1)
+    <span class="org-doc">"Maximal integer value representable natively in emacs lisp."</span>))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">face-spec-default</span> (spec)
+  <span class="org-doc">"Get list containing at most the default entry of face SPEC.</span>
+<span class="org-doc">Return nil if SPEC has no default entry."</span>
+  (<span class="org-keyword">let*</span> ((first (car-safe spec))
+     (display (car-safe first)))
+    (<span class="org-keyword">when</span> (eq display 'default)
+      (list (car-safe spec)))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">face-spec-min-color</span> (display-atts)
+  <span class="org-doc">"Get min-color entry of DISPLAY-ATTS pair from face spec."</span>
+  (<span class="org-keyword">let*</span> ((display (car-safe display-atts)))
+    (<span class="org-keyword">or</span> (car-safe (cdr (assoc 'min-colors display)))
+    maximal-integer)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">face-spec-highest-color</span> (spec)
+  <span class="org-doc">"Search face SPEC for highest color.</span>
+<span class="org-doc">That means the DISPLAY entry of SPEC</span>
+<span class="org-doc">with class 'color and highest min-color value."</span>
+  (<span class="org-keyword">let</span> ((color-list (cl-remove-if-not
+             (<span class="org-keyword">lambda</span> (display-atts)
+               (<span class="org-keyword">when-let</span> ((display (car-safe display-atts))
+                  (class (<span class="org-keyword">and</span> (listp display)
+                          (assoc 'class display)))
+                  (background (assoc 'background display)))
+             (<span class="org-keyword">and</span> (member 'light (cdr background))
+                  (member 'color (cdr class)))))
+             spec)))
+    (cl-reduce (<span class="org-keyword">lambda</span> (display-atts1 display-atts2)
+         (<span class="org-keyword">if</span> (&gt; (face-spec-min-color display-atts1)
+            (face-spec-min-color display-atts2))
+             display-atts1
+           display-atts2))
+           (cdr color-list)
+           <span class="org-builtin">:initial-value</span> (car color-list))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">face-spec-t</span> (spec)
+  <span class="org-doc">"Search face SPEC for fall back."</span>
+  (cl-find-if (<span class="org-keyword">lambda</span> (display-atts)
+        (eq (car-safe display-atts) t))
+          spec))
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">This is slightly tweaked from the original, because the incoming "face" value can look like (fixed-pitch face-name) --- so we take the second element.</span>
+(<span class="org-keyword">defun</span> <span class="org-function-name">my-face-attribute</span> (face attribute <span class="org-type">&amp;optional</span> frame inherit)
+  <span class="org-doc">"Get FACE ATTRIBUTE from `</span><span class="org-doc"><span class="org-constant">face-user-default-spec</span></span><span class="org-doc">' and not from `</span><span class="org-doc"><span class="org-constant">face-attribute</span></span><span class="org-doc">'."</span>
+  (<span class="org-keyword">let*</span> ((face-spec (face-user-default-spec (<span class="org-keyword">if</span> (listp face) (car (cdr face)) face)))
+     (display-attr (<span class="org-keyword">or</span> (face-spec-highest-color face-spec)
+               (face-spec-t face-spec)))
+     (attr (cdr display-attr))
+     (val (<span class="org-keyword">or</span> (plist-get attr attribute) (car-safe (cdr (assoc attribute attr))))))
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">(message "attribute: %S" attribute) ;; for debugging</span>
+    (<span class="org-keyword">when</span> (<span class="org-keyword">and</span> (null (eq attribute <span class="org-builtin">:inherit</span>))
+           (null val))
+      (<span class="org-keyword">let</span> ((inherited-face (my-face-attribute face <span class="org-builtin">:inherit</span>)))
+    (<span class="org-keyword">when</span> (<span class="org-keyword">and</span> inherited-face
+           (null (eq inherited-face 'unspecified)))
+      (<span class="org-keyword">setq</span> val (my-face-attribute inherited-face attribute)))))
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">(message "face: %S attribute: %S display-attr: %S, val: %S" face attribute display-attr val) ;; for debugging</span>
+    (<span class="org-keyword">or</span> val 'unspecified)))
+
+(advice-add 'face-attribute <span class="org-builtin">:override</span> #'my-face-attribute)
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Debugging</span>
+(<span class="org-keyword">defmacro</span> <span class="org-function-name">print-args-and-ret</span> (fun)
+  <span class="org-doc">"Prepare FUN for printing args and return value."</span>
+  `(advice-add (<span class="org-keyword">quote</span> ,fun) <span class="org-builtin">:around</span>
+           (<span class="org-keyword">lambda</span> (oldfun <span class="org-type">&amp;rest</span> args)
+         (<span class="org-keyword">let</span> ((ret (apply oldfun args)))
+           (message ,(concat <span class="org-string">"Calling "</span> (symbol-name fun) <span class="org-string">" with args %S returns %S."</span>) args ret)
+           ret))
+           '((name <span class="org-string">"print-args-and-ret"</span>))))
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret htmlize-faces-in-buffer)</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret htmlize-get-override-fstruct)</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret htmlize-face-to-fstruct)</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret htmlize-attrlist-to-fstruct)</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret face-foreground)</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret face-background)</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret face-attribute)</span>
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Fix-non-determinism" class="outline-4">
+<h4 id="h-Fix-non-determinism"><span class="section-number-4">5.1.5.</span> Fix non-determinism</h4>
+<div class="outline-text-4" id="text-h-Fix-non-determinism">
+<p>
+There are some things that Org mode does that annoyingly break determinism. Here we take care to set things right so that we can have reprducible, stable HTML output.
+</p>
+</div>
+
+<div id="outline-container-h-Do-not-insert-current-time-as-HTML-comment" class="outline-5">
+<h5 id="h-Do-not-insert-current-time-as-HTML-comment"><span class="section-number-5">5.1.5.1.</span> Do not insert current time as HTML comment</h5>
+<div class="outline-text-5" id="text-h-Do-not-insert-current-time-as-HTML-comment">
+<p>
+Org mode also injects an HTML comment (not visible to the user) to record the time that the HTML was generated. We disable this because it breaks deterministic output. See <a href="https://emacs.stackexchange.com/questions/50117/how-to-disable-commented-date-in-org-mode-html-export">this link</a> for more info.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-fix-nondeterminism</a></span>(1/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-fix-nondeterminism">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-fix-nondeterminism">(<span class="org-keyword">setq</span> org-export-time-stamp-file nil)
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Do-not-insert-current-Org-mode-version" class="outline-5">
+<h5 id="h-Do-not-insert-current-Org-mode-version"><span class="section-number-5">5.1.5.2.</span> Do not insert current Org mode version</h5>
+<div class="outline-text-5" id="text-h-Do-not-insert-current-Org-mode-version">
+<p>
+By default Org mode appends visible metadata at the bottom of the HTML document, including the Org version used to generate the document. We suppress this information.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-fix-nondeterminism</a></span>(2/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-fix-nondeterminism-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-fix-nondeterminism-2">(<span class="org-keyword">setq</span> org-html-postamble nil)
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Do-not-use-random-numbers-for-the-HTML--id--attribute" class="outline-5">
+<h5 id="h-Do-not-use-random-numbers-for-the-HTML--id--attribute"><span class="section-number-5">5.1.5.3.</span> Do not use random numbers for the HTML "id" attribute</h5>
+<div class="outline-text-5" id="text-h-Do-not-use-random-numbers-for-the-HTML--id--attribute">
+<p>
+Stop randomized ids from being generated every time. Instead count from 0 and work our way up.
+</p>
+
+<p>
+See <a href="https://www.reddit.com/r/orgmode/comments/aagmfh/comment/hk6upbf">https://www.reddit.com/r/orgmode/comments/aagmfh/comment/hk6upbf</a>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-fix-nondeterminism</a></span>(3/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-fix-nondeterminism-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-fix-nondeterminism-3">(<span class="org-keyword">defun</span> <span class="org-function-name">org-export-deterministic-reference</span> (references)
+  (<span class="org-keyword">let</span> ((new (length references)))
+     (<span class="org-keyword">while</span> (rassq new references) (<span class="org-keyword">setq</span> new (+ new 1)))
+     new))
+(advice-add #'org-export-new-reference <span class="org-builtin">:override</span> #'org-export-deterministic-reference)
+</pre></div></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Misc-settings" class="outline-4">
+<h4 id="h-Misc-settings"><span class="section-number-4">5.1.6.</span> Misc settings</h4>
+<div class="outline-text-4" id="text-h-Misc-settings">
+<p>
+Disable backup files for <code>lilac.el</code> (that look like <code>lilac.el~</code>) when we invoke Emacs from the <a href="#Makefile">Makefile</a>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc">(<span class="org-keyword">setq</span> make-backup-files nil)
+(<span class="org-keyword">setq</span> org-src-preserve-indentation t)
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">See https://stackoverflow.com/a/27285582/437583.</span>
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-test-file-name</span> ()
+  (concat <span class="org-string">"test_"</span> (file-name-nondirectory (directory-file-name (file-name-directory (buffer-file-name))))  <span class="org-string">".py"</span>))
+</pre></div></div>
+</div>
+
+<div id="outline-container-h-Use-HTML5-export--not-XML--to-un-break-MathJax" class="outline-5">
+<h5 id="h-Use-HTML5-export--not-XML--to-un-break-MathJax"><span class="section-number-5">5.1.6.1.</span> Use HTML5 export, not XML (to un-break MathJax)</h5>
+<div class="outline-text-5" id="text-h-Use-HTML5-export--not-XML--to-un-break-MathJax">
+<p>
+By default on Org 9.6, MathJax settings (JavaScript snippet) gets wrapped in a CDATA tag, and we run into the same problem described on this email that has gone unanswered: <a href="https://www.mail-archive.com/emacs-orgmode@gnu.org/msg140821.html">https://www.mail-archive.com/emacs-orgmode@gnu.org/msg140821.html</a>. It appears that this is because the document is exported as XML, not HTMl. Setting the document type to <code>html5</code>, as below, appears to make the CDATA tag magically disappear.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-2">(<span class="org-keyword">setq</span> org-html-doctype <span class="org-string">"html5"</span>)
+</pre></div></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Automatically-link-headlines--h2-to-h6" class="outline-4">
+<h4 id="h-Automatically-link-headlines--h2-to-h6"><span class="section-number-4">5.1.7.</span> Automatically link headlines (h2 to h6)</h4>
+<div class="outline-text-4" id="text-h-Automatically-link-headlines--h2-to-h6">
+<p>
+Every HTML element <code>h2</code> to <code>h6</code> (which encode the Org mode headlines) already come with a unique ID, but they are only ever linked from the Table of Contents. The code here makes it so that the headlines are linked to themselves, which makes it easy for users to link to them directly when they're reading the page.
+</p>
+
+<p>
+The code here is taken from <a href="https://github.com/listx/listx_blog/blame/8e6e7b533d89f77a6939e5eda9fd9d990d25a7a9/misc.js#L1">https://github.com/listx/listx_blog/blame/8e6e7b533d89f77a6939e5eda9fd9d990d25a7a9/misc.js#L1</a>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">misc.js</label><span class="lilac-caption-link-symbol"><a href="#misc-js">&#x1f517;</a></span></div><pre class="src src-js" id="misc-js">$(<span class="org-keyword">function</span>() {
+    $(<span class="org-string">"h2,h3,h4,h5,h6"</span>).each(<span class="org-keyword">function</span>() {
+        <span class="org-keyword">var</span> <span class="org-variable-name">$this</span> = $(<span class="org-constant">this</span>);
+        <span class="org-keyword">var</span> <span class="org-variable-name">text</span> = $this.text();
+        <span class="org-keyword">var</span> <span class="org-variable-name">href</span> = $this.attr(<span class="org-string">"id"</span>);
+        <span class="org-keyword">var</span> <span class="org-variable-name">href_parts</span> = [];
+        <span class="org-keyword">var</span> <span class="org-variable-name">href_custom</span> = <span class="org-string">""</span>;
+        <span class="org-keyword">if</span> (<span class="org-keyword">typeof</span> href === <span class="org-string">"undefined"</span>) {
+            href_custom = <span class="org-string">""</span>;
+            href_parts = text.split(<span class="org-string">" "</span>);
+            <span class="org-keyword">for</span> (i = 0; i &lt; href_parts.length; i++) {
+                href_custom += href_parts[i] + <span class="org-string">'-'</span>;
+            }
+            href_custom = href_custom.slice(0, -1).toLowerCase();
+            console.log(href_custom);
+        }
+
+        $this.text(<span class="org-string">""</span>);
+        <span class="org-keyword">if</span> (<span class="org-keyword">typeof</span> href === <span class="org-string">"undefined"</span>) {
+            href = href_custom;
+            $this.attr(<span class="org-string">"id"</span>, href);
+        }
+        $this.prepend($(<span class="org-string">"&lt;a&gt;"</span>).attr(<span class="org-string">"href"</span>, <span class="org-string">'#'</span> +
+            href).addClass(<span class="org-string">"section-headline"</span>).text(text));
+    });
+});
+</pre></div></div><p>
+Now we just have to refer to the above in the snippet below, to be included in <a href="#h-Create--lilac-theme--file"><code>lilac.theme</code></a>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-theme">automatically_link_headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__automatically_link_headlines">&#x1f517;</a></span></div><pre class="src src-org" id="__NREF__automatically_link_headlines"><span class="org-comment"># Automatically link headlines.</span>
+<span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="<a href="https://code.jquery.com/jquery-3.6.4.min.js">https://code.jquery.com/jquery-3.6.4.min.js</a>"&gt;&lt;/script&gt;</span>
+<span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="misc.js"&gt;&lt;/script&gt;</span>
+</pre></div></div><p>
+Linkifying itself makes all the headlines blue (the default color for links). This is a bit distracting, so make them black.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-section-headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines"><span class="org-css-selector">a.section-headline </span>{
+    <span class="org-css-property">color</span>: <span class="custom">black</span>;
+}
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Imports" class="outline-4">
+<h4 id="h-Imports"><span class="section-number-4">5.1.8.</span> Imports</h4>
+<div class="outline-text-4" id="text-h-Imports">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-imports</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-imports">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-imports"><span class="org-comment-delimiter">;; </span><span class="org-comment">Built-in packages (distributed with Emacs).</span>
+(<span class="org-keyword">require</span> '<span class="org-constant">tex-mode</span>)
+(<span class="org-keyword">require</span> '<span class="org-constant">elisp-mode</span>)
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Third-party packages (checked in as Git submodules)</span>
+(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/s.el"</span>))
+(<span class="org-keyword">require</span> '<span class="org-constant">s</span>)
+(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/compat.el"</span>))
+(<span class="org-keyword">require</span> '<span class="org-constant">compat</span>)
+(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/dash.el"</span>))
+(<span class="org-keyword">require</span> '<span class="org-constant">dash</span>)
+(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/dr-qubit.org"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/f.el"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/parsebib"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/citeproc-el"</span>))
+(<span class="org-keyword">require</span> '<span class="org-constant">citeproc</span>)
+(<span class="org-keyword">require</span> '<span class="org-constant">oc-csl</span>)
+(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/emacs-htmlize"</span>))
+(<span class="org-keyword">require</span> '<span class="org-constant">htmlize</span>)
+(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/magit/lisp"</span>))
+(<span class="org-keyword">require</span> '<span class="org-constant">magit-section</span>)
+(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/nix-mode"</span>))
+(<span class="org-keyword">require</span> '<span class="org-constant">nix-mode</span>)
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Performance-optimizations" class="outline-4">
+<h4 id="h-Performance-optimizations"><span class="section-number-4">5.1.9.</span> Performance optimizations</h4>
+<div class="outline-text-4" id="text-h-Performance-optimizations">
+<p>
+This "optimization" is inspired by <a href="https://www.reddit.com/r/emacs/comments/mmdeei/comment/gtvryvy">https://www.reddit.com/r/emacs/comments/mmdeei/comment/gtvryvy</a>. There, the idea was to ignore hooks associated with major modes for the source code blocks, Because they use <code>org-publish</code> and we don't, we can't use the same code but we can still use the same idea. In particular, <code>org-html-export-to-html</code> calls <code>org-html-fontify-code</code> to perform syntax highlighting of source code blocks.
+</p>
+
+<p>
+During ad-hoc tests, this shaves off a few seconds. This was determined by comparing the regular <code>weave</code> target versus the <code>weave-nocolor</code> target.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-performance-optimization</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-performance-optimization">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-performance-optimization"><span class="org-comment-delimiter">; </span><span class="org-comment">Set garbage-collection threshold to 16 GiB.</span>
+(<span class="org-keyword">setq</span> gc-cons-threshold #x400000000)
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-disable-syntax-highlighting</span> (_orig-func <span class="org-type">&amp;rest</span> args)
+  (apply 'lilac-org-html-fontify-code args))
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-org-html-fontify-code</span> (code lang) (org-html-encode-plain-text code))
+
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-profiling">lilac_dot_el-profiling</a></span>
+</pre></div></div>
+</div>
+
+<div id="outline-container-h-Profiling" class="outline-5">
+<h5 id="h-Profiling"><span class="section-number-5">5.1.9.1.</span> Profiling</h5>
+<div class="outline-text-5" id="text-h-Profiling">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-performance-optimization">lilac_dot_el-profiling</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-profiling">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-profiling">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish-profile</span> ()
+  (<span class="org-keyword">interactive</span>)
+  (profiler-start 'cpu)
+  (lilac-publish)
+  (profiler-stop)
+  (profiler-report)
+  (profiler-report-write-profile <span class="org-string">"emacs-profile-weave.txt"</span>) t)
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-tangle-profile</span> ()
+  (<span class="org-keyword">interactive</span>)
+  (profiler-start 'cpu)
+  (org-babel-tangle)
+  (profiler-stop)
+  (profiler-report)
+  (profiler-report-write-profile <span class="org-string">"emacs-profile-tangle.txt"</span>) t)
+</pre></div></div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Additional--hand-tweaked--CSS" class="outline-3">
+<h3 id="h-Additional--hand-tweaked--CSS"><span class="section-number-3">5.2.</span> Additional (hand-tweaked) CSS</h3>
+<div class="outline-text-3" id="text-h-Additional--hand-tweaked--CSS">
+<p>
+We add some additional CSS tweaks on top of what we get from Org.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">style.css</label><span class="lilac-caption-link-symbol"><a href="#style-css">&#x1f517;</a></span></div><pre class="src src-css" id="style-css"><span class="org-css-selector">a </span>{
+    <span class="org-css-property">color</span>: <span class="custom-2">#0000ff</span>;
+}
+
+<span class="org-css-selector">body </span>{
+    <span class="org-css-property">font-size</span>: 1.5em;
+    <span class="org-css-property">margin</span>: 0 100px;
+}
+
+<span class="org-css-selector">body, p, li, h1, h2, h3, h4, h5, h6, legend </span>{
+    <span class="org-css-property">font-family</span>: <span class="org-string">"Source Serif Pro, serif"</span>;
+}
+
+<span class="org-css-selector">p, li </span>{
+    <span class="org-css-property">line-height</span>: 1.2em;
+}
+
+<span class="org-css-selector">p, ol, ul </span>{
+    <span class="org-css-property">margin-bottom</span>: 0.5em;
+}
+
+<span class="org-css-selector">li </span>{
+    <span class="org-css-property">margin-bottom</span>: 0;
+}
+
+<span class="org-css-selector">table </span>{
+    <span class="org-css-property">margin</span>: 1em auto 0em auto;
+}
+<span class="org-css-selector">table, th, td </span>{
+    <span class="org-css-property">border</span>: 1px solid <span class="custom-1">black</span>;
+    <span class="org-css-property">border-collapse</span>: collapse;
+}
+<span class="org-css-selector">th, td </span>{
+    <span class="org-css-property">padding</span>: 3px 6px;
+}
+
+<span class="org-comment-delimiter">/* </span><span class="org-comment">Center all images.</span><span class="org-comment-delimiter"> */</span>
+<span class="org-css-selector">img </span>{
+    <span class="org-css-property">display</span>: block;
+    <span class="org-css-property">margin</span>: 0 auto;
+}
+
+<span class="org-comment-delimiter">/* </span><span class="org-comment">Increase text size for smaller sections.</span><span class="org-comment-delimiter"> */</span>
+<span class="org-css-selector">h3, h4, h5, h6 </span>{
+    <span class="org-css-property">margin-top</span>: 1em;
+    <span class="org-css-property">margin-bottom</span>: 1em;
+    <span class="org-css-property">font-size</span>: 18pt;
+}
+<span class="org-css-selector">h7 </span>{
+    <span class="org-css-property">font-weight</span>: bold;
+    <span class="org-css-property">font-size</span>: 18pt;
+}
+<span class="org-css-selector">.outline-7 </span>{
+    <span class="org-css-property">margin-top</span>: 1em;
+}
+
+<span class="org-css-selector">code </span>{
+    <span class="org-css-property">background</span>: <span class="custom">#eee</span>;
+    <span class="org-css-property">padding-left</span>: 0.5em;
+    <span class="org-css-property">padding-right</span>: 0.5em;
+    <span class="org-css-property">white-space</span>: nowrap;
+}
+
+<span class="org-css-selector">thead </span>{
+    <span class="org-css-property">background</span>: <span class="custom">#eee</span>;
+}
+
+<span class="org-css-selector">pre </span>{
+    <span class="org-css-property">font-size</span>: 0.8em;
+    <span class="org-css-property">border-top-left-radius</span>: 0;
+    <span class="org-css-property">border-top-right-radius</span>: 0;
+    <span class="org-css-property">border-bottom-left-radius</span>: 5px;
+    <span class="org-css-property">border-bottom-right-radius</span>: 5px;
+}
+
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-section-headlines">css-source-code-section-headlines</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-body">css-source-code-block-body</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-captions">css-source-code-block-captions</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-child-link-from-parent">css-source-code-block-child-link-from-parent</a></span>
+</pre></div></div>
+</div>
+
+<div id="outline-container-h-Source-code-block-body" class="outline-4">
+<h4 id="h-Source-code-block-body"><span class="section-number-4">5.2.1.</span> Source code block body</h4>
+<div class="outline-text-4" id="text-h-Source-code-block-body">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-block-body</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-body">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-body"><span class="org-css-selector">.org-src-container </span>{
+    <span class="org-css-property">margin</span>: 1em 100px 1em 50px;
+}
+
+<span class="org-css-selector">.org-src-container pre </span>{
+    <span class="org-css-property">margin</span>: 0;
+    <span class="org-css-property">font-family</span>: <span class="org-string">"monospace"</span>;
+    <span class="org-css-property">border-width</span>: 0;
+    <span class="org-css-property">scroll-margin-top</span>: 100px;
+    <span class="org-css-property">border-style</span>: solid;
+    <span class="org-css-property">border-width</span>: 2px;
+    <span class="org-css-property">border-color</span>: <span class="custom-1">#999</span>;
+    <span class="org-css-property">border-radius</span>: 5px;
+}
+
+<span class="org-comment-delimiter">/* </span><span class="org-comment">Source code block body.</span><span class="org-comment-delimiter"> */</span>
+<span class="org-css-selector">.org-src-container pre.src </span>{
+    <span class="org-css-property">background-color</span>: <span class="custom">#f3f3f3</span>;
+}
+
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Source-code-block-captions" class="outline-4">
+<h4 id="h-Source-code-block-captions"><span class="section-number-4">5.2.2.</span> Source code block captions</h4>
+<div class="outline-text-4" id="text-h-Source-code-block-captions">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-captions"><span class="org-css-selector">.lilac-caption </span>{
+    <span class="org-css-property">font-family</span>: <span class="org-string">"monospace"</span>;
+    <span class="org-css-property">text-align</span>: right;
+    <span class="org-css-property">border-top-left-radius</span>: 5px;
+    <span class="org-css-property">border-top-right-radius</span>: 5px;
+    <span class="org-css-property">padding-top</span>: 2px;
+    <span class="org-css-property">padding-bottom</span>: 5px;
+}
+
+<span class="org-css-selector">.lilac-caption label </span>{
+    <span class="org-css-property">margin-right</span>: 10px;
+    <span class="org-css-property">padding-left</span>: 10px;
+    <span class="org-css-property">padding-right</span>: 10px;
+    <span class="org-css-property">padding-bottom</span>: 5px;
+    <span class="org-css-property">border-radius</span>: 5px;
+    <span class="org-css-property">border-style</span>: solid;
+    <span class="org-css-property">border-bottom-style</span>: none;
+    <span class="org-css-property">border-bottom-left-radius</span>: 0;
+    <span class="org-css-property">border-bottom-right-radius</span>: 0;
+    <span class="org-css-property">background-color</span>: <span class="custom-6">#ddd</span>;
+    <span class="org-css-property">border-color</span>: <span class="custom-5">#999</span>;
+}
+
+<span class="org-css-selector">.lilac-caption-source-code-block-name </span>{
+    <span class="org-css-property">color</span>: <span class="custom-4">#444444</span>;
+    <span class="org-css-property">font-weight</span>: bold;
+    <span class="org-css-property">margin-right</span>: 5px;
+}
+
+<span class="org-css-selector">.lilac-caption-parent-link </span>{
+    <span class="org-css-property">margin-top</span>: 5px;
+    <span class="org-css-property">margin-right</span>: 5px;
+    <span class="org-css-property">padding-left</span>: 5px;
+    <span class="org-css-property">padding-right</span>: 5px;
+    <span class="org-css-property">font-weight</span>: bold;
+}
+<span class="org-css-selector">.lilac-caption-parent-link a </span>{
+    <span class="org-css-property">padding-left</span>: 10px;
+    <span class="org-css-property">padding-right</span>: 10px;
+    <span class="org-css-property">padding-bottom</span>: 5px;
+    <span class="org-css-property">color</span>: <span class="custom-3">#21618c</span>;
+    <span class="org-css-property">background-color</span>: <span class="custom-2">#d6eaf8</span>;
+    <span class="org-css-property">border-radius</span>: 5px;
+    <span class="org-css-property">border-style</span>: solid;
+    <span class="org-css-property">border-bottom-style</span>: none;
+    <span class="org-css-property">border-bottom-left-radius</span>: 0;
+    <span class="org-css-property">border-bottom-right-radius</span>: 0;
+}
+<span class="org-css-selector">.lilac-caption-parent-link a:hover </span>{
+    <span class="org-css-property">color</span>: <span class="custom-1">#7d3c98</span>;
+    <span class="org-css-property">background-color</span>: <span class="custom">#e8daef</span>;
+    <span class="org-css-property">text-decoration</span>: none;
+}
+
+<span class="org-css-selector">.lilac-caption-link-symbol a </span>{
+    <span class="org-css-property">margin-right</span>: 5px;
+}
+<span class="org-css-selector">.lilac-caption-link-symbol a:hover </span>{
+    <span class="org-css-property">text-decoration</span>: none;
+}
+
+<span class="org-css-selector">.lilac-caption-listing-number </span>{
+    <span class="org-css-property">margin-right</span>: 5px;
+}
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Links-to-child-source-block-from-parent" class="outline-4">
+<h4 id="h-Links-to-child-source-block-from-parent"><span class="section-number-4">5.2.3.</span> Links to child source block from parent</h4>
+<div class="outline-text-4" id="text-h-Links-to-child-source-block-from-parent">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-block-child-link-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-child-link-from-parent">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-child-link-from-parent"><span class="org-css-selector">.lilac-child-link-from-parent </span>{
+    <span class="org-css-property">font-weight</span>: bold;
+}
+<span class="org-css-selector">.lilac-child-link-from-parent a </span>{
+    <span class="org-css-property">color</span>: <span class="custom-3">#21618c</span>;
+    <span class="org-css-property">background-color</span>: <span class="custom-2">#d6eaf8</span>;
+    <span class="org-css-property">border-radius</span>: 5px;
+    <span class="org-css-property">border-style</span>: solid;
+    <span class="org-css-property">margin</span>: 5px 0;
+    <span class="org-css-property">padding</span>: 2px 5px;
+    <span class="org-css-property">display</span>: inline-block;
+}
+<span class="org-css-selector">.lilac-child-link-from-parent a:hover </span>{
+    <span class="org-css-property">color</span>: <span class="custom-1">#7d3c98</span>;
+    <span class="org-css-property">background-color</span>: <span class="custom">#e8daef</span>;
+    <span class="org-css-property">text-decoration</span>: none;
+}
+</pre></div></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Create--lilac-theme--file" class="outline-3">
+<h3 id="h-Create--lilac-theme--file"><span class="section-number-3">5.3.</span> Create <code>lilac.theme</code> file</h3>
+<div class="outline-text-3" id="text-h-Create--lilac-theme--file">
+<p>
+Allow HTML exports of Org files (inluding this one) to pull in CSS and JavaScript that we've defined for Lilac by referring to a single theme file. The inspiration for this setup comes from <a href="https://gitlab.com/OlMon/org-themes">https://gitlab.com/OlMon/org-themes</a>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.theme</label><span class="lilac-caption-link-symbol"><a href="#lilac-theme">&#x1f517;</a></span></div><pre class="src src-org" id="lilac-theme"><span class="org-comment"># Include additional CSS styles.</span>
+<span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/&gt;</span>
+<span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="style.css" /&gt;</span>
+
+<span class="lilac-child-link-from-parent"><a href="#__NREF__automatically_link_headlines">automatically_link_headlines</a></span>
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Ignore-woven-HTML-from--git-diff" class="outline-3">
+<h3 id="h-Ignore-woven-HTML-from--git-diff"><span class="section-number-3">5.4.</span> Ignore woven HTML from <code>git diff</code></h3>
+<div class="outline-text-3" id="text-h-Ignore-woven-HTML-from--git-diff">
+<p>
+Typically we only need to look at the rendered HTML output in a web browser as the raw HTML diff output is extremely difficult to parse as a human. So by default we ask Git to exclude it from <code>git diff</code> by treating them as binary data.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">.gitattributes</label><span class="lilac-caption-link-symbol"><a href="#gitattributes">&#x1f517;</a></span></div><pre class="src src-gitattributes" id="gitattributes">* -diff
+**/*.org diff
+**/.gitattributes diff
+**/.gitmodules diff
+**/.gitignore diff
+</pre></div></div><p>
+In order to still show the HTML textual diff, we can run <code>git diff --text</code>.
+</p>
+</div>
+
+<div id="outline-container-h-git-add--p" class="outline-4">
+<h4 id="h-git-add--p"><span class="section-number-4">5.4.1.</span> <code>git add -p</code></h4>
+<div class="outline-text-4" id="text-h-git-add--p">
+<p>
+Note that the above setting to treat HTML files as binary data prevents them from being considered for <code>git add -p</code>. In order to add them, use <code>git add -u</code> instead.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-gitignore" class="outline-3">
+<h3 id="h-gitignore"><span class="section-number-3">5.5.</span> gitignore</h3>
+<div class="outline-text-3" id="text-h-gitignore">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">.gitignore</label><span class="lilac-caption-link-symbol"><a href="#gitignore">&#x1f517;</a></span></div><pre class="src src-gitignore" id="gitignore">**/*.auctex-auto
+tangle
+weave
+</pre></div></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Tangling--generating-the-source-code" class="outline-2">
+<h2 id="h-Tangling--generating-the-source-code"><span class="section-number-2">6.</span> Tangling (generating the source code)</h2>
+<div class="outline-text-2" id="text-h-Tangling--generating-the-source-code">
+<p>
+Tangling is simply the act of collecting the <code>#+begin_src ... #+end_src</code> blocks and arranging them into the various target (source code) files. Every source code block is given a unique name.
+</p>
+
+<p>
+We simply tangle the <code>README.org</code> file (this file) to get all the code we need.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#Makefile">Makefile-tangle</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-tangle">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-tangle"><span class="org-comment-delimiter"># </span><span class="org-comment">Currently we don't have any optimizations for tangling, but we still set LILAC_LP_QUICK=1 anyway to align with what we do for weave-quick.</span>
+<span class="org-makefile-targets">$(</span><span class="org-variable-name"><span class="org-makefile-targets">README_org_output</span></span><span class="org-makefile-targets">) tangle &amp;</span>: README.org
+        <span class="org-type">@</span><span class="org-makefile-shell">echo tangling in parallel</span>
+        <span class="org-variable-name">LILAC_LP_QUICK</span>=1 make -C $(<span class="org-variable-name">PROJ_ROOT</span>) -j$(<span class="org-variable-name">PROCS</span>) $(<span class="org-variable-name">README_org_output</span>)
+        touch tangle
+
+<span class="org-variable-name">README_org_output</span> = citations.bib lilac.el lilac.theme .gitattributes .gitignore Makefile misc.js shell.nix style.css syntax-highlighting.css
+
+<span class="org-makefile-targets">$(</span><span class="org-variable-name"><span class="org-makefile-targets">README_org_output</span></span><span class="org-makefile-targets">) &amp;</span>: README.org
+<span class="org-makefile-space">        #</span><span class="org-comment-delimiter"> </span><span class="org-comment">Generate the toplevel Makefile (this file) and image/Makefile (overwriting</span>
+<span class="org-makefile-space">        #</span><span class="org-comment-delimiter"> </span><span class="org-comment">them if necessary). In a way this bootstraps the whole</span>
+<span class="org-makefile-space">        #</span><span class="org-comment-delimiter"> </span><span class="org-comment">literate-programming pipeline. Note that these files are different than</span>
+<span class="org-makefile-space">        #</span><span class="org-comment-delimiter"> </span><span class="org-comment">the ones used to compile the tangled source code.</span>
+        $(<span class="org-variable-name">call</span> run_emacs,(org-babel-tangle),README.org)
+
+define tangle_tests
+
+<span class="org-makefile-targets">$(</span><span class="org-variable-name"><span class="org-makefile-targets">1</span></span><span class="org-makefile-targets">) $(</span><span class="org-variable-name"><span class="org-makefile-targets">2</span></span><span class="org-makefile-targets">) &amp;</span>: $(<span class="org-variable-name">3</span>)
+        <span class="org-type">@</span><span class="org-makefile-shell">echo tangling $(</span><span class="org-makefile-shell"><span class="org-variable-name">3</span></span><span class="org-makefile-shell">)</span>
+        $(<span class="org-variable-name">call</span> run_emacs,(org-babel-tangle),$(<span class="org-variable-name">3</span>))
+
+endef
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Development-environment--Nix-shell" class="outline-2">
+<h2 id="h-Development-environment--Nix-shell"><span class="section-number-2">7.</span> Development environment (Nix shell)</h2>
+<div class="outline-text-2" id="text-h-Development-environment--Nix-shell">
+<p>
+This is taken from <a href="https://github.com/tweag/haskell-stack-nix-example/blob/b9383e35416a2b0e21fbc97ed079538f9f395b6a/shell.nix#L1">https://github.com/tweag/haskell-stack-nix-example/blob/b9383e35416a2b0e21fbc97ed079538f9f395b6a/shell.nix#L1</a>.
+</p>
+
+<p>
+This is the main development shell and brings in all of our dependencies to build all of our code.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">shell.nix</label><span class="lilac-caption-link-symbol"><a href="#shell-nix">&#x1f517;</a></span></div><pre class="src src-nix" id="shell-nix"><span class="org-nix-keyword">let</span>
+  <span class="org-comment"># Nixpkgs snapshot.</span>
+  <span class="org-nix-attribute">sources</span> = <span class="org-nix-builtin">import</span> <span class="org-nix-constant">./package/nix/sources.nix</span>;
+  <span class="org-comment"># The final "pkgs" attribute with all the bells and whistles of our overlays.</span>
+  <span class="org-nix-attribute">pkgs</span> = <span class="org-nix-builtin">import</span> sources.nixpkgs {};
+<span class="org-nix-keyword">in</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">This is our development shell.</span>
+pkgs.mkShell ({
+  <span class="org-nix-attribute">buildInputs</span> = [
+    <span class="org-comment"># Tangling and weaving for Literate Programming.</span>
+    pkgs.emacs
+
+    <span class="org-comment"># Misc</span>
+    pkgs.git
+    pkgs.less
+  ];
+})
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Glossary" class="outline-2">
+<h2 id="h-Glossary"><span class="section-number-2">8.</span> Glossary</h2>
+<div class="outline-text-2" id="text-h-Glossary">
+<ul class="org-ul">
+<li><a id="org0000000"></a> <b>monoblock</b>: an Org mode source code block with a <code>#+name: ...</code> field. This block is an independent block and there are no other blocks with the same name.</li>
+<li><b>Noweb</b>: A literate programming tool from 1989 that still works and from which <a href="#org0000054">Org mode</a> borrows heavily using <a href="#org0000056">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</li>
+<li><a id="org0000056"></a> <b>noweb-ref</b>: aka "Noweb-style reference". A Noweb-style reference is just a name (string) that refers to a monoblock or polyblock. See <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</li>
+<li><a id="org0000054"></a> <b>Org mode</b>: An Emacs major mode for <code>*.org</code> files, where "major mode" means that it provides things like syntax highlighting and keyboard shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the important thing is that we use Org mode as a literate programming tool. See <a href="https://orgmode.org/">Org mode</a>.</li>
+<li><a id="org0000002"></a> <b>polyblock</b>: an Org mode source code block without a <code>#+name: ...</code> field, but which has a <code>#+header: :noweb-ref ...</code> field. Other blocks with the same Noweb-ref name are concatenated together when they are tangled. Polyblocks are used in cases where we would like to break up a single block into smaller pieces for explanatory purposes. In all other cases, monoblocks are preferable, unless the source code block is not to be tangled and is only for explanatory purposes in the woven output.</li>
+<li><b>source code block</b>: An Org mode facility that allows you to enclose a multiline piece of text with <code>#+begin_src ...</code> and <code>#+end_src</code> lines.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-h-References" class="outline-2">
+<h2 id="h-References"><span class="section-number-2">9.</span> References</h2>
+<div class="outline-text-2" id="text-h-References">
+<style>.csl-left-margin{float: left; padding-right: 1em;}
+ .csl-right-inline{margin: 0 0 0 2em;}</style><div class="csl-bib-body">
+  <div class="csl-entry"><a id="citeproc_bib_item_1"></a>
+    <div class="csl-left-margin">[1]</div><div class="csl-right-inline">N. Ramsey, “Literate programming simplified,” <i>Ieee software</i>, vol. 11, no. 5, pp. 97–105, Sep. 1994, doi: <a href="https://doi.org/10.1109/52.311070">10.1109/52.311070</a>.</div>
+  </div>
+  <div class="csl-entry"><a id="citeproc_bib_item_2"></a>
+    <div class="csl-left-margin">[2]</div><div class="csl-right-inline">D. E. Knuth, “Literate programming,” <i>The computer journal</i>, vol. 27, no. 2, pp. 97–111, Feb. 1984, doi: <a href="https://doi.org/10.1093/comjnl/27.2.97">10.1093/comjnl/27.2.97</a>.</div>
+  </div>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,1634 @@
+#+title: Lilac
+#+SETUPFILE: lilac.theme
+
+# Set default header argument for all source code blocks. The "no-export" means
+# that we do not expand noweb references when exporting (weaving) --- the fact
+# that this is not the default option is odd.
+#+PROPERTY: header-args :noweb no-export
+
+# Number the top 5 levels of headings; since h1 is the title, this means headings
+# up to 5 numbers --- e.g., "1.2.3.4.5".
+#+OPTIONS: H:5
+
+#+BIBLIOGRAPHY: ./citations.bib
+
+* Introduction
+
+/Lilac/ is an addon for Emacs Org mode to make [[https://en.wikipedia.org/wiki/Literate_programming][Literate Programming]] (LP) using Noweb-style [cite:@ramsey_1994] references easy. It comes in two parts:
+
+1. =lilac.el=: to be loaded and used when /weaving/ [cite:@knuth_1984 98] and /tangling/ [cite:@knuth_1984 98] from your own Org mode files (which use Noweb references), and
+2. =lilac.theme=: to be sourced by your Org mode files to use Lilac's customized HTML export.
+
+This document itself reuses the =lilac.theme= file, which gives you a preview (if you are viewing the HTML output) of what weaving with Lilac looks like.
+
+* Motivation
+
+Lilac was created mainly because the existing Org mode features around Noweb references were lacking in features. There seems to have been a great deal of effort to make /tangling/ (extracting source code from source code blocks) work well, but not much has been done around /weaving/, where I think most of the difficulties lie (because making output look good to a human (weaving) is much more difficult than making output look good to a computer (tangling)).
+
+Probably the biggest feature of Lilac is that it frees you from having to write a custom =#+caption: ...= text for every source code block. And Lilac also automatically links child blocks and parent blocks together (something that Org mode leaves out entirely). Lilac also automatically adds link anchors to all source code blocks as well as headlines, making it easier to link to different parts of an Org file while browsing it.
+
+Lilac also comes with some minor adjustments to make HTML generation deterministic (you may be surprised that Org mode by default creates random UIDs for every HTML export invocation). This makes it VCS and CI-friendly because you don't get meaningless diffs. Speaking of CI-friendliness, Lilac was designed to be run from outside of Emacs by default (and not interactively).
+
+* Usage
+
+First create an Org mode file that uses LP. Then either clone this repo or add it as a submodule to your project. The point is to get the =lilac.el= (and its dependencies, themselves submodules) and =lilac.theme= (and associated CSS/JavaScript files) available locally. Then for the Org mode file you are using, you can load =lilac.el= and run =(lilac-publish)= to generate the HTML file, or run =(org-babel-tangle)= to generate the source code from it.
+
+You can use this Org file (the file you are reading) as a reference.
+
+** Source code blocks: monoblocks and polyblocks
+
+Lilac makes using Noweb-style references in source code blocks easy. In default Org mode, Noweb-style references must be enclosed in double angle brackets =<<= and =>>=. While this works, it's problematic because it can mean different things syntactically based on the source code language. Your source code block's language might think that the angle brackets are operators or keywords and colorize them differently, for example. This results in an inconsistent experience.
+
+Instead, Lilac expects Noweb-style references, in the form =__NREF__foo= (where the "NREF" stands for "Noweb reference"). Then you are free to name your child block with this same =__NREF__foo= name. This is better because now you can search for this word =__NREF__foo= in your raw Org mode document and you'll instantly be able to see where it is used. Contrast this with the default Org mode behavior where you'll have to search for =<<foo>= and =foo= separately.
+
+In the example below, the =parent-block= refers to 2 other child blocks for its definition.
+
+#+begin_comment
+The =,#+name: ...=, =,#+begin_src ...= and =,#+end_src= in the =org= source blocks have a leading comma but this comma is only for Org's own parser to disambiguate against actual source code blocks in this file. The leading comma is stripped during HTML export.
+#+end_comment
+
+#+caption: Sample Org-mode Noweb-style references
+#+begin_src org
+,#+name: parent-block
+,#+begin_src bash
+echo "Hello from the parent block"
+__NREF__child-block-1
+__NREF__child-block-2
+,#+end_src
+
+...
+
+,#+name: __NREF__child-block-1
+,#+begin_src bash
+echo "I am child 1"
+,#+end_src
+
+...
+
+,#+header: :noweb-ref __NREF__child-block-2
+,#+begin_src bash
+echo -n "I am "
+,#+end_src
+
+,#+header: :noweb-ref __NREF__child-block-2
+,#+begin_src bash
+echo "child 2"
+,#+end_src
+#+end_src
+
+This example illustrates the two ways to define a child block: either as a single code block with =#+name: __NREF__foo=, or as multiple blocks with =#+header: :noweb-ref __NREF__foo=. Lilac calls them [[monoblock][monoblocks]] and [[polyblock][polyblocks]] respectively. Polyblocks are concatenated together in the order they appear in the overall Org file; this final concatenated version is what gets inserted into the Noweb reference in the parent block.
+
+* How Lilac uses LP
+
+All source code is generated by /tangling/ this (=README.org=) Org file. This file is the single source of truth for basically everything. Some misc things like COPYRIGHT and LICENSE do not come from this file, but they are exceptions.
+
+Tangling is done by loading this file into Emacs and then running =(org-babel-tangle)=. This Org file is also the source of truth for the /woven/ HTML documentation (=README.html=), and similarly the HTML is generated by invoking =(lilac-publish)=. The outputs of both tangling and weaving are checked into version control.
+
+The =Makefile= in this repo is used as the main "driver" for both tangling and weaving.
+
+* Weaving (generating the docs)
+
+Weaving is conceptually simpler than tangling because there is no extra step --- the output is an HTML page and that is something that we can use directly (unlike program source code, which may require additional compilation into a binary, depending on the language). We also limit ourselves to only HTML for simplicity (in particular, we don't have to worry about page breaks).
+
+However, most of the code in [[file:lilac.el][=lilac.el=]] have to do with weaving because the default infrastructure that ships with Org mode is too rigid for our needs. For example, we make heavy use of Noweb-style [cite:@ramsey_1994] references, but also add in extensive HTML links to allow the reader to jump around code easily because Org does not cross-link these references by default.
+
+Weaving currently requires the following dependencies:
+
+| Dependency | Why                      |
+|------------+--------------------------|
+| [[https://www.gnu.org/software/make/][GNU Make]]   | to run "make"            |
+| [[https://www.gnu.org/software/emacs/][GNU Emacs]]  | for tangling and weaving |
+
+Note that all of the above can be brought in by using the [[https://github.com/NixOS/nix][Nix package manager]].
+
+We have a top-level =Makefile= so that we can run some =make= commands on the command line (instead of needing to invoke emacs directly).
+
+#+name: Makefile
+#+caption: Makefile
+#+begin_src makefile :tangle Makefile :eval no
+PROJ_ROOT := $(shell git rev-parse --show-toplevel)
+PROCS := $(shell nproc)
+define run_emacs
+	emacs $(2) --quick --batch --kill --load $(PROJ_ROOT)/lilac.el --eval="$(1)"
+endef
+
+all: test weave
+.PHONY: all
+
+__NREF__Makefile-tangle
+
+weave: build-html
+
+build-html: README.html
+.PHONY: build-html
+
+README.html: README.org citations.bib
+	$(call run_emacs,(batch-org-gen-css-and-exit \"README.org\"),)
+	$(call run_emacs,(lilac-publish),README.org)
+	sed -i 's/.csl-left-margin{float: left; padding-right: 0em/.csl-left-margin{float: left; padding-right: 1em/' README.html
+	sed -i 's/.csl-right-inline{margin: 0 0 0 1em/.csl-right-inline{margin: 0 0 0 2em/' README.html
+
+test: tangle
+	# TODO: Add unit tests
+.PHONY: test
+
+# Enter development environment.
+shell:
+	nix-shell --pure
+#+end_src
+
+** Emacs customizations for HTML export (lilac.el)
+
+The default Org mode defaults present two major problems:
+
+1. nondeterminism, and
+2. lack of cross-linking across Noweb references.
+
+Nondeterminism is problematic for us because it results in a different HTML file every time we run =org-babel-tangle=, /even if the Org files have not changed/. This is taken care of in Section [[* Fix non-determinism]].
+
+We define "cross-linking" to mean the act of linking to a child source code block whenever we reference it from a parent source code block, and vice versa. These links manifest themselves as blue and green boxes in this document.
+
+The reason why cross-linking is so important is because the source code blocks are interleaved with prose. And the order of code presented may not match the order of code in the tangled output. And sometimes the reader may just want to jump to a source code block just to see its implementation right away instead of waiting for the prose to catch up to it. Cross-linking makes it easier to navigate by source code blocks. Cross-linking is implemented in [[* HTML modifications]].
+
+#+name: lilac.el
+#+caption: lilac.el
+#+begin_src emacs-lisp :tangle lilac.el :eval no
+__NREF__lilac_dot_el-performance-optimization
+__NREF__lilac_dot_el-imports
+__NREF__lilac_dot_el-fix-nondeterminism
+__NREF__lilac_dot_el-lilac-publish
+__NREF__lilac_dot_el-autogenerate-css
+__NREF__lilac_dot_el-misc
+#+end_src
+
+*** Toplevel publishing function (=lilac-publish=)
+
+The toplevel function is =lilac-publish=. This actually publishes twice, with =lilac-publish-1= and =lilac-publish-2=. The reason we publish twice is because we need to examine the HTML output twice in order to build up a database of parent/child source code block links (which is then used to link between these parent/child source code blocks).
+
+Also note that we do some modifications to the Org buffer directly before exporting to HTML. The main reason is so that the source code blocks that are named =__NREF__...= get an automatic =#+caption: ...= text to go along with it (because for these Noweb-style blocks, the captions should always look uniform).
+
+#+name: __NREF__lilac_dot_el-lilac-publish
+#+begin_src emacs-lisp
+; This optimization can be used to crudely speed up weaving time by disabling
+; fontification (no syntax highlighting of source code blocks).
+(if (getenv "LILAC_LP_QUICK")
+    (progn
+      (message "LILAC_LP_QUICK set; invoking some cost-cutting measures")
+      (advice-add 'org-html-fontify-code :around #'lilac-disable-syntax-highlighting)))
+
+(defun lilac-publish ()
+  (interactive)
+  (lilac-publish-1)
+  (clrhash lilac-polyblock-names-totals)
+  (lilac-publish-2))
+
+;; This is here solely to populate the lilac-child-HTML_ID-hash-table.
+(defun lilac-publish-1 ()
+  (let (
+        __NREF__lilac-publish-modify-org
+        __NREF__lilac-publish-modify-HTML-1
+        __NREF__lilac-publish-use-css)
+    (org-html-export-to-html)))
+
+(defun lilac-publish-2 ()
+  (let (
+        __NREF__lilac-publish-modify-org
+        __NREF__lilac-publish-modify-HTML-2
+        __NREF__lilac-publish-use-css)
+    ;; Debugging
+    ;(message "lilac-child-HTML_ID-hash-table: %s" lilac-child-HTML_ID-hash-table)
+    ;(message "lilac-org_id-human_id-hash-table: %s" lilac-org_id-human_id-hash-table)
+    (org-html-export-to-html)))
+
+;; Modify Org buffer
+__NREF__smart-source-code-block-captions
+__NREF__UID-for-all-headlines
+__NREF__UID-for-all-polyblocks
+
+;; Modify HTML
+__NREF__lilac-html-filter-src-blocks
+__NREF__lilac-prettify-source-code-captions
+__NREF__lilac-human-readable-src-block-ids
+#+end_src
+
+**** Modify the Org buffer
+
+Here we modify the Org mode buffer, by using =org-export-before-parsing-hook=. This takes a list of functions that are free to modify the Org mode buffer before each Org element in the buffer gets converted into HTML.
+
+#+name: __NREF__lilac-publish-modify-org
+#+begin_src emacs-lisp
+(org-export-before-parsing-hook
+ '(lilac-noweb-source-code-block-captions
+   lilac-UID-for-all-headlines
+   lilac-UID-for-all-polyblocks))
+#+end_src
+
+As for the actual modifications, see:
+
+- =lilac-noweb-source-code-block-captions=: [[* Automatic captions for Noweb source code blocks]]
+- =lilac-UID-for-all-headlines=: [[* Human-readable UIDs (Headings, aka headlines)]]
+- =lilac-UID-for-all-polyblocks=: [[* Give polyblocks a =#+name: ...= field (HTML ID)]]
+
+In brief, the =lilac-UID-for-all-*= functions make it so that the links to headlines and source code blocks are both deterministic and human-readable. The =lilac-noweb-source-code-block-captions= function
+
+**** Modify the HTML
+
+This is useful for adding in final tweaks to the HTML that is difficult to accomplish at the Org-mode buffer level.
+
+Phase 1: In the first phase, we use the generated HTML data to populate the =child-HTML_ID-hash-table=. This data structure is used to link to child blocks from parent blocks.
+
+#+name: __NREF__lilac-publish-modify-HTML-1
+#+begin_src emacs-lisp
+(org-export-filter-src-block-functions
+ '(lilac-populate-child-HTML_ID-hash-table
+   lilac-populate-org_id-human_id-hash-table))
+#+end_src
+
+
+Phase 2: In this phase we perform the linking from parent blocks to child blocks.
+
+#+name: __NREF__lilac-publish-modify-HTML-2
+#+begin_src emacs-lisp
+(org-export-filter-src-block-functions
+ '(lilac-link-to-children-from-parent-body
+   lilac-prettify-source-code-captions))
+(org-export-filter-final-output-functions
+ '(lilac-replace-org_ids-with-human_ids))
+#+end_src
+
+**** Miscellaneous export settings
+
+Do not hardcode colors into the HTML. Instead refer to CSS class names, to be stylized by an external CSS file.
+
+#+name: __NREF__lilac-publish-use-css
+#+begin_src emacs-lisp
+(org-html-htmlize-output-type 'css)
+#+end_src
+
+*** Org modifications
+
+**** Automatic captions for Noweb source code blocks
+
+For the parent/child source code blocks, we simply build these up by having blocks named =#+name: __NREF__foo= or =#+header: :noweb-ref __NREF__foo=. Each of these blocks can also reference other blocks by having a line =__NREF__bar= inside its body. When defining such blocks, we really don't want to define the =#+caption: ...= part manually because it gets tedious rather quickly. Yet we still have to have these =#+caption: ...= bits (/for every =__NREF__...= block!/) because that's the only way that Org's HTML exporter knows how to label these blocks.
+
+The code in this section automatically generates =#+caption: ...= text for these =__NREF__...= blocks.
+
+We want each =#+caption: ...= text to have the following items:
+
+1. [[(NSCB_NAME)][=NSCB_NAME=]]: name of the Noweb source code block,
+2. [[(NSCB_POLYBLOCK_INDICATOR)][=NSCB_POLYBLOCK_INDICATOR=]]: an indicator to show whether this block is broken up over multiple blocks, and
+3. [[(NSCB_LINK_TO_PARENT)][=NSCB_LINK_TO_PARENT=]]: a link back up to a parent block (if any) where this block is used.
+
+/NSCB/ here means /Noweb source code block/. We loop through every source code block and insert a (=#+caption: ...=) text into the buffer. This modified buffer (with the three bits of information from above) is what is sent down the pipeline for final export to HTML (i.e., the buffer modification does not affect the actual buffer (=*.org= file)).
+
+So assume that we already have the smart captions in a sorted [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Association-Lists.html][association list]] (aka alist), where the KEY is the integer buffer position where this caption should be inserted, and the VALUE is the caption itself (a string), like this:
+
+#+caption: Caption locations
+#+begin_src elisp
+'((153  . "#+caption: ...")
+  (384  . "#+caption: ...")
+  (555  . "#+caption: ...")
+  (684  . "#+caption: ...")
+  (1051 . "#+caption: ..."))
+#+end_src
+
+We can use the KEY to go to that buffer position and insert the caption. However the insertion operation mutates the buffer. This means if we perform the insertions top-to-bottom, the subsequent KEY values will become obsolete. The trick then is to just do the insertions in reverse order (bottom-to-top), so that the remaining KEY values remain valid. This is what we do below, where =smart-captions= is an alist like the one just described.
+
+#+name: __NREF__smart-source-code-block-captions
+#+begin_src emacs-lisp
+(defun lilac-noweb-source-code-block-captions (_backend)
+  (let* ((parent-blocks
+           __NREF__parent-blocks)
+         (child-parent-hash-table
+           __NREF__child-parent-hash-table)
+         (all-src-blocks
+           __NREF__all-src-blocks)
+         (smart-captions
+           __NREF__smart-captions))
+    (cl-loop for smart-caption in (reverse smart-captions) do
+      (let ((pos (car smart-caption))
+            (caption (cdr smart-caption)))
+        (goto-char pos)
+        (insert caption)))))
+
+__NREF__smart-source-code-block-captions-helpers
+#+end_src
+
+(We'll get to the helper functions =smart-source-code-block-captions-helpers= later as they obscure the big picture.)
+
+Now we just have to construct =smart-captions=. The main difficulty is the construction of [[(NSCB_LINK_TO_PARENT)][=NSCB_LINK_TO_PARENT=]], so most of the code will be concerned about child-parent associations.
+
+Why do we even need these source code blocks to link back to their parents? The point is to make things easier to navigate. For example, if we have
+
+#+caption: Sample Org-mode Noweb-style references
+#+begin_src org
+,#+name: parent-block
+,#+begin_src bash
+echo "Hello from the parent block"
+__NREF__child-block-1
+__NREF__child-block-2
+,#+end_src
+
+...
+
+,#+name: __NREF__child-block-1
+,#+begin_src bash
+echo "I am child 1"
+,#+end_src
+
+...
+
+,#+header: :noweb-ref __NREF__child-block-2
+,#+begin_src bash
+echo -n "I am "
+,#+end_src
+
+,#+header: :noweb-ref __NREF__child-block-2
+,#+begin_src bash
+echo "child 2"
+,#+end_src
+#+end_src
+
+and we export this to HTML, ideally we would want both =__NREF__child-block-1= and each of the =__NREF__child-block-2= blocks to include an HTML link back up to =parent-block=. This would make it easier to skim the document and not get too lost (any time you are looking at any particular source code block, you would be able to just click on the link back to the parent (if there is one) to see a higher-level view).
+
+The key idea here is to build a hash table (=child-parent-hash-table=) where the KEY is a child source code block and the VALUE is the parent block. Then in order to construct [[(NSCB_LINK_TO_PARENT)][=NSCB_LINK_TO_PARENT=]] we just do a lookup against this hash table to find the parent (if any).
+
+The first thing we need is a list of parent source code blocks. We consider a source code block a parent block if it has any Noweb references within its body.
+
+#+name: __NREF__parent-blocks
+#+begin_src emacs-lisp
+;; parent-blocks is a let* binding, not a function call.
+(org-element-map (org-element-parse-buffer) 'src-block
+  (lambda (src-block)
+     (if (lilac-is-parent-block src-block) src-block)))
+#+end_src
+
+Then we construct the =child-parent-hash-table=. For each parent block, we get all of its children (=child-names=), and use this data to construct a child-parent association:
+
+#+name: __NREF__child-parent-hash-table
+#+begin_src emacs-lisp
+(let ((hash-table (make-hash-table :test 'equal)))
+  (mapc
+   (lambda (parent-block)
+    (let* ((parent-name (org-element-property :name parent-block))
+           (parent-body (org-element-property :value parent-block))
+           (child-names (lilac-get-noweb-children parent-body)))
+      (mapc (lambda (child-name) (puthash child-name parent-name hash-table)) child-names)))
+   parent-blocks)
+  hash-table)
+#+end_src
+
+Now that we have the child-parent associations, we have to look at all source code blocks and check if
+
+1. this source code block's name shows up at all in =child-parent-hash-table=, and if so
+2. add a link to the parent ([[(NSCB_LINK_TO_PARENT)][=NSCB_LINK_TO_PARENT=]]).
+
+Let's grab all source code blocks:
+
+#+name: __NREF__all-src-blocks
+#+begin_src emacs-lisp
+(org-element-map (org-element-parse-buffer) 'src-block 'identity)
+#+end_src
+
+And now we can finally construct =smart-captions=:
+
+#+name: __NREF__smart-captions
+#+begin_src emacs-lisp -r -l ";ref:%s"
+(-remove 'null
+  (cl-loop for src-block in all-src-blocks collect
+    (let* ((child (lilac-get-src-block-name src-block))
+           (child-name (car child))
+           (NSCB_NAME (format "=%s= " child-name))                  ;ref:NSCB_NAME
+           (NSCB_POLYBLOCK_INDICATOR (car (cdr child)))             ;ref:NSCB_POLYBLOCK_INDICATOR
+           (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
+           (polyblock-counter-incremented (puthash child-name (+ 1 polyblock-counter) lilac-polyblock-names-totals))
+           (parent (gethash child-name child-parent-hash-table))
+           (pos (org-element-property :begin src-block))
+           (NSCB_LINK_TO_PARENT                                     ;ref:NSCB_LINK_TO_PARENT
+            (if parent (format " [[%s][PARENT]]" parent) ""))
+           (smart-caption
+            (concat
+              "#+caption: "
+              NSCB_NAME
+              NSCB_POLYBLOCK_INDICATOR
+              NSCB_LINK_TO_PARENT
+              "\n")))
+      (when parent (cons pos smart-caption)))))
+#+end_src
+
+We used some helper functions up in [[__NREF__smart-source-code-block-captions][=__NREF__smart-source-code-block-captions=]]; let's examine them now.
+
+=lilac-is-parent-block= checks whether a source code block is a parent (contains noweb references to other child blocks in the form =__NREF__child-name=).
+
+#+header: :noweb-ref __NREF__smart-source-code-block-captions-helpers
+#+begin_src emacs-lisp
+(defun lilac-is-parent-block (src-block)
+  (let ((body (org-element-property :value src-block)))
+    (lilac-get-noweb-children body)))
+#+end_src
+
+=lilac-get-noweb-children= extracts all Noweb references in the form "=__NREF__foo=" from a given multiline string, returning a list of all such references. This function expects at most 1 Noweb reference per line. The return type is a list of strings.
+
+#+header: :noweb-ref __NREF__smart-source-code-block-captions-helpers
+#+begin_src emacs-lisp
+(defun lilac-get-noweb-children (s)
+  (let* ((lines (split-string s "\n"))
+         (refs (-remove 'null
+                 (mapcar
+                  (lambda (line)
+                   (if (string-match (lilac-nref-rx nil) line)
+                       (match-string-no-properties 1 line)))
+                  lines))))
+    refs))
+#+end_src
+
+=lilac-get-noweb-ref-polyblock-name= gets the string =__NREF__foo= in a =#+header: :noweb-ref __NREF__foo= line for a source code block.
+
+#+header: :noweb-ref __NREF__smart-source-code-block-captions-helpers
+#+begin_src emacs-lisp
+(defun lilac-get-noweb-ref-polyblock-name (source-code-block)
+  (let* ((headers (org-element-property :header source-code-block))
+         (noweb-ref-name
+          (nth 0
+           (-remove 'null
+            (mapcar
+             (lambda (header)
+               (if (string-match ":noweb-ref \\(.+\\)" header)
+                   (match-string-no-properties 1 header)))
+             headers)))))
+    noweb-ref-name))
+#+end_src
+
+Note that a child source block can have two ways of defining its name. The first is with the direct =#+name: __NREF__foo= style ([[monoblock][monoblock]]), and the second way is with a line like =#+header: :noweb-ref __NREF__foo= ([[polyblock][polyblock]]). Here =lilac-get-src-block-name= grabs the name of a (child) source code block, taking into account these two styles. For polyblock names, we mark it as such with a =(polyblock)= string, which is used later for the [[(NSCB_POLYBLOCK_INDICATOR)][=NSCB_POLYBLOCK_INDICATOR=]].
+
+#+header: :noweb-ref __NREF__smart-source-code-block-captions-helpers
+#+begin_src emacs-lisp
+(defun lilac-get-src-block-name (src-block)
+  (let* ((name-direct (org-element-property :name src-block))
+         (name-indirect (lilac-get-noweb-ref-polyblock-name src-block)))
+    (if name-direct
+        `(,name-direct "")
+        `(,name-indirect "(polyblock)"))))
+#+end_src
+
+**** Human-readable UIDs (Headings, aka headlines)
+
+By default Org does a terrible job of naming HTML =id= fields for headings. By default it uses a randomly-generated number. In [[* Do not use random numbers for the HTML "id" attribute]] we tweak this behavior to use a deterministic, incrementing number starting from 0. However while this solution gets rid of the nondeterminism, it still results in human-unfriendly =id= attributes because they are all numeric (e.g. =org00000a1=, =org00000f3=, etc).
+
+For headings, we can do better because in practice they already mostly have unique contents, which should work most of the time to act as an =id=. In other words, we want all headings to have HTML IDs that are patterned after their contents. This way we can have IDs like =some-heading-name-1= (where the trailing =-1= is only used to disambiguate against another heading of the same name) instead of =org00000a1= (numeric hex).
+
+For each heading, we insert a =CUSTOM_ID= property. This makes Org refer to this =CUSTOM_ID= instead of the numeric =org...= link names. We append this headline property just below every headline we find in the buffer. The actual construction of the =CUSTOM_ID= (=headline-UID= in the code below) is done by =lilac-get-unique-id=.
+
+#+Name: __NREF__UID-for-all-headlines
+#+begin_src emacs-lisp
+(defun lilac-UID-for-all-headlines (_backend)
+  (let* ((all-headlines
+           (org-element-map (org-element-parse-buffer) 'headline 'identity))
+
+         (headline-uid-hash-table (make-hash-table :test 'equal))
+         (headline-UIDs
+           (-remove 'null
+             (cl-loop for headline in all-headlines collect
+               (let* ((headline-UID (lilac-get-unique-id headline headline-uid-hash-table))
+                      ;; Get the position just after the headline (just underneath it).
+                      (pos (progn
+                             (goto-char (org-element-property :begin headline))
+                             (re-search-forward "\n"))))
+                 (cons pos (concat
+                            ":PROPERTIES:\n"
+                            ":CUSTOM_ID: " headline-UID "\n"
+                            ":END:\n")))))))
+    ; (message "custom ID insertions: %s" headline-UIDs)
+    (cl-loop for pos-insertion in (reverse headline-UIDs) do
+        (let ((pos (car pos-insertion))
+              (insertion (cdr pos-insertion)))
+            (goto-char pos)
+            (insert insertion)))))
+
+__NREF__get-unique-id
+#+end_src
+
+=lilac-get-unique-id= converts a given headline to its canonical form (every non-word character converted to a dash) and performs a lookup against the hash table. If the entry exists, it looks up a =entry-N= value in a loop with =N= increasing until it sees that no such key exists (at which point we know that we have a unique ID).
+
+#+name: __NREF__get-unique-id
+#+begin_src emacs-lisp
+(defun lilac-get-unique-id (headline hash-table)
+  (let* ((name (org-element-property :raw-value headline))
+         (disambiguation-number 0)
+         (key (concat "h-" (lilac-normalize-string name)))
+         (val (gethash key hash-table)))
+    ;; Discard the key if a value already exists. This drives up the
+    ;; disambiguation number.
+    (while val
+      (setq disambiguation-number (+ 1 disambiguation-number))
+      (setq key (concat "h-"
+                        (lilac-normalize-string
+                         (format "%s-%s" name disambiguation-number))))
+      (setq val (gethash key hash-table)))
+    (puthash key t hash-table)
+    key))
+
+(defun lilac-normalize-string (s)
+  (string-trim
+    (replace-regexp-in-string "[^A-Za-z0-9]" "-" s)
+    "-"
+    "-"))
+#+end_src
+
+**** Give polyblocks a =#+name: ...= field (HTML ID)
+
+Only source code blocks that have a =#+name: ...= field (org name field) get an HTML ID (org ID) assigned to it. The problem with polyblocks is that they are not assigned an org name field by default.
+
+Of course, we still want all polyblock to have an HTML ID, which can then be extracted by [[(lilac-get-src-block-HTML_ID)][=lilac-get-src-block-HTML_ID=]] to build up the =child-HTML_ID-hash-table= in [[* Link noweb references (link to child block from parent block)]]. If we don't do this then parent source code blocks won't be able to link to the polyblock at all.
+
+(Monoblocks with a =#+name: ...= field get a unique HTML ID assigned to it in the form =orgN= where =N= is a hexadecimal number. By default Org generates a random number for =N=, but we use a simple counter that increments, starting from 0 (see [[*Do not use random numbers for the HTML "id" attribute]]).)
+
+What we can do is inject a =#+name: ___polyblock-N= line (where =N= is an incrementing number) into the beginning of the source code section of all polyblocks. Then we can construct an HTML link to any polyblock.
+
+Note that we only name the first polyblock in the set of polyblocks that share the same Noweb reference name (=__NREF__foo=). This is so that we link to the first polyblock child from the parent block (because the assumption is that we will want to start reading about this set of polyblocks beginning with the first block).
+
+#+name: __NREF__UID-for-all-polyblocks
+#+begin_src emacs-lisp
+(defun lilac-UID-for-all-polyblocks (_)
+  (let* ((all-src-blocks
+           __NREF__all-src-blocks)
+         (polyblock-id 0)
+         (noweb-ref-last "")
+         (polyblock-UIDs
+           (-remove 'null
+             (cl-loop for src-block in all-src-blocks collect
+               (let* ((noweb-ref (lilac-get-noweb-ref-polyblock-name src-block))
+                      (is-polyblock
+                       (and
+                         noweb-ref
+                         (not (org-element-property :name src-block))))
+                      (pos (org-element-property :begin src-block))
+                      (name-field-with-uid (format "#+name: ___polyblock-%s\n" polyblock-id)))
+                 (when (and
+                         is-polyblock
+                         (not (string= noweb-ref noweb-ref-last)))
+                   (setq noweb-ref-last noweb-ref)
+                   (setq polyblock-id (+ 1 polyblock-id))
+                   (cons pos name-field-with-uid)))))))
+    (cl-loop for polyblock-UID in (reverse polyblock-UIDs) do
+        (let ((pos (car polyblock-UID))
+              (name-field-with-uid (cdr polyblock-UID)))
+            (goto-char pos)
+            (insert name-field-with-uid)))))
+#+end_src
+
+*** HTML modifications
+
+**** Use human-readable HTML IDs for source code links
+
+Recall that there are 2 types of source code blocks: [[monoblock][monoblocks]] and [[polyblock][polyblocks]].
+
+Polyblocks do get a name field attached to them during the [[*Give polyblocks a =#+name: ...= field (HTML ID)][Org modification stage]], in the format =___polyblock-N=. These names are for HTML link generation only, because the user won't see them --- they will instead just see =org000012= or some such. In fact, all monoblocks are also given these random-looking (and unstable) =org...= HTML IDs.
+
+And therein lies the problem: if a user decides to bookmark a particular source code block, whether a monoblock or polyblock, they will link to an =org...=-style ID and chances are that this link will break over time.
+
+This is exactly the same problem we have for headlines. For headlines we solved the problem with a [[* Human-readable UIDs (Headings, aka headlines)][hash table]], and we need to do the same thing here. The major difference, though, is that unlike headlines which can accept a =CUSTOM_ID= Org property, source code blocks have no such facility. So instead of modifying the buffer (as we do for headlines), we have to modify the final HTML output instead.
+
+The solution is to simply look at all source code block links, then modify the ~id=...~ part so that it looks like a more human-readable ID. We can extract the human-readable ID by looking at the smart captions inside the =<label>...</label>= area for both monoblocks and polyblocks. And then it's just a matter of doing a basic search-and-replace across the entire buffer (HTML file).
+
+We have to do a search-and-replace across the entire file because we may also have manual links to source code blocks (although --- maybe it's just not worth it because we can't refer to polyblocks anyway by name).
+
+#+name: __NREF__lilac-human-readable-src-block-ids
+#+begin_src emacs-lisp -r -l ";ref:%s"
+; Define a global hash table for mapping Org-mode-generated ids (that look like "org00012") for source code blocks to a more human-readable ID.
+(setq lilac-org_id-human_id-hash-table (make-hash-table :test 'equal))
+
+(defun lilac-populate-org_id-human_id-hash-table (src-block-html backend info)
+  (when (org-export-derived-backend-p backend 'html)
+    (let* ((block-name (lilac-get-src-block-name-from-html src-block-html))
+           (orgid (lilac-get-src-block-HTML_ID src-block-html)))
+      (when orgid
+        (puthash orgid block-name lilac-org_id-human_id-hash-table))
+      src-block-html)))
+
+(defun lilac-replace-org_ids-with-human_ids (entire-html backend info)
+  (when (org-export-derived-backend-p backend 'html)
+    (let ((html-oneline (lilac-to-single-line entire-html)))
+      (maphash
+       (lambda (k v)
+        (when (and k v)
+         (setq html-oneline
+               (replace-regexp-in-string
+                (rx-to-string `(and " id=" (* (not "\"")) "\"" ,k "\""))
+                (format " id=\"%s\"" v) html-oneline))
+         (setq html-oneline
+               (replace-regexp-in-string
+                (rx-to-string `(and " href=" (* (not "\"")) "\"#" ,k "\""))
+                (format " href=\"#%s\"" v) html-oneline))))
+       lilac-org_id-human_id-hash-table)
+      (lilac-to-multi-line html-oneline))))
+#+end_src
+
+**** Pretty source code captions
+
+Here there are basically 3 things we have to keep track of:
+
+1. the outer =<div>= that encloses the entire source code block,
+2. the =<label>=, if any (it may not exist), and
+3. the =<pre>= content.
+
+We only care about source code blocks with a =<label>= because that determines whether we have a "Listing: ..." or not. We just need to save the 3 bits of information, and then:
+
+1. print the outer =<div ...>=,
+2. print the =<pre>= content, and
+3. print the =<label>= content but as a =<div>=.
+
+For the last step, we want to additionally parse the inner "Listing N ... PARENT-link" text and transform it with reordering and also additional metadata information such as ~<span class="...">~ tags.
+
+We also save the =NSCB_POLYBLOCK_INDICATOR= with the =polyblock-indicator= variable and display it.
+
+#+name: __NREF__lilac-prettify-source-code-captions
+#+begin_src emacs-lisp
+(setq lilac-polyblock-names (make-hash-table :test 'equal))
+(setq lilac-polyblock-names-totals (make-hash-table :test 'equal))
+
+(defun lilac-prettify-source-code-captions (src-block-html backend info)
+  (when (org-export-derived-backend-p backend 'html)
+    ;; Break up source block into 3 subparts --- the leading <div ...>, the <label ...></label> (if any) and
+    ;; <pre ...></pre>.
+    ;; Then run the linkifying logic against only the body, and then return the
+    ;; original label and new body.
+    (let* ((div-caption-body (lilac-get-source-block-html-parts-without-newlines src-block-html))
+           (leading-div (nth 0 div-caption-body))
+           (body (nth 2 div-caption-body))
+           (pre-id-match
+             (string-match
+               (rx-to-string
+                 '(and
+                       "<pre "
+                       (* (not ">"))
+                       "id=\""
+                       (group (+ (not "\"")))))
+               body))
+           (pre-id
+             (if pre-id-match
+                 (match-string-no-properties 1 body)
+                 "#deadlink"))
+           (body-with-newlines
+            (lilac-to-multi-line body))
+           (caption (nth 1 div-caption-body))
+           (caption-parts
+             (let* ((caption-match
+                      (string-match "<label [^>]+>\\(.*?\\)</label>" caption)))
+               (if caption-match
+                   (match-string-no-properties 1 caption)
+                   "")))
+           (source-block-name-match
+             (string-match
+               (rx-to-string
+                 '(and
+                       "<code>"
+                       (group (+ (not "<")))
+                       "</code>"))
+               caption-parts))
+           ;; A source code block is anonymous if: (1) it does not have a "#+name: ..." line, or (2) it does not have a "#+header: :noweb-ref ..." line.
+           (source-block-name
+             (if source-block-name-match
+                 (match-string-no-properties 1 caption-parts)
+                 "anonymous"))
+           ;; This is just used for the side effect of recording the
+           ;; source-block-name, to be used for the fallback-id.
+           (source-block-counter (gethash source-block-name lilac-polyblock-names 0))
+           (source-block-counter-incremented (puthash source-block-name (+ 1 source-block-counter) lilac-polyblock-names))
+           (source-block-name-styled
+             (cond ((string-prefix-p "__NREF__" source-block-name)
+                    (concat
+                      "<span class=\"lilac-caption-source-code-block-name\">"
+                      (string-remove-prefix "__NREF__" source-block-name)
+                      "</span>"))
+                   (t
+                    (concat
+                      "<span class=\"lilac-caption-source-code-block-name\">"
+                      "&#x1f4c4; "
+                      source-block-name
+                      "</span>"))))
+           (polyblock-chain-total (gethash source-block-name lilac-polyblock-names-totals 0))
+           (polyblock-chain-location (if (= polyblock-chain-total 0) "" (format "(%s/%s) " source-block-counter-incremented polyblock-chain-total)))
+           (polyblock-indicator
+             (if (string-match "\(polyblock\)" caption-parts)
+                 polyblock-chain-location ""))
+           (parent-id-match
+             (string-match
+               (rx-to-string
+                 '(and
+                       " <a href=\""
+                       (group (+ (not "\"")))))
+               caption-parts))
+           (parent-id
+             (if parent-id-match
+                 (format "<span class=\"lilac-caption-parent-link\"><a href=\"%s\">%s</a></span>"
+                   (match-string-no-properties 1 caption-parts) (string-remove-prefix "__NREF__" source-block-name))
+                 ""))
+           ;; For polyblocks, only the first (head) block gets an id field for a
+           ;; <pre> tag. The rest (tail) don't have this field so they would
+           ;; normally get assigned a deadlink. To avoid this, use a counter for
+           ;; the parent-id, because this parent-id is shared across all
+           ;; polyblocks. Then use this with the parent-id to generate an
+           ;; alternate, fallback-id. This way the tail polyblocks get assigned
+           ;; a unique (meaningful) ID and not just "##deadlink".
+           (fallback-id
+             (if (string= pre-id "#deadlink")
+                 (format "%s-%s" source-block-name source-block-counter-incremented)
+                 pre-id))
+           (pre-tag-match
+             (string-match
+               (rx-to-string
+                 '(and
+                       "<pre "
+                       (group (* (not ">")))
+                       ">"))
+               body))
+           (pre-tag-entire (match-string-no-properties 0 body))
+           (pre-tag-contents (match-string-no-properties 1 body))
+           (body-with-replaced-pre
+             (if pre-id-match
+                 body-with-newlines
+                 (string-replace pre-tag-entire
+                                 (concat "<pre " pre-tag-contents
+                                         (format " id=\"%s\"" fallback-id) ">") body-with-newlines)))
+           (link-symbol
+             (format "<span class=\"lilac-caption-link-symbol\"><a href=\"#%s\">&#x1f517;</a></span>"
+               fallback-id))
+           (caption-without-listing-prefix (replace-regexp-in-string "<span.+?span>" "" caption))
+           (caption-text
+            (if (s-blank? parent-id)
+                (concat
+                  "<div class=\"lilac-caption\">"
+                    caption-without-listing-prefix
+                    link-symbol
+                  "</div>")
+                (concat
+                  "<div class=\"lilac-caption\">"
+                    parent-id
+                    polyblock-indicator
+                    link-symbol
+                  "</div>")))
+           )
+      (if (s-blank? caption)
+       src-block-html
+       (concat
+        leading-div
+          "<div class=\"lilac-pre-with-caption\">"
+            caption-text
+            body-with-replaced-pre
+          "</div>"
+        "</div>")))))
+
+__NREF__lilac-get-source-block-html-parts-without-newlines
+#+end_src
+
+This is a helper function to parse the HTML output for a source code block.
+
+#+name: __NREF__lilac-get-source-block-html-parts-without-newlines
+#+begin_src emacs-lisp
+(defun lilac-get-source-block-html-parts-without-newlines (src-block-html)
+    (let* ((one-line (lilac-to-single-line src-block-html))
+           (leading-div
+             (let ((div-match
+                    (string-match "<div [^>]+>" one-line)))
+               (match-string-no-properties 0 one-line)))
+           (caption
+             (let* ((caption-match
+                      (string-match "<label [^>]+>.*?</label>" one-line)))
+               (if caption-match
+                   (match-string-no-properties 0 one-line)
+                   "")))
+           (body (progn (string-match "<pre [^>]+>.*?</pre>" one-line)
+                        (match-string-no-properties 0 one-line))))
+      `(,leading-div ,caption ,body)))
+#+end_src
+
+**** Link noweb references (link to child block from parent block)
+
+Consider the following code:
+
+#+caption: Sample Org-mode Noweb-style references
+#+begin_src org
+,#+name: parent-block
+,#+begin_src bash
+echo "Hello from the parent block"
+__NREF__child-block-1
+__NREF__child-block-2
+,#+end_src
+
+...
+
+,#+name: __NREF__child-block-1
+,#+begin_src bash
+echo "I am child 1"
+,#+end_src
+
+...
+
+,#+header: :noweb-ref __NREF__child-block-2
+,#+begin_src bash
+echo -n "I am "
+,#+end_src
+
+,#+header: :noweb-ref __NREF__child-block-2
+,#+begin_src bash
+echo "child 2"
+,#+end_src
+#+end_src
+
+What we want to do is to make the =__NREF__child-block-1= and =__NREF__child-block-2= references inside =parent-block= to link to their definitions, so that the reader can just click on them to go to see how they're defined. Unfortunately Org mode doesn't do this by default so we have to do this ourselves.
+
+In the case of =__NREF__child-block-2=, it is defined in multiple blocks so we would want to link to the very first block.
+
+We cannot use a =org-export-before-parsing-hook= like we did in [[__NREF__lilac-publish-modify-org][=__NREF__lilac-publish-modify-org=]] because at that stage of processing, we are dealing with Org mode syntax. Any modifications we make to the parent source code block will be treated as text upon HTML export. Thankfully Org mode allows customizations on generated HTML through the =org-export-filter-src-block-functions= variable. This variable is analogous to =org-export-before-parsing-hook=, but operates at the HTML level (not at the Org syntax level) for source code blocks, which is exactly what we need.
+
+So we have to craft valid HTML links (not Org links) to the child source code blocks. For this we need the actual =id= part of the HTML =<pre>...= block that will hold the source code. That is, the algorithm should be something like:
+
+1. for every parent source code block,
+2. for every child block (noweb) referenced in the body, insert an HTML link to the child block (lookup in =child-HTML_ID-hash-table=).
+
+The only thing remaining is the construction of =child-HTML_ID-hash-table=. We can construct this by mapping through all source code blocks and getting the name which can be just drawn from the =<label ...>= HTML tag, thanks to the smart captions we inserted for all child blocks earlier in [[* Automatic captions for Noweb source code blocks]].
+
+#+name: __NREF__lilac-html-filter-src-blocks
+#+begin_src emacs-lisp -r -l ";ref:%s"
+; Define a global hash table for mapping child source block names to their HTML IDs.
+(setq lilac-child-HTML_ID-hash-table (make-hash-table :test 'equal))
+
+(defun lilac-populate-child-HTML_ID-hash-table (src-block-html backend info)
+  (when (org-export-derived-backend-p backend 'html)
+    (let* ((child-name (lilac-get-src-block-name-from-html src-block-html))
+           (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html)))
+      (if child-HTML_ID ; Skip blocks that lack an HTML ID, such as non-head polyblocks.
+        (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
+      ; Return src-block-html as-is (no modifications).
+      src-block-html)))
+
+(defun lilac-get-src-block-name-from-html (src-block-html)
+  (let* ((match-nref (string-match
+                      (concat
+                       "<label.+?<code>"
+                       (lilac-nref-rx nil)
+                       "</code>")
+                      src-block-html))
+         (match-raw (if (not match-nref)
+                        (string-match
+                         (rx-to-string
+                          '(and
+                            "<label"
+                            (+ (not ">"))
+                            ">"
+                            (group (*? anychar))
+                            "</label>"))
+                         src-block-html)))
+         (matched-contents (match-string-no-properties 1 src-block-html)))
+    (if match-nref
+        matched-contents
+        (if match-raw
+            (lilac-clean-up-match-raw matched-contents)))))
+
+(defun lilac-clean-up-match-raw (s)
+  (let* ((normalized (lilac-normalize-string s))
+         (rx (rx-to-string
+                '(and
+                  "Listing-"
+                  (+ (any digit))
+                  (+ "-")
+                  "span"
+                  (* "-")
+                  (group (+ anychar)))))
+         (match (string-match rx normalized)))
+    (if match
+        (match-string-no-properties 1 normalized)
+        normalized)))
+
+(defun lilac-get-src-block-HTML_ID (src-block-html) ;ref:lilac-get-src-block-HTML_ID
+  (let ((match (string-match "<pre [^>]+?id=\"\\([^\"]+\\)\">" src-block-html)))
+    (if match (match-string-no-properties 1 src-block-html))))
+
+(defun lilac-link-to-children-from-parent-body (src-block-html backend info)
+  (when (org-export-derived-backend-p backend 'html)
+    ;; Break up source block into 3 subparts --- the leading <div ...>, the <label ...></label> (if any) and
+    ;; <pre ...></pre>.
+    ;; Then run the linkifying logic against only the body, and then return the
+    ;; original label and new body.
+    (let* ((div-caption-body (lilac-get-source-block-html-parts-without-newlines src-block-html))
+           (leading-div (nth 0 div-caption-body))
+           (caption (nth 1 div-caption-body))
+           (body (nth 2 div-caption-body))
+           (body-linkified-without-newlines
+            (replace-regexp-in-string
+             (lilac-nref-rx nil)
+             (lambda (child-name-text)
+                 (let* ((HTML_ID (gethash child-name-text lilac-child-HTML_ID-hash-table)))
+                  (if HTML_ID
+                      (concat "<span class=\"lilac-child-link-from-parent\"><a href=\"#" HTML_ID "\">"
+                              (string-remove-prefix "__NREF__" child-name-text)
+                              "</a></span>")
+                      child-name-text)))
+             body))
+           (body-linkified-with-newlines
+            (lilac-to-multi-line body-linkified-without-newlines)))
+      (concat leading-div caption body-linkified-with-newlines "</div>"))))
+
+(defun lilac-to-single-line (s)
+  (replace-regexp-in-string "\n" "<<<NEWLINE>>>" s))
+
+(defun lilac-to-multi-line (s)
+  (replace-regexp-in-string "<<<NEWLINE>>>" "\n" s))
+
+__NREF__custom-noweb-delimiters
+#+end_src
+
+**** Custom Noweb delimiters
+
+Note that we need to evaluate this lisp code if we want to run ~C-c C-v t~ to tangle code blocks properly in an interactive manner from an Emacs editing session.
+
+#+name: __NREF__custom-noweb-delimiters
+#+begin_src emacs-lisp :noweb no
+(setq org-babel-noweb-wrap-start "__NREF__")
+(setq org-babel-noweb-wrap-end "")
+
+(defun lilac-nref-rx (match-optional-params)
+  (rx-to-string
+   (lilac-nref-rx-primitive match-optional-params)))
+
+(defun lilac-nref-rx-primitive (match-optional-params)
+  (if match-optional-params
+   `(group
+           "__NREF__"
+          (any alpha) ;; Noweb reference must start with a letter...
+          ;; ...and must be followed by letters,numbers,dashes,underscores,periods...
+          (* (or (any alnum) "-" "_" "."))
+          ;; ...and may terminate with a "(...)" where the "..." may be an empty string, or some other argument.
+          (* (or "()"
+                 (and "("
+                      (* (not ")"))
+                      ")"))))
+   `(group
+          "__NREF__"
+          (any alpha)
+          (* (or (any alnum) "-" "_" ".")))))
+
+;; Customize noweb delimiters. Unlike traditional << and >> delimiters, we just use the "__NREF__" prefix as our only delimiter. This has the advantage of being encoded the same way into HTML, which makes our HTML modifications easier and more consistent across different source code languages.
+;; See https://emacs.stackexchange.com/a/73720/13006.
+(defun org-babel-noweb-wrap (&optional regexp)
+  "Return regexp matching a Noweb reference.
+
+Match any reference, or only those matching REGEXP, if non-nil.
+When matching, reference is stored in match group 1."
+  (lilac-nref-rx t))
+#+end_src
+
+*** Autogenerate CSS for syntax highlighting of source code blocks
+
+See https://emacs.stackexchange.com/questions/31439/how-to-get-colored-syntax-highlighting-of-code-blocks-in-asynchronous-org-mode-e, specifically https://emacs.stackexchange.com/a/36759.
+
+Generate =syntax-highlighting.css= and quit emacs. This function is designed to be run from the command line on a fresh emacs instance (dedicated OS process). Unfortunately, by itself it is almost useless (see [[__NREF__enable-syntax-highlighting-from-batch-mode][=__NREF__enable-syntax-highlighting-from-batch-mode=]]).
+
+#+name: __NREF__lilac_dot_el-autogenerate-css
+#+begin_src emacs-lisp
+(defun batch-org-gen-css-and-exit (org-file)
+  (find-file org-file)
+  (font-lock-flush)
+  (font-lock-fontify-buffer)
+  (org-html-htmlize-generate-css)
+  (with-current-buffer "*html*"
+    (write-file "syntax-highlighting.css"))
+  (kill-emacs))
+
+;; Without this, batch-org-gen-css-and-exit produces a near-empty CSS file.
+__NREF__enable-syntax-highlighting-from-batch-mode
+#+end_src
+
+Sadly, =batch-org-gen-css-and-exit= by itself generates a near-blank CSS file. So we have to use code from https://emacs.stackexchange.com/questions/38437/org-mode-batch-export-missing-syntax-highlighting:
+
+#+name: __NREF__enable-syntax-highlighting-from-batch-mode
+#+begin_src emacs-lisp
+(require 'font-lock)
+(require 'subr-x) ;; for `when-let'
+
+(unless (boundp 'maximal-integer)
+  (defconst maximal-integer (lsh -1 -1)
+    "Maximal integer value representable natively in emacs lisp."))
+
+(defun face-spec-default (spec)
+  "Get list containing at most the default entry of face SPEC.
+Return nil if SPEC has no default entry."
+  (let* ((first (car-safe spec))
+     (display (car-safe first)))
+    (when (eq display 'default)
+      (list (car-safe spec)))))
+
+(defun face-spec-min-color (display-atts)
+  "Get min-color entry of DISPLAY-ATTS pair from face spec."
+  (let* ((display (car-safe display-atts)))
+    (or (car-safe (cdr (assoc 'min-colors display)))
+    maximal-integer)))
+
+(defun face-spec-highest-color (spec)
+  "Search face SPEC for highest color.
+That means the DISPLAY entry of SPEC
+with class 'color and highest min-color value."
+  (let ((color-list (cl-remove-if-not
+             (lambda (display-atts)
+               (when-let ((display (car-safe display-atts))
+                  (class (and (listp display)
+                          (assoc 'class display)))
+                  (background (assoc 'background display)))
+             (and (member 'light (cdr background))
+                  (member 'color (cdr class)))))
+             spec)))
+    (cl-reduce (lambda (display-atts1 display-atts2)
+         (if (> (face-spec-min-color display-atts1)
+            (face-spec-min-color display-atts2))
+             display-atts1
+           display-atts2))
+           (cdr color-list)
+           :initial-value (car color-list))))
+
+(defun face-spec-t (spec)
+  "Search face SPEC for fall back."
+  (cl-find-if (lambda (display-atts)
+        (eq (car-safe display-atts) t))
+          spec))
+
+; This is slightly tweaked from the original, because the incoming "face" value can look like (fixed-pitch face-name) --- so we take the second element.
+(defun my-face-attribute (face attribute &optional frame inherit)
+  "Get FACE ATTRIBUTE from `face-user-default-spec' and not from `face-attribute'."
+  (let* ((face-spec (face-user-default-spec (if (listp face) (car (cdr face)) face)))
+     (display-attr (or (face-spec-highest-color face-spec)
+               (face-spec-t face-spec)))
+     (attr (cdr display-attr))
+     (val (or (plist-get attr attribute) (car-safe (cdr (assoc attribute attr))))))
+    ;; (message "attribute: %S" attribute) ;; for debugging
+    (when (and (null (eq attribute :inherit))
+           (null val))
+      (let ((inherited-face (my-face-attribute face :inherit)))
+    (when (and inherited-face
+           (null (eq inherited-face 'unspecified)))
+      (setq val (my-face-attribute inherited-face attribute)))))
+    ;; (message "face: %S attribute: %S display-attr: %S, val: %S" face attribute display-attr val) ;; for debugging
+    (or val 'unspecified)))
+
+(advice-add 'face-attribute :override #'my-face-attribute)
+
+;; Debugging
+(defmacro print-args-and-ret (fun)
+  "Prepare FUN for printing args and return value."
+  `(advice-add (quote ,fun) :around
+           (lambda (oldfun &rest args)
+         (let ((ret (apply oldfun args)))
+           (message ,(concat "Calling " (symbol-name fun) " with args %S returns %S.") args ret)
+           ret))
+           '((name "print-args-and-ret"))))
+
+; (print-args-and-ret htmlize-faces-in-buffer)
+; (print-args-and-ret htmlize-get-override-fstruct)
+; (print-args-and-ret htmlize-face-to-fstruct)
+; (print-args-and-ret htmlize-attrlist-to-fstruct)
+; (print-args-and-ret face-foreground)
+; (print-args-and-ret face-background)
+; (print-args-and-ret face-attribute)
+#+end_src
+
+*** Fix non-determinism
+
+There are some things that Org mode does that annoyingly break determinism. Here we take care to set things right so that we can have reprducible, stable HTML output.
+
+**** Do not insert current time as HTML comment
+
+Org mode also injects an HTML comment (not visible to the user) to record the time that the HTML was generated. We disable this because it breaks deterministic output. See [[https://emacs.stackexchange.com/questions/50117/how-to-disable-commented-date-in-org-mode-html-export][this link]] for more info.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-fix-nondeterminism
+#+begin_src emacs-lisp
+(setq org-export-time-stamp-file nil)
+#+end_src
+
+**** Do not insert current Org mode version
+
+By default Org mode appends visible metadata at the bottom of the HTML document, including the Org version used to generate the document. We suppress this information.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-fix-nondeterminism
+#+begin_src emacs-lisp
+(setq org-html-postamble nil)
+#+end_src
+
+**** Do not use random numbers for the HTML "id" attribute
+
+Stop randomized ids from being generated every time. Instead count from 0 and work our way up.
+
+See https://www.reddit.com/r/orgmode/comments/aagmfh/comment/hk6upbf.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-fix-nondeterminism
+#+begin_src emacs-lisp
+(defun org-export-deterministic-reference (references)
+  (let ((new (length references)))
+     (while (rassq new references) (setq new (+ new 1)))
+     new))
+(advice-add #'org-export-new-reference :override #'org-export-deterministic-reference)
+#+end_src
+
+*** Misc settings
+
+Disable backup files for =lilac.el= (that look like =lilac.el~=) when we invoke Emacs from the [[Makefile][Makefile]].
+
+#+header: :noweb-ref __NREF__lilac_dot_el-misc
+#+begin_src emacs-lisp
+(setq make-backup-files nil)
+(setq org-src-preserve-indentation t)
+
+; See https://stackoverflow.com/a/27285582/437583.
+(defun lilac-test-file-name ()
+  (concat "test_" (file-name-nondirectory (directory-file-name (file-name-directory (buffer-file-name))))  ".py"))
+#+end_src
+
+**** Use HTML5 export, not XML (to un-break MathJax)
+
+By default on Org 9.6, MathJax settings (JavaScript snippet) gets wrapped in a CDATA tag, and we run into the same problem described on this email that has gone unanswered: https://www.mail-archive.com/emacs-orgmode@gnu.org/msg140821.html. It appears that this is because the document is exported as XML, not HTMl. Setting the document type to =html5=, as below, appears to make the CDATA tag magically disappear.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-misc
+#+begin_src emacs-lisp
+(setq org-html-doctype "html5")
+#+end_src
+
+*** Automatically link headlines (h2 to h6)
+
+Every HTML element =h2= to =h6= (which encode the Org mode headlines) already come with a unique ID, but they are only ever linked from the Table of Contents. The code here makes it so that the headlines are linked to themselves, which makes it easy for users to link to them directly when they're reading the page.
+
+The code here is taken from https://github.com/listx/listx_blog/blame/8e6e7b533d89f77a6939e5eda9fd9d990d25a7a9/misc.js#L1.
+
+#+name: misc.js
+#+caption: misc.js
+#+begin_src js :tangle misc.js :eval no
+$(function() {
+    $("h2,h3,h4,h5,h6").each(function() {
+        var $this = $(this);
+        var text = $this.text();
+        var href = $this.attr("id");
+        var href_parts = [];
+        var href_custom = "";
+        if (typeof href === "undefined") {
+            href_custom = "";
+            href_parts = text.split(" ");
+            for (i = 0; i < href_parts.length; i++) {
+                href_custom += href_parts[i] + '-';
+            }
+            href_custom = href_custom.slice(0, -1).toLowerCase();
+            console.log(href_custom);
+        }
+
+        $this.text("");
+        if (typeof href === "undefined") {
+            href = href_custom;
+            $this.attr("id", href);
+        }
+        $this.prepend($("<a>").attr("href", '#' +
+            href).addClass("section-headline").text(text));
+    });
+});
+#+end_src
+
+Now we just have to refer to the above in the snippet below, to be included in [[* Create =lilac.theme= file][=lilac.theme=]].
+
+#+name: __NREF__automatically_link_headlines
+#+begin_src org
+# Automatically link headlines.
+,#+HTML_HEAD: <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+,#+HTML_HEAD: <script src="misc.js"></script>
+#+end_src
+
+Linkifying itself makes all the headlines blue (the default color for links). This is a bit distracting, so make them black.
+
+#+name: __NREF__css-source-code-section-headlines
+#+begin_src css
+a.section-headline {
+    color: black;
+}
+#+end_src
+
+*** Imports
+
+#+name: __NREF__lilac_dot_el-imports
+#+begin_src emacs-lisp
+;; Built-in packages (distributed with Emacs).
+(require 'tex-mode)
+(require 'elisp-mode)
+
+;; Third-party packages (checked in as Git submodules)
+(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/s.el"))
+(require 's)
+(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/compat.el"))
+(require 'compat)
+(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/dash.el"))
+(require 'dash)
+(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/dr-qubit.org"))
+(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/f.el"))
+(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/parsebib"))
+(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/citeproc-el"))
+(require 'citeproc)
+(require 'oc-csl)
+(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/emacs-htmlize"))
+(require 'htmlize)
+(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/magit/lisp"))
+(require 'magit-section)
+(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/nix-mode"))
+(require 'nix-mode)
+#+end_src
+
+*** Performance optimizations
+
+This "optimization" is inspired by [[https://www.reddit.com/r/emacs/comments/mmdeei/comment/gtvryvy]]. There, the idea was to ignore hooks associated with major modes for the source code blocks, Because they use =org-publish= and we don't, we can't use the same code but we can still use the same idea. In particular, =org-html-export-to-html= calls =org-html-fontify-code= to perform syntax highlighting of source code blocks.
+
+During ad-hoc tests, this shaves off a few seconds. This was determined by comparing the regular =weave= target versus the =weave-nocolor= target.
+
+#+name: __NREF__lilac_dot_el-performance-optimization
+#+begin_src emacs-lisp
+; Set garbage-collection threshold to 16 GiB.
+(setq gc-cons-threshold #x400000000)
+
+(defun lilac-disable-syntax-highlighting (_orig-func &rest args)
+  (apply 'lilac-org-html-fontify-code args))
+(defun lilac-org-html-fontify-code (code lang) (org-html-encode-plain-text code))
+
+__NREF__lilac_dot_el-profiling
+#+end_src
+
+**** Profiling
+
+#+name: __NREF__lilac_dot_el-profiling
+#+begin_src emacs-lisp
+(defun lilac-publish-profile ()
+  (interactive)
+  (profiler-start 'cpu)
+  (lilac-publish)
+  (profiler-stop)
+  (profiler-report)
+  (profiler-report-write-profile "emacs-profile-weave.txt") t)
+
+(defun lilac-tangle-profile ()
+  (interactive)
+  (profiler-start 'cpu)
+  (org-babel-tangle)
+  (profiler-stop)
+  (profiler-report)
+  (profiler-report-write-profile "emacs-profile-tangle.txt") t)
+#+end_src
+
+** Additional (hand-tweaked) CSS
+
+We add some additional CSS tweaks on top of what we get from Org.
+
+#+name: style.css
+#+caption: style.css
+#+begin_src css :tangle style.css
+a {
+    color: #0000ff;
+}
+
+body {
+    font-size: 1.5em;
+    margin: 0 100px;
+}
+
+body, p, li, h1, h2, h3, h4, h5, h6, legend {
+    font-family: "Source Serif Pro, serif";
+}
+
+p, li {
+    line-height: 1.2em;
+}
+
+p, ol, ul {
+    margin-bottom: 0.5em;
+}
+
+li {
+    margin-bottom: 0;
+}
+
+table {
+    margin: 1em auto 0em auto;
+}
+table, th, td {
+    border: 1px solid black;
+    border-collapse: collapse;
+}
+th, td {
+    padding: 3px 6px;
+}
+
+/* Center all images. */
+img {
+    display: block;
+    margin: 0 auto;
+}
+
+/* Increase text size for smaller sections. */
+h3, h4, h5, h6 {
+    margin-top: 1em;
+    margin-bottom: 1em;
+    font-size: 18pt;
+}
+h7 {
+    font-weight: bold;
+    font-size: 18pt;
+}
+.outline-7 {
+    margin-top: 1em;
+}
+
+code {
+    background: #eee;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+    white-space: nowrap;
+}
+
+thead {
+    background: #eee;
+}
+
+pre {
+    font-size: 0.8em;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
+__NREF__css-source-code-section-headlines
+__NREF__css-source-code-block-body
+__NREF__css-source-code-block-captions
+__NREF__css-source-code-block-child-link-from-parent
+#+end_src
+
+*** Source code block body
+
+#+name: __NREF__css-source-code-block-body
+#+begin_src css
+.org-src-container {
+    margin: 1em 100px 1em 50px;
+}
+
+.org-src-container pre {
+    margin: 0;
+    font-family: "monospace";
+    border-width: 0;
+    scroll-margin-top: 100px;
+    border-style: solid;
+    border-width: 2px;
+    border-color: #999;
+    border-radius: 5px;
+}
+
+/* Source code block body. */
+.org-src-container pre.src {
+    background-color: #f3f3f3;
+}
+
+#+end_src
+
+*** Source code block captions
+
+#+name: __NREF__css-source-code-block-captions
+#+begin_src css
+.lilac-caption {
+    font-family: "monospace";
+    text-align: right;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    padding-top: 2px;
+    padding-bottom: 5px;
+}
+
+.lilac-caption label {
+    margin-right: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 5px;
+    border-radius: 5px;
+    border-style: solid;
+    border-bottom-style: none;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    background-color: #ddd;
+    border-color: #999;
+}
+
+.lilac-caption-source-code-block-name {
+    color: #444444;
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+.lilac-caption-parent-link {
+    margin-top: 5px;
+    margin-right: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-weight: bold;
+}
+.lilac-caption-parent-link a {
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 5px;
+    color: #21618c;
+    background-color: #d6eaf8;
+    border-radius: 5px;
+    border-style: solid;
+    border-bottom-style: none;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.lilac-caption-parent-link a:hover {
+    color: #7d3c98;
+    background-color: #e8daef;
+    text-decoration: none;
+}
+
+.lilac-caption-link-symbol a {
+    margin-right: 5px;
+}
+.lilac-caption-link-symbol a:hover {
+    text-decoration: none;
+}
+
+.lilac-caption-listing-number {
+    margin-right: 5px;
+}
+#+end_src
+
+*** Links to child source block from parent
+
+#+name: __NREF__css-source-code-block-child-link-from-parent
+#+begin_src css
+.lilac-child-link-from-parent {
+    font-weight: bold;
+}
+.lilac-child-link-from-parent a {
+    color: #21618c;
+    background-color: #d6eaf8;
+    border-radius: 5px;
+    border-style: solid;
+    margin: 5px 0;
+    padding: 2px 5px;
+    display: inline-block;
+}
+.lilac-child-link-from-parent a:hover {
+    color: #7d3c98;
+    background-color: #e8daef;
+    text-decoration: none;
+}
+#+end_src
+
+** Create =lilac.theme= file
+
+Allow HTML exports of Org files (inluding this one) to pull in CSS and JavaScript that we've defined for Lilac by referring to a single theme file. The inspiration for this setup comes from https://gitlab.com/OlMon/org-themes.
+
+#+name: lilac.theme
+#+caption: lilac.theme
+#+begin_src org :tangle lilac.theme :eval no
+# Include additional CSS styles.
+,#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
+,#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="style.css" />
+
+__NREF__automatically_link_headlines
+#+end_src
+
+** Ignore woven HTML from =git diff=
+
+Typically we only need to look at the rendered HTML output in a web browser as the raw HTML diff output is extremely difficult to parse as a human. So by default we ask Git to exclude it from =git diff= by treating them as binary data.
+
+#+name: .gitattributes
+#+caption: .gitattributes
+#+begin_src gitattributes :tangle .gitattributes :eval no
+,* -diff
+,**/*.org diff
+,**/.gitattributes diff
+,**/.gitmodules diff
+,**/.gitignore diff
+#+end_src
+
+In order to still show the HTML textual diff, we can run =git diff --text=.
+
+*** =git add -p=
+
+Note that the above setting to treat HTML files as binary data prevents them from being considered for =git add -p=. In order to add them, use =git add -u= instead.
+
+** gitignore
+
+#+name: .gitignore
+#+caption: .gitignore
+#+begin_src gitignore :tangle .gitignore :eval no
+,**/*.auctex-auto
+tangle
+weave
+#+end_src
+
+* Tangling (generating the source code)
+
+Tangling is simply the act of collecting the =#+begin_src ... #+end_src= blocks and arranging them into the various target (source code) files. Every source code block is given a unique name.
+
+We simply tangle the =README.org= file (this file) to get all the code we need.
+
+#+name: __NREF__Makefile-tangle
+#+begin_src makefile
+# Currently we don't have any optimizations for tangling, but we still set LILAC_LP_QUICK=1 anyway to align with what we do for weave-quick.
+$(README_org_output) tangle &: README.org
+	@echo tangling in parallel
+	LILAC_LP_QUICK=1 make -C $(PROJ_ROOT) -j$(PROCS) $(README_org_output)
+	touch tangle
+
+README_org_output = citations.bib lilac.el lilac.theme .gitattributes .gitignore Makefile misc.js shell.nix style.css syntax-highlighting.css
+
+$(README_org_output) &: README.org
+	# Generate the toplevel Makefile (this file) and image/Makefile (overwriting
+	# them if necessary). In a way this bootstraps the whole
+	# literate-programming pipeline. Note that these files are different than
+	# the ones used to compile the tangled source code.
+	$(call run_emacs,(org-babel-tangle),README.org)
+
+define tangle_tests
+
+$(1) $(2) &: $(3)
+	@echo tangling $(3)
+	$(call run_emacs,(org-babel-tangle),$(3))
+
+endef
+#+end_src
+
+* Development environment (Nix shell)
+
+This is taken from https://github.com/tweag/haskell-stack-nix-example/blob/b9383e35416a2b0e21fbc97ed079538f9f395b6a/shell.nix#L1.
+
+This is the main development shell and brings in all of our dependencies to build all of our code.
+
+#+name: shell.nix
+#+caption: shell.nix
+#+begin_src nix :tangle shell.nix :eval no
+let
+  # Nixpkgs snapshot.
+  sources = import ./package/nix/sources.nix;
+  # The final "pkgs" attribute with all the bells and whistles of our overlays.
+  pkgs = import sources.nixpkgs {};
+in
+
+# This is our development shell.
+pkgs.mkShell ({
+  buildInputs = [
+    # Tangling and weaving for Literate Programming.
+    pkgs.emacs
+
+    # Misc
+    pkgs.git
+    pkgs.less
+  ];
+})
+#+end_src
+
+* Glossary
+
+- <<monoblock>> *monoblock*: an Org mode source code block with a =#+name: ...= field. This block is an independent block and there are no other blocks with the same name.
+- *Noweb*: A literate programming tool from 1989 that still works and from which [[Org mode][Org mode]] borrows heavily using [[noweb-ref][Noweb-style references]]. See [[https://en.wikipedia.org/wiki/Noweb][Wikipedia]].
+- <<noweb-ref>> *noweb-ref*: aka "Noweb-style reference". A Noweb-style reference is just a name (string) that refers to a monoblock or polyblock. See [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][the Org manual]].
+- <<Org mode>> *Org mode*: An Emacs major mode for =*.org= files, where "major mode" means that it provides things like syntax highlighting and keyboard shortcuts for =*.org= text files if you are using Emacs. For Lilac, the important thing is that we use Org mode as a literate programming tool. See [[https://orgmode.org/][Org mode]].
+- <<polyblock>> *polyblock*: an Org mode source code block without a =#+name: ...= field, but which has a =#+header: :noweb-ref ...= field. Other blocks with the same Noweb-ref name are concatenated together when they are tangled. Polyblocks are used in cases where we would like to break up a single block into smaller pieces for explanatory purposes. In all other cases, monoblocks are preferable, unless the source code block is not to be tangled and is only for explanatory purposes in the woven output.
+- *source code block*: An Org mode facility that allows you to enclose a multiline piece of text with =#+begin_src ...= and =#+end_src= lines.
+
+* References
+
+#+begin_src bibtex :tangle citations.bib :eval no :exports none
+@article{knuth_1984,
+    title = {Literate Programming},
+    volume = {27},
+    issn = {0010-4620, 1460-2067},
+    url = {https://academic.oup.com/comjnl/article-lookup/doi/10.1093/comjnl/27.2.97},
+    doi = {10.1093/comjnl/27.2.97},
+    language = {en},
+    number = {2},
+    urldate = {2023-05-03},
+    journal = {The Computer Journal},
+    author = {Knuth, D. E.},
+    month = feb,
+    year = {1984},
+    pages = {97--111},
+}
+
+@article{ramsey_1994,
+    title = {Literate programming simplified},
+    author = {Ramsey, Norman},
+    year = {1994},
+    journal = {IEEE Software},
+    volume = {11},
+    issn = {1937-4194},
+    doi = {10.1109/52.311070},
+    abstract = {Literate programming tools let you arrange the parts of a program in any order and extract documentation and code from the same source file. The author argues that language-dependence and feature complexity have hampered acceptance of these tools, then offers a simpler alternative.{\textless}{\textgreater}},
+    number = {5},
+    month = sep,
+    keywords = {Documentation, Code standards, Writing, Program processors, Computer languages, Operating systems, Internet, Strips, Pipelines},
+    pages = {97--105},
+}
+#+end_src
+
+#+CITE_EXPORT: csl ~/prog/lilac/deps/styles/ieee.csl
+#+PRINT_BIBLIOGRAPHY:
