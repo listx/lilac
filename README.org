@@ -275,9 +275,9 @@ The code in this section automatically generates =#+caption: ...= text for these
 
 We want each =#+caption: ...= text to have the following items:
 
-1. [[(NSCB_NAME)][=NSCB_NAME=]]: name of the Noweb source code block,
-2. [[(NSCB_POLYBLOCK_INDICATOR)][=NSCB_POLYBLOCK_INDICATOR=]]: an indicator to show whether this block is broken up over multiple blocks, and
-3. [[(NSCB_LINK_TO_PARENT)][=NSCB_LINK_TO_PARENT=]]: a link back up to a parent block (if any) where this block is used.
+- [[(NSCB_NAME)][=NSCB_NAME=]] :: name of the Noweb source code block,
+- [[(NSCB_POLYBLOCK_INDICATOR)][=NSCB_POLYBLOCK_INDICATOR=]] :: an indicator to show whether this block is broken up over multiple blocks, and
+- [[(NSCB_LINKS_TO_PARENTS)][=NSCB_LINKS_TO_PARENTS=]] :: a link back up to a parent block (if any) where this block is used; can contain more than 1 parent if multiple parents refer to this same child block
 
 /NSCB/ here means /Noweb source code block/. We loop through every source code block and insert a (=#+caption: ...=) text into the buffer. This modified buffer (with the three bits of information from above) is what is sent down the pipeline for final export to HTML (i.e., the buffer modification does not affect the actual buffer (=*.org= file)).
 
@@ -299,8 +299,8 @@ We can use the KEY to go to that buffer position and insert the caption. However
 (defun lilac-noweb-source-code-block-captions (_backend)
   (let* ((parent-blocks
            __NREF__parent-blocks)
-         (child-parent-hash-table
-           __NREF__child-parent-hash-table)
+         (child-parents-hash-table
+           __NREF__child-parents-hash-table)
          (all-src-blocks
            __NREF__all-src-blocks)
          (smart-captions
@@ -316,7 +316,7 @@ __NREF__smart-source-code-block-captions-helpers
 
 (We'll get to the helper functions =smart-source-code-block-captions-helpers= later as they obscure the big picture.)
 
-Now we just have to construct =smart-captions=. The main difficulty is the construction of [[(NSCB_LINK_TO_PARENT)][=NSCB_LINK_TO_PARENT=]], so most of the code will be concerned about child-parent associations.
+Now we just have to construct =smart-captions=. The main difficulty is the construction of [[(NSCB_LINKS_TO_PARENTS)][=NSCB_LINKS_TO_PARENTS=]], so most of the code will be concerned about child-parent associations.
 
 Why do we even need these source code blocks to link back to their parents? The point is to make things easier to navigate. For example, if we have
 
@@ -351,7 +351,7 @@ echo "child 2"
 
 and we export this to HTML, ideally we would want both =__NREF__child-block-1= and each of the =__NREF__child-block-2= blocks to include an HTML link back up to =parent-block=. This would make it easier to skim the document and not get too lost (any time you are looking at any particular source code block, you would be able to just click on the link back to the parent (if there is one) to see a higher-level view).
 
-The key idea here is to build a hash table (=child-parent-hash-table=) where the KEY is a child source code block and the VALUE is the parent block. Then in order to construct [[(NSCB_LINK_TO_PARENT)][=NSCB_LINK_TO_PARENT=]] we just do a lookup against this hash table to find the parent (if any).
+The key idea here is to build a hash table (=child-parents-hash-table=) where the KEY is a child source code block and the VALUE is the parent block(s). Then in order to construct [[(NSCB_LINKS_TO_PARENTS)][=NSCB_LINKS_TO_PARENTS=]] we just do a lookup against this hash table to find the parent(s), if any.
 
 The first thing we need is a list of parent source code blocks. We consider a source code block a parent block if it has any Noweb references within its body.
 
@@ -363,9 +363,9 @@ The first thing we need is a list of parent source code blocks. We consider a so
      (if (lilac-is-parent-block src-block) src-block)))
 #+end_src
 
-Then we construct the =child-parent-hash-table=. For each parent block, we get all of its children (=child-names=), and use this data to construct a child-parent association:
+Then we construct the =child-parents-hash-table=. For each parent block, we get all of its children (=child-names=), and use this data to construct a child-parent association:
 
-#+name: __NREF__child-parent-hash-table
+#+name: __NREF__child-parents-hash-table
 #+begin_src emacs-lisp
 (let ((hash-table (make-hash-table :test 'equal)))
   (mapc
@@ -373,15 +373,21 @@ Then we construct the =child-parent-hash-table=. For each parent block, we get a
     (let* ((parent-name (org-element-property :name parent-block))
            (parent-body (org-element-property :value parent-block))
            (child-names (lilac-get-noweb-children parent-body)))
-      (mapc (lambda (child-name) (puthash child-name parent-name hash-table)) child-names)))
+      (mapc (lambda (child-name)
+              (let* ((parents (gethash child-name hash-table)))
+                (if parents
+                  ; cl-pushnew to dedup parents (when a single parent refers to the same child more than once).
+                  (puthash child-name (cl-pushnew parent-name parents) hash-table)
+                  (puthash child-name (list parent-name) hash-table))))
+            child-names)))
    parent-blocks)
   hash-table)
 #+end_src
 
 Now that we have the child-parent associations, we have to look at all source code blocks and check if
 
-1. this source code block's name shows up at all in =child-parent-hash-table=, and if so
-2. add a link to the parent ([[(NSCB_LINK_TO_PARENT)][=NSCB_LINK_TO_PARENT=]]).
+1. this source code block's name shows up at all in =child-parents-hash-table=, and if so
+2. add a link to the parent ([[(NSCB_LINKS_TO_PARENTS)][=NSCB_LINKS_TO_PARENTS=]]).
 
 Let's grab all source code blocks:
 
@@ -402,18 +408,22 @@ And now we can finally construct =smart-captions=:
            (NSCB_POLYBLOCK_INDICATOR (car (cdr child)))             ;ref:NSCB_POLYBLOCK_INDICATOR
            (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
            (polyblock-counter-incremented (puthash child-name (+ 1 polyblock-counter) lilac-polyblock-names-totals))
-           (parent (gethash child-name child-parent-hash-table))
+           (parents (gethash child-name child-parents-hash-table))
+           (parents-zipped (lilac-enumerate parents))
            (pos (org-element-property :begin src-block))
-           (NSCB_LINK_TO_PARENT                                     ;ref:NSCB_LINK_TO_PARENT
-            (if parent (format " [[%s][PARENT]]" parent) ""))
+           (NSCB_LINKS_TO_PARENTS                                   ;ref:NSCB_LINKS_TO_PARENTS
+            (mapconcat (lambda (parent-with-idx)
+                         (format " [[%s][%S]]"
+                                 (nth 1 parent-with-idx)
+                                 (+ 1 (nth 0 parent-with-idx)))) parents-zipped " "))
            (smart-caption
             (concat
               "#+caption: "
               NSCB_NAME
               NSCB_POLYBLOCK_INDICATOR
-              NSCB_LINK_TO_PARENT
+              NSCB_LINKS_TO_PARENTS
               "\n")))
-      (when parent (cons pos smart-caption)))))
+      (when parents (cons pos smart-caption)))))
 #+end_src
 
 We used some helper functions up in [[__NREF__smart-source-code-block-captions][=__NREF__smart-source-code-block-captions=]]; let's examine them now.
@@ -469,6 +479,48 @@ Note that a child source block can have two ways of defining its name. The first
     (if name-direct
         `(,name-direct "")
         `(,name-indirect "(polyblock)"))))
+#+end_src
+
+Next we have some helpers to enumerate through a list just like in Python. The index starts at 0 (same as Python).
+
+#+header: :noweb-ref __NREF__smart-source-code-block-captions-helpers
+#+begin_src emacs-lisp
+; See https://stackoverflow.com/a/33989966/437583.
+(defun lilac-zip (xs ys)
+  (cond
+   ((or (null xs) (null ys)) ())
+   (t (cons (list (car xs) (car ys)) (lilac-zip (cdr xs) (cdr ys))))))
+
+(defun lilac-indices (size)
+  (let ((idx 0)
+        (lst ()))
+    (while (< idx size)
+      (push idx lst)
+      (setq idx (1+ idx)))
+    (reverse lst)))
+
+(defun lilac-enumerate-orig (lst)
+  (lilac-zip (lilac-indices (length lst)) lst))
+
+(defun lilac-enumerate (lst &optional start)
+  (let ((ret ()))
+    (cl-loop for index from (if start start 0)
+           for item in lst
+           do (push (list index item) ret))
+    (reverse ret)))
+
+; See https://emacs.stackexchange.com/a/7150.
+(defun lilac-matches (regexp s &optional group)
+  "Get a list of all regexp matches in a string"
+  (if (= (length s) 0)
+      ()
+      (save-match-data
+        (let ((pos 0)
+              (matches ()))
+          (while (string-match regexp s pos)
+            (push (match-string (if group group 0) s) matches)
+            (setq pos (match-end 0)))
+          matches))))
 #+end_src
 
 **** Human-readable UIDs (Headings, aka headlines)
@@ -638,7 +690,7 @@ We only care about source code blocks with a =<label>= because that determines w
 2. print the =<pre>= content, and
 3. print the =<label>= content but as a =<div>=.
 
-For the last step, we want to additionally parse the inner "Listing N ... PARENT-link" text and transform it with reordering and also additional metadata information such as ~<span class="...">~ tags.
+For the last step, we want to additionally parse the inner "Listing N ... 0 [1 2 3 ...]" text and transform it with reordering and also additional metadata information such as ~<span class="...">~ tags.
 
 We also save the =NSCB_POLYBLOCK_INDICATOR= with the =polyblock-indicator= variable and display it.
 
@@ -672,6 +724,7 @@ We also save the =NSCB_POLYBLOCK_INDICATOR= with the =polyblock-indicator= varia
            (body-with-newlines
             (lilac-to-multi-line body))
            (caption (nth 1 div-caption-body))
+           ; caption-parts just captures whatever substring is inside the <label> tags.
            (caption-parts
              (let* ((caption-match
                       (string-match "<label [^>]+>\\(.*?\\)</label>" caption)))
@@ -712,18 +765,20 @@ We also save the =NSCB_POLYBLOCK_INDICATOR= with the =polyblock-indicator= varia
            (polyblock-indicator
              (if (string-match "\(polyblock\)" caption-parts)
                  polyblock-chain-location ""))
-           (parent-id-match
-             (string-match
+           (parent-id-regexp
                (rx-to-string
                  '(and
                        " <a href=\""
-                       (group (+ (not "\"")))))
-               caption-parts))
-           (parent-id
-             (if parent-id-match
-                 (format "<span class=\"lilac-caption-parent-link\"><a href=\"%s\">%s</a></span>"
-                   (match-string-no-properties 1 caption-parts) (string-remove-prefix "__NREF__" source-block-name))
-                 ""))
+                       (group (+ (not "\""))))))
+           (parent-ids-with-idx (lilac-enumerate (lilac-matches parent-id-regexp caption-parts 1) 1))
+           (parent-links
+             (mapconcat (lambda (parent-id-with-idx)
+                          (let ((parent-id (car (cdr parent-id-with-idx)))
+                                (idx (car parent-id-with-idx)))
+                             (format "<span class=\"lilac-caption-parent-link\"><a href=\"%s\">%s</a></span>"
+                               parent-id
+                               (if (= idx 1) (string-remove-prefix "__NREF__" source-block-name) idx))))
+                        parent-ids-with-idx ""))
            ;; For polyblocks, only the first (head) block gets an id field for a
            ;; <pre> tag. The rest (tail) don't have this field so they would
            ;; normally get assigned a deadlink. To avoid this, use a counter for
@@ -756,16 +811,16 @@ We also save the =NSCB_POLYBLOCK_INDICATOR= with the =polyblock-indicator= varia
                fallback-id))
            (caption-without-listing-prefix (replace-regexp-in-string "<span.+?span>" "" caption))
            (caption-text
-            (if (s-blank? parent-id)
+            (if parent-links
                 (concat
                   "<div class=\"lilac-caption\">"
-                    caption-without-listing-prefix
+                    parent-links
+                    polyblock-indicator
                     link-symbol
                   "</div>")
                 (concat
                   "<div class=\"lilac-caption\">"
-                    parent-id
-                    polyblock-indicator
+                    caption-without-listing-prefix
                     link-symbol
                   "</div>")))
            )

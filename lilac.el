@@ -100,14 +100,20 @@
            (org-element-map (org-element-parse-buffer) 'src-block
              (lambda (src-block)
                 (if (lilac-is-parent-block src-block) src-block))))
-         (child-parent-hash-table
+         (child-parents-hash-table
            (let ((hash-table (make-hash-table :test 'equal)))
              (mapc
               (lambda (parent-block)
                (let* ((parent-name (org-element-property :name parent-block))
                       (parent-body (org-element-property :value parent-block))
                       (child-names (lilac-get-noweb-children parent-body)))
-                 (mapc (lambda (child-name) (puthash child-name parent-name hash-table)) child-names)))
+                 (mapc (lambda (child-name)
+                         (let* ((parents (gethash child-name hash-table)))
+                           (if parents
+                             ; cl-pushnew to dedup parents (when a single parent refers to the same child more than once).
+                             (puthash child-name (cl-pushnew parent-name parents) hash-table)
+                             (puthash child-name (list parent-name) hash-table))))
+                       child-names)))
               parent-blocks)
              hash-table))
          (all-src-blocks
@@ -121,18 +127,22 @@
                       (NSCB_POLYBLOCK_INDICATOR (car (cdr child)))             ;ref:NSCB_POLYBLOCK_INDICATOR
                       (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
                       (polyblock-counter-incremented (puthash child-name (+ 1 polyblock-counter) lilac-polyblock-names-totals))
-                      (parent (gethash child-name child-parent-hash-table))
+                      (parents (gethash child-name child-parents-hash-table))
+                      (parents-zipped (lilac-enumerate parents))
                       (pos (org-element-property :begin src-block))
-                      (NSCB_LINK_TO_PARENT                                     ;ref:NSCB_LINK_TO_PARENT
-                       (if parent (format " [[%s][PARENT]]" parent) ""))
+                      (NSCB_LINKS_TO_PARENTS                                   ;ref:NSCB_LINKS_TO_PARENTS
+                       (mapconcat (lambda (parent-with-idx)
+                                    (format " [[%s][%S]]"
+                                            (nth 1 parent-with-idx)
+                                            (+ 1 (nth 0 parent-with-idx)))) parents-zipped " "))
                       (smart-caption
                        (concat
                          "#+caption: "
                          NSCB_NAME
                          NSCB_POLYBLOCK_INDICATOR
-                         NSCB_LINK_TO_PARENT
+                         NSCB_LINKS_TO_PARENTS
                          "\n")))
-                 (when parent (cons pos smart-caption)))))))
+                 (when parents (cons pos smart-caption)))))))
     (cl-loop for smart-caption in (reverse smart-captions) do
       (let ((pos (car smart-caption))
             (caption (cdr smart-caption)))
@@ -168,6 +178,42 @@
     (if name-direct
         `(,name-direct "")
         `(,name-indirect "(polyblock)"))))
+; See https://stackoverflow.com/a/33989966/437583.
+(defun lilac-zip (xs ys)
+  (cond
+   ((or (null xs) (null ys)) ())
+   (t (cons (list (car xs) (car ys)) (lilac-zip (cdr xs) (cdr ys))))))
+
+(defun lilac-indices (size)
+  (let ((idx 0)
+        (lst ()))
+    (while (< idx size)
+      (push idx lst)
+      (setq idx (1+ idx)))
+    (reverse lst)))
+
+(defun lilac-enumerate-orig (lst)
+  (lilac-zip (lilac-indices (length lst)) lst))
+
+(defun lilac-enumerate (lst &optional start)
+  (let ((ret ()))
+    (cl-loop for index from (if start start 0)
+           for item in lst
+           do (push (list index item) ret))
+    (reverse ret)))
+
+; See https://emacs.stackexchange.com/a/7150.
+(defun lilac-matches (regexp s &optional group)
+  "Get a list of all regexp matches in a string"
+  (if (= (length s) 0)
+      ()
+      (save-match-data
+        (let ((pos 0)
+              (matches ()))
+          (while (string-match regexp s pos)
+            (push (match-string (if group group 0) s) matches)
+            (setq pos (match-end 0)))
+          matches))))
 (defun lilac-UID-for-all-headlines (_backend)
   (let* ((all-headlines
            (org-element-map (org-element-parse-buffer) 'headline 'identity))
@@ -386,6 +432,7 @@ When matching, reference is stored in match group 1."
            (body-with-newlines
             (lilac-to-multi-line body))
            (caption (nth 1 div-caption-body))
+           ; caption-parts just captures whatever substring is inside the <label> tags.
            (caption-parts
              (let* ((caption-match
                       (string-match "<label [^>]+>\\(.*?\\)</label>" caption)))
@@ -426,18 +473,20 @@ When matching, reference is stored in match group 1."
            (polyblock-indicator
              (if (string-match "\(polyblock\)" caption-parts)
                  polyblock-chain-location ""))
-           (parent-id-match
-             (string-match
+           (parent-id-regexp
                (rx-to-string
                  '(and
                        " <a href=\""
-                       (group (+ (not "\"")))))
-               caption-parts))
-           (parent-id
-             (if parent-id-match
-                 (format "<span class=\"lilac-caption-parent-link\"><a href=\"%s\">%s</a></span>"
-                   (match-string-no-properties 1 caption-parts) (string-remove-prefix "__NREF__" source-block-name))
-                 ""))
+                       (group (+ (not "\""))))))
+           (parent-ids-with-idx (lilac-enumerate (lilac-matches parent-id-regexp caption-parts 1) 1))
+           (parent-links
+             (mapconcat (lambda (parent-id-with-idx)
+                          (let ((parent-id (car (cdr parent-id-with-idx)))
+                                (idx (car parent-id-with-idx)))
+                             (format "<span class=\"lilac-caption-parent-link\"><a href=\"%s\">%s</a></span>"
+                               parent-id
+                               (if (= idx 1) (string-remove-prefix "__NREF__" source-block-name) idx))))
+                        parent-ids-with-idx ""))
            ;; For polyblocks, only the first (head) block gets an id field for a
            ;; <pre> tag. The rest (tail) don't have this field so they would
            ;; normally get assigned a deadlink. To avoid this, use a counter for
@@ -470,16 +519,16 @@ When matching, reference is stored in match group 1."
                fallback-id))
            (caption-without-listing-prefix (replace-regexp-in-string "<span.+?span>" "" caption))
            (caption-text
-            (if (s-blank? parent-id)
+            (if parent-links
                 (concat
                   "<div class=\"lilac-caption\">"
-                    caption-without-listing-prefix
+                    parent-links
+                    polyblock-indicator
                     link-symbol
                   "</div>")
                 (concat
                   "<div class=\"lilac-caption\">"
-                    parent-id
-                    polyblock-indicator
+                    caption-without-listing-prefix
                     link-symbol
                   "</div>")))
            )

@@ -344,7 +344,7 @@ Instead, Lilac expects Noweb-style references, in the form <code>__NREF__foo</co
 In the example below, the <code>parent-block</code> refers to 2 other child blocks for its definition.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Sample Org-mode Noweb-style references</label><span class="lilac-caption-link-symbol"><a href="#anonymous-1">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-1"><span class="org-org-meta-line">#+name: parent-block</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-1">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-1"><span class="org-org-meta-line">#+name: parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
 <span class="org-org-block">__NREF__child-block-1</span>
@@ -443,7 +443,7 @@ Note that all of the above can be brought in by using the <a href="https://githu
 We have a top-level <code>Makefile</code> so that we can run some <code>make</code> commands on the command line (instead of needing to invoke emacs directly).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Makefile</label><span class="lilac-caption-link-symbol"><a href="#Makefile">&#x1f517;</a></span></div><pre class="src src-makefile" id="Makefile"><span class="org-variable-name">PROJ_ROOT</span> := $(<span class="org-variable-name">shell</span> git rev-parse --show-toplevel)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#Makefile">&#x1f517;</a></span></div><pre class="src src-makefile" id="Makefile"><span class="org-variable-name">PROJ_ROOT</span> := $(<span class="org-variable-name">shell</span> git rev-parse --show-toplevel)
 <span class="org-variable-name">PROCS</span> := $(<span class="org-variable-name">shell</span> nproc)
 define run_emacs
         emacs $(<span class="org-variable-name">2</span>) --quick --batch --kill --load $(<span class="org-variable-name">PROJ_ROOT</span>)/lilac.el --eval=<span class="org-string">"$(</span><span class="org-string"><span class="org-variable-name">1</span></span><span class="org-string">)"</span>
@@ -499,7 +499,7 @@ We define "cross-linking" to mean the act of linking to a child source code bloc
 The reason why cross-linking is so important is because the source code blocks are interleaved with prose. And the order of code presented may not match the order of code in the tangled output. And sometimes the reader may just want to jump to a source code block just to see its implementation right away instead of waiting for the prose to catch up to it. Cross-linking makes it easier to navigate by source code blocks. Cross-linking is implemented in <a href="#h-HTML-modifications">5.1.3</a>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.el</label><span class="lilac-caption-link-symbol"><a href="#lilac-el">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="lilac-el"><span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-performance-optimization">lilac_dot_el-performance-optimization</a></span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#lilac-el">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="lilac-el"><span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-performance-optimization">lilac_dot_el-performance-optimization</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-imports">lilac_dot_el-imports</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-fix-nondeterminism">lilac_dot_el-fix-nondeterminism</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac_dot_el-lilac-publish</a></span>
@@ -649,11 +649,11 @@ The code in this section automatically generates <code>#+caption: ...</code> tex
 We want each <code>#+caption: ...</code> text to have the following items:
 </p>
 
-<ol class="org-ol">
-<li><a href="#coderef-NSCB_NAME" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_NAME');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_NAME');"><code>NSCB_NAME</code></a>: name of the Noweb source code block,</li>
-<li><a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a>: an indicator to show whether this block is broken up over multiple blocks, and</li>
-<li><a href="#coderef-NSCB_LINK_TO_PARENT" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINK_TO_PARENT');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINK_TO_PARENT');"><code>NSCB_LINK_TO_PARENT</code></a>: a link back up to a parent block (if any) where this block is used.</li>
-</ol>
+<dl class="org-dl">
+<dt><a href="#coderef-NSCB_NAME" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_NAME');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_NAME');"><code>NSCB_NAME</code></a></dt><dd>name of the Noweb source code block,</dd>
+<dt><a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a></dt><dd>an indicator to show whether this block is broken up over multiple blocks, and</dd>
+<dt><a href="#coderef-NSCB_LINKS_TO_PARENTS" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINKS_TO_PARENTS');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINKS_TO_PARENTS');"><code>NSCB_LINKS_TO_PARENTS</code></a></dt><dd>a link back up to a parent block (if any) where this block is used; can contain more than 1 parent if multiple parents refer to this same child block</dd>
+</dl>
 
 <p>
 <i>NSCB</i> here means <i>Noweb source code block</i>. We loop through every source code block and insert a (<code>#+caption: ...</code>) text into the buffer. This modified buffer (with the three bits of information from above) is what is sent down the pipeline for final export to HTML (i.e., the buffer modification does not affect the actual buffer (<code>*.org</code> file)).
@@ -663,7 +663,7 @@ We want each <code>#+caption: ...</code> text to have the following items:
 So assume that we already have the smart captions in a sorted <a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Association-Lists.html">association list</a> (aka alist), where the KEY is the integer buffer position where this caption should be inserted, and the VALUE is the caption itself (a string), like this:
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Caption locations</label><span class="lilac-caption-link-symbol"><a href="#anonymous-4">&#x1f517;</a></span></div><pre class="src src-elisp" id="anonymous-4">'((153  . <span class="org-string">"#+caption: ..."</span>)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-4">&#x1f517;</a></span></div><pre class="src src-elisp" id="anonymous-4">'((153  . <span class="org-string">"#+caption: ..."</span>)
   (384  . <span class="org-string">"#+caption: ..."</span>)
   (555  . <span class="org-string">"#+caption: ..."</span>)
   (684  . <span class="org-string">"#+caption: ..."</span>)
@@ -675,8 +675,8 @@ We can use the KEY to go to that buffer position and insert the caption. However
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">smart-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-noweb-source-code-block-captions</span> (_backend)
   (<span class="org-keyword">let*</span> ((parent-blocks
            <span class="lilac-child-link-from-parent"><a href="#__NREF__parent-blocks">parent-blocks</a></span>)
-         (child-parent-hash-table
-           <span class="lilac-child-link-from-parent"><a href="#__NREF__child-parent-hash-table">child-parent-hash-table</a></span>)
+         (child-parents-hash-table
+           <span class="lilac-child-link-from-parent"><a href="#__NREF__child-parents-hash-table">child-parents-hash-table</a></span>)
          (all-src-blocks
            <span class="lilac-child-link-from-parent"><a href="#__NREF__all-src-blocks">all-src-blocks</a></span>)
          (smart-captions
@@ -693,14 +693,14 @@ We can use the KEY to go to that buffer position and insert the caption. However
 </p>
 
 <p>
-Now we just have to construct <code>smart-captions</code>. The main difficulty is the construction of <a href="#coderef-NSCB_LINK_TO_PARENT" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINK_TO_PARENT');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINK_TO_PARENT');"><code>NSCB_LINK_TO_PARENT</code></a>, so most of the code will be concerned about child-parent associations.
+Now we just have to construct <code>smart-captions</code>. The main difficulty is the construction of <a href="#coderef-NSCB_LINKS_TO_PARENTS" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINKS_TO_PARENTS');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINKS_TO_PARENTS');"><code>NSCB_LINKS_TO_PARENTS</code></a>, so most of the code will be concerned about child-parent associations.
 </p>
 
 <p>
 Why do we even need these source code blocks to link back to their parents? The point is to make things easier to navigate. For example, if we have
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Sample Org-mode Noweb-style references</label><span class="lilac-caption-link-symbol"><a href="#anonymous-5">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-5"><span class="org-org-meta-line">#+name: parent-block</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-5">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-5"><span class="org-org-meta-line">#+name: parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
 <span class="org-org-block">__NREF__child-block-1</span>
@@ -730,7 +730,7 @@ and we export this to HTML, ideally we would want both <code>__NREF__child-block
 </p>
 
 <p>
-The key idea here is to build a hash table (<code>child-parent-hash-table</code>) where the KEY is a child source code block and the VALUE is the parent block. Then in order to construct <a href="#coderef-NSCB_LINK_TO_PARENT" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINK_TO_PARENT');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINK_TO_PARENT');"><code>NSCB_LINK_TO_PARENT</code></a> we just do a lookup against this hash table to find the parent (if any).
+The key idea here is to build a hash table (<code>child-parents-hash-table</code>) where the KEY is a child source code block and the VALUE is the parent block(s). Then in order to construct <a href="#coderef-NSCB_LINKS_TO_PARENTS" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINKS_TO_PARENTS');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINKS_TO_PARENTS');"><code>NSCB_LINKS_TO_PARENTS</code></a> we just do a lookup against this hash table to find the parent(s), if any.
 </p>
 
 <p>
@@ -742,16 +742,22 @@ The first thing we need is a list of parent source code blocks. We consider a so
   (<span class="org-keyword">lambda</span> (src-block)
      (<span class="org-keyword">if</span> (lilac-is-parent-block src-block) src-block)))
 </pre></div></div><p>
-Then we construct the <code>child-parent-hash-table</code>. For each parent block, we get all of its children (<code>child-names</code>), and use this data to construct a child-parent association:
+Then we construct the <code>child-parents-hash-table</code>. For each parent block, we get all of its children (<code>child-names</code>), and use this data to construct a child-parent association:
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">child-parent-hash-table</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__child-parent-hash-table">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__child-parent-hash-table">(<span class="org-keyword">let</span> ((hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal)))
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">child-parents-hash-table</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__child-parents-hash-table">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__child-parents-hash-table">(<span class="org-keyword">let</span> ((hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal)))
   (mapc
    (<span class="org-keyword">lambda</span> (parent-block)
     (<span class="org-keyword">let*</span> ((parent-name (org-element-property <span class="org-builtin">:name</span> parent-block))
            (parent-body (org-element-property <span class="org-builtin">:value</span> parent-block))
            (child-names (lilac-get-noweb-children parent-body)))
-      (mapc (<span class="org-keyword">lambda</span> (child-name) (puthash child-name parent-name hash-table)) child-names)))
+      (mapc (<span class="org-keyword">lambda</span> (child-name)
+              (<span class="org-keyword">let*</span> ((parents (gethash child-name hash-table)))
+                (<span class="org-keyword">if</span> parents
+                  <span class="org-comment-delimiter">; </span><span class="org-comment">cl-pushnew to dedup parents (when a single parent refers to the same child more than once).</span>
+                  (puthash child-name (<span class="org-keyword">cl-pushnew</span> parent-name parents) hash-table)
+                  (puthash child-name (list parent-name) hash-table))))
+            child-names)))
    parent-blocks)
   hash-table)
 </pre></div></div><p>
@@ -759,15 +765,15 @@ Now that we have the child-parent associations, we have to look at all source co
 </p>
 
 <ol class="org-ol">
-<li>this source code block's name shows up at all in <code>child-parent-hash-table</code>, and if so</li>
-<li>add a link to the parent (<a href="#coderef-NSCB_LINK_TO_PARENT" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINK_TO_PARENT');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINK_TO_PARENT');"><code>NSCB_LINK_TO_PARENT</code></a>).</li>
+<li>this source code block's name shows up at all in <code>child-parents-hash-table</code>, and if so</li>
+<li>add a link to the parent (<a href="#coderef-NSCB_LINKS_TO_PARENTS" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINKS_TO_PARENTS');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINKS_TO_PARENTS');"><code>NSCB_LINKS_TO_PARENTS</code></a>).</li>
 </ol>
 
 <p>
 Let's grab all source code blocks:
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__UID-for-all-polyblocks">all-src-blocks</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__all-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__all-src-blocks">(org-element-map (org-element-parse-buffer) 'src-block 'identity)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">all-src-blocks</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__UID-for-all-polyblocks">2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__all-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__all-src-blocks">(org-element-map (org-element-parse-buffer) 'src-block 'identity)
 </pre></div></div><p>
 And now we can finally construct <code>smart-captions</code>:
 </p>
@@ -780,18 +786,22 @@ And now we can finally construct <code>smart-captions</code>:
 <span id="coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef-off">           (NSCB_POLYBLOCK_INDICATOR (car (cdr child)))</span>
            (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
            (polyblock-counter-incremented (puthash child-name (+ 1 polyblock-counter) lilac-polyblock-names-totals))
-           (parent (gethash child-name child-parent-hash-table))
+           (parents (gethash child-name child-parents-hash-table))
+           (parents-zipped (lilac-enumerate parents))
            (pos (org-element-property <span class="org-builtin">:begin</span> src-block))
-<span id="coderef-NSCB_LINK_TO_PARENT" class="coderef-off">           (NSCB_LINK_TO_PARENT</span>
-            (<span class="org-keyword">if</span> parent (format <span class="org-string">" [[%s][PARENT]]"</span> parent) <span class="org-string">""</span>))
+<span id="coderef-NSCB_LINKS_TO_PARENTS" class="coderef-off">           (NSCB_LINKS_TO_PARENTS</span>
+            (mapconcat (<span class="org-keyword">lambda</span> (parent-with-idx)
+                         (format <span class="org-string">" [[%s][%S]]"</span>
+                                 (nth 1 parent-with-idx)
+                                 (+ 1 (nth 0 parent-with-idx)))) <span class="org-warning">parents-zipped </span><span class="org-string"><span class="org-warning">" "</span></span><span class="org-warning">))</span>
            (smart-caption
             (concat
               <span class="org-string">"#+caption: "</span>
               NSCB_NAME
               NSCB_POLYBLOCK_INDICATOR
-              NSCB_LINK_TO_PARENT
+              NSCB_LINKS_TO_PARENTS
               <span class="org-string">"\n"</span>)))
-      (<span class="org-keyword">when</span> parent (cons pos smart-caption)))))
+      (<span class="org-keyword">when</span> parents (cons pos smart-caption)))))
 </pre></div></div><p>
 We used some helper functions up in <a href="#__NREF__smart-source-code-block-captions"><code>__NREF__smart-source-code-block-captions</code></a>; let's examine them now.
 </p>
@@ -800,14 +810,14 @@ We used some helper functions up in <a href="#__NREF__smart-source-code-block-ca
 <code>lilac-is-parent-block</code> checks whether a source code block is a parent (contains noweb references to other child blocks in the form <code>__NREF__child-name</code>).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(1/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-is-parent-block</span> (src-block)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(1/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-is-parent-block</span> (src-block)
   (<span class="org-keyword">let</span> ((body (org-element-property <span class="org-builtin">:value</span> src-block)))
     (lilac-get-noweb-children body)))
 </pre></div></div><p>
 <code>lilac-get-noweb-children</code> extracts all Noweb references in the form "<code>__NREF__foo</code>" from a given multiline string, returning a list of all such references. This function expects at most 1 Noweb reference per line. The return type is a list of strings.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(2/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-noweb-children</span> (s)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(2/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-noweb-children</span> (s)
   (<span class="org-keyword">let*</span> ((lines (split-string s <span class="org-string">"\n"</span>))
          (refs (-remove 'null
                  (mapcar
@@ -820,7 +830,7 @@ We used some helper functions up in <a href="#__NREF__smart-source-code-block-ca
 <code>lilac-get-noweb-ref-polyblock-name</code> gets the string <code>__NREF__foo</code> in a <code>#+header: :noweb-ref __NREF__foo</code> line for a source code block.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(3/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-3">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-noweb-ref-polyblock-name</span> (source-code-block)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(3/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-3">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-noweb-ref-polyblock-name</span> (source-code-block)
   (<span class="org-keyword">let*</span> ((headers (org-element-property <span class="org-builtin">:header</span> source-code-block))
          (noweb-ref-name
           (nth 0
@@ -835,12 +845,52 @@ We used some helper functions up in <a href="#__NREF__smart-source-code-block-ca
 Note that a child source block can have two ways of defining its name. The first is with the direct <code>#+name: __NREF__foo</code> style (<a href="#org0000000">monoblock</a>), and the second way is with a line like <code>#+header: :noweb-ref __NREF__foo</code> (<a href="#org0000002">polyblock</a>). Here <code>lilac-get-src-block-name</code> grabs the name of a (child) source code block, taking into account these two styles. For polyblock names, we mark it as such with a <code>(polyblock)</code> string, which is used later for the <a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(4/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-4">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-name</span> (src-block)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(4/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-4">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-name</span> (src-block)
   (<span class="org-keyword">let*</span> ((name-direct (org-element-property <span class="org-builtin">:name</span> src-block))
          (name-indirect (lilac-get-noweb-ref-polyblock-name src-block)))
     (<span class="org-keyword">if</span> name-direct
         `(,name-direct <span class="org-string">""</span>)
         `(,name-indirect <span class="org-string">"(polyblock)"</span>))))
+</pre></div></div><p>
+Next we have some helpers to enumerate through a list just like in Python. The index starts at 0 (same as Python).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(5/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-5"><span class="org-comment-delimiter">; </span><span class="org-comment">See https://stackoverflow.com/a/33989966/437583.</span>
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-zip</span> (xs ys)
+  (<span class="org-keyword">cond</span>
+   ((<span class="org-keyword">or</span> (null xs) (null ys)) ())
+   (t (cons (list (car xs) (car ys)) (lilac-zip (cdr xs) (cdr ys))))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-indices</span> (size)
+  (<span class="org-keyword">let</span> ((idx 0)
+        (lst ()))
+    (<span class="org-keyword">while</span> (&lt; idx size)
+      (<span class="org-keyword">push</span> idx lst)
+      (<span class="org-keyword">setq</span> idx (1+ idx)))
+    (reverse lst)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-enumerate-orig</span> (lst)
+  (lilac-zip (lilac-indices (length lst)) lst))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-enumerate</span> (lst <span class="org-type">&amp;optional</span> start)
+  (<span class="org-keyword">let</span> ((ret ()))
+    (<span class="org-keyword">cl-loop</span> for index from (<span class="org-keyword">if</span> start start 0)
+           for item in lst
+           do (<span class="org-keyword">push</span> (list index item) ret))
+    (reverse ret)))
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">See https://emacs.stackexchange.com/a/7150.</span>
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-matches</span> (regexp s <span class="org-type">&amp;optional</span> group)
+  <span class="org-doc">"Get a list of all regexp matches in a string"</span>
+  (<span class="org-keyword">if</span> (= (length s) 0)
+      ()
+      (<span class="org-keyword">save-match-data</span>
+        (<span class="org-keyword">let</span> ((pos 0)
+              (matches ()))
+          (<span class="org-keyword">while</span> (string-match regexp s pos)
+            (<span class="org-keyword">push</span> (match-string (<span class="org-keyword">if</span> group group 0) s) matches)
+            (<span class="org-keyword">setq</span> pos (match-end 0)))
+          matches))))
 </pre></div></div>
 </div>
 </div>
@@ -1055,7 +1105,7 @@ We only care about source code blocks with a <code>&lt;label&gt;</code> because 
 </ol>
 
 <p>
-For the last step, we want to additionally parse the inner "Listing N &#x2026; PARENT-link" text and transform it with reordering and also additional metadata information such as <code>&lt;span class="..."&gt;</code> tags.
+For the last step, we want to additionally parse the inner "Listing N &#x2026; 0 [1 2 3 &#x2026;]" text and transform it with reordering and also additional metadata information such as <code>&lt;span class="..."&gt;</code> tags.
 </p>
 
 <p>
@@ -1090,6 +1140,7 @@ We also save the <code>NSCB_POLYBLOCK_INDICATOR</code> with the <code>polyblock-
            (body-with-newlines
             (lilac-to-multi-line body))
            (caption (nth 1 div-caption-body))
+           <span class="org-comment-delimiter">; </span><span class="org-comment">caption-parts just captures whatever substring is inside the &lt;label&gt; tags.</span>
            (caption-parts
              (<span class="org-keyword">let*</span> ((caption-match
                       (string-match <span class="org-string">"&lt;label [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+&gt;</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">.*?</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&lt;/label&gt;"</span> caption)))
@@ -1130,18 +1181,20 @@ We also save the <code>NSCB_POLYBLOCK_INDICATOR</code> with the <code>polyblock-
            (polyblock-indicator
              (<span class="org-keyword">if</span> (string-match <span class="org-string">"</span><span class="org-string"><span class="org-warning">\</span></span><span class="org-string">(polyblock</span><span class="org-string"><span class="org-warning">\</span></span><span class="org-string">)"</span> caption-parts)
                  polyblock-chain-location <span class="org-string">""</span>))
-           (parent-id-match
-             (string-match
+           (parent-id-regexp
                (rx-to-string
                  '(and
                        <span class="org-string">" &lt;a href=\""</span>
-                       (group (+ (not <span class="org-string">"\""</span>)))))
-               caption-parts))
-           (parent-id
-             (<span class="org-keyword">if</span> parent-id-match
-                 (format <span class="org-string">"&lt;span class=\"lilac-caption-parent-link\"&gt;&lt;a href=\"%s\"&gt;%s&lt;/a&gt;&lt;/span&gt;"</span>
-                   (match-string-no-properties 1 caption-parts) (string-remove-prefix <span class="org-string">"__NREF__"</span> source-block-name))
-                 <span class="org-string">""</span>))
+                       (group (+ (not <span class="org-string">"\""</span>))))))
+           (parent-ids-with-idx (lilac-enumerate (lilac-matches parent-id-regexp caption-parts 1) 1))
+           (parent-links
+             (mapconcat (<span class="org-keyword">lambda</span> (parent-id-with-idx)
+                          (<span class="org-keyword">let</span> ((parent-id (car (cdr parent-id-with-idx)))
+                                (idx (car parent-id-with-idx)))
+                             (format <span class="org-string">"&lt;span class=\"lilac-caption-parent-link\"&gt;&lt;a href=\"%s\"&gt;%s&lt;/a&gt;&lt;/span&gt;"</span>
+                               parent-id
+                               (<span class="org-keyword">if</span> (= idx 1) (string-remove-prefix <span class="org-string">"__NREF__"</span> source-block-name) idx))))
+                        parent-ids-with-idx <span class="org-string">""</span>))
            <span class="org-comment-delimiter">;; </span><span class="org-comment">For polyblocks, only the first (head) block gets an id field for a</span>
            <span class="org-comment-delimiter">;; </span><span class="org-comment">&lt;pre&gt; tag. The rest (tail) don't have this field so they would</span>
            <span class="org-comment-delimiter">;; </span><span class="org-comment">normally get assigned a deadlink. To avoid this, use a counter for</span>
@@ -1174,16 +1227,16 @@ We also save the <code>NSCB_POLYBLOCK_INDICATOR</code> with the <code>polyblock-
                fallback-id))
            (caption-without-listing-prefix (replace-regexp-in-string <span class="org-string">"&lt;span.+?span&gt;"</span> <span class="org-string">""</span> caption))
            (caption-text
-            (<span class="org-keyword">if</span> (s-blank? parent-id)
+            (<span class="org-keyword">if</span> parent-links
                 (concat
                   <span class="org-string">"&lt;div class=\"lilac-caption\"&gt;"</span>
-                    caption-without-listing-prefix
+                    parent-links
+                    polyblock-indicator
                     link-symbol
                   <span class="org-string">"&lt;/div&gt;"</span>)
                 (concat
                   <span class="org-string">"&lt;div class=\"lilac-caption\"&gt;"</span>
-                    parent-id
-                    polyblock-indicator
+                    caption-without-listing-prefix
                     link-symbol
                   <span class="org-string">"&lt;/div&gt;"</span>)))
            )
@@ -1228,7 +1281,7 @@ This is a helper function to parse the HTML output for a source code block.
 Consider the following code:
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Sample Org-mode Noweb-style references</label><span class="lilac-caption-link-symbol"><a href="#anonymous-6">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-6"><span class="org-org-meta-line">#+name: parent-block</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-6">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-6"><span class="org-org-meta-line">#+name: parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
 <span class="org-org-block">__NREF__child-block-1</span>
@@ -1620,7 +1673,7 @@ Every HTML element <code>h2</code> to <code>h6</code> (which encode the Org mode
 The code here is taken from <a href="https://github.com/listx/listx_blog/blame/8e6e7b533d89f77a6939e5eda9fd9d990d25a7a9/misc.js#L1">https://github.com/listx/listx_blog/blame/8e6e7b533d89f77a6939e5eda9fd9d990d25a7a9/misc.js#L1</a>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">misc.js</label><span class="lilac-caption-link-symbol"><a href="#misc-js">&#x1f517;</a></span></div><pre class="src src-js" id="misc-js">$(<span class="org-keyword">function</span>() {
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#misc-js">&#x1f517;</a></span></div><pre class="src src-js" id="misc-js">$(<span class="org-keyword">function</span>() {
     $(<span class="org-string">"h2,h3,h4,h5,h6"</span>).each(<span class="org-keyword">function</span>() {
         <span class="org-keyword">var</span> <span class="org-variable-name">$this</span> = $(<span class="org-constant">this</span>);
         <span class="org-keyword">var</span> <span class="org-variable-name">text</span> = $this.text();
@@ -1747,7 +1800,7 @@ During ad-hoc tests, this shaves off a few seconds. This was determined by compa
 We add some additional CSS tweaks on top of what we get from Org.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">style.css</label><span class="lilac-caption-link-symbol"><a href="#style-css">&#x1f517;</a></span></div><pre class="src src-css" id="style-css"><span class="org-css-selector">a </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#style-css">&#x1f517;</a></span></div><pre class="src src-css" id="style-css"><span class="org-css-selector">a </span>{
     <span class="org-css-property">color</span>: <span class="custom-2">#0000ff</span>;
 }
 
@@ -1959,7 +2012,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 Allow HTML exports of Org files (inluding this one) to pull in CSS and JavaScript that we've defined for Lilac by referring to a single theme file. The inspiration for this setup comes from <a href="https://gitlab.com/OlMon/org-themes">https://gitlab.com/OlMon/org-themes</a>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.theme</label><span class="lilac-caption-link-symbol"><a href="#lilac-theme">&#x1f517;</a></span></div><pre class="src src-org" id="lilac-theme"><span class="org-comment"># Include additional CSS styles.</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#lilac-theme">&#x1f517;</a></span></div><pre class="src src-org" id="lilac-theme"><span class="org-comment"># Include additional CSS styles.</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/&gt;</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="style.css" /&gt;</span>
 
@@ -1975,7 +2028,7 @@ Allow HTML exports of Org files (inluding this one) to pull in CSS and JavaScrip
 Typically we only need to look at the rendered HTML output in a web browser as the raw HTML diff output is extremely difficult to parse as a human. So by default we ask Git to exclude it from <code>git diff</code> by treating them as binary data.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">.gitattributes</label><span class="lilac-caption-link-symbol"><a href="#gitattributes">&#x1f517;</a></span></div><pre class="src src-gitattributes" id="gitattributes">* -diff
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#gitattributes">&#x1f517;</a></span></div><pre class="src src-gitattributes" id="gitattributes">* -diff
 **/*.org diff
 **/.gitattributes diff
 **/.gitmodules diff
@@ -1998,7 +2051,7 @@ Note that the above setting to treat HTML files as binary data prevents them fro
 <div id="outline-container-h-gitignore" class="outline-3">
 <h3 id="h-gitignore"><span class="section-number-3">5.5.</span> gitignore</h3>
 <div class="outline-text-3" id="text-h-gitignore">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">.gitignore</label><span class="lilac-caption-link-symbol"><a href="#gitignore">&#x1f517;</a></span></div><pre class="src src-gitignore" id="gitignore">**/*.auctex-auto
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#gitignore">&#x1f517;</a></span></div><pre class="src src-gitignore" id="gitignore">**/*.auctex-auto
 tangle
 weave
 </pre></div></div>
@@ -2054,7 +2107,7 @@ This is taken from <a href="https://github.com/tweag/haskell-stack-nix-example/b
 This is the main development shell and brings in all of our dependencies to build all of our code.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">shell.nix</label><span class="lilac-caption-link-symbol"><a href="#shell-nix">&#x1f517;</a></span></div><pre class="src src-nix" id="shell-nix"><span class="org-nix-keyword">let</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#shell-nix">&#x1f517;</a></span></div><pre class="src src-nix" id="shell-nix"><span class="org-nix-keyword">let</span>
   <span class="org-comment"># Nixpkgs snapshot.</span>
   <span class="org-nix-attribute">sources</span> = <span class="org-nix-builtin">import</span> <span class="org-nix-constant">./package/nix/sources.nix</span>;
   <span class="org-comment"># The final "pkgs" attribute with all the bells and whistles of our overlays.</span>
