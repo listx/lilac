@@ -3,7 +3,8 @@
 
 (defun lilac-disable-syntax-highlighting (_orig-func &rest args)
   (apply 'lilac-org-html-fontify-code args))
-(defun lilac-org-html-fontify-code (code lang) (org-html-encode-plain-text code))
+(defun lilac-org-html-fontify-code (code lang)
+  (org-html-encode-plain-text code))
 
 (defun lilac-publish-profile ()
   (interactive)
@@ -49,13 +50,15 @@
   (let ((new (length references)))
      (while (rassq new references) (setq new (+ new 1)))
      new))
-(advice-add #'org-export-new-reference :override #'org-export-deterministic-reference)
+(advice-add #'org-export-new-reference
+            :override #'org-export-deterministic-reference)
 ; This optimization can be used to crudely speed up weaving time by disabling
 ; fontification (no syntax highlighting of source code blocks).
 (if (getenv "LILAC_LP_QUICK")
     (progn
       (message "LILAC_LP_QUICK set; invoking some cost-cutting measures")
-      (advice-add 'org-html-fontify-code :around #'lilac-disable-syntax-highlighting)))
+      (advice-add 'org-html-fontify-code
+                  :around #'lilac-disable-syntax-highlighting)))
 
 (defun lilac-publish ()
   (interactive)
@@ -88,9 +91,6 @@
         (org-export-filter-final-output-functions
          '(lilac-replace-org_ids-with-human_ids))
         (org-html-htmlize-output-type 'css))
-    ;; Debugging
-    ;(message "lilac-child-HTML_ID-hash-table: %s" lilac-child-HTML_ID-hash-table)
-    ;(message "lilac-org_id-human_id-hash-table: %s" lilac-org_id-human_id-hash-table)
     (org-html-export-to-html)))
 
 ;; Modify Org buffer
@@ -110,7 +110,8 @@
                  (mapc (lambda (child-name)
                          (let* ((parents (gethash child-name hash-table)))
                            (if parents
-                             ; cl-pushnew to dedup parents (when a single parent refers to the same child more than once).
+                             ; cl-pushnew to dedup parents (when a single parent refers to
+                             ; the same child more than once).
                              (puthash child-name (cl-pushnew parent-name parents) hash-table)
                              (puthash child-name (list parent-name) hash-table))))
                        child-names)))
@@ -126,7 +127,9 @@
                       (NSCB_NAME (format "=%s= " child-name))                  ;ref:NSCB_NAME
                       (NSCB_POLYBLOCK_INDICATOR (car (cdr child)))             ;ref:NSCB_POLYBLOCK_INDICATOR
                       (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
-                      (polyblock-counter-incremented (puthash child-name (+ 1 polyblock-counter) lilac-polyblock-names-totals))
+                      (polyblock-counter-incremented
+                       (puthash child-name (+ 1 polyblock-counter)
+                                lilac-polyblock-names-totals))
                       (parents (gethash child-name child-parents-hash-table))
                       (parents-zipped (lilac-enumerate parents))
                       (pos (org-element-property :begin src-block))
@@ -134,7 +137,8 @@
                        (mapconcat (lambda (parent-with-idx)
                                     (format " [[%s][%S]]"
                                             (nth 1 parent-with-idx)
-                                            (+ 1 (nth 0 parent-with-idx)))) parents-zipped " "))
+                                            (+ 1 (nth 0 parent-with-idx))))
+                                  parents-zipped " "))
                       (smart-caption
                        (concat
                          "#+caption: "
@@ -222,8 +226,10 @@
          (headline-UIDs
            (-remove 'null
              (cl-loop for headline in all-headlines collect
-               (let* ((headline-UID (lilac-get-unique-id headline headline-uid-hash-table))
-                      ;; Get the position just after the headline (just underneath it).
+               (let* ((headline-UID
+                       (lilac-get-unique-id headline headline-uid-hash-table))
+                      ;; Get the position just a
+                      ;; fter the headline (just underneath it).
                       (pos (progn
                              (goto-char (org-element-property :begin headline))
                              (re-search-forward "\n"))))
@@ -273,7 +279,8 @@
                          noweb-ref
                          (not (org-element-property :name src-block))))
                       (pos (org-element-property :begin src-block))
-                      (name-field-with-uid (format "#+name: ___polyblock-%s\n" polyblock-id)))
+                      (name-field-with-uid
+                       (format "#+name: ___polyblock-%s\n" polyblock-id)))
                  (when (and
                          is-polyblock
                          (not (string= noweb-ref noweb-ref-last)))
@@ -287,14 +294,16 @@
             (insert name-field-with-uid)))))
 
 ;; Modify HTML
-; Define a global hash table for mapping child source block names to their HTML IDs.
+; Define a global hash table for mapping child source block names to their HTML
+; IDs.
 (setq lilac-child-HTML_ID-hash-table (make-hash-table :test 'equal))
 
 (defun lilac-populate-child-HTML_ID-hash-table (src-block-html backend info)
   (when (org-export-derived-backend-p backend 'html)
     (let* ((child-name (lilac-get-src-block-name-from-html src-block-html))
            (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html)))
-      (if child-HTML_ID ; Skip blocks that lack an HTML ID, such as non-head polyblocks.
+      ; Skip blocks that lack an HTML ID, such as non-head polyblocks.
+      (if child-HTML_ID
         (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
       ; Return src-block-html as-is (no modifications).
       src-block-html)))
@@ -337,17 +346,19 @@
         (match-string-no-properties 1 normalized)
         normalized)))
 
-(defun lilac-get-src-block-HTML_ID (src-block-html) ;ref:lilac-get-src-block-HTML_ID
+;ref:lilac-get-src-block-HTML_ID
+(defun lilac-get-src-block-HTML_ID (src-block-html)
   (let ((match (string-match "<pre [^>]+?id=\"\\([^\"]+\\)\">" src-block-html)))
     (if match (match-string-no-properties 1 src-block-html))))
 
 (defun lilac-link-to-children-from-parent-body (src-block-html backend info)
   (when (org-export-derived-backend-p backend 'html)
-    ;; Break up source block into 3 subparts --- the leading <div ...>, the <label ...></label> (if any) and
-    ;; <pre ...></pre>.
+    ;; Break up source block into 3 subparts --- the leading <div ...>, the
+    ;; <label ...></label> (if any) and <pre ...></pre>.
     ;; Then run the linkifying logic against only the body, and then return the
     ;; original label and new body.
-    (let* ((div-caption-body (lilac-get-source-block-html-parts-without-newlines src-block-html))
+    (let* ((div-caption-body (lilac-get-source-block-html-parts-without-newlines
+                              src-block-html))
            (leading-div (nth 0 div-caption-body))
            (caption (nth 1 div-caption-body))
            (body (nth 2 div-caption-body))
@@ -355,9 +366,11 @@
             (replace-regexp-in-string
              (lilac-nref-rx nil)
              (lambda (child-name-text)
-                 (let* ((HTML_ID (gethash child-name-text lilac-child-HTML_ID-hash-table)))
+                 (let* ((HTML_ID (gethash child-name-text
+                                          lilac-child-HTML_ID-hash-table)))
                   (if HTML_ID
-                      (concat "<span class=\"lilac-child-link-from-parent\"><a href=\"#" HTML_ID "\">"
+                      (concat "<span class=\"lilac-child-link-from-parent\">"
+                              "<a href=\"#" HTML_ID "\">"
                               (string-remove-prefix "__NREF__" child-name-text)
                               "</a></span>")
                       child-name-text)))
@@ -383,10 +396,13 @@
   (if match-optional-params
    `(group
            "__NREF__"
-          (any alpha) ;; Noweb reference must start with a letter...
-          ;; ...and must be followed by letters,numbers,dashes,underscores,periods...
+          ;; Noweb reference must start with a letter...
+          (any alpha)
+          ;; ...and must be followed by
+          ;; letters,numbers,dashes,underscores,periods...
           (* (or (any alnum) "-" "_" "."))
-          ;; ...and may terminate with a "(...)" where the "..." may be an empty string, or some other argument.
+          ;; ...and may terminate with a "(...)" where the "..." may be an empty
+          ;; string, or some other argument.
           (* (or "()"
                  (and "("
                       (* (not ")"))
@@ -396,7 +412,10 @@
           (any alpha)
           (* (or (any alnum) "-" "_" ".")))))
 
-;; Customize noweb delimiters. Unlike traditional << and >> delimiters, we just use the "__NREF__" prefix as our only delimiter. This has the advantage of being encoded the same way into HTML, which makes our HTML modifications easier and more consistent across different source code languages.
+;; Customize noweb delimiters. Unlike traditional << and >> delimiters, we just
+;; use the "__NREF__" prefix as our only delimiter. This has the advantage of
+;; being encoded the same way into HTML, which makes our HTML modifications
+;; easier and more consistent across different source code languages.
 ;; See https://emacs.stackexchange.com/a/73720/13006.
 (defun org-babel-noweb-wrap (&optional regexp)
   "Return regexp matching a Noweb reference.
@@ -409,11 +428,12 @@ When matching, reference is stored in match group 1."
 
 (defun lilac-prettify-source-code-captions (src-block-html backend info)
   (when (org-export-derived-backend-p backend 'html)
-    ;; Break up source block into 3 subparts --- the leading <div ...>, the <label ...></label> (if any) and
-    ;; <pre ...></pre>.
+    ;; Break up source block into 3 subparts --- the leading <div ...>, the
+    ;; <label ...></label> (if any) and <pre ...></pre>.
     ;; Then run the linkifying logic against only the body, and then return the
     ;; original label and new body.
-    (let* ((div-caption-body (lilac-get-source-block-html-parts-without-newlines src-block-html))
+    (let* ((div-caption-body (lilac-get-source-block-html-parts-without-newlines
+                              src-block-html))
            (leading-div (nth 0 div-caption-body))
            (body (nth 2 div-caption-body))
            (pre-id-match
@@ -432,7 +452,8 @@ When matching, reference is stored in match group 1."
            (body-with-newlines
             (lilac-to-multi-line body))
            (caption (nth 1 div-caption-body))
-           ; caption-parts just captures whatever substring is inside the <label> tags.
+           ; caption-parts just captures whatever substring is inside the
+           ; <label> tags.
            (caption-parts
              (let* ((caption-match
                       (string-match "<label [^>]+>\\(.*?\\)</label>" caption)))
@@ -447,15 +468,20 @@ When matching, reference is stored in match group 1."
                        (group (+ (not "<")))
                        "</code>"))
                caption-parts))
-           ;; A source code block is anonymous if: (1) it does not have a "#+name: ..." line, or (2) it does not have a "#+header: :noweb-ref ..." line.
+           ;; A source code block is anonymous if: (1) it does not have a
+           ;; "#+name: ..." line, or (2) it does not have a "#+header:
+           ;; :noweb-ref ..." line.
            (source-block-name
              (if source-block-name-match
                  (match-string-no-properties 1 caption-parts)
                  "anonymous"))
            ;; This is just used for the side effect of recording the
            ;; source-block-name, to be used for the fallback-id.
-           (source-block-counter (gethash source-block-name lilac-polyblock-names 0))
-           (source-block-counter-incremented (puthash source-block-name (+ 1 source-block-counter) lilac-polyblock-names))
+           (source-block-counter
+            (gethash source-block-name lilac-polyblock-names 0))
+           (source-block-counter-incremented
+            (puthash source-block-name (+ 1 source-block-counter)
+                     lilac-polyblock-names))
            (source-block-name-styled
              (cond ((string-prefix-p "__NREF__" source-block-name)
                     (concat
@@ -468,8 +494,13 @@ When matching, reference is stored in match group 1."
                       "&#x1f4c4; "
                       source-block-name
                       "</span>"))))
-           (polyblock-chain-total (gethash source-block-name lilac-polyblock-names-totals 0))
-           (polyblock-chain-location (if (= polyblock-chain-total 0) "" (format "(%s/%s) " source-block-counter-incremented polyblock-chain-total)))
+           (polyblock-chain-total
+            (gethash source-block-name lilac-polyblock-names-totals 0))
+           (polyblock-chain-location
+            (if (= polyblock-chain-total 0)
+                ""
+              (format "(%s/%s) "
+                      source-block-counter-incremented polyblock-chain-total)))
            (polyblock-indicator
              (if (string-match "\(polyblock\)" caption-parts)
                  polyblock-chain-location ""))
@@ -478,14 +509,22 @@ When matching, reference is stored in match group 1."
                  '(and
                        " <a href=\""
                        (group (+ (not "\""))))))
-           (parent-ids-with-idx (lilac-enumerate (lilac-matches parent-id-regexp caption-parts 1) 1))
+           (parent-ids-with-idx
+            (lilac-enumerate
+             (lilac-matches parent-id-regexp caption-parts 1) 1))
            (parent-links
              (mapconcat (lambda (parent-id-with-idx)
                           (let ((parent-id (car (cdr parent-id-with-idx)))
                                 (idx (car parent-id-with-idx)))
-                             (format "<span class=\"lilac-caption-parent-link\"><a href=\"%s\">%s</a></span>"
+                             (format (concat
+                                      "<span class="
+                                      "\"lilac-caption-parent-link\">"
+                                      "<a href=\"%s\">%s</a></span>")
                                parent-id
-                               (if (= idx 1) (string-remove-prefix "__NREF__" source-block-name) idx))))
+                               (if (= idx 1)
+                                   (string-remove-prefix
+                                    "__NREF__" source-block-name)
+                                 idx))))
                         parent-ids-with-idx ""))
            ;; For polyblocks, only the first (head) block gets an id field for a
            ;; <pre> tag. The rest (tail) don't have this field so they would
@@ -496,7 +535,9 @@ When matching, reference is stored in match group 1."
            ;; a unique (meaningful) ID and not just "##deadlink".
            (fallback-id
              (if (string= pre-id "#deadlink")
-                 (format "%s-%s" source-block-name source-block-counter-incremented)
+                 (format "%s-%s"
+                         source-block-name
+                         source-block-counter-incremented)
                  pre-id))
            (pre-tag-match
              (string-match
@@ -513,11 +554,14 @@ When matching, reference is stored in match group 1."
                  body-with-newlines
                  (string-replace pre-tag-entire
                                  (concat "<pre " pre-tag-contents
-                                         (format " id=\"%s\"" fallback-id) ">") body-with-newlines)))
+                                         (format " id=\"%s\"" fallback-id) ">")
+                                 body-with-newlines)))
            (link-symbol
-             (format "<span class=\"lilac-caption-link-symbol\"><a href=\"#%s\">&#x1f517;</a></span>"
+             (format (concat "<span class=\"lilac-caption-link-symbol\">"
+                             "<a href=\"#%s\">&#x1f517;</a></span>")
                fallback-id))
-           (caption-without-listing-prefix (replace-regexp-in-string "<span.+?span>" "" caption))
+           (caption-without-listing-prefix
+            (replace-regexp-in-string "<span.+?span>" "" caption))
            (caption-text
             (if parent-links
                 (concat
@@ -557,7 +601,8 @@ When matching, reference is stored in match group 1."
            (body (progn (string-match "<pre [^>]+>.*?</pre>" one-line)
                         (match-string-no-properties 0 one-line))))
       `(,leading-div ,caption ,body)))
-; Define a global hash table for mapping Org-mode-generated ids (that look like "org00012") for source code blocks to a more human-readable ID.
+; Define a global hash table for mapping Org-mode-generated ids (that look like
+; "org00012") for source code blocks to a more human-readable ID.
 (setq lilac-org_id-human_id-hash-table (make-hash-table :test 'equal))
 
 (defun lilac-populate-org_id-human_id-hash-table (src-block-html backend info)
@@ -642,14 +687,20 @@ with class 'color and highest min-color value."
         (eq (car-safe display-atts) t))
           spec))
 
-; This is slightly tweaked from the original, because the incoming "face" value can look like (fixed-pitch face-name) --- so we take the second element.
+; This is slightly tweaked from the original, because the incoming "face" value
+; can look like (fixed-pitch face-name) --- so we take the second element.
 (defun my-face-attribute (face attribute &optional frame inherit)
-  "Get FACE ATTRIBUTE from `face-user-default-spec' and not from `face-attribute'."
-  (let* ((face-spec (face-user-default-spec (if (listp face) (car (cdr face)) face)))
+  "Get FACE ATTRIBUTE from `face-user-default-spec' and not from
+`face-attribute'."
+  (let*
+    ((face-spec (face-user-default-spec (if (listp face)
+                                            (car (cdr face))
+                                          face)))
      (display-attr (or (face-spec-highest-color face-spec)
                (face-spec-t face-spec)))
      (attr (cdr display-attr))
-     (val (or (plist-get attr attribute) (car-safe (cdr (assoc attribute attr))))))
+     (val (or (plist-get attr attribute)
+              (car-safe (cdr (assoc attribute attr))))))
     ;; (message "attribute: %S" attribute) ;; for debugging
     (when (and (null (eq attribute :inherit))
            (null val))
@@ -657,7 +708,6 @@ with class 'color and highest min-color value."
     (when (and inherited-face
            (null (eq inherited-face 'unspecified)))
       (setq val (my-face-attribute inherited-face attribute)))))
-    ;; (message "face: %S attribute: %S display-attr: %S, val: %S" face attribute display-attr val) ;; for debugging
     (or val 'unspecified)))
 
 (advice-add 'face-attribute :override #'my-face-attribute)
@@ -668,10 +718,13 @@ with class 'color and highest min-color value."
   `(advice-add (quote ,fun) :around
            (lambda (oldfun &rest args)
          (let ((ret (apply oldfun args)))
-           (message ,(concat "Calling " (symbol-name fun) " with args %S returns %S.") args ret)
+           (message ,(concat "Calling "
+                             (symbol-name fun)
+                             " with args %S returns %S.") args ret)
            ret))
            '((name "print-args-and-ret"))))
 
+; Debugging.
 ; (print-args-and-ret htmlize-faces-in-buffer)
 ; (print-args-and-ret htmlize-get-override-fstruct)
 ; (print-args-and-ret htmlize-face-to-fstruct)
@@ -684,5 +737,9 @@ with class 'color and highest min-color value."
 
 ; See https://stackoverflow.com/a/27285582/437583.
 (defun lilac-test-file-name ()
-  (concat "test_" (file-name-nondirectory (directory-file-name (file-name-directory (buffer-file-name))))  ".py"))
+  (concat "test_"
+          (file-name-nondirectory
+           (directory-file-name
+            (file-name-directory (buffer-file-name))))
+          ".py"))
 (setq org-html-doctype "html5")

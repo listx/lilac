@@ -7,13 +7,24 @@ endef
 all: test weave
 .PHONY: all
 
-# Currently we don't have any optimizations for tangling, but we still set LILAC_LP_QUICK=1 anyway to align with what we do for weave-quick.
+# Currently we don't have any optimizations for tangling, but we still set
+# LILAC_LP_QUICK=1 anyway to align with what we do for weave-quick.
 $(README_org_output) tangle &: README.org
 	@echo tangling in parallel
 	LILAC_LP_QUICK=1 make -C $(PROJ_ROOT) -j$(PROCS) $(README_org_output)
 	touch tangle
 
-README_org_output = citations.bib lilac.el lilac.theme .gitattributes .gitignore Makefile misc.js shell.nix style.css syntax-highlighting.css
+README_org_output = \
+	citations.bib \
+	lilac.el \
+	lilac.theme \
+	.gitattributes \
+	.gitignore \
+	Makefile \
+	misc.js \
+	shell.nix \
+	style.css \
+	syntax-highlighting.css
 
 $(README_org_output) &: README.org
 	# Generate the toplevel Makefile (this file) and image/Makefile (overwriting
