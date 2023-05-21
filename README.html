@@ -207,7 +207,15 @@
 <li><a href="#h-Motivation">2. Motivation</a></li>
 <li><a href="#h-Usage">3. Usage</a>
 <ul>
-<li><a href="#h-Source-code-blocks--monoblocks-and-polyblocks">3.1. Source code blocks: monoblocks and polyblocks</a></li>
+<li><a href="#h-Source-code-blocks--monoblocks-and-polyblocks">3.1. Source code blocks: monoblocks and polyblocks</a>
+<ul>
+<li><a href="#h-Examples-of-source-code-block-usage">3.1.1. Examples of source code block usage</a>
+<ul>
+<li><a href="#h-Multi-parent-child-blocks">3.1.1.1. Multi-parent child blocks</a></li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#h-How-Lilac-uses-LP">4. How Lilac uses LP</a></li>
@@ -382,28 +390,28 @@ In the example below, the <code>parent-block</code> refers to 2 other child bloc
 definition.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-1">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-1"><span class="org-org-meta-line">#+name: parent-block</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-1">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-1"><span class="org-org-meta-line">#+name: example-parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
-<span class="org-org-block">__NREF__child-block-1</span>
-<span class="org-org-block">__NREF__child-block-2</span>
+<span class="org-org-block">__NREF__example-child-block-foo-1</span>
+<span class="org-org-block">__NREF__example-child-block-bar-1</span>
 <span class="org-org-block-end-line">#+end_src</span>
 
 ...
 
-<span class="org-org-meta-line">#+name: __NREF__child-block-1</span>
+<span class="org-org-meta-line">#+name: __NREF__example-child-block-foo-1</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"I am child 1"</span></span>
 <span class="org-org-block-end-line">#+end_src</span>
 
 ...
 
-<span class="org-org-meta-line">#+header: :noweb-ref __NREF__child-block-2</span>
+<span class="org-org-meta-line">#+header: :noweb-ref __NREF__example-child-block-bar-1</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> -n </span><span class="org-org-block"><span class="org-string">"I am "</span></span>
 <span class="org-org-block-end-line">#+end_src</span>
 
-<span class="org-org-meta-line">#+header: :noweb-ref __NREF__child-block-2</span>
+<span class="org-org-meta-line">#+header: :noweb-ref __NREF__example-child-block-bar-1</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"child 2"</span></span>
 <span class="org-org-block-end-line">#+end_src</span>
@@ -415,6 +423,68 @@ respectively. Polyblocks are concatenated together in the order they appear in
 the overall Org file; this final concatenated version is what gets inserted into
 the Noweb reference in the parent block.
 </p>
+</div>
+
+<div id="outline-container-h-Examples-of-source-code-block-usage" class="outline-4">
+<h4 id="h-Examples-of-source-code-block-usage"><span class="section-number-4">3.1.1.</span> Examples of source code block usage</h4>
+<div class="outline-text-4" id="text-h-Examples-of-source-code-block-usage">
+<p>
+The basic use case is like the example above.
+</p>
+
+<div class="org-src-container"><pre class="src src-bash" id="org0000004"><span class="org-builtin">echo</span> <span class="org-string">"Hello from the parent block"</span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__example-child-block-foo">example-child-block-foo</a></span>
+<span class="org-builtin">echo</span> <span class="org-string">""</span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__example-child-block-bar">example-child-block-bar</a></span>
+</pre></div><p>
+The child blocks above are linked to their definitions below.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#org0000004">example-child-block-foo</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__example-child-block-foo">&#x1f517;</a></span></div><pre class="src src-bash" id="__NREF__example-child-block-foo"><span class="org-builtin">echo</span> <span class="org-string">"I am child 1"</span>
+</pre></div></div><p>
+The blocks below are examples of polyblocks. Note the fraction after the name
+which denotes the position of the block in the overall polyblock "chain".
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#org0000004">example-child-block-bar</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__example-child-block-bar">&#x1f517;</a></span></div><pre class="src src-bash" id="__NREF__example-child-block-bar"><span class="org-builtin">echo</span> -n <span class="org-string">"I am "</span>
+</pre></div></div><p>
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#org0000004">example-child-block-bar</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__example-child-block-bar-2">&#x1f517;</a></span></div><pre class="src src-bash" id="__NREF__example-child-block-bar-2"><span class="org-builtin">echo</span> <span class="org-string">"child 2"</span>
+</pre></div></div>
+</div>
+
+<div id="outline-container-h-Multi-parent-child-blocks" class="outline-5">
+<h5 id="h-Multi-parent-child-blocks"><span class="section-number-5">3.1.1.1.</span> Multi-parent child blocks</h5>
+<div class="outline-text-5" id="text-h-Multi-parent-child-blocks">
+<p>
+Sometimes a piece of code will be reused in different source code blocks. You
+can think of it as constants in a programming language, but in LP the concept
+extends to any arbitrary piece of text.
+</p>
+
+<p>
+Below is an example where we define a child block once&#x2026;
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#org000000e">example-child-block-baz</a></span><span class="lilac-caption-parent-link"><a href="#org000000c">2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__example-child-block-baz">&#x1f517;</a></span></div><pre class="src src-bash" id="__NREF__example-child-block-baz"><span class="org-builtin">echo</span> <span class="org-string">"Hello from child block baz"</span>
+</pre></div></div><p>
+&#x2026;but where we also reuse it (reference it) in different parent blocks.
+</p>
+
+<div class="org-src-container"><pre class="src src-bash" id="org000000e"><span class="org-builtin">echo</span> <span class="org-string">"Hello from parent 1"</span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__example-child-block-baz">example-child-block-baz</a></span>
+</pre></div><div class="org-src-container"><pre class="src src-bash" id="org000000c"><span class="org-builtin">echo</span> <span class="org-string">"Hello from parent 2"</span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__example-child-block-baz">example-child-block-baz</a></span>
+</pre></div><p>
+Notice that the child block has an additional link named "2", which points to
+the second parent that references this block (the first parent is linked by the
+child block name itself, as in the previous example).
+</p>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -754,7 +824,7 @@ So assume that we already have the smart captions in a sorted <a href="https://w
 should be inserted, and the VALUE is the caption itself (a string), like this:
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-4">&#x1f517;</a></span></div><pre class="src src-elisp" id="anonymous-4">'((153  . <span class="org-string">"#+caption: ..."</span>)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-7">&#x1f517;</a></span></div><pre class="src src-elisp" id="anonymous-7">'((153  . <span class="org-string">"#+caption: ..."</span>)
   (384  . <span class="org-string">"#+caption: ..."</span>)
   (555  . <span class="org-string">"#+caption: ..."</span>)
   (684  . <span class="org-string">"#+caption: ..."</span>)
@@ -800,7 +870,7 @@ Why do we even need these source code blocks to link back to their parents? The
 point is to make things easier to navigate. For example, if we have
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-5">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-5"><span class="org-org-meta-line">#+name: parent-block</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-8">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-8"><span class="org-org-meta-line">#+name: parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
 <span class="org-org-block">__NREF__child-block-1</span>
@@ -1476,7 +1546,7 @@ This is a helper function to parse the HTML output for a source code block.
 Consider the following code:
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-6">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-6"><span class="org-org-meta-line">#+name: parent-block</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-9">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-9"><span class="org-org-meta-line">#+name: parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
 <span class="org-org-block">__NREF__child-block-1</span>
@@ -2406,11 +2476,11 @@ pkgs.mkShell ({
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org0000054">Org mode</a> borrows heavily using <a href="#org0000056">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org0000056"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org0000060">Org mode</a> borrows heavily using <a href="#org0000062">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org0000062"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org0000054"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org0000060"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

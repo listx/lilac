@@ -88,28 +88,28 @@ is stripped during HTML export.
 
 #+caption: Sample Org-mode Noweb-style references
 #+begin_src org
-,#+name: parent-block
+,#+name: example-parent-block
 ,#+begin_src bash
 echo "Hello from the parent block"
-__NREF__child-block-1
-__NREF__child-block-2
+__NREF__example-child-block-foo-1
+__NREF__example-child-block-bar-1
 ,#+end_src
 
 ...
 
-,#+name: __NREF__child-block-1
+,#+name: __NREF__example-child-block-foo-1
 ,#+begin_src bash
 echo "I am child 1"
 ,#+end_src
 
 ...
 
-,#+header: :noweb-ref __NREF__child-block-2
+,#+header: :noweb-ref __NREF__example-child-block-bar-1
 ,#+begin_src bash
 echo -n "I am "
 ,#+end_src
 
-,#+header: :noweb-ref __NREF__child-block-2
+,#+header: :noweb-ref __NREF__example-child-block-bar-1
 ,#+begin_src bash
 echo "child 2"
 ,#+end_src
@@ -121,6 +121,73 @@ single code block with =#+name: __NREF__foo=, or as multiple blocks with
 respectively. Polyblocks are concatenated together in the order they appear in
 the overall Org file; this final concatenated version is what gets inserted into
 the Noweb reference in the parent block.
+
+*** Examples of source code block usage
+
+The basic use case is like the example above.
+
+#+name: example-parent-block
+#+begin_src bash
+echo "Hello from the parent block"
+__NREF__example-child-block-foo
+echo ""
+__NREF__example-child-block-bar
+#+end_src
+
+The child blocks above are linked to their definitions below.
+
+#+name: __NREF__example-child-block-foo
+#+begin_src bash
+echo "I am child 1"
+#+end_src
+
+The blocks below are examples of polyblocks. Note the fraction after the name
+which denotes the position of the block in the overall polyblock "chain".
+
+#+header: :noweb-ref __NREF__example-child-block-bar
+#+begin_src bash
+echo -n "I am "
+#+end_src
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua.
+
+#+header: :noweb-ref __NREF__example-child-block-bar
+#+begin_src bash
+echo "child 2"
+#+end_src
+
+**** Multi-parent child blocks
+
+Sometimes a piece of code will be reused in different source code blocks. You
+can think of it as constants in a programming language, but in LP the concept
+extends to any arbitrary piece of text.
+
+Below is an example where we define a child block once...
+
+#+name: __NREF__example-child-block-baz
+#+begin_src bash
+echo "Hello from child block baz"
+#+end_src
+
+...but where we also reuse it (reference it) in different parent blocks.
+
+#+name: example-parent-1
+#+begin_src bash
+echo "Hello from parent 1"
+__NREF__example-child-block-baz
+#+end_src
+
+#+name: example-parent-2
+#+begin_src bash
+echo "Hello from parent 2"
+__NREF__example-child-block-baz
+#+end_src
+
+Notice that the child block has an additional link named "2", which points to
+the second parent that references this block (the first parent is linked by the
+child block name itself, as in the previous example). If it is referenced in
+additional parent blocks, they will show up as links "3", "4", etc.
 
 * How Lilac uses LP
 
