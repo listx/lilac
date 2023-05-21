@@ -328,11 +328,12 @@ parts of an Org file while browsing it.
 </p>
 
 <p>
-Lilac also comes with some minor adjustments to make HTML generation
+Lilac comes with some minor adjustments to make HTML generation
 deterministic (you may be surprised that Org mode by default creates random UIDs
-for every HTML export invocation). This makes it VCS and CI-friendly because you
-don't get meaningless diffs. Speaking of CI-friendliness, Lilac was designed to
-be run from outside of Emacs by default (and not interactively).
+for every HTML export invocation). This makes it VCS and CI-friendly because the
+output changes if and only if the input changes. Speaking of CI-friendliness,
+Lilac was designed to be run from outside of Emacs by default (and not
+interactively).
 </p>
 </div>
 </div>
@@ -593,15 +594,7 @@ named <code>__NREF__...</code> get an automatic <code>#+caption: ...</code> text
 (because for these Noweb-style blocks, the captions should always look uniform).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish"><span class="org-comment-delimiter">; </span><span class="org-comment">This optimization can be used to crudely speed up weaving time by disabling</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">fontification (no syntax highlighting of source code blocks).</span>
-(<span class="org-keyword">if</span> (getenv <span class="org-string">"LILAC_LP_QUICK"</span>)
-    (<span class="org-keyword">progn</span>
-      (message <span class="org-string">"LILAC_LP_QUICK set; invoking some cost-cutting measures"</span>)
-      (advice-add 'org-html-fontify-code
-                  <span class="org-builtin">:around</span> #'lilac-disable-syntax-highlighting)))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish</span> ()
   (<span class="org-keyword">interactive</span>)
   (lilac-publish-1)
   (clrhash lilac-polyblock-names-totals)
@@ -991,24 +984,7 @@ Next we have some helpers to enumerate through a list just like in Python. The
 index starts at 0 (same as Python).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(5/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-5"><span class="org-comment-delimiter">; </span><span class="org-comment">See https://stackoverflow.com/a/33989966/437583.</span>
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-zip</span> (xs ys)
-  (<span class="org-keyword">cond</span>
-   ((<span class="org-keyword">or</span> (null xs) (null ys)) ())
-   (t (cons (list (car xs) (car ys)) (lilac-zip (cdr xs) (cdr ys))))))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-indices</span> (size)
-  (<span class="org-keyword">let</span> ((idx 0)
-        (lst ()))
-    (<span class="org-keyword">while</span> (&lt; idx size)
-      (<span class="org-keyword">push</span> idx lst)
-      (<span class="org-keyword">setq</span> idx (1+ idx)))
-    (reverse lst)))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-enumerate-orig</span> (lst)
-  (lilac-zip (lilac-indices (length lst)) lst))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-enumerate</span> (lst <span class="org-type">&amp;optional</span> start)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions-helpers</a></span>(5/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions-helpers-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions-helpers-5">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-enumerate</span> (lst <span class="org-type">&amp;optional</span> start)
   (<span class="org-keyword">let</span> ((ret ()))
     (<span class="org-keyword">cl-loop</span> for index from (<span class="org-keyword">if</span> start start 0)
            for item in lst
@@ -1808,7 +1784,6 @@ So we have to use code from <a href="https://emacs.stackexchange.com/questions/3
      (attr (cdr display-attr))
      (val (<span class="org-keyword">or</span> (plist-get attr attribute)
               (car-safe (cdr (assoc attribute attr))))))
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">(message "attribute: %S" attribute) ;; for debugging</span>
     (<span class="org-keyword">when</span> (<span class="org-keyword">and</span> (null (eq attribute <span class="org-builtin">:inherit</span>))
            (null val))
       (<span class="org-keyword">let</span> ((inherited-face (my-face-attribute face <span class="org-builtin">:inherit</span>)))
@@ -1818,27 +1793,6 @@ So we have to use code from <a href="https://emacs.stackexchange.com/questions/3
     (<span class="org-keyword">or</span> val 'unspecified)))
 
 (advice-add 'face-attribute <span class="org-builtin">:override</span> #'my-face-attribute)
-
-<span class="org-comment-delimiter">;; </span><span class="org-comment">Debugging</span>
-(<span class="org-keyword">defmacro</span> <span class="org-function-name">print-args-and-ret</span> (fun)
-  <span class="org-doc">"Prepare FUN for printing args and return value."</span>
-  `(advice-add (<span class="org-keyword">quote</span> ,fun) <span class="org-builtin">:around</span>
-           (<span class="org-keyword">lambda</span> (oldfun <span class="org-type">&amp;rest</span> args)
-         (<span class="org-keyword">let</span> ((ret (apply oldfun args)))
-           (message ,(concat <span class="org-string">"Calling "</span>
-                             (symbol-name fun)
-                             <span class="org-string">" with args %S returns %S."</span>) <span class="org-warning">args ret)</span>
-           ret))
-           '((name <span class="org-string">"print-args-and-ret"</span>))))
-
-<span class="org-comment-delimiter">; </span><span class="org-comment">Debugging.</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret htmlize-faces-in-buffer)</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret htmlize-get-override-fstruct)</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret htmlize-face-to-fstruct)</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret htmlize-attrlist-to-fstruct)</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret face-foreground)</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret face-background)</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">(print-args-and-ret face-attribute)</span>
 </pre></div></div>
 </div>
 </div>

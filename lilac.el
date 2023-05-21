@@ -52,14 +52,6 @@
      new))
 (advice-add #'org-export-new-reference
             :override #'org-export-deterministic-reference)
-; This optimization can be used to crudely speed up weaving time by disabling
-; fontification (no syntax highlighting of source code blocks).
-(if (getenv "LILAC_LP_QUICK")
-    (progn
-      (message "LILAC_LP_QUICK set; invoking some cost-cutting measures")
-      (advice-add 'org-html-fontify-code
-                  :around #'lilac-disable-syntax-highlighting)))
-
 (defun lilac-publish ()
   (interactive)
   (lilac-publish-1)
@@ -182,23 +174,6 @@
     (if name-direct
         `(,name-direct "")
         `(,name-indirect "(polyblock)"))))
-; See https://stackoverflow.com/a/33989966/437583.
-(defun lilac-zip (xs ys)
-  (cond
-   ((or (null xs) (null ys)) ())
-   (t (cons (list (car xs) (car ys)) (lilac-zip (cdr xs) (cdr ys))))))
-
-(defun lilac-indices (size)
-  (let ((idx 0)
-        (lst ()))
-    (while (< idx size)
-      (push idx lst)
-      (setq idx (1+ idx)))
-    (reverse lst)))
-
-(defun lilac-enumerate-orig (lst)
-  (lilac-zip (lilac-indices (length lst)) lst))
-
 (defun lilac-enumerate (lst &optional start)
   (let ((ret ()))
     (cl-loop for index from (if start start 0)
@@ -701,7 +676,6 @@ with class 'color and highest min-color value."
      (attr (cdr display-attr))
      (val (or (plist-get attr attribute)
               (car-safe (cdr (assoc attribute attr))))))
-    ;; (message "attribute: %S" attribute) ;; for debugging
     (when (and (null (eq attribute :inherit))
            (null val))
       (let ((inherited-face (my-face-attribute face :inherit)))
@@ -711,27 +685,6 @@ with class 'color and highest min-color value."
     (or val 'unspecified)))
 
 (advice-add 'face-attribute :override #'my-face-attribute)
-
-;; Debugging
-(defmacro print-args-and-ret (fun)
-  "Prepare FUN for printing args and return value."
-  `(advice-add (quote ,fun) :around
-           (lambda (oldfun &rest args)
-         (let ((ret (apply oldfun args)))
-           (message ,(concat "Calling "
-                             (symbol-name fun)
-                             " with args %S returns %S.") args ret)
-           ret))
-           '((name "print-args-and-ret"))))
-
-; Debugging.
-; (print-args-and-ret htmlize-faces-in-buffer)
-; (print-args-and-ret htmlize-get-override-fstruct)
-; (print-args-and-ret htmlize-face-to-fstruct)
-; (print-args-and-ret htmlize-attrlist-to-fstruct)
-; (print-args-and-ret face-foreground)
-; (print-args-and-ret face-background)
-; (print-args-and-ret face-attribute)
 (setq make-backup-files nil)
 (setq org-src-preserve-indentation t)
 
