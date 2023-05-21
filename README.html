@@ -204,12 +204,17 @@
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
 <li><a href="#h-Introduction">1. Introduction</a></li>
-<li><a href="#h-Motivation">2. Motivation</a></li>
+<li><a href="#h-Motivation">2. Motivation</a>
+<ul>
+<li><a href="#h-Problems-with-Org-mode">2.1. Problems with Org mode</a></li>
+<li><a href="#h-Lilac-to-the-rescue">2.2. Lilac to the rescue</a></li>
+</ul>
+</li>
 <li><a href="#h-Usage">3. Usage</a>
 <ul>
 <li><a href="#h-Source-code-blocks--monoblocks-and-polyblocks">3.1. Source code blocks: monoblocks and polyblocks</a>
 <ul>
-<li><a href="#h-Examples-of-source-code-block-usage">3.1.1. Examples of source code block usage</a>
+<li><a href="#h-Examples-of-source-code-blocks">3.1.1. Examples of source code blocks</a>
 <ul>
 <li><a href="#h-Multi-parent-child-blocks">3.1.1.1. Multi-parent child blocks</a></li>
 </ul>
@@ -325,24 +330,78 @@ well, but not much has been done around <i>weaving</i>, where I think most of th
 difficulties lie (because making output look good to a human (weaving) is much
 more difficult than making output look good to a computer (tangling)).
 </p>
+</div>
 
+<div id="outline-container-h-Problems-with-Org-mode" class="outline-3">
+<h3 id="h-Problems-with-Org-mode"><span class="section-number-3">2.1.</span> Problems with Org mode</h3>
+<div class="outline-text-3" id="text-h-Problems-with-Org-mode">
 <p>
-Probably the biggest feature of Lilac is that it frees you from having to write
-a custom <code>#+caption: ...</code> text for every source code block. And Lilac also
-automatically links child blocks and parent blocks together (something that Org
-mode leaves out entirely). Lilac also automatically adds link anchors to all
-source code blocks as well as headlines, making it easier to link to different
-parts of an Org file while browsing it.
+By default, source code blocks do not get any captions in the HTML output. This
+is a problem for LP because you have to manually explain the name of each block
+to keep track of their usage in other blocks (when referring to them with Noweb
+style references). This gets repetitive rather quickly.
 </p>
 
 <p>
-Lilac comes with some minor adjustments to make HTML generation
-deterministic (you may be surprised that Org mode by default creates random UIDs
-for every HTML export invocation). This makes it VCS and CI-friendly because the
-output changes if and only if the input changes. Speaking of CI-friendliness,
-Lilac was designed to be run from outside of Emacs by default (and not
-interactively).
+While Org mode allows source code blocks to refer to other blocks (Noweb
+references), it does not do any kind of linking. So you can write blocks like
 </p>
+
+<div class="org-src-container"><pre class="src src-org"><span class="org-org-meta-line">#+name: example-parent-block</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
+<span class="org-org-block">&lt;&lt;some-other-block&gt;&gt;</span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+...
+
+<span class="org-org-meta-line">#+name: some-child-block</span>
+<span class="org-org-block-begin-line">#+begin_src bash</span>
+<span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"I am child 1"</span></span>
+<span class="org-org-block-end-line">#+end_src</span>
+</pre></div><p>
+but when this is exported to HTML neither <code>example-parent-block</code> nor
+<code>some-child-block</code> have any links to each other. This is frustrating because it
+makes navigating between them difficult.
+</p>
+
+<p>
+Org mode does not create link anchors for headings, which makes referring to
+them from other external documents slightly annoying. Org mode does not add link
+anchors to source code blocks.
+</p>
+
+<p>
+Org mode generates random link ID's on every export. That is, even if you change
+nothing in your Org mode file, if you export to HTML there <b>will</b> be a diff
+because all of the linked objects will get a new link ID.
+</p>
+</div>
+</div>
+
+<div id="outline-container-h-Lilac-to-the-rescue" class="outline-3">
+<h3 id="h-Lilac-to-the-rescue"><span class="section-number-3">2.2.</span> Lilac to the rescue</h3>
+<div class="outline-text-3" id="text-h-Lilac-to-the-rescue">
+<p>
+Lilac addresses all of the issues presented above.
+</p>
+
+<p>
+Lilac frees you from having to write
+a custom <code>#+caption: ...</code> text for every source code block, because it generates
+them automatically based on the name of the Noweb reference. And Lilac
+automatically links child blocks and parent blocks together. Lilac automatically
+adds link anchors to all source code blocks as well as headlines, making it
+easier to link to different parts of an Org file while browsing it.
+</p>
+
+<p>
+Lilac makes HTML generation deterministic. This makes it VCS and CI-friendly
+because the output changes if and only if the input changes. Speaking of
+CI-friendliness, Lilac was designed to be run from outside of Emacs by default
+(and not interactively).
+</p>
+</div>
 </div>
 </div>
 
@@ -355,11 +414,14 @@ it as a submodule to your project. The point is to get the <code>lilac.el</code>
 dependencies, themselves submodules) and <code>lilac.theme</code> (and associated
 CSS/JavaScript files) available locally. Then for the Org mode file you are
 using, you can load <code>lilac.el</code> and run <code>(lilac-publish)</code> to generate the HTML
-file, or run <code>(org-babel-tangle)</code> to generate the source code from it.
+file, or run <code>(org-babel-tangle)</code> to generate the source code from it. See the
+<code>Makefile</code> that this project uses as a reference.
 </p>
 
 <p>
-You can use this Org file (the file you are reading) as a reference.
+The main thing that you need to keep in mind when writing Org mode files for
+consumption by Lilac is that the source code blocks must use Noweb references
+using <code>__NREF__</code> as a prefix. See the discussion below.
 </p>
 </div>
 
@@ -367,22 +429,22 @@ You can use this Org file (the file you are reading) as a reference.
 <h3 id="h-Source-code-blocks--monoblocks-and-polyblocks"><span class="section-number-3">3.1.</span> Source code blocks: monoblocks and polyblocks</h3>
 <div class="outline-text-3" id="text-h-Source-code-blocks--monoblocks-and-polyblocks">
 <p>
-Lilac makes using Noweb-style references in source code blocks easy. In default
-Org mode, Noweb-style references must be enclosed in double angle brackets <code>&lt;&lt;</code>
-and <code>&gt;&gt;</code>. While this works, it's problematic because it can mean different
-things syntactically based on the source code language. Your source code block's
-language might think that the angle brackets are operators or keywords and
-colorize them differently, for example. This results in an inconsistent
-experience.
+In Org mode, Noweb-style references by default must be enclosed in double angle
+brackets <code>&lt;&lt;</code> and <code>&gt;&gt;</code>. While this works, it's problematic because it can mean
+different things syntactically based on the source code language. Your source
+code block's language might think that the angle brackets are operators or
+keywords and colorize them differently, for example.
 </p>
 
 <p>
-Instead, Lilac expects Noweb-style references, in the form <code>__NREF__foo</code> (where
+Instead, Lilac expects Noweb-style references in the form <code>__NREF__foo</code> (where
 the "NREF" stands for "Noweb reference"). Then you are free to name your child
 block with this same <code>__NREF__foo</code> name. This is better because now you can
 search for this word <code>__NREF__foo</code> in your raw Org mode document and you'll
 instantly be able to see where it is used. Contrast this with the default Org
-mode behavior where you'll have to search for <code>&lt;&lt;foo&gt;</code> and <code>foo</code> separately.
+mode behavior where you'll have to search for <code>&lt;&lt;foo&gt;&gt;</code> and <code>foo</code> separately
+(because searching for just <code>foo</code> may collide with other names that are not
+source code block names).
 </p>
 
 <p>
@@ -390,28 +452,28 @@ In the example below, the <code>parent-block</code> refers to 2 other child bloc
 definition.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-1">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-1"><span class="org-org-meta-line">#+name: example-parent-block</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-2">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-2"><span class="org-org-meta-line">#+name: parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
-<span class="org-org-block">__NREF__example-child-block-foo-1</span>
-<span class="org-org-block">__NREF__example-child-block-bar-1</span>
+<span class="org-org-block">__NREF__child-block-1</span>
+<span class="org-org-block">__NREF__child-block-2</span>
 <span class="org-org-block-end-line">#+end_src</span>
 
 ...
 
-<span class="org-org-meta-line">#+name: __NREF__example-child-block-foo-1</span>
+<span class="org-org-meta-line">#+name: __NREF__child-block-1</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"I am child 1"</span></span>
 <span class="org-org-block-end-line">#+end_src</span>
 
 ...
 
-<span class="org-org-meta-line">#+header: :noweb-ref __NREF__example-child-block-bar-1</span>
+<span class="org-org-meta-line">#+header: :noweb-ref __NREF__child-block-2</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> -n </span><span class="org-org-block"><span class="org-string">"I am "</span></span>
 <span class="org-org-block-end-line">#+end_src</span>
 
-<span class="org-org-meta-line">#+header: :noweb-ref __NREF__example-child-block-bar-1</span>
+<span class="org-org-meta-line">#+header: :noweb-ref __NREF__child-block-2</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"child 2"</span></span>
 <span class="org-org-block-end-line">#+end_src</span>
@@ -425,11 +487,12 @@ the Noweb reference in the parent block.
 </p>
 </div>
 
-<div id="outline-container-h-Examples-of-source-code-block-usage" class="outline-4">
-<h4 id="h-Examples-of-source-code-block-usage"><span class="section-number-4">3.1.1.</span> Examples of source code block usage</h4>
-<div class="outline-text-4" id="text-h-Examples-of-source-code-block-usage">
+<div id="outline-container-h-Examples-of-source-code-blocks" class="outline-4">
+<h4 id="h-Examples-of-source-code-blocks"><span class="section-number-4">3.1.1.</span> Examples of source code blocks</h4>
+<div class="outline-text-4" id="text-h-Examples-of-source-code-blocks">
 <p>
-The basic use case is like the example above.
+Below is an example of the usage described above. Notice how the child blocks
+referenced in the parent block are linked to their definitions.
 </p>
 
 <div class="org-src-container"><pre class="src src-bash" id="org0000004"><span class="org-builtin">echo</span> <span class="org-string">"Hello from the parent block"</span>
@@ -437,19 +500,19 @@ The basic use case is like the example above.
 <span class="org-builtin">echo</span> <span class="org-string">""</span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__example-child-block-bar">example-child-block-bar</a></span>
 </pre></div><p>
-The child blocks above are linked to their definitions below.
+Below are the child blocks. The first is a monoblock. Every child block's name
+links back up to the parent block where it is referenced.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#org0000004">example-child-block-foo</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__example-child-block-foo">&#x1f517;</a></span></div><pre class="src src-bash" id="__NREF__example-child-block-foo"><span class="org-builtin">echo</span> <span class="org-string">"I am child 1"</span>
 </pre></div></div><p>
-The blocks below are examples of polyblocks. Note the fraction after the name
-which denotes the position of the block in the overall polyblock "chain".
+The blocks below are polyblocks.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#org0000004">example-child-block-bar</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__example-child-block-bar">&#x1f517;</a></span></div><pre class="src src-bash" id="__NREF__example-child-block-bar"><span class="org-builtin">echo</span> -n <span class="org-string">"I am "</span>
 </pre></div></div><p>
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-incididunt ut labore et dolore magna aliqua.
+Note the fraction after the name which denotes the position of the block in the
+overall polyblock "chain".
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#org0000004">example-child-block-bar</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__example-child-block-bar-2">&#x1f517;</a></span></div><pre class="src src-bash" id="__NREF__example-child-block-bar-2"><span class="org-builtin">echo</span> <span class="org-string">"child 2"</span>
@@ -481,7 +544,8 @@ Below is an example where we define a child block once&#x2026;
 </pre></div><p>
 Notice that the child block has an additional link named "2", which points to
 the second parent that references this block (the first parent is linked by the
-child block name itself, as in the previous example).
+child block name itself, as in the previous example). If it is referenced in
+additional parent blocks, they will show up as links "3", "4", etc.
 </p>
 </div>
 </div>
@@ -520,16 +584,18 @@ weaving.
 Weaving is conceptually simpler than tangling because there is no extra step &#x2014;
 the output is an HTML page and that is something that we can use directly
 (unlike program source code, which may require additional compilation into a
-binary, depending on the language). We also limit ourselves to only HTML for
-simplicity (in particular, we don't have to worry about page breaks).
+binary, depending on the language). We limit ourselves to HTML output because
+HTML support is ubiquitous; plus we don't have to worry about page breaks (if we
+were to output PDFs for example).
 </p>
 
 <p>
-However, most of the code in <a href="lilac.el"><code>lilac.el</code></a> have to do with weaving because the
-default infrastructure that ships with Org mode is too rigid for our needs. For
-example, we make heavy use of Noweb-style <a href="#citeproc_bib_item_1">[1]</a> references, but
-also add in extensive HTML links to allow the reader to jump around code easily
-because Org does not cross-link these references by default.
+Although weaving is conceptually simple, most of the code in <a href="lilac.el"><code>lilac.el</code></a> have to
+do with weaving because the default infrastructure that ships with Org mode is
+too rigid for our needs. For example, we make heavy use of Noweb-style
+<a href="#citeproc_bib_item_1">[1]</a> references, but also add in extensive HTML links to allow
+the reader to jump around code easily because Org does not cross-link these
+references by default.
 </p>
 
 <p>
@@ -824,7 +890,7 @@ So assume that we already have the smart captions in a sorted <a href="https://w
 should be inserted, and the VALUE is the caption itself (a string), like this:
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-7">&#x1f517;</a></span></div><pre class="src src-elisp" id="anonymous-7">'((153  . <span class="org-string">"#+caption: ..."</span>)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-8">&#x1f517;</a></span></div><pre class="src src-elisp" id="anonymous-8">'((153  . <span class="org-string">"#+caption: ..."</span>)
   (384  . <span class="org-string">"#+caption: ..."</span>)
   (555  . <span class="org-string">"#+caption: ..."</span>)
   (684  . <span class="org-string">"#+caption: ..."</span>)
@@ -870,7 +936,7 @@ Why do we even need these source code blocks to link back to their parents? The
 point is to make things easier to navigate. For example, if we have
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-8">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-8"><span class="org-org-meta-line">#+name: parent-block</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-9">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-9"><span class="org-org-meta-line">#+name: parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
 <span class="org-org-block">__NREF__child-block-1</span>
@@ -1546,7 +1612,7 @@ This is a helper function to parse the HTML output for a source code block.
 Consider the following code:
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-9">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-9"><span class="org-org-meta-line">#+name: parent-block</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-link-symbol"><a href="#anonymous-10">&#x1f517;</a></span></div><pre class="src src-org" id="anonymous-10"><span class="org-org-meta-line">#+name: parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
 <span class="org-org-block">__NREF__child-block-1</span>
