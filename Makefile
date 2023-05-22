@@ -9,7 +9,7 @@ weave: README.html
 .PHONY: weave
 
 README.html: README.org
-	$(call run_emacs,(batch-org-gen-css-and-exit),README.org)
+	$(call run_emacs,(lilac-gen-css-and-exit),README.org)
 	$(call run_emacs,(lilac-publish),README.org)
 	# Fix inline styles.
 	sed -i 's/<style>.csl-left-margin{float: left; padding-right: 0em/'\

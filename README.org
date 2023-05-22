@@ -299,7 +299,7 @@ __NREF__Makefile-run_emacs
 #+end_src
 
 Weaving just depends on the main =README.html= file being generated. Before we
-call =(lilac-publish)=, we have to first call =(batch-org-gen-css-and-exit
+call =(lilac-publish)=, we have to first call =(lilac-gen-css-and-exit
 \"README.org\")= because otherwise the source code blocks do not get any syntax
 highlighting. And lastly we have to modify the generated =README.html= file with
 =sed= because we have to fix up some CSS classes that get inlined into the HTML.
@@ -310,7 +310,7 @@ weave: README.html
 .PHONY: weave
 
 README.html: README.org
-	$(call run_emacs,(batch-org-gen-css-and-exit),README.org)
+	$(call run_emacs,(lilac-gen-css-and-exit),README.org)
 	$(call run_emacs,(lilac-publish),README.org)
 	# Fix inline styles.
 	sed -i 's/<style>.csl-left-margin{float: left; padding-right: 0em/'\
@@ -371,42 +371,71 @@ endef
 PROJ_ROOT := $(shell git rev-parse --show-toplevel)
 #+end_src
 
-** Emacs customizations for HTML export (lilac.el)
+** Emacs customizations for HTML export (=lilac.el=)
 
-The default Org mode defaults present two major problems:
-
-1. nondeterminism, and
-2. lack of cross-linking across Noweb references.
-
-Nondeterminism is problematic for us because it results in a different HTML file
-every time we run =org-babel-tangle=, /even if the Org files have not changed/.
-This is taken care of in Section [[* Fix non-determinism]].
-
-We define "cross-linking" to mean the act of linking to a child source code
-block whenever we reference it from a parent source code block, and vice versa.
-These links manifest themselves as blue boxes (with rounded corners) in this
-HTML document.
-
-The reason why cross-linking is so important is because the source code blocks
-are interleaved with prose. And the order of code presented may not match the
-order of code in the tangled output. And sometimes the reader may just want to
-jump to a source code block just to see its implementation right away instead of
-waiting for the prose to catch up to it. Cross-linking makes it easier to
-navigate by source code blocks. Cross-linking is implemented in [[* HTML
-modifications]].
+Below is the overall structure of =lilac.el=. The =gc-cons-threshold= setting is
+to prevent =emacs= from entering garbage collection pauses, because we invoke
+=emacs= from the command line in a fire-and-forget manner.
 
 #+name: lilac.el
 #+caption: lilac.el
 #+begin_src emacs-lisp :tangle lilac.el :eval no
-__NREF__lilac_dot_el-performance-optimization
+; Set garbage-collection threshold to 16 GiB.
+(setq gc-cons-threshold #x400000000)
 __NREF__lilac_dot_el-imports
 __NREF__lilac_dot_el-fix-nondeterminism
-__NREF__lilac_dot_el-lilac-publish
 __NREF__lilac_dot_el-autogenerate-css
+__NREF__lilac_dot_el-lilac-publish
 __NREF__lilac_dot_el-misc
 #+end_src
 
-*** Toplevel publishing function (=lilac-publish=)
+** Fix non-determinism
+
+Nondeterminism is problematic because it results in a different HTML file
+every time we run =org-babel-tangle=, /even if the Org files have not changed/.
+Here we take care to set things right so that we can have reprducible, stable
+HTML output.
+
+*** Do not insert current time as HTML comment
+
+Org mode also injects an HTML comment (not visible to the user) to record the
+time that the HTML was generated. We disable this because it breaks
+deterministic output. See [[https://emacs.stackexchange.com/questions/50117/how-to-disable-commented-date-in-org-mode-html-export][this link]] for more info.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-fix-nondeterminism
+#+begin_src emacs-lisp
+(setq org-export-time-stamp-file nil)
+#+end_src
+
+*** Do not insert current Org mode version
+
+By default Org mode appends visible metadata at the bottom of the HTML document,
+including the Org version used to generate the document. We suppress this
+information.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-fix-nondeterminism
+#+begin_src emacs-lisp
+(setq org-html-postamble nil)
+#+end_src
+
+*** Do not use random numbers for the HTML "=id=" attribute
+
+Stop randomized IDs from being generated every time. Instead count from 0 and
+work our way up.
+
+See https://www.reddit.com/r/orgmode/comments/aagmfh/comment/hk6upbf.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-fix-nondeterminism
+#+begin_src emacs-lisp
+(defun org-export-deterministic-reference (references)
+  (let ((new (length references)))
+     (while (rassq new references) (setq new (+ new 1)))
+     new))
+(advice-add #'org-export-new-reference
+            :override #'org-export-deterministic-reference)
+#+end_src
+
+** Toplevel publishing function (=lilac-publish=)
 
 The toplevel function is =lilac-publish=. This actually publishes twice, with
 =lilac-publish-1= and =lilac-publish-2=. The reason we publish twice is because
@@ -453,7 +482,7 @@ __NREF__lilac-prettify-source-code-captions
 __NREF__lilac-human-readable-src-block-ids
 #+end_src
 
-**** Modify the Org buffer
+*** Modify the Org buffer
 
 Here we modify the Org mode buffer, by using =org-export-before-parsing-hook=.
 This takes a list of functions that are free to modify the Org mode buffer
@@ -477,7 +506,7 @@ In brief, the =lilac-UID-for-all-*= functions make it so that the links to
 headlines and source code blocks are both deterministic and human-readable. The
 =lilac-noweb-source-code-block-captions= function
 
-**** Modify the HTML
+*** Modify the HTML
 
 This is useful for adding in final tweaks to the HTML that is difficult to
 accomplish at the Org-mode buffer level.
@@ -506,7 +535,7 @@ blocks.
  '(lilac-replace-org_ids-with-human_ids))
 #+end_src
 
-**** Miscellaneous export settings
+*** Miscellaneous export settings
 
 Do not hardcode colors into the HTML. Instead refer to CSS class names, to be
 stylized by an external CSS file.
@@ -516,9 +545,9 @@ stylized by an external CSS file.
 (org-html-htmlize-output-type 'css)
 #+end_src
 
-*** Org modifications
+** Org modifications
 
-**** Automatic captions for Noweb source code blocks
+*** Automatic captions for Noweb source code blocks
 
 For the parent/child source code blocks, we simply build these up by having
 blocks named =#+name: __NREF__foo= or =#+header: :noweb-ref __NREF__foo=. Each
@@ -812,11 +841,11 @@ index starts at 0 (same as Python).
           matches))))
 #+end_src
 
-**** Human-readable UIDs (Headings, aka headlines)
+*** Human-readable UIDs (Headings, aka headlines)
 
 By default Org does a terrible job of naming HTML =id= fields for headings. By
 default it uses a randomly-generated number. In [[* Do not use random numbers for
-the HTML "id" attribute]] we tweak this behavior to use a deterministic,
+the HTML "=id=" attribute]] we tweak this behavior to use a deterministic,
 incrementing number starting from 0. However while this solution gets rid of the
 nondeterminism, it still results in human-unfriendly =id= attributes because
 they are all numeric (e.g. =org00000a1=, =org00000f3=, etc).
@@ -896,7 +925,7 @@ have a unique ID).
     "-"))
 #+end_src
 
-**** Give polyblocks a =#+name: ...= field (HTML ID)
+*** Give polyblocks a =#+name: ...= field (HTML ID)
 
 Only source code blocks that have a =#+name: ...= field (org name field) get an
 HTML ID (org ID) assigned to it. The problem with polyblocks is that they are
@@ -911,7 +940,7 @@ able to link to the polyblock at all.
 (Monoblocks with a =#+name: ...= field get a unique HTML ID assigned to it in
 the form =orgN= where =N= is a hexadecimal number. By default Org generates a
 random number for =N=, but we use a simple counter that increments, starting
-from 0 (see [[*Do not use random numbers for the HTML "id" attribute]]).)
+from 0 (see [[*Do not use random numbers for the HTML "=id=" attribute]]).)
 
 What we can do is inject a =#+name: ___polyblock-N= line (where =N= is an
 incrementing number) into the beginning of the source code section of all
@@ -954,9 +983,9 @@ block).
             (insert name-field-with-uid)))))
 #+end_src
 
-*** HTML modifications
+** HTML modifications
 
-**** Use human-readable HTML IDs for source code links
+*** Use human-readable HTML IDs for source code links
 
 Recall that there are 2 types of source code blocks: [[monoblock][monoblocks]] and [[polyblock][polyblocks]].
 
@@ -1020,7 +1049,7 @@ it because we can't refer to polyblocks anyway by name).
       (lilac-to-multi-line html-oneline))))
 #+end_src
 
-**** Pretty source code captions
+*** Pretty source code captions
 
 Here there are basically 3 things we have to keep track of:
 
@@ -1232,7 +1261,7 @@ This is a helper function to parse the HTML output for a source code block.
       `(,leading-div ,caption ,body)))
 #+end_src
 
-**** Link noweb references (link to child block from parent block)
+*** Link noweb references (link to child block from parent block)
 
 Consider the following code:
 
@@ -1393,7 +1422,7 @@ for Noweb source code blocks]].
 __NREF__custom-noweb-delimiters
 #+end_src
 
-**** Custom Noweb delimiters
+*** Custom Noweb delimiters
 
 Note that we need to evaluate this lisp code if we want to run ~C-c C-v t~ to
 tangle code blocks properly in an interactive manner from an Emacs editing
@@ -1441,18 +1470,19 @@ When matching, reference is stored in match group 1."
   (lilac-nref-rx t))
 #+end_src
 
-*** Autogenerate CSS for syntax highlighting of source code blocks
+** Autogenerate CSS for syntax highlighting of source code blocks
 
 See [[https://emacs.stackexchange.com/questions/31439/how-to-get-colored-syntax-highlighting-of-code-blocks-in-asynchronous-org-mode-e][this]], specifically https://emacs.stackexchange.com/a/36759.
 
 Generate =syntax-highlighting.css= and quit emacs. This function is designed to
 be run from the command line on a fresh emacs instance (dedicated OS process).
 Unfortunately, by itself it is almost useless (see
-[[__NREF__enable-syntax-highlighting-from-batch-mode][=__NREF__enable-syntax-highlighting-from-batch-mode=]]).
+[[__NREF__enable-syntax-highlighting-from-batch-mode][=__NREF__enable-syntax-highlighting-from-batch-mode=]]), because there appears to
+be a [[https://debbugs.gnu.org/cgi/bugreport.cgi?bug=61521][bug]] in Emacs 28 which [[https://emacs.stackexchange.com/questions/75814/org-html-htmlize-generate-css-not-generating-styles][breaks]] =org-html-htmlize-generate-css=.
 
 #+name: __NREF__lilac_dot_el-autogenerate-css
 #+begin_src emacs-lisp
-(defun batch-org-gen-css-and-exit ()
+(defun lilac-gen-css-and-exit ()
   (font-lock-flush)
   (font-lock-fontify-buffer)
   (org-html-htmlize-generate-css)
@@ -1464,7 +1494,7 @@ Unfortunately, by itself it is almost useless (see
 __NREF__enable-syntax-highlighting-from-batch-mode
 #+end_src
 
-Sadly, =batch-org-gen-css-and-exit= by itself generates a near-blank CSS file.
+Sadly, =lilac-gen-css-and-exit= by itself generates a near-blank CSS file.
 So we have to use code from [[https://emacs.stackexchange.com/questions/38437/org-mode-batch-export-missing-syntax-highlighting][here]]:
 
 #+name: __NREF__enable-syntax-highlighting-from-batch-mode
@@ -1542,71 +1572,9 @@ with class 'color and highest min-color value."
 (advice-add 'face-attribute :override #'my-face-attribute)
 #+end_src
 
-*** Fix non-determinism
+** Misc settings
 
-There are some things that Org mode does that annoyingly break determinism. Here
-we take care to set things right so that we can have reprducible, stable HTML
-output.
-
-**** Do not insert current time as HTML comment
-
-Org mode also injects an HTML comment (not visible to the user) to record the
-time that the HTML was generated. We disable this because it breaks
-deterministic output. See [[https://emacs.stackexchange.com/questions/50117/how-to-disable-commented-date-in-org-mode-html-export][this link]] for more info.
-
-#+header: :noweb-ref __NREF__lilac_dot_el-fix-nondeterminism
-#+begin_src emacs-lisp
-(setq org-export-time-stamp-file nil)
-#+end_src
-
-**** Do not insert current Org mode version
-
-By default Org mode appends visible metadata at the bottom of the HTML document,
-including the Org version used to generate the document. We suppress this
-information.
-
-#+header: :noweb-ref __NREF__lilac_dot_el-fix-nondeterminism
-#+begin_src emacs-lisp
-(setq org-html-postamble nil)
-#+end_src
-
-**** Do not use random numbers for the HTML "id" attribute
-
-Stop randomized ids from being generated every time. Instead count from 0 and
-work our way up.
-
-See https://www.reddit.com/r/orgmode/comments/aagmfh/comment/hk6upbf.
-
-#+header: :noweb-ref __NREF__lilac_dot_el-fix-nondeterminism
-#+begin_src emacs-lisp
-(defun org-export-deterministic-reference (references)
-  (let ((new (length references)))
-     (while (rassq new references) (setq new (+ new 1)))
-     new))
-(advice-add #'org-export-new-reference
-            :override #'org-export-deterministic-reference)
-#+end_src
-
-*** Misc settings
-
-Disable backup files for =lilac.el= (that look like =lilac.el~=) when we invoke
-Emacs from the [[Makefile][Makefile]].
-
-#+header: :noweb-ref __NREF__lilac_dot_el-misc
-#+begin_src emacs-lisp
-(setq make-backup-files nil)
-(setq org-src-preserve-indentation t)
-
-; See https://stackoverflow.com/a/27285582/437583.
-(defun lilac-test-file-name ()
-  (concat "test_"
-          (file-name-nondirectory
-           (directory-file-name
-            (file-name-directory (buffer-file-name))))
-          ".py"))
-#+end_src
-
-**** Use HTML5 export, not XML (to un-break MathJax)
+*** Use HTML5 export, not XML (to un-break MathJax)
 
 By default on Org 9.6, MathJax settings (JavaScript snippet) gets wrapped in a
 CDATA tag, and we run into the same problem described on this email that has
@@ -1621,14 +1589,55 @@ disappear.
 (setq org-html-doctype "html5")
 #+end_src
 
-*** Automatically link headlines (h2 to h6)
+*** Preserve leading whitespace characters on export
+
+#+header: :noweb-ref __NREF__lilac_dot_el-misc
+#+begin_src emacs-lisp
+(setq org-src-preserve-indentation t)
+#+end_src
+
+*** Disable backups
+
+Disable backup files for =lilac.el= (that look like =lilac.el~=) when we invoke
+Emacs from the [[Makefile][Makefile]].
+
+#+header: :noweb-ref __NREF__lilac_dot_el-misc
+#+begin_src emacs-lisp
+(setq make-backup-files nil)
+#+end_src
+
+*** Profiling
+
+We don't use this very often, but it's mainly for determining cost centers for
+weaving and tangling.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-misc
+#+begin_src emacs-lisp
+(defun lilac-publish-profile ()
+  (interactive)
+  (profiler-start 'cpu)
+  (lilac-publish)
+  (profiler-stop)
+  (profiler-report)
+  (profiler-report-write-profile "emacs-profile-weave.txt") t)
+
+(defun lilac-tangle-profile ()
+  (interactive)
+  (profiler-start 'cpu)
+  (org-babel-tangle)
+  (profiler-stop)
+  (profiler-report)
+  (profiler-report-write-profile "emacs-profile-tangle.txt") t)
+#+end_src
+
+** Automatically link headlines (h2 to h6)
 
 Every HTML element =h2= to =h6= (which encode the Org mode headlines) already
 come with a unique ID, but they are only ever linked from the Table of Contents.
 The code here makes it so that the headlines are linked to themselves, which
 makes it easy for users to link to them directly when they're reading the page.
 
-The code here is taken from [[https://github.com/listx/listx_blog/blame/8e6e7b533d89f77a6939e5eda9fd9d990d25a7a9/misc.js#L1][here]].
+The JavaScript below is taken from [[https://github.com/listx/listx_blog/blame/8e6e7b533d89f77a6939e5eda9fd9d990d25a7a9/misc.js#L1][here]].
 
 #+name: misc.js
 #+caption: misc.js
@@ -1681,12 +1690,14 @@ a.section-headline {
 }
 #+end_src
 
-*** Imports
+** Imports
+
+If we want syntax-highlighting to work for a code block, that code block's major
+mode (language) must be loaded in here.
 
 #+name: __NREF__lilac_dot_el-imports
 #+begin_src emacs-lisp
 ;; Built-in packages (distributed with Emacs).
-(require 'tex-mode)
 (require 'elisp-mode)
 
 ;; Third-party packages (checked in as Git submodules)
@@ -1708,37 +1719,6 @@ a.section-headline {
 (require 'magit-section)
 (add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/nix-mode"))
 (require 'nix-mode)
-#+end_src
-
-*** Performance optimizations
-
-#+name: __NREF__lilac_dot_el-performance-optimization
-#+begin_src emacs-lisp
-; Set garbage-collection threshold to 16 GiB.
-(setq gc-cons-threshold #x400000000)
-
-__NREF__lilac_dot_el-profiling
-#+end_src
-
-**** Profiling
-
-#+name: __NREF__lilac_dot_el-profiling
-#+begin_src emacs-lisp
-(defun lilac-publish-profile ()
-  (interactive)
-  (profiler-start 'cpu)
-  (lilac-publish)
-  (profiler-stop)
-  (profiler-report)
-  (profiler-report-write-profile "emacs-profile-weave.txt") t)
-
-(defun lilac-tangle-profile ()
-  (interactive)
-  (profiler-start 'cpu)
-  (org-babel-tangle)
-  (profiler-stop)
-  (profiler-report)
-  (profiler-report-write-profile "emacs-profile-tangle.txt") t)
 #+end_src
 
 ** Additional (hand-tweaked) CSS
