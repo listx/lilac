@@ -538,7 +538,7 @@ When matching, reference is stored in match group 1."
            (caption-without-listing-prefix
             (replace-regexp-in-string "<span.+?span>" "" caption))
            (caption-text
-            (if parent-links
+            (if (> (length parent-links) 0)
                 (concat
                   "<div class=\"lilac-caption\">"
                     parent-links

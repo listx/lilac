@@ -1123,7 +1123,7 @@ variable and display it.
            (caption-without-listing-prefix
             (replace-regexp-in-string "<span.+?span>" "" caption))
            (caption-text
-            (if parent-links
+            (if (> (length parent-links) 0)
                 (concat
                   "<div class=\"lilac-caption\">"
                     parent-links
