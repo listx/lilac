@@ -1,11 +1,6 @@
 ; Set garbage-collection threshold to 16 GiB.
 (setq gc-cons-threshold #x400000000)
 
-(defun lilac-disable-syntax-highlighting (_orig-func &rest args)
-  (apply 'lilac-org-html-fontify-code args))
-(defun lilac-org-html-fontify-code (code lang)
-  (org-html-encode-plain-text code))
-
 (defun lilac-publish-profile ()
   (interactive)
   (profiler-start 'cpu)

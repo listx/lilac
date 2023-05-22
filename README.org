@@ -1712,25 +1712,10 @@ a.section-headline {
 
 *** Performance optimizations
 
-This "optimization" is inspired by
-[[https://www.reddit.com/r/emacs/comments/mmdeei/comment/gtvryvy]]. There, the idea
-was to ignore hooks associated with major modes for the source code blocks.
-Because they use =org-publish= and we don't, we can't use the same code but we
-can still use the same idea. In particular, =org-html-export-to-html= calls
-=org-html-fontify-code= to perform syntax highlighting of source code blocks.
-
-During ad-hoc tests, this shaves off a few seconds. This was determined by
-comparing the regular =weave= target versus the =weave-nocolor= target.
-
 #+name: __NREF__lilac_dot_el-performance-optimization
 #+begin_src emacs-lisp
 ; Set garbage-collection threshold to 16 GiB.
 (setq gc-cons-threshold #x400000000)
-
-(defun lilac-disable-syntax-highlighting (_orig-func &rest args)
-  (apply 'lilac-org-html-fontify-code args))
-(defun lilac-org-html-fontify-code (code lang)
-  (org-html-encode-plain-text code))
 
 __NREF__lilac_dot_el-profiling
 #+end_src

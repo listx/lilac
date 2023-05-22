@@ -2186,27 +2186,8 @@ This is a bit distracting, so make them black.
 <div id="outline-container-h-Performance-optimizations" class="outline-4">
 <h4 id="h-Performance-optimizations"><span class="section-number-4">5.2.9.</span> Performance optimizations</h4>
 <div class="outline-text-4" id="text-h-Performance-optimizations">
-<p>
-This "optimization" is inspired by
-<a href="https://www.reddit.com/r/emacs/comments/mmdeei/comment/gtvryvy">https://www.reddit.com/r/emacs/comments/mmdeei/comment/gtvryvy</a>. There, the idea
-was to ignore hooks associated with major modes for the source code blocks.
-Because they use <code>org-publish</code> and we don't, we can't use the same code but we
-can still use the same idea. In particular, <code>org-html-export-to-html</code> calls
-<code>org-html-fontify-code</code> to perform syntax highlighting of source code blocks.
-</p>
-
-<p>
-During ad-hoc tests, this shaves off a few seconds. This was determined by
-comparing the regular <code>weave</code> target versus the <code>weave-nocolor</code> target.
-</p>
-
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-performance-optimization</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-performance-optimization">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-performance-optimization"><span class="org-comment-delimiter">; </span><span class="org-comment">Set garbage-collection threshold to 16 GiB.</span>
 (<span class="org-keyword">setq</span> gc-cons-threshold #x400000000)
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-disable-syntax-highlighting</span> (_orig-func <span class="org-type">&amp;rest</span> args)
-  (apply 'lilac-org-html-fontify-code args))
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-org-html-fontify-code</span> (code lang)
-  (org-html-encode-plain-text code))
 
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-profiling">lilac_dot_el-profiling</a></span>
 </pre></div></div>
