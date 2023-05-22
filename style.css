@@ -4,7 +4,8 @@ a {
 
 body {
     font-size: 1.5em;
-    margin: 0 250px;
+    width: 1000px;
+    margin: auto;
 }
 
 body, p, li, h1, h2, h3, h4, h5, h6, legend {
@@ -25,13 +26,24 @@ li {
 
 table {
     margin: 1em auto 0em auto;
+    border-spacing: 0;
+    border-radius: 4px;
+    border: 1px solid #777;
+    border-collapse: unset;
 }
-table, th, td {
-    border: 1px solid black;
-    border-collapse: collapse;
-}
+
 th, td {
     padding: 3px 6px;
+    border-right: 1px solid #777;
+    border-bottom: 1px solid #777;
+}
+
+th:last-child, td:last-child  {
+    border-right: none;
+}
+
+tr:last-child td {
+    border-bottom: none;
 }
 
 /* Center all images. */
@@ -81,7 +93,7 @@ a.section-headline {
     color: black;
 }
 .org-src-container {
-    margin: 1em 100px 1em 50px;
+    margin: 1em 0;
 }
 
 .org-src-container pre {
