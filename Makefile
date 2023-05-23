@@ -2,7 +2,10 @@ all: test weave
 .PHONY: all
 
 test: tangle
-	# FIXME: Add unit tests
+	emacs --quick --batch --kill --load ert \
+		--load lilac.el \
+		--load lilac-tests.el \
+		--funcall ert-run-tests-batch-and-exit
 .PHONY: test
 
 weave: README.html

@@ -290,7 +290,10 @@ all: test weave
 .PHONY: all
 
 test: tangle
-	# FIXME: Add unit tests
+	emacs --quick --batch --kill --load ert \
+		--load lilac.el \
+		--load lilac-tests.el \
+		--funcall ert-run-tests-batch-and-exit
 .PHONY: test
 
 __NREF__Makefile-weave
@@ -397,6 +400,7 @@ __NREF__lilac_dot_el-fix-nondeterminism
 __NREF__lilac_dot_el-autogenerate-css
 __NREF__lilac_dot_el-lilac-publish
 __NREF__lilac_dot_el-misc
+(provide 'lilac)
 #+end_src
 
 ** Fix non-determinism
@@ -2036,6 +2040,20 @@ pkgs.mkShell ({
     pkgs.less
   ];
 })
+#+end_src
+
+* Tests
+
+#+name: lilac-tests.el
+#+caption: lilac-tests.el
+#+begin_src emacs-lisp :tangle lilac-tests.el :eval no
+(require 'ert)
+(require 'lilac)
+
+(ert-deftest lilac-tests-basic ()
+  (should (equal "" "")))
+
+(provide 'lilac-tests)
 #+end_src
 
 * Glossary

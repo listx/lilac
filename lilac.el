@@ -680,3 +680,4 @@ When matching, reference is stored in match group 1."
   (profiler-stop)
   (profiler-report)
   (profiler-report-write-profile "emacs-profile-tangle.txt") t)
+(provide 'lilac)
