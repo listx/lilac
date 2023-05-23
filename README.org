@@ -1645,27 +1645,10 @@ The JavaScript below is taken from [[https://github.com/listx/listx_blog/blame/8
 $(function() {
     $("h2,h3,h4,h5,h6").each(function() {
         var $this = $(this);
-        var text = $this.text();
         var href = $this.attr("id");
-        var href_parts = [];
-        var href_custom = "";
-        if (typeof href === "undefined") {
-            href_custom = "";
-            href_parts = text.split(" ");
-            for (i = 0; i < href_parts.length; i++) {
-                href_custom += href_parts[i] + '-';
-            }
-            href_custom = href_custom.slice(0, -1).toLowerCase();
-            console.log(href_custom);
-        }
-
-        $this.text("");
-        if (typeof href === "undefined") {
-            href = href_custom;
-            $this.attr("id", href);
-        }
-        $this.prepend($("<a>").attr("href", '#' +
-            href).addClass("section-headline").text(text));
+        $this.wrapInner(
+            $("<a/>").attr("href", '#' + href)
+                     .addClass("section-heading"));
     });
 });
 #+end_src
@@ -1685,8 +1668,15 @@ This is a bit distracting, so make them black.
 
 #+name: __NREF__css-source-code-section-headlines
 #+begin_src css
-a.section-headline {
+a.section-heading {
     color: black;
+    text-decoration: none;
+}
+
+a.section-heading:hover::after {
+    float: left;
+    margin-left: -1.3em;
+    content: "\1f517";
 }
 #+end_src
 

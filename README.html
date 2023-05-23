@@ -2117,27 +2117,10 @@ The JavaScript below is taken from <a href="https://github.com/listx/listx_blog/
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">misc.js</label><span class="lilac-caption-link-symbol"><a href="#misc-js">&#x1f517;</a></span></div><pre class="src src-js" id="misc-js">$(<span class="org-keyword">function</span>() {
     $(<span class="org-string">"h2,h3,h4,h5,h6"</span>).each(<span class="org-keyword">function</span>() {
         <span class="org-keyword">var</span> <span class="org-variable-name">$this</span> = $(<span class="org-constant">this</span>);
-        <span class="org-keyword">var</span> <span class="org-variable-name">text</span> = $this.text();
         <span class="org-keyword">var</span> <span class="org-variable-name">href</span> = $this.attr(<span class="org-string">"id"</span>);
-        <span class="org-keyword">var</span> <span class="org-variable-name">href_parts</span> = [];
-        <span class="org-keyword">var</span> <span class="org-variable-name">href_custom</span> = <span class="org-string">""</span>;
-        <span class="org-keyword">if</span> (<span class="org-keyword">typeof</span> href === <span class="org-string">"undefined"</span>) {
-            href_custom = <span class="org-string">""</span>;
-            href_parts = text.split(<span class="org-string">" "</span>);
-            <span class="org-keyword">for</span> (i = 0; i &lt; href_parts.length; i++) {
-                href_custom += href_parts[i] + <span class="org-string">'-'</span>;
-            }
-            href_custom = href_custom.slice(0, -1).toLowerCase();
-            console.log(href_custom);
-        }
-
-        $this.text(<span class="org-string">""</span>);
-        <span class="org-keyword">if</span> (<span class="org-keyword">typeof</span> href === <span class="org-string">"undefined"</span>) {
-            href = href_custom;
-            $this.attr(<span class="org-string">"id"</span>, href);
-        }
-        $this.prepend($(<span class="org-string">"&lt;a&gt;"</span>).attr(<span class="org-string">"href"</span>, <span class="org-string">'#'</span> +
-            href).addClass(<span class="org-string">"section-headline"</span>).text(text));
+        $this.wrapInner(
+            $(<span class="org-string">"&lt;a/&gt;"</span>).attr(<span class="org-string">"href"</span>, <span class="org-string">'#'</span> + href)
+                     .addClass(<span class="org-string">"section-heading"</span>));
     });
 });
 </pre></div></div><p>
@@ -2152,8 +2135,15 @@ Linkifying itself makes all the headlines blue (the default color for links).
 This is a bit distracting, so make them black.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-section-headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines"><span class="org-css-selector">a.section-headline </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-section-headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines"><span class="org-css-selector">a.section-heading </span>{
     <span class="org-css-property">color</span>: <span class="custom">black</span>;
+    <span class="org-css-property">text-decoration</span>: none;
+}
+
+<span class="org-css-selector">a.section-heading:hover::after </span>{
+    <span class="org-css-property">float</span>: left;
+    <span class="org-css-property">margin-left</span>: -1.3em;
+    <span class="org-css-property">content</span>: <span class="org-string">"\1f517"</span>;
 }
 </pre></div></div>
 </div>
