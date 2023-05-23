@@ -2050,10 +2050,70 @@ pkgs.mkShell ({
 (require 'ert)
 (require 'lilac)
 
-(ert-deftest lilac-tests-basic ()
-  (should (equal "" "")))
+__NREF__t-helpers
+__NREF__t-lilac-is-parent-block
+__NREF__t-lilac-get-noweb-children
 
 (provide 'lilac-tests)
+#+end_src
+
+** Test helpers
+
+Note that we cannot write =__NREF__foo= directly in the test code here, because
+when this Org file is tangled, the references will be detected and Org mode will
+try to replace them with a monoblock or polyblock elsewhere in this file named
+=__NREF__foo=. So we have to go in "stealth mode" by writing the =__NREF__=
+prefix indirectly with the =(nref)= helper function.
+
+#+name: __NREF__t-helpers
+#+begin_src emacs-lisp
+(defun nref (s) (concat "__NREF__" s))
+#+end_src
+
+** Smart source code block caption helpers
+
+#+name: __NREF__t-lilac-get-noweb-children
+#+begin_src emacs-lisp
+(ert-deftest t-lilac-get-noweb-children ()
+  (let ((body
+         (concat
+          "#+name: parent\n"
+          "#+caption: parent\n"
+          "#+begin_src emacs-lisp\n"
+          "; foo\n"
+          "#+end_src\n")))
+    (should (equal (lilac-get-noweb-children body)
+                   ())))
+  (let ((body
+         (concat
+          "#+name: parent\n"
+          "#+caption: parent\n"
+          "#+begin_src emacs-lisp\n"
+          "; foo\n"
+          (nref "one") "\n"
+          "; bar\n"
+          (nref "two") "\n"
+          "#+end_src\n")))
+    (should (equal (lilac-get-noweb-children body)
+                   `(,(nref "one") ,(nref "two"))))))
+#+end_src
+
+=lilac-is-parent-block= depends on =lilac-get-noweb-children=. We tested the
+latter already above, but we test the former anyway for completeness.
+
+#+name: __NREF__t-lilac-is-parent-block
+#+begin_src emacs-lisp
+(ert-deftest t-lilac-is-parent-block ()
+  (with-temp-buffer
+    (insert "#+name: parent\n")
+    (insert "#+caption: parent\n")
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; foo\n")
+    (insert (concat (nref "child") "\n"))
+    (insert "#+end_src\n")
+    (goto-char (point-min))
+    (let ((src-block (org-element-at-point)))
+      (should-not (equal nil (lilac-is-parent-block src-block))))))
 #+end_src
 
 * Glossary
