@@ -2491,18 +2491,15 @@ We simply tangle the <code>README.org</code> file (this file) to get all the cod
 <h2 id="h-Development-environment--Nix-shell"><span class="section-number-2">7.</span> Development environment (Nix shell)</h2>
 <div class="outline-text-2" id="text-h-Development-environment--Nix-shell">
 <p>
-This is taken from <a href="https://github.com/tweag/haskell-stack-nix-example/blob/b9383e35416a2b0e21fbc97ed079538f9f395b6a/shell.nix#L1">here</a>.
-</p>
-
-<p>
 This is the main development shell and brings in all of our dependencies to
-build all of our code.
+build all of our code. Taken from <a href="https://github.com/tweag/haskell-stack-nix-example/blob/b9383e35416a2b0e21fbc97ed079538f9f395b6a/shell.nix#L1">here</a>. The <code>Makefile</code> is meant to be executed
+from within this environment.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">shell.nix</label><span class="lilac-caption-link-symbol"><a href="#shell-nix">&#x1f517;</a></span></div><pre class="src src-nix" id="shell-nix"><span class="org-nix-keyword">let</span>
   <span class="org-comment"># Nixpkgs snapshot.</span>
   <span class="org-nix-attribute">sources</span> = <span class="org-nix-builtin">import</span> <span class="org-nix-constant">./package/nix/sources.nix</span>;
-  <span class="org-comment"># The final "pkgs" attribute with all the bells and whistles of our overlays.</span>
+  <span class="org-comment"># The final "pkgs" attribute.</span>
   <span class="org-nix-attribute">pkgs</span> = <span class="org-nix-builtin">import</span> sources.nixpkgs {};
 <span class="org-nix-keyword">in</span>
 
@@ -2512,7 +2509,7 @@ pkgs.mkShell ({
     <span class="org-comment"># Tangling and weaving for Literate Programming.</span>
     pkgs.emacs
 
-    <span class="org-comment"># Misc</span>
+    <span class="org-comment"># Misc.</span>
     pkgs.git
     pkgs.less
   ];

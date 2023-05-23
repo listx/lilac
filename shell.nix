@@ -1,7 +1,7 @@
 let
   # Nixpkgs snapshot.
   sources = import ./package/nix/sources.nix;
-  # The final "pkgs" attribute with all the bells and whistles of our overlays.
+  # The final "pkgs" attribute.
   pkgs = import sources.nixpkgs {};
 in
 
@@ -11,7 +11,7 @@ pkgs.mkShell ({
     # Tangling and weaving for Literate Programming.
     pkgs.emacs
 
-    # Misc
+    # Misc.
     pkgs.git
     pkgs.less
   ];
