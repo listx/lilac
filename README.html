@@ -650,6 +650,7 @@ associated tests.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-weave">Makefile-weave</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-tangle">Makefile-tangle</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-run_emacs">Makefile-run_emacs</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-update-deps">Makefile-update-deps</a></span>
 </pre></div></div><p>
 Weaving just depends on the main <code>README.html</code> file being generated. Before we
 call <code>(lilac-publish)</code>, we have to first call <code>(lilac-gen-css-and-exit
@@ -721,6 +722,13 @@ evaluating the given expression.
 endef
 
 <span class="org-variable-name">PROJ_ROOT</span> := $(<span class="org-variable-name">shell</span> git rev-parse --show-toplevel)
+</pre></div></div><p>
+We use <code>niv</code> to update the dependencies sourced by <code>shell.nix</code>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#Makefile">Makefile-update-deps</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-update-deps">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-update-deps"><span class="org-makefile-targets">update-deps</span>: package/nix/sources.json package/nix/sources.nix
+        cd package &amp;&amp; niv update
+        touch update-deps
 </pre></div></div>
 </div>
 </div>
@@ -2444,6 +2452,8 @@ data.
 **/.gitattributes diff
 **/.gitmodules diff
 **/.gitignore diff
+package/nix/sources.json diff
+package/nix/sources.nix diff
 </pre></div></div><p>
 In order to still show the HTML textual diff, we can run <code>git diff --text</code>.
 </p>
@@ -2466,6 +2476,7 @@ instead.
 <div class="outline-text-3" id="text-h-gitignore">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">.gitignore</label><span class="lilac-caption-link-symbol"><a href="#gitignore">&#x1f517;</a></span></div><pre class="src src-gitignore" id="gitignore">**/*.auctex-auto
 tangle
+update-deps
 weave
 </pre></div></div>
 </div>
@@ -2509,6 +2520,9 @@ pkgs.mkShell ({
     <span class="org-comment"># Tangling and weaving for Literate Programming.</span>
     pkgs.emacs
 
+    <span class="org-comment"># Update Nix dependencies in package/nix/sources.nix.</span>
+    pkgs.niv
+
     <span class="org-comment"># Misc.</span>
     pkgs.git
     pkgs.less
@@ -2526,11 +2540,11 @@ pkgs.mkShell ({
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org0000060">Org mode</a> borrows heavily using <a href="#org0000062">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org0000062"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org0000062">Org mode</a> borrows heavily using <a href="#org0000064">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org0000064"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org0000060"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org0000062"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

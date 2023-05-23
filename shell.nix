@@ -11,6 +11,9 @@ pkgs.mkShell ({
     # Tangling and weaving for Literate Programming.
     pkgs.emacs
 
+    # Update Nix dependencies in package/nix/sources.nix.
+    pkgs.niv
+
     # Misc.
     pkgs.git
     pkgs.less

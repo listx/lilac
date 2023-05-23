@@ -296,6 +296,7 @@ test: tangle
 __NREF__Makefile-weave
 __NREF__Makefile-tangle
 __NREF__Makefile-run_emacs
+__NREF__Makefile-update-deps
 #+end_src
 
 Weaving just depends on the main =README.html= file being generated. Before we
@@ -369,6 +370,15 @@ define run_emacs
 endef
 
 PROJ_ROOT := $(shell git rev-parse --show-toplevel)
+#+end_src
+
+We use =niv= to update the dependencies sourced by =shell.nix=.
+
+#+name: __NREF__Makefile-update-deps
+#+begin_src makefile
+update-deps: package/nix/sources.json package/nix/sources.nix
+	cd package && niv update
+	touch update-deps
 #+end_src
 
 ** Emacs customizations for HTML export (=lilac.el=)
@@ -1965,6 +1975,8 @@ data.
 ,**/.gitattributes diff
 ,**/.gitmodules diff
 ,**/.gitignore diff
+package/nix/sources.json diff
+package/nix/sources.nix diff
 #+end_src
 
 In order to still show the HTML textual diff, we can run =git diff --text=.
@@ -1982,6 +1994,7 @@ instead.
 #+begin_src gitignore :tangle .gitignore :eval no
 ,**/*.auctex-auto
 tangle
+update-deps
 weave
 #+end_src
 
@@ -2014,6 +2027,9 @@ pkgs.mkShell ({
   buildInputs = [
     # Tangling and weaving for Literate Programming.
     pkgs.emacs
+
+    # Update Nix dependencies in package/nix/sources.nix.
+    pkgs.niv
 
     # Misc.
     pkgs.git

@@ -40,3 +40,6 @@ define run_emacs
 endef
 
 PROJ_ROOT := $(shell git rev-parse --show-toplevel)
+update-deps: package/nix/sources.json package/nix/sources.nix
+	cd package && niv update
+	touch update-deps
