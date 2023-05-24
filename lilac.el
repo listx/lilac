@@ -120,7 +120,7 @@ with class 'color and highest min-color value."
 (defun lilac-publish-1 ()
   (let (
         (org-export-before-parsing-hook
-         '(lilac-noweb-source-code-block-captions
+         '(lilac-insert-noweb-source-code-block-captions
            lilac-UID-for-all-headlines
            lilac-UID-for-all-polyblocks))
         (org-export-filter-src-block-functions
@@ -132,7 +132,7 @@ with class 'color and highest min-color value."
 (defun lilac-publish-2 ()
   (let (
         (org-export-before-parsing-hook
-         '(lilac-noweb-source-code-block-captions
+         '(lilac-insert-noweb-source-code-block-captions
            lilac-UID-for-all-headlines
            lilac-UID-for-all-polyblocks))
         (org-export-filter-src-block-functions
@@ -144,66 +144,73 @@ with class 'color and highest min-color value."
     (org-html-export-to-html)))
 
 ;; Modify Org buffer
-(defun lilac-noweb-source-code-block-captions (_backend)
+(defun lilac-insert-noweb-source-code-block-captions (_backend)
   (let* ((parent-blocks
-           ;; parent-blocks is a let* binding, not a function call.
-           (org-element-map (org-element-parse-buffer) 'src-block
-             (lambda (src-block)
-                (if (lilac-is-parent-block src-block) src-block))))
+           (lilac-get-parent-blocks))
          (child-parents-hash-table
-           (let ((hash-table (make-hash-table :test 'equal)))
-             (mapc
-              (lambda (parent-block)
-               (let* ((parent-name (org-element-property :name parent-block))
-                      (parent-body (org-element-property :value parent-block))
-                      (child-names (lilac-get-noweb-children parent-body)))
-                 (mapc (lambda (child-name)
-                         (let* ((parents (gethash child-name hash-table)))
-                           (if parents
-                             (puthash child-name (cl-pushnew parent-name parents) hash-table)
-                             (puthash child-name (list parent-name) hash-table))))
-                       child-names)))
-              (reverse parent-blocks))
-             hash-table))
+           (lilac-mk-child-parents-hash-table parent-blocks))
          (all-src-blocks
            (org-element-map (org-element-parse-buffer) 'src-block 'identity))
          (smart-captions
-           (-remove 'null
-             (cl-loop for src-block in all-src-blocks collect
-               (let* ((child (lilac-get-src-block-name src-block))
-                      (child-name (car child))
-                      (NSCB_NAME (format "=%s= " child-name))                  ;ref:NSCB_NAME
-                      (NSCB_POLYBLOCK_INDICATOR (car (cdr child)))             ;ref:NSCB_POLYBLOCK_INDICATOR
-                      (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
-                      (polyblock-counter-incremented
-                       (puthash child-name (+ 1 polyblock-counter)
-                                lilac-polyblock-names-totals))
-                      (parents (gethash child-name child-parents-hash-table))
-                      (parents-zipped (lilac-enumerate parents))
-                      (pos (org-element-property :begin src-block))
-                      (NSCB_LINKS_TO_PARENTS                                   ;ref:NSCB_LINKS_TO_PARENTS
-                       (mapconcat (lambda (parent-with-idx)
-                                    (format " [[%s][%S]]"
-                                            (nth 1 parent-with-idx)
-                                            (+ 1 (nth 0 parent-with-idx))))
-                                  parents-zipped " "))
-                      (smart-caption
-                       (concat
-                         "#+caption: "
-                         NSCB_NAME
-                         NSCB_POLYBLOCK_INDICATOR
-                         NSCB_LINKS_TO_PARENTS
-                         "\n")))
-                 (when parents (cons pos smart-caption)))))))
-    (cl-loop for smart-caption in (reverse smart-captions) do
-      (let ((pos (car smart-caption))
-            (caption (cdr smart-caption)))
-        (goto-char pos)
-        (insert caption)))))
+           (lilac-mk-smart-captions all-src-blocks child-parents-hash-table)))
+    (lilac-insert-strings-into-buffer smart-captions)))
 
 (defun lilac-is-parent-block (src-block)
   (let ((body (org-element-property :value src-block)))
     (lilac-get-noweb-children body)))
+(defun lilac-get-parent-blocks ()
+  (org-element-map (org-element-parse-buffer) 'src-block
+    (lambda (src-block)
+       (if (lilac-is-parent-block src-block) src-block))))
+(defun lilac-mk-child-parents-hash-table (parent-blocks)
+  (let ((hash-table (make-hash-table :test 'equal)))
+    (mapc
+     (lambda (parent-block)
+      (let* ((parent-name (org-element-property :name parent-block))
+             (parent-body (org-element-property :value parent-block))
+             (child-names (lilac-get-noweb-children parent-body)))
+        (mapc (lambda (child-name)
+                (let* ((parents (gethash child-name hash-table)))
+                  (if parents
+                    (puthash child-name (cl-pushnew parent-name parents) hash-table)
+                    (puthash child-name (list parent-name) hash-table))))
+              child-names)))
+     (reverse parent-blocks))
+    hash-table))
+(defun lilac-mk-smart-captions (all-src-blocks child-parents-hash-table)
+  (-remove 'null
+    (cl-loop for src-block in all-src-blocks collect
+      (let* ((child (lilac-get-src-block-name src-block))
+             (child-name (car child))
+             (NSCB_NAME (format "=%s= " child-name))                  ;ref:NSCB_NAME
+             (NSCB_POLYBLOCK_INDICATOR (car (cdr child)))             ;ref:NSCB_POLYBLOCK_INDICATOR
+             (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
+             (polyblock-counter-incremented
+              (puthash child-name (+ 1 polyblock-counter)
+                       lilac-polyblock-names-totals))
+             (parents (gethash child-name child-parents-hash-table))
+             (parents-zipped (lilac-enumerate parents))
+             (pos (org-element-property :begin src-block))
+             (NSCB_LINKS_TO_PARENTS                                   ;ref:NSCB_LINKS_TO_PARENTS
+              (mapconcat (lambda (parent-with-idx)
+                           (format " [[%s][%S]]"
+                                   (nth 1 parent-with-idx)
+                                   (+ 1 (nth 0 parent-with-idx))))
+                         parents-zipped " "))
+             (smart-caption
+              (concat
+                "#+caption: "
+                NSCB_NAME
+                NSCB_POLYBLOCK_INDICATOR
+                NSCB_LINKS_TO_PARENTS
+                "\n")))
+        (when parents (cons pos smart-caption))))))
+(defun lilac-insert-strings-into-buffer (alist)
+  (cl-loop for smart-caption in (reverse smart-captions) do
+        (let ((pos (car smart-caption))
+              (caption (cdr smart-caption)))
+          (goto-char pos)
+          (insert caption))))
 (defun lilac-get-noweb-children (s)
   (let* ((lines (split-string s "\n"))
          (refs (-remove 'null

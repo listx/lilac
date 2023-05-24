@@ -1,6 +1,8 @@
 (require 'ert)
 (require 'lilac)
 
+(org-mode)
+
 (defun nref (s) (concat "__NREF__" s))
 (ert-deftest t-lilac-get-noweb-children ()
   (let ((body
@@ -35,7 +37,7 @@
     (goto-char (point-min))
     (let ((src-block (org-element-at-point)))
       (should-not (equal nil (lilac-is-parent-block src-block))))))
-(ert-deftest t-lilac-noweb-source-code-block-captions ()
+(ert-deftest t-lilac-insert-noweb-source-code-block-captions ()
   (with-temp-buffer
     (insert "#+name: parent\n")
     (insert "#+caption: parent\n")
@@ -54,7 +56,7 @@
     (insert "#+begin_src emacs-lisp\n")
     (insert "; baz\n")
     (insert "#+end_src\n")
-    (lilac-noweb-source-code-block-captions nil)
+    (lilac-insert-noweb-source-code-block-captions nil)
     (goto-char (point-min))
     (should (search-forward
              (concat "#+caption: =" (nref "child1") "=  [[parent][1]]")
@@ -87,7 +89,7 @@
     (insert "; foo\n")
     (insert (concat (nref "child1") "\n"))
     (insert "#+end_src\n")
-    (lilac-noweb-source-code-block-captions nil)
+    (lilac-insert-noweb-source-code-block-captions nil)
     (goto-char (point-min))
     (should (search-forward
              (concat "#+caption: =" (nref "child1") "=  [[parent1][1]]  [[parent2][2]]")
