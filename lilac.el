@@ -160,8 +160,6 @@ with class 'color and highest min-color value."
                  (mapc (lambda (child-name)
                          (let* ((parents (gethash child-name hash-table)))
                            (if parents
-                             ; cl-pushnew to dedup parents (when a single parent refers to
-                             ; the same child more than once).
                              (puthash child-name (cl-pushnew parent-name parents) hash-table)
                              (puthash child-name (list parent-name) hash-table))))
                        child-names)))

@@ -694,7 +694,10 @@ source code block a parent block if it has any Noweb references within its body.
 
 Then we construct the =child-parents-hash-table=. For each parent block, we get
 all of its children (=child-names=), and use this data to construct a
-child-parent association:
+child-parent association. Note that we use =cl-pushnew= instead of =push= to
+deduplicate parents (i.e., when a single parent refers to the same child more
+than once we do not want to link back to this same parent more than once from
+the child block's caption).
 
 #+name: __NREF__child-parents-hash-table
 #+begin_src emacs-lisp
@@ -707,8 +710,6 @@ child-parent association:
       (mapc (lambda (child-name)
               (let* ((parents (gethash child-name hash-table)))
                 (if parents
-                  ; cl-pushnew to dedup parents (when a single parent refers to
-                  ; the same child more than once).
                   (puthash child-name (cl-pushnew parent-name parents) hash-table)
                   (puthash child-name (list parent-name) hash-table))))
             child-names)))

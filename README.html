@@ -1102,7 +1102,10 @@ source code block a parent block if it has any Noweb references within its body.
 </pre></div></div><p>
 Then we construct the <code>child-parents-hash-table</code>. For each parent block, we get
 all of its children (<code>child-names</code>), and use this data to construct a
-child-parent association:
+child-parent association. Note that we use <code>cl-pushnew</code> instead of <code>push</code> to
+deduplicate parents (i.e., when a single parent refers to the same child more
+than once we do not want to link back to this same parent more than once from
+the child block's caption).
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">child-parents-hash-table</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__child-parents-hash-table">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__child-parents-hash-table">(<span class="org-keyword">let</span> ((hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal)))
@@ -1114,8 +1117,6 @@ child-parent association:
       (mapc (<span class="org-keyword">lambda</span> (child-name)
               (<span class="org-keyword">let*</span> ((parents (gethash child-name hash-table)))
                 (<span class="org-keyword">if</span> parents
-                  <span class="org-comment-delimiter">; </span><span class="org-comment">cl-pushnew to dedup parents (when a single parent refers to</span>
-                  <span class="org-comment-delimiter">; </span><span class="org-comment">the same child more than once).</span>
                   (puthash child-name (<span class="org-keyword">cl-pushnew</span> parent-name parents) hash-table)
                   (puthash child-name (list parent-name) hash-table))))
             child-names)))
