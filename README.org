@@ -2045,6 +2045,13 @@ pkgs.mkShell ({
 
 * Tests
 
+We use [[https://www.gnu.org/software/emacs/manual/ert.html][ERT, the Emacs Lisp Regression Testing tool]] for our unit tests. Pure
+functions that take all of their inputs explicitly ("dependency-injected") are
+easy to test because we just provide the various inputs and expect the function
+to produce certain outputs. For functions that operate on an Emacs buffer, we
+use =with-temp-buffer= to create a temporary buffer first before invoking the
+functions under test.
+
 #+name: lilac-tests.el
 #+caption: lilac-tests.el
 #+begin_src emacs-lisp :tangle lilac-tests.el :eval no

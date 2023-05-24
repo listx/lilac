@@ -2546,6 +2546,15 @@ pkgs.mkShell ({
 <div id="outline-container-h-Tests" class="outline-2">
 <h2 id="h-Tests"><span class="section-number-2">8.</span> Tests</h2>
 <div class="outline-text-2" id="text-h-Tests">
+<p>
+We use <a href="https://www.gnu.org/software/emacs/manual/ert.html">ERT, the Emacs Lisp Regression Testing tool</a> for our unit tests. Pure
+functions that take all of their inputs explicitly ("dependency-injected") are
+easy to test because we just provide the various inputs and expect the function
+to produce certain outputs. For functions that operate on an Emacs buffer, we
+use <code>with-temp-buffer</code> to create a temporary buffer first before invoking the
+functions under test.
+</p>
+
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac-tests.el</label><span class="lilac-caption-link-symbol"><a href="#lilac-tests-el">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="lilac-tests-el">(<span class="org-keyword">require</span> '<span class="org-constant">ert</span>)
 (<span class="org-keyword">require</span> '<span class="org-constant">lilac</span>)
 
