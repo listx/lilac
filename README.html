@@ -2550,9 +2550,7 @@ pkgs.mkShell ({
 (<span class="org-keyword">require</span> '<span class="org-constant">lilac</span>)
 
 <span class="lilac-child-link-from-parent"><a href="#__NREF__t-helpers">t-helpers</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__t-lilac-is-parent-block">t-lilac-is-parent-block</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__t-lilac-get-noweb-children">t-lilac-get-noweb-children</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__t-lilac-noweb-source-code-block-captions">t-lilac-noweb-source-code-block-captions</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__t-smart-caption-generation">t-smart-caption-generation</a></span>
 
 (<span class="org-keyword">provide</span> '<span class="org-constant">lilac-tests</span>)
 </pre></div></div>
@@ -2577,7 +2575,7 @@ prefix indirectly with the <code>(nref)</code> helper function.
 <div id="outline-container-h-Smart-source-code-block-caption-helpers" class="outline-3">
 <h3 id="h-Smart-source-code-block-caption-helpers"><span class="section-number-3">8.2.</span> Smart source code block caption helpers</h3>
 <div class="outline-text-3" id="text-h-Smart-source-code-block-caption-helpers">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-lilac-get-noweb-children</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__t-lilac-get-noweb-children">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-lilac-get-noweb-children">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-get-noweb-children</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-smart-caption-generation</a></span>(1/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-get-noweb-children</span> ()
   (<span class="org-keyword">let</span> ((body
          (concat
           <span class="org-string">"#+name: parent\n"</span>
@@ -2604,7 +2602,7 @@ prefix indirectly with the <code>(nref)</code> helper function.
 latter already above, but we test the former anyway for completeness.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-lilac-is-parent-block</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__t-lilac-is-parent-block">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-lilac-is-parent-block">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-is-parent-block</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-smart-caption-generation</a></span>(2/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-2">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-is-parent-block</span> ()
   (<span class="org-keyword">with-temp-buffer</span>
     (insert <span class="org-string">"#+name: parent\n"</span>)
     (insert <span class="org-string">"#+caption: parent\n"</span>)
@@ -2619,7 +2617,7 @@ latter already above, but we test the former anyway for completeness.
 Here we test whether we can automatically insert captions for child blocks.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-lilac-noweb-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__t-lilac-noweb-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-lilac-noweb-source-code-block-captions">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-noweb-source-code-block-captions</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-smart-caption-generation</a></span>(3/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-3">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-noweb-source-code-block-captions</span> ()
   (<span class="org-keyword">with-temp-buffer</span>
     (insert <span class="org-string">"#+name: parent\n"</span>)
     (insert <span class="org-string">"#+caption: parent\n"</span>)
@@ -2692,11 +2690,11 @@ Here we test whether we can automatically insert captions for child blocks.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org000006c">Org mode</a> borrows heavily using <a href="#org000006e">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org000006e"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org0000068">Org mode</a> borrows heavily using <a href="#org000006a">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org000006a"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org000006c"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org0000068"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

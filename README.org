@@ -2052,9 +2052,7 @@ pkgs.mkShell ({
 (require 'lilac)
 
 __NREF__t-helpers
-__NREF__t-lilac-is-parent-block
-__NREF__t-lilac-get-noweb-children
-__NREF__t-lilac-noweb-source-code-block-captions
+__NREF__t-smart-caption-generation
 
 (provide 'lilac-tests)
 #+end_src
@@ -2074,7 +2072,7 @@ prefix indirectly with the =(nref)= helper function.
 
 ** Smart source code block caption helpers
 
-#+name: __NREF__t-lilac-get-noweb-children
+#+header: :noweb-ref __NREF__t-smart-caption-generation
 #+begin_src emacs-lisp
 (ert-deftest t-lilac-get-noweb-children ()
   (let ((body
@@ -2103,7 +2101,7 @@ prefix indirectly with the =(nref)= helper function.
 =lilac-is-parent-block= depends on =lilac-get-noweb-children=. We tested the
 latter already above, but we test the former anyway for completeness.
 
-#+name: __NREF__t-lilac-is-parent-block
+#+header: :noweb-ref __NREF__t-smart-caption-generation
 #+begin_src emacs-lisp
 (ert-deftest t-lilac-is-parent-block ()
   (with-temp-buffer
@@ -2120,7 +2118,7 @@ latter already above, but we test the former anyway for completeness.
 
 Here we test whether we can automatically insert captions for child blocks.
 
-#+name: __NREF__t-lilac-noweb-source-code-block-captions
+#+header: :noweb-ref __NREF__t-smart-caption-generation
 #+begin_src emacs-lisp
 (ert-deftest t-lilac-noweb-source-code-block-captions ()
   (with-temp-buffer
