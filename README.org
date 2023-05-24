@@ -2053,6 +2053,7 @@ pkgs.mkShell ({
 __NREF__t-helpers
 __NREF__t-lilac-is-parent-block
 __NREF__t-lilac-get-noweb-children
+__NREF__t-lilac-noweb-source-code-block-captions
 
 (provide 'lilac-tests)
 #+end_src
@@ -2114,6 +2115,72 @@ latter already above, but we test the former anyway for completeness.
     (goto-char (point-min))
     (let ((src-block (org-element-at-point)))
       (should-not (equal nil (lilac-is-parent-block src-block))))))
+#+end_src
+
+Here we test whether we can automatically insert captions for child blocks.
+
+#+name: __NREF__t-lilac-noweb-source-code-block-captions
+#+begin_src emacs-lisp
+(ert-deftest t-lilac-noweb-source-code-block-captions ()
+  (with-temp-buffer
+    (insert "#+name: parent\n")
+    (insert "#+caption: parent\n")
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; foo\n")
+    (insert (concat (nref "child1") "\n"))
+    (insert (concat (nref "child2") "\n"))
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; bar\n")
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; baz\n")
+    (insert "#+end_src\n")
+    (lilac-noweb-source-code-block-captions nil)
+    (goto-char (point-min))
+    (should (search-forward
+             (concat "#+caption: =" (nref "child1") "=  [[parent][1]]")
+             nil t))
+    (should (search-forward
+             (concat "#+caption: =" (nref "child2") "=  [[parent][1]]")
+             nil t)))
+  (with-temp-buffer
+    (insert "#+name: parent1\n")
+    (insert "#+caption: parent1\n")
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; foo\n")
+    (insert (concat (nref "child1") "\n"))
+    (insert (concat (nref "child2") "\n"))
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; bar\n")
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; baz\n")
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert (concat "#+name: parent2\n"))
+    (insert "#+caption: parent2\n")
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; foo\n")
+    (insert (concat (nref "child1") "\n"))
+    (insert "#+end_src\n")
+    (lilac-noweb-source-code-block-captions nil)
+    (goto-char (point-min))
+    (should (search-forward
+             (concat "#+caption: =" (nref "child1") "=  [[parent2][1]]  [[parent1][2]]")
+             nil t))
+    (should (search-forward
+             (concat "#+caption: =" (nref "child2") "=  [[parent1][1]]")
+             nil t))))
 #+end_src
 
 * Glossary

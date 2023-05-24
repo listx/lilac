@@ -2551,6 +2551,7 @@ pkgs.mkShell ({
 <span class="lilac-child-link-from-parent"><a href="#__NREF__t-helpers">t-helpers</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__t-lilac-is-parent-block">t-lilac-is-parent-block</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__t-lilac-get-noweb-children">t-lilac-get-noweb-children</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__t-lilac-noweb-source-code-block-captions">t-lilac-noweb-source-code-block-captions</a></span>
 
 (<span class="org-keyword">provide</span> '<span class="org-constant">lilac-tests</span>)
 </pre></div></div>
@@ -2613,6 +2614,70 @@ latter already above, but we test the former anyway for completeness.
     (goto-char (point-min))
     (<span class="org-keyword">let</span> ((src-block (org-element-at-point)))
       (<span class="org-keyword">should-not</span> (equal nil (lilac-is-parent-block src-block))))))
+</pre></div></div><p>
+Here we test whether we can automatically insert captions for child blocks.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-lilac-noweb-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__t-lilac-noweb-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-lilac-noweb-source-code-block-captions">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-noweb-source-code-block-captions</span> ()
+  (<span class="org-keyword">with-temp-buffer</span>
+    (insert <span class="org-string">"#+name: parent\n"</span>)
+    (insert <span class="org-string">"#+caption: parent\n"</span>)
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; foo\n"</span>)
+    (insert (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>))
+    (insert (concat (nref <span class="org-string">"child2"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; bar\n"</span>)
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child2"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; baz\n"</span>)
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (lilac-noweb-source-code-block-captions nil)
+    (goto-char (point-min))
+    (<span class="org-keyword">should</span> (search-forward
+             (concat <span class="org-string">"#+caption: ="</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"=  [[parent][1]]"</span>)
+             nil t))
+    (<span class="org-keyword">should</span> (search-forward
+             (concat <span class="org-string">"#+caption: ="</span> (nref <span class="org-string">"child2"</span>) <span class="org-string">"=  [[parent][1]]"</span>)
+             nil t)))
+  (<span class="org-keyword">with-temp-buffer</span>
+    (insert <span class="org-string">"#+name: parent1\n"</span>)
+    (insert <span class="org-string">"#+caption: parent1\n"</span>)
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; foo\n"</span>)
+    (insert (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>))
+    (insert (concat (nref <span class="org-string">"child2"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; bar\n"</span>)
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child2"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; baz\n"</span>)
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert (concat <span class="org-string">"#+name: parent2\n"</span>))
+    (insert <span class="org-string">"#+caption: parent2\n"</span>)
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; foo\n"</span>)
+    (insert (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (lilac-noweb-source-code-block-captions nil)
+    (goto-char (point-min))
+    (<span class="org-keyword">should</span> (search-forward
+             (concat <span class="org-string">"#+caption: ="</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"=  [[parent2][1]]  [[parent1][2]]"</span>)
+             nil t))
+    (<span class="org-keyword">should</span> (search-forward
+             (concat <span class="org-string">"#+caption: ="</span> (nref <span class="org-string">"child2"</span>) <span class="org-string">"=  [[parent1][1]]"</span>)
+             nil t))))
 </pre></div></div>
 </div>
 </div>
@@ -2626,11 +2691,11 @@ latter already above, but we test the former anyway for completeness.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org000006a">Org mode</a> borrows heavily using <a href="#org000006c">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org000006c"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org000006c">Org mode</a> borrows heavily using <a href="#org000006e">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org000006e"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org000006a"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org000006c"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
