@@ -90,7 +90,7 @@
     (lilac-noweb-source-code-block-captions nil)
     (goto-char (point-min))
     (should (search-forward
-             (concat "#+caption: =" (nref "child1") "=  [[parent2][1]]  [[parent1][2]]")
+             (concat "#+caption: =" (nref "child1") "=  [[parent1][1]]  [[parent2][2]]")
              nil t))
     (should (search-forward
              (concat "#+caption: =" (nref "child2") "=  [[parent1][1]]")

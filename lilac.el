@@ -165,7 +165,7 @@ with class 'color and highest min-color value."
                              (puthash child-name (cl-pushnew parent-name parents) hash-table)
                              (puthash child-name (list parent-name) hash-table))))
                        child-names)))
-              parent-blocks)
+              (reverse parent-blocks))
              hash-table))
          (all-src-blocks
            (org-element-map (org-element-parse-buffer) 'src-block 'identity))

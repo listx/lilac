@@ -712,7 +712,7 @@ child-parent association:
                   (puthash child-name (cl-pushnew parent-name parents) hash-table)
                   (puthash child-name (list parent-name) hash-table))))
             child-names)))
-   parent-blocks)
+   (reverse parent-blocks))
   hash-table)
 #+end_src
 
@@ -2176,7 +2176,7 @@ Here we test whether we can automatically insert captions for child blocks.
     (lilac-noweb-source-code-block-captions nil)
     (goto-char (point-min))
     (should (search-forward
-             (concat "#+caption: =" (nref "child1") "=  [[parent2][1]]  [[parent1][2]]")
+             (concat "#+caption: =" (nref "child1") "=  [[parent1][1]]  [[parent2][2]]")
              nil t))
     (should (search-forward
              (concat "#+caption: =" (nref "child2") "=  [[parent1][1]]")
