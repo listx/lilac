@@ -7,8 +7,8 @@
 (ert-deftest t-lilac-get-noweb-children ()
   (let ((body
          (concat
-          "#+name: parent\n"
-          "#+caption: parent\n"
+          "#+name: foo\n"
+          "#+caption: foo\n"
           "#+begin_src emacs-lisp\n"
           "; foo\n"
           "#+end_src\n")))

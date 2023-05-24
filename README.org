@@ -2121,13 +2121,16 @@ prefix indirectly with the =(nref)= helper function.
 
 ** Smart source code block caption helpers
 
+=lilac-get-noweb-children= should return a list of Noweb references (child block
+names) found in a source code block.
+
 #+header: :noweb-ref __NREF__t-smart-caption-generation
 #+begin_src emacs-lisp
 (ert-deftest t-lilac-get-noweb-children ()
   (let ((body
          (concat
-          "#+name: parent\n"
-          "#+caption: parent\n"
+          "#+name: foo\n"
+          "#+caption: foo\n"
           "#+begin_src emacs-lisp\n"
           "; foo\n"
           "#+end_src\n")))
