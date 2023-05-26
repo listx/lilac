@@ -800,7 +800,9 @@ noweb references to other child blocks in the form =__NREF__child-name=).
 
 =lilac-mk-child-parents-hash-table= takes all parent source code blocks and
 generates a hash table where the KEY is the child block name and the VALUE is
-the list of parents that refer to the child.
+the list of parents that refer to the child. When we loop through
+=parent-blocks= below, we have to first =reverse= it because the function
+=cl-pushnew= grows the list by prepending to it.
 
 #+header: :noweb-ref __NREF__smart-source-code-block-captions-helpers
 #+begin_src emacs-lisp
