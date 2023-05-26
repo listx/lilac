@@ -641,19 +641,40 @@ When matching, reference is stored in match group 1."
 ; "org00012") for source code blocks to a more human-readable ID.
 (setq lilac-org_id-human_id-hash-table (make-hash-table :test 'equal))
 (setq lilac-human_id-count-hash-table (make-hash-table :test 'equal))
+(setq lilac-human_id-org_id-hash-table (make-hash-table :test 'equal))
 
 (defun lilac-populate-org_id-human_id-hash-table (src-block-html backend info)
   (when (org-export-derived-backend-p backend 'html)
     (let* ((block-name (lilac-get-src-block-name-from-html src-block-html))
-           (block-name-count (gethash block-name lilac-human_id-count-hash-table 1))
+           (block-name-count (gethash block-name
+                                      lilac-human_id-count-hash-table
+                                      0))
            (orgid (lilac-get-src-block-HTML_ID src-block-html)))
       (when orgid
         (puthash block-name
                  (1+ block-name-count)
                  lilac-human_id-count-hash-table)
-        (puthash orgid
-                 (format "%s-%d" block-name block-name-count)
-                 lilac-org_id-human_id-hash-table))
+        (cond ((= block-name-count 0)
+                (progn
+                  (puthash orgid
+                           block-name
+                           lilac-org_id-human_id-hash-table)
+                  (puthash block-name
+                           orgid
+                           lilac-human_id-org_id-hash-table)))
+              ((= block-name-count 1)
+                (let* ((orgid-first-block
+                        (gethash block-name lilac-human_id-org_id-hash-table)))
+                  (puthash orgid-first-block
+                           (format "%s-1" block-name)
+                           lilac-org_id-human_id-hash-table)
+                  (puthash orgid
+                           (format "%s-%d" block-name (1+ block-name-count))
+                           lilac-org_id-human_id-hash-table)))
+              (t
+                 (puthash orgid
+                          (format "%s-%d" block-name (1+ block-name-count))
+                          lilac-org_id-human_id-hash-table))))
       src-block-html)))
 
 (defun lilac-replace-org_ids-with-human_ids (entire-html backend info)
