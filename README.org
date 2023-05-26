@@ -951,7 +951,7 @@ index starts at 0 (same as Python).
           (while (string-match regexp s pos)
             (push (match-string (if group group 0) s) matches)
             (setq pos (match-end 0)))
-          matches))))
+          (reverse matches)))))
 #+end_src
 
 *** Human-readable UIDs (Headings, aka headlines)

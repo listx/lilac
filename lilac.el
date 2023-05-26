@@ -258,7 +258,7 @@ with class 'color and highest min-color value."
           (while (string-match regexp s pos)
             (push (match-string (if group group 0) s) matches)
             (setq pos (match-end 0)))
-          matches))))
+          (reverse matches)))))
 (defun lilac-UID-for-all-headlines (_backend)
   (let* ((all-headlines
            (org-element-map (org-element-parse-buffer) 'headline 'identity))

@@ -534,7 +534,7 @@ extends to any arbitrary piece of text.
 Below is an example where we define a child block once&#x2026;
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#example-parent-2">example-child-block-baz</a></span><span class="lilac-caption-parent-link"><a href="#example-parent-1">2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__example-child-block-baz">&#x1f517;</a></span></div><pre class="src src-bash" id="__NREF__example-child-block-baz"><span class="org-builtin">echo</span> <span class="org-string">"Hello from child block baz"</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#example-parent-1">example-child-block-baz</a></span><span class="lilac-caption-parent-link"><a href="#example-parent-2">2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__example-child-block-baz">&#x1f517;</a></span></div><pre class="src src-bash" id="__NREF__example-child-block-baz"><span class="org-builtin">echo</span> <span class="org-string">"Hello from child block baz"</span>
 </pre></div></div><p>
 &#x2026;but where we also reuse it (reference it) in different parent blocks.
 </p>
@@ -1184,7 +1184,7 @@ and if so</li>
 Let's grab all source code blocks:
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions-helpers-4">all-src-blocks</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">2</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__UID-for-all-src-blocks">3</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__all-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__all-src-blocks">(org-element-map (org-element-parse-buffer) 'src-block 'identity)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__UID-for-all-src-blocks">all-src-blocks</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions">2</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__smart-source-code-block-captions-helpers-4">3</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__all-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__all-src-blocks">(org-element-map (org-element-parse-buffer) 'src-block 'identity)
 </pre></div></div><p>
 And now we can finally construct <code>smart-captions</code>:
 </p>
@@ -1353,7 +1353,7 @@ index starts at 0 (same as Python).
           (<span class="org-keyword">while</span> (string-match regexp s pos)
             (<span class="org-keyword">push</span> (match-string (<span class="org-keyword">if</span> group group 0) s) matches)
             (<span class="org-keyword">setq</span> pos (match-end 0)))
-          matches))))
+          (reverse matches)))))
 </pre></div></div>
 </div>
 </div>
