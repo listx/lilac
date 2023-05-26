@@ -1403,12 +1403,7 @@ construction of the <code>CUSTOM_ID</code> (<code>headline-UID</code> in the cod
                             <span class="org-string">":PROPERTIES:\n"</span>
                             <span class="org-string">":CUSTOM_ID: "</span> headline-UID <span class="org-string">"\n"</span>
                             <span class="org-string">":END:\n"</span>)))))))
-    <span class="org-comment-delimiter">; </span><span class="org-comment">(message "custom ID insertions: %s" headline-UIDs)</span>
-    (<span class="org-keyword">cl-loop</span> for pos-insertion in (reverse headline-UIDs) do
-        (<span class="org-keyword">let</span> ((pos (car pos-insertion))
-              (insertion (cdr pos-insertion)))
-            (goto-char pos)
-            (insert insertion)))))
+    (lilac-insert-strings-into-buffer headline-UIDs)))
 
 <span class="lilac-child-link-from-parent"><a href="#__NREF__get-unique-id">get-unique-id</a></span>
 </pre></div></div><p>

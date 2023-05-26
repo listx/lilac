@@ -995,12 +995,7 @@ construction of the =CUSTOM_ID= (=headline-UID= in the code below) is done by
                             ":PROPERTIES:\n"
                             ":CUSTOM_ID: " headline-UID "\n"
                             ":END:\n")))))))
-    ; (message "custom ID insertions: %s" headline-UIDs)
-    (cl-loop for pos-insertion in (reverse headline-UIDs) do
-        (let ((pos (car pos-insertion))
-              (insertion (cdr pos-insertion)))
-            (goto-char pos)
-            (insert insertion)))))
+    (lilac-insert-strings-into-buffer headline-UIDs)))
 
 __NREF__get-unique-id
 #+end_src

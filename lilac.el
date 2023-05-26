@@ -278,12 +278,7 @@ with class 'color and highest min-color value."
                             ":PROPERTIES:\n"
                             ":CUSTOM_ID: " headline-UID "\n"
                             ":END:\n")))))))
-    ; (message "custom ID insertions: %s" headline-UIDs)
-    (cl-loop for pos-insertion in (reverse headline-UIDs) do
-        (let ((pos (car pos-insertion))
-              (insertion (cdr pos-insertion)))
-            (goto-char pos)
-            (insert insertion)))))
+    (lilac-insert-strings-into-buffer headline-UIDs)))
 
 (defun lilac-get-unique-id (headline hash-table)
   (let* ((name (org-element-property :raw-value headline))
