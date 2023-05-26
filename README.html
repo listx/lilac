@@ -2604,7 +2604,7 @@ functions are available), so we turn it on here by calling <code>(org-mode)</cod
 (org-mode)
 
 <span class="lilac-child-link-from-parent"><a href="#__NREF__t-helpers-1">t-helpers</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__t-smart-caption-generation-5">t-smart-caption-generation</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__t-smart-caption-generation-6">t-smart-caption-generation</a></span>
 
 (<span class="org-keyword">provide</span> '<span class="org-constant">lilac-tests</span>)
 </pre></div></div>
@@ -2634,7 +2634,7 @@ prefix indirectly with the <code>(nref)</code> helper function.
 names) found in a source code block.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(1/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-1">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-get-noweb-children</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(1/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-1">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-get-noweb-children</span> ()
   (<span class="org-keyword">let</span> ((body
          (concat
           <span class="org-string">"#+name: foo\n"</span>
@@ -2661,7 +2661,7 @@ names) found in a source code block.
 latter already above, but we test the former anyway for completeness.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(2/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-2">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-is-parent-block</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(2/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-2">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-is-parent-block</span> ()
   (<span class="org-keyword">with-temp-buffer</span>
     (insert <span class="org-string">"#+name: parent\n"</span>)
     (insert <span class="org-string">"#+caption: parent\n"</span>)
@@ -2676,7 +2676,7 @@ latter already above, but we test the former anyway for completeness.
 Here we test whether we can automatically insert captions for child blocks.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(3/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-3">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-insert-noweb-source-code-block-captions</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(3/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-3">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-insert-noweb-source-code-block-captions</span> ()
   (<span class="org-keyword">with-temp-buffer</span>
     (insert <span class="org-string">"#+name: parent\n"</span>)
     (insert <span class="org-string">"#+caption: parent\n"</span>)
@@ -2740,7 +2740,7 @@ Here we test whether we can automatically insert captions for child blocks.
 Here we test retrieval of parent source code blocks.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(4/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-4">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-get-parent-blocks</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(4/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-4">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-get-parent-blocks</span> ()
   (<span class="org-keyword">with-temp-buffer</span>
     (insert <span class="org-string">"#+name: foo\n"</span>)
     (insert <span class="org-string">"#+caption: foo\n"</span>)
@@ -2773,7 +2773,7 @@ Here we test retrieval of parent source code blocks.
 Here we test generating the child-to-parents hash table.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(5/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-5">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-mk-child-parents-hash-table</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(5/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-5">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-mk-child-parents-hash-table</span> ()
   (<span class="org-keyword">with-temp-buffer</span>
     (insert <span class="org-string">"#+name: foo\n"</span>)
     (insert <span class="org-string">"#+caption: foo\n"</span>)
@@ -2808,6 +2808,99 @@ Here we test generating the child-to-parents hash table.
            (child-parents-hash-table
              (lilac-mk-child-parents-hash-table parent-blocks)))
       (<span class="org-keyword">should</span> (equal (hash-table-count child-parents-hash-table) 2)))))
+</pre></div></div><p>
+Here we test the construction of smart captions.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el-1">t-smart-caption-generation</a></span>(6/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-smart-caption-generation-6">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-smart-caption-generation-6">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-mk-smart-captions</span> ()
+  (<span class="org-keyword">with-temp-buffer</span>
+    (insert <span class="org-string">"#+name: parent1\n"</span>)
+    (insert <span class="org-string">"#+caption: parent1\n"</span>)
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; foo\n"</span>)
+    (insert (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert <span class="org-string">"#+name: parent2\n"</span>)
+    (insert <span class="org-string">"#+caption: parent2\n"</span>)
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; bar\n"</span>)
+    (insert (concat (nref <span class="org-string">"child2"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (<span class="org-keyword">let*</span> ((parent-blocks (lilac-get-parent-blocks))
+           (child-parents-hash-table
+             (lilac-mk-child-parents-hash-table parent-blocks))
+           (smart-captions (lilac-mk-smart-captions
+                            child-parents-hash-table)))
+      (<span class="org-keyword">should</span> (equal smart-captions nil))))
+  (<span class="org-keyword">with-temp-buffer</span>
+    (insert <span class="org-string">"#+name: parent1\n"</span>)
+    (insert <span class="org-string">"#+caption: parent1\n"</span>)
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; foo\n"</span>)
+    (insert (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert <span class="org-string">"#+name: parent2\n"</span>)
+    (insert <span class="org-string">"#+caption: parent2\n"</span>)
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; bar\n"</span>)
+    (insert (concat (nref <span class="org-string">"child2"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; child1\n"</span>)
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child2"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; child2\n"</span>)
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (<span class="org-keyword">let*</span> ((parent-blocks (lilac-get-parent-blocks))
+           (child-parents-hash-table
+             (lilac-mk-child-parents-hash-table parent-blocks))
+           (smart-captions (lilac-mk-smart-captions
+                            child-parents-hash-table)))
+      (<span class="org-keyword">should</span> (equal smart-captions
+       `((181 . ,(concat <span class="org-string">"#+caption: ="</span>
+                         (nref <span class="org-string">"child1"</span>)
+                         <span class="org-string">"=  [[parent1][1]]\n"</span>))
+         (247 . ,(concat <span class="org-string">"#+caption: ="</span>
+                         (nref <span class="org-string">"child2"</span>)
+                         <span class="org-string">"=  [[parent2][1]]\n"</span>)))))))
+  (<span class="org-keyword">with-temp-buffer</span>
+    (insert <span class="org-string">"#+name: parent1\n"</span>)
+    (insert <span class="org-string">"#+caption: parent1\n"</span>)
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; foo\n"</span>)
+    (insert (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; child1\n"</span>)
+    (insert (concat (nref <span class="org-string">"child2"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (insert <span class="org-string">"\n"</span>)
+    (insert (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child2"</span>) <span class="org-string">"\n"</span>))
+    (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
+    (insert <span class="org-string">"; child2\n"</span>)
+    (insert <span class="org-string">"#+end_src\n"</span>)
+    (<span class="org-keyword">let*</span> ((parent-blocks (lilac-get-parent-blocks))
+           (child-parents-hash-table
+             (lilac-mk-child-parents-hash-table parent-blocks))
+           (smart-captions (lilac-mk-smart-captions
+                            child-parents-hash-table)))
+      (<span class="org-keyword">should</span> (equal smart-captions
+       `((91 . ,(concat <span class="org-string">"#+caption: ="</span>
+                         (nref <span class="org-string">"child1"</span>)
+                         <span class="org-string">"=  [[parent1][1]]\n"</span>))
+         (172 . ,(concat <span class="org-string">"#+caption: ="</span>
+                         (nref <span class="org-string">"child2"</span>)
+                         <span class="org-string">"=  [["</span>
+                         (nref <span class="org-string">"child1"</span>)
+                         <span class="org-string">"][1]]\n"</span>))))))))
 </pre></div></div>
 </div>
 </div>
@@ -2821,11 +2914,11 @@ Here we test generating the child-to-parents hash table.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org0000096">Org mode</a> borrows heavily using <a href="#org0000098">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org0000098"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org0000098">Org mode</a> borrows heavily using <a href="#org000009a">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org000009a"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org0000096"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org0000098"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

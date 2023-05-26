@@ -2318,6 +2318,101 @@ Here we test generating the child-to-parents hash table.
       (should (equal (hash-table-count child-parents-hash-table) 2)))))
 #+end_src
 
+Here we test the construction of smart captions.
+
+#+header: :noweb-ref __NREF__t-smart-caption-generation
+#+begin_src emacs-lisp
+(ert-deftest t-lilac-mk-smart-captions ()
+  (with-temp-buffer
+    (insert "#+name: parent1\n")
+    (insert "#+caption: parent1\n")
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; foo\n")
+    (insert (concat (nref "child1") "\n"))
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert "#+name: parent2\n")
+    (insert "#+caption: parent2\n")
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; bar\n")
+    (insert (concat (nref "child2") "\n"))
+    (insert "#+end_src\n")
+    (let* ((parent-blocks (lilac-get-parent-blocks))
+           (child-parents-hash-table
+             (lilac-mk-child-parents-hash-table parent-blocks))
+           (smart-captions (lilac-mk-smart-captions
+                            child-parents-hash-table)))
+      (should (equal smart-captions nil))))
+  (with-temp-buffer
+    (insert "#+name: parent1\n")
+    (insert "#+caption: parent1\n")
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; foo\n")
+    (insert (concat (nref "child1") "\n"))
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert "#+name: parent2\n")
+    (insert "#+caption: parent2\n")
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; bar\n")
+    (insert (concat (nref "child2") "\n"))
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; child1\n")
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; child2\n")
+    (insert "#+end_src\n")
+    (let* ((parent-blocks (lilac-get-parent-blocks))
+           (child-parents-hash-table
+             (lilac-mk-child-parents-hash-table parent-blocks))
+           (smart-captions (lilac-mk-smart-captions
+                            child-parents-hash-table)))
+      (should (equal smart-captions
+       `((181 . ,(concat "#+caption: ="
+                         (nref "child1")
+                         "=  [[parent1][1]]\n"))
+         (247 . ,(concat "#+caption: ="
+                         (nref "child2")
+                         "=  [[parent2][1]]\n")))))))
+  (with-temp-buffer
+    (insert "#+name: parent1\n")
+    (insert "#+caption: parent1\n")
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; foo\n")
+    (insert (concat (nref "child1") "\n"))
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; child1\n")
+    (insert (concat (nref "child2") "\n"))
+    (insert "#+end_src\n")
+    (insert "\n")
+    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert "#+begin_src emacs-lisp\n")
+    (insert "; child2\n")
+    (insert "#+end_src\n")
+    (let* ((parent-blocks (lilac-get-parent-blocks))
+           (child-parents-hash-table
+             (lilac-mk-child-parents-hash-table parent-blocks))
+           (smart-captions (lilac-mk-smart-captions
+                            child-parents-hash-table)))
+      (should (equal smart-captions
+       `((91 . ,(concat "#+caption: ="
+                         (nref "child1")
+                         "=  [[parent1][1]]\n"))
+         (172 . ,(concat "#+caption: ="
+                         (nref "child2")
+                         "=  [["
+                         (nref "child1")
+                         "][1]]\n"))))))))
+#+end_src
+
 * Glossary
 
 - <<monoblock>> *monoblock* :: an Org mode source code block with a =#+name:
