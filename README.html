@@ -1858,7 +1858,7 @@ smart captions we inserted for all child blocks earlier in <a href="#h-Automatic
   (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
     (<span class="org-keyword">let*</span> ((child-name (lilac-get-src-block-name-from-html src-block-html))
            (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html)))
-      <span class="org-comment-delimiter">; </span><span class="org-comment">Skip blocks that lack an HTML ID, such as non-head polyblocks.</span>
+      <span class="org-comment-delimiter">; </span><span class="org-comment">Skip blocks that lack an HTML ID.</span>
       (<span class="org-keyword">if</span> child-HTML_ID
         (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
       <span class="org-comment-delimiter">; </span><span class="org-comment">Return src-block-html as-is (no modifications).</span>
