@@ -332,9 +332,11 @@ with class 'color and highest min-color value."
 (defun lilac-populate-child-HTML_ID-hash-table (src-block-html backend info)
   (when (org-export-derived-backend-p backend 'html)
     (let* ((child-name (lilac-get-src-block-name-from-html src-block-html))
-           (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html)))
+           (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html))
+           (child-HTML_ID-exists-already
+            (gethash child-name lilac-child-HTML_ID-hash-table nil)))
       ; Skip blocks that lack an HTML ID.
-      (if child-HTML_ID
+      (if (and child-HTML_ID (not child-HTML_ID-exists-already))
         (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
       ; Return src-block-html as-is (no modifications).
       src-block-html)))

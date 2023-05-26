@@ -500,7 +500,7 @@ referenced in the parent block are linked to their definitions.
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">example-parent-block</label><span class="lilac-caption-link-symbol"><a href="#example-parent-block">&#x1f517;</a></span></div><pre class="src src-bash" id="example-parent-block"><span class="org-builtin">echo</span> <span class="org-string">"Hello from the parent block"</span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__example-child-block-foo">example-child-block-foo</a></span>
 <span class="org-builtin">echo</span> <span class="org-string">""</span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__example-child-block-bar-2">example-child-block-bar</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__example-child-block-bar-1">example-child-block-bar</a></span>
 </pre></div></div><p>
 Below are the child blocks. The first is a monoblock. Every child block's name
 links back up to the parent block where it is referenced.
@@ -754,10 +754,10 @@ to prevent <code>emacs</code> from entering garbage collection pauses, because w
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.el</label><span class="lilac-caption-link-symbol"><a href="#lilac-el">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="lilac-el"><span class="org-comment-delimiter">; </span><span class="org-comment">Set garbage-collection threshold to 16 GiB.</span>
 (<span class="org-keyword">setq</span> gc-cons-threshold #x400000000)
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-imports">lilac_dot_el-imports</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-fix-nondeterminism-3">lilac_dot_el-fix-nondeterminism</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-fix-nondeterminism-1">lilac_dot_el-fix-nondeterminism</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-autogenerate-css">lilac_dot_el-autogenerate-css</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac_dot_el-lilac-publish</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-misc-4">lilac_dot_el-misc</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-misc-1">lilac_dot_el-misc</a></span>
 (<span class="org-keyword">provide</span> '<span class="org-constant">lilac</span>)
 </pre></div></div>
 </div>
@@ -1095,7 +1095,7 @@ that the remaining KEY values remain valid. This is what we do below, where
            <span class="lilac-child-link-from-parent"><a href="#__NREF__smart-captions">smart-captions</a></span>))
     (lilac-insert-strings-into-buffer smart-captions)))
 
-<span class="lilac-child-link-from-parent"><a href="#__NREF__smart-source-code-block-captions-helpers-9">smart-source-code-block-captions-helpers</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__smart-source-code-block-captions-helpers-1">smart-source-code-block-captions-helpers</a></span>
 </pre></div></div><p>
 (We'll get to the helper functions <code>smart-source-code-block-captions-helpers</code>
 later as they obscure the big picture.)
@@ -1857,9 +1857,11 @@ smart captions we inserted for all child blocks earlier in <a href="#h-Automatic
 (<span class="org-keyword">defun</span> <span class="org-function-name">lilac-populate-child-HTML_ID-hash-table</span> (src-block-html backend info)
   (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
     (<span class="org-keyword">let*</span> ((child-name (lilac-get-src-block-name-from-html src-block-html))
-           (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html)))
+           (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html))
+           (child-HTML_ID-exists-already
+            (gethash child-name lilac-child-HTML_ID-hash-table nil)))
       <span class="org-comment-delimiter">; </span><span class="org-comment">Skip blocks that lack an HTML ID.</span>
-      (<span class="org-keyword">if</span> child-HTML_ID
+      (<span class="org-keyword">if</span> (<span class="org-keyword">and</span> child-HTML_ID (not child-HTML_ID-exists-already))
         (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
       <span class="org-comment-delimiter">; </span><span class="org-comment">Return src-block-html as-is (no modifications).</span>
       src-block-html)))
@@ -2622,7 +2624,7 @@ functions are available), so we turn it on here by calling <code>(org-mode)</cod
 (org-mode)
 
 <span class="lilac-child-link-from-parent"><a href="#__NREF__t-helpers">t-helpers</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__t-smart-caption-generation-6">t-smart-caption-generation</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__t-smart-caption-generation-1">t-smart-caption-generation</a></span>
 
 (<span class="org-keyword">provide</span> '<span class="org-constant">lilac-tests</span>)
 </pre></div></div>
