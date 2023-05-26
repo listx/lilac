@@ -120,9 +120,9 @@ with class 'color and highest min-color value."
 (defun lilac-publish-1 ()
   (let (
         (org-export-before-parsing-hook
-         '(lilac-insert-noweb-source-code-block-captions
-           lilac-UID-for-all-headlines
-           lilac-UID-for-all-polyblocks))
+         '(lilac-UID-for-all-src-blocks
+           lilac-insert-noweb-source-code-block-captions
+           lilac-UID-for-all-headlines))
         (org-export-filter-src-block-functions
          '(lilac-populate-child-HTML_ID-hash-table
            lilac-populate-org_id-human_id-hash-table))
@@ -132,9 +132,9 @@ with class 'color and highest min-color value."
 (defun lilac-publish-2 ()
   (let (
         (org-export-before-parsing-hook
-         '(lilac-insert-noweb-source-code-block-captions
-           lilac-UID-for-all-headlines
-           lilac-UID-for-all-polyblocks))
+         '(lilac-UID-for-all-src-blocks
+           lilac-insert-noweb-source-code-block-captions
+           lilac-UID-for-all-headlines))
         (org-export-filter-src-block-functions
          '(lilac-link-to-children-from-parent-body
            lilac-prettify-source-code-captions))
@@ -152,7 +152,7 @@ with class 'color and highest min-color value."
          (all-src-blocks
            (org-element-map (org-element-parse-buffer) 'src-block 'identity))
          (smart-captions
-           (lilac-mk-smart-captions all-src-blocks child-parents-hash-table)))
+           (lilac-mk-smart-captions child-parents-hash-table)))
     (lilac-insert-strings-into-buffer smart-captions)))
 
 (defun lilac-is-parent-block (src-block)
@@ -177,13 +177,16 @@ with class 'color and highest min-color value."
               child-names)))
      (reverse parent-blocks))
     hash-table))
-(defun lilac-mk-smart-captions (all-src-blocks child-parents-hash-table)
+(defun lilac-mk-smart-captions (child-parents-hash-table)
   (-remove 'null
-    (cl-loop for src-block in all-src-blocks collect
+    (cl-loop for src-block in (org-element-map (org-element-parse-buffer) 'src-block 'identity) collect
       (let* ((child (lilac-get-src-block-name src-block))
              (child-name (car child))
              (NSCB_NAME (format "=%s= " child-name))                  ;ref:NSCB_NAME
-             (NSCB_POLYBLOCK_INDICATOR (car (cdr child)))             ;ref:NSCB_POLYBLOCK_INDICATOR
+             (NSCB_POLYBLOCK_INDICATOR                                ;ref:NSCB_POLYBLOCK_INDICATOR
+               (if (lilac-get-noweb-ref-polyblock-name src-block)
+                   "(polyblock)"
+                 ""))
              (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
              (polyblock-counter-incremented
               (puthash child-name (+ 1 polyblock-counter)
@@ -193,7 +196,7 @@ with class 'color and highest min-color value."
              (pos (org-element-property :begin src-block))
              (NSCB_LINKS_TO_PARENTS                                   ;ref:NSCB_LINKS_TO_PARENTS
               (mapconcat (lambda (parent-with-idx)
-                           (format " [[%s][%S]]"
+                           (format " [[%s][%d]]"
                                    (nth 1 parent-with-idx)
                                    (+ 1 (nth 0 parent-with-idx))))
                          parents-zipped " "))
@@ -205,12 +208,12 @@ with class 'color and highest min-color value."
                 NSCB_LINKS_TO_PARENTS
                 "\n")))
         (when parents (cons pos smart-caption))))))
-(defun lilac-insert-strings-into-buffer (alist)
-  (cl-loop for smart-caption in (reverse smart-captions) do
-        (let ((pos (car smart-caption))
-              (caption (cdr smart-caption)))
+(defun lilac-insert-strings-into-buffer (pos-strings)
+  (cl-loop for pos-string in (reverse pos-strings) do
+        (let ((pos (car pos-string))
+              (str (cdr pos-string)))
           (goto-char pos)
-          (insert caption))))
+          (insert str))))
 (defun lilac-get-noweb-children (s)
   (let* ((lines (split-string s "\n"))
          (refs (-remove 'null
@@ -234,9 +237,9 @@ with class 'color and highest min-color value."
 (defun lilac-get-src-block-name (src-block)
   (let* ((name-direct (org-element-property :name src-block))
          (name-indirect (lilac-get-noweb-ref-polyblock-name src-block)))
-    (if name-direct
-        `(,name-direct "")
-        `(,name-indirect "(polyblock)"))))
+    (if name-indirect
+        `(,name-indirect "(polyblock)")
+        `(,name-direct ""))))
 (defun lilac-enumerate (lst &optional start)
   (let ((ret ()))
     (cl-loop for index from (if start start 0)
@@ -303,33 +306,28 @@ with class 'color and highest min-color value."
     (replace-regexp-in-string "[^A-Za-z0-9]" "-" s)
     "-"
     "-"))
-(defun lilac-UID-for-all-polyblocks (_)
+(defun lilac-UID-for-all-src-blocks (_backend)
   (let* ((all-src-blocks
            (org-element-map (org-element-parse-buffer) 'src-block 'identity))
-         (polyblock-id 0)
-         (noweb-ref-last "")
-         (polyblock-UIDs
+         (counter 0)
+         (auto-names
            (-remove 'null
              (cl-loop for src-block in all-src-blocks collect
-               (let* ((noweb-ref (lilac-get-noweb-ref-polyblock-name src-block))
-                      (is-polyblock
-                       (and
-                         noweb-ref
-                         (not (org-element-property :name src-block))))
-                      (pos (org-element-property :begin src-block))
-                      (name-field-with-uid
-                       (format "#+name: ___polyblock-%s\n" polyblock-id)))
-                 (when (and
-                         is-polyblock
-                         (not (string= noweb-ref noweb-ref-last)))
-                   (setq noweb-ref-last noweb-ref)
-                   (setq polyblock-id (+ 1 polyblock-id))
-                   (cons pos name-field-with-uid)))))))
-    (cl-loop for polyblock-UID in (reverse polyblock-UIDs) do
-        (let ((pos (car polyblock-UID))
-              (name-field-with-uid (cdr polyblock-UID)))
-            (goto-char pos)
-            (insert name-field-with-uid)))))
+               (let* ((pos (org-element-property :begin src-block))
+                      (parent-name-struct (lilac-get-src-block-name src-block))
+                      (direct-name (org-element-property :name src-block))
+                      (no-direct-name (s-blank? direct-name))
+                      (prefix
+                        (cond ((s-blank? (car parent-name-struct))
+                               "___anonymous-src-block")
+                              (t
+                               (car parent-name-struct))))
+                      (name-final
+                       (format "#+name: %s-%x\n" prefix counter)))
+                 (setq counter (1+ counter))
+                 (when no-direct-name
+                   (cons pos name-final)))))))
+    (lilac-insert-strings-into-buffer auto-names)))
 
 ;; Modify HTML
 ; Define a global hash table for mapping child source block names to their HTML
@@ -642,13 +640,20 @@ When matching, reference is stored in match group 1."
 ; Define a global hash table for mapping Org-mode-generated ids (that look like
 ; "org00012") for source code blocks to a more human-readable ID.
 (setq lilac-org_id-human_id-hash-table (make-hash-table :test 'equal))
+(setq lilac-human_id-count-hash-table (make-hash-table :test 'equal))
 
 (defun lilac-populate-org_id-human_id-hash-table (src-block-html backend info)
   (when (org-export-derived-backend-p backend 'html)
     (let* ((block-name (lilac-get-src-block-name-from-html src-block-html))
+           (block-name-count (gethash block-name lilac-human_id-count-hash-table 1))
            (orgid (lilac-get-src-block-HTML_ID src-block-html)))
       (when orgid
-        (puthash orgid block-name lilac-org_id-human_id-hash-table))
+        (puthash block-name
+                 (1+ block-name-count)
+                 lilac-human_id-count-hash-table)
+        (puthash orgid
+                 (format "%s-%d" block-name block-name-count)
+                 lilac-org_id-human_id-hash-table))
       src-block-html)))
 
 (defun lilac-replace-org_ids-with-human_ids (entire-html backend info)
