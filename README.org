@@ -470,7 +470,6 @@ named =__NREF__...= get an automatic =#+caption: ...= text to go along with it
   (clrhash lilac-polyblock-names-totals)
   (lilac-publish-2))
 
-;; This is here solely to populate the lilac-child-HTML_ID-hash-table.
 (defun lilac-publish-1 ()
   (let (
         __NREF__lilac-publish-modify-org
@@ -526,8 +525,10 @@ This is useful for adding in final tweaks to the HTML that is difficult to
 accomplish at the Org-mode buffer level.
 
 Phase 1: In the first phase, we use the generated HTML data to populate the
-=child-HTML_ID-hash-table=. This data structure is used to link to child blocks
-from parent blocks.
+=lilac-child-HTML_ID-hash-table=. This data structure is used to link to child
+blocks from parent blocks. We also populate the
+=lilac-org_id-human_id-hash-table= which is used to convert HTML IDs to be more
+human-readable.
 
 #+name: __NREF__lilac-publish-modify-HTML-1
 #+begin_src emacs-lisp
@@ -536,9 +537,9 @@ from parent blocks.
    lilac-populate-org_id-human_id-hash-table))
 #+end_src
 
-
-Phase 2: In this phase we perform the linking from parent blocks to child
-blocks.
+Phase 2: In this phase we perform the linking from parent blocks to child blocks
+(=lilac-link-to-children-from-parent-body=), and also convert the child source
+code captions to look prettier (=lilac-prettify-source-code-captions=).
 
 #+name: __NREF__lilac-publish-modify-HTML-2
 #+begin_src emacs-lisp
@@ -569,9 +570,9 @@ not assigned an org name field by default.
 
 Of course, we still want all polyblock to have an HTML ID, which can then be
 extracted by [[(lilac-get-src-block-HTML_ID)][=lilac-get-src-block-HTML_ID=]] to build up the
-=child-HTML_ID-hash-table= in [[* Link noweb references (link to child block from
-parent block)]]. If we don't do this then parent source code blocks won't be
-able to link to the polyblock at all (or vice versa).
+=lilac-child-HTML_ID-hash-table= in [[* Link noweb references (link to child block
+from parent block)]]. If we don't do this then parent source code blocks won't
+be able to link to the polyblock at all (or vice versa).
 
 Monoblocks with a =#+name: ...= field get a unique HTML ID assigned to it in
 the form =orgN= where =N= is a hexadecimal number. By default Org generates a
@@ -988,8 +989,8 @@ construction of the =CUSTOM_ID= (=headline-UID= in the code below) is done by
              (cl-loop for headline in all-headlines collect
                (let* ((headline-UID
                        (lilac-get-unique-id headline headline-uid-hash-table))
-                      ;; Get the position just a
-                      ;; fter the headline (just underneath it).
+                      ;; Get the position just after the headline (just
+                      ;; underneath it).
                       (pos (progn
                              (goto-char (org-element-property :begin headline))
                              (re-search-forward "\n"))))
@@ -1396,13 +1397,13 @@ will hold the source code. That is, the algorithm should be something like:
 
 1. for every parent source code block,
 2. for every child block (noweb) referenced in the body, insert an HTML link to
-   the child block (lookup in =child-HTML_ID-hash-table=).
+   the child block (lookup in =lilac-child-HTML_ID-hash-table=).
 
-The only thing remaining is the construction of =child-HTML_ID-hash-table=. We
-can construct this by mapping through all source code blocks and getting the
-name which can be just drawn from the =<label ...>= HTML tag, thanks to the
-smart captions we inserted for all child blocks earlier in [[* Automatic captions
-for Noweb source code blocks]].
+The only thing remaining is the construction of
+=lilac-child-HTML_ID-hash-table=. We can construct this by mapping through all
+source code blocks and getting the name which can be just drawn from the =<label
+...>= HTML tag, thanks to the smart captions we inserted for all child blocks
+earlier in [[* Automatic captions for Noweb source code blocks]].
 
 #+name: __NREF__lilac-html-filter-src-blocks
 #+begin_src emacs-lisp -r -l ";ref:%s"

@@ -116,7 +116,6 @@ with class 'color and highest min-color value."
   (clrhash lilac-polyblock-names-totals)
   (lilac-publish-2))
 
-;; This is here solely to populate the lilac-child-HTML_ID-hash-table.
 (defun lilac-publish-1 ()
   (let (
         (org-export-before-parsing-hook
@@ -269,8 +268,8 @@ with class 'color and highest min-color value."
              (cl-loop for headline in all-headlines collect
                (let* ((headline-UID
                        (lilac-get-unique-id headline headline-uid-hash-table))
-                      ;; Get the position just a
-                      ;; fter the headline (just underneath it).
+                      ;; Get the position just after the headline (just
+                      ;; underneath it).
                       (pos (progn
                              (goto-char (org-element-property :begin headline))
                              (re-search-forward "\n"))))

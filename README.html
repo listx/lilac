@@ -849,7 +849,6 @@ named <code>__NREF__...</code> get an automatic <code>#+caption: ...</code> text
   (clrhash lilac-polyblock-names-totals)
   (lilac-publish-2))
 
-<span class="org-comment-delimiter">;; </span><span class="org-comment">This is here solely to populate the lilac-child-HTML_ID-hash-table.</span>
 (<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish-1</span> ()
   (<span class="org-keyword">let</span> (
         <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-org">lilac-publish-modify-org</a></span>
@@ -917,16 +916,19 @@ accomplish at the Org-mode buffer level.
 
 <p>
 Phase 1: In the first phase, we use the generated HTML data to populate the
-<code>child-HTML_ID-hash-table</code>. This data structure is used to link to child blocks
-from parent blocks.
+<code>lilac-child-HTML_ID-hash-table</code>. This data structure is used to link to child
+blocks from parent blocks. We also populate the
+<code>lilac-org_id-human_id-hash-table</code> which is used to convert HTML IDs to be more
+human-readable.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-HTML-1</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-HTML-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-HTML-1">(org-export-filter-src-block-functions
  '(lilac-populate-child-HTML_ID-hash-table
    lilac-populate-org_id-human_id-hash-table))
 </pre></div></div><p>
-Phase 2: In this phase we perform the linking from parent blocks to child
-blocks.
+Phase 2: In this phase we perform the linking from parent blocks to child blocks
+(<code>lilac-link-to-children-from-parent-body</code>), and also convert the child source
+code captions to look prettier (<code>lilac-prettify-source-code-captions</code>).
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-HTML-2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-HTML-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-HTML-2">(org-export-filter-src-block-functions
@@ -969,8 +971,8 @@ not assigned an org name field by default.
 <p>
 Of course, we still want all polyblock to have an HTML ID, which can then be
 extracted by <a href="#coderef-lilac-get-src-block-HTML_ID" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-lilac-get-src-block-HTML_ID');" onmouseout="CodeHighlightOff(this, 'coderef-lilac-get-src-block-HTML_ID');"><code>lilac-get-src-block-HTML_ID</code></a> to build up the
-<code>child-HTML_ID-hash-table</code> in <a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">5.6.3</a>. If we don't do this then parent source code blocks won't be
-able to link to the polyblock at all (or vice versa).
+<code>lilac-child-HTML_ID-hash-table</code> in <a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">5.6.3</a>. If we don't do this then parent source code blocks won't
+be able to link to the polyblock at all (or vice versa).
 </p>
 
 <p>
@@ -1396,8 +1398,8 @@ construction of the <code>CUSTOM_ID</code> (<code>headline-UID</code> in the cod
              (<span class="org-keyword">cl-loop</span> for headline in all-headlines collect
                (<span class="org-keyword">let*</span> ((headline-UID
                        (lilac-get-unique-id headline headline-uid-hash-table))
-                      <span class="org-comment-delimiter">;; </span><span class="org-comment">Get the position just a</span>
-                      <span class="org-comment-delimiter">;; </span><span class="org-comment">fter the headline (just underneath it).</span>
+                      <span class="org-comment-delimiter">;; </span><span class="org-comment">Get the position just after the headline (just</span>
+                      <span class="org-comment-delimiter">;; </span><span class="org-comment">underneath it).</span>
                       (pos (<span class="org-keyword">progn</span>
                              (goto-char (org-element-property <span class="org-builtin">:begin</span> headline))
                              (re-search-forward <span class="org-string">"\n"</span>))))
@@ -1840,14 +1842,15 @@ will hold the source code. That is, the algorithm should be something like:
 <ol class="org-ol">
 <li>for every parent source code block,</li>
 <li>for every child block (noweb) referenced in the body, insert an HTML link to
-the child block (lookup in <code>child-HTML_ID-hash-table</code>).</li>
+the child block (lookup in <code>lilac-child-HTML_ID-hash-table</code>).</li>
 </ol>
 
 <p>
-The only thing remaining is the construction of <code>child-HTML_ID-hash-table</code>. We
-can construct this by mapping through all source code blocks and getting the
-name which can be just drawn from the <code>&lt;label ...&gt;</code> HTML tag, thanks to the
-smart captions we inserted for all child blocks earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">5.5.2</a>.
+The only thing remaining is the construction of
+<code>lilac-child-HTML_ID-hash-table</code>. We can construct this by mapping through all
+source code blocks and getting the name which can be just drawn from the <code>&lt;label
+...&gt;</code> HTML tag, thanks to the smart captions we inserted for all child blocks
+earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">5.5.2</a>.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-html-filter-src-blocks</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-html-filter-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-html-filter-src-blocks"><span class="org-comment-delimiter">; </span><span class="org-comment">Define a global hash table for mapping child source block names to their HTML</span>
