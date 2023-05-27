@@ -1255,7 +1255,7 @@ into the buffer.
                  <span class="org-string">""</span>))
              (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
              (polyblock-counter-incremented
-              (puthash child-name (+ 1 polyblock-counter)
+              (puthash child-name (1+ polyblock-counter)
                        lilac-polyblock-names-totals))
              (parents (gethash child-name child-parents-hash-table))
              (parents-zipped (lilac-enumerate parents))
@@ -1264,7 +1264,7 @@ into the buffer.
               (mapconcat (<span class="org-keyword">lambda</span> (parent-with-idx)
                            (format <span class="org-string">" [[%s][%d]]"</span>
                                    (nth 1 parent-with-idx)
-                                   (+ 1 (nth 0 parent-with-idx))))
+                                   (1+ (nth 0 parent-with-idx))))
                          parents-zipped <span class="org-string">" "</span>))
              (smart-caption
               (concat
@@ -1426,7 +1426,7 @@ have a unique ID).
     <span class="org-comment-delimiter">;; </span><span class="org-comment">Discard the key if a value already exists. This drives up the</span>
     <span class="org-comment-delimiter">;; </span><span class="org-comment">disambiguation number.</span>
     (<span class="org-keyword">while</span> val
-      (<span class="org-keyword">setq</span> disambiguation-number (+ 1 disambiguation-number))
+      (<span class="org-keyword">setq</span> disambiguation-number (1+ disambiguation-number))
       (<span class="org-keyword">setq</span> key (concat <span class="org-string">"h-"</span>
                         (lilac-normalize-string
                          (format <span class="org-string">"%s-%s"</span> name disambiguation-number))))
@@ -1647,7 +1647,7 @@ variable and display it.
            (source-block-counter
             (gethash source-block-name lilac-polyblock-names 0))
            (source-block-counter-incremented
-            (puthash source-block-name (+ 1 source-block-counter)
+            (puthash source-block-name (1+ source-block-counter)
                      lilac-polyblock-names))
            (source-block-name-styled
              (<span class="org-keyword">cond</span> ((string-prefix-p <span class="org-string">"__NREF__"</span> source-block-name)

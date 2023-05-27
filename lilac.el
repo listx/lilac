@@ -188,7 +188,7 @@ with class 'color and highest min-color value."
                  ""))
              (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
              (polyblock-counter-incremented
-              (puthash child-name (+ 1 polyblock-counter)
+              (puthash child-name (1+ polyblock-counter)
                        lilac-polyblock-names-totals))
              (parents (gethash child-name child-parents-hash-table))
              (parents-zipped (lilac-enumerate parents))
@@ -197,7 +197,7 @@ with class 'color and highest min-color value."
               (mapconcat (lambda (parent-with-idx)
                            (format " [[%s][%d]]"
                                    (nth 1 parent-with-idx)
-                                   (+ 1 (nth 0 parent-with-idx))))
+                                   (1+ (nth 0 parent-with-idx))))
                          parents-zipped " "))
              (smart-caption
               (concat
@@ -287,7 +287,7 @@ with class 'color and highest min-color value."
     ;; Discard the key if a value already exists. This drives up the
     ;; disambiguation number.
     (while val
-      (setq disambiguation-number (+ 1 disambiguation-number))
+      (setq disambiguation-number (1+ disambiguation-number))
       (setq key (concat "h-"
                         (lilac-normalize-string
                          (format "%s-%s" name disambiguation-number))))
@@ -512,7 +512,7 @@ When matching, reference is stored in match group 1."
            (source-block-counter
             (gethash source-block-name lilac-polyblock-names 0))
            (source-block-counter-incremented
-            (puthash source-block-name (+ 1 source-block-counter)
+            (puthash source-block-name (1+ source-block-counter)
                      lilac-polyblock-names))
            (source-block-name-styled
              (cond ((string-prefix-p "__NREF__" source-block-name)
