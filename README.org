@@ -1495,10 +1495,10 @@ earlier in [[* Automatic captions for Noweb source code blocks]].
       (concat leading-div caption body-linkified-with-newlines "</div>"))))
 
 (defun lilac-to-single-line (s)
-  (replace-regexp-in-string "\n" "<<<NEWLINE>>>" s))
+  (replace-regexp-in-string "\n" "<<<LILAC_NEWLINE>>>" s))
 
 (defun lilac-to-multi-line (s)
-  (replace-regexp-in-string "<<<NEWLINE>>>" "\n" s))
+  (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
 
 __NREF__custom-noweb-delimiters
 #+end_src

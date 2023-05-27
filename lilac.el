@@ -412,10 +412,10 @@ with class 'color and highest min-color value."
       (concat leading-div caption body-linkified-with-newlines "</div>"))))
 
 (defun lilac-to-single-line (s)
-  (replace-regexp-in-string "\n" "<<<NEWLINE>>>" s))
+  (replace-regexp-in-string "\n" "<<<LILAC_NEWLINE>>>" s))
 
 (defun lilac-to-multi-line (s)
-  (replace-regexp-in-string "<<<NEWLINE>>>" "\n" s))
+  (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
 
 (setq org-babel-noweb-wrap-start "__NREF__")
 (setq org-babel-noweb-wrap-end "")
