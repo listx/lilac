@@ -143,6 +143,28 @@ with class 'color and highest min-color value."
     (org-html-export-to-html)))
 
 ;; Modify Org buffer
+(defun lilac-UID-for-all-src-blocks (_backend)
+  (let* ((all-src-blocks
+           (org-element-map (org-element-parse-buffer) 'src-block 'identity))
+         (counter 0)
+         (auto-names
+           (-remove 'null
+             (cl-loop for src-block in all-src-blocks collect
+               (let* ((pos (org-element-property :begin src-block))
+                      (parent-name-struct (lilac-get-src-block-name src-block))
+                      (direct-name (org-element-property :name src-block))
+                      (no-direct-name (s-blank? direct-name))
+                      (prefix
+                        (cond ((s-blank? (car parent-name-struct))
+                               "___anonymous-src-block")
+                              (t
+                               (car parent-name-struct))))
+                      (name-final
+                       (format "#+name: %s-%x\n" prefix counter)))
+                 (setq counter (1+ counter))
+                 (when no-direct-name
+                   (cons pos name-final)))))))
+    (lilac-insert-strings-into-buffer auto-names)))
 (defun lilac-insert-noweb-source-code-block-captions (_backend)
   (let* ((parent-blocks
            (lilac-get-parent-blocks))
@@ -300,28 +322,6 @@ with class 'color and highest min-color value."
     (replace-regexp-in-string "[^A-Za-z0-9]" "-" s)
     "-"
     "-"))
-(defun lilac-UID-for-all-src-blocks (_backend)
-  (let* ((all-src-blocks
-           (org-element-map (org-element-parse-buffer) 'src-block 'identity))
-         (counter 0)
-         (auto-names
-           (-remove 'null
-             (cl-loop for src-block in all-src-blocks collect
-               (let* ((pos (org-element-property :begin src-block))
-                      (parent-name-struct (lilac-get-src-block-name src-block))
-                      (direct-name (org-element-property :name src-block))
-                      (no-direct-name (s-blank? direct-name))
-                      (prefix
-                        (cond ((s-blank? (car parent-name-struct))
-                               "___anonymous-src-block")
-                              (t
-                               (car parent-name-struct))))
-                      (name-final
-                       (format "#+name: %s-%x\n" prefix counter)))
-                 (setq counter (1+ counter))
-                 (when no-direct-name
-                   (cons pos name-final)))))))
-    (lilac-insert-strings-into-buffer auto-names)))
 
 ;; Modify HTML
 ; Define a global hash table for mapping child source block names to their HTML

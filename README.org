@@ -485,12 +485,12 @@ named =__NREF__...= get an automatic =#+caption: ...= text to go along with it
     (org-html-export-to-html)))
 
 ;; Modify Org buffer
+__NREF__UID-for-all-src-blocks
 __NREF__smart-source-code-block-captions
 __NREF__UID-for-all-headlines
-__NREF__UID-for-all-src-blocks
 
 ;; Modify HTML
-__NREF__lilac-html-filter-src-blocks
+__NREF__lilac-link-to-child-blocks-from-parent
 __NREF__lilac-prettify-source-code-captions
 __NREF__lilac-human-readable-src-block-ids
 #+end_src
@@ -1141,8 +1141,8 @@ whether we have a "Listing: ..." or not. We just need to save the 3 bits of
 information, and then:
 
 1. print the outer =<div ...>=,
-2. print the =<pre>= content, and
-3. print the =<label>= content but as a =<div>=.
+2. print the =<label>= content but as a =<div>=, and
+3. print the =<pre>= content.
 
 For the last step, we want to additionally parse the inner "Listing N ... 0 [1 2
 3 ...]" text and transform it with reordering and also additional metadata
@@ -1405,7 +1405,7 @@ source code blocks and getting the name which can be just drawn from the =<label
 ...>= HTML tag, thanks to the smart captions we inserted for all child blocks
 earlier in [[* Automatic captions for Noweb source code blocks]].
 
-#+name: __NREF__lilac-html-filter-src-blocks
+#+name: __NREF__lilac-link-to-child-blocks-from-parent
 #+begin_src emacs-lisp -r -l ";ref:%s"
 ; Define a global hash table for mapping child source block names to their HTML
 ; IDs.

@@ -864,12 +864,12 @@ named <code>__NREF__...</code> get an automatic <code>#+caption: ...</code> text
     (org-html-export-to-html)))
 
 <span class="org-comment-delimiter">;; </span><span class="org-comment">Modify Org buffer</span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-src-blocks">UID-for-all-src-blocks</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-headlines">UID-for-all-headlines</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-src-blocks">UID-for-all-src-blocks</a></span>
 
 <span class="org-comment-delimiter">;; </span><span class="org-comment">Modify HTML</span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-html-filter-src-blocks">lilac-html-filter-src-blocks</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-link-to-child-blocks-from-parent">lilac-link-to-child-blocks-from-parent</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-prettify-source-code-captions">lilac-prettify-source-code-captions</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-human-readable-src-block-ids">lilac-human-readable-src-block-ids</a></span>
 </pre></div></div>
@@ -1575,8 +1575,8 @@ information, and then:
 
 <ol class="org-ol">
 <li>print the outer <code>&lt;div ...&gt;</code>,</li>
-<li>print the <code>&lt;pre&gt;</code> content, and</li>
-<li>print the <code>&lt;label&gt;</code> content but as a <code>&lt;div&gt;</code>.</li>
+<li>print the <code>&lt;label&gt;</code> content but as a <code>&lt;div&gt;</code>, and</li>
+<li>print the <code>&lt;pre&gt;</code> content.</li>
 </ol>
 
 <p>
@@ -1853,7 +1853,7 @@ source code blocks and getting the name which can be just drawn from the <code>&
 earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">5.5.2</a>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-html-filter-src-blocks</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-html-filter-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-html-filter-src-blocks"><span class="org-comment-delimiter">; </span><span class="org-comment">Define a global hash table for mapping child source block names to their HTML</span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent"><span class="org-comment-delimiter">; </span><span class="org-comment">Define a global hash table for mapping child source block names to their HTML</span>
 <span class="org-comment-delimiter">; </span><span class="org-comment">IDs.</span>
 (<span class="org-keyword">setq</span> lilac-child-HTML_ID-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
 
@@ -1960,7 +1960,7 @@ tangle code blocks properly in an interactive manner from an Emacs editing
 session.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-html-filter-src-blocks">custom-noweb-delimiters</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__custom-noweb-delimiters">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__custom-noweb-delimiters">(<span class="org-keyword">setq</span> org-babel-noweb-wrap-start <span class="org-string">"__NREF__"</span>)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-link-to-child-blocks-from-parent">custom-noweb-delimiters</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__custom-noweb-delimiters">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__custom-noweb-delimiters">(<span class="org-keyword">setq</span> org-babel-noweb-wrap-start <span class="org-string">"__NREF__"</span>)
 (<span class="org-keyword">setq</span> org-babel-noweb-wrap-end <span class="org-string">""</span>)
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">lilac-nref-rx</span> (match-optional-params)
