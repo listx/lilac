@@ -14,6 +14,10 @@
 
 * Introduction
 
+#+begin_sidenote
+The /lilac/ is a [[https://en.wikipedia.org/wiki/Syringa][small flowering plant]].
+#+end_sidenote
+
 /Lilac/ is an addon for Emacs Org mode to make [[https://en.wikipedia.org/wiki/Literate_programming][Literate Programming]] (LP) using
 Noweb-style [cite:@ramsey_1994] references easy. It comes in two parts:
 
@@ -1893,6 +1897,7 @@ __NREF__css-source-code-section-headlines
 __NREF__css-source-code-block-body
 __NREF__css-source-code-block-captions
 __NREF__css-source-code-block-child-link-from-parent
+__NREF__css-sidenotes
 #+end_src
 
 *** Source code block body
@@ -2011,6 +2016,45 @@ __NREF__css-source-code-block-child-link-from-parent
     color: #7d3c98;
     background-color: #f8e9ff;
     text-decoration: none;
+}
+#+end_src
+
+*** Sidenotes
+
+Sidenotes are small blurbs of text that are displayed "out-of-band", on the
+right margin. This right margin is good for presenting smaller ideas that
+shouldn't necessarily sit in the main body text.
+
+The CSS below is drawn primarily from [[https://scripter.co/sidenotes-using-only-css/][here]], with some modifications.
+
+#+name: __NREF__css-sidenotes
+#+begin_src css
+.sidenote {
+    font-size: 80%;
+    position: relative;
+}
+/* Wide viewport */
+@media (min-width: 1400px) {
+    .sidenote {
+        float: right;
+        clear: right;
+        margin-right: -23vw;
+        padding-right: 2vw;
+        text-align: left;
+        top: -3rem;
+        width: 20vw;
+        margin-top: 1rem;
+    }
+}
+/* Narrow viewport */
+@media (max-width: 1400px) {
+    .sidenote {
+        float: right;
+        text-align: left;
+        width: 100%;
+        margin: 1rem 0;
+        padding-left: 15%;
+    }
 }
 #+end_src
 

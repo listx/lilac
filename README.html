@@ -273,6 +273,7 @@
 <li><a href="#h-Source-code-block-body">5.11.1. Source code block body</a></li>
 <li><a href="#h-Source-code-block-captions">5.11.2. Source code block captions</a></li>
 <li><a href="#h-Links-to-child-source-block-from-parent">5.11.3. Links to child source block from parent</a></li>
+<li><a href="#h-Sidenotes">5.11.4. Sidenotes</a></li>
 </ul>
 </li>
 <li><a href="#h-Create--lilac-theme--file">5.12. Create <code>lilac.theme</code> file</a></li>
@@ -301,6 +302,13 @@
 <div id="outline-container-h-Introduction" class="outline-2">
 <h2 id="h-Introduction"><span class="section-number-2">1.</span> Introduction</h2>
 <div class="outline-text-2" id="text-h-Introduction">
+<div class="sidenote" id="org0000000">
+<p>
+The <i>lilac</i> is a <a href="https://en.wikipedia.org/wiki/Syringa">small flowering plant</a>.
+</p>
+
+</div>
+
 <p>
 <i>Lilac</i> is an addon for Emacs Org mode to make <a href="https://en.wikipedia.org/wiki/Literate_programming">Literate Programming</a> (LP) using
 Noweb-style <a href="#citeproc_bib_item_1">[1]</a> references easy. It comes in two parts:
@@ -349,7 +357,7 @@ While Org mode allows source code blocks to refer to other blocks (Noweb
 references), it does not do any kind of linking. So you can write blocks like
 </p>
 
-<div class="org-src-container"><pre class="src src-org" id="org0000000"><span class="org-org-meta-line">#+name: example-parent-block</span>
+<div class="org-src-container"><pre class="src src-org" id="org0000001"><span class="org-org-meta-line">#+name: example-parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
 <span class="org-org-block">&lt;&lt;some-other-block&gt;&gt;</span>
@@ -482,7 +490,7 @@ definition.
 </pre></div></div><p>
 This example illustrates the two ways to define a child block: either as a
 single code block with <code>#+name: __NREF__foo</code>, or as multiple blocks with
-<code>#+header: :noweb-ref __NREF__foo</code>. Lilac calls them <a href="#org0000004">monoblocks</a> and <a href="#org0000006">polyblocks</a>
+<code>#+header: :noweb-ref __NREF__foo</code>. Lilac calls them <a href="#org0000005">monoblocks</a> and <a href="#org0000007">polyblocks</a>
 respectively. Polyblocks are concatenated together in the order they appear in
 the overall Org file; this final concatenated version is what gets inserted into
 the Noweb reference in the parent block.
@@ -1319,8 +1327,8 @@ type is a list of strings.
     noweb-ref-name))
 </pre></div></div><p>
 Note that a child source block can have two ways of defining its name. The first
-is with the direct <code>#+name: __NREF__foo</code> style (<a href="#org0000004">monoblock</a>), and the second way
-is with a line like <code>#+header: :noweb-ref __NREF__foo</code> (<a href="#org0000006">polyblock</a>). Here
+is with the direct <code>#+name: __NREF__foo</code> style (<a href="#org0000005">monoblock</a>), and the second way
+is with a line like <code>#+header: :noweb-ref __NREF__foo</code> (<a href="#org0000007">polyblock</a>). Here
 <code>lilac-get-src-block-name</code> grabs the name of a (child) source code block, taking
 into account these two styles. For polyblock names, we mark it as such with a
 <code>(polyblock)</code> string, which is used later for the <a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a>.
@@ -1453,7 +1461,7 @@ have a unique ID).
 <h4 id="h-Use-human-readable-HTML-IDs-for-source-code-links"><span class="section-number-4">5.6.1.</span> Use human-readable HTML IDs for source code links</h4>
 <div class="outline-text-4" id="text-h-Use-human-readable-HTML-IDs-for-source-code-links">
 <p>
-Recall that there are 2 types of source code blocks: <a href="#org0000004">monoblocks</a> and <a href="#org0000006">polyblocks</a>.
+Recall that there are 2 types of source code blocks: <a href="#org0000005">monoblocks</a> and <a href="#org0000007">polyblocks</a>.
 </p>
 
 <p>
@@ -2364,6 +2372,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-body">css-source-code-block-body</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-captions">css-source-code-block-captions</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-child-link-from-parent">css-source-code-block-child-link-from-parent</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-sidenotes">css-sidenotes</a></span>
 </pre></div></div>
 </div>
 
@@ -2484,6 +2493,50 @@ We add some additional CSS tweaks on top of what we get from Org.
     <span class="org-css-property">color</span>: <span class="custom-1">#7d3c98</span>;
     <span class="org-css-property">background-color</span>: <span class="custom">#f8e9ff</span>;
     <span class="org-css-property">text-decoration</span>: none;
+}
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Sidenotes" class="outline-4">
+<h4 id="h-Sidenotes"><span class="section-number-4">5.11.4.</span> Sidenotes</h4>
+<div class="outline-text-4" id="text-h-Sidenotes">
+<p>
+Sidenotes are small blurbs of text that are displayed "out-of-band", on the
+right margin. This right margin is good for presenting smaller ideas that
+shouldn't necessarily sit in the main body text.
+</p>
+
+<p>
+The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-using-only-css/">here</a>, with some modifications.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-sidenotes</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-sidenotes">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-sidenotes"><span class="org-css-selector">.sidenote </span>{
+    <span class="org-css-property">font-size</span>: 80%;
+    <span class="org-css-property">position</span>: relative;
+}
+<span class="org-comment-delimiter">/* </span><span class="org-comment">Wide viewport</span><span class="org-comment-delimiter"> */</span>
+<span class="org-builtin">@media</span> (min-width: 1400px) {
+    <span class="org-css-selector">.sidenote </span>{
+        <span class="org-css-property">float</span>: right;
+        <span class="org-css-property">clear</span>: right;
+        <span class="org-css-property">margin-right</span>: -23vw;
+        <span class="org-css-property">padding-right</span>: 2vw;
+        <span class="org-css-property">text-align</span>: left;
+        <span class="org-css-property">top</span>: -3rem;
+        <span class="org-css-property">width</span>: 20vw;
+        <span class="org-css-property">margin-top</span>: 1rem;
+    }
+}
+<span class="org-comment-delimiter">/* </span><span class="org-comment">Narrow viewport</span><span class="org-comment-delimiter"> */</span>
+<span class="org-builtin">@media</span> (max-width: 1400px) {
+    <span class="org-css-selector">.sidenote </span>{
+        <span class="org-css-property">float</span>: right;
+        <span class="org-css-property">text-align</span>: left;
+        <span class="org-css-property">width</span>: 100%;
+        <span class="org-css-property">margin</span>: 1rem 0;
+        <span class="org-css-property">padding-left</span>: 15%;
+    }
 }
 </pre></div></div>
 </div>
@@ -2961,20 +3014,20 @@ Here we test the construction of smart captions.
 <h2 id="h-Glossary"><span class="section-number-2">9.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
-<dt><a id="org0000004"></a> <b>monoblock</b></dt><dd>an Org mode source code block with a <code>#+name:
+<dt><a id="org0000005"></a> <b>monoblock</b></dt><dd>an Org mode source code block with a <code>#+name:
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org0000098">Org mode</a> borrows heavily using <a href="#org000009a">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org000009a"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org000009b">Org mode</a> borrows heavily using <a href="#org000009d">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org000009d"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org0000098"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org000009b"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
 <a href="https://orgmode.org/">Org mode</a>.</dd>
-<dt><a id="org0000006"></a> <b>polyblock</b></dt><dd>an Org mode source code block without a <code>#+name:
+<dt><a id="org0000007"></a> <b>polyblock</b></dt><dd>an Org mode source code block without a <code>#+name:
   ...</code> field, but which has a <code>#+header: :noweb-ref ...</code> field. Other blocks
 with the same Noweb-ref name are concatenated together when they are tangled.
 Polyblocks are used in cases where we would like to break up a single block
