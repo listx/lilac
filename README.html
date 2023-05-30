@@ -200,6 +200,7 @@
 <div id="content" class="content">
 <h1 class="title">Lilac</h1>
 <div id="table-of-contents" role="doc-toc">
+
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
 <li><a href="#h-Introduction">1. Introduction</a></li>
@@ -2536,11 +2537,10 @@ The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-usi
     <span class="org-css-selector">.sidenote </span>{
         <span class="org-css-property">float</span>: right;
         <span class="org-css-property">clear</span>: right;
-        <span class="org-css-property">margin-right</span>: -23vw;
-        <span class="org-css-property">padding-right</span>: 2vw;
+        <span class="org-css-property">margin-right</span>: -300px;
+        <span class="org-css-property">width</span>: 270px;
         <span class="org-css-property">text-align</span>: left;
         <span class="org-css-property">top</span>: -3rem;
-        <span class="org-css-property">width</span>: 20vw;
         <span class="org-css-property">margin-top</span>: 1rem;
     }
 }
@@ -2579,13 +2579,11 @@ Make the "Table of Contents" float off to the left so that it is always visible.
   <span class="org-css-property">height</span>: 100vh;
 }
 </pre></div></div><p>
-We also replace the text "Table of Contents" with "Lilac" because it looks
-better when we're in the middle of the doc (where readers spend most of their
-time).
+We also delete the text "Table of Contents" because it looks too intrusive when
+it is placed in the sidebar area.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__Makefile-weave">Makefile-replace-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-replace-toc-text">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-replace-toc-text">sed -i <span class="org-string">'s|&lt;h2&gt;Table of Contents&lt;/h2&gt;|'</span>\
-<span class="org-string">'&lt;p&gt;Lilac&lt;/p&gt;|'</span> README.html
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__Makefile-weave">Makefile-replace-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-replace-toc-text">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-replace-toc-text">sed -i <span class="org-string">'s|&lt;h2&gt;Table of Contents&lt;/h2&gt;||'</span> README.html
 </pre></div></div>
 </div>
 </div>
