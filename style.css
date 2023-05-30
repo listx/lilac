@@ -97,6 +97,8 @@ a.section-heading:hover::after {
     float: left;
     margin-left: -1.3em;
     content: "\1f517";
+    position: relative;
+    z-index: 10;
 }
 .org-src-container {
     margin: 1em 0;
@@ -230,11 +232,46 @@ a.section-heading:hover::after {
   top: 0;
   float: left;
   margin-left: -300px;
-  width: 270px;
+  width: 280px;
+  padding-right: 10px;
+  font-size: 90%;
 }
 #text-table-of-contents {
   position: sticky;
   top: 0;
   overflow-y: scroll;
   height: 100vh;
+}
+#text-table-of-contents ul {
+  margin: 0;
+  padding: 0;
+}
+#text-table-of-contents ul li {
+  margin-top: 20px;
+}
+#text-table-of-contents ul li ul li {
+  margin-top: 5px;
+}
+#text-table-of-contents ul li ul li ul li {
+  margin-bottom: 0;
+}
+#text-table-of-contents ul li ul li ul li ul li {
+  margin-bottom: 0;
+}
+#table-of-contents a {
+  display: block;
+  transition: all 50ms ease-in-out;
+  padding: 5px;
+  border-radius: 4px;
+}
+#table-of-contents a:hover,
+#table-of-contents a:focus {
+  text-decoration: none;
+}
+#table-of-contents .nav-link {
+  color: black;
+}
+#table-of-contents .active {
+  color: black;
+  background-color: #e3f5e0;
 }

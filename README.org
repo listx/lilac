@@ -1747,7 +1747,12 @@ $(function() {
                      .addClass("section-heading"));
     });
 });
+
+__NREF__js-toc-scrollspy
 #+end_src
+
+(Ignore the =js-toc-scrollspy= bit, as that's for the [[* Table of contents]["Table of contents"]]
+section below.)
 
 Now we just have to refer to the above in the snippet below, to be included in [[* Create
 =lilac.theme= file][=lilac.theme=]].
@@ -1756,6 +1761,7 @@ Now we just have to refer to the above in the snippet below, to be included in [
 #+begin_src org
 # Automatically link headlines.
 ,#+HTML_HEAD: <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+,#+HTML_HEAD: <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
 ,#+HTML_HEAD: <script src="misc.js"></script>
 #+end_src
 
@@ -1773,6 +1779,8 @@ a.section-heading:hover::after {
     float: left;
     margin-left: -1.3em;
     content: "\1f517";
+    position: relative;
+    z-index: 10;
 }
 #+end_src
 
@@ -2080,13 +2088,48 @@ Make the "Table of Contents" float off to the left so that it is always visible.
   top: 0;
   float: left;
   margin-left: -300px;
-  width: 270px;
+  width: 280px;
+  padding-right: 10px;
+  font-size: 90%;
 }
 #text-table-of-contents {
   position: sticky;
   top: 0;
   overflow-y: scroll;
   height: 100vh;
+}
+#text-table-of-contents ul {
+  margin: 0;
+  padding: 0;
+}
+#text-table-of-contents ul li {
+  margin-top: 20px;
+}
+#text-table-of-contents ul li ul li {
+  margin-top: 5px;
+}
+#text-table-of-contents ul li ul li ul li {
+  margin-bottom: 0;
+}
+#text-table-of-contents ul li ul li ul li ul li {
+  margin-bottom: 0;
+}
+#table-of-contents a {
+  display: block;
+  transition: all 50ms ease-in-out;
+  padding: 5px;
+  border-radius: 4px;
+}
+#table-of-contents a:hover,
+#table-of-contents a:focus {
+  text-decoration: none;
+}
+#table-of-contents .nav-link {
+  color: black;
+}
+#table-of-contents .active {
+  color: black;
+  background-color: #e3f5e0;
 }
 #+end_src
 
@@ -2096,6 +2139,58 @@ it is placed in the sidebar area.
 #+name: __NREF__Makefile-replace-toc-text
 #+begin_src makefile
 sed -i 's|<h2>Table of Contents</h2>||' README.html
+sed -i 's|<body>|<body data-bs-spy="scroll" '\
+'data-bs-target="#text-table-of-contents">|' README.html
+#+end_src
+
+Lastly we use some JavaScript to automatically update the Table of Contents when
+we scroll up or down the page, using Bootstrap's "scrollspy" feature.
+
+#+name: __NREF__js-toc-scrollspy
+#+begin_src js
+function activate_toc_item_on_click (item){
+    $(item).toggleClass("active");
+}
+
+function scrollIntoViewIfNeeded(target) {
+    if (target.getBoundingClientRect().bottom > window.innerHeight) {
+        target.scrollIntoView(false);
+    }
+
+    if (target.getBoundingClientRect().top < 0) {
+        target.scrollIntoView();
+    }
+}
+
+$(document).ready(function() {
+  $('#text-table-of-contents ul').first().addClass('nav');
+  $('#text-table-of-contents ul li').addClass('nav-item');
+  $('#text-table-of-contents ul li a').addClass('nav-link');
+
+  const scrollSpy = new bootstrap.ScrollSpy(document.body, {
+    smoothScroll: true,
+    target: '#text-table-of-contents'
+  })
+
+  $("#text-table-of-contents a").click(function() {
+    activate_toc_item_on_click(this);
+  });
+
+  const firstScrollSpyEl = document.querySelector('[data-bs-spy="scroll"]')
+  firstScrollSpyEl.addEventListener('activate.bs.scrollspy', () => {
+    let elems = document.getElementsByClassName('active');
+    if (elems.length > 0) {
+      // Unfortunately, scrollIntoViewIfNeeded is not supported on Firefox.
+      // Otherwise we could do
+      //
+      //    elems[0].scrollIntoViewIfNeeded({ block: "center" });
+      //
+      // instead. So here we call the custom function that does what we want.
+      // See https://stackoverflow.com/a/37829643/437583.
+      scrollIntoViewIfNeeded(elems[0]);
+    }
+  })
+});
 #+end_src
 
 ** Create =lilac.theme= file

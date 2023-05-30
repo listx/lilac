@@ -194,9 +194,10 @@
 <link rel="stylesheet" type="text/css" href="style.css" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro&family=Source+Code+Pro">
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
 <script src="misc.js"></script>
 </head>
-<body>
+<body data-bs-spy="scroll" data-bs-target="#text-table-of-contents">
 <div id="content" class="content">
 <h1 class="title">Lilac</h1>
 <div id="table-of-contents" role="doc-toc">
@@ -2227,12 +2228,20 @@ The JavaScript below is taken from <a href="https://github.com/listx/listx_blog/
                      .addClass(<span class="org-string">"section-heading"</span>));
     });
 });
+
+<span class="lilac-child-link-from-parent"><a href="#__NREF__js-toc-scrollspy">js-toc-scrollspy</a></span>
 </pre></div></div><p>
+(Ignore the <code>js-toc-scrollspy</code> bit, as that's for the <a href="#h-Table-of-contents">"Table of contents"</a>
+section below.)
+</p>
+
+<p>
 Now we just have to refer to the above in the snippet below, to be included in <a href="#h-Create--lilac-theme--file"><code>lilac.theme</code></a>.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-theme">automatically_link_headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__automatically_link_headlines">&#x1f517;</a></span></div><pre class="src src-org" id="__NREF__automatically_link_headlines"><span class="org-comment"># Automatically link headlines.</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="<a href="https://code.jquery.com/jquery-3.6.4.min.js">https://code.jquery.com/jquery-3.6.4.min.js</a>"&gt;&lt;/script&gt;</span>
+<span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="<a href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js</a>" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"&gt;&lt;/script&gt;</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="misc.js"&gt;&lt;/script&gt;</span>
 </pre></div></div><p>
 Linkifying itself makes all the headlines blue (the default color for links).
@@ -2248,6 +2257,8 @@ This is a bit distracting, so make them black.
     <span class="org-css-property">float</span>: left;
     <span class="org-css-property">margin-left</span>: -1.3em;
     <span class="org-css-property">content</span>: <span class="org-string">"\1f517"</span>;
+    <span class="org-css-property">position</span>: relative;
+    <span class="org-css-property">z-index</span>: 10;
 }
 </pre></div></div>
 </div>
@@ -2570,7 +2581,9 @@ Make the "Table of Contents" float off to the left so that it is always visible.
   <span class="org-css-property">top</span>: 0;
   <span class="org-css-property">float</span>: left;
   <span class="org-css-property">margin-left</span>: -300px;
-  <span class="org-css-property">width</span>: 270px;
+  <span class="org-css-property">width</span>: 280px;
+  <span class="org-css-property">padding-right</span>: 10px;
+  <span class="org-css-property">font-size</span>: 90%;
 }
 <span class="org-css-selector">#text-table-of-contents </span>{
   <span class="org-css-property">position</span>: sticky;
@@ -2578,12 +2591,95 @@ Make the "Table of Contents" float off to the left so that it is always visible.
   <span class="org-css-property">overflow-y</span>: scroll;
   <span class="org-css-property">height</span>: 100vh;
 }
+<span class="org-css-selector">#text-table-of-contents ul </span>{
+  <span class="org-css-property">margin</span>: 0;
+  <span class="org-css-property">padding</span>: 0;
+}
+<span class="org-css-selector">#text-table-of-contents ul li </span>{
+  <span class="org-css-property">margin-top</span>: 20px;
+}
+<span class="org-css-selector">#text-table-of-contents ul li ul li </span>{
+  <span class="org-css-property">margin-top</span>: 5px;
+}
+<span class="org-css-selector">#text-table-of-contents ul li ul li ul li </span>{
+  <span class="org-css-property">margin-bottom</span>: 0;
+}
+<span class="org-css-selector">#text-table-of-contents ul li ul li ul li ul li </span>{
+  <span class="org-css-property">margin-bottom</span>: 0;
+}
+<span class="org-css-selector">#table-of-contents a </span>{
+  <span class="org-css-property">display</span>: block;
+  <span class="org-css-property">transition</span>: all 50ms ease-in-out;
+  <span class="org-css-property">padding</span>: 5px;
+  <span class="org-css-property">border-radius</span>: 4px;
+}
+#table-of-contents a:hover,
+<span class="org-css-selector">#table-of-contents a:focus </span>{
+  <span class="org-css-property">text-decoration</span>: none;
+}
+<span class="org-css-selector">#table-of-contents .nav-link </span>{
+  <span class="org-css-property">color</span>: <span class="custom-1">black</span>;
+}
+<span class="org-css-selector">#table-of-contents .active </span>{
+  <span class="org-css-property">color</span>: <span class="custom-1">black</span>;
+  <span class="org-css-property">background-color</span>: <span class="custom">#e3f5e0</span>;
+}
 </pre></div></div><p>
 We also delete the text "Table of Contents" because it looks too intrusive when
 it is placed in the sidebar area.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__Makefile-weave">Makefile-replace-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-replace-toc-text">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-replace-toc-text">sed -i <span class="org-string">'s|&lt;h2&gt;Table of Contents&lt;/h2&gt;||'</span> README.html
+sed -i <span class="org-string">'s|&lt;body&gt;|&lt;body data-bs-spy="scroll" '</span>\
+<span class="org-string">'data-bs-target="#text-table-of-contents"&gt;|'</span> README.html
+</pre></div></div><p>
+Lastly we use some JavaScript to automatically update the Table of Contents when
+we scroll up or down the page, using Bootstrap's "scrollspy" feature.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#misc-js">js-toc-scrollspy</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__js-toc-scrollspy">&#x1f517;</a></span></div><pre class="src src-js" id="__NREF__js-toc-scrollspy"><span class="org-keyword">function</span> <span class="org-function-name">activate_toc_item_on_click</span> (<span class="org-variable-name">item</span>){
+    $(item).toggleClass(<span class="org-string">"active"</span>);
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">scrollIntoViewIfNeeded</span>(<span class="org-variable-name">target</span>) {
+    <span class="org-keyword">if</span> (target.getBoundingClientRect().bottom &gt; window.innerHeight) {
+        target.scrollIntoView(<span class="org-constant">false</span>);
+    }
+
+    <span class="org-keyword">if</span> (target.getBoundingClientRect().top &lt; 0) {
+        target.scrollIntoView();
+    }
+}
+
+$(document).ready(<span class="org-keyword">function</span>() {
+  $(<span class="org-string">'#text-table-of-contents ul'</span>).first().addClass(<span class="org-string">'nav'</span>);
+  $(<span class="org-string">'#text-table-of-contents ul li'</span>).addClass(<span class="org-string">'nav-item'</span>);
+  $(<span class="org-string">'#text-table-of-contents ul li a'</span>).addClass(<span class="org-string">'nav-link'</span>);
+
+  <span class="org-keyword">const</span> <span class="org-variable-name">scrollSpy</span> = <span class="org-keyword">new</span> <span class="org-type">bootstrap.ScrollSpy</span>(document.body, {
+    smoothScroll: <span class="org-constant">true</span>,
+    target: <span class="org-string">'#text-table-of-contents'</span>
+  })
+
+  $(<span class="org-string">"#text-table-of-contents a"</span>).click(<span class="org-keyword">function</span>() {
+    activate_toc_item_on_click(<span class="org-constant">this</span>);
+  });
+
+  <span class="org-keyword">const</span> <span class="org-variable-name">firstScrollSpyEl</span> = document.querySelector(<span class="org-string">'[data-bs-spy="scroll"]'</span>)
+  firstScrollSpyEl.addEventListener(<span class="org-string">'activate.bs.scrollspy'</span>, () =&gt; {
+    <span class="org-keyword">let</span> <span class="org-variable-name">elems</span> = document.getElementsByClassName(<span class="org-string">'active'</span>);
+    <span class="org-keyword">if</span> (elems.length &gt; 0) {
+      <span class="org-comment-delimiter">// </span><span class="org-comment">Unfortunately, scrollIntoViewIfNeeded is not supported on Firefox.</span>
+      <span class="org-comment-delimiter">// </span><span class="org-comment">Otherwise we could do</span>
+      <span class="org-comment-delimiter">//</span>
+      <span class="org-comment-delimiter">//    </span><span class="org-comment">elems[0].scrollIntoViewIfNeeded({ block: "center" });</span>
+      <span class="org-comment-delimiter">//</span>
+      <span class="org-comment-delimiter">// </span><span class="org-comment">instead. So here we call the custom function that does what we want.</span>
+      <span class="org-comment-delimiter">// </span><span class="org-comment">See https://stackoverflow.com/a/37829643/437583.</span>
+      scrollIntoViewIfNeeded(elems[0]);
+    }
+  })
+});
 </pre></div></div>
 </div>
 </div>
@@ -3066,11 +3162,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000a1">Org mode</a> borrows heavily using <a href="#org00000a3">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000a3"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000a3">Org mode</a> borrows heavily using <a href="#org00000a5">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000a5"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000a1"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000a3"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
