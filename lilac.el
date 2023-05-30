@@ -26,7 +26,7 @@
 (setq org-html-postamble nil)
 (defun org-export-deterministic-reference (references)
   (let ((new (length references)))
-     (while (rassq new references) (setq new (+ new 1)))
+     (while (rassq new references) (setq new (1+ new)))
      new))
 (advice-add #'org-export-new-reference
             :override #'org-export-deterministic-reference)
