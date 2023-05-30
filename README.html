@@ -1262,7 +1262,8 @@ into the buffer.
                (<span class="org-keyword">if</span> (lilac-get-noweb-ref-polyblock-name src-block)
                    <span class="org-string">"(polyblock)"</span>
                  <span class="org-string">""</span>))
-             (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
+             (polyblock-counter
+              (gethash child-name lilac-polyblock-names-totals 0))
              (polyblock-counter-incremented
               (puthash child-name (1+ polyblock-counter)
                        lilac-polyblock-names-totals))
@@ -2820,7 +2821,9 @@ Here we test whether we can automatically insert captions for child blocks.
     (lilac-insert-noweb-source-code-block-captions nil)
     (goto-char (point-min))
     (<span class="org-keyword">should</span> (search-forward
-             (concat <span class="org-string">"#+caption: ="</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"=  [[parent1][1]]  [[parent2][2]]"</span>)
+             (concat <span class="org-string">"#+caption: ="</span>
+                     (nref <span class="org-string">"child1"</span>)
+                     <span class="org-string">"=  [[parent1][1]]  [[parent2][2]]"</span>)
              nil t))
     (<span class="org-keyword">should</span> (search-forward
              (concat <span class="org-string">"#+caption: ="</span> (nref <span class="org-string">"child2"</span>) <span class="org-string">"=  [[parent1][1]]"</span>)

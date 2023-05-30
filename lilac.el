@@ -208,7 +208,8 @@ with class 'color and highest min-color value."
                (if (lilac-get-noweb-ref-polyblock-name src-block)
                    "(polyblock)"
                  ""))
-             (polyblock-counter (gethash child-name lilac-polyblock-names-totals 0))
+             (polyblock-counter
+              (gethash child-name lilac-polyblock-names-totals 0))
              (polyblock-counter-incremented
               (puthash child-name (1+ polyblock-counter)
                        lilac-polyblock-names-totals))
