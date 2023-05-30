@@ -325,6 +325,7 @@ README.html: README.org
 	'<style>.csl-left-margin{float: left; padding-right: 1em/' README.html
 	sed -i 's/.csl-right-inline{margin: 0 0 0 1em;}<\/style>/'\
 	'.csl-right-inline{margin: 0 0 0 2em;}<\/style>/' README.html
+	__NREF__Makefile-replace-toc-text
 #+end_src
 
 Tangling is pretty straightforward --- we just need to call
@@ -1908,6 +1909,7 @@ __NREF__css-source-code-block-body
 __NREF__css-source-code-block-captions
 __NREF__css-source-code-block-child-link-from-parent
 __NREF__css-sidenotes
+__NREF__css-toc
 #+end_src
 
 *** Source code block body
@@ -2066,6 +2068,35 @@ The CSS below is drawn primarily from [[https://scripter.co/sidenotes-using-only
         padding-left: 15%;
     }
 }
+#+end_src
+
+*** Table of contents
+
+Make the "Table of Contents" float off to the left so that it is always visible.
+
+#+name: __NREF__css-toc
+#+begin_src css
+#table-of-contents {
+  position: sticky;
+  top: 0;
+  float: left;
+  margin-left: -300px;
+  width: 270px;
+}
+#text-table-of-contents {
+  position: sticky;
+  top: 0;
+  overflow-y: scroll;
+  height: 100vh;
+}
+#+end_src
+
+We also delete the text "Table of Contents" because it looks too intrusive when
+it is placed in the sidebar area.
+
+#+name: __NREF__Makefile-replace-toc-text
+#+begin_src makefile
+sed -i 's|<h2>Table of Contents</h2>||' README.html
 #+end_src
 
 ** Create =lilac.theme= file

@@ -200,7 +200,6 @@
 <div id="content" class="content">
 <h1 class="title">Lilac</h1>
 <div id="table-of-contents" role="doc-toc">
-<h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
 <li><a href="#h-Introduction">1. Introduction</a></li>
@@ -275,6 +274,7 @@
 <li><a href="#h-Source-code-block-captions">5.11.2. Source code block captions</a></li>
 <li><a href="#h-Links-to-child-source-block-from-parent">5.11.3. Links to child source block from parent</a></li>
 <li><a href="#h-Sidenotes">5.11.4. Sidenotes</a></li>
+<li><a href="#h-Table-of-contents">5.11.5. Table of contents</a></li>
 </ul>
 </li>
 <li><a href="#h-Create--lilac-theme--file">5.12. Create <code>lilac.theme</code> file</a></li>
@@ -688,6 +688,7 @@ highlighting. And lastly we have to modify the generated <code>README.html</code
     <span class="org-string">'&lt;style&gt;.csl-left-margin{float: left; padding-right: 1em/'</span> README.html
     sed -i <span class="org-string">'s/.csl-right-inline{margin: 0 0 0 1em;}&lt;\/style&gt;/'</span>\
     <span class="org-string">'.csl-right-inline{margin: 0 0 0 2em;}&lt;\/style&gt;/'</span> README.html
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-replace-toc-text">Makefile-replace-toc-text</a></span>
 </pre></div></div><p>
 Tangling is pretty straightforward &#x2014; we just need to call
 <code>(org-babel-tangle)</code> on <code>README.org</code>. This generates a number of files, such as
@@ -2387,6 +2388,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-captions">css-source-code-block-captions</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-child-link-from-parent">css-source-code-block-child-link-from-parent</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-sidenotes">css-sidenotes</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-toc">css-toc</a></span>
 </pre></div></div>
 </div>
 
@@ -2552,6 +2554,38 @@ The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-usi
         <span class="org-css-property">padding-left</span>: 15%;
     }
 }
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Table-of-contents" class="outline-4">
+<h4 id="h-Table-of-contents"><span class="section-number-4">5.11.5.</span> Table of contents</h4>
+<div class="outline-text-4" id="text-h-Table-of-contents">
+<p>
+Make the "Table of Contents" float off to the left so that it is always visible.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-toc</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc"><span class="org-css-selector">#table-of-contents </span>{
+  <span class="org-css-property">position</span>: sticky;
+  <span class="org-css-property">top</span>: 0;
+  <span class="org-css-property">float</span>: left;
+  <span class="org-css-property">margin-left</span>: -300px;
+  <span class="org-css-property">width</span>: 270px;
+}
+<span class="org-css-selector">#text-table-of-contents </span>{
+  <span class="org-css-property">position</span>: sticky;
+  <span class="org-css-property">top</span>: 0;
+  <span class="org-css-property">overflow-y</span>: scroll;
+  <span class="org-css-property">height</span>: 100vh;
+}
+</pre></div></div><p>
+We also replace the text "Table of Contents" with "Lilac" because it looks
+better when we're in the middle of the doc (where readers spend most of their
+time).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__Makefile-weave">Makefile-replace-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-replace-toc-text">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-replace-toc-text">sed -i <span class="org-string">'s|&lt;h2&gt;Table of Contents&lt;/h2&gt;|'</span>\
+<span class="org-string">'&lt;p&gt;Lilac&lt;/p&gt;|'</span> README.html
 </pre></div></div>
 </div>
 </div>
@@ -3034,11 +3068,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org000009d">Org mode</a> borrows heavily using <a href="#org000009f">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org000009f"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000a1">Org mode</a> borrows heavily using <a href="#org00000a3">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000a3"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org000009d"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000a1"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
