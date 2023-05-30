@@ -691,6 +691,7 @@ When matching, reference is stored in match group 1."
       (lilac-to-multi-line html-oneline))))
 (setq org-html-doctype "html5")
 (setq org-src-preserve-indentation t)
+(setq-default tab-width 4)
 (setq make-backup-files nil)
 (defun lilac-publish-profile ()
   (interactive)

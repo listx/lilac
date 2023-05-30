@@ -1681,6 +1681,15 @@ disappear.
 (setq org-src-preserve-indentation t)
 #+end_src
 
+*** Set tab width to 4 spaces
+
+This matters for languages that require tabs, such as Makefiles.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-misc
+#+begin_src emacs-lisp
+(setq-default tab-width 4)
+#+end_src
+
 *** Disable backups
 
 Disable backup files for =lilac.el= (that look like =lilac.el~=) when we invoke
