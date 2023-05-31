@@ -2259,7 +2259,7 @@ The JavaScript below is taken from <a href="https://github.com/listx/listx_blog/
         <span class="org-keyword">var</span> <span class="org-variable-name">$this</span> = $(<span class="org-constant">this</span>);
         <span class="org-keyword">var</span> <span class="org-variable-name">href</span> = $this.attr(<span class="org-string">"id"</span>);
         $this.wrapInner(
-            $(<span class="org-string">"&lt;a/&gt;"</span>).attr(<span class="org-string">"href"</span>, <span class="org-string">'#'</span> + href)
+            $(<span class="org-string">"&lt;a/&gt;"</span>).attr(<span class="org-string">"href"</span>, <span class="org-string">"#"</span> + href)
                      .addClass(<span class="org-string">"section-heading"</span>));
     });
 });
@@ -2605,48 +2605,48 @@ Make the "Table of Contents" float off to the left so that it is always visible.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-toc</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc"><span class="org-css-selector">#table-of-contents </span>{
-  <span class="org-css-property">position</span>: fixed;
-  <span class="org-css-property">top</span>: 0;
-  <span class="org-css-property">float</span>: left;
-  <span class="org-css-property">margin-left</span>: -300px;
-  <span class="org-css-property">width</span>: 280px;
-  <span class="org-css-property">padding-right</span>: 10px;
-  <span class="org-css-property">font-size</span>: 90%;
+    <span class="org-css-property">position</span>: fixed;
+    <span class="org-css-property">top</span>: 0;
+    <span class="org-css-property">float</span>: left;
+    <span class="org-css-property">margin-left</span>: -300px;
+    <span class="org-css-property">width</span>: 280px;
+    <span class="org-css-property">padding-right</span>: 10px;
+    <span class="org-css-property">font-size</span>: 90%;
 }
 <span class="org-css-selector">#text-table-of-contents </span>{
-  <span class="org-css-property">overflow-y</span>: scroll;
-  <span class="org-css-property">height</span>: 100vh;
+    <span class="org-css-property">overflow-y</span>: scroll;
+    <span class="org-css-property">height</span>: 100vh;
 }
 <span class="org-css-selector">#text-table-of-contents ul </span>{
-  <span class="org-css-property">margin</span>: 0;
-  <span class="org-css-property">padding</span>: 0;
+    <span class="org-css-property">margin</span>: 0;
+    <span class="org-css-property">padding</span>: 0;
 }
 <span class="org-css-selector">#text-table-of-contents ul li </span>{
 }
 <span class="org-css-selector">#text-table-of-contents ul li ul li </span>{
 }
 <span class="org-css-selector">#text-table-of-contents ul li ul li ul li </span>{
-  <span class="org-css-property">margin-bottom</span>: 0;
+    <span class="org-css-property">margin-bottom</span>: 0;
 }
 <span class="org-css-selector">#text-table-of-contents ul li ul li ul li ul li </span>{
-  <span class="org-css-property">margin-bottom</span>: 0;
+    <span class="org-css-property">margin-bottom</span>: 0;
 }
 <span class="org-css-selector">#table-of-contents a </span>{
-  <span class="org-css-property">display</span>: block;
-  <span class="org-css-property">transition</span>: all 50ms ease-in-out;
-  <span class="org-css-property">padding</span>: 5px;
-  <span class="org-css-property">border-radius</span>: 4px;
+    <span class="org-css-property">display</span>: block;
+    <span class="org-css-property">transition</span>: all 50ms ease-in-out;
+    <span class="org-css-property">padding</span>: 5px;
+    <span class="org-css-property">border-radius</span>: 4px;
 }
 #table-of-contents a:hover,
 <span class="org-css-selector">#table-of-contents a:focus </span>{
-  <span class="org-css-property">text-decoration</span>: none;
+    <span class="org-css-property">text-decoration</span>: none;
 }
 <span class="org-css-selector">#table-of-contents .nav-link </span>{
-  <span class="org-css-property">color</span>: <span class="custom-1">black</span>;
+    <span class="org-css-property">color</span>: <span class="custom-1">black</span>;
 }
 <span class="org-css-selector">#table-of-contents .active </span>{
-  <span class="org-css-property">color</span>: <span class="custom-1">black</span>;
-  <span class="org-css-property">background-color</span>: <span class="custom">#e3f5e0</span>;
+    <span class="org-css-property">color</span>: <span class="custom-1">black</span>;
+    <span class="org-css-property">background-color</span>: <span class="custom">#e3f5e0</span>;
 }
 </pre></div></div><p>
 We also delete the text "Table of Contents" because it looks too intrusive when
@@ -2672,54 +2672,54 @@ it because it was too heavy and opinionated.
 }
 
 <span class="org-keyword">function</span> <span class="org-function-name">deactivate_other_toc_items</span>(<span class="org-variable-name">hash</span>) {
-  $(<span class="org-string">'#text-table-of-contents a'</span>).each((index, elt) =&gt; {
-    <span class="org-keyword">if</span> (elt.hash !== hash) {
-      $(elt).removeClass(<span class="org-string">'active'</span>);
-    }
-  })
+    $(<span class="org-string">"#text-table-of-contents a"</span>).each((index, elt) =&gt; {
+        <span class="org-keyword">if</span> (elt.hash !== hash) {
+            $(elt).removeClass(<span class="org-string">"active"</span>);
+        }
+    })
 }
 
 <span class="org-keyword">function</span> <span class="org-function-name">get_toc_item</span>(<span class="org-variable-name">hash</span>) {
-  <span class="org-keyword">return</span> $(<span class="org-string">`#text-table-of-contents a[href='${hash}']`</span>)[0];
+    <span class="org-keyword">return</span> $(<span class="org-string">`#text-table-of-contents a[href='${hash}']`</span>)[0];
 }
 
 $(document).ready(() =&gt; {
-  $(<span class="org-string">'#text-table-of-contents ul'</span>).first().addClass(<span class="org-string">'nav'</span>);
-  $(<span class="org-string">'#text-table-of-contents ul li'</span>).addClass(<span class="org-string">'nav-item'</span>);
-  $(<span class="org-string">'#text-table-of-contents ul li a'</span>).addClass(<span class="org-string">'nav-link'</span>);
+    $(<span class="org-string">"#text-table-of-contents ul"</span>).first().addClass(<span class="org-string">"nav"</span>);
+    $(<span class="org-string">"#text-table-of-contents ul li"</span>).addClass(<span class="org-string">"nav-item"</span>);
+    $(<span class="org-string">"#text-table-of-contents ul li a"</span>).addClass(<span class="org-string">"nav-link"</span>);
 
-  $(<span class="org-string">"#text-table-of-contents a"</span>).click((elt) =&gt; {
-    <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(elt.target.hash);
-    $(tocItem).addClass(<span class="org-string">'active'</span>);
-    deactivate_other_toc_items(elt.target.hash);
-  });
+    $(<span class="org-string">"#text-table-of-contents a"</span>).click((elt) =&gt; {
+        <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(elt.target.hash);
+        $(tocItem).addClass(<span class="org-string">"active"</span>);
+        deactivate_other_toc_items(elt.target.hash);
+    });
 
-  $(<span class="org-string">"*[id^='outline-container-h-']"</span>).each((index, elt) =&gt; {
-    <span class="org-keyword">var</span> <span class="org-variable-name">hash</span> = elt.getAttribute(<span class="org-string">'id'</span>)
-    hash = hash.replace(<span class="org-string">'outline-container-'</span>, <span class="org-string">'#'</span>)
-    <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(hash);
-    elt.addEventListener(<span class="org-string">'mouseover'</span>, () =&gt; {
-      $(tocItem).addClass(<span class="org-string">"active"</span>);
-      deactivate_other_toc_items(hash);
+    $(<span class="org-string">"*[id^='outline-container-h-']"</span>).each((index, elt) =&gt; {
+        <span class="org-keyword">var</span> <span class="org-variable-name">hash</span> = elt.getAttribute(<span class="org-string">"id"</span>)
+        hash = hash.replace(<span class="org-string">"outline-container-"</span>, <span class="org-string">"#"</span>)
+        <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(hash);
+        elt.addEventListener(<span class="org-string">"mouseover"</span>, () =&gt; {
+            $(tocItem).addClass(<span class="org-string">"active"</span>);
+            deactivate_other_toc_items(hash);
+        });
+        elt.addEventListener(<span class="org-string">"mouseover"</span>, (e) =&gt; {
+            <span class="org-comment-delimiter">// </span><span class="org-comment">If we don't call stopPropagation(), we end up scrolling *all*</span>
+            <span class="org-comment-delimiter">// </span><span class="org-comment">elements in the stack, which means we will try to scroll e.g.,</span>
+            <span class="org-comment-delimiter">// </span><span class="org-comment">Section 5 and Section 5.1.2.3 (when we only want the latter).</span>
+            e.stopPropagation();
+            <span class="org-comment-delimiter">// </span><span class="org-comment">Unfortunately, scrollIntoViewIfNeeded is not supported on</span>
+            <span class="org-comment-delimiter">// </span><span class="org-comment">Firefox. Otherwise we could do</span>
+            <span class="org-comment-delimiter">//</span>
+            <span class="org-comment-delimiter">//    </span><span class="org-comment">elems[0].scrollIntoViewIfNeeded({ block: "center" });</span>
+            <span class="org-comment-delimiter">//</span>
+            <span class="org-comment-delimiter">// </span><span class="org-comment">instead. So here we call the custom function that does what we</span>
+            <span class="org-comment-delimiter">// </span><span class="org-comment">want.  See https://stackoverflow.com/a/37829643/437583.</span>
+            scrollIntoViewIfNeeded(tocItem);
+        });
+        elt.addEventListener(<span class="org-string">"mouseout"</span>, () =&gt; {
+            $(tocItem).removeClass(<span class="org-string">"active"</span>);
+        });
     });
-    elt.addEventListener(<span class="org-string">'mouseover'</span>, (e) =&gt; {
-      <span class="org-comment-delimiter">// </span><span class="org-comment">If we don't call stopPropagation(), we end up scrolling *all*</span>
-      <span class="org-comment-delimiter">// </span><span class="org-comment">elements in the stack, which means we will try to scroll e.g.,</span>
-      <span class="org-comment-delimiter">// </span><span class="org-comment">Section 5 and Section 5.1.2.3 (when we only want the latter).</span>
-      e.stopPropagation();
-      <span class="org-comment-delimiter">// </span><span class="org-comment">Unfortunately, scrollIntoViewIfNeeded is not supported on Firefox.</span>
-      <span class="org-comment-delimiter">// </span><span class="org-comment">Otherwise we could do</span>
-      <span class="org-comment-delimiter">//</span>
-      <span class="org-comment-delimiter">//    </span><span class="org-comment">elems[0].scrollIntoViewIfNeeded({ block: "center" });</span>
-      <span class="org-comment-delimiter">//</span>
-      <span class="org-comment-delimiter">// </span><span class="org-comment">instead. So here we call the custom function that does what we want.</span>
-      <span class="org-comment-delimiter">// </span><span class="org-comment">See https://stackoverflow.com/a/37829643/437583.</span>
-      scrollIntoViewIfNeeded(tocItem);
-    });
-    elt.addEventListener(<span class="org-string">'mouseout'</span>, () =&gt; {
-      $(tocItem).removeClass(<span class="org-string">"active"</span>);
-    });
-  });
 });
 </pre></div></div>
 </div>
