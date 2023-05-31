@@ -1852,7 +1852,9 @@ p, li {
 }
 
 p, ol, ul {
-    margin-bottom: 0.5em;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 1em;
 }
 
 li {
@@ -1888,8 +1890,8 @@ img {
 }
 
 h2, h3, h4, h5, h6 {
-    margin-top: 1em;
-    margin-bottom: 1em;
+    margin: 0;
+    padding-top: 1em;
 }
 
 code {
@@ -1928,7 +1930,7 @@ __NREF__css-toc
 #+name: __NREF__css-source-code-block-body
 #+begin_src css
 .org-src-container {
-    margin: 1em 0;
+    padding-top: 1em;
 }
 
 .org-src-container pre {
@@ -2087,7 +2089,7 @@ Make the "Table of Contents" float off to the left so that it is always visible.
 #+name: __NREF__css-toc
 #+begin_src css
 #table-of-contents {
-  position: sticky;
+  position: fixed;
   top: 0;
   float: left;
   margin-left: -300px;
@@ -2096,8 +2098,6 @@ Make the "Table of Contents" float off to the left so that it is always visible.
   font-size: 90%;
 }
 #text-table-of-contents {
-  position: sticky;
-  top: 0;
   overflow-y: scroll;
   height: 100vh;
 }
@@ -2106,10 +2106,8 @@ Make the "Table of Contents" float off to the left so that it is always visible.
   padding: 0;
 }
 #text-table-of-contents ul li {
-  margin-top: 20px;
 }
 #text-table-of-contents ul li ul li {
-  margin-top: 5px;
 }
 #text-table-of-contents ul li ul li ul li {
   margin-bottom: 0;
