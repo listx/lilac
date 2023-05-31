@@ -1761,7 +1761,6 @@ Now we just have to refer to the above in the snippet below, to be included in [
 #+begin_src org
 # Automatically link headlines.
 ,#+HTML_HEAD: <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-,#+HTML_HEAD: <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
 ,#+HTML_HEAD: <script src="misc.js"></script>
 #+end_src
 
@@ -2139,19 +2138,15 @@ it is placed in the sidebar area.
 #+name: __NREF__Makefile-replace-toc-text
 #+begin_src makefile
 sed -i 's|<h2>Table of Contents</h2>||' README.html
-sed -i 's|<body>|<body data-bs-spy="scroll" '\
-'data-bs-target="#text-table-of-contents">|' README.html
 #+end_src
 
 Lastly we use some JavaScript to automatically update the Table of Contents when
-we scroll up or down the page, using Bootstrap's "scrollspy" feature.
+we scroll up or down the page, forcing it to stay in sync with the content in
+the main body. We initially used Bootstrap's "scrollspy" component, but dropped
+it because it was too heavy and opinionated.
 
 #+name: __NREF__js-toc-scrollspy
 #+begin_src js
-function activate_toc_item_on_click (item){
-    $(item).toggleClass("active");
-}
-
 function scrollIntoViewIfNeeded(target) {
     if (target.getBoundingClientRect().bottom > window.innerHeight) {
         target.scrollIntoView(false);
@@ -2162,24 +2157,23 @@ function scrollIntoViewIfNeeded(target) {
     }
 }
 
-$(document).ready(function() {
+$(document).ready(() => {
   $('#text-table-of-contents ul').first().addClass('nav');
   $('#text-table-of-contents ul li').addClass('nav-item');
   $('#text-table-of-contents ul li a').addClass('nav-link');
 
-  const scrollSpy = new bootstrap.ScrollSpy(document.body, {
-    smoothScroll: true,
-    target: '#text-table-of-contents'
-  })
-
-  $("#text-table-of-contents a").click(function() {
-    activate_toc_item_on_click(this);
-  });
-
-  const firstScrollSpyEl = document.querySelector('[data-bs-spy="scroll"]')
-  firstScrollSpyEl.addEventListener('activate.bs.scrollspy', () => {
-    let elems = document.getElementsByClassName('active');
-    if (elems.length > 0) {
+  $("*[id^='outline-container-h-']").each((index, elt) => {
+    var s = elt.getAttribute('id')
+    s = s.replace('outline-container-', '')
+    var tocItem = $(`#text-table-of-contents a[href='#${s}']`)[0];
+    elt.addEventListener('mouseover', () => {
+      $(tocItem).addClass("active");
+    });
+    elt.addEventListener('mouseover', (e) => {
+      // If we don't call stopPropagation(), we end up scrolling *all*
+      // elements in the stack, which means we will try to scroll e.g.,
+      // Section 5 and Section 5.1.2.3 (when we only want the latter).
+      e.stopPropagation();
       // Unfortunately, scrollIntoViewIfNeeded is not supported on Firefox.
       // Otherwise we could do
       //
@@ -2187,9 +2181,12 @@ $(document).ready(function() {
       //
       // instead. So here we call the custom function that does what we want.
       // See https://stackoverflow.com/a/37829643/437583.
-      scrollIntoViewIfNeeded(elems[0]);
-    }
-  })
+      scrollIntoViewIfNeeded(tocItem);
+    });
+    elt.addEventListener('mouseout', () => {
+      $(tocItem).removeClass("active");
+    });
+  });
 });
 #+end_src
 

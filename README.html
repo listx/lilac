@@ -194,10 +194,9 @@
 <link rel="stylesheet" type="text/css" href="style.css" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro&family=Source+Code+Pro">
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
 <script src="misc.js"></script>
 </head>
-<body data-bs-spy="scroll" data-bs-target="#text-table-of-contents">
+<body>
 <div id="content" class="content">
 <h1 class="title">Lilac</h1>
 <div id="table-of-contents" role="doc-toc">
@@ -2241,7 +2240,6 @@ Now we just have to refer to the above in the snippet below, to be included in <
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-theme">automatically_link_headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__automatically_link_headlines">&#x1f517;</a></span></div><pre class="src src-org" id="__NREF__automatically_link_headlines"><span class="org-comment"># Automatically link headlines.</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="<a href="https://code.jquery.com/jquery-3.6.4.min.js">https://code.jquery.com/jquery-3.6.4.min.js</a>"&gt;&lt;/script&gt;</span>
-<span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="<a href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js</a>" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"&gt;&lt;/script&gt;</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="misc.js"&gt;&lt;/script&gt;</span>
 </pre></div></div><p>
 Linkifying itself makes all the headlines blue (the default color for links).
@@ -2630,18 +2628,14 @@ it is placed in the sidebar area.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__Makefile-weave">Makefile-replace-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-replace-toc-text">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-replace-toc-text">sed -i <span class="org-string">'s|&lt;h2&gt;Table of Contents&lt;/h2&gt;||'</span> README.html
-sed -i <span class="org-string">'s|&lt;body&gt;|&lt;body data-bs-spy="scroll" '</span>\
-<span class="org-string">'data-bs-target="#text-table-of-contents"&gt;|'</span> README.html
 </pre></div></div><p>
 Lastly we use some JavaScript to automatically update the Table of Contents when
-we scroll up or down the page, using Bootstrap's "scrollspy" feature.
+we scroll up or down the page, forcing it to stay in sync with the content in
+the main body. We initially used Bootstrap's "scrollspy" component, but dropped
+it because it was too heavy and opinionated.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#misc-js">js-toc-scrollspy</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__js-toc-scrollspy">&#x1f517;</a></span></div><pre class="src src-js" id="__NREF__js-toc-scrollspy"><span class="org-keyword">function</span> <span class="org-function-name">activate_toc_item_on_click</span> (<span class="org-variable-name">item</span>){
-    $(item).toggleClass(<span class="org-string">"active"</span>);
-}
-
-<span class="org-keyword">function</span> <span class="org-function-name">scrollIntoViewIfNeeded</span>(<span class="org-variable-name">target</span>) {
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#misc-js">js-toc-scrollspy</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__js-toc-scrollspy">&#x1f517;</a></span></div><pre class="src src-js" id="__NREF__js-toc-scrollspy"><span class="org-keyword">function</span> <span class="org-function-name">scrollIntoViewIfNeeded</span>(<span class="org-variable-name">target</span>) {
     <span class="org-keyword">if</span> (target.getBoundingClientRect().bottom &gt; window.innerHeight) {
         target.scrollIntoView(<span class="org-constant">false</span>);
     }
@@ -2651,24 +2645,23 @@ we scroll up or down the page, using Bootstrap's "scrollspy" feature.
     }
 }
 
-$(document).ready(<span class="org-keyword">function</span>() {
+$(document).ready(() =&gt; {
   $(<span class="org-string">'#text-table-of-contents ul'</span>).first().addClass(<span class="org-string">'nav'</span>);
   $(<span class="org-string">'#text-table-of-contents ul li'</span>).addClass(<span class="org-string">'nav-item'</span>);
   $(<span class="org-string">'#text-table-of-contents ul li a'</span>).addClass(<span class="org-string">'nav-link'</span>);
 
-  <span class="org-keyword">const</span> <span class="org-variable-name">scrollSpy</span> = <span class="org-keyword">new</span> <span class="org-type">bootstrap.ScrollSpy</span>(document.body, {
-    smoothScroll: <span class="org-constant">true</span>,
-    target: <span class="org-string">'#text-table-of-contents'</span>
-  })
-
-  $(<span class="org-string">"#text-table-of-contents a"</span>).click(<span class="org-keyword">function</span>() {
-    activate_toc_item_on_click(<span class="org-constant">this</span>);
-  });
-
-  <span class="org-keyword">const</span> <span class="org-variable-name">firstScrollSpyEl</span> = document.querySelector(<span class="org-string">'[data-bs-spy="scroll"]'</span>)
-  firstScrollSpyEl.addEventListener(<span class="org-string">'activate.bs.scrollspy'</span>, () =&gt; {
-    <span class="org-keyword">let</span> <span class="org-variable-name">elems</span> = document.getElementsByClassName(<span class="org-string">'active'</span>);
-    <span class="org-keyword">if</span> (elems.length &gt; 0) {
+  $(<span class="org-string">"*[id^='outline-container-h-']"</span>).each((index, elt) =&gt; {
+    <span class="org-keyword">var</span> <span class="org-variable-name">s</span> = elt.getAttribute(<span class="org-string">'id'</span>)
+    s = s.replace(<span class="org-string">'outline-container-'</span>, <span class="org-string">''</span>)
+    <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = $(<span class="org-string">`#text-table-of-contents a[href='#${s}']`</span>)[0];
+    elt.addEventListener(<span class="org-string">'mouseover'</span>, () =&gt; {
+      $(tocItem).addClass(<span class="org-string">"active"</span>);
+    });
+    elt.addEventListener(<span class="org-string">'mouseover'</span>, (e) =&gt; {
+      <span class="org-comment-delimiter">// </span><span class="org-comment">If we don't call stopPropagation(), we end up scrolling *all*</span>
+      <span class="org-comment-delimiter">// </span><span class="org-comment">elements in the stack, which means we will try to scroll e.g.,</span>
+      <span class="org-comment-delimiter">// </span><span class="org-comment">Section 5 and Section 5.1.2.3 (when we only want the latter).</span>
+      e.stopPropagation();
       <span class="org-comment-delimiter">// </span><span class="org-comment">Unfortunately, scrollIntoViewIfNeeded is not supported on Firefox.</span>
       <span class="org-comment-delimiter">// </span><span class="org-comment">Otherwise we could do</span>
       <span class="org-comment-delimiter">//</span>
@@ -2676,9 +2669,12 @@ $(document).ready(<span class="org-keyword">function</span>() {
       <span class="org-comment-delimiter">//</span>
       <span class="org-comment-delimiter">// </span><span class="org-comment">instead. So here we call the custom function that does what we want.</span>
       <span class="org-comment-delimiter">// </span><span class="org-comment">See https://stackoverflow.com/a/37829643/437583.</span>
-      scrollIntoViewIfNeeded(elems[0]);
-    }
-  })
+      scrollIntoViewIfNeeded(tocItem);
+    });
+    elt.addEventListener(<span class="org-string">'mouseout'</span>, () =&gt; {
+      $(tocItem).removeClass(<span class="org-string">"active"</span>);
+    });
+  });
 });
 </pre></div></div>
 </div>
