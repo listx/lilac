@@ -281,7 +281,12 @@
 <li><a href="#h-Misc-settings">5.8. Misc settings</a>
 <ul>
 <li><a href="#h-Use-HTML5-export--not-XML--to-un-break-MathJax">5.8.1. Use HTML5 export, not XML (to un-break MathJax)</a></li>
-<li><a href="#h-Include--CodeHighlightOn--and--CodeHighlightOff">5.8.2. Include <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></a></li>
+<li><a href="#h-Code-references">5.8.2. Code references</a>
+<ul>
+<li><a href="#h-Define--CodeHighlightOn--and--CodeHighlightOff">5.8.2.1. Define <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></a></li>
+<li><a href="#h-Do-not-highlight-coderefs">5.8.2.2. Do not highlight coderefs</a></li>
+</ul>
+</li>
 <li><a href="#h-Preserve-leading-whitespace-characters-on-export">5.8.3. Preserve leading whitespace characters on export</a></li>
 <li><a href="#h-Set-tab-width-to-4-spaces">5.8.4. Set tab width to 4 spaces</a></li>
 <li><a href="#h-Disable-backups">5.8.5. Disable backups</a></li>
@@ -292,11 +297,16 @@
 <li><a href="#h-Imports">5.10. Imports</a></li>
 <li><a href="#h-Additional--hand-tweaked--CSS">5.11. Additional (hand-tweaked) CSS</a>
 <ul>
-<li><a href="#h-Source-code-block-body">5.11.1. Source code block body</a></li>
-<li><a href="#h-Source-code-block-captions">5.11.2. Source code block captions</a></li>
-<li><a href="#h-Links-to-child-source-block-from-parent">5.11.3. Links to child source block from parent</a></li>
-<li><a href="#h-Sidenotes">5.11.4. Sidenotes</a></li>
-<li><a href="#h-Table-of-contents">5.11.5. Table of contents</a></li>
+<li><a href="#h-General-body-text">5.11.1. General body text</a></li>
+<li><a href="#h-Tables">5.11.2. Tables</a></li>
+<li><a href="#h-Images">5.11.3. Images</a></li>
+<li><a href="#h-Monospaced">5.11.4. Monospaced</a></li>
+<li><a href="#h-Links">5.11.5. Links</a></li>
+<li><a href="#h-Source-code-block-body">5.11.6. Source code block body</a></li>
+<li><a href="#h-Source-code-block-captions">5.11.7. Source code block captions</a></li>
+<li><a href="#h-Links-to-child-source-block-from-parent">5.11.8. Links to child source block from parent</a></li>
+<li><a href="#h-Sidenotes">5.11.9. Sidenotes</a></li>
+<li><a href="#h-Table-of-contents">5.11.10. Table of contents</a></li>
 </ul>
 </li>
 <li><a href="#h-Create--lilac-theme--file">5.12. Create <code>lilac.theme</code> file</a></li>
@@ -2164,9 +2174,14 @@ disappear.
 </div>
 </div>
 
-<div id="outline-container-h-Include--CodeHighlightOn--and--CodeHighlightOff" class="outline-4">
-<h4 id="h-Include--CodeHighlightOn--and--CodeHighlightOff"><span class="section-number-4">5.8.2.</span> Include <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></h4>
-<div class="outline-text-4" id="text-h-Include--CodeHighlightOn--and--CodeHighlightOff">
+<div id="outline-container-h-Code-references" class="outline-4">
+<h4 id="h-Code-references"><span class="section-number-4">5.8.2.</span> Code references</h4>
+<div class="outline-text-4" id="text-h-Code-references">
+</div>
+
+<div id="outline-container-h-Define--CodeHighlightOn--and--CodeHighlightOff" class="outline-5">
+<h5 id="h-Define--CodeHighlightOn--and--CodeHighlightOff"><span class="section-number-5">5.8.2.1.</span> Define <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></h5>
+<div class="outline-text-5" id="text-h-Define--CodeHighlightOn--and--CodeHighlightOff">
 <p>
 If we don't do this, we get an error because the "coderef" links (the links
 inside code blocks, for example <code>;ref:NSCB_NAME</code>) will still try to run the
@@ -2176,6 +2191,17 @@ setting on here injects the definitions of these functions into the HTML.
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(2/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-2">(<span class="org-keyword">setq</span> org-html-head-include-scripts t)
 </pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Do-not-highlight-coderefs" class="outline-5">
+<h5 id="h-Do-not-highlight-coderefs"><span class="section-number-5">5.8.2.2.</span> Do not highlight coderefs</h5>
+<div class="outline-text-5" id="text-h-Do-not-highlight-coderefs">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-coderef-disable-background-color</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-coderef-disable-background-color">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-coderef-disable-background-color"><span class="org-css-selector">.code-highlighted </span>{
+    <span class="org-css-property">background-color</span>: inherit;
+}
+</pre></div></div>
+</div>
 </div>
 </div>
 
@@ -2338,11 +2364,21 @@ mode (language) must be loaded in here.
 We add some additional CSS tweaks on top of what we get from Org.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">style.css</label><span class="lilac-caption-link-symbol"><a href="#style-css">&#x1f517;</a></span></div><pre class="src src-css" id="style-css"><span class="org-css-selector">a </span>{
-    <span class="org-css-property">color</span>: <span class="custom-2">#0000ff</span>;
-}
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">style.css</label><span class="lilac-caption-link-symbol"><a href="#style-css">&#x1f517;</a></span></div><pre class="src src-css" id="style-css"><span class="lilac-child-link-from-parent"><a href="#__NREF__css-general-1">css-general</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-coderef-disable-background-color">css-coderef-disable-background-color</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-section-headlines">css-source-code-section-headlines</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-body">css-source-code-block-body</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-captions">css-source-code-block-captions</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-child-link-from-parent">css-source-code-block-child-link-from-parent</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-sidenotes">css-sidenotes</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-toc">css-toc</a></span>
+</pre></div></div>
+</div>
 
-<span class="org-css-selector">body </span>{
+<div id="outline-container-h-General-body-text" class="outline-4">
+<h4 id="h-General-body-text"><span class="section-number-4">5.11.1.</span> General body text</h4>
+<div class="outline-text-4" id="text-h-General-body-text">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-general</a></span>(1/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-1"><span class="org-css-selector">body </span>{
     <span class="org-css-property">font-size</span>: 1.25em;
     <span class="org-css-property">width</span>: 800px;
     <span class="org-css-property">margin</span>: auto;
@@ -2350,6 +2386,12 @@ We add some additional CSS tweaks on top of what we get from Org.
 
 <span class="org-css-selector">body, p, li, h1, h2, h3, h4, h5, h6, legend </span>{
     <span class="org-css-property">font-family</span>: <span class="org-string">"Source Serif Pro"</span>, serif;
+}
+
+<span class="org-css-selector">h2, h3, h4, h5, h6 </span>{
+    <span class="org-css-property">margin</span>: 0;
+    <span class="org-css-property">padding-top</span>: 1em;
+    <span class="org-css-property">display</span>: inline-block;
 }
 
 <span class="org-css-selector">p, li </span>{
@@ -2365,8 +2407,14 @@ We add some additional CSS tweaks on top of what we get from Org.
 <span class="org-css-selector">li </span>{
     <span class="org-css-property">margin-bottom</span>: 0;
 }
+</pre></div></div>
+</div>
+</div>
 
-<span class="org-css-selector">table </span>{
+<div id="outline-container-h-Tables" class="outline-4">
+<h4 id="h-Tables"><span class="section-number-4">5.11.2.</span> Tables</h4>
+<div class="outline-text-4" id="text-h-Tables">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-general</a></span>(2/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-2"><span class="org-css-selector">table </span>{
     <span class="org-css-property">margin</span>: 1em auto 0em auto;
     <span class="org-css-property">border-spacing</span>: 0;
     <span class="org-css-property">border-radius</span>: 4px;
@@ -2388,31 +2436,36 @@ We add some additional CSS tweaks on top of what we get from Org.
     <span class="org-css-property">border-bottom</span>: none;
 }
 
-<span class="org-comment-delimiter">/* </span><span class="org-comment">Center all images.</span><span class="org-comment-delimiter"> */</span>
-<span class="org-css-selector">img </span>{
+<span class="org-css-selector">thead </span>{
+    <span class="org-css-property">background</span>: <span class="custom">#eee</span>;
+}
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Images" class="outline-4">
+<h4 id="h-Images"><span class="section-number-4">5.11.3.</span> Images</h4>
+<div class="outline-text-4" id="text-h-Images">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-general</a></span>(3/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-3"><span class="org-css-selector">img </span>{
     <span class="org-css-property">display</span>: block;
     <span class="org-css-property">margin</span>: 0 auto;
 }
+</pre></div></div>
+</div>
+</div>
 
-<span class="org-css-selector">h2, h3, h4, h5, h6 </span>{
-    <span class="org-css-property">margin</span>: 0;
-    <span class="org-css-property">padding-top</span>: 1em;
-    <span class="org-css-property">display</span>: inline-block;
-}
-
-<span class="org-css-selector">code </span>{
-    <span class="org-css-property">background</span>: <span class="custom">#eee</span>;
+<div id="outline-container-h-Monospaced" class="outline-4">
+<h4 id="h-Monospaced"><span class="section-number-4">5.11.4.</span> Monospaced</h4>
+<div class="outline-text-4" id="text-h-Monospaced">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-general</a></span>(4/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-4">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-4"><span class="org-css-selector">code </span>{
+    <span class="org-css-property">background</span>: <span class="custom-1">#eee</span>;
     <span class="org-css-property">padding-left</span>: 5px;
     <span class="org-css-property">padding-right</span>: 5px;
     <span class="org-css-property">white-space</span>: nowrap;
     <span class="org-css-property">border-radius</span>: 4px;
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
-    <span class="org-css-property">border-color</span>: <span class="custom-1">#777</span>;
-}
-
-<span class="org-css-selector">thead </span>{
-    <span class="org-css-property">background</span>: <span class="custom">#eee</span>;
+    <span class="org-css-property">border-color</span>: <span class="custom">#777</span>;
 }
 
 <span class="org-css-selector">pre </span>{
@@ -2422,22 +2475,27 @@ We add some additional CSS tweaks on top of what we get from Org.
     <span class="org-css-property">border-bottom-left-radius</span>: 5px;
     <span class="org-css-property">border-bottom-right-radius</span>: 5px;
 }
-
-<span class="org-css-selector">.code-highlighted </span>{
-    <span class="org-css-property">background-color</span>: inherit;
-}
-
-<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-section-headlines">css-source-code-section-headlines</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-body">css-source-code-block-body</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-captions">css-source-code-block-captions</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-child-link-from-parent">css-source-code-block-child-link-from-parent</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__css-sidenotes">css-sidenotes</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__css-toc">css-toc</a></span>
 </pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Links" class="outline-4">
+<h4 id="h-Links"><span class="section-number-4">5.11.5.</span> Links</h4>
+<div class="outline-text-4" id="text-h-Links">
+<p>
+Force all links to have a blue color. This is mainly to override whatever Org
+gives us by default.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-general</a></span>(5/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-5">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-5"><span class="org-css-selector">a </span>{
+    <span class="org-css-property">color</span>: <span class="custom">#0000ff</span>;
+}
+</pre></div></div>
+</div>
 </div>
 
 <div id="outline-container-h-Source-code-block-body" class="outline-4">
-<h4 id="h-Source-code-block-body"><span class="section-number-4">5.11.1.</span> Source code block body</h4>
+<h4 id="h-Source-code-block-body"><span class="section-number-4">5.11.6.</span> Source code block body</h4>
 <div class="outline-text-4" id="text-h-Source-code-block-body">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-block-body</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-body">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-body"><span class="org-css-selector">.org-src-container </span>{
     <span class="org-css-property">padding-top</span>: 1em;
@@ -2464,7 +2522,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 
 <div id="outline-container-h-Source-code-block-captions" class="outline-4">
-<h4 id="h-Source-code-block-captions"><span class="section-number-4">5.11.2.</span> Source code block captions</h4>
+<h4 id="h-Source-code-block-captions"><span class="section-number-4">5.11.7.</span> Source code block captions</h4>
 <div class="outline-text-4" id="text-h-Source-code-block-captions">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-captions"><span class="org-css-selector">.lilac-caption </span>{
     <span class="org-css-property">font-family</span>: <span class="org-string">"Source Code Pro"</span>, monospace;
@@ -2535,7 +2593,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 
 <div id="outline-container-h-Links-to-child-source-block-from-parent" class="outline-4">
-<h4 id="h-Links-to-child-source-block-from-parent"><span class="section-number-4">5.11.3.</span> Links to child source block from parent</h4>
+<h4 id="h-Links-to-child-source-block-from-parent"><span class="section-number-4">5.11.8.</span> Links to child source block from parent</h4>
 <div class="outline-text-4" id="text-h-Links-to-child-source-block-from-parent">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-block-child-link-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-child-link-from-parent">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-child-link-from-parent"><span class="org-css-selector">.lilac-child-link-from-parent </span>{
     <span class="org-css-property">font-weight</span>: bold;
@@ -2559,7 +2617,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 
 <div id="outline-container-h-Sidenotes" class="outline-4">
-<h4 id="h-Sidenotes"><span class="section-number-4">5.11.4.</span> Sidenotes</h4>
+<h4 id="h-Sidenotes"><span class="section-number-4">5.11.9.</span> Sidenotes</h4>
 <div class="outline-text-4" id="text-h-Sidenotes">
 <p>
 Sidenotes are small blurbs of text that are displayed "out-of-band", on the
@@ -2602,7 +2660,7 @@ The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-usi
 </div>
 
 <div id="outline-container-h-Table-of-contents" class="outline-4">
-<h4 id="h-Table-of-contents"><span class="section-number-4">5.11.5.</span> Table of contents</h4>
+<h4 id="h-Table-of-contents"><span class="section-number-4">5.11.10.</span> Table of contents</h4>
 <div class="outline-text-4" id="text-h-Table-of-contents">
 <p>
 Make the "Table of Contents" float off to the left so that it is always visible.
@@ -3192,11 +3250,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000a5">Org mode</a> borrows heavily using <a href="#org00000a7">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000a7"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000b1">Org mode</a> borrows heavily using <a href="#org00000b3">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000b3"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000a5"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000b1"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

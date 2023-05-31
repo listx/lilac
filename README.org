@@ -1676,7 +1676,9 @@ disappear.
 (setq org-html-doctype "html5")
 #+end_src
 
-*** Include =CodeHighlightOn= and =CodeHighlightOff=
+*** Code references
+
+**** Define =CodeHighlightOn= and =CodeHighlightOff=
 
 If we don't do this, we get an error because the "coderef" links (the links
 inside code blocks, for example =;ref:NSCB_NAME=) will still try to run the
@@ -1686,6 +1688,15 @@ setting on here injects the definitions of these functions into the HTML.
 #+header: :noweb-ref __NREF__lilac_dot_el-misc
 #+begin_src emacs-lisp
 (setq org-html-head-include-scripts t)
+#+end_src
+
+**** Do not highlight coderefs
+
+#+name: __NREF__css-coderef-disable-background-color
+#+begin_src css
+.code-highlighted {
+    background-color: inherit;
+}
 #+end_src
 
 *** Preserve leading whitespace characters on export
@@ -1832,10 +1843,20 @@ We add some additional CSS tweaks on top of what we get from Org.
 #+name: style.css
 #+caption: style.css
 #+begin_src css :tangle style.css
-a {
-    color: #0000ff;
-}
+__NREF__css-general
+__NREF__css-coderef-disable-background-color
+__NREF__css-source-code-section-headlines
+__NREF__css-source-code-block-body
+__NREF__css-source-code-block-captions
+__NREF__css-source-code-block-child-link-from-parent
+__NREF__css-sidenotes
+__NREF__css-toc
+#+end_src
 
+*** General body text
+
+#+header: :noweb-ref __NREF__css-general
+#+begin_src css
 body {
     font-size: 1.25em;
     width: 800px;
@@ -1844,6 +1865,12 @@ body {
 
 body, p, li, h1, h2, h3, h4, h5, h6, legend {
     font-family: "Source Serif Pro", serif;
+}
+
+h2, h3, h4, h5, h6 {
+    margin: 0;
+    padding-top: 1em;
+    display: inline-block;
 }
 
 p, li {
@@ -1859,7 +1886,12 @@ p, ol, ul {
 li {
     margin-bottom: 0;
 }
+#+end_src
 
+*** Tables
+
+#+header: :noweb-ref __NREF__css-general
+#+begin_src css
 table {
     margin: 1em auto 0em auto;
     border-spacing: 0;
@@ -1882,18 +1914,25 @@ tr:last-child td {
     border-bottom: none;
 }
 
-/* Center all images. */
+thead {
+    background: #eee;
+}
+#+end_src
+
+*** Images
+
+#+header: :noweb-ref __NREF__css-general
+#+begin_src css
 img {
     display: block;
     margin: 0 auto;
 }
+#+end_src
 
-h2, h3, h4, h5, h6 {
-    margin: 0;
-    padding-top: 1em;
-    display: inline-block;
-}
+*** Monospaced
 
+#+header: :noweb-ref __NREF__css-general
+#+begin_src css
 code {
     background: #eee;
     padding-left: 5px;
@@ -1905,10 +1944,6 @@ code {
     border-color: #777;
 }
 
-thead {
-    background: #eee;
-}
-
 pre {
     font-size: 0.8em;
     border-top-left-radius: 0;
@@ -1916,17 +1951,18 @@ pre {
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
 }
+#+end_src
 
-.code-highlighted {
-    background-color: inherit;
+*** Links
+
+Force all links to have a blue color. This is mainly to override whatever Org
+gives us by default.
+
+#+header: :noweb-ref __NREF__css-general
+#+begin_src css
+a {
+    color: #0000ff;
 }
-
-__NREF__css-source-code-section-headlines
-__NREF__css-source-code-block-body
-__NREF__css-source-code-block-captions
-__NREF__css-source-code-block-child-link-from-parent
-__NREF__css-sidenotes
-__NREF__css-toc
 #+end_src
 
 *** Source code block body
