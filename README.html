@@ -2633,28 +2633,30 @@ The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-usi
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-sidenotes</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-sidenotes">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-sidenotes"><span class="org-css-selector">.sidenote </span>{
     <span class="org-css-property">font-size</span>: 80%;
-    <span class="org-css-property">position</span>: relative;
+    <span class="org-css-property">margin-top</span>: 1em;
+    <span class="org-css-property">padding</span>: 1em 0 1em 1em;
+    <span class="org-css-property">border-left</span>: solid;
+    <span class="org-css-property">border-right</span>: none;
+    <span class="org-css-property">border-width</span>: 1px;
 }
-<span class="org-comment-delimiter">/* </span><span class="org-comment">Wide viewport</span><span class="org-comment-delimiter"> */</span>
-<span class="org-builtin">@media</span> (min-width: 1400px) {
+
+<span class="org-css-selector">.sidenote p </span>{
+    <span class="org-css-property">padding-top</span>: 0;
+}
+
+<span class="org-builtin">@media</span> (max-width: 1425px) {
     <span class="org-css-selector">.sidenote </span>{
-        <span class="org-css-property">float</span>: right;
-        <span class="org-css-property">clear</span>: right;
-        <span class="org-css-property">margin-right</span>: -300px;
-        <span class="org-css-property">width</span>: 270px;
-        <span class="org-css-property">text-align</span>: left;
-        <span class="org-css-property">top</span>: -3rem;
-        <span class="org-css-property">margin-top</span>: 1rem;
+        <span class="org-css-property">margin-left</span>: 1em;
     }
 }
-<span class="org-comment-delimiter">/* </span><span class="org-comment">Narrow viewport</span><span class="org-comment-delimiter"> */</span>
-<span class="org-builtin">@media</span> (max-width: 1400px) {
+
+<span class="org-builtin">@media</span> (min-width: 1425px) {
     <span class="org-css-selector">.sidenote </span>{
+        <span class="org-css-property">margin-left</span>: 0;
+
+        <span class="org-css-property">width</span>: 280px;
         <span class="org-css-property">float</span>: right;
-        <span class="org-css-property">text-align</span>: left;
-        <span class="org-css-property">width</span>: 100%;
-        <span class="org-css-property">margin</span>: 1rem 0;
-        <span class="org-css-property">padding-left</span>: 15%;
+        <span class="org-css-property">margin-right</span>: -300px;
     }
 }
 </pre></div></div>

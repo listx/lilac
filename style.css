@@ -194,28 +194,30 @@ a.section-heading:hover::after {
 }
 .sidenote {
     font-size: 80%;
-    position: relative;
+    margin-top: 1em;
+    padding: 1em 0 1em 1em;
+    border-left: solid;
+    border-right: none;
+    border-width: 1px;
 }
-/* Wide viewport */
-@media (min-width: 1400px) {
+
+.sidenote p {
+    padding-top: 0;
+}
+
+@media (max-width: 1425px) {
     .sidenote {
-        float: right;
-        clear: right;
-        margin-right: -300px;
-        width: 270px;
-        text-align: left;
-        top: -3rem;
-        margin-top: 1rem;
+        margin-left: 1em;
     }
 }
-/* Narrow viewport */
-@media (max-width: 1400px) {
+
+@media (min-width: 1425px) {
     .sidenote {
+        margin-left: 0;
+
+        width: 280px;
         float: right;
-        text-align: left;
-        width: 100%;
-        margin: 1rem 0;
-        padding-left: 15%;
+        margin-right: -300px;
     }
 }
 #table-of-contents {
