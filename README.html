@@ -2468,7 +2468,7 @@ We add some additional CSS tweaks on top of what we get from Org.
     <span class="org-css-property">border-top-left-radius</span>: 5px;
     <span class="org-css-property">border-top-right-radius</span>: 5px;
     <span class="org-css-property">padding-top</span>: 2px;
-    <span class="org-css-property">padding-bottom</span>: 5px;
+    <span class="org-css-property">padding-bottom</span>: 2px;
 }
 
 <span class="org-css-selector">.lilac-caption label </span>{
@@ -2610,43 +2610,35 @@ Make the "Table of Contents" float off to the left so that it is always visible.
     <span class="org-css-property">float</span>: left;
     <span class="org-css-property">margin-left</span>: -300px;
     <span class="org-css-property">width</span>: 280px;
-    <span class="org-css-property">padding-right</span>: 10px;
     <span class="org-css-property">font-size</span>: 90%;
 }
 <span class="org-css-selector">#text-table-of-contents </span>{
     <span class="org-css-property">overflow-y</span>: scroll;
     <span class="org-css-property">height</span>: 100vh;
+    <span class="org-css-property">padding-right</span>: 10px;
 }
 <span class="org-css-selector">#text-table-of-contents ul </span>{
     <span class="org-css-property">margin</span>: 0;
     <span class="org-css-property">padding</span>: 0;
-}
-<span class="org-css-selector">#text-table-of-contents ul li </span>{
-}
-<span class="org-css-selector">#text-table-of-contents ul li ul li </span>{
-}
-<span class="org-css-selector">#text-table-of-contents ul li ul li ul li </span>{
-    <span class="org-css-property">margin-bottom</span>: 0;
-}
-<span class="org-css-selector">#text-table-of-contents ul li ul li ul li ul li </span>{
-    <span class="org-css-property">margin-bottom</span>: 0;
 }
 <span class="org-css-selector">#table-of-contents a </span>{
     <span class="org-css-property">display</span>: block;
     <span class="org-css-property">transition</span>: all 50ms ease-in-out;
     <span class="org-css-property">padding</span>: 5px;
     <span class="org-css-property">border-radius</span>: 4px;
+    <span class="org-css-property">border-style</span>: solid;
+    <span class="org-css-property">border-width</span>: 1px;
+    <span class="org-css-property">border-color</span>: <span class="custom-3">white</span>;
+    <span class="org-css-property">color</span>: <span class="custom-2">black</span>;
 }
 #table-of-contents a:hover,
 <span class="org-css-selector">#table-of-contents a:focus </span>{
     <span class="org-css-property">text-decoration</span>: none;
 }
-<span class="org-css-selector">#table-of-contents .nav-link </span>{
-    <span class="org-css-property">color</span>: <span class="custom-1">black</span>;
-}
 <span class="org-css-selector">#table-of-contents .active </span>{
-    <span class="org-css-property">color</span>: <span class="custom-1">black</span>;
-    <span class="org-css-property">background-color</span>: <span class="custom">#e3f5e0</span>;
+    <span class="org-css-property">color</span>: <span class="custom-2">black</span>;
+    <span class="org-css-property">background-color</span>: <span class="custom-1">#e3f5e0</span>;
+    <span class="org-css-property">border-color</span>: <span class="custom">green</span>;
 }
 </pre></div></div><p>
 We also delete the text "Table of Contents" because it looks too intrusive when
@@ -2684,10 +2676,6 @@ it because it was too heavy and opinionated.
 }
 
 $(document).ready(() =&gt; {
-    $(<span class="org-string">"#text-table-of-contents ul"</span>).first().addClass(<span class="org-string">"nav"</span>);
-    $(<span class="org-string">"#text-table-of-contents ul li"</span>).addClass(<span class="org-string">"nav-item"</span>);
-    $(<span class="org-string">"#text-table-of-contents ul li a"</span>).addClass(<span class="org-string">"nav-link"</span>);
-
     $(<span class="org-string">"#text-table-of-contents a"</span>).click((elt) =&gt; {
         <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(elt.target.hash);
         $(tocItem).addClass(<span class="org-string">"active"</span>);
@@ -2715,9 +2703,6 @@ $(document).ready(() =&gt; {
             <span class="org-comment-delimiter">// </span><span class="org-comment">instead. So here we call the custom function that does what we</span>
             <span class="org-comment-delimiter">// </span><span class="org-comment">want.  See https://stackoverflow.com/a/37829643/437583.</span>
             scrollIntoViewIfNeeded(tocItem);
-        });
-        elt.addEventListener(<span class="org-string">"mouseout"</span>, () =&gt; {
-            $(tocItem).removeClass(<span class="org-string">"active"</span>);
         });
     });
 });

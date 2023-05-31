@@ -31,10 +31,6 @@ function get_toc_item(hash) {
 }
 
 $(document).ready(() => {
-    $("#text-table-of-contents ul").first().addClass("nav");
-    $("#text-table-of-contents ul li").addClass("nav-item");
-    $("#text-table-of-contents ul li a").addClass("nav-link");
-
     $("#text-table-of-contents a").click((elt) => {
         var tocItem = get_toc_item(elt.target.hash);
         $(tocItem).addClass("active");
@@ -62,9 +58,6 @@ $(document).ready(() => {
             // instead. So here we call the custom function that does what we
             // want.  See https://stackoverflow.com/a/37829643/437583.
             scrollIntoViewIfNeeded(tocItem);
-        });
-        elt.addEventListener("mouseout", () => {
-            $(tocItem).removeClass("active");
         });
     });
 });
