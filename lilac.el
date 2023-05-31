@@ -636,8 +636,6 @@ When matching, reference is stored in match group 1."
            (body (progn (string-match "<pre [^>]+>.*?</pre>" one-line)
                         (match-string-no-properties 0 one-line))))
       `(,leading-div ,caption ,body)))
-; Define a global hash table for mapping Org-mode-generated ids (that look like
-; "org00012") for source code blocks to a more human-readable ID.
 (setq lilac-org_id-human_id-hash-table (make-hash-table :test 'equal))
 (setq lilac-human_id-count-hash-table (make-hash-table :test 'equal))
 (setq lilac-human_id-org_id-hash-table (make-hash-table :test 'equal))
