@@ -195,6 +195,26 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro&family=Source+Code+Pro">
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
 <script src="misc.js"></script>
+<script>
+// @license magnet:?xt=urn:btih:1f739d935676111cfff4b4693e3816e664797050&amp;dn=gpl-3.0.txt GPL-v3-or-Later
+     function CodeHighlightOn(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.add("code-highlighted");
+         target.classList.add("code-highlighted");
+       }
+     }
+     function CodeHighlightOff(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.remove("code-highlighted");
+         target.classList.remove("code-highlighted");
+       }
+     }
+// @license-end
+</script>
 </head>
 <body>
 <div id="content" class="content">
@@ -261,10 +281,11 @@
 <li><a href="#h-Misc-settings">5.8. Misc settings</a>
 <ul>
 <li><a href="#h-Use-HTML5-export--not-XML--to-un-break-MathJax">5.8.1. Use HTML5 export, not XML (to un-break MathJax)</a></li>
-<li><a href="#h-Preserve-leading-whitespace-characters-on-export">5.8.2. Preserve leading whitespace characters on export</a></li>
-<li><a href="#h-Set-tab-width-to-4-spaces">5.8.3. Set tab width to 4 spaces</a></li>
-<li><a href="#h-Disable-backups">5.8.4. Disable backups</a></li>
-<li><a href="#h-Profiling">5.8.5. Profiling</a></li>
+<li><a href="#h-Include--CodeHighlightOn--and--CodeHighlightOff">5.8.2. Include <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></a></li>
+<li><a href="#h-Preserve-leading-whitespace-characters-on-export">5.8.3. Preserve leading whitespace characters on export</a></li>
+<li><a href="#h-Set-tab-width-to-4-spaces">5.8.4. Set tab width to 4 spaces</a></li>
+<li><a href="#h-Disable-backups">5.8.5. Disable backups</a></li>
+<li><a href="#h-Profiling">5.8.6. Profiling</a></li>
 </ul>
 </li>
 <li><a href="#h-Automatically-link-headlines--h2-to-h6">5.9. Automatically link headlines (h2 to h6)</a></li>
@@ -2138,53 +2159,68 @@ document type to <code>html5</code>, as below, appears to make the CDATA tag mag
 disappear.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(1/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-1">(<span class="org-keyword">setq</span> org-html-doctype <span class="org-string">"html5"</span>)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(1/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-1">(<span class="org-keyword">setq</span> org-html-doctype <span class="org-string">"html5"</span>)
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Include--CodeHighlightOn--and--CodeHighlightOff" class="outline-4">
+<h4 id="h-Include--CodeHighlightOn--and--CodeHighlightOff"><span class="section-number-4">5.8.2.</span> Include <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></h4>
+<div class="outline-text-4" id="text-h-Include--CodeHighlightOn--and--CodeHighlightOff">
+<p>
+If we don't do this, we get an error because the "coderef" links (the links
+inside code blocks, for example <code>;ref:NSCB_NAME</code>) will still try to run the
+<code>CodeHighlightOn</code> and <code>CodeHighlightOff</code> JavaScript functions. Turning this
+setting on here injects the definitions of these functions into the HTML.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(2/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-2">(<span class="org-keyword">setq</span> org-html-head-include-scripts t)
 </pre></div></div>
 </div>
 </div>
 
 <div id="outline-container-h-Preserve-leading-whitespace-characters-on-export" class="outline-4">
-<h4 id="h-Preserve-leading-whitespace-characters-on-export"><span class="section-number-4">5.8.2.</span> Preserve leading whitespace characters on export</h4>
+<h4 id="h-Preserve-leading-whitespace-characters-on-export"><span class="section-number-4">5.8.3.</span> Preserve leading whitespace characters on export</h4>
 <div class="outline-text-4" id="text-h-Preserve-leading-whitespace-characters-on-export">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(2/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-2">(<span class="org-keyword">setq</span> org-src-preserve-indentation t)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(3/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-3">(<span class="org-keyword">setq</span> org-src-preserve-indentation t)
 </pre></div></div>
 </div>
 </div>
 
 <div id="outline-container-h-Set-tab-width-to-4-spaces" class="outline-4">
-<h4 id="h-Set-tab-width-to-4-spaces"><span class="section-number-4">5.8.3.</span> Set tab width to 4 spaces</h4>
+<h4 id="h-Set-tab-width-to-4-spaces"><span class="section-number-4">5.8.4.</span> Set tab width to 4 spaces</h4>
 <div class="outline-text-4" id="text-h-Set-tab-width-to-4-spaces">
 <p>
 This matters for languages that require tabs, such as Makefiles.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(3/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-3">(<span class="org-keyword">setq-default</span> tab-width 4)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(4/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-4">(<span class="org-keyword">setq-default</span> tab-width 4)
 </pre></div></div>
 </div>
 </div>
 
 <div id="outline-container-h-Disable-backups" class="outline-4">
-<h4 id="h-Disable-backups"><span class="section-number-4">5.8.4.</span> Disable backups</h4>
+<h4 id="h-Disable-backups"><span class="section-number-4">5.8.5.</span> Disable backups</h4>
 <div class="outline-text-4" id="text-h-Disable-backups">
 <p>
 Disable backup files for <code>lilac.el</code> (that look like <code>lilac.el~</code>) when we invoke
 Emacs from the <a href="#Makefile">Makefile</a>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(4/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-4">(<span class="org-keyword">setq</span> make-backup-files nil)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(5/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-5">(<span class="org-keyword">setq</span> make-backup-files nil)
 </pre></div></div>
 </div>
 </div>
 
 <div id="outline-container-h-Profiling" class="outline-4">
-<h4 id="h-Profiling"><span class="section-number-4">5.8.5.</span> Profiling</h4>
+<h4 id="h-Profiling"><span class="section-number-4">5.8.6.</span> Profiling</h4>
 <div class="outline-text-4" id="text-h-Profiling">
 <p>
 We don't use this very often, but it's mainly for determining cost centers for
 weaving and tangling.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(5/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-5">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish-profile</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(6/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-6">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-6">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish-profile</span> ()
   (<span class="org-keyword">interactive</span>)
   (profiler-start 'cpu)
   (lilac-publish)
@@ -3158,11 +3194,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000a3">Org mode</a> borrows heavily using <a href="#org00000a5">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000a5"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000a5">Org mode</a> borrows heavily using <a href="#org00000a7">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000a7"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000a3"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000a5"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

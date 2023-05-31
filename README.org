@@ -1676,6 +1676,18 @@ disappear.
 (setq org-html-doctype "html5")
 #+end_src
 
+*** Include =CodeHighlightOn= and =CodeHighlightOff=
+
+If we don't do this, we get an error because the "coderef" links (the links
+inside code blocks, for example =;ref:NSCB_NAME=) will still try to run the
+=CodeHighlightOn= and =CodeHighlightOff= JavaScript functions. Turning this
+setting on here injects the definitions of these functions into the HTML.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-misc
+#+begin_src emacs-lisp
+(setq org-html-head-include-scripts t)
+#+end_src
+
 *** Preserve leading whitespace characters on export
 
 #+header: :noweb-ref __NREF__lilac_dot_el-misc
