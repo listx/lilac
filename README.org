@@ -437,7 +437,7 @@ information.
 (setq org-html-postamble nil)
 #+end_src
 
-*** Do not use random numbers for the HTML "=id=" attribute
+*** Do not use random numbers for the HTML =id= attribute
 
 Stop randomized IDs from being generated every time. Instead count from 0 and
 work our way up.
@@ -582,7 +582,7 @@ be able to link to the polyblock at all (or vice versa).
 Monoblocks with a =#+name: ...= field get a unique HTML ID assigned to it in
 the form =orgN= where =N= is a hexadecimal number. By default Org generates a
 random number for =N=, but we use a simple counter that increments, starting
-from 0 (see [[*Do not use random numbers for the HTML "=id=" attribute]]).
+from 0 (see [[*Do not use random numbers for the HTML =id= attribute]]).
 
 Some source code blocks may not even be monoblocks, because a =#+name: ...=
 field may simply be missing.
@@ -965,7 +965,7 @@ index starts at 0 (same as Python).
 
 By default Org does a terrible job of naming HTML =id= fields for headings. By
 default it uses a randomly-generated number. In [[* Do not use random numbers for
-the HTML "=id=" attribute]] we tweak this behavior to use a deterministic,
+the HTML =id= attribute]] we tweak this behavior to use a deterministic,
 incrementing number starting from 0. However while this solution gets rid of the
 nondeterminism, it still results in human-unfriendly =id= attributes because
 they are all numeric (e.g. =org00000a1=, =org00000f3=, etc).
