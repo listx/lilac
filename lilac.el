@@ -193,7 +193,9 @@ with class 'color and highest min-color value."
         (mapc (lambda (child-name)
                 (let* ((parents (gethash child-name hash-table)))
                   (if parents
-                    (puthash child-name (cl-pushnew parent-name parents) hash-table)
+                    (puthash child-name
+                             (cl-pushnew parent-name parents)
+                             hash-table)
                     (puthash child-name (list parent-name) hash-table))))
               child-names)))
      (reverse parent-blocks))

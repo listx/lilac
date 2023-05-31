@@ -1274,7 +1274,9 @@ the list of parents that refer to the child. When we loop through
         (mapc (<span class="org-keyword">lambda</span> (child-name)
                 (<span class="org-keyword">let*</span> ((parents (gethash child-name hash-table)))
                   (<span class="org-keyword">if</span> parents
-                    (puthash child-name (<span class="org-keyword">cl-pushnew</span> parent-name parents) hash-table)
+                    (puthash child-name
+                             (<span class="org-keyword">cl-pushnew</span> parent-name parents)
+                             hash-table)
                     (puthash child-name (list parent-name) hash-table))))
               child-names)))
      (reverse parent-blocks))
