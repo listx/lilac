@@ -2671,17 +2671,36 @@ it because it was too heavy and opinionated.
     }
 }
 
+<span class="org-keyword">function</span> <span class="org-function-name">deactivate_other_toc_items</span>(<span class="org-variable-name">hash</span>) {
+  $(<span class="org-string">'#text-table-of-contents a'</span>).each((index, elt) =&gt; {
+    <span class="org-keyword">if</span> (elt.hash !== hash) {
+      $(elt).removeClass(<span class="org-string">'active'</span>);
+    }
+  })
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">get_toc_item</span>(<span class="org-variable-name">hash</span>) {
+  <span class="org-keyword">return</span> $(<span class="org-string">`#text-table-of-contents a[href='${hash}']`</span>)[0];
+}
+
 $(document).ready(() =&gt; {
   $(<span class="org-string">'#text-table-of-contents ul'</span>).first().addClass(<span class="org-string">'nav'</span>);
   $(<span class="org-string">'#text-table-of-contents ul li'</span>).addClass(<span class="org-string">'nav-item'</span>);
   $(<span class="org-string">'#text-table-of-contents ul li a'</span>).addClass(<span class="org-string">'nav-link'</span>);
 
+  $(<span class="org-string">"#text-table-of-contents a"</span>).click((elt) =&gt; {
+    <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(elt.target.hash);
+    $(tocItem).addClass(<span class="org-string">'active'</span>);
+    deactivate_other_toc_items(elt.target.hash);
+  });
+
   $(<span class="org-string">"*[id^='outline-container-h-']"</span>).each((index, elt) =&gt; {
-    <span class="org-keyword">var</span> <span class="org-variable-name">s</span> = elt.getAttribute(<span class="org-string">'id'</span>)
-    s = s.replace(<span class="org-string">'outline-container-'</span>, <span class="org-string">''</span>)
-    <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = $(<span class="org-string">`#text-table-of-contents a[href='#${s}']`</span>)[0];
+    <span class="org-keyword">var</span> <span class="org-variable-name">hash</span> = elt.getAttribute(<span class="org-string">'id'</span>)
+    hash = hash.replace(<span class="org-string">'outline-container-'</span>, <span class="org-string">'#'</span>)
+    <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(hash);
     elt.addEventListener(<span class="org-string">'mouseover'</span>, () =&gt; {
       $(tocItem).addClass(<span class="org-string">"active"</span>);
+      deactivate_other_toc_items(hash);
     });
     elt.addEventListener(<span class="org-string">'mouseover'</span>, (e) =&gt; {
       <span class="org-comment-delimiter">// </span><span class="org-comment">If we don't call stopPropagation(), we end up scrolling *all*</span>

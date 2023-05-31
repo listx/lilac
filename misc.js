@@ -18,17 +18,36 @@ function scrollIntoViewIfNeeded(target) {
     }
 }
 
+function deactivate_other_toc_items(hash) {
+  $('#text-table-of-contents a').each((index, elt) => {
+    if (elt.hash !== hash) {
+      $(elt).removeClass('active');
+    }
+  })
+}
+
+function get_toc_item(hash) {
+  return $(`#text-table-of-contents a[href='${hash}']`)[0];
+}
+
 $(document).ready(() => {
   $('#text-table-of-contents ul').first().addClass('nav');
   $('#text-table-of-contents ul li').addClass('nav-item');
   $('#text-table-of-contents ul li a').addClass('nav-link');
 
+  $("#text-table-of-contents a").click((elt) => {
+    var tocItem = get_toc_item(elt.target.hash);
+    $(tocItem).addClass('active');
+    deactivate_other_toc_items(elt.target.hash);
+  });
+
   $("*[id^='outline-container-h-']").each((index, elt) => {
-    var s = elt.getAttribute('id')
-    s = s.replace('outline-container-', '')
-    var tocItem = $(`#text-table-of-contents a[href='#${s}']`)[0];
+    var hash = elt.getAttribute('id')
+    hash = hash.replace('outline-container-', '#')
+    var tocItem = get_toc_item(hash);
     elt.addEventListener('mouseover', () => {
       $(tocItem).addClass("active");
+      deactivate_other_toc_items(hash);
     });
     elt.addEventListener('mouseover', (e) => {
       // If we don't call stopPropagation(), we end up scrolling *all*
