@@ -1627,11 +1627,13 @@ the icon results in a new line break).
 #+begin_src css
 a.section-heading::after {
     opacity: 0;
+    transition: opacity 150ms;
     content: "\1f517";
     padding-left: 1rem;
 }
 a.section-heading:hover::after {
     opacity: 1;
+    transition: opacity 150ms;
     content: "\1f517";
 }
 #+end_src
@@ -2229,6 +2231,7 @@ a {
     border-bottom-style: none;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
+    transition: all 150ms ease-in-out;
 }
 .lilac-caption-parent-link a:hover {
     color: #7d3c98;
@@ -2264,6 +2267,7 @@ a {
     margin: 5px 0;
     padding: 2px 5px;
     display: inline-block;
+    transition: all 150ms ease-in-out;
 }
 .lilac-child-link-from-parent a:hover {
     color: #7d3c98;
