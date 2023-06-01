@@ -107,8 +107,13 @@ a.section-heading {
     text-decoration: none;
     display: block;
 }
+a.section-heading::after {
+    opacity: 0;
+    content: "\1f517";
+    padding-left: 1rem;
+}
 a.section-heading:hover::after {
-    float: right;
+    opacity: 1;
     content: "\1f517";
 }
 .org-src-container {

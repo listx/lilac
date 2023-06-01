@@ -1617,12 +1617,21 @@ a.section-heading {
 }
 #+end_src
 
-Lastly, show a link anchor icon when the user hovers over a headline.
+Lastly, show a link anchor icon when the user hovers over a headline. We have
+the icon present at all times; we only make it visible when we hover over the
+heading. This way, there is no "jumping" of any kind when the heading is about
+the same size as the width of the enclosing =div= (it can jump when displaying
+the icon results in a new line break).
 
 #+header: :noweb-ref __NREF__css-source-code-section-headlines
 #+begin_src css
+a.section-heading::after {
+    opacity: 0;
+    content: "\1f517";
+    padding-left: 1rem;
+}
 a.section-heading:hover::after {
-    float: right;
+    opacity: 1;
     content: "\1f517";
 }
 #+end_src

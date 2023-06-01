@@ -2120,11 +2120,20 @@ This is a bit distracting, so make them black.
     <span class="org-css-property">display</span>: block;
 }
 </pre></div></div><p>
-Lastly, show a link anchor icon when the user hovers over a headline.
+Lastly, show a link anchor icon when the user hovers over a headline. We have
+the icon present at all times; we only make it visible when we hover over the
+heading. This way, there is no "jumping" of any kind when the heading is about
+the same size as the width of the enclosing <code>div</code> (it can jump when displaying
+the icon results in a new line break).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-section-headlines</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines-2"><span class="org-css-selector">a.section-heading:hover::after </span>{
-    <span class="org-css-property">float</span>: right;
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-section-headlines</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines-2"><span class="org-css-selector">a.section-heading::after </span>{
+    <span class="org-css-property">opacity</span>: 0;
+    <span class="org-css-property">content</span>: <span class="org-string">"\1f517"</span>;
+    <span class="org-css-property">padding-left</span>: 1rem;
+}
+<span class="org-css-selector">a.section-heading:hover::after </span>{
+    <span class="org-css-property">opacity</span>: 1;
     <span class="org-css-property">content</span>: <span class="org-string">"\1f517"</span>;
 }
 </pre></div></div>
