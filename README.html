@@ -223,122 +223,131 @@
 
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#h-Introduction">1. Introduction</a></li>
-<li><a href="#h-Motivation">2. Motivation</a>
+<li><a href="#h-Introduction">1. Introduction</a>
 <ul>
-<li><a href="#h-Problems-with-Org-mode">2.1. Problems with Org mode</a></li>
-<li><a href="#h-Enter--Lilac">2.2. Enter <i>Lilac</i></a></li>
-</ul>
-</li>
-<li><a href="#h-Usage">3. Usage</a>
+<li><a href="#h-Motivation">1.1. Motivation</a>
 <ul>
-<li><a href="#h-Source-code-blocks--monoblocks-and-polyblocks">3.1. Source code blocks: monoblocks and polyblocks</a>
-<ul>
-<li><a href="#h-Examples-of-source-code-blocks">3.1.1. Examples of source code blocks</a>
-<ul>
-<li><a href="#h-Multi-parent-child-blocks">3.1.1.1. Multi-parent child blocks</a></li>
+<li><a href="#h-Problems-with-Org-mode">1.1.1. Problems with Org mode</a></li>
+<li><a href="#h-Enter--Lilac">1.1.2. Enter <i>Lilac</i></a></li>
 </ul>
 </li>
 </ul>
 </li>
-</ul>
-</li>
-<li><a href="#h-How-Lilac-uses-LP">4. How Lilac uses LP</a></li>
-<li><a href="#h-Weaving--generating-the-HTML">5. Weaving (generating the HTML)</a>
+<li><a href="#h-User-Guide">2. User Guide</a>
 <ul>
-<li><a href="#h-Makefile">5.1. Makefile</a></li>
-<li><a href="#h-Emacs-customizations-for-HTML-export---lilac-el-">5.2. Emacs customizations for HTML export (<code>lilac.el</code>)</a></li>
-<li><a href="#h-Fix-non-determinism">5.3. Fix non-determinism</a>
+<li><a href="#h-Source-code-blocks--monoblocks-and-polyblocks">2.1. Source code blocks: monoblocks and polyblocks</a>
 <ul>
-<li><a href="#h-Do-not-insert-current-time-as-HTML-comment">5.3.1. Do not insert current time as HTML comment</a></li>
-<li><a href="#h-Do-not-insert-current-Org-mode-version">5.3.2. Do not insert current Org mode version</a></li>
-<li><a href="#h-Do-not-use-random-numbers-for-the-HTML--id--attribute">5.3.3. Do not use random numbers for the HTML <code>id</code> attribute</a></li>
-</ul>
-</li>
-<li><a href="#h-Toplevel-publishing-function---lilac-publish-">5.4. Toplevel publishing function (<code>lilac-publish</code>)</a>
+<li><a href="#h-Examples-of-source-code-blocks">2.1.1. Examples of source code blocks</a>
 <ul>
-<li><a href="#h-Modify-the-Org-buffer">5.4.1. Modify the Org buffer</a></li>
-<li><a href="#h-Modify-the-HTML">5.4.2. Modify the HTML</a></li>
-<li><a href="#h-Miscellaneous-export-settings">5.4.3. Miscellaneous export settings</a></li>
+<li><a href="#h-Multi-parent-child-blocks">2.1.1.1. Multi-parent child blocks</a></li>
 </ul>
 </li>
-<li><a href="#h-Org-modifications">5.5. Org modifications</a>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h-Developer-Guide">3. Developer Guide</a>
 <ul>
-<li><a href="#h-Give-all-source-code-blocks-a----name-------field--HTML-ID">5.5.1. Give all source code blocks a <code>#+name: ...</code> field (HTML ID)</a></li>
-<li><a href="#h-Automatic-captions-for-Noweb-source-code-blocks">5.5.2. Automatic captions for Noweb source code blocks</a></li>
-<li><a href="#h-Human-readable-UIDs--Headings--aka-headlines">5.5.3. Human-readable UIDs (Headings, aka headlines)</a></li>
-</ul>
-</li>
-<li><a href="#h-HTML-modifications">5.6. HTML modifications</a>
+<li><a href="#h-Development-environment--Nix-shell">3.1. Development environment (Nix shell)</a></li>
+<li><a href="#h-Makefile">3.2. Makefile</a></li>
+<li><a href="#h-Tangling--generating-the-source-code">3.3. Tangling (generating the source code)</a>
 <ul>
-<li><a href="#h-Use-human-readable-HTML-IDs-for-source-code-links">5.6.1. Use human-readable HTML IDs for source code links</a></li>
-<li><a href="#h-Pretty-source-code-captions">5.6.2. Pretty source code captions</a></li>
-<li><a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">5.6.3. Link noweb references (link to child block from parent block)</a></li>
-<li><a href="#h-Custom-Noweb-delimiters">5.6.4. Custom Noweb delimiters</a></li>
+<li><a href="#h-Custom-Noweb-delimiters">3.3.1. Custom Noweb delimiters</a></li>
 </ul>
 </li>
-<li><a href="#h-JavaScript">5.7. JavaScript</a>
+<li><a href="#h-Weaving--generating-the-HTML">3.4. Weaving (generating the HTML)</a>
 <ul>
-<li><a href="#h-Self-linked-headlines">5.7.1. Self-linked headlines</a></li>
-<li><a href="#h-Table-of-contents-sidebar">5.7.2. Table of contents sidebar</a>
+<li><a href="#h-Emacs-customizations---lilac-el-">3.4.1. Emacs customizations (<code>lilac.el</code>)</a></li>
+<li><a href="#h-Fix-non-determinism">3.4.2. Fix non-determinism</a>
 <ul>
-<li><a href="#h-Delete--Table-of-Contents--text">5.7.2.1. Delete "Table of Contents" text</a></li>
-<li><a href="#h-Convert--Table-of-Contents--to-a-sidebar-on-the-left">5.7.2.2. Convert "Table of Contents" to a sidebar on the left</a></li>
-<li><a href="#h-Track-the-current-headline">5.7.2.3. Track the current headline</a></li>
+<li><a href="#h-Do-not-insert-current-time-as-HTML-comment">3.4.2.1. Do not insert current time as HTML comment</a></li>
+<li><a href="#h-Do-not-insert-current-Org-mode-version">3.4.2.2. Do not insert current Org mode version</a></li>
+<li><a href="#h-Do-not-use-random-numbers-for-the-HTML--id--attribute">3.4.2.3. Do not use random numbers for the HTML <code>id</code> attribute</a></li>
 </ul>
 </li>
-</ul>
-</li>
-<li><a href="#h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">5.8. Autogenerate CSS for syntax highlighting of source code blocks</a></li>
-<li><a href="#h-Misc-settings">5.9. Misc settings</a>
+<li><a href="#h-Toplevel-publishing-function---lilac-publish-">3.4.3. Toplevel publishing function (<code>lilac-publish</code>)</a>
 <ul>
-<li><a href="#h-Use-HTML5-export--not-XML--to-un-break-MathJax">5.9.1. Use HTML5 export, not XML (to un-break MathJax)</a></li>
-<li><a href="#h-Code-references">5.9.2. Code references</a>
+<li><a href="#h-Modify-the-Org-buffer">3.4.3.1. Modify the Org buffer</a></li>
+<li><a href="#h-Modify-the-HTML">3.4.3.2. Modify the HTML</a></li>
+<li><a href="#h-Miscellaneous-export-settings">3.4.3.3. Miscellaneous export settings</a></li>
+</ul>
+</li>
+<li><a href="#h-Org-modifications">3.4.4. Org modifications</a>
 <ul>
-<li><a href="#h-Define--CodeHighlightOn--and--CodeHighlightOff">5.9.2.1. Define <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></a></li>
-<li><a href="#h-Do-not-highlight-coderefs">5.9.2.2. Do not highlight coderefs</a></li>
+<li><a href="#h-Give-all-source-code-blocks-a----name-------field--HTML-ID">3.4.4.1. Give all source code blocks a <code>#+name: ...</code> field (HTML ID)</a></li>
+<li><a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2. Automatic captions for Noweb source code blocks</a></li>
+<li><a href="#h-Human-readable-UIDs--Headings--aka-headlines">3.4.4.3. Human-readable UIDs (Headings, aka headlines)</a></li>
 </ul>
 </li>
-<li><a href="#h-Preserve-leading-whitespace-characters-on-export">5.9.3. Preserve leading whitespace characters on export</a></li>
-<li><a href="#h-Set-tab-width-to-4-spaces">5.9.4. Set tab width to 4 spaces</a></li>
-<li><a href="#h-Disable-backups">5.9.5. Disable backups</a></li>
-<li><a href="#h-Profiling">5.9.6. Profiling</a></li>
-</ul>
-</li>
-<li><a href="#h-Imports">5.10. Imports</a></li>
-<li><a href="#h-Additional--hand-tweaked--CSS">5.11. Additional (hand-tweaked) CSS</a>
+<li><a href="#h-HTML-modifications">3.4.5. HTML modifications</a>
 <ul>
-<li><a href="#h-General-body-text">5.11.1. General body text</a></li>
-<li><a href="#h-Headline-font-sizes">5.11.2. Headline font sizes</a></li>
-<li><a href="#h-Tables">5.11.3. Tables</a></li>
-<li><a href="#h-Images">5.11.4. Images</a></li>
-<li><a href="#h-Monospaced">5.11.5. Monospaced</a></li>
-<li><a href="#h-Links">5.11.6. Links</a></li>
-<li><a href="#h-Source-code-block-body">5.11.7. Source code block body</a></li>
-<li><a href="#h-Source-code-block-captions">5.11.8. Source code block captions</a></li>
-<li><a href="#h-Links-to-child-source-block-from-parent">5.11.9. Links to child source block from parent</a></li>
-<li><a href="#h-Sidenotes">5.11.10. Sidenotes</a></li>
+<li><a href="#h-Use-human-readable-HTML-IDs-for-source-code-links">3.4.5.1. Use human-readable HTML IDs for source code links</a></li>
+<li><a href="#h-Pretty-source-code-captions">3.4.5.2. Pretty source code captions</a></li>
+<li><a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">3.4.5.3. Link noweb references (link to child block from parent block)</a></li>
 </ul>
 </li>
-<li><a href="#h-Create--lilac-theme--file">5.12. Create <code>lilac.theme</code> file</a></li>
-<li><a href="#h-Ignore-woven-HTML-from--git-diff">5.13. Ignore woven HTML from <code>git diff</code></a>
+<li><a href="#h-JavaScript">3.4.6. JavaScript</a>
 <ul>
-<li><a href="#h-git-add--p">5.13.1. <code>git add -p</code></a></li>
-</ul>
-</li>
-<li><a href="#h-gitignore">5.14. gitignore</a></li>
-</ul>
-</li>
-<li><a href="#h-Tangling--generating-the-source-code">6. Tangling (generating the source code)</a></li>
-<li><a href="#h-Development-environment--Nix-shell">7. Development environment (Nix shell)</a></li>
-<li><a href="#h-Tests">8. Tests</a>
+<li><a href="#h-Self-linked-headlines">3.4.6.1. Self-linked headlines</a></li>
+<li><a href="#h-Table-of-contents-sidebar">3.4.6.2. Table of contents sidebar</a>
 <ul>
-<li><a href="#h-Test-helpers">8.1. Test helpers</a></li>
-<li><a href="#h-Smart-source-code-block-caption-helpers">8.2. Smart source code block caption helpers</a></li>
+<li><a href="#h-Delete--Table-of-Contents--text">3.4.6.2.1. Delete "Table of Contents" text</a></li>
+<li><a href="#h-Convert--Table-of-Contents--to-a-sidebar-on-the-left">3.4.6.2.2. Convert "Table of Contents" to a sidebar on the left</a></li>
+<li><a href="#h-Track-the-current-headline">3.4.6.2.3. Track the current headline</a></li>
 </ul>
 </li>
-<li><a href="#h-Glossary">9. Glossary</a></li>
-<li><a href="#h-References">10. References</a></li>
+</ul>
+</li>
+<li><a href="#h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">3.4.7. Autogenerate CSS for syntax highlighting of source code blocks</a></li>
+<li><a href="#h-Misc-settings">3.4.8. Misc settings</a>
+<ul>
+<li><a href="#h-Use-HTML5-export--not-XML--to-un-break-MathJax">3.4.8.1. Use HTML5 export, not XML (to un-break MathJax)</a></li>
+<li><a href="#h-Code-references">3.4.8.2. Code references</a>
+<ul>
+<li><a href="#h-Define--CodeHighlightOn--and--CodeHighlightOff">3.4.8.2.1. Define <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></a></li>
+<li><a href="#h-Do-not-highlight-coderefs">3.4.8.2.2. Do not highlight coderefs</a></li>
+</ul>
+</li>
+<li><a href="#h-Preserve-leading-whitespace-characters-on-export">3.4.8.3. Preserve leading whitespace characters on export</a></li>
+<li><a href="#h-Set-tab-width-to-4-spaces">3.4.8.4. Set tab width to 4 spaces</a></li>
+<li><a href="#h-Disable-backups">3.4.8.5. Disable backups</a></li>
+<li><a href="#h-Profiling">3.4.8.6. Profiling</a></li>
+</ul>
+</li>
+<li><a href="#h-Imports">3.4.9. Imports</a></li>
+<li><a href="#h-Additional--hand-tweaked--CSS">3.4.10. Additional (hand-tweaked) CSS</a>
+<ul>
+<li><a href="#h-General-body-text">3.4.10.1. General body text</a></li>
+<li><a href="#h-Headline-font-sizes">3.4.10.2. Headline font sizes</a></li>
+<li><a href="#h-Tables">3.4.10.3. Tables</a></li>
+<li><a href="#h-Images">3.4.10.4. Images</a></li>
+<li><a href="#h-Monospaced">3.4.10.5. Monospaced</a></li>
+<li><a href="#h-Links">3.4.10.6. Links</a></li>
+<li><a href="#h-Source-code-block-body">3.4.10.7. Source code block body</a></li>
+<li><a href="#h-Source-code-block-captions">3.4.10.8. Source code block captions</a></li>
+<li><a href="#h-Links-to-child-source-block-from-parent">3.4.10.9. Links to child source block from parent</a></li>
+<li><a href="#h-Sidenotes">3.4.10.10. Sidenotes</a></li>
+</ul>
+</li>
+<li><a href="#h-Create--lilac-theme--file">3.4.11. Create <code>lilac.theme</code> file</a></li>
+<li><a href="#h-Ignore-woven-HTML-from--git-diff">3.4.12. Ignore woven HTML from <code>git diff</code></a>
+<ul>
+<li><a href="#h-git-add--p">3.4.12.1. <code>git add -p</code></a></li>
+</ul>
+</li>
+<li><a href="#h-gitignore">3.4.13. gitignore</a></li>
+</ul>
+</li>
+<li><a href="#h-Tests">3.5. Tests</a>
+<ul>
+<li><a href="#h-Test-helpers">3.5.1. Test helpers</a></li>
+<li><a href="#h-Smart-source-code-block-caption-helpers">3.5.2. Smart source code block caption helpers</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h-Glossary">4. Glossary</a></li>
+<li><a href="#h-References">5. References</a></li>
 </ul>
 </div>
 </div>
@@ -371,11 +380,10 @@ This document itself reuses the <code>lilac.theme</code> file, which gives you a
 (if you are viewing the HTML output) of what weaving with Lilac looks like.
 </p>
 </div>
-</div>
 
-<div id="outline-container-h-Motivation" class="outline-2">
-<h2 id="h-Motivation"><span class="section-number-2">2.</span> Motivation</h2>
-<div class="outline-text-2" id="text-h-Motivation">
+<div id="outline-container-h-Motivation" class="outline-3">
+<h3 id="h-Motivation"><span class="section-number-3">1.1.</span> Motivation</h3>
+<div class="outline-text-3" id="text-h-Motivation">
 <p>
 Lilac was created mainly because the existing Org mode features around Noweb
 references were lacking in features. There seems to have been a great deal of
@@ -386,9 +394,9 @@ more difficult than making output look good to a computer (tangling)).
 </p>
 </div>
 
-<div id="outline-container-h-Problems-with-Org-mode" class="outline-3">
-<h3 id="h-Problems-with-Org-mode"><span class="section-number-3">2.1.</span> Problems with Org mode</h3>
-<div class="outline-text-3" id="text-h-Problems-with-Org-mode">
+<div id="outline-container-h-Problems-with-Org-mode" class="outline-4">
+<h4 id="h-Problems-with-Org-mode"><span class="section-number-4">1.1.1.</span> Problems with Org mode</h4>
+<div class="outline-text-4" id="text-h-Problems-with-Org-mode">
 <p>
 By default, source code blocks do not get any captions in the HTML output. This
 is a problem for LP because you have to manually explain the name of each block
@@ -433,9 +441,9 @@ because all of the linked objects will get a new link ID.
 </div>
 </div>
 
-<div id="outline-container-h-Enter--Lilac" class="outline-3">
-<h3 id="h-Enter--Lilac"><span class="section-number-3">2.2.</span> Enter <i>Lilac</i></h3>
-<div class="outline-text-3" id="text-h-Enter--Lilac">
+<div id="outline-container-h-Enter--Lilac" class="outline-4">
+<h4 id="h-Enter--Lilac"><span class="section-number-4">1.1.2.</span> Enter <i>Lilac</i></h4>
+<div class="outline-text-4" id="text-h-Enter--Lilac">
 <p>
 Lilac addresses all of the issues presented above.
 </p>
@@ -458,10 +466,11 @@ CI-friendliness, Lilac was designed to be run from outside of Emacs by default
 </div>
 </div>
 </div>
+</div>
 
-<div id="outline-container-h-Usage" class="outline-2">
-<h2 id="h-Usage"><span class="section-number-2">3.</span> Usage</h2>
-<div class="outline-text-2" id="text-h-Usage">
+<div id="outline-container-h-User-Guide" class="outline-2">
+<h2 id="h-User-Guide"><span class="section-number-2">2.</span> User Guide</h2>
+<div class="outline-text-2" id="text-h-User-Guide">
 <p>
 First create an Org mode file that uses LP. Then either clone this repo or add
 it as a submodule to your project. The point is to get the <code>lilac.el</code> (and its
@@ -480,7 +489,7 @@ using <code>__NREF__</code> as a prefix. See the discussion below.
 </div>
 
 <div id="outline-container-h-Source-code-blocks--monoblocks-and-polyblocks" class="outline-3">
-<h3 id="h-Source-code-blocks--monoblocks-and-polyblocks"><span class="section-number-3">3.1.</span> Source code blocks: monoblocks and polyblocks</h3>
+<h3 id="h-Source-code-blocks--monoblocks-and-polyblocks"><span class="section-number-3">2.1.</span> Source code blocks: monoblocks and polyblocks</h3>
 <div class="outline-text-3" id="text-h-Source-code-blocks--monoblocks-and-polyblocks">
 <p>
 In Org mode, Noweb-style references by default must be enclosed in double angle
@@ -542,7 +551,7 @@ the Noweb reference in the parent block.
 </div>
 
 <div id="outline-container-h-Examples-of-source-code-blocks" class="outline-4">
-<h4 id="h-Examples-of-source-code-blocks"><span class="section-number-4">3.1.1.</span> Examples of source code blocks</h4>
+<h4 id="h-Examples-of-source-code-blocks"><span class="section-number-4">2.1.1.</span> Examples of source code blocks</h4>
 <div class="outline-text-4" id="text-h-Examples-of-source-code-blocks">
 <p>
 Below is an example of the usage described above. Notice how the child blocks
@@ -574,7 +583,7 @@ overall polyblock "chain".
 </div>
 
 <div id="outline-container-h-Multi-parent-child-blocks" class="outline-5">
-<h5 id="h-Multi-parent-child-blocks"><span class="section-number-5">3.1.1.1.</span> Multi-parent child blocks</h5>
+<h5 id="h-Multi-parent-child-blocks"><span class="section-number-5">2.1.1.1.</span> Multi-parent child blocks</h5>
 <div class="outline-text-5" id="text-h-Multi-parent-child-blocks">
 <p>
 Sometimes a piece of code will be reused in different source code blocks. You
@@ -607,9 +616,9 @@ additional parent blocks, they will show up as links "3", "4", etc.
 </div>
 </div>
 
-<div id="outline-container-h-How-Lilac-uses-LP" class="outline-2">
-<h2 id="h-How-Lilac-uses-LP"><span class="section-number-2">4.</span> How Lilac uses LP</h2>
-<div class="outline-text-2" id="text-h-How-Lilac-uses-LP">
+<div id="outline-container-h-Developer-Guide" class="outline-2">
+<h2 id="h-Developer-Guide"><span class="section-number-2">3.</span> Developer Guide</h2>
+<div class="outline-text-2" id="text-h-Developer-Guide">
 <p>
 All source code is generated by <i>tangling</i> this Org file (<code>README.org</code>). This
 file is the single source of truth for basically everything. Some other things
@@ -626,71 +635,48 @@ into version control.
 
 <p>
 The <code>Makefile</code> in this repo is used as the main "driver" for both tangling and
-weaving.
+weaving. Typically, you would have a browser pointed to <code>README.html</code> and
+refresh it after editing the underlying <code>README.org</code> file. After every change to
+the Org file, you can run <code>make</code> to tangle, weave, and run unit tests.
 </p>
 </div>
+
+<div id="outline-container-h-Development-environment--Nix-shell" class="outline-3">
+<h3 id="h-Development-environment--Nix-shell"><span class="section-number-3">3.1.</span> Development environment (Nix shell)</h3>
+<div class="outline-text-3" id="text-h-Development-environment--Nix-shell">
+<p>
+This is the main development shell and brings in all of our dependencies to
+build all of our code. Taken from <a href="https://github.com/tweag/haskell-stack-nix-example/blob/b9383e35416a2b0e21fbc97ed079538f9f395b6a/shell.nix#L1">here</a>. The <code>Makefile</code> is meant to be executed
+from within this environment.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">shell.nix</label><span class="lilac-caption-link-symbol"><a href="#shell-nix">&#x1f517;</a></span></div><pre class="src src-nix" id="shell-nix"><span class="org-nix-keyword">let</span>
+  <span class="org-comment"># Nixpkgs snapshot.</span>
+  <span class="org-nix-attribute">sources</span> = <span class="org-nix-builtin">import</span> <span class="org-nix-constant">./package/nix/sources.nix</span>;
+  <span class="org-comment"># The final "pkgs" attribute.</span>
+  <span class="org-nix-attribute">pkgs</span> = <span class="org-nix-builtin">import</span> sources.nixpkgs {};
+<span class="org-nix-keyword">in</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">This is our development shell.</span>
+pkgs.mkShell ({
+  <span class="org-nix-attribute">buildInputs</span> = [
+    <span class="org-comment"># Tangling and weaving for Literate Programming.</span>
+    pkgs.emacs
+
+    <span class="org-comment"># Update Nix dependencies in package/nix/sources.nix.</span>
+    pkgs.niv
+
+    <span class="org-comment"># Misc.</span>
+    pkgs.git
+    pkgs.less
+  ];
+})
+</pre></div></div>
 </div>
-
-<div id="outline-container-h-Weaving--generating-the-HTML" class="outline-2">
-<h2 id="h-Weaving--generating-the-HTML"><span class="section-number-2">5.</span> Weaving (generating the HTML)</h2>
-<div class="outline-text-2" id="text-h-Weaving--generating-the-HTML">
-<p>
-Weaving is conceptually simpler than tangling because there is no extra step &#x2014;
-the output is an HTML page and that is something that we can use directly
-(unlike program source code, which may require additional compilation into a
-binary, depending on the language). We limit ourselves to HTML output because
-HTML support is ubiquitous; plus we don't have to worry about page breaks such
-as in PDF output.
-</p>
-
-<p>
-Although weaving is conceptually simple, most of the code in <a href="lilac.el"><code>lilac.el</code></a> have to
-do with weaving because the default infrastructure that ships with Org mode is
-too rigid for our needs. For example, we make heavy use of Noweb-style
-<a href="#citeproc_bib_item_1">[1]</a> references, but also add in extensive HTML links to allow
-the reader to jump around code easily because Org does not cross-link these
-references by default.
-</p>
-
-<p>
-Weaving currently requires the following dependencies:
-</p>
-
-<table>
-
-
-<colgroup>
-<col  class="org-left">
-
-<col  class="org-left">
-</colgroup>
-<thead>
-<tr>
-<th scope="col" class="org-left">Dependency</th>
-<th scope="col" class="org-left">Why</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="org-left"><a href="https://www.gnu.org/software/make/">GNU Make</a></td>
-<td class="org-left">to run "make"</td>
-</tr>
-
-<tr>
-<td class="org-left"><a href="https://www.gnu.org/software/emacs/">GNU Emacs</a></td>
-<td class="org-left">for tangling and weaving</td>
-</tr>
-</tbody>
-</table>
-
-<p>
-Note that all of the above can be brought in by using the <a href="https://github.com/NixOS/nix">Nix package manager</a>.
-This is why we provide a <a href="shell.nix">shell.nix</a> file in this repo.
-</p>
 </div>
 
 <div id="outline-container-h-Makefile" class="outline-3">
-<h3 id="h-Makefile"><span class="section-number-3">5.1.</span> Makefile</h3>
+<h3 id="h-Makefile"><span class="section-number-3">3.2.</span> Makefile</h3>
 <div class="outline-text-3" id="text-h-Makefile">
 <p>
 We have a top-level <code>Makefile</code> so that we can run some <code>make</code> commands on the
@@ -795,13 +781,142 @@ We use <a href="https://github.com/nmattia/niv"><code>niv</code></a> to update t
 </div>
 </div>
 
-<div id="outline-container-h-Emacs-customizations-for-HTML-export---lilac-el-" class="outline-3">
-<h3 id="h-Emacs-customizations-for-HTML-export---lilac-el-"><span class="section-number-3">5.2.</span> Emacs customizations for HTML export (<code>lilac.el</code>)</h3>
-<div class="outline-text-3" id="text-h-Emacs-customizations-for-HTML-export---lilac-el-">
+<div id="outline-container-h-Tangling--generating-the-source-code" class="outline-3">
+<h3 id="h-Tangling--generating-the-source-code"><span class="section-number-3">3.3.</span> Tangling (generating the source code)</h3>
+<div class="outline-text-3" id="text-h-Tangling--generating-the-source-code">
 <p>
-Below is the overall structure of <code>lilac.el</code>. The <code>gc-cons-threshold</code> setting is
-to prevent <code>emacs</code> from entering garbage collection pauses, because we invoke
-<code>emacs</code> from the command line in a fire-and-forget manner.
+Tangling is simply the act of collecting the <code>#+begin_src ... #+end_src</code> blocks
+and arranging them into the various target (source code) files. Every source
+code block is given a unique name.
+</p>
+
+<p>
+We simply tangle the <code>README.org</code> file to get all the code we need.
+</p>
+
+<p>
+The only thing that we customize in terms of tangling is how we define Noweb
+references inside source code blocks.
+</p>
+</div>
+
+<div id="outline-container-h-Custom-Noweb-delimiters" class="outline-4">
+<h4 id="h-Custom-Noweb-delimiters"><span class="section-number-4">3.3.1.</span> Custom Noweb delimiters</h4>
+<div class="outline-text-4" id="text-h-Custom-Noweb-delimiters">
+<p>
+Note that we need to evaluate this lisp code if we want to run <code>C-c C-v t</code> to
+tangle code blocks properly in an interactive manner from an Emacs editing
+session.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">custom-noweb-delimiters</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__custom-noweb-delimiters">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__custom-noweb-delimiters">(<span class="org-keyword">setq</span> org-babel-noweb-wrap-start <span class="org-string">"__NREF__"</span>)
+(<span class="org-keyword">setq</span> org-babel-noweb-wrap-end <span class="org-string">""</span>)
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-nref-rx</span> (match-optional-params)
+  (rx-to-string
+   (lilac-nref-rx-primitive match-optional-params)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-nref-rx-primitive</span> (match-optional-params)
+  (<span class="org-keyword">if</span> match-optional-params
+   `(group
+           <span class="org-string">"__NREF__"</span>
+          <span class="org-comment-delimiter">;; </span><span class="org-comment">Noweb reference must start with a letter...</span>
+          (any alpha)
+          <span class="org-comment-delimiter">;; </span><span class="org-comment">...and must be followed by</span>
+          <span class="org-comment-delimiter">;; </span><span class="org-comment">letters,numbers,dashes,underscores,periods...</span>
+          (* (<span class="org-keyword">or</span> (any alnum) <span class="org-string">"-"</span> <span class="org-string">"_"</span> <span class="org-string">"."</span>))
+          <span class="org-comment-delimiter">;; </span><span class="org-comment">...and may terminate with a "(...)" where the "..." may be an empty</span>
+          <span class="org-comment-delimiter">;; </span><span class="org-comment">string, or some other argument.</span>
+          (* (<span class="org-keyword">or</span> <span class="org-string">"()"</span>
+                 (<span class="org-keyword">and</span> <span class="org-string">"("</span>
+                      (* (not <span class="org-string">")"</span>))
+                      <span class="org-string">")"</span>))))
+   `(group
+          <span class="org-string">"__NREF__"</span>
+          (any alpha)
+          (* (<span class="org-keyword">or</span> (any alnum) <span class="org-string">"-"</span> <span class="org-string">"_"</span> <span class="org-string">"."</span>)))))
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Customize noweb delimiters. Unlike traditional &lt;&lt; and &gt;&gt; delimiters, we just</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">use the "__NREF__" prefix as our only delimiter. This has the advantage of</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">being encoded the same way into HTML, which makes our HTML modifications</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">easier and more consistent across different source code languages.</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">See https://emacs.stackexchange.com/a/73720/13006.</span>
+(<span class="org-keyword">defun</span> <span class="org-function-name">org-babel-noweb-wrap</span> (<span class="org-type">&amp;optional</span> regexp)
+  <span class="org-doc">"Return regexp matching a Noweb reference.</span>
+
+<span class="org-doc">Match any reference, or only those matching REGEXP, if non-nil.</span>
+<span class="org-doc">When matching, reference is stored in match group 1."</span>
+  (lilac-nref-rx t))
+</pre></div></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Weaving--generating-the-HTML" class="outline-3">
+<h3 id="h-Weaving--generating-the-HTML"><span class="section-number-3">3.4.</span> Weaving (generating the HTML)</h3>
+<div class="outline-text-3" id="text-h-Weaving--generating-the-HTML">
+<p>
+Weaving is conceptually simpler than tangling because there is no extra step &#x2014;
+the output is an HTML page and that is something that we can use directly
+(unlike program source code, which may require additional compilation into a
+binary, depending on the language). We limit ourselves to HTML output because
+HTML support is ubiquitous; plus we don't have to worry about page breaks such
+as in PDF output.
+</p>
+
+<p>
+Although weaving is conceptually simple, most of the code in <a href="lilac.el"><code>lilac.el</code></a> have to
+do with weaving because the default infrastructure that ships with Org mode is
+too rigid for our needs. For example, we make heavy use of Noweb-style
+<a href="#citeproc_bib_item_1">[1]</a> references, but also add in extensive HTML links to allow
+the reader to jump around code easily because Org does not cross-link these
+references by default.
+</p>
+
+<p>
+Weaving currently requires the following dependencies:
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Dependency</th>
+<th scope="col" class="org-left">Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><a href="https://www.gnu.org/software/make/">GNU Make</a></td>
+<td class="org-left">to run "make"</td>
+</tr>
+
+<tr>
+<td class="org-left"><a href="https://www.gnu.org/software/emacs/">GNU Emacs</a></td>
+<td class="org-left">for tangling and weaving</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Note that all of the above can be brought in by using the <a href="https://github.com/NixOS/nix">Nix package manager</a>.
+This is why we provide a <a href="shell.nix"><code>shell.nix</code></a> file in this repo.
+</p>
+</div>
+
+<div id="outline-container-h-Emacs-customizations---lilac-el-" class="outline-4">
+<h4 id="h-Emacs-customizations---lilac-el-"><span class="section-number-4">3.4.1.</span> Emacs customizations (<code>lilac.el</code>)</h4>
+<div class="outline-text-4" id="text-h-Emacs-customizations---lilac-el-">
+<p>
+Below is the overall structure of <a href="lilac.el"><code>lilac.el</code></a>, the . The <code>gc-cons-threshold</code>
+setting is to prevent <code>emacs</code> from entering garbage collection pauses, because
+we invoke <code>emacs</code> from the command line in a non-interactive manner.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.el</label><span class="lilac-caption-link-symbol"><a href="#lilac-el">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="lilac-el"><span class="org-comment-delimiter">; </span><span class="org-comment">Set garbage-collection threshold to 16 GiB.</span>
@@ -816,9 +931,9 @@ to prevent <code>emacs</code> from entering garbage collection pauses, because w
 </div>
 </div>
 
-<div id="outline-container-h-Fix-non-determinism" class="outline-3">
-<h3 id="h-Fix-non-determinism"><span class="section-number-3">5.3.</span> Fix non-determinism</h3>
-<div class="outline-text-3" id="text-h-Fix-non-determinism">
+<div id="outline-container-h-Fix-non-determinism" class="outline-4">
+<h4 id="h-Fix-non-determinism"><span class="section-number-4">3.4.2.</span> Fix non-determinism</h4>
+<div class="outline-text-4" id="text-h-Fix-non-determinism">
 <p>
 Nondeterminism is problematic because it results in a different HTML file
 every time we run <code>org-babel-tangle</code>, <i>even if the Org files have not changed</i>.
@@ -827,9 +942,9 @@ HTML output.
 </p>
 </div>
 
-<div id="outline-container-h-Do-not-insert-current-time-as-HTML-comment" class="outline-4">
-<h4 id="h-Do-not-insert-current-time-as-HTML-comment"><span class="section-number-4">5.3.1.</span> Do not insert current time as HTML comment</h4>
-<div class="outline-text-4" id="text-h-Do-not-insert-current-time-as-HTML-comment">
+<div id="outline-container-h-Do-not-insert-current-time-as-HTML-comment" class="outline-5">
+<h5 id="h-Do-not-insert-current-time-as-HTML-comment"><span class="section-number-5">3.4.2.1.</span> Do not insert current time as HTML comment</h5>
+<div class="outline-text-5" id="text-h-Do-not-insert-current-time-as-HTML-comment">
 <p>
 Org mode also injects an HTML comment (not visible to the user) to record the
 time that the HTML was generated. We disable this because it breaks
@@ -841,9 +956,9 @@ deterministic output. See <a href="https://emacs.stackexchange.com/questions/501
 </div>
 </div>
 
-<div id="outline-container-h-Do-not-insert-current-Org-mode-version" class="outline-4">
-<h4 id="h-Do-not-insert-current-Org-mode-version"><span class="section-number-4">5.3.2.</span> Do not insert current Org mode version</h4>
-<div class="outline-text-4" id="text-h-Do-not-insert-current-Org-mode-version">
+<div id="outline-container-h-Do-not-insert-current-Org-mode-version" class="outline-5">
+<h5 id="h-Do-not-insert-current-Org-mode-version"><span class="section-number-5">3.4.2.2.</span> Do not insert current Org mode version</h5>
+<div class="outline-text-5" id="text-h-Do-not-insert-current-Org-mode-version">
 <p>
 By default Org mode appends visible metadata at the bottom of the HTML document,
 including the Org version used to generate the document. We suppress this
@@ -855,9 +970,9 @@ information.
 </div>
 </div>
 
-<div id="outline-container-h-Do-not-use-random-numbers-for-the-HTML--id--attribute" class="outline-4">
-<h4 id="h-Do-not-use-random-numbers-for-the-HTML--id--attribute"><span class="section-number-4">5.3.3.</span> Do not use random numbers for the HTML <code>id</code> attribute</h4>
-<div class="outline-text-4" id="text-h-Do-not-use-random-numbers-for-the-HTML--id--attribute">
+<div id="outline-container-h-Do-not-use-random-numbers-for-the-HTML--id--attribute" class="outline-5">
+<h5 id="h-Do-not-use-random-numbers-for-the-HTML--id--attribute"><span class="section-number-5">3.4.2.3.</span> Do not use random numbers for the HTML <code>id</code> attribute</h5>
+<div class="outline-text-5" id="text-h-Do-not-use-random-numbers-for-the-HTML--id--attribute">
 <p>
 Stop randomized IDs from being generated every time. Instead count from 0 and
 work our way up.
@@ -878,9 +993,9 @@ See <a href="https://www.reddit.com/r/orgmode/comments/aagmfh/comment/hk6upbf">h
 </div>
 </div>
 
-<div id="outline-container-h-Toplevel-publishing-function---lilac-publish-" class="outline-3">
-<h3 id="h-Toplevel-publishing-function---lilac-publish-"><span class="section-number-3">5.4.</span> Toplevel publishing function (<code>lilac-publish</code>)</h3>
-<div class="outline-text-3" id="text-h-Toplevel-publishing-function---lilac-publish-">
+<div id="outline-container-h-Toplevel-publishing-function---lilac-publish-" class="outline-4">
+<h4 id="h-Toplevel-publishing-function---lilac-publish-"><span class="section-number-4">3.4.3.</span> Toplevel publishing function (<code>lilac-publish</code>)</h4>
+<div class="outline-text-4" id="text-h-Toplevel-publishing-function---lilac-publish-">
 <p>
 The toplevel function is <code>lilac-publish</code>. This actually publishes twice, with
 <code>lilac-publish-1</code> and <code>lilac-publish-2</code>. The reason we publish twice is because
@@ -898,23 +1013,18 @@ named <code>__NREF__...</code> get an automatic <code>#+caption: ...</code> text
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish</span> ()
   (<span class="org-keyword">interactive</span>)
-  (lilac-publish-1)
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-use-css">lilac-publish-use-css</a></span>
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-org">lilac-publish-modify-org</a></span>
+
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-HTML-1">lilac-publish-modify-HTML-1</a></span>
+  (org-html-export-to-html)
+
   (clrhash lilac-polyblock-names-totals)
-  (lilac-publish-2))
 
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish-1</span> ()
-  (<span class="org-keyword">let</span> (
-        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-org">lilac-publish-modify-org</a></span>
-        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-HTML-1">lilac-publish-modify-HTML-1</a></span>
-        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-use-css">lilac-publish-use-css</a></span>)
-    (org-html-export-to-html)))
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-HTML-2">lilac-publish-modify-HTML-2</a></span>
+  (org-html-export-to-html))
 
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish-2</span> ()
-  (<span class="org-keyword">let</span> (
-        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-org">lilac-publish-modify-org</a></span>
-        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-HTML-2">lilac-publish-modify-HTML-2</a></span>
-        <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-use-css">lilac-publish-use-css</a></span>)
-    (org-html-export-to-html)))
+<span class="lilac-child-link-from-parent"><a href="#__NREF__custom-noweb-delimiters">custom-noweb-delimiters</a></span>
 
 <span class="org-comment-delimiter">;; </span><span class="org-comment">Modify Org buffer</span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-src-blocks">UID-for-all-src-blocks</a></span>
@@ -928,16 +1038,16 @@ named <code>__NREF__...</code> get an automatic <code>#+caption: ...</code> text
 </pre></div></div>
 </div>
 
-<div id="outline-container-h-Modify-the-Org-buffer" class="outline-4">
-<h4 id="h-Modify-the-Org-buffer"><span class="section-number-4">5.4.1.</span> Modify the Org buffer</h4>
-<div class="outline-text-4" id="text-h-Modify-the-Org-buffer">
+<div id="outline-container-h-Modify-the-Org-buffer" class="outline-5">
+<h5 id="h-Modify-the-Org-buffer"><span class="section-number-5">3.4.3.1.</span> Modify the Org buffer</h5>
+<div class="outline-text-5" id="text-h-Modify-the-Org-buffer">
 <p>
 Here we modify the Org mode buffer, by using <code>org-export-before-parsing-hook</code>.
 This takes a list of functions that are free to modify the Org mode buffer
 before each Org element in the buffer gets converted into HTML.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-org</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-org">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-org">(org-export-before-parsing-hook
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-org</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-org">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-org">(<span class="org-keyword">setq</span> org-export-before-parsing-hook
  '(lilac-UID-for-all-src-blocks
    lilac-insert-noweb-source-code-block-captions
    lilac-UID-for-all-headlines))
@@ -946,9 +1056,9 @@ As for the actual modifications, see:
 </p>
 
 <ul class="org-ul">
-<li><code>lilac-UID-for-all-src-blocks</code> (<a href="#h-Give-all-source-code-blocks-a----name-------field--HTML-ID">5.5.1</a>)</li>
-<li><code>lilac-insert-noweb-source-code-block-captions</code> (<a href="#h-Automatic-captions-for-Noweb-source-code-blocks">5.5.2</a>)</li>
-<li><code>lilac-UID-for-all-headlines</code> (<a href="#h-Human-readable-UIDs--Headings--aka-headlines">5.5.3</a>)</li>
+<li><code>lilac-UID-for-all-src-blocks</code> (<a href="#h-Give-all-source-code-blocks-a----name-------field--HTML-ID">3.4.4.1</a>)</li>
+<li><code>lilac-insert-noweb-source-code-block-captions</code> (<a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2</a>)</li>
+<li><code>lilac-UID-for-all-headlines</code> (<a href="#h-Human-readable-UIDs--Headings--aka-headlines">3.4.4.3</a>)</li>
 </ul>
 
 <p>
@@ -959,9 +1069,9 @@ headlines and source code blocks are both deterministic and human-readable. The
 </div>
 </div>
 
-<div id="outline-container-h-Modify-the-HTML" class="outline-4">
-<h4 id="h-Modify-the-HTML"><span class="section-number-4">5.4.2.</span> Modify the HTML</h4>
-<div class="outline-text-4" id="text-h-Modify-the-HTML">
+<div id="outline-container-h-Modify-the-HTML" class="outline-5">
+<h5 id="h-Modify-the-HTML"><span class="section-number-5">3.4.3.2.</span> Modify the HTML</h5>
+<div class="outline-text-5" id="text-h-Modify-the-HTML">
 <p>
 This is useful for adding in final tweaks to the HTML that is difficult to
 accomplish at the Org-mode buffer level.
@@ -975,7 +1085,7 @@ blocks from parent blocks. We also populate the
 human-readable.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-HTML-1</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-HTML-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-HTML-1">(org-export-filter-src-block-functions
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-HTML-1</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-HTML-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-HTML-1">(<span class="org-keyword">setq</span> org-export-filter-src-block-functions
  '(lilac-populate-child-HTML_ID-hash-table
    lilac-populate-org_id-human_id-hash-table))
 </pre></div></div><p>
@@ -984,37 +1094,37 @@ Phase 2: In this phase we perform the linking from parent blocks to child blocks
 code captions to look prettier (<code>lilac-prettify-source-code-captions</code>).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-HTML-2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-HTML-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-HTML-2">(org-export-filter-src-block-functions
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-HTML-2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-HTML-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-HTML-2">(<span class="org-keyword">setq</span> org-export-filter-src-block-functions
  '(lilac-link-to-children-from-parent-body
    lilac-prettify-source-code-captions))
-(org-export-filter-final-output-functions
+(<span class="org-keyword">setq</span> org-export-filter-final-output-functions
  '(lilac-replace-org_ids-with-human_ids))
 </pre></div></div>
 </div>
 </div>
 
-<div id="outline-container-h-Miscellaneous-export-settings" class="outline-4">
-<h4 id="h-Miscellaneous-export-settings"><span class="section-number-4">5.4.3.</span> Miscellaneous export settings</h4>
-<div class="outline-text-4" id="text-h-Miscellaneous-export-settings">
+<div id="outline-container-h-Miscellaneous-export-settings" class="outline-5">
+<h5 id="h-Miscellaneous-export-settings"><span class="section-number-5">3.4.3.3.</span> Miscellaneous export settings</h5>
+<div class="outline-text-5" id="text-h-Miscellaneous-export-settings">
 <p>
 Do not hardcode colors into the HTML. Instead refer to CSS class names, to be
 stylized by an external CSS file.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-use-css</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-use-css">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-use-css">(org-html-htmlize-output-type 'css)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-use-css</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-use-css">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-use-css">(<span class="org-keyword">setq</span> org-html-htmlize-output-type 'css)
 </pre></div></div>
 </div>
 </div>
 </div>
 
-<div id="outline-container-h-Org-modifications" class="outline-3">
-<h3 id="h-Org-modifications"><span class="section-number-3">5.5.</span> Org modifications</h3>
-<div class="outline-text-3" id="text-h-Org-modifications">
+<div id="outline-container-h-Org-modifications" class="outline-4">
+<h4 id="h-Org-modifications"><span class="section-number-4">3.4.4.</span> Org modifications</h4>
+<div class="outline-text-4" id="text-h-Org-modifications">
 </div>
 
-<div id="outline-container-h-Give-all-source-code-blocks-a----name-------field--HTML-ID" class="outline-4">
-<h4 id="h-Give-all-source-code-blocks-a----name-------field--HTML-ID"><span class="section-number-4">5.5.1.</span> Give all source code blocks a <code>#+name: ...</code> field (HTML ID)</h4>
-<div class="outline-text-4" id="text-h-Give-all-source-code-blocks-a----name-------field--HTML-ID">
+<div id="outline-container-h-Give-all-source-code-blocks-a----name-------field--HTML-ID" class="outline-5">
+<h5 id="h-Give-all-source-code-blocks-a----name-------field--HTML-ID"><span class="section-number-5">3.4.4.1.</span> Give all source code blocks a <code>#+name: ...</code> field (HTML ID)</h5>
+<div class="outline-text-5" id="text-h-Give-all-source-code-blocks-a----name-------field--HTML-ID">
 <p>
 Only source code blocks that have a <code>#+name: ...</code> field (org name field) get an
 HTML ID (org ID) assigned to it. The problem with polyblocks is that they are
@@ -1024,7 +1134,7 @@ not assigned an org name field by default.
 <p>
 Of course, we still want all polyblock to have an HTML ID, which can then be
 extracted by <a href="#coderef-lilac-get-src-block-HTML_ID" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-lilac-get-src-block-HTML_ID');" onmouseout="CodeHighlightOff(this, 'coderef-lilac-get-src-block-HTML_ID');"><code>lilac-get-src-block-HTML_ID</code></a> to build up the
-<code>lilac-child-HTML_ID-hash-table</code> in <a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">5.6.3</a>. If we don't do this then parent source code blocks won't
+<code>lilac-child-HTML_ID-hash-table</code> in <a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">3.4.5.3</a>. If we don't do this then parent source code blocks won't
 be able to link to the polyblock at all (or vice versa).
 </p>
 
@@ -1032,7 +1142,7 @@ be able to link to the polyblock at all (or vice versa).
 Monoblocks with a <code>#+name: ...</code> field get a unique HTML ID assigned to it in
 the form <code>orgN</code> where <code>N</code> is a hexadecimal number. By default Org generates a
 random number for <code>N</code>, but we use a simple counter that increments, starting
-from 0 (see <a href="#h-Do-not-use-random-numbers-for-the-HTML--id--attribute">5.3.3</a>).
+from 0 (see <a href="#h-Do-not-use-random-numbers-for-the-HTML--id--attribute">3.4.2.3</a>).
 </p>
 
 <p>
@@ -1050,7 +1160,7 @@ source code block.
 <p>
 Note that the actual name <code>__anonymous-src-block-N</code> is not important, because it
 gets erased and replaced with an <code>orgN</code> ID during HTML export. At that point we
-make these <code>orgN</code> strings human-readable in <a href="#h-Use-human-readable-HTML-IDs-for-source-code-links">5.6.1</a>.
+make these <code>orgN</code> strings human-readable in <a href="#h-Use-human-readable-HTML-IDs-for-source-code-links">3.4.5.1</a>.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">UID-for-all-src-blocks</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__UID-for-all-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__UID-for-all-src-blocks">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-UID-for-all-src-blocks</span> (_backend)
@@ -1079,9 +1189,9 @@ make these <code>orgN</code> strings human-readable in <a href="#h-Use-human-rea
 </div>
 </div>
 
-<div id="outline-container-h-Automatic-captions-for-Noweb-source-code-blocks" class="outline-4">
-<h4 id="h-Automatic-captions-for-Noweb-source-code-blocks"><span class="section-number-4">5.5.2.</span> Automatic captions for Noweb source code blocks</h4>
-<div class="outline-text-4" id="text-h-Automatic-captions-for-Noweb-source-code-blocks">
+<div id="outline-container-h-Automatic-captions-for-Noweb-source-code-blocks" class="outline-5">
+<h5 id="h-Automatic-captions-for-Noweb-source-code-blocks"><span class="section-number-5">3.4.4.2.</span> Automatic captions for Noweb source code blocks</h5>
+<div class="outline-text-5" id="text-h-Automatic-captions-for-Noweb-source-code-blocks">
 <p>
 For the parent/child source code blocks, we simply build these up by having
 blocks named <code>#+name: __NREF__foo</code> or <code>#+header: :noweb-ref __NREF__foo</code>. Each
@@ -1416,12 +1526,12 @@ index starts at 0 (same as Python).
 </div>
 </div>
 
-<div id="outline-container-h-Human-readable-UIDs--Headings--aka-headlines" class="outline-4">
-<h4 id="h-Human-readable-UIDs--Headings--aka-headlines"><span class="section-number-4">5.5.3.</span> Human-readable UIDs (Headings, aka headlines)</h4>
-<div class="outline-text-4" id="text-h-Human-readable-UIDs--Headings--aka-headlines">
+<div id="outline-container-h-Human-readable-UIDs--Headings--aka-headlines" class="outline-5">
+<h5 id="h-Human-readable-UIDs--Headings--aka-headlines"><span class="section-number-5">3.4.4.3.</span> Human-readable UIDs (Headings, aka headlines)</h5>
+<div class="outline-text-5" id="text-h-Human-readable-UIDs--Headings--aka-headlines">
 <p>
 By default Org does a terrible job of naming HTML <code>id</code> fields for headings. By
-default it uses a randomly-generated number. In <a href="#h-Do-not-use-random-numbers-for-the-HTML--id--attribute">5.3.3</a> we tweak this behavior to use a deterministic,
+default it uses a randomly-generated number. In <a href="#h-Do-not-use-random-numbers-for-the-HTML--id--attribute">3.4.2.3</a> we tweak this behavior to use a deterministic,
 incrementing number starting from 0. However while this solution gets rid of the
 nondeterminism, it still results in human-unfriendly <code>id</code> attributes because
 they are all numeric (e.g. <code>org00000a1</code>, <code>org00000f3</code>, etc).
@@ -1500,14 +1610,14 @@ have a unique ID).
 </div>
 </div>
 
-<div id="outline-container-h-HTML-modifications" class="outline-3">
-<h3 id="h-HTML-modifications"><span class="section-number-3">5.6.</span> HTML modifications</h3>
-<div class="outline-text-3" id="text-h-HTML-modifications">
+<div id="outline-container-h-HTML-modifications" class="outline-4">
+<h4 id="h-HTML-modifications"><span class="section-number-4">3.4.5.</span> HTML modifications</h4>
+<div class="outline-text-4" id="text-h-HTML-modifications">
 </div>
 
-<div id="outline-container-h-Use-human-readable-HTML-IDs-for-source-code-links" class="outline-4">
-<h4 id="h-Use-human-readable-HTML-IDs-for-source-code-links"><span class="section-number-4">5.6.1.</span> Use human-readable HTML IDs for source code links</h4>
-<div class="outline-text-4" id="text-h-Use-human-readable-HTML-IDs-for-source-code-links">
+<div id="outline-container-h-Use-human-readable-HTML-IDs-for-source-code-links" class="outline-5">
+<h5 id="h-Use-human-readable-HTML-IDs-for-source-code-links"><span class="section-number-5">3.4.5.1.</span> Use human-readable HTML IDs for source code links</h5>
+<div class="outline-text-5" id="text-h-Use-human-readable-HTML-IDs-for-source-code-links">
 <p>
 Recall that there are 2 types of source code blocks: <a href="#org0000005">monoblocks</a> and <a href="#org0000007">polyblocks</a>.
 </p>
@@ -1608,9 +1718,9 @@ it because we can't refer to polyblocks anyway by name).
 </div>
 </div>
 
-<div id="outline-container-h-Pretty-source-code-captions" class="outline-4">
-<h4 id="h-Pretty-source-code-captions"><span class="section-number-4">5.6.2.</span> Pretty source code captions</h4>
-<div class="outline-text-4" id="text-h-Pretty-source-code-captions">
+<div id="outline-container-h-Pretty-source-code-captions" class="outline-5">
+<h5 id="h-Pretty-source-code-captions"><span class="section-number-5">3.4.5.2.</span> Pretty source code captions</h5>
+<div class="outline-text-5" id="text-h-Pretty-source-code-captions">
 <p>
 Here there are basically 3 things we have to keep track of:
 </p>
@@ -1831,9 +1941,9 @@ This is a helper function to parse the HTML output for a source code block.
 </div>
 </div>
 
-<div id="outline-container-h-Link-noweb-references--link-to-child-block-from-parent-block" class="outline-4">
-<h4 id="h-Link-noweb-references--link-to-child-block-from-parent-block"><span class="section-number-4">5.6.3.</span> Link noweb references (link to child block from parent block)</h4>
-<div class="outline-text-4" id="text-h-Link-noweb-references--link-to-child-block-from-parent-block">
+<div id="outline-container-h-Link-noweb-references--link-to-child-block-from-parent-block" class="outline-5">
+<h5 id="h-Link-noweb-references--link-to-child-block-from-parent-block"><span class="section-number-5">3.4.5.3.</span> Link noweb references (link to child block from parent block)</h5>
+<div class="outline-text-5" id="text-h-Link-noweb-references--link-to-child-block-from-parent-block">
 <p>
 Consider the following code:
 </p>
@@ -1904,7 +2014,7 @@ The only thing remaining is the construction of
 <code>lilac-child-HTML_ID-hash-table</code>. We can construct this by mapping through all
 source code blocks and getting the name which can be just drawn from the <code>&lt;label
 ...&gt;</code> HTML tag, thanks to the smart captions we inserted for all child blocks
-earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">5.5.2</a>.
+earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2</a>.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent"><span class="org-comment-delimiter">; </span><span class="org-comment">Define a global hash table for mapping child source block names to their HTML</span>
@@ -1999,67 +2109,14 @@ earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">5.5.2</a
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">lilac-to-multi-line</span> (s)
   (replace-regexp-in-string <span class="org-string">"&lt;&lt;&lt;LILAC_NEWLINE&gt;&gt;&gt;"</span> <span class="org-string">"\n"</span> s))
-
-<span class="lilac-child-link-from-parent"><a href="#__NREF__custom-noweb-delimiters">custom-noweb-delimiters</a></span>
-</pre></div></div>
-</div>
-</div>
-
-<div id="outline-container-h-Custom-Noweb-delimiters" class="outline-4">
-<h4 id="h-Custom-Noweb-delimiters"><span class="section-number-4">5.6.4.</span> Custom Noweb delimiters</h4>
-<div class="outline-text-4" id="text-h-Custom-Noweb-delimiters">
-<p>
-Note that we need to evaluate this lisp code if we want to run <code>C-c C-v t</code> to
-tangle code blocks properly in an interactive manner from an Emacs editing
-session.
-</p>
-
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-link-to-child-blocks-from-parent">custom-noweb-delimiters</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__custom-noweb-delimiters">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__custom-noweb-delimiters">(<span class="org-keyword">setq</span> org-babel-noweb-wrap-start <span class="org-string">"__NREF__"</span>)
-(<span class="org-keyword">setq</span> org-babel-noweb-wrap-end <span class="org-string">""</span>)
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-nref-rx</span> (match-optional-params)
-  (rx-to-string
-   (lilac-nref-rx-primitive match-optional-params)))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-nref-rx-primitive</span> (match-optional-params)
-  (<span class="org-keyword">if</span> match-optional-params
-   `(group
-           <span class="org-string">"__NREF__"</span>
-          <span class="org-comment-delimiter">;; </span><span class="org-comment">Noweb reference must start with a letter...</span>
-          (any alpha)
-          <span class="org-comment-delimiter">;; </span><span class="org-comment">...and must be followed by</span>
-          <span class="org-comment-delimiter">;; </span><span class="org-comment">letters,numbers,dashes,underscores,periods...</span>
-          (* (<span class="org-keyword">or</span> (any alnum) <span class="org-string">"-"</span> <span class="org-string">"_"</span> <span class="org-string">"."</span>))
-          <span class="org-comment-delimiter">;; </span><span class="org-comment">...and may terminate with a "(...)" where the "..." may be an empty</span>
-          <span class="org-comment-delimiter">;; </span><span class="org-comment">string, or some other argument.</span>
-          (* (<span class="org-keyword">or</span> <span class="org-string">"()"</span>
-                 (<span class="org-keyword">and</span> <span class="org-string">"("</span>
-                      (* (not <span class="org-string">")"</span>))
-                      <span class="org-string">")"</span>))))
-   `(group
-          <span class="org-string">"__NREF__"</span>
-          (any alpha)
-          (* (<span class="org-keyword">or</span> (any alnum) <span class="org-string">"-"</span> <span class="org-string">"_"</span> <span class="org-string">"."</span>)))))
-
-<span class="org-comment-delimiter">;; </span><span class="org-comment">Customize noweb delimiters. Unlike traditional &lt;&lt; and &gt;&gt; delimiters, we just</span>
-<span class="org-comment-delimiter">;; </span><span class="org-comment">use the "__NREF__" prefix as our only delimiter. This has the advantage of</span>
-<span class="org-comment-delimiter">;; </span><span class="org-comment">being encoded the same way into HTML, which makes our HTML modifications</span>
-<span class="org-comment-delimiter">;; </span><span class="org-comment">easier and more consistent across different source code languages.</span>
-<span class="org-comment-delimiter">;; </span><span class="org-comment">See https://emacs.stackexchange.com/a/73720/13006.</span>
-(<span class="org-keyword">defun</span> <span class="org-function-name">org-babel-noweb-wrap</span> (<span class="org-type">&amp;optional</span> regexp)
-  <span class="org-doc">"Return regexp matching a Noweb reference.</span>
-
-<span class="org-doc">Match any reference, or only those matching REGEXP, if non-nil.</span>
-<span class="org-doc">When matching, reference is stored in match group 1."</span>
-  (lilac-nref-rx t))
 </pre></div></div>
 </div>
 </div>
 </div>
 
-<div id="outline-container-h-JavaScript" class="outline-3">
-<h3 id="h-JavaScript"><span class="section-number-3">5.7.</span> JavaScript</h3>
-<div class="outline-text-3" id="text-h-JavaScript">
+<div id="outline-container-h-JavaScript" class="outline-4">
+<h4 id="h-JavaScript"><span class="section-number-4">3.4.6.</span> JavaScript</h4>
+<div class="outline-text-4" id="text-h-JavaScript">
 <p>
 We use JavaScript to make the HTML document more useful. The main ideas are:
 </p>
@@ -2086,9 +2143,9 @@ because we depend on it.
 </pre></div></div>
 </div>
 
-<div id="outline-container-h-Self-linked-headlines" class="outline-4">
-<h4 id="h-Self-linked-headlines"><span class="section-number-4">5.7.1.</span> Self-linked headlines</h4>
-<div class="outline-text-4" id="text-h-Self-linked-headlines">
+<div id="outline-container-h-Self-linked-headlines" class="outline-5">
+<h5 id="h-Self-linked-headlines"><span class="section-number-5">3.4.6.1.</span> Self-linked headlines</h5>
+<div class="outline-text-5" id="text-h-Self-linked-headlines">
 <p>
 Every HTML element <code>h2</code> to <code>h6</code> (which encode the Org mode headlines) already
 come with a unique ID, but they are not linked to themselves. We add the
@@ -2142,9 +2199,9 @@ the icon results in a new line break).
 </div>
 </div>
 
-<div id="outline-container-h-Table-of-contents-sidebar" class="outline-4">
-<h4 id="h-Table-of-contents-sidebar"><span class="section-number-4">5.7.2.</span> Table of contents sidebar</h4>
-<div class="outline-text-4" id="text-h-Table-of-contents-sidebar">
+<div id="outline-container-h-Table-of-contents-sidebar" class="outline-5">
+<h5 id="h-Table-of-contents-sidebar"><span class="section-number-5">3.4.6.2.</span> Table of contents sidebar</h5>
+<div class="outline-text-5" id="text-h-Table-of-contents-sidebar">
 <p>
 By default Org's HTML export gives us a "Table of Contents". We make several
 modifications to it:
@@ -2157,17 +2214,17 @@ modifications to it:
 </ol>
 </div>
 
-<div id="outline-container-h-Delete--Table-of-Contents--text" class="outline-5">
-<h5 id="h-Delete--Table-of-Contents--text"><span class="section-number-5">5.7.2.1.</span> Delete "Table of Contents" text</h5>
-<div class="outline-text-5" id="text-h-Delete--Table-of-Contents--text">
+<div id="outline-container-h-Delete--Table-of-Contents--text" class="outline-6">
+<h6 id="h-Delete--Table-of-Contents--text"><span class="section-number-6">3.4.6.2.1.</span> Delete "Table of Contents" text</h6>
+<div class="outline-text-6" id="text-h-Delete--Table-of-Contents--text">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__Makefile-weave">Makefile-replace-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-replace-toc-text">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-replace-toc-text">sed -i <span class="org-string">'s|&lt;h2&gt;Table of Contents&lt;/h2&gt;||'</span> README.html
 </pre></div></div>
 </div>
 </div>
 
-<div id="outline-container-h-Convert--Table-of-Contents--to-a-sidebar-on-the-left" class="outline-5">
-<h5 id="h-Convert--Table-of-Contents--to-a-sidebar-on-the-left"><span class="section-number-5">5.7.2.2.</span> Convert "Table of Contents" to a sidebar on the left</h5>
-<div class="outline-text-5" id="text-h-Convert--Table-of-Contents--to-a-sidebar-on-the-left">
+<div id="outline-container-h-Convert--Table-of-Contents--to-a-sidebar-on-the-left" class="outline-6">
+<h6 id="h-Convert--Table-of-Contents--to-a-sidebar-on-the-left"><span class="section-number-6">3.4.6.2.2.</span> Convert "Table of Contents" to a sidebar on the left</h6>
+<div class="outline-text-6" id="text-h-Convert--Table-of-Contents--to-a-sidebar-on-the-left">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-1"><span class="org-css-selector">#table-of-contents </span>{
     <span class="org-css-property">position</span>: fixed;
     <span class="org-css-property">top</span>: 0;
@@ -2189,9 +2246,9 @@ modifications to it:
 </div>
 </div>
 
-<div id="outline-container-h-Track-the-current-headline" class="outline-5">
-<h5 id="h-Track-the-current-headline"><span class="section-number-5">5.7.2.3.</span> Track the current headline</h5>
-<div class="outline-text-5" id="text-h-Track-the-current-headline">
+<div id="outline-container-h-Track-the-current-headline" class="outline-6">
+<h6 id="h-Track-the-current-headline"><span class="section-number-6">3.4.6.2.3.</span> Track the current headline</h6>
+<div class="outline-text-6" id="text-h-Track-the-current-headline">
 <p>
 We use some JavaScript to track the current headline when we scroll up or
 down the page, forcing it to stay in sync with the content in the main body. We
@@ -2287,9 +2344,9 @@ border makes the item jump a little bit when it's applied.
 </div>
 </div>
 
-<div id="outline-container-h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks" class="outline-3">
-<h3 id="h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks"><span class="section-number-3">5.8.</span> Autogenerate CSS for syntax highlighting of source code blocks</h3>
-<div class="outline-text-3" id="text-h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">
+<div id="outline-container-h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks" class="outline-4">
+<h4 id="h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks"><span class="section-number-4">3.4.7.</span> Autogenerate CSS for syntax highlighting of source code blocks</h4>
+<div class="outline-text-4" id="text-h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">
 <p>
 See <a href="https://emacs.stackexchange.com/questions/31439/how-to-get-colored-syntax-highlighting-of-code-blocks-in-asynchronous-org-mode-e">this</a>, specifically <a href="https://emacs.stackexchange.com/a/36759">https://emacs.stackexchange.com/a/36759</a>.
 </p>
@@ -2392,14 +2449,14 @@ So we have to use code from <a href="https://emacs.stackexchange.com/questions/3
 </div>
 </div>
 
-<div id="outline-container-h-Misc-settings" class="outline-3">
-<h3 id="h-Misc-settings"><span class="section-number-3">5.9.</span> Misc settings</h3>
-<div class="outline-text-3" id="text-h-Misc-settings">
+<div id="outline-container-h-Misc-settings" class="outline-4">
+<h4 id="h-Misc-settings"><span class="section-number-4">3.4.8.</span> Misc settings</h4>
+<div class="outline-text-4" id="text-h-Misc-settings">
 </div>
 
-<div id="outline-container-h-Use-HTML5-export--not-XML--to-un-break-MathJax" class="outline-4">
-<h4 id="h-Use-HTML5-export--not-XML--to-un-break-MathJax"><span class="section-number-4">5.9.1.</span> Use HTML5 export, not XML (to un-break MathJax)</h4>
-<div class="outline-text-4" id="text-h-Use-HTML5-export--not-XML--to-un-break-MathJax">
+<div id="outline-container-h-Use-HTML5-export--not-XML--to-un-break-MathJax" class="outline-5">
+<h5 id="h-Use-HTML5-export--not-XML--to-un-break-MathJax"><span class="section-number-5">3.4.8.1.</span> Use HTML5 export, not XML (to un-break MathJax)</h5>
+<div class="outline-text-5" id="text-h-Use-HTML5-export--not-XML--to-un-break-MathJax">
 <p>
 By default on Org 9.6, MathJax settings (JavaScript snippet) gets wrapped in a
 CDATA tag, and we run into the same problem described on this email that has
@@ -2415,14 +2472,14 @@ disappear.
 </div>
 </div>
 
-<div id="outline-container-h-Code-references" class="outline-4">
-<h4 id="h-Code-references"><span class="section-number-4">5.9.2.</span> Code references</h4>
-<div class="outline-text-4" id="text-h-Code-references">
+<div id="outline-container-h-Code-references" class="outline-5">
+<h5 id="h-Code-references"><span class="section-number-5">3.4.8.2.</span> Code references</h5>
+<div class="outline-text-5" id="text-h-Code-references">
 </div>
 
-<div id="outline-container-h-Define--CodeHighlightOn--and--CodeHighlightOff" class="outline-5">
-<h5 id="h-Define--CodeHighlightOn--and--CodeHighlightOff"><span class="section-number-5">5.9.2.1.</span> Define <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></h5>
-<div class="outline-text-5" id="text-h-Define--CodeHighlightOn--and--CodeHighlightOff">
+<div id="outline-container-h-Define--CodeHighlightOn--and--CodeHighlightOff" class="outline-6">
+<h6 id="h-Define--CodeHighlightOn--and--CodeHighlightOff"><span class="section-number-6">3.4.8.2.1.</span> Define <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></h6>
+<div class="outline-text-6" id="text-h-Define--CodeHighlightOn--and--CodeHighlightOff">
 <p>
 If we don't do this, we get an error because the "coderef" links (the links
 inside code blocks, for example <code>;ref:NSCB_NAME</code>) will still try to run the
@@ -2435,9 +2492,9 @@ setting on here injects the definitions of these functions into the HTML.
 </div>
 </div>
 
-<div id="outline-container-h-Do-not-highlight-coderefs" class="outline-5">
-<h5 id="h-Do-not-highlight-coderefs"><span class="section-number-5">5.9.2.2.</span> Do not highlight coderefs</h5>
-<div class="outline-text-5" id="text-h-Do-not-highlight-coderefs">
+<div id="outline-container-h-Do-not-highlight-coderefs" class="outline-6">
+<h6 id="h-Do-not-highlight-coderefs"><span class="section-number-6">3.4.8.2.2.</span> Do not highlight coderefs</h6>
+<div class="outline-text-6" id="text-h-Do-not-highlight-coderefs">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-coderef-disable-background-color</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-coderef-disable-background-color">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-coderef-disable-background-color"><span class="org-css-selector">.code-highlighted </span>{
     <span class="org-css-property">background-color</span>: inherit;
 }
@@ -2446,17 +2503,17 @@ setting on here injects the definitions of these functions into the HTML.
 </div>
 </div>
 
-<div id="outline-container-h-Preserve-leading-whitespace-characters-on-export" class="outline-4">
-<h4 id="h-Preserve-leading-whitespace-characters-on-export"><span class="section-number-4">5.9.3.</span> Preserve leading whitespace characters on export</h4>
-<div class="outline-text-4" id="text-h-Preserve-leading-whitespace-characters-on-export">
+<div id="outline-container-h-Preserve-leading-whitespace-characters-on-export" class="outline-5">
+<h5 id="h-Preserve-leading-whitespace-characters-on-export"><span class="section-number-5">3.4.8.3.</span> Preserve leading whitespace characters on export</h5>
+<div class="outline-text-5" id="text-h-Preserve-leading-whitespace-characters-on-export">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(3/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-3">(<span class="org-keyword">setq</span> org-src-preserve-indentation t)
 </pre></div></div>
 </div>
 </div>
 
-<div id="outline-container-h-Set-tab-width-to-4-spaces" class="outline-4">
-<h4 id="h-Set-tab-width-to-4-spaces"><span class="section-number-4">5.9.4.</span> Set tab width to 4 spaces</h4>
-<div class="outline-text-4" id="text-h-Set-tab-width-to-4-spaces">
+<div id="outline-container-h-Set-tab-width-to-4-spaces" class="outline-5">
+<h5 id="h-Set-tab-width-to-4-spaces"><span class="section-number-5">3.4.8.4.</span> Set tab width to 4 spaces</h5>
+<div class="outline-text-5" id="text-h-Set-tab-width-to-4-spaces">
 <p>
 This matters for languages that require tabs, such as Makefiles.
 </p>
@@ -2466,9 +2523,9 @@ This matters for languages that require tabs, such as Makefiles.
 </div>
 </div>
 
-<div id="outline-container-h-Disable-backups" class="outline-4">
-<h4 id="h-Disable-backups"><span class="section-number-4">5.9.5.</span> Disable backups</h4>
-<div class="outline-text-4" id="text-h-Disable-backups">
+<div id="outline-container-h-Disable-backups" class="outline-5">
+<h5 id="h-Disable-backups"><span class="section-number-5">3.4.8.5.</span> Disable backups</h5>
+<div class="outline-text-5" id="text-h-Disable-backups">
 <p>
 Disable backup files for <code>lilac.el</code> (that look like <code>lilac.el~</code>) when we invoke
 Emacs from the <a href="#Makefile">Makefile</a>.
@@ -2479,9 +2536,9 @@ Emacs from the <a href="#Makefile">Makefile</a>.
 </div>
 </div>
 
-<div id="outline-container-h-Profiling" class="outline-4">
-<h4 id="h-Profiling"><span class="section-number-4">5.9.6.</span> Profiling</h4>
-<div class="outline-text-4" id="text-h-Profiling">
+<div id="outline-container-h-Profiling" class="outline-5">
+<h5 id="h-Profiling"><span class="section-number-5">3.4.8.6.</span> Profiling</h5>
+<div class="outline-text-5" id="text-h-Profiling">
 <p>
 We don't use this very often, but it's mainly for determining cost centers for
 weaving and tangling.
@@ -2507,9 +2564,9 @@ weaving and tangling.
 </div>
 </div>
 
-<div id="outline-container-h-Imports" class="outline-3">
-<h3 id="h-Imports"><span class="section-number-3">5.10.</span> Imports</h3>
-<div class="outline-text-3" id="text-h-Imports">
+<div id="outline-container-h-Imports" class="outline-4">
+<h4 id="h-Imports"><span class="section-number-4">3.4.9.</span> Imports</h4>
+<div class="outline-text-4" id="text-h-Imports">
 <p>
 If we want syntax-highlighting to work for a code block, that code block's major
 mode (language) must be loaded in here.
@@ -2541,9 +2598,9 @@ mode (language) must be loaded in here.
 </div>
 </div>
 
-<div id="outline-container-h-Additional--hand-tweaked--CSS" class="outline-3">
-<h3 id="h-Additional--hand-tweaked--CSS"><span class="section-number-3">5.11.</span> Additional (hand-tweaked) CSS</h3>
-<div class="outline-text-3" id="text-h-Additional--hand-tweaked--CSS">
+<div id="outline-container-h-Additional--hand-tweaked--CSS" class="outline-4">
+<h4 id="h-Additional--hand-tweaked--CSS"><span class="section-number-4">3.4.10.</span> Additional (hand-tweaked) CSS</h4>
+<div class="outline-text-4" id="text-h-Additional--hand-tweaked--CSS">
 <p>
 We add some additional CSS tweaks on top of what we get from Org.
 </p>
@@ -2560,9 +2617,9 @@ We add some additional CSS tweaks on top of what we get from Org.
 </pre></div></div>
 </div>
 
-<div id="outline-container-h-General-body-text" class="outline-4">
-<h4 id="h-General-body-text"><span class="section-number-4">5.11.1.</span> General body text</h4>
-<div class="outline-text-4" id="text-h-General-body-text">
+<div id="outline-container-h-General-body-text" class="outline-5">
+<h5 id="h-General-body-text"><span class="section-number-5">3.4.10.1.</span> General body text</h5>
+<div class="outline-text-5" id="text-h-General-body-text">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(1/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-1"><span class="org-css-selector">body </span>{
     <span class="org-css-property">font-size</span>: 1.25em;
     <span class="org-css-property">width</span>: 800px;
@@ -2595,9 +2652,9 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 </div>
 
-<div id="outline-container-h-Headline-font-sizes" class="outline-4">
-<h4 id="h-Headline-font-sizes"><span class="section-number-4">5.11.2.</span> Headline font sizes</h4>
-<div class="outline-text-4" id="text-h-Headline-font-sizes">
+<div id="outline-container-h-Headline-font-sizes" class="outline-5">
+<h5 id="h-Headline-font-sizes"><span class="section-number-5">3.4.10.2.</span> Headline font sizes</h5>
+<div class="outline-text-5" id="text-h-Headline-font-sizes">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-headline-font-size</a></span>(1/1) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-headline-font-size">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-headline-font-size"><span class="org-css-selector">h1 </span>{
     <span class="org-css-property">font-size</span>: 3em;
 }
@@ -2625,9 +2682,9 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 </div>
 
-<div id="outline-container-h-Tables" class="outline-4">
-<h4 id="h-Tables"><span class="section-number-4">5.11.3.</span> Tables</h4>
-<div class="outline-text-4" id="text-h-Tables">
+<div id="outline-container-h-Tables" class="outline-5">
+<h5 id="h-Tables"><span class="section-number-5">3.4.10.3.</span> Tables</h5>
+<div class="outline-text-5" id="text-h-Tables">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(2/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-2"><span class="org-css-selector">table </span>{
     <span class="org-css-property">margin</span>: 1em auto 0em auto;
     <span class="org-css-property">border-spacing</span>: 0;
@@ -2657,9 +2714,9 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 </div>
 
-<div id="outline-container-h-Images" class="outline-4">
-<h4 id="h-Images"><span class="section-number-4">5.11.4.</span> Images</h4>
-<div class="outline-text-4" id="text-h-Images">
+<div id="outline-container-h-Images" class="outline-5">
+<h5 id="h-Images"><span class="section-number-5">3.4.10.4.</span> Images</h5>
+<div class="outline-text-5" id="text-h-Images">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(3/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-3"><span class="org-css-selector">img </span>{
     <span class="org-css-property">display</span>: block;
     <span class="org-css-property">margin</span>: 0 auto;
@@ -2668,9 +2725,9 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 </div>
 
-<div id="outline-container-h-Monospaced" class="outline-4">
-<h4 id="h-Monospaced"><span class="section-number-4">5.11.5.</span> Monospaced</h4>
-<div class="outline-text-4" id="text-h-Monospaced">
+<div id="outline-container-h-Monospaced" class="outline-5">
+<h5 id="h-Monospaced"><span class="section-number-5">3.4.10.5.</span> Monospaced</h5>
+<div class="outline-text-5" id="text-h-Monospaced">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(4/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-4">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-4"><span class="org-css-selector">code </span>{
     <span class="org-css-property">background</span>: <span class="custom-1">#eee</span>;
     <span class="org-css-property">padding-left</span>: 5px;
@@ -2693,9 +2750,9 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 </div>
 
-<div id="outline-container-h-Links" class="outline-4">
-<h4 id="h-Links"><span class="section-number-4">5.11.6.</span> Links</h4>
-<div class="outline-text-4" id="text-h-Links">
+<div id="outline-container-h-Links" class="outline-5">
+<h5 id="h-Links"><span class="section-number-5">3.4.10.6.</span> Links</h5>
+<div class="outline-text-5" id="text-h-Links">
 <p>
 Force all links to have a blue color. This is mainly to override whatever Org
 gives us by default.
@@ -2708,9 +2765,9 @@ gives us by default.
 </div>
 </div>
 
-<div id="outline-container-h-Source-code-block-body" class="outline-4">
-<h4 id="h-Source-code-block-body"><span class="section-number-4">5.11.7.</span> Source code block body</h4>
-<div class="outline-text-4" id="text-h-Source-code-block-body">
+<div id="outline-container-h-Source-code-block-body" class="outline-5">
+<h5 id="h-Source-code-block-body"><span class="section-number-5">3.4.10.7.</span> Source code block body</h5>
+<div class="outline-text-5" id="text-h-Source-code-block-body">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-body</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-body">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-body"><span class="org-css-selector">.org-src-container </span>{
     <span class="org-css-property">padding-top</span>: 1em;
 }
@@ -2735,9 +2792,9 @@ gives us by default.
 </div>
 </div>
 
-<div id="outline-container-h-Source-code-block-captions" class="outline-4">
-<h4 id="h-Source-code-block-captions"><span class="section-number-4">5.11.8.</span> Source code block captions</h4>
-<div class="outline-text-4" id="text-h-Source-code-block-captions">
+<div id="outline-container-h-Source-code-block-captions" class="outline-5">
+<h5 id="h-Source-code-block-captions"><span class="section-number-5">3.4.10.8.</span> Source code block captions</h5>
+<div class="outline-text-5" id="text-h-Source-code-block-captions">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-captions"><span class="org-css-selector">.lilac-caption </span>{
     <span class="org-css-property">font-family</span>: <span class="org-string">"Source Code Pro"</span>, monospace;
     <span class="org-css-property">text-align</span>: right;
@@ -2808,9 +2865,9 @@ gives us by default.
 </div>
 </div>
 
-<div id="outline-container-h-Links-to-child-source-block-from-parent" class="outline-4">
-<h4 id="h-Links-to-child-source-block-from-parent"><span class="section-number-4">5.11.9.</span> Links to child source block from parent</h4>
-<div class="outline-text-4" id="text-h-Links-to-child-source-block-from-parent">
+<div id="outline-container-h-Links-to-child-source-block-from-parent" class="outline-5">
+<h5 id="h-Links-to-child-source-block-from-parent"><span class="section-number-5">3.4.10.9.</span> Links to child source block from parent</h5>
+<div class="outline-text-5" id="text-h-Links-to-child-source-block-from-parent">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-child-link-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-child-link-from-parent">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-child-link-from-parent"><span class="org-css-selector">.lilac-child-link-from-parent </span>{
     <span class="org-css-property">font-weight</span>: bold;
 }
@@ -2834,9 +2891,9 @@ gives us by default.
 </div>
 </div>
 
-<div id="outline-container-h-Sidenotes" class="outline-4">
-<h4 id="h-Sidenotes"><span class="section-number-4">5.11.10.</span> Sidenotes</h4>
-<div class="outline-text-4" id="text-h-Sidenotes">
+<div id="outline-container-h-Sidenotes" class="outline-5">
+<h5 id="h-Sidenotes"><span class="section-number-5">3.4.10.10.</span> Sidenotes</h5>
+<div class="outline-text-5" id="text-h-Sidenotes">
 <p>
 Sidenotes are small blurbs of text that are displayed "out-of-band", on the
 right margin. This right margin is good for presenting smaller ideas that
@@ -2880,9 +2937,9 @@ The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-usi
 </div>
 </div>
 
-<div id="outline-container-h-Create--lilac-theme--file" class="outline-3">
-<h3 id="h-Create--lilac-theme--file"><span class="section-number-3">5.12.</span> Create <code>lilac.theme</code> file</h3>
-<div class="outline-text-3" id="text-h-Create--lilac-theme--file">
+<div id="outline-container-h-Create--lilac-theme--file" class="outline-4">
+<h4 id="h-Create--lilac-theme--file"><span class="section-number-4">3.4.11.</span> Create <code>lilac.theme</code> file</h4>
+<div class="outline-text-4" id="text-h-Create--lilac-theme--file">
 <p>
 Allow HTML exports of Org files (inluding this one) to pull in CSS and
 JavaScript that we've defined for Lilac by referring to a single theme file. The
@@ -2899,9 +2956,9 @@ inspiration for this setup comes from <a href="https://gitlab.com/OlMon/org-them
 </div>
 </div>
 
-<div id="outline-container-h-Ignore-woven-HTML-from--git-diff" class="outline-3">
-<h3 id="h-Ignore-woven-HTML-from--git-diff"><span class="section-number-3">5.13.</span> Ignore woven HTML from <code>git diff</code></h3>
-<div class="outline-text-3" id="text-h-Ignore-woven-HTML-from--git-diff">
+<div id="outline-container-h-Ignore-woven-HTML-from--git-diff" class="outline-4">
+<h4 id="h-Ignore-woven-HTML-from--git-diff"><span class="section-number-4">3.4.12.</span> Ignore woven HTML from <code>git diff</code></h4>
+<div class="outline-text-4" id="text-h-Ignore-woven-HTML-from--git-diff">
 <p>
 Typically we only need to look at the rendered HTML output in a web browser as
 the raw HTML diff output is extremely difficult to parse as a human. So by
@@ -2921,9 +2978,9 @@ In order to still show the HTML textual diff, we can run <code>git diff --text</
 </p>
 </div>
 
-<div id="outline-container-h-git-add--p" class="outline-4">
-<h4 id="h-git-add--p"><span class="section-number-4">5.13.1.</span> <code>git add -p</code></h4>
-<div class="outline-text-4" id="text-h-git-add--p">
+<div id="outline-container-h-git-add--p" class="outline-5">
+<h5 id="h-git-add--p"><span class="section-number-5">3.4.12.1.</span> <code>git add -p</code></h5>
+<div class="outline-text-5" id="text-h-git-add--p">
 <p>
 Note that the above setting to treat HTML files as binary data prevents them
 from being considered for <code>git add -p</code>. In order to add them, use <code>git add -u</code>
@@ -2933,9 +2990,9 @@ instead.
 </div>
 </div>
 
-<div id="outline-container-h-gitignore" class="outline-3">
-<h3 id="h-gitignore"><span class="section-number-3">5.14.</span> gitignore</h3>
-<div class="outline-text-3" id="text-h-gitignore">
+<div id="outline-container-h-gitignore" class="outline-4">
+<h4 id="h-gitignore"><span class="section-number-4">3.4.13.</span> gitignore</h4>
+<div class="outline-text-4" id="text-h-gitignore">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">.gitignore</label><span class="lilac-caption-link-symbol"><a href="#gitignore">&#x1f517;</a></span></div><pre class="src src-gitignore" id="gitignore">**/*.auctex-auto
 tangle
 update-deps
@@ -2945,58 +3002,9 @@ weave
 </div>
 </div>
 
-<div id="outline-container-h-Tangling--generating-the-source-code" class="outline-2">
-<h2 id="h-Tangling--generating-the-source-code"><span class="section-number-2">6.</span> Tangling (generating the source code)</h2>
-<div class="outline-text-2" id="text-h-Tangling--generating-the-source-code">
-<p>
-Tangling is simply the act of collecting the <code>#+begin_src ... #+end_src</code> blocks
-and arranging them into the various target (source code) files. Every source
-code block is given a unique name.
-</p>
-
-<p>
-We simply tangle the <code>README.org</code> file (this file) to get all the code we need.
-</p>
-</div>
-</div>
-
-<div id="outline-container-h-Development-environment--Nix-shell" class="outline-2">
-<h2 id="h-Development-environment--Nix-shell"><span class="section-number-2">7.</span> Development environment (Nix shell)</h2>
-<div class="outline-text-2" id="text-h-Development-environment--Nix-shell">
-<p>
-This is the main development shell and brings in all of our dependencies to
-build all of our code. Taken from <a href="https://github.com/tweag/haskell-stack-nix-example/blob/b9383e35416a2b0e21fbc97ed079538f9f395b6a/shell.nix#L1">here</a>. The <code>Makefile</code> is meant to be executed
-from within this environment.
-</p>
-
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">shell.nix</label><span class="lilac-caption-link-symbol"><a href="#shell-nix">&#x1f517;</a></span></div><pre class="src src-nix" id="shell-nix"><span class="org-nix-keyword">let</span>
-  <span class="org-comment"># Nixpkgs snapshot.</span>
-  <span class="org-nix-attribute">sources</span> = <span class="org-nix-builtin">import</span> <span class="org-nix-constant">./package/nix/sources.nix</span>;
-  <span class="org-comment"># The final "pkgs" attribute.</span>
-  <span class="org-nix-attribute">pkgs</span> = <span class="org-nix-builtin">import</span> sources.nixpkgs {};
-<span class="org-nix-keyword">in</span>
-
-<span class="org-comment-delimiter"># </span><span class="org-comment">This is our development shell.</span>
-pkgs.mkShell ({
-  <span class="org-nix-attribute">buildInputs</span> = [
-    <span class="org-comment"># Tangling and weaving for Literate Programming.</span>
-    pkgs.emacs
-
-    <span class="org-comment"># Update Nix dependencies in package/nix/sources.nix.</span>
-    pkgs.niv
-
-    <span class="org-comment"># Misc.</span>
-    pkgs.git
-    pkgs.less
-  ];
-})
-</pre></div></div>
-</div>
-</div>
-
-<div id="outline-container-h-Tests" class="outline-2">
-<h2 id="h-Tests"><span class="section-number-2">8.</span> Tests</h2>
-<div class="outline-text-2" id="text-h-Tests">
+<div id="outline-container-h-Tests" class="outline-3">
+<h3 id="h-Tests"><span class="section-number-3">3.5.</span> Tests</h3>
+<div class="outline-text-3" id="text-h-Tests">
 <p>
 We use <a href="https://www.gnu.org/software/emacs/manual/ert.html">ERT, the Emacs Lisp Regression Testing tool</a> for our unit tests. Pure
 functions that take all of their inputs explicitly ("dependency-injected") are
@@ -3023,9 +3031,9 @@ functions are available), so we turn it on here by calling <code>(org-mode)</cod
 </pre></div></div>
 </div>
 
-<div id="outline-container-h-Test-helpers" class="outline-3">
-<h3 id="h-Test-helpers"><span class="section-number-3">8.1.</span> Test helpers</h3>
-<div class="outline-text-3" id="text-h-Test-helpers">
+<div id="outline-container-h-Test-helpers" class="outline-4">
+<h4 id="h-Test-helpers"><span class="section-number-4">3.5.1.</span> Test helpers</h4>
+<div class="outline-text-4" id="text-h-Test-helpers">
 <p>
 Note that we cannot write <code>__NREF__foo</code> directly in the test code here, because
 when this Org file is tangled, the references will be detected and Org mode will
@@ -3039,9 +3047,9 @@ prefix indirectly with the <code>(nref)</code> helper function.
 </div>
 </div>
 
-<div id="outline-container-h-Smart-source-code-block-caption-helpers" class="outline-3">
-<h3 id="h-Smart-source-code-block-caption-helpers"><span class="section-number-3">8.2.</span> Smart source code block caption helpers</h3>
-<div class="outline-text-3" id="text-h-Smart-source-code-block-caption-helpers">
+<div id="outline-container-h-Smart-source-code-block-caption-helpers" class="outline-4">
+<h4 id="h-Smart-source-code-block-caption-helpers"><span class="section-number-4">3.5.2.</span> Smart source code block caption helpers</h4>
+<div class="outline-text-4" id="text-h-Smart-source-code-block-caption-helpers">
 <p>
 <code>lilac-get-noweb-children</code> should return a list of Noweb references (child block
 names) found in a source code block.
@@ -3348,9 +3356,10 @@ Here we test the construction of smart captions.
 </div>
 </div>
 </div>
+</div>
 
 <div id="outline-container-h-Glossary" class="outline-2">
-<h2 id="h-Glossary"><span class="section-number-2">9.</span> Glossary</h2>
+<h2 id="h-Glossary"><span class="section-number-2">4.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
 <dt><a id="org0000005"></a> <b>monoblock</b></dt><dd>an Org mode source code block with a <code>#+name:
@@ -3380,7 +3389,7 @@ multiline piece of text with <code>#+begin_src ...</code> and <code>#+end_src</c
 </div>
 
 <div id="outline-container-h-References" class="outline-2">
-<h2 id="h-References"><span class="section-number-2">10.</span> References</h2>
+<h2 id="h-References"><span class="section-number-2">5.</span> References</h2>
 <div class="outline-text-2" id="text-h-References">
 <style>.csl-left-margin{float: left; padding-right: 1em;}
  .csl-right-inline{margin: 0 0 0 2em;}</style><div class="csl-bib-body">

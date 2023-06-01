@@ -112,35 +112,64 @@ with class 'color and highest min-color value."
 (advice-add 'face-attribute :override #'my-face-attribute)
 (defun lilac-publish ()
   (interactive)
-  (lilac-publish-1)
+  (setq org-html-htmlize-output-type 'css)
+  (setq org-export-before-parsing-hook
+   '(lilac-UID-for-all-src-blocks
+     lilac-insert-noweb-source-code-block-captions
+     lilac-UID-for-all-headlines))
+
+  (setq org-export-filter-src-block-functions
+   '(lilac-populate-child-HTML_ID-hash-table
+     lilac-populate-org_id-human_id-hash-table))
+  (org-html-export-to-html)
+
   (clrhash lilac-polyblock-names-totals)
-  (lilac-publish-2))
 
-(defun lilac-publish-1 ()
-  (let (
-        (org-export-before-parsing-hook
-         '(lilac-UID-for-all-src-blocks
-           lilac-insert-noweb-source-code-block-captions
-           lilac-UID-for-all-headlines))
-        (org-export-filter-src-block-functions
-         '(lilac-populate-child-HTML_ID-hash-table
-           lilac-populate-org_id-human_id-hash-table))
-        (org-html-htmlize-output-type 'css))
-    (org-html-export-to-html)))
+  (setq org-export-filter-src-block-functions
+   '(lilac-link-to-children-from-parent-body
+     lilac-prettify-source-code-captions))
+  (setq org-export-filter-final-output-functions
+   '(lilac-replace-org_ids-with-human_ids))
+  (org-html-export-to-html))
 
-(defun lilac-publish-2 ()
-  (let (
-        (org-export-before-parsing-hook
-         '(lilac-UID-for-all-src-blocks
-           lilac-insert-noweb-source-code-block-captions
-           lilac-UID-for-all-headlines))
-        (org-export-filter-src-block-functions
-         '(lilac-link-to-children-from-parent-body
-           lilac-prettify-source-code-captions))
-        (org-export-filter-final-output-functions
-         '(lilac-replace-org_ids-with-human_ids))
-        (org-html-htmlize-output-type 'css))
-    (org-html-export-to-html)))
+(setq org-babel-noweb-wrap-start "__NREF__")
+(setq org-babel-noweb-wrap-end "")
+
+(defun lilac-nref-rx (match-optional-params)
+  (rx-to-string
+   (lilac-nref-rx-primitive match-optional-params)))
+
+(defun lilac-nref-rx-primitive (match-optional-params)
+  (if match-optional-params
+   `(group
+           "__NREF__"
+          ;; Noweb reference must start with a letter...
+          (any alpha)
+          ;; ...and must be followed by
+          ;; letters,numbers,dashes,underscores,periods...
+          (* (or (any alnum) "-" "_" "."))
+          ;; ...and may terminate with a "(...)" where the "..." may be an empty
+          ;; string, or some other argument.
+          (* (or "()"
+                 (and "("
+                      (* (not ")"))
+                      ")"))))
+   `(group
+          "__NREF__"
+          (any alpha)
+          (* (or (any alnum) "-" "_" ".")))))
+
+;; Customize noweb delimiters. Unlike traditional << and >> delimiters, we just
+;; use the "__NREF__" prefix as our only delimiter. This has the advantage of
+;; being encoded the same way into HTML, which makes our HTML modifications
+;; easier and more consistent across different source code languages.
+;; See https://emacs.stackexchange.com/a/73720/13006.
+(defun org-babel-noweb-wrap (&optional regexp)
+  "Return regexp matching a Noweb reference.
+
+Match any reference, or only those matching REGEXP, if non-nil.
+When matching, reference is stored in match group 1."
+  (lilac-nref-rx t))
 
 ;; Modify Org buffer
 (defun lilac-UID-for-all-src-blocks (_backend)
@@ -419,45 +448,6 @@ with class 'color and highest min-color value."
 
 (defun lilac-to-multi-line (s)
   (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
-
-(setq org-babel-noweb-wrap-start "__NREF__")
-(setq org-babel-noweb-wrap-end "")
-
-(defun lilac-nref-rx (match-optional-params)
-  (rx-to-string
-   (lilac-nref-rx-primitive match-optional-params)))
-
-(defun lilac-nref-rx-primitive (match-optional-params)
-  (if match-optional-params
-   `(group
-           "__NREF__"
-          ;; Noweb reference must start with a letter...
-          (any alpha)
-          ;; ...and must be followed by
-          ;; letters,numbers,dashes,underscores,periods...
-          (* (or (any alnum) "-" "_" "."))
-          ;; ...and may terminate with a "(...)" where the "..." may be an empty
-          ;; string, or some other argument.
-          (* (or "()"
-                 (and "("
-                      (* (not ")"))
-                      ")"))))
-   `(group
-          "__NREF__"
-          (any alpha)
-          (* (or (any alnum) "-" "_" ".")))))
-
-;; Customize noweb delimiters. Unlike traditional << and >> delimiters, we just
-;; use the "__NREF__" prefix as our only delimiter. This has the advantage of
-;; being encoded the same way into HTML, which makes our HTML modifications
-;; easier and more consistent across different source code languages.
-;; See https://emacs.stackexchange.com/a/73720/13006.
-(defun org-babel-noweb-wrap (&optional regexp)
-  "Return regexp matching a Noweb reference.
-
-Match any reference, or only those matching REGEXP, if non-nil.
-When matching, reference is stored in match group 1."
-  (lilac-nref-rx t))
 (setq lilac-polyblock-names (make-hash-table :test 'equal))
 (setq lilac-polyblock-names-totals (make-hash-table :test 'equal))
 
