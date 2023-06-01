@@ -9,11 +9,15 @@ $(function() {
 });
 function scrollIntoViewIfNeeded(target) {
     if (target.getBoundingClientRect().bottom > window.innerHeight) {
-        target.scrollIntoView(false);
+        target.scrollIntoView({ behavior: "smooth",
+                                block: "end",
+                                inline: "nearest" });
     }
 
     if (target.getBoundingClientRect().top < 0) {
-        target.scrollIntoView();
+        target.scrollIntoView({ behavior: "smooth",
+                                block: "start",
+                                inline: "nearest" });
     }
 }
 

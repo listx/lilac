@@ -1686,11 +1686,15 @@ too heavy and opinionated.
 #+begin_src js
 function scrollIntoViewIfNeeded(target) {
     if (target.getBoundingClientRect().bottom > window.innerHeight) {
-        target.scrollIntoView(false);
+        target.scrollIntoView({ behavior: "smooth",
+                                block: "end",
+                                inline: "nearest" });
     }
 
     if (target.getBoundingClientRect().top < 0) {
-        target.scrollIntoView();
+        target.scrollIntoView({ behavior: "smooth",
+                                block: "start",
+                                inline: "nearest" });
     }
 }
 
@@ -1748,7 +1752,7 @@ border makes the item jump a little bit when it's applied.
 #+begin_src css
 #table-of-contents a {
     display: block;
-    transition: all 50ms ease-in-out;
+    transition: all 300ms ease-in-out;
     padding: 5px;
     border-radius: 4px;
     border-style: solid;

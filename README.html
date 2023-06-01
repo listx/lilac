@@ -2199,11 +2199,15 @@ too heavy and opinionated.
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-js">js-toc-scrollspy</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__js-toc-scrollspy">&#x1f517;</a></span></div><pre class="src src-js" id="__NREF__js-toc-scrollspy"><span class="org-keyword">function</span> <span class="org-function-name">scrollIntoViewIfNeeded</span>(<span class="org-variable-name">target</span>) {
     <span class="org-keyword">if</span> (target.getBoundingClientRect().bottom &gt; window.innerHeight) {
-        target.scrollIntoView(<span class="org-constant">false</span>);
+        target.scrollIntoView({ behavior: <span class="org-string">"smooth"</span>,
+                                block: <span class="org-string">"end"</span>,
+                                inline: <span class="org-string">"nearest"</span> });
     }
 
     <span class="org-keyword">if</span> (target.getBoundingClientRect().top &lt; 0) {
-        target.scrollIntoView();
+        target.scrollIntoView({ behavior: <span class="org-string">"smooth"</span>,
+                                block: <span class="org-string">"start"</span>,
+                                inline: <span class="org-string">"nearest"</span> });
     }
 }
 
@@ -2259,7 +2263,7 @@ border makes the item jump a little bit when it's applied.
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-2"><span class="org-css-selector">#table-of-contents a </span>{
     <span class="org-css-property">display</span>: block;
-    <span class="org-css-property">transition</span>: all 50ms ease-in-out;
+    <span class="org-css-property">transition</span>: all 300ms ease-in-out;
     <span class="org-css-property">padding</span>: 5px;
     <span class="org-css-property">border-radius</span>: 4px;
     <span class="org-css-property">border-style</span>: solid;
