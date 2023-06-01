@@ -414,7 +414,7 @@ Note that we need to evaluate this lisp code if we want to run ~C-c C-v t~ to
 tangle code blocks properly in an interactive manner from an Emacs editing
 session.
 
-#+name: __NREF__custom-noweb-delimiters
+#+name: __NREF__lilac_dot_el-custom-noweb-delimiters
 #+begin_src emacs-lisp :noweb no
 (setq org-babel-noweb-wrap-start "__NREF__")
 (setq org-babel-noweb-wrap-end "")
@@ -495,8 +495,9 @@ we invoke =emacs= from the command line in a non-interactive manner.
 (setq gc-cons-threshold #x400000000)
 __NREF__lilac_dot_el-imports
 __NREF__lilac_dot_el-fix-nondeterminism
-__NREF__lilac_dot_el-autogenerate-css
+__NREF__lilac_dot_el-custom-noweb-delimiters
 __NREF__lilac_dot_el-lilac-publish
+__NREF__lilac_dot_el-autogenerate-css
 __NREF__lilac_dot_el-misc
 (provide 'lilac)
 #+end_src
@@ -574,8 +575,6 @@ named =__NREF__...= get an automatic =#+caption: ...= text to go along with it
 
   __NREF__lilac-publish-modify-HTML-2
   (org-html-export-to-html))
-
-__NREF__custom-noweb-delimiters
 
 ;; Modify Org buffer
 __NREF__UID-for-all-src-blocks
