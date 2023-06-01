@@ -191,10 +191,10 @@
   .org-svg { }
 </style>
 <link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
-<link rel="stylesheet" type="text/css" href="style.css" />
+<link rel="stylesheet" type="text/css" href="lilac.css" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro&family=Source+Code+Pro">
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-<script src="misc.js"></script>
+<script src="lilac.js"></script>
 <script>
 // @license magnet:?xt=urn:btih:1f739d935676111cfff4b4693e3816e664797050&amp;dn=gpl-3.0.txt GPL-v3-or-Later
      function CodeHighlightOn(elem, id)
@@ -277,23 +277,34 @@
 <li><a href="#h-Custom-Noweb-delimiters">5.6.4. Custom Noweb delimiters</a></li>
 </ul>
 </li>
-<li><a href="#h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">5.7. Autogenerate CSS for syntax highlighting of source code blocks</a></li>
-<li><a href="#h-Misc-settings">5.8. Misc settings</a>
+<li><a href="#h-JavaScript">5.7. JavaScript</a>
 <ul>
-<li><a href="#h-Use-HTML5-export--not-XML--to-un-break-MathJax">5.8.1. Use HTML5 export, not XML (to un-break MathJax)</a></li>
-<li><a href="#h-Code-references">5.8.2. Code references</a>
+<li><a href="#h-Self-linked-headlines">5.7.1. Self-linked headlines</a></li>
+<li><a href="#h-Table-of-contents-sidebar">5.7.2. Table of contents sidebar</a>
 <ul>
-<li><a href="#h-Define--CodeHighlightOn--and--CodeHighlightOff">5.8.2.1. Define <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></a></li>
-<li><a href="#h-Do-not-highlight-coderefs">5.8.2.2. Do not highlight coderefs</a></li>
+<li><a href="#h-Delete--Table-of-Contents--text">5.7.2.1. Delete "Table of Contents" text</a></li>
+<li><a href="#h-Convert--Table-of-Contents--to-a-sidebar-on-the-left">5.7.2.2. Convert "Table of Contents" to a sidebar on the left</a></li>
+<li><a href="#h-Track-the-current-headline">5.7.2.3. Track the current headline</a></li>
 </ul>
 </li>
-<li><a href="#h-Preserve-leading-whitespace-characters-on-export">5.8.3. Preserve leading whitespace characters on export</a></li>
-<li><a href="#h-Set-tab-width-to-4-spaces">5.8.4. Set tab width to 4 spaces</a></li>
-<li><a href="#h-Disable-backups">5.8.5. Disable backups</a></li>
-<li><a href="#h-Profiling">5.8.6. Profiling</a></li>
 </ul>
 </li>
-<li><a href="#h-Automatically-link-headlines--h2-to-h6">5.9. Automatically link headlines (h2 to h6)</a></li>
+<li><a href="#h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">5.8. Autogenerate CSS for syntax highlighting of source code blocks</a></li>
+<li><a href="#h-Misc-settings">5.9. Misc settings</a>
+<ul>
+<li><a href="#h-Use-HTML5-export--not-XML--to-un-break-MathJax">5.9.1. Use HTML5 export, not XML (to un-break MathJax)</a></li>
+<li><a href="#h-Code-references">5.9.2. Code references</a>
+<ul>
+<li><a href="#h-Define--CodeHighlightOn--and--CodeHighlightOff">5.9.2.1. Define <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></a></li>
+<li><a href="#h-Do-not-highlight-coderefs">5.9.2.2. Do not highlight coderefs</a></li>
+</ul>
+</li>
+<li><a href="#h-Preserve-leading-whitespace-characters-on-export">5.9.3. Preserve leading whitespace characters on export</a></li>
+<li><a href="#h-Set-tab-width-to-4-spaces">5.9.4. Set tab width to 4 spaces</a></li>
+<li><a href="#h-Disable-backups">5.9.5. Disable backups</a></li>
+<li><a href="#h-Profiling">5.9.6. Profiling</a></li>
+</ul>
+</li>
 <li><a href="#h-Imports">5.10. Imports</a></li>
 <li><a href="#h-Additional--hand-tweaked--CSS">5.11. Additional (hand-tweaked) CSS</a>
 <ul>
@@ -306,7 +317,6 @@
 <li><a href="#h-Source-code-block-captions">5.11.7. Source code block captions</a></li>
 <li><a href="#h-Links-to-child-source-block-from-parent">5.11.8. Links to child source block from parent</a></li>
 <li><a href="#h-Sidenotes">5.11.9. Sidenotes</a></li>
-<li><a href="#h-Table-of-contents">5.11.10. Table of contents</a></li>
 </ul>
 </li>
 <li><a href="#h-Create--lilac-theme--file">5.12. Create <code>lilac.theme</code> file</a></li>
@@ -351,8 +361,8 @@ Noweb-style <a href="#citeproc_bib_item_1">[1]</a> references easy. It comes in 
 <li><code>lilac.el</code>: to be loaded and used when <i>weaving</i> <a href="#citeproc_bib_item_2">[2, p. 98]</a> and
 <i>tangling</i> <a href="#citeproc_bib_item_2">[2, p. 98]</a> from your own Org mode files (which use
 Noweb references), and</li>
-<li><code>lilac.theme</code>: to be sourced by your Org mode files to use Lilac's customized
-HTML export.</li>
+<li><code>lilac.theme</code>: to be sourced by your Org mode files to use Lilac's CSS and
+JavaScript on top of the HTML export.</li>
 </ol>
 
 <p>
@@ -746,14 +756,14 @@ Lastly we make use of the fake file <code>tangle</code>, so that we can write th
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#Makefile">Makefile-tangle</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-tangle">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-tangle"><span class="org-comment-delimiter"># </span><span class="org-comment">tangled_output are all files that are generated by tangling README.org.</span>
 <span class="org-variable-name">tangled_output</span> = \
     citations.bib \
+    lilac.css \
     lilac.el \
+    lilac.js \
     lilac.theme \
     .gitattributes \
     .gitignore \
     Makefile \
-    misc.js \
     shell.nix \
-    style.css \
     syntax-highlighting.css
 
 <span class="org-makefile-targets">tangle $(</span><span class="org-variable-name"><span class="org-makefile-targets">tangled_output</span></span><span class="org-makefile-targets">) &amp;</span>: README.org
@@ -2046,8 +2056,223 @@ session.
 </div>
 </div>
 
+<div id="outline-container-h-JavaScript" class="outline-3">
+<h3 id="h-JavaScript"><span class="section-number-3">5.7.</span> JavaScript</h3>
+<div class="outline-text-3" id="text-h-JavaScript">
+<p>
+We use JavaScript to make the HTML document more useful. The main ideas are:
+</p>
+
+<ol class="org-ol">
+<li><a href="#h-Self-linked-headlines">self-linked headlines</a>, and</li>
+<li>current heading tracking in the left sidebar (effectively a Table of
+Contents).</li>
+</ol>
+
+<p>
+These are included in <code>lilac.js</code>, as below.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.js</label><span class="lilac-caption-link-symbol"><a href="#lilac-js">&#x1f517;</a></span></div><pre class="src src-js" id="lilac-js"><span class="lilac-child-link-from-parent"><a href="#__NREF__js-automatically-link-headlines">js-automatically-link-headlines</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__js-toc-scrollspy">js-toc-scrollspy</a></span>
+</pre></div></div><p>
+In the<a href="#h-Create--lilac-theme--file"><code>lilac.theme</code></a> file, we include <code>lilac.js</code> and also jQuery
+because we depend on it.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-theme">lilac-theme-js</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-theme-js">&#x1f517;</a></span></div><pre class="src src-org" id="__NREF__lilac-theme-js"><span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="<a href="https://code.jquery.com/jquery-3.6.4.min.js">https://code.jquery.com/jquery-3.6.4.min.js</a>"&gt;&lt;/script&gt;</span>
+<span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="lilac.js"&gt;&lt;/script&gt;</span>
+</pre></div></div>
+</div>
+
+<div id="outline-container-h-Self-linked-headlines" class="outline-4">
+<h4 id="h-Self-linked-headlines"><span class="section-number-4">5.7.1.</span> Self-linked headlines</h4>
+<div class="outline-text-4" id="text-h-Self-linked-headlines">
+<p>
+Every HTML element <code>h2</code> to <code>h6</code> (which encode the Org mode headlines) already
+come with a unique ID, but they are not linked to themselves. We add the
+self-links here, which makes it easy for users to link to them directly when
+they're reading the page.
+</p>
+
+<p>
+The JavaScript below is taken from <a href="https://github.com/listx/listx_blog/blame/8e6e7b533d89f77a6939e5eda9fd9d990d25a7a9/misc.js#L1">here</a>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-js">js-automatically-link-headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__js-automatically-link-headlines">&#x1f517;</a></span></div><pre class="src src-js" id="__NREF__js-automatically-link-headlines">$(<span class="org-keyword">function</span>() {
+    $(<span class="org-string">"h2,h3,h4,h5,h6"</span>).each(<span class="org-keyword">function</span>() {
+        <span class="org-keyword">var</span> <span class="org-variable-name">$this</span> = $(<span class="org-constant">this</span>);
+        <span class="org-keyword">var</span> <span class="org-variable-name">href</span> = $this.attr(<span class="org-string">"id"</span>);
+        $this.wrapInner(
+            $(<span class="org-string">"&lt;a/&gt;"</span>).attr(<span class="org-string">"href"</span>, <span class="org-string">"#"</span> + href)
+                     .addClass(<span class="org-string">"section-heading"</span>));
+    });
+});
+</pre></div></div><p>
+Linkifying itself makes all the headlines blue (the default color for links).
+This is a bit distracting, so make them black.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-section-headlines</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines-1"><span class="org-css-selector">a.section-heading </span>{
+    <span class="org-css-property">color</span>: <span class="custom">black</span>;
+    <span class="org-css-property">text-decoration</span>: none;
+    <span class="org-css-property">display</span>: block;
+}
+</pre></div></div><p>
+Lastly, show a link anchor icon when the user hovers over a headline.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-section-headlines</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines-2"><span class="org-css-selector">a.section-heading:hover::after </span>{
+    <span class="org-css-property">float</span>: right;
+    <span class="org-css-property">content</span>: <span class="org-string">"\1f517"</span>;
+}
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Table-of-contents-sidebar" class="outline-4">
+<h4 id="h-Table-of-contents-sidebar"><span class="section-number-4">5.7.2.</span> Table of contents sidebar</h4>
+<div class="outline-text-4" id="text-h-Table-of-contents-sidebar">
+<p>
+By default Org's HTML export gives us a "Table of Contents". We make several
+modifications to it:
+</p>
+
+<ol class="org-ol">
+<li>remove the "Table of Contents" phrase because it doesn't add much value,</li>
+<li>convert it to a sidebar on the left, and</li>
+<li>track the current headline.</li>
+</ol>
+</div>
+
+<div id="outline-container-h-Delete--Table-of-Contents--text" class="outline-5">
+<h5 id="h-Delete--Table-of-Contents--text"><span class="section-number-5">5.7.2.1.</span> Delete "Table of Contents" text</h5>
+<div class="outline-text-5" id="text-h-Delete--Table-of-Contents--text">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__Makefile-weave">Makefile-replace-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-replace-toc-text">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-replace-toc-text">sed -i <span class="org-string">'s|&lt;h2&gt;Table of Contents&lt;/h2&gt;||'</span> README.html
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Convert--Table-of-Contents--to-a-sidebar-on-the-left" class="outline-5">
+<h5 id="h-Convert--Table-of-Contents--to-a-sidebar-on-the-left"><span class="section-number-5">5.7.2.2.</span> Convert "Table of Contents" to a sidebar on the left</h5>
+<div class="outline-text-5" id="text-h-Convert--Table-of-Contents--to-a-sidebar-on-the-left">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-1"><span class="org-css-selector">#table-of-contents </span>{
+    <span class="org-css-property">position</span>: fixed;
+    <span class="org-css-property">top</span>: 0;
+    <span class="org-css-property">float</span>: left;
+    <span class="org-css-property">margin-left</span>: -300px;
+    <span class="org-css-property">width</span>: 280px;
+    <span class="org-css-property">font-size</span>: 90%;
+}
+<span class="org-css-selector">#text-table-of-contents </span>{
+    <span class="org-css-property">overflow-y</span>: scroll;
+    <span class="org-css-property">height</span>: 100vh;
+    <span class="org-css-property">padding-right</span>: 10px;
+}
+<span class="org-css-selector">#text-table-of-contents ul </span>{
+    <span class="org-css-property">margin</span>: 0;
+    <span class="org-css-property">padding</span>: 0;
+}
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Track-the-current-headline" class="outline-5">
+<h5 id="h-Track-the-current-headline"><span class="section-number-5">5.7.2.3.</span> Track the current headline</h5>
+<div class="outline-text-5" id="text-h-Track-the-current-headline">
+<p>
+We use some JavaScript to track the current headline when we scroll up or
+down the page, forcing it to stay in sync with the content in the main body. We
+initially used Bootstrap's "scrollspy" component, but dropped it because it was
+too heavy and opinionated.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-js">js-toc-scrollspy</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__js-toc-scrollspy">&#x1f517;</a></span></div><pre class="src src-js" id="__NREF__js-toc-scrollspy"><span class="org-keyword">function</span> <span class="org-function-name">scrollIntoViewIfNeeded</span>(<span class="org-variable-name">target</span>) {
+    <span class="org-keyword">if</span> (target.getBoundingClientRect().bottom &gt; window.innerHeight) {
+        target.scrollIntoView(<span class="org-constant">false</span>);
+    }
+
+    <span class="org-keyword">if</span> (target.getBoundingClientRect().top &lt; 0) {
+        target.scrollIntoView();
+    }
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">deactivate_other_toc_items</span>(<span class="org-variable-name">hash</span>) {
+    $(<span class="org-string">"#text-table-of-contents a"</span>).each((index, elt) =&gt; {
+        <span class="org-keyword">if</span> (elt.hash !== hash) {
+            $(elt).removeClass(<span class="org-string">"active"</span>);
+        }
+    })
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">get_toc_item</span>(<span class="org-variable-name">hash</span>) {
+    <span class="org-keyword">return</span> $(<span class="org-string">`#text-table-of-contents a[href='${hash}']`</span>)[0];
+}
+
+$(document).ready(() =&gt; {
+    $(<span class="org-string">"#text-table-of-contents a"</span>).click((elt) =&gt; {
+        <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(elt.target.hash);
+        $(tocItem).addClass(<span class="org-string">"active"</span>);
+        deactivate_other_toc_items(elt.target.hash);
+    });
+
+    $(<span class="org-string">"*[id^='outline-container-h-']"</span>).each((index, elt) =&gt; {
+        <span class="org-keyword">var</span> <span class="org-variable-name">hash</span> = elt.getAttribute(<span class="org-string">"id"</span>)
+        hash = hash.replace(<span class="org-string">"outline-container-"</span>, <span class="org-string">"#"</span>)
+        <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(hash);
+        elt.addEventListener(<span class="org-string">"mouseover"</span>, () =&gt; {
+            $(tocItem).addClass(<span class="org-string">"active"</span>);
+            deactivate_other_toc_items(hash);
+        });
+        elt.addEventListener(<span class="org-string">"mouseover"</span>, (e) =&gt; {
+            <span class="org-comment-delimiter">// </span><span class="org-comment">If we don't call stopPropagation(), we end up scrolling *all*</span>
+            <span class="org-comment-delimiter">// </span><span class="org-comment">elements in the stack, which means we will try to scroll e.g.,</span>
+            <span class="org-comment-delimiter">// </span><span class="org-comment">Section 5 and Section 5.1.2.3 (when we only want the latter).</span>
+            e.stopPropagation();
+            <span class="org-comment-delimiter">// </span><span class="org-comment">Unfortunately, scrollIntoViewIfNeeded is not supported on</span>
+            <span class="org-comment-delimiter">// </span><span class="org-comment">Firefox. Otherwise we could do</span>
+            <span class="org-comment-delimiter">//</span>
+            <span class="org-comment-delimiter">//    </span><span class="org-comment">elems[0].scrollIntoViewIfNeeded({ block: "center" });</span>
+            <span class="org-comment-delimiter">//</span>
+            <span class="org-comment-delimiter">// </span><span class="org-comment">instead. So here we call the custom function that does what we</span>
+            <span class="org-comment-delimiter">// </span><span class="org-comment">want.  See https://stackoverflow.com/a/37829643/437583.</span>
+            scrollIntoViewIfNeeded(tocItem);
+        });
+    });
+});
+</pre></div></div><p>
+We add some styling for the "active" headline. The main point is to add a green
+background and border around it. For the border, we have to make the non-active
+headlines have a white (invisible) border around it because otherwise the active
+border makes the item jump a little bit when it's applied.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-2"><span class="org-css-selector">#table-of-contents a </span>{
+    <span class="org-css-property">display</span>: block;
+    <span class="org-css-property">transition</span>: all 50ms ease-in-out;
+    <span class="org-css-property">padding</span>: 5px;
+    <span class="org-css-property">border-radius</span>: 4px;
+    <span class="org-css-property">border-style</span>: solid;
+    <span class="org-css-property">border-width</span>: 1px;
+    <span class="org-css-property">border-color</span>: <span class="custom-3">white</span>;
+    <span class="org-css-property">color</span>: <span class="custom-2">black</span>;
+}
+<span class="org-css-selector">#table-of-contents .active </span>{
+    <span class="org-css-property">color</span>: <span class="custom-2">black</span>;
+    <span class="org-css-property">background-color</span>: <span class="custom-1">#e3f5e0</span>;
+    <span class="org-css-property">border-color</span>: <span class="custom">green</span>;
+}
+<span class="org-css-selector">#table-of-contents a:hover </span>{
+    <span class="org-css-property">text-decoration</span>: none;
+}
+</pre></div></div>
+</div>
+</div>
+</div>
+</div>
+
 <div id="outline-container-h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks" class="outline-3">
-<h3 id="h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks"><span class="section-number-3">5.7.</span> Autogenerate CSS for syntax highlighting of source code blocks</h3>
+<h3 id="h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks"><span class="section-number-3">5.8.</span> Autogenerate CSS for syntax highlighting of source code blocks</h3>
 <div class="outline-text-3" id="text-h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">
 <p>
 See <a href="https://emacs.stackexchange.com/questions/31439/how-to-get-colored-syntax-highlighting-of-code-blocks-in-asynchronous-org-mode-e">this</a>, specifically <a href="https://emacs.stackexchange.com/a/36759">https://emacs.stackexchange.com/a/36759</a>.
@@ -2152,12 +2377,12 @@ So we have to use code from <a href="https://emacs.stackexchange.com/questions/3
 </div>
 
 <div id="outline-container-h-Misc-settings" class="outline-3">
-<h3 id="h-Misc-settings"><span class="section-number-3">5.8.</span> Misc settings</h3>
+<h3 id="h-Misc-settings"><span class="section-number-3">5.9.</span> Misc settings</h3>
 <div class="outline-text-3" id="text-h-Misc-settings">
 </div>
 
 <div id="outline-container-h-Use-HTML5-export--not-XML--to-un-break-MathJax" class="outline-4">
-<h4 id="h-Use-HTML5-export--not-XML--to-un-break-MathJax"><span class="section-number-4">5.8.1.</span> Use HTML5 export, not XML (to un-break MathJax)</h4>
+<h4 id="h-Use-HTML5-export--not-XML--to-un-break-MathJax"><span class="section-number-4">5.9.1.</span> Use HTML5 export, not XML (to un-break MathJax)</h4>
 <div class="outline-text-4" id="text-h-Use-HTML5-export--not-XML--to-un-break-MathJax">
 <p>
 By default on Org 9.6, MathJax settings (JavaScript snippet) gets wrapped in a
@@ -2175,12 +2400,12 @@ disappear.
 </div>
 
 <div id="outline-container-h-Code-references" class="outline-4">
-<h4 id="h-Code-references"><span class="section-number-4">5.8.2.</span> Code references</h4>
+<h4 id="h-Code-references"><span class="section-number-4">5.9.2.</span> Code references</h4>
 <div class="outline-text-4" id="text-h-Code-references">
 </div>
 
 <div id="outline-container-h-Define--CodeHighlightOn--and--CodeHighlightOff" class="outline-5">
-<h5 id="h-Define--CodeHighlightOn--and--CodeHighlightOff"><span class="section-number-5">5.8.2.1.</span> Define <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></h5>
+<h5 id="h-Define--CodeHighlightOn--and--CodeHighlightOff"><span class="section-number-5">5.9.2.1.</span> Define <code>CodeHighlightOn</code> and <code>CodeHighlightOff</code></h5>
 <div class="outline-text-5" id="text-h-Define--CodeHighlightOn--and--CodeHighlightOff">
 <p>
 If we don't do this, we get an error because the "coderef" links (the links
@@ -2195,9 +2420,9 @@ setting on here injects the definitions of these functions into the HTML.
 </div>
 
 <div id="outline-container-h-Do-not-highlight-coderefs" class="outline-5">
-<h5 id="h-Do-not-highlight-coderefs"><span class="section-number-5">5.8.2.2.</span> Do not highlight coderefs</h5>
+<h5 id="h-Do-not-highlight-coderefs"><span class="section-number-5">5.9.2.2.</span> Do not highlight coderefs</h5>
 <div class="outline-text-5" id="text-h-Do-not-highlight-coderefs">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-coderef-disable-background-color</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-coderef-disable-background-color">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-coderef-disable-background-color"><span class="org-css-selector">.code-highlighted </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-coderef-disable-background-color</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-coderef-disable-background-color">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-coderef-disable-background-color"><span class="org-css-selector">.code-highlighted </span>{
     <span class="org-css-property">background-color</span>: inherit;
 }
 </pre></div></div>
@@ -2206,7 +2431,7 @@ setting on here injects the definitions of these functions into the HTML.
 </div>
 
 <div id="outline-container-h-Preserve-leading-whitespace-characters-on-export" class="outline-4">
-<h4 id="h-Preserve-leading-whitespace-characters-on-export"><span class="section-number-4">5.8.3.</span> Preserve leading whitespace characters on export</h4>
+<h4 id="h-Preserve-leading-whitespace-characters-on-export"><span class="section-number-4">5.9.3.</span> Preserve leading whitespace characters on export</h4>
 <div class="outline-text-4" id="text-h-Preserve-leading-whitespace-characters-on-export">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-misc</a></span>(3/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-misc-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-misc-3">(<span class="org-keyword">setq</span> org-src-preserve-indentation t)
 </pre></div></div>
@@ -2214,7 +2439,7 @@ setting on here injects the definitions of these functions into the HTML.
 </div>
 
 <div id="outline-container-h-Set-tab-width-to-4-spaces" class="outline-4">
-<h4 id="h-Set-tab-width-to-4-spaces"><span class="section-number-4">5.8.4.</span> Set tab width to 4 spaces</h4>
+<h4 id="h-Set-tab-width-to-4-spaces"><span class="section-number-4">5.9.4.</span> Set tab width to 4 spaces</h4>
 <div class="outline-text-4" id="text-h-Set-tab-width-to-4-spaces">
 <p>
 This matters for languages that require tabs, such as Makefiles.
@@ -2226,7 +2451,7 @@ This matters for languages that require tabs, such as Makefiles.
 </div>
 
 <div id="outline-container-h-Disable-backups" class="outline-4">
-<h4 id="h-Disable-backups"><span class="section-number-4">5.8.5.</span> Disable backups</h4>
+<h4 id="h-Disable-backups"><span class="section-number-4">5.9.5.</span> Disable backups</h4>
 <div class="outline-text-4" id="text-h-Disable-backups">
 <p>
 Disable backup files for <code>lilac.el</code> (that look like <code>lilac.el~</code>) when we invoke
@@ -2239,7 +2464,7 @@ Emacs from the <a href="#Makefile">Makefile</a>.
 </div>
 
 <div id="outline-container-h-Profiling" class="outline-4">
-<h4 id="h-Profiling"><span class="section-number-4">5.8.6.</span> Profiling</h4>
+<h4 id="h-Profiling"><span class="section-number-4">5.9.6.</span> Profiling</h4>
 <div class="outline-text-4" id="text-h-Profiling">
 <p>
 We don't use this very often, but it's mainly for determining cost centers for
@@ -2263,62 +2488,6 @@ weaving and tangling.
   (profiler-report-write-profile <span class="org-string">"emacs-profile-tangle.txt"</span>) t)
 </pre></div></div>
 </div>
-</div>
-</div>
-
-<div id="outline-container-h-Automatically-link-headlines--h2-to-h6" class="outline-3">
-<h3 id="h-Automatically-link-headlines--h2-to-h6"><span class="section-number-3">5.9.</span> Automatically link headlines (h2 to h6)</h3>
-<div class="outline-text-3" id="text-h-Automatically-link-headlines--h2-to-h6">
-<p>
-Every HTML element <code>h2</code> to <code>h6</code> (which encode the Org mode headlines) already
-come with a unique ID, but they are only ever linked from the Table of Contents.
-The code here makes it so that the headlines are linked to themselves, which
-makes it easy for users to link to them directly when they're reading the page.
-</p>
-
-<p>
-The JavaScript below is taken from <a href="https://github.com/listx/listx_blog/blame/8e6e7b533d89f77a6939e5eda9fd9d990d25a7a9/misc.js#L1">here</a>.
-</p>
-
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">misc.js</label><span class="lilac-caption-link-symbol"><a href="#misc-js">&#x1f517;</a></span></div><pre class="src src-js" id="misc-js">$(<span class="org-keyword">function</span>() {
-    $(<span class="org-string">"h2,h3,h4,h5,h6"</span>).each(<span class="org-keyword">function</span>() {
-        <span class="org-keyword">var</span> <span class="org-variable-name">$this</span> = $(<span class="org-constant">this</span>);
-        <span class="org-keyword">var</span> <span class="org-variable-name">href</span> = $this.attr(<span class="org-string">"id"</span>);
-        $this.wrapInner(
-            $(<span class="org-string">"&lt;a/&gt;"</span>).attr(<span class="org-string">"href"</span>, <span class="org-string">"#"</span> + href)
-                     .addClass(<span class="org-string">"section-heading"</span>));
-    });
-});
-
-<span class="lilac-child-link-from-parent"><a href="#__NREF__js-toc-scrollspy">js-toc-scrollspy</a></span>
-</pre></div></div><p>
-(Ignore the <code>js-toc-scrollspy</code> bit, as that's for the <a href="#h-Table-of-contents">"Table of contents"</a>
-section below.)
-</p>
-
-<p>
-Now we just have to refer to the above in the snippet below, to be included in <a href="#h-Create--lilac-theme--file"><code>lilac.theme</code></a>.
-</p>
-
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-theme">automatically_link_headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__automatically_link_headlines">&#x1f517;</a></span></div><pre class="src src-org" id="__NREF__automatically_link_headlines"><span class="org-comment"># Automatically link headlines.</span>
-<span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="<a href="https://code.jquery.com/jquery-3.6.4.min.js">https://code.jquery.com/jquery-3.6.4.min.js</a>"&gt;&lt;/script&gt;</span>
-<span class="org-org-meta-line">#+HTML_HEAD: &lt;script src="misc.js"&gt;&lt;/script&gt;</span>
-</pre></div></div><p>
-Linkifying itself makes all the headlines blue (the default color for links).
-This is a bit distracting, so make them black.
-</p>
-
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-section-headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines"><span class="org-css-selector">a.section-heading </span>{
-    <span class="org-css-property">color</span>: <span class="custom">black</span>;
-    <span class="org-css-property">text-decoration</span>: none;
-    <span class="org-css-property">display</span>: block;
-}
-
-<span class="org-css-selector">a.section-heading:hover::after </span>{
-    <span class="org-css-property">float</span>: right;
-    <span class="org-css-property">content</span>: <span class="org-string">"\1f517"</span>;
-}
-</pre></div></div>
 </div>
 </div>
 
@@ -2363,21 +2532,21 @@ mode (language) must be loaded in here.
 We add some additional CSS tweaks on top of what we get from Org.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">style.css</label><span class="lilac-caption-link-symbol"><a href="#style-css">&#x1f517;</a></span></div><pre class="src src-css" id="style-css"><span class="lilac-child-link-from-parent"><a href="#__NREF__css-general-1">css-general</a></span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.css</label><span class="lilac-caption-link-symbol"><a href="#lilac-css">&#x1f517;</a></span></div><pre class="src src-css" id="lilac-css"><span class="lilac-child-link-from-parent"><a href="#__NREF__css-general-1">css-general</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-coderef-disable-background-color">css-coderef-disable-background-color</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-section-headlines">css-source-code-section-headlines</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-section-headlines-1">css-source-code-section-headlines</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-body">css-source-code-block-body</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-captions">css-source-code-block-captions</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-child-link-from-parent">css-source-code-block-child-link-from-parent</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-sidenotes">css-sidenotes</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__css-toc">css-toc</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-toc-1">css-toc</a></span>
 </pre></div></div>
 </div>
 
 <div id="outline-container-h-General-body-text" class="outline-4">
 <h4 id="h-General-body-text"><span class="section-number-4">5.11.1.</span> General body text</h4>
 <div class="outline-text-4" id="text-h-General-body-text">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-general</a></span>(1/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-1"><span class="org-css-selector">body </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(1/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-1"><span class="org-css-selector">body </span>{
     <span class="org-css-property">font-size</span>: 1.25em;
     <span class="org-css-property">width</span>: 800px;
     <span class="org-css-property">margin-left</span>: 310px;
@@ -2412,7 +2581,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 <div id="outline-container-h-Tables" class="outline-4">
 <h4 id="h-Tables"><span class="section-number-4">5.11.2.</span> Tables</h4>
 <div class="outline-text-4" id="text-h-Tables">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-general</a></span>(2/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-2"><span class="org-css-selector">table </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(2/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-2"><span class="org-css-selector">table </span>{
     <span class="org-css-property">margin</span>: 1em auto 0em auto;
     <span class="org-css-property">border-spacing</span>: 0;
     <span class="org-css-property">border-radius</span>: 4px;
@@ -2444,7 +2613,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 <div id="outline-container-h-Images" class="outline-4">
 <h4 id="h-Images"><span class="section-number-4">5.11.3.</span> Images</h4>
 <div class="outline-text-4" id="text-h-Images">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-general</a></span>(3/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-3"><span class="org-css-selector">img </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(3/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-3"><span class="org-css-selector">img </span>{
     <span class="org-css-property">display</span>: block;
     <span class="org-css-property">margin</span>: 0 auto;
 }
@@ -2455,7 +2624,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 <div id="outline-container-h-Monospaced" class="outline-4">
 <h4 id="h-Monospaced"><span class="section-number-4">5.11.4.</span> Monospaced</h4>
 <div class="outline-text-4" id="text-h-Monospaced">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-general</a></span>(4/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-4">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-4"><span class="org-css-selector">code </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(4/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-4">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-4"><span class="org-css-selector">code </span>{
     <span class="org-css-property">background</span>: <span class="custom-1">#eee</span>;
     <span class="org-css-property">padding-left</span>: 5px;
     <span class="org-css-property">padding-right</span>: 5px;
@@ -2485,7 +2654,7 @@ Force all links to have a blue color. This is mainly to override whatever Org
 gives us by default.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-general</a></span>(5/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-5">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-5"><span class="org-css-selector">a </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(5/5) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-5">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-5"><span class="org-css-selector">a </span>{
     <span class="org-css-property">color</span>: <span class="custom">#0000ff</span>;
 }
 </pre></div></div>
@@ -2495,7 +2664,7 @@ gives us by default.
 <div id="outline-container-h-Source-code-block-body" class="outline-4">
 <h4 id="h-Source-code-block-body"><span class="section-number-4">5.11.6.</span> Source code block body</h4>
 <div class="outline-text-4" id="text-h-Source-code-block-body">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-block-body</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-body">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-body"><span class="org-css-selector">.org-src-container </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-body</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-body">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-body"><span class="org-css-selector">.org-src-container </span>{
     <span class="org-css-property">padding-top</span>: 1em;
 }
 
@@ -2522,7 +2691,7 @@ gives us by default.
 <div id="outline-container-h-Source-code-block-captions" class="outline-4">
 <h4 id="h-Source-code-block-captions"><span class="section-number-4">5.11.7.</span> Source code block captions</h4>
 <div class="outline-text-4" id="text-h-Source-code-block-captions">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-captions"><span class="org-css-selector">.lilac-caption </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-captions"><span class="org-css-selector">.lilac-caption </span>{
     <span class="org-css-property">font-family</span>: <span class="org-string">"Source Code Pro"</span>, monospace;
     <span class="org-css-property">text-align</span>: right;
     <span class="org-css-property">border-top-left-radius</span>: 5px;
@@ -2594,7 +2763,7 @@ gives us by default.
 <div id="outline-container-h-Links-to-child-source-block-from-parent" class="outline-4">
 <h4 id="h-Links-to-child-source-block-from-parent"><span class="section-number-4">5.11.8.</span> Links to child source block from parent</h4>
 <div class="outline-text-4" id="text-h-Links-to-child-source-block-from-parent">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-source-code-block-child-link-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-child-link-from-parent">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-child-link-from-parent"><span class="org-css-selector">.lilac-child-link-from-parent </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-child-link-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-child-link-from-parent">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-child-link-from-parent"><span class="org-css-selector">.lilac-child-link-from-parent </span>{
     <span class="org-css-property">font-weight</span>: bold;
 }
 <span class="org-css-selector">.lilac-child-link-from-parent a </span>{
@@ -2629,7 +2798,7 @@ shouldn't necessarily sit in the main body text.
 The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-using-only-css/">here</a>, with some modifications.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-sidenotes</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-sidenotes">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-sidenotes"><span class="org-css-selector">.sidenote </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-sidenotes</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-sidenotes">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-sidenotes"><span class="org-css-selector">.sidenote </span>{
     <span class="org-css-property">font-size</span>: 80%;
     <span class="org-css-property">margin-top</span>: 1em;
     <span class="org-css-property">padding</span>: 1em 0 1em 1em;
@@ -2660,119 +2829,6 @@ The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-usi
 </pre></div></div>
 </div>
 </div>
-
-<div id="outline-container-h-Table-of-contents" class="outline-4">
-<h4 id="h-Table-of-contents"><span class="section-number-4">5.11.10.</span> Table of contents</h4>
-<div class="outline-text-4" id="text-h-Table-of-contents">
-<p>
-Make the "Table of Contents" float off to the left so that it is always visible.
-</p>
-
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#style-css">css-toc</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc"><span class="org-css-selector">#table-of-contents </span>{
-    <span class="org-css-property">position</span>: fixed;
-    <span class="org-css-property">top</span>: 0;
-    <span class="org-css-property">float</span>: left;
-    <span class="org-css-property">margin-left</span>: -300px;
-    <span class="org-css-property">width</span>: 280px;
-    <span class="org-css-property">font-size</span>: 90%;
-}
-<span class="org-css-selector">#text-table-of-contents </span>{
-    <span class="org-css-property">overflow-y</span>: scroll;
-    <span class="org-css-property">height</span>: 100vh;
-    <span class="org-css-property">padding-right</span>: 10px;
-}
-<span class="org-css-selector">#text-table-of-contents ul </span>{
-    <span class="org-css-property">margin</span>: 0;
-    <span class="org-css-property">padding</span>: 0;
-}
-<span class="org-css-selector">#table-of-contents a </span>{
-    <span class="org-css-property">display</span>: block;
-    <span class="org-css-property">transition</span>: all 50ms ease-in-out;
-    <span class="org-css-property">padding</span>: 5px;
-    <span class="org-css-property">border-radius</span>: 4px;
-    <span class="org-css-property">border-style</span>: solid;
-    <span class="org-css-property">border-width</span>: 1px;
-    <span class="org-css-property">border-color</span>: <span class="custom-3">white</span>;
-    <span class="org-css-property">color</span>: <span class="custom-2">black</span>;
-}
-#table-of-contents a:hover,
-<span class="org-css-selector">#table-of-contents a:focus </span>{
-    <span class="org-css-property">text-decoration</span>: none;
-}
-<span class="org-css-selector">#table-of-contents .active </span>{
-    <span class="org-css-property">color</span>: <span class="custom-2">black</span>;
-    <span class="org-css-property">background-color</span>: <span class="custom-1">#e3f5e0</span>;
-    <span class="org-css-property">border-color</span>: <span class="custom">green</span>;
-}
-</pre></div></div><p>
-We also delete the text "Table of Contents" because it looks too intrusive when
-it is placed in the sidebar area.
-</p>
-
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__Makefile-weave">Makefile-replace-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-replace-toc-text">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-replace-toc-text">sed -i <span class="org-string">'s|&lt;h2&gt;Table of Contents&lt;/h2&gt;||'</span> README.html
-</pre></div></div><p>
-Lastly we use some JavaScript to automatically update the Table of Contents when
-we scroll up or down the page, forcing it to stay in sync with the content in
-the main body. We initially used Bootstrap's "scrollspy" component, but dropped
-it because it was too heavy and opinionated.
-</p>
-
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#misc-js">js-toc-scrollspy</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__js-toc-scrollspy">&#x1f517;</a></span></div><pre class="src src-js" id="__NREF__js-toc-scrollspy"><span class="org-keyword">function</span> <span class="org-function-name">scrollIntoViewIfNeeded</span>(<span class="org-variable-name">target</span>) {
-    <span class="org-keyword">if</span> (target.getBoundingClientRect().bottom &gt; window.innerHeight) {
-        target.scrollIntoView(<span class="org-constant">false</span>);
-    }
-
-    <span class="org-keyword">if</span> (target.getBoundingClientRect().top &lt; 0) {
-        target.scrollIntoView();
-    }
-}
-
-<span class="org-keyword">function</span> <span class="org-function-name">deactivate_other_toc_items</span>(<span class="org-variable-name">hash</span>) {
-    $(<span class="org-string">"#text-table-of-contents a"</span>).each((index, elt) =&gt; {
-        <span class="org-keyword">if</span> (elt.hash !== hash) {
-            $(elt).removeClass(<span class="org-string">"active"</span>);
-        }
-    })
-}
-
-<span class="org-keyword">function</span> <span class="org-function-name">get_toc_item</span>(<span class="org-variable-name">hash</span>) {
-    <span class="org-keyword">return</span> $(<span class="org-string">`#text-table-of-contents a[href='${hash}']`</span>)[0];
-}
-
-$(document).ready(() =&gt; {
-    $(<span class="org-string">"#text-table-of-contents a"</span>).click((elt) =&gt; {
-        <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(elt.target.hash);
-        $(tocItem).addClass(<span class="org-string">"active"</span>);
-        deactivate_other_toc_items(elt.target.hash);
-    });
-
-    $(<span class="org-string">"*[id^='outline-container-h-']"</span>).each((index, elt) =&gt; {
-        <span class="org-keyword">var</span> <span class="org-variable-name">hash</span> = elt.getAttribute(<span class="org-string">"id"</span>)
-        hash = hash.replace(<span class="org-string">"outline-container-"</span>, <span class="org-string">"#"</span>)
-        <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(hash);
-        elt.addEventListener(<span class="org-string">"mouseover"</span>, () =&gt; {
-            $(tocItem).addClass(<span class="org-string">"active"</span>);
-            deactivate_other_toc_items(hash);
-        });
-        elt.addEventListener(<span class="org-string">"mouseover"</span>, (e) =&gt; {
-            <span class="org-comment-delimiter">// </span><span class="org-comment">If we don't call stopPropagation(), we end up scrolling *all*</span>
-            <span class="org-comment-delimiter">// </span><span class="org-comment">elements in the stack, which means we will try to scroll e.g.,</span>
-            <span class="org-comment-delimiter">// </span><span class="org-comment">Section 5 and Section 5.1.2.3 (when we only want the latter).</span>
-            e.stopPropagation();
-            <span class="org-comment-delimiter">// </span><span class="org-comment">Unfortunately, scrollIntoViewIfNeeded is not supported on</span>
-            <span class="org-comment-delimiter">// </span><span class="org-comment">Firefox. Otherwise we could do</span>
-            <span class="org-comment-delimiter">//</span>
-            <span class="org-comment-delimiter">//    </span><span class="org-comment">elems[0].scrollIntoViewIfNeeded({ block: "center" });</span>
-            <span class="org-comment-delimiter">//</span>
-            <span class="org-comment-delimiter">// </span><span class="org-comment">instead. So here we call the custom function that does what we</span>
-            <span class="org-comment-delimiter">// </span><span class="org-comment">want.  See https://stackoverflow.com/a/37829643/437583.</span>
-            scrollIntoViewIfNeeded(tocItem);
-        });
-    });
-});
-</pre></div></div>
-</div>
-</div>
 </div>
 
 <div id="outline-container-h-Create--lilac-theme--file" class="outline-3">
@@ -2786,10 +2842,10 @@ inspiration for this setup comes from <a href="https://gitlab.com/OlMon/org-them
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.theme</label><span class="lilac-caption-link-symbol"><a href="#lilac-theme">&#x1f517;</a></span></div><pre class="src src-org" id="lilac-theme"><span class="org-comment"># Include additional CSS styles.</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/&gt;</span>
-<span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="style.css" /&gt;</span>
+<span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="lilac.css" /&gt;</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" href="<a href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro&amp;family=Source+Code+Pro">https://fonts.googleapis.com/css2?family=Source+Serif+Pro&amp;family=Source+Code+Pro</a>"&gt;</span>
 
-<span class="lilac-child-link-from-parent"><a href="#__NREF__automatically_link_headlines">automatically_link_headlines</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-theme-js">lilac-theme-js</a></span>
 </pre></div></div>
 </div>
 </div>
@@ -3252,11 +3308,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000b1">Org mode</a> borrows heavily using <a href="#org00000b3">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000b3"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000b7">Org mode</a> borrows heavily using <a href="#org00000b9">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000b9"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000b1"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000b7"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
