@@ -2,7 +2,7 @@ all: test weave
 .PHONY: all
 
 test: tangle
-	emacs --quick --batch --kill --load ert \
+	LILAC_ROOT=$(LILAC_ROOT) emacs --quick --batch --kill --load ert \
 		--load lilac.el \
 		--load lilac-tests.el \
 		--funcall ert-run-tests-batch-and-exit
@@ -40,10 +40,11 @@ tangle $(tangled_output) &: README.org
 	$(call run_emacs,(org-babel-tangle),README.org)
 	touch tangle
 define run_emacs
-	emacs $(2) --quick --batch --kill --load $(PROJ_ROOT)/lilac.el --eval="$(1)"
+	LILAC_ROOT=$(LILAC_ROOT) emacs $(2) --quick --batch --kill \
+		--load $(LILAC_ROOT)/lilac.el --eval="$(1)"
 endef
 
-PROJ_ROOT := $(shell git rev-parse --show-toplevel)
+LILAC_ROOT := $(shell git rev-parse --show-toplevel)
 update-deps: package/nix/sources.json package/nix/sources.nix
 	cd package && niv update
 	touch update-deps

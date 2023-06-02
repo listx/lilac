@@ -302,7 +302,7 @@ all: test weave
 .PHONY: all
 
 test: tangle
-	emacs --quick --batch --kill --load ert \
+	LILAC_ROOT=$(LILAC_ROOT) emacs --quick --batch --kill --load ert \
 		--load lilac.el \
 		--load lilac-tests.el \
 		--funcall ert-run-tests-batch-and-exit
@@ -382,10 +382,11 @@ evaluating the given expression.
 #+name: __NREF__Makefile-run_emacs
 #+begin_src makefile
 define run_emacs
-	emacs $(2) --quick --batch --kill --load $(PROJ_ROOT)/lilac.el --eval="$(1)"
+	LILAC_ROOT=$(LILAC_ROOT) emacs $(2) --quick --batch --kill \
+		--load $(LILAC_ROOT)/lilac.el --eval="$(1)"
 endef
 
-PROJ_ROOT := $(shell git rev-parse --show-toplevel)
+LILAC_ROOT := $(shell git rev-parse --show-toplevel)
 #+end_src
 
 We use [[https://github.com/nmattia/niv][=niv=]] to update the dependencies sourced by =shell.nix=.
@@ -2012,23 +2013,23 @@ mode (language) must be loaded in here.
 (require 'elisp-mode)
 
 ;; Third-party packages (checked in as Git submodules)
-(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/s.el"))
+(add-to-list 'load-path (concat (getenv "LILAC_ROOT") "/deps/elisp/s.el"))
 (require 's)
-(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/compat.el"))
+(add-to-list 'load-path (concat (getenv "LILAC_ROOT") "/deps/elisp/compat.el"))
 (require 'compat)
-(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/dash.el"))
+(add-to-list 'load-path (concat (getenv "LILAC_ROOT") "/deps/elisp/dash.el"))
 (require 'dash)
-(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/dr-qubit.org"))
-(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/f.el"))
-(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/parsebib"))
-(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/citeproc-el"))
+(add-to-list 'load-path (concat (getenv "LILAC_ROOT") "/deps/elisp/dr-qubit.org"))
+(add-to-list 'load-path (concat (getenv "LILAC_ROOT") "/deps/elisp/f.el"))
+(add-to-list 'load-path (concat (getenv "LILAC_ROOT") "/deps/elisp/parsebib"))
+(add-to-list 'load-path (concat (getenv "LILAC_ROOT") "/deps/elisp/citeproc-el"))
 (require 'citeproc)
 (require 'oc-csl)
-(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/emacs-htmlize"))
+(add-to-list 'load-path (concat (getenv "LILAC_ROOT") "/deps/elisp/emacs-htmlize"))
 (require 'htmlize)
-(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/magit/lisp"))
+(add-to-list 'load-path (concat (getenv "LILAC_ROOT") "/deps/elisp/magit/lisp"))
 (require 'magit-section)
-(add-to-list 'load-path (concat (getenv "PWD") "/deps/elisp/nix-mode"))
+(add-to-list 'load-path (concat (getenv "LILAC_ROOT") "/deps/elisp/nix-mode"))
 (require 'nix-mode)
 #+end_src
 

@@ -688,7 +688,7 @@ associated tests.
 <span class="org-makefile-targets">.PHONY</span>: all
 
 <span class="org-makefile-targets">test</span>: tangle
-    emacs --quick --batch --kill --load ert \
+    <span class="org-variable-name">LILAC_ROOT</span>=$(<span class="org-variable-name">LILAC_ROOT</span>) emacs --quick --batch --kill --load ert \
         --load lilac.el \
         --load lilac-tests.el \
         --funcall ert-run-tests-batch-and-exit
@@ -766,10 +766,11 @@ evaluating the given expression.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#Makefile">Makefile-run_emacs</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-run_emacs">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-run_emacs">define run_emacs
-    emacs $(<span class="org-variable-name">2</span>) --quick --batch --kill --load $(<span class="org-variable-name">PROJ_ROOT</span>)/lilac.el --eval=<span class="org-string">"$(</span><span class="org-string"><span class="org-variable-name">1</span></span><span class="org-string">)"</span>
+    <span class="org-variable-name">LILAC_ROOT</span>=$(<span class="org-variable-name">LILAC_ROOT</span>) emacs $(<span class="org-variable-name">2</span>) --quick --batch --kill \
+        --load $(<span class="org-variable-name">LILAC_ROOT</span>)/lilac.el --eval=<span class="org-string">"$(</span><span class="org-string"><span class="org-variable-name">1</span></span><span class="org-string">)"</span>
 endef
 
-<span class="org-variable-name">PROJ_ROOT</span> := $(<span class="org-variable-name">shell</span> git rev-parse --show-toplevel)
+<span class="org-variable-name">LILAC_ROOT</span> := $(<span class="org-variable-name">shell</span> git rev-parse --show-toplevel)
 </pre></div></div><p>
 We use <a href="https://github.com/nmattia/niv"><code>niv</code></a> to update the dependencies sourced by <code>shell.nix</code>.
 </p>
@@ -2575,23 +2576,23 @@ mode (language) must be loaded in here.
 (<span class="org-keyword">require</span> '<span class="org-constant">elisp-mode</span>)
 
 <span class="org-comment-delimiter">;; </span><span class="org-comment">Third-party packages (checked in as Git submodules)</span>
-(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/s.el"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"LILAC_ROOT"</span>) <span class="org-string">"/deps/elisp/s.el"</span>))
 (<span class="org-keyword">require</span> '<span class="org-constant">s</span>)
-(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/compat.el"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"LILAC_ROOT"</span>) <span class="org-string">"/deps/elisp/compat.el"</span>))
 (<span class="org-keyword">require</span> '<span class="org-constant">compat</span>)
-(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/dash.el"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"LILAC_ROOT"</span>) <span class="org-string">"/deps/elisp/dash.el"</span>))
 (<span class="org-keyword">require</span> '<span class="org-constant">dash</span>)
-(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/dr-qubit.org"</span>))
-(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/f.el"</span>))
-(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/parsebib"</span>))
-(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/citeproc-el"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"LILAC_ROOT"</span>) <span class="org-string">"/deps/elisp/dr-qubit.org"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"LILAC_ROOT"</span>) <span class="org-string">"/deps/elisp/f.el"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"LILAC_ROOT"</span>) <span class="org-string">"/deps/elisp/parsebib"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"LILAC_ROOT"</span>) <span class="org-string">"/deps/elisp/citeproc-el"</span>))
 (<span class="org-keyword">require</span> '<span class="org-constant">citeproc</span>)
 (<span class="org-keyword">require</span> '<span class="org-constant">oc-csl</span>)
-(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/emacs-htmlize"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"LILAC_ROOT"</span>) <span class="org-string">"/deps/elisp/emacs-htmlize"</span>))
 (<span class="org-keyword">require</span> '<span class="org-constant">htmlize</span>)
-(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/magit/lisp"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"LILAC_ROOT"</span>) <span class="org-string">"/deps/elisp/magit/lisp"</span>))
 (<span class="org-keyword">require</span> '<span class="org-constant">magit-section</span>)
-(add-to-list 'load-path (concat (getenv <span class="org-string">"PWD"</span>) <span class="org-string">"/deps/elisp/nix-mode"</span>))
+(add-to-list 'load-path (concat (getenv <span class="org-string">"LILAC_ROOT"</span>) <span class="org-string">"/deps/elisp/nix-mode"</span>))
 (<span class="org-keyword">require</span> '<span class="org-constant">nix-mode</span>)
 </pre></div></div>
 </div>
