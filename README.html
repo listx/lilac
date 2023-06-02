@@ -244,6 +244,15 @@
 </li>
 </ul>
 </li>
+<li><a href="#h-Examples">2.2. Examples</a>
+<ul>
+<li><a href="#h-Code-blocks">2.2.1. Code blocks</a>
+<ul>
+<li><a href="#h---begin-example---------end-example">2.2.1.1. <code>#+begin_example</code> &#x2026; <code>#+end_example</code></a></li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#h-Developer-Guide">3. Developer Guide</a>
@@ -610,6 +619,32 @@ the second parent that references this block (the first parent is linked by the
 child block name itself, as in the previous example). If it is referenced in
 additional parent blocks, they will show up as links "3", "4", etc.
 </p>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Examples" class="outline-3">
+<h3 id="h-Examples"><span class="section-number-3">2.2.</span> Examples</h3>
+<div class="outline-text-3" id="text-h-Examples">
+<p>
+Here we have some examples of how certain Org mode features look when exported
+to HTML with Lilac.
+</p>
+</div>
+
+<div id="outline-container-h-Code-blocks" class="outline-4">
+<h4 id="h-Code-blocks"><span class="section-number-4">2.2.1.</span> Code blocks</h4>
+<div class="outline-text-4" id="text-h-Code-blocks">
+</div>
+
+<div id="outline-container-h---begin-example---------end-example" class="outline-5">
+<h5 id="h---begin-example---------end-example"><span class="section-number-5">2.2.1.1.</span> <code>#+begin_example</code> &#x2026; <code>#+end_example</code></h5>
+<div class="outline-text-5" id="text-h---begin-example---------end-example">
+<pre class="example" id="org0000017">
+Hello world.
+Foo bar.
+</pre>
 </div>
 </div>
 </div>
@@ -2741,10 +2776,10 @@ We add some additional CSS tweaks on top of what we get from Org.
 
 <span class="org-css-selector">pre </span>{
     <span class="org-css-property">font-size</span>: 0.8em;
-    <span class="org-css-property">border-top-left-radius</span>: 0;
-    <span class="org-css-property">border-top-right-radius</span>: 0;
-    <span class="org-css-property">border-bottom-left-radius</span>: 5px;
-    <span class="org-css-property">border-bottom-right-radius</span>: 5px;
+    <span class="org-css-property">border-radius</span>: 5px;
+    <span class="org-css-property">margin</span>: 1em 0 0 0;
+    <span class="org-css-property">background-color</span>: <span class="custom-1">#f7f7f7</span>;
+    <span class="org-css-property">border-color</span>: <span class="custom">#777</span>;
 }
 </pre></div></div><p>
 Also make the background color of the programming language hover text the same
@@ -3376,11 +3411,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000bb">Org mode</a> borrows heavily using <a href="#org00000bd">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000bd"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000bc">Org mode</a> borrows heavily using <a href="#org00000be">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000be"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000bb"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000bc"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
