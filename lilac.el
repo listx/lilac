@@ -607,7 +607,7 @@ When matching, reference is stored in match group 1."
     (write-file "syntax-highlighting.css"))
   (kill-emacs))
 
-;; Without this, batch-org-gen-css-and-exit produces a near-empty CSS file.
+;; Without this, lilac-gen-css-and-exit produces a near-empty CSS file.
 (require 'font-lock)
 (require 'subr-x) ;; for `when-let'
 
