@@ -2140,7 +2140,7 @@ tr:last-child td {
 }
 
 thead {
-    background-color: #eee;
+    background-color: #f7f7f7;
 }
 #+end_src
 
@@ -2159,7 +2159,7 @@ img {
 #+header: :noweb-ref __NREF__css-general
 #+begin_src css
 code {
-    background-color: #eee;
+    background-color: #f7f7f7;
     padding-left: 5px;
     padding-right: 5px;
     white-space: nowrap;
@@ -2175,6 +2175,17 @@ pre {
     border-top-right-radius: 0;
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
+}
+#+end_src
+
+Also make the background color of the programming language hover text the same
+as what we have elsewhere. This hover text comes with Org mode's HTML export of
+source code blocks.
+
+#+header: :noweb-ref __NREF__css-general
+#+begin_src css
+pre.src::before {
+    background-color: #f7f7f7;
 }
 #+end_src
 
@@ -2205,13 +2216,13 @@ a {
     scroll-margin-top: 100px;
     border-style: solid;
     border-width: 1px;
-    border-color: #999;
+    border-color: #777;
     border-radius: 5px;
 }
 
 /* Source code block body. */
 .org-src-container pre.src {
-    background-color: #f3f3f3;
+    background-color: #f7f7f7;
 }
 
 #+end_src
@@ -2239,8 +2250,9 @@ a {
     border-bottom-style: none;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
-    background-color: #ddd;
-    border-color: #999;
+    border-width: 1px;
+    background-color: #f7f7f7;
+    border-color: #777;
 }
 
 .lilac-caption-source-code-block-name {
