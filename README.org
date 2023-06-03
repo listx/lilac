@@ -346,7 +346,7 @@ README.html: README.org
 	sed -i 's/<style>.csl-left-margin{float: left; padding-right: 0em/'\
 	'<style>.csl-left-margin{float: left; padding-right: 1em/' README.html
 	sed -i 's/.csl-right-inline{margin: 0 0 0 1em;}<\/style>/'\
-	'.csl-right-inline{margin: 0 0 0 2em;}<\/style>/' README.html
+	'.csl-right-inline{margin: 1em 0 0 2em;}<\/style>/' README.html
 	__NREF__Makefile-replace-toc-text
 #+end_src
 
@@ -2169,6 +2169,16 @@ tr:last-child td {
 
 thead {
     background-color: #f7f7f7;
+}
+#+end_src
+
+**** Definition lists
+
+#+header: :noweb-ref __NREF__css-general
+#+begin_src css
+dl {
+    margin: 0;
+    padding-top: 1em;
 }
 #+end_src
 
