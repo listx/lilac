@@ -1943,6 +1943,18 @@ disappear.
 (setq org-html-doctype "html5")
 #+end_src
 
+**** Set citeproc styles folder
+
+For some reason we cannot specify citeproc styles based on a relative path in
+our Org file. The solution is to set the =org-cite-csl-styles-dir= variable. See
+[[https://list.orgmode.org/CAFyQvY2SZ3jMWo2uwVq0bzTkZGog8eyDSEwhdBZVc8ui9K54vQ@mail.gmail.com/][this post]].
+
+#+header: :noweb-ref __NREF__lilac_dot_el-misc
+#+begin_src emacs-lisp
+(setq org-cite-csl-styles-dir
+      (concat (getenv "LILAC_ROOT") "/deps/styles/"))
+#+end_src
+
 **** Code references
 
 ***** Define =CodeHighlightOn= and =CodeHighlightOff=
@@ -2860,5 +2872,5 @@ Here we test the construction of smart captions.
 }
 #+end_src
 
-#+cite_export: csl ~/prog/lilac/deps/styles/ieee.csl
+#+cite_export: csl ieee.csl
 #+print_bibliography:

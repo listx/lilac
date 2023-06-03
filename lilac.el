@@ -680,6 +680,8 @@ with class 'color and highest min-color value."
 
 (advice-add 'face-attribute :override #'my-face-attribute)
 (setq org-html-doctype "html5")
+(setq org-cite-csl-styles-dir
+      (concat (getenv "LILAC_ROOT") "/deps/styles/"))
 (setq org-html-head-include-scripts t)
 (setq org-src-preserve-indentation t)
 (setq-default tab-width 4)
