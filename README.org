@@ -340,13 +340,13 @@ weave: README.html
 .PHONY: weave
 
 README.html: README.org
-	$(call run_emacs,(lilac-gen-css-and-exit),README.org)
-	$(call run_emacs,(lilac-publish),README.org)
+	$(call run_emacs,(lilac-gen-css-and-exit),$<)
+	$(call run_emacs,(lilac-publish),$<)
 	# Fix inline styles.
 	sed -i 's/<style>.csl-left-margin{float: left; padding-right: 0em/'\
-	'<style>.csl-left-margin{float: left; padding-right: 1em/' README.html
+	'<style>.csl-left-margin{float: left; padding-right: 1em/' $@
 	sed -i 's/.csl-right-inline{margin: 0 0 0 1em;}<\/style>/'\
-	'.csl-right-inline{margin: 1em 0 0 2em;}<\/style>/' README.html
+	'.csl-right-inline{margin: 1em 0 0 2em;}<\/style>/' $@
 	__NREF__Makefile-replace-toc-text
 #+end_src
 
@@ -1703,7 +1703,7 @@ modifications to it:
 
 #+name: __NREF__Makefile-replace-toc-text
 #+begin_src makefile
-sed -i 's|<h2>Table of Contents</h2>||' README.html
+sed -i 's|<h2>Table of Contents</h2>||' $@
 #+end_src
 
 ***** Convert "Table of Contents" to a sidebar on the left
