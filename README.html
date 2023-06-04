@@ -294,6 +294,7 @@
 <li><a href="#h-Use-human-readable-HTML-IDs-for-source-code-links">3.4.5.1. Use human-readable HTML IDs for source code links</a></li>
 <li><a href="#h-Pretty-source-code-captions">3.4.5.2. Pretty source code captions</a></li>
 <li><a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">3.4.5.3. Link noweb references (link to child block from parent block)</a></li>
+<li><a href="#h-Search-and-replace-hardcoded-things">3.4.5.4. Search and replace hardcoded things</a></li>
 </ul>
 </li>
 <li><a href="#h-JavaScript">3.4.6. JavaScript</a>
@@ -750,12 +751,6 @@ highlighting. And lastly we have to modify the generated <code>README.html</code
 <span class="org-makefile-targets">README.html</span>: README.org
     $(<span class="org-variable-name">call</span> run_emacs,(lilac-gen-css-and-exit),$<span class="org-constant">&lt;</span>)
     $(<span class="org-variable-name">call</span> run_emacs,(lilac-publish),$<span class="org-constant">&lt;</span>)
-<span class="org-makefile-space">    #</span><span class="org-comment-delimiter"> </span><span class="org-comment">Fix inline styles.</span>
-    sed -i <span class="org-string">'s/&lt;style&gt;.csl-left-margin{float: left; padding-right: 0em/'</span>\
-    <span class="org-string">'&lt;style&gt;.csl-left-margin{float: left; padding-right: 1em/'</span> <span class="org-makefile-targets">$</span><span class="org-makefile-targets"><span class="org-constant">@</span></span>
-    sed -i <span class="org-string">'s/.csl-right-inline{margin: 0 0 0 1em;}&lt;\/style&gt;/'</span>\
-    <span class="org-string">'.csl-right-inline{margin: 1em 0 0 2em;}&lt;\/style&gt;/'</span> <span class="org-makefile-targets">$</span><span class="org-makefile-targets"><span class="org-constant">@</span></span>
-    <span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-replace-toc-text">Makefile-replace-toc-text</a></span>
 </pre></div></div><p>
 Tangling is pretty straightforward &#x2014; we just need to call
 <code>(org-babel-tangle)</code> on <code>README.org</code>. This generates a number of files, such as
@@ -964,6 +959,7 @@ we invoke <code>emacs</code> from the command line in a non-interactive manner.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-fix-nondeterminism-1">lilac_dot_el-fix-nondeterminism</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-custom-noweb-delimiters">lilac_dot_el-custom-noweb-delimiters</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac_dot_el-lilac-publish</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-search-replace-1">lilac_dot_el-search-replace</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-autogenerate-css">lilac_dot_el-autogenerate-css</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-misc-1">lilac_dot_el-misc</a></span>
 (<span class="org-keyword">provide</span> '<span class="org-constant">lilac</span>)
@@ -1062,7 +1058,10 @@ named <code>__NREF__...</code> get an automatic <code>#+caption: ...</code> text
   (clrhash lilac-polyblock-names-totals)
 
   <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-HTML-2">lilac-publish-modify-HTML-2</a></span>
-  (org-html-export-to-html))
+  (org-html-export-to-html)
+
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-delete-toc-text">lilac-publish-delete-toc-text</a></span>
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-inline-styles">lilac-publish-fix-inline-styles</a></span>)
 
 <span class="org-comment-delimiter">;; </span><span class="org-comment">Modify Org buffer</span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-src-blocks">UID-for-all-src-blocks</a></span>
@@ -2150,6 +2149,51 @@ earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2<
 </pre></div></div>
 </div>
 </div>
+
+<div id="outline-container-h-Search-and-replace-hardcoded-things" class="outline-5">
+<h5 id="h-Search-and-replace-hardcoded-things"><span class="section-number-5">3.4.5.4.</span> Search and replace hardcoded things</h5>
+<div class="outline-text-5" id="text-h-Search-and-replace-hardcoded-things">
+<p>
+Org's HTML export hardcodes some things. We have to do some manual surgery to
+set things right. First let's define a generic search-and-replace function. This
+function is based on <a href="https://emacs.stackexchange.com/a/2382/13006">this example</a>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-search-replace</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-search-replace-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-search-replace-1">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-replace-from-to</span> (str repl)
+  (<span class="org-keyword">interactive</span> <span class="org-string">"sString: \nsReplacement: "</span>)
+  (<span class="org-keyword">save-excursion</span>
+    (goto-char (point-min))
+    (replace-string str repl)))
+</pre></div></div><p>
+Here's a basic wrapper to perform the string replacement for an HTML file based
+on the current buffer name.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-search-replace</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-search-replace-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-search-replace-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-replace-from-to-html</span> (str repl)
+  (<span class="org-keyword">let</span> ((html-file-name (concat
+                         (file-name-sans-extension (buffer-file-name))
+                         <span class="org-string">".html"</span>)))
+    (find-file html-file-name)
+    (lilac-replace-from-to str repl)
+    (save-buffer)))
+</pre></div></div><p>
+Now we do some basic search-and-replace commands to clean up the exported HTML
+file from Emacs (instead of invoking <code>sed</code>).
+</p>
+
+<p>
+This cleans up the inline styles for citations.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-fix-inline-styles</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-inline-styles">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-inline-styles">(lilac-replace-from-to-html
+ <span class="org-string">"&lt;style&gt;.csl-left-margin{float: left; padding-right: 0em"</span>
+ <span class="org-string">"&lt;style&gt;.csl-left-margin{float: left; padding-right: 1em"</span>)
+(lilac-replace-from-to-html
+ <span class="org-string">".csl-right-inline{margin: 0 0 0 1em;}&lt;/style&gt;"</span>
+ <span class="org-string">".csl-right-inline{margin: 1em 0 0 2em;}&lt;/style&gt;"</span>)
+</pre></div></div>
+</div>
+</div>
 </div>
 
 <div id="outline-container-h-JavaScript" class="outline-4">
@@ -2255,7 +2299,9 @@ modifications to it:
 <div id="outline-container-h-Delete--Table-of-Contents--text" class="outline-6">
 <h6 id="h-Delete--Table-of-Contents--text"><span class="section-number-6">3.4.6.2.1.</span> Delete "Table of Contents" text</h6>
 <div class="outline-text-6" id="text-h-Delete--Table-of-Contents--text">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__Makefile-weave">Makefile-replace-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-replace-toc-text">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-replace-toc-text">sed -i <span class="org-string">'s|&lt;h2&gt;Table of Contents&lt;/h2&gt;||'</span> <span class="org-makefile-targets">$</span><span class="org-makefile-targets"><span class="org-constant">@</span></span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-delete-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-delete-toc-text">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-delete-toc-text">(lilac-replace-from-to-html
+ <span class="org-string">"&lt;h2&gt;Table of Contents&lt;/h2&gt;"</span>
+ <span class="org-string">""</span>)
 </pre></div></div>
 </div>
 </div>
@@ -3450,11 +3496,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000c0">Org mode</a> borrows heavily using <a href="#org00000c2">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000c2"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000c6">Org mode</a> borrows heavily using <a href="#org00000c8">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000c8"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000c0"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000c6"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

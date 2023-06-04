@@ -88,7 +88,17 @@ When matching, reference is stored in match group 1."
      lilac-prettify-source-code-captions))
   (setq org-export-filter-final-output-functions
    '(lilac-replace-org_ids-with-human_ids))
-  (org-html-export-to-html))
+  (org-html-export-to-html)
+
+  (lilac-replace-from-to-html
+   "<h2>Table of Contents</h2>"
+   "")
+  (lilac-replace-from-to-html
+   "<style>.csl-left-margin{float: left; padding-right: 0em"
+   "<style>.csl-left-margin{float: left; padding-right: 1em")
+  (lilac-replace-from-to-html
+   ".csl-right-inline{margin: 0 0 0 1em;}</style>"
+   ".csl-right-inline{margin: 1em 0 0 2em;}</style>"))
 
 ;; Modify Org buffer
 (defun lilac-UID-for-all-src-blocks (_backend)
@@ -599,6 +609,18 @@ When matching, reference is stored in match group 1."
                 (format " href=\"#%s\"" v) html-oneline))))
        lilac-org_id-human_id-hash-table)
       (lilac-to-multi-line html-oneline))))
+(defun lilac-replace-from-to (str repl)
+  (interactive "sString: \nsReplacement: ")
+  (save-excursion
+    (goto-char (point-min))
+    (replace-string str repl)))
+(defun lilac-replace-from-to-html (str repl)
+  (let ((html-file-name (concat
+                         (file-name-sans-extension (buffer-file-name))
+                         ".html")))
+    (find-file html-file-name)
+    (lilac-replace-from-to str repl)
+    (save-buffer)))
 (defun lilac-gen-css-and-exit ()
   (font-lock-flush)
   (font-lock-fontify-buffer)

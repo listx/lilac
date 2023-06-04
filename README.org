@@ -342,12 +342,6 @@ weave: README.html
 README.html: README.org
 	$(call run_emacs,(lilac-gen-css-and-exit),$<)
 	$(call run_emacs,(lilac-publish),$<)
-	# Fix inline styles.
-	sed -i 's/<style>.csl-left-margin{float: left; padding-right: 0em/'\
-	'<style>.csl-left-margin{float: left; padding-right: 1em/' $@
-	sed -i 's/.csl-right-inline{margin: 0 0 0 1em;}<\/style>/'\
-	'.csl-right-inline{margin: 1em 0 0 2em;}<\/style>/' $@
-	__NREF__Makefile-replace-toc-text
 #+end_src
 
 Tangling is pretty straightforward --- we just need to call
@@ -512,6 +506,7 @@ __NREF__lilac_dot_el-imports
 __NREF__lilac_dot_el-fix-nondeterminism
 __NREF__lilac_dot_el-custom-noweb-delimiters
 __NREF__lilac_dot_el-lilac-publish
+__NREF__lilac_dot_el-search-replace
 __NREF__lilac_dot_el-autogenerate-css
 __NREF__lilac_dot_el-misc
 (provide 'lilac)
@@ -589,7 +584,10 @@ named =__NREF__...= get an automatic =#+caption: ...= text to go along with it
   (clrhash lilac-polyblock-names-totals)
 
   __NREF__lilac-publish-modify-HTML-2
-  (org-html-export-to-html))
+  (org-html-export-to-html)
+
+  __NREF__lilac-publish-delete-toc-text
+  __NREF__lilac-publish-fix-inline-styles)
 
 ;; Modify Org buffer
 __NREF__UID-for-all-src-blocks
@@ -1609,6 +1607,50 @@ earlier in [[* Automatic captions for Noweb source code blocks]].
   (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
 #+end_src
 
+**** Search and replace hardcoded things
+
+Org's HTML export hardcodes some things. We have to do some manual surgery to
+set things right. First let's define a generic search-and-replace function. This
+function is based on [[https://emacs.stackexchange.com/a/2382/13006][this example]].
+
+#+header: :noweb-ref __NREF__lilac_dot_el-search-replace
+#+begin_src emacs-lisp
+(defun lilac-replace-from-to (str repl)
+  (interactive "sString: \nsReplacement: ")
+  (save-excursion
+    (goto-char (point-min))
+    (replace-string str repl)))
+#+end_src
+
+Here's a basic wrapper to perform the string replacement for an HTML file based
+on the current buffer name.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-search-replace
+#+begin_src emacs-lisp
+(defun lilac-replace-from-to-html (str repl)
+  (let ((html-file-name (concat
+                         (file-name-sans-extension (buffer-file-name))
+                         ".html")))
+    (find-file html-file-name)
+    (lilac-replace-from-to str repl)
+    (save-buffer)))
+#+end_src
+
+Now we do some basic search-and-replace commands to clean up the exported HTML
+file from Emacs (instead of invoking =sed=).
+
+This cleans up the inline styles for citations.
+
+#+name: __NREF__lilac-publish-fix-inline-styles
+#+begin_src emacs-lisp
+(lilac-replace-from-to-html
+ "<style>.csl-left-margin{float: left; padding-right: 0em"
+ "<style>.csl-left-margin{float: left; padding-right: 1em")
+(lilac-replace-from-to-html
+ ".csl-right-inline{margin: 0 0 0 1em;}</style>"
+ ".csl-right-inline{margin: 1em 0 0 2em;}</style>")
+#+end_src
+
 *** JavaScript
 
 We use JavaScript to make the HTML document more useful. The main ideas are:
@@ -1701,9 +1743,11 @@ modifications to it:
 
 ***** Delete "Table of Contents" text
 
-#+name: __NREF__Makefile-replace-toc-text
-#+begin_src makefile
-sed -i 's|<h2>Table of Contents</h2>||' $@
+#+name: __NREF__lilac-publish-delete-toc-text
+#+begin_src emacs-lisp
+(lilac-replace-from-to-html
+ "<h2>Table of Contents</h2>"
+ "")
 #+end_src
 
 ***** Convert "Table of Contents" to a sidebar on the left
