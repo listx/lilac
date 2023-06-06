@@ -367,6 +367,7 @@ tangled_output = \
 	citations.bib \
 	lilac.css \
 	lilac.el \
+	lilac-tests.el \
 	lilac.js \
 	lilac.theme \
 	.gitattributes \
@@ -397,11 +398,21 @@ endef
 LILAC_ROOT := $(shell git rev-parse --show-toplevel)
 #+end_src
 
-We use [[https://github.com/nmattia/niv][=niv=]] to update the dependencies sourced by =shell.nix=.
+We use [[https://github.com/nmattia/niv][=niv=]] to update the dependencies sourced by =shell.nix=. Niv uses two
+sources of truth: the niv repository itself on GitHub, and a branch of nixpkgs.
+The former tracks the =master= branch, and the latter tracks the stable channels
+(example: =nixos-23.05= branch). Whenever we run =niv update=, =niv= will update
+the HEAD commit SHA of these branches.
+
+One problem with the nixpkgs stable channel is that it will eventually become
+obsolete as newer stable channels get created. So we have to manually track
+these channels ourselves.
 
 #+name: __NREF__Makefile-update-deps
 #+begin_src makefile
+nixpkgs_stable_channel := nixos-23.05
 update-deps: package/nix/sources.json package/nix/sources.nix
+	cd package && niv update nixpkgs --branch $(nixpkgs_stable_channel)
 	cd package && niv update
 	touch update-deps
 #+end_src

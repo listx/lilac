@@ -19,6 +19,7 @@ tangled_output = \
 	citations.bib \
 	lilac.css \
 	lilac.el \
+	lilac-tests.el \
 	lilac.js \
 	lilac.theme \
 	.gitattributes \
@@ -39,6 +40,8 @@ define run_emacs
 endef
 
 LILAC_ROOT := $(shell git rev-parse --show-toplevel)
+nixpkgs_stable_channel := nixos-23.05
 update-deps: package/nix/sources.json package/nix/sources.nix
+	cd package && niv update nixpkgs --branch $(nixpkgs_stable_channel)
 	cd package && niv update
 	touch update-deps
