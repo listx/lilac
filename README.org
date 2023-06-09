@@ -339,7 +339,7 @@ highlighting. And lastly we have to modify the generated =README.html= file with
 weave: README.html
 .PHONY: weave
 
-README.html: README.org
+README.html syntax-highlighting.css &: README.org
 	$(call run_emacs,(lilac-gen-css-and-exit),$<)
 	$(call run_emacs,(lilac-publish),$<)
 #+end_src
