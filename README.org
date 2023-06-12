@@ -1246,198 +1246,82 @@ it because we can't refer to polyblocks anyway by name).
 
 **** Pretty source code captions
 
-Here there are basically 3 things we have to keep track of:
+The default HTML export creates a =<div>= around the entire source code block.
+This =<div>= will have a =<pre>= tag with the source code contents, along with a
+preceding =<label>= if there was a =#+caption: ...= for this block. Because of
+automatic generation of =#+caption: ...= bits for all Noweb-style references in
+Section [[* Automatic captions for Noweb source code blocks]], the vast majority of
+source code blocks will have this =<label>= tag.
 
-1. the outer =<div>= that encloses the entire source code block,
-2. the =<label>=, if any (it may not exist), and
-3. the =<pre>= content.
+By default the =<label>= tag includes a Listing number ("Listing 1: ...",
+"Listing 17: ...", etc), because Org likes to numerically number every single
+source code block. We simply drop these listing numbers and instead link back to
+the parent block(s) that refer to this source code block (as a Noweb reference),
+if any.
 
-We only care about source code blocks with a =<label>= because that determines
-whether we have a "Listing: ..." or not. We just need to save the 3 bits of
-information, and then:
+For polyblock chains, we also have to keep track of how long each chain is. This
+way, each block in the chain will get a unique fraction denoting the position of
+that block in the overall chain. (If we don't do this, then all of the captions
+for all polyblocks in the same chain will look identical, which can be a bit
+confusing). In order to generate these fractions we have to keep around a couple
+hash tables for bookkeeping.
 
-1. print the outer =<div ...>=,
-2. print the =<label>= content but as a =<div>=, and
-3. print the =<pre>= content.
-
-For the last step, we want to additionally parse the inner "Listing N ... 0 [1 2
-3 ...]" text and transform it with reordering and also additional metadata
-information such as ~<span class="...">~ tags.
-
-We also save the =NSCB_POLYBLOCK_INDICATOR= with the =polyblock-indicator=
-variable and display it.
-
-#+name: __NREF__lilac-prettify-source-code-captions
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions
 #+begin_src emacs-lisp
 (setq lilac-polyblock-names (make-hash-table :test 'equal))
 (setq lilac-polyblock-names-totals (make-hash-table :test 'equal))
-
-(defun lilac-prettify-source-code-captions (src-block-html backend info)
-  (when (org-export-derived-backend-p backend 'html)
-    ;; Break up source block into 3 subparts --- the leading <div ...>, the
-    ;; <label ...></label> (if any) and <pre ...></pre>.
-    ;; Then run the linkifying logic against only the body, and then return the
-    ;; original label and new body.
-    (let* ((div-caption-body (lilac-get-source-block-html-parts-without-newlines
-                              src-block-html))
-           (leading-div (nth 0 div-caption-body))
-           (body (nth 2 div-caption-body))
-           (pre-id-match
-             (string-match
-               (rx-to-string
-                 '(and
-                       "<pre "
-                       (* (not ">"))
-                       "id=\""
-                       (group (+ (not "\"")))))
-               body))
-           (pre-id
-             (if pre-id-match
-                 (match-string-no-properties 1 body)
-                 "#deadlink"))
-           (body-with-newlines
-            (lilac-to-multi-line body))
-           (caption (nth 1 div-caption-body))
-           ; caption-parts just captures whatever substring is inside the
-           ; <label> tags.
-           (caption-parts
-             (let* ((caption-match
-                      (string-match "<label [^>]+>\\(.*?\\)</label>" caption)))
-               (if caption-match
-                   (match-string-no-properties 1 caption)
-                   "")))
-           (source-block-name-match
-             (string-match
-               (rx-to-string
-                 '(and
-                       "<code>"
-                       (group (+ (not "<")))
-                       "</code>"))
-               caption-parts))
-           ;; A source code block is anonymous if: (1) it does not have a
-           ;; "#+name: ..." line, or (2) it does not have a "#+header:
-           ;; :noweb-ref ..." line.
-           (source-block-name
-             (if source-block-name-match
-                 (match-string-no-properties 1 caption-parts)
-                 "anonymous"))
-           ;; This is just used for the side effect of recording the
-           ;; source-block-name, to be used for the fallback-id.
-           (source-block-counter
-            (gethash source-block-name lilac-polyblock-names 0))
-           (source-block-counter-incremented
-            (puthash source-block-name (1+ source-block-counter)
-                     lilac-polyblock-names))
-           (source-block-name-styled
-             (cond ((string-prefix-p "__NREF__" source-block-name)
-                    (concat
-                      "<span class=\"lilac-caption-source-code-block-name\">"
-                      (string-remove-prefix "__NREF__" source-block-name)
-                      "</span>"))
-                   (t
-                    (concat
-                      "<span class=\"lilac-caption-source-code-block-name\">"
-                      "&#x1f4c4; "
-                      source-block-name
-                      "</span>"))))
-           (polyblock-chain-total
-            (gethash source-block-name lilac-polyblock-names-totals 0))
-           (polyblock-chain-location
-            (if (= polyblock-chain-total 0)
-                ""
-              (format "(%s/%s) "
-                      source-block-counter-incremented polyblock-chain-total)))
-           (polyblock-indicator
-             (if (string-match "\(polyblock\)" caption-parts)
-                 polyblock-chain-location ""))
-           (parent-id-regexp
-               (rx-to-string
-                 '(and
-                       " <a href=\""
-                       (group (+ (not "\""))))))
-           (parent-ids-with-idx
-            (lilac-enumerate
-             (lilac-matches parent-id-regexp caption-parts 1) 1))
-           (parent-links
-             (mapconcat (lambda (parent-id-with-idx)
-                          (let ((parent-id (car (cdr parent-id-with-idx)))
-                                (idx (car parent-id-with-idx)))
-                             (format (concat
-                                      "<span class="
-                                      "\"lilac-caption-parent-link\">"
-                                      "<a href=\"%s\">%s</a></span>")
-                               parent-id
-                               (if (= idx 1)
-                                   (string-remove-prefix
-                                    "__NREF__" source-block-name)
-                                 idx))))
-                        parent-ids-with-idx ""))
-           ;; For polyblocks, only the first (head) block gets an id field for a
-           ;; <pre> tag. The rest (tail) don't have this field so they would
-           ;; normally get assigned a deadlink. To avoid this, use a counter for
-           ;; the parent-id, because this parent-id is shared across all
-           ;; polyblocks. Then use this with the parent-id to generate an
-           ;; alternate, fallback-id. This way the tail polyblocks get assigned
-           ;; a unique (meaningful) ID and not just "##deadlink".
-           (fallback-id
-             (if (string= pre-id "#deadlink")
-                 (format "%s-%s"
-                         source-block-name
-                         source-block-counter-incremented)
-                 pre-id))
-           (pre-tag-match
-             (string-match
-               (rx-to-string
-                 '(and
-                       "<pre "
-                       (group (* (not ">")))
-                       ">"))
-               body))
-           (pre-tag-entire (match-string-no-properties 0 body))
-           (pre-tag-contents (match-string-no-properties 1 body))
-           (body-with-replaced-pre
-             (if pre-id-match
-                 body-with-newlines
-                 (string-replace pre-tag-entire
-                                 (concat "<pre " pre-tag-contents
-                                         (format " id=\"%s\"" fallback-id) ">")
-                                 body-with-newlines)))
-           (link-symbol
-             (format (concat "<span class=\"lilac-caption-link-symbol\">"
-                             "<a href=\"#%s\">&#x1f517;</a></span>")
-               fallback-id))
-           (caption-without-listing-prefix
-            (replace-regexp-in-string "<span.+?span>" "" caption))
-           (caption-text
-            (if (> (length parent-links) 0)
-                (concat
-                  "<div class=\"lilac-caption\">"
-                    parent-links
-                    polyblock-indicator
-                    link-symbol
-                  "</div>")
-                (concat
-                  "<div class=\"lilac-caption\">"
-                    caption-without-listing-prefix
-                    link-symbol
-                  "</div>")))
-           )
-      (if (s-blank? caption)
-       src-block-html
-       (concat
-        leading-div
-          "<div class=\"lilac-pre-with-caption\">"
-            caption-text
-            body-with-replaced-pre
-          "</div>"
-        "</div>")))))
-
-__NREF__lilac-get-source-block-html-parts-without-newlines
 #+end_src
 
-This is a helper function to parse the HTML output for a source code block.
+First here is the overall shape of the function. If there is no caption
+(=<label>= tag in the HTML), then we return the original HTML unmodified.
+Otherwise we prettify this label (removing the "Listing N: ..." text, including
+a link back to the parent, etc) along with the body text (linkifying references
+to child Noweb references), and return both inside a new
+=lilac-pre-with-caption= div.
 
-#+name: __NREF__lilac-get-source-block-html-parts-without-newlines
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions
+#+begin_src emacs-lisp
+(defun lilac-prettify-source-code-captions (src-block-html backend info)
+  (when (org-export-derived-backend-p backend 'html)
+    (let* (
+           __NREF__lilac-prettify-source-code-captions-let-bindings)
+      (if (s-blank? caption)
+          src-block-html
+        (concat
+          leading-div
+            "<div class=\"lilac-pre-with-caption\">"
+              caption-text
+              body-with-replaced-pre
+            "</div>"
+          "</div>")))))
+#+end_src
+
+Now let's get into the bindings. The first order of business is parsing the HTML
+bits into separate parts.
+
+=div-caption-body= is the original HTML but all on a single line. We need to
+work with the text without newlines because Emacs Lisp's regular expressions
+don't work well with newlines. That's why we call
+=lilac-get-source-block-html-parts-without-newlines=.
+
+We need =leading-div= because this outermost =div= contains various class and
+other information that Org generates. We don't want to lose any of that info.
+
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions-let-bindings
+#+begin_src emacs-lisp
+(div-caption-body (lilac-get-source-block-html-parts-without-newlines
+                   src-block-html))
+(leading-div (nth 0 div-caption-body))
+(caption (nth 1 div-caption-body))
+(body (nth 2 div-caption-body))
+(body-with-newlines
+ (lilac-to-multi-line body))
+#+end_src
+
+=lilac-get-source-block-html-parts-without-newlines= is defined below. It's just
+a list of parsed pieces of HTML.
+
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions
 #+begin_src emacs-lisp
 (defun lilac-get-source-block-html-parts-without-newlines (src-block-html)
     (let* ((one-line (lilac-to-single-line src-block-html))
@@ -1454,6 +1338,199 @@ This is a helper function to parse the HTML output for a source code block.
            (body (progn (string-match "<pre [^>]+>.*?</pre>" one-line)
                         (match-string-no-properties 0 one-line))))
       `(,leading-div ,caption ,body)))
+#+end_src
+
+Now come the bits for identifying the human-readable source code block name by
+looking at the caption (=<label>=). We extract it from the =<code>= tags that we
+expect to see inside the =<label>= tag.
+
+It may very well be the case that the block will not have a name, in which
+case we just name it as =anonymous=. A source code block is anonymous if:
+
+1. it does not have a ="#+name: ..."= line, or
+2. it does not have a ="#+header: :noweb-ref ..."= line.
+
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions-let-bindings
+#+begin_src emacs-lisp
+(caption-parts
+  (let* ((caption-match
+           (string-match "<label [^>]+>\\(.*?\\)</label>" caption)))
+    (if caption-match
+        (match-string-no-properties 1 caption)
+        "")))
+(source-block-name-match
+  (string-match
+    (rx-to-string
+      '(and
+            "<code>"
+            (group (+ (not "<")))
+            "</code>"))
+    caption-parts))
+#+end_src
+
+Because the name =anonymous= is meaningless (there can be more than one such
+block), we need to disambiguate it. We do this by appending a numeric suffix to
+all source code blocks with the same human-readable =source-block-name=.
+
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions-let-bindings
+#+begin_src emacs-lisp
+(source-block-name
+  (if source-block-name-match
+      (match-string-no-properties 1 caption-parts)
+      "anonymous"))
+(source-block-counter
+ (gethash source-block-name lilac-polyblock-names 0))
+(source-block-counter-incremented
+ (puthash source-block-name (1+ source-block-counter)
+          lilac-polyblock-names))
+#+end_src
+
+Here we do some additional introspection into the =<pre>= tag which holds the
+body text (the actual source code in the source code block). The =pre-id= is
+important because it gives us a unique ID (linkable ID) to the body text. We'll
+be using this when linking to a child block from a parent block.
+
+Sadly, Org does not give every source code block an ~id=...~ field. Notably,
+polyblocks do not get an =id= except for the very first block in the chain. And
+so we inject an =id= for every =<pre>= tag ourselves. But first we have to see
+if the =<pre>= tag has an ID already with =pre-id-match=.
+
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions-let-bindings
+#+begin_src emacs-lisp
+(pre-id-match
+  (string-match
+    (rx-to-string
+      '(and
+            "<pre "
+            (* (not ">"))
+            "id=\""
+            (group (+ (not "\"")))))
+    body))
+#+end_src
+
+Now we can create a universal =pre-id= for all =<pre>= tags, and make sure that
+all =<pre>= tags without a given =id= can use =pre-id-universal= as a fallback.
+
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions-let-bindings
+#+begin_src emacs-lisp
+(pre-id-universal
+  (if pre-id-match
+      (match-string-no-properties 1 body)
+    (format "%s-%s"
+            source-block-name
+            source-block-counter-incremented)))
+(pre-tag-match
+  (string-match
+    (rx-to-string
+      '(and
+            "<pre "
+            (group (* (not ">")))
+            ">"))
+    body))
+(pre-tag-entire (match-string-no-properties 0 body))
+(pre-tag-contents (match-string-no-properties 1 body))
+(body-with-replaced-pre
+  (if pre-id-match
+      body-with-newlines
+      (string-replace pre-tag-entire
+                      (concat "<pre " pre-tag-contents
+                              (format " id=\"%s\"" pre-id-universal) ">")
+                      body-with-newlines)))
+#+end_src
+
+For polyblocks though, we also want to show a fraction in the form =(N/TOTAL)=
+where =N= is the numeric position of the polyblock (1 for the head, 2 for the
+second one in the chain, 3 for the third, and so on), and =TOTAL= is the total
+number of polyblocks in the chain. This way the reader can get some idea about
+how many pieces there are as the overall chain is explained in the prose. This
+=(N/TOTAL)= fraction is called a =polyblock-indicator=.
+
+Note that we use the =(polyblock)= marker text from [[(NSCB_POLYBLOCK_INDICATOR)][=NSCB_POLYBLOCK_INDICATOR=]]
+to detect whether we're dealing with a polyblock, because otherwise all of those
+anonymous blocks will get treated as part of a single polyblock chain.
+
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions-let-bindings
+#+begin_src emacs-lisp
+(polyblock-chain-total
+ (gethash source-block-name lilac-polyblock-names-totals 0))
+(polyblock-indicator
+ (if (and
+      (> polyblock-chain-total 0)
+      (string-match "\(polyblock\)" caption-parts))
+     (format "(%s/%s) "
+             source-block-counter-incremented
+             polyblock-chain-total)
+   ""))
+#+end_src
+
+Most source code blocks have a parent where this code block's contents should be
+inserted into. There could be more than one parent if the code is reused
+verbatim in multiple places.
+
+We generate a link back to the parent (or parents), by extracting the links
+(=href= bits in the =<a>= (aka anchor) tags) found in the caption. These links
+were generated for us in Section [[* Automatic captions for Noweb source code
+blocks]]; our job is to prettify them with CSS classes and such.
+
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions-let-bindings
+#+begin_src emacs-lisp
+(parent-id-regexp
+    (rx-to-string
+      '(and
+            " <a href=\""
+            (group (+ (not "\""))))))
+(parent-ids-with-idx
+ (lilac-enumerate
+  (lilac-matches parent-id-regexp caption-parts 1) 1))
+(parent-links
+  (mapconcat (lambda (parent-id-with-idx)
+               (let ((parent-id (car (cdr parent-id-with-idx)))
+                     (idx (car parent-id-with-idx)))
+                  (format (concat
+                           "<span class="
+                           "\"lilac-caption-parent-link\">"
+                           "<a href=\"%s\">%s</a></span>")
+                    parent-id
+                    (if (= idx 1)
+                        (string-remove-prefix
+                         "__NREF__" source-block-name)
+                      idx))))
+             parent-ids-with-idx ""))
+#+end_src
+
+Every source code block gets a self-link back to itself (shown as a link icon
+"🔗"). This goes at the very end of the caption on the far right (top right
+corner of the source code block's rectangular area).
+
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions-let-bindings
+#+begin_src emacs-lisp
+(link-symbol
+  (format (concat "<span class=\"lilac-caption-link-symbol\">"
+                  "<a href=\"#%s\">&#x1f517;</a></span>")
+    pre-id-universal))
+#+end_src
+
+Finally, we're ready to recompose the overall source code block. We make a
+distinction for source code blocks that have links back to a parent (or multiple
+parents). In all cases we make sure to remove Org's default "Listing N:" prefix.
+
+#+header: :noweb-ref __NREF__lilac-prettify-source-code-captions-let-bindings
+#+begin_src emacs-lisp
+(caption-without-listing-prefix
+ (replace-regexp-in-string "<span.+?span>" "" caption))
+(caption-text
+ (if (> (length parent-links) 0)
+     (concat
+       "<div class=\"lilac-caption\">"
+         parent-links
+         polyblock-indicator
+         link-symbol
+       "</div>")
+     (concat
+       "<div class=\"lilac-caption\">"
+         caption-without-listing-prefix
+         link-symbol
+       "</div>")))
 #+end_src
 
 **** Link noweb references (link to child block from parent block)

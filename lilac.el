@@ -379,35 +379,16 @@ When matching, reference is stored in match group 1."
   (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
 (setq lilac-polyblock-names (make-hash-table :test 'equal))
 (setq lilac-polyblock-names-totals (make-hash-table :test 'equal))
-
 (defun lilac-prettify-source-code-captions (src-block-html backend info)
   (when (org-export-derived-backend-p backend 'html)
-    ;; Break up source block into 3 subparts --- the leading <div ...>, the
-    ;; <label ...></label> (if any) and <pre ...></pre>.
-    ;; Then run the linkifying logic against only the body, and then return the
-    ;; original label and new body.
-    (let* ((div-caption-body (lilac-get-source-block-html-parts-without-newlines
+    (let* (
+           (div-caption-body (lilac-get-source-block-html-parts-without-newlines
                               src-block-html))
            (leading-div (nth 0 div-caption-body))
+           (caption (nth 1 div-caption-body))
            (body (nth 2 div-caption-body))
-           (pre-id-match
-             (string-match
-               (rx-to-string
-                 '(and
-                       "<pre "
-                       (* (not ">"))
-                       "id=\""
-                       (group (+ (not "\"")))))
-               body))
-           (pre-id
-             (if pre-id-match
-                 (match-string-no-properties 1 body)
-                 "#deadlink"))
            (body-with-newlines
             (lilac-to-multi-line body))
-           (caption (nth 1 div-caption-body))
-           ; caption-parts just captures whatever substring is inside the
-           ; <label> tags.
            (caption-parts
              (let* ((caption-match
                       (string-match "<label [^>]+>\\(.*?\\)</label>" caption)))
@@ -422,42 +403,57 @@ When matching, reference is stored in match group 1."
                        (group (+ (not "<")))
                        "</code>"))
                caption-parts))
-           ;; A source code block is anonymous if: (1) it does not have a
-           ;; "#+name: ..." line, or (2) it does not have a "#+header:
-           ;; :noweb-ref ..." line.
            (source-block-name
              (if source-block-name-match
                  (match-string-no-properties 1 caption-parts)
                  "anonymous"))
-           ;; This is just used for the side effect of recording the
-           ;; source-block-name, to be used for the fallback-id.
            (source-block-counter
             (gethash source-block-name lilac-polyblock-names 0))
            (source-block-counter-incremented
             (puthash source-block-name (1+ source-block-counter)
                      lilac-polyblock-names))
-           (source-block-name-styled
-             (cond ((string-prefix-p "__NREF__" source-block-name)
-                    (concat
-                      "<span class=\"lilac-caption-source-code-block-name\">"
-                      (string-remove-prefix "__NREF__" source-block-name)
-                      "</span>"))
-                   (t
-                    (concat
-                      "<span class=\"lilac-caption-source-code-block-name\">"
-                      "&#x1f4c4; "
-                      source-block-name
-                      "</span>"))))
+           (pre-id-match
+             (string-match
+               (rx-to-string
+                 '(and
+                       "<pre "
+                       (* (not ">"))
+                       "id=\""
+                       (group (+ (not "\"")))))
+               body))
+           (pre-id-universal
+             (if pre-id-match
+                 (match-string-no-properties 1 body)
+               (format "%s-%s"
+                       source-block-name
+                       source-block-counter-incremented)))
+           (pre-tag-match
+             (string-match
+               (rx-to-string
+                 '(and
+                       "<pre "
+                       (group (* (not ">")))
+                       ">"))
+               body))
+           (pre-tag-entire (match-string-no-properties 0 body))
+           (pre-tag-contents (match-string-no-properties 1 body))
+           (body-with-replaced-pre
+             (if pre-id-match
+                 body-with-newlines
+                 (string-replace pre-tag-entire
+                                 (concat "<pre " pre-tag-contents
+                                         (format " id=\"%s\"" pre-id-universal) ">")
+                                 body-with-newlines)))
            (polyblock-chain-total
             (gethash source-block-name lilac-polyblock-names-totals 0))
-           (polyblock-chain-location
-            (if (= polyblock-chain-total 0)
-                ""
-              (format "(%s/%s) "
-                      source-block-counter-incremented polyblock-chain-total)))
            (polyblock-indicator
-             (if (string-match "\(polyblock\)" caption-parts)
-                 polyblock-chain-location ""))
+            (if (and
+                 (> polyblock-chain-total 0)
+                 (string-match "\(polyblock\)" caption-parts))
+                (format "(%s/%s) "
+                        source-block-counter-incremented
+                        polyblock-chain-total)
+              ""))
            (parent-id-regexp
                (rx-to-string
                  '(and
@@ -480,40 +476,10 @@ When matching, reference is stored in match group 1."
                                     "__NREF__" source-block-name)
                                  idx))))
                         parent-ids-with-idx ""))
-           ;; For polyblocks, only the first (head) block gets an id field for a
-           ;; <pre> tag. The rest (tail) don't have this field so they would
-           ;; normally get assigned a deadlink. To avoid this, use a counter for
-           ;; the parent-id, because this parent-id is shared across all
-           ;; polyblocks. Then use this with the parent-id to generate an
-           ;; alternate, fallback-id. This way the tail polyblocks get assigned
-           ;; a unique (meaningful) ID and not just "##deadlink".
-           (fallback-id
-             (if (string= pre-id "#deadlink")
-                 (format "%s-%s"
-                         source-block-name
-                         source-block-counter-incremented)
-                 pre-id))
-           (pre-tag-match
-             (string-match
-               (rx-to-string
-                 '(and
-                       "<pre "
-                       (group (* (not ">")))
-                       ">"))
-               body))
-           (pre-tag-entire (match-string-no-properties 0 body))
-           (pre-tag-contents (match-string-no-properties 1 body))
-           (body-with-replaced-pre
-             (if pre-id-match
-                 body-with-newlines
-                 (string-replace pre-tag-entire
-                                 (concat "<pre " pre-tag-contents
-                                         (format " id=\"%s\"" fallback-id) ">")
-                                 body-with-newlines)))
            (link-symbol
              (format (concat "<span class=\"lilac-caption-link-symbol\">"
                              "<a href=\"#%s\">&#x1f517;</a></span>")
-               fallback-id))
+               pre-id-universal))
            (caption-without-listing-prefix
             (replace-regexp-in-string "<span.+?span>" "" caption))
            (caption-text
@@ -528,18 +494,16 @@ When matching, reference is stored in match group 1."
                   "<div class=\"lilac-caption\">"
                     caption-without-listing-prefix
                     link-symbol
-                  "</div>")))
-           )
+                  "</div>"))))
       (if (s-blank? caption)
-       src-block-html
-       (concat
-        leading-div
-          "<div class=\"lilac-pre-with-caption\">"
-            caption-text
-            body-with-replaced-pre
-          "</div>"
-        "</div>")))))
-
+          src-block-html
+        (concat
+          leading-div
+            "<div class=\"lilac-pre-with-caption\">"
+              caption-text
+              body-with-replaced-pre
+            "</div>"
+          "</div>")))))
 (defun lilac-get-source-block-html-parts-without-newlines (src-block-html)
     (let* ((one-line (lilac-to-single-line src-block-html))
            (leading-div

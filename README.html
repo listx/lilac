@@ -1083,7 +1083,7 @@ named <code>__NREF__...</code> get an automatic <code>#+caption: ...</code> text
 
 <span class="org-comment-delimiter">;; </span><span class="org-comment">Modify HTML</span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-link-to-child-blocks-from-parent">lilac-link-to-child-blocks-from-parent</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-prettify-source-code-captions">lilac-prettify-source-code-captions</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-prettify-source-code-captions-1">lilac-prettify-source-code-captions</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-human-readable-src-block-ids">lilac-human-readable-src-block-ids</a></span>
 </pre></div></div>
 </div>
@@ -1772,207 +1772,85 @@ it because we can't refer to polyblocks anyway by name).
 <h5 id="h-Pretty-source-code-captions"><span class="section-number-5">3.4.5.2.</span> Pretty source code captions</h5>
 <div class="outline-text-5" id="text-h-Pretty-source-code-captions">
 <p>
-Here there are basically 3 things we have to keep track of:
-</p>
-
-<ol class="org-ol">
-<li>the outer <code>&lt;div&gt;</code> that encloses the entire source code block,</li>
-<li>the <code>&lt;label&gt;</code>, if any (it may not exist), and</li>
-<li>the <code>&lt;pre&gt;</code> content.</li>
-</ol>
-
-<p>
-We only care about source code blocks with a <code>&lt;label&gt;</code> because that determines
-whether we have a "Listing: &#x2026;" or not. We just need to save the 3 bits of
-information, and then:
-</p>
-
-<ol class="org-ol">
-<li>print the outer <code>&lt;div ...&gt;</code>,</li>
-<li>print the <code>&lt;label&gt;</code> content but as a <code>&lt;div&gt;</code>, and</li>
-<li>print the <code>&lt;pre&gt;</code> content.</li>
-</ol>
-
-<p>
-For the last step, we want to additionally parse the inner "Listing N &#x2026; 0 [1 2
-3 &#x2026;]" text and transform it with reordering and also additional metadata
-information such as <code>&lt;span class="..."&gt;</code> tags.
+The default HTML export creates a <code>&lt;div&gt;</code> around the entire source code block.
+This <code>&lt;div&gt;</code> will have a <code>&lt;pre&gt;</code> tag with the source code contents, along with a
+preceding <code>&lt;label&gt;</code> if there was a <code>#+caption: ...</code> for this block. Because of
+automatic generation of <code>#+caption: ...</code> bits for all Noweb-style references in
+Section <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2</a>, the vast majority of
+source code blocks will have this <code>&lt;label&gt;</code> tag.
 </p>
 
 <p>
-We also save the <code>NSCB_POLYBLOCK_INDICATOR</code> with the <code>polyblock-indicator</code>
-variable and display it.
+By default the <code>&lt;label&gt;</code> tag includes a Listing number ("Listing 1: &#x2026;",
+"Listing 17: &#x2026;", etc), because Org likes to numerically number every single
+source code block. We simply drop these listing numbers and instead link back to
+the parent block(s) that refer to this source code block (as a Noweb reference),
+if any.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-prettify-source-code-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions">(<span class="org-keyword">setq</span> lilac-polyblock-names (make-hash-table <span class="org-builtin">:test</span> 'equal))
+<p>
+For polyblock chains, we also have to keep track of how long each chain is. This
+way, each block in the chain will get a unique fraction denoting the position of
+that block in the overall chain. (If we don't do this, then all of the captions
+for all polyblocks in the same chain will look identical, which can be a bit
+confusing). In order to generate these fractions we have to keep around a couple
+hash tables for bookkeeping.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-prettify-source-code-captions</a></span>(1/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-1">(<span class="org-keyword">setq</span> lilac-polyblock-names (make-hash-table <span class="org-builtin">:test</span> 'equal))
 (<span class="org-keyword">setq</span> lilac-polyblock-names-totals (make-hash-table <span class="org-builtin">:test</span> 'equal))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-prettify-source-code-captions</span> (src-block-html backend info)
-  (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">Break up source block into 3 subparts --- the leading &lt;div ...&gt;, the</span>
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">&lt;label ...&gt;&lt;/label&gt; (if any) and &lt;pre ...&gt;&lt;/pre&gt;.</span>
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">Then run the linkifying logic against only the body, and then return the</span>
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">original label and new body.</span>
-    (<span class="org-keyword">let*</span> ((div-caption-body (lilac-get-source-block-html-parts-without-newlines
-                              src-block-html))
-           (leading-div (nth 0 div-caption-body))
-           (body (nth 2 div-caption-body))
-           (pre-id-match
-             (string-match
-               (rx-to-string
-                 '(and
-                       <span class="org-string">"&lt;pre "</span>
-                       (* (not <span class="org-string">"&gt;"</span>))
-                       <span class="org-string">"id=\""</span>
-                       (group (+ (not <span class="org-string">"\""</span>)))))
-               body))
-           (pre-id
-             (<span class="org-keyword">if</span> pre-id-match
-                 (match-string-no-properties 1 body)
-                 <span class="org-string">"#deadlink"</span>))
-           (body-with-newlines
-            (lilac-to-multi-line body))
-           (caption (nth 1 div-caption-body))
-           <span class="org-comment-delimiter">; </span><span class="org-comment">caption-parts just captures whatever substring is inside the</span>
-           <span class="org-comment-delimiter">; </span><span class="org-comment">&lt;label&gt; tags.</span>
-           (caption-parts
-             (<span class="org-keyword">let*</span> ((caption-match
-                      (string-match <span class="org-string">"&lt;label [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+&gt;</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">.*?</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&lt;/label&gt;"</span> caption)))
-               (<span class="org-keyword">if</span> caption-match
-                   (match-string-no-properties 1 caption)
-                   <span class="org-string">""</span>)))
-           (source-block-name-match
-             (string-match
-               (rx-to-string
-                 '(and
-                       <span class="org-string">"&lt;code&gt;"</span>
-                       (group (+ (not <span class="org-string">"&lt;"</span>)))
-                       <span class="org-string">"&lt;/code&gt;"</span>))
-               caption-parts))
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">A source code block is anonymous if: (1) it does not have a</span>
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">"#+name: ..." line, or (2) it does not have a "#+header:</span>
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">:noweb-ref ..." line.</span>
-           (source-block-name
-             (<span class="org-keyword">if</span> source-block-name-match
-                 (match-string-no-properties 1 caption-parts)
-                 <span class="org-string">"anonymous"</span>))
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">This is just used for the side effect of recording the</span>
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">source-block-name, to be used for the fallback-id.</span>
-           (source-block-counter
-            (gethash source-block-name lilac-polyblock-names 0))
-           (source-block-counter-incremented
-            (puthash source-block-name (1+ source-block-counter)
-                     lilac-polyblock-names))
-           (source-block-name-styled
-             (<span class="org-keyword">cond</span> ((string-prefix-p <span class="org-string">"__NREF__"</span> source-block-name)
-                    (concat
-                      <span class="org-string">"&lt;span class=\"lilac-caption-source-code-block-name\"&gt;"</span>
-                      (string-remove-prefix <span class="org-string">"__NREF__"</span> source-block-name)
-                      <span class="org-string">"&lt;/span&gt;"</span>))
-                   (t
-                    (concat
-                      <span class="org-string">"&lt;span class=\"lilac-caption-source-code-block-name\"&gt;"</span>
-                      <span class="org-string">"&amp;#x1f4c4; "</span>
-                      source-block-name
-                      <span class="org-string">"&lt;/span&gt;"</span>))))
-           (polyblock-chain-total
-            (gethash source-block-name lilac-polyblock-names-totals 0))
-           (polyblock-chain-location
-            (<span class="org-keyword">if</span> (= polyblock-chain-total 0)
-                <span class="org-string">""</span>
-              (format <span class="org-string">"(%s/%s) "</span>
-                      source-block-counter-incremented polyblock-chain-total)))
-           (polyblock-indicator
-             (<span class="org-keyword">if</span> (string-match <span class="org-string">"</span><span class="org-string"><span class="org-warning">\</span></span><span class="org-string">(polyblock</span><span class="org-string"><span class="org-warning">\</span></span><span class="org-string">)"</span> caption-parts)
-                 polyblock-chain-location <span class="org-string">""</span>))
-           (parent-id-regexp
-               (rx-to-string
-                 '(and
-                       <span class="org-string">" &lt;a href=\""</span>
-                       (group (+ (not <span class="org-string">"\""</span>))))))
-           (parent-ids-with-idx
-            (lilac-enumerate
-             (lilac-matches parent-id-regexp caption-parts 1) 1))
-           (parent-links
-             (mapconcat (<span class="org-keyword">lambda</span> (parent-id-with-idx)
-                          (<span class="org-keyword">let</span> ((parent-id (car (cdr parent-id-with-idx)))
-                                (idx (car parent-id-with-idx)))
-                             (format (concat
-                                      <span class="org-string">"&lt;span class="</span>
-                                      <span class="org-string">"\"lilac-caption-parent-link\"&gt;"</span>
-                                      <span class="org-string">"&lt;a href=\"%s\"&gt;%s&lt;/a&gt;&lt;/span&gt;"</span>)
-                               parent-id
-                               (<span class="org-keyword">if</span> (= idx 1)
-                                   (string-remove-prefix
-                                    <span class="org-string">"__NREF__"</span> source-block-name)
-                                 idx))))
-                        parent-ids-with-idx <span class="org-string">""</span>))
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">For polyblocks, only the first (head) block gets an id field for a</span>
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">&lt;pre&gt; tag. The rest (tail) don't have this field so they would</span>
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">normally get assigned a deadlink. To avoid this, use a counter for</span>
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">the parent-id, because this parent-id is shared across all</span>
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">polyblocks. Then use this with the parent-id to generate an</span>
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">alternate, fallback-id. This way the tail polyblocks get assigned</span>
-           <span class="org-comment-delimiter">;; </span><span class="org-comment">a unique (meaningful) ID and not just "##deadlink".</span>
-           (fallback-id
-             (<span class="org-keyword">if</span> (string= pre-id <span class="org-string">"#deadlink"</span>)
-                 (format <span class="org-string">"%s-%s"</span>
-                         source-block-name
-                         source-block-counter-incremented)
-                 pre-id))
-           (pre-tag-match
-             (string-match
-               (rx-to-string
-                 '(and
-                       <span class="org-string">"&lt;pre "</span>
-                       (group (* (not <span class="org-string">"&gt;"</span>)))
-                       <span class="org-string">"&gt;"</span>))
-               body))
-           (pre-tag-entire (match-string-no-properties 0 body))
-           (pre-tag-contents (match-string-no-properties 1 body))
-           (body-with-replaced-pre
-             (<span class="org-keyword">if</span> pre-id-match
-                 body-with-newlines
-                 (string-replace pre-tag-entire
-                                 (concat <span class="org-string">"&lt;pre "</span> pre-tag-contents
-                                         (format <span class="org-string">" id=\"%s\""</span> fallback-id) <span class="org-string">"&gt;"</span>)
-                                 body-with-newlines)))
-           (link-symbol
-             (format (concat <span class="org-string">"&lt;span class=\"lilac-caption-link-symbol\"&gt;"</span>
-                             <span class="org-string">"&lt;a href=\"#%s\"&gt;&amp;#x1f517;&lt;/a&gt;&lt;/span&gt;"</span>)
-               fallback-id))
-           (caption-without-listing-prefix
-            (replace-regexp-in-string <span class="org-string">"&lt;span.+?span&gt;"</span> <span class="org-string">""</span> caption))
-           (caption-text
-            (<span class="org-keyword">if</span> (&gt; (length parent-links) 0)
-                (concat
-                  <span class="org-string">"&lt;div class=\"lilac-caption\"&gt;"</span>
-                    parent-links
-                    polyblock-indicator
-                    link-symbol
-                  <span class="org-string">"&lt;/div&gt;"</span>)
-                (concat
-                  <span class="org-string">"&lt;div class=\"lilac-caption\"&gt;"</span>
-                    caption-without-listing-prefix
-                    link-symbol
-                  <span class="org-string">"&lt;/div&gt;"</span>)))
-           )
-      (<span class="org-keyword">if</span> (s-blank? caption)
-       src-block-html
-       (concat
-        leading-div
-          <span class="org-string">"&lt;div class=\"lilac-pre-with-caption\"&gt;"</span>
-            caption-text
-            body-with-replaced-pre
-          <span class="org-string">"&lt;/div&gt;"</span>
-        <span class="org-string">"&lt;/div&gt;"</span>)))))
-
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-get-source-block-html-parts-without-newlines">lilac-get-source-block-html-parts-without-newlines</a></span>
 </pre></div></div><p>
-This is a helper function to parse the HTML output for a source code block.
+First here is the overall shape of the function. If there is no caption
+(<code>&lt;label&gt;</code> tag in the HTML), then we return the original HTML unmodified.
+Otherwise we prettify this label (removing the "Listing N: &#x2026;" text, including
+a link back to the parent, etc) along with the body text (linkifying references
+to child Noweb references), and return both inside a new
+<code>lilac-pre-with-caption</code> div.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions">lilac-get-source-block-html-parts-without-newlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-get-source-block-html-parts-without-newlines">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-get-source-block-html-parts-without-newlines">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-source-block-html-parts-without-newlines</span> (src-block-html)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-prettify-source-code-captions</a></span>(2/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-prettify-source-code-captions</span> (src-block-html backend info)
+  (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
+    (<span class="org-keyword">let*</span> (
+           <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-1">lilac-prettify-source-code-captions-let-bindings</a></span>)
+      (<span class="org-keyword">if</span> (s-blank? caption)
+          src-block-html
+        (concat
+          leading-div
+            <span class="org-string">"&lt;div class=\"lilac-pre-with-caption\"&gt;"</span>
+              caption-text
+              body-with-replaced-pre
+            <span class="org-string">"&lt;/div&gt;"</span>
+          <span class="org-string">"&lt;/div&gt;"</span>)))))
+</pre></div></div><p>
+Now let's get into the bindings. The first order of business is parsing the HTML
+bits into separate parts.
+</p>
+
+<p>
+<code>div-caption-body</code> is the original HTML but all on a single line. We need to
+work with the text without newlines because Emacs Lisp's regular expressions
+don't work well with newlines. That's why we call
+<code>lilac-get-source-block-html-parts-without-newlines</code>.
+</p>
+
+<p>
+We need <code>leading-div</code> because this outermost <code>div</code> contains various class and
+other information that Org generates. We don't want to lose any of that info.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions-2">lilac-prettify-source-code-captions-let-bindings</a></span>(1/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-let-bindings-1">(div-caption-body (lilac-get-source-block-html-parts-without-newlines
+                   src-block-html))
+(leading-div (nth 0 div-caption-body))
+(caption (nth 1 div-caption-body))
+(body (nth 2 div-caption-body))
+(body-with-newlines
+ (lilac-to-multi-line body))
+</pre></div></div><p>
+<code>lilac-get-source-block-html-parts-without-newlines</code> is defined below. It's just
+a list of parsed pieces of HTML.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-prettify-source-code-captions</a></span>(3/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-3">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-source-block-html-parts-without-newlines</span> (src-block-html)
     (<span class="org-keyword">let*</span> ((one-line (lilac-to-single-line src-block-html))
            (leading-div
              (<span class="org-keyword">let</span> ((div-match
@@ -1987,6 +1865,192 @@ This is a helper function to parse the HTML output for a source code block.
            (body (<span class="org-keyword">progn</span> (string-match <span class="org-string">"&lt;pre [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+&gt;.*?&lt;/pre&gt;"</span> one-line)
                         (match-string-no-properties 0 one-line))))
       `(,leading-div ,caption ,body)))
+</pre></div></div><p>
+Now come the bits for identifying the human-readable source code block name by
+looking at the caption (<code>&lt;label&gt;</code>). We extract it from the <code>&lt;code&gt;</code> tags that we
+expect to see inside the <code>&lt;label&gt;</code> tag.
+</p>
+
+<p>
+It may very well be the case that the block will not have a name, in which
+case we just name it as <code>anonymous</code>. A source code block is anonymous if:
+</p>
+
+<ol class="org-ol">
+<li>it does not have a <code>"#+name: ..."</code> line, or</li>
+<li>it does not have a <code>"#+header: :noweb-ref ..."</code> line.</li>
+</ol>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions-2">lilac-prettify-source-code-captions-let-bindings</a></span>(2/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-let-bindings-2">(caption-parts
+  (<span class="org-keyword">let*</span> ((caption-match
+           (string-match <span class="org-string">"&lt;label [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+&gt;</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">.*?</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&lt;/label&gt;"</span> caption)))
+    (<span class="org-keyword">if</span> caption-match
+        (match-string-no-properties 1 caption)
+        <span class="org-string">""</span>)))
+(source-block-name-match
+  (string-match
+    (rx-to-string
+      '(and
+            <span class="org-string">"&lt;code&gt;"</span>
+            (group (+ (not <span class="org-string">"&lt;"</span>)))
+            <span class="org-string">"&lt;/code&gt;"</span>))
+    caption-parts))
+</pre></div></div><p>
+Because the name <code>anonymous</code> is meaningless (there can be more than one such
+block), we need to disambiguate it. We do this by appending a numeric suffix to
+all source code blocks with the same human-readable <code>source-block-name</code>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions-2">lilac-prettify-source-code-captions-let-bindings</a></span>(3/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-let-bindings-3">(source-block-name
+  (<span class="org-keyword">if</span> source-block-name-match
+      (match-string-no-properties 1 caption-parts)
+      <span class="org-string">"anonymous"</span>))
+(source-block-counter
+ (gethash source-block-name lilac-polyblock-names 0))
+(source-block-counter-incremented
+ (puthash source-block-name (1+ source-block-counter)
+          lilac-polyblock-names))
+</pre></div></div><p>
+Here we do some additional introspection into the <code>&lt;pre&gt;</code> tag which holds the
+body text (the actual source code in the source code block). The <code>pre-id</code> is
+important because it gives us a unique ID (linkable ID) to the body text. We'll
+be using this when linking to a child block from a parent block.
+</p>
+
+<p>
+Sadly, Org does not give every source code block an <code>id=...</code> field. Notably,
+polyblocks do not get an <code>id</code> except for the very first block in the chain. And
+so we inject an <code>id</code> for every <code>&lt;pre&gt;</code> tag ourselves. But first we have to see
+if the <code>&lt;pre&gt;</code> tag has an ID already with <code>pre-id-match</code>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions-2">lilac-prettify-source-code-captions-let-bindings</a></span>(4/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-let-bindings-4">(pre-id-match
+  (string-match
+    (rx-to-string
+      '(and
+            <span class="org-string">"&lt;pre "</span>
+            (* (not <span class="org-string">"&gt;"</span>))
+            <span class="org-string">"id=\""</span>
+            (group (+ (not <span class="org-string">"\""</span>)))))
+    body))
+</pre></div></div><p>
+Now we can create a universal <code>pre-id</code> for all <code>&lt;pre&gt;</code> tags, and make sure that
+all <code>&lt;pre&gt;</code> tags without a given <code>id</code> can use <code>pre-id-universal</code> as a fallback.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions-2">lilac-prettify-source-code-captions-let-bindings</a></span>(5/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-let-bindings-5">(pre-id-universal
+  (<span class="org-keyword">if</span> pre-id-match
+      (match-string-no-properties 1 body)
+    (format <span class="org-string">"%s-%s"</span>
+            source-block-name
+            source-block-counter-incremented)))
+(pre-tag-match
+  (string-match
+    (rx-to-string
+      '(and
+            <span class="org-string">"&lt;pre "</span>
+            (group (* (not <span class="org-string">"&gt;"</span>)))
+            <span class="org-string">"&gt;"</span>))
+    body))
+(pre-tag-entire (match-string-no-properties 0 body))
+(pre-tag-contents (match-string-no-properties 1 body))
+(body-with-replaced-pre
+  (<span class="org-keyword">if</span> pre-id-match
+      body-with-newlines
+      (string-replace pre-tag-entire
+                      (concat <span class="org-string">"&lt;pre "</span> pre-tag-contents
+                              (format <span class="org-string">" id=\"%s\""</span> pre-id-universal) <span class="org-string">"&gt;"</span>)
+                      body-with-newlines)))
+</pre></div></div><p>
+For polyblocks though, we also want to show a fraction in the form <code>(N/TOTAL)</code>
+where <code>N</code> is the numeric position of the polyblock (1 for the head, 2 for the
+second one in the chain, 3 for the third, and so on), and <code>TOTAL</code> is the total
+number of polyblocks in the chain. This way the reader can get some idea about
+how many pieces there are as the overall chain is explained in the prose. This
+<code>(N/TOTAL)</code> fraction is called a <code>polyblock-indicator</code>.
+</p>
+
+<p>
+Note that we use the <code>(polyblock)</code> marker text from <a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a>
+to detect whether we're dealing with a polyblock, because otherwise all of those
+anonymous blocks will get treated as part of a single polyblock chain.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions-2">lilac-prettify-source-code-captions-let-bindings</a></span>(6/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-6">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-let-bindings-6">(polyblock-chain-total
+ (gethash source-block-name lilac-polyblock-names-totals 0))
+(polyblock-indicator
+ (<span class="org-keyword">if</span> (<span class="org-keyword">and</span>
+      (&gt; polyblock-chain-total 0)
+      (string-match <span class="org-string">"</span><span class="org-string"><span class="org-warning">\</span></span><span class="org-string">(polyblock</span><span class="org-string"><span class="org-warning">\</span></span><span class="org-string">)"</span> caption-parts))
+     (format <span class="org-string">"(%s/%s) "</span>
+             source-block-counter-incremented
+             polyblock-chain-total)
+   <span class="org-string">""</span>))
+</pre></div></div><p>
+Most source code blocks have a parent where this code block's contents should be
+inserted into. There could be more than one parent if the code is reused
+verbatim in multiple places.
+</p>
+
+<p>
+We generate a link back to the parent (or parents), by extracting the links
+(<code>href</code> bits in the <code>&lt;a&gt;</code> (aka anchor) tags) found in the caption. These links
+were generated for us in Section <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2</a>; our job is to prettify them with CSS classes and such.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions-2">lilac-prettify-source-code-captions-let-bindings</a></span>(7/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-7">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-let-bindings-7">(parent-id-regexp
+    (rx-to-string
+      '(and
+            <span class="org-string">" &lt;a href=\""</span>
+            (group (+ (not <span class="org-string">"\""</span>))))))
+(parent-ids-with-idx
+ (lilac-enumerate
+  (lilac-matches parent-id-regexp caption-parts 1) 1))
+(parent-links
+  (mapconcat (<span class="org-keyword">lambda</span> (parent-id-with-idx)
+               (<span class="org-keyword">let</span> ((parent-id (car (cdr parent-id-with-idx)))
+                     (idx (car parent-id-with-idx)))
+                  (format (concat
+                           <span class="org-string">"&lt;span class="</span>
+                           <span class="org-string">"\"lilac-caption-parent-link\"&gt;"</span>
+                           <span class="org-string">"&lt;a href=\"%s\"&gt;%s&lt;/a&gt;&lt;/span&gt;"</span>)
+                    parent-id
+                    (<span class="org-keyword">if</span> (= idx 1)
+                        (string-remove-prefix
+                         <span class="org-string">"__NREF__"</span> source-block-name)
+                      idx))))
+             parent-ids-with-idx <span class="org-string">""</span>))
+</pre></div></div><p>
+Every source code block gets a self-link back to itself (shown as a link icon
+"🔗"). This goes at the very end of the caption on the far right (top right
+corner of the source code block's rectangular area).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions-2">lilac-prettify-source-code-captions-let-bindings</a></span>(8/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-8">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-let-bindings-8">(link-symbol
+  (format (concat <span class="org-string">"&lt;span class=\"lilac-caption-link-symbol\"&gt;"</span>
+                  <span class="org-string">"&lt;a href=\"#%s\"&gt;&amp;#x1f517;&lt;/a&gt;&lt;/span&gt;"</span>)
+    pre-id-universal))
+</pre></div></div><p>
+Finally, we're ready to recompose the overall source code block. We make a
+distinction for source code blocks that have links back to a parent (or multiple
+parents). In all cases we make sure to remove Org's default "Listing N:" prefix.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac-prettify-source-code-captions-2">lilac-prettify-source-code-captions-let-bindings</a></span>(9/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-9">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-let-bindings-9">(caption-without-listing-prefix
+ (replace-regexp-in-string <span class="org-string">"&lt;span.+?span&gt;"</span> <span class="org-string">""</span> caption))
+(caption-text
+ (<span class="org-keyword">if</span> (&gt; (length parent-links) 0)
+     (concat
+       <span class="org-string">"&lt;div class=\"lilac-caption\"&gt;"</span>
+         parent-links
+         polyblock-indicator
+         link-symbol
+       <span class="org-string">"&lt;/div&gt;"</span>)
+     (concat
+       <span class="org-string">"&lt;div class=\"lilac-caption\"&gt;"</span>
+         caption-without-listing-prefix
+         link-symbol
+       <span class="org-string">"&lt;/div&gt;"</span>)))
 </pre></div></div>
 </div>
 </div>
@@ -3621,11 +3685,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000d0">Org mode</a> borrows heavily using <a href="#org00000d2">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000d2"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000e4">Org mode</a> borrows heavily using <a href="#org00000e6">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000e6"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000d0"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000e4"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
