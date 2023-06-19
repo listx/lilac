@@ -193,7 +193,7 @@
 <link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
 <link rel="stylesheet" type="text/css" href="lilac.css" />
 <link rel="stylesheet" href=
-"https://fonts.googleapis.com/css2?family=Source+Serif+Pro&family=Source+Code+Pro">
+"https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&family=Source+Code+Pro">
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
 <script src="lilac.js"></script>
 <script>
@@ -305,6 +305,7 @@
 <li><a href="#h-Delete--Table-of-Contents--text">3.4.6.2.1. Delete "Table of Contents" text</a></li>
 <li><a href="#h-Convert--Table-of-Contents--to-a-sidebar-on-the-left">3.4.6.2.2. Convert "Table of Contents" to a sidebar on the left</a></li>
 <li><a href="#h-Track-the-current-headline">3.4.6.2.3. Track the current headline</a></li>
+<li><a href="#h-Highlight-just-clicked-on-item">3.4.6.2.4. Highlight just-clicked-on item</a></li>
 </ul>
 </li>
 </ul>
@@ -2227,6 +2228,7 @@ These are included in <code>lilac.js</code>, as below.
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.js</label><span class="lilac-caption-link-symbol"><a href="#lilac-js">&#x1f517;</a></span></div><pre class="src src-js" id="lilac-js"><span class="lilac-child-link-from-parent"><a href="#__NREF__js-automatically-link-headlines">js-automatically-link-headlines</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__js-toc-scrollspy">js-toc-scrollspy</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__js-highlight-link-destination">js-highlight-link-destination</a></span>
 </pre></div></div><p>
 In the<a href="#h-Create--lilac-theme--file"><code>lilac.theme</code></a> file, we include <code>lilac.js</code> and also jQuery
 because we depend on it.
@@ -2432,16 +2434,120 @@ border makes the item jump a little bit when it's applied.
     <span class="org-css-property">border-radius</span>: 4px;
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
-    <span class="org-css-property">border-color</span>: <span class="custom-3">white</span>;
-    <span class="org-css-property">color</span>: <span class="custom-2">black</span>;
+    <span class="org-css-property">border-color</span>: <span class="custom-1">white</span>;
+    <span class="org-css-property">color</span>: <span class="custom">black</span>;
 }
 <span class="org-css-selector">#table-of-contents .active </span>{
-    <span class="org-css-property">color</span>: <span class="custom-2">black</span>;
-    <span class="org-css-property">background-color</span>: <span class="custom-1">#e3f5e0</span>;
-    <span class="org-css-property">border-color</span>: <span class="custom">green</span>;
+    <span class="org-css-property">color</span>: <span class="custom">black</span>;
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item">css-active-item</a></span>
 }
 <span class="org-css-selector">#table-of-contents a:hover </span>{
     <span class="org-css-property">text-decoration</span>: none;
+}
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Highlight-just-clicked-on-item" class="outline-6">
+<h6 id="h-Highlight-just-clicked-on-item"><span class="section-number-6">3.4.6.2.4.</span> Highlight just-clicked-on item</h6>
+<div class="outline-text-6" id="text-h-Highlight-just-clicked-on-item">
+<p>
+When we click on any link (typically a code block but it can also be a headline
+or some other intra-document link destination), the browser shifts the page
+there.  But sometimes we are already near the link destination so the page
+doesn't move.  Other times we get moved all the way to the top or the bottom of
+the page, so by the time the browser finishes moving there, the user can be
+confused as to know which destination the browser wanted to go to. This can be
+somewhat disorienting.
+</p>
+
+<p>
+The solution is to highlight the just-clicked-on link's destination element.
+Every time we click on anything, we add a class to the destination element. Then
+from CSS we can make this visually compelling. This way we give the user a
+visual cue when clicking on links that navigate to a destination within the same
+document.
+</p>
+
+<p>
+We adapt the code in <a href="#h-Track-the-current-headline">3.4.6.2.3</a> to do what we need here. The
+main difference is that while the code there is concerned with adding and
+removing the <code>active</code> class from the <code>#text-table-of-contents</code> div, here we want
+to do the same but for the <code>outline-2</code> div which contains the outline text
+(There can be multiple <code>outline-2</code> divs, but this is immaterial.)
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-js">js-highlight-link-destination</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__js-highlight-link-destination">&#x1f517;</a></span></div><pre class="src src-js" id="__NREF__js-highlight-link-destination"><span class="org-keyword">function</span> <span class="org-function-name">deactivate_other_non_toc_items</span>(<span class="org-variable-name">hash</span>) {
+    $(<span class="org-string">".outline-2 *"</span>).each((index, elt) =&gt; {
+        <span class="org-keyword">if</span> (<span class="org-string">`#${elt.id}`</span> !== hash) {
+            $(elt).removeClass(<span class="org-string">"active"</span>);
+        }
+    })
+}
+
+$(document).ready(() =&gt; {
+    $(<span class="org-string">"a"</span>).click((elt) =&gt; {
+        console.log(elt.target.hash);
+        console.log(elt.target);
+        <span class="org-keyword">var</span> <span class="org-variable-name">destination</span>;
+        <span class="org-keyword">if</span> (elt.target.nodeName === <span class="org-string">"CODE"</span>) {
+            destination = elt.target.parentElement.hash;
+        } <span class="org-keyword">else</span> {
+            destination = elt.target.hash;
+        }
+        $(destination).addClass(<span class="org-string">"active"</span>);
+        deactivate_other_non_toc_items(destination);
+    });
+});
+</pre></div></div><p>
+Now we just need to style the active element.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__css-toc-2">css-active-item</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-item-headline">2</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-item-span">3</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-non-toc-item">4</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-item">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-item"><span class="org-css-property">background-color</span>: <span class="custom-1">#f1ffef</span>;
+<span class="org-css-property">border-color</span>: <span class="custom">green</span>;
+</pre></div></div><p>
+For headlines, we draw a border around it.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-non-toc-item">css-active-item-headline</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-item-headline">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-item-headline"><span class="org-css-property">border-style</span>: solid;
+<span class="org-css-property">border-width</span>: 1px;
+<span class="org-css-property">border-radius</span>: 5px;
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item">css-active-item</a></span>
+</pre></div></div><p>
+For span nodes, we also draw a border around it. Spans can be the destination
+when we link to a line inside a source code block.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-non-toc-item">css-active-item-span</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-item-span">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-item-span"><span class="org-css-property">display</span>: inline-block;
+<span class="org-css-property">width</span>: 100%;
+<span class="org-css-property">border-style</span>: solid;
+<span class="org-css-property">border-width</span>: 1px;
+<span class="org-css-property">border-radius</span>: 5px;
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item">css-active-item</a></span>
+</pre></div></div><p>
+Different destination elements need different selectors. We cover them all here.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-active-non-toc-item</a></span>(1/1) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-non-toc-item">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-non-toc-item"><span class="org-css-selector">.outline-2 pre.active </span>{
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item">css-active-item</a></span>
+}
+<span class="org-css-selector">.outline-2 span.active </span>{
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-span">css-active-item-span</a></span>
+}
+<span class="org-css-selector">.outline-2 h2.active </span>{
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
+}
+<span class="org-css-selector">.outline-2 h3.active </span>{
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
+}
+<span class="org-css-selector">.outline-2 h4.active </span>{
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
+}
+<span class="org-css-selector">.outline-2 h5.active </span>{
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
+}
+<span class="org-css-selector">.outline-2 h6.active </span>{
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
 }
 </pre></div></div>
 </div>
@@ -2734,6 +2840,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-child-link-from-parent">css-source-code-block-child-link-from-parent</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-sidenotes">css-sidenotes</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-toc-1">css-toc</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-non-toc-item">css-active-non-toc-item</a></span>
 </pre></div></div>
 </div>
 
@@ -2752,8 +2859,11 @@ We add some additional CSS tweaks on top of what we get from Org.
 }
 
 <span class="org-css-selector">h2, h3, h4, h5, h6 </span>{
-    <span class="org-css-property">margin</span>: 0;
-    <span class="org-css-property">padding-top</span>: 1em;
+    <span class="org-css-property">margin</span>: 1em 0 0 0;
+    <span class="org-css-property">padding</span>: 0 4px;
+    <span class="org-css-property">border-style</span>: solid;
+    <span class="org-css-property">border-width</span>: 1px;
+    <span class="org-css-property">border-color</span>: <span class="custom">rgba(255, 255, 255, 0)</span>;
 }
 
 <span class="org-css-selector">p, li </span>{
@@ -3094,7 +3204,7 @@ inspiration for this setup comes from <a href="https://gitlab.com/OlMon/org-them
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/&gt;</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="lilac.css" /&gt;</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" href=</span>
-<span class="org-org-meta-line">#+HTML_HEAD: "<a href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro&amp;family=Source+Code+Pro">https://fonts.googleapis.com/css2?family=Source+Serif+Pro&amp;family=Source+Code+Pro</a>"&gt;</span>
+<span class="org-org-meta-line">#+HTML_HEAD: "<a href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&amp;family=Source+Code+Pro">https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&amp;family=Source+Code+Pro</a>"&gt;</span>
 
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-theme-js">lilac-theme-js</a></span>
 </pre></div></div>
@@ -3511,11 +3621,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000c6">Org mode</a> borrows heavily using <a href="#org00000c8">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000c8"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000d0">Org mode</a> borrows heavily using <a href="#org00000d2">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000d2"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000c6"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000d0"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

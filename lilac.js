@@ -64,3 +64,25 @@ $(document).ready(() => {
         });
     });
 });
+function deactivate_other_non_toc_items(hash) {
+    $(".outline-2 *").each((index, elt) => {
+        if (`#${elt.id}` !== hash) {
+            $(elt).removeClass("active");
+        }
+    })
+}
+
+$(document).ready(() => {
+    $("a").click((elt) => {
+        console.log(elt.target.hash);
+        console.log(elt.target);
+        var destination;
+        if (elt.target.nodeName === "CODE") {
+            destination = elt.target.parentElement.hash;
+        } else {
+            destination = elt.target.hash;
+        }
+        $(destination).addClass("active");
+        deactivate_other_non_toc_items(destination);
+    });
+});

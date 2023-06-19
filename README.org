@@ -1676,6 +1676,7 @@ These are included in =lilac.js=, as below.
 #+begin_src js :tangle lilac.js :eval no
 __NREF__js-automatically-link-headlines
 __NREF__js-toc-scrollspy
+__NREF__js-highlight-link-destination
 #+end_src
 
 In the[[* Create =lilac.theme= file][=lilac.theme=]] file, we include =lilac.js= and also jQuery
@@ -1879,11 +1880,116 @@ border makes the item jump a little bit when it's applied.
 }
 #table-of-contents .active {
     color: black;
-    background-color: #e3f5e0;
-    border-color: green;
+    __NREF__css-active-item
 }
 #table-of-contents a:hover {
     text-decoration: none;
+}
+#+end_src
+
+***** Highlight just-clicked-on item
+
+When we click on any link (typically a code block but it can also be a headline
+or some other intra-document link destination), the browser shifts the page
+there.  But sometimes we are already near the link destination so the page
+doesn't move.  Other times we get moved all the way to the top or the bottom of
+the page, so by the time the browser finishes moving there, the user can be
+confused as to know which destination the browser wanted to go to. This can be
+somewhat disorienting.
+
+The solution is to highlight the just-clicked-on link's destination element.
+Every time we click on anything, we add a class to the destination element. Then
+from CSS we can make this visually compelling. This way we give the user a
+visual cue when clicking on links that navigate to a destination within the same
+document.
+
+We adapt the code in [[* Track the current headline]] to do what we need here. The
+main difference is that while the code there is concerned with adding and
+removing the =active= class from the =#text-table-of-contents= div, here we want
+to do the same but for the =outline-2= div which contains the outline text
+(There can be multiple =outline-2= divs, but this is immaterial.)
+
+#+name: __NREF__js-highlight-link-destination
+#+begin_src js
+function deactivate_other_non_toc_items(hash) {
+    $(".outline-2 *").each((index, elt) => {
+        if (`#${elt.id}` !== hash) {
+            $(elt).removeClass("active");
+        }
+    })
+}
+
+$(document).ready(() => {
+    $("a").click((elt) => {
+        console.log(elt.target.hash);
+        console.log(elt.target);
+        var destination;
+        if (elt.target.nodeName === "CODE") {
+            destination = elt.target.parentElement.hash;
+        } else {
+            destination = elt.target.hash;
+        }
+        $(destination).addClass("active");
+        deactivate_other_non_toc_items(destination);
+    });
+});
+#+end_src
+
+Now we just need to style the active element.
+
+#+name: __NREF__css-active-item
+#+begin_src css
+background-color: #f1ffef;
+border-color: green;
+#+end_src
+
+For headlines, we draw a border around it.
+
+#+name: __NREF__css-active-item-headline
+#+begin_src css
+border-style: solid;
+border-width: 1px;
+border-radius: 5px;
+__NREF__css-active-item
+#+end_src
+
+For span nodes, we also draw a border around it. Spans can be the destination
+when we link to a line inside a source code block.
+
+#+name: __NREF__css-active-item-span
+#+begin_src css
+display: inline-block;
+width: 100%;
+border-style: solid;
+border-width: 1px;
+border-radius: 5px;
+__NREF__css-active-item
+#+end_src
+
+Different destination elements need different selectors. We cover them all here.
+
+#+header: :noweb-ref __NREF__css-active-non-toc-item
+#+begin_src css
+.outline-2 pre.active {
+    __NREF__css-active-item
+}
+.outline-2 span.active {
+    __NREF__css-active-item-span
+}
+.outline-2 h2.active {
+    __NREF__css-active-item-headline
+}
+.outline-2 h3.active {
+    __NREF__css-active-item-headline
+}
+.outline-2 h4.active {
+    __NREF__css-active-item-headline
+}
+.outline-2 h5.active {
+    __NREF__css-active-item-headline
+}
+.outline-2 h6.active {
+    __NREF__css-active-item-headline
 }
 #+end_src
 
@@ -2138,6 +2244,7 @@ __NREF__css-source-code-block-captions
 __NREF__css-source-code-block-child-link-from-parent
 __NREF__css-sidenotes
 __NREF__css-toc
+__NREF__css-active-non-toc-item
 #+end_src
 
 **** General body text
@@ -2156,8 +2263,11 @@ body, p, li, h1, h2, h3, h4, h5, h6, legend {
 }
 
 h2, h3, h4, h5, h6 {
-    margin: 0;
-    padding-top: 1em;
+    margin: 1em 0 0 0;
+    padding: 0 4px;
+    border-style: solid;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0);
 }
 
 p, li {
@@ -2481,7 +2591,7 @@ inspiration for this setup comes from https://gitlab.com/OlMon/org-themes.
 ,#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
 ,#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="lilac.css" />
 ,#+HTML_HEAD: <link rel="stylesheet" href=
-,#+HTML_HEAD: "https://fonts.googleapis.com/css2?family=Source+Serif+Pro&family=Source+Code+Pro">
+,#+HTML_HEAD: "https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&family=Source+Code+Pro">
 
 __NREF__lilac-theme-js
 #+end_src
