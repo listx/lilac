@@ -285,8 +285,6 @@ When matching, reference is stored in match group 1."
     "-"))
 
 ;; Modify HTML
-; Define a global hash table for mapping child source block names to their HTML
-; IDs.
 (setq lilac-child-HTML_ID-hash-table (make-hash-table :test 'equal))
 
 (defun lilac-populate-child-HTML_ID-hash-table (src-block-html backend info)
@@ -295,12 +293,16 @@ When matching, reference is stored in match group 1."
            (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html))
            (child-HTML_ID-exists-already
             (gethash child-name lilac-child-HTML_ID-hash-table nil)))
-      ; Skip blocks that lack an HTML ID.
+      ; Only process child blocks that have an HTML ID.
       (if (and child-HTML_ID (not child-HTML_ID-exists-already))
-        (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
+          (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
       ; Return src-block-html as-is (no modifications).
       src-block-html)))
 
+;ref:lilac-get-src-block-HTML_ID
+(defun lilac-get-src-block-HTML_ID (src-block-html)
+  (let ((match (string-match "<pre [^>]+?id=\"\\([^\"]+\\)\">" src-block-html)))
+    (if match (match-string-no-properties 1 src-block-html))))
 (defun lilac-get-src-block-name-from-html (src-block-html)
   (let* ((match-nref (string-match
                       (concat
@@ -323,7 +325,6 @@ When matching, reference is stored in match group 1."
         matched-contents
         (if match-raw
             (lilac-clean-up-match-raw matched-contents)))))
-
 (defun lilac-clean-up-match-raw (s)
   (let* ((normalized (lilac-normalize-string s))
          (rx (rx-to-string
@@ -338,18 +339,8 @@ When matching, reference is stored in match group 1."
     (if match
         (match-string-no-properties 1 normalized)
         normalized)))
-
-;ref:lilac-get-src-block-HTML_ID
-(defun lilac-get-src-block-HTML_ID (src-block-html)
-  (let ((match (string-match "<pre [^>]+?id=\"\\([^\"]+\\)\">" src-block-html)))
-    (if match (match-string-no-properties 1 src-block-html))))
-
 (defun lilac-link-to-children-from-parent-body (src-block-html backend info)
   (when (org-export-derived-backend-p backend 'html)
-    ;; Break up source block into 3 subparts --- the leading <div ...>, the
-    ;; <label ...></label> (if any) and <pre ...></pre>.
-    ;; Then run the linkifying logic against only the body, and then return the
-    ;; original label and new body.
     (let* ((div-caption-body (lilac-get-source-block-html-parts-without-newlines
                               src-block-html))
            (leading-div (nth 0 div-caption-body))
@@ -371,12 +362,6 @@ When matching, reference is stored in match group 1."
            (body-linkified-with-newlines
             (lilac-to-multi-line body-linkified-without-newlines)))
       (concat leading-div caption body-linkified-with-newlines "</div>"))))
-
-(defun lilac-to-single-line (s)
-  (replace-regexp-in-string "\n" "<<<LILAC_NEWLINE>>>" s))
-
-(defun lilac-to-multi-line (s)
-  (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
 (setq lilac-polyblock-names (make-hash-table :test 'equal))
 (setq lilac-polyblock-names-totals (make-hash-table :test 'equal))
 (defun lilac-prettify-source-code-captions (src-block-html backend info)
@@ -573,6 +558,12 @@ When matching, reference is stored in match group 1."
                 (format " href=\"#%s\"" v) html-oneline))))
        lilac-org_id-human_id-hash-table)
       (lilac-to-multi-line html-oneline))))
+
+(defun lilac-to-single-line (s)
+  (replace-regexp-in-string "\n" "<<<LILAC_NEWLINE>>>" s))
+
+(defun lilac-to-multi-line (s)
+  (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
 (defun lilac-replace-from-to (str repl)
   (interactive "sString: \nsReplacement: ")
   (save-excursion

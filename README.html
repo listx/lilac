@@ -1082,7 +1082,7 @@ named <code>__NREF__...</code> get an automatic <code>#+caption: ...</code> text
 <span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-headlines">UID-for-all-headlines</a></span>
 
 <span class="org-comment-delimiter">;; </span><span class="org-comment">Modify HTML</span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-link-to-child-blocks-from-parent">lilac-link-to-child-blocks-from-parent</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-1">lilac-link-to-child-blocks-from-parent</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-prettify-source-code-captions-1">lilac-prettify-source-code-captions</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-human-readable-src-block-ids">lilac-human-readable-src-block-ids</a></span>
 </pre></div></div>
@@ -1764,6 +1764,12 @@ it because we can't refer to polyblocks anyway by name).
                 (format <span class="org-string">" href=\"#%s\""</span> v) html-oneline))))
        lilac-org_id-human_id-hash-table)
       (lilac-to-multi-line html-oneline))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-to-single-line</span> (s)
+  (replace-regexp-in-string <span class="org-string">"\n"</span> <span class="org-string">"&lt;&lt;&lt;LILAC_NEWLINE&gt;&gt;&gt;"</span> s))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-to-multi-line</span> (s)
+  (replace-regexp-in-string <span class="org-string">"&lt;&lt;&lt;LILAC_NEWLINE&gt;&gt;&gt;"</span> <span class="org-string">"\n"</span> s))
 </pre></div></div>
 </div>
 </div>
@@ -2059,7 +2065,10 @@ parents). In all cases we make sure to remove Org's default "Listing N:" prefix.
 <h5 id="h-Link-noweb-references--link-to-child-block-from-parent-block"><span class="section-number-5">3.4.5.3.</span> Link noweb references (link to child block from parent block)</h5>
 <div class="outline-text-5" id="text-h-Link-noweb-references--link-to-child-block-from-parent-block">
 <p>
-Consider the following code:
+In <a href="#h-Pretty-source-code-captions">3.4.5.2</a> we tweaked the HTML so that source code blocks
+could link back up to their parents. In this section we are concerned with the
+opposite &#x2014; linking to child blocks from the parents. For example, consider the
+following code:
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Sample Org-mode Noweb-style references</label><span class="lilac-caption-link-symbol"><a href="#Sample-Org-mode-Noweb-style-references-3">&#x1f517;</a></span></div><pre class="src src-org" id="Sample-Org-mode-Noweb-style-references-3"><span class="org-org-meta-line">#+name: parent-block</span>
@@ -2128,12 +2137,17 @@ The only thing remaining is the construction of
 <code>lilac-child-HTML_ID-hash-table</code>. We can construct this by mapping through all
 source code blocks and getting the name which can be just drawn from the <code>&lt;label
 ...&gt;</code> HTML tag, thanks to the smart captions we inserted for all child blocks
-earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2</a>.
+earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2</a>. This hash table
+will hold mappings from child source block names to ther HTML ID's.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent"><span class="org-comment-delimiter">; </span><span class="org-comment">Define a global hash table for mapping child source block names to their HTML</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">IDs.</span>
-(<span class="org-keyword">setq</span> lilac-child-HTML_ID-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
+<p>
+Now that we have a high-level understanding, let's walk through the
+implementation. First here's the code to populate the
+<code>lilac-child-HTML_ID-hash-table</code>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span>(1/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-1">(<span class="org-keyword">setq</span> lilac-child-HTML_ID-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">lilac-populate-child-HTML_ID-hash-table</span> (src-block-html backend info)
   (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
@@ -2141,13 +2155,27 @@ earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2<
            (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html))
            (child-HTML_ID-exists-already
             (gethash child-name lilac-child-HTML_ID-hash-table nil)))
-      <span class="org-comment-delimiter">; </span><span class="org-comment">Skip blocks that lack an HTML ID.</span>
+      <span class="org-comment-delimiter">; </span><span class="org-comment">Only process child blocks that have an HTML ID.</span>
       (<span class="org-keyword">if</span> (<span class="org-keyword">and</span> child-HTML_ID (not child-HTML_ID-exists-already))
-        (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
+          (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
       <span class="org-comment-delimiter">; </span><span class="org-comment">Return src-block-html as-is (no modifications).</span>
       src-block-html)))
 
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-name-from-html</span> (src-block-html)
+<span id="coderef-lilac-get-src-block-HTML_ID" class="coderef-off"></span>
+(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-HTML_ID</span> (src-block-html)
+  (<span class="org-keyword">let</span> ((match (string-match <span class="org-string">"&lt;pre [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+?id=\"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">\"]+</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">\"&gt;"</span> src-block-html)))
+    (<span class="org-keyword">if</span> match (match-string-no-properties 1 src-block-html))))
+</pre></div></div><p>
+We need to get the source block name (the name of the child) from the HTML. We
+do this in <code>lilac-get-src-block-name-from-html</code> below. Either there is a
+<code>__NREF__...</code> text in the <code>&lt;code&gt;</code> tag within a <code>&lt;label&gt;</code> tag (from <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2</a>), or there is just a plain  <code>&lt;label&gt;</code> as
+a result of a manually-written <code>#+caption: ...</code> bit. We use either one. Note
+that the latter category assumes that the user used unique caption labels for
+all blocks; if the user manually creates non-unique captions, this will probably
+break. (FIXME: add test to confirm breakage&#x2026;?)
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span>(2/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-name-from-html</span> (src-block-html)
   (<span class="org-keyword">let*</span> ((match-nref (string-match
                       (concat
                        <span class="org-string">"&lt;label.+?&lt;code&gt;"</span>
@@ -2169,8 +2197,12 @@ earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2<
         matched-contents
         (<span class="org-keyword">if</span> match-raw
             (lilac-clean-up-match-raw matched-contents)))))
+</pre></div></div><p>
+If the user used manual captions, we have to remove the "Listing N: &#x2026;" text
+that Org automatically inserts.
+</p>
 
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-clean-up-match-raw</span> (s)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span>(3/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-3">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-clean-up-match-raw</span> (s)
   (<span class="org-keyword">let*</span> ((normalized (lilac-normalize-string s))
          (rx (rx-to-string
                 '(and
@@ -2184,18 +2216,15 @@ earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2<
     (<span class="org-keyword">if</span> match
         (match-string-no-properties 1 normalized)
         normalized)))
+</pre></div></div><p>
+Now we have everything we need to add HTML links into the body of the source
+code block directly. We search for the child name (which begins with a
+<code>__NREF__...</code>, which is defined in <code>lilac-nref-rx</code>), and perform a string
+replacement, adding in the link to the child block.
+</p>
 
-<span id="coderef-lilac-get-src-block-HTML_ID" class="coderef-off"></span>
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-HTML_ID</span> (src-block-html)
-  (<span class="org-keyword">let</span> ((match (string-match <span class="org-string">"&lt;pre [</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">&gt;]+?id=\"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">\"]+</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">\"&gt;"</span> src-block-html)))
-    (<span class="org-keyword">if</span> match (match-string-no-properties 1 src-block-html))))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-link-to-children-from-parent-body</span> (src-block-html backend info)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span>(4/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-4">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-link-to-children-from-parent-body</span> (src-block-html backend info)
   (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">Break up source block into 3 subparts --- the leading &lt;div ...&gt;, the</span>
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">&lt;label ...&gt;&lt;/label&gt; (if any) and &lt;pre ...&gt;&lt;/pre&gt;.</span>
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">Then run the linkifying logic against only the body, and then return the</span>
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">original label and new body.</span>
     (<span class="org-keyword">let*</span> ((div-caption-body (lilac-get-source-block-html-parts-without-newlines
                               src-block-html))
            (leading-div (nth 0 div-caption-body))
@@ -2217,12 +2246,6 @@ earlier in <a href="#h-Automatic-captions-for-Noweb-source-code-blocks">3.4.4.2<
            (body-linkified-with-newlines
             (lilac-to-multi-line body-linkified-without-newlines)))
       (concat leading-div caption body-linkified-with-newlines <span class="org-string">"&lt;/div&gt;"</span>))))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-to-single-line</span> (s)
-  (replace-regexp-in-string <span class="org-string">"\n"</span> <span class="org-string">"&lt;&lt;&lt;LILAC_NEWLINE&gt;&gt;&gt;"</span> s))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-to-multi-line</span> (s)
-  (replace-regexp-in-string <span class="org-string">"&lt;&lt;&lt;LILAC_NEWLINE&gt;&gt;&gt;"</span> <span class="org-string">"\n"</span> s))
 </pre></div></div>
 </div>
 </div>
@@ -3686,11 +3709,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000e4">Org mode</a> borrows heavily using <a href="#org00000e6">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000e6"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000ea">Org mode</a> borrows heavily using <a href="#org00000ec">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000ec"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000e4"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000ea"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

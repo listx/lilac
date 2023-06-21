@@ -1242,6 +1242,12 @@ it because we can't refer to polyblocks anyway by name).
                 (format " href=\"#%s\"" v) html-oneline))))
        lilac-org_id-human_id-hash-table)
       (lilac-to-multi-line html-oneline))))
+
+(defun lilac-to-single-line (s)
+  (replace-regexp-in-string "\n" "<<<LILAC_NEWLINE>>>" s))
+
+(defun lilac-to-multi-line (s)
+  (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
 #+end_src
 
 **** Pretty source code captions
@@ -1535,7 +1541,10 @@ parents). In all cases we make sure to remove Org's default "Listing N:" prefix.
 
 **** Link noweb references (link to child block from parent block)
 
-Consider the following code:
+In [[* Pretty source code captions]] we tweaked the HTML so that source code blocks
+could link back up to their parents. In this section we are concerned with the
+opposite --- linking to child blocks from the parents. For example, consider the
+following code:
 
 #+caption: Sample Org-mode Noweb-style references
 #+begin_src org
@@ -1596,12 +1605,15 @@ The only thing remaining is the construction of
 =lilac-child-HTML_ID-hash-table=. We can construct this by mapping through all
 source code blocks and getting the name which can be just drawn from the =<label
 ...>= HTML tag, thanks to the smart captions we inserted for all child blocks
-earlier in [[* Automatic captions for Noweb source code blocks]].
+earlier in [[* Automatic captions for Noweb source code blocks]]. This hash table
+will hold mappings from child source block names to ther HTML ID's.
 
-#+name: __NREF__lilac-link-to-child-blocks-from-parent
+Now that we have a high-level understanding, let's walk through the
+implementation. First here's the code to populate the
+=lilac-child-HTML_ID-hash-table=.
+
+#+header: :noweb-ref __NREF__lilac-link-to-child-blocks-from-parent
 #+begin_src emacs-lisp -r -l ";ref:%s"
-; Define a global hash table for mapping child source block names to their HTML
-; IDs.
 (setq lilac-child-HTML_ID-hash-table (make-hash-table :test 'equal))
 
 (defun lilac-populate-child-HTML_ID-hash-table (src-block-html backend info)
@@ -1610,12 +1622,29 @@ earlier in [[* Automatic captions for Noweb source code blocks]].
            (child-HTML_ID (lilac-get-src-block-HTML_ID src-block-html))
            (child-HTML_ID-exists-already
             (gethash child-name lilac-child-HTML_ID-hash-table nil)))
-      ; Skip blocks that lack an HTML ID.
+      ; Only process child blocks that have an HTML ID.
       (if (and child-HTML_ID (not child-HTML_ID-exists-already))
-        (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
+          (puthash child-name child-HTML_ID lilac-child-HTML_ID-hash-table))
       ; Return src-block-html as-is (no modifications).
       src-block-html)))
 
+;ref:lilac-get-src-block-HTML_ID
+(defun lilac-get-src-block-HTML_ID (src-block-html)
+  (let ((match (string-match "<pre [^>]+?id=\"\\([^\"]+\\)\">" src-block-html)))
+    (if match (match-string-no-properties 1 src-block-html))))
+#+end_src
+
+We need to get the source block name (the name of the child) from the HTML. We
+do this in =lilac-get-src-block-name-from-html= below. Either there is a
+=__NREF__...= text in the =<code>= tag within a =<label>= tag (from [[* Automatic
+captions for Noweb source code blocks]]), or there is just a plain  =<label>= as
+a result of a manually-written =#+caption: ...= bit. We use either one. Note
+that the latter category assumes that the user used unique caption labels for
+all blocks; if the user manually creates non-unique captions, this will probably
+break. (FIXME: add test to confirm breakage...?)
+
+#+header: :noweb-ref __NREF__lilac-link-to-child-blocks-from-parent
+#+begin_src emacs-lisp -r -l ";ref:%s"
 (defun lilac-get-src-block-name-from-html (src-block-html)
   (let* ((match-nref (string-match
                       (concat
@@ -1638,7 +1667,13 @@ earlier in [[* Automatic captions for Noweb source code blocks]].
         matched-contents
         (if match-raw
             (lilac-clean-up-match-raw matched-contents)))))
+#+end_src
 
+If the user used manual captions, we have to remove the "Listing N: ..." text
+that Org automatically inserts.
+
+#+header: :noweb-ref __NREF__lilac-link-to-child-blocks-from-parent
+#+begin_src emacs-lisp -r -l ";ref:%s"
 (defun lilac-clean-up-match-raw (s)
   (let* ((normalized (lilac-normalize-string s))
          (rx (rx-to-string
@@ -1653,18 +1688,17 @@ earlier in [[* Automatic captions for Noweb source code blocks]].
     (if match
         (match-string-no-properties 1 normalized)
         normalized)))
+#+end_src
 
-;ref:lilac-get-src-block-HTML_ID
-(defun lilac-get-src-block-HTML_ID (src-block-html)
-  (let ((match (string-match "<pre [^>]+?id=\"\\([^\"]+\\)\">" src-block-html)))
-    (if match (match-string-no-properties 1 src-block-html))))
+Now we have everything we need to add HTML links into the body of the source
+code block directly. We search for the child name (which begins with a
+=__NREF__...=, which is defined in =lilac-nref-rx=), and perform a string
+replacement, adding in the link to the child block.
 
+#+header: :noweb-ref __NREF__lilac-link-to-child-blocks-from-parent
+#+begin_src emacs-lisp -r -l ";ref:%s"
 (defun lilac-link-to-children-from-parent-body (src-block-html backend info)
   (when (org-export-derived-backend-p backend 'html)
-    ;; Break up source block into 3 subparts --- the leading <div ...>, the
-    ;; <label ...></label> (if any) and <pre ...></pre>.
-    ;; Then run the linkifying logic against only the body, and then return the
-    ;; original label and new body.
     (let* ((div-caption-body (lilac-get-source-block-html-parts-without-newlines
                               src-block-html))
            (leading-div (nth 0 div-caption-body))
@@ -1686,12 +1720,6 @@ earlier in [[* Automatic captions for Noweb source code blocks]].
            (body-linkified-with-newlines
             (lilac-to-multi-line body-linkified-without-newlines)))
       (concat leading-div caption body-linkified-with-newlines "</div>"))))
-
-(defun lilac-to-single-line (s)
-  (replace-regexp-in-string "\n" "<<<LILAC_NEWLINE>>>" s))
-
-(defun lilac-to-multi-line (s)
-  (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
 #+end_src
 
 **** Search and replace hardcoded things
