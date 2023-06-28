@@ -516,6 +516,7 @@ __NREF__lilac_dot_el-imports
 __NREF__lilac_dot_el-fix-nondeterminism
 __NREF__lilac_dot_el-custom-noweb-delimiters
 __NREF__lilac_dot_el-lilac-publish
+__NREF__lilac_dot_el-lilac-publish-helpers
 __NREF__lilac_dot_el-search-replace
 __NREF__lilac_dot_el-autogenerate-css
 __NREF__lilac_dot_el-misc
@@ -570,59 +571,47 @@ See https://www.reddit.com/r/orgmode/comments/aagmfh/comment/hk6upbf.
 
 *** Toplevel publishing function (=lilac-publish=)
 
-The toplevel function is =lilac-publish=. This actually publishes twice, with
-=lilac-publish-1= and =lilac-publish-2=. The reason we publish twice is because
-we need to examine the HTML output twice in order to build up a database of
-parent/child source code block links (which is then used to link between these
-parent/child source code blocks).
+The toplevel function is =lilac-publish=. This actually publishes to HTML twice,
+with two separate calls to =org-html-export-to-html=. The reason we publish
+twice is because we need to examine the HTML output twice in order to build up a
+database of parent/child source code block links (which is then used to link
+between these parent/child source code blocks).
 
 Also note that we do some modifications to the Org buffer directly before
 exporting to HTML. The main reason is so that the source code blocks that are
 named =__NREF__...= get an automatic =#+caption: ...= text to go along with it
 (because for these Noweb-style blocks, the captions should always look uniform).
 
-#+name: __NREF__lilac_dot_el-lilac-publish
+The full code listing for =lilac-publish= is below.
+
+#+caption: lilac-publish
+#+begin_src emacs-lisp :noweb yes
+__NREF__lilac_dot_el-lilac-publish
+#+end_src
+
+Now let's go through =lilac-publish= in detail.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish
 #+begin_src emacs-lisp
 (defun lilac-publish ()
   (interactive)
-  __NREF__lilac-publish-use-css
-  __NREF__lilac-publish-modify-org
-
-  __NREF__lilac-publish-modify-HTML-1
-  (org-html-export-to-html)
-
-  (clrhash lilac-polyblock-names-totals)
-
-  __NREF__lilac-publish-modify-HTML-2
-  (org-html-export-to-html)
-
-  __NREF__lilac-publish-delete-toc-text
-  __NREF__lilac-publish-fix-inline-styles)
-
-;; Modify Org buffer
-__NREF__UID-for-all-src-blocks
-__NREF__smart-source-code-block-captions
-__NREF__UID-for-all-headlines
-
-;; Modify HTML
-__NREF__lilac-link-to-child-blocks-from-parent
-__NREF__lilac-prettify-source-code-captions
-__NREF__lilac-human-readable-src-block-ids
+  (setq org-html-htmlize-output-type 'css)
 #+end_src
 
-**** Modify the Org buffer
+Do not hardcode colors into the HTML. Instead refer to CSS class names, to be
+stylized by an external CSS file.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish
+#+begin_src emacs-lisp
+  (setq org-export-before-parsing-hook
+   '(lilac-UID-for-all-src-blocks
+     lilac-insert-noweb-source-code-block-captions
+     lilac-UID-for-all-headlines))
+#+end_src
 
 Here we modify the Org mode buffer, by using =org-export-before-parsing-hook=.
 This takes a list of functions that are free to modify the Org mode buffer
 before each Org element in the buffer gets converted into HTML.
-
-#+name: __NREF__lilac-publish-modify-org
-#+begin_src emacs-lisp
-(setq org-export-before-parsing-hook
- '(lilac-UID-for-all-src-blocks
-   lilac-insert-noweb-source-code-block-captions
-   lilac-UID-for-all-headlines))
-#+end_src
 
 As for the actual modifications, see:
 
@@ -634,7 +623,7 @@ In brief, the =lilac-UID-for-all-*= functions make it so that the links to
 headlines and source code blocks are both deterministic and human-readable. The
 =lilac-insert-noweb-source-code-block-captions= function
 
-**** Modify the HTML
+Now we start modifying the HTML.
 
 This is useful for adding in final tweaks to the HTML that is difficult to
 accomplish at the Org-mode buffer level.
@@ -645,34 +634,70 @@ blocks from parent blocks. We also populate the
 =lilac-org_id-human_id-hash-table= which is used to convert HTML IDs to be more
 human-readable.
 
-#+name: __NREF__lilac-publish-modify-HTML-1
+#+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish
 #+begin_src emacs-lisp
-(setq org-export-filter-src-block-functions
- '(lilac-populate-child-HTML_ID-hash-table
-   lilac-populate-org_id-human_id-hash-table))
+  (setq org-export-filter-src-block-functions
+   '(lilac-populate-child-HTML_ID-hash-table
+     lilac-populate-org_id-human_id-hash-table))
+
+  (org-html-export-to-html)
 #+end_src
+
+In between these phases we have to call
+
+#+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish
+#+begin_src emacs-lisp
+  (clrhash lilac-polyblock-names-totals)
+#+end_src
+
+because of some internal housekeeping we have to do.
 
 Phase 2: In this phase we perform the linking from parent blocks to child blocks
 (=lilac-link-to-children-from-parent-body=), and also convert the child source
 code captions to look prettier (=lilac-prettify-source-code-captions=).
 
-#+name: __NREF__lilac-publish-modify-HTML-2
+#+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish
 #+begin_src emacs-lisp
-(setq org-export-filter-src-block-functions
- '(lilac-link-to-children-from-parent-body
-   lilac-prettify-source-code-captions))
-(setq org-export-filter-final-output-functions
- '(lilac-replace-org_ids-with-human_ids))
+  (setq org-export-filter-src-block-functions
+   '(lilac-link-to-children-from-parent-body
+     lilac-prettify-source-code-captions))
+  (setq org-export-filter-final-output-functions
+   '(lilac-replace-org_ids-with-human_ids))
+
+  (org-html-export-to-html)
 #+end_src
 
-**** Miscellaneous export settings
+The final bits are
 
-Do not hardcode colors into the HTML. Instead refer to CSS class names, to be
-stylized by an external CSS file.
+1. the deletion of the "Table of Contents" text from the autogenerated
+   Table of Contents section, which we'll [[* Table of contents sidebar][convert into a sidebar]]; and
+2. the cleaning up of some inline CSS styles that get injected into the HTML as
+   part of citation styles.
 
-#+name: __NREF__lilac-publish-use-css
+#+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish
 #+begin_src emacs-lisp
-(setq org-html-htmlize-output-type 'css)
+  __NREF__lilac-publish-delete-toc-text
+  __NREF__lilac-publish-fix-inline-styles)
+#+end_src
+
+**** Helper functions
+
+These are for modifying the Org buffer.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish-helpers
+#+begin_src emacs-lisp
+__NREF__UID-for-all-src-blocks
+__NREF__smart-source-code-block-captions
+__NREF__UID-for-all-headlines
+#+end_src
+
+These are for modifying the HTML.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish-helpers
+#+begin_src emacs-lisp
+__NREF__lilac-link-to-child-blocks-from-parent
+__NREF__lilac-prettify-source-code-captions
+__NREF__lilac-human-readable-src-block-ids
 #+end_src
 
 *** Org modifications
@@ -1584,14 +1609,14 @@ ourselves.
 In the case of =__NREF__child-block-2=, it is defined in multiple blocks so we
 would want to link to the very first block.
 
-We cannot use a =org-export-before-parsing-hook= like we did in
-[[__NREF__lilac-publish-modify-org][=__NREF__lilac-publish-modify-org=]] because at that stage of processing, we are
-dealing with Org mode syntax. Any modifications we make to the parent source
-code block will be treated as text upon HTML export. Thankfully Org mode allows
-customizations on generated HTML through the
+We cannot use a =org-export-before-parsing-hook= like we did in [[* Toplevel
+ publishing function (=lilac-publish=)]] because at that stage of processing, we
+are dealing with Org mode syntax. Any modifications we make to the parent
+source code block will be treated as text upon HTML export. Thankfully Org mode
+allows customizations on generated HTML through the
 =org-export-filter-src-block-functions= variable. This variable is analogous to
-=org-export-before-parsing-hook=, but operates at the HTML level (not at the Org
-syntax level) for source code blocks, which is exactly what we need.
+=org-export-before-parsing-hook=, but operates at the HTML level (not at the
+Org syntax level) for source code blocks, which is exactly what we need.
 
 So we have to craft valid HTML links (not Org links) to the child source code
 blocks. For this we need the actual =id= part of the HTML =<pre>...= block that

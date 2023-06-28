@@ -277,9 +277,7 @@
 </li>
 <li><a href="#h-Toplevel-publishing-function---lilac-publish-">3.4.3. Toplevel publishing function (<code>lilac-publish</code>)</a>
 <ul>
-<li><a href="#h-Modify-the-Org-buffer">3.4.3.1. Modify the Org buffer</a></li>
-<li><a href="#h-Modify-the-HTML">3.4.3.2. Modify the HTML</a></li>
-<li><a href="#h-Miscellaneous-export-settings">3.4.3.3. Miscellaneous export settings</a></li>
+<li><a href="#h-Helper-functions">3.4.3.1. Helper functions</a></li>
 </ul>
 </li>
 <li><a href="#h-Org-modifications">3.4.4. Org modifications</a>
@@ -971,7 +969,8 @@ we invoke <code>emacs</code> from the command line in a non-interactive manner.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-imports">lilac_dot_el-imports</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-fix-nondeterminism-1">lilac_dot_el-fix-nondeterminism</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-custom-noweb-delimiters">lilac_dot_el-custom-noweb-delimiters</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac_dot_el-lilac-publish</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-lilac-publish-1">lilac_dot_el-lilac-publish</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-1">lilac_dot_el-lilac-publish-helpers</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-search-replace-1">lilac_dot_el-search-replace</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-autogenerate-css">lilac_dot_el-autogenerate-css</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-misc-1">lilac_dot_el-misc</a></span>
@@ -1046,11 +1045,11 @@ See <a href="https://www.reddit.com/r/orgmode/comments/aagmfh/comment/hk6upbf">h
 <h4 id="h-Toplevel-publishing-function---lilac-publish-"><span class="section-number-4">3.4.3.</span> Toplevel publishing function (<code>lilac-publish</code>)</h4>
 <div class="outline-text-4" id="text-h-Toplevel-publishing-function---lilac-publish-">
 <p>
-The toplevel function is <code>lilac-publish</code>. This actually publishes twice, with
-<code>lilac-publish-1</code> and <code>lilac-publish-2</code>. The reason we publish twice is because
-we need to examine the HTML output twice in order to build up a database of
-parent/child source code block links (which is then used to link between these
-parent/child source code blocks).
+The toplevel function is <code>lilac-publish</code>. This actually publishes to HTML twice,
+with two separate calls to <code>org-html-export-to-html</code>. The reason we publish
+twice is because we need to examine the HTML output twice in order to build up a
+database of parent/child source code block links (which is then used to link
+between these parent/child source code blocks).
 </p>
 
 <p>
@@ -1060,48 +1059,62 @@ named <code>__NREF__...</code> get an automatic <code>#+caption: ...</code> text
 (because for these Noweb-style blocks, the captions should always look uniform).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish</span> ()
-  (<span class="org-keyword">interactive</span>)
-  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-use-css">lilac-publish-use-css</a></span>
-  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-org">lilac-publish-modify-org</a></span>
-
-  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-HTML-1">lilac-publish-modify-HTML-1</a></span>
-  (org-html-export-to-html)
-
-  (clrhash lilac-polyblock-names-totals)
-
-  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-modify-HTML-2">lilac-publish-modify-HTML-2</a></span>
-  (org-html-export-to-html)
-
-  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-delete-toc-text">lilac-publish-delete-toc-text</a></span>
-  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-inline-styles">lilac-publish-fix-inline-styles</a></span>)
-
-<span class="org-comment-delimiter">;; </span><span class="org-comment">Modify Org buffer</span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-src-blocks">UID-for-all-src-blocks</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-headlines">UID-for-all-headlines</a></span>
-
-<span class="org-comment-delimiter">;; </span><span class="org-comment">Modify HTML</span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-1">lilac-link-to-child-blocks-from-parent</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-prettify-source-code-captions-1">lilac-prettify-source-code-captions</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-human-readable-src-block-ids">lilac-human-readable-src-block-ids</a></span>
-</pre></div></div>
-</div>
-
-<div id="outline-container-h-Modify-the-Org-buffer" class="outline-5">
-<h5 id="h-Modify-the-Org-buffer"><span class="section-number-5">3.4.3.1.</span> Modify the Org buffer</h5>
-<div class="outline-text-5" id="text-h-Modify-the-Org-buffer">
 <p>
+The full code listing for <code>lilac-publish</code> is below.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac-publish</label><span class="lilac-caption-link-symbol"><a href="#lilac-publish">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="lilac-publish">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish</span> ()
+  (<span class="org-keyword">interactive</span>)
+  (<span class="org-keyword">setq</span> org-html-htmlize-output-type 'css)
+  (<span class="org-keyword">setq</span> org-export-before-parsing-hook
+   '(lilac-UID-for-all-src-blocks
+     lilac-insert-noweb-source-code-block-captions
+     lilac-UID-for-all-headlines))
+  (<span class="org-keyword">setq</span> org-export-filter-src-block-functions
+   '(lilac-populate-child-HTML_ID-hash-table
+     lilac-populate-org_id-human_id-hash-table))
+
+  (org-html-export-to-html)
+  (clrhash lilac-polyblock-names-totals)
+  (<span class="org-keyword">setq</span> org-export-filter-src-block-functions
+   '(lilac-link-to-children-from-parent-body
+     lilac-prettify-source-code-captions))
+  (<span class="org-keyword">setq</span> org-export-filter-final-output-functions
+   '(lilac-replace-org_ids-with-human_ids))
+
+  (org-html-export-to-html)
+  (lilac-replace-from-to-html
+   <span class="org-string">"&lt;h2&gt;Table of Contents&lt;/h2&gt;"</span>
+   <span class="org-string">""</span>)
+  (lilac-replace-from-to-html
+   <span class="org-string">"&lt;style&gt;.csl-left-margin{float: left; padding-right: 0em"</span>
+   <span class="org-string">"&lt;style&gt;.csl-left-margin{float: left; padding-right: 1em"</span>)
+  (lilac-replace-from-to-html
+   <span class="org-string">".csl-right-inline{margin: 0 0 0 1em;}&lt;/style&gt;"</span>
+   <span class="org-string">".csl-right-inline{margin: 1em 0 0 2em;}&lt;/style&gt;"</span>))
+</pre></div></div><p>
+Now let's go through <code>lilac-publish</code> in detail.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(1/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-1">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish</span> ()
+  (<span class="org-keyword">interactive</span>)
+  (<span class="org-keyword">setq</span> org-html-htmlize-output-type 'css)
+</pre></div></div><p>
+Do not hardcode colors into the HTML. Instead refer to CSS class names, to be
+stylized by an external CSS file.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(2/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-2">  (<span class="org-keyword">setq</span> org-export-before-parsing-hook
+   '(lilac-UID-for-all-src-blocks
+     lilac-insert-noweb-source-code-block-captions
+     lilac-UID-for-all-headlines))
+</pre></div></div><p>
 Here we modify the Org mode buffer, by using <code>org-export-before-parsing-hook</code>.
 This takes a list of functions that are free to modify the Org mode buffer
 before each Org element in the buffer gets converted into HTML.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-org</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-org">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-org">(<span class="org-keyword">setq</span> org-export-before-parsing-hook
- '(lilac-UID-for-all-src-blocks
-   lilac-insert-noweb-source-code-block-captions
-   lilac-UID-for-all-headlines))
-</pre></div></div><p>
+<p>
 As for the actual modifications, see:
 </p>
 
@@ -1116,12 +1129,11 @@ In brief, the <code>lilac-UID-for-all-*</code> functions make it so that the lin
 headlines and source code blocks are both deterministic and human-readable. The
 <code>lilac-insert-noweb-source-code-block-captions</code> function
 </p>
-</div>
-</div>
 
-<div id="outline-container-h-Modify-the-HTML" class="outline-5">
-<h5 id="h-Modify-the-HTML"><span class="section-number-5">3.4.3.2.</span> Modify the HTML</h5>
-<div class="outline-text-5" id="text-h-Modify-the-HTML">
+<p>
+Now we start modifying the HTML.
+</p>
+
 <p>
 This is useful for adding in final tweaks to the HTML that is difficult to
 accomplish at the Org-mode buffer level.
@@ -1135,33 +1147,66 @@ blocks from parent blocks. We also populate the
 human-readable.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-HTML-1</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-HTML-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-HTML-1">(<span class="org-keyword">setq</span> org-export-filter-src-block-functions
- '(lilac-populate-child-HTML_ID-hash-table
-   lilac-populate-org_id-human_id-hash-table))
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(3/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-3">  (<span class="org-keyword">setq</span> org-export-filter-src-block-functions
+   '(lilac-populate-child-HTML_ID-hash-table
+     lilac-populate-org_id-human_id-hash-table))
+
+  (org-html-export-to-html)
 </pre></div></div><p>
+In between these phases we have to call
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(4/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-4">  (clrhash lilac-polyblock-names-totals)
+</pre></div></div><p>
+because of some internal housekeeping we have to do.
+</p>
+
+<p>
 Phase 2: In this phase we perform the linking from parent blocks to child blocks
 (<code>lilac-link-to-children-from-parent-body</code>), and also convert the child source
 code captions to look prettier (<code>lilac-prettify-source-code-captions</code>).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-modify-HTML-2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-modify-HTML-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-modify-HTML-2">(<span class="org-keyword">setq</span> org-export-filter-src-block-functions
- '(lilac-link-to-children-from-parent-body
-   lilac-prettify-source-code-captions))
-(<span class="org-keyword">setq</span> org-export-filter-final-output-functions
- '(lilac-replace-org_ids-with-human_ids))
-</pre></div></div>
-</div>
-</div>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(5/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-5">  (<span class="org-keyword">setq</span> org-export-filter-src-block-functions
+   '(lilac-link-to-children-from-parent-body
+     lilac-prettify-source-code-captions))
+  (<span class="org-keyword">setq</span> org-export-filter-final-output-functions
+   '(lilac-replace-org_ids-with-human_ids))
 
-<div id="outline-container-h-Miscellaneous-export-settings" class="outline-5">
-<h5 id="h-Miscellaneous-export-settings"><span class="section-number-5">3.4.3.3.</span> Miscellaneous export settings</h5>
-<div class="outline-text-5" id="text-h-Miscellaneous-export-settings">
-<p>
-Do not hardcode colors into the HTML. Instead refer to CSS class names, to be
-stylized by an external CSS file.
+  (org-html-export-to-html)
+</pre></div></div><p>
+The final bits are
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-use-css</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-use-css">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-use-css">(<span class="org-keyword">setq</span> org-html-htmlize-output-type 'css)
+<ol class="org-ol">
+<li>the deletion of the "Table of Contents" text from the autogenerated
+Table of Contents section, which we'll <a href="#h-Table-of-contents-sidebar">convert into a sidebar</a>; and</li>
+<li>the cleaning up of some inline CSS styles that get injected into the HTML as
+part of citation styles.</li>
+</ol>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(6/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-6">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-6">  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-delete-toc-text">lilac-publish-delete-toc-text</a></span>
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-inline-styles">lilac-publish-fix-inline-styles</a></span>)
+</pre></div></div>
+</div>
+
+<div id="outline-container-h-Helper-functions" class="outline-5">
+<h5 id="h-Helper-functions"><span class="section-number-5">3.4.3.1.</span> Helper functions</h5>
+<div class="outline-text-5" id="text-h-Helper-functions">
+<p>
+These are for modifying the Org buffer.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish-helpers</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-helpers-1"><span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-src-blocks">UID-for-all-src-blocks</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__smart-source-code-block-captions">smart-source-code-block-captions</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__UID-for-all-headlines">UID-for-all-headlines</a></span>
+</pre></div></div><p>
+These are for modifying the HTML.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish-helpers</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-helpers-2"><span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-1">lilac-link-to-child-blocks-from-parent</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-prettify-source-code-captions-1">lilac-prettify-source-code-captions</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-human-readable-src-block-ids">lilac-human-readable-src-block-ids</a></span>
 </pre></div></div>
 </div>
 </div>
@@ -1213,7 +1258,7 @@ gets erased and replaced with an <code>orgN</code> ID during HTML export. At tha
 make these <code>orgN</code> strings human-readable in <a href="#h-Use-human-readable-HTML-IDs-for-source-code-links">3.4.5.1</a>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">UID-for-all-src-blocks</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__UID-for-all-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__UID-for-all-src-blocks">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-UID-for-all-src-blocks</span> (_backend)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-1">UID-for-all-src-blocks</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__UID-for-all-src-blocks">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__UID-for-all-src-blocks">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-UID-for-all-src-blocks</span> (_backend)
   (<span class="org-keyword">let*</span> ((all-src-blocks
            <span class="lilac-child-link-from-parent"><a href="#__NREF__all-src-blocks">all-src-blocks</a></span>)
          (counter 0)
@@ -1299,7 +1344,7 @@ that the remaining KEY values remain valid. This is what we do below, where
 <code>smart-captions</code> is an alist like the one just described.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">smart-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-insert-noweb-source-code-block-captions</span> (_backend)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-1">smart-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__smart-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__smart-source-code-block-captions">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-insert-noweb-source-code-block-captions</span> (_backend)
   (<span class="org-keyword">let*</span> ((parent-blocks
            <span class="lilac-child-link-from-parent"><a href="#__NREF__parent-blocks">parent-blocks</a></span>)
          (child-parents-hash-table
@@ -1604,7 +1649,7 @@ construction of the <code>CUSTOM_ID</code> (<code>headline-UID</code> in the cod
 <code>lilac-get-unique-id</code>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">UID-for-all-headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__UID-for-all-headlines">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__UID-for-all-headlines">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-UID-for-all-headlines</span> (_backend)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-1">UID-for-all-headlines</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__UID-for-all-headlines">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__UID-for-all-headlines">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-UID-for-all-headlines</span> (_backend)
   (<span class="org-keyword">let*</span> ((all-headlines
            (org-element-map (org-element-parse-buffer) 'headline 'identity))
 
@@ -1710,7 +1755,7 @@ have manual links to source code blocks (although &#x2014; maybe it's just not w
 it because we can't refer to polyblocks anyway by name).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-human-readable-src-block-ids</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-human-readable-src-block-ids">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-human-readable-src-block-ids">(<span class="org-keyword">setq</span> lilac-org_id-human_id-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-2">lilac-human-readable-src-block-ids</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-human-readable-src-block-ids">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-human-readable-src-block-ids">(<span class="org-keyword">setq</span> lilac-org_id-human_id-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
 (<span class="org-keyword">setq</span> lilac-human_id-count-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
 (<span class="org-keyword">setq</span> lilac-human_id-org_id-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
 
@@ -1803,7 +1848,7 @@ confusing). In order to generate these fractions we have to keep around a couple
 hash tables for bookkeeping.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-prettify-source-code-captions</a></span>(1/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-1">(<span class="org-keyword">setq</span> lilac-polyblock-names (make-hash-table <span class="org-builtin">:test</span> 'equal))
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-2">lilac-prettify-source-code-captions</a></span>(1/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-1">(<span class="org-keyword">setq</span> lilac-polyblock-names (make-hash-table <span class="org-builtin">:test</span> 'equal))
 (<span class="org-keyword">setq</span> lilac-polyblock-names-totals (make-hash-table <span class="org-builtin">:test</span> 'equal))
 </pre></div></div><p>
 First here is the overall shape of the function. If there is no caption
@@ -1814,7 +1859,7 @@ to child Noweb references), and return both inside a new
 <code>lilac-pre-with-caption</code> div.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-prettify-source-code-captions</a></span>(2/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-prettify-source-code-captions</span> (src-block-html backend info)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-2">lilac-prettify-source-code-captions</a></span>(2/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-prettify-source-code-captions</span> (src-block-html backend info)
   (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
     (<span class="org-keyword">let*</span> (
            <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-prettify-source-code-captions-let-bindings-1">lilac-prettify-source-code-captions-let-bindings</a></span>)
@@ -1856,7 +1901,7 @@ other information that Org generates. We don't want to lose any of that info.
 a list of parsed pieces of HTML.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-prettify-source-code-captions</a></span>(3/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-3">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-source-block-html-parts-without-newlines</span> (src-block-html)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-2">lilac-prettify-source-code-captions</a></span>(3/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-prettify-source-code-captions-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-prettify-source-code-captions-3">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-source-block-html-parts-without-newlines</span> (src-block-html)
     (<span class="org-keyword">let*</span> ((one-line (lilac-to-single-line src-block-html))
            (leading-div
              (<span class="org-keyword">let</span> ((div-match
@@ -2110,14 +2155,13 @@ would want to link to the very first block.
 </p>
 
 <p>
-We cannot use a <code>org-export-before-parsing-hook</code> like we did in
-<a href="#__NREF__lilac-publish-modify-org"><code>__NREF__lilac-publish-modify-org</code></a> because at that stage of processing, we are
-dealing with Org mode syntax. Any modifications we make to the parent source
-code block will be treated as text upon HTML export. Thankfully Org mode allows
-customizations on generated HTML through the
+We cannot use a <code>org-export-before-parsing-hook</code> like we did in <a href="#h-Toplevel-publishing-function---lilac-publish-">3.4.3</a> because at that stage of processing, we
+are dealing with Org mode syntax. Any modifications we make to the parent
+source code block will be treated as text upon HTML export. Thankfully Org mode
+allows customizations on generated HTML through the
 <code>org-export-filter-src-block-functions</code> variable. This variable is analogous to
-<code>org-export-before-parsing-hook</code>, but operates at the HTML level (not at the Org
-syntax level) for source code blocks, which is exactly what we need.
+<code>org-export-before-parsing-hook</code>, but operates at the HTML level (not at the
+Org syntax level) for source code blocks, which is exactly what we need.
 </p>
 
 <p>
@@ -2147,7 +2191,7 @@ implementation. First here's the code to populate the
 <code>lilac-child-HTML_ID-hash-table</code>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span>(1/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-1">(<span class="org-keyword">setq</span> lilac-child-HTML_ID-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-2">lilac-link-to-child-blocks-from-parent</a></span>(1/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-1">(<span class="org-keyword">setq</span> lilac-child-HTML_ID-hash-table (make-hash-table <span class="org-builtin">:test</span> 'equal))
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">lilac-populate-child-HTML_ID-hash-table</span> (src-block-html backend info)
   (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
@@ -2175,7 +2219,7 @@ all blocks; if the user manually creates non-unique captions, this will probably
 break. (FIXME: add test to confirm breakage&#x2026;?)
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span>(2/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-name-from-html</span> (src-block-html)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-2">lilac-link-to-child-blocks-from-parent</a></span>(2/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-get-src-block-name-from-html</span> (src-block-html)
   (<span class="org-keyword">let*</span> ((match-nref (string-match
                       (concat
                        <span class="org-string">"&lt;label.+?&lt;code&gt;"</span>
@@ -2202,7 +2246,7 @@ If the user used manual captions, we have to remove the "Listing N: &#x2026;" te
 that Org automatically inserts.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span>(3/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-3">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-clean-up-match-raw</span> (s)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-2">lilac-link-to-child-blocks-from-parent</a></span>(3/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-3">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-clean-up-match-raw</span> (s)
   (<span class="org-keyword">let*</span> ((normalized (lilac-normalize-string s))
          (rx (rx-to-string
                 '(and
@@ -2223,7 +2267,7 @@ code block directly. We search for the child name (which begins with a
 replacement, adding in the link to the child block.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-link-to-child-blocks-from-parent</a></span>(4/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-4">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-link-to-children-from-parent-body</span> (src-block-html backend info)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-2">lilac-link-to-child-blocks-from-parent</a></span>(4/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-link-to-child-blocks-from-parent-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-link-to-child-blocks-from-parent-4">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-link-to-children-from-parent-body</span> (src-block-html backend info)
   (<span class="org-keyword">when</span> (org-export-derived-backend-p backend 'html)
     (<span class="org-keyword">let*</span> ((div-caption-body (lilac-get-source-block-html-parts-without-newlines
                               src-block-html))
@@ -2285,7 +2329,7 @@ file from Emacs (instead of invoking <code>sed</code>).
 This cleans up the inline styles for citations.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-fix-inline-styles</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-inline-styles">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-inline-styles">(lilac-replace-from-to-html
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-fix-inline-styles</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-inline-styles">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-inline-styles">(lilac-replace-from-to-html
  <span class="org-string">"&lt;style&gt;.csl-left-margin{float: left; padding-right: 0em"</span>
  <span class="org-string">"&lt;style&gt;.csl-left-margin{float: left; padding-right: 1em"</span>)
 (lilac-replace-from-to-html
@@ -2400,7 +2444,7 @@ modifications to it:
 <div id="outline-container-h-Delete--Table-of-Contents--text" class="outline-6">
 <h6 id="h-Delete--Table-of-Contents--text"><span class="section-number-6">3.4.6.2.1.</span> Delete "Table of Contents" text</h6>
 <div class="outline-text-6" id="text-h-Delete--Table-of-Contents--text">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish">lilac-publish-delete-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-delete-toc-text">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-delete-toc-text">(lilac-replace-from-to-html
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-delete-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-delete-toc-text">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-delete-toc-text">(lilac-replace-from-to-html
  <span class="org-string">"&lt;h2&gt;Table of Contents&lt;/h2&gt;"</span>
  <span class="org-string">""</span>)
 </pre></div></div>
@@ -3709,11 +3753,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000ea">Org mode</a> borrows heavily using <a href="#org00000ec">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000ec"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000f2">Org mode</a> borrows heavily using <a href="#org00000f4">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000f4"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000ea"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000f2"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

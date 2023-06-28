@@ -75,21 +75,19 @@ When matching, reference is stored in match group 1."
    '(lilac-UID-for-all-src-blocks
      lilac-insert-noweb-source-code-block-captions
      lilac-UID-for-all-headlines))
-
   (setq org-export-filter-src-block-functions
    '(lilac-populate-child-HTML_ID-hash-table
      lilac-populate-org_id-human_id-hash-table))
+
   (org-html-export-to-html)
-
   (clrhash lilac-polyblock-names-totals)
-
   (setq org-export-filter-src-block-functions
    '(lilac-link-to-children-from-parent-body
      lilac-prettify-source-code-captions))
   (setq org-export-filter-final-output-functions
    '(lilac-replace-org_ids-with-human_ids))
-  (org-html-export-to-html)
 
+  (org-html-export-to-html)
   (lilac-replace-from-to-html
    "<h2>Table of Contents</h2>"
    "")
@@ -99,8 +97,6 @@ When matching, reference is stored in match group 1."
   (lilac-replace-from-to-html
    ".csl-right-inline{margin: 0 0 0 1em;}</style>"
    ".csl-right-inline{margin: 1em 0 0 2em;}</style>"))
-
-;; Modify Org buffer
 (defun lilac-UID-for-all-src-blocks (_backend)
   (let* ((all-src-blocks
            (org-element-map (org-element-parse-buffer) 'src-block 'identity))
@@ -283,8 +279,6 @@ When matching, reference is stored in match group 1."
     (replace-regexp-in-string "[^A-Za-z0-9]" "-" s)
     "-"
     "-"))
-
-;; Modify HTML
 (setq lilac-child-HTML_ID-hash-table (make-hash-table :test 'equal))
 
 (defun lilac-populate-child-HTML_ID-hash-table (src-block-html backend info)
