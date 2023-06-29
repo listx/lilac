@@ -84,5 +84,7 @@ $(document).ready(() => {
         }
         $(destination).addClass("active");
         deactivate_other_non_toc_items(destination);
+        elt.preventDefault();
+        scrollIntoViewIfNeeded($(destination)[0]);
     });
 });

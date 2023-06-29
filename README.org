@@ -2018,7 +2018,7 @@ border makes the item jump a little bit when it's applied.
 }
 #+end_src
 
-***** Highlight just-clicked-on item
+***** Highlight and scroll to just-clicked-on item
 
 When we click on any link (typically a code block but it can also be a headline
 or some other intra-document link destination), the browser shifts the page
@@ -2039,6 +2039,10 @@ main difference is that while the code there is concerned with adding and
 removing the =active= class from the =#text-table-of-contents= div, here we want
 to do the same but for the =outline-2= div which contains the outline text
 (There can be multiple =outline-2= divs, but this is immaterial.)
+
+We also use the =scrollIntoViewIfNeeded= function to scroll the item into view,
+but only if we need to. This way we minimize the need to scroll, resulting in a
+much less "jumpy" experience.
 
 #+name: __NREF__js-highlight-link-destination
 #+begin_src js
@@ -2062,6 +2066,8 @@ $(document).ready(() => {
         }
         $(destination).addClass("active");
         deactivate_other_non_toc_items(destination);
+        elt.preventDefault();
+        scrollIntoViewIfNeeded($(destination)[0]);
     });
 });
 #+end_src
