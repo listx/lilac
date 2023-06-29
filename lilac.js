@@ -74,8 +74,6 @@ function deactivate_other_non_toc_items(hash) {
 
 $(document).ready(() => {
     $("a").click((elt) => {
-        console.log(elt.target.hash);
-        console.log(elt.target);
         var destination;
         if (elt.target.nodeName === "CODE") {
             destination = elt.target.parentElement.hash;
