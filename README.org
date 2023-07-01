@@ -1938,12 +1938,21 @@ function scrollIntoViewIfNeeded(target) {
         target.scrollIntoView({ behavior: "smooth",
                                 block: "end",
                                 inline: "nearest" });
+        window.scrollBy({
+            top: 100,
+            behavior: "smooth",
+        });
     }
 
     if (target.getBoundingClientRect().top < 0) {
         target.scrollIntoView({ behavior: "smooth",
                                 block: "start",
                                 inline: "nearest" });
+        window.scrollBy({
+            top: -100,
+            behavior: "smooth",
+        });
+
     }
 }
 
