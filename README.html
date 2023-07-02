@@ -303,9 +303,10 @@
 <li><a href="#h-Delete--Table-of-Contents--text">3.4.6.2.1. Delete "Table of Contents" text</a></li>
 <li><a href="#h-Convert--Table-of-Contents--to-a-sidebar-on-the-left">3.4.6.2.2. Convert "Table of Contents" to a sidebar on the left</a></li>
 <li><a href="#h-Track-the-current-headline">3.4.6.2.3. Track the current headline</a></li>
-<li><a href="#h-Highlight-and-scroll-to-just-clicked-on-item">3.4.6.2.4. Highlight and scroll to just-clicked-on item</a></li>
 </ul>
 </li>
+<li><a href="#h-Highlight-and-scroll-to-just-clicked-on-item">3.4.6.3. Highlight and scroll to just-clicked-on item</a></li>
+<li><a href="#h-Scroll-to-history-item">3.4.6.4. Scroll to history item</a></li>
 </ul>
 </li>
 <li><a href="#h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">3.4.7. Autogenerate CSS for syntax highlighting of source code blocks</a></li>
@@ -2360,6 +2361,7 @@ These are included in <code>lilac.js</code>, as below.
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.js</label><span class="lilac-caption-link-symbol"><a href="#lilac-js">&#x1f517;</a></span></div><pre class="src src-js" id="lilac-js"><span class="lilac-child-link-from-parent"><a href="#__NREF__js-automatically-link-headlines">js-automatically-link-headlines</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__js-toc-scrollspy">js-toc-scrollspy</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__js-highlight-link-destination">js-highlight-link-destination</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__js-scroll-to-history-item">js-scroll-to-history-item</a></span>
 </pre></div></div><p>
 In the<a href="#h-Create--lilac-theme--file"><code>lilac.theme</code></a> file, we include <code>lilac.js</code> and also jQuery
 because we depend on it.
@@ -2583,10 +2585,11 @@ border makes the item jump a little bit when it's applied.
 </pre></div></div>
 </div>
 </div>
+</div>
 
-<div id="outline-container-h-Highlight-and-scroll-to-just-clicked-on-item" class="outline-6">
-<h6 id="h-Highlight-and-scroll-to-just-clicked-on-item"><span class="section-number-6">3.4.6.2.4.</span> Highlight and scroll to just-clicked-on item</h6>
-<div class="outline-text-6" id="text-h-Highlight-and-scroll-to-just-clicked-on-item">
+<div id="outline-container-h-Highlight-and-scroll-to-just-clicked-on-item" class="outline-5">
+<h5 id="h-Highlight-and-scroll-to-just-clicked-on-item"><span class="section-number-5">3.4.6.3.</span> Highlight and scroll to just-clicked-on item</h5>
+<div class="outline-text-5" id="text-h-Highlight-and-scroll-to-just-clicked-on-item">
 <p>
 When we click on any link (typically a code block but it can also be a headline
 or some other intra-document link destination), the browser shifts the page
@@ -2639,6 +2642,14 @@ $(document).ready(() =&gt; {
         deactivate_other_non_toc_items(destination);
         elt.preventDefault();
         scrollIntoViewIfNeeded($(destination)[0]);
+        <span class="org-comment-delimiter">// </span><span class="org-comment">Save intra-document link into history, but only if it's not a repeat</span>
+        <span class="org-comment-delimiter">// </span><span class="org-comment">of one already there.</span>
+        <span class="org-keyword">var</span> <span class="org-variable-name">hash</span> = destination;
+        <span class="org-keyword">if</span> (history.state.hash != hash) {
+<span id="coderef-HISTORY_PUSHSTATE" class="coderef-off">            history.pushState(</span>
+                {hash: destination},
+                <span class="org-string">""</span>, destination);
+        }
     });
 });
 </pre></div></div><p>
@@ -2693,6 +2704,36 @@ Different destination elements need different selectors. We cover them all here.
 }
 </pre></div></div>
 </div>
+</div>
+
+<div id="outline-container-h-Scroll-to-history-item" class="outline-5">
+<h5 id="h-Scroll-to-history-item"><span class="section-number-5">3.4.6.4.</span> Scroll to history item</h5>
+<div class="outline-text-5" id="text-h-Scroll-to-history-item">
+<p>
+Normally, browsers only treat links across URLs as new points in history; this
+means that for links <i>within</i> the page, their history is not saved. We make sure
+to save it explicitly with <code>history.pushState()</code> though in <a href="#coderef-HISTORY_PUSHSTATE" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-HISTORY_PUSHSTATE');" onmouseout="CodeHighlightOff(this, 'coderef-HISTORY_PUSHSTATE');"><code>HISTORY_PUSHSTATE</code></a>.
+So then every time we want to go back in history (by pressing the "back" arrow
+button in the browser), we just need to scroll to it.  We already scroll to the
+element we click on when we push on a new history item into the stack, so
+there's no need to keep it symmetric here.
+</p>
+
+<p>
+We have to activate the restored history item (to re-highlight it with the
+<code>active</code> class), so we do that also.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-js">js-scroll-to-history-item</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__js-scroll-to-history-item">&#x1f517;</a></span></div><pre class="src src-js" id="__NREF__js-scroll-to-history-item">$(document).ready(() =&gt; {
+    window.addEventListener(<span class="org-string">"popstate"</span>, <span class="org-keyword">function</span> (<span class="org-variable-name">e</span>) {
+        <span class="org-keyword">var</span> <span class="org-variable-name">hash</span> = e.state.hash;
+        e.preventDefault();
+        scrollIntoViewIfNeeded($(hash)[0]);
+        $(hash).addClass(<span class="org-string">"active"</span>);
+        deactivate_other_non_toc_items(hash);
+    });
+});
+</pre></div></div>
 </div>
 </div>
 </div>
@@ -3768,11 +3809,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000f2">Org mode</a> borrows heavily using <a href="#org00000f4">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000f4"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000f4">Org mode</a> borrows heavily using <a href="#org00000f6">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000f6"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000f2"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000f4"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

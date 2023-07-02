@@ -79,5 +79,22 @@ $(document).ready(() => {
         deactivate_other_non_toc_items(destination);
         elt.preventDefault();
         scrollIntoViewIfNeeded($(destination)[0]);
+        // Save intra-document link into history, but only if it's not a repeat
+        // of one already there.
+        var hash = destination;
+        if (history.state.hash != hash) {
+            history.pushState( //ref:HISTORY_PUSHSTATE
+                {hash: destination},
+                "", destination);
+        }
+    });
+});
+$(document).ready(() => {
+    window.addEventListener("popstate", function (e) {
+        var hash = e.state.hash;
+        e.preventDefault();
+        scrollIntoViewIfNeeded($(hash)[0]);
+        $(hash).addClass("active");
+        deactivate_other_non_toc_items(hash);
     });
 });

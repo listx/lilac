@@ -1807,6 +1807,7 @@ These are included in =lilac.js=, as below.
 __NREF__js-automatically-link-headlines
 __NREF__js-toc-scrollspy
 __NREF__js-highlight-link-destination
+__NREF__js-scroll-to-history-item
 #+end_src
 
 In the[[* Create =lilac.theme= file][=lilac.theme=]] file, we include =lilac.js= and also jQuery
@@ -1941,7 +1942,7 @@ initially used Bootstrap's "scrollspy" component, but dropped it because it was
 too heavy and opinionated.
 
 #+name: __NREF__js-toc-scrollspy
-#+begin_src js
+#+begin_src js -r -l "//ref:%s"
 function scrollIntoViewIfNeeded(target) {
     if ((target.getBoundingClientRect().bottom > window.innerHeight)
         || (target.getBoundingClientRect().top < 0)) {
@@ -2022,7 +2023,7 @@ border makes the item jump a little bit when it's applied.
 }
 #+end_src
 
-***** Highlight and scroll to just-clicked-on item
+**** Highlight and scroll to just-clicked-on item
 
 When we click on any link (typically a code block but it can also be a headline
 or some other intra-document link destination), the browser shifts the page
@@ -2049,7 +2050,7 @@ but only if we need to. This way we minimize the need to scroll, resulting in a
 much less "jumpy" experience.
 
 #+name: __NREF__js-highlight-link-destination
-#+begin_src js
+#+begin_src js -r -l "//ref:%s"
 function deactivate_other_non_toc_items(hash) {
     $(".outline-2 *").each((index, elt) => {
         if (`#${elt.id}` !== hash) {
@@ -2070,6 +2071,14 @@ $(document).ready(() => {
         deactivate_other_non_toc_items(destination);
         elt.preventDefault();
         scrollIntoViewIfNeeded($(destination)[0]);
+        // Save intra-document link into history, but only if it's not a repeat
+        // of one already there.
+        var hash = destination;
+        if (history.state.hash != hash) {
+            history.pushState( //ref:HISTORY_PUSHSTATE
+                {hash: destination},
+                "", destination);
+        }
     });
 });
 #+end_src
@@ -2130,6 +2139,32 @@ Different destination elements need different selectors. We cover them all here.
 .outline-2 h6.active {
     __NREF__css-active-item-headline
 }
+#+end_src
+
+**** Scroll to history item
+
+Normally, browsers only treat links across URLs as new points in history; this
+means that for links /within/ the page, their history is not saved. We make sure
+to save it explicitly with =history.pushState()= though in [[(HISTORY_PUSHSTATE)][=HISTORY_PUSHSTATE=]].
+So then every time we want to go back in history (by pressing the "back" arrow
+button in the browser), we just need to scroll to it.  We already scroll to the
+element we click on when we push on a new history item into the stack, so
+there's no need to keep it symmetric here.
+
+We have to activate the restored history item (to re-highlight it with the
+=active= class), so we do that also.
+
+#+name: __NREF__js-scroll-to-history-item
+#+begin_src js
+$(document).ready(() => {
+    window.addEventListener("popstate", function (e) {
+        var hash = e.state.hash;
+        e.preventDefault();
+        scrollIntoViewIfNeeded($(hash)[0]);
+        $(hash).addClass("active");
+        deactivate_other_non_toc_items(hash);
+    });
+});
 #+end_src
 
 *** Autogenerate CSS for syntax highlighting of source code blocks
