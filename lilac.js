@@ -8,16 +8,11 @@ $(function() {
     });
 });
 function scrollIntoViewIfNeeded(target) {
-    if (target.getBoundingClientRect().bottom > window.innerHeight) {
+    if ((target.getBoundingClientRect().bottom > window.innerHeight)
+        || (target.getBoundingClientRect().top < 0)) {
         target.scrollIntoView({ behavior: "smooth",
-                                block: "end",
-                                inline: "nearest" });
-    }
-
-    if (target.getBoundingClientRect().top < 0) {
-        target.scrollIntoView({ behavior: "smooth",
-                                block: "start",
-                                inline: "nearest" });
+                                block: "center",
+                                inline: "center" });
     }
 }
 
