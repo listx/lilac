@@ -193,7 +193,7 @@
 <link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
 <link rel="stylesheet" type="text/css" href="lilac.css" />
 <link rel="stylesheet" href=
-"https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&family=Source+Code+Pro">
+"https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&family=Source+Sans+Pro:wght@400;700&family=Source+Code+Pro">
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
 <script src="lilac.js"></script>
 <script>
@@ -2471,6 +2471,15 @@ modifications to it:
     <span class="org-css-property">padding-right</span>: 20px;
     <span class="org-css-property">padding-left</span>: 5px;
 }
+<span class="org-css-selector">#text-table-of-contents li </span>{
+    <span class="org-css-property">font-family</span>: <span class="org-string">"Source Sans Pro"</span>, sans;
+}
+<span class="org-css-selector">#text-table-of-contents ul li </span>{
+    <span class="org-css-property">font-weight</span>: bold;
+}
+<span class="org-css-selector">#text-table-of-contents ul li ul li </span>{
+    <span class="org-css-property">font-weight</span>: normal;
+}
 <span class="org-css-selector">#text-table-of-contents ul </span>{
     <span class="org-css-property">margin</span>: 0;
     <span class="org-css-property">padding</span>: 0;
@@ -2987,7 +2996,7 @@ We add some additional CSS tweaks on top of what we get from Org.
     <span class="org-css-property">overflow-x</span>: hidden;
 }
 
-<span class="org-css-selector">body, p, li, h1, h2, h3, h4, h5, h6, legend </span>{
+<span class="org-css-selector">body, p, li, legend </span>{
     <span class="org-css-property">font-family</span>: <span class="org-string">"Source Serif Pro"</span>, serif;
 }
 
@@ -2998,6 +3007,10 @@ We add some additional CSS tweaks on top of what we get from Org.
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
     <span class="org-css-property">border-color</span>: <span class="custom">rgba(255, 255, 255, 0)</span>;
+}
+
+<span class="org-css-selector">h1, h2, h3, h4, h5, h6, dt </span>{
+    <span class="org-css-property">font-family</span>: <span class="org-string">"Source Sans Pro"</span>, sans;
 }
 
 <span class="org-css-selector">p, li </span>{
@@ -3338,7 +3351,7 @@ inspiration for this setup comes from <a href="https://gitlab.com/OlMon/org-them
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/&gt;</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="lilac.css" /&gt;</span>
 <span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" href=</span>
-<span class="org-org-meta-line">#+HTML_HEAD: "<a href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&amp;family=Source+Code+Pro">https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&amp;family=Source+Code+Pro</a>"&gt;</span>
+<span class="org-org-meta-line">#+HTML_HEAD: "<a href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&amp;family=Source+Sans+Pro:wght@400;700&amp;family=Source+Code+Pro">https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&amp;family=Source+Sans+Pro:wght@400;700&amp;family=Source+Code+Pro</a>"&gt;</span>
 
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-theme-js">lilac-theme-js</a></span>
 </pre></div></div>
