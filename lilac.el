@@ -68,6 +68,7 @@
 Match any reference, or only those matching REGEXP, if non-nil.
 When matching, reference is stored in match group 1."
   (lilac-nref-rx t))
+(setq org-confirm-babel-evaluate nil)
 (defun lilac-publish ()
   (interactive)
   (setq org-html-htmlize-output-type 'css)
