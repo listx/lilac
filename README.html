@@ -248,9 +248,18 @@
 <ul>
 <li><a href="#h-Code-blocks">2.2.1. Code blocks</a>
 <ul>
-<li><a href="#h---begin-example---------end-example">2.2.1.1. <code>#+begin_example</code> &#x2026; <code>#+end_example</code></a></li>
+<li><a href="#h-Source-blocks">2.2.1.1. Source blocks</a>
+<ul>
+<li><a href="#h-Plain">2.2.1.1.1. Plain</a></li>
+<li><a href="#h-Monoblock">2.2.1.1.2. Monoblock</a></li>
+<li><a href="#h-Polyblock">2.2.1.1.3. Polyblock</a></li>
 </ul>
 </li>
+<li><a href="#h-Example-blocks">2.2.1.2. Example blocks</a></li>
+<li><a href="#h-Quote-blocks">2.2.1.3. Quote blocks</a></li>
+</ul>
+</li>
+<li><a href="#h-Sidenotes">2.2.2. Sidenotes</a></li>
 </ul>
 </li>
 </ul>
@@ -340,7 +349,7 @@
 <li><a href="#h-Source-code-block-body">3.4.10.9. Source code block body</a></li>
 <li><a href="#h-Source-code-block-captions">3.4.10.10. Source code block captions</a></li>
 <li><a href="#h-Links-to-child-source-block-from-parent">3.4.10.11. Links to child source block from parent</a></li>
-<li><a href="#h-Sidenotes">3.4.10.12. Sidenotes</a></li>
+<li><a href="#h-Sidenotes-1">3.4.10.12. Sidenotes</a></li>
 </ul>
 </li>
 <li><a href="#h-Create--lilac-theme--file">3.4.11. Create <code>lilac.theme</code> file</a></li>
@@ -423,7 +432,7 @@ While Org mode allows source code blocks to refer to other blocks (Noweb
 references), it does not do any kind of linking. So you can write blocks like
 </p>
 
-<div class="org-src-container"><pre class="src src-org" id="org0000001"><span class="org-org-meta-line">#+name: example-parent-block</span>
+<div class="org-src-container"><pre class="src src-org" id="nil-1"><span class="org-org-meta-line">#+name: example-parent-block</span>
 <span class="org-org-block-begin-line">#+begin_src bash</span>
 <span class="org-org-block"><span class="org-builtin">echo</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-string">"Hello from the parent block"</span></span>
 <span class="org-org-block">&lt;&lt;some-other-block&gt;&gt;</span>
@@ -634,7 +643,10 @@ additional parent blocks, they will show up as links "3", "4", etc.
 <div class="outline-text-3" id="text-h-Examples">
 <p>
 Here we have some examples of how certain Org mode features look when exported
-to HTML with Lilac.
+to HTML with Lilac. Each section has an orgmode input and HTML output. The input
+is what you type into your <code>*.org</code> (plaintext) file, and the output is what you
+get in HTML after it is rendered with Lilac's publishing function,
+<code>(lilac-publish)</code>.
 </p>
 </div>
 
@@ -643,18 +655,218 @@ to HTML with Lilac.
 <div class="outline-text-4" id="text-h-Code-blocks">
 </div>
 
-<div id="outline-container-h---begin-example---------end-example" class="outline-5">
-<h5 id="h---begin-example---------end-example"><span class="section-number-5">2.2.1.1.</span> <code>#+begin_example</code> &#x2026; <code>#+end_example</code></h5>
-<div class="outline-text-5" id="text-h---begin-example---------end-example">
-<pre class="example" id="org0000017">
+<div id="outline-container-h-Source-blocks" class="outline-5">
+<h5 id="h-Source-blocks"><span class="section-number-5">2.2.1.1.</span> Source blocks</h5>
+<div class="outline-text-5" id="text-h-Source-blocks">
+</div>
+
+<div id="outline-container-h-Plain" class="outline-6">
+<h6 id="h-Plain"><span class="section-number-6">2.2.1.1.1.</span> Plain</h6>
+<div class="outline-text-6" id="text-h-Plain">
+<p>
+Orgmode input:
+</p>
+
+<div class="org-src-container"><pre class="src src-org" id="nil-2"><span class="org-org-block-begin-line">#+begin_src python</span>
+<span class="org-org-block"><span class="org-keyword">def</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-function-name">foo</span></span><span class="org-org-block">():</span>
+<span class="org-org-block">    </span><span class="org-org-block"><span class="org-keyword">return</span></span><span class="org-org-block"> 42</span>
+<span class="org-org-block-end-line">#+end_src</span>
+</pre></div><p>
+Rendered HTML output:
+</p>
+
+<div class="org-src-container"><pre class="src src-python" id="nil-3"><span class="org-keyword">def</span> <span class="org-function-name">foo</span>():
+    <span class="org-keyword">return</span> 42
+</pre></div>
+</div>
+</div>
+
+<div id="outline-container-h-Monoblock" class="outline-6">
+<h6 id="h-Monoblock"><span class="section-number-6">2.2.1.1.2.</span> Monoblock</h6>
+<div class="outline-text-6" id="text-h-Monoblock">
+<p>
+Orgmode input:
+</p>
+
+<div class="sidenote" id="org000001b">
+<p>
+Although the <code>ex_monoblock</code> text is linkified here, ignore it. The text that you
+need to write in the Orgmode input is literally <code>__NREF__ex_monoblock</code>. Lilac
+currently doesn't understand that the block here is an example and that it
+should not linkify it.
+</p>
+
+</div>
+
+<div class="org-src-container"><pre class="src src-org" id="nil-4"><span class="org-org-meta-line">#+caption:</span> <span class="org-org-block">A parent block.</span>
+<span class="org-org-block-begin-line">#+begin_src python</span>
+<span class="org-org-block"><span class="org-keyword">def</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-function-name">foo</span></span><span class="org-org-block">():</span>
+<span class="org-org-block">    <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_monoblock">ex_monoblock</a></span></span>
+<span class="org-org-block">    </span><span class="org-org-block"><span class="org-keyword">return</span></span><span class="org-org-block"> 42</span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+<span class="org-org-meta-line">#+name: <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_monoblock">ex_monoblock</a></span></span>
+<span class="org-org-block-begin-line">#+begin_src python</span>
+<span class="org-org-block"><span class="org-builtin">print</span></span><span class="org-org-block">(</span><span class="org-org-block"><span class="org-string">"hello world"</span></span><span class="org-org-block">)</span>
+<span class="org-org-block-end-line">#+end_src</span>
+</pre></div><p>
+Rendered HTML output:
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">A parent block.</label><span class="lilac-caption-link-symbol"><a href="#A-parent-block-1">&#x1f517;</a></span></div><pre class="src src-python" id="A-parent-block-1"><span class="org-keyword">def</span> <span class="org-function-name">foo</span>():
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_monoblock">ex_monoblock</a></span>
+    <span class="org-keyword">return</span> 42
+</pre></div></div><div class="sidenote" id="org0000020">
+<p>
+Similarly, the <code>2</code> link is only here because Lilac thinks that this child block
+is referenced in multiple blocks. In a real example this <code>2</code> would not show up.
+</p>
+
+</div>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-4">ex_monoblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-1">2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__ex_monoblock">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_monoblock"><span class="org-builtin">print</span>(<span class="org-string">"hello world"</span>)
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Polyblock" class="outline-6">
+<h6 id="h-Polyblock"><span class="section-number-6">2.2.1.1.3.</span> Polyblock</h6>
+<div class="outline-text-6" id="text-h-Polyblock">
+<p>
+Orgmode input:
+</p>
+
+<div class="sidenote" id="org0000023">
+<p>
+Like above for monoblocks, Lilac needlessly linkifies the source code body text
+of the parent block when it doesn't need to (as this is only an illustrative
+example).
+</p>
+
+</div>
+
+<div class="org-src-container"><pre class="src src-org" id="nil-5"><span class="org-org-meta-line">#+caption:</span> <span class="org-org-block">A parent block.</span>
+<span class="org-org-block-begin-line">#+begin_src python</span>
+<span class="org-org-block"><span class="org-keyword">def</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-function-name">foo</span></span><span class="org-org-block">():</span>
+<span class="org-org-block">    <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span></span>
+<span class="org-org-block">    </span><span class="org-org-block"><span class="org-keyword">return</span></span><span class="org-org-block"> 42</span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+<span class="org-org-meta-line">#+header: :noweb-ref <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span></span>
+<span class="org-org-block-begin-line">#+begin_src python</span>
+<span class="org-org-block"><span class="org-builtin">print</span></span><span class="org-org-block">(</span><span class="org-org-block"><span class="org-string">"hello world"</span></span><span class="org-org-block">)</span>
+<span class="org-org-block-end-line">#+end_src</span>
+
+Some intervening text.
+
+<span class="org-org-meta-line">#+header: :noweb-ref <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span></span>
+<span class="org-org-block-begin-line">#+begin_src python</span>
+<span class="org-org-block"><span class="org-builtin">print</span></span><span class="org-org-block">(</span><span class="org-org-block"><span class="org-string">"abcdefg"</span></span><span class="org-org-block">)</span>
+<span class="org-org-block-end-line">#+end_src</span>
+</pre></div><p>
+Rendered HTML output:
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">A parent block.</label><span class="lilac-caption-link-symbol"><a href="#A-parent-block-2">&#x1f517;</a></span></div><pre class="src src-python" id="A-parent-block-2"><span class="org-keyword">def</span> <span class="org-function-name">foo</span>():
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span>
+    <span class="org-keyword">return</span> 42
+</pre></div></div><div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-5">ex_polyblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-2">2</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__ex_polyblock-1">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_polyblock-1"><span class="org-builtin">print</span>(<span class="org-string">"hello world"</span>)
+</pre></div></div><p>
+Some intervening text.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-5">ex_polyblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-2">2</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__ex_polyblock-2">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_polyblock-2"><span class="org-builtin">print</span>(<span class="org-string">"abcdefg"</span>)
+</pre></div></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Example-blocks" class="outline-5">
+<h5 id="h-Example-blocks"><span class="section-number-5">2.2.1.2.</span> Example blocks</h5>
+<div class="outline-text-5" id="text-h-Example-blocks">
+<p>
+Orgmode input:
+</p>
+
+<div class="org-src-container"><pre class="src src-org" id="nil-6"><span class="org-org-block-begin-line">#+begin_example</span>
+<span class="custom">Hello world.</span>
+<span class="custom">Foo bar.</span>
+<span class="org-org-block-end-line">#+end_example</span>
+</pre></div><p>
+Rendered HTML output:
+</p>
+
+<pre class="example" id="org000002e">
 Hello world.
 Foo bar.
 </pre>
 </div>
 </div>
+
+<div id="outline-container-h-Quote-blocks" class="outline-5">
+<h5 id="h-Quote-blocks"><span class="section-number-5">2.2.1.3.</span> Quote blocks</h5>
+<div class="outline-text-5" id="text-h-Quote-blocks">
+<p>
+Orgmode input:
+</p>
+
+<div class="org-src-container"><pre class="src src-org" id="nil-7"><span class="org-org-block-begin-line">#+begin_quote</span>
+Hello world.
+Foo bar.
+<span class="org-org-block-end-line">#+end_quote</span>
+</pre></div><p>
+Rendered HTML output:
+</p>
+
+<blockquote>
+<p>
+Hello world.
+Foo bar.
+</p>
+</blockquote>
 </div>
 </div>
 </div>
+
+<div id="outline-container-h-Sidenotes" class="outline-4">
+<h4 id="h-Sidenotes"><span class="section-number-4">2.2.2.</span> Sidenotes</h4>
+<div class="outline-text-4" id="text-h-Sidenotes">
+<p>
+Sidenotes are not part of vanilla Orgmode. They are used to insert notes on the
+right-hand-side margin, and are inspired by the ones found in Donald Knuth's
+books.
+</p>
+
+<p>
+Note that Lilac only adds some special CSS styling to sidenotes. Orgmode is
+generous with source code blocks and accepts any <code>#+begin_foo</code> and <code>#+end_foo</code>
+lines.
+</p>
+
+<p>
+Orgmode input:
+</p>
+
+<div class="org-src-container"><pre class="src src-org" id="nil-8"><span class="org-org-block-begin-line">#+begin_sidenote</span>
+Hello world.
+Foo bar.
+<span class="org-org-block-end-line">#+end_sidenote</span>
+</pre></div><p>
+Rendered HTML output:
+</p>
+
+<div class="sidenote" id="org0000033">
+<p>
+Hello world.
+Foo bar.
+</p>
+
+</div>
+</div>
+</div>
+</div>
+</div>
+
 
 <div id="outline-container-h-Developer-Guide" class="outline-2">
 <h2 id="h-Developer-Guide"><span class="section-number-2">3.</span> Developer Guide</h2>
@@ -3390,9 +3602,9 @@ gives us by default.
 </div>
 </div>
 
-<div id="outline-container-h-Sidenotes" class="outline-5">
-<h5 id="h-Sidenotes"><span class="section-number-5">3.4.10.12.</span> Sidenotes</h5>
-<div class="outline-text-5" id="text-h-Sidenotes">
+<div id="outline-container-h-Sidenotes-1" class="outline-5">
+<h5 id="h-Sidenotes-1"><span class="section-number-5">3.4.10.12.</span> Sidenotes</h5>
+<div class="outline-text-5" id="text-h-Sidenotes-1">
 <p>
 Sidenotes are small blurbs of text that are displayed "out-of-band", on the
 right margin. This right margin is good for presenting smaller ideas that
@@ -3883,11 +4095,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000fa">Org mode</a> borrows heavily using <a href="#org00000fc">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000fc"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org0000116">Org mode</a> borrows heavily using <a href="#org0000118">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org0000118"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000fa"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org0000116"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

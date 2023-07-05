@@ -243,16 +243,191 @@ additional parent blocks, they will show up as links "3", "4", etc.
 ** Examples
 
 Here we have some examples of how certain Org mode features look when exported
-to HTML with Lilac.
+to HTML with Lilac. Each section has an orgmode input and HTML output. The input
+is what you type into your =*.org= (plaintext) file, and the output is what you
+get in HTML after it is rendered with Lilac's publishing function,
+=(lilac-publish)=.
 
 *** Code blocks
 
-**** =#+begin_example= ... =#+end_example=
+**** Source blocks
+
+***** Plain
+
+Orgmode input:
+
+#+begin_src org
+,#+begin_src python
+def foo():
+    return 42
+,#+end_src
+#+end_src
+
+Rendered HTML output:
+
+#+begin_src python
+def foo():
+    return 42
+#+end_src
+
+***** Monoblock
+
+Orgmode input:
+
+#+begin_sidenote
+Although the =ex_monoblock= text is linkified here, ignore it. The text that you
+need to write in the Orgmode input is literally =__NREF__ex_monoblock=. Lilac
+currently doesn't understand that the block here is an example and that it
+should not linkify it.
+#+end_sidenote
+
+#+begin_src org
+,#+caption: A parent block.
+,#+begin_src python
+def foo():
+    __NREF__ex_monoblock
+    return 42
+,#+end_src
+
+,#+name: __NREF__ex_monoblock
+,#+begin_src python
+print("hello world")
+,#+end_src
+#+end_src
+
+Rendered HTML output:
+
+#+caption: A parent block.
+#+begin_src python
+def foo():
+    __NREF__ex_monoblock
+    return 42
+#+end_src
+
+#+begin_sidenote
+Similarly, the =2= link is only here because Lilac thinks that this child block
+is referenced in multiple blocks. In a real example this =2= would not show up.
+#+end_sidenote
+
+#+name: __NREF__ex_monoblock
+#+begin_src python
+print("hello world")
+#+end_src
+
+***** Polyblock
+
+Orgmode input:
+
+#+begin_sidenote
+Like above for monoblocks, Lilac needlessly linkifies the source code body text
+of the parent block when it doesn't need to (as this is only an illustrative
+example).
+#+end_sidenote
+
+#+begin_src org
+,#+caption: A parent block.
+,#+begin_src python
+def foo():
+    __NREF__ex_polyblock
+    return 42
+,#+end_src
+
+,#+header: :noweb-ref __NREF__ex_polyblock
+,#+begin_src python
+print("hello world")
+,#+end_src
+
+Some intervening text.
+
+,#+header: :noweb-ref __NREF__ex_polyblock
+,#+begin_src python
+print("abcdefg")
+,#+end_src
+#+end_src
+
+Rendered HTML output:
+
+#+caption: A parent block.
+#+begin_src python
+def foo():
+    __NREF__ex_polyblock
+    return 42
+#+end_src
+
+#+header: :noweb-ref __NREF__ex_polyblock
+#+begin_src python
+print("hello world")
+#+end_src
+
+Some intervening text.
+
+#+header: :noweb-ref __NREF__ex_polyblock
+#+begin_src python
+print("abcdefg")
+#+end_src
+
+**** Example blocks
+
+Orgmode input:
+
+#+begin_src org
+,#+begin_example
+Hello world.
+Foo bar.
+,#+end_example
+#+end_src
+
+Rendered HTML output:
 
 #+begin_example
 Hello world.
 Foo bar.
 #+end_example
+
+**** Quote blocks
+
+Orgmode input:
+
+#+begin_src org
+,#+begin_quote
+Hello world.
+Foo bar.
+,#+end_quote
+#+end_src
+
+Rendered HTML output:
+
+#+begin_quote
+Hello world.
+Foo bar.
+#+end_quote
+
+*** Sidenotes
+
+Sidenotes are not part of vanilla Orgmode. They are used to insert notes on the
+right-hand-side margin, and are inspired by the ones found in Donald Knuth's
+books.
+
+Note that Lilac only adds some special CSS styling to sidenotes. Orgmode is
+generous with source code blocks and accepts any =#+begin_foo= and =#+end_foo=
+lines.
+
+Orgmode input:
+
+#+begin_src org
+,#+begin_sidenote
+Hello world.
+Foo bar.
+,#+end_sidenote
+#+end_src
+
+Rendered HTML output:
+
+#+begin_sidenote
+Hello world.
+Foo bar.
+#+end_sidenote
+
 
 * Developer Guide
 
