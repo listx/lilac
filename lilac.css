@@ -1,3 +1,16 @@
+:root {
+    --bg-code: #f7f7f7;
+    --border-code: #777;
+    --fg-link: #0000ff;
+    --fg-nref-link: #21618c;
+    --bg-nref-link: #d8f6ff;
+    --fg-nref-link-hover: #7d3c98;
+    --bg-nref-link-hover: #f8e9ff;
+    --fg-toc-item: green;
+    --bg-toc-item: #f1ffef;
+    --fg-heading: black;
+    --clear: rgba(255, 255, 255, 0);
+}
 body {
     font-size: 1.25em;
     width: 800px;
@@ -15,7 +28,7 @@ h2, h3, h4, h5, h6 {
     display: inline-block;
     border-style: solid;
     border-width: 1px;
-    border-color: rgba(255, 255, 255, 0);
+    border-color: var(--clear);
 }
 
 h1, h2, h3, h4, h5, h6, dt {
@@ -43,15 +56,15 @@ table {
     margin: 1em auto 0em auto;
     border-spacing: 0;
     border-radius: 4px;
-    border: 1px solid #777;
+    border: 1px solid var(--border-code);
     border-collapse: unset;
     overflow: hidden;
 }
 
 th, td {
     padding: 3px 6px;
-    border-right: 1px solid #777;
-    border-bottom: 1px solid #777;
+    border-right: 1px solid var(--border-code);
+    border-bottom: 1px solid var(--border-code);
 }
 
 th:last-child, td:last-child  {
@@ -63,7 +76,7 @@ tr:last-child td {
 }
 
 thead {
-    background-color: #f7f7f7;
+    background-color: var(--bg-code);
 }
 dl {
     margin: 0;
@@ -74,29 +87,29 @@ img {
     margin: 0 auto;
 }
 code {
-    background-color: #f7f7f7;
+    background-color: var(--bg-code);
     padding-left: 5px;
     padding-right: 5px;
     white-space: nowrap;
     border-radius: 4px;
     border-style: solid;
     border-width: 1px;
-    border-color: #777;
+    border-color: var(--border-code);
 }
 
 pre {
     font-size: 0.8em;
     border-radius: 5px;
     margin: 1em 0 0 0;
-    background-color: #f7f7f7;
-    border-color: #777;
+    background-color: var(--bg-code);
+    border-color: var(--border-code);
     min-width: fit-content;
 }
 pre.src::before {
-    background-color: #f7f7f7;
+    background-color: var(--bg-code);
 }
 a {
-    color: #0000ff;
+    color: var(--fg-link);
 }
 h1 {
     font-size: 3em;
@@ -151,13 +164,13 @@ a.section-heading:hover::after {
     scroll-margin-top: 100px;
     border-style: solid;
     border-width: 1px;
-    border-color: #777;
+    border-color: var(--border-code);
     border-radius: 5px;
 }
 
 /* Source code block body. */
 .org-src-container pre.src {
-    background-color: #f7f7f7;
+    background-color: var(--bg-code);
 }
 
 .lilac-caption {
@@ -180,8 +193,8 @@ a.section-heading:hover::after {
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
     border-width: 1px;
-    background-color: #f7f7f7;
-    border-color: #777;
+    background-color: var(--bg-code);
+    border-color: var(--border-code);
 }
 
 .lilac-caption-source-code-block-name {
@@ -201,8 +214,8 @@ a.section-heading:hover::after {
     padding-left: 10px;
     padding-right: 10px;
     padding-bottom: 10px;
-    color: #21618c;
-    background-color: #d8f6ff;
+    color: var(--fg-nref-link);
+    background-color: var(--bg-nref-link);
     border-radius: 5px;
     border-style: solid;
     border-width: 1px;
@@ -212,8 +225,8 @@ a.section-heading:hover::after {
     transition: all 150ms ease-in-out;
 }
 .lilac-caption-parent-link a:hover {
-    color: #7d3c98;
-    background-color: #f8e9ff;
+    color: var(--fg-nref-link-hover);
+    background-color: var(--bg-nref-link-hover);
     text-decoration: none;
 }
 
@@ -231,8 +244,8 @@ a.section-heading:hover::after {
     font-weight: bold;
 }
 .lilac-child-link-from-parent a {
-    color: #21618c;
-    background-color: #d8f6ff;
+    color: var(--fg-nref-link);
+    background-color: var(--bg-nref-link);
     border-radius: 5px;
     border-style: solid;
     border-width: 1px;
@@ -242,8 +255,8 @@ a.section-heading:hover::after {
     transition: all 150ms ease-in-out;
 }
 .lilac-child-link-from-parent a:hover {
-    color: #7d3c98;
-    background-color: #f8e9ff;
+    color: var(--fg-nref-link-hover);
+    background-color: var(--bg-nref-link-hover);
     text-decoration: none;
 }
 .sidenote {
@@ -317,20 +330,20 @@ a.section-heading:hover::after {
     border-radius: 4px;
     border-style: solid;
     border-width: 1px;
-    border-color: white;
-    color: black;
+    border-color: var(--clear);
+    color: var(--fg-heading);
 }
 #table-of-contents .active {
-    color: black;
-    background-color: #f1ffef;
-    border-color: green;
+    color: var(--fg-heading);
+    background-color: var(--bg-toc-item);
+    border-color: var(--fg-toc-item);
 }
 #table-of-contents a:hover {
     text-decoration: none;
 }
 .outline-2 pre.active {
-    background-color: #f1ffef;
-    border-color: green;
+    background-color: var(--bg-toc-item);
+    border-color: var(--fg-toc-item);
 }
 .outline-2 span.active {
     display: inline-block;
@@ -338,41 +351,41 @@ a.section-heading:hover::after {
     border-style: solid;
     border-width: 1px;
     border-radius: 5px;
-    background-color: #f1ffef;
-    border-color: green;
+    background-color: var(--bg-toc-item);
+    border-color: var(--fg-toc-item);
 }
 .outline-2 h2.active {
     border-style: solid;
     border-width: 1px;
     border-radius: 5px;
-    background-color: #f1ffef;
-    border-color: green;
+    background-color: var(--bg-toc-item);
+    border-color: var(--fg-toc-item);
 }
 .outline-2 h3.active {
     border-style: solid;
     border-width: 1px;
     border-radius: 5px;
-    background-color: #f1ffef;
-    border-color: green;
+    background-color: var(--bg-toc-item);
+    border-color: var(--fg-toc-item);
 }
 .outline-2 h4.active {
     border-style: solid;
     border-width: 1px;
     border-radius: 5px;
-    background-color: #f1ffef;
-    border-color: green;
+    background-color: var(--bg-toc-item);
+    border-color: var(--fg-toc-item);
 }
 .outline-2 h5.active {
     border-style: solid;
     border-width: 1px;
     border-radius: 5px;
-    background-color: #f1ffef;
-    border-color: green;
+    background-color: var(--bg-toc-item);
+    border-color: var(--fg-toc-item);
 }
 .outline-2 h6.active {
     border-style: solid;
     border-width: 1px;
     border-radius: 5px;
-    background-color: #f1ffef;
-    border-color: green;
+    background-color: var(--bg-toc-item);
+    border-color: var(--fg-toc-item);
 }

@@ -329,17 +329,18 @@
 <li><a href="#h-Imports">3.4.9. Imports</a></li>
 <li><a href="#h-Additional--hand-tweaked--CSS">3.4.10. Additional (hand-tweaked) CSS</a>
 <ul>
-<li><a href="#h-General-body-text">3.4.10.1. General body text</a></li>
-<li><a href="#h-Headline-font-sizes">3.4.10.2. Headline font sizes</a></li>
-<li><a href="#h-Tables">3.4.10.3. Tables</a></li>
-<li><a href="#h-Definition-lists">3.4.10.4. Definition lists</a></li>
-<li><a href="#h-Images">3.4.10.5. Images</a></li>
-<li><a href="#h-Monospaced">3.4.10.6. Monospaced</a></li>
-<li><a href="#h-Links">3.4.10.7. Links</a></li>
-<li><a href="#h-Source-code-block-body">3.4.10.8. Source code block body</a></li>
-<li><a href="#h-Source-code-block-captions">3.4.10.9. Source code block captions</a></li>
-<li><a href="#h-Links-to-child-source-block-from-parent">3.4.10.10. Links to child source block from parent</a></li>
-<li><a href="#h-Sidenotes">3.4.10.11. Sidenotes</a></li>
+<li><a href="#h-Colors">3.4.10.1. Colors</a></li>
+<li><a href="#h-General-body-text">3.4.10.2. General body text</a></li>
+<li><a href="#h-Headline-font-sizes">3.4.10.3. Headline font sizes</a></li>
+<li><a href="#h-Tables">3.4.10.4. Tables</a></li>
+<li><a href="#h-Definition-lists">3.4.10.5. Definition lists</a></li>
+<li><a href="#h-Images">3.4.10.6. Images</a></li>
+<li><a href="#h-Monospaced">3.4.10.7. Monospaced</a></li>
+<li><a href="#h-Links">3.4.10.8. Links</a></li>
+<li><a href="#h-Source-code-block-body">3.4.10.9. Source code block body</a></li>
+<li><a href="#h-Source-code-block-captions">3.4.10.10. Source code block captions</a></li>
+<li><a href="#h-Links-to-child-source-block-from-parent">3.4.10.11. Links to child source block from parent</a></li>
+<li><a href="#h-Sidenotes">3.4.10.12. Sidenotes</a></li>
 </ul>
 </li>
 <li><a href="#h-Create--lilac-theme--file">3.4.11. Create <code>lilac.theme</code> file</a></li>
@@ -2587,6 +2588,11 @@ headlines have a white (invisible) border around it because otherwise the active
 border makes the item jump a little bit when it's applied.
 </p>
 
+<p>
+We have to colorize the foreground color of the link because otherwise it
+becomes the color of all other links as per <a href="#h-Links">3.4.10.8</a>.
+</p>
+
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-2"><span class="org-css-selector">#table-of-contents a </span>{
     <span class="org-css-property">display</span>: block;
     <span class="org-css-property">transition</span>: all 300ms ease-in-out;
@@ -2594,11 +2600,11 @@ border makes the item jump a little bit when it's applied.
     <span class="org-css-property">border-radius</span>: 4px;
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
-    <span class="org-css-property">border-color</span>: <span class="custom-1">white</span>;
-    <span class="org-css-property">color</span>: <span class="custom">black</span>;
+    <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--clear</span>);
+    <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-heading</span>);
 }
 <span class="org-css-selector">#table-of-contents .active </span>{
-    <span class="org-css-property">color</span>: <span class="custom">black</span>;
+    <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-heading</span>);
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item">css-active-item</a></span>
 }
 <span class="org-css-selector">#table-of-contents a:hover </span>{
@@ -2678,8 +2684,8 @@ $(document).ready(() =&gt; {
 Now we just need to style the active element.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__css-toc-2">css-active-item</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-item-headline">2</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-item-span">3</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-non-toc-item">4</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-item">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-item"><span class="org-css-property">background-color</span>: <span class="custom-1">#f1ffef</span>;
-<span class="org-css-property">border-color</span>: <span class="custom">green</span>;
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__css-toc-2">css-active-item</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-item-headline">2</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-item-span">3</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-non-toc-item">4</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-item">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-item"><span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-toc-item</span>);
+<span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--fg-toc-item</span>);
 </pre></div></div><p>
 For headlines, we draw a border around it.
 </p>
@@ -3049,10 +3055,35 @@ We add some additional CSS tweaks on top of what we get from Org.
 </pre></div></div>
 </div>
 
+<div id="outline-container-h-Colors" class="outline-5">
+<h5 id="h-Colors"><span class="section-number-5">3.4.10.1.</span> Colors</h5>
+<div class="outline-text-5" id="text-h-Colors">
+<p>
+We define colors in one place and reuse them throughout the rest of the CSS,
+with the <code>var()</code> function.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(1/8) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-1"><span class="org-css-selector">:root</span> {
+    <span class="org-variable-name">--bg-code</span>: <span class="custom-10">#f7f7f7</span>;
+    <span class="org-variable-name">--border-code</span>: <span class="custom-9">#777</span>;
+    <span class="org-variable-name">--fg-link</span>: <span class="custom-8">#0000ff</span>;
+    <span class="org-variable-name">--fg-nref-link</span>: <span class="custom-7">#21618c</span>;
+    <span class="org-variable-name">--bg-nref-link</span>: <span class="custom-6">#d8f6ff</span>;
+    <span class="org-variable-name">--fg-nref-link-hover</span>: <span class="custom-5">#7d3c98</span>;
+    <span class="org-variable-name">--bg-nref-link-hover</span>: <span class="custom-4">#f8e9ff</span>;
+    <span class="org-variable-name">--fg-toc-item</span>: <span class="custom-3">green</span>;
+    <span class="org-variable-name">--bg-toc-item</span>: <span class="custom-2">#f1ffef</span>;
+    <span class="org-variable-name">--fg-heading</span>: <span class="custom-1">black</span>;
+    <span class="org-variable-name">--clear</span>: <span class="custom">rgba(255, 255, 255, 0)</span>;
+}
+</pre></div></div>
+</div>
+</div>
+
 <div id="outline-container-h-General-body-text" class="outline-5">
-<h5 id="h-General-body-text"><span class="section-number-5">3.4.10.1.</span> General body text</h5>
+<h5 id="h-General-body-text"><span class="section-number-5">3.4.10.2.</span> General body text</h5>
 <div class="outline-text-5" id="text-h-General-body-text">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(1/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-1"><span class="org-css-selector">body </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(2/8) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-2"><span class="org-css-selector">body </span>{
     <span class="org-css-property">font-size</span>: 1.25em;
     <span class="org-css-property">width</span>: 800px;
     <span class="org-css-property">margin-left</span>: 310px;
@@ -3069,7 +3100,7 @@ We add some additional CSS tweaks on top of what we get from Org.
     <span class="org-css-property">display</span>: inline-block;
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
-    <span class="org-css-property">border-color</span>: <span class="custom">rgba(255, 255, 255, 0)</span>;
+    <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--clear</span>);
 }
 
 <span class="org-css-selector">h1, h2, h3, h4, h5, h6, dt </span>{
@@ -3098,7 +3129,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 
 <div id="outline-container-h-Headline-font-sizes" class="outline-5">
-<h5 id="h-Headline-font-sizes"><span class="section-number-5">3.4.10.2.</span> Headline font sizes</h5>
+<h5 id="h-Headline-font-sizes"><span class="section-number-5">3.4.10.3.</span> Headline font sizes</h5>
 <div class="outline-text-5" id="text-h-Headline-font-sizes">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-headline-font-size</a></span>(1/1) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-headline-font-size">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-headline-font-size"><span class="org-css-selector">h1 </span>{
     <span class="org-css-property">font-size</span>: 3em;
@@ -3128,21 +3159,21 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 
 <div id="outline-container-h-Tables" class="outline-5">
-<h5 id="h-Tables"><span class="section-number-5">3.4.10.3.</span> Tables</h5>
+<h5 id="h-Tables"><span class="section-number-5">3.4.10.4.</span> Tables</h5>
 <div class="outline-text-5" id="text-h-Tables">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(2/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-2"><span class="org-css-selector">table </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(3/8) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-3"><span class="org-css-selector">table </span>{
     <span class="org-css-property">margin</span>: 1em auto 0em auto;
     <span class="org-css-property">border-spacing</span>: 0;
     <span class="org-css-property">border-radius</span>: 4px;
-    <span class="org-css-property">border</span>: 1px solid <span class="custom-1">#777</span>;
+    <span class="org-css-property">border</span>: 1px solid var(<span class="org-variable-name">--border-code</span>);
     <span class="org-css-property">border-collapse</span>: unset;
     <span class="org-css-property">overflow</span>: hidden;
 }
 
 <span class="org-css-selector">th, td </span>{
     <span class="org-css-property">padding</span>: 3px 6px;
-    <span class="org-css-property">border-right</span>: 1px solid <span class="custom-1">#777</span>;
-    <span class="org-css-property">border-bottom</span>: 1px solid <span class="custom-1">#777</span>;
+    <span class="org-css-property">border-right</span>: 1px solid var(<span class="org-variable-name">--border-code</span>);
+    <span class="org-css-property">border-bottom</span>: 1px solid var(<span class="org-variable-name">--border-code</span>);
 }
 
 <span class="org-css-selector">th:last-child, td:last-child  </span>{
@@ -3154,16 +3185,16 @@ We add some additional CSS tweaks on top of what we get from Org.
 }
 
 <span class="org-css-selector">thead </span>{
-    <span class="org-css-property">background-color</span>: <span class="custom">#f7f7f7</span>;
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
 }
 </pre></div></div>
 </div>
 </div>
 
 <div id="outline-container-h-Definition-lists" class="outline-5">
-<h5 id="h-Definition-lists"><span class="section-number-5">3.4.10.4.</span> Definition lists</h5>
+<h5 id="h-Definition-lists"><span class="section-number-5">3.4.10.5.</span> Definition lists</h5>
 <div class="outline-text-5" id="text-h-Definition-lists">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(3/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-3"><span class="org-css-selector">dl </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(4/8) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-4">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-4"><span class="org-css-selector">dl </span>{
     <span class="org-css-property">margin</span>: 0;
     <span class="org-css-property">padding-top</span>: 1em;
 }
@@ -3172,9 +3203,9 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 
 <div id="outline-container-h-Images" class="outline-5">
-<h5 id="h-Images"><span class="section-number-5">3.4.10.5.</span> Images</h5>
+<h5 id="h-Images"><span class="section-number-5">3.4.10.6.</span> Images</h5>
 <div class="outline-text-5" id="text-h-Images">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(4/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-4">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-4"><span class="org-css-selector">img </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(5/8) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-5">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-5"><span class="org-css-selector">img </span>{
     <span class="org-css-property">display</span>: block;
     <span class="org-css-property">margin</span>: 0 auto;
 }
@@ -3183,25 +3214,25 @@ We add some additional CSS tweaks on top of what we get from Org.
 </div>
 
 <div id="outline-container-h-Monospaced" class="outline-5">
-<h5 id="h-Monospaced"><span class="section-number-5">3.4.10.6.</span> Monospaced</h5>
+<h5 id="h-Monospaced"><span class="section-number-5">3.4.10.7.</span> Monospaced</h5>
 <div class="outline-text-5" id="text-h-Monospaced">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(5/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-5">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-5"><span class="org-css-selector">code </span>{
-    <span class="org-css-property">background-color</span>: <span class="custom-1">#f7f7f7</span>;
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(6/8) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-6">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-6"><span class="org-css-selector">code </span>{
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
     <span class="org-css-property">padding-left</span>: 5px;
     <span class="org-css-property">padding-right</span>: 5px;
     <span class="org-css-property">white-space</span>: nowrap;
     <span class="org-css-property">border-radius</span>: 4px;
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
-    <span class="org-css-property">border-color</span>: <span class="custom">#777</span>;
+    <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--border-code</span>);
 }
 
 <span class="org-css-selector">pre </span>{
     <span class="org-css-property">font-size</span>: 0.8em;
     <span class="org-css-property">border-radius</span>: 5px;
     <span class="org-css-property">margin</span>: 1em 0 0 0;
-    <span class="org-css-property">background-color</span>: <span class="custom-1">#f7f7f7</span>;
-    <span class="org-css-property">border-color</span>: <span class="custom">#777</span>;
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
+    <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--border-code</span>);
     <span class="org-css-property">min-width</span>: fit-content;
 }
 </pre></div></div><p>
@@ -3210,30 +3241,30 @@ as what we have elsewhere. This hover text comes with Org mode's HTML export of
 source code blocks.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(6/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-6">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-6"><span class="org-css-selector">pre.src::before </span>{
-    <span class="org-css-property">background-color</span>: <span class="custom">#f7f7f7</span>;
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(7/8) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-7">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-7"><span class="org-css-selector">pre.src::before </span>{
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
 }
 </pre></div></div>
 </div>
 </div>
 
 <div id="outline-container-h-Links" class="outline-5">
-<h5 id="h-Links"><span class="section-number-5">3.4.10.7.</span> Links</h5>
+<h5 id="h-Links"><span class="section-number-5">3.4.10.8.</span> Links</h5>
 <div class="outline-text-5" id="text-h-Links">
 <p>
 Force all links to have a blue color. This is mainly to override whatever Org
 gives us by default.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(7/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-7">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-7"><span class="org-css-selector">a </span>{
-    <span class="org-css-property">color</span>: <span class="custom">#0000ff</span>;
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(8/8) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-8">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-8"><span class="org-css-selector">a </span>{
+    <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-link</span>);
 }
 </pre></div></div>
 </div>
 </div>
 
 <div id="outline-container-h-Source-code-block-body" class="outline-5">
-<h5 id="h-Source-code-block-body"><span class="section-number-5">3.4.10.8.</span> Source code block body</h5>
+<h5 id="h-Source-code-block-body"><span class="section-number-5">3.4.10.9.</span> Source code block body</h5>
 <div class="outline-text-5" id="text-h-Source-code-block-body">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-body</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-body">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-body"><span class="org-css-selector">.org-src-container </span>{
     <span class="org-css-property">padding-top</span>: 1em;
@@ -3246,13 +3277,13 @@ gives us by default.
     <span class="org-css-property">scroll-margin-top</span>: 100px;
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
-    <span class="org-css-property">border-color</span>: <span class="custom-1">#777</span>;
+    <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--border-code</span>);
     <span class="org-css-property">border-radius</span>: 5px;
 }
 
 <span class="org-comment-delimiter">/* </span><span class="org-comment">Source code block body.</span><span class="org-comment-delimiter"> */</span>
 <span class="org-css-selector">.org-src-container pre.src </span>{
-    <span class="org-css-property">background-color</span>: <span class="custom">#f7f7f7</span>;
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
 }
 
 </pre></div></div>
@@ -3260,7 +3291,7 @@ gives us by default.
 </div>
 
 <div id="outline-container-h-Source-code-block-captions" class="outline-5">
-<h5 id="h-Source-code-block-captions"><span class="section-number-5">3.4.10.9.</span> Source code block captions</h5>
+<h5 id="h-Source-code-block-captions"><span class="section-number-5">3.4.10.10.</span> Source code block captions</h5>
 <div class="outline-text-5" id="text-h-Source-code-block-captions">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-captions"><span class="org-css-selector">.lilac-caption </span>{
     <span class="org-css-property">font-family</span>: <span class="org-string">"Source Code Pro"</span>, monospace;
@@ -3282,12 +3313,12 @@ gives us by default.
     <span class="org-css-property">border-bottom-left-radius</span>: 0;
     <span class="org-css-property">border-bottom-right-radius</span>: 0;
     <span class="org-css-property">border-width</span>: 1px;
-    <span class="org-css-property">background-color</span>: <span class="custom-6">#f7f7f7</span>;
-    <span class="org-css-property">border-color</span>: <span class="custom-5">#777</span>;
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
+    <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--border-code</span>);
 }
 
 <span class="org-css-selector">.lilac-caption-source-code-block-name </span>{
-    <span class="org-css-property">color</span>: <span class="custom-4">#444444</span>;
+    <span class="org-css-property">color</span>: <span class="custom">#444444</span>;
     <span class="org-css-property">font-weight</span>: bold;
     <span class="org-css-property">margin-right</span>: 5px;
 }
@@ -3303,8 +3334,8 @@ gives us by default.
     <span class="org-css-property">padding-left</span>: 10px;
     <span class="org-css-property">padding-right</span>: 10px;
     <span class="org-css-property">padding-bottom</span>: 10px;
-    <span class="org-css-property">color</span>: <span class="custom-3">#21618c</span>;
-    <span class="org-css-property">background-color</span>: <span class="custom-2">#d8f6ff</span>;
+    <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-nref-link</span>);
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-nref-link</span>);
     <span class="org-css-property">border-radius</span>: 5px;
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
@@ -3314,8 +3345,8 @@ gives us by default.
     <span class="org-css-property">transition</span>: all 150ms ease-in-out;
 }
 <span class="org-css-selector">.lilac-caption-parent-link a:hover </span>{
-    <span class="org-css-property">color</span>: <span class="custom-1">#7d3c98</span>;
-    <span class="org-css-property">background-color</span>: <span class="custom">#f8e9ff</span>;
+    <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-nref-link-hover</span>);
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-nref-link-hover</span>);
     <span class="org-css-property">text-decoration</span>: none;
 }
 
@@ -3334,14 +3365,14 @@ gives us by default.
 </div>
 
 <div id="outline-container-h-Links-to-child-source-block-from-parent" class="outline-5">
-<h5 id="h-Links-to-child-source-block-from-parent"><span class="section-number-5">3.4.10.10.</span> Links to child source block from parent</h5>
+<h5 id="h-Links-to-child-source-block-from-parent"><span class="section-number-5">3.4.10.11.</span> Links to child source block from parent</h5>
 <div class="outline-text-5" id="text-h-Links-to-child-source-block-from-parent">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-child-link-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-child-link-from-parent">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-child-link-from-parent"><span class="org-css-selector">.lilac-child-link-from-parent </span>{
     <span class="org-css-property">font-weight</span>: bold;
 }
 <span class="org-css-selector">.lilac-child-link-from-parent a </span>{
-    <span class="org-css-property">color</span>: <span class="custom-3">#21618c</span>;
-    <span class="org-css-property">background-color</span>: <span class="custom-2">#d8f6ff</span>;
+    <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-nref-link</span>);
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-nref-link</span>);
     <span class="org-css-property">border-radius</span>: 5px;
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
@@ -3351,8 +3382,8 @@ gives us by default.
     <span class="org-css-property">transition</span>: all 150ms ease-in-out;
 }
 <span class="org-css-selector">.lilac-child-link-from-parent a:hover </span>{
-    <span class="org-css-property">color</span>: <span class="custom-1">#7d3c98</span>;
-    <span class="org-css-property">background-color</span>: <span class="custom">#f8e9ff</span>;
+    <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-nref-link-hover</span>);
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-nref-link-hover</span>);
     <span class="org-css-property">text-decoration</span>: none;
 }
 </pre></div></div>
@@ -3360,7 +3391,7 @@ gives us by default.
 </div>
 
 <div id="outline-container-h-Sidenotes" class="outline-5">
-<h5 id="h-Sidenotes"><span class="section-number-5">3.4.10.11.</span> Sidenotes</h5>
+<h5 id="h-Sidenotes"><span class="section-number-5">3.4.10.12.</span> Sidenotes</h5>
 <div class="outline-text-5" id="text-h-Sidenotes">
 <p>
 Sidenotes are small blurbs of text that are displayed "out-of-band", on the
@@ -3852,11 +3883,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org00000f8">Org mode</a> borrows heavily using <a href="#org00000fa">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org00000fa"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org00000fa">Org mode</a> borrows heavily using <a href="#org00000fc">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org00000fc"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org00000f8"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org00000fa"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
