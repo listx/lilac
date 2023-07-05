@@ -253,6 +253,7 @@
 <li><a href="#h-Plain">2.2.1.1.1. Plain</a></li>
 <li><a href="#h-Monoblock">2.2.1.1.2. Monoblock</a></li>
 <li><a href="#h-Polyblock">2.2.1.1.3. Polyblock</a></li>
+<li><a href="#h-Linking-to-a-line-in-the-code-block-body">2.2.1.1.4. Linking to a line in the code block body</a></li>
 </ul>
 </li>
 <li><a href="#h-Example-blocks">2.2.1.2. Example blocks</a></li>
@@ -667,10 +668,10 @@ get in HTML after it is rendered with Lilac's publishing function,
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-org" id="nil-2"><span class="org-org-block-begin-line">#+begin_src python</span>
-<span class="org-org-block"><span class="org-keyword">def</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-function-name">foo</span></span><span class="org-org-block">():</span>
-<span class="org-org-block">    </span><span class="org-org-block"><span class="org-keyword">return</span></span><span class="org-org-block"> 42</span>
-<span class="org-org-block-end-line">#+end_src</span>
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-2">#+begin_src python
+def foo():
+    return 42
+#+end_src
 </pre></div><p>
 Rendered HTML output:
 </p>
@@ -698,17 +699,17 @@ should not linkify it.
 
 </div>
 
-<div class="org-src-container"><pre class="src src-org" id="nil-4"><span class="org-org-meta-line">#+caption:</span> <span class="org-org-block">A parent block.</span>
-<span class="org-org-block-begin-line">#+begin_src python</span>
-<span class="org-org-block"><span class="org-keyword">def</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-function-name">foo</span></span><span class="org-org-block">():</span>
-<span class="org-org-block">    <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_monoblock">ex_monoblock</a></span></span>
-<span class="org-org-block">    </span><span class="org-org-block"><span class="org-keyword">return</span></span><span class="org-org-block"> 42</span>
-<span class="org-org-block-end-line">#+end_src</span>
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-4">#+caption: A parent block.
+#+begin_src python
+def foo():
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_monoblock">ex_monoblock</a></span>
+    return 42
+#+end_src
 
-<span class="org-org-meta-line">#+name: <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_monoblock">ex_monoblock</a></span></span>
-<span class="org-org-block-begin-line">#+begin_src python</span>
-<span class="org-org-block"><span class="org-builtin">print</span></span><span class="org-org-block">(</span><span class="org-org-block"><span class="org-string">"hello world"</span></span><span class="org-org-block">)</span>
-<span class="org-org-block-end-line">#+end_src</span>
+#+name: <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_monoblock">ex_monoblock</a></span>
+#+begin_src python
+print("hello world")
+#+end_src
 </pre></div><p>
 Rendered HTML output:
 </p>
@@ -745,24 +746,24 @@ example).
 
 </div>
 
-<div class="org-src-container"><pre class="src src-org" id="nil-5"><span class="org-org-meta-line">#+caption:</span> <span class="org-org-block">A parent block.</span>
-<span class="org-org-block-begin-line">#+begin_src python</span>
-<span class="org-org-block"><span class="org-keyword">def</span></span><span class="org-org-block"> </span><span class="org-org-block"><span class="org-function-name">foo</span></span><span class="org-org-block">():</span>
-<span class="org-org-block">    <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span></span>
-<span class="org-org-block">    </span><span class="org-org-block"><span class="org-keyword">return</span></span><span class="org-org-block"> 42</span>
-<span class="org-org-block-end-line">#+end_src</span>
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-5">#+caption: A parent block.
+#+begin_src python
+def foo():
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span>
+    return 42
+#+end_src
 
-<span class="org-org-meta-line">#+header: :noweb-ref <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span></span>
-<span class="org-org-block-begin-line">#+begin_src python</span>
-<span class="org-org-block"><span class="org-builtin">print</span></span><span class="org-org-block">(</span><span class="org-org-block"><span class="org-string">"hello world"</span></span><span class="org-org-block">)</span>
-<span class="org-org-block-end-line">#+end_src</span>
+#+header: :noweb-ref <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span>
+#+begin_src python
+print("hello world")
+#+end_src
 
 Some intervening text.
 
-<span class="org-org-meta-line">#+header: :noweb-ref <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span></span>
-<span class="org-org-block-begin-line">#+begin_src python</span>
-<span class="org-org-block"><span class="org-builtin">print</span></span><span class="org-org-block">(</span><span class="org-org-block"><span class="org-string">"abcdefg"</span></span><span class="org-org-block">)</span>
-<span class="org-org-block-end-line">#+end_src</span>
+#+header: :noweb-ref <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span>
+#+begin_src python
+print("abcdefg")
+#+end_src
 </pre></div><p>
 Rendered HTML output:
 </p>
@@ -779,6 +780,47 @@ Some intervening text.
 </pre></div></div>
 </div>
 </div>
+
+<div id="outline-container-h-Linking-to-a-line-in-the-code-block-body" class="outline-6">
+<h6 id="h-Linking-to-a-line-in-the-code-block-body"><span class="section-number-6">2.2.1.1.4.</span> Linking to a line in the code block body</h6>
+<div class="outline-text-6" id="text-h-Linking-to-a-line-in-the-code-block-body">
+<div class="sidenote" id="org000002c">
+<p>
+The <code>-r</code> flag removes these <code>#ref:...</code> labels from the source code. The <code>-l</code>
+flag changes the format. In this case we make the format use a leading <code>#</code>
+character because that's the comment character in Python. This way they appear
+as comments when we are inserting them into the block while still in Orgmode.
+</p>
+
+<p>
+These links are documented in Org's <a href="https://orgmode.org/manual/Literal-Examples.html">Literal Examples</a> section.
+</p>
+
+</div>
+
+<p>
+Orgmode input:
+</p>
+
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-6">#+begin_src python -r -l "#ref:%s"
+print("foo")
+print("hi")     #ref:embedded-link
+print("bar")
+#+end_src
+
+The line at [[(embedded-link)][=embedded-link=]] prints "hi".
+</pre></div><p>
+Rendered HTML output:
+</p>
+
+<div class="org-src-container"><pre class="src src-python" id="nil-7"><span class="org-builtin">print</span>(<span class="org-string">"foo"</span>)
+<span id="coderef-embedded-link" class="coderef-off"><span class="org-builtin">print</span>(<span class="org-string">"hi"</span>)</span>
+<span class="org-builtin">print</span>(<span class="org-string">"bar"</span>)
+</pre></div><p>
+The line at <a href="#coderef-embedded-link" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-embedded-link');" onmouseout="CodeHighlightOff(this, 'coderef-embedded-link');"><code>embedded-link</code></a> prints "hi".
+</p>
+</div>
+</div>
 </div>
 
 <div id="outline-container-h-Example-blocks" class="outline-5">
@@ -788,15 +830,15 @@ Some intervening text.
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-org" id="nil-6"><span class="org-org-block-begin-line">#+begin_example</span>
-<span class="custom">Hello world.</span>
-<span class="custom">Foo bar.</span>
-<span class="org-org-block-end-line">#+end_example</span>
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-8">#+begin_example
+Hello world.
+Foo bar.
+#+end_example
 </pre></div><p>
 Rendered HTML output:
 </p>
 
-<pre class="example" id="org000002e">
+<pre class="example" id="org0000033">
 Hello world.
 Foo bar.
 </pre>
@@ -810,10 +852,10 @@ Foo bar.
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-org" id="nil-7"><span class="org-org-block-begin-line">#+begin_quote</span>
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-9">#+begin_quote
 Hello world.
 Foo bar.
-<span class="org-org-block-end-line">#+end_quote</span>
+#+end_quote
 </pre></div><p>
 Rendered HTML output:
 </p>
@@ -847,15 +889,15 @@ lines.
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-org" id="nil-8"><span class="org-org-block-begin-line">#+begin_sidenote</span>
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-10">#+begin_sidenote
 Hello world.
 Foo bar.
-<span class="org-org-block-end-line">#+end_sidenote</span>
+#+end_sidenote
 </pre></div><p>
-Rendered HTML output:
+Rendered HTML output (see right hand margin):
 </p>
 
-<div class="sidenote" id="org0000033">
+<div class="sidenote" id="org0000038">
 <p>
 Hello world.
 Foo bar.
@@ -4095,11 +4137,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org0000116">Org mode</a> borrows heavily using <a href="#org0000118">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org0000118"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org000011b">Org mode</a> borrows heavily using <a href="#org000011d">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org000011d"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org0000116"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org000011b"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

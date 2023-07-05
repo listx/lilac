@@ -256,7 +256,7 @@ get in HTML after it is rendered with Lilac's publishing function,
 
 Orgmode input:
 
-#+begin_src org
+#+begin_src plaintext
 ,#+begin_src python
 def foo():
     return 42
@@ -281,7 +281,7 @@ currently doesn't understand that the block here is an example and that it
 should not linkify it.
 #+end_sidenote
 
-#+begin_src org
+#+begin_src plaintext
 ,#+caption: A parent block.
 ,#+begin_src python
 def foo():
@@ -324,7 +324,7 @@ of the parent block when it doesn't need to (as this is only an illustrative
 example).
 #+end_sidenote
 
-#+begin_src org
+#+begin_src plaintext
 ,#+caption: A parent block.
 ,#+begin_src python
 def foo():
@@ -366,11 +366,44 @@ Some intervening text.
 print("abcdefg")
 #+end_src
 
+***** Linking to a line in the code block body
+
+#+begin_sidenote
+The =-r= flag removes these =#ref:...= labels from the source code. The =-l=
+flag changes the format. In this case we make the format use a leading =#=
+character because that's the comment character in Python. This way they appear
+as comments when we are inserting them into the block while still in Orgmode.
+
+These links are documented in Org's [[https://orgmode.org/manual/Literal-Examples.html][Literal Examples]] section.
+#+end_sidenote
+
+Orgmode input:
+
+#+begin_src plaintext
+,#+begin_src python -r -l "#ref:%s"
+print("foo")
+print("hi")     #ref:embedded-link
+print("bar")
+,#+end_src
+
+The line at [[(embedded-link)][=embedded-link=]] prints "hi".
+#+end_src
+
+Rendered HTML output:
+
+#+begin_src python -r -l "#ref:%s"
+print("foo")
+print("hi")     #ref:embedded-link
+print("bar")
+#+end_src
+
+The line at [[(embedded-link)][=embedded-link=]] prints "hi".
+
 **** Example blocks
 
 Orgmode input:
 
-#+begin_src org
+#+begin_src plaintext
 ,#+begin_example
 Hello world.
 Foo bar.
@@ -388,7 +421,7 @@ Foo bar.
 
 Orgmode input:
 
-#+begin_src org
+#+begin_src plaintext
 ,#+begin_quote
 Hello world.
 Foo bar.
@@ -414,14 +447,14 @@ lines.
 
 Orgmode input:
 
-#+begin_src org
+#+begin_src plaintext
 ,#+begin_sidenote
 Hello world.
 Foo bar.
 ,#+end_sidenote
 #+end_src
 
-Rendered HTML output:
+Rendered HTML output (see right hand margin):
 
 #+begin_sidenote
 Hello world.
