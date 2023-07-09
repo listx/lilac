@@ -2920,9 +2920,17 @@ $(document).ready(() =&gt; {
         } <span class="org-keyword">else</span> {
             destination = elt.target.hash;
         }
+        <span class="org-comment-delimiter">// </span><span class="org-comment">Only disable the browser's "jump to the link immediately" behavior if</span>
+        <span class="org-comment-delimiter">// </span><span class="org-comment">we are dealing with an intra-document link. For links to other pages,</span>
+        <span class="org-comment-delimiter">// </span><span class="org-comment">we want the default behavior. The destination is empty if the link</span>
+        <span class="org-comment-delimiter">// </span><span class="org-comment">goes to another page.</span>
+        <span class="org-keyword">if</span> (destination === <span class="org-string">""</span>) {
+            <span class="org-keyword">return</span>;
+        } <span class="org-keyword">else</span> {
+            elt.preventDefault();
+        }
         $(destination).addClass(<span class="org-string">"active"</span>);
         deactivate_other_non_toc_items(destination);
-        elt.preventDefault();
         scrollIntoViewIfNeeded($(destination)[0]);
         <span class="org-comment-delimiter">// </span><span class="org-comment">Save intra-document link into history, but only if it's not a repeat</span>
         <span class="org-comment-delimiter">// </span><span class="org-comment">of one already there.</span>
