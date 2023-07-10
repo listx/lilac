@@ -903,7 +903,8 @@ The final bits are
 #+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish
 #+begin_src emacs-lisp
   __NREF__lilac-publish-delete-toc-text
-  __NREF__lilac-publish-fix-inline-styles)
+  __NREF__lilac-publish-fix-inline-styles
+  __NREF__lilac-publish-fix-bibliography-ids)
 #+end_src
 
 **** Helper functions
@@ -1993,12 +1994,14 @@ on the current buffer name.
 
 #+header: :noweb-ref __NREF__lilac_dot_el-search-replace
 #+begin_src emacs-lisp
-(defun lilac-replace-from-to-html (str repl)
+(defun lilac-replace-from-to-html (str repl &optional regex)
   (let ((html-file-name (concat
                          (file-name-sans-extension (buffer-file-name))
                          ".html")))
     (find-file html-file-name)
-    (lilac-replace-from-to str repl)
+    (if regex
+        (replace-regexp str repl)
+        (lilac-replace-from-to str repl))
     (save-buffer)))
 #+end_src
 
@@ -2012,9 +2015,32 @@ This cleans up the inline styles for citations.
 (lilac-replace-from-to-html
  "<style>.csl-left-margin{float: left; padding-right: 0em"
  "<style>.csl-left-margin{float: left; padding-right: 1em")
+#+end_src
+
+We also do some replacements for the bibliography entries themselves. Namely,
+each entry has the following (odd) structure by default:
+
+#+begin_example
+<div class="csl-entry"><a id="citeproc_bib_item_1"></a> ... </div>
+#+end_example
+
+and instead we delete the content-less link anchor and instead move th ID to the
+parent div, like this:
+
+#+begin_example
+<div class="csl-entry" id="citeproc_bib_item_1"> ... </div>
+#+end_example
+
+This way we can target this surronding parent div for the =active= HTML class
+attribute (instead of the empty link anchor) to style the entire entry when we
+click a link to go to it.
+
+#+name: __NREF__lilac-publish-fix-bibliography-ids
+#+begin_src emacs-lisp
 (lilac-replace-from-to-html
- ".csl-right-inline{margin: 0 0 0 1em;}</style>"
- ".csl-right-inline{margin: 1em 0 0 2em;}</style>")
+ "\"csl-entry\"><a \\(id=\"[^\"]+\"\\)></a>"
+ "\"csl-entry\" \\1>"
+ t)
 #+end_src
 
 *** JavaScript
@@ -2376,6 +2402,9 @@ Different destination elements need different selectors. We cover them all here.
 .outline-2 span.active {
     __NREF__css-active-item-span
 }
+.outline-2 .csl-bib-body .active {
+    __NREF__css-active-item-headline
+}
 #+end_src
 
 **** Scroll to history item
@@ -2658,6 +2687,7 @@ __NREF__css-source-code-block-body
 __NREF__css-source-code-block-captions
 __NREF__css-source-code-block-child-link-from-parent
 __NREF__css-sidenotes
+__NREF__css-bibliography
 __NREF__css-toc
 __NREF__css-active-non-toc-item
 #+end_src
@@ -3028,6 +3058,20 @@ The CSS below is drawn primarily from [[https://scripter.co/sidenotes-using-only
         float: right;
         margin-right: -315px;
     }
+}
+#+end_src
+
+**** Bibliography
+
+#+name: __NREF__css-bibliography
+#+begin_src css
+.csl-entry {
+    margin-top: 1em;
+    padding: 0.5em;
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 5px;
+    border-color: var(--clear);
 }
 #+end_src
 

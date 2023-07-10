@@ -351,6 +351,7 @@
 <li><a href="#h-Source-code-block-captions">3.4.10.10. Source code block captions</a></li>
 <li><a href="#h-Links-to-child-source-block-from-parent">3.4.10.11. Links to child source block from parent</a></li>
 <li><a href="#h-Sidenotes-1">3.4.10.12. Sidenotes</a></li>
+<li><a href="#h-Bibliography">3.4.10.13. Bibliography</a></li>
 </ul>
 </li>
 <li><a href="#h-Create--lilac-theme--file">3.4.11. Create <code>lilac.theme</code> file</a></li>
@@ -1368,8 +1369,9 @@ The full code listing for <code>lilac-publish</code> is below.
    <span class="org-string">"&lt;style&gt;.csl-left-margin{float: left; padding-right: 0em"</span>
    <span class="org-string">"&lt;style&gt;.csl-left-margin{float: left; padding-right: 1em"</span>)
   (lilac-replace-from-to-html
-   <span class="org-string">".csl-right-inline{margin: 0 0 0 1em;}&lt;/style&gt;"</span>
-   <span class="org-string">".csl-right-inline{margin: 1em 0 0 2em;}&lt;/style&gt;"</span>))
+   <span class="org-string">"\"csl-entry\"&gt;&lt;a </span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">id=\"[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">\"]+\"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&gt;&lt;/a&gt;"</span>
+   <span class="org-string">"\"csl-entry\" \\1&gt;"</span>
+   t))
 </pre></div></div><p>
 Now let's go through <code>lilac-publish</code> in detail.
 </p>
@@ -1464,7 +1466,8 @@ part of citation styles.</li>
 </ol>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(6/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-6">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-6">  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-delete-toc-text">lilac-publish-delete-toc-text</a></span>
-  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-inline-styles">lilac-publish-fix-inline-styles</a></span>)
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-inline-styles">lilac-publish-fix-inline-styles</a></span>
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-bibliography-ids">lilac-publish-fix-bibliography-ids</a></span>)
 </pre></div></div>
 </div>
 
@@ -2591,12 +2594,14 @@ Here's a basic wrapper to perform the string replacement for an HTML file based
 on the current buffer name.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-search-replace</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-search-replace-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-search-replace-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-replace-from-to-html</span> (str repl)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-search-replace</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-search-replace-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-search-replace-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-replace-from-to-html</span> (str repl <span class="org-type">&amp;optional</span> regex)
   (<span class="org-keyword">let</span> ((html-file-name (concat
                          (file-name-sans-extension (buffer-file-name))
                          <span class="org-string">".html"</span>)))
     (find-file html-file-name)
-    (lilac-replace-from-to str repl)
+    (<span class="org-keyword">if</span> regex
+        (replace-regexp str repl)
+        (lilac-replace-from-to str repl))
     (save-buffer)))
 </pre></div></div><p>
 Now we do some basic search-and-replace commands to clean up the exported HTML
@@ -2610,9 +2615,34 @@ This cleans up the inline styles for citations.
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-fix-inline-styles</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-inline-styles">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-inline-styles">(lilac-replace-from-to-html
  <span class="org-string">"&lt;style&gt;.csl-left-margin{float: left; padding-right: 0em"</span>
  <span class="org-string">"&lt;style&gt;.csl-left-margin{float: left; padding-right: 1em"</span>)
-(lilac-replace-from-to-html
- <span class="org-string">".csl-right-inline{margin: 0 0 0 1em;}&lt;/style&gt;"</span>
- <span class="org-string">".csl-right-inline{margin: 1em 0 0 2em;}&lt;/style&gt;"</span>)
+</pre></div></div><p>
+We also do some replacements for the bibliography entries themselves. Namely,
+each entry has the following (odd) structure by default:
+</p>
+
+<pre class="example" id="org00000b3">
+&lt;div class="csl-entry"&gt;&lt;a id="citeproc_bib_item_1"&gt;&lt;/a&gt; ... &lt;/div&gt;
+</pre>
+
+<p>
+and instead we delete the content-less link anchor and instead move th ID to the
+parent div, like this:
+</p>
+
+<pre class="example" id="org00000b4">
+&lt;div class="csl-entry" id="citeproc_bib_item_1"&gt; ... &lt;/div&gt;
+</pre>
+
+<p>
+This way we can target this surronding parent div for the <code>active</code> HTML class
+attribute (instead of the empty link anchor) to style the entire entry when we
+click a link to go to it.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-fix-bibliography-ids</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-bibliography-ids">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-bibliography-ids">(lilac-replace-from-to-html
+ <span class="org-string">"\"csl-entry\"&gt;&lt;a </span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">id=\"[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">\"]+\"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&gt;&lt;/a&gt;"</span>
+ <span class="org-string">"\"csl-entry\" \\1&gt;"</span>
+ t)
 </pre></div></div>
 </div>
 </div>
@@ -2992,6 +3022,9 @@ Different destination elements need different selectors. We cover them all here.
 <span class="org-css-selector">.outline-2 span.active </span>{
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-span">css-active-item-span</a></span>
 }
+<span class="org-css-selector">.outline-2 .csl-bib-body .active </span>{
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
+}
 </pre></div></div>
 </div>
 </div>
@@ -3316,6 +3349,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-captions">css-source-code-block-captions</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-child-link-from-parent">css-source-code-block-child-link-from-parent</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-sidenotes">css-sidenotes</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-bibliography">css-bibliography</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-toc-1">css-toc</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-non-toc-item">css-active-non-toc-item</a></span>
 </pre></div></div>
@@ -3703,6 +3737,21 @@ The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-usi
         <span class="org-css-property">float</span>: right;
         <span class="org-css-property">margin-right</span>: -315px;
     }
+}
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Bibliography" class="outline-5">
+<h5 id="h-Bibliography"><span class="section-number-5">3.4.10.13.</span> Bibliography</h5>
+<div class="outline-text-5" id="text-h-Bibliography">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-bibliography</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-bibliography">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-bibliography"><span class="org-css-selector">.csl-entry </span>{
+    <span class="org-css-property">margin-top</span>: 1em;
+    <span class="org-css-property">padding</span>: 0.5em;
+    <span class="org-css-property">border-style</span>: solid;
+    <span class="org-css-property">border-width</span>: 1px;
+    <span class="org-css-property">border-radius</span>: 5px;
+    <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--clear</span>);
 }
 </pre></div></div>
 </div>
@@ -4156,11 +4205,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd>
 <dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org000011b">Org mode</a> borrows heavily using <a href="#org000011d">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org000011d"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org0000121">Org mode</a> borrows heavily using <a href="#org0000123">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
+<dt><a id="org0000123"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org000011b"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<dt><a id="org0000121"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
@@ -4182,11 +4231,11 @@ multiline piece of text with <code>#+begin_src ...</code> and <code>#+end_src</c
 <h2 id="h-References"><span class="section-number-2">5.</span> References</h2>
 <div class="outline-text-2" id="text-h-References">
 <style>.csl-left-margin{float: left; padding-right: 1em;}
- .csl-right-inline{margin: 1em 0 0 2em;}</style><div class="csl-bib-body">
-  <div class="csl-entry"><a id="citeproc_bib_item_1"></a>
+ .csl-right-inline{margin: 0 0 0 1em;}</style><div class="csl-bib-body">
+  <div class="csl-entry" id="citeproc_bib_item_1">
     <div class="csl-left-margin">[1]</div><div class="csl-right-inline">N. Ramsey, “Literate programming simplified,” <i>IEEE Software</i>, vol. 11, no. 5, pp. 97–105, Sep. 1994, doi: <a href="https://doi.org/10.1109/52.311070">10.1109/52.311070</a>.</div>
   </div>
-  <div class="csl-entry"><a id="citeproc_bib_item_2"></a>
+  <div class="csl-entry" id="citeproc_bib_item_2">
     <div class="csl-left-margin">[2]</div><div class="csl-right-inline">D. E. Knuth, “Literate Programming,” <i>The Computer Journal</i>, vol. 27, no. 2, pp. 97–111, Feb. 1984, doi: <a href="https://doi.org/10.1093/comjnl/27.2.97">10.1093/comjnl/27.2.97</a>.</div>
   </div>
 </div>

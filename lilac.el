@@ -100,8 +100,9 @@ When matching, reference is stored in match group 1."
    "<style>.csl-left-margin{float: left; padding-right: 0em"
    "<style>.csl-left-margin{float: left; padding-right: 1em")
   (lilac-replace-from-to-html
-   ".csl-right-inline{margin: 0 0 0 1em;}</style>"
-   ".csl-right-inline{margin: 1em 0 0 2em;}</style>"))
+   "\"csl-entry\"><a \\(id=\"[^\"]+\"\\)></a>"
+   "\"csl-entry\" \\1>"
+   t))
 (defun lilac-UID-for-all-src-blocks (_backend)
   (let* ((all-src-blocks
            (org-element-map (org-element-parse-buffer) 'src-block 'identity))
@@ -568,12 +569,14 @@ When matching, reference is stored in match group 1."
   (save-excursion
     (goto-char (point-min))
     (replace-string str repl)))
-(defun lilac-replace-from-to-html (str repl)
+(defun lilac-replace-from-to-html (str repl &optional regex)
   (let ((html-file-name (concat
                          (file-name-sans-extension (buffer-file-name))
                          ".html")))
     (find-file html-file-name)
-    (lilac-replace-from-to str repl)
+    (if regex
+        (replace-regexp str repl)
+        (lilac-replace-from-to str repl))
     (save-buffer)))
 (defun lilac-gen-css-and-exit ()
   (font-lock-flush)
