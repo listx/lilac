@@ -1999,6 +1999,7 @@ on the current buffer name.
                          (file-name-sans-extension (buffer-file-name))
                          ".html")))
     (find-file html-file-name)
+    (goto-char 0)
     (if regex
         (replace-regexp str repl)
         (lilac-replace-from-to str repl))
