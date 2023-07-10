@@ -302,7 +302,12 @@
 <li><a href="#h-Use-human-readable-HTML-IDs-for-source-code-links">3.4.5.1. Use human-readable HTML IDs for source code links</a></li>
 <li><a href="#h-Pretty-source-code-captions">3.4.5.2. Pretty source code captions</a></li>
 <li><a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">3.4.5.3. Link noweb references (link to child block from parent block)</a></li>
-<li><a href="#h-Search-and-replace-hardcoded-things">3.4.5.4. Search and replace hardcoded things</a></li>
+<li><a href="#h-Search-and-replace-hardcoded-things">3.4.5.4. Search and replace hardcoded things</a>
+<ul>
+<li><a href="#h-Bibliography--citations">3.4.5.4.1. Bibliography (citations)</a></li>
+<li><a href="#h-Glossary--description-lists">3.4.5.4.2. Glossary (description lists)</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#h-JavaScript">3.4.6. JavaScript</a>
@@ -343,7 +348,7 @@
 <li><a href="#h-General-body-text">3.4.10.2. General body text</a></li>
 <li><a href="#h-Headline-font-sizes">3.4.10.3. Headline font sizes</a></li>
 <li><a href="#h-Tables">3.4.10.4. Tables</a></li>
-<li><a href="#h-Definition-lists">3.4.10.5. Definition lists</a></li>
+<li><a href="#h-Description-lists">3.4.10.5. Description lists</a></li>
 <li><a href="#h-Images">3.4.10.6. Images</a></li>
 <li><a href="#h-Monospaced">3.4.10.7. Monospaced</a></li>
 <li><a href="#h-Links">3.4.10.8. Links</a></li>
@@ -389,7 +394,7 @@ The <i>lilac</i> is a <a href="https://en.wikipedia.org/wiki/Syringa">flowering 
 
 <p>
 <i>Lilac</i> is an addon for Emacs Org mode to make <a href="https://en.wikipedia.org/wiki/Literate_programming">Literate Programming</a> (LP) using
-Noweb-style <a href="#citeproc_bib_item_1">[1]</a> references easy. It comes in two parts:
+<a href="#org0000001">Noweb</a>-style <a href="#citeproc_bib_item_1">[1]</a> references easy. It comes in two parts:
 </p>
 
 <ol class="org-ol">
@@ -412,7 +417,7 @@ This document itself reuses the <code>lilac.theme</code> file, which gives you a
 <p>
 Lilac was created mainly because the existing Org mode features around Noweb
 references were lacking in features. There seems to have been a great deal of
-effort to make <i>tangling</i> (extracting source code from source code blocks) work
+effort to make <i>tangling</i> (extracting source code from <a href="#org0000003">source code blocks</a>) work
 well, but not much has been done around <i>weaving</i>, where I think most of the
 difficulties lie (because making output look good to a human (weaving) is much
 more difficult than making output look good to a computer (tangling)).
@@ -568,7 +573,7 @@ definition.
 </pre></div></div><p>
 This example illustrates the two ways to define a child block: either as a
 single code block with <code>#+name: __NREF__foo</code>, or as multiple blocks with
-<code>#+header: :noweb-ref __NREF__foo</code>. Lilac calls them <a href="#org0000005">monoblocks</a> and <a href="#org0000007">polyblocks</a>
+<code>#+header: :noweb-ref __NREF__foo</code>. Lilac calls them <a href="#org0000009">monoblocks</a> and <a href="#org000000b">polyblocks</a>
 respectively. Polyblocks are concatenated together in the order they appear in
 the overall Org file; this final concatenated version is what gets inserted into
 the Noweb reference in the parent block.
@@ -690,7 +695,7 @@ Rendered HTML output:
 Orgmode input:
 </p>
 
-<div class="sidenote" id="org000001b">
+<div class="sidenote" id="org000001f">
 <p>
 Although the <code>ex_monoblock</code> text is linkified here, ignore it. The text that you
 need to write in the Orgmode input is literally <code>__NREF__ex_monoblock</code>. Lilac
@@ -718,7 +723,7 @@ Rendered HTML output:
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">A parent block.</label><span class="lilac-caption-link-symbol"><a href="#A-parent-block-1">&#x1f517;</a></span></div><pre class="src src-python" id="A-parent-block-1"><span class="org-keyword">def</span> <span class="org-function-name">foo</span>():
     <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_monoblock">ex_monoblock</a></span>
     <span class="org-keyword">return</span> 42
-</pre></div></div><div class="sidenote" id="org0000020">
+</pre></div></div><div class="sidenote" id="org0000024">
 <p>
 Similarly, the <code>2</code> link is only here because Lilac thinks that this child block
 is referenced in multiple blocks. In a real example this <code>2</code> would not show up.
@@ -738,7 +743,7 @@ is referenced in multiple blocks. In a real example this <code>2</code> would no
 Orgmode input:
 </p>
 
-<div class="sidenote" id="org0000023">
+<div class="sidenote" id="org0000027">
 <p>
 Like above for monoblocks, Lilac needlessly linkifies the source code body text
 of the parent block when it doesn't need to (as this is only an illustrative
@@ -785,7 +790,7 @@ Some intervening text.
 <div id="outline-container-h-Linking-to-a-line-in-the-code-block-body" class="outline-6">
 <h6 id="h-Linking-to-a-line-in-the-code-block-body"><span class="section-number-6">2.2.1.1.4.</span> Linking to a line in the code block body</h6>
 <div class="outline-text-6" id="text-h-Linking-to-a-line-in-the-code-block-body">
-<div class="sidenote" id="org000002c">
+<div class="sidenote" id="org0000030">
 <p>
 The <code>-r</code> flag removes these <code>#ref:...</code> labels from the source code. The <code>-l</code>
 flag changes the format. In this case we make the format use a leading <code>#</code>
@@ -839,7 +844,7 @@ Foo bar.
 Rendered HTML output:
 </p>
 
-<pre class="example" id="org0000033">
+<pre class="example" id="org0000037">
 Hello world.
 Foo bar.
 </pre>
@@ -898,7 +903,7 @@ Foo bar.
 Rendered HTML output (see right hand margin):
 </p>
 
-<div class="sidenote" id="org0000038">
+<div class="sidenote" id="org000003c">
 <p>
 Hello world.
 Foo bar.
@@ -1371,7 +1376,18 @@ The full code listing for <code>lilac-publish</code> is below.
   (lilac-replace-from-to-html
    <span class="org-string">"\"csl-entry\"&gt;&lt;a </span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">id=\"[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">\"]+\"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&gt;&lt;/a&gt;"</span>
    <span class="org-string">"\"csl-entry\" \\1&gt;"</span>
-   t))
+   t)
+  (lilac-replace-from-to-html
+   <span class="org-string">"&lt;dt&gt;"</span>
+   <span class="org-string">"&lt;div class=\"lilac-description-list-entry\"&gt;&lt;dt&gt;"</span>
+   t)
+  (lilac-replace-from-to-html
+   <span class="org-string">"\"lilac-description-list-entry\"&gt;&lt;dt&gt;&lt;a </span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">id=\"[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">\"]+\"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&gt;&lt;/a&gt;"</span>
+   <span class="org-string">"\"lilac-description-list-entry\" \\1&gt;&lt;dt&gt;"</span>
+   t)
+  (lilac-replace-from-to-html
+   <span class="org-string">"&lt;/dd&gt;"</span>
+   <span class="org-string">"&lt;/dd&gt;&lt;/div&gt;"</span>))
 </pre></div></div><p>
 Now let's go through <code>lilac-publish</code> in detail.
 </p>
@@ -1467,7 +1483,8 @@ part of citation styles.</li>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(6/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-6">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-6">  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-delete-toc-text">lilac-publish-delete-toc-text</a></span>
   <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-inline-styles">lilac-publish-fix-inline-styles</a></span>
-  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-bibliography-ids">lilac-publish-fix-bibliography-ids</a></span>)
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-bibliography-ids">lilac-publish-fix-bibliography-ids</a></span>
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-description-lists">lilac-publish-fix-description-lists</a></span>)
 </pre></div></div>
 </div>
 
@@ -1589,12 +1606,12 @@ We want each <code>#+caption: ...</code> text to have the following items:
 </p>
 
 <dl class="org-dl">
-<dt><a href="#coderef-NSCB_NAME" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_NAME');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_NAME');"><code>NSCB_NAME</code></a></dt><dd>name of the Noweb source code block,</dd>
-<dt><a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a></dt><dd>an indicator to show whether this block is
-broken up over multiple blocks, and</dd>
-<dt><a href="#coderef-NSCB_LINKS_TO_PARENTS" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINKS_TO_PARENTS');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINKS_TO_PARENTS');"><code>NSCB_LINKS_TO_PARENTS</code></a></dt><dd>a link back up to a parent block (if any) where
+<div class="lilac-description-list-entry"><dt><a href="#coderef-NSCB_NAME" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_NAME');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_NAME');"><code>NSCB_NAME</code></a></dt><dd>name of the Noweb source code block,</dd></div>
+<div class="lilac-description-list-entry"><dt><a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a></dt><dd>an indicator to show whether this block is
+broken up over multiple blocks, and</dd></div>
+<div class="lilac-description-list-entry"><dt><a href="#coderef-NSCB_LINKS_TO_PARENTS" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_LINKS_TO_PARENTS');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_LINKS_TO_PARENTS');"><code>NSCB_LINKS_TO_PARENTS</code></a></dt><dd>a link back up to a parent block (if any) where
 this block is used; can contain more than 1 parent if multiple parents refer
-to this same child block</dd>
+to this same child block</dd></div>
 </dl>
 
 <p>
@@ -1861,8 +1878,8 @@ type is a list of strings.
     noweb-ref-name))
 </pre></div></div><p>
 Note that a child source block can have two ways of defining its name. The first
-is with the direct <code>#+name: __NREF__foo</code> style (<a href="#org0000005">monoblock</a>), and the second way
-is with a line like <code>#+header: :noweb-ref __NREF__foo</code> (<a href="#org0000007">polyblock</a>). Here
+is with the direct <code>#+name: __NREF__foo</code> style (<a href="#org0000009">monoblock</a>), and the second way
+is with a line like <code>#+header: :noweb-ref __NREF__foo</code> (<a href="#org000000b">polyblock</a>). Here
 <code>lilac-get-src-block-name</code> grabs the name of a (child) source code block, taking
 into account these two styles. For polyblock names, we mark it as such with a
 <code>(polyblock)</code> string, which is used later for the <a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a>.
@@ -1995,7 +2012,7 @@ have a unique ID).
 <h5 id="h-Use-human-readable-HTML-IDs-for-source-code-links"><span class="section-number-5">3.4.5.1.</span> Use human-readable HTML IDs for source code links</h5>
 <div class="outline-text-5" id="text-h-Use-human-readable-HTML-IDs-for-source-code-links">
 <p>
-Recall that there are 2 types of source code blocks: <a href="#org0000005">monoblocks</a> and <a href="#org0000007">polyblocks</a>.
+Recall that there are 2 types of source code blocks: <a href="#org0000009">monoblocks</a> and <a href="#org000000b">polyblocks</a>.
 </p>
 
 <p>
@@ -2599,6 +2616,7 @@ on the current buffer name.
                          (file-name-sans-extension (buffer-file-name))
                          <span class="org-string">".html"</span>)))
     (find-file html-file-name)
+    (goto-char 0)
     (<span class="org-keyword">if</span> regex
         (replace-regexp str repl)
         (lilac-replace-from-to str repl))
@@ -2607,7 +2625,11 @@ on the current buffer name.
 Now we do some basic search-and-replace commands to clean up the exported HTML
 file from Emacs (instead of invoking <code>sed</code>).
 </p>
+</div>
 
+<div id="outline-container-h-Bibliography--citations" class="outline-6">
+<h6 id="h-Bibliography--citations"><span class="section-number-6">3.4.5.4.1.</span> Bibliography (citations)</h6>
+<div class="outline-text-6" id="text-h-Bibliography--citations">
 <p>
 This cleans up the inline styles for citations.
 </p>
@@ -2620,7 +2642,7 @@ We also do some replacements for the bibliography entries themselves. Namely,
 each entry has the following (odd) structure by default:
 </p>
 
-<pre class="example" id="org00000b3">
+<pre class="example" id="org00000b7">
 &lt;div class="csl-entry"&gt;&lt;a id="citeproc_bib_item_1"&gt;&lt;/a&gt; ... &lt;/div&gt;
 </pre>
 
@@ -2629,7 +2651,7 @@ and instead we delete the content-less link anchor and instead move th ID to the
 parent div, like this:
 </p>
 
-<pre class="example" id="org00000b4">
+<pre class="example" id="org00000b8">
 &lt;div class="csl-entry" id="citeproc_bib_item_1"&gt; ... &lt;/div&gt;
 </pre>
 
@@ -2644,6 +2666,49 @@ click a link to go to it.
  <span class="org-string">"\"csl-entry\" \\1&gt;"</span>
  t)
 </pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Glossary--description-lists" class="outline-6">
+<h6 id="h-Glossary--description-lists"><span class="section-number-6">3.4.5.4.2.</span> Glossary (description lists)</h6>
+<div class="outline-text-6" id="text-h-Glossary--description-lists">
+<p>
+Similar to the bibliography entries, the description lists in HTML have empty
+link anchors in them, because of the way we insert the link anchors manually in
+the Org text (this is a convention we follow; see the <a href="#h-Glossary">4</a> for examples).
+We get rid of these anchors and instead create a surrounding div around it, so
+that we can highlight the enclosed <code>&lt;dt&gt;</code> (description term) and <code>&lt;dd&gt;</code>
+(description details).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-fix-description-lists</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-description-lists">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-description-lists">(lilac-replace-from-to-html
+ <span class="org-string">"&lt;dt&gt;"</span>
+ <span class="org-string">"&lt;div class=\"lilac-description-list-entry\"&gt;&lt;dt&gt;"</span>
+ t)
+(lilac-replace-from-to-html
+ <span class="org-string">"\"lilac-description-list-entry\"&gt;&lt;dt&gt;&lt;a </span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">id=\"[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">\"]+\"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&gt;&lt;/a&gt;"</span>
+ <span class="org-string">"\"lilac-description-list-entry\" \\1&gt;&lt;dt&gt;"</span>
+ t)
+(lilac-replace-from-to-html
+ <span class="org-string">"&lt;/dd&gt;"</span>
+ <span class="org-string">"&lt;/dd&gt;&lt;/div&gt;"</span>)
+</pre></div></div><p>
+And here we style it.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-description-lists</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-description-lists">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-description-lists"><span class="org-css-selector">.lilac-description-list-entry </span>{
+    <span class="org-css-property">padding</span>: 0.2em 0.5em 0.5em 0.5em;
+    <span class="org-css-property">border-style</span>: solid;
+    <span class="org-css-property">border-width</span>: 1px;
+    <span class="org-css-property">border-radius</span>: 5px;
+    <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--clear</span>);
+}
+
+<span class="org-css-selector">.org-dl .active </span>{
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
+}
+</pre></div></div>
+</div>
 </div>
 </div>
 </div>
@@ -2982,7 +3047,7 @@ Now we just need to style the active element.
 For headlines, we draw a border around it.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-non-toc-item">css-active-item-headline</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-item-headline">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-item-headline"><span class="org-css-property">border-style</span>: solid;
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__css-description-lists">css-active-item-headline</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-non-toc-item">2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-item-headline">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-item-headline"><span class="org-css-property">border-style</span>: solid;
 <span class="org-css-property">border-width</span>: 1px;
 <span class="org-css-property">border-radius</span>: 5px;
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item">css-active-item</a></span>
@@ -3349,6 +3414,7 @@ We add some additional CSS tweaks on top of what we get from Org.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-captions">css-source-code-block-captions</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-source-code-block-child-link-from-parent">css-source-code-block-child-link-from-parent</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-sidenotes">css-sidenotes</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__css-description-lists">css-description-lists</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-bibliography">css-bibliography</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-toc-1">css-toc</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-non-toc-item">css-active-non-toc-item</a></span>
@@ -3492,9 +3558,9 @@ with the <code>var()</code> function.
 </div>
 </div>
 
-<div id="outline-container-h-Definition-lists" class="outline-5">
-<h5 id="h-Definition-lists"><span class="section-number-5">3.4.10.5.</span> Definition lists</h5>
-<div class="outline-text-5" id="text-h-Definition-lists">
+<div id="outline-container-h-Description-lists" class="outline-5">
+<h5 id="h-Description-lists"><span class="section-number-5">3.4.10.5.</span> Description lists</h5>
+<div class="outline-text-5" id="text-h-Description-lists">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(4/8) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-4">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-4"><span class="org-css-selector">dl </span>{
     <span class="org-css-property">margin</span>: 0;
     <span class="org-css-property">padding-top</span>: 1em;
@@ -4201,28 +4267,33 @@ Here we test the construction of smart captions.
 <h2 id="h-Glossary"><span class="section-number-2">4.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
-<dt><a id="org0000005"></a> <b>monoblock</b></dt><dd>an Org mode source code block with a <code>#+name:
+<div class="lilac-description-list-entry" id="org0000009"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a <code>#+name:
   ...</code> field. This block is an independent block and there are no other blocks
-with the same name.</dd>
-<dt><b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org0000121">Org mode</a> borrows heavily using <a href="#org0000123">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd>
-<dt><a id="org0000123"></a> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+with the same name.</dd></div>
+<div class="lilac-description-list-entry" id="org0000001"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
+which <a href="#org0000129">Org mode</a> borrows heavily using <a href="#org000012b">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org000012b"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
-<a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd>
-<dt><a id="org0000121"></a> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org0000129"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
-<a href="https://orgmode.org/">Org mode</a>.</dd>
-<dt><a id="org0000007"></a> <b>polyblock</b></dt><dd>an Org mode source code block without a <code>#+name:
+<a href="https://orgmode.org/">Org mode</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org000000b"><dt> <b>polyblock</b></dt><dd>an Org mode source code block without a <code>#+name:
   ...</code> field, but which has a <code>#+header: :noweb-ref ...</code> field. Other blocks
 with the same Noweb-ref name are concatenated together when they are tangled.
 Polyblocks are used in cases where we would like to break up a single block
 into smaller pieces for explanatory purposes. In all other cases, monoblocks
 are preferable, unless the source code block is not to be tangled and is only
-for explanatory purposes in the woven output.</dd>
-<dt><b>source code block</b></dt><dd>An Org mode facility that allows you to enclose a
-multiline piece of text with <code>#+begin_src ...</code> and <code>#+end_src</code> lines.</dd>
+for explanatory purposes in the woven output.</dd></div>
+<div class="lilac-description-list-entry" id="org0000003"><dt> <b>source code block</b></dt><dd>An Org mode facility that allows
+you to enclose a multiline text (typically source code) with <code>#+begin_src ...</code>
+and <code>#+end_src</code> lines. They are enclosed in a separate background color in the
+HTML output, and are often used for illustrating source code listings. The
+format is <code>#+begin_src LANGUAGE_NAME</code> where <code>LANGUAGE_NAME</code> is the name of the
+programming language used for the listing. If the name is a recognized name,
+it will get syntax highlighting in the output automatically.</dd></div>
 </dl>
 </div>
 </div>

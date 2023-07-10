@@ -904,7 +904,8 @@ The final bits are
 #+begin_src emacs-lisp
   __NREF__lilac-publish-delete-toc-text
   __NREF__lilac-publish-fix-inline-styles
-  __NREF__lilac-publish-fix-bibliography-ids)
+  __NREF__lilac-publish-fix-bibliography-ids
+  __NREF__lilac-publish-fix-description-lists)
 #+end_src
 
 **** Helper functions
@@ -2009,6 +2010,8 @@ on the current buffer name.
 Now we do some basic search-and-replace commands to clean up the exported HTML
 file from Emacs (instead of invoking =sed=).
 
+***** Bibliography (citations)
+
 This cleans up the inline styles for citations.
 
 #+name: __NREF__lilac-publish-fix-inline-styles
@@ -2042,6 +2045,47 @@ click a link to go to it.
  "\"csl-entry\"><a \\(id=\"[^\"]+\"\\)></a>"
  "\"csl-entry\" \\1>"
  t)
+#+end_src
+
+***** Glossary (description lists)
+
+Similar to the bibliography entries, the description lists in HTML have empty
+link anchors in them, because of the way we insert the link anchors manually in
+the Org text (this is a convention we follow; see the [[* Glossary]] for examples).
+We get rid of these anchors and instead create a surrounding div around it, so
+that we can highlight the enclosed =<dt>= (description term) and =<dd>=
+(description details).
+
+#+name: __NREF__lilac-publish-fix-description-lists
+#+begin_src emacs-lisp
+(lilac-replace-from-to-html
+ "<dt>"
+ "<div class=\"lilac-description-list-entry\"><dt>"
+ t)
+(lilac-replace-from-to-html
+ "\"lilac-description-list-entry\"><dt><a \\(id=\"[^\"]+\"\\)></a>"
+ "\"lilac-description-list-entry\" \\1><dt>"
+ t)
+(lilac-replace-from-to-html
+ "</dd>"
+ "</dd></div>")
+#+end_src
+
+And here we style it.
+
+#+name: __NREF__css-description-lists
+#+begin_src css
+.lilac-description-list-entry {
+    padding: 0.2em 0.5em 0.5em 0.5em;
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 5px;
+    border-color: var(--clear);
+}
+
+.org-dl .active {
+    __NREF__css-active-item-headline
+}
 #+end_src
 
 *** JavaScript
@@ -2688,6 +2732,7 @@ __NREF__css-source-code-block-body
 __NREF__css-source-code-block-captions
 __NREF__css-source-code-block-child-link-from-parent
 __NREF__css-sidenotes
+__NREF__css-description-lists
 __NREF__css-bibliography
 __NREF__css-toc
 __NREF__css-active-non-toc-item
@@ -2824,7 +2869,7 @@ thead {
 }
 #+end_src
 
-**** Definition lists
+**** Description lists
 
 #+header: :noweb-ref __NREF__css-general
 #+begin_src css

@@ -102,7 +102,18 @@ When matching, reference is stored in match group 1."
   (lilac-replace-from-to-html
    "\"csl-entry\"><a \\(id=\"[^\"]+\"\\)></a>"
    "\"csl-entry\" \\1>"
-   t))
+   t)
+  (lilac-replace-from-to-html
+   "<dt>"
+   "<div class=\"lilac-description-list-entry\"><dt>"
+   t)
+  (lilac-replace-from-to-html
+   "\"lilac-description-list-entry\"><dt><a \\(id=\"[^\"]+\"\\)></a>"
+   "\"lilac-description-list-entry\" \\1><dt>"
+   t)
+  (lilac-replace-from-to-html
+   "</dd>"
+   "</dd></div>"))
 (defun lilac-UID-for-all-src-blocks (_backend)
   (let* ((all-src-blocks
            (org-element-map (org-element-parse-buffer) 'src-block 'identity))
@@ -574,6 +585,7 @@ When matching, reference is stored in match group 1."
                          (file-name-sans-extension (buffer-file-name))
                          ".html")))
     (find-file html-file-name)
+    (goto-char 0)
     (if regex
         (replace-regexp str repl)
         (lilac-replace-from-to str repl))
