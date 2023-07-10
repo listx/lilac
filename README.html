@@ -356,7 +356,6 @@
 <li><a href="#h-Source-code-block-captions">3.4.10.10. Source code block captions</a></li>
 <li><a href="#h-Links-to-child-source-block-from-parent">3.4.10.11. Links to child source block from parent</a></li>
 <li><a href="#h-Sidenotes-1">3.4.10.12. Sidenotes</a></li>
-<li><a href="#h-Bibliography">3.4.10.13. Bibliography</a></li>
 </ul>
 </li>
 <li><a href="#h-Create--lilac-theme--file">3.4.11. Create <code>lilac.theme</code> file</a></li>
@@ -2665,6 +2664,22 @@ click a link to go to it.
  <span class="org-string">"\"csl-entry\"&gt;&lt;a </span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">id=\"[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">\"]+\"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&gt;&lt;/a&gt;"</span>
  <span class="org-string">"\"csl-entry\" \\1&gt;"</span>
  t)
+</pre></div></div><p>
+And here we style these entries.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-bibliography</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-bibliography">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-bibliography"><span class="org-css-selector">.csl-entry </span>{
+    <span class="org-css-property">margin-top</span>: 1em;
+    <span class="org-css-property">padding</span>: 0.5em;
+    <span class="org-css-property">border-style</span>: solid;
+    <span class="org-css-property">border-width</span>: 1px;
+    <span class="org-css-property">border-radius</span>: 5px;
+    <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--clear</span>);
+}
+
+<span class="org-css-selector">.outline-2 .csl-bib-body .active </span>{
+    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
+}
 </pre></div></div>
 </div>
 </div>
@@ -3047,7 +3062,7 @@ Now we just need to style the active element.
 For headlines, we draw a border around it.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__css-description-lists">css-active-item-headline</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-non-toc-item">2</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-item-headline">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-item-headline"><span class="org-css-property">border-style</span>: solid;
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__css-bibliography">css-active-item-headline</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-description-lists">2</a></span><span class="lilac-caption-parent-link"><a href="#__NREF__css-active-non-toc-item">3</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-item-headline">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-item-headline"><span class="org-css-property">border-style</span>: solid;
 <span class="org-css-property">border-width</span>: 1px;
 <span class="org-css-property">border-radius</span>: 5px;
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item">css-active-item</a></span>
@@ -3063,7 +3078,8 @@ when we link to a line inside a source code block.
 <span class="org-css-property">border-radius</span>: 5px;
 <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item">css-active-item</a></span>
 </pre></div></div><p>
-Different destination elements need different selectors. We cover them all here.
+Different destination elements need different selectors. We cover most of them
+here.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-active-non-toc-item</a></span>(1/1) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-non-toc-item">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-non-toc-item"><span class="org-css-selector">.outline-2 h2.active </span>{
@@ -3086,9 +3102,6 @@ Different destination elements need different selectors. We cover them all here.
 }
 <span class="org-css-selector">.outline-2 span.active </span>{
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-span">css-active-item-span</a></span>
-}
-<span class="org-css-selector">.outline-2 .csl-bib-body .active </span>{
-    <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
 }
 </pre></div></div>
 </div>
@@ -3803,21 +3816,6 @@ The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-usi
         <span class="org-css-property">float</span>: right;
         <span class="org-css-property">margin-right</span>: -315px;
     }
-}
-</pre></div></div>
-</div>
-</div>
-
-<div id="outline-container-h-Bibliography" class="outline-5">
-<h5 id="h-Bibliography"><span class="section-number-5">3.4.10.13.</span> Bibliography</h5>
-<div class="outline-text-5" id="text-h-Bibliography">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-bibliography</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-bibliography">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-bibliography"><span class="org-css-selector">.csl-entry </span>{
-    <span class="org-css-property">margin-top</span>: 1em;
-    <span class="org-css-property">padding</span>: 0.5em;
-    <span class="org-css-property">border-style</span>: solid;
-    <span class="org-css-property">border-width</span>: 1px;
-    <span class="org-css-property">border-radius</span>: 5px;
-    <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--clear</span>);
 }
 </pre></div></div>
 </div>

@@ -2047,6 +2047,24 @@ click a link to go to it.
  t)
 #+end_src
 
+And here we style these entries.
+
+#+name: __NREF__css-bibliography
+#+begin_src css
+.csl-entry {
+    margin-top: 1em;
+    padding: 0.5em;
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 5px;
+    border-color: var(--clear);
+}
+
+.outline-2 .csl-bib-body .active {
+    __NREF__css-active-item-headline
+}
+#+end_src
+
 ***** Glossary (description lists)
 
 Similar to the bibliography entries, the description lists in HTML have empty
@@ -2422,7 +2440,8 @@ border-radius: 5px;
 __NREF__css-active-item
 #+end_src
 
-Different destination elements need different selectors. We cover them all here.
+Different destination elements need different selectors. We cover most of them
+here.
 
 #+header: :noweb-ref __NREF__css-active-non-toc-item
 #+begin_src css
@@ -2446,9 +2465,6 @@ Different destination elements need different selectors. We cover them all here.
 }
 .outline-2 span.active {
     __NREF__css-active-item-span
-}
-.outline-2 .csl-bib-body .active {
-    __NREF__css-active-item-headline
 }
 #+end_src
 
@@ -3104,20 +3120,6 @@ The CSS below is drawn primarily from [[https://scripter.co/sidenotes-using-only
         float: right;
         margin-right: -315px;
     }
-}
-#+end_src
-
-**** Bibliography
-
-#+name: __NREF__css-bibliography
-#+begin_src css
-.csl-entry {
-    margin-top: 1em;
-    padding: 0.5em;
-    border-style: solid;
-    border-width: 1px;
-    border-radius: 5px;
-    border-color: var(--clear);
 }
 #+end_src
 
