@@ -19,7 +19,7 @@ The /lilac/ is a [[https://en.wikipedia.org/wiki/Syringa][flowering woody plant]
 #+end_sidenote
 
 /Lilac/ is an addon for Emacs Org mode to make [[https://en.wikipedia.org/wiki/Literate_programming][Literate Programming]] (LP) using
-Noweb-style [cite:@ramsey_1994] references easy. It comes in two parts:
+[[Noweb][Noweb]]-style [cite:@ramsey_1994] references easy. It comes in two parts:
 
 1. =lilac.el=: to be loaded and used when /weaving/ [cite:@knuth_1984 98] and
    /tangling/ [cite:@knuth_1984 98] from your own Org mode files (which use
@@ -34,7 +34,7 @@ This document itself reuses the =lilac.theme= file, which gives you a preview
 
 Lilac was created mainly because the existing Org mode features around Noweb
 references were lacking in features. There seems to have been a great deal of
-effort to make /tangling/ (extracting source code from source code blocks) work
+effort to make /tangling/ (extracting source code from [[source code block][source code blocks]]) work
 well, but not much has been done around /weaving/, where I think most of the
 difficulties lie (because making output look good to a human (weaving) is much
 more difficult than making output look good to a computer (tangling)).
@@ -3508,7 +3508,7 @@ Here we test the construction of smart captions.
 - <<monoblock>> *monoblock* :: an Org mode source code block with a =#+name:
   ...= field. This block is an independent block and there are no other blocks
   with the same name.
-- *Noweb* :: A literate programming tool from 1989 that still works and from
+- <<Noweb>> *Noweb* :: A literate programming tool from 1989 that still works and from
   which [[Org mode][Org mode]] borrows heavily using [[noweb-ref][Noweb-style references]]. See [[https://en.wikipedia.org/wiki/Noweb][Wikipedia]].
 - <<noweb-ref>> *noweb-ref* :: aka "Noweb-style reference". A Noweb-style
   reference is just a name (string) that refers to a monoblock or polyblock. See
@@ -3525,8 +3525,13 @@ Here we test the construction of smart captions.
   into smaller pieces for explanatory purposes. In all other cases, monoblocks
   are preferable, unless the source code block is not to be tangled and is only
   for explanatory purposes in the woven output.
-- *source code block* :: An Org mode facility that allows you to enclose a
-  multiline piece of text with =#+begin_src ...= and =#+end_src= lines.
+- <<source code block>> *source code block* :: An Org mode facility that allows
+  you to enclose a multiline text (typically source code) with =#+begin_src ...=
+  and =#+end_src= lines. They are enclosed in a separate background color in the
+  HTML output, and are often used for illustrating source code listings. The
+  format is =#+begin_src LANGUAGE_NAME= where =LANGUAGE_NAME= is the name of the
+  programming language used for the listing. If the name is a recognized name,
+  it will get syntax highlighting in the output automatically.
 
 * References
 
