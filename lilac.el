@@ -97,8 +97,8 @@ When matching, reference is stored in match group 1."
    "<h2>Table of Contents</h2>"
    "")
   (lilac-replace-from-to-html
-   "<style>.csl-left-margin{float: left; padding-right: 0em"
-   "<style>.csl-left-margin{float: left; padding-right: 1em")
+   ".csl-right-inline{margin: 0 0 0 1em;"
+   ".csl-right-inline{margin: 0 0 0 2em;")
   (lilac-replace-from-to-html
    "\"csl-entry\"><a \\(id=\"[^\"]+\"\\)></a>"
    "\"csl-entry\" \\1>"
