@@ -2730,6 +2730,8 @@ mode (language) must be loaded in here.
 (require 'magit-section)
 (lilac-load "/deps/elisp/nix-mode")
 (require 'nix-mode)
+(lilac-load "/deps/elisp/elquery")
+(require 'elquery)
 #+end_src
 
 *** Additional (hand-tweaked) CSS
@@ -3217,11 +3219,14 @@ functions are available), so we turn it on here by calling =(org-mode)=.
 
 __NREF__t-helpers
 __NREF__t-smart-caption-generation
+__NREF__t-link-to-child-block-from-parent-block
 
 (provide 'lilac-tests)
 #+end_src
 
 *** Test helpers
+
+**** Avoid cross-abstraction Noweb reference prefix collision
 
 Note that we cannot write =__NREF__foo= directly in the test code here, because
 when this Org file is tangled, the references will be detected and Org mode will
@@ -3229,9 +3234,29 @@ try to replace them with a monoblock or polyblock elsewhere in this file named
 =__NREF__foo=. So we have to go in "stealth mode" by writing the =__NREF__=
 prefix indirectly with the =(nref)= helper function.
 
-#+name: __NREF__t-helpers
+#+header: :noweb-ref __NREF__t-helpers
 #+begin_src emacs-lisp
 (defun nref (s) (concat "__NREF__" s))
+#+end_src
+
+**** Run =lilac-publish= on temporary files
+
+Return the full path to the HTML file which was just published.
+
+#+header: :noweb-ref __NREF__t-helpers
+#+begin_src emacs-lisp
+(defun lilac-temp-publish (fname-prefix content)
+  (let* ((fname-org (make-temp-file
+                    "fname-prefix"
+                    nil
+                    ".org"))
+         (fname-html (concat (string-remove-suffix "org" fname-org) "html")))
+    (with-temp-file fname-org
+      (org-mode)
+      (insert content))
+    (find-file fname-org)
+    (lilac-publish)
+    fname-html))
 #+end_src
 
 *** Smart source code block caption helpers
@@ -3548,6 +3573,100 @@ Here we test the construction of smart captions.
                          "=  [["
                          (nref "child1")
                          "][1]]\n"))))))))
+#+end_src
+
+*** Link to child block from parent block
+
+**** One (same) child node block referenced in two different parent blocks
+
+Expect to find a link in the HTML from the parent blocks to the same child
+block.
+
+#+header: :noweb-ref __NREF__t-link-to-child-block-from-parent-block
+#+begin_src emacs-lisp
+(ert-deftest t-lilac-children-are-linked-from-parent ()
+    (let* ((fname-html
+            (lilac-temp-publish
+             "t-lilac-children-are-linked-from-parent-"
+             (concat
+              "#+name: parent1\n"
+              "#+caption: parent1\n"
+              "#+begin_src emacs-lisp\n"
+              "; foo\n"
+              (concat (nref "child1") "\n")
+              "#+end_src\n"
+              "\n"
+              "#+name: parent2\n"
+              "#+caption: parent2\n"
+              "#+begin_src emacs-lisp\n"
+              "; bar\n"
+              (concat (nref "child1") "\n")
+              "#+end_src\n"
+              "\n"
+              (concat "#+name: " (nref "child1") "\n")
+              "#+begin_src emacs-lisp\n"
+              "; child1\n"
+              "#+end_src\n")))
+           (html (elquery-read-file fname-html))
+           (got-child-link-text-parent1
+            (elquery-text
+             (car (elquery-$
+                   "#parent1 .lilac-child-link-from-parent a"
+                   html))))
+           (got-child-link-text-parent2
+            (elquery-text
+             (car (elquery-$
+                   "#parent2 .lilac-child-link-from-parent a"
+                   html)))))
+      (should (equal got-child-link-text-parent1 "child1"))
+      (should (equal got-child-link-text-parent2 "child1"))))
+#+end_src
+
+**** Nested child blocks
+
+A child block can itself be a parent (and link to the nested child within it).
+Expect to find a link to the nested child block from wiithin the first child
+block.
+
+#+header: :noweb-ref __NREF__t-link-to-child-block-from-parent-block
+#+begin_src emacs-lisp
+(ert-deftest t-lilac-children-are-linked-from-parent ()
+  (let* ((fname-html
+          (lilac-temp-publish
+           "t-lilac-children-are-linked-from-parent-nested-"
+           (concat
+            "#+name: parent1\n"
+            "#+caption: parent1\n"
+            "#+begin_src emacs-lisp\n"
+            "; foo\n"
+            (concat (nref "child1") "\n")
+            "#+end_src\n"
+            "\n"
+            (concat "#+name: " (nref "child1") "\n")
+            "#+begin_src emacs-lisp\n"
+            "; child1\n"
+            (concat (nref "nested-child") "\n")
+            "#+end_src\n"
+            "\n"
+            (concat "#+name: " (nref "nested-child") "\n")
+            "#+caption: nested-child\n"
+            "#+begin_src emacs-lisp\n"
+            "; nested-child\n"
+            "#+end_src\n")))
+         (html (elquery-read-file fname-html))
+         (got-child-link-text-parent1
+          (elquery-text
+           (car (elquery-$
+                 "#parent1 .lilac-child-link-from-parent a"
+                 html))))
+         (got-child-link-text-child1
+          (elquery-text
+           (car (elquery-$
+                 (concat "#" (nref "child1")
+                         " .lilac-child-link-from-parent a")
+                 html)))))
+      (should (equal got-child-link-text-parent1 "child1"))
+      (should (equal got-child-link-text-child1 "nested-child"))))
 #+end_src
 
 * Glossary

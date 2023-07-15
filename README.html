@@ -371,6 +371,7 @@
 <ul>
 <li><a href="#h-Test-helpers">3.5.1. Test helpers</a></li>
 <li><a href="#h-Smart-source-code-block-caption-helpers">3.5.2. Smart source code block caption helpers</a></li>
+<li><a href="#h-Link-to-child-block-from-parent-block">3.5.3. Link to child block from parent block</a></li>
 </ul>
 </li>
 </ul>
@@ -3407,6 +3408,8 @@ mode (language) must be loaded in here.
 (<span class="org-keyword">require</span> '<span class="org-constant">magit-section</span>)
 (lilac-load <span class="org-string">"/deps/elisp/nix-mode"</span>)
 (<span class="org-keyword">require</span> '<span class="org-constant">nix-mode</span>)
+(lilac-load <span class="org-string">"/deps/elisp/elquery"</span>)
+(<span class="org-keyword">require</span> '<span class="org-constant">elquery</span>)
 </pre></div></div>
 </div>
 </div>
@@ -3928,6 +3931,7 @@ functions are available), so we turn it on here by calling <code>(org-mode)</cod
 
 <span class="lilac-child-link-from-parent"><a href="#__NREF__t-helpers">t-helpers</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__t-smart-caption-generation-1">t-smart-caption-generation</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__t-link-to-child-block-from-parent-block">t-link-to-child-block-from-parent-block</a></span>
 
 (<span class="org-keyword">provide</span> '<span class="org-constant">lilac-tests</span>)
 </pre></div></div>
@@ -4257,6 +4261,49 @@ Here we test the construction of smart captions.
 </pre></div></div>
 </div>
 </div>
+
+<div id="outline-container-h-Link-to-child-block-from-parent-block" class="outline-4">
+<h4 id="h-Link-to-child-block-from-parent-block"><span class="section-number-4">3.5.3.</span> Link to child block from parent block</h4>
+<div class="outline-text-4" id="text-h-Link-to-child-block-from-parent-block">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-link-to-child-block-from-parent-block</a></span>(1/1) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-link-to-child-block-from-parent-block">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-link-to-child-block-from-parent-block">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-children-are-linked-from-parent</span> ()
+  (<span class="org-keyword">let*</span> ((fname-org (make-temp-file
+                    <span class="org-string">"t-lilac-children-are-linked-from-parent-"</span>
+                    nil
+                    <span class="org-string">".org"</span>))
+         (fname-html (concat (string-remove-suffix <span class="org-string">"org"</span> fname-org) <span class="org-string">"html"</span>))
+         (buf-org (concat
+               <span class="org-string">"#+name: parent1\n"</span>
+               <span class="org-string">"#+caption: parent1\n"</span>
+               <span class="org-string">"#+begin_src emacs-lisp\n"</span>
+               <span class="org-string">"; foo\n"</span>
+               (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
+               <span class="org-string">"#+end_src\n"</span>
+               <span class="org-string">"\n"</span>
+               <span class="org-string">"#+name: parent2\n"</span>
+               <span class="org-string">"#+caption: parent2\n"</span>
+               <span class="org-string">"#+begin_src emacs-lisp\n"</span>
+               <span class="org-string">"; bar\n"</span>
+               (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
+               <span class="org-string">"#+end_src\n"</span>
+               <span class="org-string">"\n"</span>
+               (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
+               <span class="org-string">"#+begin_src emacs-lisp\n"</span>
+               <span class="org-string">"; child1\n"</span>
+               <span class="org-string">"#+end_src\n"</span>)))
+    (<span class="org-keyword">with-temp-file</span> fname-org
+      (org-mode)
+      (insert buf-org))
+    (find-file fname-org)
+    (lilac-publish)
+    (<span class="org-keyword">let</span> ((html (elquery-read-file fname-html))
+
+      (foo (elquery-el (car (elquery-$ <span class="org-string">"#parent1"</span>))))
+          )
+      (princ foo)
+      (<span class="org-keyword">should</span> (equal 1 1)))))
+</pre></div></div>
+</div>
+</div>
 </div>
 </div>
 
@@ -4268,11 +4315,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd></div>
 <div class="lilac-description-list-entry" id="org0000001"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org0000129">Org mode</a> borrows heavily using <a href="#org000012b">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000012b"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org000012b">Org mode</a> borrows heavily using <a href="#org000012d">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org000012d"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000129"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<div class="lilac-description-list-entry" id="org000012b"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

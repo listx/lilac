@@ -26,6 +26,8 @@
 (require 'magit-section)
 (lilac-load "/deps/elisp/nix-mode")
 (require 'nix-mode)
+(lilac-load "/deps/elisp/elquery")
+(require 'elquery)
 (setq org-export-time-stamp-file nil)
 (setq org-html-postamble nil)
 (defun org-export-deterministic-reference (references)
