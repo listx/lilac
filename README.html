@@ -2994,10 +2994,10 @@ too heavy and opinionated.
 }
 
 $(document).ready(() =&gt; {
-    $(<span class="org-string">"#text-table-of-contents a"</span>).click((elt) =&gt; {
-        <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(elt.target.hash);
+    $(<span class="org-string">"#text-table-of-contents a"</span>).click((e) =&gt; {
+        <span class="org-keyword">var</span> <span class="org-variable-name">tocItem</span> = get_toc_item(e.target.hash);
         $(tocItem).addClass(<span class="org-string">"active"</span>);
-        deactivate_other_toc_items(elt.target.hash);
+        deactivate_other_toc_items(e.target.hash);
     });
 
     $(<span class="org-string">"*[id^='outline-container-h-']"</span>).each((index, elt) =&gt; {
@@ -3102,12 +3102,12 @@ much less "jumpy" experience.
 }
 
 $(document).ready(() =&gt; {
-    $(<span class="org-string">"a"</span>).click((elt) =&gt; {
+    $(<span class="org-string">"a"</span>).click((e) =&gt; {
         <span class="org-keyword">var</span> <span class="org-variable-name">destination</span>;
-        <span class="org-keyword">if</span> (elt.target.nodeName === <span class="org-string">"CODE"</span>) {
-            destination = elt.target.parentElement.hash;
+        <span class="org-keyword">if</span> (e.target.nodeName === <span class="org-string">"CODE"</span>) {
+            destination = e.target.parentElement.hash;
         } <span class="org-keyword">else</span> {
-            destination = elt.target.hash;
+            destination = e.target.hash;
         }
         <span class="org-comment-delimiter">// </span><span class="org-comment">Only disable the browser's "jump to the link immediately" behavior if</span>
         <span class="org-comment-delimiter">// </span><span class="org-comment">we are dealing with an intra-document link. For links to other pages,</span>
@@ -3116,7 +3116,7 @@ $(document).ready(() =&gt; {
         <span class="org-keyword">if</span> (destination === <span class="org-string">""</span>) {
             <span class="org-keyword">return</span>;
         } <span class="org-keyword">else</span> {
-            elt.preventDefault();
+            e.preventDefault();
         }
         $(destination).addClass(<span class="org-string">"active"</span>);
         deactivate_other_non_toc_items(destination);

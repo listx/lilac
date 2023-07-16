@@ -29,10 +29,10 @@ function get_toc_item(hash) {
 }
 
 $(document).ready(() => {
-    $("#text-table-of-contents a").click((elt) => {
-        var tocItem = get_toc_item(elt.target.hash);
+    $("#text-table-of-contents a").click((e) => {
+        var tocItem = get_toc_item(e.target.hash);
         $(tocItem).addClass("active");
-        deactivate_other_toc_items(elt.target.hash);
+        deactivate_other_toc_items(e.target.hash);
     });
 
     $("*[id^='outline-container-h-']").each((index, elt) => {
@@ -68,12 +68,12 @@ function deactivate_other_non_toc_items(hash) {
 }
 
 $(document).ready(() => {
-    $("a").click((elt) => {
+    $("a").click((e) => {
         var destination;
-        if (elt.target.nodeName === "CODE") {
-            destination = elt.target.parentElement.hash;
+        if (e.target.nodeName === "CODE") {
+            destination = e.target.parentElement.hash;
         } else {
-            destination = elt.target.hash;
+            destination = e.target.hash;
         }
         // Only disable the browser's "jump to the link immediately" behavior if
         // we are dealing with an intra-document link. For links to other pages,
@@ -82,7 +82,7 @@ $(document).ready(() => {
         if (destination === "") {
             return;
         } else {
-            elt.preventDefault();
+            e.preventDefault();
         }
         $(destination).addClass("active");
         deactivate_other_non_toc_items(destination);
