@@ -100,6 +100,9 @@ $(document).ready(() => {
 $(document).ready(() => {
     history.scrollRestoration = "manual";
     window.addEventListener("popstate", function (e) {
+        if (e.state === null) {
+           return;
+        }
         var hash = e.state.hash;
         e.preventDefault();
         scrollIntoViewIfNeeded($(hash)[0]);
