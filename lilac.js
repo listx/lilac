@@ -98,6 +98,7 @@ $(document).ready(() => {
     });
 });
 $(document).ready(() => {
+    history.scrollRestoration = "manual";
     window.addEventListener("popstate", function (e) {
         var hash = e.state.hash;
         e.preventDefault();

@@ -2479,9 +2479,14 @@ there's no need to keep it symmetric here.
 We have to activate the restored history item (to re-highlight it with the
 =active= class), so we do that also.
 
+Lastly, setting the =scrollRestoration= property is critical because otherwise
+the browser will want to restore the custom scroll position (instead of going to
+the history item location we've saved).
+
 #+name: __NREF__js-scroll-to-history-item
 #+begin_src js
 $(document).ready(() => {
+    history.scrollRestoration = "manual";
     window.addEventListener("popstate", function (e) {
         var hash = e.state.hash;
         e.preventDefault();
