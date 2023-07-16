@@ -3241,15 +3241,15 @@ prefix indirectly with the =(nref)= helper function.
 
 **** Setup and tear-down fixture for HTML tests
 
-When testing HTML output (behavior of =(lilac-publish)=), it's useful to create
-a temporary Org file and to generate the HTML output (as part of "setup"). Then
-we'd run the tests, and finally delete the temporary files (as part of
-"tear-down").
-
 #+begin_sidenote
 The [[https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites][Emacs manual]] for ERT defines fixtures as environments which provide setup
 and tear-down.
 #+end_sidenote
+
+When testing HTML output (behavior of =(lilac-publish)=), it's useful to create
+a temporary Org file and to generate the HTML output (as part of "setup"). Then
+we'd run the tests, and finally delete the temporary files (as part of
+"tear-down").
 
 We use =(lilac-publish-fixture)= to do the aforementioned setup and tear-down
 for us. In between setup and tear-down, we execute the =test= function with a

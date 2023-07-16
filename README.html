@@ -3971,13 +3971,6 @@ prefix indirectly with the <code>(nref)</code> helper function.
 <div id="outline-container-h-Setup-and-tear-down-fixture-for-HTML-tests" class="outline-5">
 <h5 id="h-Setup-and-tear-down-fixture-for-HTML-tests"><span class="section-number-5">3.5.1.2.</span> Setup and tear-down fixture for HTML tests</h5>
 <div class="outline-text-5" id="text-h-Setup-and-tear-down-fixture-for-HTML-tests">
-<p>
-When testing HTML output (behavior of <code>(lilac-publish)</code>), it's useful to create
-a temporary Org file and to generate the HTML output (as part of "setup"). Then
-we'd run the tests, and finally delete the temporary files (as part of
-"tear-down").
-</p>
-
 <div class="sidenote" id="org000011d">
 <p>
 The <a href="https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites">Emacs manual</a> for ERT defines fixtures as environments which provide setup
@@ -3985,6 +3978,13 @@ and tear-down.
 </p>
 
 </div>
+
+<p>
+When testing HTML output (behavior of <code>(lilac-publish)</code>), it's useful to create
+a temporary Org file and to generate the HTML output (as part of "setup"). Then
+we'd run the tests, and finally delete the temporary files (as part of
+"tear-down").
+</p>
 
 <p>
 We use <code>(lilac-publish-fixture)</code> to do the aforementioned setup and tear-down
