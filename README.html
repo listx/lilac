@@ -3124,10 +3124,7 @@ $(document).ready(() =&gt; {
         <span class="org-comment-delimiter">// </span><span class="org-comment">Save intra-document link into history, but only if it's not a repeat</span>
         <span class="org-comment-delimiter">// </span><span class="org-comment">of one already there.</span>
         <span class="org-keyword">var</span> <span class="org-variable-name">hash</span> = destination;
-        <span class="org-keyword">if</span> (history.state === <span class="org-constant">null</span>) {
-            <span class="org-keyword">return</span>;
-        }
-        <span class="org-keyword">if</span> (history.state.hash != hash) {
+        <span class="org-keyword">if</span> (history.state === <span class="org-constant">null</span> || history.state.hash != hash) {
 <span id="coderef-HISTORY_PUSHSTATE" class="coderef-off">            history.pushState(</span>
                 {hash: destination},
                 <span class="org-string">""</span>, destination);
