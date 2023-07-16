@@ -517,6 +517,10 @@ We have a top-level =Makefile= so that we can run some =make= commands on the
 command line. The overall idea is to tangle and weave, while also running any
 associated tests.
 
+Note that we make use of the fake file =tangle=, so that we can write the
+top-level =test= rule as =test: tangle=, which reads more naturally than the
+equivalent =test: Makefile= or =test: lilac.el=.
+
 #+name: Makefile
 #+caption: Makefile
 #+begin_src makefile :tangle Makefile :eval no
@@ -562,10 +566,6 @@ because all of the tangled files are tangled together at once with
 =(org-babel-tangle)=, we could just list one of them such as =Makefile= (instead
 of enumerating all of them). However we still enumerate them all here for
 completeness.
-
-Lastly we make use of the fake file =tangle=, so that we can write the top-level
-=test= rule as =test: tangle=, which reads more naturally than the equivalent
-=test: Makefile= or =test: lilac.el=.
 
 #+name: __NREF__Makefile-tangle
 #+begin_src makefile
