@@ -369,9 +369,19 @@
 </li>
 <li><a href="#h-Tests">3.5. Tests</a>
 <ul>
-<li><a href="#h-Test-helpers">3.5.1. Test helpers</a></li>
+<li><a href="#h-Test-helpers">3.5.1. Test helpers</a>
+<ul>
+<li><a href="#h-Avoid-cross-abstraction-Noweb-reference-prefix-collision">3.5.1.1. Avoid cross-abstraction Noweb reference prefix collision</a></li>
+<li><a href="#h-Setup-and-tear-down-fixture-for-HTML-tests">3.5.1.2. Setup and tear-down fixture for HTML tests</a></li>
+</ul>
+</li>
 <li><a href="#h-Smart-source-code-block-caption-helpers">3.5.2. Smart source code block caption helpers</a></li>
-<li><a href="#h-Link-to-child-block-from-parent-block">3.5.3. Link to child block from parent block</a></li>
+<li><a href="#h-Link-to-child-block-from-parent-block">3.5.3. Link to child block from parent block</a>
+<ul>
+<li><a href="#h-One--same--child-node-block-referenced-in-two-different-parent-blocks">3.5.3.1. One (same) child node block referenced in two different parent blocks</a></li>
+<li><a href="#h-Nested-child-blocks">3.5.3.2. Nested child blocks</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -3929,9 +3939,9 @@ functions are available), so we turn it on here by calling <code>(org-mode)</cod
 
 (org-mode)
 
-<span class="lilac-child-link-from-parent"><a href="#__NREF__t-helpers">t-helpers</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__t-helpers-1">t-helpers</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__t-smart-caption-generation-1">t-smart-caption-generation</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__t-link-to-child-block-from-parent-block">t-link-to-child-block-from-parent-block</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__t-link-to-child-block-from-parent-block-1">t-link-to-child-block-from-parent-block</a></span>
 
 (<span class="org-keyword">provide</span> '<span class="org-constant">lilac-tests</span>)
 </pre></div></div>
@@ -3940,6 +3950,11 @@ functions are available), so we turn it on here by calling <code>(org-mode)</cod
 <div id="outline-container-h-Test-helpers" class="outline-4">
 <h4 id="h-Test-helpers"><span class="section-number-4">3.5.1.</span> Test helpers</h4>
 <div class="outline-text-4" id="text-h-Test-helpers">
+</div>
+
+<div id="outline-container-h-Avoid-cross-abstraction-Noweb-reference-prefix-collision" class="outline-5">
+<h5 id="h-Avoid-cross-abstraction-Noweb-reference-prefix-collision"><span class="section-number-5">3.5.1.1.</span> Avoid cross-abstraction Noweb reference prefix collision</h5>
+<div class="outline-text-5" id="text-h-Avoid-cross-abstraction-Noweb-reference-prefix-collision">
 <p>
 Note that we cannot write <code>__NREF__foo</code> directly in the test code here, because
 when this Org file is tangled, the references will be detected and Org mode will
@@ -3948,8 +3963,51 @@ try to replace them with a monoblock or polyblock elsewhere in this file named
 prefix indirectly with the <code>(nref)</code> helper function.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-helpers</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__t-helpers">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-helpers">(<span class="org-keyword">defun</span> <span class="org-function-name">nref</span> (s) (concat <span class="org-string">"__NREF__"</span> s))
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-helpers</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-helpers-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-helpers-1">(<span class="org-keyword">defun</span> <span class="org-function-name">nref</span> (s) (concat <span class="org-string">"__NREF__"</span> s))
 </pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Setup-and-tear-down-fixture-for-HTML-tests" class="outline-5">
+<h5 id="h-Setup-and-tear-down-fixture-for-HTML-tests"><span class="section-number-5">3.5.1.2.</span> Setup and tear-down fixture for HTML tests</h5>
+<div class="outline-text-5" id="text-h-Setup-and-tear-down-fixture-for-HTML-tests">
+<p>
+When testing HTML output (behavior of <code>(lilac-publish)</code>), it's useful to create
+a temporary Org file and to generate the HTML output (as part of "setup"). Then
+we'd run the tests, and finally delete the temporary files (as part of
+"tear-down").
+</p>
+
+<div class="sidenote" id="org000011d">
+<p>
+The <a href="https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites">Emacs manual</a> for ERT defines fixtures as environments which provide setup
+and tear-down.
+</p>
+
+</div>
+
+<p>
+We use <code>(lilac-publish-fixture)</code> to do the aforementioned setup and tear-down
+for us. In between setup and tear-down, we execute the <code>test</code> function with a
+<code>funcall</code>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-helpers</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-helpers-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-helpers-2">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish-fixture</span> (fname-prefix content test)
+  (<span class="org-keyword">let*</span> ((fname-org (make-temp-file fname-prefix nil <span class="org-string">".org"</span>))
+         (fname-html (concat (string-remove-suffix <span class="org-string">"org"</span> fname-org) <span class="org-string">"html"</span>)))
+    (<span class="org-keyword">unwind-protect</span>
+        (<span class="org-keyword">progn</span>
+          (<span class="org-keyword">with-temp-file</span> fname-org
+            (org-mode)
+            (insert content))
+          (find-file fname-org)
+          (lilac-publish)
+          (funcall test (elquery-read-file fname-html)))
+    (shell-command-to-string
+     (concat <span class="org-string">"rm -f "</span>
+             (mapconcat 'identity `(,fname-org ,fname-html) <span class="org-string">" "</span>))))))
+</pre></div></div>
+</div>
 </div>
 </div>
 
@@ -4265,43 +4323,102 @@ Here we test the construction of smart captions.
 <div id="outline-container-h-Link-to-child-block-from-parent-block" class="outline-4">
 <h4 id="h-Link-to-child-block-from-parent-block"><span class="section-number-4">3.5.3.</span> Link to child block from parent block</h4>
 <div class="outline-text-4" id="text-h-Link-to-child-block-from-parent-block">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-link-to-child-block-from-parent-block</a></span>(1/1) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-link-to-child-block-from-parent-block">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-link-to-child-block-from-parent-block">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-children-are-linked-from-parent</span> ()
-  (<span class="org-keyword">let*</span> ((fname-org (make-temp-file
-                    <span class="org-string">"t-lilac-children-are-linked-from-parent-"</span>
-                    nil
-                    <span class="org-string">".org"</span>))
-         (fname-html (concat (string-remove-suffix <span class="org-string">"org"</span> fname-org) <span class="org-string">"html"</span>))
-         (buf-org (concat
-               <span class="org-string">"#+name: parent1\n"</span>
-               <span class="org-string">"#+caption: parent1\n"</span>
-               <span class="org-string">"#+begin_src emacs-lisp\n"</span>
-               <span class="org-string">"; foo\n"</span>
-               (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
-               <span class="org-string">"#+end_src\n"</span>
-               <span class="org-string">"\n"</span>
-               <span class="org-string">"#+name: parent2\n"</span>
-               <span class="org-string">"#+caption: parent2\n"</span>
-               <span class="org-string">"#+begin_src emacs-lisp\n"</span>
-               <span class="org-string">"; bar\n"</span>
-               (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
-               <span class="org-string">"#+end_src\n"</span>
-               <span class="org-string">"\n"</span>
-               (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
-               <span class="org-string">"#+begin_src emacs-lisp\n"</span>
-               <span class="org-string">"; child1\n"</span>
-               <span class="org-string">"#+end_src\n"</span>)))
-    (<span class="org-keyword">with-temp-file</span> fname-org
-      (org-mode)
-      (insert buf-org))
-    (find-file fname-org)
-    (lilac-publish)
-    (<span class="org-keyword">let</span> ((html (elquery-read-file fname-html))
+</div>
 
-      (foo (elquery-el (car (elquery-$ <span class="org-string">"#parent1"</span>))))
-          )
-      (princ foo)
-      (<span class="org-keyword">should</span> (equal 1 1)))))
+<div id="outline-container-h-One--same--child-node-block-referenced-in-two-different-parent-blocks" class="outline-5">
+<h5 id="h-One--same--child-node-block-referenced-in-two-different-parent-blocks"><span class="section-number-5">3.5.3.1.</span> One (same) child node block referenced in two different parent blocks</h5>
+<div class="outline-text-5" id="text-h-One--same--child-node-block-referenced-in-two-different-parent-blocks">
+<p>
+Expect to find a link in the HTML from the parent blocks to the same child
+block.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-link-to-child-block-from-parent-block</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-link-to-child-block-from-parent-block-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-link-to-child-block-from-parent-block-1">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-children-are-linked-from-parent</span> ()
+  (lilac-publish-fixture
+   <span class="org-string">"t-lilac-children-are-linked-from-parent-"</span>
+   (concat
+    <span class="org-string">"#+name: parent1\n"</span>
+    <span class="org-string">"#+caption: parent1\n"</span>
+    <span class="org-string">"#+begin_src emacs-lisp\n"</span>
+    <span class="org-string">"; foo\n"</span>
+    (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
+    <span class="org-string">"#+end_src\n"</span>
+    <span class="org-string">"\n"</span>
+    <span class="org-string">"#+name: parent2\n"</span>
+    <span class="org-string">"#+caption: parent2\n"</span>
+    <span class="org-string">"#+begin_src emacs-lisp\n"</span>
+    <span class="org-string">"; bar\n"</span>
+    (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
+    <span class="org-string">"#+end_src\n"</span>
+    <span class="org-string">"\n"</span>
+    (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
+    <span class="org-string">"#+begin_src emacs-lisp\n"</span>
+    <span class="org-string">"; child1\n"</span>
+    <span class="org-string">"#+end_src\n"</span>)
+   (<span class="org-keyword">lambda</span> (html-ast)
+     (<span class="org-keyword">let</span> ((got-child-link-text-parent1
+            (elquery-text
+             (car (elquery-$
+                   <span class="org-string">"#parent1 .lilac-child-link-from-parent a"</span>
+                   html-ast))))
+           (got-child-link-text-parent2
+            (elquery-text
+             (car (elquery-$
+                   <span class="org-string">"#parent2 .lilac-child-link-from-parent a"</span>
+                   html-ast)))))
+       (<span class="org-keyword">should</span> (equal got-child-link-text-parent1 <span class="org-string">"child1"</span>))
+       (<span class="org-keyword">should</span> (equal got-child-link-text-parent2 <span class="org-string">"child1"</span>))))))
 </pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Nested-child-blocks" class="outline-5">
+<h5 id="h-Nested-child-blocks"><span class="section-number-5">3.5.3.2.</span> Nested child blocks</h5>
+<div class="outline-text-5" id="text-h-Nested-child-blocks">
+<p>
+A child block can itself be a parent (and link to the nested child within it).
+Expect to find a link to the nested child block from wiithin the first child
+block.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-link-to-child-block-from-parent-block</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-link-to-child-block-from-parent-block-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-link-to-child-block-from-parent-block-2">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-children-are-linked-from-parent</span> ()
+  (lilac-publish-fixture
+   <span class="org-string">"t-lilac-children-are-linked-from-parent-nested-"</span>
+   (concat
+    <span class="org-string">"#+name: parent1\n"</span>
+    <span class="org-string">"#+caption: parent1\n"</span>
+    <span class="org-string">"#+begin_src emacs-lisp\n"</span>
+    <span class="org-string">"; foo\n"</span>
+    (concat (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
+    <span class="org-string">"#+end_src\n"</span>
+    <span class="org-string">"\n"</span>
+    (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"\n"</span>)
+    <span class="org-string">"#+begin_src emacs-lisp\n"</span>
+    <span class="org-string">"; child1\n"</span>
+    (concat (nref <span class="org-string">"nested-child"</span>) <span class="org-string">"\n"</span>)
+    <span class="org-string">"#+end_src\n"</span>
+    <span class="org-string">"\n"</span>
+    (concat <span class="org-string">"#+name: "</span> (nref <span class="org-string">"nested-child"</span>) <span class="org-string">"\n"</span>)
+    <span class="org-string">"#+caption: nested-child\n"</span>
+    <span class="org-string">"#+begin_src emacs-lisp\n"</span>
+    <span class="org-string">"; nested-child\n"</span>
+    <span class="org-string">"#+end_src\n"</span>)
+   (<span class="org-keyword">lambda</span> (html-ast)
+     (<span class="org-keyword">let</span> ((got-child-link-text-parent1
+            (elquery-text
+             (car (elquery-$
+                   <span class="org-string">"#parent1 .lilac-child-link-from-parent a"</span>
+                   html-ast))))
+           (got-child-link-text-child1
+            (elquery-text
+             (car (elquery-$
+                   (concat <span class="org-string">"#"</span> (nref <span class="org-string">"child1"</span>)
+                           <span class="org-string">" .lilac-child-link-from-parent a"</span>)
+                 html-ast)))))
+       (<span class="org-keyword">should</span> (equal got-child-link-text-parent1 <span class="org-string">"child1"</span>))
+       (<span class="org-keyword">should</span> (equal got-child-link-text-child1 <span class="org-string">"nested-child"</span>))))))
+</pre></div></div>
+</div>
 </div>
 </div>
 </div>
@@ -4315,11 +4432,11 @@ Here we test the construction of smart captions.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd></div>
 <div class="lilac-description-list-entry" id="org0000001"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org000012b">Org mode</a> borrows heavily using <a href="#org000012d">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000012d"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org0000130">Org mode</a> borrows heavily using <a href="#org0000132">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org0000132"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000012b"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<div class="lilac-description-list-entry" id="org0000130"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See

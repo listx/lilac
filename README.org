@@ -3239,24 +3239,38 @@ prefix indirectly with the =(nref)= helper function.
 (defun nref (s) (concat "__NREF__" s))
 #+end_src
 
-**** Run =lilac-publish= on temporary files
+**** Setup and tear-down fixture for HTML tests
 
-Return the full path to the HTML file which was just published.
+When testing HTML output (behavior of =(lilac-publish)=), it's useful to create
+a temporary Org file and to generate the HTML output (as part of "setup"). Then
+we'd run the tests, and finally delete the temporary files (as part of
+"tear-down").
+
+#+begin_sidenote
+The [[https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites][Emacs manual]] for ERT defines fixtures as environments which provide setup
+and tear-down.
+#+end_sidenote
+
+We use =(lilac-publish-fixture)= to do the aforementioned setup and tear-down
+for us. In between setup and tear-down, we execute the =test= function with a
+=funcall=.
 
 #+header: :noweb-ref __NREF__t-helpers
 #+begin_src emacs-lisp
-(defun lilac-temp-publish (fname-prefix content)
-  (let* ((fname-org (make-temp-file
-                    "fname-prefix"
-                    nil
-                    ".org"))
+(defun lilac-publish-fixture (fname-prefix content test)
+  (let* ((fname-org (make-temp-file fname-prefix nil ".org"))
          (fname-html (concat (string-remove-suffix "org" fname-org) "html")))
-    (with-temp-file fname-org
-      (org-mode)
-      (insert content))
-    (find-file fname-org)
-    (lilac-publish)
-    fname-html))
+    (unwind-protect
+        (progn
+          (with-temp-file fname-org
+            (org-mode)
+            (insert content))
+          (find-file fname-org)
+          (lilac-publish)
+          (funcall test (elquery-read-file fname-html)))
+    (shell-command-to-string
+     (concat "rm -f "
+             (mapconcat 'identity `(,fname-org ,fname-html) " "))))))
 #+end_src
 
 *** Smart source code block caption helpers
@@ -3585,41 +3599,40 @@ block.
 #+header: :noweb-ref __NREF__t-link-to-child-block-from-parent-block
 #+begin_src emacs-lisp
 (ert-deftest t-lilac-children-are-linked-from-parent ()
-    (let* ((fname-html
-            (lilac-temp-publish
-             "t-lilac-children-are-linked-from-parent-"
-             (concat
-              "#+name: parent1\n"
-              "#+caption: parent1\n"
-              "#+begin_src emacs-lisp\n"
-              "; foo\n"
-              (concat (nref "child1") "\n")
-              "#+end_src\n"
-              "\n"
-              "#+name: parent2\n"
-              "#+caption: parent2\n"
-              "#+begin_src emacs-lisp\n"
-              "; bar\n"
-              (concat (nref "child1") "\n")
-              "#+end_src\n"
-              "\n"
-              (concat "#+name: " (nref "child1") "\n")
-              "#+begin_src emacs-lisp\n"
-              "; child1\n"
-              "#+end_src\n")))
-           (html (elquery-read-file fname-html))
-           (got-child-link-text-parent1
+  (lilac-publish-fixture
+   "t-lilac-children-are-linked-from-parent-"
+   (concat
+    "#+name: parent1\n"
+    "#+caption: parent1\n"
+    "#+begin_src emacs-lisp\n"
+    "; foo\n"
+    (concat (nref "child1") "\n")
+    "#+end_src\n"
+    "\n"
+    "#+name: parent2\n"
+    "#+caption: parent2\n"
+    "#+begin_src emacs-lisp\n"
+    "; bar\n"
+    (concat (nref "child1") "\n")
+    "#+end_src\n"
+    "\n"
+    (concat "#+name: " (nref "child1") "\n")
+    "#+begin_src emacs-lisp\n"
+    "; child1\n"
+    "#+end_src\n")
+   (lambda (html-ast)
+     (let ((got-child-link-text-parent1
             (elquery-text
              (car (elquery-$
                    "#parent1 .lilac-child-link-from-parent a"
-                   html))))
+                   html-ast))))
            (got-child-link-text-parent2
             (elquery-text
              (car (elquery-$
                    "#parent2 .lilac-child-link-from-parent a"
-                   html)))))
-      (should (equal got-child-link-text-parent1 "child1"))
-      (should (equal got-child-link-text-parent2 "child1"))))
+                   html-ast)))))
+       (should (equal got-child-link-text-parent1 "child1"))
+       (should (equal got-child-link-text-parent2 "child1"))))))
 #+end_src
 
 **** Nested child blocks
@@ -3631,42 +3644,41 @@ block.
 #+header: :noweb-ref __NREF__t-link-to-child-block-from-parent-block
 #+begin_src emacs-lisp
 (ert-deftest t-lilac-children-are-linked-from-parent ()
-  (let* ((fname-html
-          (lilac-temp-publish
-           "t-lilac-children-are-linked-from-parent-nested-"
-           (concat
-            "#+name: parent1\n"
-            "#+caption: parent1\n"
-            "#+begin_src emacs-lisp\n"
-            "; foo\n"
-            (concat (nref "child1") "\n")
-            "#+end_src\n"
-            "\n"
-            (concat "#+name: " (nref "child1") "\n")
-            "#+begin_src emacs-lisp\n"
-            "; child1\n"
-            (concat (nref "nested-child") "\n")
-            "#+end_src\n"
-            "\n"
-            (concat "#+name: " (nref "nested-child") "\n")
-            "#+caption: nested-child\n"
-            "#+begin_src emacs-lisp\n"
-            "; nested-child\n"
-            "#+end_src\n")))
-         (html (elquery-read-file fname-html))
-         (got-child-link-text-parent1
-          (elquery-text
-           (car (elquery-$
-                 "#parent1 .lilac-child-link-from-parent a"
-                 html))))
-         (got-child-link-text-child1
-          (elquery-text
-           (car (elquery-$
-                 (concat "#" (nref "child1")
-                         " .lilac-child-link-from-parent a")
-                 html)))))
-      (should (equal got-child-link-text-parent1 "child1"))
-      (should (equal got-child-link-text-child1 "nested-child"))))
+  (lilac-publish-fixture
+   "t-lilac-children-are-linked-from-parent-nested-"
+   (concat
+    "#+name: parent1\n"
+    "#+caption: parent1\n"
+    "#+begin_src emacs-lisp\n"
+    "; foo\n"
+    (concat (nref "child1") "\n")
+    "#+end_src\n"
+    "\n"
+    (concat "#+name: " (nref "child1") "\n")
+    "#+begin_src emacs-lisp\n"
+    "; child1\n"
+    (concat (nref "nested-child") "\n")
+    "#+end_src\n"
+    "\n"
+    (concat "#+name: " (nref "nested-child") "\n")
+    "#+caption: nested-child\n"
+    "#+begin_src emacs-lisp\n"
+    "; nested-child\n"
+    "#+end_src\n")
+   (lambda (html-ast)
+     (let ((got-child-link-text-parent1
+            (elquery-text
+             (car (elquery-$
+                   "#parent1 .lilac-child-link-from-parent a"
+                   html-ast))))
+           (got-child-link-text-child1
+            (elquery-text
+             (car (elquery-$
+                   (concat "#" (nref "child1")
+                           " .lilac-child-link-from-parent a")
+                 html-ast)))))
+       (should (equal got-child-link-text-parent1 "child1"))
+       (should (equal got-child-link-text-child1 "nested-child"))))))
 #+end_src
 
 * Glossary
