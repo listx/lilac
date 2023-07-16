@@ -90,6 +90,9 @@ $(document).ready(() => {
         // Save intra-document link into history, but only if it's not a repeat
         // of one already there.
         var hash = destination;
+        if (history.state === null) {
+            return;
+        }
         if (history.state.hash != hash) {
             history.pushState( //ref:HISTORY_PUSHSTATE
                 {hash: destination},
