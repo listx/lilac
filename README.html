@@ -252,8 +252,9 @@
 <ul>
 <li><a href="#h-Plain">2.2.1.1.1. Plain</a></li>
 <li><a href="#h-Monoblock">2.2.1.1.2. Monoblock</a></li>
-<li><a href="#h-Polyblock">2.2.1.1.3. Polyblock</a></li>
-<li><a href="#h-Linking-to-a-line-in-the-code-block-body">2.2.1.1.4. Linking to a line in the code block body</a></li>
+<li><a href="#h-Monoblock--evaluation-result-s-value">2.2.1.1.3. Monoblock (evaluation result's value)</a></li>
+<li><a href="#h-Polyblock">2.2.1.1.4. Polyblock</a></li>
+<li><a href="#h-Linking-to-a-line-in-the-code-block-body">2.2.1.1.5. Linking to a line in the code block body</a></li>
 </ul>
 </li>
 <li><a href="#h-Example-blocks">2.2.1.2. Example blocks</a></li>
@@ -746,14 +747,59 @@ is referenced in multiple blocks. In a real example this <code>2</code> would no
 </div>
 </div>
 
+<div id="outline-container-h-Monoblock--evaluation-result-s-value" class="outline-6">
+<h6 id="h-Monoblock--evaluation-result-s-value"><span class="section-number-6">2.2.1.1.3.</span> Monoblock (evaluation result's value)</h6>
+<div class="outline-text-6" id="text-h-Monoblock--evaluation-result-s-value">
+<p>
+Sometimes it's useful to evaluate code and to use the resulting value. This is
+in contrast to always inserting the contents of the source code blocks
+literally.
+</p>
+
+<p>
+However you must make sure that the referenced source code block's programming
+language is added to the list of <code>org-babel-do-load-languages</code>. Otherwise the
+evaluation will be forbidden.
+</p>
+
+<p>
+Orgmode input:
+</p>
+
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-5">#+name: __NREF__ex_evaluate_me
+#+begin_src python :exports none
+return 4 * 10 + 2
+#+end_src
+
+#+caption: This uses an evaluation result.
+#+begin_src python :noweb yes
+print("The answer is __NREF__ex_evaluate_me()")
+#+end_src
+</pre></div><p>
+Rendered HTML output:
+</p>
+
+<div class="sidenote" id="org0000029">
+<p>
+The "42" here is computed on the fly and injected into the print statement's
+string argument.
+</p>
+
+</div>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">This uses an evaluation result.</label><span class="lilac-caption-link-symbol"><a href="#This-uses-an-evaluation-result">&#x1f517;</a></span></div><pre class="src src-python" id="This-uses-an-evaluation-result"><span class="org-builtin">print</span>(<span class="org-string">"The answer is 42"</span>)
+</pre></div></div>
+</div>
+</div>
+
 <div id="outline-container-h-Polyblock" class="outline-6">
-<h6 id="h-Polyblock"><span class="section-number-6">2.2.1.1.3.</span> Polyblock</h6>
+<h6 id="h-Polyblock"><span class="section-number-6">2.2.1.1.4.</span> Polyblock</h6>
 <div class="outline-text-6" id="text-h-Polyblock">
 <p>
 Orgmode input:
 </p>
 
-<div class="sidenote" id="org0000027">
+<div class="sidenote" id="org000002c">
 <p>
 Like above for monoblocks, Lilac needlessly linkifies the source code body text
 of the parent block when it doesn't need to (as this is only an illustrative
@@ -762,7 +808,7 @@ example).
 
 </div>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-5">#+caption: A parent block.
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-6">#+caption: A parent block.
 #+begin_src python
 def foo():
     <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span>
@@ -787,20 +833,20 @@ Rendered HTML output:
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">A parent block.</label><span class="lilac-caption-link-symbol"><a href="#A-parent-block-2">&#x1f517;</a></span></div><pre class="src src-python" id="A-parent-block-2"><span class="org-keyword">def</span> <span class="org-function-name">foo</span>():
     <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span>
     <span class="org-keyword">return</span> 42
-</pre></div></div><div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-5">ex_polyblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-2">2</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__ex_polyblock-1">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_polyblock-1"><span class="org-builtin">print</span>(<span class="org-string">"hello world"</span>)
+</pre></div></div><div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-6">ex_polyblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-2">2</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__ex_polyblock-1">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_polyblock-1"><span class="org-builtin">print</span>(<span class="org-string">"hello world"</span>)
 </pre></div></div><p>
 Some intervening text.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-5">ex_polyblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-2">2</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__ex_polyblock-2">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_polyblock-2"><span class="org-builtin">print</span>(<span class="org-string">"abcdefg"</span>)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-6">ex_polyblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-2">2</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__ex_polyblock-2">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_polyblock-2"><span class="org-builtin">print</span>(<span class="org-string">"abcdefg"</span>)
 </pre></div></div>
 </div>
 </div>
 
 <div id="outline-container-h-Linking-to-a-line-in-the-code-block-body" class="outline-6">
-<h6 id="h-Linking-to-a-line-in-the-code-block-body"><span class="section-number-6">2.2.1.1.4.</span> Linking to a line in the code block body</h6>
+<h6 id="h-Linking-to-a-line-in-the-code-block-body"><span class="section-number-6">2.2.1.1.5.</span> Linking to a line in the code block body</h6>
 <div class="outline-text-6" id="text-h-Linking-to-a-line-in-the-code-block-body">
-<div class="sidenote" id="org0000030">
+<div class="sidenote" id="org0000035">
 <p>
 The <code>-r</code> flag removes these <code>#ref:...</code> labels from the source code. The <code>-l</code>
 flag changes the format. In this case we make the format use a leading <code>#</code>
@@ -818,7 +864,7 @@ These links are documented in Org's <a href="https://orgmode.org/manual/Literal-
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-6">#+begin_src python -r -l "#ref:%s"
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-7">#+begin_src python -r -l "#ref:%s"
 print("foo")
 print("hi")     #ref:embedded-link
 print("bar")
@@ -829,7 +875,7 @@ The line at [[(embedded-link)][=embedded-link=]] prints "hi".
 Rendered HTML output:
 </p>
 
-<div class="org-src-container"><pre class="src src-python" id="nil-7"><span class="org-builtin">print</span>(<span class="org-string">"foo"</span>)
+<div class="org-src-container"><pre class="src src-python" id="nil-8"><span class="org-builtin">print</span>(<span class="org-string">"foo"</span>)
 <span id="coderef-embedded-link" class="coderef-off"><span class="org-builtin">print</span>(<span class="org-string">"hi"</span>)</span>
 <span class="org-builtin">print</span>(<span class="org-string">"bar"</span>)
 </pre></div><p>
@@ -846,7 +892,7 @@ The line at <a href="#coderef-embedded-link" class="coderef" onmouseover="CodeHi
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-8">#+begin_example
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-9">#+begin_example
 Hello world.
 Foo bar.
 #+end_example
@@ -854,7 +900,7 @@ Foo bar.
 Rendered HTML output:
 </p>
 
-<pre class="example" id="org0000037">
+<pre class="example" id="org000003c">
 Hello world.
 Foo bar.
 </pre>
@@ -868,7 +914,7 @@ Foo bar.
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-9">#+begin_quote
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-10">#+begin_quote
 Hello world.
 Foo bar.
 #+end_quote
@@ -905,7 +951,7 @@ lines.
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-10">#+begin_sidenote
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-11">#+begin_sidenote
 Hello world.
 Foo bar.
 #+end_sidenote
@@ -913,7 +959,7 @@ Foo bar.
 Rendered HTML output (see right hand margin):
 </p>
 
-<div class="sidenote" id="org000003c">
+<div class="sidenote" id="org0000041">
 <p>
 Hello world.
 Foo bar.
@@ -924,7 +970,6 @@ Foo bar.
 </div>
 </div>
 </div>
-
 
 <div id="outline-container-h-Developer-Guide" class="outline-2">
 <h2 id="h-Developer-Guide"><span class="section-number-2">3.</span> Developer Guide</h2>
@@ -1120,9 +1165,33 @@ references inside source code blocks.
 <h4 id="h-Custom-Noweb-delimiters"><span class="section-number-4">3.3.1.</span> Custom Noweb delimiters</h4>
 <div class="outline-text-4" id="text-h-Custom-Noweb-delimiters">
 <p>
-Note that we need to evaluate this lisp code if we want to run <code>C-c C-v t</code> to
-tangle code blocks properly in an interactive manner from an Emacs editing
-session.
+By default, Org mode requires Noweb source code references to be delimited with
+double angled brackeds (<code>&lt;&lt;</code> and <code>&gt;&gt;</code>). This presents two problems:
+</p>
+
+<ol class="org-ol">
+<li>The biggest problem with this is that it interferes with syntax highlighting,
+especially because different programming languages treat these brackets in a
+different manner (it may be a particular type of token in one language, but a
+different one in another).</li>
+<li>It's also slightly annoying because when searching inside an editor such as
+Vim (or even Emacs with the Org mode on), the angle brackets are not
+considered part of the word being searched. This means that if the source
+code block shares the same name as another (unrelated) string, the search
+results for both are combined into one.</li>
+</ol>
+
+<p>
+To avoid these problems, we simply make Noweb references use a <code>__NREF__</code>
+prefix. We also define a suffix group such that the refernce can take an
+argument to the code block itself. See the example in FIXME.
+</p>
+
+<p>
+Note that because this is a customizaion, we cannot run <code>C-c C-v t</code> to tangle
+code blocks properly in an interactive manner from an Emacs editing session of
+this Org file, without first evaluating the bits of code in the following code
+block.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-custom-noweb-delimiters</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-custom-noweb-delimiters">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-custom-noweb-delimiters">(<span class="org-keyword">setq</span> org-babel-noweb-wrap-start <span class="org-string">"__NREF__"</span>)
@@ -1171,19 +1240,29 @@ session.
 <h4 id="h-Allow-evaluation-of-code-blocks"><span class="section-number-4">3.3.2.</span> Allow evaluation of code blocks</h4>
 <div class="outline-text-4" id="text-h-Allow-evaluation-of-code-blocks">
 <p>
-Some code blocks are generated by executing code in other blocks. This way, you
+Some code blocks are generated by evaluting code in other blocks. This way, you
 can use all the power of Org mode (as well as any supported programming
-language) as a kind of meta-programming system. For example, see <a href="#h-Create--lilac-theme--file">3.4.11</a>.
+language) as a kind of meta-programming system.
 </p>
 
 <p>
 Orgmode by default disables automatic evaluation of source code blocks, because
-it is a big security risk. For us, we know that we want to allow code execution,
-so we disable the evaluation confirmation check. This way, evaluation can still
-work even in batch mode.
+it is a big security risk. For us, we know that we want to allow code
+evaluation, so we disable the evaluation confirmation check. This way,
+evaluation can still work even in batch mode.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-allow-code-evaluation</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-allow-code-evaluation">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-allow-code-evaluation">(<span class="org-keyword">setq</span> org-confirm-babel-evaluate nil)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-allow-code-evaluation</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-allow-code-evaluation-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-allow-code-evaluation-1">(<span class="org-keyword">setq</span> org-confirm-babel-evaluate nil)
+</pre></div></div><p>
+The following is needed to evaluate the example for source code block evaluation
+in <a href="#h-Monoblock--evaluation-result-s-value">2.2.1.1.3</a>, which evaluates Python. We don't
+need to add in Emacs lisp here because it's already supported by default (which
+we take advantage of in <a href="#h-Create--lilac-theme--file">3.4.11</a>).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-allow-code-evaluation</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-allow-code-evaluation-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-allow-code-evaluation-2">(org-babel-do-load-languages 'org-babel-load-languages
+                             (append org-babel-load-languages
+                              '((python     . t))))
 </pre></div></div>
 </div>
 </div>
@@ -1261,7 +1340,7 @@ we invoke <code>emacs</code> from the command line in a non-interactive manner.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-imports">lilac_dot_el-imports</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-fix-nondeterminism-1">lilac_dot_el-fix-nondeterminism</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-custom-noweb-delimiters">lilac_dot_el-custom-noweb-delimiters</a></span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-allow-code-evaluation">lilac_dot_el-allow-code-evaluation</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-allow-code-evaluation-1">lilac_dot_el-allow-code-evaluation</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-lilac-publish-1">lilac_dot_el-lilac-publish</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-lilac-publish-helpers-1">lilac_dot_el-lilac-publish-helpers</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac_dot_el-search-replace-1">lilac_dot_el-search-replace</a></span>
@@ -2651,7 +2730,7 @@ We also do some replacements for the bibliography entries themselves. Namely,
 each entry has the following (odd) structure by default:
 </p>
 
-<pre class="example" id="org00000b7">
+<pre class="example" id="org00000be">
 &lt;div class="csl-entry"&gt;&lt;a id="citeproc_bib_item_1"&gt;&lt;/a&gt; ... &lt;/div&gt;
 </pre>
 
@@ -2660,7 +2739,7 @@ and instead we delete the content-less link anchor and instead move th ID to the
 parent div, like this:
 </p>
 
-<pre class="example" id="org00000b8">
+<pre class="example" id="org00000bf">
 &lt;div class="csl-entry" id="citeproc_bib_item_1"&gt; ... &lt;/div&gt;
 </pre>
 
@@ -3971,7 +4050,7 @@ prefix indirectly with the <code>(nref)</code> helper function.
 <div id="outline-container-h-Setup-and-tear-down-fixture-for-HTML-tests" class="outline-5">
 <h5 id="h-Setup-and-tear-down-fixture-for-HTML-tests"><span class="section-number-5">3.5.1.2.</span> Setup and tear-down fixture for HTML tests</h5>
 <div class="outline-text-5" id="text-h-Setup-and-tear-down-fixture-for-HTML-tests">
-<div class="sidenote" id="org000011d">
+<div class="sidenote" id="org0000124">
 <p>
 The <a href="https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites">Emacs manual</a> for ERT defines fixtures as environments which provide setup
 and tear-down.
@@ -4432,11 +4511,11 @@ block.
   ...</code> field. This block is an independent block and there are no other blocks
 with the same name.</dd></div>
 <div class="lilac-description-list-entry" id="org0000001"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that still works and from
-which <a href="#org0000130">Org mode</a> borrows heavily using <a href="#org0000132">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000132"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
+which <a href="#org0000137">Org mode</a> borrows heavily using <a href="#org0000139">Noweb-style references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org0000139"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A Noweb-style
 reference is just a name (string) that refers to a monoblock or polyblock. See
 <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000130"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
+<div class="lilac-description-list-entry" id="org0000137"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files, where "major
 mode" means that it provides things like syntax highlighting and keyboard
 shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac, the
 important thing is that we use Org mode as a literate programming tool. See
