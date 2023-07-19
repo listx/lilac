@@ -18,12 +18,12 @@
 The /lilac/ is a [[https://en.wikipedia.org/wiki/Syringa][flowering woody plant]].
 #+end_sidenote
 
-/Lilac/ is an addon for Emacs Org mode to make [[https://en.wikipedia.org/wiki/Literate_programming][Literate Programming]] (LP) using
-[[Noweb][Noweb]]-style [cite:@ramsey_1994] references easy. It comes in two parts:
+/Lilac/ is an addon for Emacs Org mode to make [[https://en.wikipedia.org/wiki/Literate_programming][Literate Programming]] (LP) using [[glossary:
+Noweb][Noweb]]-style [cite:@ramsey_1994] references easy. It comes in two parts:
 
-1. =lilac.el=: to be loaded and used when /weaving/ [cite:@knuth_1984 98] and
-   /tangling/ [cite:@knuth_1984 98] from your own Org mode files (which use
-   Noweb references), and
+1. =lilac.el=: to be loaded and used when [[glossary: weaving][/weaving/]] [cite:@knuth_1984 98] and [[glossary:
+   tangling][/tangling/]] [cite:@knuth_1984 98] from your own Org mode files
+   (which use Noweb references), and
 2. =lilac.theme=: to be sourced by your Org mode files to use Lilac's CSS and
    JavaScript on top of the HTML export.
 
@@ -34,7 +34,7 @@ This document itself reuses the =lilac.theme= file, which gives you a preview
 
 Lilac was created mainly because the existing Org mode features around Noweb
 references were lacking in features. There seems to have been a great deal of
-effort to make /tangling/ (extracting source code from [[source code block][source code blocks]]) work
+effort to make /tangling/ (extracting source code from [[glossary: source code block][source code blocks]]) work
 well, but not much has been done around /weaving/, where I think most of the
 difficulties lie (because making output look good to a human (weaving) is much
 more difficult than making output look good to a computer (tangling)).
@@ -164,7 +164,7 @@ echo "child 2"
 
 This example illustrates the two ways to define a child block: either as a
 single code block with =#+name: __NREF__foo=, or as multiple blocks with
-=#+header: :noweb-ref __NREF__foo=. Lilac calls them [[monoblock][monoblocks]] and [[polyblock][polyblocks]]
+=#+header: :noweb-ref __NREF__foo=. Lilac calls them [[glossary: monoblock][monoblocks]] and [[glossary: polyblock][polyblocks]]
 respectively. Polyblocks are concatenated together in the order they appear in
 the overall Org file; this final concatenated version is what gets inserted into
 the Noweb reference in the parent block.
@@ -1352,8 +1352,8 @@ type is a list of strings.
 #+end_src
 
 Note that a child source block can have two ways of defining its name. The first
-is with the direct =#+name: __NREF__foo= style ([[monoblock][monoblock]]), and the second way
-is with a line like =#+header: :noweb-ref __NREF__foo= ([[polyblock][polyblock]]). Here
+is with the direct =#+name: __NREF__foo= style ([[glossary: monoblock][monoblock]]), and the second way
+is with a line like =#+header: :noweb-ref __NREF__foo= ([[glossary: polyblock][polyblock]]). Here
 =lilac-get-src-block-name= grabs the name of a (child) source code block, taking
 into account these two styles. For polyblock names, we mark it as such with a
 =(polyblock)= string, which is used later for the [[(NSCB_POLYBLOCK_INDICATOR)][=NSCB_POLYBLOCK_INDICATOR=]].
@@ -1477,7 +1477,7 @@ have a unique ID).
 
 **** Use human-readable HTML IDs for source code links
 
-Recall that there are 2 types of source code blocks: [[monoblock][monoblocks]] and [[polyblock][polyblocks]].
+Recall that there are 2 types of source code blocks: [[glossary: monoblock][monoblocks]] and [[glossary: polyblock][polyblocks]].
 
 Polyblocks do get a name field attached to them during the [[*Give all source code blocks a =#+name: ...= field (HTML ID)][Org
 modification stage]], in the format =___anonymous-src-block-N=. These names are
@@ -3754,33 +3754,44 @@ block.
 
 * Glossary
 
-- <<monoblock>> *monoblock* :: an Org mode source code block with a =#+name:
-  ...= field. This block is an independent block and there are no other blocks
-  with the same name.
-- <<Noweb>> *Noweb* :: A literate programming tool from 1989 that still works and from
-  which [[Org mode][Org mode]] borrows heavily using [[noweb-ref][Noweb-style references]]. See [[https://en.wikipedia.org/wiki/Noweb][Wikipedia]].
-- <<noweb-ref>> *noweb-ref* :: aka "Noweb-style reference". A Noweb-style
-  reference is just a name (string) that refers to a monoblock or polyblock. See
-  [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][the Org manual]].
-- <<Org mode>> *Org mode* :: An Emacs major mode for =*.org= files, where "major
-  mode" means that it provides things like syntax highlighting and keyboard
-  shortcuts for =*.org= text files if you are using Emacs. For Lilac, the
-  important thing is that we use Org mode as a literate programming tool. See
-  [[https://orgmode.org/][Org mode]].
-- <<polyblock>> *polyblock* :: an Org mode source code block without a =#+name:
-  ...= field, but which has a =#+header: :noweb-ref ...= field. Other blocks
-  with the same Noweb-ref name are concatenated together when they are tangled.
-  Polyblocks are used in cases where we would like to break up a single block
-  into smaller pieces for explanatory purposes. In all other cases, monoblocks
-  are preferable, unless the source code block is not to be tangled and is only
-  for explanatory purposes in the woven output.
-- <<source code block>> *source code block* :: An Org mode facility that allows
-  you to enclose a multiline text (typically source code) with =#+begin_src ...=
-  and =#+end_src= lines. They are enclosed in a separate background color in the
-  HTML output, and are often used for illustrating source code listings. The
-  format is =#+begin_src LANGUAGE_NAME= where =LANGUAGE_NAME= is the name of the
-  programming language used for the listing. If the name is a recognized name,
-  it will get syntax highlighting in the output automatically.
+- <<glossary: literate document>> *literate document* :: A file or collection of
+  files that include both source code and prose to explain it. Well-known
+  formats include Noweb files (=*.nw=) and Org mode files (=*.org=).
+- <<glossary: monoblock>> *monoblock* :: an Org mode source code block with a
+  =#+name: ...= field. This block is an independent block and there are no other
+  blocks with the same name.
+- <<glossary: Noweb>> *Noweb* :: A literate programming tool from 1989 that
+  still works and from which [[glossary: Org mode][Org mode]] borrows heavily using [[glossary: noweb-ref][Noweb-style
+  references]]. See [[https://en.wikipedia.org/wiki/Noweb][Wikipedia]].
+- <<glossary: noweb-ref>> *noweb-ref* :: aka "Noweb-style reference". A
+  Noweb-style reference is just a name (string) that refers to a monoblock or
+  polyblock. See [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][the Org manual]].
+- <<glossary: Org mode>> *Org mode* :: An Emacs major mode for =*.org= files,
+  where "major mode" means that it provides things like syntax highlighting and
+  keyboard shortcuts for =*.org= text files if you are using Emacs. For Lilac,
+  the important thing is that we use Org mode as a literate programming tool.
+  See [[https://orgmode.org/][Org mode]].
+- <<glossary: polyblock>> *polyblock* :: an Org mode source code block without a
+  =#+name: ...= field, but which has a =#+header: :noweb-ref ...= field. Other
+  blocks with the same Noweb-ref name are concatenated together when they are
+  tangled.  Polyblocks are used in cases where we would like to break up a
+  single block into smaller pieces for explanatory purposes. In all other cases,
+  monoblocks are preferable, unless the source code block is not to be tangled
+  and is only for explanatory purposes in the woven output.
+- <<glossary: source code block>> *source code block* :: An Org mode facility
+  that allows you to enclose a multiline text (typically source code) with
+  =#+begin_src ...= and =#+end_src= lines. They are enclosed in a separate
+  background color in the HTML output, and are often used for illustrating
+  source code listings. The format is =#+begin_src LANGUAGE_NAME= where
+  =LANGUAGE_NAME= is the name of the programming language used for the listing.
+  If the name is a recognized name, it will get syntax highlighting in the
+  output automatically.
+- <<glossary: tangling>> *tangling* :: The act of extracting source code from a
+  raw [[glossary: literate document][literate document]].
+- <<glossary: weaving>> *weaving* :: The act of converting a raw literate
+  document to a richer format such as PDF or HTML. This allows fancier output,
+  such as for mathematical formulas, which are easier to read versus the
+  original [[glossary: literate document][literate document]].
 
 * References
 
