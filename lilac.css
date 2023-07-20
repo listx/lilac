@@ -378,6 +378,14 @@ a.section-heading:hover::after {
 #table-of-contents a:hover {
     text-decoration: none;
 }
+@media print {
+    #table-of-contents {
+        display: none !important;
+    }
+    body {
+        margin-left: 0;
+    }
+}
 .outline-2 h2.active {
     border-style: solid;
     border-width: 1px;

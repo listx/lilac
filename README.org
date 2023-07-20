@@ -3195,6 +3195,23 @@ The CSS below is drawn primarily from [[https://scripter.co/sidenotes-using-only
 }
 #+end_src
 
+**** Printer-friendly styling
+
+When printing, we don't display the sidebar because it unnecessarily narrows the
+width of the main text area.
+
+#+header: :noweb-ref __NREF__css-toc
+#+begin_src css
+@media print {
+    #table-of-contents {
+        display: none !important;
+    }
+    body {
+        margin-left: 0;
+    }
+}
+#+end_src
+
 *** Create =lilac.theme= file
 
 Allow HTML exports of Org files (inluding this one) to pull in CSS and
