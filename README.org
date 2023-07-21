@@ -80,12 +80,16 @@ because all of the linked objects will get a new link ID.
 
 Lilac addresses all of the issues presented above.
 
-Lilac frees you from having to write
-a custom =#+caption: ...= text for every source code block, because it generates
-them automatically based on the name of the Noweb reference. And Lilac
-automatically links child blocks and parent blocks together. Lilac automatically
-adds link anchors to all source code blocks as well as headlines, making it
-easier to link to different parts of an Org file while browsing it.
+Lilac frees you from having to write a custom =#+caption: ...= text for every
+source code block, because it generates them based on the name of the Noweb
+reference. Lilac links child blocks and parent blocks together so that you can
+click on code block names to navigate around this parent/child hierarchy.
+
+Also, link anchors are added to all source code blocks as well as headlines,
+and they are saved in your browser's history as you click around, such that you
+can go back/forward and be taken back to these intra-document locations. This
+makes intra-document navigation more structured to help prevent you from getting
+lost.
 
 Lilac makes HTML generation deterministic. This makes it VCS and CI-friendly
 because the output changes if and only if the input changes. Speaking of
