@@ -1,4 +1,6 @@
 :root {
+    --bg: #fff;
+    --fg: #000;
     --bg-code: #f7f7f7;
     --border-code: #777;
     --border-light: #ccc;
@@ -11,16 +13,21 @@
     --bg-toc-item: #f1ffef;
     --fg-heading: black;
     --clear: rgba(255, 255, 255, 0);
+    --font-serif: "Source Serif Pro", serif;
+    --font-sans: "Source Sans Pro", sans;
+    --font-mono: "Source Code Pro", monospace;
 }
 body {
     font-size: 1.25em;
     width: 800px;
     margin-left: 310px;
     overflow-x: hidden;
+    background-color: var(--bg);
+    color: var(--fg);
 }
 
 body, p, li, legend {
-    font-family: "Source Serif Pro", serif;
+    font-family: var(--font-serif);
 }
 
 h2, h3, h4, h5, h6 {
@@ -33,7 +40,7 @@ h2, h3, h4, h5, h6 {
 }
 
 h1, h2, h3, h4, h5, h6, dt {
-    font-family: "Source Sans Pro", sans;
+    font-family: var(--font-sans);
 }
 
 h3, h4, h5, h6 {
@@ -160,7 +167,7 @@ a.section-heading:hover::after {
 
 .org-src-container pre {
     margin: 0;
-    font-family: "Source Code Pro", monospace;
+    font-family: var(--font-mono);
     border-width: 0;
     scroll-margin-top: 100px;
     border-style: solid;
@@ -175,7 +182,7 @@ a.section-heading:hover::after {
 }
 
 .lilac-caption {
-    font-family: "Source Code Pro", monospace;
+    font-family: var(--font-mono);
     text-align: right;
     border-top-left-radius: 5px;
     border-top-right-radius: 5px;
@@ -342,7 +349,7 @@ a.section-heading:hover::after {
     padding-left: 5px;
 }
 #text-table-of-contents li {
-    font-family: "Source Sans Pro", sans;
+    font-family: var(--font-sans);
 }
 #text-table-of-contents ul li {
     font-weight: bold;

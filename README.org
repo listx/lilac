@@ -1076,7 +1076,8 @@ The final bits are
   __NREF__lilac-publish-delete-toc-text
   __NREF__lilac-publish-fix-inline-styles
   __NREF__lilac-publish-fix-bibliography-ids
-  __NREF__lilac-publish-fix-description-lists)
+  __NREF__lilac-publish-fix-description-lists
+  __NREF__lilac-publish-inject-custom-html-head)
 #+end_src
 
 **** Helper functions
@@ -2276,6 +2277,24 @@ And here we style it.
 }
 #+end_src
 
+**** Custom HTML "head" section
+
+If a user wants to use a custom Google web font, they have to make the HTML page
+pull it in in the =<head>= part of the page. This requires modifying the HTML.
+In order to facilitate this, we provide a replaceable piece of text that can be
+swapped out for the value that the user can provide. Specifically, we inject the
+line =<!-- LILAC_HTML_HEAD -->= into the HTML, and this can be replaced by the
+value of the =lilac-html-head= variable in Emacs Lisp (which can be provided by
+the user when they invoke the =lilac-publish= function).
+
+#+name: __NREF__lilac-publish-inject-custom-html-head
+#+begin_src emacs-lisp
+(if (boundp 'lilac-html-head)
+    (lilac-replace-from-to-html
+     "<!-- LILAC_HTML_HEAD -->"
+     lilac-html-head))
+#+end_src
+
 *** JavaScript
 
 We use JavaScript to make the HTML document more useful. The primary concern is
@@ -2394,7 +2413,7 @@ modifications to it:
     padding-left: 5px;
 }
 #text-table-of-contents li {
-    font-family: "Source Sans Pro", sans;
+    font-family: var(--font-sans);
 }
 #text-table-of-contents ul li {
     font-weight: bold;
@@ -2929,14 +2948,21 @@ __NREF__css-toc
 __NREF__css-active-non-toc-item
 #+end_src
 
-**** Colors
+**** Colors and fonts
 
-We define colors in one place and reuse them throughout the rest of the CSS,
-with the =var()= function.
+We define colors and fonts in one place and reuse them throughout the rest of
+the CSS, with the =var()= function.
+
+#+begin_sidenote
+This would be an excellent candidate to copy/paste/tweak into your own
+=lilac-override.css= file to tweak any of the colors or fonts used by Lilac.
+#+end_sidenote
 
 #+header: :noweb-ref __NREF__css-general
 #+begin_src css
 :root {
+    --bg: #fff;
+    --fg: #000;
     --bg-code: #f7f7f7;
     --border-code: #777;
     --border-light: #ccc;
@@ -2949,6 +2975,9 @@ with the =var()= function.
     --bg-toc-item: #f1ffef;
     --fg-heading: black;
     --clear: rgba(255, 255, 255, 0);
+    --font-serif: "Source Serif Pro", serif;
+    --font-sans: "Source Sans Pro", sans;
+    --font-mono: "Source Code Pro", monospace;
 }
 #+end_src
 
@@ -2961,10 +2990,12 @@ body {
     width: 800px;
     margin-left: 310px;
     overflow-x: hidden;
+    background-color: var(--bg);
+    color: var(--fg);
 }
 
 body, p, li, legend {
-    font-family: "Source Serif Pro", serif;
+    font-family: var(--font-serif);
 }
 
 h2, h3, h4, h5, h6 {
@@ -2977,7 +3008,7 @@ h2, h3, h4, h5, h6 {
 }
 
 h1, h2, h3, h4, h5, h6, dt {
-    font-family: "Source Sans Pro", sans;
+    font-family: var(--font-sans);
 }
 
 h3, h4, h5, h6 {
@@ -3138,7 +3169,7 @@ a {
 
 .org-src-container pre {
     margin: 0;
-    font-family: "Source Code Pro", monospace;
+    font-family: var(--font-mono);
     border-width: 0;
     scroll-margin-top: 100px;
     border-style: solid;
@@ -3159,7 +3190,7 @@ a {
 #+name: __NREF__css-source-code-block-captions
 #+begin_src css
 .lilac-caption {
-    font-family: "Source Code Pro", monospace;
+    font-family: var(--font-mono);
     text-align: right;
     border-top-left-radius: 5px;
     border-top-right-radius: 5px;
@@ -3321,8 +3352,8 @@ Allow HTML exports of Org files (inluding this one) to pull in CSS and
 JavaScript that we've defined for Lilac by referring to a single theme file. The
 inspiration for this setup comes from https://gitlab.com/OlMon/org-themes.
 
-For the fonts, we break up the definition over multiple lines here using Emacs
-Lisp for readability.
+For the default fonts, we break up the definition over multiple lines here using
+Emacs Lisp for readability.
 
 #+name: __NREF__fonts-to-load
 #+begin_src emacs-lisp
@@ -3336,18 +3367,27 @@ Lisp for readability.
 #+end_src
 
 Now we get the result of evaluating the above with =__NREF__fonts-to-load()=
-below (note the trailing parentheses =()=, which evaluates the referenced code
-block before injecting its evaluated value).
+(note the trailing parentheses =()=, which evaluates the referenced code block
+before injecting its evaluated value).
+
+Also note that we pull in both the =lilac.css= file which we tangle in [[*
+Additional (hand-tweaked) CSS]], but this can be expanded by customizing the
+value of =lilac-html-head=, per [[* Custom HTML "head" section]]. For example, you
+could make this variable link to a separate =lilac-override.css= file to
+override any of the values we have hardcoded in =lilac.css=.
 
 #+name: lilac.theme
 #+caption: lilac.theme
 #+begin_src org :tangle lilac.theme :eval no
-# Include additional CSS styles.
-,#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
-,#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="lilac.css" />
 __NREF__fonts-to-load()
 
 __NREF__lilac-theme-js
+
+# Include additional CSS styles.
+,#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
+,#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="lilac.css" />
+
+,#+HTML_HEAD: <!-- LILAC_HTML_HEAD -->
 #+end_src
 
 *** Ignore woven HTML from =git diff=

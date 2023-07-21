@@ -190,11 +190,12 @@
     { background-color: #ffff00; color: #000000; font-weight: bold; }
   .org-svg { }
 </style>
-<link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
-<link rel="stylesheet" type="text/css" href="lilac.css" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&family=Source+Sans+Pro:wght@400;700&family=Source+Code+Pro">
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
 <script src="lilac.js"></script>
+<link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
+<link rel="stylesheet" type="text/css" href="lilac.css" />
+<!-- LILAC_HTML_HEAD -->
 <script>
 // @license magnet:?xt=urn:btih:1f739d935676111cfff4b4693e3816e664797050&amp;dn=gpl-3.0.txt GPL-v3-or-Later
      function CodeHighlightOn(elem, id)
@@ -331,6 +332,7 @@
 <li><a href="#h-Glossary--description-lists">3.4.5.4.2. Glossary (description lists)</a></li>
 </ul>
 </li>
+<li><a href="#h-Custom-HTML--head--section">3.4.5.5. Custom HTML "head" section</a></li>
 </ul>
 </li>
 <li><a href="#h-JavaScript">3.4.6. JavaScript</a>
@@ -367,7 +369,7 @@
 <li><a href="#h-Imports">3.4.9. Imports</a></li>
 <li><a href="#h-Additional--hand-tweaked--CSS">3.4.10. Additional (hand-tweaked) CSS</a>
 <ul>
-<li><a href="#h-Colors">3.4.10.1. Colors</a></li>
+<li><a href="#h-Colors-and-fonts">3.4.10.1. Colors and fonts</a></li>
 <li><a href="#h-General-body-text">3.4.10.2. General body text</a></li>
 <li><a href="#h-Headline-font-sizes">3.4.10.3. Headline font sizes</a></li>
 <li><a href="#h-Tables">3.4.10.4. Tables</a></li>
@@ -1621,7 +1623,11 @@ The full code listing for <code>lilac-publish</code> is below.
    t)
   (lilac-replace-from-to-html
    <span class="org-string">"&lt;/dd&gt;"</span>
-   <span class="org-string">"&lt;/dd&gt;&lt;/div&gt;"</span>))
+   <span class="org-string">"&lt;/dd&gt;&lt;/div&gt;"</span>)
+  (<span class="org-keyword">if</span> (boundp 'lilac-html-head)
+      (lilac-replace-from-to-html
+       <span class="org-string">"&lt;!-- LILAC_HTML_HEAD --&gt;"</span>
+       lilac-html-head)))
 </pre></div></div><p>
 Now let's go through <code>lilac-publish</code> in detail.
 </p>
@@ -1718,7 +1724,8 @@ part of citation styles.</li>
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(6/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-6">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-6">  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-delete-toc-text">lilac-publish-delete-toc-text</a></span>
   <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-inline-styles">lilac-publish-fix-inline-styles</a></span>
   <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-bibliography-ids">lilac-publish-fix-bibliography-ids</a></span>
-  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-description-lists">lilac-publish-fix-description-lists</a></span>)
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-description-lists">lilac-publish-fix-description-lists</a></span>
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-inject-custom-html-head">lilac-publish-inject-custom-html-head</a></span>)
 </pre></div></div>
 </div>
 
@@ -2960,6 +2967,27 @@ And here we style it.
 </div>
 </div>
 </div>
+
+<div id="outline-container-h-Custom-HTML--head--section" class="outline-5">
+<h5 id="h-Custom-HTML--head--section"><span class="section-number-5">3.4.5.5.</span> Custom HTML "head" section</h5>
+<div class="outline-text-5" id="text-h-Custom-HTML--head--section">
+<p>
+If a user wants to use a custom Google web font, they have to make the HTML page
+pull it in in the <code>&lt;head&gt;</code> part of the page. This requires modifying the HTML.
+In order to facilitate this, we provide a replaceable piece of text that can be
+swapped out for the value that the user can provide. Specifically, we inject the
+line <code>&lt;!-- LILAC_HTML_HEAD --&gt;</code> into the HTML, and this can be replaced by the
+value of the <code>lilac-html-head</code> variable in Emacs Lisp (which can be provided by
+the user when they invoke the <code>lilac-publish</code> function).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-inject-custom-html-head</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-inject-custom-html-head">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-inject-custom-html-head">(<span class="org-keyword">if</span> (boundp 'lilac-html-head)
+    (lilac-replace-from-to-html
+     <span class="org-string">"&lt;!-- LILAC_HTML_HEAD --&gt;"</span>
+     lilac-html-head))
+</pre></div></div>
+</div>
+</div>
 </div>
 
 <div id="outline-container-h-JavaScript" class="outline-4">
@@ -3086,7 +3114,7 @@ modifications to it:
     <span class="org-css-property">padding-left</span>: 5px;
 }
 <span class="org-css-selector">#text-table-of-contents li </span>{
-    <span class="org-css-property">font-family</span>: <span class="org-string">"Source Sans Pro"</span>, sans;
+    <span class="org-css-property">font-family</span>: var(<span class="org-variable-name">--font-sans</span>);
 }
 <span class="org-css-selector">#text-table-of-contents ul li </span>{
     <span class="org-css-property">font-weight</span>: bold;
@@ -3671,15 +3699,25 @@ We add some additional CSS tweaks on top of what we get from Org.
 </pre></div></div>
 </div>
 
-<div id="outline-container-h-Colors" class="outline-5">
-<h5 id="h-Colors"><span class="section-number-5">3.4.10.1.</span> Colors</h5>
-<div class="outline-text-5" id="text-h-Colors">
+<div id="outline-container-h-Colors-and-fonts" class="outline-5">
+<h5 id="h-Colors-and-fonts"><span class="section-number-5">3.4.10.1.</span> Colors and fonts</h5>
+<div class="outline-text-5" id="text-h-Colors-and-fonts">
 <p>
-We define colors in one place and reuse them throughout the rest of the CSS,
-with the <code>var()</code> function.
+We define colors and fonts in one place and reuse them throughout the rest of
+the CSS, with the <code>var()</code> function.
 </p>
 
+<div class="sidenote" id="org000010c">
+<p>
+This would be an excellent candidate to copy/paste/tweak into your own
+<code>lilac-override.css</code> file to tweak any of the colors or fonts used by Lilac.
+</p>
+
+</div>
+
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(1/8) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-1"><span class="org-css-selector">:root</span> {
+    <span class="org-variable-name">--bg</span>: <span class="custom-13">#fff</span>;
+    <span class="org-variable-name">--fg</span>: <span class="custom-12">#000</span>;
     <span class="org-variable-name">--bg-code</span>: <span class="custom-11">#f7f7f7</span>;
     <span class="org-variable-name">--border-code</span>: <span class="custom-10">#777</span>;
     <span class="org-variable-name">--border-light</span>: <span class="custom-9">#ccc</span>;
@@ -3692,6 +3730,9 @@ with the <code>var()</code> function.
     <span class="org-variable-name">--bg-toc-item</span>: <span class="custom-2">#f1ffef</span>;
     <span class="org-variable-name">--fg-heading</span>: <span class="custom-1">black</span>;
     <span class="org-variable-name">--clear</span>: <span class="custom">rgba(255, 255, 255, 0)</span>;
+    <span class="org-variable-name">--font-serif</span>: <span class="org-string">"Source Serif Pro"</span>, serif;
+    <span class="org-variable-name">--font-sans</span>: <span class="org-string">"Source Sans Pro"</span>, sans;
+    <span class="org-variable-name">--font-mono</span>: <span class="org-string">"Source Code Pro"</span>, monospace;
 }
 </pre></div></div>
 </div>
@@ -3705,10 +3746,12 @@ with the <code>var()</code> function.
     <span class="org-css-property">width</span>: 800px;
     <span class="org-css-property">margin-left</span>: 310px;
     <span class="org-css-property">overflow-x</span>: hidden;
+    <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg</span>);
+    <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg</span>);
 }
 
 <span class="org-css-selector">body, p, li, legend </span>{
-    <span class="org-css-property">font-family</span>: <span class="org-string">"Source Serif Pro"</span>, serif;
+    <span class="org-css-property">font-family</span>: var(<span class="org-variable-name">--font-serif</span>);
 }
 
 <span class="org-css-selector">h2, h3, h4, h5, h6 </span>{
@@ -3721,7 +3764,7 @@ with the <code>var()</code> function.
 }
 
 <span class="org-css-selector">h1, h2, h3, h4, h5, h6, dt </span>{
-    <span class="org-css-property">font-family</span>: <span class="org-string">"Source Sans Pro"</span>, sans;
+    <span class="org-css-property">font-family</span>: var(<span class="org-variable-name">--font-sans</span>);
 }
 
 <span class="org-css-selector">h3, h4, h5, h6 </span>{
@@ -3889,7 +3932,7 @@ gives us by default.
 
 <span class="org-css-selector">.org-src-container pre </span>{
     <span class="org-css-property">margin</span>: 0;
-    <span class="org-css-property">font-family</span>: <span class="org-string">"Source Code Pro"</span>, monospace;
+    <span class="org-css-property">font-family</span>: var(<span class="org-variable-name">--font-mono</span>);
     <span class="org-css-property">border-width</span>: 0;
     <span class="org-css-property">scroll-margin-top</span>: 100px;
     <span class="org-css-property">border-style</span>: solid;
@@ -3911,7 +3954,7 @@ gives us by default.
 <h5 id="h-Source-code-block-captions"><span class="section-number-5">3.4.10.10.</span> Source code block captions</h5>
 <div class="outline-text-5" id="text-h-Source-code-block-captions">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-captions"><span class="org-css-selector">.lilac-caption </span>{
-    <span class="org-css-property">font-family</span>: <span class="org-string">"Source Code Pro"</span>, monospace;
+    <span class="org-css-property">font-family</span>: var(<span class="org-variable-name">--font-mono</span>);
     <span class="org-css-property">text-align</span>: right;
     <span class="org-css-property">border-top-left-radius</span>: 5px;
     <span class="org-css-property">border-top-right-radius</span>: 5px;
@@ -4089,8 +4132,8 @@ inspiration for this setup comes from <a href="https://gitlab.com/OlMon/org-them
 </p>
 
 <p>
-For the fonts, we break up the definition over multiple lines here using Emacs
-Lisp for readability.
+For the default fonts, we break up the definition over multiple lines here using
+Emacs Lisp for readability.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-theme">fonts-to-load</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__fonts-to-load">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__fonts-to-load">(concat
@@ -4102,16 +4145,26 @@ Lisp for readability.
  <span class="org-string">"\"&gt;"</span>)
 </pre></div></div><p>
 Now we get the result of evaluating the above with <code>__NREF__fonts-to-load()</code>
-below (note the trailing parentheses <code>()</code>, which evaluates the referenced code
-block before injecting its evaluated value).
+(note the trailing parentheses <code>()</code>, which evaluates the referenced code block
+before injecting its evaluated value).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.theme</label><span class="lilac-caption-link-symbol"><a href="#lilac-theme">&#x1f517;</a></span></div><pre class="src src-org" id="lilac-theme"><span class="org-comment"># Include additional CSS styles.</span>
-<span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/&gt;</span>
-<span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="lilac.css" /&gt;</span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__fonts-to-load">fonts-to-load</a></span>()
+<p>
+Also note that we pull in both the <code>lilac.css</code> file which we tangle in <a href="#h-Additional--hand-tweaked--CSS">3.4.10</a>, but this can be expanded by customizing the
+value of <code>lilac-html-head</code>, per <a href="#h-Custom-HTML--head--section">3.4.5.5</a>. For example, you
+could make this variable link to a separate <code>lilac-override.css</code> file to
+override any of the values we have hardcoded in <code>lilac.css</code>.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">lilac.theme</label><span class="lilac-caption-link-symbol"><a href="#lilac-theme">&#x1f517;</a></span></div><pre class="src src-org" id="lilac-theme"><span class="lilac-child-link-from-parent"><a href="#__NREF__fonts-to-load">fonts-to-load</a></span>()
 
 <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-theme-js">lilac-theme-js</a></span>
+
+<span class="org-comment"># Include additional CSS styles.</span>
+<span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/&gt;</span>
+<span class="org-org-meta-line">#+HTML_HEAD: &lt;link rel="stylesheet" type="text/css" href="lilac.css" /&gt;</span>
+
+<span class="org-org-meta-line">#+HTML_HEAD: &lt;!-- LILAC_HTML_HEAD --&gt;</span>
 </pre></div></div>
 </div>
 </div>
@@ -4216,7 +4269,7 @@ prefix indirectly with the <code>(nref)</code> helper function.
 <div id="outline-container-h-Setup-and-tear-down-fixture-for-HTML-tests" class="outline-5">
 <h5 id="h-Setup-and-tear-down-fixture-for-HTML-tests"><span class="section-number-5">3.5.1.2.</span> Setup and tear-down fixture for HTML tests</h5>
 <div class="outline-text-5" id="text-h-Setup-and-tear-down-fixture-for-HTML-tests">
-<div class="sidenote" id="org0000130">
+<div class="sidenote" id="org0000133">
 <p>
 The <a href="https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites">Emacs manual</a> for ERT defines fixtures as environments which provide setup
 and tear-down.
@@ -4673,19 +4726,19 @@ block.
 <h2 id="h-Glossary"><span class="section-number-2">4.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
-<div class="lilac-description-list-entry" id="org0000143"><dt> <b>literate document</b></dt><dd>A file or collection of
+<div class="lilac-description-list-entry" id="org0000146"><dt> <b>literate document</b></dt><dd>A file or collection of
 files that include both source code and prose to explain it. Well-known
 formats include Noweb files (<code>*.nw</code>) and Org mode files (<code>*.org</code>).</dd></div>
 <div class="lilac-description-list-entry" id="org000000d"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
 <code>#+name: ...</code> field. This block is an independent block and there are no other
 blocks with the same name.</dd></div>
 <div class="lilac-description-list-entry" id="org0000001"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
-still works and from which <a href="#org0000145">Org mode</a> borrows heavily using <a href="#org0000147">Noweb-style
+still works and from which <a href="#org0000148">Org mode</a> borrows heavily using <a href="#org000014a">Noweb-style
 references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000147"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
+<div class="lilac-description-list-entry" id="org000014a"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
 Noweb-style reference is just a name (string) that refers to a monoblock or
 polyblock. See <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000145"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
+<div class="lilac-description-list-entry" id="org0000148"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
 where "major mode" means that it provides things like syntax highlighting and
 keyboard shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac,
 the important thing is that we use Org mode as a literate programming tool.
@@ -4706,11 +4759,11 @@ source code listings. The format is <code>#+begin_src LANGUAGE_NAME</code> where
 If the name is a recognized name, it will get syntax highlighting in the
 output automatically.</dd></div>
 <div class="lilac-description-list-entry" id="org0000005"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
-raw <a href="#org0000143">literate document</a>.</dd></div>
+raw <a href="#org0000146">literate document</a>.</dd></div>
 <div class="lilac-description-list-entry" id="org0000003"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
 document to a richer format such as PDF or HTML. This allows fancier output,
 such as for mathematical formulas, which are easier to read versus the
-original <a href="#org0000143">literate document</a>.</dd></div>
+original <a href="#org0000146">literate document</a>.</dd></div>
 </dl>
 </div>
 </div>

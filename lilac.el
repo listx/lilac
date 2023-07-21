@@ -118,7 +118,11 @@ When matching, reference is stored in match group 1."
    t)
   (lilac-replace-from-to-html
    "</dd>"
-   "</dd></div>"))
+   "</dd></div>")
+  (if (boundp 'lilac-html-head)
+      (lilac-replace-from-to-html
+       "<!-- LILAC_HTML_HEAD -->"
+       lilac-html-head)))
 (defun lilac-UID-for-all-src-blocks (_backend)
   (let* ((all-src-blocks
            (org-element-map (org-element-parse-buffer) 'src-block 'identity))
