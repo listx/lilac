@@ -1,3 +1,6 @@
+:PROPERTIES:
+:HTML_CONTAINER_CLASS: title
+:END:
 #+title: Lilac
 #+setupfile: lilac.theme
 
@@ -3059,6 +3062,18 @@ h6 {
 }
 #+end_src
 
+***** Title font
+
+For the main title page, we customize the font to look a bit more ornate.
+
+#+header: :noweb-ref __NREF__css-general
+#+begin_src css
+h1.title {
+    font-family: "Overlock", cursive;
+    font-size: 100pt;
+}
+#+end_src
+
 **** Tables
 
 #+header: :noweb-ref __NREF__css-general
@@ -3363,6 +3378,7 @@ Emacs Lisp for readability.
      "?family=Source+Serif+Pro:wght@400;700"
      "&family=Source+Sans+Pro:wght@400;700"
      "&family=Source+Code+Pro"
+     "&family=Overlock:ital,wght@1,900"
  "\">")
 #+end_src
 
@@ -3379,6 +3395,8 @@ override any of the values we have hardcoded in =lilac.css=.
 #+name: lilac.theme
 #+caption: lilac.theme
 #+begin_src org :tangle lilac.theme :eval no
+,#+HTML_HEAD: <link rel="preconnect" href="https://fonts.googleapis.com" />
+,#+HTML_HEAD: <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 __NREF__fonts-to-load()
 
 __NREF__lilac-theme-js
