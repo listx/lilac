@@ -156,7 +156,7 @@ endef
 LILAC_ROOT := $(shell git rev-parse --show-toplevel)
 #+end_src
 
-We use [[https://github.com/nmattia/niv][=niv=]] to update the dependencies sourced by =shell.nix=. Niv uses two
+We use [[https://github.com/nmattia/niv][=niv=]] to update the dependencies sourced by [[shell.nix][=shell.nix=]]. Niv uses two
 sources of truth: the niv repository itself on GitHub, and a branch of nixpkgs.
 The former tracks the =master= branch, and the latter tracks the stable channels
 (example: =nixos-23.05= branch). Whenever we run =niv update=, =niv= will update
@@ -1970,19 +1970,24 @@ function deactivate_other_non_toc_items(hash) {
     })
 }
 
+function is_external_link(destination) {
+    return (destination[0] !== "#");
+}
+
 $(document).ready(() => {
     $("a").click((e) => {
-        var destination;
-        if (e.target.nodeName === "CODE") {
-            destination = e.target.parentElement.hash;
+        var destination = null;
+        if (e.target.attributes.length > 0) {
+            destination = e.target.attributes.href.nodeValue;
         } else {
-            destination = e.target.hash;
+            destination = e.target.parentElement.hash;
         }
+
         // Only disable the browser's "jump to the link immediately" behavior if
         // we are dealing with an intra-document link. For links to other pages,
         // we want the default behavior. The destination is empty if the link
         // goes to another page.
-        if (destination === "") {
+        if (is_external_link(destination)) {
             return;
         } else {
             e.preventDefault();

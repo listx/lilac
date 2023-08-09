@@ -506,7 +506,7 @@ endef
 
 <span class="org-variable-name">LILAC_ROOT</span> := $(<span class="org-variable-name">shell</span> git rev-parse --show-toplevel)
 </pre></div></div><p>
-We use <a href="https://github.com/nmattia/niv"><code>niv</code></a> to update the dependencies sourced by <code>shell.nix</code>. Niv uses two
+We use <a href="https://github.com/nmattia/niv"><code>niv</code></a> to update the dependencies sourced by <a href="#shell-nix"><code>shell.nix</code></a>. Niv uses two
 sources of truth: the niv repository itself on GitHub, and a branch of nixpkgs.
 The former tracks the <code>master</code> branch, and the latter tracks the stable channels
 (example: <code>nixos-23.05</code> branch). Whenever we run <code>niv update</code>, <code>niv</code> will update
@@ -2513,19 +2513,24 @@ much less "jumpy" experience.
     })
 }
 
+<span class="org-keyword">function</span> <span class="org-function-name">is_external_link</span>(<span class="org-variable-name">destination</span>) {
+    <span class="org-keyword">return</span> (destination[0] !== <span class="org-string">"#"</span>);
+}
+
 $(document).ready(() =&gt; {
     $(<span class="org-string">"a"</span>).click((e) =&gt; {
-        <span class="org-keyword">var</span> <span class="org-variable-name">destination</span>;
-        <span class="org-keyword">if</span> (e.target.nodeName === <span class="org-string">"CODE"</span>) {
-            destination = e.target.parentElement.hash;
+        <span class="org-keyword">var</span> <span class="org-variable-name">destination</span> = <span class="org-constant">null</span>;
+        <span class="org-keyword">if</span> (e.target.attributes.length &gt; 0) {
+            destination = e.target.attributes.href.nodeValue;
         } <span class="org-keyword">else</span> {
-            destination = e.target.hash;
+            destination = e.target.parentElement.hash;
         }
+
         <span class="org-comment-delimiter">// </span><span class="org-comment">Only disable the browser's "jump to the link immediately" behavior if</span>
         <span class="org-comment-delimiter">// </span><span class="org-comment">we are dealing with an intra-document link. For links to other pages,</span>
         <span class="org-comment-delimiter">// </span><span class="org-comment">we want the default behavior. The destination is empty if the link</span>
         <span class="org-comment-delimiter">// </span><span class="org-comment">goes to another page.</span>
-        <span class="org-keyword">if</span> (destination === <span class="org-string">""</span>) {
+        <span class="org-keyword">if</span> (is_external_link(destination)) {
             <span class="org-keyword">return</span>;
         } <span class="org-keyword">else</span> {
             e.preventDefault();

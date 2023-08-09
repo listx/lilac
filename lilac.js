@@ -67,19 +67,24 @@ function deactivate_other_non_toc_items(hash) {
     })
 }
 
+function is_external_link(destination) {
+    return (destination[0] !== "#");
+}
+
 $(document).ready(() => {
     $("a").click((e) => {
-        var destination;
-        if (e.target.nodeName === "CODE") {
-            destination = e.target.parentElement.hash;
+        var destination = null;
+        if (e.target.attributes.length > 0) {
+            destination = e.target.attributes.href.nodeValue;
         } else {
-            destination = e.target.hash;
+            destination = e.target.parentElement.hash;
         }
+
         // Only disable the browser's "jump to the link immediately" behavior if
         // we are dealing with an intra-document link. For links to other pages,
         // we want the default behavior. The destination is empty if the link
         // goes to another page.
-        if (destination === "") {
+        if (is_external_link(destination)) {
             return;
         } else {
             e.preventDefault();
