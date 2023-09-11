@@ -397,7 +397,7 @@ from within this environment.
 pkgs.mkShell ({
   <span class="org-nix-attribute">buildInputs</span> = [
     <span class="org-comment"># Tangling and weaving for Literate Programming.</span>
-    pkgs.emacs
+    pkgs.emacs29-nox
 
     <span class="org-comment"># Update Nix dependencies in package/nix/sources.nix.</span>
     pkgs.niv
@@ -407,7 +407,11 @@ pkgs.mkShell ({
     pkgs.less
   ];
 })
-</pre></div></div>
+</pre></div></div><p>
+For Emacs, we use the "nox" version to avoid GUI dependencies (because we always
+invoke Emacs in batch mode in the terminal without ever using it in an
+interactive manner).
+</p>
 </div>
 </div>
 

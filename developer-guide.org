@@ -46,7 +46,7 @@ in
 pkgs.mkShell ({
   buildInputs = [
     # Tangling and weaving for Literate Programming.
-    pkgs.emacs
+    pkgs.emacs29-nox
 
     # Update Nix dependencies in package/nix/sources.nix.
     pkgs.niv
@@ -57,6 +57,10 @@ pkgs.mkShell ({
   ];
 })
 #+end_src
+
+For Emacs, we use the "nox" version to avoid GUI dependencies (because we always
+invoke Emacs in batch mode in the terminal without ever using it in an
+interactive manner).
 
 * Makefile
 

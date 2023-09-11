@@ -9,7 +9,7 @@ in
 pkgs.mkShell ({
   buildInputs = [
     # Tangling and weaving for Literate Programming.
-    pkgs.emacs
+    pkgs.emacs29-nox
 
     # Update Nix dependencies in package/nix/sources.nix.
     pkgs.niv
