@@ -98,6 +98,11 @@ When matching, reference is stored in match group 1."
    '(lilac-replace-org_ids-with-human_ids))
 
   (org-html-export-to-html)
+  (clrhash lilac-polyblock-names)
+  (clrhash lilac-polyblock-names-totals)
+  (clrhash lilac-org_id-human_id-hash-table)
+  (clrhash lilac-human_id-count-hash-table)
+  (clrhash lilac-human_id-org_id-hash-table)
   (lilac-replace-from-to-html
    "<h2>Table of Contents</h2>"
    "")

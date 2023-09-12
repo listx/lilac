@@ -329,7 +329,7 @@
                    html-ast)))))
        (should (equal got-child-link-text-parent1 "child1"))
        (should (equal got-child-link-text-parent2 "child1"))))))
-(ert-deftest t-lilac-children-are-linked-from-parent ()
+(ert-deftest t-lilac-children-are-linked-from-parent-nested ()
   (lilac-publish-fixture
    "t-lilac-children-are-linked-from-parent-nested-"
    (concat

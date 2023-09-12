@@ -845,6 +845,11 @@ The full code listing for <code>lilac-publish</code> is below.
    '(lilac-replace-org_ids-with-human_ids))
 
   (org-html-export-to-html)
+  (clrhash lilac-polyblock-names)
+  (clrhash lilac-polyblock-names-totals)
+  (clrhash lilac-org_id-human_id-hash-table)
+  (clrhash lilac-human_id-count-hash-table)
+  (clrhash lilac-human_id-org_id-hash-table)
   (lilac-replace-from-to-html
    <span class="org-string">"&lt;h2&gt;Table of Contents&lt;/h2&gt;"</span>
    <span class="org-string">""</span>)
@@ -874,7 +879,7 @@ The full code listing for <code>lilac-publish</code> is below.
 Now let's go through <code>lilac-publish</code> in detail.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(1/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-1">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(1/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-1">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-1">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-publish</span> ()
   (<span class="org-keyword">interactive</span>)
   (<span class="org-keyword">setq</span> org-html-htmlize-output-type 'css)
 </pre></div></div><p>
@@ -882,7 +887,7 @@ Do not hardcode colors into the HTML. Instead refer to CSS class names, to be
 stylized by an external CSS file.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(2/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-2">  (<span class="org-keyword">setq</span> org-export-before-parsing-hook
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(2/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-2">  (<span class="org-keyword">setq</span> org-export-before-parsing-hook
    '(lilac-UID-for-all-src-blocks
      lilac-insert-noweb-source-code-block-captions
      lilac-UID-for-all-headlines))
@@ -925,7 +930,7 @@ blocks from parent blocks. We also populate the
 human-readable.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(3/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-3">  (<span class="org-keyword">setq</span> org-export-filter-src-block-functions
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(3/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-3">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-3">  (<span class="org-keyword">setq</span> org-export-filter-src-block-functions
    '(lilac-populate-child-HTML_ID-hash-table
      lilac-populate-org_id-human_id-hash-table))
 
@@ -934,7 +939,7 @@ human-readable.
 In between these phases we have to call
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(4/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-4">  (clrhash lilac-polyblock-names-totals)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(4/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-4">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-4">  (clrhash lilac-polyblock-names-totals)
 </pre></div></div><p>
 because of some internal housekeeping we have to do.
 </p>
@@ -945,13 +950,24 @@ Phase 2: In this phase we perform the linking from parent blocks to child blocks
 code captions to look prettier (<code>lilac-prettify-source-code-captions</code>).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(5/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-5">  (<span class="org-keyword">setq</span> org-export-filter-src-block-functions
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(5/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-5">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-5">  (<span class="org-keyword">setq</span> org-export-filter-src-block-functions
    '(lilac-link-to-children-from-parent-body
      lilac-prettify-source-code-captions))
   (<span class="org-keyword">setq</span> org-export-filter-final-output-functions
    '(lilac-replace-org_ids-with-human_ids))
 
   (org-html-export-to-html)
+</pre></div></div><p>
+After publishing to HTML, we have to clear the intermediate hashtables used for
+the export, because we could be invoking <code>lilac-publsh</code> multiple times from the
+same emacs session (such as during unit tests).
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(6/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-6">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-6">  (clrhash lilac-polyblock-names)
+  (clrhash lilac-polyblock-names-totals)
+  (clrhash lilac-org_id-human_id-hash-table)
+  (clrhash lilac-human_id-count-hash-table)
+  (clrhash lilac-human_id-org_id-hash-table)
 </pre></div></div><p>
 The final bits are
 </p>
@@ -963,7 +979,7 @@ Table of Contents section, which we'll <a href="#h-Table-of-contents-sidebar">co
 part of citation styles.</li>
 </ol>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(6/6) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-6">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-6">  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-delete-toc-text">lilac-publish-delete-toc-text</a></span>
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(7/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-7">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-7">  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-delete-toc-text">lilac-publish-delete-toc-text</a></span>
   <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-inline-styles">lilac-publish-fix-inline-styles</a></span>
   <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-bibliography-ids">lilac-publish-fix-bibliography-ids</a></span>
   <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-description-lists">lilac-publish-fix-description-lists</a></span>
@@ -1361,8 +1377,8 @@ type is a list of strings.
     noweb-ref-name))
 </pre></div></div><p>
 Note that a child source block can have two ways of defining its name. The first
-is with the direct <code>#+name: __NREF__foo</code> style (<a href="#org000004a">monoblock</a>), and the second way
-is with a line like <code>#+header: :noweb-ref __NREF__foo</code> (<a href="#org000004c">polyblock</a>). Here
+is with the direct <code>#+name: __NREF__foo</code> style (<a href="#org000004c">monoblock</a>), and the second way
+is with a line like <code>#+header: :noweb-ref __NREF__foo</code> (<a href="#org000004e">polyblock</a>). Here
 <code>lilac-get-src-block-name</code> grabs the name of a (child) source code block, taking
 into account these two styles. For polyblock names, we mark it as such with a
 <code>(polyblock)</code> string, which is used later for the <a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a>.
@@ -1495,7 +1511,7 @@ have a unique ID).
 <h4 id="h-Use-human-readable-HTML-IDs-for-source-code-links"><span class="section-number-4">4.5.1.</span> Use human-readable HTML IDs for source code links</h4>
 <div class="outline-text-4" id="text-h-Use-human-readable-HTML-IDs-for-source-code-links">
 <p>
-Recall that there are 2 types of source code blocks: <a href="#org000004a">monoblocks</a> and <a href="#org000004c">polyblocks</a>.
+Recall that there are 2 types of source code blocks: <a href="#org000004c">monoblocks</a> and <a href="#org000004e">polyblocks</a>.
 </p>
 
 <p>
@@ -2117,7 +2133,7 @@ file from Emacs (instead of invoking <code>sed</code>).
 This cleans up the inline styles for citations.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-fix-inline-styles</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-inline-styles">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-inline-styles">(lilac-replace-from-to-html
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-7">lilac-publish-fix-inline-styles</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-inline-styles">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-inline-styles">(lilac-replace-from-to-html
  <span class="org-string">".csl-right-inline{margin: 0 0 0 2em;"</span>
  <span class="org-string">".csl-right-inline{margin: 0 0 0 2em;"</span>)
 </pre></div></div><p>
@@ -2125,7 +2141,7 @@ We also do some replacements for the bibliography entries themselves. Namely,
 each entry has the following (odd) structure by default:
 </p>
 
-<pre class="example" id="org0000080">
+<pre class="example" id="org0000082">
 &lt;div class="csl-entry"&gt;&lt;a id="citeproc_bib_item_1"&gt;&lt;/a&gt; ... &lt;/div&gt;
 </pre>
 
@@ -2134,7 +2150,7 @@ and instead we delete the content-less link anchor and instead move th ID to the
 parent div, like this:
 </p>
 
-<pre class="example" id="org0000081">
+<pre class="example" id="org0000083">
 &lt;div class="csl-entry" id="citeproc_bib_item_1"&gt; ... &lt;/div&gt;
 </pre>
 
@@ -2144,7 +2160,7 @@ attribute (instead of the empty link anchor) to style the entire entry when we
 click a link to go to it.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-fix-bibliography-ids</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-bibliography-ids">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-bibliography-ids">(lilac-replace-from-to-html
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-7">lilac-publish-fix-bibliography-ids</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-bibliography-ids">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-bibliography-ids">(lilac-replace-from-to-html
  <span class="org-string">"\"csl-entry\"&gt;&lt;a </span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">id=\"[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">\"]+\"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">&gt;&lt;/a&gt;"</span>
  <span class="org-string">"\"csl-entry\" \\1&gt;"</span>
  t)
@@ -2152,7 +2168,7 @@ click a link to go to it.
 And here we style these entries.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-bibliography</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-bibliography">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-bibliography"><span class="org-css-selector">.csl-entry </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-bibliography</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-bibliography">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-bibliography"><span class="org-css-selector">.csl-entry</span> {
     <span class="org-css-property">padding</span>: 0.5em;
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
@@ -2160,7 +2176,7 @@ And here we style these entries.
     <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--clear</span>);
 }
 
-<span class="org-css-selector">.outline-2 .csl-bib-body .active </span>{
+<span class="org-css-selector">.outline-2 .csl-bib-body .active</span> {
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
 }
 </pre></div></div>
@@ -2179,7 +2195,7 @@ that we can highlight the enclosed <code>&lt;dt&gt;</code> (description term) an
 (description details).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-fix-description-lists</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-description-lists">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-description-lists">(lilac-replace-from-to-html
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-7">lilac-publish-fix-description-lists</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-description-lists">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-description-lists">(lilac-replace-from-to-html
  <span class="org-string">"&lt;dt&gt;"</span>
  <span class="org-string">"&lt;div class=\"lilac-description-list-entry\"&gt;&lt;dt&gt;"</span>
  t)
@@ -2194,7 +2210,7 @@ that we can highlight the enclosed <code>&lt;dt&gt;</code> (description term) an
 And here we style it.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-description-lists</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-description-lists">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-description-lists"><span class="org-css-selector">.lilac-description-list-entry </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-description-lists</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-description-lists">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-description-lists"><span class="org-css-selector">.lilac-description-list-entry</span> {
     <span class="org-css-property">padding</span>: 0.2em 0.5em 0.5em 0.5em;
     <span class="org-css-property">border-style</span>: solid;
     <span class="org-css-property">border-width</span>: 1px;
@@ -2202,7 +2218,7 @@ And here we style it.
     <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--clear</span>);
 }
 
-<span class="org-css-selector">.org-dl .active </span>{
+<span class="org-css-selector">.org-dl .active</span> {
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
 }
 </pre></div></div>
@@ -2223,7 +2239,7 @@ value of the <code>lilac-html-head</code> variable in Emacs Lisp (which can be p
 the user when they invoke the <code>lilac-publish</code> function).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-inject-custom-html-head</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-inject-custom-html-head">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-inject-custom-html-head">(<span class="org-keyword">if</span> (boundp 'lilac-html-head)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-7">lilac-publish-inject-custom-html-head</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-inject-custom-html-head">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-inject-custom-html-head">(<span class="org-keyword">if</span> (boundp 'lilac-html-head)
     (lilac-replace-from-to-html
      <span class="org-string">"&lt;!-- LILAC_HTML_HEAD --&gt;"</span>
      lilac-html-head))
@@ -2282,7 +2298,7 @@ Linkifying itself makes all the headlines blue (the default color for links).
 This is a bit distracting, so make them black.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-section-headlines</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines-1"><span class="org-css-selector">a.section-heading </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-section-headlines</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines-1"><span class="org-css-selector">a.section-heading</span> {
     <span class="org-css-property">color</span>: <span class="custom">black</span>;
     <span class="org-css-property">text-decoration</span>: none;
     <span class="org-css-property">display</span>: block;
@@ -2295,13 +2311,13 @@ the same size as the width of the enclosing <code>div</code> (it can jump when d
 the icon results in a new line break).
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-section-headlines</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines-2"><span class="org-css-selector">a.section-heading::after </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-section-headlines</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-section-headlines-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-section-headlines-2"><span class="org-css-selector">a.section-heading::after</span> {
     <span class="org-css-property">opacity</span>: 0;
     <span class="org-css-property">transition</span>: opacity 150ms;
     <span class="org-css-property">content</span>: <span class="org-string">"\1f517"</span>;
     <span class="org-css-property">padding-left</span>: 1rem;
 }
-<span class="org-css-selector">a.section-heading:hover::after </span>{
+a.section-heading:hover::after {
     <span class="org-css-property">opacity</span>: 1;
     <span class="org-css-property">transition</span>: opacity 150ms;
     <span class="org-css-property">content</span>: <span class="org-string">"\1f517"</span>;
@@ -2328,7 +2344,7 @@ modifications to it:
 <div id="outline-container-h-Delete--Table-of-Contents--text" class="outline-5">
 <h5 id="h-Delete--Table-of-Contents--text"><span class="section-number-5">4.6.2.1.</span> Delete "Table of Contents" text</h5>
 <div class="outline-text-5" id="text-h-Delete--Table-of-Contents--text">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-6">lilac-publish-delete-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-delete-toc-text">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-delete-toc-text">(lilac-replace-from-to-html
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-7">lilac-publish-delete-toc-text</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-delete-toc-text">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-delete-toc-text">(lilac-replace-from-to-html
  <span class="org-string">"&lt;h2&gt;Table of Contents&lt;/h2&gt;"</span>
  <span class="org-string">""</span>)
 </pre></div></div>
@@ -2338,7 +2354,7 @@ modifications to it:
 <div id="outline-container-h-Convert--Table-of-Contents--to-a-sidebar-on-the-left" class="outline-5">
 <h5 id="h-Convert--Table-of-Contents--to-a-sidebar-on-the-left"><span class="section-number-5">4.6.2.2.</span> Convert "Table of Contents" to a sidebar on the left</h5>
 <div class="outline-text-5" id="text-h-Convert--Table-of-Contents--to-a-sidebar-on-the-left">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(1/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-1"><span class="org-css-selector">#table-of-contents </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(1/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-1"><span class="org-css-selector">#table-of-contents</span> {
     <span class="org-css-property">position</span>: fixed;
     <span class="org-css-property">top</span>: 0;
     <span class="org-css-property">float</span>: left;
@@ -2349,29 +2365,29 @@ modifications to it:
     <span class="org-css-property">border-right-width</span>: 1px;
     <span class="org-css-property">border-right-color</span>: var(<span class="org-variable-name">--border-light</span>);
 }
-<span class="org-css-selector">#text-table-of-contents </span>{
+<span class="org-css-selector">#text-table-of-contents</span> {
     <span class="org-css-property">overflow-y</span>: scroll;
     <span class="org-css-property">height</span>: 100vh;
     <span class="org-css-property">padding-right</span>: 20px;
     <span class="org-css-property">padding-left</span>: 5px;
 }
-<span class="org-css-selector">#text-table-of-contents li </span>{
+<span class="org-css-selector">#text-table-of-contents li</span> {
     <span class="org-css-property">font-family</span>: var(<span class="org-variable-name">--font-sans</span>);
 }
-<span class="org-css-selector">#text-table-of-contents ul li </span>{
+<span class="org-css-selector">#text-table-of-contents ul li</span> {
     <span class="org-css-property">font-weight</span>: bold;
 }
-<span class="org-css-selector">#text-table-of-contents ul li ul li </span>{
+<span class="org-css-selector">#text-table-of-contents ul li ul li</span> {
     <span class="org-css-property">font-weight</span>: normal;
 }
-<span class="org-css-selector">#text-table-of-contents ul </span>{
+<span class="org-css-selector">#text-table-of-contents ul</span> {
     <span class="org-css-property">margin</span>: 0;
     <span class="org-css-property">padding</span>: 0;
 }
-<span class="org-css-selector">#text-table-of-contents &gt; ul &gt; li </span>{
+<span class="org-css-selector">#text-table-of-contents &gt; ul &gt; li</span> {
     <span class="org-css-property">padding-top</span>: 1em;
 }
-<span class="org-css-selector">#text-table-of-contents &gt; ul &gt; li:last-child </span>{
+<span class="org-css-selector">#text-table-of-contents &gt; ul &gt; li:last-child</span> {
     <span class="org-css-property">padding-bottom</span>: 1.5em;
 }
 </pre></div></div>
@@ -2452,7 +2468,7 @@ We have to colorize the foreground color of the link because otherwise it
 becomes the color of all other links as per <a href="#h-Links">4.10.8</a>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(2/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-2"><span class="org-css-selector">#table-of-contents a </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(2/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-2"><span class="org-css-selector">#table-of-contents a</span> {
     <span class="org-css-property">display</span>: block;
     <span class="org-css-property">transition</span>: all 300ms ease-in-out;
     <span class="org-css-property">padding</span>: 5px;
@@ -2462,11 +2478,11 @@ becomes the color of all other links as per <a href="#h-Links">4.10.8</a>.
     <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--clear</span>);
     <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-heading</span>);
 }
-<span class="org-css-selector">#table-of-contents .active </span>{
+<span class="org-css-selector">#table-of-contents .active</span> {
     <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-heading</span>);
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item">css-active-item</a></span>
 }
-<span class="org-css-selector">#table-of-contents a:hover </span>{
+<span class="org-css-selector">#table-of-contents a:hover</span> {
     <span class="org-css-property">text-decoration</span>: none;
 }
 </pre></div></div>
@@ -2582,25 +2598,25 @@ Different destination elements need different selectors. We cover most of them
 here.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-active-non-toc-item</a></span>(1/1) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-non-toc-item">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-non-toc-item"><span class="org-css-selector">.outline-2 h2.active </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-active-non-toc-item</a></span>(1/1) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-active-non-toc-item">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-active-non-toc-item"><span class="org-css-selector">.outline-2 h2.active</span> {
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
 }
-<span class="org-css-selector">.outline-2 h3.active </span>{
+<span class="org-css-selector">.outline-2 h3.active</span> {
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
 }
-<span class="org-css-selector">.outline-2 h4.active </span>{
+<span class="org-css-selector">.outline-2 h4.active</span> {
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
 }
-<span class="org-css-selector">.outline-2 h5.active </span>{
+<span class="org-css-selector">.outline-2 h5.active</span> {
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
 }
-<span class="org-css-selector">.outline-2 h6.active </span>{
+<span class="org-css-selector">.outline-2 h6.active</span> {
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-headline">css-active-item-headline</a></span>
 }
-<span class="org-css-selector">.outline-2 pre.active </span>{
+<span class="org-css-selector">.outline-2 pre.active</span> {
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item">css-active-item</a></span>
 }
-<span class="org-css-selector">.outline-2 span.active </span>{
+<span class="org-css-selector">.outline-2 span.active</span> {
     <span class="lilac-child-link-from-parent"><a href="#__NREF__css-active-item-span">css-active-item-span</a></span>
 }
 </pre></div></div>
@@ -2815,7 +2831,7 @@ setting on here injects the definitions of these functions into the HTML.
 <div id="outline-container-h-Do-not-highlight-coderefs" class="outline-5">
 <h5 id="h-Do-not-highlight-coderefs"><span class="section-number-5">4.8.3.2.</span> Do not highlight coderefs</h5>
 <div class="outline-text-5" id="text-h-Do-not-highlight-coderefs">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-coderef-disable-background-color</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-coderef-disable-background-color">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-coderef-disable-background-color"><span class="org-css-selector">.code-highlighted </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-coderef-disable-background-color</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-coderef-disable-background-color">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-coderef-disable-background-color"><span class="org-css-selector">.code-highlighted</span> {
     <span class="org-css-property">background-color</span>: inherit;
 }
 </pre></div></div>
@@ -2954,7 +2970,7 @@ We define colors and fonts in one place and reuse them throughout the rest of
 the CSS, with the <code>var()</code> function.
 </p>
 
-<div class="sidenote" id="org00000c4">
+<div class="sidenote" id="org00000c6">
 <p>
 This would be an excellent candidate to copy/paste/tweak into your own
 <code>lilac-override.css</code> file to tweak any of the colors or fonts used by Lilac.
@@ -2988,7 +3004,7 @@ This would be an excellent candidate to copy/paste/tweak into your own
 <div id="outline-container-h-General-body-text" class="outline-4">
 <h4 id="h-General-body-text"><span class="section-number-4">4.10.2.</span> General body text</h4>
 <div class="outline-text-4" id="text-h-General-body-text">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(2/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-2"><span class="org-css-selector">body </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(2/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-2"><span class="org-css-selector">body</span> {
     <span class="org-css-property">font-size</span>: 1.25em;
     <span class="org-css-property">width</span>: 800px;
     <span class="org-css-property">margin-left</span>: 310px;
@@ -2997,11 +3013,11 @@ This would be an excellent candidate to copy/paste/tweak into your own
     <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg</span>);
 }
 
-<span class="org-css-selector">body, p, li, legend </span>{
+<span class="org-css-selector">body, p, li, legend</span> {
     <span class="org-css-property">font-family</span>: var(<span class="org-variable-name">--font-serif</span>);
 }
 
-<span class="org-css-selector">h2, h3, h4, h5, h6 </span>{
+<span class="org-css-selector">h2, h3, h4, h5, h6</span> {
     <span class="org-css-property">margin</span>: 1em 0 0 -4px;
     <span class="org-css-property">padding</span>: 0 4px;
     <span class="org-css-property">display</span>: inline-block;
@@ -3010,25 +3026,25 @@ This would be an excellent candidate to copy/paste/tweak into your own
     <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--clear</span>);
 }
 
-<span class="org-css-selector">h1, h2, h3, h4, h5, h6, dt </span>{
+<span class="org-css-selector">h1, h2, h3, h4, h5, h6, dt</span> {
     <span class="org-css-property">font-family</span>: var(<span class="org-variable-name">--font-sans</span>);
 }
 
-<span class="org-css-selector">h3, h4, h5, h6 </span>{
+<span class="org-css-selector">h3, h4, h5, h6</span> {
     <span class="org-css-property">font-weight</span>: normal;
 }
 
-<span class="org-css-selector">p, li </span>{
+<span class="org-css-selector">p, li</span> {
     <span class="org-css-property">line-height</span>: 1.2em;
 }
 
-<span class="org-css-selector">p, ol, ul </span>{
+<span class="org-css-selector">p, ol, ul</span> {
     <span class="org-css-property">margin-top</span>: 0;
     <span class="org-css-property">margin-bottom</span>: 0;
     <span class="org-css-property">padding-top</span>: 1em;
 }
 
-<span class="org-css-selector">li </span>{
+<span class="org-css-selector">li</span> {
     <span class="org-css-property">margin-bottom</span>: 0;
 }
 </pre></div></div>
@@ -3038,27 +3054,27 @@ This would be an excellent candidate to copy/paste/tweak into your own
 <div id="outline-container-h-Headline-font-sizes" class="outline-4">
 <h4 id="h-Headline-font-sizes"><span class="section-number-4">4.10.3.</span> Headline font sizes</h4>
 <div class="outline-text-4" id="text-h-Headline-font-sizes">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-headline-font-size</a></span>(1/1) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-headline-font-size">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-headline-font-size"><span class="org-css-selector">h1 </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-headline-font-size</a></span>(1/1) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-headline-font-size">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-headline-font-size"><span class="org-css-selector">h1</span> {
     <span class="org-css-property">font-size</span>: 3em;
 }
 
-<span class="org-css-selector">h2 </span>{
+<span class="org-css-selector">h2</span> {
     <span class="org-css-property">font-size</span>: 2.4em;
 }
 
-<span class="org-css-selector">h3 </span>{
+<span class="org-css-selector">h3</span> {
     <span class="org-css-property">font-size</span>: 2em;
 }
 
-<span class="org-css-selector">h4 </span>{
+<span class="org-css-selector">h4</span> {
     <span class="org-css-property">font-size</span>: 1.6em;
 }
 
-<span class="org-css-selector">h5 </span>{
+<span class="org-css-selector">h5</span> {
     <span class="org-css-property">font-size</span>: 1.2em;
 }
 
-<span class="org-css-selector">h6 </span>{
+<span class="org-css-selector">h6</span> {
     <span class="org-css-property">font-size</span>: 1em;
 }
 </pre></div></div>
@@ -3071,7 +3087,7 @@ This would be an excellent candidate to copy/paste/tweak into your own
 For the main title page, we customize the font to look a bit more ornate.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(3/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-3"><span class="org-css-selector">h1.title </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(3/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-3"><span class="org-css-selector">h1.title</span> {
     <span class="org-css-property">font-family</span>: <span class="org-string">"Overlock"</span>, cursive;
     <span class="org-css-property">font-size</span>: 100pt;
     <span class="org-css-property">margin-top</span>: 0.4em;
@@ -3085,7 +3101,7 @@ For the main title page, we customize the font to look a bit more ornate.
 <div id="outline-container-h-Tables" class="outline-4">
 <h4 id="h-Tables"><span class="section-number-4">4.10.4.</span> Tables</h4>
 <div class="outline-text-4" id="text-h-Tables">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(4/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-4">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-4"><span class="org-css-selector">table </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(4/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-4">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-4"><span class="org-css-selector">table</span> {
     <span class="org-css-property">margin</span>: 1em auto 0em auto;
     <span class="org-css-property">border-spacing</span>: 0;
     <span class="org-css-property">border-radius</span>: 4px;
@@ -3094,21 +3110,21 @@ For the main title page, we customize the font to look a bit more ornate.
     <span class="org-css-property">overflow</span>: hidden;
 }
 
-<span class="org-css-selector">th, td </span>{
+<span class="org-css-selector">th, td</span> {
     <span class="org-css-property">padding</span>: 3px 6px;
     <span class="org-css-property">border-right</span>: 1px solid var(<span class="org-variable-name">--border-code</span>);
     <span class="org-css-property">border-bottom</span>: 1px solid var(<span class="org-variable-name">--border-code</span>);
 }
 
-<span class="org-css-selector">th:last-child, td:last-child  </span>{
+<span class="org-css-selector">th:last-child, td:last-child</span>  {
     <span class="org-css-property">border-right</span>: none;
 }
 
-<span class="org-css-selector">tr:last-child td </span>{
+<span class="org-css-selector">tr:last-child td</span> {
     <span class="org-css-property">border-bottom</span>: none;
 }
 
-<span class="org-css-selector">thead </span>{
+<span class="org-css-selector">thead</span> {
     <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
 }
 </pre></div></div>
@@ -3118,7 +3134,7 @@ For the main title page, we customize the font to look a bit more ornate.
 <div id="outline-container-h-Description-lists" class="outline-4">
 <h4 id="h-Description-lists"><span class="section-number-4">4.10.5.</span> Description lists</h4>
 <div class="outline-text-4" id="text-h-Description-lists">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(5/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-5">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-5"><span class="org-css-selector">dl </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(5/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-5">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-5"><span class="org-css-selector">dl</span> {
     <span class="org-css-property">margin</span>: 0;
     <span class="org-css-property">padding-top</span>: 1em;
 }
@@ -3129,7 +3145,7 @@ For the main title page, we customize the font to look a bit more ornate.
 <div id="outline-container-h-Images" class="outline-4">
 <h4 id="h-Images"><span class="section-number-4">4.10.6.</span> Images</h4>
 <div class="outline-text-4" id="text-h-Images">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(6/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-6">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-6"><span class="org-css-selector">img </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(6/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-6">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-6"><span class="org-css-selector">img</span> {
     <span class="org-css-property">display</span>: block;
     <span class="org-css-property">margin</span>: 0 auto;
 }
@@ -3140,7 +3156,7 @@ For the main title page, we customize the font to look a bit more ornate.
 <div id="outline-container-h-Monospaced" class="outline-4">
 <h4 id="h-Monospaced"><span class="section-number-4">4.10.7.</span> Monospaced</h4>
 <div class="outline-text-4" id="text-h-Monospaced">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(7/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-7">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-7"><span class="org-css-selector">code </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(7/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-7">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-7"><span class="org-css-selector">code</span> {
     <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
     <span class="org-css-property">padding-left</span>: 5px;
     <span class="org-css-property">padding-right</span>: 5px;
@@ -3151,7 +3167,7 @@ For the main title page, we customize the font to look a bit more ornate.
     <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--border-code</span>);
 }
 
-<span class="org-css-selector">pre </span>{
+<span class="org-css-selector">pre</span> {
     <span class="org-css-property">font-size</span>: 0.8em;
     <span class="org-css-property">border-radius</span>: 5px;
     <span class="org-css-property">margin</span>: 1em 0 0 0;
@@ -3165,7 +3181,7 @@ as what we have elsewhere. This hover text comes with Org mode's HTML export of
 source code blocks.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(8/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-8">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-8"><span class="org-css-selector">pre.src::before </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(8/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-8">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-8"><span class="org-css-selector">pre.src::before</span> {
     <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
 }
 </pre></div></div>
@@ -3180,7 +3196,7 @@ Force all links to have a blue color. This is mainly to override whatever Org
 gives us by default.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(9/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-9">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-9"><span class="org-css-selector">a </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(9/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-9">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-9"><span class="org-css-selector">a</span> {
     <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-link</span>);
 }
 </pre></div></div>
@@ -3190,11 +3206,11 @@ gives us by default.
 <div id="outline-container-h-Source-code-block-body" class="outline-4">
 <h4 id="h-Source-code-block-body"><span class="section-number-4">4.10.9.</span> Source code block body</h4>
 <div class="outline-text-4" id="text-h-Source-code-block-body">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-body</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-body">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-body"><span class="org-css-selector">.org-src-container </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-body</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-body">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-body"><span class="org-css-selector">.org-src-container</span> {
     <span class="org-css-property">padding-top</span>: 1em;
 }
 
-<span class="org-css-selector">.org-src-container pre </span>{
+<span class="org-css-selector">.org-src-container pre</span> {
     <span class="org-css-property">margin</span>: 0;
     <span class="org-css-property">font-family</span>: var(<span class="org-variable-name">--font-mono</span>);
     <span class="org-css-property">border-width</span>: 0;
@@ -3206,7 +3222,7 @@ gives us by default.
 }
 
 <span class="org-comment-delimiter">/* </span><span class="org-comment">Source code block body.</span><span class="org-comment-delimiter"> */</span>
-<span class="org-css-selector">.org-src-container pre.src </span>{
+<span class="org-css-selector">.org-src-container pre.src</span> {
     <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
 }
 
@@ -3217,7 +3233,7 @@ gives us by default.
 <div id="outline-container-h-Source-code-block-captions" class="outline-4">
 <h4 id="h-Source-code-block-captions"><span class="section-number-4">4.10.10.</span> Source code block captions</h4>
 <div class="outline-text-4" id="text-h-Source-code-block-captions">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-captions"><span class="org-css-selector">.lilac-caption </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-captions</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-captions">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-captions"><span class="org-css-selector">.lilac-caption</span> {
     <span class="org-css-property">font-family</span>: var(<span class="org-variable-name">--font-mono</span>);
     <span class="org-css-property">text-align</span>: right;
     <span class="org-css-property">border-top-left-radius</span>: 5px;
@@ -3226,7 +3242,7 @@ gives us by default.
     <span class="org-css-property">padding-bottom</span>: 2px;
 }
 
-<span class="org-css-selector">.lilac-caption label </span>{
+<span class="org-css-selector">.lilac-caption label</span> {
     <span class="org-css-property">margin-right</span>: 10px;
     <span class="org-css-property">padding-left</span>: 10px;
     <span class="org-css-property">padding-right</span>: 10px;
@@ -3241,20 +3257,20 @@ gives us by default.
     <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--border-code</span>);
 }
 
-<span class="org-css-selector">.lilac-caption-source-code-block-name </span>{
+<span class="org-css-selector">.lilac-caption-source-code-block-name</span> {
     <span class="org-css-property">color</span>: <span class="custom">#444444</span>;
     <span class="org-css-property">font-weight</span>: bold;
     <span class="org-css-property">margin-right</span>: 5px;
 }
 
-<span class="org-css-selector">.lilac-caption-parent-link </span>{
+<span class="org-css-selector">.lilac-caption-parent-link</span> {
     <span class="org-css-property">margin-top</span>: 5px;
     <span class="org-css-property">margin-right</span>: 5px;
     <span class="org-css-property">padding-left</span>: 5px;
     <span class="org-css-property">padding-right</span>: 5px;
     <span class="org-css-property">font-weight</span>: bold;
 }
-<span class="org-css-selector">.lilac-caption-parent-link a </span>{
+<span class="org-css-selector">.lilac-caption-parent-link a</span> {
     <span class="org-css-property">padding-left</span>: 10px;
     <span class="org-css-property">padding-right</span>: 10px;
     <span class="org-css-property">padding-bottom</span>: 10px;
@@ -3268,20 +3284,20 @@ gives us by default.
     <span class="org-css-property">border-bottom-right-radius</span>: 0;
     <span class="org-css-property">transition</span>: all 150ms ease-in-out;
 }
-<span class="org-css-selector">.lilac-caption-parent-link a:hover </span>{
+<span class="org-css-selector">.lilac-caption-parent-link a:hover</span> {
     <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-nref-link-hover</span>);
     <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-nref-link-hover</span>);
     <span class="org-css-property">text-decoration</span>: none;
 }
 
-<span class="org-css-selector">.lilac-caption-link-symbol a </span>{
+<span class="org-css-selector">.lilac-caption-link-symbol a</span> {
     <span class="org-css-property">margin-right</span>: 5px;
 }
-<span class="org-css-selector">.lilac-caption-link-symbol a:hover </span>{
+<span class="org-css-selector">.lilac-caption-link-symbol a:hover</span> {
     <span class="org-css-property">text-decoration</span>: none;
 }
 
-<span class="org-css-selector">.lilac-caption-listing-number </span>{
+<span class="org-css-selector">.lilac-caption-listing-number</span> {
     <span class="org-css-property">margin-right</span>: 5px;
 }
 </pre></div></div>
@@ -3291,10 +3307,10 @@ gives us by default.
 <div id="outline-container-h-Links-to-child-source-block-from-parent" class="outline-4">
 <h4 id="h-Links-to-child-source-block-from-parent"><span class="section-number-4">4.10.11.</span> Links to child source block from parent</h4>
 <div class="outline-text-4" id="text-h-Links-to-child-source-block-from-parent">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-child-link-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-child-link-from-parent">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-child-link-from-parent"><span class="org-css-selector">.lilac-child-link-from-parent </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-source-code-block-child-link-from-parent</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-source-code-block-child-link-from-parent">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-source-code-block-child-link-from-parent"><span class="org-css-selector">.lilac-child-link-from-parent</span> {
     <span class="org-css-property">font-weight</span>: bold;
 }
-<span class="org-css-selector">.lilac-child-link-from-parent a </span>{
+<span class="org-css-selector">.lilac-child-link-from-parent a</span> {
     <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-nref-link</span>);
     <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-nref-link</span>);
     <span class="org-css-property">border-radius</span>: 5px;
@@ -3305,7 +3321,7 @@ gives us by default.
     <span class="org-css-property">display</span>: inline-block;
     <span class="org-css-property">transition</span>: all 150ms ease-in-out;
 }
-<span class="org-css-selector">.lilac-child-link-from-parent a:hover </span>{
+<span class="org-css-selector">.lilac-child-link-from-parent a:hover</span> {
     <span class="org-css-property">color</span>: var(<span class="org-variable-name">--fg-nref-link-hover</span>);
     <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-nref-link-hover</span>);
     <span class="org-css-property">text-decoration</span>: none;
@@ -3327,7 +3343,7 @@ shouldn't necessarily sit in the main body text.
 The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-using-only-css/">here</a>, with some modifications.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-sidenotes</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-sidenotes">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-sidenotes"><span class="org-css-selector">.sidenote </span>{
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-sidenotes</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__css-sidenotes">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-sidenotes"><span class="org-css-selector">.sidenote</span> {
     <span class="org-css-property">font-size</span>: 80%;
     <span class="org-css-property">margin-top</span>: 1em;
     <span class="org-css-property">padding</span>: 1em 0 1em 1em;
@@ -3337,23 +3353,23 @@ The CSS below is drawn primarily from <a href="https://scripter.co/sidenotes-usi
     <span class="org-css-property">border-color</span>: var(<span class="org-variable-name">--border-light</span>);
 }
 
-<span class="org-css-selector">.sidenote p </span>{
+<span class="org-css-selector">.sidenote p</span> {
     <span class="org-css-property">padding-top</span>: 0;
     <span class="org-css-property">margin-top</span>: 1em;
 }
 
-<span class="org-css-selector">.sidenote p:first-child </span>{
+<span class="org-css-selector">.sidenote p:first-child</span> {
     <span class="org-css-property">margin-top</span>: 0;
 }
 
 <span class="org-builtin">@media</span> (max-width: 1425px) {
-    <span class="org-css-selector">.sidenote </span>{
+    <span class="org-css-selector">.sidenote</span> {
         <span class="org-css-property">margin-left</span>: 1em;
     }
 }
 
 <span class="org-builtin">@media</span> (min-width: 1425px) {
-    <span class="org-css-selector">.sidenote </span>{
+    <span class="org-css-selector">.sidenote</span> {
         <span class="org-css-property">margin-left</span>: 0;
 
         <span class="org-css-property">width</span>: 280px;
@@ -3374,10 +3390,10 @@ width of the main text area.
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(3/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-3"><span class="org-builtin">@media</span> print {
-    <span class="org-css-selector">#table-of-contents </span>{
+    <span class="org-css-selector">#table-of-contents</span> {
         <span class="org-css-property">display</span>: none <span class="org-builtin">!important</span>;
     }
-    <span class="org-css-selector">body </span>{
+    <span class="org-css-selector">body</span> {
         <span class="org-css-property">margin-left</span>: 0;
     }
 }
@@ -3536,7 +3552,7 @@ prefix indirectly with the <code>(nref)</code> helper function.
 <div id="outline-container-h-Setup-and-tear-down-fixture-for-HTML-tests" class="outline-4">
 <h4 id="h-Setup-and-tear-down-fixture-for-HTML-tests"><span class="section-number-4">5.1.2.</span> Setup and tear-down fixture for HTML tests</h4>
 <div class="outline-text-4" id="text-h-Setup-and-tear-down-fixture-for-HTML-tests">
-<div class="sidenote" id="org00000ed">
+<div class="sidenote" id="org00000ef">
 <p>
 The <a href="https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites">Emacs manual</a> for ERT defines fixtures as environments which provide setup
 and tear-down.
@@ -3592,7 +3608,7 @@ names) found in a source code block.
           <span class="org-string">"#+begin_src emacs-lisp\n"</span>
           <span class="org-string">"; foo\n"</span>
           <span class="org-string">"#+end_src\n"</span>)))
-    (<span class="org-keyword">should</span> (equal (lilac-get-noweb-children body)
+    (should (equal (lilac-get-noweb-children body)
                    ())))
   (<span class="org-keyword">let</span> ((body
          (concat
@@ -3604,7 +3620,7 @@ names) found in a source code block.
           <span class="org-string">"; bar\n"</span>
           (nref <span class="org-string">"two"</span>) <span class="org-string">"\n"</span>
           <span class="org-string">"#+end_src\n"</span>)))
-    (<span class="org-keyword">should</span> (equal (lilac-get-noweb-children body)
+    (should (equal (lilac-get-noweb-children body)
                    `(,(nref <span class="org-string">"one"</span>) ,(nref <span class="org-string">"two"</span>))))))
 </pre></div></div><p>
 <code>lilac-is-parent-block</code> depends on <code>lilac-get-noweb-children</code>. We tested the
@@ -3621,7 +3637,7 @@ latter already above, but we test the former anyway for completeness.
     (insert <span class="org-string">"#+end_src\n"</span>)
     (goto-char (point-min))
     (<span class="org-keyword">let</span> ((src-block (org-element-at-point)))
-      (<span class="org-keyword">should-not</span> (equal nil (lilac-is-parent-block src-block))))))
+      (should-not (equal nil (lilac-is-parent-block src-block))))))
 </pre></div></div><p>
 Here we test whether we can automatically insert captions for child blocks.
 </p>
@@ -3647,10 +3663,10 @@ Here we test whether we can automatically insert captions for child blocks.
     (insert <span class="org-string">"#+end_src\n"</span>)
     (lilac-insert-noweb-source-code-block-captions nil)
     (goto-char (point-min))
-    (<span class="org-keyword">should</span> (search-forward
+    (should (search-forward
              (concat <span class="org-string">"#+caption: ="</span> (nref <span class="org-string">"child1"</span>) <span class="org-string">"=  [[parent][1]]"</span>)
              nil t))
-    (<span class="org-keyword">should</span> (search-forward
+    (should (search-forward
              (concat <span class="org-string">"#+caption: ="</span> (nref <span class="org-string">"child2"</span>) <span class="org-string">"=  [[parent][1]]"</span>)
              nil t)))
   (<span class="org-keyword">with-temp-buffer</span>
@@ -3680,12 +3696,12 @@ Here we test whether we can automatically insert captions for child blocks.
     (insert <span class="org-string">"#+end_src\n"</span>)
     (lilac-insert-noweb-source-code-block-captions nil)
     (goto-char (point-min))
-    (<span class="org-keyword">should</span> (search-forward
+    (should (search-forward
              (concat <span class="org-string">"#+caption: ="</span>
                      (nref <span class="org-string">"child1"</span>)
                      <span class="org-string">"=  [[parent1][1]]  [[parent2][2]]"</span>)
              nil t))
-    (<span class="org-keyword">should</span> (search-forward
+    (should (search-forward
              (concat <span class="org-string">"#+caption: ="</span> (nref <span class="org-string">"child2"</span>) <span class="org-string">"=  [[parent1][1]]"</span>)
              nil t))))
 </pre></div></div><p>
@@ -3705,7 +3721,7 @@ Here we test retrieval of parent source code blocks.
     (insert <span class="org-string">"#+begin_src emacs-lisp\n"</span>)
     (insert <span class="org-string">"; bar\n"</span>)
     (insert <span class="org-string">"#+end_src\n"</span>)
-    (<span class="org-keyword">should-not</span> (lilac-get-parent-blocks)))
+    (should-not (lilac-get-parent-blocks)))
   (<span class="org-keyword">with-temp-buffer</span>
     (insert <span class="org-string">"#+name: parent1\n"</span>)
     (insert <span class="org-string">"#+caption: parent1\n"</span>)
@@ -3720,7 +3736,7 @@ Here we test retrieval of parent source code blocks.
     (insert <span class="org-string">"; bar\n"</span>)
     (insert (concat (nref <span class="org-string">"child2"</span>) <span class="org-string">"\n"</span>))
     (insert <span class="org-string">"#+end_src\n"</span>)
-    (<span class="org-keyword">should</span> (lilac-get-parent-blocks))))
+    (should (lilac-get-parent-blocks))))
 </pre></div></div><p>
 Here we test generating the child-to-parents hash table.
 </p>
@@ -3741,7 +3757,7 @@ Here we test generating the child-to-parents hash table.
     (<span class="org-keyword">let*</span> ((parent-blocks (lilac-get-parent-blocks))
            (child-parents-hash-table
              (lilac-mk-child-parents-hash-table parent-blocks)))
-      (<span class="org-keyword">should</span> (equal (hash-table-count child-parents-hash-table) 0))))
+      (should (equal (hash-table-count child-parents-hash-table) 0))))
   (<span class="org-keyword">with-temp-buffer</span>
     (insert <span class="org-string">"#+name: parent1\n"</span>)
     (insert <span class="org-string">"#+caption: parent1\n"</span>)
@@ -3759,7 +3775,7 @@ Here we test generating the child-to-parents hash table.
     (<span class="org-keyword">let*</span> ((parent-blocks (lilac-get-parent-blocks))
            (child-parents-hash-table
              (lilac-mk-child-parents-hash-table parent-blocks)))
-      (<span class="org-keyword">should</span> (equal (hash-table-count child-parents-hash-table) 2)))))
+      (should (equal (hash-table-count child-parents-hash-table) 2)))))
 </pre></div></div><p>
 Here we test the construction of smart captions.
 </p>
@@ -3784,7 +3800,7 @@ Here we test the construction of smart captions.
              (lilac-mk-child-parents-hash-table parent-blocks))
            (smart-captions (lilac-mk-smart-captions
                             child-parents-hash-table)))
-      (<span class="org-keyword">should</span> (equal smart-captions nil))))
+      (should (equal smart-captions nil))))
   (<span class="org-keyword">with-temp-buffer</span>
     (insert <span class="org-string">"#+name: parent1\n"</span>)
     (insert <span class="org-string">"#+caption: parent1\n"</span>)
@@ -3809,7 +3825,7 @@ Here we test the construction of smart captions.
              (lilac-mk-child-parents-hash-table parent-blocks))
            (smart-captions (lilac-mk-smart-captions
                             child-parents-hash-table)))
-      (<span class="org-keyword">should</span> (equal smart-captions
+      (should (equal smart-captions
        `((181 . ,(concat <span class="org-string">"#+caption: ="</span>
                          (nref <span class="org-string">"child1"</span>)
                          <span class="org-string">"=  [[parent1][1]]  [[parent2][2]]\n"</span>)))))))
@@ -3842,7 +3858,7 @@ Here we test the construction of smart captions.
              (lilac-mk-child-parents-hash-table parent-blocks))
            (smart-captions (lilac-mk-smart-captions
                             child-parents-hash-table)))
-      (<span class="org-keyword">should</span> (equal smart-captions
+      (should (equal smart-captions
        `((181 . ,(concat <span class="org-string">"#+caption: ="</span>
                          (nref <span class="org-string">"child1"</span>)
                          <span class="org-string">"=  [[parent1][1]]\n"</span>))
@@ -3872,7 +3888,7 @@ Here we test the construction of smart captions.
              (lilac-mk-child-parents-hash-table parent-blocks))
            (smart-captions (lilac-mk-smart-captions
                             child-parents-hash-table)))
-      (<span class="org-keyword">should</span> (equal smart-captions
+      (should (equal smart-captions
        `((91 . ,(concat <span class="org-string">"#+caption: ="</span>
                          (nref <span class="org-string">"child1"</span>)
                          <span class="org-string">"=  [[parent1][1]]\n"</span>))
@@ -3931,8 +3947,8 @@ block.
              (car (elquery-$
                    <span class="org-string">"#parent2 .lilac-child-link-from-parent a"</span>
                    html-ast)))))
-       (<span class="org-keyword">should</span> (equal got-child-link-text-parent1 <span class="org-string">"child1"</span>))
-       (<span class="org-keyword">should</span> (equal got-child-link-text-parent2 <span class="org-string">"child1"</span>))))))
+       (should (equal got-child-link-text-parent1 <span class="org-string">"child1"</span>))
+       (should (equal got-child-link-text-parent2 <span class="org-string">"child1"</span>))))))
 </pre></div></div>
 </div>
 </div>
@@ -3946,7 +3962,7 @@ Expect to find a link to the nested child block from wiithin the first child
 block.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-link-to-child-block-from-parent-block</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-link-to-child-block-from-parent-block-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-link-to-child-block-from-parent-block-2">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-children-are-linked-from-parent</span> ()
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-tests-el">t-link-to-child-block-from-parent-block</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__t-link-to-child-block-from-parent-block-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__t-link-to-child-block-from-parent-block-2">(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">t-lilac-children-are-linked-from-parent-nested</span> ()
   (lilac-publish-fixture
    <span class="org-string">"t-lilac-children-are-linked-from-parent-nested-"</span>
    (concat
@@ -3980,8 +3996,8 @@ block.
                    (concat <span class="org-string">"#"</span> (nref <span class="org-string">"child1"</span>)
                            <span class="org-string">" .lilac-child-link-from-parent a"</span>)
                  html-ast)))))
-       (<span class="org-keyword">should</span> (equal got-child-link-text-parent1 <span class="org-string">"child1"</span>))
-       (<span class="org-keyword">should</span> (equal got-child-link-text-child1 <span class="org-string">"nested-child"</span>))))))
+       (should (equal got-child-link-text-parent1 <span class="org-string">"child1"</span>))
+       (should (equal got-child-link-text-child1 <span class="org-string">"nested-child"</span>))))))
 </pre></div></div>
 </div>
 </div>
@@ -3992,31 +4008,31 @@ block.
 <h2 id="h-Glossary"><span class="section-number-2">6.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
-<div class="lilac-description-list-entry" id="org0000100"><dt> <b>literate document</b></dt><dd>A file or collection of
+<div class="lilac-description-list-entry" id="org0000102"><dt> <b>literate document</b></dt><dd>A file or collection of
 files that include both source code and prose to explain it. Well-known
 formats include Noweb files (<code>*.nw</code>) and Org mode files (<code>*.org</code>).</dd></div>
-<div class="lilac-description-list-entry" id="org000004a"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
+<div class="lilac-description-list-entry" id="org000004c"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
 <code>#+name: ...</code> field. This block is an independent block and there are no other
 blocks with the same name.</dd></div>
-<div class="lilac-description-list-entry" id="org0000106"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
-still works and from which <a href="#org0000102">Org mode</a> borrows heavily using <a href="#org0000104">Noweb-style
+<div class="lilac-description-list-entry" id="org0000108"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
+still works and from which <a href="#org0000104">Org mode</a> borrows heavily using <a href="#org0000106">Noweb-style
 references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000104"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
+<div class="lilac-description-list-entry" id="org0000106"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
 Noweb-style reference is just a name (string) that refers to a monoblock or
 polyblock. See <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000102"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
+<div class="lilac-description-list-entry" id="org0000104"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
 where "major mode" means that it provides things like syntax highlighting and
 keyboard shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac,
 the important thing is that we use Org mode as a literate programming tool.
 See <a href="https://orgmode.org/">Org mode</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000004c"><dt> <b>polyblock</b></dt><dd>an Org mode source code block without a
+<div class="lilac-description-list-entry" id="org000004e"><dt> <b>polyblock</b></dt><dd>an Org mode source code block without a
 <code>#+name: ...</code> field, but which has a <code>#+header: :noweb-ref ...</code> field. Other
 blocks with the same Noweb-ref name are concatenated together when they are
 tangled.  Polyblocks are used in cases where we would like to break up a
 single block into smaller pieces for explanatory purposes. In all other cases,
 monoblocks are preferable, unless the source code block is not to be tangled
 and is only for explanatory purposes in the woven output.</dd></div>
-<div class="lilac-description-list-entry" id="org0000108"><dt> <b>source code block</b></dt><dd>An Org mode facility
+<div class="lilac-description-list-entry" id="org000010a"><dt> <b>source code block</b></dt><dd>An Org mode facility
 that allows you to enclose a multiline text (typically source code) with
 <code>#+begin_src ...</code> and <code>#+end_src</code> lines. They are enclosed in a separate
 background color in the HTML output, and are often used for illustrating
@@ -4024,12 +4040,12 @@ source code listings. The format is <code>#+begin_src LANGUAGE_NAME</code> where
 <code>LANGUAGE_NAME</code> is the name of the programming language used for the listing.
 If the name is a recognized name, it will get syntax highlighting in the
 output automatically.</dd></div>
-<div class="lilac-description-list-entry" id="org000010a"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
-raw <a href="#org0000100">literate document</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000010c"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
+<div class="lilac-description-list-entry" id="org000010c"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
+raw <a href="#org0000102">literate document</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org000010e"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
 document to a richer format such as PDF or HTML. This allows fancier output,
 such as for mathematical formulas, which are easier to read versus the
-original <a href="#org0000100">literate document</a>.</dd></div>
+original <a href="#org0000102">literate document</a>.</dd></div>
 </dl>
 </div>
 </div>
