@@ -15,9 +15,9 @@
           (find-file fname-org)
           (lilac-publish)
           (funcall test (elquery-read-file fname-html)))
-    (shell-command-to-string
-     (concat "rm -f "
-             (mapconcat 'identity `(,fname-org ,fname-html) " "))))))
+      (shell-command-to-string
+       (concat
+        "rm -f " (mapconcat 'identity `(,fname-org ,fname-html) " "))))))
 (ert-deftest t-lilac-get-noweb-children ()
   (let ((body
          (concat

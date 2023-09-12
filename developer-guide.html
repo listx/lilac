@@ -3584,9 +3584,9 @@ for us. In between setup and tear-down, we execute the <code>test</code> functio
           (find-file fname-org)
           (lilac-publish)
           (funcall test (elquery-read-file fname-html)))
-    (shell-command-to-string
-     (concat <span class="org-string">"rm -f "</span>
-             (mapconcat 'identity `(,fname-org ,fname-html) <span class="org-string">" "</span>))))))
+      (shell-command-to-string
+       (concat
+        <span class="org-string">"rm -f "</span> (mapconcat 'identity `(,fname-org ,fname-html) <span class="org-string">" "</span>))))))
 </pre></div></div>
 </div>
 </div>

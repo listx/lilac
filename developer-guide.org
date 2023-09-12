@@ -2947,9 +2947,9 @@ for us. In between setup and tear-down, we execute the =test= function with a
           (find-file fname-org)
           (lilac-publish)
           (funcall test (elquery-read-file fname-html)))
-    (shell-command-to-string
-     (concat "rm -f "
-             (mapconcat 'identity `(,fname-org ,fname-html) " "))))))
+      (shell-command-to-string
+       (concat
+        "rm -f " (mapconcat 'identity `(,fname-org ,fname-html) " "))))))
 #+end_src
 
 ** Smart source code block caption helpers
