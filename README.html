@@ -260,10 +260,38 @@
 <ul>
 <li><a href="#h-Introduction">1. Introduction</a>
 <ul>
-<li><a href="#h-Motivation">1.1. Motivation</a>
+<li><a href="#h-Motivation-and-differences-vs-Org-defaults">1.1. Motivation and differences vs Org defaults</a>
 <ul>
-<li><a href="#h-Problems-with-Org-mode">1.1.1. Problems with Org mode</a></li>
-<li><a href="#h-Enter--Lilac">1.1.2. Enter <i>Lilac</i></a></li>
+<li><a href="#h-Source-code-block-captions">1.1.1. Source code block captions</a>
+<ul>
+<li><a href="#h-Org-defaults">1.1.1.1. Org defaults</a></li>
+<li><a href="#h-Lilac">1.1.1.2. Lilac</a></li>
+</ul>
+</li>
+<li><a href="#h-Source-code-block-links">1.1.2. Source code block links</a>
+<ul>
+<li><a href="#h-Org-defaults-1">1.1.2.1. Org defaults</a></li>
+<li><a href="#h-Lilac-1">1.1.2.2. Lilac</a></li>
+</ul>
+</li>
+<li><a href="#h-Link-IDs">1.1.3. Link IDs</a>
+<ul>
+<li><a href="#h-Org-defaults-2">1.1.3.1. Org defaults</a></li>
+<li><a href="#h-Lilac-2">1.1.3.2. Lilac</a></li>
+</ul>
+</li>
+<li><a href="#h-HTML-Table-of-Contents">1.1.4. HTML Table of Contents</a>
+<ul>
+<li><a href="#h-Org-defaults-3">1.1.4.1. Org defaults</a></li>
+<li><a href="#h-Lilac-3">1.1.4.2. Lilac</a></li>
+</ul>
+</li>
+<li><a href="#h-Side-notes--aka--margin-notes">1.1.5. Side notes, aka "margin notes"</a>
+<ul>
+<li><a href="#h-Org-defaults-4">1.1.5.1. Org defaults</a></li>
+<li><a href="#h-Lilac-4">1.1.5.2. Lilac</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -296,7 +324,7 @@
 <li><a href="#h-Quote-blocks">2.2.1.3. Quote blocks</a></li>
 </ul>
 </li>
-<li><a href="#h-Sidenotes">2.2.2. Sidenotes</a></li>
+<li><a href="#h-Side-notes">2.2.2. Side notes</a></li>
 <li><a href="#h-Math--MathJax">2.2.3. Math (MathJax)</a></li>
 </ul>
 </li>
@@ -336,29 +364,59 @@ This document itself reuses the <code>lilac.theme</code> file, which gives you a
 </p>
 </div>
 
-<div id="outline-container-h-Motivation" class="outline-3">
-<h3 id="h-Motivation"><span class="section-number-3">1.1.</span> Motivation</h3>
-<div class="outline-text-3" id="text-h-Motivation">
+<div id="outline-container-h-Motivation-and-differences-vs-Org-defaults" class="outline-3">
+<h3 id="h-Motivation-and-differences-vs-Org-defaults"><span class="section-number-3">1.1.</span> Motivation and differences vs Org defaults</h3>
+<div class="outline-text-3" id="text-h-Motivation-and-differences-vs-Org-defaults">
 <p>
-Lilac was created mainly because the existing Org mode features around Noweb
-references were lacking in features. There seems to have been a great deal of
-effort to make <i>tangling</i> (extracting source code from <a href="#org0000007">source code blocks</a>) work
-well, but not much has been done around <i>weaving</i>, where I think most of the
-difficulties lie (because making output look good to a human (weaving) is much
-more difficult than making output look good to a computer (tangling)).
+Lilac sacrifices some degree of customization in Org mode in order to make it
+easier to write literate programs using Noweb-style references. Lilac also
+focuses on HTML export for <i>weaving</i>.
+</p>
+
+<p>
+The following are some examples of how things are done in the default Org mode
+settings, and how Lilac does things differently.
 </p>
 </div>
 
-<div id="outline-container-h-Problems-with-Org-mode" class="outline-4">
-<h4 id="h-Problems-with-Org-mode"><span class="section-number-4">1.1.1.</span> Problems with Org mode</h4>
-<div class="outline-text-4" id="text-h-Problems-with-Org-mode">
+<div id="outline-container-h-Source-code-block-captions" class="outline-4">
+<h4 id="h-Source-code-block-captions"><span class="section-number-4">1.1.1.</span> Source code block captions</h4>
+<div class="outline-text-4" id="text-h-Source-code-block-captions">
+</div>
+
+<div id="outline-container-h-Org-defaults" class="outline-5">
+<h5 id="h-Org-defaults"><span class="section-number-5">1.1.1.1.</span> Org defaults</h5>
+<div class="outline-text-5" id="text-h-Org-defaults">
 <p>
 By default, source code blocks do not get any captions in the HTML output. This
-is a problem for LP because you have to manually explain the name of each block
-to keep track of their usage in other blocks (when referring to them with Noweb
-style references). This gets repetitive rather quickly.
+can be an annoyance for LP because you have to manually explain the name of each
+block to keep track of their usage in other blocks (when referring to them with
+Noweb style references).
 </p>
+</div>
+</div>
 
+<div id="outline-container-h-Lilac" class="outline-5">
+<h5 id="h-Lilac"><span class="section-number-5">1.1.1.2.</span> Lilac</h5>
+<div class="outline-text-5" id="text-h-Lilac">
+<p>
+Lilac frees you from having to write a custom <code>#+caption: ...</code> text for every
+source code block, because it generates them based on the name of the Noweb
+reference. Lilac links child blocks and parent blocks together so that you can
+click on code block names to navigate around this parent/child hierarchy.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Source-code-block-links" class="outline-4">
+<h4 id="h-Source-code-block-links"><span class="section-number-4">1.1.2.</span> Source code block links</h4>
+<div class="outline-text-4" id="text-h-Source-code-block-links">
+</div>
+
+<div id="outline-container-h-Org-defaults-1" class="outline-5">
+<h5 id="h-Org-defaults-1"><span class="section-number-5">1.1.2.1.</span> Org defaults</h5>
+<div class="outline-text-5" id="text-h-Org-defaults-1">
 <p>
 While Org mode allows source code blocks to refer to other blocks (Noweb
 references), it does not do any kind of linking. So you can write blocks like
@@ -387,27 +445,15 @@ Org mode does not create link anchors for headings, which makes referring to
 them from other external documents slightly annoying. Org mode does not add link
 anchors to source code blocks.
 </p>
-
-<p>
-Org mode generates random link ID's on every export. That is, even if you change
-nothing in your Org mode file, if you export to HTML there <b>will</b> be a diff
-because all of the linked objects will get a new link ID.
-</p>
 </div>
 </div>
 
-<div id="outline-container-h-Enter--Lilac" class="outline-4">
-<h4 id="h-Enter--Lilac"><span class="section-number-4">1.1.2.</span> Enter <i>Lilac</i></h4>
-<div class="outline-text-4" id="text-h-Enter--Lilac">
+<div id="outline-container-h-Lilac-1" class="outline-5">
+<h5 id="h-Lilac-1"><span class="section-number-5">1.1.2.2.</span> Lilac</h5>
+<div class="outline-text-5" id="text-h-Lilac-1">
 <p>
-Lilac addresses all of the issues presented above.
-</p>
-
-<p>
-Lilac frees you from having to write a custom <code>#+caption: ...</code> text for every
-source code block, because it generates them based on the name of the Noweb
-reference. Lilac links child blocks and parent blocks together so that you can
-click on code block names to navigate around this parent/child hierarchy.
+Lilac automatically links child blocks and parent blocks together so that you
+can click on code block names to navigate around this parent/child hierarchy.
 </p>
 
 <p>
@@ -417,13 +463,93 @@ can go back/forward and be taken back to these intra-document locations. This
 makes intra-document navigation more structured to help prevent you from getting
 lost.
 </p>
+</div>
+</div>
+</div>
 
+<div id="outline-container-h-Link-IDs" class="outline-4">
+<h4 id="h-Link-IDs"><span class="section-number-4">1.1.3.</span> Link IDs</h4>
+<div class="outline-text-4" id="text-h-Link-IDs">
+</div>
+
+<div id="outline-container-h-Org-defaults-2" class="outline-5">
+<h5 id="h-Org-defaults-2"><span class="section-number-5">1.1.3.1.</span> Org defaults</h5>
+<div class="outline-text-5" id="text-h-Org-defaults-2">
+<p>
+Org mode generates random link ID's on every export. That is, even if you change
+nothing in your Org mode file, if you export to HTML there <b>will</b> be a diff
+because all of the linked objects will get a new link ID.
+</p>
+</div>
+</div>
+
+<div id="outline-container-h-Lilac-2" class="outline-5">
+<h5 id="h-Lilac-2"><span class="section-number-5">1.1.3.2.</span> Lilac</h5>
+<div class="outline-text-5" id="text-h-Lilac-2">
 <p>
 Lilac makes HTML generation deterministic. This makes it VCS and CI-friendly
 because the output changes if and only if the input changes. Speaking of
 CI-friendliness, Lilac was designed to be run from outside of Emacs by default
 (and not interactively).
 </p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-HTML-Table-of-Contents" class="outline-4">
+<h4 id="h-HTML-Table-of-Contents"><span class="section-number-4">1.1.4.</span> HTML Table of Contents</h4>
+<div class="outline-text-4" id="text-h-HTML-Table-of-Contents">
+</div>
+
+<div id="outline-container-h-Org-defaults-3" class="outline-5">
+<h5 id="h-Org-defaults-3"><span class="section-number-5">1.1.4.1.</span> Org defaults</h5>
+<div class="outline-text-5" id="text-h-Org-defaults-3">
+<p>
+When exporting to HTML, the Table of Contents (TOC) is at the top of the
+document.
+</p>
+</div>
+</div>
+
+<div id="outline-container-h-Lilac-3" class="outline-5">
+<h5 id="h-Lilac-3"><span class="section-number-5">1.1.4.2.</span> Lilac</h5>
+<div class="outline-text-5" id="text-h-Lilac-3">
+<p>
+Lilac puts the TOC in a sidebar on the left. It also uses some JavaScript to
+check where the current mouse position is to update the current location in the
+TOC. That is, the TOC follows you as you scroll down the document.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-h-Side-notes--aka--margin-notes" class="outline-4">
+<h4 id="h-Side-notes--aka--margin-notes"><span class="section-number-4">1.1.5.</span> Side notes, aka "margin notes"</h4>
+<div class="outline-text-4" id="text-h-Side-notes--aka--margin-notes">
+</div>
+
+<div id="outline-container-h-Org-defaults-4" class="outline-5">
+<h5 id="h-Org-defaults-4"><span class="section-number-5">1.1.5.1.</span> Org defaults</h5>
+<div class="outline-text-5" id="text-h-Org-defaults-4">
+<p>
+Side notes are used to insert notes on the right-hand-side margin, and are
+inspired by the ones found in Donald Knuth's books.
+</p>
+
+<p>
+They are not supported in Org mode.
+</p>
+</div>
+</div>
+
+<div id="outline-container-h-Lilac-4" class="outline-5">
+<h5 id="h-Lilac-4"><span class="section-number-5">1.1.5.2.</span> Lilac</h5>
+<div class="outline-text-5" id="text-h-Lilac-4">
+<p>
+Lilac supports the <code>#+begin_sidenote</code> and <code>#+end_sidenote</code> delimiters. Text
+inside such delimiters are shown on the right hand margin.
+</p>
+</div>
 </div>
 </div>
 </div>
@@ -504,7 +630,7 @@ definition.
 </pre></div></div><p>
 This example illustrates the two ways to define a child block: either as a
 single code block with <code>#+name: __NREF__foo</code>, or as multiple blocks with
-<code>#+header: :noweb-ref __NREF__foo</code>. Lilac calls them <a href="#org000000d">monoblocks</a> and <a href="#org000000f">polyblocks</a>
+<code>#+header: :noweb-ref __NREF__foo</code>. Lilac calls them <a href="#org000000b">monoblocks</a> and <a href="#org000000d">polyblocks</a>
 respectively. Polyblocks are concatenated together in the order they appear in
 the overall Org file; this final concatenated version is what gets inserted into
 the Noweb reference in the parent block.
@@ -626,7 +752,7 @@ Rendered HTML output:
 Orgmode input:
 </p>
 
-<div class="sidenote" id="org0000023">
+<div class="sidenote" id="org0000021">
 <p>
 Although the <code>ex_monoblock</code> text is linkified here, ignore it. The text that you
 need to write in the Orgmode input is literally <code>__NREF__ex_monoblock</code>. Lilac
@@ -654,7 +780,7 @@ Rendered HTML output:
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">A parent block.</label><span class="lilac-caption-link-symbol"><a href="#A-parent-block-1">&#x1f517;</a></span></div><pre class="src src-python" id="A-parent-block-1"><span class="org-keyword">def</span> <span class="org-function-name">foo</span>():
     <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_monoblock">ex_monoblock</a></span>
     <span class="org-keyword">return</span> 42
-</pre></div></div><div class="sidenote" id="org0000028">
+</pre></div></div><div class="sidenote" id="org0000026">
 <p>
 Similarly, the <code>2</code> link is only here because Lilac thinks that this child block
 is referenced in multiple blocks. In a real example this <code>2</code> would not show up.
@@ -699,7 +825,7 @@ print("The answer is __NREF__ex_evaluate_me()")
 Rendered HTML output:
 </p>
 
-<div class="sidenote" id="org000002d">
+<div class="sidenote" id="org000002b">
 <p>
 The "42" here is computed by the Python interpreter and then injected into the
 print statement's string argument.
@@ -719,7 +845,7 @@ print statement's string argument.
 Orgmode input:
 </p>
 
-<div class="sidenote" id="org0000030">
+<div class="sidenote" id="org000002e">
 <p>
 Like above for monoblocks, Lilac needlessly linkifies the source code body text
 of the parent block when it doesn't need to (as this is only an illustrative
@@ -766,7 +892,7 @@ Some intervening text.
 <div id="outline-container-h-Linking-to-a-line-in-the-code-block-body" class="outline-6">
 <h6 id="h-Linking-to-a-line-in-the-code-block-body"><span class="section-number-6">2.2.1.1.5.</span> Linking to a line in the code block body</h6>
 <div class="outline-text-6" id="text-h-Linking-to-a-line-in-the-code-block-body">
-<div class="sidenote" id="org0000039">
+<div class="sidenote" id="org0000037">
 <p>
 The <code>-r</code> flag removes these <code>#ref:...</code> labels from the source code. The <code>-l</code>
 flag changes the format. In this case we make the format use a leading <code>#</code>
@@ -820,7 +946,7 @@ Foo bar.
 Rendered HTML output:
 </p>
 
-<pre class="example" id="org0000040">
+<pre class="example" id="org000003e">
 Hello world.
 Foo bar.
 </pre>
@@ -852,17 +978,11 @@ Foo bar.
 </div>
 </div>
 
-<div id="outline-container-h-Sidenotes" class="outline-4">
-<h4 id="h-Sidenotes"><span class="section-number-4">2.2.2.</span> Sidenotes</h4>
-<div class="outline-text-4" id="text-h-Sidenotes">
+<div id="outline-container-h-Side-notes" class="outline-4">
+<h4 id="h-Side-notes"><span class="section-number-4">2.2.2.</span> Side notes</h4>
+<div class="outline-text-4" id="text-h-Side-notes">
 <p>
-Sidenotes are not part of vanilla Orgmode. They are used to insert notes on the
-right-hand-side margin, and are inspired by the ones found in Donald Knuth's
-books.
-</p>
-
-<p>
-Note that Lilac only adds some special CSS styling to sidenotes. Orgmode is
+Note that Lilac only adds some special CSS styling to side notes. Orgmode is
 generous with source code blocks and accepts any <code>#+begin_foo</code> and <code>#+end_foo</code>
 lines.
 </p>
@@ -879,7 +999,7 @@ Foo bar.
 Rendered HTML output (see right hand margin):
 </p>
 
-<div class="sidenote" id="org0000045">
+<div class="sidenote" id="org0000043">
 <p>
 Hello world.
 Foo bar.
@@ -975,7 +1095,7 @@ was first demonstrated by Leonhard Euler in 1734. Here's another equation,
 </p>
 
 \begin{equation}
-\label{org0000048}
+\label{org0000046}
 \pi = \sum_{k = 0}^{\infty}\left[\frac{1}{16^k} \
 \left(\frac{4}{8k+1}-\frac{2}{8k+4}-\frac{1}{8k + 5}-\frac{1}{8k+6}\right)\right]
 \end{equation}
@@ -986,7 +1106,7 @@ digits of \(\pi\). A variant of this equation is as follows
 </p>
 
 \begin{equation}
-\label{org000004a}
+\label{org0000048}
 \pi = \frac1{2^6} \sum_{n=0}^\infty \frac{(-1)^n}{2^{10n}} \
 \left(-\frac{2^5}{4n+1} - \frac1{4n+3} + \frac{2^8}{10n+1} - \
 \frac{2^6}{10n+3} - \frac{2^2}{10n+5} - \frac{2^2}{10n+7} + \
@@ -994,7 +1114,7 @@ digits of \(\pi\). A variant of this equation is as follows
 \end{equation}
 
 <p>
-and is known as the Bellard's formula. Equation \eqref{org000004a} is too wide so
+and is known as the Bellard's formula. Equation \eqref{org0000048} is too wide so
 MathJax breaks it over multiple lines. Below is a version where we do the line
 breaking ourselves.
 </p>
@@ -1024,31 +1144,31 @@ curious to see how everything works, have a look at the <a href="developer-guide
 <h2 id="h-Glossary"><span class="section-number-2">4.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
-<div class="lilac-description-list-entry" id="org000004c"><dt> <b>literate document</b></dt><dd>A file or collection of
+<div class="lilac-description-list-entry" id="org000004a"><dt> <b>literate document</b></dt><dd>A file or collection of
 files that include both source code and prose to explain it. Well-known
 formats include Noweb files (<code>*.nw</code>) and Org mode files (<code>*.org</code>).</dd></div>
-<div class="lilac-description-list-entry" id="org000000d"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
+<div class="lilac-description-list-entry" id="org000000b"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
 <code>#+name: ...</code> field. This block is an independent block and there are no other
 blocks with the same name.</dd></div>
 <div class="lilac-description-list-entry" id="org0000001"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
-still works and from which <a href="#org000004e">Org mode</a> borrows heavily using <a href="#org0000050">Noweb-style
+still works and from which <a href="#org000004c">Org mode</a> borrows heavily using <a href="#org000004e">Noweb-style
 references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000050"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
+<div class="lilac-description-list-entry" id="org000004e"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
 Noweb-style reference is just a name (string) that refers to a monoblock or
 polyblock. See <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000004e"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
+<div class="lilac-description-list-entry" id="org000004c"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
 where "major mode" means that it provides things like syntax highlighting and
 keyboard shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac,
 the important thing is that we use Org mode as a literate programming tool.
 See <a href="https://orgmode.org/">Org mode</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000000f"><dt> <b>polyblock</b></dt><dd>an Org mode source code block without a
+<div class="lilac-description-list-entry" id="org000000d"><dt> <b>polyblock</b></dt><dd>an Org mode source code block without a
 <code>#+name: ...</code> field, but which has a <code>#+header: :noweb-ref ...</code> field. Other
 blocks with the same Noweb-ref name are concatenated together when they are
 tangled.  Polyblocks are used in cases where we would like to break up a
 single block into smaller pieces for explanatory purposes. In all other cases,
 monoblocks are preferable, unless the source code block is not to be tangled
 and is only for explanatory purposes in the woven output.</dd></div>
-<div class="lilac-description-list-entry" id="org0000007"><dt> <b>source code block</b></dt><dd>An Org mode facility
+<div class="lilac-description-list-entry" id="org0000050"><dt> <b>source code block</b></dt><dd>An Org mode facility
 that allows you to enclose a multiline text (typically source code) with
 <code>#+begin_src ...</code> and <code>#+end_src</code> lines. They are enclosed in a separate
 background color in the HTML output, and are often used for illustrating
@@ -1057,11 +1177,11 @@ source code listings. The format is <code>#+begin_src LANGUAGE_NAME</code> where
 If the name is a recognized name, it will get syntax highlighting in the
 output automatically.</dd></div>
 <div class="lilac-description-list-entry" id="org0000005"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
-raw <a href="#org000004c">literate document</a>.</dd></div>
+raw <a href="#org000004a">literate document</a>.</dd></div>
 <div class="lilac-description-list-entry" id="org0000003"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
 document to a richer format such as PDF or HTML. This allows fancier output,
 such as for mathematical formulas, which are easier to read versus the
-original <a href="#org000004c">literate document</a>.</dd></div>
+original <a href="#org000004a">literate document</a>.</dd></div>
 </dl>
 </div>
 </div>

@@ -33,21 +33,34 @@ Noweb][Noweb]]-style [cite:@ramsey_1994] references easy. It comes in two parts:
 This document itself reuses the =lilac.theme= file, which gives you a preview
 (if you are viewing the HTML output) of what weaving with Lilac looks like.
 
-** Motivation
+** Motivation and differences vs Org defaults
 
-Lilac was created mainly because the existing Org mode features around Noweb
-references were lacking in features. There seems to have been a great deal of
-effort to make /tangling/ (extracting source code from [[glossary: source code block][source code blocks]]) work
-well, but not much has been done around /weaving/, where I think most of the
-difficulties lie (because making output look good to a human (weaving) is much
-more difficult than making output look good to a computer (tangling)).
+Lilac sacrifices some degree of customization in Org mode in order to make it
+easier to write literate programs using Noweb-style references. Lilac also
+focuses on HTML export for /weaving/.
 
-*** Problems with Org mode
+The following are some examples of how things are done in the default Org mode
+settings, and how Lilac does things differently.
+
+*** Source code block captions
+
+**** Org defaults
 
 By default, source code blocks do not get any captions in the HTML output. This
-is a problem for LP because you have to manually explain the name of each block
-to keep track of their usage in other blocks (when referring to them with Noweb
-style references). This gets repetitive rather quickly.
+can be an annoyance for LP because you have to manually explain the name of each
+block to keep track of their usage in other blocks (when referring to them with
+Noweb style references).
+
+**** Lilac
+
+Lilac frees you from having to write a custom =#+caption: ...= text for every
+source code block, because it generates them based on the name of the Noweb
+reference. Lilac links child blocks and parent blocks together so that you can
+click on code block names to navigate around this parent/child hierarchy.
+
+*** Source code block links
+
+**** Org defaults
 
 While Org mode allows source code blocks to refer to other blocks (Noweb
 references), it does not do any kind of linking. So you can write blocks like
@@ -75,18 +88,10 @@ Org mode does not create link anchors for headings, which makes referring to
 them from other external documents slightly annoying. Org mode does not add link
 anchors to source code blocks.
 
-Org mode generates random link ID's on every export. That is, even if you change
-nothing in your Org mode file, if you export to HTML there *will* be a diff
-because all of the linked objects will get a new link ID.
+**** Lilac
 
-*** Enter /Lilac/
-
-Lilac addresses all of the issues presented above.
-
-Lilac frees you from having to write a custom =#+caption: ...= text for every
-source code block, because it generates them based on the name of the Noweb
-reference. Lilac links child blocks and parent blocks together so that you can
-click on code block names to navigate around this parent/child hierarchy.
+Lilac automatically links child blocks and parent blocks together so that you
+can click on code block names to navigate around this parent/child hierarchy.
 
 Also, link anchors are added to all source code blocks as well as headlines,
 and they are saved in your browser's history as you click around, such that you
@@ -94,10 +99,47 @@ can go back/forward and be taken back to these intra-document locations. This
 makes intra-document navigation more structured to help prevent you from getting
 lost.
 
+*** Link IDs
+
+**** Org defaults
+
+Org mode generates random link ID's on every export. That is, even if you change
+nothing in your Org mode file, if you export to HTML there *will* be a diff
+because all of the linked objects will get a new link ID.
+
+**** Lilac
+
 Lilac makes HTML generation deterministic. This makes it VCS and CI-friendly
 because the output changes if and only if the input changes. Speaking of
 CI-friendliness, Lilac was designed to be run from outside of Emacs by default
 (and not interactively).
+
+*** HTML Table of Contents
+
+**** Org defaults
+
+When exporting to HTML, the Table of Contents (TOC) is at the top of the
+document.
+
+**** Lilac
+
+Lilac puts the TOC in a sidebar on the left. It also uses some JavaScript to
+check where the current mouse position is to update the current location in the
+TOC. That is, the TOC follows you as you scroll down the document.
+
+*** Side notes, aka "margin notes"
+
+**** Org defaults
+
+Side notes are used to insert notes on the right-hand-side margin, and are
+inspired by the ones found in Donald Knuth's books.
+
+They are not supported in Org mode.
+
+**** Lilac
+
+Lilac supports the =#+begin_sidenote= and =#+end_sidenote= delimiters. Text
+inside such delimiters are shown on the right hand margin.
 
 * User Guide
 
@@ -483,13 +525,9 @@ Hello world.
 Foo bar.
 #+end_quote
 
-*** Sidenotes
+*** Side notes
 
-Sidenotes are not part of vanilla Orgmode. They are used to insert notes on the
-right-hand-side margin, and are inspired by the ones found in Donald Knuth's
-books.
-
-Note that Lilac only adds some special CSS styling to sidenotes. Orgmode is
+Note that Lilac only adds some special CSS styling to side notes. Orgmode is
 generous with source code blocks and accepts any =#+begin_foo= and =#+end_foo=
 lines.
 
