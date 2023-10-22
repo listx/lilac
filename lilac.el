@@ -107,11 +107,11 @@ When matching, reference is stored in match group 1."
    "<h2>Table of Contents</h2>"
    "")
   (lilac-replace-from-to-html
-   "mathjax@3/es5/tex-mml-chtml.js"
-   "mathjax@4.0.0-beta.4/tex-mml-chtml.js")
+   "mathjax@3/es5/tex-mml-chtml.js\">"
+   "mathjax@4.0.0-beta.4/tex-mml-chtml.js\">")
   (lilac-replace-from-to-html
-   ".csl-right-inline{margin: 0 0 0 1em;"
-   ".csl-right-inline{margin: 0 0 0 2em;")
+   ".csl-right-inline{margin: 0 0 0 1em;}<"
+   ".csl-right-inline{margin: 0 0 0 2em;}<")
   (lilac-replace-from-to-html
    "\"csl-entry\"><a \\(id=\"[^\"]+\"\\)></a>"
    "\"csl-entry\" \\1>"

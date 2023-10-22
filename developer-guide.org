@@ -1618,19 +1618,25 @@ that.
 #+name: __NREF__lilac-publish-fix-mathjax-version
 #+begin_src emacs-lisp
 (lilac-replace-from-to-html
- "mathjax@3/es5/tex-mml-chtml.js"
- "mathjax@4.0.0-beta.4/tex-mml-chtml.js")
+ "mathjax@3/es5/tex-mml-chtml.js\">"
+ "mathjax@4.0.0-beta.4/tex-mml-chtml.js\">")
 #+end_src
+
+We have to include the trailing (and somewhat redundant) =\">= so that the
+function does not replace the text above as well as the intended raw HTML
+(hardcoded) bits that we want to replace.
 
 **** Bibliography (citations)
 
-This cleans up the inline styles for citations.
+This cleans up the inline styles for citations. Again we include some additional
+characters in the pattern (notably the left angle bracket (=<=)) so that the
+text below itself does not get recognized and replaced.
 
 #+name: __NREF__lilac-publish-fix-inline-styles
 #+begin_src emacs-lisp
 (lilac-replace-from-to-html
- ".csl-right-inline{margin: 0 0 0 1em;"
- ".csl-right-inline{margin: 0 0 0 2em;")
+ ".csl-right-inline{margin: 0 0 0 1em;}<"
+ ".csl-right-inline{margin: 0 0 0 2em;}<")
 #+end_src
 
 We also do some replacements for the bibliography entries themselves. Namely,
