@@ -263,8 +263,9 @@
 <li><a href="#h-Link-noweb-references--link-to-child-block-from-parent-block">4.5.3. Link noweb references (link to child block from parent block)</a></li>
 <li><a href="#h-Search-and-replace-hardcoded-things">4.5.4. Search and replace hardcoded things</a>
 <ul>
-<li><a href="#h-Bibliography--citations">4.5.4.1. Bibliography (citations)</a></li>
-<li><a href="#h-Glossary--description-lists">4.5.4.2. Glossary (description lists)</a></li>
+<li><a href="#h-MathJax-with-line-breaking-support">4.5.4.1. MathJax with line breaking support</a></li>
+<li><a href="#h-Bibliography--citations">4.5.4.2. Bibliography (citations)</a></li>
+<li><a href="#h-Glossary--description-lists">4.5.4.3. Glossary (description lists)</a></li>
 </ul>
 </li>
 <li><a href="#h-Custom-HTML--head--section">4.5.5. Custom HTML "head" section</a></li>
@@ -854,6 +855,9 @@ The full code listing for <code>lilac-publish</code> is below.
    <span class="org-string">"&lt;h2&gt;Table of Contents&lt;/h2&gt;"</span>
    <span class="org-string">""</span>)
   (lilac-replace-from-to-html
+   <span class="org-string">"mathjax@4.0.0-beta.4/tex-mml-chtml.js"</span>
+   <span class="org-string">"mathjax@4.0.0-beta.4/tex-mml-chtml.js"</span>)
+  (lilac-replace-from-to-html
    <span class="org-string">".csl-right-inline{margin: 0 0 0 2em;"</span>
    <span class="org-string">".csl-right-inline{margin: 0 0 0 2em;"</span>)
   (lilac-replace-from-to-html
@@ -980,6 +984,7 @@ part of citation styles.</li>
 </ol>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-lilac-publish</a></span>(7/7) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-lilac-publish-7">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-lilac-publish-7">  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-delete-toc-text">lilac-publish-delete-toc-text</a></span>
+  <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-mathjax-version">lilac-publish-fix-mathjax-version</a></span>
   <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-inline-styles">lilac-publish-fix-inline-styles</a></span>
   <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-bibliography-ids">lilac-publish-fix-bibliography-ids</a></span>
   <span class="lilac-child-link-from-parent"><a href="#__NREF__lilac-publish-fix-description-lists">lilac-publish-fix-description-lists</a></span>
@@ -2126,8 +2131,24 @@ file from Emacs (instead of invoking <code>sed</code>).
 </p>
 </div>
 
+<div id="outline-container-h-MathJax-with-line-breaking-support" class="outline-5">
+<h5 id="h-MathJax-with-line-breaking-support"><span class="section-number-5">4.5.4.1.</span> MathJax with line breaking support</h5>
+<div class="outline-text-5" id="text-h-MathJax-with-line-breaking-support">
+<p>
+Surprisingly, MathJax v3 (which Org ships with) <a href="https://github.com/mathjax/MathJax/issues/2312">does not support manual line
+breaks</a>. However, line breaks are supported in the new <a href="https://github.com/mathjax/MathJax/releases/tag/4.0.0-beta.4">v4 alpha version</a>. So use
+that.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-lilac-publish-7">lilac-publish-fix-mathjax-version</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac-publish-fix-mathjax-version">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac-publish-fix-mathjax-version">(lilac-replace-from-to-html
+ <span class="org-string">"mathjax@4.0.0-beta.4/tex-mml-chtml.js"</span>
+ <span class="org-string">"mathjax@4.0.0-beta.4/tex-mml-chtml.js"</span>)
+</pre></div></div>
+</div>
+</div>
+
 <div id="outline-container-h-Bibliography--citations" class="outline-5">
-<h5 id="h-Bibliography--citations"><span class="section-number-5">4.5.4.1.</span> Bibliography (citations)</h5>
+<h5 id="h-Bibliography--citations"><span class="section-number-5">4.5.4.2.</span> Bibliography (citations)</h5>
 <div class="outline-text-5" id="text-h-Bibliography--citations">
 <p>
 This cleans up the inline styles for citations.
@@ -2141,7 +2162,7 @@ We also do some replacements for the bibliography entries themselves. Namely,
 each entry has the following (odd) structure by default:
 </p>
 
-<pre class="example" id="org0000082">
+<pre class="example" id="org0000084">
 &lt;div class="csl-entry"&gt;&lt;a id="citeproc_bib_item_1"&gt;&lt;/a&gt; ... &lt;/div&gt;
 </pre>
 
@@ -2150,7 +2171,7 @@ and instead we delete the content-less link anchor and instead move th ID to the
 parent div, like this:
 </p>
 
-<pre class="example" id="org0000083">
+<pre class="example" id="org0000085">
 &lt;div class="csl-entry" id="citeproc_bib_item_1"&gt; ... &lt;/div&gt;
 </pre>
 
@@ -2184,7 +2205,7 @@ And here we style these entries.
 </div>
 
 <div id="outline-container-h-Glossary--description-lists" class="outline-5">
-<h5 id="h-Glossary--description-lists"><span class="section-number-5">4.5.4.2.</span> Glossary (description lists)</h5>
+<h5 id="h-Glossary--description-lists"><span class="section-number-5">4.5.4.3.</span> Glossary (description lists)</h5>
 <div class="outline-text-5" id="text-h-Glossary--description-lists">
 <p>
 Similar to the bibliography entries, the description lists in HTML have empty
@@ -2970,7 +2991,7 @@ We define colors and fonts in one place and reuse them throughout the rest of
 the CSS, with the <code>var()</code> function.
 </p>
 
-<div class="sidenote" id="org00000c6">
+<div class="sidenote" id="org00000c8">
 <p>
 This would be an excellent candidate to copy/paste/tweak into your own
 <code>lilac-override.css</code> file to tweak any of the colors or fonts used by Lilac.
@@ -3547,7 +3568,7 @@ prefix indirectly with the <code>(nref)</code> helper function.
 <div id="outline-container-h-Setup-and-tear-down-fixture-for-HTML-tests" class="outline-4">
 <h4 id="h-Setup-and-tear-down-fixture-for-HTML-tests"><span class="section-number-4">5.1.2.</span> Setup and tear-down fixture for HTML tests</h4>
 <div class="outline-text-4" id="text-h-Setup-and-tear-down-fixture-for-HTML-tests">
-<div class="sidenote" id="org00000ef">
+<div class="sidenote" id="org00000f1">
 <p>
 The <a href="https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites">Emacs manual</a> for ERT defines fixtures as environments which provide setup
 and tear-down.
@@ -4003,19 +4024,19 @@ block.
 <h2 id="h-Glossary"><span class="section-number-2">6.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
-<div class="lilac-description-list-entry" id="org0000102"><dt> <b>literate document</b></dt><dd>A file or collection of
+<div class="lilac-description-list-entry" id="org0000104"><dt> <b>literate document</b></dt><dd>A file or collection of
 files that include both source code and prose to explain it. Well-known
 formats include Noweb files (<code>*.nw</code>) and Org mode files (<code>*.org</code>).</dd></div>
 <div class="lilac-description-list-entry" id="org000004c"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
 <code>#+name: ...</code> field. This block is an independent block and there are no other
 blocks with the same name.</dd></div>
-<div class="lilac-description-list-entry" id="org0000108"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
-still works and from which <a href="#org0000104">Org mode</a> borrows heavily using <a href="#org0000106">Noweb-style
+<div class="lilac-description-list-entry" id="org000010a"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
+still works and from which <a href="#org0000106">Org mode</a> borrows heavily using <a href="#org0000108">Noweb-style
 references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000106"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
+<div class="lilac-description-list-entry" id="org0000108"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
 Noweb-style reference is just a name (string) that refers to a monoblock or
 polyblock. See <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000104"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
+<div class="lilac-description-list-entry" id="org0000106"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
 where "major mode" means that it provides things like syntax highlighting and
 keyboard shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac,
 the important thing is that we use Org mode as a literate programming tool.
@@ -4027,7 +4048,7 @@ tangled.  Polyblocks are used in cases where we would like to break up a
 single block into smaller pieces for explanatory purposes. In all other cases,
 monoblocks are preferable, unless the source code block is not to be tangled
 and is only for explanatory purposes in the woven output.</dd></div>
-<div class="lilac-description-list-entry" id="org000010a"><dt> <b>source code block</b></dt><dd>An Org mode facility
+<div class="lilac-description-list-entry" id="org000010c"><dt> <b>source code block</b></dt><dd>An Org mode facility
 that allows you to enclose a multiline text (typically source code) with
 <code>#+begin_src ...</code> and <code>#+end_src</code> lines. They are enclosed in a separate
 background color in the HTML output, and are often used for illustrating
@@ -4035,12 +4056,12 @@ source code listings. The format is <code>#+begin_src LANGUAGE_NAME</code> where
 <code>LANGUAGE_NAME</code> is the name of the programming language used for the listing.
 If the name is a recognized name, it will get syntax highlighting in the
 output automatically.</dd></div>
-<div class="lilac-description-list-entry" id="org000010c"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
-raw <a href="#org0000102">literate document</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000010e"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
+<div class="lilac-description-list-entry" id="org000010e"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
+raw <a href="#org0000104">literate document</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org0000110"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
 document to a richer format such as PDF or HTML. This allows fancier output,
 such as for mathematical formulas, which are easier to read versus the
-original <a href="#org0000102">literate document</a>.</dd></div>
+original <a href="#org0000104">literate document</a>.</dd></div>
 </dl>
 </div>
 </div>

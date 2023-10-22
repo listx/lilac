@@ -500,6 +500,7 @@ The final bits are
 #+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish
 #+begin_src emacs-lisp
   __NREF__lilac-publish-delete-toc-text
+  __NREF__lilac-publish-fix-mathjax-version
   __NREF__lilac-publish-fix-inline-styles
   __NREF__lilac-publish-fix-bibliography-ids
   __NREF__lilac-publish-fix-description-lists
@@ -1607,6 +1608,19 @@ on the current buffer name.
 
 Now we do some basic search-and-replace commands to clean up the exported HTML
 file from Emacs (instead of invoking =sed=).
+
+**** MathJax with line breaking support
+
+Surprisingly, MathJax v3 (which Org ships with) [[https://github.com/mathjax/MathJax/issues/2312][does not support manual line
+breaks]]. However, line breaks are supported in the new [[https://github.com/mathjax/MathJax/releases/tag/4.0.0-beta.4][v4 alpha version]]. So use
+that.
+
+#+name: __NREF__lilac-publish-fix-mathjax-version
+#+begin_src emacs-lisp
+(lilac-replace-from-to-html
+ "mathjax@3/es5/tex-mml-chtml.js"
+ "mathjax@4.0.0-beta.4/tex-mml-chtml.js")
+#+end_src
 
 **** Bibliography (citations)
 
