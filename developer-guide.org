@@ -48,6 +48,9 @@ pkgs.mkShell ({
     # Tangling and weaving for Literate Programming.
     pkgs.emacs29-nox
 
+    # Spell checking.
+    pkgs.typos
+
     # Update Nix dependencies in package/nix/sources.nix.
     pkgs.niv
 
@@ -88,6 +91,7 @@ test: tangle
 __NREF__Makefile-weave
 __NREF__Makefile-tangle
 __NREF__Makefile-run_emacs
+__NREF__Makefile-lint
 __NREF__Makefile-update-deps
 #+end_src
 
@@ -98,7 +102,7 @@ any syntax highlighting.
 
 #+name: __NREF__Makefile-weave
 #+begin_src makefile
-weave: README.html developer-guide.html
+weave: lint README.html developer-guide.html
 .PHONY: weave
 
 README.html syntax-highlighting.css &: README.org
@@ -177,6 +181,35 @@ update-deps: package/nix/sources.json package/nix/sources.nix
 	cd package && niv update nixpkgs --branch $(nixpkgs_stable_channel)
 	cd package && niv update
 	touch update-deps
+#+end_src
+
+** Linting
+
+*** Spell checker
+
+We use [[https://crates.io/crates/typos-cli][typos-cli]] to check for spelling errors. Below we configure it to only
+check the original source material --- Org files.
+
+#+name: _typos.toml
+#+caption: _typos.toml
+#+begin_src toml :tangle _typos.toml :eval no
+[files]
+extend-exclude = [
+    "*.html",
+    "deps/*",
+]
+#+end_src
+
+Here we have the Makefile rules for linting, which include this spellchecker.
+
+#+name: __NREF__Makefile-lint
+#+begin_src makefile
+lint: spellcheck
+.PHONY: lint
+
+spellcheck: README.org developer-guide.org
+	typos
+.PHONY: spellcheck
 #+end_src
 
 * Tangling (generating the source code)

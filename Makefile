@@ -8,7 +8,7 @@ test: tangle
 		--funcall ert-run-tests-batch-and-exit
 .PHONY: test
 
-weave: README.html developer-guide.html
+weave: lint README.html developer-guide.html
 .PHONY: weave
 
 README.html syntax-highlighting.css &: README.org
@@ -43,6 +43,12 @@ define run_emacs
 endef
 
 LILAC_ROOT := $(shell git rev-parse --show-toplevel)
+lint: spellcheck
+.PHONY: lint
+
+spellcheck: README.org developer-guide.org
+	typos
+.PHONY: spellcheck
 nixpkgs_stable_channel := nixos-23.05
 update-deps: package/nix/sources.json package/nix/sources.nix
 	cd package && niv update nixpkgs --branch $(nixpkgs_stable_channel)

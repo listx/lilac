@@ -11,6 +11,9 @@ pkgs.mkShell ({
     # Tangling and weaving for Literate Programming.
     pkgs.emacs29-nox
 
+    # Spell checking.
+    pkgs.typos
+
     # Update Nix dependencies in package/nix/sources.nix.
     pkgs.niv
 

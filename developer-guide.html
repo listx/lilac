@@ -227,7 +227,15 @@
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
 <li><a href="#h-Development-environment--Nix-shell">1. Development environment (Nix shell)</a></li>
-<li><a href="#h-Makefile">2. Makefile</a></li>
+<li><a href="#h-Makefile">2. Makefile</a>
+<ul>
+<li><a href="#h-Linting">2.1. Linting</a>
+<ul>
+<li><a href="#h-Spell-checker">2.1.1. Spell checker</a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li><a href="#h-Tangling--generating-the-source-code">3. Tangling (generating the source code)</a>
 <ul>
 <li><a href="#h-Custom-Noweb-delimiters">3.1. Custom Noweb delimiters</a></li>
@@ -400,6 +408,9 @@ pkgs.mkShell ({
     <span class="org-comment"># Tangling and weaving for Literate Programming.</span>
     pkgs.emacs29-nox
 
+    <span class="org-comment"># Spell checking.</span>
+    pkgs.typos
+
     <span class="org-comment"># Update Nix dependencies in package/nix/sources.nix.</span>
     pkgs.niv
 
@@ -444,6 +455,7 @@ equivalent <code>test: Makefile</code> or <code>test: lilac.el</code>.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-weave">Makefile-weave</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-tangle">Makefile-tangle</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-run_emacs">Makefile-run_emacs</a></span>
+<span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-lint">Makefile-lint</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__Makefile-update-deps">Makefile-update-deps</a></span>
 </pre></div></div><p>
 Weaving just depends on the main <code>README.html</code> and <code>developer-guide</code> files being
@@ -452,7 +464,7 @@ generated. Before we call <code>(lilac-publish)</code>, we have to first call
 any syntax highlighting.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#Makefile">Makefile-weave</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-weave">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-weave"><span class="org-makefile-targets">weave</span>: README.html developer-guide.html
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#Makefile">Makefile-weave</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-weave">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-weave"><span class="org-makefile-targets">weave</span>: lint README.html developer-guide.html
 <span class="org-makefile-targets">.PHONY</span>: weave
 
 <span class="org-makefile-targets">README.html syntax-highlighting.css &amp;</span>: README.org
@@ -530,6 +542,39 @@ these channels ourselves.
     cd package &amp;&amp; niv update
     touch update-deps
 </pre></div></div>
+</div>
+
+<div id="outline-container-h-Linting" class="outline-3">
+<h3 id="h-Linting"><span class="section-number-3">2.1.</span> Linting</h3>
+<div class="outline-text-3" id="text-h-Linting">
+</div>
+
+<div id="outline-container-h-Spell-checker" class="outline-4">
+<h4 id="h-Spell-checker"><span class="section-number-4">2.1.1.</span> Spell checker</h4>
+<div class="outline-text-4" id="text-h-Spell-checker">
+<p>
+We use <a href="https://crates.io/crates/typos-cli">typos-cli</a> to check for spelling errors. Below we configure it to only
+check the original source material &#x2014; Org files.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">_typos.toml</label><span class="lilac-caption-link-symbol"><a href="#typos-toml">&#x1f517;</a></span></div><pre class="src src-toml" id="typos-toml">[<span class="org-type">files</span>]
+<span class="org-variable-name">extend-exclude</span> = [
+    <span class="org-string">"*.html"</span>,
+    <span class="org-string">"deps/*"</span>,
+]
+</pre></div></div><p>
+Here we have the Makefile rules for linting, which include this spellchecker.
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#Makefile">Makefile-lint</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-lint">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-lint"><span class="org-makefile-targets">lint</span>: spellcheck
+<span class="org-makefile-targets">.PHONY</span>: lint
+
+<span class="org-makefile-targets">spellcheck</span>: README.org developer-guide.org
+    typos
+<span class="org-makefile-targets">.PHONY</span>: spellcheck
+</pre></div></div>
+</div>
+</div>
 </div>
 </div>
 
@@ -1382,8 +1427,8 @@ type is a list of strings.
     noweb-ref-name))
 </pre></div></div><p>
 Note that a child source block can have two ways of defining its name. The first
-is with the direct <code>#+name: __NREF__foo</code> style (<a href="#org000004c">monoblock</a>), and the second way
-is with a line like <code>#+header: :noweb-ref __NREF__foo</code> (<a href="#org000004e">polyblock</a>). Here
+is with the direct <code>#+name: __NREF__foo</code> style (<a href="#org0000050">monoblock</a>), and the second way
+is with a line like <code>#+header: :noweb-ref __NREF__foo</code> (<a href="#org0000052">polyblock</a>). Here
 <code>lilac-get-src-block-name</code> grabs the name of a (child) source code block, taking
 into account these two styles. For polyblock names, we mark it as such with a
 <code>(polyblock)</code> string, which is used later for the <a href="#coderef-NSCB_POLYBLOCK_INDICATOR" class="coderef" onmouseover="CodeHighlightOn(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');" onmouseout="CodeHighlightOff(this, 'coderef-NSCB_POLYBLOCK_INDICATOR');"><code>NSCB_POLYBLOCK_INDICATOR</code></a>.
@@ -1516,7 +1561,7 @@ have a unique ID).
 <h4 id="h-Use-human-readable-HTML-IDs-for-source-code-links"><span class="section-number-4">4.5.1.</span> Use human-readable HTML IDs for source code links</h4>
 <div class="outline-text-4" id="text-h-Use-human-readable-HTML-IDs-for-source-code-links">
 <p>
-Recall that there are 2 types of source code blocks: <a href="#org000004c">monoblocks</a> and <a href="#org000004e">polyblocks</a>.
+Recall that there are 2 types of source code blocks: <a href="#org0000050">monoblocks</a> and <a href="#org0000052">polyblocks</a>.
 </p>
 
 <p>
@@ -2168,7 +2213,7 @@ We also do some replacements for the bibliography entries themselves. Namely,
 each entry has the following (odd) structure by default:
 </p>
 
-<pre class="example" id="org0000084">
+<pre class="example" id="org0000088">
 &lt;div class="csl-entry"&gt;&lt;a id="citeproc_bib_item_1"&gt;&lt;/a&gt; ... &lt;/div&gt;
 </pre>
 
@@ -2177,7 +2222,7 @@ and instead we delete the content-less link anchor and instead move th ID to the
 parent div, like this:
 </p>
 
-<pre class="example" id="org0000085">
+<pre class="example" id="org0000089">
 &lt;div class="csl-entry" id="citeproc_bib_item_1"&gt; ... &lt;/div&gt;
 </pre>
 
@@ -2997,7 +3042,7 @@ We define colors and fonts in one place and reuse them throughout the rest of
 the CSS, with the <code>var()</code> function.
 </p>
 
-<div class="sidenote" id="org00000c8">
+<div class="sidenote" id="org00000cc">
 <p>
 This would be an excellent candidate to copy/paste/tweak into your own
 <code>lilac-override.css</code> file to tweak any of the colors or fonts used by Lilac.
@@ -3574,7 +3619,7 @@ prefix indirectly with the <code>(nref)</code> helper function.
 <div id="outline-container-h-Setup-and-tear-down-fixture-for-HTML-tests" class="outline-4">
 <h4 id="h-Setup-and-tear-down-fixture-for-HTML-tests"><span class="section-number-4">5.1.2.</span> Setup and tear-down fixture for HTML tests</h4>
 <div class="outline-text-4" id="text-h-Setup-and-tear-down-fixture-for-HTML-tests">
-<div class="sidenote" id="org00000f1">
+<div class="sidenote" id="org00000f5">
 <p>
 The <a href="https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites">Emacs manual</a> for ERT defines fixtures as environments which provide setup
 and tear-down.
@@ -4030,31 +4075,31 @@ block.
 <h2 id="h-Glossary"><span class="section-number-2">6.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
-<div class="lilac-description-list-entry" id="org0000104"><dt> <b>literate document</b></dt><dd>A file or collection of
+<div class="lilac-description-list-entry" id="org0000108"><dt> <b>literate document</b></dt><dd>A file or collection of
 files that include both source code and prose to explain it. Well-known
 formats include Noweb files (<code>*.nw</code>) and Org mode files (<code>*.org</code>).</dd></div>
-<div class="lilac-description-list-entry" id="org000004c"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
+<div class="lilac-description-list-entry" id="org0000050"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
 <code>#+name: ...</code> field. This block is an independent block and there are no other
 blocks with the same name.</dd></div>
-<div class="lilac-description-list-entry" id="org000010a"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
-still works and from which <a href="#org0000106">Org mode</a> borrows heavily using <a href="#org0000108">Noweb-style
+<div class="lilac-description-list-entry" id="org000010e"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
+still works and from which <a href="#org000010a">Org mode</a> borrows heavily using <a href="#org000010c">Noweb-style
 references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000108"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
+<div class="lilac-description-list-entry" id="org000010c"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
 Noweb-style reference is just a name (string) that refers to a monoblock or
 polyblock. See <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000106"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
+<div class="lilac-description-list-entry" id="org000010a"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
 where "major mode" means that it provides things like syntax highlighting and
 keyboard shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac,
 the important thing is that we use Org mode as a literate programming tool.
 See <a href="https://orgmode.org/">Org mode</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000004e"><dt> <b>polyblock</b></dt><dd>an Org mode source code block without a
+<div class="lilac-description-list-entry" id="org0000052"><dt> <b>polyblock</b></dt><dd>an Org mode source code block without a
 <code>#+name: ...</code> field, but which has a <code>#+header: :noweb-ref ...</code> field. Other
 blocks with the same Noweb-ref name are concatenated together when they are
 tangled.  Polyblocks are used in cases where we would like to break up a
 single block into smaller pieces for explanatory purposes. In all other cases,
 monoblocks are preferable, unless the source code block is not to be tangled
 and is only for explanatory purposes in the woven output.</dd></div>
-<div class="lilac-description-list-entry" id="org000010c"><dt> <b>source code block</b></dt><dd>An Org mode facility
+<div class="lilac-description-list-entry" id="org0000110"><dt> <b>source code block</b></dt><dd>An Org mode facility
 that allows you to enclose a multiline text (typically source code) with
 <code>#+begin_src ...</code> and <code>#+end_src</code> lines. They are enclosed in a separate
 background color in the HTML output, and are often used for illustrating
@@ -4062,12 +4107,12 @@ source code listings. The format is <code>#+begin_src LANGUAGE_NAME</code> where
 <code>LANGUAGE_NAME</code> is the name of the programming language used for the listing.
 If the name is a recognized name, it will get syntax highlighting in the
 output automatically.</dd></div>
-<div class="lilac-description-list-entry" id="org000010e"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
-raw <a href="#org0000104">literate document</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000110"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
+<div class="lilac-description-list-entry" id="org0000112"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
+raw <a href="#org0000108">literate document</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org0000114"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
 document to a richer format such as PDF or HTML. This allows fancier output,
 such as for mathematical formulas, which are easier to read versus the
-original <a href="#org0000104">literate document</a>.</dd></div>
+original <a href="#org0000108">literate document</a>.</dd></div>
 </dl>
 </div>
 </div>
