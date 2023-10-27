@@ -48,6 +48,9 @@ pkgs.mkShell ({
     # Tangling and weaving for Literate Programming.
     pkgs.emacs29-nox
 
+    # For evaluation of Python source code blocks.
+    pkgs.python3Minimal
+
     # Spell checking.
     pkgs.typos
 
@@ -240,7 +243,7 @@ double angled brackets (=<<= and =>>=). This presents two problems:
 
 To avoid these problems, we simply make Noweb references use a =__NREF__=
 prefix. We also define a suffix group such that the reference can take an
-argument to the code block itself. See the example in FIXME.
+argument to the code block itself. See the example [[file:README.org#h-Monoblock--pass-argument-to-source-code-block][here]].
 
 Note that because this is a customization, we cannot run ~C-c C-v t~ to tangle
 code blocks properly in an interactive manner from an Emacs editing session of

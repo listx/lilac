@@ -11,6 +11,9 @@ pkgs.mkShell ({
     # Tangling and weaving for Literate Programming.
     pkgs.emacs29-nox
 
+    # For evaluation of Python source code blocks.
+    pkgs.python3Minimal
+
     # Spell checking.
     pkgs.typos
 

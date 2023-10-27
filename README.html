@@ -316,8 +316,9 @@
 <li><a href="#h-Plain">2.2.1.1.1. Plain</a></li>
 <li><a href="#h-Monoblock">2.2.1.1.2. Monoblock</a></li>
 <li><a href="#h-Monoblock--evaluation-result-s-value">2.2.1.1.3. Monoblock (evaluation result's value)</a></li>
-<li><a href="#h-Polyblock">2.2.1.1.4. Polyblock</a></li>
-<li><a href="#h-Linking-to-a-line-in-the-code-block-body">2.2.1.1.5. Linking to a line in the code block body</a></li>
+<li><a href="#h-Monoblock--pass-argument-to-source-code-block">2.2.1.1.4. Monoblock (pass argument to source code block)</a></li>
+<li><a href="#h-Polyblock">2.2.1.1.5. Polyblock</a></li>
+<li><a href="#h-Linking-to-a-line-in-the-code-block-body">2.2.1.1.6. Linking to a line in the code block body</a></li>
 </ul>
 </li>
 <li><a href="#h-Example-blocks">2.2.1.2. Example blocks</a></li>
@@ -843,19 +844,50 @@ print statement's string argument.
 
 </div>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">This uses an evaluation result.</label><span class="lilac-caption-link-symbol"><a href="#This-uses-an-evaluation-result">&#x1f517;</a></span></div><pre class="src src-python" id="This-uses-an-evaluation-result"><span class="org-builtin">print</span>(<span class="org-string">"The answer is "</span>)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">This uses an evaluation result.</label><span class="lilac-caption-link-symbol"><a href="#This-uses-an-evaluation-result">&#x1f517;</a></span></div><pre class="src src-python" id="This-uses-an-evaluation-result"><span class="org-builtin">print</span>(<span class="org-string">"The answer is 42"</span>)
+</pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Monoblock--pass-argument-to-source-code-block" class="outline-6">
+<h6 id="h-Monoblock--pass-argument-to-source-code-block"><span class="section-number-6">2.2.1.1.4.</span> Monoblock (pass argument to source code block)</h6>
+<div class="outline-text-6" id="text-h-Monoblock--pass-argument-to-source-code-block">
+<p>
+Here we have an example of passing in an argument to a source code block.
+</p>
+
+<p>
+Orgmode input:
+</p>
+
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-6">#+name: __NREF__ex_take_argument
+#+begin_src python :exports none :var my_var="foo"
+return "Hello, my name is " + my_var
+#+end_src
+
+#+caption: Passing string args.
+#+begin_src python :noweb yes
+print("Call without explicit argument: __NREF__ex_take_argument()")
+print("Call with explicit argument: __NREF__ex_take_argument(my_var="bar")")
+#+end_src
+</pre></div><p>
+Rendered HTML output:
+</p>
+
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">Passing string args.</label><span class="lilac-caption-link-symbol"><a href="#Passing-string-args">&#x1f517;</a></span></div><pre class="src src-python" id="Passing-string-args"><span class="org-builtin">print</span>(<span class="org-string">"Call without explicit argument: Hello, my name is foo"</span>)
+<span class="org-builtin">print</span>(<span class="org-string">"Call with explicit argument: Hello, my name is bar"</span>)
 </pre></div></div>
 </div>
 </div>
 
 <div id="outline-container-h-Polyblock" class="outline-6">
-<h6 id="h-Polyblock"><span class="section-number-6">2.2.1.1.4.</span> Polyblock</h6>
+<h6 id="h-Polyblock"><span class="section-number-6">2.2.1.1.5.</span> Polyblock</h6>
 <div class="outline-text-6" id="text-h-Polyblock">
 <p>
 Orgmode input:
 </p>
 
-<div class="sidenote" id="org000002e">
+<div class="sidenote" id="org0000032">
 <p>
 Like above for monoblocks, Lilac needlessly linkifies the source code body text
 of the parent block when it doesn't need to (as this is only an illustrative
@@ -864,7 +896,7 @@ example).
 
 </div>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-6">#+caption: A parent block.
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-7">#+caption: A parent block.
 #+begin_src python
 def foo():
     <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span>
@@ -889,20 +921,20 @@ Rendered HTML output:
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><label class="org-src-name">A parent block.</label><span class="lilac-caption-link-symbol"><a href="#A-parent-block-2">&#x1f517;</a></span></div><pre class="src src-python" id="A-parent-block-2"><span class="org-keyword">def</span> <span class="org-function-name">foo</span>():
     <span class="lilac-child-link-from-parent"><a href="#__NREF__ex_polyblock-1">ex_polyblock</a></span>
     <span class="org-keyword">return</span> 42
-</pre></div></div><div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-6">ex_polyblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-2">2</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__ex_polyblock-1">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_polyblock-1"><span class="org-builtin">print</span>(<span class="org-string">"hello world"</span>)
+</pre></div></div><div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-7">ex_polyblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-2">2</a></span>(1/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__ex_polyblock-1">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_polyblock-1"><span class="org-builtin">print</span>(<span class="org-string">"hello world"</span>)
 </pre></div></div><p>
 Some intervening text.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-6">ex_polyblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-2">2</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__ex_polyblock-2">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_polyblock-2"><span class="org-builtin">print</span>(<span class="org-string">"abcdefg"</span>)
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#nil-7">ex_polyblock</a></span><span class="lilac-caption-parent-link"><a href="#A-parent-block-2">2</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__ex_polyblock-2">&#x1f517;</a></span></div><pre class="src src-python" id="__NREF__ex_polyblock-2"><span class="org-builtin">print</span>(<span class="org-string">"abcdefg"</span>)
 </pre></div></div>
 </div>
 </div>
 
 <div id="outline-container-h-Linking-to-a-line-in-the-code-block-body" class="outline-6">
-<h6 id="h-Linking-to-a-line-in-the-code-block-body"><span class="section-number-6">2.2.1.1.5.</span> Linking to a line in the code block body</h6>
+<h6 id="h-Linking-to-a-line-in-the-code-block-body"><span class="section-number-6">2.2.1.1.6.</span> Linking to a line in the code block body</h6>
 <div class="outline-text-6" id="text-h-Linking-to-a-line-in-the-code-block-body">
-<div class="sidenote" id="org0000037">
+<div class="sidenote" id="org000003b">
 <p>
 The <code>-r</code> flag removes these <code>#ref:...</code> labels from the source code. The <code>-l</code>
 flag changes the format. In this case we make the format use a leading <code>#</code>
@@ -920,7 +952,7 @@ These links are documented in Org's <a href="https://orgmode.org/manual/Literal-
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-7">#+begin_src python -r -l "#ref:%s"
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-8">#+begin_src python -r -l "#ref:%s"
 print("foo")
 print("hi")     #ref:embedded-link
 print("bar")
@@ -931,7 +963,7 @@ The line at [[(embedded-link)][=embedded-link=]] prints "hi".
 Rendered HTML output:
 </p>
 
-<div class="org-src-container"><pre class="src src-python" id="nil-8"><span class="org-builtin">print</span>(<span class="org-string">"foo"</span>)
+<div class="org-src-container"><pre class="src src-python" id="nil-9"><span class="org-builtin">print</span>(<span class="org-string">"foo"</span>)
 <span id="coderef-embedded-link" class="coderef-off"><span class="org-builtin">print</span>(<span class="org-string">"hi"</span>)</span>
 <span class="org-builtin">print</span>(<span class="org-string">"bar"</span>)
 </pre></div><p>
@@ -948,7 +980,7 @@ The line at <a href="#coderef-embedded-link" class="coderef" onmouseover="CodeHi
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-9">#+begin_example
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-10">#+begin_example
 Hello world.
 Foo bar.
 #+end_example
@@ -956,7 +988,7 @@ Foo bar.
 Rendered HTML output:
 </p>
 
-<pre class="example" id="org000003e">
+<pre class="example" id="org0000042">
 Hello world.
 Foo bar.
 </pre>
@@ -970,7 +1002,7 @@ Foo bar.
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-10">#+begin_quote
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-11">#+begin_quote
 Hello world.
 Foo bar.
 #+end_quote
@@ -1001,7 +1033,7 @@ lines.
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-11">#+begin_sidenote
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-12">#+begin_sidenote
 Hello world.
 Foo bar.
 #+end_sidenote
@@ -1009,7 +1041,7 @@ Foo bar.
 Rendered HTML output (see right hand margin):
 </p>
 
-<div class="sidenote" id="org0000043">
+<div class="sidenote" id="org0000047">
 <p>
 Hello world.
 Foo bar.
@@ -1031,7 +1063,7 @@ demonstrating how it looks.
 Orgmode input:
 </p>
 
-<div class="org-src-container"><pre class="src src-plaintext" id="nil-12">The equation \( E = mc^2 \) is probably the most famous equation in the world,
+<div class="org-src-container"><pre class="src src-plaintext" id="nil-13">The equation \( E = mc^2 \) is probably the most famous equation in the world,
 perhaps more famous than the Pythagorean theorem
 
 \[
@@ -1105,7 +1137,7 @@ was first demonstrated by Leonhard Euler in 1734. Here's another equation,
 </p>
 
 \begin{equation}
-\label{org0000046}
+\label{org000004a}
 \pi = \sum_{k = 0}^{\infty}\left[\frac{1}{16^k} \
 \left(\frac{4}{8k+1}-\frac{2}{8k+4}-\frac{1}{8k + 5}-\frac{1}{8k+6}\right)\right]
 \end{equation}
@@ -1116,7 +1148,7 @@ digits of \(\pi\). A variant of this equation is as follows
 </p>
 
 \begin{equation}
-\label{org0000048}
+\label{org000004c}
 \pi = \frac1{2^6} \sum_{n=0}^\infty \frac{(-1)^n}{2^{10n}} \
 \left(-\frac{2^5}{4n+1} - \frac1{4n+3} + \frac{2^8}{10n+1} - \
 \frac{2^6}{10n+3} - \frac{2^2}{10n+5} - \frac{2^2}{10n+7} + \
@@ -1124,7 +1156,7 @@ digits of \(\pi\). A variant of this equation is as follows
 \end{equation}
 
 <p>
-and is known as the Bellard's formula. Equation \eqref{org0000048} is too wide, though. Below
+and is known as the Bellard's formula. Equation \eqref{org000004c} is too wide, though. Below
 is a version where we insert manual line breaks.
 </p>
 
@@ -1170,19 +1202,19 @@ curious to see how everything works, have a look at the <a href="developer-guide
 <h2 id="h-Glossary"><span class="section-number-2">5.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
-<div class="lilac-description-list-entry" id="org000004a"><dt> <b>literate document</b></dt><dd>A file or collection of
+<div class="lilac-description-list-entry" id="org000004e"><dt> <b>literate document</b></dt><dd>A file or collection of
 files that include both source code and prose to explain it. Well-known
 formats include Noweb files (<code>*.nw</code>) and Org mode files (<code>*.org</code>).</dd></div>
 <div class="lilac-description-list-entry" id="org000000b"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
 <code>#+name: ...</code> field. This block is an independent block and there are no other
 blocks with the same name.</dd></div>
 <div class="lilac-description-list-entry" id="org0000001"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
-still works and from which <a href="#org000004c">Org mode</a> borrows heavily using <a href="#org000004e">Noweb-style
+still works and from which <a href="#org0000050">Org mode</a> borrows heavily using <a href="#org0000052">Noweb-style
 references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000004e"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
+<div class="lilac-description-list-entry" id="org0000052"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
 Noweb-style reference is just a name (string) that refers to a monoblock or
 polyblock. See <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000004c"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
+<div class="lilac-description-list-entry" id="org0000050"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
 where "major mode" means that it provides things like syntax highlighting and
 keyboard shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac,
 the important thing is that we use Org mode as a literate programming tool.
@@ -1194,7 +1226,7 @@ tangled.  Polyblocks are used in cases where we would like to break up a
 single block into smaller pieces for explanatory purposes. In all other cases,
 monoblocks are preferable, unless the source code block is not to be tangled
 and is only for explanatory purposes in the woven output.</dd></div>
-<div class="lilac-description-list-entry" id="org0000050"><dt> <b>source code block</b></dt><dd>An Org mode facility
+<div class="lilac-description-list-entry" id="org0000054"><dt> <b>source code block</b></dt><dd>An Org mode facility
 that allows you to enclose a multiline text (typically source code) with
 <code>#+begin_src ...</code> and <code>#+end_src</code> lines. They are enclosed in a separate
 background color in the HTML output, and are often used for illustrating
@@ -1203,11 +1235,11 @@ source code listings. The format is <code>#+begin_src LANGUAGE_NAME</code> where
 If the name is a recognized name, it will get syntax highlighting in the
 output automatically.</dd></div>
 <div class="lilac-description-list-entry" id="org0000005"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
-raw <a href="#org000004a">literate document</a>.</dd></div>
+raw <a href="#org000004e">literate document</a>.</dd></div>
 <div class="lilac-description-list-entry" id="org0000003"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
 document to a richer format such as PDF or HTML. This allows fancier output,
 such as for mathematical formulas, which are easier to read versus the
-original <a href="#org000004a">literate document</a>.</dd></div>
+original <a href="#org000004e">literate document</a>.</dd></div>
 </dl>
 </div>
 </div>
