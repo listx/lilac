@@ -2451,7 +2451,6 @@ This would be an excellent candidate to copy/paste/tweak into your own
     --bg: #fff;
     --fg: #000;
     --bg-code: #f7f7f7;
-    --border-code: #777;
     --border-light: #ccc;
     --fg-link: #0000ff;
     --fg-nref-link: #21618c;
@@ -2566,15 +2565,15 @@ table {
     margin: 1em auto 0em auto;
     border-spacing: 0;
     border-radius: 4px;
-    border: 1px solid var(--border-code);
+    border: 1px solid var(--border-light);
     border-collapse: unset;
     overflow: hidden;
 }
 
 th, td {
     padding: 3px 6px;
-    border-right: 1px solid var(--border-code);
-    border-bottom: 1px solid var(--border-code);
+    border-right: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-light);
 }
 
 th:last-child, td:last-child  {
@@ -2616,13 +2615,14 @@ img {
 #+begin_src css
 code {
     background-color: var(--bg-code);
+    padding-top: 2px;
     padding-left: 5px;
     padding-right: 5px;
     white-space: nowrap;
     border-radius: 4px;
     border-style: solid;
     border-width: 1px;
-    border-color: var(--border-code);
+    border-color: var(--border-light);
 }
 
 pre {
@@ -2630,7 +2630,7 @@ pre {
     border-radius: 5px;
     margin: 1em 0 0 0;
     background-color: var(--bg-code);
-    border-color: var(--border-code);
+    border-color: var(--border-light);
     min-width: fit-content;
 }
 #+end_src
@@ -2673,7 +2673,7 @@ a {
     scroll-margin-top: 100px;
     border-style: solid;
     border-width: 1px;
-    border-color: var(--border-code);
+    border-color: var(--border-light);
     border-radius: 5px;
 }
 
@@ -2709,7 +2709,7 @@ a {
     border-bottom-right-radius: 0;
     border-width: 1px;
     background-color: var(--bg-code);
-    border-color: var(--border-code);
+    border-color: var(--border-light);
 }
 
 .lilac-caption-source-code-block-name {
