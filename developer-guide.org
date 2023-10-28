@@ -313,11 +313,27 @@ in [[file:README.org::#h-Monoblock--evaluation-result-s-value][Monoblock (evalua
 need to add in Emacs lisp here because it's already supported by default (which
 we take advantage of in [[* Create =lilac.theme= file]]).
 
+In addition to Python, we add in some additional languages that might be of use.
+
 #+header: :noweb-ref __NREF__lilac_dot_el-allow-code-evaluation
 #+begin_src emacs-lisp
 (org-babel-do-load-languages 'org-babel-load-languages
                              (append org-babel-load-languages
-                              '((python     . t))))
+                              '((awk        . t)
+                                (C          . t)
+                                (calc       . t)
+                                (clojure    . t)
+                                (java       . t)
+                                (js         . t)
+                                (lisp       . t)
+                                (lua        . t)
+                                (perl       . t)
+                                (python     . t)
+                                (R          . t)
+                                (ruby       . t)
+                                (scheme     . t)
+                                (sed        . t)
+                                (shell      . t))))
 #+end_src
 
 * Weaving (generating the HTML)

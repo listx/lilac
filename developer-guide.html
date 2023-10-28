@@ -699,9 +699,27 @@ need to add in Emacs lisp here because it's already supported by default (which
 we take advantage of in <a href="#h-Create--lilac-theme--file">4.11</a>).
 </p>
 
+<p>
+In addition to Python, we add in some additional languages that might be of use.
+</p>
+
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-allow-code-evaluation</a></span>(2/2) <span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-allow-code-evaluation-2">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-allow-code-evaluation-2">(org-babel-do-load-languages 'org-babel-load-languages
                              (append org-babel-load-languages
-                              '((python     . t))))
+                              '((awk        . t)
+                                (C          . t)
+                                (calc       . t)
+                                (clojure    . t)
+                                (java       . t)
+                                (js         . t)
+                                (lisp       . t)
+                                (lua        . t)
+                                (perl       . t)
+                                (python     . t)
+                                (R          . t)
+                                (ruby       . t)
+                                (scheme     . t)
+                                (sed        . t)
+                                (shell      . t))))
 </pre></div></div>
 </div>
 </div>
@@ -3228,6 +3246,7 @@ This would be an excellent candidate to copy/paste/tweak into your own
 <div class="outline-text-4" id="text-h-Monospaced">
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-general</a></span>(7/9) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-general-7">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-general-7"><span class="org-css-selector">code</span> {
     <span class="org-css-property">background-color</span>: var(<span class="org-variable-name">--bg-code</span>);
+    <span class="org-css-property">padding-top</span>: 2px;
     <span class="org-css-property">padding-left</span>: 5px;
     <span class="org-css-property">padding-right</span>: 5px;
     <span class="org-css-property">white-space</span>: nowrap;
