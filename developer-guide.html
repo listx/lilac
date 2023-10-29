@@ -470,13 +470,15 @@ any syntax highlighting.
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#Makefile">Makefile-weave</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-weave">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-weave"><span class="org-makefile-targets">weave</span>: lint README.html developer-guide.html
 <span class="org-makefile-targets">.PHONY</span>: weave
 
-<span class="org-makefile-targets">README.html syntax-highlighting.css &amp;</span>: README.org
-    $(<span class="org-variable-name">call</span> run_emacs,(lilac-gen-css-and-exit),$<span class="org-constant">&lt;</span>)
+<span class="org-makefile-targets">README.html</span>: README.org
     $(<span class="org-variable-name">call</span> run_emacs,(lilac-publish),$<span class="org-constant">&lt;</span>)
 
-<span class="org-makefile-targets">developer-guide.html syntax-highlighting.css &amp;</span>: developer-guide.org
-    $(<span class="org-variable-name">call</span> run_emacs,(lilac-gen-css-and-exit),$<span class="org-constant">&lt;</span>)
+<span class="org-makefile-targets">developer-guide.html</span>: developer-guide.org
     $(<span class="org-variable-name">call</span> run_emacs,(lilac-publish),$<span class="org-constant">&lt;</span>)
+
+<span class="org-makefile-targets">syntax-highlighting.css</span>:
+    $(<span class="org-variable-name">call</span> run_emacs_nobatch,(lilac-gen-css-and-exit),$<span class="org-constant">&lt;</span>)
+<span class="org-makefile-targets">.PHONY</span>: syntax-highlighting.css
 </pre></div></div><p>
 Tangling is pretty straightforward &#x2014; we just need to call
 <code>(org-babel-tangle)</code> on <code>developer-guide.org</code> (the <code>README.org</code> does not contain
@@ -521,6 +523,11 @@ evaluating the given expression.
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#Makefile">Makefile-run_emacs</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__Makefile-run_emacs">&#x1f517;</a></span></div><pre class="src src-makefile" id="__NREF__Makefile-run_emacs">define run_emacs
     <span class="org-variable-name">LILAC_ROOT</span>=$(<span class="org-variable-name">LILAC_ROOT</span>) emacs $(<span class="org-variable-name">2</span>) --quick --batch --kill \
+        --load $(<span class="org-variable-name">LILAC_ROOT</span>)/lilac.el --eval=<span class="org-string">"$(</span><span class="org-string"><span class="org-variable-name">1</span></span><span class="org-string">)"</span>
+endef
+
+define run_emacs_nobatch
+    <span class="org-variable-name">LILAC_ROOT</span>=$(<span class="org-variable-name">LILAC_ROOT</span>) emacs $(<span class="org-variable-name">2</span>) --quick --kill \
         --load $(<span class="org-variable-name">LILAC_ROOT</span>)/lilac.el --eval=<span class="org-string">"$(</span><span class="org-string"><span class="org-variable-name">1</span></span><span class="org-string">)"</span>
 endef
 
@@ -2762,104 +2769,24 @@ the history item location we've saved).
 <h3 id="h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks"><span class="section-number-3">4.7.</span> Autogenerate CSS for syntax highlighting of source code blocks</h3>
 <div class="outline-text-3" id="text-h-Autogenerate-CSS-for-syntax-highlighting-of-source-code-blocks">
 <p>
-See <a href="https://emacs.stackexchange.com/questions/31439/how-to-get-colored-syntax-highlighting-of-code-blocks-in-asynchronous-org-mode-e">this</a>, specifically <a href="https://emacs.stackexchange.com/a/36759">https://emacs.stackexchange.com/a/36759</a>.
-</p>
-
-<p>
 Generate <code>syntax-highlighting.css</code> and quit emacs. This function is designed to
 be run from the command line on a fresh emacs instance (dedicated OS process).
-Unfortunately, by itself it is almost useless (see
-<a href="#__NREF__enable-syntax-highlighting-from-batch-mode"><code>__NREF__enable-syntax-highlighting-from-batch-mode</code></a>), because there appears to
-be a <a href="https://debbugs.gnu.org/cgi/bugreport.cgi?bug=61521">bug</a> in Emacs 28 which <a href="https://emacs.stackexchange.com/questions/75814/org-html-htmlize-generate-css-not-generating-styles">breaks</a> <code>org-html-htmlize-generate-css</code>.
+Unfortunately, it can only be run in interactve mode (without the <code>--batch</code> flag
+to emacs).
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-autogenerate-css</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-autogenerate-css">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-autogenerate-css">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-gen-css-and-exit</span> ()
+  (load-theme 'tango t)
   (font-lock-flush)
   (font-lock-fontify-buffer)
   (org-html-htmlize-generate-css)
   (<span class="org-keyword">with-current-buffer</span> <span class="org-string">"*html*"</span>
     (write-file <span class="org-string">"syntax-highlighting.css"</span>))
   (kill-emacs))
-
-<span class="org-comment-delimiter">;; </span><span class="org-comment">Without this, lilac-gen-css-and-exit produces a near-empty CSS file.</span>
-<span class="lilac-child-link-from-parent"><a href="#__NREF__enable-syntax-highlighting-from-batch-mode">enable-syntax-highlighting-from-batch-mode</a></span>
 </pre></div></div><p>
-Sadly, <code>lilac-gen-css-and-exit</code> by itself generates a near-blank CSS file.
-So we have to use code from <a href="https://emacs.stackexchange.com/questions/38437/org-mode-batch-export-missing-syntax-highlighting">here</a>:
+If we use the workaround from <a href="https://emacs.stackexchange.com/questions/38437/org-mode-batch-export-missing-syntax-highlighting">here</a>, we can generate a CSS file with colors from
+batch mode. However, the hackiness is not worth it.
 </p>
-
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#__NREF__lilac_dot_el-autogenerate-css">enable-syntax-highlighting-from-batch-mode</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__enable-syntax-highlighting-from-batch-mode">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__enable-syntax-highlighting-from-batch-mode">(<span class="org-keyword">require</span> '<span class="org-constant">font-lock</span>)
-(<span class="org-keyword">require</span> '<span class="org-constant">subr-x</span>) <span class="org-comment-delimiter">;; </span><span class="org-comment">for `</span><span class="org-comment"><span class="org-constant">when-let</span></span><span class="org-comment">'</span>
-
-(<span class="org-keyword">unless</span> (boundp 'maximal-integer)
-  (<span class="org-keyword">defconst</span> <span class="org-variable-name">maximal-integer</span> (lsh -1 -1)
-    <span class="org-doc">"Maximal integer value representable natively in emacs lisp."</span>))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">face-spec-default</span> (spec)
-  <span class="org-doc">"Get list containing at most the default entry of face SPEC.</span>
-<span class="org-doc">Return nil if SPEC has no default entry."</span>
-  (<span class="org-keyword">let*</span> ((first (car-safe spec))
-     (display (car-safe first)))
-    (<span class="org-keyword">when</span> (eq display 'default)
-      (list (car-safe spec)))))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">face-spec-min-color</span> (display-atts)
-  <span class="org-doc">"Get min-color entry of DISPLAY-ATTS pair from face spec."</span>
-  (<span class="org-keyword">let*</span> ((display (car-safe display-atts)))
-    (<span class="org-keyword">or</span> (car-safe (cdr (assoc 'min-colors display)))
-    maximal-integer)))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">face-spec-highest-color</span> (spec)
-  <span class="org-doc">"Search face SPEC for highest color.</span>
-<span class="org-doc">That means the DISPLAY entry of SPEC</span>
-<span class="org-doc">with class 'color and highest min-color value."</span>
-  (<span class="org-keyword">let</span> ((color-list (cl-remove-if-not
-             (<span class="org-keyword">lambda</span> (display-atts)
-               (<span class="org-keyword">when-let</span> ((display (car-safe display-atts))
-                  (class (<span class="org-keyword">and</span> (listp display)
-                          (assoc 'class display)))
-                  (background (assoc 'background display)))
-             (<span class="org-keyword">and</span> (member 'light (cdr background))
-                  (member 'color (cdr class)))))
-             spec)))
-    (cl-reduce (<span class="org-keyword">lambda</span> (display-atts1 display-atts2)
-         (<span class="org-keyword">if</span> (&gt; (face-spec-min-color display-atts1)
-            (face-spec-min-color display-atts2))
-             display-atts1
-           display-atts2))
-           (cdr color-list)
-           <span class="org-builtin">:initial-value</span> (car color-list))))
-
-(<span class="org-keyword">defun</span> <span class="org-function-name">face-spec-t</span> (spec)
-  <span class="org-doc">"Search face SPEC for fall back."</span>
-  (cl-find-if (<span class="org-keyword">lambda</span> (display-atts)
-        (eq (car-safe display-atts) t))
-          spec))
-
-<span class="org-comment-delimiter">; </span><span class="org-comment">This is slightly tweaked from the original, because the incoming "face" value</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">can look like (fixed-pitch face-name) --- so we take the second element.</span>
-(<span class="org-keyword">defun</span> <span class="org-function-name">my-face-attribute</span> (face attribute <span class="org-type">&amp;optional</span> frame inherit)
-  <span class="org-doc">"Get FACE ATTRIBUTE from `</span><span class="org-doc"><span class="org-constant">face-user-default-spec</span></span><span class="org-doc">' and not from</span>
-<span class="org-doc">`</span><span class="org-doc"><span class="org-constant">face-attribute</span></span><span class="org-doc">'."</span>
-  (<span class="org-keyword">let*</span>
-    ((face-spec (face-user-default-spec (<span class="org-keyword">if</span> (listp face)
-                                            (car (cdr face))
-                                          face)))
-     (display-attr (<span class="org-keyword">or</span> (face-spec-highest-color face-spec)
-               (face-spec-t face-spec)))
-     (attr (cdr display-attr))
-     (val (<span class="org-keyword">or</span> (plist-get attr attribute)
-              (car-safe (cdr (assoc attribute attr))))))
-    (<span class="org-keyword">when</span> (<span class="org-keyword">and</span> (null (eq attribute <span class="org-builtin">:inherit</span>))
-           (null val))
-      (<span class="org-keyword">let</span> ((inherited-face (my-face-attribute face <span class="org-builtin">:inherit</span>)))
-    (<span class="org-keyword">when</span> (<span class="org-keyword">and</span> inherited-face
-           (null (eq inherited-face 'unspecified)))
-      (<span class="org-keyword">setq</span> val (my-face-attribute inherited-face attribute)))))
-    (<span class="org-keyword">or</span> val 'unspecified)))
-
-(advice-add 'face-attribute <span class="org-builtin">:override</span> #'my-face-attribute)
-</pre></div></div>
 </div>
 </div>
 
@@ -3063,7 +2990,7 @@ We define colors and fonts in one place and reuse them throughout the rest of
 the CSS, with the <code>var()</code> function.
 </p>
 
-<div class="sidenote" id="org00000cc">
+<div class="sidenote" id="org00000ca">
 <p>
 This would be an excellent candidate to copy/paste/tweak into your own
 <code>lilac-override.css</code> file to tweak any of the colors or fonts used by Lilac.
@@ -3640,7 +3567,7 @@ prefix indirectly with the <code>(nref)</code> helper function.
 <div id="outline-container-h-Setup-and-tear-down-fixture-for-HTML-tests" class="outline-4">
 <h4 id="h-Setup-and-tear-down-fixture-for-HTML-tests"><span class="section-number-4">5.1.2.</span> Setup and tear-down fixture for HTML tests</h4>
 <div class="outline-text-4" id="text-h-Setup-and-tear-down-fixture-for-HTML-tests">
-<div class="sidenote" id="org00000f5">
+<div class="sidenote" id="org00000f3">
 <p>
 The <a href="https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites">Emacs manual</a> for ERT defines fixtures as environments which provide setup
 and tear-down.
@@ -4096,19 +4023,19 @@ block.
 <h2 id="h-Glossary"><span class="section-number-2">6.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
-<div class="lilac-description-list-entry" id="org0000108"><dt> <b>literate document</b></dt><dd>A file or collection of
+<div class="lilac-description-list-entry" id="org0000106"><dt> <b>literate document</b></dt><dd>A file or collection of
 files that include both source code and prose to explain it. Well-known
 formats include Noweb files (<code>*.nw</code>) and Org mode files (<code>*.org</code>).</dd></div>
 <div class="lilac-description-list-entry" id="org0000050"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
 <code>#+name: ...</code> field. This block is an independent block and there are no other
 blocks with the same name.</dd></div>
-<div class="lilac-description-list-entry" id="org000010e"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
-still works and from which <a href="#org000010a">Org mode</a> borrows heavily using <a href="#org000010c">Noweb-style
+<div class="lilac-description-list-entry" id="org000010c"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
+still works and from which <a href="#org0000108">Org mode</a> borrows heavily using <a href="#org000010a">Noweb-style
 references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000010c"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
+<div class="lilac-description-list-entry" id="org000010a"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
 Noweb-style reference is just a name (string) that refers to a monoblock or
 polyblock. See <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000010a"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
+<div class="lilac-description-list-entry" id="org0000108"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
 where "major mode" means that it provides things like syntax highlighting and
 keyboard shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac,
 the important thing is that we use Org mode as a literate programming tool.
@@ -4120,7 +4047,7 @@ tangled.  Polyblocks are used in cases where we would like to break up a
 single block into smaller pieces for explanatory purposes. In all other cases,
 monoblocks are preferable, unless the source code block is not to be tangled
 and is only for explanatory purposes in the woven output.</dd></div>
-<div class="lilac-description-list-entry" id="org0000110"><dt> <b>source code block</b></dt><dd>An Org mode facility
+<div class="lilac-description-list-entry" id="org000010e"><dt> <b>source code block</b></dt><dd>An Org mode facility
 that allows you to enclose a multiline text (typically source code) with
 <code>#+begin_src ...</code> and <code>#+end_src</code> lines. They are enclosed in a separate
 background color in the HTML output, and are often used for illustrating
@@ -4128,12 +4055,12 @@ source code listings. The format is <code>#+begin_src LANGUAGE_NAME</code> where
 <code>LANGUAGE_NAME</code> is the name of the programming language used for the listing.
 If the name is a recognized name, it will get syntax highlighting in the
 output automatically.</dd></div>
-<div class="lilac-description-list-entry" id="org0000112"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
-raw <a href="#org0000108">literate document</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000114"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
+<div class="lilac-description-list-entry" id="org0000110"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
+raw <a href="#org0000106">literate document</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org0000112"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
 document to a richer format such as PDF or HTML. This allows fancier output,
 such as for mathematical formulas, which are easier to read versus the
-original <a href="#org0000108">literate document</a>.</dd></div>
+original <a href="#org0000106">literate document</a>.</dd></div>
 </dl>
 </div>
 </div>

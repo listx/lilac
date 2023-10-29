@@ -108,13 +108,15 @@ any syntax highlighting.
 weave: lint README.html developer-guide.html
 .PHONY: weave
 
-README.html syntax-highlighting.css &: README.org
-	$(call run_emacs,(lilac-gen-css-and-exit),$<)
+README.html: README.org
 	$(call run_emacs,(lilac-publish),$<)
 
-developer-guide.html syntax-highlighting.css &: developer-guide.org
-	$(call run_emacs,(lilac-gen-css-and-exit),$<)
+developer-guide.html: developer-guide.org
 	$(call run_emacs,(lilac-publish),$<)
+
+syntax-highlighting.css:
+	$(call run_emacs_nobatch,(lilac-gen-css-and-exit),)
+.PHONY: syntax-highlighting.css
 #+end_src
 
 Tangling is pretty straightforward --- we just need to call
@@ -161,6 +163,11 @@ evaluating the given expression.
 #+begin_src makefile
 define run_emacs
 	LILAC_ROOT=$(LILAC_ROOT) emacs $(2) --quick --batch --kill \
+		--load $(LILAC_ROOT)/lilac.el --eval="$(1)"
+endef
+
+define run_emacs_nobatch
+	LILAC_ROOT=$(LILAC_ROOT) emacs $(2) --quick --kill \
 		--load $(LILAC_ROOT)/lilac.el --eval="$(1)"
 endef
 
@@ -2191,105 +2198,25 @@ $(document).ready(() => {
 
 ** Autogenerate CSS for syntax highlighting of source code blocks
 
-See [[https://emacs.stackexchange.com/questions/31439/how-to-get-colored-syntax-highlighting-of-code-blocks-in-asynchronous-org-mode-e][this]], specifically https://emacs.stackexchange.com/a/36759.
-
 Generate =syntax-highlighting.css= and quit emacs. This function is designed to
 be run from the command line on a fresh emacs instance (dedicated OS process).
-Unfortunately, by itself it is almost useless (see
-[[__NREF__enable-syntax-highlighting-from-batch-mode][=__NREF__enable-syntax-highlighting-from-batch-mode=]]), because there appears to
-be a [[https://debbugs.gnu.org/cgi/bugreport.cgi?bug=61521][bug]] in Emacs 28 which [[https://emacs.stackexchange.com/questions/75814/org-html-htmlize-generate-css-not-generating-styles][breaks]] =org-html-htmlize-generate-css=.
+Unfortunately, it can only be run in interactve mode (without the =--batch= flag
+to emacs).
 
 #+name: __NREF__lilac_dot_el-autogenerate-css
 #+begin_src emacs-lisp
 (defun lilac-gen-css-and-exit ()
+  (load-theme 'tango t)
   (font-lock-flush)
   (font-lock-fontify-buffer)
   (org-html-htmlize-generate-css)
   (with-current-buffer "*html*"
     (write-file "syntax-highlighting.css"))
   (kill-emacs))
-
-;; Without this, lilac-gen-css-and-exit produces a near-empty CSS file.
-__NREF__enable-syntax-highlighting-from-batch-mode
 #+end_src
 
-Sadly, =lilac-gen-css-and-exit= by itself generates a near-blank CSS file.
-So we have to use code from [[https://emacs.stackexchange.com/questions/38437/org-mode-batch-export-missing-syntax-highlighting][here]]:
-
-#+name: __NREF__enable-syntax-highlighting-from-batch-mode
-#+begin_src emacs-lisp
-(require 'font-lock)
-(require 'subr-x) ;; for `when-let'
-
-(unless (boundp 'maximal-integer)
-  (defconst maximal-integer (lsh -1 -1)
-    "Maximal integer value representable natively in emacs lisp."))
-
-(defun face-spec-default (spec)
-  "Get list containing at most the default entry of face SPEC.
-Return nil if SPEC has no default entry."
-  (let* ((first (car-safe spec))
-     (display (car-safe first)))
-    (when (eq display 'default)
-      (list (car-safe spec)))))
-
-(defun face-spec-min-color (display-atts)
-  "Get min-color entry of DISPLAY-ATTS pair from face spec."
-  (let* ((display (car-safe display-atts)))
-    (or (car-safe (cdr (assoc 'min-colors display)))
-    maximal-integer)))
-
-(defun face-spec-highest-color (spec)
-  "Search face SPEC for highest color.
-That means the DISPLAY entry of SPEC
-with class 'color and highest min-color value."
-  (let ((color-list (cl-remove-if-not
-             (lambda (display-atts)
-               (when-let ((display (car-safe display-atts))
-                  (class (and (listp display)
-                          (assoc 'class display)))
-                  (background (assoc 'background display)))
-             (and (member 'light (cdr background))
-                  (member 'color (cdr class)))))
-             spec)))
-    (cl-reduce (lambda (display-atts1 display-atts2)
-         (if (> (face-spec-min-color display-atts1)
-            (face-spec-min-color display-atts2))
-             display-atts1
-           display-atts2))
-           (cdr color-list)
-           :initial-value (car color-list))))
-
-(defun face-spec-t (spec)
-  "Search face SPEC for fall back."
-  (cl-find-if (lambda (display-atts)
-        (eq (car-safe display-atts) t))
-          spec))
-
-; This is slightly tweaked from the original, because the incoming "face" value
-; can look like (fixed-pitch face-name) --- so we take the second element.
-(defun my-face-attribute (face attribute &optional frame inherit)
-  "Get FACE ATTRIBUTE from `face-user-default-spec' and not from
-`face-attribute'."
-  (let*
-    ((face-spec (face-user-default-spec (if (listp face)
-                                            (car (cdr face))
-                                          face)))
-     (display-attr (or (face-spec-highest-color face-spec)
-               (face-spec-t face-spec)))
-     (attr (cdr display-attr))
-     (val (or (plist-get attr attribute)
-              (car-safe (cdr (assoc attribute attr))))))
-    (when (and (null (eq attribute :inherit))
-           (null val))
-      (let ((inherited-face (my-face-attribute face :inherit)))
-    (when (and inherited-face
-           (null (eq inherited-face 'unspecified)))
-      (setq val (my-face-attribute inherited-face attribute)))))
-    (or val 'unspecified)))
-
-(advice-add 'face-attribute :override #'my-face-attribute)
-#+end_src
+If we use the workaround from [[https://emacs.stackexchange.com/questions/38437/org-mode-batch-export-missing-syntax-highlighting][here]], we can generate a CSS file with colors from
+batch mode. However, the hackiness is not worth it.
 
 ** Misc settings
 
