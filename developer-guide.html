@@ -477,7 +477,7 @@ any syntax highlighting.
     $(<span class="org-variable-name">call</span> run_emacs,(lilac-publish),$<span class="org-constant">&lt;</span>)
 
 <span class="org-makefile-targets">syntax-highlighting.css</span>:
-    $(<span class="org-variable-name">call</span> run_emacs_nobatch,(lilac-gen-css-and-exit),$<span class="org-constant">&lt;</span>)
+    $(<span class="org-variable-name">call</span> run_emacs_nobatch,(lilac-gen-css-and-exit),)
 <span class="org-makefile-targets">.PHONY</span>: syntax-highlighting.css
 </pre></div></div><p>
 Tangling is pretty straightforward &#x2014; we just need to call
@@ -718,6 +718,7 @@ In addition to Python, we add in some additional languages that might be of use.
                                 (clojure    . t)
                                 (java       . t)
                                 (js         . t)
+                                (latex      . t)
                                 (lisp       . t)
                                 (lua        . t)
                                 (perl       . t)

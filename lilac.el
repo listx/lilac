@@ -83,6 +83,7 @@ When matching, reference is stored in match group 1."
                                 (clojure    . t)
                                 (java       . t)
                                 (js         . t)
+                                (latex      . t)
                                 (lisp       . t)
                                 (lua        . t)
                                 (perl       . t)
