@@ -330,6 +330,7 @@
 <li><a href="#h-Links-to-child-source-block-from-parent">4.10.11. Links to child source block from parent</a></li>
 <li><a href="#h-Sidenotes">4.10.12. Sidenotes</a></li>
 <li><a href="#h-Printer-friendly-styling">4.10.13. Printer-friendly styling</a></li>
+<li><a href="#h-Disable-Table-of-Contents-sidebar-for-mobile--touch--screens">4.10.14. Disable Table of Contents sidebar for mobile (touch) screens</a></li>
 </ul>
 </li>
 <li><a href="#h-Create--lilac-theme--file">4.11. Create <code>lilac.theme</code> file</a></li>
@@ -2457,7 +2458,7 @@ modifications to it:
 <div id="outline-container-h-Convert--Table-of-Contents--to-a-sidebar-on-the-left" class="outline-5">
 <h5 id="h-Convert--Table-of-Contents--to-a-sidebar-on-the-left"><span class="section-number-5">4.6.2.2.</span> Convert "Table of Contents" to a sidebar on the left</h5>
 <div class="outline-text-5" id="text-h-Convert--Table-of-Contents--to-a-sidebar-on-the-left">
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(1/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-1"><span class="org-css-selector">#table-of-contents</span> {
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(1/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-1">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-1"><span class="org-css-selector">#table-of-contents</span> {
     <span class="org-css-property">position</span>: fixed;
     <span class="org-css-property">top</span>: 0;
     <span class="org-css-property">float</span>: left;
@@ -2571,7 +2572,7 @@ We have to colorize the foreground color of the link because otherwise it
 becomes the color of all other links as per <a href="#h-Links">4.10.8</a>.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(2/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-2"><span class="org-css-selector">#table-of-contents a</span> {
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(2/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-2">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-2"><span class="org-css-selector">#table-of-contents a</span> {
     <span class="org-css-property">display</span>: block;
     <span class="org-css-property">transition</span>: all 300ms ease-in-out;
     <span class="org-css-property">padding</span>: 5px;
@@ -3408,7 +3409,7 @@ When printing, we don't display the sidebar because it unnecessarily narrows the
 width of the main text area.
 </p>
 
-<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(3/3) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-3"><span class="org-builtin">@media</span> print {
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(3/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-3">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-3"><span class="org-builtin">@media</span> print {
     <span class="org-css-selector">#table-of-contents</span> {
         <span class="org-css-property">display</span>: none <span class="org-builtin">!important</span>;
     }
@@ -3417,6 +3418,28 @@ width of the main text area.
     }
 }
 </pre></div></div>
+</div>
+</div>
+
+<div id="outline-container-h-Disable-Table-of-Contents-sidebar-for-mobile--touch--screens" class="outline-4">
+<h4 id="h-Disable-Table-of-Contents-sidebar-for-mobile--touch--screens"><span class="section-number-4">4.10.14.</span> Disable Table of Contents sidebar for mobile (touch) screens</h4>
+<div class="outline-text-4" id="text-h-Disable-Table-of-Contents-sidebar-for-mobile--touch--screens">
+<div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-css">css-toc</a></span>(4/4) <span class="lilac-caption-link-symbol"><a href="#__NREF__css-toc-4">&#x1f517;</a></span></div><pre class="src src-css" id="__NREF__css-toc-4"><span class="org-builtin">@media</span> (any-pointer: coarse) {
+    <span class="org-css-selector">#table-of-contents</span> {
+        <span class="org-css-property">display</span>: none <span class="org-builtin">!important</span>;
+    }
+    <span class="org-css-selector">h1.title</span> {
+        <span class="org-css-property">font-size</span>: 40pt;
+    }
+    <span class="org-css-selector">body</span> {
+        <span class="org-css-property">margin-left</span>: 1em;
+        <span class="org-css-property">font-size</span>: 1em;
+        <span class="org-css-property">width</span>: auto;
+    }
+}
+</pre></div></div><p>
+See <a href="https://stackoverflow.com/a/74215894">https://stackoverflow.com/a/74215894</a>.
+</p>
 </div>
 </div>
 </div>
@@ -3572,7 +3595,7 @@ prefix indirectly with the <code>(nref)</code> helper function.
 <div id="outline-container-h-Setup-and-tear-down-fixture-for-HTML-tests" class="outline-4">
 <h4 id="h-Setup-and-tear-down-fixture-for-HTML-tests"><span class="section-number-4">5.1.2.</span> Setup and tear-down fixture for HTML tests</h4>
 <div class="outline-text-4" id="text-h-Setup-and-tear-down-fixture-for-HTML-tests">
-<div class="sidenote" id="org00000f3">
+<div class="sidenote" id="org00000f5">
 <p>
 The <a href="https://www.gnu.org/software/emacs/manual/html_mono/ert.html#Fixtures-and-Test-Suites">Emacs manual</a> for ERT defines fixtures as environments which provide setup
 and tear-down.
@@ -4028,19 +4051,19 @@ block.
 <h2 id="h-Glossary"><span class="section-number-2">6.</span> Glossary</h2>
 <div class="outline-text-2" id="text-h-Glossary">
 <dl class="org-dl">
-<div class="lilac-description-list-entry" id="org0000106"><dt> <b>literate document</b></dt><dd>A file or collection of
+<div class="lilac-description-list-entry" id="org0000108"><dt> <b>literate document</b></dt><dd>A file or collection of
 files that include both source code and prose to explain it. Well-known
 formats include Noweb files (<code>*.nw</code>) and Org mode files (<code>*.org</code>).</dd></div>
 <div class="lilac-description-list-entry" id="org0000050"><dt> <b>monoblock</b></dt><dd>an Org mode source code block with a
 <code>#+name: ...</code> field. This block is an independent block and there are no other
 blocks with the same name.</dd></div>
-<div class="lilac-description-list-entry" id="org000010c"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
-still works and from which <a href="#org0000108">Org mode</a> borrows heavily using <a href="#org000010a">Noweb-style
+<div class="lilac-description-list-entry" id="org000010e"><dt> <b>Noweb</b></dt><dd>A literate programming tool from 1989 that
+still works and from which <a href="#org000010a">Org mode</a> borrows heavily using <a href="#org000010c">Noweb-style
 references</a>. See <a href="https://en.wikipedia.org/wiki/Noweb">Wikipedia</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org000010a"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
+<div class="lilac-description-list-entry" id="org000010c"><dt> <b>noweb-ref</b></dt><dd>aka "Noweb-style reference". A
 Noweb-style reference is just a name (string) that refers to a monoblock or
 polyblock. See <a href="https://orgmode.org/manual/Noweb-Reference-Syntax.html">the Org manual</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000108"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
+<div class="lilac-description-list-entry" id="org000010a"><dt> <b>Org mode</b></dt><dd>An Emacs major mode for <code>*.org</code> files,
 where "major mode" means that it provides things like syntax highlighting and
 keyboard shortcuts for <code>*.org</code> text files if you are using Emacs. For Lilac,
 the important thing is that we use Org mode as a literate programming tool.
@@ -4052,7 +4075,7 @@ tangled.  Polyblocks are used in cases where we would like to break up a
 single block into smaller pieces for explanatory purposes. In all other cases,
 monoblocks are preferable, unless the source code block is not to be tangled
 and is only for explanatory purposes in the woven output.</dd></div>
-<div class="lilac-description-list-entry" id="org000010e"><dt> <b>source code block</b></dt><dd>An Org mode facility
+<div class="lilac-description-list-entry" id="org0000110"><dt> <b>source code block</b></dt><dd>An Org mode facility
 that allows you to enclose a multiline text (typically source code) with
 <code>#+begin_src ...</code> and <code>#+end_src</code> lines. They are enclosed in a separate
 background color in the HTML output, and are often used for illustrating
@@ -4060,12 +4083,12 @@ source code listings. The format is <code>#+begin_src LANGUAGE_NAME</code> where
 <code>LANGUAGE_NAME</code> is the name of the programming language used for the listing.
 If the name is a recognized name, it will get syntax highlighting in the
 output automatically.</dd></div>
-<div class="lilac-description-list-entry" id="org0000110"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
-raw <a href="#org0000106">literate document</a>.</dd></div>
-<div class="lilac-description-list-entry" id="org0000112"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
+<div class="lilac-description-list-entry" id="org0000112"><dt> <b>tangling</b></dt><dd>The act of extracting source code from a
+raw <a href="#org0000108">literate document</a>.</dd></div>
+<div class="lilac-description-list-entry" id="org0000114"><dt> <b>weaving</b></dt><dd>The act of converting a raw literate
 document to a richer format such as PDF or HTML. This allows fancier output,
 such as for mathematical formulas, which are easier to read versus the
-original <a href="#org0000106">literate document</a>.</dd></div>
+original <a href="#org0000108">literate document</a>.</dd></div>
 </dl>
 </div>
 </div>

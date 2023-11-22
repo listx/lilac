@@ -2791,6 +2791,27 @@ width of the main text area.
 }
 #+end_src
 
+*** Disable Table of Contents sidebar for mobile (touch) screens
+
+#+header: :noweb-ref __NREF__css-toc
+#+begin_src css
+@media (any-pointer: coarse) {
+    #table-of-contents {
+        display: none !important;
+    }
+    h1.title {
+        font-size: 40pt;
+    }
+    body {
+        margin-left: 1em;
+        font-size: 1em;
+        width: auto;
+    }
+}
+#+end_src
+
+See https://stackoverflow.com/a/74215894.
+
 ** Create =lilac.theme= file
 
 Allow HTML exports of Org files (including this one) to pull in CSS and
