@@ -74,6 +74,9 @@
 Match any reference, or only those matching REGEXP, if non-nil.
 When matching, reference is stored in match group 1."
   (lilac-nref-rx t))
+(add-hook 'org-babel-post-tangle-hook (lambda ()
+                                        (delete-trailing-whitespace)
+                                        (save-buffer)))
 (setq org-confirm-babel-evaluate nil)
 (org-babel-do-load-languages 'org-babel-load-languages
                              (append org-babel-load-languages
