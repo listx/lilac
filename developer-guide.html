@@ -253,7 +253,7 @@
 <li><a href="#h-Do-not-use-random-numbers-for-the-HTML--id--attribute">4.2.3. Do not use random numbers for the HTML <code>id</code> attribute</a></li>
 </ul>
 </li>
-<li><a href="#h-Toplevel-publishing-function---lilac-publish-">4.3. Toplevel publishing function (<code>lilac-publish</code>)</a>
+<li><a href="#h-Top-level-publishing-function---lilac-publish-">4.3. Top-level publishing function (<code>lilac-publish</code>)</a>
 <ul>
 <li><a href="#h-Helper-functions">4.3.1. Helper functions</a></li>
 </ul>
@@ -425,8 +425,8 @@ pkgs.mkShell ({
   ];
 })
 </pre></div></div><p>
-For Emacs, we use the "nox" version to avoid GUI dependencies (because we always
-invoke Emacs in batch mode in the terminal without ever using it in an
+For Emacs, we use the <code>-nox</code> version to avoid GUI dependencies (because we
+always invoke Emacs in batch mode in the terminal without ever using it in an
 interactive manner).
 </p>
 </div>
@@ -536,14 +536,14 @@ endef
 <span class="org-variable-name">LILAC_ROOT</span> := $(<span class="org-variable-name">shell</span> git rev-parse --show-toplevel)
 </pre></div></div><p>
 We use <a href="https://github.com/nmattia/niv"><code>niv</code></a> to update the dependencies sourced by <a href="#shell-nix"><code>shell.nix</code></a>. Niv uses two
-sources of truth: the niv repository itself on GitHub, and a branch of nixpkgs.
-The former tracks the <code>master</code> branch, and the latter tracks the stable channels
-(example: <code>nixos-23.11</code> branch). Whenever we run <code>niv update</code>, <code>niv</code> will update
-the HEAD commit SHA of these branches.
+sources of truth: the niv repository itself on GitHub, and a branch of
+<code>nixpkgs</code>. The former tracks the <code>master</code> branch, and the latter tracks the
+stable channels (example: <code>nixos-23.11</code> branch). Whenever we run <code>niv update</code>,
+<code>niv</code> will update the HEAD commit SHA of these branches.
 </p>
 
 <p>
-One problem with the nixpkgs stable channel is that it will eventually become
+One problem with the <code>nixpkgs</code> stable channel is that it will eventually become
 obsolete as newer stable channels get created. So we have to manually track
 these channels ourselves.
 </p>
@@ -842,7 +842,7 @@ we invoke <code>emacs</code> from the command line in a non-interactive manner.
 <p>
 Nondeterminism is problematic because it results in a different HTML file
 every time we run <code>org-babel-tangle</code>, <i>even if the Org files have not changed</i>.
-Here we take care to set things right so that we can have reprducible, stable
+Here we take care to set things right so that we can have reproducible, stable
 HTML output.
 </p>
 </div>
@@ -898,15 +898,15 @@ See <a href="https://www.reddit.com/r/orgmode/comments/aagmfh/comment/hk6upbf">h
 </div>
 </div>
 
-<div id="outline-container-h-Toplevel-publishing-function---lilac-publish-" class="outline-3">
-<h3 id="h-Toplevel-publishing-function---lilac-publish-"><span class="section-number-3">4.3.</span> Toplevel publishing function (<code>lilac-publish</code>)</h3>
-<div class="outline-text-3" id="text-h-Toplevel-publishing-function---lilac-publish-">
+<div id="outline-container-h-Top-level-publishing-function---lilac-publish-" class="outline-3">
+<h3 id="h-Top-level-publishing-function---lilac-publish-"><span class="section-number-3">4.3.</span> Top-level publishing function (<code>lilac-publish</code>)</h3>
+<div class="outline-text-3" id="text-h-Top-level-publishing-function---lilac-publish-">
 <p>
-The toplevel function is <code>lilac-publish</code>. This actually publishes to HTML twice,
-with two separate calls to <code>org-html-export-to-html</code>. The reason we publish
-twice is because we need to examine the HTML output twice in order to build up a
-database of parent/child source code block links (which is then used to link
-between these parent/child source code blocks).
+The top-level function is <code>lilac-publish</code>. This actually publishes to HTML
+twice, with two separate calls to <code>org-html-export-to-html</code>. The reason we
+publish twice is because we need to examine the HTML output twice in order to
+build up a database of parent/child source code block links (which is then used
+to link between these parent/child source code blocks).
 </p>
 
 <p>
@@ -1056,7 +1056,7 @@ code captions to look prettier (<code>lilac-prettify-source-code-captions</code>
 
   (org-html-export-to-html)
 </pre></div></div><p>
-After publishing to HTML, we have to clear the intermediate hashtables used for
+After publishing to HTML, we have to clear the intermediate hash tables used for
 the export, because we could be invoking <code>lilac-publish</code> multiple times from the
 same emacs session (such as during unit tests).
 </p>
@@ -1750,7 +1750,7 @@ hash tables for bookkeeping.
 First here is the overall shape of the function. If there is no caption
 (<code>&lt;label&gt;</code> tag in the HTML), then we return the original HTML unmodified.
 Otherwise we prettify this label (removing the "Listing N: &#x2026;" text, including
-a link back to the parent, etc) along with the body text (linkifying references
+a link back to the parent, etc) along with the body text (linking references
 to child Noweb references), and return both inside a new
 <code>lilac-pre-with-caption</code> div.
 </p>
@@ -2051,7 +2051,7 @@ would want to link to the very first block.
 </p>
 
 <p>
-We cannot use a <code>org-export-before-parsing-hook</code> like we did in <a href="#h-Toplevel-publishing-function---lilac-publish-">4.3</a> because at that stage of processing, we
+We cannot use a <code>org-export-before-parsing-hook</code> like we did in <a href="#h-Top-level-publishing-function---lilac-publish-">4.3</a> because at that stage of processing, we
 are dealing with Org mode syntax. Any modifications we make to the parent
 source code block will be treated as text upon HTML export. Thankfully Org mode
 allows customizations on generated HTML through the
@@ -2384,7 +2384,7 @@ to make it easier to navigate around the various intra-document links.
 <span class="lilac-child-link-from-parent"><a href="#__NREF__js-highlight-link-destination">js-highlight-link-destination</a></span>
 <span class="lilac-child-link-from-parent"><a href="#__NREF__js-scroll-to-history-item">js-scroll-to-history-item</a></span>
 </pre></div></div><p>
-In the<a href="#h-Create--lilac-theme--file"><code>lilac.theme</code></a> file, we include <code>lilac.js</code> and also jQuery
+In the<a href="#h-Create--lilac-theme--file"><code>lilac.theme</code></a> file, we include <code>lilac.js</code> and also <code>jQuery</code>
 because we depend on it.
 </p>
 
@@ -2417,7 +2417,7 @@ The JavaScript below is taken from <a href="https://github.com/listx/listx_blog/
     });
 });
 </pre></div></div><p>
-Linkifying itself makes all the headlines blue (the default color for links).
+Linking itself makes all the headlines blue (the default color for links).
 This is a bit distracting, so make them black.
 </p>
 
@@ -2523,7 +2523,7 @@ modifications to it:
 <p>
 We use some JavaScript to track the current headline when we scroll up or
 down the page, forcing it to stay in sync with the content in the main body. We
-initially used Bootstrap's "scrollspy" component, but dropped it because it was
+initially used Bootstrap's <code>scrollspy</code> component, but dropped it because it was
 too heavy and opinionated.
 </p>
 
@@ -2794,8 +2794,8 @@ the history item location we've saved).
 <p>
 Generate <code>syntax-highlighting.css</code> and quit emacs. This function is designed to
 be run from the command line on a fresh emacs instance (dedicated OS process).
-Unfortunately, it can only be run in interactve mode (without the <code>--batch</code> flag
-to emacs).
+Unfortunately, it can only be run in interactive mode (without the <code>--batch</code>
+flag to emacs).
 </p>
 
 <div class="org-src-container"><div class="lilac-pre-with-caption"><div class="lilac-caption"><span class="lilac-caption-parent-link"><a href="#lilac-el">lilac_dot_el-autogenerate-css</a></span><span class="lilac-caption-link-symbol"><a href="#__NREF__lilac_dot_el-autogenerate-css">&#x1f517;</a></span></div><pre class="src src-emacs-lisp" id="__NREF__lilac_dot_el-autogenerate-css">(<span class="org-keyword">defun</span> <span class="org-function-name">lilac-gen-css-and-exit</span> ()
@@ -4026,7 +4026,7 @@ block.
 <div class="outline-text-4" id="text-h-Nested-child-blocks">
 <p>
 A child block can itself be a parent (and link to the nested child within it).
-Expect to find a link to the nested child block from wiithin the first child
+Expect to find a link to the nested child block from within the first child
 block.
 </p>
 

@@ -64,8 +64,8 @@ pkgs.mkShell ({
 })
 #+end_src
 
-For Emacs, we use the "nox" version to avoid GUI dependencies (because we always
-invoke Emacs in batch mode in the terminal without ever using it in an
+For Emacs, we use the =-nox= version to avoid GUI dependencies (because we
+always invoke Emacs in batch mode in the terminal without ever using it in an
 interactive manner).
 
 * Makefile
@@ -175,12 +175,12 @@ LILAC_ROOT := $(shell git rev-parse --show-toplevel)
 #+end_src
 
 We use [[https://github.com/nmattia/niv][=niv=]] to update the dependencies sourced by [[shell.nix][=shell.nix=]]. Niv uses two
-sources of truth: the niv repository itself on GitHub, and a branch of nixpkgs.
-The former tracks the =master= branch, and the latter tracks the stable channels
-(example: =nixos-23.11= branch). Whenever we run =niv update=, =niv= will update
-the HEAD commit SHA of these branches.
+sources of truth: the niv repository itself on GitHub, and a branch of
+=nixpkgs=. The former tracks the =master= branch, and the latter tracks the
+stable channels (example: =nixos-23.11= branch). Whenever we run =niv update=,
+=niv= will update the HEAD commit SHA of these branches.
 
-One problem with the nixpkgs stable channel is that it will eventually become
+One problem with the =nixpkgs= stable channel is that it will eventually become
 obsolete as newer stable channels get created. So we have to manually track
 these channels ourselves.
 
@@ -412,7 +412,7 @@ __NREF__lilac_dot_el-misc
 
 Nondeterminism is problematic because it results in a different HTML file
 every time we run =org-babel-tangle=, /even if the Org files have not changed/.
-Here we take care to set things right so that we can have reprducible, stable
+Here we take care to set things right so that we can have reproducible, stable
 HTML output.
 
 *** Do not insert current time as HTML comment
@@ -454,13 +454,13 @@ See https://www.reddit.com/r/orgmode/comments/aagmfh/comment/hk6upbf.
             :override #'org-export-deterministic-reference)
 #+end_src
 
-** Toplevel publishing function (=lilac-publish=)
+** Top-level publishing function (=lilac-publish=)
 
-The toplevel function is =lilac-publish=. This actually publishes to HTML twice,
-with two separate calls to =org-html-export-to-html=. The reason we publish
-twice is because we need to examine the HTML output twice in order to build up a
-database of parent/child source code block links (which is then used to link
-between these parent/child source code blocks).
+The top-level function is =lilac-publish=. This actually publishes to HTML
+twice, with two separate calls to =org-html-export-to-html=. The reason we
+publish twice is because we need to examine the HTML output twice in order to
+build up a database of parent/child source code block links (which is then used
+to link between these parent/child source code blocks).
 
 Also note that we do some modifications to the Org buffer directly before
 exporting to HTML. The main reason is so that the source code blocks that are
@@ -552,7 +552,7 @@ code captions to look prettier (=lilac-prettify-source-code-captions=).
   (org-html-export-to-html)
 #+end_src
 
-After publishing to HTML, we have to clear the intermediate hashtables used for
+After publishing to HTML, we have to clear the intermediate hash tables used for
 the export, because we could be invoking =lilac-publish= multiple times from the
 same emacs session (such as during unit tests).
 
@@ -1208,7 +1208,7 @@ hash tables for bookkeeping.
 First here is the overall shape of the function. If there is no caption
 (=<label>= tag in the HTML), then we return the original HTML unmodified.
 Otherwise we prettify this label (removing the "Listing N: ..." text, including
-a link back to the parent, etc) along with the body text (linkifying references
+a link back to the parent, etc) along with the body text (linking references
 to child Noweb references), and return both inside a new
 =lilac-pre-with-caption= div.
 
@@ -1511,7 +1511,7 @@ ourselves.
 In the case of =__NREF__child-block-2=, it is defined in multiple blocks so we
 would want to link to the very first block.
 
-We cannot use a =org-export-before-parsing-hook= like we did in [[* Toplevel
+We cannot use a =org-export-before-parsing-hook= like we did in [[* Top-level
  publishing function (=lilac-publish=)]] because at that stage of processing, we
 are dealing with Org mode syntax. Any modifications we make to the parent
 source code block will be treated as text upon HTML export. Thankfully Org mode
@@ -1832,7 +1832,7 @@ __NREF__js-highlight-link-destination
 __NREF__js-scroll-to-history-item
 #+end_src
 
-In the[[* Create =lilac.theme= file][=lilac.theme=]] file, we include =lilac.js= and also jQuery
+In the[[* Create =lilac.theme= file][=lilac.theme=]] file, we include =lilac.js= and also =jQuery=
 because we depend on it.
 
 #+name: __NREF__lilac-theme-js
@@ -1863,7 +1863,7 @@ $(function() {
 });
 #+end_src
 
-Linkifying itself makes all the headlines blue (the default color for links).
+Linking itself makes all the headlines blue (the default color for links).
 This is a bit distracting, so make them black.
 
 #+header: :noweb-ref __NREF__css-source-code-section-headlines
@@ -1960,7 +1960,7 @@ modifications to it:
 
 We use some JavaScript to track the current headline when we scroll up or
 down the page, forcing it to stay in sync with the content in the main body. We
-initially used Bootstrap's "scrollspy" component, but dropped it because it was
+initially used Bootstrap's =scrollspy= component, but dropped it because it was
 too heavy and opinionated.
 
 #+name: __NREF__js-toc-scrollspy
@@ -2218,8 +2218,8 @@ $(document).ready(() => {
 
 Generate =syntax-highlighting.css= and quit emacs. This function is designed to
 be run from the command line on a fresh emacs instance (dedicated OS process).
-Unfortunately, it can only be run in interactve mode (without the =--batch= flag
-to emacs).
+Unfortunately, it can only be run in interactive mode (without the =--batch=
+flag to emacs).
 
 #+name: __NREF__lilac_dot_el-autogenerate-css
 #+begin_src emacs-lisp
@@ -3360,7 +3360,7 @@ block.
 *** Nested child blocks
 
 A child block can itself be a parent (and link to the nested child within it).
-Expect to find a link to the nested child block from wiithin the first child
+Expect to find a link to the nested child block from within the first child
 block.
 
 #+header: :noweb-ref __NREF__t-link-to-child-block-from-parent-block
