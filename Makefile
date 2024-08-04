@@ -56,7 +56,7 @@ lint: spellcheck
 spellcheck: README.org developer-guide.org
 	typos
 .PHONY: spellcheck
-nixpkgs_stable_channel := nixos-23.11
+nixpkgs_stable_channel := nixos-24.05
 update-deps: package/nix/sources.json package/nix/sources.nix
 	cd package && niv update nixpkgs --branch $(nixpkgs_stable_channel)
 	cd package && niv update
