@@ -91,11 +91,11 @@ test: tangle
 		--funcall ert-run-tests-batch-and-exit
 .PHONY: test
 
-__NREF__Makefile-weave
-__NREF__Makefile-tangle
-__NREF__Makefile-run_emacs
-__NREF__Makefile-lint
-__NREF__Makefile-update-deps
+<<__NREF__Makefile-weave>>
+<<__NREF__Makefile-tangle>>
+<<__NREF__Makefile-run_emacs>>
+<<__NREF__Makefile-lint>>
+<<__NREF__Makefile-update-deps>>
 #+end_src
 
 Weaving just depends on the main =README.html= and =developer-guide= files being
@@ -231,38 +231,20 @@ code block is given a unique name.
 
 We simply tangle the =developer-guide.org= file to get all the code we need.
 
-The only thing that we customize in terms of tangling is how we define Noweb
-references inside source code blocks.
+** Standardized Noweb reference syntax
 
-** Custom Noweb delimiters
+Lilac places the following requirements for naming Noweb references:
 
-By default, Org mode requires Noweb source code references to be delimited with
-double angled brackets (=<<= and =>>=). This presents two problems:
+  1) the reference must start with a =__NREF__= prefix
 
-1. The biggest problem with this is that it interferes with syntax highlighting,
-   especially because different programming languages treat these brackets in a
-   different manner (it may be a particular type of token in one language, but a
-   different one in another).
-1. It's also slightly annoying because when searching inside an editor such as
-   Vim (or even Emacs with the Org mode on), the angle brackets are not
-   considered part of the word being searched. This means that if the source
-   code block shares the same name as another (unrelated) string, the search
-   results for both are combined into one.
+  2) the reference must then start with a letter, followed by letters, numbers,
+     dashes, underscores, or periods, and may terminate with =(...)= where the
+     "..." may be an empty string or some other argument.
 
-To avoid these problems, we simply make Noweb references use a =__NREF__=
-prefix. We also define a suffix group such that the reference can take an
-argument to the code block itself. See the example [[file:README.org#h-Monoblock--pass-argument-to-source-code-block][here]].
-
-Note that because this is a customization, we cannot run ~C-c C-v t~ to tangle
-code blocks properly in an interactive manner from an Emacs editing session of
-this Org file, without first evaluating the bits of code in the following code
-block.
+These rules help Lilac detect Noweb references easily.
 
 #+name: __NREF__lilac_dot_el-custom-noweb-delimiters
 #+begin_src emacs-lisp :noweb no
-(setq org-babel-noweb-wrap-start "__NREF__")
-(setq org-babel-noweb-wrap-end "")
-
 (defun lilac-nref-rx (match-optional-params)
   (rx-to-string
    (lilac-nref-rx-primitive match-optional-params)))
@@ -286,18 +268,6 @@ block.
           "__NREF__"
           (any alpha)
           (* (or (any alnum) "-" "_" ".")))))
-
-;; Customize noweb delimiters. Unlike traditional << and >> delimiters, we just
-;; use the "__NREF__" prefix as our only delimiter. This has the advantage of
-;; being encoded the same way into HTML, which makes our HTML modifications
-;; easier and more consistent across different source code languages.
-;; See https://emacs.stackexchange.com/a/73720/13006.
-(defun org-babel-noweb-wrap (&optional regexp)
-  "Return regexp matching a Noweb reference.
-
-Match any reference, or only those matching REGEXP, if non-nil.
-When matching, reference is stored in match group 1."
-  (lilac-nref-rx t))
 #+end_src
 
 ** Remove trailing whitespace
@@ -396,16 +366,16 @@ we invoke =emacs= from the command line in a non-interactive manner.
 #+begin_src emacs-lisp :tangle lilac.el :eval no
 ; Set garbage-collection threshold to 16 GiB.
 (setq gc-cons-threshold #x400000000)
-__NREF__lilac_dot_el-imports
-__NREF__lilac_dot_el-fix-nondeterminism
-__NREF__lilac_dot_el-custom-noweb-delimiters
-__NREF__lilac_dot_el-remove-trailing-whitespace
-__NREF__lilac_dot_el-allow-code-evaluation
-__NREF__lilac_dot_el-lilac-publish
-__NREF__lilac_dot_el-lilac-publish-helpers
-__NREF__lilac_dot_el-search-replace
-__NREF__lilac_dot_el-autogenerate-css
-__NREF__lilac_dot_el-misc
+<<__NREF__lilac_dot_el-imports>>
+<<__NREF__lilac_dot_el-fix-nondeterminism>>
+<<__NREF__lilac_dot_el-custom-noweb-delimiters>>
+<<__NREF__lilac_dot_el-remove-trailing-whitespace>>
+<<__NREF__lilac_dot_el-allow-code-evaluation>>
+<<__NREF__lilac_dot_el-lilac-publish>>
+<<__NREF__lilac_dot_el-lilac-publish-helpers>>
+<<__NREF__lilac_dot_el-search-replace>>
+<<__NREF__lilac_dot_el-autogenerate-css>>
+<<__NREF__lilac_dot_el-misc>>
 (provide 'lilac)
 #+end_src
 
@@ -472,7 +442,7 @@ The full code listing for =lilac-publish= is below.
 
 #+caption: lilac-publish
 #+begin_src emacs-lisp :noweb yes
-__NREF__lilac_dot_el-lilac-publish
+<<__NREF__lilac_dot_el-lilac-publish>>
 #+end_src
 
 Now let's go through =lilac-publish= in detail.
@@ -575,12 +545,12 @@ The final bits are
 
 #+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish
 #+begin_src emacs-lisp
-  __NREF__lilac-publish-delete-toc-text
-  __NREF__lilac-publish-fix-mathjax-version
-  __NREF__lilac-publish-fix-inline-styles
-  __NREF__lilac-publish-fix-bibliography-ids
-  __NREF__lilac-publish-fix-description-lists
-  __NREF__lilac-publish-inject-custom-html-head)
+  <<__NREF__lilac-publish-delete-toc-text>>
+  <<__NREF__lilac-publish-fix-mathjax-version>>
+  <<__NREF__lilac-publish-fix-inline-styles>>
+  <<__NREF__lilac-publish-fix-bibliography-ids>>
+  <<__NREF__lilac-publish-fix-description-lists>>
+  <<__NREF__lilac-publish-inject-custom-html-head>>)
 #+end_src
 
 *** Helper functions
@@ -589,18 +559,18 @@ These are for modifying the Org buffer.
 
 #+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish-helpers
 #+begin_src emacs-lisp
-__NREF__UID-for-all-src-blocks
-__NREF__smart-source-code-block-captions
-__NREF__UID-for-all-headlines
+<<__NREF__UID-for-all-src-blocks>>
+<<__NREF__smart-source-code-block-captions>>
+<<__NREF__UID-for-all-headlines>>
 #+end_src
 
 These are for modifying the HTML.
 
 #+header: :noweb-ref __NREF__lilac_dot_el-lilac-publish-helpers
 #+begin_src emacs-lisp
-__NREF__lilac-link-to-child-blocks-from-parent
-__NREF__lilac-prettify-source-code-captions
-__NREF__lilac-human-readable-src-block-ids
+<<__NREF__lilac-link-to-child-blocks-from-parent>>
+<<__NREF__lilac-prettify-source-code-captions>>
+<<__NREF__lilac-human-readable-src-block-ids>>
 #+end_src
 
 ** Org modifications
@@ -639,7 +609,7 @@ source code links]].
 #+begin_src emacs-lisp
 (defun lilac-UID-for-all-src-blocks (_backend)
   (let* ((all-src-blocks
-           __NREF__all-src-blocks)
+           <<__NREF__all-src-blocks>>)
          (counter 0)
          (auto-names
            (-remove 'null
@@ -714,16 +684,16 @@ that the remaining KEY values remain valid. This is what we do below, where
 #+begin_src emacs-lisp
 (defun lilac-insert-noweb-source-code-block-captions (_backend)
   (let* ((parent-blocks
-           __NREF__parent-blocks)
+           <<__NREF__parent-blocks>>)
          (child-parents-hash-table
-           __NREF__child-parents-hash-table)
+           <<__NREF__child-parents-hash-table>>)
          (all-src-blocks
-           __NREF__all-src-blocks)
+           <<__NREF__all-src-blocks>>)
          (smart-captions
-           __NREF__smart-captions))
+           <<__NREF__smart-captions>>))
     (lilac-insert-strings-into-buffer smart-captions)))
 
-__NREF__smart-source-code-block-captions-helpers
+<<__NREF__smart-source-code-block-captions-helpers>>
 #+end_src
 
 (We'll get to the helper functions =smart-source-code-block-captions-helpers=
@@ -741,8 +711,8 @@ point is to make things easier to navigate. For example, if we have
 ,#+name: parent-block
 ,#+begin_src bash
 echo "Hello from the parent block"
-__NREF__child-block-1
-__NREF__child-block-2
+<<__NREF__child-block-1>>
+<<__NREF__child-block-2>>
 ,#+end_src
 
 ...
@@ -877,7 +847,7 @@ into the buffer.
 #+begin_src emacs-lisp -r -l ";ref:%s"
 (defun lilac-mk-smart-captions (child-parents-hash-table)
   (-remove 'null
-    (cl-loop for src-block in __NREF__all-src-blocks collect
+    (cl-loop for src-block in <<__NREF__all-src-blocks>> collect
       (let* ((child (lilac-get-src-block-name src-block))
              (child-name (car child))
              (NSCB_NAME (format "=%s= " child-name))                  ;ref:NSCB_NAME
@@ -1046,7 +1016,7 @@ construction of the =CUSTOM_ID= (=headline-UID= in the code below) is done by
                             ":END:\n")))))))
     (lilac-insert-strings-into-buffer headline-UIDs)))
 
-__NREF__get-unique-id
+<<__NREF__get-unique-id>>
 #+end_src
 
 =lilac-get-unique-id= converts a given headline to its canonical form (every
@@ -1172,10 +1142,10 @@ it because we can't refer to polyblocks anyway by name).
       (lilac-to-multi-line html-oneline))))
 
 (defun lilac-to-single-line (s)
-  (replace-regexp-in-string "\n" "<<<LILAC_NEWLINE>>>" s))
+  (replace-regexp-in-string "\n" ">>>LILAC_NEWLINE<<<" s))
 
 (defun lilac-to-multi-line (s)
-  (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
+  (replace-regexp-in-string ">>>LILAC_NEWLINE<<<" "\n" s))
 #+end_src
 
 *** Pretty source code captions
@@ -1218,7 +1188,7 @@ to child Noweb references), and return both inside a new
 (defun lilac-prettify-source-code-captions (src-block-html backend info)
   (when (org-export-derived-backend-p backend 'html)
     (let* (
-           __NREF__lilac-prettify-source-code-captions-let-bindings)
+           <<__NREF__lilac-prettify-source-code-captions-let-bindings>>)
       (if (s-blank? caption)
           src-block-html
         (concat
@@ -1479,8 +1449,8 @@ following code:
 ,#+name: parent-block
 ,#+begin_src bash
 echo "Hello from the parent block"
-__NREF__child-block-1
-__NREF__child-block-2
+<<__NREF__child-block-1>>
+<<__NREF__child-block-2>>
 ,#+end_src
 
 ...
@@ -1756,7 +1726,7 @@ And here we style these entries.
 }
 
 .outline-2 .csl-bib-body .active {
-    __NREF__css-active-item-headline
+    <<__NREF__css-active-item-headline>>
 }
 #+end_src
 
@@ -1797,7 +1767,7 @@ And here we style it.
 }
 
 .org-dl .active {
-    __NREF__css-active-item-headline
+    <<__NREF__css-active-item-headline>>
 }
 #+end_src
 
@@ -1827,10 +1797,10 @@ to make it easier to navigate around the various intra-document links.
 #+name: lilac.js
 #+caption: lilac.js
 #+begin_src js :tangle lilac.js :eval no
-__NREF__js-automatically-link-headlines
-__NREF__js-toc-scrollspy
-__NREF__js-highlight-link-destination
-__NREF__js-scroll-to-history-item
+<<__NREF__js-automatically-link-headlines>>
+<<__NREF__js-toc-scrollspy>>
+<<__NREF__js-highlight-link-destination>>
+<<__NREF__js-scroll-to-history-item>>
 #+end_src
 
 In the[[* Create =lilac.theme= file][=lilac.theme=]] file, we include =lilac.js= and also =jQuery=
@@ -2042,7 +2012,7 @@ becomes the color of all other links as per [[* Links]].
 }
 #table-of-contents .active {
     color: var(--fg-heading);
-    __NREF__css-active-item
+    <<__NREF__css-active-item>>
 }
 #table-of-contents a:hover {
     text-decoration: none;
@@ -2137,7 +2107,7 @@ For headlines, we draw a border around it.
 border-style: solid;
 border-width: 1px;
 border-radius: 5px;
-__NREF__css-active-item
+<<__NREF__css-active-item>>
 #+end_src
 
 For span nodes, we also draw a border around it. Spans can be the destination
@@ -2150,7 +2120,7 @@ width: 100%;
 border-style: solid;
 border-width: 1px;
 border-radius: 5px;
-__NREF__css-active-item
+<<__NREF__css-active-item>>
 #+end_src
 
 Different destination elements need different selectors. We cover most of them
@@ -2159,25 +2129,25 @@ here.
 #+header: :noweb-ref __NREF__css-active-non-toc-item
 #+begin_src css
 .outline-2 h2.active {
-    __NREF__css-active-item-headline
+    <<__NREF__css-active-item-headline>>
 }
 .outline-2 h3.active {
-    __NREF__css-active-item-headline
+    <<__NREF__css-active-item-headline>>
 }
 .outline-2 h4.active {
-    __NREF__css-active-item-headline
+    <<__NREF__css-active-item-headline>>
 }
 .outline-2 h5.active {
-    __NREF__css-active-item-headline
+    <<__NREF__css-active-item-headline>>
 }
 .outline-2 h6.active {
-    __NREF__css-active-item-headline
+    <<__NREF__css-active-item-headline>>
 }
 .outline-2 pre.active {
-    __NREF__css-active-item
+    <<__NREF__css-active-item>>
 }
 .outline-2 span.active {
-    __NREF__css-active-item-span
+    <<__NREF__css-active-item-span>>
 }
 #+end_src
 
@@ -2383,18 +2353,18 @@ We add some additional CSS tweaks on top of what we get from Org.
 #+name: lilac.css
 #+caption: lilac.css
 #+begin_src css :tangle lilac.css
-__NREF__css-general
-__NREF__css-headline-font-size
-__NREF__css-coderef-disable-background-color
-__NREF__css-source-code-section-headlines
-__NREF__css-source-code-block-body
-__NREF__css-source-code-block-captions
-__NREF__css-source-code-block-child-link-from-parent
-__NREF__css-sidenotes
-__NREF__css-description-lists
-__NREF__css-bibliography
-__NREF__css-toc
-__NREF__css-active-non-toc-item
+<<__NREF__css-general>>
+<<__NREF__css-headline-font-size>>
+<<__NREF__css-coderef-disable-background-color>>
+<<__NREF__css-source-code-section-headlines>>
+<<__NREF__css-source-code-block-body>>
+<<__NREF__css-source-code-block-captions>>
+<<__NREF__css-source-code-block-child-link-from-parent>>
+<<__NREF__css-sidenotes>>
+<<__NREF__css-description-lists>>
+<<__NREF__css-bibliography>>
+<<__NREF__css-toc>>
+<<__NREF__css-active-non-toc-item>>
 #+end_src
 
 *** Colors and fonts
@@ -2870,9 +2840,9 @@ override any of the values we have hardcoded in =lilac.css=.
 #+begin_src org :tangle lilac.theme :eval no
 ,#+HTML_HEAD: <link rel="preconnect" href="https://fonts.googleapis.com" />
 ,#+HTML_HEAD: <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-__NREF__fonts-to-load()
+<<__NREF__fonts-to-load()>>
 
-__NREF__lilac-theme-js
+<<__NREF__lilac-theme-js>>
 
 # Include additional CSS styles.
 ,#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="syntax-highlighting.css"/>
@@ -2940,27 +2910,14 @@ functions are available), so we turn it on here by calling =(org-mode)=.
 
 (org-mode)
 
-__NREF__t-helpers
-__NREF__t-smart-caption-generation
-__NREF__t-link-to-child-block-from-parent-block
+<<__NREF__t-helpers>>
+<<__NREF__t-smart-caption-generation>>
+<<__NREF__t-link-to-child-block-from-parent-block>>
 
 (provide 'lilac-tests)
 #+end_src
 
 ** Test helpers
-
-*** Avoid cross-abstraction Noweb reference prefix collision
-
-Note that we cannot write =__NREF__foo= directly in the test code here, because
-when this Org file is tangled, the references will be detected and Org mode will
-try to replace them with a monoblock or polyblock elsewhere in this file named
-=__NREF__foo=. So we have to go in "stealth mode" by writing the =__NREF__=
-prefix indirectly with the =(nref)= helper function.
-
-#+header: :noweb-ref __NREF__t-helpers
-#+begin_src emacs-lisp
-(defun nref (s) (concat "__NREF__" s))
-#+end_src
 
 *** Setup and tear-down fixture for HTML tests
 
@@ -3019,12 +2976,12 @@ names) found in a source code block.
           "#+caption: parent\n"
           "#+begin_src emacs-lisp\n"
           "; foo\n"
-          (nref "one") "\n"
+          "__NREF__one" "\n"
           "; bar\n"
-          (nref "two") "\n"
+          "__NREF__two" "\n"
           "#+end_src\n")))
     (should (equal (lilac-get-noweb-children body)
-                   `(,(nref "one") ,(nref "two"))))))
+                   '("__NREF__one" "__NREF__two")))))
 #+end_src
 
 =lilac-is-parent-block= depends on =lilac-get-noweb-children=. We tested the
@@ -3038,7 +2995,7 @@ latter already above, but we test the former anyway for completeness.
     (insert "#+caption: parent\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child") "\n"))
+    (insert (concat "__NREF__child" "\n"))
     (insert "#+end_src\n")
     (goto-char (point-min))
     (let ((src-block (org-element-at-point)))
@@ -3055,42 +3012,42 @@ Here we test whether we can automatically insert captions for child blocks.
     (insert "#+caption: parent\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert (concat "#+name: " "__NREF__child1" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert (concat "#+name: " "__NREF__child2" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; baz\n")
     (insert "#+end_src\n")
     (lilac-insert-noweb-source-code-block-captions nil)
     (goto-char (point-min))
     (should (search-forward
-             (concat "#+caption: =" (nref "child1") "=  [[parent][1]]")
+             (concat "#+caption: =" "__NREF__child1" "=  [[parent][1]]")
              nil t))
     (should (search-forward
-             (concat "#+caption: =" (nref "child2") "=  [[parent][1]]")
+             (concat "#+caption: =" "__NREF__child2" "=  [[parent][1]]")
              nil t)))
   (with-temp-buffer
     (insert "#+name: parent1\n")
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert (concat "#+name: " "__NREF__child1" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert (concat "#+name: " "__NREF__child2" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; baz\n")
     (insert "#+end_src\n")
@@ -3099,17 +3056,17 @@ Here we test whether we can automatically insert captions for child blocks.
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (lilac-insert-noweb-source-code-block-captions nil)
     (goto-char (point-min))
     (should (search-forward
              (concat "#+caption: ="
-                     (nref "child1")
+                     "__NREF__child1"
                      "=  [[parent1][1]]  [[parent2][2]]")
              nil t))
     (should (search-forward
-             (concat "#+caption: =" (nref "child2") "=  [[parent1][1]]")
+             (concat "#+caption: =" "__NREF__child2" "=  [[parent1][1]]")
              nil t))))
 #+end_src
 
@@ -3136,14 +3093,14 @@ Here we test retrieval of parent source code blocks.
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
     (insert "#+name: parent2\n")
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (should (lilac-get-parent-blocks))))
 #+end_src
@@ -3174,14 +3131,14 @@ Here we test generating the child-to-parents hash table.
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
     (insert "#+name: parent2\n")
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (let* ((parent-blocks (lilac-get-parent-blocks))
            (child-parents-hash-table
@@ -3199,14 +3156,14 @@ Here we test the construction of smart captions.
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
     (insert "#+name: parent2\n")
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (let* ((parent-blocks (lilac-get-parent-blocks))
            (child-parents-hash-table
@@ -3219,17 +3176,17 @@ Here we test the construction of smart captions.
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
     (insert "#+name: parent2\n")
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert (concat "#+name: " "__NREF__child1" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; child1\n")
     (insert "#+end_src\n")
@@ -3240,29 +3197,29 @@ Here we test the construction of smart captions.
                             child-parents-hash-table)))
       (should (equal smart-captions
        `((181 . ,(concat "#+caption: ="
-                         (nref "child1")
+                         "__NREF__child1"
                          "=  [[parent1][1]]  [[parent2][2]]\n")))))))
   (with-temp-buffer
     (insert "#+name: parent1\n")
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
     (insert "#+name: parent2\n")
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert (concat "#+name: " "__NREF__child1" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; child1\n")
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert (concat "#+name: " "__NREF__child2" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; child2\n")
     (insert "#+end_src\n")
@@ -3273,26 +3230,26 @@ Here we test the construction of smart captions.
                             child-parents-hash-table)))
       (should (equal smart-captions
        `((181 . ,(concat "#+caption: ="
-                         (nref "child1")
+                         "__NREF__child1"
                          "=  [[parent1][1]]\n"))
          (247 . ,(concat "#+caption: ="
-                         (nref "child2")
+                         "__NREF__child2"
                          "=  [[parent2][1]]\n")))))))
   (with-temp-buffer
     (insert "#+name: parent1\n")
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert (concat "#+name: " "__NREF__child1" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; child1\n")
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert (concat "#+name: " "__NREF__child2" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; child2\n")
     (insert "#+end_src\n")
@@ -3303,12 +3260,12 @@ Here we test the construction of smart captions.
                             child-parents-hash-table)))
       (should (equal smart-captions
        `((91 . ,(concat "#+caption: ="
-                         (nref "child1")
+                         "__NREF__child1"
                          "=  [[parent1][1]]\n"))
          (172 . ,(concat "#+caption: ="
-                         (nref "child2")
+                         "__NREF__child2"
                          "=  [["
-                         (nref "child1")
+                         "__NREF__child1"
                          "][1]]\n"))))))))
 #+end_src
 
@@ -3329,17 +3286,17 @@ block.
     "#+caption: parent1\n"
     "#+begin_src emacs-lisp\n"
     "; foo\n"
-    (concat (nref "child1") "\n")
+    (concat "__NREF__child1" "\n")
     "#+end_src\n"
     "\n"
     "#+name: parent2\n"
     "#+caption: parent2\n"
     "#+begin_src emacs-lisp\n"
     "; bar\n"
-    (concat (nref "child1") "\n")
+    (concat "__NREF__child1" "\n")
     "#+end_src\n"
     "\n"
-    (concat "#+name: " (nref "child1") "\n")
+    (concat "#+name: " "__NREF__child1" "\n")
     "#+begin_src emacs-lisp\n"
     "; child1\n"
     "#+end_src\n")
@@ -3374,16 +3331,16 @@ block.
     "#+caption: parent1\n"
     "#+begin_src emacs-lisp\n"
     "; foo\n"
-    (concat (nref "child1") "\n")
+    (concat "__NREF__child1" "\n")
     "#+end_src\n"
     "\n"
-    (concat "#+name: " (nref "child1") "\n")
+    (concat "#+name: " "__NREF__child1" "\n")
     "#+begin_src emacs-lisp\n"
     "; child1\n"
-    (concat (nref "nested-child") "\n")
+    (concat "__NREF__nested-child" "\n")
     "#+end_src\n"
     "\n"
-    (concat "#+name: " (nref "nested-child") "\n")
+    (concat "#+name: " "__NREF__nested-child" "\n")
     "#+caption: nested-child\n"
     "#+begin_src emacs-lisp\n"
     "; nested-child\n"
@@ -3397,7 +3354,7 @@ block.
            (got-child-link-text-child1
             (elquery-text
              (car (elquery-$
-                   (concat "#" (nref "child1")
+                   (concat "#" "__NREF__child1"
                            " .lilac-child-link-from-parent a")
                  html-ast)))))
        (should (equal got-child-link-text-parent1 "child1"))

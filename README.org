@@ -21,7 +21,7 @@
 The /lilac/ is a [[https://en.wikipedia.org/wiki/Syringa][flowering woody plant]].
 #+end_sidenote
 
-/Lilac/ is an add-on for Emacs Org mode to make [[https://en.wikipedia.org/wiki/Literate_programming][Literate Programming]] (LP) using
+/Lilac/ is an addon for Emacs Org mode to make [[https://en.wikipedia.org/wiki/Literate_programming][Literate Programming]] (LP) using
 [[glossary:
 Noweb][Noweb]]-style [cite:@ramsey_1994] references easy. It comes in two parts:
 
@@ -389,7 +389,7 @@ return 4 * 10 + 2
 
 ,#+caption: This uses an evaluation result.
 ,#+begin_src python :noweb yes
-print("The answer is __NREF__ex_evaluate_me()")
+print("The answer is <<__NREF__ex_evaluate_me()>>")
 ,#+end_src
 #+end_src
 
@@ -407,7 +407,7 @@ print statement's string argument.
 
 #+caption: This uses an evaluation result.
 #+begin_src python :noweb yes
-print("The answer is __NREF__ex_evaluate_me()")
+print("The answer is <<__NREF__ex_evaluate_me()>>")
 #+end_src
 
 ***** Monoblock (pass argument to source code block)
@@ -438,8 +438,8 @@ return "Hello, my name is " + my_var
 
 #+caption: Passing string args.
 #+begin_src python :noweb yes
-print("Call without explicit argument: __NREF__ex_take_argument()")
-print("Call with explicit argument: __NREF__ex_take_argument(my_var="bar")")
+print("Call without explicit argument: <<__NREF__ex_take_argument()>>")
+print("Call with explicit argument: <<__NREF__ex_take_argument(my_var="bar")>>")
 #+end_src
 
 ***** Polyblock

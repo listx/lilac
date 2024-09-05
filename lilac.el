@@ -36,9 +36,6 @@
      new))
 (advice-add #'org-export-new-reference
             :override #'org-export-deterministic-reference)
-(setq org-babel-noweb-wrap-start "__NREF__")
-(setq org-babel-noweb-wrap-end "")
-
 (defun lilac-nref-rx (match-optional-params)
   (rx-to-string
    (lilac-nref-rx-primitive match-optional-params)))
@@ -62,18 +59,6 @@
           "__NREF__"
           (any alpha)
           (* (or (any alnum) "-" "_" ".")))))
-
-;; Customize noweb delimiters. Unlike traditional << and >> delimiters, we just
-;; use the "__NREF__" prefix as our only delimiter. This has the advantage of
-;; being encoded the same way into HTML, which makes our HTML modifications
-;; easier and more consistent across different source code languages.
-;; See https://emacs.stackexchange.com/a/73720/13006.
-(defun org-babel-noweb-wrap (&optional regexp)
-  "Return regexp matching a Noweb reference.
-
-Match any reference, or only those matching REGEXP, if non-nil.
-When matching, reference is stored in match group 1."
-  (lilac-nref-rx t))
 (add-hook 'org-babel-post-tangle-hook (lambda ()
                                         (delete-trailing-whitespace)
                                         (save-buffer)))
@@ -606,10 +591,10 @@ When matching, reference is stored in match group 1."
       (lilac-to-multi-line html-oneline))))
 
 (defun lilac-to-single-line (s)
-  (replace-regexp-in-string "\n" "<<<LILAC_NEWLINE>>>" s))
+  (replace-regexp-in-string "\n" ">>>LILAC_NEWLINE<<<" s))
 
 (defun lilac-to-multi-line (s)
-  (replace-regexp-in-string "<<<LILAC_NEWLINE>>>" "\n" s))
+  (replace-regexp-in-string ">>>LILAC_NEWLINE<<<" "\n" s))
 (defun lilac-replace-from-to (str repl)
   (interactive "sString: \nsReplacement: ")
   (save-excursion

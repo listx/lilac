@@ -3,7 +3,6 @@
 
 (org-mode)
 
-(defun nref (s) (concat "__NREF__" s))
 (defun lilac-publish-fixture (fname-prefix content test)
   (let* ((fname-org (make-temp-file fname-prefix nil ".org"))
          (fname-html (concat (string-remove-suffix "org" fname-org) "html")))
@@ -34,19 +33,19 @@
           "#+caption: parent\n"
           "#+begin_src emacs-lisp\n"
           "; foo\n"
-          (nref "one") "\n"
+          "__NREF__one" "\n"
           "; bar\n"
-          (nref "two") "\n"
+          "__NREF__two" "\n"
           "#+end_src\n")))
     (should (equal (lilac-get-noweb-children body)
-                   `(,(nref "one") ,(nref "two"))))))
+                   '("__NREF__one" "__NREF__two")))))
 (ert-deftest t-lilac-is-parent-block ()
   (with-temp-buffer
     (insert "#+name: parent\n")
     (insert "#+caption: parent\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child") "\n"))
+    (insert (concat "__NREF__child" "\n"))
     (insert "#+end_src\n")
     (goto-char (point-min))
     (let ((src-block (org-element-at-point)))
@@ -57,42 +56,42 @@
     (insert "#+caption: parent\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert (concat "#+name: " "__NREF__child1" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert (concat "#+name: " "__NREF__child2" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; baz\n")
     (insert "#+end_src\n")
     (lilac-insert-noweb-source-code-block-captions nil)
     (goto-char (point-min))
     (should (search-forward
-             (concat "#+caption: =" (nref "child1") "=  [[parent][1]]")
+             (concat "#+caption: =" "__NREF__child1" "=  [[parent][1]]")
              nil t))
     (should (search-forward
-             (concat "#+caption: =" (nref "child2") "=  [[parent][1]]")
+             (concat "#+caption: =" "__NREF__child2" "=  [[parent][1]]")
              nil t)))
   (with-temp-buffer
     (insert "#+name: parent1\n")
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert (concat "#+name: " "__NREF__child1" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert (concat "#+name: " "__NREF__child2" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; baz\n")
     (insert "#+end_src\n")
@@ -101,17 +100,17 @@
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (lilac-insert-noweb-source-code-block-captions nil)
     (goto-char (point-min))
     (should (search-forward
              (concat "#+caption: ="
-                     (nref "child1")
+                     "__NREF__child1"
                      "=  [[parent1][1]]  [[parent2][2]]")
              nil t))
     (should (search-forward
-             (concat "#+caption: =" (nref "child2") "=  [[parent1][1]]")
+             (concat "#+caption: =" "__NREF__child2" "=  [[parent1][1]]")
              nil t))))
 (ert-deftest t-lilac-get-parent-blocks ()
   (with-temp-buffer
@@ -132,14 +131,14 @@
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
     (insert "#+name: parent2\n")
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (should (lilac-get-parent-blocks))))
 (ert-deftest t-lilac-mk-child-parents-hash-table ()
@@ -164,14 +163,14 @@
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
     (insert "#+name: parent2\n")
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (let* ((parent-blocks (lilac-get-parent-blocks))
            (child-parents-hash-table
@@ -183,14 +182,14 @@
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
     (insert "#+name: parent2\n")
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (let* ((parent-blocks (lilac-get-parent-blocks))
            (child-parents-hash-table
@@ -203,17 +202,17 @@
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
     (insert "#+name: parent2\n")
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert (concat "#+name: " "__NREF__child1" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; child1\n")
     (insert "#+end_src\n")
@@ -224,29 +223,29 @@
                             child-parents-hash-table)))
       (should (equal smart-captions
        `((181 . ,(concat "#+caption: ="
-                         (nref "child1")
+                         "__NREF__child1"
                          "=  [[parent1][1]]  [[parent2][2]]\n")))))))
   (with-temp-buffer
     (insert "#+name: parent1\n")
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
     (insert "#+name: parent2\n")
     (insert "#+caption: parent2\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; bar\n")
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert (concat "#+name: " "__NREF__child1" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; child1\n")
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert (concat "#+name: " "__NREF__child2" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; child2\n")
     (insert "#+end_src\n")
@@ -257,26 +256,26 @@
                             child-parents-hash-table)))
       (should (equal smart-captions
        `((181 . ,(concat "#+caption: ="
-                         (nref "child1")
+                         "__NREF__child1"
                          "=  [[parent1][1]]\n"))
          (247 . ,(concat "#+caption: ="
-                         (nref "child2")
+                         "__NREF__child2"
                          "=  [[parent2][1]]\n")))))))
   (with-temp-buffer
     (insert "#+name: parent1\n")
     (insert "#+caption: parent1\n")
     (insert "#+begin_src emacs-lisp\n")
     (insert "; foo\n")
-    (insert (concat (nref "child1") "\n"))
+    (insert (concat "__NREF__child1" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child1") "\n"))
+    (insert (concat "#+name: " "__NREF__child1" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; child1\n")
-    (insert (concat (nref "child2") "\n"))
+    (insert (concat "__NREF__child2" "\n"))
     (insert "#+end_src\n")
     (insert "\n")
-    (insert (concat "#+name: " (nref "child2") "\n"))
+    (insert (concat "#+name: " "__NREF__child2" "\n"))
     (insert "#+begin_src emacs-lisp\n")
     (insert "; child2\n")
     (insert "#+end_src\n")
@@ -287,12 +286,12 @@
                             child-parents-hash-table)))
       (should (equal smart-captions
        `((91 . ,(concat "#+caption: ="
-                         (nref "child1")
+                         "__NREF__child1"
                          "=  [[parent1][1]]\n"))
          (172 . ,(concat "#+caption: ="
-                         (nref "child2")
+                         "__NREF__child2"
                          "=  [["
-                         (nref "child1")
+                         "__NREF__child1"
                          "][1]]\n"))))))))
 (ert-deftest t-lilac-children-are-linked-from-parent ()
   (lilac-publish-fixture
@@ -302,17 +301,17 @@
     "#+caption: parent1\n"
     "#+begin_src emacs-lisp\n"
     "; foo\n"
-    (concat (nref "child1") "\n")
+    (concat "__NREF__child1" "\n")
     "#+end_src\n"
     "\n"
     "#+name: parent2\n"
     "#+caption: parent2\n"
     "#+begin_src emacs-lisp\n"
     "; bar\n"
-    (concat (nref "child1") "\n")
+    (concat "__NREF__child1" "\n")
     "#+end_src\n"
     "\n"
-    (concat "#+name: " (nref "child1") "\n")
+    (concat "#+name: " "__NREF__child1" "\n")
     "#+begin_src emacs-lisp\n"
     "; child1\n"
     "#+end_src\n")
@@ -337,16 +336,16 @@
     "#+caption: parent1\n"
     "#+begin_src emacs-lisp\n"
     "; foo\n"
-    (concat (nref "child1") "\n")
+    (concat "__NREF__child1" "\n")
     "#+end_src\n"
     "\n"
-    (concat "#+name: " (nref "child1") "\n")
+    (concat "#+name: " "__NREF__child1" "\n")
     "#+begin_src emacs-lisp\n"
     "; child1\n"
-    (concat (nref "nested-child") "\n")
+    (concat "__NREF__nested-child" "\n")
     "#+end_src\n"
     "\n"
-    (concat "#+name: " (nref "nested-child") "\n")
+    (concat "#+name: " "__NREF__nested-child" "\n")
     "#+caption: nested-child\n"
     "#+begin_src emacs-lisp\n"
     "; nested-child\n"
@@ -360,7 +359,7 @@
            (got-child-link-text-child1
             (elquery-text
              (car (elquery-$
-                   (concat "#" (nref "child1")
+                   (concat "#" "__NREF__child1"
                            " .lilac-child-link-from-parent a")
                  html-ast)))))
        (should (equal got-child-link-text-parent1 "child1"))
