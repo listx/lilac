@@ -151,7 +151,7 @@ tangle $(tangled_output) &: developer-guide.org
 	# Generate the toplevel Makefile (this file) and others as described in
 	# tangled_output. In a way this bootstraps the whole literate-programming
 	# pipeline.
-	$(call run_emacs,(org-babel-tangle),developer-guide.org)
+	$(call run_emacs,(lilac-tangle),developer-guide.org)
 	touch tangle
 #+end_src
 
@@ -329,6 +329,26 @@ In addition to Python, we add in some additional languages that might be of use.
                                 (shell      . t))))
 #+end_src
 
+** Faster tangling
+
+These settings are stolen from
+https://github.com/doomemacs/doomemacs/commit/295ab7ed3a20ba4619a142be15f5f2ef08d2adcf.
+
+#+header: :noweb-ref __NREF__lilac_dot_el-faster-tangling
+#+begin_src emacs-lisp
+(defun lilac-tangle ()
+  (interactive)
+  (let ((org-startup-indented nil)
+        (org-startup-folded nil)
+        (vc-handled-backends nil)
+        (write-file-functions nil)
+        (before-save-hook nil)
+        (after-save-hook nil)
+        (org-mode-hook nil)
+        (org-inhibit-startup t))
+    (org-babel-tangle)))
+#+end_src
+
 * Weaving (generating the HTML)
 
 Weaving is conceptually simpler than tangling because there is no extra step ---
@@ -371,6 +391,7 @@ we invoke =emacs= from the command line in a non-interactive manner.
 <<__NREF__lilac_dot_el-custom-noweb-delimiters>>
 <<__NREF__lilac_dot_el-remove-trailing-whitespace>>
 <<__NREF__lilac_dot_el-allow-code-evaluation>>
+<<__NREF__lilac_dot_el-faster-tangling>>
 <<__NREF__lilac_dot_el-lilac-publish>>
 <<__NREF__lilac_dot_el-lilac-publish-helpers>>
 <<__NREF__lilac_dot_el-search-replace>>

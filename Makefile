@@ -37,7 +37,7 @@ tangle $(tangled_output) &: developer-guide.org
 	# Generate the toplevel Makefile (this file) and others as described in
 	# tangled_output. In a way this bootstraps the whole literate-programming
 	# pipeline.
-	$(call run_emacs,(org-babel-tangle),developer-guide.org)
+	$(call run_emacs,(lilac-tangle),developer-guide.org)
 	touch tangle
 define run_emacs
 	LILAC_ROOT=$(LILAC_ROOT) emacs $(2) --quick --batch --kill \
