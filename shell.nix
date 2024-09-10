@@ -6,10 +6,10 @@
 in
   pkgs.mkShell {
     buildInputs = [
-      pkgs.nixkell.shell
+      pkgs.lilac.shell
     ];
     shellHook = ''
-      export LD_LIBRARY_PATH=${pkgs.nixkell.shell}/lib:$LD_LIBRARY_PATH
+      export LD_LIBRARY_PATH=${pkgs.lilac.shell}/lib:$LD_LIBRARY_PATH
       logo
     '';
   }

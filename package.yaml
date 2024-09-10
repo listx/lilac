@@ -1,4 +1,4 @@
-name: nixkell
+name: lilac
 version: 0.1.0.0
 
 dependencies:
@@ -21,7 +21,7 @@ library:
   source-dirs: src
 
 executables:
-  nixkell:
+  lilac:
     main: Main.hs
     source-dirs: bin
     ghc-options:
@@ -29,7 +29,7 @@ executables:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
-      - nixkell
+      - lilac
 
 tests:
   spec:
@@ -41,7 +41,7 @@ tests:
       - -with-rtsopts=-N
     dependencies:
       - hspec
-      - nixkell
+      - lilac
 
 default-extensions:
   - BangPatterns

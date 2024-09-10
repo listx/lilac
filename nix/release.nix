@@ -4,4 +4,4 @@
 }: let
   pkgs = import ./. {inherit system compiler;};
 in
-  pkgs.nixkell
+  pkgs.lilac

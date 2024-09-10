@@ -11,6 +11,6 @@
   '';
   run = pkgs.writeShellScriptBin "run" ''
     set -euo pipefail
-    result/bin/nixkell "$@"
+    result/bin/lilac "$@"
   '';
 in [logo build run]

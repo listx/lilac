@@ -51,7 +51,7 @@
 
   # Create your own setup using the choosen GHC version (in the config) as a starting point
   ourHaskell = let
-    # https://github.com/pwm/nixkell#direct-hackagegithub-dependencies
+    # https://github.com/pwm/lilac#direct-hackagegithub-dependencies
     depsFromDir = hlib.packagesFromDirectory {
       directory = ./packages;
     };
@@ -60,14 +60,14 @@
       haskell-language-server =
         hlsDisablePlugins hprev.haskell-language-server conf.hls.disable_plugins;
 
-      nixkell = let
+      lilac = let
         cleanSource = util.filterSrc {
           path = ../.; # Root of the project
           files = conf.ignore.files;
           paths = conf.ignore.paths;
         };
       in
-        confPkg (hprev.callCabal2nix "nixkell" cleanSource {});
+        confPkg (hprev.callCabal2nix "lilac" cleanSource {});
     };
   in
     pkgs.haskell.packages.${ghcVer}.extend (
@@ -82,7 +82,7 @@
     hlib.getHaskellBuildInputs (
       # Tell getHaskellBuildInputs to include benchmarkHaskellDepends
       # so that they are available in the shell for cabal to use them
-      hlib.doBenchmark ourHaskell.nixkell
+      hlib.doBenchmark ourHaskell.lilac
     ));
 
   # Compile haskell tools with ourHaskell to ensure compatibility
@@ -94,10 +94,10 @@
 in {
   inherit conf ourHaskell ghc confPkg; # TODO: remove
 
-  bin = ourHaskell.nixkell;
+  bin = ourHaskell.lilac;
 
   shell = pkgs.buildEnv {
-    name = "nixkell-env";
+    name = "lilac-env";
     paths = [ghc] ++ haskellTools ++ tools ++ scripts;
   };
 }
