@@ -1,0 +1,331 @@
+#+title: Lilac (version 2)
+
+# Set default header argument for all code blocks. The "no-export" means
+# that we do not expand noweb references when exporting (weaving) --- the fact
+# that this is not the default option is odd.
+#+property: header-args :noweb no-export
+#+auto_tangle: t
+
+* Introduction
+
+Lilac v1 (LV1) is an Org extension, in that it does all of its work as
+Emacs Lisp on top of Org.
+
+Lilac v2 (LV2) is a native program which understands a subset of Org and
+which runs very fast. Notably, it can tangle Noweb references and also weave
+HTML in under a second for all but the largest Org files. This speed allows
+us to have rapid feedback.
+
+** Motivation
+
+Although LV1 can fix most of the nondeterminism issues of Org, the Org HTML
+export can still be very slow. It can take 10+ seconds on large documents.
+Performance is the main reason for LV2.
+
+The other problem with Org is that the syntax highlighting of code blocks
+only works properly if you are exporting to HTML interactively. If you use Emacs
+in batch mode (non-interactively), the syntax highlighting won't work.
+
+Yet another problem is that tangling doesn't work very well with =#+include=
+statements; that is, if you use =#+include= you must tangle each included file
+separately from the main one.
+
+LV2 is designed to fix these shortcomings, while still maintaining Org's syntax;
+this way users can edit Org files in Emacs and still enjoy most of the benefits
+of using Org interactively for day-to-day writing.
+
+** Why not extend Pandoc?
+
+Tangling code is beyond the scope of Pandoc.
+
+** Why not use org-parser?
+
+[[https://github.com/200ok-ch/org-parser/issues/56][Performance is too slow.]]
+
+* Differences with vanilla Org
+
+** Tangling
+
+*** =#+include= support
+
+Org does not support including other files when tangling. That is, if you
+=#+include= other Org files into a bigger Org file, and tangle the bigger one, the
+nested Org files' code blocks do not get tangled.
+
+LV2 supports this.
+
+** Weaving
+
+*** HTML only
+
+We only support weaving HTML output. Other exporters don't exist yet.
+
+*** Noweb expansion disabled
+
+Noweb references are never expanded during weaving. This is equivalent to the
+=no-export= option described at
+https://orgmode.org/manual/Noweb-Reference-Syntax.html.
+
+* Design
+
+** Language and libraries
+
+We use Haskell for speed and Megaparsec for parsing Org syntax.
+
+** Features
+
+  - HTML export
+
+  - syntax highlighting for code blocks
+
+  - internal link checker (checks if links to headings and other files are
+    broken)
+
+** Domain-specific data structures
+
+There are several major things we want to keep track of:
+
+  1) headings
+
+  2) properties (metadata that can be scoped to headings or code blocks)
+
+  3) paragraphs
+
+  4) ordered and unordered lists
+
+  5) code blocks
+
+  6) internal links
+
+  7) mathematical expressions
+
+The headings is just a list of trees, with each tree having a list of subtrees,
+recursively.
+
+Each tree root (heading) can have properties applied to it. Children inherit
+those properties unless the child overrides them.
+
+Paragraphs are free-form text. Paragraphs are "cells" that can have formatted
+text, links, and mathematical expressions inside them.
+
+Ordered and unordered lists are like mini-headings because they can also be
+nested.
+
+Code blocks are just nodes in a graph. The Noweb references form directed
+links, which form a DAG (cycles are prohibited).
+
+Internal links form a directed graph (cycles are allowed). Some examples are
+footnotes, links to headings, dedicated targets and radio targets.
+
+** Summary of main parts
+
+*** Org parser
+
+This step parses the raw =.org= text input to populate the data structures
+discussed in [[*Domain-specific data structures]]. These data structures remain the
+source of truth for all subsequent operations.
+
+*** Input validation
+
+The first step before doing anything is to check that the input conforms to our
+expectations. If there are any problems, we say so during parsing and reject the
+input.
+
+*** Tangling
+
+Tangling requires two main things:
+
+  1) finding all =:tangle= targets defined in code blocks
+
+  2) expanding all Noweb references
+
+The second step involves doing a topological sort, so that we know which
+reference we can expand first.
+
+*** Weaving
+
+Weaving requires adding markup to the output so that things get displayed in an
+aesthetically pleasing way. This part isn't very interesting and is quite
+mechanical.
+
+**** Split output
+
+We allow the user to specify whether they want the entire Org file to be
+woven as a single HTML page, or as a collection of smaller pages.
+
+* Implementation
+
+** Development environment
+
+We use Nix to help us set up a reproducible development environment. We imported
+the [[https://github.com/pwm/nixkell][Nixkell]] project skeleton at commit 29e78ce (Some tidying (#36), 2024-03-18),
+which gave us a working Haskell development environment with many of the
+infrastructural issues sorted out.
+
+*** Makefile
+
+#+header: :tangle Makefile
+#+begin_src makefile
+<<Build lilac>>
+#+end_src
+
+**** Build =lilac=
+
+We build with =cabal=, Haskell's default tooling for building Haskell programs.
+
+#+header: :noweb-ref Build lilac
+#+begin_src makefile
+lilac: lilac.org lilac.cabal
+	cabal build
+#+end_src
+
+** Cabal configuration
+
+#+header: :tangle lilac.cabal
+#+begin_src haskell-cabal
+cabal-version:  1.12
+
+name:           lilac
+version:        0.1.0.0
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+
+library
+  other-modules:
+      Paths_lilac
+  hs-source-dirs:
+      src
+  default-extensions:
+      <<Default GHC extensions>>
+  ghc-options: -Weverything
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , directory
+    , either
+    , filepath
+    , mtl
+    , random
+    , text
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+  default-language: Haskell2010
+
+executable lilac
+  main-is: Main.hs
+  other-modules:
+      Paths_lilac
+  hs-source-dirs:
+      bin
+  default-extensions:
+      <<Default GHC extensions>>
+  ghc-options: -Weverything -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , directory
+    , either
+    , filepath
+    , lilac
+    , mtl
+    , random
+    , text
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+  default-language: Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_lilac
+  hs-source-dirs:
+      test
+  default-extensions:
+      <<Default GHC extensions>>
+  ghc-options: -Weverything -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , directory
+    , either
+    , filepath
+    , hspec
+    , lilac
+    , mtl
+    , random
+    , text
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+  default-language: Haskell2010
+#+end_src
+
+We save ourselves some repetition (at least in the Org file) by declaring the
+default GHC extensions in one place:
+
+#+header: :noweb-ref Default GHC extensions
+#+begin_src txt
+BangPatterns
+BinaryLiterals
+ConstraintKinds
+DataKinds
+DefaultSignatures
+DeriveAnyClass
+DeriveDataTypeable
+DeriveFoldable
+DeriveFunctor
+DeriveGeneric
+DeriveTraversable
+DerivingStrategies
+DerivingVia
+DuplicateRecordFields
+EmptyCase
+FlexibleContexts
+FlexibleInstances
+FunctionalDependencies
+GeneralizedNewtypeDeriving
+ImportQualifiedPost
+InstanceSigs
+MultiParamTypeClasses
+MultiWayIf
+NamedFieldPuns
+NumDecimals
+NumericUnderscores
+LambdaCase
+OverloadedLabels
+OverloadedRecordDot
+OverloadedStrings
+PatternSynonyms
+RankNTypes
+ScopedTypeVariables
+StandaloneDeriving
+TupleSections
+TypeApplications
+TypeOperators
+ViewPatterns
+#+end_src
+
+** Org parser
+
+** Main
+
+#+header: :tangle bin/Main.hs
+#+begin_src haskell
+module Main (main) where
+
+main :: IO ()
+main = putStrLn "Hello literate lilac!"
+#+end_src
