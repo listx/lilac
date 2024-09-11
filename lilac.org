@@ -224,7 +224,7 @@ jobs:
       - name: Set nix path
         id: nix-path
         run: |
-          echo ::set-output name=nixpkgs::$(jq -r .nixpkgs.url ./nix/sources.json)
+          echo "nixpkgs=$(jq -r .nixpkgs.url ./nix/sources.json)" >> $GITHUB_OUTPUT
 
       - uses: cachix/install-nix-action@V27
         with:
