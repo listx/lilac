@@ -9,8 +9,8 @@
     set -euo pipefail
     nix-build nix/release.nix
   '';
-  run = pkgs.writeShellScriptBin "run" ''
+  lilac = pkgs.writeShellScriptBin "lilac" ''
     set -euo pipefail
     result/bin/lilac "$@"
   '';
-in [logo build run]
+in [logo build lilac]
