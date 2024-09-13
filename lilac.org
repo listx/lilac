@@ -162,6 +162,52 @@ the [[https://github.com/pwm/nixkell][Nixkell]] project skeleton at commit 29e78
 which gave us a working Haskell development environment with many of the
 infrastructural issues sorted out.
 
+*** Nix shell
+
+#+header: :tangle shell.nix
+#+begin_src nix
+{
+  system ? builtins.currentSystem,
+  compiler ? null,
+}: let
+  pkgs = import ./nix {inherit system compiler;};
+in
+  pkgs.mkShell {
+    buildInputs = [
+      pkgs.lilac.shell
+    ];
+    shellHook = ''
+      export LD_LIBRARY_PATH=${pkgs.lilac.shell}/lib:$LD_LIBRARY_PATH
+      logo
+    '';
+  }
+#+end_src
+
+**** Logo
+
+The "logo" script below is displayed when we enter the development environment
+(Nix shell) automatically via =direnv= (through =.envrc=).
+
+#+header: :tangle nix/scripts.nix
+#+begin_src nix
+{pkgs}: let
+  logo = pkgs.writeShellScriptBin "logo" ''
+    set -euo pipefail
+    echo -e "\n$(tput setaf 4)"
+    echo Lilac | ${pkgs.figlet}/bin/figlet
+    echo -e "$(tput sgr0)\n"
+  '';
+  build = pkgs.writeShellScriptBin "build" ''
+    set -euo pipefail
+    nix-build nix/release.nix
+  '';
+  run = pkgs.writeShellScriptBin "run" ''
+    set -euo pipefail
+    result/bin/lilac "$@"
+  '';
+in [logo build run]
+#+end_src
+
 *** Makefile
 
 #+header: :tangle Makefile

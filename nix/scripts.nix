@@ -1,8 +1,8 @@
 {pkgs}: let
   logo = pkgs.writeShellScriptBin "logo" ''
     set -euo pipefail
-    echo -e "\n$(tput setaf 2)"
-    echo Nixkell | ${pkgs.figlet}/bin/figlet
+    echo -e "\n$(tput setaf 4)"
+    echo Lilac | ${pkgs.figlet}/bin/figlet
     echo -e "$(tput sgr0)\n"
   '';
   build = pkgs.writeShellScriptBin "build" ''
