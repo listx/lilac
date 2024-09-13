@@ -197,15 +197,11 @@ The "logo" script below is displayed when we enter the development environment
     echo Lilac | ${pkgs.figlet}/bin/figlet
     echo -e "$(tput sgr0)\n"
   '';
-  build = pkgs.writeShellScriptBin "build" ''
-    set -euo pipefail
-    nix-build nix/release.nix
-  '';
   lilac = pkgs.writeShellScriptBin "lilac" ''
     set -euo pipefail
     result/bin/lilac "$@"
   '';
-in [logo build lilac]
+in [logo lilac]
 #+end_src
 
 *** Makefile
@@ -217,12 +213,23 @@ in [logo build lilac]
 
 **** Build =lilac=
 
-We build with =cabal=, Haskell's default tooling for building Haskell programs.
+There are two ways to build =lilac=. The first option, =build-quick=, builds with
+=cabal=, Haskell's default tooling for building Haskell programs.
 
 #+header: :noweb-ref Build lilac
 #+begin_src makefile
-lilac: lilac.org lilac.cabal
+build-quick: lilac.org lilac.cabal
 	cabal build
+#+end_src
+
+Another option is to build with Nix, which wraps everything up for public
+consumption. This allows us to check locally that our Nix build pipeline is in
+working order.
+
+#+header: :noweb-ref Build lilac
+#+begin_src makefile
+build-release: lilac.org lilac.cabal
+	nix-build nix/release.nix
 #+end_src
 
 *** GitHub Actions
