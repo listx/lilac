@@ -51,7 +51,7 @@
 
   # Create your own setup using the choosen GHC version (in the config) as a starting point
   ourHaskell = let
-    # https://github.com/pwm/lilac#direct-hackagegithub-dependencies
+    # https://github.com/pwm/nixkell#direct-hackagegithub-dependencies
     depsFromDir = hlib.packagesFromDirectory {
       directory = ./packages;
     };
