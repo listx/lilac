@@ -759,10 +759,6 @@ jobs:
         run: |
           nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
 
-      - name: Nix Shell
-        run: |
-          nix-shell --run "echo OK"
-
       - name: Check code formatting
         if: ${{runner.os == 'Linux'}}
         run: |
