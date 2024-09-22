@@ -552,7 +552,7 @@ working order.
 #+header: :noweb-ref Build lilac
 #+begin_src makefile
 build-release: lilac.org lilac.cabal
-	nix-build nix/release.nix
+	nix-build ./nix/release.nix --argstr compiler <<GHC version>>
 #+end_src
 
 **** Run linters
@@ -764,11 +764,11 @@ jobs:
         # enough).
         if: ${{runner.os == 'Linux'}}
         run: |
-          nix-shell --run "treefmt --fail-on-change"
+          nix-shell --run "make lint"
 
       - name: Build
         run: |
-          nix-build ./nix/release.nix --argstr compiler <<GHC version>>
+          make build-release
 
       - name: Run
         run: |

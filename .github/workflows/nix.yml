@@ -53,11 +53,11 @@ jobs:
         # enough).
         if: ${{runner.os == 'Linux'}}
         run: |
-          nix-shell --run "treefmt --fail-on-change"
+          nix-shell --run "make lint"
 
       - name: Build
         run: |
-          nix-build ./nix/release.nix --argstr compiler 9.4.8
+          make build-release
 
       - name: Run
         run: |
