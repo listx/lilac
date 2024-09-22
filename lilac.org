@@ -521,6 +521,7 @@ in [logo lilac]
 #+header: :tangle Makefile
 #+begin_src makefile
 <<Build lilac>>
+<<Run linters>>
 #+end_src
 
 **** Build =lilac=
@@ -542,6 +543,14 @@ working order.
 #+begin_src makefile
 build-release: lilac.org lilac.cabal
 	nix-build nix/release.nix
+#+end_src
+
+**** Run linters
+
+#+header: :noweb-ref Run linters
+#+begin_src makefile
+lint: lilac.org
+	./check-tangled.sh
 #+end_src
 
 *** Linters
