@@ -183,6 +183,20 @@ in
   }
 #+end_src
 
+**** Direnv integration
+
+The =.envrc= file below makes =direnv= uses Nix to load a cached development
+environment.
+
+#+header: :tangle .envrc
+#+begin_src bash
+#!/usr/bin/env bash
+use nix
+watch_file lilac.toml
+watch_file lilac.cabal
+watch_file nix/*
+#+end_src
+
 **** Logo
 
 The "logo" script below is displayed when we enter the development environment
@@ -232,7 +246,75 @@ build-release: lilac.org lilac.cabal
 	nix-build nix/release.nix
 #+end_src
 
+
+*** Linters
+
+**** HLint (Haskell)
+
+#+header: :tangle .hlint.yaml
+#+begin_src yaml
+- arguments:
+    - -XTypeApplications
+    - -XNumericUnderscores
+    - -XBangPatterns
+    - -XPatternSynonyms
+    - -XOverloadedLabels
+
+- modules:
+    - { name: [Data.List], as: List }
+    - { name: [Data.List.NonEmpty], as: NonEmpty }
+    - { name: [Data.Vector], as: Vector }
+    - { name: [Data.Set], as: Set }
+    - { name: [Data.HashSet], as: HSet }
+    - { name: [Data.Set.Ordered], as: OSet }
+    - { name: [Data.Map, Data.Map.Strict], as: Map }
+    - { name: [Data.HashMap.Strict, Data.HashMap.Lazy], as: HMap }
+    - { name: [Data.Sequence], as: Sequence }
+    - { name: [Data.ByteString, Data.ByteString.Builder, Data.ByteString.Char8], as: BS }
+    - { name: [Data.ByteString.Lazy, Data.ByteString.Lazy.Char8], as: BSL }
+    - { name: [Data.Text, Data.Text.Encoding], as: T }
+    - { name: [Data.Text.Lazy, Data.Text.Lazy.Encoding], as: TL }
+#+end_src
+
+*** Formatters
+
+We use =treefmt= to format everything. While this isn't important for tangling
+(the computer doesn't care about formatting), it's important for weaving because
+we want code blocks in woven output to still look decent and consistent.
+
+#+header: :tangle treefmt.toml
+#+begin_src toml
+# One CLI to format the code tree - https://github.com/numtide/treefmt
+
+[formatter.haskell]
+command = "ormolu"
+options = [
+  "--mode", "inplace",
+  "--check-idempotence"
+]
+includes = ["*.hs"]
+
+[formatter.nix]
+command = "alejandra"
+includes = ["*.nix"]
+excludes = [
+  "nix/packages/*.nix",
+  "nix/sources.nix",
+]
+
+[formatter.shell]
+command = "shfmt"
+options = [
+    "--indent", "0",
+    "--simplify",
+    "--write",
+]
+includes = ["*.sh"]
+#+end_src
+
 *** GitHub Actions
+
+**** CI to run =nix-build=
 
 We only have one action so far for this, which runs the build with =nix-build=, on
 both Linux and Mac.
@@ -305,6 +387,21 @@ jobs:
       - name: Run
         run: |
           result/bin/lilac
+#+end_src
+
+**** Dependabot
+
+Invoke Dependabot weekly to check for library updates.
+
+#+header: :tangle .github/dependabot.yml
+#+begin_src yaml
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
 #+end_src
 
 ** Cabal configuration
@@ -446,6 +543,47 @@ TypeOperators
 ViewPatterns
 #+end_src
 
+*** Cabal project file
+
+#+header: :tangle cabal.project
+#+begin_src haskell-cabal
+packages: *.cabal
+
+package *
+  test-show-details: direct
+  ghc-options:
+    -j8 +RTS -A256m -n2m -RTS
+    -- The following sets -all_load and -dead_strip for ld in cctools
+    -- without it we get intermittent linker error on aarch64
+    -fwhole-archive-hs-libs
+    -fwrite-ide-info
+    -hiedir=.hie
+
+-- tell ghc to write the package environment file
+write-ghc-environment-files: always
+
+-- Define -O0 by default so that all dev processes are faster.
+-- This also affects HLS which will pick up on this (otherwise it'll use -O1)
+-- CI Nix builds are unaffected by this and will use the default -O1
+optimization: False
+
+-- Nix handles dependencies.
+-- It is generally a bug if cabal has to download anything
+-- In other words ~/.cabal should be empty (modulo some meta files)
+active-repositories: none
+#+end_src
+
+*** =Setup.hs= file
+
+This file is needed for Cabal.
+
+#+header: :tangle Setup.hs
+#+begin_src haskell
+import Distribution.Simple
+
+main = defaultMain
+#+end_src
+
 ** Org parser
 
 ** Main
@@ -458,7 +596,16 @@ main :: IO ()
 main = putStrLn "Hello literate lilac!"
 #+end_src
 
-* Helpers
+** Tests
+
+The tests are discovered by Hspec automatically.
+
+#+header: :tangle test/Spec.hs
+#+begin_src haskell
+{-# OPTIONS_GHC -F -pgmF hspec-discover #-}
+#+end_src
+
+* Helpers and housekeeping
 ** Audit tangled vs tracked files
 
 Run a script which can detect whether we've accounted for all tracked files via
@@ -477,6 +624,7 @@ SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
 # typically).
 known_not_tangled=(
     LICENSE
+    src/.gitkeep
 )
 
 # List all files we explicitly tangle from Org files.
@@ -517,3 +665,16 @@ main "$@"
 #+end_src
 
 Eventually this script's features should be implemented in Lilac natively.
+
+** .gitignore
+
+#+header: :tangle .gitignore
+#+begin_src gitignore
+.direnv
+.ghc.environment*
+.hie
+cabal.project.local
+dist-newstyle
+result*
+*~
+#+end_src

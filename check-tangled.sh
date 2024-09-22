@@ -8,6 +8,7 @@ SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
 # typically).
 known_not_tangled=(
     LICENSE
+    src/.gitkeep
 )
 
 # List all files we explicitly tangle from Org files.

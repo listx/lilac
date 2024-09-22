@@ -9,7 +9,7 @@
     inherit (pkgs) lib gitignoreFilter;
   };
 
-  conf = lib.importTOML ../nixkell.toml;
+  conf = lib.importTOML ../lilac.toml;
 
   ghcVersion =
     if compiler != null
