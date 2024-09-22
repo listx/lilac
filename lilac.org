@@ -457,3 +457,62 @@ module Main (main) where
 main :: IO ()
 main = putStrLn "Hello literate lilac!"
 #+end_src
+
+* Helpers
+** Audit tangled vs tracked files
+
+Run a script which can detect whether we've accounted for all tracked files via
+Literate Programming. That is, we want to detect any files that are checked into
+source control without being tangled from an Org file.
+
+#+header: :tangle check-tangled.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src bash
+set -euo pipefail
+
+SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
+
+# Files which are tracked outside of our tangling step, but for legitimate
+# reasons (generated code, symlinks to dependencies, or LICENSE files,
+# typically).
+known_not_tangled=(
+)
+
+# List all files we explicitly tangle from Org files.
+tangled_files()
+{
+    git -C "${SCRIPT_ROOT}" grep -P '^#\+header: :tangle' -- '*.org' \
+        | awk '{print $3}' \
+        | sort
+}
+
+# List all files checked into version control.
+tracked_files()
+{
+    git -C "${SCRIPT_ROOT}" ls-tree -r HEAD \
+        | awk '{print $2,$4}' \
+        | grep '^blob' \
+        | grep -v '\.\(html\|org\)$' \
+        | awk '{print $2}'
+}
+
+main()
+{
+    >&2 echo -n "$0: checking tangled vs tracked files... "
+    # Combine tangled files and those which are tracked but not tangled. This
+    # list should match the sum of all tangled files (modulo HTML and Org
+    # files).
+    if diff -u \
+        <(printf '%s\n' "$(tangled_files)" "${known_not_tangled[@]}" | sort) \
+        <(tracked_files); then
+
+        >&2 echo "OK"
+    else
+        >&2 echo "$0: failed"
+    fi
+}
+
+main "$@"
+#+end_src
+
+Eventually this script's features should be implemented in Lilac natively.
