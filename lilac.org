@@ -162,6 +162,16 @@ the [[https://github.com/pwm/nixkell][Nixkell]] project skeleton at commit 29e78
 which gave us a working Haskell development environment with many of the
 infrastructural issues sorted out.
 
+For the Haskell compiler, we use the following GHC version:
+
+#+header: :noweb-ref GHC version
+#+begin_src txt
+9.4.8
+#+end_src
+
+The above version is used throughout other configuration files and such in the
+rest of this document.
+
 *** Nix shell
 
 #+header: :tangle shell.nix
@@ -435,7 +445,7 @@ TOML here for now, as it was designed by Nixkell.
 # Warning: if you don't choose one from the currently available versions
 # https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/compilers/ghc
 # you will most likely have to compile *everything* yourself.
-version = "9.4.8"
+version = "<<GHC version>>"
 # optimise = true
 # profiling = false
 # benckmark = false
@@ -719,7 +729,7 @@ jobs:
           - ubuntu-latest
           - macOS-latest
         ghc:
-          - "9.4.8"
+          - "<<GHC version>>"
 
     steps:
       # https://github.com/dependabot/dependabot-core/issues/3253#issuecomment-799466911
@@ -760,7 +770,7 @@ jobs:
 
       - name: Build
         run: |
-          nix-build ./nix/release.nix --argstr compiler ${{ matrix.ghc }}
+          nix-build ./nix/release.nix --argstr compiler <<GHC version>>
 
       - name: Run
         run: |
