@@ -279,7 +279,7 @@ jobs:
         run: |
           echo "nixpkgs=$(jq -r .nixpkgs.url ./nix/sources.json)" >> $GITHUB_OUTPUT
 
-      - uses: cachix/install-nix-action@v27
+      - uses: cachix/install-nix-action@V28
         with:
           nix_path: nixpkgs=${{ steps.nix-path.outputs.nixpkgs }}
           extra_nix_config: |
