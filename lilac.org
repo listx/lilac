@@ -760,6 +760,8 @@ jobs:
           nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
 
       - name: Check code formatting
+        # For linting, we don't need to run it on Mac (just once on Linux is
+        # enough).
         if: ${{runner.os == 'Linux'}}
         run: |
           nix-shell --run "treefmt --fail-on-change"
