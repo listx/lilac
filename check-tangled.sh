@@ -7,6 +7,7 @@ SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
 # reasons (generated code, symlinks to dependencies, or LICENSE files,
 # typically).
 known_not_tangled=(
+    LICENSE
 )
 
 # List all files we explicitly tangle from Org files.
