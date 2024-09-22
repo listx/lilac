@@ -50,22 +50,12 @@ library
       TypeApplications
       TypeOperators
       ViewPatterns
-  ghc-options: -Weverything
+  ghc-options:
+      -Weverything
+      -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode
+      -Wno-implicit-prelude
   build-depends:
-      aeson
-    , base >=4.7 && <5
-    , bytestring
-    , containers
-    , directory
-    , either
-    , filepath
-    , mtl
-    , random
-    , text
-    , time
-    , transformers
-    , unordered-containers
-    , vector
+      base >=4.7 && <5
   default-language: Haskell2010
 
 executable lilac
@@ -113,23 +103,14 @@ executable lilac
       TypeApplications
       TypeOperators
       ViewPatterns
-  ghc-options: -Weverything -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:
+      -Weverything
+      -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode
+      -Wno-implicit-prelude
+      -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
-    , base >=4.7 && <5
-    , bytestring
-    , containers
-    , directory
-    , either
-    , filepath
+      base >=4.7 && <5
     , lilac
-    , mtl
-    , random
-    , text
-    , time
-    , transformers
-    , unordered-containers
-    , vector
   default-language: Haskell2010
 
 test-suite spec
@@ -178,22 +159,13 @@ test-suite spec
       TypeApplications
       TypeOperators
       ViewPatterns
-  ghc-options: -Weverything -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:
+      -Weverything
+      -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode
+      -Wno-implicit-prelude
+      -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
-    , base >=4.7 && <5
-    , bytestring
-    , containers
-    , directory
-    , either
-    , filepath
+      base >=4.7 && <5
     , hspec
     , lilac
-    , mtl
-    , random
-    , text
-    , time
-    , transformers
-    , unordered-containers
-    , vector
   default-language: Haskell2010

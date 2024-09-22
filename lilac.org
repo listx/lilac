@@ -809,22 +809,10 @@ library
       src
   default-extensions:
       <<Default GHC extensions>>
-  ghc-options: -Weverything
+  ghc-options:
+      <<GHC warning flags>>
   build-depends:
-      aeson
-    , base >=4.7 && <5
-    , bytestring
-    , containers
-    , directory
-    , either
-    , filepath
-    , mtl
-    , random
-    , text
-    , time
-    , transformers
-    , unordered-containers
-    , vector
+      base >=4.7 && <5
   default-language: Haskell2010
 
 executable lilac
@@ -835,23 +823,12 @@ executable lilac
       bin
   default-extensions:
       <<Default GHC extensions>>
-  ghc-options: -Weverything -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:
+      <<GHC warning flags>>
+      -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
-    , base >=4.7 && <5
-    , bytestring
-    , containers
-    , directory
-    , either
-    , filepath
+      base >=4.7 && <5
     , lilac
-    , mtl
-    , random
-    , text
-    , time
-    , transformers
-    , unordered-containers
-    , vector
   default-language: Haskell2010
 
 test-suite spec
@@ -863,24 +840,13 @@ test-suite spec
       test
   default-extensions:
       <<Default GHC extensions>>
-  ghc-options: -Weverything -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:
+      <<GHC warning flags>>
+      -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
-    , base >=4.7 && <5
-    , bytestring
-    , containers
-    , directory
-    , either
-    , filepath
+      base >=4.7 && <5
     , hspec
     , lilac
-    , mtl
-    , random
-    , text
-    , time
-    , transformers
-    , unordered-containers
-    , vector
   default-language: Haskell2010
 #+end_src
 
@@ -927,6 +893,38 @@ TupleSections
 TypeApplications
 TypeOperators
 ViewPatterns
+#+end_src
+
+*** GHC compiler warnings
+
+We turn on all warnings with =-Weverything=.
+
+#+header: :noweb-ref GHC warning flags
+#+begin_src txt
+-Weverything
+#+end_src
+
+Now we disable some warnings that are not that important.
+
+**** Safe Haskell
+
+"Safe Haskell" is essentially a dialect of Haskell that has stronger guarantees
+about referential transparency. It's an interesting idea, but not one worth
+pursuing in this program.
+
+#+header: :noweb-ref GHC warning flags
+#+begin_src txt
+-Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode
+#+end_src
+
+**** Implicit Prelude
+
+Traditionally, Haskell imports the Prelude by default. Tell GHC not to make a
+fuss about this tradition.
+
+#+header: :noweb-ref GHC warning flags
+#+begin_src txt
+-Wno-implicit-prelude
 #+end_src
 
 *** Cabal project file
