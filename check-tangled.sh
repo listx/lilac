@@ -52,6 +52,7 @@ main()
 		echo >&2 "OK"
 	else
 		echo >&2 "$0: failed"
+		return 1
 	fi
 }
 
