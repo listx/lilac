@@ -30,7 +30,7 @@ Yet another problem is that tangling doesn't work very well with =#+include=
 statements; that is, if you use =#+include= you must tangle each included file
 separately from the main one.
 
-LV2 is designed to fix these shortcomings, while still maintaining Org's syntax;
+LV2 is designed to fix these shortcomings, while still using Org's syntax;
 this way users can edit Org files in Emacs and still enjoy most of the benefits
 of using Org interactively for day-to-day writing.
 
@@ -43,6 +43,14 @@ Tangling code is beyond the scope of Pandoc.
 [[https://github.com/200ok-ch/org-parser/issues/56][Performance is too slow.]]
 
 * Differences with vanilla Org
+
+** Org subset
+
+We only support a subset of Org, just enough to make it viable for doing
+Literate Programming with Noweb references. Many of Org's other features like
+timestamps and planning lines (TODO keyword, etc) are not given special meaning
+during parsing (they will be output as plain text without any styling during
+export).
 
 ** Tangling
 
