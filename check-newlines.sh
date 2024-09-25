@@ -3,8 +3,9 @@ set -euo pipefail
 
 SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
 
-# Generated files should be excluded from this check.
+# Generated files (and binary files) should be excluded from this check.
 excluded=(
+	image/PNG-Gradient.png
 )
 
 check_trailing_newlines()
@@ -18,6 +19,11 @@ check_trailing_newlines()
 	for f in "${files[@]}"; do
 		# Skip empty files.
 		if [[ ! -s "$f" ]]; then
+			continue
+		fi
+
+		# Skip excluded files.
+		if [[ " ${excluded[*]} " =~ [[:space:]]${f}[[:space:]] ]]; then
 			continue
 		fi
 

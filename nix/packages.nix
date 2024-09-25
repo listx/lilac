@@ -90,6 +90,25 @@
 
   tools = builtins.map util.getDrv conf.env.tools;
 
+  # See https://nixos.wiki/wiki/TexLive for customizing texlive packages
+  # (picking only those packages we need as in here).
+  tex = pkgs.texlive.combine {
+    inherit
+      (pkgs.texlive)
+      scheme-basic
+      dvisvgm
+      etoolbox
+      fontspec
+      hyperref
+      luatex85
+      metafont
+      pgf
+      sourcesanspro
+      standalone
+      xkeyval
+      ;
+  };
+
   scripts = import ./scripts.nix {inherit pkgs;};
 in {
   inherit conf ourHaskell ghc confPkg; # TODO: remove
@@ -98,6 +117,6 @@ in {
 
   shell = pkgs.buildEnv {
     name = "lilac-env";
-    paths = [ghc] ++ haskellTools ++ tools ++ scripts;
+    paths = [ghc] ++ haskellTools ++ tools ++ scripts ++ [tex];
   };
 }
