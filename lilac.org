@@ -62,6 +62,51 @@ nested Org files' code blocks do not get tangled.
 
 LV2 supports this.
 
+*** Padding between Noweb references
+
+Org supports adding blank lines between concatenated source code blocks with the
+[[https://orgmode.org/manual/Extracting-Source-Code.html][=padline= header argument]]. However this does not work for Noweb references.
+
+For example, a blank line is inserted between =foo= and =bar= and =bar= and =baz=:
+
+#+header: :tangle doc/tangling-padline.txt
+#+begin_src txt
+foo
+#+end_src
+
+#+header: :tangle doc/tangling-padline.txt
+#+begin_src txt
+bar
+#+end_src
+
+#+header: :tangle doc/tangling-padline.txt
+#+begin_src txt
+baz
+#+end_src
+
+But the same blank lines are not inserted for the following case using =Noweb
+chunk= as a Noweb reference.
+
+#+header: :tangle doc/tangling-padline-noweb.txt
+#+begin_src txt
+<<Noweb chunk>>
+#+end_src
+
+#+header: :noweb-ref Noweb chunk
+#+begin_src txt
+foo
+#+end_src
+
+#+header: :noweb-ref Noweb chunk
+#+begin_src txt
+bar
+#+end_src
+
+#+header: :noweb-ref Noweb chunk
+#+begin_src txt
+baz
+#+end_src
+
 ** Weaving
 
 *** HTML only
