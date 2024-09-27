@@ -26,7 +26,7 @@ tangled_files()
 {
 	git -C "${SCRIPT_ROOT}" grep -P '^#\+header: :tangle' -- '*.org' \
 		| awk '{print $3}' \
-		| sort
+		| sort -u
 }
 
 # List all files checked into version control.
