@@ -1131,9 +1131,10 @@ type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { cells :: [Cell],
     code :: [Graph],
-    codeBlocks :: IntMap Block,
+    codeBlocks :: IM.IntMap Block,
     meta :: M.Map T.Text T.Text
   }
+  deriving stock (Eq, Show)
 
 #+end_src
 
@@ -1165,6 +1166,7 @@ data Cell
         grid :: M.Map (Int, Int) Prose,
         gridSize :: (Int, Int)
       }
+  deriving stock (Eq, Show)
 
 #+end_src
 
@@ -1193,6 +1195,7 @@ data Heading = Heading
     body :: Prose,
     meta :: M.Map T.Text T.Text
   }
+  deriving stock (Eq, Show)
 
 #+end_src
 
@@ -1219,6 +1222,7 @@ data PToken
   = PTokenStyledString StyledString
   | PTokenLink Link
   | PTokenMathFragment MathFragment
+  deriving stock (Eq, Show)
 
 #+end_src
 
@@ -1231,6 +1235,7 @@ data StyledString = StyledString
   { body :: T.Text,
     style :: Style
   }
+  deriving stock (Eq, Show)
 
 #+end_src
 
@@ -1241,6 +1246,7 @@ styles, for simplicity.
 #+begin_src haskell
 type Style :: Type
 data Style = Plain | Bold | Italic | Code | Verbatim
+  deriving stock (Eq, Show)
 
 #+end_src
 
@@ -1255,6 +1261,7 @@ data Link = Link
     target :: T.Text,
     name :: [StyledString]
   }
+  deriving stock (Eq, Show)
 
 type LinkType :: Type
 data LinkType
@@ -1264,6 +1271,7 @@ data LinkType
   | LinkNameKeyword
   | LinkFootnote
   | LinkExternal
+  deriving stock (Eq, Show)
 
 #+end_src
 
@@ -1381,6 +1389,7 @@ data Block = Block
   { meta :: M.Map T.Text T.Text,
     body :: [BToken]
   }
+  deriving stock (Eq, Show)
 
 #+end_src
 
@@ -1392,6 +1401,7 @@ type BToken :: Type
 data BToken
   = BTokenString T.Text
   | BTokenLink Link
+  deriving stock (Eq, Show)
 
 #+end_src
 
@@ -1453,6 +1463,7 @@ data MathFragment = MathFragment
   { meta :: M.Map T.Text T.Text,
     body :: T.Text
   }
+  deriving stock (Eq, Show)
 #+end_src
 
 ***** Figures
@@ -1491,25 +1502,65 @@ single block.
 
 #+header: :tangle src/Lilac/Parse.hs
 #+begin_src haskell
-module Lilac.Parse (parseOrgDoc) where
+module Lilac.Parse (defaultOrgDoc, parseOrgDoc) where
 
 import Data.Graph
-import Data.IntMap
+import Data.IntMap qualified as IM
 import Data.Kind (Type)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Void
-import Text.Megaparsec (errorBundlePretty, parse)
+import Text.Megaparsec (Parsec, errorBundlePretty, parse)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
 <<Data structures>>
 
+<<Parsing mechanism>>
+#+end_src
+
+The top-level parsing function is =parseOrgDoc=, which takes some raw text input
+and parses it into a rich =OrgDoc= type.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+parseOrgDoc :: T.Text -> Either T.Text OrgDoc
+parseOrgDoc input = case parse orgDocParser "" input of
+  Left err -> Left . T.pack $ errorBundlePretty err
+  Right m -> Right m
+
+#+end_src
+
+The =orgDocParser= is the main parser combinator; it is itself composed of other
+parser combinators. All of these parsers live inside the =Megaparser= monadic
+type, which is defined as =Parsec Void T.Text=, where =Void= is the state used
+during parsing and =T.Text= is the type of the text being parsed. We use =Void= for
+now while we think about what to use for internal state (if any) during parsing.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
 type Megaparser :: Type -> Type
 type Megaparser = Parsec Void T.Text
 
-parseOrgDoc :: T.Text -> IO ()
-parseOrgDoc _ = pure ()
+#+end_src
+
+**** =orgDocParser=
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+orgDocParser :: Megaparser OrgDoc
+orgDocParser = do
+  pure defaultOrgDoc
+
+defaultOrgDoc :: OrgDoc
+defaultOrgDoc =
+  OrgDoc
+    { cells = [],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+
 #+end_src
 
 **** Tests
@@ -1518,15 +1569,15 @@ parseOrgDoc _ = pure ()
 #+begin_src haskell
 module Lilac.ParseSpec (spec) where
 
-import Lilac.Parse (parseOrgDoc)
+import Lilac.Parse (defaultOrgDoc, parseOrgDoc)
 import Test.Hspec (Spec, describe, it, shouldBe)
 
 spec :: Spec
 spec = do
   describe "parse" $ do
     it "parses headlines" $ do
-      r <- parseOrgDoc "\t  foo bar\n"
-      r `shouldBe` ()
+      let r = parseOrgDoc "\t  foo bar\n"
+      r `shouldBe` Right defaultOrgDoc
 #+end_src
 
 ** Main
