@@ -1,8 +1,8 @@
-cabal-version:  1.12
+cabal-version:  2.2
 
 name:           lilac
 version:        0.1.0.0
-license:        GPL-2
+license:        GPL-2.0-only
 license-file:   LICENSE
 build-type:     Simple
 
@@ -38,11 +38,14 @@ library
       MultiParamTypeClasses
       MultiWayIf
       NamedFieldPuns
+      NoFieldSelectors
+      NoImplicitPrelude
       NumDecimals
       NumericUnderscores
       LambdaCase
       OverloadedLabels
       OverloadedRecordDot
+      OverloadedRecordUpdate
       OverloadedStrings
       PatternSynonyms
       RankNTypes
@@ -61,6 +64,7 @@ library
       base >=4.7 && <5
     , containers
     , megaparsec
+    , relude
     , text
   default-language: Haskell2010
 
@@ -95,11 +99,14 @@ executable lilac
       MultiParamTypeClasses
       MultiWayIf
       NamedFieldPuns
+      NoFieldSelectors
+      NoImplicitPrelude
       NumDecimals
       NumericUnderscores
       LambdaCase
       OverloadedLabels
       OverloadedRecordDot
+      OverloadedRecordUpdate
       OverloadedStrings
       PatternSynonyms
       RankNTypes
@@ -153,11 +160,14 @@ test-suite spec
       MultiParamTypeClasses
       MultiWayIf
       NamedFieldPuns
+      NoFieldSelectors
+      NoImplicitPrelude
       NumDecimals
       NumericUnderscores
       LambdaCase
       OverloadedLabels
       OverloadedRecordDot
+      OverloadedRecordUpdate
       OverloadedStrings
       PatternSynonyms
       RankNTypes
@@ -177,4 +187,5 @@ test-suite spec
       base >=4.7 && <5
     , hspec
     , lilac
+    , relude
   default-language: Haskell2010
