@@ -574,6 +574,7 @@ in [logo lilac]
 #+begin_src makefile
 <<Build lilac>>
 <<Run linters>>
+<<Run tests>>
 #+end_src
 
 **** Build =lilac=
@@ -605,6 +606,14 @@ lint: lilac.org
 	./check-tangled.sh
 	./check-newlines.sh
 	treefmt --fail-on-change
+#+end_src
+
+**** Run tests
+
+#+header: :noweb-ref Run tests
+#+begin_src makefile
+test: lilac.org
+	cabal test --ghc-options="-fforce-recomp"
 #+end_src
 
 *** Linters
@@ -937,6 +946,7 @@ executable lilac
   build-depends:
       base >=4.7 && <5
     , lilac
+    , relude
   default-language: Haskell2010
 
 test-suite spec
@@ -955,7 +965,9 @@ test-suite spec
   build-depends:
       base >=4.7 && <5
     , hspec
+    , hspec-megaparsec
     , lilac
+    , megaparsec
     , relude
   default-language: Haskell2010
 #+end_src
@@ -1130,7 +1142,7 @@ metadata (the title, author name, etc).
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { cells :: [Cell],
-    code :: [Graph],
+    code :: [G.Graph],
     codeBlocks :: IM.IntMap Block,
     meta :: M.Map T.Text T.Text
   }
@@ -1465,6 +1477,7 @@ data MathFragment = MathFragment
     body :: T.Text
   }
   deriving stock (Eq, Show)
+
 #+end_src
 
 ***** Figures
@@ -1524,22 +1537,34 @@ single block.
 
 *** Parsing mechanism
 
+The parsing mechanism is in [[file:src/Lilac/Parse.hs]], which we describe below. We
+discuss each parser and interleave some tests for the smaller parsers, so if you
+are curious about where and how these tests are executed, you may want to take a
+a look at [[id:ebf0d269-79d3-408a-a6e7-baf720d73837][this section]].
+
 #+header: :tangle src/Lilac/Parse.hs
 #+begin_src haskell
-module Lilac.Parse (defaultOrgDoc, parseOrgDoc) where
+module Lilac.Parse
+  ( defaultOrgDoc,
+    defaultOrgDocWithMeta,
+    orgDocParser,
+    parseOrgDoc,
+    OrgDoc,
+  )
+where
 
-import Data.Graph
+import Data.Char (isAsciiLower)
+import Data.Graph qualified as G
 import Data.IntMap qualified as IM
-import Data.Kind (Type)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Void
-import Text.Megaparsec (Parsec, errorBundlePretty, parse)
+import Relude
+import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
 <<Data structures>>
-
 <<Parsing mechanism>>
 #+end_src
 
@@ -1549,8 +1574,8 @@ and parses it into a rich =OrgDoc= type.
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 parseOrgDoc :: T.Text -> Either T.Text OrgDoc
-parseOrgDoc input = case parse orgDocParser "" input of
-  Left err -> Left . T.pack $ errorBundlePretty err
+parseOrgDoc input = case MP.parse orgDocParser "" input of
+  Left err -> Left . T.pack $ MP.errorBundlePretty err
   Right m -> Right m
 
 #+end_src
@@ -1564,17 +1589,104 @@ now while we think about what to use for internal state (if any) during parsing.
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 type Megaparser :: Type -> Type
-type Megaparser = Parsec Void T.Text
+type Megaparser = MP.Parsec Void T.Text
+
+#+end_src
+
+**** Parsing helpers for whitespace and comments
+
+Before writing our first parsers, we have to consider the problem of whitespace
+and comments.
+
+Any syntax that is expected to be used by humans have some designation for
+whitespace to separate meaningful tokens from each other. One way to deal with
+(necessary) whitespace is to bake in whitespace parsers into each token we want
+to parse. This gets cumbersome so we want to instead be able to teach parsers to
+be able to skip over trailing whitespace. This way, these parsers will all know
+how to deal with whitespace in a uniform way. Leading whitespace is a special
+consideration because they can have meaningful information (e.g., indentation
+for list items), so we will handle that case separately.
+
+A slightly separate problem is how to deal with comments. In a sense they are
+just like whitespace because they hold no meaningful information on their own.
+Luckily, =Text.Megaparsec.Char.Lexer= provides a =space= helper which can create a
+space-consuming function. This function produces a parser which is able to skip
+over any combination of whitespace and comments (both single-line and block
+comments). This is what we use below to create the =spaceConsumer= function below.
+See https://markkarpov.com/tutorial/megaparsec.html#lexing for more information.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+spaceConsumer :: Megaparser ()
+spaceConsumer =
+  L.space
+    whiteSpaceParser
+    singleLineCommentParser
+    blockCommentParser
+  where
+    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser = space1
+    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser = (L.skipLineComment "# ")
+    blockCommentParser :: Megaparser ()
+    blockCommentParser = (L.skipBlockComment "#+begin_comment" "#+end_comment")
+
+#+end_src
+
+The three arguments to =L.space= (where =L= stands for =Text.Megaparsec.Char.Lexer=)
+are the parsers for whitespace, single-line comments, and block comments.
+It's important that we use =space1= here (where the =1= denotes that it requires at
+least 1 space character) because otherwise if it accepts 0 or more spaces, it
+may loop forever upon seeing non-space input.
+
+The ="# "= for =singleLineCommentParser= signifies that single-line comments start
+with a pound sign and a space. The =blockCommentParser= uses =L.skipBlockComment= to
+denote a region of text which is considered a commented area.
+
+We have two more helpers for us. The first is =symbol=, which parses any trailing
+spaces or comments after parsing the given text.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+symbol :: T.Text -> Megaparser T.Text
+symbol = L.symbol spaceConsumer
+
+#+end_src
+
+Lastly we have =lexeme=, which wraps around any other parser to make it consume
+trailing spaces and comments.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+lexeme :: Megaparser a -> Megaparser a
+lexeme = L.lexeme spaceConsumer
 
 #+end_src
 
 **** =orgDocParser=
 
+The =orgDocParser= first needs to parse any metadata associated with the document,
+such as the title and author. It starts by skipping any leading
+whitespace/comments. We have to do this first because all of the other parsers
+we use will follow the pattern of parsing the thing we want, followed by
+skipping over as much trailing whitespace as possible. In other words, none of
+the parsers are able to deal with leading whitespace/comments, so we have to
+deal with it here separately.
+
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 orgDocParser :: Megaparser OrgDoc
 orgDocParser = do
-  pure defaultOrgDoc
+  _ <- optional spaceConsumer
+  meta <- docMetaParser
+  MP.eof
+  pure
+    $ OrgDoc
+      { cells = [],
+        code = [],
+        codeBlocks = IM.fromList [],
+        meta = meta
+      }
 
 defaultOrgDoc :: OrgDoc
 defaultOrgDoc =
@@ -1585,23 +1697,172 @@ defaultOrgDoc =
       meta = M.fromList []
     }
 
+defaultOrgDocWithMeta :: [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDocWithMeta metas =
+  OrgDoc
+    { cells = [],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList metas
+    }
+
+#+end_src
+
+***** Document metadata
+
+The first thing we need to parse is the document metadata. Metadata is a line
+that looks like =#+key: value= where =key= is a string and =value= is a series of
+tokens (it can have multiple words in it). This is what the =docMetaEntryParser=
+parses.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+docMetaEntryParser :: Megaparser (T.Text, T.Text)
+docMetaEntryParser = do
+  _ <- string "#+"
+  key <- MP.takeWhile1P (Just "keyword letter") isKeywordLetter
+  _ <- symbol ":"
+  value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
+  pure (key, value)
+  where
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+
+#+end_src
+
+The =docMetaParser= just parses =docMetaEntryParser= one or more times, while
+consuming any trailing whitespace or comments with the =lexeme= helper from
+[[*Parsing helpers for whitespace and comments]].
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+docMetaParser :: Megaparser (M.Map T.Text T.Text)
+docMetaParser = do
+  metaKVs <- many (lexeme docMetaEntryParser)
+  pure $ M.fromList metaKVs
+#+end_src
+
+Below are some unit test cases for parsing metadata.
+
+****** Tests without comments and trailing whitespace
+
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata
+#+begin_src org
+,#+title: An Org Document
+,#+author: A. U. Thor
+,#+property: header-args+ :noweb no-export
+,#+auto_tangle: t
+#+end_src
+
+#+header: :noweb-ref Test parsing document metadata
+#+begin_src haskell
+p "parses document metadata" "test/Lilac/ParseSpec/0002-doc-metadata"
+  $ defaultOrgDocWithMeta
+    [ ("author", "A. U. Thor"),
+      ("auto_tangle", "t"),
+      ("property", "header-args+ :noweb no-export"),
+      ("title", "An Org Document")
+    ]
+#+end_src
+
+Note that we currently don't do any intelligent processing of the metadata
+fields. For example, all values are strings even though the "t" for =auto_tangle=
+above represents a boolean "true" value. Similarly the value of the =property= key
+above is a mess because it itself contains a key and value (=:noweb= and
+=no-export=).
+
+****** Tests with comments and trailing whitespace
+
+This is the same as the test above, but with some whitespace and comments
+sprinkled in between.
+
+#+header: :tangle test/Lilac/ParseSpec/0003-doc-metadata-with-comments
+#+begin_src org
+,#+title: An Org Document
+# This is a comment line.
+,#+author: A. U. Thor
+     # This is another comment line.
+
+
+# Note the whitespace above this line.
+,#+property: header-args+ :noweb no-export
+# Below is a block comment.
+,#+begin_comment
+Yet another comment.
+,#+end_comment
+,#+auto_tangle: t
+
+# Last comment followed by some trailing newlines.
+
+
+
+
+
+#+end_src
+
+#+header: :noweb-ref Test parsing document metadata
+#+begin_src haskell
+p
+  "parses document metadata (skips comments)"
+  "test/Lilac/ParseSpec/0003-doc-metadata-with-comments"
+  $ defaultOrgDocWithMeta
+    [ ("author", "A. U. Thor"),
+      ("auto_tangle", "t"),
+      ("property", "header-args+ :noweb no-export"),
+      ("title", "An Org Document")
+    ]
 #+end_src
 
 **** Tests
+:PROPERTIES:
+:ID:       ebf0d269-79d3-408a-a6e7-baf720d73837
+:END:
 
 #+header: :tangle test/Lilac/ParseSpec.hs
 #+begin_src haskell
 module Lilac.ParseSpec (spec) where
 
-import Lilac.Parse (defaultOrgDoc, parseOrgDoc)
-import Test.Hspec (Spec, describe, it, shouldBe)
+import Lilac.Parse
+  ( OrgDoc,
+    defaultOrgDoc,
+    defaultOrgDocWithMeta,
+    orgDocParser,
+  )
+import Relude
+import Test.Hspec (Spec, before, describe, it)
+import Test.Hspec.Megaparsec (shouldParse)
+import Text.Megaparsec qualified as MP
+#+end_src
 
+We need a helper function around =parseOrgDoc=, which will read in a file from a
+given path (to feed to =parseOrgDoc=). We name this helper just =p=.
+
+#+header: :tangle test/Lilac/ParseSpec.hs
+#+begin_src haskell
+p :: String -> FilePath -> OrgDoc -> Spec
+p behavior path expected = do
+  before (readFileBS path) $ do
+    it behavior $ \input -> do
+      MP.parse orgDocParser path (decodeUtf8 input) `shouldParse` expected
+#+end_src
+
+Below are all of the individual test cases.
+
+#+header: :tangle test/Lilac/ParseSpec.hs
+#+begin_src haskell
 spec :: Spec
-spec = do
+spec =
   describe "parse" $ do
-    it "parses headlines" $ do
-      let r = parseOrgDoc "\t  foo bar\n"
-      r `shouldBe` Right defaultOrgDoc
+    it "parses empty input as defaultOrgDoc" $ do
+      MP.parse orgDocParser "empty input" "" `shouldParse` defaultOrgDoc
+    p
+      "parses blank line as defaultOrgDoc"
+      "test/Lilac/ParseSpec/0001-blankline"
+      defaultOrgDoc
+    <<Test parsing document metadata>>
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0001-blankline
+#+begin_src org
 #+end_src
 
 ** Main
@@ -1609,6 +1870,8 @@ spec = do
 #+header: :tangle bin/Main.hs
 #+begin_src haskell
 module Main (main) where
+
+import Relude
 
 main :: IO ()
 main = putStrLn "Hello literate lilac!"

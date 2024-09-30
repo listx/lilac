@@ -1,19 +1,27 @@
-module Lilac.Parse (defaultOrgDoc, parseOrgDoc) where
+module Lilac.Parse
+  ( defaultOrgDoc,
+    defaultOrgDocWithMeta,
+    orgDocParser,
+    parseOrgDoc,
+    OrgDoc,
+  )
+where
 
-import Data.Graph
+import Data.Char (isAsciiLower)
+import Data.Graph qualified as G
 import Data.IntMap qualified as IM
-import Data.Kind (Type)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Void
-import Text.Megaparsec (Parsec, errorBundlePretty, parse)
+import Relude
+import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { cells :: [Cell],
-    code :: [Graph],
+    code :: [G.Graph],
     codeBlocks :: IM.IntMap Block,
     meta :: M.Map T.Text T.Text
   }
@@ -104,6 +112,7 @@ data MathFragment = MathFragment
     body :: T.Text
   }
   deriving stock (Eq, Show)
+
 type Figure :: Type
 data Figure = Figure
   { meta :: M.Map T.Text T.Text,
@@ -119,18 +128,46 @@ data Table = Table
   }
   deriving stock (Eq, Show)
 
-
 parseOrgDoc :: T.Text -> Either T.Text OrgDoc
-parseOrgDoc input = case parse orgDocParser "" input of
-  Left err -> Left . T.pack $ errorBundlePretty err
+parseOrgDoc input = case MP.parse orgDocParser "" input of
+  Left err -> Left . T.pack $ MP.errorBundlePretty err
   Right m -> Right m
 
 type Megaparser :: Type -> Type
-type Megaparser = Parsec Void T.Text
+type Megaparser = MP.Parsec Void T.Text
+
+spaceConsumer :: Megaparser ()
+spaceConsumer =
+  L.space
+    whiteSpaceParser
+    singleLineCommentParser
+    blockCommentParser
+  where
+    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser = space1
+    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser = (L.skipLineComment "# ")
+    blockCommentParser :: Megaparser ()
+    blockCommentParser = (L.skipBlockComment "#+begin_comment" "#+end_comment")
+
+symbol :: T.Text -> Megaparser T.Text
+symbol = L.symbol spaceConsumer
+
+lexeme :: Megaparser a -> Megaparser a
+lexeme = L.lexeme spaceConsumer
 
 orgDocParser :: Megaparser OrgDoc
 orgDocParser = do
-  pure defaultOrgDoc
+  _ <- optional spaceConsumer
+  meta <- docMetaParser
+  MP.eof
+  pure
+    $ OrgDoc
+      { cells = [],
+        code = [],
+        codeBlocks = IM.fromList [],
+        meta = meta
+      }
 
 defaultOrgDoc :: OrgDoc
 defaultOrgDoc =
@@ -140,3 +177,27 @@ defaultOrgDoc =
       codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
+
+defaultOrgDocWithMeta :: [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDocWithMeta metas =
+  OrgDoc
+    { cells = [],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList metas
+    }
+
+docMetaEntryParser :: Megaparser (T.Text, T.Text)
+docMetaEntryParser = do
+  _ <- string "#+"
+  key <- MP.takeWhile1P (Just "keyword letter") isKeywordLetter
+  _ <- symbol ":"
+  value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
+  pure (key, value)
+  where
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+
+docMetaParser :: Megaparser (M.Map T.Text T.Text)
+docMetaParser = do
+  metaKVs <- many (lexeme docMetaEntryParser)
+  pure $ M.fromList metaKVs

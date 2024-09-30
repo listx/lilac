@@ -6,3 +6,5 @@ lint: lilac.org
 	./check-tangled.sh
 	./check-newlines.sh
 	treefmt --fail-on-change
+test: lilac.org
+	cabal test --ghc-options="-fforce-recomp"
