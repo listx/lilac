@@ -24,21 +24,10 @@ data Cell
   = CHeading Heading
   | CProse Prose
   | CBlock Block
-  | CListItem
-      { level :: Int,
-        ordered :: Bool,
-        body :: Prose
-      }
+  | CListItem ListItem
   | CMathFragment MathFragment
-  | CFigure
-      { meta :: M.Map T.Text T.Text,
-        link :: Link
-      }
-  | CTable
-      { meta :: M.Map T.Text T.Text,
-        grid :: M.Map (Int, Int) Prose,
-        gridSize :: (Int, Int)
-      }
+  | CFigure Figure
+  | CTable Table
   deriving stock (Eq, Show)
 
 type Heading :: Type
@@ -101,12 +90,35 @@ data BToken
   | BTokenLink Link
   deriving stock (Eq, Show)
 
+type ListItem :: Type
+data ListItem = ListItem
+  { level :: Int,
+    ordered :: Bool,
+    body :: Prose
+  }
+  deriving stock (Eq, Show)
+
 type MathFragment :: Type
 data MathFragment = MathFragment
   { meta :: M.Map T.Text T.Text,
     body :: T.Text
   }
   deriving stock (Eq, Show)
+type Figure :: Type
+data Figure = Figure
+  { meta :: M.Map T.Text T.Text,
+    link :: Link
+  }
+  deriving stock (Eq, Show)
+
+type Table :: Type
+data Table = Table
+  { meta :: M.Map T.Text T.Text,
+    grid :: M.Map (Int, Int) Prose,
+    gridSize :: (Int, Int)
+  }
+  deriving stock (Eq, Show)
+
 
 parseOrgDoc :: T.Text -> Either T.Text OrgDoc
 parseOrgDoc input = case parse orgDocParser "" input of

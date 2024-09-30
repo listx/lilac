@@ -1151,21 +1151,10 @@ data Cell
   = CHeading Heading
   | CProse Prose
   | CBlock Block
-  | CListItem
-      { level :: Int,
-        ordered :: Bool,
-        body :: Prose
-      }
+  | CListItem ListItem
   | CMathFragment MathFragment
-  | CFigure
-      { meta :: M.Map T.Text T.Text,
-        link :: Link
-      }
-  | CTable
-      { meta :: M.Map T.Text T.Text,
-        grid :: M.Map (Int, Int) Prose,
-        gridSize :: (Int, Int)
-      }
+  | CFigure Figure
+  | CTable Table
   deriving stock (Eq, Show)
 
 #+end_src
@@ -1425,6 +1414,18 @@ The symbols =-= and =+= can be used, but they are treated the same. Only the
 Lists must start with leading indentation (this deviates from vanilla Org which
 does not have this requirement).
 
+#+header: :noweb-ref Data structures
+#+begin_src haskell
+type ListItem :: Type
+data ListItem = ListItem
+  { level :: Int,
+    ordered :: Bool,
+    body :: Prose
+  }
+  deriving stock (Eq, Show)
+
+#+end_src
+
 ***** Math fragments
 
 In vanilla Org, Latex fragments begin with =\begin{<ENVIRONMENT>}= and
@@ -1473,6 +1474,17 @@ Figures are external links to images. Below is an example:
 #+name: fig:Portable Network Graphics sample image
 [[./image/PNG-Gradient.png]]
 
+#+header: :noweb-ref Data structures
+#+begin_src haskell
+type Figure :: Type
+data Figure = Figure
+  { meta :: M.Map T.Text T.Text,
+    link :: Link
+  }
+  deriving stock (Eq, Show)
+
+#+end_src
+
 ***** Tables
 
 Tables are 2-dimensional grids holding information. Below is an example:
@@ -1485,6 +1497,18 @@ Tables are 2-dimensional grids holding information. Below is an example:
 | Haskell  | static, strong  |
 
 Because we named the above with a =#+name= keyword, we can refer to it as [[tbl:Programming languages][this]].
+
+#+header: :noweb-ref Data structures
+#+begin_src haskell
+type Table :: Type
+data Table = Table
+  { meta :: M.Map T.Text T.Text,
+    grid :: M.Map (Int, Int) Prose,
+    gridSize :: (Int, Int)
+  }
+  deriving stock (Eq, Show)
+
+#+end_src
 
 **** Code graphs
 
