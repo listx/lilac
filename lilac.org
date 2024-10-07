@@ -964,6 +964,7 @@ test-suite spec
       -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , containers
     , hspec
     , hspec-megaparsec
     , lilac
@@ -1156,6 +1157,7 @@ We'll examine the =Cell= type first, followed by code graphs.
 
 A cell is roughly any newline-delimited region of text.
 
+#+name: Cell ADT
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type Cell :: Type
@@ -1549,7 +1551,11 @@ module Lilac.Parse
     defaultOrgDocWithMeta,
     orgDocParser,
     parseOrgDoc,
-    OrgDoc,
+    OrgDoc (..),
+    Cell (..),
+    Heading (..),
+    MathFragment (..),
+    PToken (..),
   )
 where
 
@@ -1558,10 +1564,9 @@ import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
-import Data.Void
 import Relude
 import Text.Megaparsec qualified as MP
-import Text.Megaparsec.Char
+import Text.Megaparsec.Char (char, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 
 <<Data structures>>
@@ -1679,10 +1684,11 @@ orgDocParser :: Megaparser OrgDoc
 orgDocParser = do
   _ <- optional spaceConsumer
   meta <- docMetaParser
+  cells <- many cellParser
   MP.eof
   pure
     $ OrgDoc
-      { cells = [],
+      { cells = cells,
         code = [],
         codeBlocks = IM.fromList [],
         meta = meta
@@ -1739,6 +1745,7 @@ docMetaParser :: Megaparser (M.Map T.Text T.Text)
 docMetaParser = do
   metaKVs <- many (lexeme docMetaEntryParser)
   pure $ M.fromList metaKVs
+
 #+end_src
 
 Below are some unit test cases for parsing metadata.
@@ -1756,7 +1763,7 @@ Below are some unit test cases for parsing metadata.
 #+header: :noweb-ref Test parsing document metadata
 #+begin_src haskell
 p "parses document metadata" "test/Lilac/ParseSpec/0002-doc-metadata"
-  $ defaultOrgDocWithMeta
+  $ L.defaultOrgDocWithMeta
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
       ("property", "header-args+ :noweb no-export"),
@@ -1804,12 +1811,227 @@ Yet another comment.
 p
   "parses document metadata (skips comments)"
   "test/Lilac/ParseSpec/0003-doc-metadata-with-comments"
-  $ defaultOrgDocWithMeta
+  $ L.defaultOrgDocWithMeta
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
       ("property", "header-args+ :noweb no-export"),
       ("title", "An Org Document")
     ]
+#+end_src
+
+***** Cells
+
+As seen in [[Cell ADT][the Cell ADT]], there are many different types of cells. The
+=cellParser= is responsible for parsing these different types.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+cellParser :: Megaparser Cell
+cellParser = do
+  lexeme headingParser
+
+#+end_src
+
+****** Headings
+
+A heading basically starts with some asterisks, followed by a space and then
+some number of non-newline characters (the body). It can also have drawers
+immediately under it.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+headingParser :: Megaparser Cell
+headingParser = do
+  stars <- MP.takeWhile1P (Just "star") (\c -> c == '*')
+  _ <- char ' '
+  body <- MP.some pTokenParser
+  _ <- char '\n'
+  drawers <- drawersParser
+  pure
+    $ CHeading
+      Heading
+        { level = T.length stars,
+          body = body,
+          meta = drawers
+        }
+
+#+end_src
+
+The body text of a heading is a series of prose tokens, or =PToken= values.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+proseParser :: Megaparser Prose
+proseParser = many (lexeme pTokenParser)
+
+#+end_src
+
+A =PToken= can be a styled string, link, or math fragment.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+pTokenParser :: Megaparser PToken
+pTokenParser = do
+  MP.choice [linkParser', mathFragmentInlineParser']
+  where
+    linkParser' = PTokenLink <$> linkParser
+    mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
+
+linkParser :: Megaparser Link
+linkParser = do
+  MP.choice [linkExternalParser]
+
+linkExternalParser :: Megaparser Link
+linkExternalParser = do
+  _ <- string "["
+  target <-
+    MP.between
+      (string "[")
+      (string "]")
+      ( MP.label "external link target"
+          $ MP.some
+          $ MP.anySingleBut ']'
+      )
+  name <-
+    MP.between
+      (string "[")
+      (string "]")
+      ( MP.label "external link name"
+          $ MP.some
+          $ MP.anySingleBut ']'
+      )
+  _ <- string "]"
+  pure
+    Link
+      { typ = LinkExternal,
+        target = T.pack target,
+        name = [StyledString {body = T.pack name, style = Plain}]
+      }
+
+mathFragmentInlineParser :: Megaparser MathFragment
+mathFragmentInlineParser = do
+  _ <- string "\\("
+  latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
+  pure
+    MathFragment
+      { meta = M.fromList [],
+        body = T.pack latex
+      }
+
+#+end_src
+
+****** Drawers
+
+Drawers look like
+
+#+begin_example
+:DRAWER_NAME:
+...content...
+:END:
+#+end_example
+
+and the =:PROPERTIES:= drawer is a special drawer that can contain values that Org
+recognizes, such as an =:ID:= key and value to encode a UUID which can be used as
+a link target from elsewhere in the document.
+
+For simplicity we capture all of the values of a drawer inside a single map,
+with the drawer name as the key and the contents inside the drawer as the value.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+drawersParser :: Megaparser (Map T.Text T.Text)
+drawersParser = do
+  kvs <- many (lexeme drawerParser)
+  pure $ M.fromList kvs
+
+drawerParser :: Megaparser (T.Text, T.Text)
+drawerParser = do
+  _ <- char ':'
+  drawerName <- MP.takeWhile1P (Just "drawer name") isDrawerLetter
+  _ <- char ':'
+  _ <- char '\n'
+  drawerContents <-
+    MP.manyTill
+      (MP.label "drawer contents" MP.anySingle)
+      (string ":END:\n")
+  pure (drawerName, T.pack drawerContents)
+  where
+    isDrawerLetter c = and $ map ($ c) [(/= '\n'), (/= ':'), (/= ' ')]
+
+#+end_src
+
+******* Tests
+
+#+header: :tangle test/Lilac/ParseSpec/0004-drawers-empty
+#+begin_src org
+,* \(foo\)
+:FOO:
+:END:
+#+end_src
+
+#+header: :noweb-ref Test drawer parsing
+#+begin_src haskell
+p
+  "parses drawers (empty)"
+  "test/Lilac/ParseSpec/0004-drawers-empty"
+  $ L.OrgDoc
+    { cells =
+        [ L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    [ L.PTokenMathFragment
+                        ( L.MathFragment
+                            { meta = fromList [],
+                              body = "foo"
+                            }
+                        )
+                    ],
+                  meta = fromList [("FOO", "")]
+                }
+            )
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0004-drawers-not-empty
+#+begin_src org
+,* \(foo\)
+:FOO:
+- a
+- b
+:END:
+#+end_src
+
+#+header: :noweb-ref Test drawer parsing
+#+begin_src haskell
+p
+  "parses drawers (not empty)"
+  "test/Lilac/ParseSpec/0004-drawers-not-empty"
+  $ L.OrgDoc
+    { cells =
+        [ L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    [ L.PTokenMathFragment
+                        ( L.MathFragment
+                            { meta = fromList [],
+                              body = "foo"
+                            }
+                        )
+                    ],
+                  meta = fromList [("FOO", "- a\n- b\n")]
+                }
+            )
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
 #+end_src
 
 **** Tests
@@ -1821,12 +2043,9 @@ p
 #+begin_src haskell
 module Lilac.ParseSpec (spec) where
 
-import Lilac.Parse
-  ( OrgDoc,
-    defaultOrgDoc,
-    defaultOrgDocWithMeta,
-    orgDocParser,
-  )
+import Data.IntMap qualified as IM
+import Data.Map.Strict qualified as M
+import Lilac.Parse qualified as L
 import Relude
 import Test.Hspec (Spec, before, describe, it)
 import Test.Hspec.Megaparsec (shouldParse)
@@ -1838,11 +2057,11 @@ given path (to feed to =parseOrgDoc=). We name this helper just =p=.
 
 #+header: :tangle test/Lilac/ParseSpec.hs
 #+begin_src haskell
-p :: String -> FilePath -> OrgDoc -> Spec
+p :: String -> FilePath -> L.OrgDoc -> Spec
 p behavior path expected = do
   before (readFileBS path) $ do
     it behavior $ \input -> do
-      MP.parse orgDocParser path (decodeUtf8 input) `shouldParse` expected
+      MP.parse L.orgDocParser path (decodeUtf8 input) `shouldParse` expected
 #+end_src
 
 Below are all of the individual test cases.
@@ -1853,12 +2072,13 @@ spec :: Spec
 spec =
   describe "parse" $ do
     it "parses empty input as defaultOrgDoc" $ do
-      MP.parse orgDocParser "empty input" "" `shouldParse` defaultOrgDoc
+      MP.parse L.orgDocParser "empty input" "" `shouldParse` L.defaultOrgDoc
     p
       "parses blank line as defaultOrgDoc"
       "test/Lilac/ParseSpec/0001-blankline"
-      defaultOrgDoc
+      L.defaultOrgDoc
     <<Test parsing document metadata>>
+    <<Test drawer parsing>>
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0001-blankline

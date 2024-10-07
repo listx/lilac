@@ -3,7 +3,11 @@ module Lilac.Parse
     defaultOrgDocWithMeta,
     orgDocParser,
     parseOrgDoc,
-    OrgDoc,
+    OrgDoc (..),
+    Cell (..),
+    Heading (..),
+    MathFragment (..),
+    PToken (..),
   )
 where
 
@@ -12,10 +16,9 @@ import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
-import Data.Void
 import Relude
 import Text.Megaparsec qualified as MP
-import Text.Megaparsec.Char
+import Text.Megaparsec.Char (char, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 
 type OrgDoc :: Type
@@ -160,10 +163,11 @@ orgDocParser :: Megaparser OrgDoc
 orgDocParser = do
   _ <- optional spaceConsumer
   meta <- docMetaParser
+  cells <- many cellParser
   MP.eof
   pure
     $ OrgDoc
-      { cells = [],
+      { cells = cells,
         code = [],
         codeBlocks = IM.fromList [],
         meta = meta
@@ -201,3 +205,92 @@ docMetaParser :: Megaparser (M.Map T.Text T.Text)
 docMetaParser = do
   metaKVs <- many (lexeme docMetaEntryParser)
   pure $ M.fromList metaKVs
+
+cellParser :: Megaparser Cell
+cellParser = do
+  lexeme headingParser
+
+headingParser :: Megaparser Cell
+headingParser = do
+  stars <- MP.takeWhile1P (Just "star") (\c -> c == '*')
+  _ <- char ' '
+  body <- MP.some pTokenParser
+  _ <- char '\n'
+  drawers <- drawersParser
+  pure
+    $ CHeading
+      Heading
+        { level = T.length stars,
+          body = body,
+          meta = drawers
+        }
+
+proseParser :: Megaparser Prose
+proseParser = many (lexeme pTokenParser)
+
+pTokenParser :: Megaparser PToken
+pTokenParser = do
+  MP.choice [linkParser', mathFragmentInlineParser']
+  where
+    linkParser' = PTokenLink <$> linkParser
+    mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
+
+linkParser :: Megaparser Link
+linkParser = do
+  MP.choice [linkExternalParser]
+
+linkExternalParser :: Megaparser Link
+linkExternalParser = do
+  _ <- string "["
+  target <-
+    MP.between
+      (string "[")
+      (string "]")
+      ( MP.label "external link target"
+          $ MP.some
+          $ MP.anySingleBut ']'
+      )
+  name <-
+    MP.between
+      (string "[")
+      (string "]")
+      ( MP.label "external link name"
+          $ MP.some
+          $ MP.anySingleBut ']'
+      )
+  _ <- string "]"
+  pure
+    Link
+      { typ = LinkExternal,
+        target = T.pack target,
+        name = [StyledString {body = T.pack name, style = Plain}]
+      }
+
+mathFragmentInlineParser :: Megaparser MathFragment
+mathFragmentInlineParser = do
+  _ <- string "\\("
+  latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
+  pure
+    MathFragment
+      { meta = M.fromList [],
+        body = T.pack latex
+      }
+
+drawersParser :: Megaparser (Map T.Text T.Text)
+drawersParser = do
+  kvs <- many (lexeme drawerParser)
+  pure $ M.fromList kvs
+
+drawerParser :: Megaparser (T.Text, T.Text)
+drawerParser = do
+  _ <- char ':'
+  drawerName <- MP.takeWhile1P (Just "drawer name") isDrawerLetter
+  _ <- char ':'
+  _ <- char '\n'
+  drawerContents <-
+    MP.manyTill
+      (MP.label "drawer contents" MP.anySingle)
+      (string ":END:\n")
+  pure (drawerName, T.pack drawerContents)
+  where
+    isDrawerLetter c = and $ map ($ c) [(/= '\n'), (/= ':'), (/= ' ')]
