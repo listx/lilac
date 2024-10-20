@@ -1280,7 +1280,7 @@ data LinkType
 
 Math fragments are discussed in [[*Math fragments]].
 
-****** LinkNoweb
+****** =LinkNoweb=
 
 Links to Noweb references. We've been using Noweb references already in this
 document, but here's an isolated example.
@@ -1299,7 +1299,7 @@ hello world
 
 Note that if no such Noweb reference is defined, Lilac will error out.
 
-****** LinkHeading
+****** =LinkHeading=
 
 Links to headings. For example, [[*Blocks]] links to the next heading named "Blocks"
 in this document.
@@ -1308,7 +1308,7 @@ Unlike in vanilla Org, a =LinkHeading= link must start with an asterisk. This is
 why the example above says =*Blocks= and not just =Blocks= inside the double
 brackets.
 
-****** LinkIdProp
+****** =LinkIdProp=
 :PROPERTIES:
 :ID:       f8254d58-7a3d-4595-a265-e0d6255e6ab5
 :END:
@@ -1323,7 +1323,7 @@ drawer and inside it, an =:ID:= field with a UUID. The link
 To add such an =:ID:= to an existing header, run the =org-id-store-link= elisp
 function.
 
-****** LinkNameKeyword
+****** =LinkNameKeyword=
 
 Link to an entry with a =#+name: ...= property. They can be used for blocks,
 figures, and tables.
@@ -1356,12 +1356,12 @@ the links named "here" won't make much sense to the reader. So if you are
 writing for physical media, you should try to avoid "hiding" the target of links
 behind names, and instead only use the link target.
 
-****** LinkFootnote
+****** =LinkFootnote=
 
 Links to footnotes. A footnote is constructed specially and only requires single
 instead of double brackets. This sentence ends with a footnote link.[fn:3]
 
-****** LinkExternal
+****** =LinkExternal=
 
 Links to some external resource, such as a web page on the internet or a file on
 disk. That is, the link points to something that exists /externally/ to the Org
