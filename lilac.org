@@ -1218,6 +1218,7 @@ type Prose = [PToken]
 A token can be a string (styled or otherwise), a link of some sort, or a Latex
 fragment.
 
+#+name: PToken ADT
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type PToken :: Type
@@ -1256,6 +1257,7 @@ data Style = Plain | Bold | Italic | Code | Verbatim
 A link just has the display text and its target. The =LinkType= can refer to a
 link to another area of the Org document, or an external link (URL).
 
+#+name: Link ADT
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type Link :: Type
@@ -1554,8 +1556,12 @@ module Lilac.Parse
     OrgDoc (..),
     Cell (..),
     Heading (..),
+    Link (..),
+    LinkType (..),
     MathFragment (..),
     PToken (..),
+    Style (..),
+    StyledString (..),
   )
 where
 
@@ -1598,7 +1604,7 @@ type Megaparser = MP.Parsec Void T.Text
 
 #+end_src
 
-**** Parsing helpers for whitespace and comments
+**** Parser helpers for whitespace and comments
 
 Before writing our first parsers, we have to consider the problem of whitespace
 and comments.
@@ -1665,6 +1671,67 @@ trailing spaces and comments.
 #+begin_src haskell
 lexeme :: Megaparser a -> Megaparser a
 lexeme = L.lexeme spaceConsumer
+
+#+end_src
+
+***** Treading carefully around newlines
+
+The =spaceConsumer= is somewhat "aggressive" because it uses =space1= which consumes
+all kinds of whitespace, including newlines. We define two other types of
+space-consuming parsers. One which does not consume newlines at all, and another
+which consumes everything except a double-newline (two newlines in a row).
+
+The first case is easy because we just need to tweak the =whiteSpaceParser= to
+only allow a space or tab character.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+spaceConsumerNoNewline :: Megaparser ()
+spaceConsumerNoNewline =
+  L.space
+    whiteSpaceParser
+    singleLineCommentParser
+    empty
+  where
+    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser = void $ some (char ' ' <|> char '\t')
+    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser = (L.skipLineComment "# ")
+
+symbolNoNewline :: T.Text -> Megaparser T.Text
+symbolNoNewline = L.symbol spaceConsumerNoNewline
+
+lexemeNoNewline :: Megaparser a -> Megaparser a
+lexemeNoNewline = L.lexeme spaceConsumerNoNewline
+
+#+end_src
+
+For the second case, the =whiteSpaceParser= is a bit more involved. We need to
+look ahead to see that the newline is not followed by another newline.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+spaceConsumerNoDoubleNewline :: Megaparser ()
+spaceConsumerNoDoubleNewline =
+  L.space
+    whiteSpaceParser
+    singleLineCommentParser
+    empty
+  where
+    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser = void $ some f
+    f :: Megaparser ()
+    f = do
+      MP.notFollowedBy (string "\n\n")
+      void $ char ' ' <|> char '\t' <|> char '\n'
+    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser = (L.skipLineComment "# ")
+
+symbolNoDoubleNewline :: T.Text -> Megaparser T.Text
+symbolNoDoubleNewline = L.symbol spaceConsumerNoDoubleNewline
+
+lexemeNoDoubleNewline :: Megaparser a -> Megaparser a
+lexemeNoDoubleNewline = L.lexeme spaceConsumerNoDoubleNewline
 
 #+end_src
 
@@ -1737,7 +1804,7 @@ docMetaEntryParser = do
 
 The =docMetaParser= just parses =docMetaEntryParser= one or more times, while
 consuming any trailing whitespace or comments with the =lexeme= helper from
-[[*Parsing helpers for whitespace and comments]].
+[[*Parser helpers for whitespace and comments]].
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
@@ -1842,9 +1909,9 @@ immediately under it.
 #+begin_src haskell
 headingParser :: Megaparser Cell
 headingParser = do
-  stars <- MP.takeWhile1P (Just "star") (\c -> c == '*')
+  stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  body <- MP.some pTokenParser
+  body <- MP.some (lexemeNoNewline pTokenParser)
   _ <- char '\n'
   drawers <- drawersParser
   pure
@@ -1857,26 +1924,46 @@ headingParser = do
 
 #+end_src
 
-The body text of a heading is a series of prose tokens, or =PToken= values.
+The body text of a heading is a series of prose tokens, or =PToken= values, which
+we call =Prose=.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 proseParser :: Megaparser Prose
-proseParser = many (lexeme pTokenParser)
+proseParser = many (lexemeNoDoubleNewline pTokenParser)
 
 #+end_src
 
-A =PToken= can be a styled string, link, or math fragment.
+Note that we don't use =proseParser= here directly, because prose inside heading
+text cannot have any newlines at all. This is why we use =lexemeNoNewline= to
+parse the =body= in =headingParser= above.
+
+We consider prose in detail in the next section.
+
+****** Prose
+
+A [[PToken ADT][PToken]] can be a styled string, link, or inline math fragment.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 pTokenParser :: Megaparser PToken
 pTokenParser = do
-  MP.choice [linkParser', mathFragmentInlineParser']
+  MP.choice
+    [ linkParser',
+      mathFragmentInlineParser'
+    ]
   where
     linkParser' = PTokenLink <$> linkParser
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
 
+#+end_src
+
+There are many kinds of links. For now we only support external links. Even so,
+the current definition is incomplete because it doesn't cover the case of raw
+links like https://kernel.org.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
 linkParser :: Megaparser Link
 linkParser = do
   MP.choice [linkExternalParser]
@@ -1893,21 +1980,33 @@ linkExternalParser = do
           $ MP.anySingleBut ']'
       )
   name <-
-    MP.between
-      (string "[")
-      (string "]")
-      ( MP.label "external link name"
-          $ MP.some
-          $ MP.anySingleBut ']'
-      )
+    MP.optional
+      $ MP.between
+        (string "[")
+        (string "]")
+        ( MP.label "external link name"
+            $ MP.some
+            $ MP.anySingleBut ']'
+        )
   _ <- string "]"
   pure
     Link
       { typ = LinkExternal,
         target = T.pack target,
-        name = [StyledString {body = T.pack name, style = Plain}]
+        name =
+          [ StyledString
+              { body = T.pack (fromMaybe target name),
+                style = Plain
+              }
+          ]
       }
 
+#+end_src
+
+Inline math fragments are delimited by =\(= and =\)=.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
 mathFragmentInlineParser :: Megaparser MathFragment
 mathFragmentInlineParser = do
   _ <- string "\\("
@@ -1918,6 +2017,80 @@ mathFragmentInlineParser = do
         body = T.pack latex
       }
 
+#+end_src
+
+******* Tests
+
+#+header: :tangle test/Lilac/ParseSpec/0005-links
+#+begin_src org
+,* \(foo\) [[link-target-only]]
+,* \(bar\) [[link-target][link-name]]
+#+end_src
+
+#+header: :noweb-ref Test link parsing
+#+begin_src haskell
+p
+  "parses links (target only)"
+  "test/Lilac/ParseSpec/0005-links"
+  $ L.OrgDoc
+    { cells =
+        [ L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    [ L.PTokenMathFragment
+                        ( L.MathFragment
+                            { meta = fromList [],
+                              body = "foo"
+                            }
+                        ),
+                      L.PTokenLink
+                        ( L.Link
+                            { typ = L.LinkExternal,
+                              target = "link-target-only",
+                              name =
+                                [ L.StyledString
+                                    { body = "link-target-only",
+                                      style = L.Plain
+                                    }
+                                ]
+                            }
+                        )
+                    ],
+                  meta = fromList []
+                }
+            )
+        , L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    [ L.PTokenMathFragment
+                        ( L.MathFragment
+                            { meta = fromList [],
+                              body = "bar"
+                            }
+                        ),
+                      L.PTokenLink
+                        ( L.Link
+                            { typ = L.LinkExternal,
+                              target = "link-target",
+                              name =
+                                [ L.StyledString
+                                    { body = "link-name",
+                                      style = L.Plain
+                                    }
+                                ]
+                            }
+                        )
+                    ],
+                  meta = fromList []
+                }
+            )
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
 #+end_src
 
 ****** Drawers
@@ -2078,6 +2251,7 @@ spec =
       "test/Lilac/ParseSpec/0001-blankline"
       L.defaultOrgDoc
     <<Test parsing document metadata>>
+    <<Test link parsing>>
     <<Test drawer parsing>>
 #+end_src
 

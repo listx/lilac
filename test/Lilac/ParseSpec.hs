@@ -40,6 +40,68 @@ spec =
           ("title", "An Org Document")
         ]
     p
+      "parses links (target only)"
+      "test/Lilac/ParseSpec/0005-links"
+      $ L.OrgDoc
+        { cells =
+            [ L.CHeading
+                ( L.Heading
+                    { level = 1,
+                      body =
+                        [ L.PTokenMathFragment
+                            ( L.MathFragment
+                                { meta = fromList [],
+                                  body = "foo"
+                                }
+                            ),
+                          L.PTokenLink
+                            ( L.Link
+                                { typ = L.LinkExternal,
+                                  target = "link-target-only",
+                                  name =
+                                    [ L.StyledString
+                                        { body = "link-target-only",
+                                          style = L.Plain
+                                        }
+                                    ]
+                                }
+                            )
+                        ],
+                      meta = fromList []
+                    }
+                )
+            , L.CHeading
+                ( L.Heading
+                    { level = 1,
+                      body =
+                        [ L.PTokenMathFragment
+                            ( L.MathFragment
+                                { meta = fromList [],
+                                  body = "bar"
+                                }
+                            ),
+                          L.PTokenLink
+                            ( L.Link
+                                { typ = L.LinkExternal,
+                                  target = "link-target",
+                                  name =
+                                    [ L.StyledString
+                                        { body = "link-name",
+                                          style = L.Plain
+                                        }
+                                    ]
+                                }
+                            )
+                        ],
+                      meta = fromList []
+                    }
+                )
+            ],
+          code = [],
+          codeBlocks = IM.fromList [],
+          meta = M.fromList []
+        }
+    p
       "parses drawers (empty)"
       "test/Lilac/ParseSpec/0004-drawers-empty"
       $ L.OrgDoc

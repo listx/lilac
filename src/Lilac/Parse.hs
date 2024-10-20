@@ -6,8 +6,12 @@ module Lilac.Parse
     OrgDoc (..),
     Cell (..),
     Heading (..),
+    Link (..),
+    LinkType (..),
     MathFragment (..),
     PToken (..),
+    Style (..),
+    StyledString (..),
   )
 where
 
@@ -159,6 +163,46 @@ symbol = L.symbol spaceConsumer
 lexeme :: Megaparser a -> Megaparser a
 lexeme = L.lexeme spaceConsumer
 
+spaceConsumerNoNewline :: Megaparser ()
+spaceConsumerNoNewline =
+  L.space
+    whiteSpaceParser
+    singleLineCommentParser
+    empty
+  where
+    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser = void $ some (char ' ' <|> char '\t')
+    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser = (L.skipLineComment "# ")
+
+symbolNoNewline :: T.Text -> Megaparser T.Text
+symbolNoNewline = L.symbol spaceConsumerNoNewline
+
+lexemeNoNewline :: Megaparser a -> Megaparser a
+lexemeNoNewline = L.lexeme spaceConsumerNoNewline
+
+spaceConsumerNoDoubleNewline :: Megaparser ()
+spaceConsumerNoDoubleNewline =
+  L.space
+    whiteSpaceParser
+    singleLineCommentParser
+    empty
+  where
+    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser = void $ some f
+    f :: Megaparser ()
+    f = do
+      MP.notFollowedBy (string "\n\n")
+      void $ char ' ' <|> char '\t' <|> char '\n'
+    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser = (L.skipLineComment "# ")
+
+symbolNoDoubleNewline :: T.Text -> Megaparser T.Text
+symbolNoDoubleNewline = L.symbol spaceConsumerNoDoubleNewline
+
+lexemeNoDoubleNewline :: Megaparser a -> Megaparser a
+lexemeNoDoubleNewline = L.lexeme spaceConsumerNoDoubleNewline
+
 orgDocParser :: Megaparser OrgDoc
 orgDocParser = do
   _ <- optional spaceConsumer
@@ -212,9 +256,9 @@ cellParser = do
 
 headingParser :: Megaparser Cell
 headingParser = do
-  stars <- MP.takeWhile1P (Just "star") (\c -> c == '*')
+  stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  body <- MP.some pTokenParser
+  body <- MP.some (lexemeNoNewline pTokenParser)
   _ <- char '\n'
   drawers <- drawersParser
   pure
@@ -226,11 +270,14 @@ headingParser = do
         }
 
 proseParser :: Megaparser Prose
-proseParser = many (lexeme pTokenParser)
+proseParser = many (lexemeNoDoubleNewline pTokenParser)
 
 pTokenParser :: Megaparser PToken
 pTokenParser = do
-  MP.choice [linkParser', mathFragmentInlineParser']
+  MP.choice
+    [ linkParser',
+      mathFragmentInlineParser'
+    ]
   where
     linkParser' = PTokenLink <$> linkParser
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
@@ -251,19 +298,25 @@ linkExternalParser = do
           $ MP.anySingleBut ']'
       )
   name <-
-    MP.between
-      (string "[")
-      (string "]")
-      ( MP.label "external link name"
-          $ MP.some
-          $ MP.anySingleBut ']'
-      )
+    MP.optional
+      $ MP.between
+        (string "[")
+        (string "]")
+        ( MP.label "external link name"
+            $ MP.some
+            $ MP.anySingleBut ']'
+        )
   _ <- string "]"
   pure
     Link
       { typ = LinkExternal,
         target = T.pack target,
-        name = [StyledString {body = T.pack name, style = Plain}]
+        name =
+          [ StyledString
+              { body = T.pack (fromMaybe target name),
+                style = Plain
+              }
+          ]
       }
 
 mathFragmentInlineParser :: Megaparser MathFragment
