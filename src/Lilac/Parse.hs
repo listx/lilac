@@ -71,7 +71,7 @@ data StyledString = StyledString
   deriving stock (Eq, Show)
 
 type Style :: Type
-data Style = Plain | Bold | Italic | Code | Verbatim
+data Style = Plain | Bold | Italic | Underline | Verbatim | Code | Strikethrough
   deriving stock (Eq, Show)
 
 type Link :: Type
@@ -277,10 +277,43 @@ pTokenParser = do
   MP.choice
     [ linkParser',
       mathFragmentInlineParser'
+      styledStringParser',
     ]
   where
     linkParser' = PTokenLink <$> linkParser
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
+    styledStringParser' = PTokenStyledString <$> styledStringParser
+
+styledStringParser :: Megaparser StyledString
+styledStringParser = do
+  bold <-
+    MP.between
+      (string "*")
+      (string "*")
+      ( MP.label "bolded text"
+          $ MP.some
+          $ MP.anySingleBut '*'
+      )
+  pure
+    StyledString
+      { body = "FOO",
+        style = Plain
+      }
+
+boldParser :: Megaparser StyledString
+boldParser = do
+  MP.between
+    (string "*")
+    (string "*")
+    ( MP.label "bolded text"
+        $ MP.some
+        $ MP.anySingleBut '*'
+    )
+  pure
+    StyledString
+      { body = "FOO",
+        style = Plain
+      }
 
 linkParser :: Megaparser Link
 linkParser = do
