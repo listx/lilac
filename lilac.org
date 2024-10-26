@@ -1592,15 +1592,15 @@ parseOrgDoc input = case MP.parse orgDocParser "" input of
 #+end_src
 
 The =orgDocParser= is the main parser combinator; it is itself composed of other
-parser combinators. All of these parsers live inside the =Megaparser= monadic
+parser combinators. All of these parsers live inside the =OrgParser= monadic
 type, which is defined as =Parsec Void T.Text=, where =Void= is the state used
 during parsing and =T.Text= is the type of the text being parsed. We use =Void= for
 now while we think about what to use for internal state (if any) during parsing.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-type Megaparser :: Type -> Type
-type Megaparser = MP.Parsec Void T.Text
+type OrgParser :: Type -> Type
+type OrgParser = MP.Parsec Void T.Text
 
 #+end_src
 
@@ -1628,18 +1628,18 @@ See https://markkarpov.com/tutorial/megaparsec.html#lexing for more information.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-spaceConsumer :: Megaparser ()
+spaceConsumer :: OrgParser ()
 spaceConsumer =
   L.space
     whiteSpaceParser
     singleLineCommentParser
     blockCommentParser
   where
-    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = space1
-    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = (L.skipLineComment "# ")
-    blockCommentParser :: Megaparser ()
+    blockCommentParser :: OrgParser ()
     blockCommentParser = (L.skipBlockComment "#+begin_comment" "#+end_comment")
 
 #+end_src
@@ -1659,7 +1659,7 @@ spaces or comments after parsing the given text.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-symbol :: T.Text -> Megaparser T.Text
+symbol :: T.Text -> OrgParser T.Text
 symbol = L.symbol spaceConsumer
 
 #+end_src
@@ -1669,7 +1669,7 @@ trailing spaces and comments.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-lexeme :: Megaparser a -> Megaparser a
+lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme spaceConsumer
 
 #+end_src
@@ -1686,22 +1686,22 @@ only allow a space or tab character.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-spaceConsumerNoNewline :: Megaparser ()
+spaceConsumerNoNewline :: OrgParser ()
 spaceConsumerNoNewline =
   L.space
     whiteSpaceParser
     singleLineCommentParser
     empty
   where
-    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = void $ some (char ' ' <|> char '\t')
-    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = (L.skipLineComment "# ")
 
-symbolNoNewline :: T.Text -> Megaparser T.Text
+symbolNoNewline :: T.Text -> OrgParser T.Text
 symbolNoNewline = L.symbol spaceConsumerNoNewline
 
-lexemeNoNewline :: Megaparser a -> Megaparser a
+lexemeNoNewline :: OrgParser a -> OrgParser a
 lexemeNoNewline = L.lexeme spaceConsumerNoNewline
 
 #+end_src
@@ -1711,26 +1711,26 @@ look ahead to see that the newline is not followed by another newline.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-spaceConsumerNoDoubleNewline :: Megaparser ()
+spaceConsumerNoDoubleNewline :: OrgParser ()
 spaceConsumerNoDoubleNewline =
   L.space
     whiteSpaceParser
     singleLineCommentParser
     empty
   where
-    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = void $ some f
-    f :: Megaparser ()
+    f :: OrgParser ()
     f = do
       MP.notFollowedBy (string "\n\n")
       void $ char ' ' <|> char '\t' <|> char '\n'
-    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = (L.skipLineComment "# ")
 
-symbolNoDoubleNewline :: T.Text -> Megaparser T.Text
+symbolNoDoubleNewline :: T.Text -> OrgParser T.Text
 symbolNoDoubleNewline = L.symbol spaceConsumerNoDoubleNewline
 
-lexemeNoDoubleNewline :: Megaparser a -> Megaparser a
+lexemeNoDoubleNewline :: OrgParser a -> OrgParser a
 lexemeNoDoubleNewline = L.lexeme spaceConsumerNoDoubleNewline
 
 #+end_src
@@ -1747,7 +1747,7 @@ deal with it here separately.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-orgDocParser :: Megaparser OrgDoc
+orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional spaceConsumer
   meta <- docMetaParser
@@ -1790,7 +1790,7 @@ parses.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-docMetaEntryParser :: Megaparser (T.Text, T.Text)
+docMetaEntryParser :: OrgParser (T.Text, T.Text)
 docMetaEntryParser = do
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "keyword letter") isKeywordLetter
@@ -1808,7 +1808,7 @@ consuming any trailing whitespace or comments with the =lexeme= helper from
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-docMetaParser :: Megaparser (M.Map T.Text T.Text)
+docMetaParser :: OrgParser (M.Map T.Text T.Text)
 docMetaParser = do
   metaKVs <- many (lexeme docMetaEntryParser)
   pure $ M.fromList metaKVs
@@ -1893,7 +1893,7 @@ As seen in [[Cell ADT][the Cell ADT]], there are many different types of cells. 
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-cellParser :: Megaparser Cell
+cellParser :: OrgParser Cell
 cellParser = do
   lexeme headingParser
 
@@ -1907,7 +1907,7 @@ immediately under it.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-headingParser :: Megaparser Cell
+headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
@@ -1929,7 +1929,7 @@ we call =Prose=.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-proseParser :: Megaparser Prose
+proseParser :: OrgParser Prose
 proseParser = many (lexemeNoDoubleNewline pTokenParser)
 
 #+end_src
@@ -1946,7 +1946,7 @@ A [[PToken ADT][PToken]] can be a styled string, link, or inline math fragment.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-pTokenParser :: Megaparser PToken
+pTokenParser :: OrgParser PToken
 pTokenParser = do
   MP.choice
     [ linkParser',
@@ -1964,7 +1964,7 @@ Styled strings are text strings with special formatting markers around them.
 Here are some examples: *bold*, /italic/, _underline_, =verbatim=, ~code~, and +strike
 through+.
 
-The styled strings are somewhat tricky, for three main reasons:
+The styled strings are somewhat tricky, because of three main problems:
 
   1) the markers use the same character for the start and end,
 
@@ -1985,7 +1985,7 @@ underlined:
 _one
 two_
 
-We approach this problem with a key idea: use a stack to keep track of
+We approach this problem with a simple idea: use a *stack* to keep track of
 markers. Every time we see a starting marker, we push it into the stack,
 and turn that style on. If we see the corresponding ending marker, we pop it
 out of the stack (and turn that style off). If the input is such that the
@@ -1995,15 +1995,18 @@ expect style markers to always be balanced. This deviates from vanilla Org,
 which does not have this restriction.
 
 Note that we don't wait until seeing the closing marker to see if we should
-stylize the text at hand. This simplifies the parsing logic.
+stylize the text at hand. This simplifies the parsing logic, and directly
+addresses the first two problems listed above. The third problem is simple
+enough to solve, by just counting how many newlines we encounter as long as the
+stack is not empty.
 
 If you need to put a style marker at a position that would normally be
-considered the start (or end) of a marker, you have to enclose it inside
-verbatim or code styles.
+considered the start (or end) of a marker, but don't want Lilac to interpret it
+as a style marker, you have to enclose it inside verbatim or code styles.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-styledStringParser :: Megaparser StyledString
+styledStringParser :: OrgParser StyledString
 styledStringParser = do
   bold <-
     MP.between
@@ -2019,7 +2022,7 @@ styledStringParser = do
         style = Plain
       }
 
-boldParser :: Megaparser StyledString
+boldParser :: OrgParser StyledString
 boldParser = do
   MP.between
     (string "*")
@@ -2042,11 +2045,11 @@ links like https://kernel.org.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-linkParser :: Megaparser Link
+linkParser :: OrgParser Link
 linkParser = do
   MP.choice [linkExternalParser]
 
-linkExternalParser :: Megaparser Link
+linkExternalParser :: OrgParser Link
 linkExternalParser = do
   _ <- string "["
   target <-
@@ -2085,7 +2088,7 @@ Inline math fragments are delimited by =\(= and =\)=.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-mathFragmentInlineParser :: Megaparser MathFragment
+mathFragmentInlineParser :: OrgParser MathFragment
 mathFragmentInlineParser = do
   _ <- string "\\("
   latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
@@ -2190,12 +2193,12 @@ with the drawer name as the key and the contents inside the drawer as the value.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-drawersParser :: Megaparser (Map T.Text T.Text)
+drawersParser :: OrgParser (Map T.Text T.Text)
 drawersParser = do
   kvs <- many (lexeme drawerParser)
   pure $ M.fromList kvs
 
-drawerParser :: Megaparser (T.Text, T.Text)
+drawerParser :: OrgParser (T.Text, T.Text)
 drawerParser = do
   _ <- char ':'
   drawerName <- MP.takeWhile1P (Just "drawer name") isDrawerLetter

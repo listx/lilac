@@ -140,70 +140,70 @@ parseOrgDoc input = case MP.parse orgDocParser "" input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
   Right m -> Right m
 
-type Megaparser :: Type -> Type
-type Megaparser = MP.Parsec Void T.Text
+type OrgParser :: Type -> Type
+type OrgParser = MP.Parsec Void T.Text
 
-spaceConsumer :: Megaparser ()
+spaceConsumer :: OrgParser ()
 spaceConsumer =
   L.space
     whiteSpaceParser
     singleLineCommentParser
     blockCommentParser
   where
-    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = space1
-    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = (L.skipLineComment "# ")
-    blockCommentParser :: Megaparser ()
+    blockCommentParser :: OrgParser ()
     blockCommentParser = (L.skipBlockComment "#+begin_comment" "#+end_comment")
 
-symbol :: T.Text -> Megaparser T.Text
+symbol :: T.Text -> OrgParser T.Text
 symbol = L.symbol spaceConsumer
 
-lexeme :: Megaparser a -> Megaparser a
+lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme spaceConsumer
 
-spaceConsumerNoNewline :: Megaparser ()
+spaceConsumerNoNewline :: OrgParser ()
 spaceConsumerNoNewline =
   L.space
     whiteSpaceParser
     singleLineCommentParser
     empty
   where
-    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = void $ some (char ' ' <|> char '\t')
-    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = (L.skipLineComment "# ")
 
-symbolNoNewline :: T.Text -> Megaparser T.Text
+symbolNoNewline :: T.Text -> OrgParser T.Text
 symbolNoNewline = L.symbol spaceConsumerNoNewline
 
-lexemeNoNewline :: Megaparser a -> Megaparser a
+lexemeNoNewline :: OrgParser a -> OrgParser a
 lexemeNoNewline = L.lexeme spaceConsumerNoNewline
 
-spaceConsumerNoDoubleNewline :: Megaparser ()
+spaceConsumerNoDoubleNewline :: OrgParser ()
 spaceConsumerNoDoubleNewline =
   L.space
     whiteSpaceParser
     singleLineCommentParser
     empty
   where
-    whiteSpaceParser :: Megaparser ()
+    whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = void $ some f
-    f :: Megaparser ()
+    f :: OrgParser ()
     f = do
       MP.notFollowedBy (string "\n\n")
       void $ char ' ' <|> char '\t' <|> char '\n'
-    singleLineCommentParser :: Megaparser ()
+    singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = (L.skipLineComment "# ")
 
-symbolNoDoubleNewline :: T.Text -> Megaparser T.Text
+symbolNoDoubleNewline :: T.Text -> OrgParser T.Text
 symbolNoDoubleNewline = L.symbol spaceConsumerNoDoubleNewline
 
-lexemeNoDoubleNewline :: Megaparser a -> Megaparser a
+lexemeNoDoubleNewline :: OrgParser a -> OrgParser a
 lexemeNoDoubleNewline = L.lexeme spaceConsumerNoDoubleNewline
 
-orgDocParser :: Megaparser OrgDoc
+orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional spaceConsumer
   meta <- docMetaParser
@@ -235,7 +235,7 @@ defaultOrgDocWithMeta metas =
       meta = M.fromList metas
     }
 
-docMetaEntryParser :: Megaparser (T.Text, T.Text)
+docMetaEntryParser :: OrgParser (T.Text, T.Text)
 docMetaEntryParser = do
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "keyword letter") isKeywordLetter
@@ -245,16 +245,16 @@ docMetaEntryParser = do
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
 
-docMetaParser :: Megaparser (M.Map T.Text T.Text)
+docMetaParser :: OrgParser (M.Map T.Text T.Text)
 docMetaParser = do
   metaKVs <- many (lexeme docMetaEntryParser)
   pure $ M.fromList metaKVs
 
-cellParser :: Megaparser Cell
+cellParser :: OrgParser Cell
 cellParser = do
   lexeme headingParser
 
-headingParser :: Megaparser Cell
+headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
@@ -269,10 +269,10 @@ headingParser = do
           meta = drawers
         }
 
-proseParser :: Megaparser Prose
+proseParser :: OrgParser Prose
 proseParser = many (lexemeNoDoubleNewline pTokenParser)
 
-pTokenParser :: Megaparser PToken
+pTokenParser :: OrgParser PToken
 pTokenParser = do
   MP.choice
     [ linkParser',
@@ -284,7 +284,7 @@ pTokenParser = do
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
     styledStringParser' = PTokenStyledString <$> styledStringParser
 
-styledStringParser :: Megaparser StyledString
+styledStringParser :: OrgParser StyledString
 styledStringParser = do
   bold <-
     MP.between
@@ -300,7 +300,7 @@ styledStringParser = do
         style = Plain
       }
 
-boldParser :: Megaparser StyledString
+boldParser :: OrgParser StyledString
 boldParser = do
   MP.between
     (string "*")
@@ -315,11 +315,11 @@ boldParser = do
         style = Plain
       }
 
-linkParser :: Megaparser Link
+linkParser :: OrgParser Link
 linkParser = do
   MP.choice [linkExternalParser]
 
-linkExternalParser :: Megaparser Link
+linkExternalParser :: OrgParser Link
 linkExternalParser = do
   _ <- string "["
   target <-
@@ -352,7 +352,7 @@ linkExternalParser = do
           ]
       }
 
-mathFragmentInlineParser :: Megaparser MathFragment
+mathFragmentInlineParser :: OrgParser MathFragment
 mathFragmentInlineParser = do
   _ <- string "\\("
   latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
@@ -362,12 +362,12 @@ mathFragmentInlineParser = do
         body = T.pack latex
       }
 
-drawersParser :: Megaparser (Map T.Text T.Text)
+drawersParser :: OrgParser (Map T.Text T.Text)
 drawersParser = do
   kvs <- many (lexeme drawerParser)
   pure $ M.fromList kvs
 
-drawerParser :: Megaparser (T.Text, T.Text)
+drawerParser :: OrgParser (T.Text, T.Text)
 drawerParser = do
   _ <- char ':'
   drawerName <- MP.takeWhile1P (Just "drawer name") isDrawerLetter
