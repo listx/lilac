@@ -5,20 +5,28 @@ import Data.Map.Strict qualified as M
 import Lilac.Parse qualified as L
 import Relude
 import Test.Hspec (Spec, before, describe, it)
-import Test.Hspec.Megaparsec (shouldParse)
+import Test.Hspec.Megaparsec (parseSatisfies, shouldParse)
 import Text.Megaparsec qualified as MP
 
 p :: String -> FilePath -> L.OrgDoc -> Spec
 p behavior path expected = do
   before (readFileBS path) $ do
     it behavior $ \input -> do
-      MP.parse L.orgDocParser path (decodeUtf8 input) `shouldParse` expected
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        path
+        (decodeUtf8 input)
+        `parseSatisfies` ((== expected) . fst)
 
 spec :: Spec
 spec =
   describe "parse" $ do
     it "parses empty input as defaultOrgDoc" $ do
-      MP.parse L.orgDocParser "empty input" "" `shouldParse` L.defaultOrgDoc
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        "empty input"
+        ""
+        `parseSatisfies` ((== L.defaultOrgDoc) . fst)
     p
       "parses blank line as defaultOrgDoc"
       "test/Lilac/ParseSpec/0001-blankline"
@@ -69,8 +77,8 @@ spec =
                         ],
                       meta = fromList []
                     }
-                )
-            , L.CHeading
+                ),
+              L.CHeading
                 ( L.Heading
                     { level = 1,
                       body =

@@ -1,6 +1,7 @@
 module Lilac.Parse
   ( defaultOrgDoc,
     defaultOrgDocWithMeta,
+    defaultOrgParserState,
     orgDocParser,
     parseOrgDoc,
     OrgDoc (..),
@@ -136,12 +137,27 @@ data Table = Table
   deriving stock (Eq, Show)
 
 parseOrgDoc :: T.Text -> Either T.Text OrgDoc
-parseOrgDoc input = case MP.parse orgDocParser "" input of
+parseOrgDoc input = case MP.runParser
+  (runStateT orgDocParser defaultOrgParserState)
+  ""
+  input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
-  Right m -> Right m
+  Right (orgDoc, _orgParserState) -> Right orgDoc
 
 type OrgParser :: Type -> Type
-type OrgParser = MP.Parsec Void T.Text
+type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
+
+type OrgParserState :: Type
+data OrgParserState = OrgParserState
+  { styleStack :: [Style]
+  }
+  deriving stock (Eq, Show)
+
+defaultOrgParserState :: OrgParserState
+defaultOrgParserState =
+  OrgParserState
+    { styleStack = []
+    }
 
 spaceConsumer :: OrgParser ()
 spaceConsumer =
@@ -276,8 +292,8 @@ pTokenParser :: OrgParser PToken
 pTokenParser = do
   MP.choice
     [ linkParser',
-      mathFragmentInlineParser'
-      styledStringParser',
+      mathFragmentInlineParser',
+      styledStringParser'
     ]
   where
     linkParser' = PTokenLink <$> linkParser

@@ -1551,6 +1551,7 @@ a look at [[id:ebf0d269-79d3-408a-a6e7-baf720d73837][this section]].
 module Lilac.Parse
   ( defaultOrgDoc,
     defaultOrgDocWithMeta,
+    defaultOrgParserState,
     orgDocParser,
     parseOrgDoc,
     OrgDoc (..),
@@ -1585,22 +1586,47 @@ and parses it into a rich =OrgDoc= type.
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 parseOrgDoc :: T.Text -> Either T.Text OrgDoc
-parseOrgDoc input = case MP.parse orgDocParser "" input of
+parseOrgDoc input = case MP.runParser
+  (runStateT orgDocParser defaultOrgParserState)
+  ""
+  input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
-  Right m -> Right m
+  Right (orgDoc, _orgParserState) -> Right orgDoc
 
 #+end_src
 
 The =orgDocParser= is the main parser combinator; it is itself composed of other
-parser combinators. All of these parsers live inside the =OrgParser= monadic
-type, which is defined as =Parsec Void T.Text=, where =Void= is the state used
-during parsing and =T.Text= is the type of the text being parsed. We use =Void= for
-now while we think about what to use for internal state (if any) during parsing.
+parser combinators. All of these parsers live inside the =OrgParser= monadic type,
+which is defined as a state monad transformer (=StateT=) with =OrgParserState=,
+which wraps around the inner =Parsec Void T.Text= monad, where =Void= is the custom
+error component and =T.Text= is the type of the text being parsed. Using =Void= for
+the custom error component means that we'll be defaulting to the default error
+handling mechanism that ships with Megaparsec.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 type OrgParser :: Type -> Type
-type OrgParser = MP.Parsec Void T.Text
+type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
+
+#+end_src
+
+The =OrgParserState= is the custom state we want to use to read and write from
+while parsing. It currently holds the stack to keep track of styles. See [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the
+section on parsing styles to see how it's used]].
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+type OrgParserState :: Type
+data OrgParserState = OrgParserState
+  { styleStack :: [Style]
+  }
+  deriving stock (Eq, Show)
+
+defaultOrgParserState :: OrgParserState
+defaultOrgParserState =
+  OrgParserState
+    { styleStack = []
+    }
 
 #+end_src
 
@@ -1941,6 +1967,9 @@ parse the =body= in =headingParser= above.
 We consider prose in detail in the next section.
 
 ****** Prose
+:PROPERTIES:
+:ID:       dc1cc132-eecb-4fd3-aae7-14131109a148
+:END:
 
 A [[PToken ADT][PToken]] can be a styled string, link, or inline math fragment.
 
@@ -1950,8 +1979,8 @@ pTokenParser :: OrgParser PToken
 pTokenParser = do
   MP.choice
     [ linkParser',
-      mathFragmentInlineParser'
-      styledStringParser',
+      mathFragmentInlineParser',
+      styledStringParser'
     ]
   where
     linkParser' = PTokenLink <$> linkParser
@@ -2140,8 +2169,8 @@ p
                     ],
                   meta = fromList []
                 }
-            )
-        , L.CHeading
+            ),
+          L.CHeading
             ( L.Heading
                 { level = 1,
                   body =
@@ -2302,7 +2331,7 @@ import Data.Map.Strict qualified as M
 import Lilac.Parse qualified as L
 import Relude
 import Test.Hspec (Spec, before, describe, it)
-import Test.Hspec.Megaparsec (shouldParse)
+import Test.Hspec.Megaparsec (parseSatisfies, shouldParse)
 import Text.Megaparsec qualified as MP
 #+end_src
 
@@ -2315,7 +2344,11 @@ p :: String -> FilePath -> L.OrgDoc -> Spec
 p behavior path expected = do
   before (readFileBS path) $ do
     it behavior $ \input -> do
-      MP.parse L.orgDocParser path (decodeUtf8 input) `shouldParse` expected
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        path
+        (decodeUtf8 input)
+        `parseSatisfies` ((== expected) . fst)
 #+end_src
 
 Below are all of the individual test cases.
@@ -2326,7 +2359,11 @@ spec :: Spec
 spec =
   describe "parse" $ do
     it "parses empty input as defaultOrgDoc" $ do
-      MP.parse L.orgDocParser "empty input" "" `shouldParse` L.defaultOrgDoc
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        "empty input"
+        ""
+        `parseSatisfies` ((== L.defaultOrgDoc) . fst)
     p
       "parses blank line as defaultOrgDoc"
       "test/Lilac/ParseSpec/0001-blankline"
