@@ -16,12 +16,14 @@ module Lilac.Parse
   )
 where
 
-import Data.Char (isAsciiLower)
+import Data.Char (isAsciiLower, isSpace)
 import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
 import Data.Text qualified as T
 import Relude
+import Relude.Extra.Map qualified as EM
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
@@ -67,13 +69,13 @@ data PToken
 type StyledString :: Type
 data StyledString = StyledString
   { body :: T.Text,
-    style :: Style
+    style :: [Style]
   }
   deriving stock (Eq, Show)
 
 type Style :: Type
-data Style = Plain | Bold | Italic | Underline | Verbatim | Code | Strikethrough
-  deriving stock (Eq, Show)
+data Style = Bold | Italic | Underline | Verbatim | Code | Strikethrough
+  deriving stock (Enum, Eq, Ord, Show)
 
 type Link :: Type
 data Link = Link
@@ -276,6 +278,7 @@ headingParser = do
   _ <- char ' '
   body <- MP.some (lexemeNoNewline pTokenParser)
   _ <- char '\n'
+  failIfUnbalancedStyleMarkers
   drawers <- drawersParser
   pure
     $ CHeading
@@ -300,36 +303,55 @@ pTokenParser = do
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
     styledStringParser' = PTokenStyledString <$> styledStringParser
 
+failIfUnbalancedStyleMarkers :: OrgParser ()
+failIfUnbalancedStyleMarkers = do
+  orgParserState <- get
+  let stack = orgParserState.styleStack
+  when (not $ null stack) $ do
+    fail
+      $ "unbalanced prose style markers; expected empty stack, but got "
+      ++ (show stack)
+
 styledStringParser :: OrgParser StyledString
 styledStringParser = do
-  bold <-
-    MP.between
-      (string "*")
-      (string "*")
-      ( MP.label "bolded text"
-          $ MP.some
-          $ MP.anySingleBut '*'
-      )
-  pure
-    StyledString
-      { body = "FOO",
-        style = Plain
-      }
+  orgParserState <- get
+  let stack = orgParserState.styleStack
+  startingMarkers <-
+    (map toStyle . T.unpack)
+      <$> MP.takeWhileP
+        (Just "starting style marker")
+        isStyleMarker
 
-boldParser :: OrgParser StyledString
-boldParser = do
-  MP.between
-    (string "*")
-    (string "*")
-    ( MP.label "bolded text"
-        $ MP.some
-        $ MP.anySingleBut '*'
-    )
+  let activeStyles = stack ++ startingMarkers
+
+  word <- MP.takeWhile1P (Just "prose word") isProseWord
+
+  endingMarkers <-
+    (map toStyle . T.unpack)
+      <$> MP.takeWhileP
+        (Just "ending style marker")
+        isStyleMarker
+  let remainingStyles =
+        Set.toList
+          $ Set.difference
+            (Set.fromList activeStyles)
+            (Set.fromList endingMarkers)
+
+  put orgParserState {styleStack = remainingStyles}
+
   pure
     StyledString
-      { body = "FOO",
-        style = Plain
+      { body = word,
+        style = intNubOn fromEnum activeStyles
       }
+  where
+    isStyleMarker c = M.member c styleMap
+    isProseWord c = M.notMember c styleMap && (not $ isSpace c)
+    styleMap =
+      M.fromList
+        [ ('*', Bold)
+        ]
+    toStyle c = EM.lookupDefault Bold c styleMap
 
 linkParser :: OrgParser Link
 linkParser = do
@@ -363,7 +385,7 @@ linkExternalParser = do
         name =
           [ StyledString
               { body = T.pack (fromMaybe target name),
-                style = Plain
+                style = []
               }
           ]
       }

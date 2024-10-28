@@ -1009,7 +1009,6 @@ NumericUnderscores
 LambdaCase
 OverloadedLabels
 OverloadedRecordDot
-OverloadedRecordUpdate
 OverloadedStrings
 PatternSynonyms
 RankNTypes
@@ -1215,8 +1214,8 @@ type Prose = [PToken]
 
 #+end_src
 
-A token can be a string (styled or otherwise), a link of some sort, or a Latex
-fragment.
+A prose token, or =PToken=, can be a string (styled or otherwise), a link of some
+sort, or a Latex fragment.
 
 #+name: PToken ADT
 #+header: :noweb-ref Data structures
@@ -1230,14 +1229,15 @@ data PToken
 
 #+end_src
 
-The =StyledString= is just a =Style= married to some text.
+The =StyledString= is just some text that has one or more styles attached to it.
+If the string has no style, then it's not stylized at all (plain style).
 
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type StyledString :: Type
 data StyledString = StyledString
   { body :: T.Text,
-    style :: Style
+    style :: [Style]
   }
   deriving stock (Eq, Show)
 
@@ -1249,8 +1249,8 @@ styles, for simplicity.
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type Style :: Type
-data Style = Plain | Bold | Italic | Underline | Verbatim | Code | Strikethrough
-  deriving stock (Eq, Show)
+data Style = Bold | Italic | Underline | Verbatim | Code | Strikethrough
+  deriving stock (Enum, Eq, Ord, Show)
 
 #+end_src
 
@@ -1566,12 +1566,14 @@ module Lilac.Parse
   )
 where
 
-import Data.Char (isAsciiLower)
+import Data.Char (isAsciiLower, isSpace)
 import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
 import Data.Text qualified as T
 import Relude
+import Relude.Extra.Map qualified as EM
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
@@ -1939,6 +1941,7 @@ headingParser = do
   _ <- char ' '
   body <- MP.some (lexemeNoNewline pTokenParser)
   _ <- char '\n'
+  failIfUnbalancedStyleMarkers
   drawers <- drawersParser
   pure
     $ CHeading
@@ -1964,7 +1967,8 @@ Note that we don't use =proseParser= here directly, because prose inside heading
 text cannot have any newlines at all. This is why we use =lexemeNoNewline= to
 parse the =body= in =headingParser= above.
 
-We consider prose in detail in the next section.
+We consider prose in detail in the next section, where we'll also discuss
+[[func:failIfUnbalancedStyleMarkers]].
 
 ****** Prose
 :PROPERTIES:
@@ -2017,14 +2021,31 @@ two_
 We approach this problem with a simple idea: use a *stack* to keep track of
 markers. Every time we see a starting marker, we push it into the stack,
 and turn that style on. If we see the corresponding ending marker, we pop it
-out of the stack (and turn that style off). If the input is such that the
-markers are not balanced, such that by the time we finish parsing a paragraph
-there are still markers left on the stack, we throw an error. That is, we
-expect style markers to always be balanced. This deviates from vanilla Org,
-which does not have this restriction.
+out of the stack (and turn that style off).
 
-Note that we don't wait until seeing the closing marker to see if we should
-stylize the text at hand. This simplifies the parsing logic, and directly
+If the input is such that the markers are not balanced, such that by the time we
+finish parsing a paragraph there are still markers left on the stack, we throw
+an error. That is, we expect style markers to always be balanced. This deviates
+from vanilla Org, which does not have this restriction. This checking of
+balanced style markers is done in =failIfUnbalancedStyleMarkers= below.
+
+#+name: func:failIfUnbalancedStyleMarkers
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+failIfUnbalancedStyleMarkers :: OrgParser ()
+failIfUnbalancedStyleMarkers = do
+  orgParserState <- get
+  let stack = orgParserState.styleStack
+  when (not $ null stack) $ do
+    fail
+      $ "unbalanced prose style markers; expected empty stack, but got "
+      ++ (show stack)
+
+#+end_src
+
+We don't wait until seeing the closing marker to see if we should stylize the
+text at hand. This simplifies the parsing logic (we can start consuming stylized
+text without needing to see a corresponding ending marker), and directly
 addresses the first two problems listed above. The third problem is simple
 enough to solve, by just counting how many newlines we encounter as long as the
 stack is not empty.
@@ -2033,38 +2054,60 @@ If you need to put a style marker at a position that would normally be
 considered the start (or end) of a marker, but don't want Lilac to interpret it
 as a style marker, you have to enclose it inside verbatim or code styles.
 
+So the overall algorithm should be:
+
+  1) Parse any leading style markers.
+
+  2) Parse the non-style text (word without spaces in it).
+
+  3) Parse any ending style markers.
+
+The markers in steps 1 and 3 are optional. The key is that by the time we get to
+Step 2, we know what the =styleStack= looks like, so we can use that information
+to stylize the text we found in Step 2.
+
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 styledStringParser :: OrgParser StyledString
 styledStringParser = do
-  bold <-
-    MP.between
-      (string "*")
-      (string "*")
-      ( MP.label "bolded text"
-          $ MP.some
-          $ MP.anySingleBut '*'
-      )
-  pure
-    StyledString
-      { body = "FOO",
-        style = Plain
-      }
+  orgParserState <- get
+  let stack = orgParserState.styleStack
+  startingMarkers <-
+    (map toStyle . T.unpack)
+      <$> MP.takeWhileP
+        (Just "starting style marker")
+        isStyleMarker
 
-boldParser :: OrgParser StyledString
-boldParser = do
-  MP.between
-    (string "*")
-    (string "*")
-    ( MP.label "bolded text"
-        $ MP.some
-        $ MP.anySingleBut '*'
-    )
+  let activeStyles = stack ++ startingMarkers
+
+  word <- MP.takeWhile1P (Just "prose word") isProseWord
+
+  endingMarkers <-
+    (map toStyle . T.unpack)
+      <$> MP.takeWhileP
+        (Just "ending style marker")
+        isStyleMarker
+  let remainingStyles =
+        Set.toList
+          $ Set.difference
+            (Set.fromList activeStyles)
+            (Set.fromList endingMarkers)
+
+  put orgParserState {styleStack = remainingStyles}
+
   pure
     StyledString
-      { body = "FOO",
-        style = Plain
+      { body = word,
+        style = intNubOn fromEnum activeStyles
       }
+  where
+    isStyleMarker c = M.member c styleMap
+    isProseWord c = M.notMember c styleMap && (not $ isSpace c)
+    styleMap =
+      M.fromList
+        [ ('*', Bold)
+        ]
+    toStyle c = EM.lookupDefault Bold c styleMap
 
 #+end_src
 
@@ -2106,7 +2149,7 @@ linkExternalParser = do
         name =
           [ StyledString
               { body = T.pack (fromMaybe target name),
-                style = Plain
+                style = []
               }
           ]
       }
@@ -2161,7 +2204,7 @@ p
                               name =
                                 [ L.StyledString
                                     { body = "link-target-only",
-                                      style = L.Plain
+                                      style = []
                                     }
                                 ]
                             }
@@ -2187,7 +2230,7 @@ p
                               name =
                                 [ L.StyledString
                                     { body = "link-name",
-                                      style = L.Plain
+                                      style = []
                                     }
                                 ]
                             }

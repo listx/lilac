@@ -69,7 +69,7 @@ spec =
                                   name =
                                     [ L.StyledString
                                         { body = "link-target-only",
-                                          style = L.Plain
+                                          style = []
                                         }
                                     ]
                                 }
@@ -95,7 +95,7 @@ spec =
                                   name =
                                     [ L.StyledString
                                         { body = "link-name",
-                                          style = L.Plain
+                                          style = []
                                         }
                                     ]
                                 }
