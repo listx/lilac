@@ -4,6 +4,7 @@ module Lilac.Parse
     defaultOrgParserState,
     orgDocParser,
     parseOrgDoc,
+    styleMaskFrom,
     OrgDoc (..),
     Cell (..),
     Heading (..),
@@ -13,20 +14,23 @@ module Lilac.Parse
     PToken (..),
     Style (..),
     StyledString (..),
+    StyleMask (..),
   )
 where
 
+import Data.Bits (complement, setBit, testBit, (.&.), (.^.), (.|.))
+import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isSpace)
 import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
-import Data.Set qualified as Set
 import Data.Text qualified as T
 import Relude
 import Relude.Extra.Map qualified as EM
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
+import Prelude qualified (show)
 
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
@@ -69,7 +73,7 @@ data PToken
 type StyledString :: Type
 data StyledString = StyledString
   { body :: T.Text,
-    style :: [Style]
+    style :: StyleMask
   }
   deriving stock (Eq, Show)
 
@@ -151,14 +155,81 @@ type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { styleStack :: [Style]
+  { styleMask :: StyleMask
   }
   deriving stock (Eq, Show)
+
+type StyleMask :: Type
+newtype StyleMask = StyleMask Word8
+  deriving stock (Eq)
+
+instance Show StyleMask where
+  show (StyleMask a) = "styleMaskFrom " <> x
+    where
+      x =
+        Prelude.show
+          . catMaybes
+          . map
+            ( \(i, b) ->
+                if b
+                  then (Just $ (toEnum i :: Style))
+                  else Nothing
+            )
+          . zip [0 ..]
+          $ toListLE a
+
+styleMaskFrom :: [Style] -> StyleMask
+styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
+  where
+    f :: Word8 -> Style -> Word8
+    f acc s = setBit acc (fromEnum s)
+
+maskToStyles :: StyleMask -> [Style]
+maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask
+  where
+    f :: [Style] -> (Int, Bool) -> [Style]
+    f acc (idx, b) =
+      if b
+        then (toEnum idx) : acc
+        else acc
+
+toStyleMask :: (MonadFail m) => [Char] -> m StyleMask
+toStyleMask cs = pure =<< stylesToStyleMask =<< charToStyles cs
+
+charToStyles :: (MonadFail m) => [Char] -> m [Style]
+charToStyles chars = foldlM f [] chars
+  where
+    f :: (MonadFail m) => [Style] -> Char -> m [Style]
+    f acc c = case EM.lookup c styleMap of
+      Just style -> pure (style : acc)
+      Nothing -> fail $ "programmer error: unrecognized style marker " <> (show c)
+
+stylesToStyleMask :: (MonadFail m) => [Style] -> m StyleMask
+stylesToStyleMask ss = pure . StyleMask =<< foldlM f (0 :: Word8) ss
+  where
+    f :: (MonadFail m) => Word8 -> Style -> m Word8
+    f acc s
+      | testBit acc sInt = fail $ "stylesToStyleMask: redundant style marker: " <> (show s)
+      | otherwise = pure $ setBit acc sInt
+      where
+        sInt = fromEnum s
+
+styleMaskIntersect :: StyleMask -> StyleMask -> StyleMask
+styleMaskIntersect (StyleMask a) (StyleMask b) = StyleMask $ a .&. b
+
+styleMaskAdd :: StyleMask -> StyleMask -> StyleMask
+styleMaskAdd (StyleMask a) (StyleMask b) = StyleMask $ a .|. b
+
+styleMaskSubtract :: StyleMask -> StyleMask -> StyleMask
+styleMaskSubtract (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
+
+invalidDeactivations :: StyleMask -> StyleMask -> StyleMask
+invalidDeactivations (StyleMask a) (StyleMask b) = StyleMask $ (complement a) .&. b
 
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { styleStack = []
+    { styleMask = styleMaskFrom []
     }
 
 spaceConsumer :: OrgParser ()
@@ -278,7 +349,7 @@ headingParser = do
   _ <- char ' '
   body <- MP.some (lexemeNoNewline pTokenParser)
   _ <- char '\n'
-  failIfUnbalancedStyleMarkers
+  failIfLeftoverActiveStyles
   drawers <- drawersParser
   pure
     $ CHeading
@@ -303,55 +374,66 @@ pTokenParser = do
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
     styledStringParser' = PTokenStyledString <$> styledStringParser
 
-failIfUnbalancedStyleMarkers :: OrgParser ()
-failIfUnbalancedStyleMarkers = do
+styleMap :: M.Map Char Style
+styleMap =
+  M.fromList
+    [ ('*', Bold)
+    ]
+
+failIfLeftoverActiveStyles :: OrgParser ()
+failIfLeftoverActiveStyles = do
   orgParserState <- get
-  let stack = orgParserState.styleStack
-  when (not $ null stack) $ do
+  let (StyleMask mask) = orgParserState.styleMask
+  when (mask /= 0) $ do
     fail
-      $ "unbalanced prose style markers; expected empty stack, but got "
-      ++ (show stack)
+      $ "leftover active styles: "
+      ++ (show $ maskToStyles $ StyleMask mask)
 
 styledStringParser :: OrgParser StyledString
 styledStringParser = do
   orgParserState <- get
-  let stack = orgParserState.styleStack
-  startingMarkers <-
-    (map toStyle . T.unpack)
+
+  let mask = orgParserState.styleMask
+  startingMask <-
+    toStyleMask
+      =<< T.unpack
       <$> MP.takeWhileP
         (Just "starting style marker")
         isStyleMarker
 
-  let activeStyles = stack ++ startingMarkers
+  let (StyleMask overlappingBits) = styleMaskIntersect mask startingMask
+  when (overlappingBits /= 0)
+    $ fail
+    $ "redundant style activations: "
+    <> (show $ maskToStyles $ StyleMask overlappingBits)
+
+  let activeMask = styleMaskAdd mask startingMask
 
   word <- MP.takeWhile1P (Just "prose word") isProseWord
 
-  endingMarkers <-
-    (map toStyle . T.unpack)
+  endingMask <-
+    toStyleMask
+      =<< T.unpack
       <$> MP.takeWhileP
         (Just "ending style marker")
         isStyleMarker
-  let remainingStyles =
-        Set.toList
-          $ Set.difference
-            (Set.fromList activeStyles)
-            (Set.fromList endingMarkers)
 
-  put orgParserState {styleStack = remainingStyles}
+  let (StyleMask overzealousBits) = invalidDeactivations activeMask endingMask
+  when (overzealousBits /= 0)
+    $ fail
+    $ "overzealous style deactivations: "
+    <> (show $ maskToStyles $ StyleMask overzealousBits)
+
+  put orgParserState {styleMask = styleMaskSubtract activeMask endingMask}
 
   pure
     StyledString
       { body = word,
-        style = intNubOn fromEnum activeStyles
+        style = activeMask
       }
   where
     isStyleMarker c = M.member c styleMap
     isProseWord c = M.notMember c styleMap && (not $ isSpace c)
-    styleMap =
-      M.fromList
-        [ ('*', Bold)
-        ]
-    toStyle c = EM.lookupDefault Bold c styleMap
 
 linkParser :: OrgParser Link
 linkParser = do
@@ -385,7 +467,7 @@ linkExternalParser = do
         name =
           [ StyledString
               { body = T.pack (fromMaybe target name),
-                style = []
+                style = styleMaskFrom []
               }
           ]
       }

@@ -5,7 +5,12 @@ import Data.Map.Strict qualified as M
 import Lilac.Parse qualified as L
 import Relude
 import Test.Hspec (Spec, before, describe, it)
-import Test.Hspec.Megaparsec (parseSatisfies, shouldFailOn)
+import Test.Hspec.Megaparsec
+  ( errFancy,
+    fancy,
+    parseSatisfies,
+    shouldFailWith,
+  )
 import Text.Megaparsec qualified as MP
 
 p :: String -> FilePath -> L.OrgDoc -> Spec
@@ -18,14 +23,15 @@ p behavior path expected = do
         (decodeUtf8 input)
         `parseSatisfies` ((== expected) . fst)
 
-pf :: String -> FilePath -> Spec
-pf behavior path = do
+pf :: String -> FilePath -> String -> Int -> Spec
+pf behavior path errMsg pos = do
   before (readFileBS path) $ do
     it behavior $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        `shouldFailOn` (decodeUtf8 input)
+        (decodeUtf8 input)
+        `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
 
 spec :: Spec
 spec =
@@ -56,6 +62,26 @@ spec =
           ("property", "header-args+ :noweb no-export"),
           ("title", "An Org Document")
         ]
+    pf
+      "detects unbalanced style markers (redundant activations)"
+      "test/Lilac/ParseSpec/0005-styled-strings-redundant-activations"
+      "redundant style activations: [Bold]"
+      8
+    pf
+      "detects unbalanced style markers (overzealous deactivations)"
+      "test/Lilac/ParseSpec/0005-styled-strings-overzealous-deactivations"
+      "overzealous style deactivations: [Bold]"
+      10
+    pf
+      "detects unbalanced style markers (leftover active styles)"
+      "test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles"
+      "leftover active styles: [Bold]"
+      15
+    pf
+      "detects unbalanced style markers (redundant style marker)"
+      "test/Lilac/ParseSpec/0005-styled-strings-redundant-style-marker"
+      "stylesToStyleMask: redundant style marker: Bold"
+      8
     p
       "parses styled strings (no style)"
       "test/Lilac/ParseSpec/0005-styled-strings-no-style"
@@ -68,7 +94,7 @@ spec =
                         [ L.PTokenStyledString
                             ( L.StyledString
                                 { body = "foo",
-                                  style = []
+                                  style = L.styleMaskFrom []
                                 }
                             )
                         ],
@@ -92,19 +118,19 @@ spec =
                         [ L.PTokenStyledString
                             ( L.StyledString
                                 { body = "foo",
-                                  style = []
+                                  style = L.styleMaskFrom []
                                 }
                             ),
                           L.PTokenStyledString
                             ( L.StyledString
                                 { body = "bar",
-                                  style = [L.Bold]
+                                  style = L.styleMaskFrom [L.Bold]
                                 }
                             ),
                           L.PTokenStyledString
                             ( L.StyledString
                                 { body = "baz",
-                                  style = []
+                                  style = L.styleMaskFrom []
                                 }
                             )
                         ],
@@ -116,12 +142,6 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
-    pf
-      "detect unbalanced style markers (starting marker)"
-      "test/Lilac/ParseSpec/0005-styled-strings-unbalanced-start"
-    pf
-      "detect unbalanced style markers (ending marker)"
-      "test/Lilac/ParseSpec/0005-styled-strings-unbalanced-end"
     p
       "parses links (target only)"
       "test/Lilac/ParseSpec/0006-links"
@@ -144,7 +164,7 @@ spec =
                                   name =
                                     [ L.StyledString
                                         { body = "link-target-only",
-                                          style = []
+                                          style = L.styleMaskFrom []
                                         }
                                     ]
                                 }
@@ -170,7 +190,7 @@ spec =
                                   name =
                                     [ L.StyledString
                                         { body = "link-name",
-                                          style = []
+                                          style = L.styleMaskFrom []
                                         }
                                     ]
                                 }

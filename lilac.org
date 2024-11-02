@@ -926,6 +926,7 @@ library
       <<GHC warning flags>>
   build-depends:
       base >=4.7 && <5
+    , bitwise
     , containers
     , megaparsec
     , relude
@@ -1237,7 +1238,7 @@ If the string has no style, then it's not stylized at all (plain style).
 type StyledString :: Type
 data StyledString = StyledString
   { body :: T.Text,
-    style :: [Style]
+    style :: StyleMask
   }
   deriving stock (Eq, Show)
 
@@ -1246,6 +1247,7 @@ data StyledString = StyledString
 The =Style= type is straightforward enough. For now we don't support all possible
 styles, for simplicity.
 
+#+name: data:Style
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type Style :: Type
@@ -1554,6 +1556,7 @@ module Lilac.Parse
     defaultOrgParserState,
     orgDocParser,
     parseOrgDoc,
+    styleMaskFrom,
     OrgDoc (..),
     Cell (..),
     Heading (..),
@@ -1563,20 +1566,23 @@ module Lilac.Parse
     PToken (..),
     Style (..),
     StyledString (..),
+    StyleMask (..),
   )
 where
 
+import Data.Bits (complement, setBit, testBit, (.&.), (.^.), (.|.))
+import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isSpace)
 import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
-import Data.Set qualified as Set
 import Data.Text qualified as T
 import Relude
 import Relude.Extra.Map qualified as EM
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
+import Prelude qualified (show)
 
 <<Data structures>>
 <<Parsing mechanism>>
@@ -1613,21 +1619,23 @@ type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
 #+end_src
 
 The =OrgParserState= is the custom state we want to use to read and write from
-while parsing. It currently holds the stack to keep track of styles. See [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the
+while parsing. It currently holds the =StyleMask= to keep track of styles. See [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the
 section on parsing styles to see how it's used]].
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { styleStack :: [Style]
+  { styleMask :: StyleMask
   }
   deriving stock (Eq, Show)
+
+<<StyleMask details>>
 
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { styleStack = []
+    { styleMask = styleMaskFrom []
     }
 
 #+end_src
@@ -1941,7 +1949,7 @@ headingParser = do
   _ <- char ' '
   body <- MP.some (lexemeNoNewline pTokenParser)
   _ <- char '\n'
-  failIfUnbalancedStyleMarkers
+  failIfLeftoverActiveStyles
   drawers <- drawersParser
   pure
     $ CHeading
@@ -1968,7 +1976,7 @@ text cannot have any newlines at all. This is why we use =lexemeNoNewline= to
 parse the =body= in =headingParser= above.
 
 We consider prose in detail in the next section, where we'll also discuss
-[[func:failIfUnbalancedStyleMarkers]].
+[[func:failIfLeftoverActiveStyles]].
 
 ****** Prose
 :PROPERTIES:
@@ -1999,62 +2007,113 @@ Styled strings are text strings with special formatting markers around them.
 Here are some examples: *bold*, /italic/, _underline_, =verbatim=, ~code~, and +strike
 through+.
 
-The styled strings are somewhat tricky, because of three main problems:
+The =styleMap= keeps track of the characters that activate and deactivate each
+style.
 
-  1) the markers use the same character for the start and end,
-
-  2) the styles can be nested, and
-
-  3) the styling may not have more than one newline character in it.
-
-You can have, for example, lines that are /italicized like this but also have
-*bold text inside* of it/. And note how the following text is *not* underlined:
-
-_one
-two
-three_
-
-Because there are two newlines inside the underlined text. But the following is
-underlined:
-
-_one
-two_
-
-We approach this problem with a simple idea: use a *stack* to keep track of
-markers. Every time we see a starting marker, we push it into the stack,
-and turn that style on. If we see the corresponding ending marker, we pop it
-out of the stack (and turn that style off).
-
-If the input is such that the markers are not balanced, such that by the time we
-finish parsing a paragraph there are still markers left on the stack, we throw
-an error. That is, we expect style markers to always be balanced. This deviates
-from vanilla Org, which does not have this restriction. This checking of
-balanced style markers is done in =failIfUnbalancedStyleMarkers= below.
-
-#+name: func:failIfUnbalancedStyleMarkers
+#+name: func:styleMap
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-failIfUnbalancedStyleMarkers :: OrgParser ()
-failIfUnbalancedStyleMarkers = do
-  orgParserState <- get
-  let stack = orgParserState.styleStack
-  when (not $ null stack) $ do
-    fail
-      $ "unbalanced prose style markers; expected empty stack, but got "
-      ++ (show stack)
+styleMap :: M.Map Char Style
+styleMap =
+  M.fromList
+    [ ('*', Bold)
+    ]
 
 #+end_src
 
-We don't wait until seeing the closing marker to see if we should stylize the
-text at hand. This simplifies the parsing logic (we can start consuming stylized
-text without needing to see a corresponding ending marker), and directly
-addresses the first two problems listed above. The third problem is simple
-enough to solve, by just counting how many newlines we encounter as long as the
-stack is not empty.
+Styled strings (for headings) are somewhat tricky, because of two main problems
 
-If you need to put a style marker at a position that would normally be
-considered the start (or end) of a marker, but don't want Lilac to interpret it
-as a style marker, you have to enclose it inside verbatim or code styles.
+  1) the markers use the same character for both activation and deactivation,
+     and
+
+  2) the styles can be nested.
+
+You can have, for example, lines that are /italicized like this but also have
+*bold text inside* of it/.
+
+We approach these problems with a simple idea: use a *bit mask*, or =StyleMask=, to
+keep track of markers. Every time we see a starting marker, we turn on the bit
+in the mask to activate that style. If we see that the user is trying to turn on
+a style which is already active, we fail with an error
+([[test:0005-styled-strings-redundant-activations]]).
+
+#+name: test:0005-styled-strings-redundant-activations
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-redundant-activations
+#+begin_src org
+,* *foo *bar baz
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+pf
+  "detects unbalanced style markers (redundant activations)"
+  "test/Lilac/ParseSpec/0005-styled-strings-redundant-activations"
+  "redundant style activations: [Bold]"
+  8
+#+end_src
+
+Similarly, if we see the corresponding ending marker, we clear it from the mask
+to turn that style off, but only if that style is already on
+([[test:0005-styled-strings-overzealous-deactivations]]).
+
+#+name: test:0005-styled-strings-overzealous-deactivations
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-overzealous-deactivations
+#+begin_src org
+,* foo bar* baz
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+pf
+  "detects unbalanced style markers (overzealous deactivations)"
+  "test/Lilac/ParseSpec/0005-styled-strings-overzealous-deactivations"
+  "overzealous style deactivations: [Bold]"
+  10
+#+end_src
+
+If the input is such that the markers are not balanced, such that by the time we
+finish parsing a paragraph (or end of a heading) and the mask still has active
+styles in it, we throw an error ([[func:failIfLeftOverActiveStyles]]). That is, we
+expect style starting and ending markers to always be balanced. This deviates
+from vanilla Org, which does not have this restriction.
+
+#+name: func:failIfLeftoverActiveStyles
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+failIfLeftoverActiveStyles :: OrgParser ()
+failIfLeftoverActiveStyles = do
+  orgParserState <- get
+  let (StyleMask mask) = orgParserState.styleMask
+  when (mask /= 0) $ do
+    fail
+      $ "leftover active styles: "
+      ++ (show $ maskToStyles $ StyleMask mask)
+
+#+end_src
+
+In =0005-styled-strings-leftover-active-styles= we keep parsing to the end of the
+heading, expecting to see the ending style marker for bold text, but never see
+it. So the failure from =failIfLeftoverActiveStyles= gets triggered.
+
+#+name: test:0005-styled-strings-leftover-active-styles
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles
+#+begin_src org
+,* foo *bar baz
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+pf
+  "detects unbalanced style markers (leftover active styles)"
+  "test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles"
+  "leftover active styles: [Bold]"
+  15
+#+end_src
+
+Note that we don't wait until seeing the closing marker to see if we should
+stylize the text at hand; the =StyleMask= is "strict" in this sense. This way, we
+can start parsing stylized text without needing to see a corresponding ending
+marker.
 
 So the overall algorithm should be:
 
@@ -2065,52 +2124,218 @@ So the overall algorithm should be:
   3) Parse any ending style markers.
 
 The markers in steps 1 and 3 are optional. The key is that by the time we get to
-Step 2, we know what the =styleStack= looks like, so we can use that information
-to stylize the text we found in Step 2.
+Step 2, we know what the =StyleMask= looks like, so we can use that information
+to stylize the text we found in Step 2. The function =styledStringParser=
+implements the above algorithm.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 styledStringParser :: OrgParser StyledString
 styledStringParser = do
   orgParserState <- get
-  let stack = orgParserState.styleStack
-  startingMarkers <-
-    (map toStyle . T.unpack)
+
+  let mask = orgParserState.styleMask
+  startingMask <-
+    toStyleMask
+      =<< T.unpack
       <$> MP.takeWhileP
         (Just "starting style marker")
         isStyleMarker
 
-  let activeStyles = stack ++ startingMarkers
+  let (StyleMask overlappingBits) = styleMaskIntersect mask startingMask
+  when (overlappingBits /= 0)
+    $ fail
+    $ "redundant style activations: "
+    <> (show $ maskToStyles $ StyleMask overlappingBits)
+
+  let activeMask = styleMaskAdd mask startingMask
 
   word <- MP.takeWhile1P (Just "prose word") isProseWord
 
-  endingMarkers <-
-    (map toStyle . T.unpack)
+  endingMask <-
+    toStyleMask
+      =<< T.unpack
       <$> MP.takeWhileP
         (Just "ending style marker")
         isStyleMarker
-  let remainingStyles =
-        Set.toList
-          $ Set.difference
-            (Set.fromList activeStyles)
-            (Set.fromList endingMarkers)
 
-  put orgParserState {styleStack = remainingStyles}
+  let (StyleMask overzealousBits) = invalidDeactivations activeMask endingMask
+  when (overzealousBits /= 0)
+    $ fail
+    $ "overzealous style deactivations: "
+    <> (show $ maskToStyles $ StyleMask overzealousBits)
+
+  put orgParserState {styleMask = styleMaskSubtract activeMask endingMask}
 
   pure
     StyledString
       { body = word,
-        style = intNubOn fromEnum activeStyles
+        style = activeMask
       }
   where
     isStyleMarker c = M.member c styleMap
     isProseWord c = M.notMember c styleMap && (not $ isSpace c)
-    styleMap =
-      M.fromList
-        [ ('*', Bold)
-        ]
-    toStyle c = EM.lookupDefault Bold c styleMap
 
+#+end_src
+
+Because of the way =isStyleMarker= and =isProseWord= checks membership of the
+characters used for activating (and deactivating) styles in [[func:styleMap]], there
+is no way to "escape" these characters. Using any of them will immediately try
+to activate or deactivate a style. So if you need to use a style marker
+character, but don't want Lilac to interpret it as a style marker, you'd have to
+enclose it inside verbatim or code styles. Like this =snake_case_word= with
+underscores in it (because otherwise the underscores would get interpreted as a
+style marker for underlined text).
+
+That's it for the high level overview of how we parse styled strings. We now get
+into the lower-level details of the =StyleMask= itself. The =StyleMask= is an 8-bit
+word, which can hold boolean values for the 6 different =Style= data constructors,
+e.g. [[data:Style][=Bold=, =Italic=]]. It's a space-efficient type to replace an equivalent map
+or list of =[Style]= values. We use a =newtype= around a =Word8= (an 8-bit word) so as
+to keep it distinct from =Word8= itself.
+
+#+header: :noweb-ref StyleMask details
+#+begin_src haskell
+type StyleMask :: Type
+newtype StyleMask = StyleMask Word8
+  deriving stock (Eq)
+
+#+end_src
+
+We have a custom =Show= instance because the default =Show= would just treat the
+=Word8= as a number. Instead we want to show what the binary bits (turned on
+inside the =Word8=) would represent in terms of actual styles. We have to import
+=Prelude= because of the way =Relude= redefines =show= (and we need to use the =show=
+that =Prelude= uses; see [[https://github.com/snoyberg/basic-prelude/issues/67#issuecomment-221628073][this related discussion for the Basic Prelude library, a
+Relude alternative, for reference]]).
+
+#+header: :noweb-ref StyleMask details
+#+begin_src haskell
+instance Show StyleMask where
+  show (StyleMask a) = "styleMaskFrom " <> x
+    where
+      x =
+        Prelude.show
+          . catMaybes
+          . map
+            ( \(i, b) ->
+                if b
+                  then (Just $ (toEnum i :: Style))
+                  else Nothing
+            )
+          . zip [0 ..]
+          $ toListLE a
+
+#+end_src
+
+The shown text string is prefixed with =styleMaskFrom= because that function is
+used as a constructor function to create a =StyleMask= easily from scratch; it's
+also used in test cases. This follows the tradition used in =Data.Map= where they
+also use a constructor function (=fromList=) when =show=-ing a =Map= data structure.
+
+#+header: :noweb-ref StyleMask details
+#+begin_src haskell
+styleMaskFrom :: [Style] -> StyleMask
+styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
+  where
+    f :: Word8 -> Style -> Word8
+    f acc s = setBit acc (fromEnum s)
+
+#+end_src
+
+Similarly, we sometimes want to go the other direction --- that is, deconstruct
+a =StyleMask= into =Style=. So we have =maskToStyles=.
+
+#+header: :noweb-ref StyleMask details
+#+begin_src haskell
+maskToStyles :: StyleMask -> [Style]
+maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask
+  where
+    f :: [Style] -> (Int, Bool) -> [Style]
+    f acc (idx, b) =
+      if b
+        then (toEnum idx) : acc
+        else acc
+
+#+end_src
+
+We have a helper function =toStyleMask= to convert =[Char]= into a =StyleMask=. This
+is used to construct style masks as they are read in from the input text. The
+function runs inside a =MonadFail= monad, because we want to detect an invalid
+sequence of characters. For example, the sequence =**foo= is wrong because it
+declares the =Bold= style (=*=, or asterisk) twice in a row to activate it when we
+only need it once. The use of =MonadFail= is seamless inside =ParsecT= (the monad we
+use inside =OrgParser=), because =ParsecT= has a =MonadFail= instance.
+
+#+header: :noweb-ref StyleMask details
+#+begin_src haskell
+toStyleMask :: (MonadFail m) => [Char] -> m StyleMask
+toStyleMask cs = pure =<< stylesToStyleMask =<< charToStyles cs
+
+charToStyles :: (MonadFail m) => [Char] -> m [Style]
+charToStyles chars = foldlM f [] chars
+  where
+    f :: (MonadFail m) => [Style] -> Char -> m [Style]
+    f acc c = case EM.lookup c styleMap of
+      Just style -> pure (style : acc)
+      Nothing -> fail $ "programmer error: unrecognized style marker " <> (show c)
+
+stylesToStyleMask :: (MonadFail m) => [Style] -> m StyleMask
+stylesToStyleMask ss = pure . StyleMask =<< foldlM f (0 :: Word8) ss
+  where
+    f :: (MonadFail m) => Word8 -> Style -> m Word8
+    f acc s
+      | testBit acc sInt = fail $ "stylesToStyleMask: redundant style marker: " <> (show s)
+      | otherwise = pure $ setBit acc sInt
+      where
+        sInt = fromEnum s
+
+#+end_src
+
+Test =0005-styled-strings-redundant-style-marker= below checks that
+=stylesToStyleMask= can indeed catch these errors.
+
+#+name: test:0005-styled-strings-redundant-style-marker
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-redundant-style-marker
+#+begin_src org
+,* foo **bar baz
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+pf
+  "detects unbalanced style markers (redundant style marker)"
+  "test/Lilac/ParseSpec/0005-styled-strings-redundant-style-marker"
+  "stylesToStyleMask: redundant style marker: Bold"
+  8
+#+end_src
+
+Lastly we have some helpers to perform binary AND, OR, and XOR operations on two
+=StyleMask= objects, so that callers don't have to perform the deconstruction and
+reconstruction of the underlying =Word8= primitive themselves.
+
+#+header: :noweb-ref StyleMask details
+#+begin_src haskell
+styleMaskIntersect :: StyleMask -> StyleMask -> StyleMask
+styleMaskIntersect (StyleMask a) (StyleMask b) = StyleMask $ a .&. b
+
+styleMaskAdd :: StyleMask -> StyleMask -> StyleMask
+styleMaskAdd (StyleMask a) (StyleMask b) = StyleMask $ a .|. b
+
+styleMaskSubtract :: StyleMask -> StyleMask -> StyleMask
+styleMaskSubtract (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
+
+#+end_src
+
+Before invoking =styleMaskSubtract=, we want to see if =StyleMask b= above is even
+valid, when looking at =StyleMask a=. In particular we want to check that if there
+are bits turned on in =b=, we want to see that those bits are indeed already on in
+=a=. The function =invalidDeactivations= detects cases where this isn't true.
+
+#+header: :noweb-ref StyleMask details
+#+begin_src haskell
+invalidDeactivations :: StyleMask -> StyleMask -> StyleMask
+invalidDeactivations (StyleMask a) (StyleMask b) = StyleMask $ (complement a) .&. b
 #+end_src
 
 ******** Tests
@@ -2136,7 +2361,7 @@ p
                     [ L.PTokenStyledString
                         ( L.StyledString
                             { body = "foo",
-                              style = []
+                              style = L.styleMaskFrom []
                             }
                         )
                     ],
@@ -2171,19 +2396,19 @@ p
                     [ L.PTokenStyledString
                         ( L.StyledString
                             { body = "foo",
-                              style = []
+                              style = L.styleMaskFrom []
                             }
                         ),
                       L.PTokenStyledString
                         ( L.StyledString
                             { body = "bar",
-                              style = [L.Bold]
+                              style = L.styleMaskFrom [L.Bold]
                             }
                         ),
                       L.PTokenStyledString
                         ( L.StyledString
                             { body = "baz",
-                              style = []
+                              style = L.styleMaskFrom []
                             }
                         )
                     ],
@@ -2198,40 +2423,22 @@ p
 #+end_src
 
 Here we test that the markers are balanced, for both the starting and ending
-positions.
+positions. Specifically, we fail in the following ways:
 
-#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-unbalanced-start
-#+begin_src org
-,* foo *bar baz
-#+end_src
+  1) if we try to activate a style that's already on
+     ([[test:0005-styled-strings-redundant-activations]]),
 
-#+header: :noweb-ref Test styled string parsing
-#+begin_src haskell
-pf
-  "detect unbalanced style markers (starting marker)"
-  "test/Lilac/ParseSpec/0005-styled-strings-unbalanced-start"
-#+end_src
+  2) if we try to turn off a style that's not already on
+     ([[test:0005-styled-strings-overzealous-deactivations]]), or
 
-The test below fails (we parse successfully) because we don't fail the parse
-when we see spurious ending style markers. Doing this check will be much simpler
-when we change the data structure we use to keep track of style marker state
-from a list into a map of =(Style, Bool)= values. That is, we can just keep track
-of whether a style has been declared to be used with a starting marker (and flip
-that style to =True=), and turn it off when we see the corresponding ending
-marker; if the markers are out of place, this data structure will make it easy
-to catch it.
+  3) if there are too many style markers left over
+     ([[test:0005-styled-strings-leftover-active-styles]]).
 
-#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-unbalanced-end
-#+begin_src org
-,* foo bar* baz
-#+end_src
-
-#+header: :noweb-ref Test styled string parsing
-#+begin_src haskell
-pf
-  "detect unbalanced style markers (ending marker)"
-  "test/Lilac/ParseSpec/0005-styled-strings-unbalanced-end"
-#+end_src
+Note that we use the =MP.ErrorFail= constructor because that's the only way we can
+check for failures in parsers where we manually return an error with
+=Control.Monad.fail= (as opposed to Megaparsec itself throwing the error because
+of a failure of the given parser combinators to account for the shape of the
+input text).
 
 ******* Links
 
@@ -2273,7 +2480,7 @@ linkExternalParser = do
         name =
           [ StyledString
               { body = T.pack (fromMaybe target name),
-                style = []
+                style = styleMaskFrom []
               }
           ]
       }
@@ -2312,7 +2519,7 @@ p
                               name =
                                 [ L.StyledString
                                     { body = "link-target-only",
-                                      style = []
+                                      style = L.styleMaskFrom []
                                     }
                                 ]
                             }
@@ -2338,7 +2545,7 @@ p
                               name =
                                 [ L.StyledString
                                     { body = "link-name",
-                                      style = []
+                                      style = L.styleMaskFrom []
                                     }
                                 ]
                             }
@@ -2500,7 +2707,12 @@ import Data.Map.Strict qualified as M
 import Lilac.Parse qualified as L
 import Relude
 import Test.Hspec (Spec, before, describe, it)
-import Test.Hspec.Megaparsec (parseSatisfies, shouldFailOn)
+import Test.Hspec.Megaparsec
+  ( errFancy,
+    fancy,
+    parseSatisfies,
+    shouldFailWith,
+  )
 import Text.Megaparsec qualified as MP
 #+end_src
 
@@ -2521,18 +2733,20 @@ p behavior path expected = do
 #+end_src
 
 Sometimes we want to test that a file will fail to parse. We do this with =pf=
-(for "parse fail").
+(for "parse fail"), which is able to detect cases where one of our parsers
+failed by calling =Control.Monad.fail=.
 
 #+header: :tangle test/Lilac/ParseSpec.hs
 #+begin_src haskell
-pf :: String -> FilePath -> Spec
-pf behavior path = do
+pf :: String -> FilePath -> String -> Int -> Spec
+pf behavior path errMsg pos = do
   before (readFileBS path) $ do
     it behavior $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        `shouldFailOn` (decodeUtf8 input)
+        (decodeUtf8 input)
+        `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
 #+end_src
 
 Below are all of the individual test cases.
