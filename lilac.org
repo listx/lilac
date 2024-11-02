@@ -1993,6 +1993,8 @@ pTokenParser = do
 
 #+end_src
 
+******* Styled strings
+
 Styled strings are text strings with special formatting markers around them.
 Here are some examples: *bold*, /italic/, _underline_, =verbatim=, ~code~, and +strike
 through+.
@@ -2111,6 +2113,128 @@ styledStringParser = do
 
 #+end_src
 
+******** Tests
+
+The simple case with no style markers.
+
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-no-style
+#+begin_src org
+,* foo
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+p
+  "parses styled strings (no style)"
+  "test/Lilac/ParseSpec/0005-styled-strings-no-style"
+  $ L.OrgDoc
+    { cells =
+        [ L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    [ L.PTokenStyledString
+                        ( L.StyledString
+                            { body = "foo",
+                              style = []
+                            }
+                        )
+                    ],
+                  meta = fromList []
+                }
+            )
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+#+end_src
+
+The next case tests a simple case where one word is bolded.
+
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-bold
+#+begin_src org
+,* foo *bar* baz
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+p
+  "parses styled strings (bold style)"
+  "test/Lilac/ParseSpec/0005-styled-strings-bold"
+  $ L.OrgDoc
+    { cells =
+        [ L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    [ L.PTokenStyledString
+                        ( L.StyledString
+                            { body = "foo",
+                              style = []
+                            }
+                        ),
+                      L.PTokenStyledString
+                        ( L.StyledString
+                            { body = "bar",
+                              style = [L.Bold]
+                            }
+                        ),
+                      L.PTokenStyledString
+                        ( L.StyledString
+                            { body = "baz",
+                              style = []
+                            }
+                        )
+                    ],
+                  meta = fromList []
+                }
+            )
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+#+end_src
+
+Here we test that the markers are balanced, for both the starting and ending
+positions.
+
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-unbalanced-start
+#+begin_src org
+,* foo *bar baz
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+pf
+  "detect unbalanced style markers (starting marker)"
+  "test/Lilac/ParseSpec/0005-styled-strings-unbalanced-start"
+#+end_src
+
+The test below fails (we parse successfully) because we don't fail the parse
+when we see spurious ending style markers. Doing this check will be much simpler
+when we change the data structure we use to keep track of style marker state
+from a list into a map of =(Style, Bool)= values. That is, we can just keep track
+of whether a style has been declared to be used with a starting marker (and flip
+that style to =True=), and turn it off when we see the corresponding ending
+marker; if the markers are out of place, this data structure will make it easy
+to catch it.
+
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-unbalanced-end
+#+begin_src org
+,* foo bar* baz
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+pf
+  "detect unbalanced style markers (ending marker)"
+  "test/Lilac/ParseSpec/0005-styled-strings-unbalanced-end"
+#+end_src
+
+******* Links
+
 There are many kinds of links. For now we only support external links. Even so,
 the current definition is incomplete because it doesn't cover the case of raw
 links like https://kernel.org.
@@ -2156,25 +2280,9 @@ linkExternalParser = do
 
 #+end_src
 
-Inline math fragments are delimited by =\(= and =\)=.
+******** Tests
 
-#+header: :noweb-ref Parsing mechanism
-#+begin_src haskell
-mathFragmentInlineParser :: OrgParser MathFragment
-mathFragmentInlineParser = do
-  _ <- string "\\("
-  latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
-  pure
-    MathFragment
-      { meta = M.fromList [],
-        body = T.pack latex
-      }
-
-#+end_src
-
-******* Tests
-
-#+header: :tangle test/Lilac/ParseSpec/0005-links
+#+header: :tangle test/Lilac/ParseSpec/0006-links
 #+begin_src org
 ,* \(foo\) [[link-target-only]]
 ,* \(bar\) [[link-target][link-name]]
@@ -2184,7 +2292,7 @@ mathFragmentInlineParser = do
 #+begin_src haskell
 p
   "parses links (target only)"
-  "test/Lilac/ParseSpec/0005-links"
+  "test/Lilac/ParseSpec/0006-links"
   $ L.OrgDoc
     { cells =
         [ L.CHeading
@@ -2244,6 +2352,24 @@ p
       codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
+#+end_src
+
+******* Inline math fragments
+
+Inline math fragments are delimited by =\(= and =\)=.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+mathFragmentInlineParser :: OrgParser MathFragment
+mathFragmentInlineParser = do
+  _ <- string "\\("
+  latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
+  pure
+    MathFragment
+      { meta = M.fromList [],
+        body = T.pack latex
+      }
+
 #+end_src
 
 ****** Drawers
@@ -2374,7 +2500,7 @@ import Data.Map.Strict qualified as M
 import Lilac.Parse qualified as L
 import Relude
 import Test.Hspec (Spec, before, describe, it)
-import Test.Hspec.Megaparsec (parseSatisfies, shouldParse)
+import Test.Hspec.Megaparsec (parseSatisfies, shouldFailOn)
 import Text.Megaparsec qualified as MP
 #+end_src
 
@@ -2392,6 +2518,21 @@ p behavior path expected = do
         path
         (decodeUtf8 input)
         `parseSatisfies` ((== expected) . fst)
+#+end_src
+
+Sometimes we want to test that a file will fail to parse. We do this with =pf=
+(for "parse fail").
+
+#+header: :tangle test/Lilac/ParseSpec.hs
+#+begin_src haskell
+pf :: String -> FilePath -> Spec
+pf behavior path = do
+  before (readFileBS path) $ do
+    it behavior $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        path
+        `shouldFailOn` (decodeUtf8 input)
 #+end_src
 
 Below are all of the individual test cases.
@@ -2412,6 +2553,7 @@ spec =
       "test/Lilac/ParseSpec/0001-blankline"
       L.defaultOrgDoc
     <<Test parsing document metadata>>
+    <<Test styled string parsing>>
     <<Test link parsing>>
     <<Test drawer parsing>>
 #+end_src
