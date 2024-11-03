@@ -53,6 +53,7 @@ spec =
           ("property", "header-args+ :noweb no-export"),
           ("title", "An Org Document")
         ]
+
     p
       "parses document metadata (skips comments)"
       "test/Lilac/ParseSpec/0003-doc-metadata-with-comments"
@@ -67,21 +68,25 @@ spec =
       "test/Lilac/ParseSpec/0005-styled-strings-redundant-activations"
       "redundant style activations: [Bold]"
       8
+
     pf
       "detects unbalanced style markers (overzealous deactivations)"
       "test/Lilac/ParseSpec/0005-styled-strings-overzealous-deactivations"
       "overzealous style deactivations: [Bold]"
       10
+
     pf
       "detects unbalanced style markers (leftover active styles)"
       "test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles"
       "leftover active styles: [Bold]"
       15
+
     pf
       "detects unbalanced style markers (redundant style marker)"
       "test/Lilac/ParseSpec/0005-styled-strings-redundant-style-marker"
       "stylesToStyleMask: redundant style marker: Bold"
       8
+
     p
       "parses styled strings (no style)"
       "test/Lilac/ParseSpec/0005-styled-strings-no-style"
@@ -106,6 +111,7 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
+
     p
       "parses styled strings (bold style)"
       "test/Lilac/ParseSpec/0005-styled-strings-bold"
@@ -142,6 +148,7 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
+
     p
       "parses styled strings (complex)"
       "test/Lilac/ParseSpec/0005-styled-strings-complex"
@@ -288,6 +295,7 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
+
     p
       "parses drawers (not empty)"
       "test/Lilac/ParseSpec/0004-drawers-not-empty"

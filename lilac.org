@@ -4,6 +4,7 @@
 # that we do not expand noweb references when exporting (weaving) --- the fact
 # that this is not the default option is odd.
 #+property: header-args+ :noweb no-export
+#+property: header-args+ :noweb-sep "\n\n"
 #+auto_tangle: t
 
 * Introduction
@@ -69,10 +70,15 @@ nested Org files' code blocks do not get tangled.
 
 LV2 supports this.
 
+** Noweb behaviors
+
 *** Padding between Noweb references
 
-Org supports adding blank lines between concatenated source code blocks with the
-[[https://orgmode.org/manual/Extracting-Source-Code.html][=padline= header argument]]. However this does not work for Noweb references.
+Org supports adding blank lines between tangled source code blocks that share
+the same path name with the [[https://orgmode.org/manual/Extracting-Source-Code.html][=padline= header argument]]; and by default a blank
+line is used to separate those blocks. However, concatenation of Noweb
+references that share the same name do not get a blank line added between them,
+unless =noweb-sep: "\n\n"= is used. In Lilac this is the default behavior.
 
 For example, a blank line is inserted between =foo= and =bar= and =bar= and =baz=:
 
@@ -91,8 +97,9 @@ bar
 baz
 #+end_src
 
-But the same blank lines are not inserted for the following case using =Noweb
-chunk= as a Noweb reference.
+And to get the same blank lines inserted for the following case using =Noweb
+chunk= as a Noweb reference, users in vanilla Org have to use =:noweb-sep "\n\n"=
+as a header argument:
 
 #+header: :tangle doc/tangling-padline-noweb.txt
 #+begin_src txt
@@ -100,11 +107,13 @@ chunk= as a Noweb reference.
 #+end_src
 
 #+header: :noweb-ref Noweb chunk
+#+header: :noweb-sep "\n\n"
 #+begin_src txt
 foo
 #+end_src
 
 #+header: :noweb-ref Noweb chunk
+#+header: :noweb-sep "\n\n"
 #+begin_src txt
 bar
 #+end_src
@@ -113,6 +122,8 @@ bar
 #+begin_src txt
 baz
 #+end_src
+
+In Lilac these =:noweb-sep= headers are unnecessary.
 
 ** Weaving
 
@@ -1148,7 +1159,6 @@ data OrgDoc = OrgDoc
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 We'll examine the =Cell= type first, followed by code graphs.
@@ -1170,7 +1180,6 @@ data Cell
   | CFigure Figure
   | CTable Table
   deriving stock (Eq, Show)
-
 #+end_src
 
 ***** Heading
@@ -1199,7 +1208,6 @@ data Heading = Heading
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 ***** Prose
@@ -1212,7 +1220,6 @@ etc, or /tokens/.
 #+begin_src haskell
 type Prose :: Type
 type Prose = [PToken]
-
 #+end_src
 
 A prose token, or =PToken=, can be a string (styled or otherwise), a link of some
@@ -1227,7 +1234,6 @@ data PToken
   | PTokenLink Link
   | PTokenMathFragment MathFragment
   deriving stock (Eq, Show)
-
 #+end_src
 
 The =StyledText= is just some text that has one or more styles attached to it.
@@ -1241,7 +1247,6 @@ data StyledText = StyledText
     style :: StyleMask
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 The =Style= type is straightforward enough. For now we don't support all possible
@@ -1253,7 +1258,6 @@ styles, for simplicity.
 type Style :: Type
 data Style = Bold | Italic | Underline | Verbatim | Code | Strikethrough
   deriving stock (Enum, Eq, Ord, Show)
-
 #+end_src
 
 A link just has the display text and its target. The =LinkType= can refer to a
@@ -1279,7 +1283,6 @@ data LinkType
   | LinkFootnote
   | LinkExternal
   deriving stock (Eq, Show)
-
 #+end_src
 
 Math fragments are discussed in [[*Math fragments]].
@@ -1397,7 +1400,6 @@ data Block = Block
     body :: [BToken]
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 A =BToken= can be either some raw piece of text, or a link.
@@ -1409,7 +1411,6 @@ data BToken
   = BTokenString T.Text
   | BTokenLink Link
   deriving stock (Eq, Show)
-
 #+end_src
 
 ***** List items
@@ -1441,7 +1442,6 @@ data ListItem = ListItem
     body :: Prose
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 ***** Math fragments
@@ -1483,7 +1483,6 @@ data MathFragment = MathFragment
     body :: T.Text
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 ***** Figures
@@ -1501,7 +1500,6 @@ data Figure = Figure
     link :: Link
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 ***** Tables
@@ -1526,7 +1524,6 @@ data Table = Table
     gridSize :: (Int, Int)
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 **** Code graphs
@@ -1585,6 +1582,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude qualified (show)
 
 <<Data structures>>
+
 <<Parsing mechanism>>
 #+end_src
 
@@ -1600,7 +1598,6 @@ parseOrgDoc input = case MP.runParser
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
   Right (orgDoc, _orgParserState) -> Right orgDoc
-
 #+end_src
 
 The =orgDocParser= is the main parser combinator; it is itself composed of other
@@ -1615,7 +1612,6 @@ handling mechanism that ships with Megaparsec.
 #+begin_src haskell
 type OrgParser :: Type -> Type
 type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
-
 #+end_src
 
 The =OrgParserState= is the custom state we want to use to read and write from
@@ -1637,7 +1633,6 @@ defaultOrgParserState =
   OrgParserState
     { styleMask = styleMaskFrom []
     }
-
 #+end_src
 
 **** Parser helpers for whitespace and comments
@@ -1677,7 +1672,6 @@ spaceConsumer =
     singleLineCommentParser = (L.skipLineComment "# ")
     blockCommentParser :: OrgParser ()
     blockCommentParser = (L.skipBlockComment "#+begin_comment" "#+end_comment")
-
 #+end_src
 
 The three arguments to =L.space= (where =L= stands for =Text.Megaparsec.Char.Lexer=)
@@ -1697,7 +1691,6 @@ spaces or comments after parsing the given text.
 #+begin_src haskell
 symbol :: T.Text -> OrgParser T.Text
 symbol = L.symbol spaceConsumer
-
 #+end_src
 
 Lastly we have =lexeme=, which wraps around any other parser to make it consume
@@ -1707,7 +1700,6 @@ trailing spaces and comments.
 #+begin_src haskell
 lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme spaceConsumer
-
 #+end_src
 
 ***** Treading carefully around newlines
@@ -1739,7 +1731,6 @@ symbolNoNewline = L.symbol spaceConsumerNoNewline
 
 lexemeNoNewline :: OrgParser a -> OrgParser a
 lexemeNoNewline = L.lexeme spaceConsumerNoNewline
-
 #+end_src
 
 For the second case, the =whiteSpaceParser= is a bit more involved. We need to
@@ -1768,7 +1759,6 @@ symbolNoDoubleNewline = L.symbol spaceConsumerNoDoubleNewline
 
 lexemeNoDoubleNewline :: OrgParser a -> OrgParser a
 lexemeNoDoubleNewline = L.lexeme spaceConsumerNoDoubleNewline
-
 #+end_src
 
 **** =orgDocParser=
@@ -1814,7 +1804,6 @@ defaultOrgDocWithMeta metas =
       codeBlocks = IM.fromList [],
       meta = M.fromList metas
     }
-
 #+end_src
 
 ***** Document metadata
@@ -1835,7 +1824,6 @@ docMetaEntryParser = do
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
-
 #+end_src
 
 The =docMetaParser= just parses =docMetaEntryParser= one or more times, while
@@ -1848,7 +1836,6 @@ docMetaParser :: OrgParser (M.Map T.Text T.Text)
 docMetaParser = do
   metaKVs <- many (lexeme docMetaEntryParser)
   pure $ M.fromList metaKVs
-
 #+end_src
 
 Below are some unit test cases for parsing metadata.
@@ -1932,7 +1919,6 @@ As seen in [[Cell ADT][the Cell ADT]], there are many different types of cells. 
 cellParser :: OrgParser Cell
 cellParser = do
   lexeme headingParser
-
 #+end_src
 
 ****** Headings
@@ -1958,7 +1944,6 @@ headingParser = do
           body = body,
           meta = drawers
         }
-
 #+end_src
 
 The body text of a heading is a series of prose tokens, or =PToken= values, which
@@ -1968,7 +1953,6 @@ we call =Prose=.
 #+begin_src haskell
 proseParser :: OrgParser Prose
 proseParser = many (lexemeNoDoubleNewline pTokenParser)
-
 #+end_src
 
 Note that we don't use =proseParser= here directly, because prose inside heading
@@ -1998,7 +1982,6 @@ pTokenParser = do
     linkParser' = PTokenLink <$> linkParser
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
     styledTextParser' = PTokenStyledText <$> styledTextParser
-
 #+end_src
 
 ******* Styled strings
@@ -2023,7 +2006,6 @@ styleMap =
       ('~', Code),
       ('+', Strikethrough)
     ]
-
 #+end_src
 
 Styled strings (for headings) are somewhat tricky, because of two main problems
@@ -2093,7 +2075,6 @@ failIfLeftoverActiveStyles = do
     fail
       $ "leftover active styles: "
       ++ (show $ maskToStyles $ StyleMask mask)
-
 #+end_src
 
 In =0005-styled-strings-leftover-active-styles= we keep parsing to the end of the
@@ -2187,7 +2168,6 @@ styledTextParser = do
       | isVerbatim styleMask = MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
       | isCode styleMask = MP.takeWhile1P (Just "code") isNotCodeMarker
       | otherwise = MP.takeWhile1P (Just "prose word") isProseWord
-
 #+end_src
 
 Because of the way =isStyleMarker= and =isProseWord= checks membership of the
@@ -2211,7 +2191,6 @@ to keep it distinct from =Word8= itself.
 type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
   deriving stock (Eq)
-
 #+end_src
 
 We have a custom =Show= instance because the default =Show= would just treat the
@@ -2237,7 +2216,6 @@ instance Show StyleMask where
             )
           . zip [0 ..]
           $ toListLE a
-
 #+end_src
 
 The shown text string is prefixed with =styleMaskFrom= because that function is
@@ -2252,7 +2230,6 @@ styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
   where
     f :: Word8 -> Style -> Word8
     f acc s = setBit acc (fromEnum s)
-
 #+end_src
 
 Similarly, we sometimes want to go the other direction --- that is, deconstruct
@@ -2268,7 +2245,6 @@ maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask
       if b
         then (toEnum idx) : acc
         else acc
-
 #+end_src
 
 We have a helper function =toStyleMask= to convert =[Char]= into a =StyleMask=. This
@@ -2301,7 +2277,6 @@ stylesToStyleMask ss = pure . StyleMask =<< foldlM f (0 :: Word8) ss
       | otherwise = pure $ setBit acc sInt
       where
         sInt = fromEnum s
-
 #+end_src
 
 Test =0005-styled-strings-redundant-style-marker= below checks that
@@ -2336,7 +2311,6 @@ styleMaskAdd (StyleMask a) (StyleMask b) = StyleMask $ a .|. b
 
 styleMaskSubtract :: StyleMask -> StyleMask -> StyleMask
 styleMaskSubtract (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
-
 #+end_src
 
 Before invoking =styleMaskSubtract=, we want to see if =StyleMask b= above is even
@@ -2348,7 +2322,6 @@ are bits turned on in =b=, we want to see that those bits are indeed already on 
 #+begin_src haskell
 invalidDeactivations :: StyleMask -> StyleMask -> StyleMask
 invalidDeactivations (StyleMask a) (StyleMask b) = StyleMask $ (complement a) .&. b
-
 #+end_src
 
 We also have some helpers to check whether particular styles are active.
@@ -2580,7 +2553,6 @@ linkExternalParser = do
               }
           ]
       }
-
 #+end_src
 
 ******** Tests
@@ -2672,7 +2644,6 @@ mathFragmentInlineParser = do
       { meta = M.fromList [],
         body = T.pack latex
       }
-
 #+end_src
 
 ****** Drawers
@@ -2712,7 +2683,6 @@ drawerParser = do
   pure (drawerName, T.pack drawerContents)
   where
     isDrawerLetter c = and $ map ($ c) [(/= '\n'), (/= ':'), (/= ' ')]
-
 #+end_src
 
 ******* Tests
