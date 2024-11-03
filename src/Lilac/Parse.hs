@@ -226,6 +226,12 @@ styleMaskSubtract (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
 invalidDeactivations :: StyleMask -> StyleMask -> StyleMask
 invalidDeactivations (StyleMask a) (StyleMask b) = StyleMask $ (complement a) .&. b
 
+isVerbatim :: StyleMask -> Bool
+isVerbatim (StyleMask a) = testBit a (fromEnum Verbatim)
+
+isCode :: StyleMask -> Bool
+isCode (StyleMask a) = testBit a (fromEnum Code)
+
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
@@ -414,7 +420,7 @@ styledStringParser = do
 
   let activeMask = styleMaskAdd mask startingMask
 
-  word <- MP.takeWhile1P (Just "prose word") isProseWord
+  text <- textParser activeMask
 
   endingMask <-
     toStyleMask
@@ -433,12 +439,19 @@ styledStringParser = do
 
   pure
     StyledString
-      { body = word,
+      { body = text,
         style = activeMask
       }
   where
     isStyleMarker c = M.member c styleMap
     isProseWord c = M.notMember c styleMap && (not $ isSpace c)
+    isNotVerbatimMarker c = c /= '='
+    isNotCodeMarker c = c /= '~'
+    textParser :: StyleMask -> OrgParser T.Text
+    textParser styleMask
+      | isVerbatim styleMask = MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
+      | isCode styleMask = MP.takeWhile1P (Just "code") isNotCodeMarker
+      | otherwise = MP.takeWhile1P (Just "prose word") isProseWord
 
 linkParser :: OrgParser Link
 linkParser = do

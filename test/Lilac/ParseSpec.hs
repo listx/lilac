@@ -179,11 +179,8 @@ spec =
                                 }
                             ),
                           L.PTokenStyledString (L.StyledString {body = "baz", style = L.styleMaskFrom [L.Bold]}),
-                          L.PTokenStyledString (L.StyledString {body = "verbatim", style = L.styleMaskFrom [L.Verbatim]}),
-                          L.PTokenStyledString (L.StyledString {body = "text", style = L.styleMaskFrom [L.Verbatim]}),
-                          L.PTokenStyledString (L.StyledString {body = "x", style = L.styleMaskFrom [L.Code]}),
-                          L.PTokenStyledString (L.StyledString {body = "y", style = L.styleMaskFrom [L.Code]}),
-                          L.PTokenStyledString (L.StyledString {body = "z", style = L.styleMaskFrom [L.Code]}),
+                          L.PTokenStyledString (L.StyledString {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
+                          L.PTokenStyledString (L.StyledString {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
                           L.PTokenStyledString
                             ( L.StyledString
                                 { body = "strikethrough",

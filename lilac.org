@@ -2155,7 +2155,7 @@ styledStringParser = do
 
   let activeMask = styleMaskAdd mask startingMask
 
-  word <- MP.takeWhile1P (Just "prose word") isProseWord
+  text <- textParser activeMask
 
   endingMask <-
     toStyleMask
@@ -2174,12 +2174,19 @@ styledStringParser = do
 
   pure
     StyledString
-      { body = word,
+      { body = text,
         style = activeMask
       }
   where
     isStyleMarker c = M.member c styleMap
     isProseWord c = M.notMember c styleMap && (not $ isSpace c)
+    isNotVerbatimMarker c = c /= '='
+    isNotCodeMarker c = c /= '~'
+    textParser :: StyleMask -> OrgParser T.Text
+    textParser styleMask
+      | isVerbatim styleMask = MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
+      | isCode styleMask = MP.takeWhile1P (Just "code") isNotCodeMarker
+      | otherwise = MP.takeWhile1P (Just "prose word") isProseWord
 
 #+end_src
 
@@ -2315,7 +2322,7 @@ pf
   8
 #+end_src
 
-Lastly we have some helpers to perform binary AND, OR, and XOR operations on two
+Below are some helpers to perform binary AND, OR, and XOR operations on two
 =StyleMask= objects, so that callers don't have to perform the deconstruction and
 reconstruction of the underlying =Word8= primitive themselves.
 
@@ -2341,6 +2348,18 @@ are bits turned on in =b=, we want to see that those bits are indeed already on 
 #+begin_src haskell
 invalidDeactivations :: StyleMask -> StyleMask -> StyleMask
 invalidDeactivations (StyleMask a) (StyleMask b) = StyleMask $ (complement a) .&. b
+
+#+end_src
+
+We also have some helpers to check whether particular styles are active.
+
+#+header: :noweb-ref StyleMask details
+#+begin_src haskell
+isVerbatim :: StyleMask -> Bool
+isVerbatim (StyleMask a) = testBit a (fromEnum Verbatim)
+
+isCode :: StyleMask -> Bool
+isCode (StyleMask a) = testBit a (fromEnum Code)
 #+end_src
 
 ******** Tests
@@ -2500,11 +2519,8 @@ p
         }
     ),
   L.PTokenStyledString (L.StyledString {body = "baz", style = L.styleMaskFrom [L.Bold]}),
-  L.PTokenStyledString (L.StyledString {body = "verbatim", style = L.styleMaskFrom [L.Verbatim]}),
-  L.PTokenStyledString (L.StyledString {body = "text", style = L.styleMaskFrom [L.Verbatim]}),
-  L.PTokenStyledString (L.StyledString {body = "x", style = L.styleMaskFrom [L.Code]}),
-  L.PTokenStyledString (L.StyledString {body = "y", style = L.styleMaskFrom [L.Code]}),
-  L.PTokenStyledString (L.StyledString {body = "z", style = L.styleMaskFrom [L.Code]}),
+  L.PTokenStyledString (L.StyledString {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
+  L.PTokenStyledString (L.StyledString {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
   L.PTokenStyledString
     ( L.StyledString
         { body = "strikethrough",
