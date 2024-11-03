@@ -377,7 +377,12 @@ pTokenParser = do
 styleMap :: M.Map Char Style
 styleMap =
   M.fromList
-    [ ('*', Bold)
+    [ ('*', Bold),
+      ('/', Italic),
+      ('_', Underline),
+      ('=', Verbatim),
+      ('~', Code),
+      ('+', Strikethrough)
     ]
 
 failIfLeftoverActiveStyles :: OrgParser ()

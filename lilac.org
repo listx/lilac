@@ -2008,7 +2008,7 @@ Here are some examples: *bold*, /italic/, _underline_, =verbatim=, ~code~, and +
 through+.
 
 The =styleMap= keeps track of the characters that activate and deactivate each
-style.
+style. The full list of =Style= data constructors can be seen at [[data:Style]].
 
 #+name: func:styleMap
 #+header: :noweb-ref Parsing mechanism
@@ -2016,7 +2016,12 @@ style.
 styleMap :: M.Map Char Style
 styleMap =
   M.fromList
-    [ ('*', Bold)
+    [ ('*', Bold),
+      ('/', Italic),
+      ('_', Underline),
+      ('=', Verbatim),
+      ('~', Code),
+      ('+', Strikethrough)
     ]
 
 #+end_src
@@ -2434,11 +2439,86 @@ positions. Specifically, we fail in the following ways:
   3) if there are too many style markers left over
      ([[test:0005-styled-strings-leftover-active-styles]]).
 
-Note that we use the =MP.ErrorFail= constructor because that's the only way we can
-check for failures in parsers where we manually return an error with
-=Control.Monad.fail= (as opposed to Megaparsec itself throwing the error because
-of a failure of the given parser combinators to account for the shape of the
-input text).
+The tests above check for simple cases working only with the =Bold= style. Below
+we mix things up a bit more, using more styles.
+
+#+name: test:0005-styled-strings-complex
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-complex
+#+begin_src org
+,* *foo /bar _underlined bold and italic_/ baz* =verbatim  text= ~x  y  z~ +strikethrough *bold*+
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+p
+  "parses styled strings (complex)"
+  "test/Lilac/ParseSpec/0005-styled-strings-complex"
+  $ L.OrgDoc
+    { cells =
+        [ L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    <<Expected prose for 0005-styled-strings-complex>>,
+                  meta = fromList []
+                }
+            )
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+#+header: :noweb-ref Expected prose for 0005-styled-strings-complex
+#+begin_src haskell
+[ L.PTokenStyledString
+    (L.StyledString {body = "foo", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledString (L.StyledString {body = "bar", style = L.styleMaskFrom [L.Bold, L.Italic]}),
+  L.PTokenStyledString
+    ( L.StyledString
+        { body = "underlined",
+          style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
+        }
+    ),
+  L.PTokenStyledString
+    ( L.StyledString
+        { body = "bold",
+          style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
+        }
+    ),
+  L.PTokenStyledString
+    ( L.StyledString
+        { body = "and",
+          style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
+        }
+    ),
+  L.PTokenStyledString
+    ( L.StyledString
+        { body = "italic",
+          style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
+        }
+    ),
+  L.PTokenStyledString (L.StyledString {body = "baz", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledString (L.StyledString {body = "verbatim", style = L.styleMaskFrom [L.Verbatim]}),
+  L.PTokenStyledString (L.StyledString {body = "text", style = L.styleMaskFrom [L.Verbatim]}),
+  L.PTokenStyledString (L.StyledString {body = "x", style = L.styleMaskFrom [L.Code]}),
+  L.PTokenStyledString (L.StyledString {body = "y", style = L.styleMaskFrom [L.Code]}),
+  L.PTokenStyledString (L.StyledString {body = "z", style = L.styleMaskFrom [L.Code]}),
+  L.PTokenStyledString
+    ( L.StyledString
+        { body = "strikethrough",
+          style = L.styleMaskFrom [L.Strikethrough]
+        }
+    ),
+  L.PTokenStyledString
+    ( L.StyledString
+        { body = "bold",
+          style = L.styleMaskFrom [L.Bold, L.Strikethrough]
+        }
+    )
+]
+#+end_src
 
 ******* Links
 
@@ -2733,8 +2813,7 @@ p behavior path expected = do
 #+end_src
 
 Sometimes we want to test that a file will fail to parse. We do this with =pf=
-(for "parse fail"), which is able to detect cases where one of our parsers
-failed by calling =Control.Monad.fail=.
+(for "parse fail").
 
 #+header: :tangle test/Lilac/ParseSpec.hs
 #+begin_src haskell
@@ -2748,6 +2827,12 @@ pf behavior path errMsg pos = do
         (decodeUtf8 input)
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
 #+end_src
+
+Note that we use the =MP.ErrorFail= constructor because that's the only way we can
+check for failures in parsers where we manually return an error with
+=Control.Monad.fail= (as opposed to Megaparsec itself throwing the error because
+of a failure of the given parser combinators to account for the shape of the
+input text).
 
 Below are all of the individual test cases.
 

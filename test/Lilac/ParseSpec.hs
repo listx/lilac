@@ -143,6 +143,69 @@ spec =
           meta = M.fromList []
         }
     p
+      "parses styled strings (complex)"
+      "test/Lilac/ParseSpec/0005-styled-strings-complex"
+      $ L.OrgDoc
+        { cells =
+            [ L.CHeading
+                ( L.Heading
+                    { level = 1,
+                      body =
+                        [ L.PTokenStyledString
+                            (L.StyledString {body = "foo", style = L.styleMaskFrom [L.Bold]}),
+                          L.PTokenStyledString (L.StyledString {body = "bar", style = L.styleMaskFrom [L.Bold, L.Italic]}),
+                          L.PTokenStyledString
+                            ( L.StyledString
+                                { body = "underlined",
+                                  style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
+                                }
+                            ),
+                          L.PTokenStyledString
+                            ( L.StyledString
+                                { body = "bold",
+                                  style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
+                                }
+                            ),
+                          L.PTokenStyledString
+                            ( L.StyledString
+                                { body = "and",
+                                  style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
+                                }
+                            ),
+                          L.PTokenStyledString
+                            ( L.StyledString
+                                { body = "italic",
+                                  style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
+                                }
+                            ),
+                          L.PTokenStyledString (L.StyledString {body = "baz", style = L.styleMaskFrom [L.Bold]}),
+                          L.PTokenStyledString (L.StyledString {body = "verbatim", style = L.styleMaskFrom [L.Verbatim]}),
+                          L.PTokenStyledString (L.StyledString {body = "text", style = L.styleMaskFrom [L.Verbatim]}),
+                          L.PTokenStyledString (L.StyledString {body = "x", style = L.styleMaskFrom [L.Code]}),
+                          L.PTokenStyledString (L.StyledString {body = "y", style = L.styleMaskFrom [L.Code]}),
+                          L.PTokenStyledString (L.StyledString {body = "z", style = L.styleMaskFrom [L.Code]}),
+                          L.PTokenStyledString
+                            ( L.StyledString
+                                { body = "strikethrough",
+                                  style = L.styleMaskFrom [L.Strikethrough]
+                                }
+                            ),
+                          L.PTokenStyledString
+                            ( L.StyledString
+                                { body = "bold",
+                                  style = L.styleMaskFrom [L.Bold, L.Strikethrough]
+                                }
+                            )
+                        ],
+                      meta = fromList []
+                    }
+                )
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+    p
       "parses links (target only)"
       "test/Lilac/ParseSpec/0006-links"
       $ L.OrgDoc
