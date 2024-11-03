@@ -1223,20 +1223,20 @@ sort, or a Latex fragment.
 #+begin_src haskell
 type PToken :: Type
 data PToken
-  = PTokenStyledString StyledString
+  = PTokenStyledText StyledText
   | PTokenLink Link
   | PTokenMathFragment MathFragment
   deriving stock (Eq, Show)
 
 #+end_src
 
-The =StyledString= is just some text that has one or more styles attached to it.
+The =StyledText= is just some text that has one or more styles attached to it.
 If the string has no style, then it's not stylized at all (plain style).
 
 #+header: :noweb-ref Data structures
 #+begin_src haskell
-type StyledString :: Type
-data StyledString = StyledString
+type StyledText :: Type
+data StyledText = StyledText
   { body :: T.Text,
     style :: StyleMask
   }
@@ -1266,7 +1266,7 @@ type Link :: Type
 data Link = Link
   { typ :: LinkType,
     target :: T.Text,
-    name :: [StyledString]
+    name :: [StyledText]
   }
   deriving stock (Eq, Show)
 
@@ -1565,7 +1565,7 @@ module Lilac.Parse
     MathFragment (..),
     PToken (..),
     Style (..),
-    StyledString (..),
+    StyledText (..),
     StyleMask (..),
   )
 where
@@ -1992,12 +1992,12 @@ pTokenParser = do
   MP.choice
     [ linkParser',
       mathFragmentInlineParser',
-      styledStringParser'
+      styledTextParser'
     ]
   where
     linkParser' = PTokenLink <$> linkParser
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
-    styledStringParser' = PTokenStyledString <$> styledStringParser
+    styledTextParser' = PTokenStyledText <$> styledTextParser
 
 #+end_src
 
@@ -2130,13 +2130,13 @@ So the overall algorithm should be:
 
 The markers in steps 1 and 3 are optional. The key is that by the time we get to
 Step 2, we know what the =StyleMask= looks like, so we can use that information
-to stylize the text we found in Step 2. The function =styledStringParser=
+to stylize the text we found in Step 2. The function =StyledTextParser=
 implements the above algorithm.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-styledStringParser :: OrgParser StyledString
-styledStringParser = do
+styledTextParser :: OrgParser StyledText
+styledTextParser = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
@@ -2173,7 +2173,7 @@ styledStringParser = do
   put orgParserState {styleMask = styleMaskSubtract activeMask endingMask}
 
   pure
-    StyledString
+    StyledText
       { body = text,
         style = activeMask
       }
@@ -2382,8 +2382,8 @@ p
             ( L.Heading
                 { level = 1,
                   body =
-                    [ L.PTokenStyledString
-                        ( L.StyledString
+                    [ L.PTokenStyledText
+                        ( L.StyledText
                             { body = "foo",
                               style = L.styleMaskFrom []
                             }
@@ -2417,20 +2417,20 @@ p
             ( L.Heading
                 { level = 1,
                   body =
-                    [ L.PTokenStyledString
-                        ( L.StyledString
+                    [ L.PTokenStyledText
+                        ( L.StyledText
                             { body = "foo",
                               style = L.styleMaskFrom []
                             }
                         ),
-                      L.PTokenStyledString
-                        ( L.StyledString
+                      L.PTokenStyledText
+                        ( L.StyledText
                             { body = "bar",
                               style = L.styleMaskFrom [L.Bold]
                             }
                         ),
-                      L.PTokenStyledString
-                        ( L.StyledString
+                      L.PTokenStyledText
+                        ( L.StyledText
                             { body = "baz",
                               style = L.styleMaskFrom []
                             }
@@ -2491,44 +2491,44 @@ p
 
 #+header: :noweb-ref Expected prose for 0005-styled-strings-complex
 #+begin_src haskell
-[ L.PTokenStyledString
-    (L.StyledString {body = "foo", style = L.styleMaskFrom [L.Bold]}),
-  L.PTokenStyledString (L.StyledString {body = "bar", style = L.styleMaskFrom [L.Bold, L.Italic]}),
-  L.PTokenStyledString
-    ( L.StyledString
+[ L.PTokenStyledText
+    (L.StyledText {body = "foo", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledText (L.StyledText {body = "bar", style = L.styleMaskFrom [L.Bold, L.Italic]}),
+  L.PTokenStyledText
+    ( L.StyledText
         { body = "underlined",
           style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
         }
     ),
-  L.PTokenStyledString
-    ( L.StyledString
+  L.PTokenStyledText
+    ( L.StyledText
         { body = "bold",
           style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
         }
     ),
-  L.PTokenStyledString
-    ( L.StyledString
+  L.PTokenStyledText
+    ( L.StyledText
         { body = "and",
           style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
         }
     ),
-  L.PTokenStyledString
-    ( L.StyledString
+  L.PTokenStyledText
+    ( L.StyledText
         { body = "italic",
           style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
         }
     ),
-  L.PTokenStyledString (L.StyledString {body = "baz", style = L.styleMaskFrom [L.Bold]}),
-  L.PTokenStyledString (L.StyledString {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
-  L.PTokenStyledString (L.StyledString {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
-  L.PTokenStyledString
-    ( L.StyledString
+  L.PTokenStyledText (L.StyledText {body = "baz", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledText (L.StyledText {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
+  L.PTokenStyledText (L.StyledText {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
+  L.PTokenStyledText
+    ( L.StyledText
         { body = "strikethrough",
           style = L.styleMaskFrom [L.Strikethrough]
         }
     ),
-  L.PTokenStyledString
-    ( L.StyledString
+  L.PTokenStyledText
+    ( L.StyledText
         { body = "bold",
           style = L.styleMaskFrom [L.Bold, L.Strikethrough]
         }
@@ -2574,7 +2574,7 @@ linkExternalParser = do
       { typ = LinkExternal,
         target = T.pack target,
         name =
-          [ StyledString
+          [ StyledText
               { body = T.pack (fromMaybe target name),
                 style = styleMaskFrom []
               }
@@ -2613,7 +2613,7 @@ p
                             { typ = L.LinkExternal,
                               target = "link-target-only",
                               name =
-                                [ L.StyledString
+                                [ L.StyledText
                                     { body = "link-target-only",
                                       style = L.styleMaskFrom []
                                     }
@@ -2639,7 +2639,7 @@ p
                             { typ = L.LinkExternal,
                               target = "link-target",
                               name =
-                                [ L.StyledString
+                                [ L.StyledText
                                     { body = "link-name",
                                       style = L.styleMaskFrom []
                                     }

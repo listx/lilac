@@ -13,7 +13,7 @@ module Lilac.Parse
     MathFragment (..),
     PToken (..),
     Style (..),
-    StyledString (..),
+    StyledText (..),
     StyleMask (..),
   )
 where
@@ -65,13 +65,13 @@ type Prose = [PToken]
 
 type PToken :: Type
 data PToken
-  = PTokenStyledString StyledString
+  = PTokenStyledText StyledText
   | PTokenLink Link
   | PTokenMathFragment MathFragment
   deriving stock (Eq, Show)
 
-type StyledString :: Type
-data StyledString = StyledString
+type StyledText :: Type
+data StyledText = StyledText
   { body :: T.Text,
     style :: StyleMask
   }
@@ -85,7 +85,7 @@ type Link :: Type
 data Link = Link
   { typ :: LinkType,
     target :: T.Text,
-    name :: [StyledString]
+    name :: [StyledText]
   }
   deriving stock (Eq, Show)
 
@@ -373,12 +373,12 @@ pTokenParser = do
   MP.choice
     [ linkParser',
       mathFragmentInlineParser',
-      styledStringParser'
+      styledTextParser'
     ]
   where
     linkParser' = PTokenLink <$> linkParser
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
-    styledStringParser' = PTokenStyledString <$> styledStringParser
+    styledTextParser' = PTokenStyledText <$> styledTextParser
 
 styleMap :: M.Map Char Style
 styleMap =
@@ -400,8 +400,8 @@ failIfLeftoverActiveStyles = do
       $ "leftover active styles: "
       ++ (show $ maskToStyles $ StyleMask mask)
 
-styledStringParser :: OrgParser StyledString
-styledStringParser = do
+styledTextParser :: OrgParser StyledText
+styledTextParser = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
@@ -438,7 +438,7 @@ styledStringParser = do
   put orgParserState {styleMask = styleMaskSubtract activeMask endingMask}
 
   pure
-    StyledString
+    StyledText
       { body = text,
         style = activeMask
       }
@@ -483,7 +483,7 @@ linkExternalParser = do
       { typ = LinkExternal,
         target = T.pack target,
         name =
-          [ StyledString
+          [ StyledText
               { body = T.pack (fromMaybe target name),
                 style = styleMaskFrom []
               }
