@@ -1927,13 +1927,14 @@ A heading basically starts with some asterisks, followed by a space and then
 some number of non-newline characters (the body). It can also have drawers
 immediately under it.
 
+#+name: func:headingParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  body <- MP.some (lexemeNoNewline pTokenParser)
+  prose <- MP.some (lexemeNoNewline pTokenParser)
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
@@ -1941,7 +1942,7 @@ headingParser = do
     $ CHeading
       Heading
         { level = T.length stars,
-          body = body,
+          body = compressProse prose,
           meta = drawers
         }
 #+end_src
@@ -1960,7 +1961,7 @@ text cannot have any newlines at all. This is why we use =lexemeNoNewline= to
 parse the =body= in =headingParser= above.
 
 We consider prose in detail in the next section, where we'll also discuss
-[[func:failIfLeftoverActiveStyles]].
+[[func:failIfLeftoverActiveStyles]] and also [[func:compressProse]].
 
 ****** Prose
 :PROPERTIES:
@@ -2335,7 +2336,79 @@ isCode :: StyleMask -> Bool
 isCode (StyleMask a) = testBit a (fromEnum Code)
 #+end_src
 
-******** Tests
+We stated earlier that we don't have to wait to see the ending style marker to
+start parsing styled text. While this is true, the downside is that by the time
+we construct a =StyledText=, we have no knowledge of future =StyledText= objects
+that have not yet been parsed. This can lead to a proliferation of =StyledText=
+objects that all share the same style, but are parsed into separate =PToken=
+objects back in [[func:headingParser]]. We want to join up sequences of styled text
+that share the same style (except for =Code= and =Verbatim=), and make them use a
+single =StyledText= object. For this purpose, we have =compressProse=.
+
+#+name: func:compressProse
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+compressProse :: [PToken] -> [PToken]
+compressProse = reverse . foldl' f []
+  where
+    f :: [PToken] -> PToken -> [PToken]
+    f [] token = token : []
+    f
+      ((t1@(PTokenStyledText (StyledText body1 style1))) : rest)
+      t2@(PTokenStyledText (StyledText body2 style2))
+        | elem Code styles = t2 : t1 : rest
+        | elem Verbatim styles = t2 : t1 : rest
+        | style1 /= style2 = t2 : t1 : rest
+        | otherwise =
+            (PTokenStyledText $ StyledText (T.unwords [body1, body2]) style1) : rest
+        where
+          styles = concatMap maskToStyles [style1, style2]
+    f acc token = token : acc
+#+end_src
+
+Here we test how we minimize the number of =PToken= objects; although the
+individual letters (without any styling, and with bold styling) are spaced out
+with multiple spaces, we only use two =PToken= objects, one for the plain text and
+another for the bold text.
+
+#+name: test:0005-styled-strings-compression
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-compression
+#+begin_src org
+,* a b  c   d    e      *f g  h   i    j*
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+p
+  "parses styled strings (compression)"
+  "test/Lilac/ParseSpec/0005-styled-strings-compression"
+  $ L.OrgDoc
+    { cells =
+        [ L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    <<Expected prose for 0005-styled-strings-compression>>,
+                  meta = fromList []
+                }
+            )
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+#+header: :noweb-ref Expected prose for 0005-styled-strings-compression
+#+begin_src haskell
+[ L.PTokenStyledText
+    (L.StyledText {body = "a b c d e", style = L.styleMaskFrom []}),
+  L.PTokenStyledText
+    (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
+]
+#+end_src
+
+******** Additional tests
 
 The simple case with no style markers.
 
@@ -2437,7 +2510,7 @@ we mix things up a bit more, using more styles.
 #+name: test:0005-styled-strings-complex
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-complex
 #+begin_src org
-,* *foo /bar _underlined bold and italic_/ baz* =verbatim  text= ~x  y  z~ +strikethrough *bold*+
+,* *foo /bar _underlined  bold  and  italic_/ baz* =verbatim  text= ~x  y  z~ +strikethrough *bold*+
 #+end_src
 
 #+header: :noweb-ref Test styled string parsing
@@ -2469,25 +2542,7 @@ p
   L.PTokenStyledText (L.StyledText {body = "bar", style = L.styleMaskFrom [L.Bold, L.Italic]}),
   L.PTokenStyledText
     ( L.StyledText
-        { body = "underlined",
-          style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
-        }
-    ),
-  L.PTokenStyledText
-    ( L.StyledText
-        { body = "bold",
-          style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
-        }
-    ),
-  L.PTokenStyledText
-    ( L.StyledText
-        { body = "and",
-          style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
-        }
-    ),
-  L.PTokenStyledText
-    ( L.StyledText
-        { body = "italic",
+        { body = "underlined bold and italic",
           style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
         }
     ),

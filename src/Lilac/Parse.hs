@@ -353,7 +353,7 @@ headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  body <- MP.some (lexemeNoNewline pTokenParser)
+  prose <- MP.some (lexemeNoNewline pTokenParser)
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
@@ -361,7 +361,7 @@ headingParser = do
     $ CHeading
       Heading
         { level = T.length stars,
-          body = body,
+          body = compressProse prose,
           meta = drawers
         }
 
@@ -452,6 +452,23 @@ styledTextParser = do
       | isVerbatim styleMask = MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
       | isCode styleMask = MP.takeWhile1P (Just "code") isNotCodeMarker
       | otherwise = MP.takeWhile1P (Just "prose word") isProseWord
+
+compressProse :: [PToken] -> [PToken]
+compressProse = reverse . foldl' f []
+  where
+    f :: [PToken] -> PToken -> [PToken]
+    f [] token = token : []
+    f
+      ((t1@(PTokenStyledText (StyledText body1 style1))) : rest)
+      t2@(PTokenStyledText (StyledText body2 style2))
+        | elem Code styles = t2 : t1 : rest
+        | elem Verbatim styles = t2 : t1 : rest
+        | style1 /= style2 = t2 : t1 : rest
+        | otherwise =
+            (PTokenStyledText $ StyledText (T.unwords [body1, body2]) style1) : rest
+        where
+          styles = concatMap maskToStyles [style1, style2]
+    f acc token = token : acc
 
 linkParser :: OrgParser Link
 linkParser = do

@@ -88,6 +88,29 @@ spec =
       8
 
     p
+      "parses styled strings (compression)"
+      "test/Lilac/ParseSpec/0005-styled-strings-compression"
+      $ L.OrgDoc
+        { cells =
+            [ L.CHeading
+                ( L.Heading
+                    { level = 1,
+                      body =
+                        [ L.PTokenStyledText
+                            (L.StyledText {body = "a b c d e", style = L.styleMaskFrom []}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
+                        ],
+                      meta = fromList []
+                    }
+                )
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    p
       "parses styled strings (no style)"
       "test/Lilac/ParseSpec/0005-styled-strings-no-style"
       $ L.OrgDoc
@@ -163,25 +186,7 @@ spec =
                           L.PTokenStyledText (L.StyledText {body = "bar", style = L.styleMaskFrom [L.Bold, L.Italic]}),
                           L.PTokenStyledText
                             ( L.StyledText
-                                { body = "underlined",
-                                  style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
-                                }
-                            ),
-                          L.PTokenStyledText
-                            ( L.StyledText
-                                { body = "bold",
-                                  style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
-                                }
-                            ),
-                          L.PTokenStyledText
-                            ( L.StyledText
-                                { body = "and",
-                                  style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
-                                }
-                            ),
-                          L.PTokenStyledText
-                            ( L.StyledText
-                                { body = "italic",
+                                { body = "underlined bold and italic",
                                   style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
                                 }
                             ),
