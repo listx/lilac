@@ -214,6 +214,37 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
+
+    p
+      "parses styled strings (complex punctuation)"
+      "test/Lilac/ParseSpec/0005-styled-strings-complex-punctuation"
+      $ L.OrgDoc
+        { cells =
+            [ L.CHeading
+                ( L.Heading
+                    { level = 1,
+                      body =
+                        [ L.PTokenStyledText
+                            (L.StyledText {body = "(foo", style = L.styleMaskFrom []}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = "bar", style = L.styleMaskFrom [L.Verbatim]}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = "). What's up? and", style = L.styleMaskFrom []}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = "that!", style = L.styleMaskFrom [L.Bold]}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = "(italic)", style = L.styleMaskFrom [L.Italic]}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = ". It's #1!", style = L.styleMaskFrom []})
+                        ],
+                      meta = fromList []
+                    }
+                )
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
     p
       "parses links (target only)"
       "test/Lilac/ParseSpec/0006-links"
