@@ -1966,16 +1966,11 @@ A [[PToken ADT][PToken]] can be a styled string, link, or inline math fragment.
 pTokenParser :: OrgParser PToken
 pTokenParser = do
   MP.choice
-    [ linkParser',
-      mathFragmentInlineParser',
-      styledTextParser',
-      trailingNonNewlineWhitespaceParser'
+    [ PTokenLink <$> linkParser,
+      PTokenMathFragment <$> mathFragmentInlineParser,
+      PTokenStyledText <$> styledTextParser,
+      PTokenStyledText <$> trailingNonNewlineWhitespaceParser
     ]
-  where
-    linkParser' = PTokenLink <$> linkParser
-    mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
-    styledTextParser' = PTokenStyledText <$> styledTextParser
-    trailingNonNewlineWhitespaceParser' = PTokenStyledText <$> trailingNonNewlineWhitespaceParser
 #+end_src
 
 Note that we parse whitespace explicitly with =trailingNonNewlineWhitespaceParser=
@@ -2585,19 +2580,26 @@ p
 #+begin_src haskell
 [ L.PTokenStyledText
     (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
-  L.PTokenStyledText (L.StyledText {body = "bar ", style = L.styleMaskFrom [L.Bold, L.Italic]}),
+  L.PTokenStyledText
+    (L.StyledText {body = "bar ", style = L.styleMaskFrom [L.Bold, L.Italic]}),
   L.PTokenStyledText
     ( L.StyledText
         { body = "underlined bold and italic",
           style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
         }
     ),
-  L.PTokenStyledText (L.StyledText {body = " baz", style = L.styleMaskFrom [L.Bold]}),
-  L.PTokenStyledText (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-  L.PTokenStyledText (L.StyledText {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
-  L.PTokenStyledText (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-  L.PTokenStyledText (L.StyledText {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
-  L.PTokenStyledText (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+  L.PTokenStyledText
+    (L.StyledText {body = " baz", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledText
+    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+  L.PTokenStyledText
+    (L.StyledText {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
+  L.PTokenStyledText
+    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+  L.PTokenStyledText
+    (L.StyledText {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
+  L.PTokenStyledText
+    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
   L.PTokenStyledText
     ( L.StyledText
         { body = "strikethrough ",

@@ -368,16 +368,11 @@ headingParser = do
 pTokenParser :: OrgParser PToken
 pTokenParser = do
   MP.choice
-    [ linkParser',
-      mathFragmentInlineParser',
-      styledTextParser',
-      trailingNonNewlineWhitespaceParser'
+    [ PTokenLink <$> linkParser,
+      PTokenMathFragment <$> mathFragmentInlineParser,
+      PTokenStyledText <$> styledTextParser,
+      PTokenStyledText <$> trailingNonNewlineWhitespaceParser
     ]
-  where
-    linkParser' = PTokenLink <$> linkParser
-    mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
-    styledTextParser' = PTokenStyledText <$> styledTextParser
-    trailingNonNewlineWhitespaceParser' = PTokenStyledText <$> trailingNonNewlineWhitespaceParser
 
 trailingNonNewlineWhitespaceParser :: OrgParser StyledText
 trailingNonNewlineWhitespaceParser = do
