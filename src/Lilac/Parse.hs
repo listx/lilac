@@ -346,14 +346,18 @@ docMetaParser = do
   pure $ M.fromList metaKVs
 
 cellParser :: OrgParser Cell
-cellParser = do
-  lexeme headingParser
+cellParser =
+  lexeme
+    $ MP.choice
+      [ headingParser,
+        paragraphParser
+      ]
 
 headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  prose <- MP.some pTokenParser
+  prose <- MP.some $ pTokenParser spaceConsumer'
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
@@ -364,31 +368,33 @@ headingParser = do
           body = compressProse prose,
           meta = drawers
         }
+  where
+    spaceConsumer' :: OrgParser T.Text
+    spaceConsumer' = MP.takeWhile1P (Just "non-newline whitespace") isNonNewlineWhitespace
+    isNonNewlineWhitespace c = isSpace c && c /= '\n'
 
-pTokenParser :: OrgParser PToken
-pTokenParser = do
+pTokenParser :: OrgParser T.Text -> OrgParser PToken
+pTokenParser spaceConsumer' = do
   MP.choice
     [ PTokenLink <$> linkParser,
       PTokenMathFragment <$> mathFragmentInlineParser,
       PTokenStyledText <$> styledTextParser,
-      PTokenStyledText <$> trailingNonNewlineWhitespaceParser
+      PTokenStyledText <$> trailingWhitespaceParser spaceConsumer'
     ]
 
-trailingNonNewlineWhitespaceParser :: OrgParser StyledText
-trailingNonNewlineWhitespaceParser = do
+trailingWhitespaceParser :: OrgParser T.Text -> OrgParser StyledText
+trailingWhitespaceParser spaceConsumer' = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
 
-  _ <- MP.takeWhile1P (Just "whitespace") isNonNewlineWhitespace
+  _ <- spaceConsumer'
 
   pure
     StyledText
       { body = " ",
         style = mask
       }
-  where
-    isNonNewlineWhitespace c = isSpace c && c /= '\n'
 
 styleMap :: M.Map Char Style
 styleMap =
@@ -545,3 +551,14 @@ drawerParser = do
   pure (drawerName, T.pack drawerContents)
   where
     isDrawerLetter c = and $ map ($ c) [(/= '\n'), (/= ':'), (/= ' ')]
+
+paragraphParser :: OrgParser Cell
+paragraphParser = do
+  prose <- MP.some $ pTokenParser spaceConsumer'
+  failIfLeftoverActiveStyles
+  pure . CProse $ compressProse prose
+  where
+    spaceConsumer' :: OrgParser T.Text
+    spaceConsumer' = do
+      MP.notFollowedBy (string "\n\n")
+      MP.takeWhile1P (Just "whitespace (newlines allowed)") isSpace

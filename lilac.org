@@ -1918,8 +1918,12 @@ As seen in [[Cell ADT][the Cell ADT]], there are many different types of cells. 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 cellParser :: OrgParser Cell
-cellParser = do
-  lexeme headingParser
+cellParser =
+  lexeme
+    $ MP.choice
+      [ headingParser,
+        paragraphParser
+      ]
 #+end_src
 
 ****** Headings
@@ -1935,7 +1939,7 @@ headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  prose <- MP.some pTokenParser
+  prose <- MP.some $ pTokenParser spaceConsumer'
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
@@ -1946,6 +1950,10 @@ headingParser = do
           body = compressProse prose,
           meta = drawers
         }
+  where
+    spaceConsumer' :: OrgParser T.Text
+    spaceConsumer' = MP.takeWhile1P (Just "non-newline whitespace") isNonNewlineWhitespace
+    isNonNewlineWhitespace c = isSpace c && c /= '\n'
 #+end_src
 
 The body text of a heading is a series of prose tokens, or =PToken= values, which
@@ -1954,30 +1962,31 @@ we call =Prose=.
 We consider prose in detail in the next section, where we'll also discuss
 [[func:failIfLeftoverActiveStyles]] and also [[func:compressProse]].
 
-****** Prose
+****** Prose (inside in a heading)
 :PROPERTIES:
 :ID:       dc1cc132-eecb-4fd3-aae7-14131109a148
 :END:
 
 A [[PToken ADT][PToken]] can be a styled string, link, or inline math fragment.
 
+#+name: func:pTokenParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-pTokenParser :: OrgParser PToken
-pTokenParser = do
+pTokenParser :: OrgParser T.Text -> OrgParser PToken
+pTokenParser spaceConsumer' = do
   MP.choice
     [ PTokenLink <$> linkParser,
       PTokenMathFragment <$> mathFragmentInlineParser,
       PTokenStyledText <$> styledTextParser,
-      PTokenStyledText <$> trailingNonNewlineWhitespaceParser
+      PTokenStyledText <$> trailingWhitespaceParser spaceConsumer'
     ]
 #+end_src
 
-Note that we parse whitespace explicitly with =trailingNonNewlineWhitespaceParser=
-which consumes whitespace as long as they are not newline characters. The
+Note that we parse whitespace explicitly with =trailingWhitespaceParser=
+which consumes whitespace based on the provided =spaceConsumer=. The
 alternative is to implicitly skip past whitespace by wrapping =lexemeNoNewline=
-(see [[func:spaceConsumerNoNewline]]) around =pTokenParser=. However, that approach
-has a problem. Consider the case of parsing something like
+(see [[func:spaceConsumerNoNewline]]) around =pTokenParser=. However, that
+approach has a problem. Consider the case of parsing something like
 
 #+begin_src org
 =foo=...
@@ -1997,27 +2006,25 @@ And now we're in the position where we have to, on export, guess (due to
 information loss) if we need to insert whitespace between the =foo= and "...".
 
 Instead, explicitly parsing the whitespace with
-=trailingNonNewlineWhitespaceParser= lets us parse the two cases above
+=trailingWhitespaceParser= lets us parse the two cases above
 differently, because we save all whitespace we parsed as their own
 =PTokenStyledText= objects.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-trailingNonNewlineWhitespaceParser :: OrgParser StyledText
-trailingNonNewlineWhitespaceParser = do
+trailingWhitespaceParser :: OrgParser T.Text -> OrgParser StyledText
+trailingWhitespaceParser spaceConsumer' = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
 
-  _ <- MP.takeWhile1P (Just "whitespace") isNonNewlineWhitespace
+  _ <- spaceConsumer'
 
   pure
     StyledText
       { body = " ",
         style = mask
       }
-  where
-    isNonNewlineWhitespace c = isSpace c && c /= '\n'
 #+end_src
 
 This parser only succeeds if it finds at least one non-newline whitespace
@@ -2929,6 +2936,80 @@ p
     }
 #+end_src
 
+****** Paragraphs (standalone prose)
+
+The =paragraphParser= below is similar to =headingParser= because it's also powered
+mostly by [[func:pTokenParser]]. However a key difference is how it handles trailing
+whitespace --- it will parse any whitespace except for two consecutive newline
+characters.
+
+#+name: func:paragraphParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+paragraphParser :: OrgParser Cell
+paragraphParser = do
+  prose <- MP.some $ pTokenParser spaceConsumer'
+  failIfLeftoverActiveStyles
+  pure . CProse $ compressProse prose
+  where
+    spaceConsumer' :: OrgParser T.Text
+    spaceConsumer' = do
+      MP.notFollowedBy (string "\n\n")
+      MP.takeWhile1P (Just "whitespace (newlines allowed)") isSpace
+#+end_src
+
+Below we check several types of paragraphs.
+
+#+name: test:0005-prose-paragraphs
+#+header: :tangle test/Lilac/ParseSpec/0005-prose-paragraphs
+#+begin_src org
+a b  c   d    e      *f g  h   i    j*
+
+x y
+z foo
+bar
+
+_multiple
+lines
+with
+underscore_
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+p
+  "parses paragraphs"
+  "test/Lilac/ParseSpec/0005-prose-paragraphs"
+  $ L.OrgDoc
+    { cells =
+        <<Expected prose for 0005-prose-paragraphs>>,
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+#+header: :noweb-ref Expected prose for 0005-prose-paragraphs
+#+begin_src haskell
+[ L.CProse
+    [ L.PTokenStyledText
+        (L.StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
+      L.PTokenStyledText
+        (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
+    ],
+  L.CProse
+    [ L.PTokenStyledText
+        (L.StyledText {body = "x y z foo bar", style = L.styleMaskFrom []})
+    ],
+  L.CProse
+    [ L.PTokenStyledText
+        (L.StyledText {body = "multiple lines with underscore", style = L.styleMaskFrom [L.Underline]}),
+      L.PTokenStyledText
+        (L.StyledText {body = " ", style = L.styleMaskFrom []})
+    ]
+]
+#+end_src
+
 **** Tests
 :PROPERTIES:
 :ID:       ebf0d269-79d3-408a-a6e7-baf720d73837
@@ -2946,8 +3027,8 @@ import Test.Hspec (Spec, before, describe, it)
 import Test.Hspec.Megaparsec
   ( errFancy,
     fancy,
-    parseSatisfies,
     shouldFailWith,
+    shouldParse,
   )
 import Text.Megaparsec qualified as MP
 #+end_src
@@ -2965,7 +3046,7 @@ p behavior path expected = do
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
         (decodeUtf8 input)
-        `parseSatisfies` ((== expected) . fst)
+        `shouldParse` (expected, L.defaultOrgParserState)
 #+end_src
 
 Sometimes we want to test that a file will fail to parse. We do this with =pf=
@@ -3002,7 +3083,7 @@ spec =
         (runStateT L.orgDocParser L.defaultOrgParserState)
         "empty input"
         ""
-        `parseSatisfies` ((== L.defaultOrgDoc) . fst)
+        `shouldParse` (L.defaultOrgDoc, L.defaultOrgParserState)
     p
       "parses blank line as defaultOrgDoc"
       "test/Lilac/ParseSpec/0001-blankline"

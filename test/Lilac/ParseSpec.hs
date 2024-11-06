@@ -8,8 +8,8 @@ import Test.Hspec (Spec, before, describe, it)
 import Test.Hspec.Megaparsec
   ( errFancy,
     fancy,
-    parseSatisfies,
     shouldFailWith,
+    shouldParse,
   )
 import Text.Megaparsec qualified as MP
 
@@ -21,7 +21,7 @@ p behavior path expected = do
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
         (decodeUtf8 input)
-        `parseSatisfies` ((== expected) . fst)
+        `shouldParse` (expected, L.defaultOrgParserState)
 
 pf :: String -> FilePath -> String -> Int -> Spec
 pf behavior path errMsg pos = do
@@ -41,7 +41,7 @@ spec =
         (runStateT L.orgDocParser L.defaultOrgParserState)
         "empty input"
         ""
-        `parseSatisfies` ((== L.defaultOrgDoc) . fst)
+        `shouldParse` (L.defaultOrgDoc, L.defaultOrgParserState)
     p
       "parses blank line as defaultOrgDoc"
       "test/Lilac/ParseSpec/0001-blankline"
@@ -252,6 +252,33 @@ spec =
                       meta = fromList []
                     }
                 )
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    p
+      "parses paragraphs"
+      "test/Lilac/ParseSpec/0005-prose-paragraphs"
+      $ L.OrgDoc
+        { cells =
+            [ L.CProse
+                [ L.PTokenStyledText
+                    (L.StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
+                ],
+              L.CProse
+                [ L.PTokenStyledText
+                    (L.StyledText {body = "x y z foo bar", style = L.styleMaskFrom []})
+                ],
+              L.CProse
+                [ L.PTokenStyledText
+                    (L.StyledText {body = "multiple lines with underscore", style = L.styleMaskFrom [L.Underline]}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = " ", style = L.styleMaskFrom []})
+                ]
             ],
           code = [],
           codeBlocks = fromList [],
