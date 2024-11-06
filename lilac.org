@@ -1712,6 +1712,7 @@ which consumes everything except a double-newline (two newlines in a row).
 The first case is easy because we just need to tweak the =whiteSpaceParser= to
 only allow a space or tab character.
 
+#+name: func:spaceConsumerNoNewline
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 spaceConsumerNoNewline :: OrgParser ()
@@ -1934,7 +1935,7 @@ headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  prose <- MP.some (lexemeNoNewline pTokenParser)
+  prose <- MP.some pTokenParser
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
@@ -1949,16 +1950,6 @@ headingParser = do
 
 The body text of a heading is a series of prose tokens, or =PToken= values, which
 we call =Prose=.
-
-#+header: :noweb-ref Parsing mechanism
-#+begin_src haskell
-proseParser :: OrgParser Prose
-proseParser = many (lexemeNoDoubleNewline pTokenParser)
-#+end_src
-
-Note that we don't use =proseParser= here directly, because prose inside heading
-text cannot have any newlines at all. This is why we use =lexemeNoNewline= to
-parse the =body= in =headingParser= above.
 
 We consider prose in detail in the next section, where we'll also discuss
 [[func:failIfLeftoverActiveStyles]] and also [[func:compressProse]].
@@ -1977,13 +1968,67 @@ pTokenParser = do
   MP.choice
     [ linkParser',
       mathFragmentInlineParser',
-      styledTextParser'
+      styledTextParser',
+      trailingNonNewlineWhitespaceParser'
     ]
   where
     linkParser' = PTokenLink <$> linkParser
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
     styledTextParser' = PTokenStyledText <$> styledTextParser
+    trailingNonNewlineWhitespaceParser' = PTokenStyledText <$> trailingNonNewlineWhitespaceParser
 #+end_src
+
+Note that we parse whitespace explicitly with =trailingNonNewlineWhitespaceParser=
+which consumes whitespace as long as they are not newline characters. The
+alternative is to implicitly skip past whitespace by wrapping =lexemeNoNewline=
+(see [[func:spaceConsumerNoNewline]]) around =pTokenParser=. However, that approach
+has a problem. Consider the case of parsing something like
+
+#+begin_src org
+=foo=...
+#+end_src
+
+where the "..." will get parsed separately from the =foo=. We'll end up with two
+=PTokenStyledText= objects, one for =foo= and another for "...". This is a problem
+because we'll also parse
+
+#+begin_src org
+=foo= ...
+#+end_src
+
+exactly the same way as two =PTokenStyledText= objects. This is because the space
+between the =foo= and "..." will get eaten up by =lexemeNoNewline=, /and discarded/.
+And now we're in the position where we have to, on export, guess (due to
+information loss) if we need to insert whitespace between the =foo= and "...".
+
+Instead, explicitly parsing the whitespace with
+=trailingNonNewlineWhitespaceParser= lets us parse the two cases above
+differently, because we save all whitespace we parsed as their own
+=PTokenStyledText= objects.
+
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+trailingNonNewlineWhitespaceParser :: OrgParser StyledText
+trailingNonNewlineWhitespaceParser = do
+  orgParserState <- get
+
+  let mask = orgParserState.styleMask
+
+  _ <- MP.takeWhile1P (Just "whitespace") isNonNewlineWhitespace
+
+  pure
+    StyledText
+      { body = " ",
+        style = mask
+      }
+  where
+    isNonNewlineWhitespace c = isSpace c && c /= '\n'
+#+end_src
+
+This parser only succeeds if it finds at least one non-newline whitespace
+character. Each time it succeeds, it "compresses" the whitespace to a single
+space character. Note that we also do a second level of "compression" in
+[[func:compressProse]].
 
 ******* Styled strings
 
@@ -2115,6 +2160,7 @@ Step 2, we know what the =StyleMask= looks like, so we can use that information
 to stylize the text we found in Step 2. The function =StyledTextParser=
 implements the above algorithm.
 
+#+name: func:styledTextParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 styledTextParser :: OrgParser StyledText
@@ -2360,7 +2406,7 @@ compressProse = reverse . foldl' f []
         | elem Verbatim styles = t2 : t1 : rest
         | style1 /= style2 = t2 : t1 : rest
         | otherwise =
-            (PTokenStyledText $ StyledText (T.unwords [body1, body2]) style1) : rest
+            (PTokenStyledText $ StyledText (T.concat [body1, body2]) style1) : rest
         where
           styles = concatMap maskToStyles [style1, style2]
     f acc token = token : acc
@@ -2402,7 +2448,7 @@ p
 #+header: :noweb-ref Expected prose for 0005-styled-strings-compression
 #+begin_src haskell
 [ L.PTokenStyledText
-    (L.StyledText {body = "a b c d e", style = L.styleMaskFrom []}),
+    (L.StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
   L.PTokenStyledText
     (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
 ]
@@ -2465,7 +2511,7 @@ p
                   body =
                     [ L.PTokenStyledText
                         ( L.StyledText
-                            { body = "foo",
+                            { body = "foo ",
                               style = L.styleMaskFrom []
                             }
                         ),
@@ -2477,7 +2523,7 @@ p
                         ),
                       L.PTokenStyledText
                         ( L.StyledText
-                            { body = "baz",
+                            { body = " baz",
                               style = L.styleMaskFrom []
                             }
                         )
@@ -2538,20 +2584,23 @@ p
 #+header: :noweb-ref Expected prose for 0005-styled-strings-complex
 #+begin_src haskell
 [ L.PTokenStyledText
-    (L.StyledText {body = "foo", style = L.styleMaskFrom [L.Bold]}),
-  L.PTokenStyledText (L.StyledText {body = "bar", style = L.styleMaskFrom [L.Bold, L.Italic]}),
+    (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledText (L.StyledText {body = "bar ", style = L.styleMaskFrom [L.Bold, L.Italic]}),
   L.PTokenStyledText
     ( L.StyledText
         { body = "underlined bold and italic",
           style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
         }
     ),
-  L.PTokenStyledText (L.StyledText {body = "baz", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledText (L.StyledText {body = " baz", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledText (L.StyledText {body = " ", style = L.styleMaskFrom []}),
   L.PTokenStyledText (L.StyledText {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
+  L.PTokenStyledText (L.StyledText {body = " ", style = L.styleMaskFrom []}),
   L.PTokenStyledText (L.StyledText {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
+  L.PTokenStyledText (L.StyledText {body = " ", style = L.styleMaskFrom []}),
   L.PTokenStyledText
     ( L.StyledText
-        { body = "strikethrough",
+        { body = "strikethrough ",
           style = L.styleMaskFrom [L.Strikethrough]
         }
     ),
@@ -2594,19 +2643,21 @@ p
     }
 #+end_src
 
-FIXME: Note that in the parsed result below, we lose the information that there
-is no space character between =bar= and the closing parenthesis.
+Note how we preserve the information of having no space character between the
+=bar= and the closing parenthesis ")".
 
 #+header: :noweb-ref Expected prose for 0005-styled-strings-complex-punctuation
 #+begin_src haskell
 [ L.PTokenStyledText
-    (L.StyledText {body = "(foo", style = L.styleMaskFrom []}),
+    (L.StyledText {body = "(foo ", style = L.styleMaskFrom []}),
   L.PTokenStyledText
     (L.StyledText {body = "bar", style = L.styleMaskFrom [L.Verbatim]}),
   L.PTokenStyledText
-    (L.StyledText {body = "). What's up? and", style = L.styleMaskFrom []}),
+    (L.StyledText {body = "). What's up? and ", style = L.styleMaskFrom []}),
   L.PTokenStyledText
     (L.StyledText {body = "that!", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledText
+    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
   L.PTokenStyledText
     (L.StyledText {body = "(italic)", style = L.styleMaskFrom [L.Italic]}),
   L.PTokenStyledText
@@ -2685,6 +2736,12 @@ p
                               body = "foo"
                             }
                         ),
+                      L.PTokenStyledText
+                        ( L.StyledText
+                            { body = " ",
+                              style = L.styleMaskFrom []
+                            }
+                        ),
                       L.PTokenLink
                         ( L.Link
                             { typ = L.LinkExternal,
@@ -2709,6 +2766,12 @@ p
                         ( L.MathFragment
                             { meta = fromList [],
                               body = "bar"
+                            }
+                        ),
+                      L.PTokenStyledText
+                        ( L.StyledText
+                            { body = " ",
+                              style = L.styleMaskFrom []
                             }
                         ),
                       L.PTokenLink

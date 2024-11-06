@@ -353,7 +353,7 @@ headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  prose <- MP.some (lexemeNoNewline pTokenParser)
+  prose <- MP.some pTokenParser
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
@@ -365,20 +365,35 @@ headingParser = do
           meta = drawers
         }
 
-proseParser :: OrgParser Prose
-proseParser = many (lexemeNoDoubleNewline pTokenParser)
-
 pTokenParser :: OrgParser PToken
 pTokenParser = do
   MP.choice
     [ linkParser',
       mathFragmentInlineParser',
-      styledTextParser'
+      styledTextParser',
+      trailingNonNewlineWhitespaceParser'
     ]
   where
     linkParser' = PTokenLink <$> linkParser
     mathFragmentInlineParser' = PTokenMathFragment <$> mathFragmentInlineParser
     styledTextParser' = PTokenStyledText <$> styledTextParser
+    trailingNonNewlineWhitespaceParser' = PTokenStyledText <$> trailingNonNewlineWhitespaceParser
+
+trailingNonNewlineWhitespaceParser :: OrgParser StyledText
+trailingNonNewlineWhitespaceParser = do
+  orgParserState <- get
+
+  let mask = orgParserState.styleMask
+
+  _ <- MP.takeWhile1P (Just "whitespace") isNonNewlineWhitespace
+
+  pure
+    StyledText
+      { body = " ",
+        style = mask
+      }
+  where
+    isNonNewlineWhitespace c = isSpace c && c /= '\n'
 
 styleMap :: M.Map Char Style
 styleMap =
@@ -465,7 +480,7 @@ compressProse = reverse . foldl' f []
         | elem Verbatim styles = t2 : t1 : rest
         | style1 /= style2 = t2 : t1 : rest
         | otherwise =
-            (PTokenStyledText $ StyledText (T.unwords [body1, body2]) style1) : rest
+            (PTokenStyledText $ StyledText (T.concat [body1, body2]) style1) : rest
         where
           styles = concatMap maskToStyles [style1, style2]
     f acc token = token : acc

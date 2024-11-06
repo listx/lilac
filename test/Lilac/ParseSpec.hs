@@ -97,7 +97,7 @@ spec =
                     { level = 1,
                       body =
                         [ L.PTokenStyledText
-                            (L.StyledText {body = "a b c d e", style = L.styleMaskFrom []}),
+                            (L.StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
                           L.PTokenStyledText
                             (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
                         ],
@@ -146,7 +146,7 @@ spec =
                       body =
                         [ L.PTokenStyledText
                             ( L.StyledText
-                                { body = "foo",
+                                { body = "foo ",
                                   style = L.styleMaskFrom []
                                 }
                             ),
@@ -158,7 +158,7 @@ spec =
                             ),
                           L.PTokenStyledText
                             ( L.StyledText
-                                { body = "baz",
+                                { body = " baz",
                                   style = L.styleMaskFrom []
                                 }
                             )
@@ -182,20 +182,23 @@ spec =
                     { level = 1,
                       body =
                         [ L.PTokenStyledText
-                            (L.StyledText {body = "foo", style = L.styleMaskFrom [L.Bold]}),
-                          L.PTokenStyledText (L.StyledText {body = "bar", style = L.styleMaskFrom [L.Bold, L.Italic]}),
+                            (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
+                          L.PTokenStyledText (L.StyledText {body = "bar ", style = L.styleMaskFrom [L.Bold, L.Italic]}),
                           L.PTokenStyledText
                             ( L.StyledText
                                 { body = "underlined bold and italic",
                                   style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
                                 }
                             ),
-                          L.PTokenStyledText (L.StyledText {body = "baz", style = L.styleMaskFrom [L.Bold]}),
+                          L.PTokenStyledText (L.StyledText {body = " baz", style = L.styleMaskFrom [L.Bold]}),
+                          L.PTokenStyledText (L.StyledText {body = " ", style = L.styleMaskFrom []}),
                           L.PTokenStyledText (L.StyledText {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
+                          L.PTokenStyledText (L.StyledText {body = " ", style = L.styleMaskFrom []}),
                           L.PTokenStyledText (L.StyledText {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
+                          L.PTokenStyledText (L.StyledText {body = " ", style = L.styleMaskFrom []}),
                           L.PTokenStyledText
                             ( L.StyledText
-                                { body = "strikethrough",
+                                { body = "strikethrough ",
                                   style = L.styleMaskFrom [L.Strikethrough]
                                 }
                             ),
@@ -225,13 +228,15 @@ spec =
                     { level = 1,
                       body =
                         [ L.PTokenStyledText
-                            (L.StyledText {body = "(foo", style = L.styleMaskFrom []}),
+                            (L.StyledText {body = "(foo ", style = L.styleMaskFrom []}),
                           L.PTokenStyledText
                             (L.StyledText {body = "bar", style = L.styleMaskFrom [L.Verbatim]}),
                           L.PTokenStyledText
-                            (L.StyledText {body = "). What's up? and", style = L.styleMaskFrom []}),
+                            (L.StyledText {body = "). What's up? and ", style = L.styleMaskFrom []}),
                           L.PTokenStyledText
                             (L.StyledText {body = "that!", style = L.styleMaskFrom [L.Bold]}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = " ", style = L.styleMaskFrom []}),
                           L.PTokenStyledText
                             (L.StyledText {body = "(italic)", style = L.styleMaskFrom [L.Italic]}),
                           L.PTokenStyledText
@@ -260,6 +265,12 @@ spec =
                                   body = "foo"
                                 }
                             ),
+                          L.PTokenStyledText
+                            ( L.StyledText
+                                { body = " ",
+                                  style = L.styleMaskFrom []
+                                }
+                            ),
                           L.PTokenLink
                             ( L.Link
                                 { typ = L.LinkExternal,
@@ -284,6 +295,12 @@ spec =
                             ( L.MathFragment
                                 { meta = fromList [],
                                   body = "bar"
+                                }
+                            ),
+                          L.PTokenStyledText
+                            ( L.StyledText
+                                { body = " ",
+                                  style = L.styleMaskFrom []
                                 }
                             ),
                           L.PTokenLink
