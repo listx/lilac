@@ -397,3 +397,128 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
+    p
+      "parses blocks with noweb references"
+      "test/Lilac/ParseSpec/0007-blocks-noweb"
+      $ L.OrgDoc
+        { cells =
+            [ L.CBlock
+                ( L.Block
+                    { meta =
+                        fromList
+                          [ ("__block_type", "src"),
+                            ("__src_language", "sh")
+                          ],
+                      body =
+                        [ L.BTokenLink
+                            ( L.Link
+                                { typ = L.LinkNoweb,
+                                  target = "foo",
+                                  name =
+                                    [ L.StyledText
+                                        { body = "foo",
+                                          style = L.styleMaskFrom []
+                                        }
+                                    ]
+                                }
+                            ),
+                          L.BTokenString "\n\n<<quux\n>>\necho ",
+                          L.BTokenLink
+                            ( L.Link
+                                { typ = L.LinkNoweb,
+                                  target = "bar",
+                                  name =
+                                    [ L.StyledText
+                                        { body = "bar",
+                                          style = L.styleMaskFrom []
+                                        }
+                                    ]
+                                }
+                            ),
+                          L.BTokenString " x y z"
+                        ]
+                    }
+                )
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    p
+      "parses blocks"
+      "test/Lilac/ParseSpec/0007-blocks-empty"
+      $ L.OrgDoc
+        { cells =
+            [ L.CBlock
+                ( L.Block
+                    { meta =
+                        fromList
+                          [ ("__block_type", "src"),
+                            ("__src_language", "haskell")
+                          ],
+                      body = []
+                    }
+                ),
+              L.CBlock
+                ( L.Block
+                    { meta =
+                        fromList
+                          [ ("__block_type", "example")
+                          ],
+                      body = []
+                    }
+                ),
+              L.CBlock
+                ( L.Block
+                    { meta =
+                        fromList
+                          [ ("__block_type", "quote")
+                          ],
+                      body = []
+                    }
+                )
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    pf
+      "detects missing language specifier in src blocks"
+      "test/Lilac/ParseSpec/0007-block-src-without-lang"
+      "block type src requires a language specifier"
+      11
+
+    p
+      "parses block metadata"
+      "test/Lilac/ParseSpec/0007-blocks-metadata"
+      $ L.OrgDoc
+        { cells =
+            [ L.CBlock
+                ( L.Block
+                    { meta =
+                        fromList
+                          [ ("__block_type", "src"),
+                            ("__src_language", "haskell"),
+                            ("name", "some-code"),
+                            ("noweb-ref", "Foo bar")
+                          ],
+                      body = []
+                    }
+                ),
+              L.CBlock
+                ( L.Block
+                    { meta =
+                        fromList
+                          [ ("__block_type", "example"),
+                            ("name", "some-example")
+                          ],
+                      body = []
+                    }
+                )
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }

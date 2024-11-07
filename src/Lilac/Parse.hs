@@ -15,6 +15,8 @@ module Lilac.Parse
     Style (..),
     StyledText (..),
     StyleMask (..),
+    Block (..),
+    BToken (..),
   )
 where
 
@@ -332,13 +334,22 @@ defaultOrgDocWithMeta metas =
 
 docMetaEntryParser :: OrgParser (T.Text, T.Text)
 docMetaEntryParser = do
+  avoidParsingBlockMetadata
   _ <- string "#+"
-  key <- MP.takeWhile1P (Just "keyword letter") isKeywordLetter
+  key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
   _ <- symbol ":"
   value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+    avoidParsingBlockMetadata :: OrgParser ()
+    avoidParsingBlockMetadata =
+      MP.notFollowedBy
+        $ MP.choice
+          [ string "#+begin_",
+            string "#+name: ",
+            string "#+header: "
+          ]
 
 docMetaParser :: OrgParser (M.Map T.Text T.Text)
 docMetaParser = do
@@ -350,6 +361,7 @@ cellParser =
   lexeme
     $ MP.choice
       [ headingParser,
+        blockParser,
         paragraphParser
       ]
 
@@ -565,3 +577,103 @@ paragraphParser = do
     spaceConsumer' = do
       MP.notFollowedBy (string "\n\n")
       MP.takeWhile1P (Just "whitespace (newlines allowed)") isSpace
+
+blockMetaEntryParser :: OrgParser (T.Text, T.Text)
+blockMetaEntryParser = do
+  _ <- string "#+header: :"
+  key <- MP.takeWhile1P (Just "(block meta) keyword letter") isKeywordLetter
+  _ <- char ' '
+  value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
+  _ <- char '\n'
+  pure (key, value)
+  where
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')]
+
+metaNameParser :: OrgParser (T.Text, T.Text)
+metaNameParser = do
+  _ <- string "#+name: "
+  name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
+  pure ("name", name)
+
+blockParser :: OrgParser Cell
+blockParser = do
+  blockName <- MP.optional metaNameParser
+  metaKVs <- many (lexeme blockMetaEntryParser)
+  _ <- string "#+begin_"
+  blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
+  srcLang <- MP.optional $ do
+    _ <- MP.skipSome $ char ' '
+    src <- MP.takeWhile1P (Just "src language") isAsciiLower
+    pure ("__src_language", src)
+  when (blockType == "src" && srcLang == Nothing)
+    $ fail "block type src requires a language specifier"
+  _ <- char '\n'
+  bTokens <-
+    MP.choice
+      [ zeroBTokensParser blockType,
+        someBTokensParser blockType
+      ]
+  pure
+    . CBlock
+    $ Block
+      { meta =
+          M.fromList
+            $ (("__block_type", blockType) : metaKVs)
+            <> concatMap maybeToList [blockName, srcLang],
+        body = compressBTokens bTokens
+      }
+  where
+    zeroBTokensParser :: T.Text -> OrgParser [BToken]
+    zeroBTokensParser blockType = do
+      _ <- string $ T.concat ["#+end_", blockType, "\n"]
+      pure []
+    someBTokensParser blockType =
+      MP.someTill
+        (bTokenParser (blockType == "src"))
+        (string $ T.concat ["\n#+end_", blockType, "\n"])
+
+bTokenParser :: Bool -> OrgParser BToken
+bTokenParser isSrcBlock = MP.choice parsers
+  where
+    baseParsers :: [OrgParser BToken]
+    baseParsers =
+      [ BTokenString <$> (MP.takeWhile1P (Just "block token") (not . isSpace)),
+        BTokenString <$> (MP.takeWhile1P (Just "spaces inside block") isSpace)
+      ]
+    parsers =
+      if isSrcBlock
+        then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
+        else baseParsers
+
+nowebLinkParser :: OrgParser Link
+nowebLinkParser = do
+  linkName <-
+    MP.between
+      (string "<<")
+      (string ">>")
+      ( MP.takeWhile1P
+          (Just "Noweb reference name")
+          isNowebReferenceChar
+      )
+  pure
+    $ Link
+      { typ = LinkNoweb,
+        target = linkName,
+        name =
+          [ StyledText
+              { body = linkName,
+                style = styleMaskFrom []
+              }
+          ]
+      }
+  where
+    isNowebReferenceChar c = c /= '\n' && c /= '>'
+
+compressBTokens :: [BToken] -> [BToken]
+compressBTokens = reverse . foldl' f []
+  where
+    f :: [BToken] -> BToken -> [BToken]
+    f [] token = token : []
+    f ((BTokenString text1) : rest) (BTokenString text2) =
+      (BTokenString $ T.append text1 text2) : rest
+    f acc token = token : acc
