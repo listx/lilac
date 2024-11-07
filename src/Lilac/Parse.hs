@@ -470,7 +470,7 @@ styledTextParser = do
       | otherwise = MP.takeWhile1P (Just "prose word") isProseWord
 
 compressProse :: [PToken] -> [PToken]
-compressProse = reverse . foldl' f []
+compressProse = reverse . dropTrailingWhitespace . foldl' f []
   where
     f :: [PToken] -> PToken -> [PToken]
     f [] token = token : []
@@ -485,6 +485,9 @@ compressProse = reverse . foldl' f []
         where
           styles = concatMap maskToStyles [style1, style2]
     f acc token = token : acc
+    dropTrailingWhitespace [] = []
+    dropTrailingWhitespace (((PTokenStyledText (StyledText " " _))) : rest) = rest
+    dropTrailingWhitespace tokens = tokens
 
 linkParser :: OrgParser Link
 linkParser = do

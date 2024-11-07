@@ -275,9 +275,7 @@ spec =
                 ],
               L.CParagraph
                 [ L.PTokenStyledText
-                    (L.StyledText {body = "multiple lines with underscore", style = L.styleMaskFrom [L.Underline]}),
-                  L.PTokenStyledText
-                    (L.StyledText {body = " ", style = L.styleMaskFrom []})
+                    (L.StyledText {body = "multiple lines with underscore", style = L.styleMaskFrom [L.Underline]})
                 ]
             ],
           code = [],

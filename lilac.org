@@ -1915,6 +1915,7 @@ p
 As seen in [[Cell ADT][the Cell ADT]], there are many different types of cells. The
 =cellParser= is responsible for parsing these different types.
 
+#+name: func:cellParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 cellParser :: OrgParser Cell
@@ -2397,7 +2398,7 @@ single =StyledText= object. For this purpose, we have =compressProse=.
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 compressProse :: [PToken] -> [PToken]
-compressProse = reverse . foldl' f []
+compressProse = reverse . dropTrailingWhitespace . foldl' f []
   where
     f :: [PToken] -> PToken -> [PToken]
     f [] token = token : []
@@ -2412,7 +2413,28 @@ compressProse = reverse . foldl' f []
         where
           styles = concatMap maskToStyles [style1, style2]
     f acc token = token : acc
+    dropTrailingWhitespace [] = []
+    dropTrailingWhitespace (((PTokenStyledText (StyledText " " _))) : rest) = rest
+    dropTrailingWhitespace tokens = tokens
 #+end_src
+
+=compressProse= also eliminates trailing whitespace, with =dropTrailingWhitespace=.
+Trailing whitespace can occur if the last word of a paragraph (at the end of the
+file) ends with an active =StyleMask= (trailing whitespace between paragraphs
+can't occur because the =lexeme= in [[func:cellParser]] will skip past them). For
+example, if the input text looks like
+
+#+begin_src org
+_foo
+bar_
+#+end_src
+
+then the last underscore can be followed by a newline (assuming the editor used
+to edit this file is UNIX-friendly and appends a trailing newline), in which
+case that newline would get parsed by the =spaceConsumer'= in
+[[func:paragraphParser]] as its own separate =StyledText= object as a single space
+character. We want to eliminate these objects because they don't add any useful
+information, and so we use =dropTrailingWhitespace= above to filter them out.
 
 Here we test how we minimize the number of =PToken= objects; although the
 individual letters (without any styling, and with bold styling) are spaced out
@@ -3003,9 +3025,7 @@ p
     ],
   L.CParagraph
     [ L.PTokenStyledText
-        (L.StyledText {body = "multiple lines with underscore", style = L.styleMaskFrom [L.Underline]}),
-      L.PTokenStyledText
-        (L.StyledText {body = " ", style = L.styleMaskFrom []})
+        (L.StyledText {body = "multiple lines with underscore", style = L.styleMaskFrom [L.Underline]})
     ]
 ]
 #+end_src
