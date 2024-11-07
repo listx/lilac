@@ -365,12 +365,8 @@ spec =
                 ( L.Heading
                     { level = 1,
                       body =
-                        [ L.PTokenMathFragment
-                            ( L.MathFragment
-                                { meta = fromList [],
-                                  body = "foo"
-                                }
-                            )
+                        [ L.PTokenStyledText
+                            (L.StyledText {body = "foo", style = L.styleMaskFrom []})
                         ],
                       meta = fromList [("FOO", "")]
                     }
@@ -390,12 +386,8 @@ spec =
                 ( L.Heading
                     { level = 1,
                       body =
-                        [ L.PTokenMathFragment
-                            ( L.MathFragment
-                                { meta = fromList [],
-                                  body = "foo"
-                                }
-                            )
+                        [ L.PTokenStyledText
+                            (L.StyledText {body = "foo", style = L.styleMaskFrom []})
                         ],
                       meta = fromList [("FOO", "- a\n- b\n")]
                     }

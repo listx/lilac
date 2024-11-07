@@ -2888,7 +2888,7 @@ drawerParser = do
 
 #+header: :tangle test/Lilac/ParseSpec/0004-drawers-empty
 #+begin_src org
-,* \(foo\)
+,* foo
 :FOO:
 :END:
 #+end_src
@@ -2904,12 +2904,8 @@ p
             ( L.Heading
                 { level = 1,
                   body =
-                    [ L.PTokenMathFragment
-                        ( L.MathFragment
-                            { meta = fromList [],
-                              body = "foo"
-                            }
-                        )
+                    [ L.PTokenStyledText
+                        (L.StyledText {body = "foo", style = L.styleMaskFrom []})
                     ],
                   meta = fromList [("FOO", "")]
                 }
@@ -2923,7 +2919,7 @@ p
 
 #+header: :tangle test/Lilac/ParseSpec/0004-drawers-not-empty
 #+begin_src org
-,* \(foo\)
+,* foo
 :FOO:
 - a
 - b
@@ -2941,12 +2937,8 @@ p
             ( L.Heading
                 { level = 1,
                   body =
-                    [ L.PTokenMathFragment
-                        ( L.MathFragment
-                            { meta = fromList [],
-                              body = "foo"
-                            }
-                        )
+                    [ L.PTokenStyledText
+                        (L.StyledText {body = "foo", style = L.styleMaskFrom []})
                     ],
                   meta = fromList [("FOO", "- a\n- b\n")]
                 }
