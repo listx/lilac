@@ -263,17 +263,17 @@ spec =
       "test/Lilac/ParseSpec/0005-prose-paragraphs"
       $ L.OrgDoc
         { cells =
-            [ L.CProse
+            [ L.CParagraph
                 [ L.PTokenStyledText
                     (L.StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
                   L.PTokenStyledText
                     (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
                 ],
-              L.CProse
+              L.CParagraph
                 [ L.PTokenStyledText
                     (L.StyledText {body = "x y z foo bar", style = L.styleMaskFrom []})
                 ],
-              L.CProse
+              L.CParagraph
                 [ L.PTokenStyledText
                     (L.StyledText {body = "multiple lines with underscore", style = L.styleMaskFrom [L.Underline]}),
                   L.PTokenStyledText

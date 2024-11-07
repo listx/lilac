@@ -44,7 +44,7 @@ data OrgDoc = OrgDoc
 type Cell :: Type
 data Cell
   = CHeading Heading
-  | CProse Prose
+  | CParagraph Prose
   | CBlock Block
   | CListItem ListItem
   | CMathFragment MathFragment
@@ -556,7 +556,7 @@ paragraphParser :: OrgParser Cell
 paragraphParser = do
   prose <- MP.some $ pTokenParser spaceConsumer'
   failIfLeftoverActiveStyles
-  pure . CProse $ compressProse prose
+  pure . CParagraph $ compressProse prose
   where
     spaceConsumer' :: OrgParser T.Text
     spaceConsumer' = do

@@ -1173,7 +1173,7 @@ A cell is roughly any newline-delimited region of text.
 type Cell :: Type
 data Cell
   = CHeading Heading
-  | CProse Prose
+  | CParagraph Prose
   | CBlock Block
   | CListItem ListItem
   | CMathFragment MathFragment
@@ -2950,7 +2950,7 @@ paragraphParser :: OrgParser Cell
 paragraphParser = do
   prose <- MP.some $ pTokenParser spaceConsumer'
   failIfLeftoverActiveStyles
-  pure . CProse $ compressProse prose
+  pure . CParagraph $ compressProse prose
   where
     spaceConsumer' :: OrgParser T.Text
     spaceConsumer' = do
@@ -2991,17 +2991,17 @@ p
 
 #+header: :noweb-ref Expected prose for 0005-prose-paragraphs
 #+begin_src haskell
-[ L.CProse
+[ L.CParagraph
     [ L.PTokenStyledText
         (L.StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
       L.PTokenStyledText
         (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
     ],
-  L.CProse
+  L.CParagraph
     [ L.PTokenStyledText
         (L.StyledText {body = "x y z foo bar", style = L.styleMaskFrom []})
     ],
-  L.CProse
+  L.CParagraph
     [ L.PTokenStyledText
         (L.StyledText {body = "multiple lines with underscore", style = L.styleMaskFrom [L.Underline]}),
       L.PTokenStyledText
