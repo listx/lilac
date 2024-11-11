@@ -3093,10 +3093,14 @@ blockParser = do
   when (blockType == "src" && srcLang == Nothing)
     $ fail "block type src requires a language specifier"
   _ <- char '\n'
+  let nowebOff =
+        (== Just "off")
+          . EM.lookup "noweb"
+          $ M.fromList metaKVs
   bTokens <-
     MP.choice
       [ zeroBTokensParser blockType,
-        someBTokensParser blockType
+        someBTokensParser blockType (not nowebOff)
       ]
   pure
     . CBlock
@@ -3112,9 +3116,9 @@ blockParser = do
     zeroBTokensParser blockType = do
       _ <- string $ T.concat ["#+end_", blockType, "\n"]
       pure []
-    someBTokensParser blockType =
+    someBTokensParser blockType nowebOn =
       MP.someTill
-        (bTokenParser (blockType == "src"))
+        (bTokenParser (blockType == "src") nowebOn)
         (string $ T.concat ["\n#+end_", blockType, "\n"])
 #+end_src
 
@@ -3133,8 +3137,8 @@ we end up expecting =someBTokensParser= to succeed.
 #+name: func:bTokenParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-bTokenParser :: Bool -> OrgParser BToken
-bTokenParser isSrcBlock = MP.choice parsers
+bTokenParser :: Bool -> Bool -> OrgParser BToken
+bTokenParser isSrcBlock nowebOn = MP.choice parsers
   where
     baseParsers :: [OrgParser BToken]
     baseParsers =
@@ -3142,7 +3146,7 @@ bTokenParser isSrcBlock = MP.choice parsers
         BTokenString <$> (MP.takeWhile1P (Just "spaces inside block") isSpace)
       ]
     parsers =
-      if isSrcBlock
+      if isSrcBlock && nowebOn
         then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
         else baseParsers
 #+end_src
@@ -3287,6 +3291,61 @@ p
 
 We had to set =#+header: :noweb off= here as well, to avoid the =<<quux\n>>= bit
 from becoming interpreted as a Noweb reference.
+
+Speaking of =#+header: :noweb off=, we also want to test this for Lilac as well.
+That is, if Lilac sees this header, it should not treat text that look like
+=<<foo>>= as a Noweb link, but as a literal =<<foo>>= string.
+
+#+name: test:0007-blocks-noweb-off
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-noweb-off
+#+header: :noweb off
+#+begin_src org
+,#+header: :noweb off
+,#+begin_src sh
+<<foo>>
+
+<<quux
+>>
+echo <<bar>> x y z
+,#+end_src
+#+end_src
+
+#+header: :noweb-ref Test block parsing
+#+begin_src haskell
+p
+  "parses blocks with noweb references, but treats them if ':noweb' is 'off'"
+  "test/Lilac/ParseSpec/0007-blocks-noweb-off"
+  $ L.OrgDoc
+    { cells =
+        <<Expected blocks for 0007-blocks-noweb-off>>,
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+#+header: :noweb-ref Expected blocks for 0007-blocks-noweb-off
+#+header: :noweb off
+#+begin_src haskell
+[ L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("noweb", "off")
+              ],
+          body =
+            [ L.BTokenString "<<foo>>\n\n<<quux\n>>\necho <<bar>> x y z"
+            ]
+        }
+    )
+]
+#+end_src
+
+Because Lilac relies heavily on Noweb references (links), it will be turned on
+by default. So the only way to disable them would be to set =#+header: :noweb off=
+for each block where you'd want it disabled.
 
 ******* Additional tests
 
@@ -3549,6 +3608,13 @@ dist-newstyle
 result*
 *~
 #+end_src
+
+* Future work
+
+** Propagation of PROPERTIES metadata to subtrees
+
+For example, we'd like to be able to turn off Noweb links for all blocks in a
+subtree instead of doing it per-block, as in [[test:0007-blocks-noweb-off]].
 
 * Footnotes
 

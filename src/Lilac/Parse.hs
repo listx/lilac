@@ -608,10 +608,14 @@ blockParser = do
   when (blockType == "src" && srcLang == Nothing)
     $ fail "block type src requires a language specifier"
   _ <- char '\n'
+  let nowebOff =
+        (== Just "off")
+          . EM.lookup "noweb"
+          $ M.fromList metaKVs
   bTokens <-
     MP.choice
       [ zeroBTokensParser blockType,
-        someBTokensParser blockType
+        someBTokensParser blockType (not nowebOff)
       ]
   pure
     . CBlock
@@ -627,13 +631,13 @@ blockParser = do
     zeroBTokensParser blockType = do
       _ <- string $ T.concat ["#+end_", blockType, "\n"]
       pure []
-    someBTokensParser blockType =
+    someBTokensParser blockType nowebOn =
       MP.someTill
-        (bTokenParser (blockType == "src"))
+        (bTokenParser (blockType == "src") nowebOn)
         (string $ T.concat ["\n#+end_", blockType, "\n"])
 
-bTokenParser :: Bool -> OrgParser BToken
-bTokenParser isSrcBlock = MP.choice parsers
+bTokenParser :: Bool -> Bool -> OrgParser BToken
+bTokenParser isSrcBlock nowebOn = MP.choice parsers
   where
     baseParsers :: [OrgParser BToken]
     baseParsers =
@@ -641,7 +645,7 @@ bTokenParser isSrcBlock = MP.choice parsers
         BTokenString <$> (MP.takeWhile1P (Just "spaces inside block") isSpace)
       ]
     parsers =
-      if isSrcBlock
+      if isSrcBlock && nowebOn
         then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
         else baseParsers
 

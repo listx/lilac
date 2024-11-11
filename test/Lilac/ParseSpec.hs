@@ -446,6 +446,30 @@ spec =
         }
 
     p
+      "parses blocks with noweb references, but treats them if ':noweb' is 'off'"
+      "test/Lilac/ParseSpec/0007-blocks-noweb-off"
+      $ L.OrgDoc
+        { cells =
+            [ L.CBlock
+                ( L.Block
+                    { meta =
+                        fromList
+                          [ ("__block_type", "src"),
+                            ("__src_language", "sh"),
+                            ("noweb", "off")
+                          ],
+                      body =
+                        [ L.BTokenString "<<foo>>\n\n<<quux\n>>\necho <<bar>> x y z"
+                        ]
+                    }
+                )
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    p
       "parses blocks"
       "test/Lilac/ParseSpec/0007-blocks-empty"
       $ L.OrgDoc
