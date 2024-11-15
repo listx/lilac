@@ -1675,7 +1675,7 @@ spaceConsumer =
     singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = L.skipLineComment "# "
     blockCommentParser :: OrgParser ()
-    blockCommentParser = L.skipBlockComment "#+begin_comment" "#+end_comment"
+    blockCommentParser = L.skipBlockComment "#+begin_comment\n" "#+end_comment\n"
 #+end_src
 
 The three arguments to =L.space= (where =L= stands for =Text.Megaparsec.Char.Lexer=)
@@ -1686,7 +1686,14 @@ may loop forever upon seeing non-space input.
 
 The ="# "= for =singleLineCommentParser= signifies that single-line comments start
 with a pound sign and a space. The =blockCommentParser= uses =L.skipBlockComment= to
-denote a region of text which is considered a commented area.
+denote a region of text which is considered a commented area. We include
+explicit newlines in =blockCommentParser= because we want to ensure that block
+comment lines are always on their own (without any trailing text on the same
+line right after it).
+
+=L.space= will try to repeatedly apply the three given parsers over and over
+again; it only stops parsing (skipping over the spaces) when none of the three
+parsers can consume input.
 
 We have two more helpers for us. The first is =symbol=, which parses any trailing
 spaces or comments after parsing the given text.
