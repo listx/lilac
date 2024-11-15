@@ -250,9 +250,9 @@ spaceConsumer =
     whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = space1
     singleLineCommentParser :: OrgParser ()
-    singleLineCommentParser = (L.skipLineComment "# ")
+    singleLineCommentParser = L.skipLineComment "# "
     blockCommentParser :: OrgParser ()
-    blockCommentParser = (L.skipBlockComment "#+begin_comment" "#+end_comment")
+    blockCommentParser = L.skipBlockComment "#+begin_comment" "#+end_comment"
 
 symbol :: T.Text -> OrgParser T.Text
 symbol = L.symbol spaceConsumer

@@ -1673,9 +1673,9 @@ spaceConsumer =
     whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = space1
     singleLineCommentParser :: OrgParser ()
-    singleLineCommentParser = (L.skipLineComment "# ")
+    singleLineCommentParser = L.skipLineComment "# "
     blockCommentParser :: OrgParser ()
-    blockCommentParser = (L.skipBlockComment "#+begin_comment" "#+end_comment")
+    blockCommentParser = L.skipBlockComment "#+begin_comment" "#+end_comment"
 #+end_src
 
 The three arguments to =L.space= (where =L= stands for =Text.Megaparsec.Char.Lexer=)
