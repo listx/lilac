@@ -337,7 +337,7 @@ docMetaEntryParser = do
   avoidParsingBlockMetadata
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
-  _ <- symbol ":"
+  _ <- L.symbol spaceConsumerNoNewline ":"
   value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
   pure (key, value)
   where

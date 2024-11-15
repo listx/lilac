@@ -1832,7 +1832,7 @@ docMetaEntryParser = do
   avoidParsingBlockMetadata
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
-  _ <- symbol ":"
+  _ <- L.symbol spaceConsumerNoNewline ":"
   value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
   pure (key, value)
   where
@@ -1864,8 +1864,6 @@ docMetaParser = do
 
 Below are some unit test cases for parsing metadata.
 
-****** Tests without comments and trailing whitespace
-
 #+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata
 #+begin_src org
 ,#+title: An Org Document
@@ -1891,9 +1889,7 @@ above represents a boolean "true" value. Similarly the value of the =property= k
 above is a mess because it itself contains a key and value (=:noweb= and
 =no-export=).
 
-****** Tests with comments and trailing whitespace
-
-This is the same as the test above, but with some whitespace and comments
+Below is the same as the test above, but with some whitespace and comments
 sprinkled in between.
 
 #+header: :tangle test/Lilac/ParseSpec/0003-doc-metadata-with-comments
@@ -1931,6 +1927,37 @@ p
       ("property", "header-args+ :noweb no-export"),
       ("title", "An Org Document")
     ]
+#+end_src
+
+Ignore leading whitespace just before the metadata value.
+
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value
+#+begin_src org
+,#+title:             Parse me without leading whitespace
+#+end_src
+
+#+header: :noweb-ref Test parsing document metadata
+#+begin_src haskell
+p "parses document metadata" "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
+  $ L.defaultOrgDocWithMeta
+    [ ("title", "Parse me without leading whitespace")
+    ]
+#+end_src
+
+Fail if the value part is missing.
+
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-missing-value
+#+begin_src org
+,#+title:
+#+end_src
+
+#+header: :noweb-ref Test parsing document metadata
+#+begin_src haskell
+pfm
+  "detects missing document metadata value"
+  "test/Lilac/ParseSpec/0002-doc-metadata-missing-value"
+  (utok '\n' <> elabel "value letter")
+  8
 #+end_src
 
 ***** Cells
@@ -3503,14 +3530,19 @@ module Lilac.ParseSpec (spec) where
 
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
+import Data.Text qualified as T
 import Lilac.Parse qualified as L
 import Relude
 import Test.Hspec (Spec, before, describe, it)
 import Test.Hspec.Megaparsec
-  ( errFancy,
+  ( ET,
+    elabel,
+    err,
+    errFancy,
     fancy,
     shouldFailWith,
     shouldParse,
+    utok,
   )
 import Text.Megaparsec qualified as MP
 #+end_src
@@ -3552,6 +3584,24 @@ check for failures in parsers where we manually return an error with
 =Control.Monad.fail= (as opposed to Megaparsec itself throwing the error because
 of a failure of the given parser combinators to account for the shape of the
 input text).
+
+Lastly we use a =pfm= helper, which checks for failures thrown by Megaparsec (the
+ones that =pf= do not check for). The =ET= likely stands for "trivial errors" or
+(error "trivial"), because it is documented in upstream as "Auxiliary type for
+construction of trivial parse errors.".
+
+#+header: :tangle test/Lilac/ParseSpec.hs
+#+begin_src haskell
+pfm :: String -> FilePath -> ET T.Text -> Int -> Spec
+pfm behavior path errorTrivial pos = do
+  before (readFileBS path) $ do
+    it behavior $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        path
+        (decodeUtf8 input)
+        `shouldFailWith` (err pos errorTrivial)
+#+end_src
 
 Below are all of the individual test cases.
 

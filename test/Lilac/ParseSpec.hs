@@ -2,14 +2,19 @@ module Lilac.ParseSpec (spec) where
 
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
+import Data.Text qualified as T
 import Lilac.Parse qualified as L
 import Relude
 import Test.Hspec (Spec, before, describe, it)
 import Test.Hspec.Megaparsec
-  ( errFancy,
+  ( ET,
+    elabel,
+    err,
+    errFancy,
     fancy,
     shouldFailWith,
     shouldParse,
+    utok,
   )
 import Text.Megaparsec qualified as MP
 
@@ -32,6 +37,16 @@ pf behavior path errMsg pos = do
         path
         (decodeUtf8 input)
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
+
+pfm :: String -> FilePath -> ET T.Text -> Int -> Spec
+pfm behavior path errorTrivial pos = do
+  before (readFileBS path) $ do
+    it behavior $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        path
+        (decodeUtf8 input)
+        `shouldFailWith` (err pos errorTrivial)
 
 spec :: Spec
 spec =
@@ -63,6 +78,17 @@ spec =
           ("property", "header-args+ :noweb no-export"),
           ("title", "An Org Document")
         ]
+
+    p "parses document metadata" "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
+      $ L.defaultOrgDocWithMeta
+        [ ("title", "Parse me without leading whitespace")
+        ]
+
+    pfm
+      "detects missing document metadata value"
+      "test/Lilac/ParseSpec/0002-doc-metadata-missing-value"
+      (utok '\n' <> elabel "value letter")
+      8
     pf
       "detects unbalanced style markers (redundant activations)"
       "test/Lilac/ParseSpec/0005-styled-strings-redundant-activations"
