@@ -1149,6 +1149,7 @@ a tree.
 In summary an Org document is made up of cells and code graphs, as well as some
 metadata (the title, author name, etc).
 
+#+name: data:OrgDoc
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type OrgDoc :: Type
@@ -1163,19 +1164,21 @@ data OrgDoc = OrgDoc
 
 We'll examine the =Cell= type first, followed by code graphs.
 
-**** Cell list
+**** Cells
 
-A cell is roughly any newline-delimited region of text.
+A cell is roughly any newline-delimited region of text. The only exception is
+the =CListItem= which is purely structural (it only describes itself and relies on
+other cells for displaying much of the information).
 
-#+name: Cell ADT
+#+name: data:Cell
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type Cell :: Type
 data Cell
   = CHeading Heading
+  | CListItem [ListMarker]
   | CParagraph Prose
   | CBlock Block
-  | CListItem ListItem
   | CMathFragment MathFragment
   | CFigure Figure
   | CTable Table
@@ -1416,35 +1419,89 @@ data BToken
 #+end_src
 
 ***** List items
+:PROPERTIES:
+:ID:       58f69993-599d-4389-ba47-3056b1bb2350
+:END:
 
-List items begin with a dash. Below is an example:
+A /list item/ is made up of a /list head/ and /list body/. Consider the following
+list:
 
-  - foo
-  - bar
-    + baz
-  - quux
+  1) a
 
-The symbols =-= and =+= can be used, but they are treated the same. Only the
-/indentation/ matters. That is, the list below is equivalent to the list above
+     b
 
-  + foo
-  - bar
-    - baz
-  + quux
+     - c
 
-Lists must start with leading indentation (this deviates from vanilla Org which
-does not have this requirement).
+     d
+
+  2) e
+
+Here the =1)= and =2)= are list heads for an /ordered/ list. The single dash =-= before
+"c" is also a list head, but for an /unordered/ list. The list body for =1)=
+includes the paragraphs =a=, =b=, the nested list item =c=, and the paragraph =d=. There
+are two list items for the top-level ordered list =1)= and =2)=.
+
+List heads encode the structure of cells that sit in the list bodies. So list
+items encode both structure and content. In this manner they are similar to
+headings. However unlike headings, a list item can have multiple other cells
+(paragraphs, tables, or even code blocks) in its body, whereas a heading can
+only have a single line of prose.
+
+Keeping track of the current level of indentation requires additional state
+during parsing, which we encode with =Level= (used by =listLevels= in
+[[data:OrgParserState]]).
 
 #+header: :noweb-ref Data structures
 #+begin_src haskell
-type ListItem :: Type
-data ListItem = ListItem
-  { level :: Int,
-    ordered :: Bool,
-    body :: Prose
+type Level :: Type
+data Level = Level
+  { indent :: Int,
+    number :: Maybe Int
   }
   deriving stock (Eq, Show)
 #+end_src
+
+This keeps track of the indentations and the last seen number of each (nested)
+level of indentation seen thus far during parsing. Whenever we see a list head
+like =1)= or ~-~, we can record the number used as well as the indentations we
+expect for the list head and list body. The main point of =listLevels= is to ensure
+that the input is correctly formatted, as well as to detect whenever we start
+nesting an additional level, or if we back out (finish) one or more levels of
+nesting (when we see dedented text).
+
+If we parse a list item, we update the =listLevels= entry for that
+level. The idea is to check (during parsing) how these levels change, so that we
+can create "start" and "end" markers for list items at a particular level. We
+take this model from HTML, which uses =<ol>= and =</ol>= to encode the start and
+end of ordered lists (=<ul>= and =</ul>= for unordered lists), and =<li>= and =</li>= to
+mark the start and en of a single list item. We encoded changes of these levels
+by parsing =ListMarker= objects as a =CListItem= cell (see [[data:Cell]]).
+
+#+name: data:ListMarker
+#+header: :noweb-ref Data structures
+#+begin_src haskell
+type ListMarker :: Type
+data ListMarker
+  = LOrderedStart
+  | LOrderedEnd
+  | LUnorderedStart
+  | LUnorderedEnd
+  | LItemStart
+  | LItemEnd
+  deriving stock (Eq, Show)
+#+end_src
+
+The =ListMarker= is equivalent to HTML's notion of ordered lists, unordered lists,
+and list items (their start and ending tags). We reuse them here because they're
+simple to reason about.
+
+In summary when we parse a list item, we parse it as a combination of =CListItem=
+and other cell types for the list structure and content, respectively. This lets
+us parse things into a single global list of cells in [[func:cellParser]], without a
+need to nest them inside a recursive data structure (as shown in
+https://markkarpov.com/tutorial/megaparsec.html#nested-indented-list).
+
+See the parsing of [[id:910d5a04-739c-4125-9a94-803ea0ebeaee][List items]] for parsing implementation details.
 
 ***** Math fragments
 
@@ -1568,12 +1625,14 @@ module Lilac.Parse
     StyleMask (..),
     Block (..),
     BToken (..),
+    ListMarker (..),
+    Level (..),
   )
 where
 
 import Data.Bits (complement, setBit, testBit, (.&.), (.^.), (.|.))
 import Data.Bits.Bitwise (toListLE)
-import Data.Char (isAsciiLower, isSpace)
+import Data.Char (isAsciiLower, isDigit, isSpace)
 import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
@@ -1620,14 +1679,17 @@ type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
 #+end_src
 
 The =OrgParserState= is the custom state we want to use to read and write from
-while parsing. It currently holds the =StyleMask= to keep track of styles. See [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the
-section on parsing styles to see how it's used]].
+while parsing. The =styleMask= is discussed in [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the section on parsing styles]]. The
+=listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]].
 
+#+name: data:OrgParserState
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { styleMask :: StyleMask
+  { styleMask :: StyleMask,
+    listLevels :: [Level],
+    listMarkers :: [ListMarker]
   }
   deriving stock (Eq, Show)
 
@@ -1636,7 +1698,9 @@ data OrgParserState = OrgParserState
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { styleMask = styleMaskFrom []
+    { styleMask = styleMaskFrom [],
+      listLevels = [],
+      listMarkers = []
     }
 #+end_src
 
@@ -1686,7 +1750,7 @@ We only parse newline characters in =whiteSpaceParser= above. We don't parse
 spaces. This is because we do not want to skip over any /indentation/ --- that is,
 space characters immediately following a newline. Such indentation could be an
 error (for example, for headings or paragraphs), or a necessary part of a cell
-(for =ListItem= cells), and so we leave that determination up to other parsers.
+(for =CListItem= cells), and so we leave that determination up to other parsers.
 
 It's important that we use =takeWhile1P= for =whiteSpaceParser= (where the =1= denotes
 that it requires at least 1 newline character) because otherwise if it accepts 0
@@ -1872,8 +1936,8 @@ p
     ]
 #+end_src
 
-Indentation is invalid, except for =ListItem= cells. Even single-line comments may
-not be indented.
+Indentation is invalid, except for =CListItem= cells. Even single-line comments
+may not be indented.
 
 #+name: test:0008-indentation-comment
 #+header: :tangle test/Lilac/ParseSpec/0008-indentation-comment
@@ -1955,7 +2019,7 @@ pfm
 
 ***** Cells
 
-As seen in [[Cell ADT][the Cell ADT]], there are many different types of cells. The
+As seen in [[data:Cell][the Cell ADT]], there are many different types of cells. The
 =cellParser= is responsible for parsing these different types.
 
 #+name: func:cellParser
@@ -1965,7 +2029,8 @@ cellParser :: OrgParser Cell
 cellParser =
   lexeme
     $ MP.choice
-      [ headingParser,
+      [ listItemParser,
+        headingParser,
         blockParser,
         paragraphParser,
         detectInvalidIndentation
@@ -3109,6 +3174,533 @@ p
 ]
 #+end_src
 
+****** List items
+:PROPERTIES:
+:ID:       910d5a04-739c-4125-9a94-803ea0ebeaee
+:END:
+
+Below are some detailed rules around /ordered/ list items, themselves expressed as
+ordered list items, which are important for parsing:
+
+  1) List items start out with 2-space indentation. This is because this makes
+     list items easier to read from the raw Org file. The amount of additional
+     indentation (in order to have nested list items) depends on where the text
+     began in the parent item. See items "5)" and "10)" below for examples.
+
+  2) List items must be separate from each other with a blank line. This makes
+     them easier to read when reading the Org file in plain text.
+
+  3) Additional hard-wrapped lines for a list item must be aligned with the text
+     of the first line. This list item is an example of such a line.
+
+  4) List items can have more than one paragraph associated with them.
+
+     This is an example of another paragraph which is still part of the "4)"
+     list item, and has 5 spaces of indentation.
+
+  5) List items can be nested.
+
+     1) This is a nested item, underneath "5)". It has 5 spaces of initial
+        indentation, where the "1" in "1)" lines up with the column where the
+        "L" in "5) List" in the parent item. Subsequent lines of this paragraph
+        have 8 spaces of indentation to line up with the text above it.
+
+  6) Unlike Markdown, the numbers of the list item must increase by one if there
+     are additional items at the same level. The first number of a level may
+     start from any non-negative number; for example, 0, 1, 5, 12 are all valid
+     starting numbers.
+
+  7) The format for ordered list items requires a closing parenthesis
+     immediately after the number. So =1)= is valid, but =1.= is invalid.
+
+  8) Only numbers may be used to denote item position. You cannot use letters or
+     Roman numerals.
+
+  9) There is no limit to the number of consecutive list items at the same
+     level (technically, we use an =Int= type to encode the number, so it will
+     eventually max out, but you'd need millions of items to hit this limit).
+
+  10) The indentation of text changes slightly depending on the number of the
+      item. For example, this line has 6 spaces of indentation, unlike the
+      paragraphs in item "4)" above, which uses 5 spaces.
+
+      1) Similarly, this child item has text which has 9 spaces of indentation,
+         unlike the 8 spaces of indentation in the child item under item "5)"
+         above.
+
+  11) There can only be up to 5 additional levels of nesting (for a total of 6
+      levels of items). This is because excessive nesting is an anti-pattern. If
+      you need more levels, consider using headings instead (which can have an
+      arbitrary level of nesting).
+
+  12) Ordered list items may have unordered list items (discussed next) as
+      children, and vice versa. However you may not mix the two types of items
+      at the same level.
+
+  13) A list item may include a table. However the table cannot be on the same
+      line as the list item head. Below is an example of such a table:
+
+      | foo | bar |
+      |-----+-----|
+      | x   | y   |
+
+  14) Similarly, a list item may include mathematical equations. However, such
+      an equation must be on a separate line from the list item head, just like
+      for tables (see Rule 13 above).
+
+      \[
+         a + b = c
+      \]
+
+      The equation above (and this paragraph) are still part of Rule 14.
+
+  15) Lists may be empty. For example, the following child list is valid even
+      though it does not have any content per se:
+
+      1)
+
+      2)
+
+      3)
+
+Unordered list items use a single dash character =-=, and always use 2-space
+indentation (if you are only using unordered list items for nesting). Below is
+an example:
+
+  - one
+
+  - two
+
+    - foo
+
+    - bar
+
+  - three
+
+Here's an example of mixing ordered and unordered lists:
+
+  - foo
+
+  - bar
+
+    1) one
+
+    2) two
+
+       - baz
+
+       - quux
+
+       Note how this paragraph is under item "2", because it is not indented the
+       same way as "two", not "quux", above.
+
+    3) three
+
+  - dog
+
+You may mix ordered and unordered lists at the same indentation level, as long
+as they are not consecutive (you need some intervening cells, such as the "quux"
+paragraph below):
+
+  - foo
+
+    1) one
+
+    2) two
+
+    quux
+
+    - a
+
+    - b
+
+On top of all this, list items are somewhat complicated because they encode
+structure and also modify the behavior of the other cell parsers by informing
+them of the current level of indentation. Thankfully we can separate these two
+concerns via the [[data:ListMarker]] and [[data:OrgParserState]] (=listLevels=),
+respectively.
+
+The top-level parser is =listItemParser=. Before getting into parsing the list
+items and taking into account all of these rules, let's first consider the
+simplest case --- where we detect no indentation. Here we simply want to close
+off all pending list items we've already seen. The list items we've already seen
+are encoded in =listMarkers= (as we shall soon see), so we just have to go through
+these and close them off.
+
+#+name: func:listItemsEndParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+listItemsEndParser :: OrgParser Cell
+listItemsEndParser = do
+  orgParserState <- get
+  when (null orgParserState.listMarkers) $ do
+    fail "no pending ListMarker objects to close off"
+  _ <- MP.eof <|> MP.notFollowedBy (char ' ')
+  markers <- mapM getEndingMarker orgParserState.listMarkers
+  put
+    orgParserState
+      { listLevels = [],
+        listMarkers = []
+      }
+  pure $ CListItem markers
+  where
+    getEndingMarker :: (MonadFail m) => ListMarker -> m ListMarker
+    getEndingMarker = \case
+      LOrderedStart -> pure LOrderedEnd
+      LUnorderedStart -> pure LUnorderedEnd
+      LItemStart -> pure LItemEnd
+      lm ->
+        fail
+          $ "programmer error: list marker "
+          <> (show lm)
+          <> " is not supported"
+#+end_src
+
+Note that if there are no pending =ListMarker= objects, we fail the parser by
+calling =fail=. This is important because the parser itself does not consume input
+and would otherwise always be "stuck" looking at the same point of the input.
+
+Now consider the other case, where we see some indentation along with a a list
+head (ordered or unordered). This task is straightforward, as we just want to
+see some number of spaces, followed by a dash for unordered lists or a number
+and closing parenthesis for ordered lists. For both cases we also parse an
+additional space at the end to separate this list head from the body. For
+ordered list heads, we can check if the number looks like an Int with =readMaybe=.
+
+These considerations are encoded in =indentLevelParser= below.
+
+#+name: func:indentLevelParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+indentLevelParser :: OrgParser Level
+indentLevelParser = do
+  spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
+  listHead <- orderedHeadParser <|> unorderedHeadParser
+  afterListHead
+  pure
+    Level
+      { indent = T.length spaces,
+        number = listHead
+      }
+  where
+    orderedHeadParser :: OrgParser (Maybe Int)
+    orderedHeadParser = do
+      num <- MP.takeWhile1P (Just "ordered list number") isDigit
+      _ <- char ')'
+      let n = readMaybe (T.unpack num) :: Maybe Int
+      when (isNothing n) $ do
+        fail $ "could not parse " <> show (T.unpack num) <> " as Int"
+      pure n
+    unorderedHeadParser :: OrgParser (Maybe Int)
+    unorderedHeadParser = do
+      _ <- char '-'
+      pure Nothing
+    afterListHead :: OrgParser ()
+    afterListHead =
+      void
+        . MP.lookAhead
+        $ MP.choice
+          [ MP.eof,
+            string "\n" >> pure (),
+            char ' ' >> MP.notFollowedBy (char ' ')
+          ]
+#+end_src
+
+Note, however, that this only checks for textual correctness. It doesn't check
+whether what's parsed is semantically correct. For example, we wouldn't want to
+blindly parse the number of spaces in the indent (instead we would want to check
+which indents are expected, given any previous list items). Similarly we
+would want to check whether the list head number (for ordered lists) is the
+expected (incremented) number from the previously-seen list head number, if any
+(or if there is no previous number, that this number is 0 or 1).
+
+We have to perform these additional checks by comparing the output of
+=indentLevelParser= against the existing [[data:OrgParserState]] (=listLevels=).
+This is what we do in =listItemStartParser= below.
+
+#+name: func:listItemStartParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+listItemStartParser :: OrgParser Cell
+listItemStartParser = do
+  orgParserState <- get
+  let levels = orgParserState.listLevels
+      markers = orgParserState.listMarkers
+  level <- indentLevelParser
+  listMarkers <-
+    if
+      | nests level.indent levels -> listItemNester level levels markers
+      | fits level.indent levels -> listItemFitter level levels
+      | otherwise -> fail "list item: invalid indentation"
+  pure $ CListItem listMarkers
+  where
+    fits :: Int -> [Level] -> Bool
+    fits indent levels = elem indent $ map (.indent) levels
+    nests :: Int -> [Level] -> Bool
+    nests _ [] = True
+    nests indent (level : _) = indent == getBodyIndent level
+
+getBodyIndent :: Level -> Int
+getBodyIndent level = level.indent + maybeNum + punctuation + space
+  where
+    punctuation :: Int
+    punctuation = 1
+    space :: Int
+    space = 1
+    maybeNum :: Int
+    maybeNum = case level.number of
+      Just n -> length $ (show n :: String)
+      Nothing -> 0
+#+end_src
+
+=listItemStartParser= checks to see whether the list item is indenting into a new,
+/nested/ list (via [[func:listItemNester]]), or whether the list item is merely
+continuing some existing list (via [[func:listItemFitter]]). The =getBodyIndent=
+function just computes what the indentation would have to be for some body of
+text for it to be considered part of the item.
+
+#+name: func:listItemNester
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+listItemNester :: Level -> [Level] -> [ListMarker] -> OrgParser [ListMarker]
+listItemNester level levels markers = do
+  when (null levels && level.indent /= 2) $ do
+    fail "starting indent must be 2 spaces"
+  case level.number of
+    Just 0 -> pure ()
+    Just 1 -> pure ()
+    Just _ -> fail "starting number must be 0 or 1"
+    Nothing -> pure ()
+  let newMarker = case level.number of
+        Just _ -> LOrderedStart
+        Nothing -> LUnorderedStart
+  orgParserState <- get
+  put
+    orgParserState
+      { listLevels = level : levels,
+        listMarkers = LItemStart : newMarker : markers
+      }
+  pure $ case level.number of
+    Just _ -> [LOrderedStart, LItemStart]
+    Nothing -> [LUnorderedStart, LItemStart]
+#+end_src
+
+The goal of [[func:listItemFitter]] is twofold:
+
+  1) continue an existing list, and
+
+  2) close off (finish) pending levels which are still open.
+
+The first task is easy --- we just append =[LItemEnd, LItemStart]= to signal that
+we are closing off the existing list item (at the same level), and starting a
+new list item (also at the same level).
+
+The second task is a bit more involved. We have to "close" any existing levels
+that are more deeply nested. For example, in the following list
+
+  1) foo
+
+     1) bar
+
+        1) baz
+
+  2) quux
+
+when we hit "quux" we have to close off the list environments for "baz", then
+"bar".
+
+We use =foldlM= to go over the existing levels. Because we cons additional nested
+levels into the existing levels in [[func:listItemNester]], this means that when we
+traverse left-to-right, we take care of the innermost (most nested) levels
+first, to close them off if the level we have at hand doesn't "fit" into it.
+
+#+name: func:listItemFitter
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+listItemFitter :: Level -> [Level] -> OrgParser [ListMarker]
+listItemFitter level levels' = foldlM f [] levels'
+  where
+    f :: [ListMarker] -> Level -> OrgParser [ListMarker]
+    f acc existingLevel
+      | existingLevel.indent == level.indent = do
+          pure $ acc <> [LItemEnd, LItemStart]
+      | existingLevel.indent < level.indent = pure acc
+      | otherwise = do
+          orgParserState <- get
+          let levels = orgParserState.listLevels
+              markers = orgParserState.listMarkers
+          put
+            orgParserState
+              { listLevels = drop 1 levels,
+                listMarkers = drop 2 markers
+              }
+          let newMarkers = case existingLevel.number of
+                Nothing -> [LItemEnd, LUnorderedEnd]
+                Just _ -> [LItemEnd, LOrderedEnd]
+          pure $ acc <> newMarkers
+#+end_src
+
+Finally we can combine the two types of list item parsers into a single
+=listItemParser=. This is the parser we use inside [[func:cellParser]].
+
+#+name: func:listItemParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+listItemParser :: OrgParser Cell
+listItemParser = listItemsEndParser <|> MP.try listItemStartParser
+#+end_src
+
+****** Tests
+
+There are [[id:910d5a04-739c-4125-9a94-803ea0ebeaee][so many rules]] associated with lists; we try to check a few of them
+here.
+
+#+name: test:0009-list-indentation-no-indent
+#+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-no-indent
+#+begin_src org
+1)
+
+2)
+#+end_src
+
+#+header: :noweb-ref Test lists
+#+begin_src haskell
+p
+  "does not recognize list without enough indentation"
+  "test/Lilac/ParseSpec/0009-list-indentation-no-indent"
+  $ L.OrgDoc
+    { cells =
+        [ L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "1)",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "2) ",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ]
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+Here's a list with the (proper) 2-space indent.
+
+#+name: test:0009-list-indentation-proper-indent
+#+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-proper-indent
+#+begin_src org
+  1)
+
+  2)
+#+end_src
+
+#+header: :noweb-ref Test lists
+#+begin_src haskell
+p
+  "parses 2-space indented list"
+  "test/Lilac/ParseSpec/0009-list-indentation-proper-indent"
+  $ L.OrgDoc
+    { cells =
+        [ L.CListItem
+            [ L.LOrderedStart,
+              L.LItemStart
+            ],
+          L.CListItem
+            [ L.LItemEnd,
+              L.LItemStart
+            ],
+          L.CListItem
+            [ L.LItemEnd,
+              L.LOrderedEnd
+            ]
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+Here's a nested example.
+
+#+name: test:0009-list-indentation-nested
+#+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-nested
+#+begin_src org
+  1)
+
+     -
+
+     -
+
+  2)
+
+     1)
+
+        -
+
+  3)
+#+end_src
+
+#+header: :noweb-ref Test lists
+#+begin_src haskell
+p
+  "parses nested list"
+  "test/Lilac/ParseSpec/0009-list-indentation-nested"
+  $ L.OrgDoc
+    { cells =
+        [ L.CListItem
+            [ L.LOrderedStart, ---- Start outer ordered list.
+              L.LItemStart -------- Start outer "1)".
+            ],
+          L.CListItem
+            [ L.LUnorderedStart, -- Start inner bullets under "1)".
+              L.LItemStart -------- Inner bullet start.
+            ],
+          L.CListItem
+            [ L.LItemEnd, --------- Inner bullet end.
+              L.LItemStart -------- Inner bullet start.
+            ],
+          L.CListItem
+            [ L.LItemEnd, --------- Inner bullet end.
+              L.LUnorderedEnd, ---- End of inner bullets under "1)".
+              L.LItemEnd, --------- End of outer "1)".
+              L.LItemStart -------- Start of outer "2)".
+            ],
+          L.CListItem
+            [ L.LOrderedStart, ---- Start of nested ordered list.
+              L.LItemStart -------- Start of nested "1)".
+            ],
+          L.CListItem
+            [ L.LUnorderedStart, -- Start deeply nested bullets.
+              L.LItemStart -------- Deeply nested bullet start.
+            ],
+          L.CListItem
+            [ L.LItemEnd, --------- Deeply nested bullet end.
+              L.LUnorderedEnd, ---- End of deeply nested bullets.
+              L.LItemEnd, --------- End of nested "1)".
+              L.LOrderedEnd, ------ End of nested ordered list.
+              L.LItemEnd, --------- End of outer "2)".
+              L.LItemStart -------- Start of outer "3)".
+            ],
+          L.CListItem
+            [ L.LItemEnd, --------- End of outer "3)".
+              L.LOrderedEnd ------- End outer ordered list.
+            ]
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
 ****** Blocks
 
 A [[data:Block][Block]] is anything that sits between =#+begin_...= and =#+end_...= lines. Some
@@ -3662,6 +4254,7 @@ spec =
     <<Test drawer parsing>>
     <<Test block parsing>>
     <<Test indentation detection>>
+    <<Test lists>>
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0001-blankline

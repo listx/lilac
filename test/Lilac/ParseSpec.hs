@@ -589,3 +589,101 @@ spec =
       "test/Lilac/ParseSpec/0008-indentation-paragraph"
       "invalid indentation"
       1
+    p
+      "does not recognize list without enough indentation"
+      "test/Lilac/ParseSpec/0009-list-indentation-no-indent"
+      $ L.OrgDoc
+        { cells =
+            [ L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "1)",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "2) ",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    p
+      "parses 2-space indented list"
+      "test/Lilac/ParseSpec/0009-list-indentation-proper-indent"
+      $ L.OrgDoc
+        { cells =
+            [ L.CListItem
+                [ L.LOrderedStart,
+                  L.LItemStart
+                ],
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LItemStart
+                ],
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LOrderedEnd
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    p
+      "parses nested list"
+      "test/Lilac/ParseSpec/0009-list-indentation-nested"
+      $ L.OrgDoc
+        { cells =
+            [ L.CListItem
+                [ L.LOrderedStart, ---- Start outer ordered list.
+                  L.LItemStart -------- Start outer "1)".
+                ],
+              L.CListItem
+                [ L.LUnorderedStart, -- Start inner bullets under "1)".
+                  L.LItemStart -------- Inner bullet start.
+                ],
+              L.CListItem
+                [ L.LItemEnd, --------- Inner bullet end.
+                  L.LItemStart -------- Inner bullet start.
+                ],
+              L.CListItem
+                [ L.LItemEnd, --------- Inner bullet end.
+                  L.LUnorderedEnd, ---- End of inner bullets under "1)".
+                  L.LItemEnd, --------- End of outer "1)".
+                  L.LItemStart -------- Start of outer "2)".
+                ],
+              L.CListItem
+                [ L.LOrderedStart, ---- Start of nested ordered list.
+                  L.LItemStart -------- Start of nested "1)".
+                ],
+              L.CListItem
+                [ L.LUnorderedStart, -- Start deeply nested bullets.
+                  L.LItemStart -------- Deeply nested bullet start.
+                ],
+              L.CListItem
+                [ L.LItemEnd, --------- Deeply nested bullet end.
+                  L.LUnorderedEnd, ---- End of deeply nested bullets.
+                  L.LItemEnd, --------- End of nested "1)".
+                  L.LOrderedEnd, ------ End of nested ordered list.
+                  L.LItemEnd, --------- End of outer "2)".
+                  L.LItemStart -------- Start of outer "3)".
+                ],
+              L.CListItem
+                [ L.LItemEnd, --------- End of outer "3)".
+                  L.LOrderedEnd ------- End outer ordered list.
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }

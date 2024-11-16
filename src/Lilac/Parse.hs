@@ -17,12 +17,14 @@ module Lilac.Parse
     StyleMask (..),
     Block (..),
     BToken (..),
+    ListMarker (..),
+    Level (..),
   )
 where
 
 import Data.Bits (complement, setBit, testBit, (.&.), (.^.), (.|.))
 import Data.Bits.Bitwise (toListLE)
-import Data.Char (isAsciiLower, isSpace)
+import Data.Char (isAsciiLower, isDigit, isSpace)
 import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
@@ -47,9 +49,9 @@ data OrgDoc = OrgDoc
 type Cell :: Type
 data Cell
   = CHeading Heading
+  | CListItem [ListMarker]
   | CParagraph Prose
   | CBlock Block
-  | CListItem ListItem
   | CMathFragment MathFragment
   | CFigure Figure
   | CTable Table
@@ -115,12 +117,21 @@ data BToken
   | BTokenLink Link
   deriving stock (Eq, Show)
 
-type ListItem :: Type
-data ListItem = ListItem
-  { level :: Int,
-    ordered :: Bool,
-    body :: Prose
+type Level :: Type
+data Level = Level
+  { indent :: Int,
+    number :: Maybe Int
   }
+  deriving stock (Eq, Show)
+
+type ListMarker :: Type
+data ListMarker
+  = LOrderedStart
+  | LOrderedEnd
+  | LUnorderedStart
+  | LUnorderedEnd
+  | LItemStart
+  | LItemEnd
   deriving stock (Eq, Show)
 
 type MathFragment :: Type
@@ -158,7 +169,9 @@ type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { styleMask :: StyleMask
+  { styleMask :: StyleMask,
+    listLevels :: [Level],
+    listMarkers :: [ListMarker]
   }
   deriving stock (Eq, Show)
 
@@ -238,7 +251,9 @@ isCode (StyleMask a) = testBit a (fromEnum Code)
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { styleMask = styleMaskFrom []
+    { styleMask = styleMaskFrom [],
+      listLevels = [],
+      listMarkers = []
     }
 
 skipNewlinesAndComments :: OrgParser ()
@@ -319,7 +334,8 @@ cellParser :: OrgParser Cell
 cellParser =
   lexeme
     $ MP.choice
-      [ headingParser,
+      [ listItemParser,
+        headingParser,
         blockParser,
         paragraphParser,
         detectInvalidIndentation
@@ -556,6 +572,142 @@ paragraphParser = do
     spaceConsumer' = do
       MP.notFollowedBy (string "\n\n")
       MP.takeWhile1P (Just "whitespace (newlines allowed)") isSpace
+
+listItemsEndParser :: OrgParser Cell
+listItemsEndParser = do
+  orgParserState <- get
+  when (null orgParserState.listMarkers) $ do
+    fail "no pending ListMarker objects to close off"
+  _ <- MP.eof <|> MP.notFollowedBy (char ' ')
+  markers <- mapM getEndingMarker orgParserState.listMarkers
+  put
+    orgParserState
+      { listLevels = [],
+        listMarkers = []
+      }
+  pure $ CListItem markers
+  where
+    getEndingMarker :: (MonadFail m) => ListMarker -> m ListMarker
+    getEndingMarker = \case
+      LOrderedStart -> pure LOrderedEnd
+      LUnorderedStart -> pure LUnorderedEnd
+      LItemStart -> pure LItemEnd
+      lm ->
+        fail
+          $ "programmer error: list marker "
+          <> (show lm)
+          <> " is not supported"
+
+indentLevelParser :: OrgParser Level
+indentLevelParser = do
+  spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
+  listHead <- orderedHeadParser <|> unorderedHeadParser
+  afterListHead
+  pure
+    Level
+      { indent = T.length spaces,
+        number = listHead
+      }
+  where
+    orderedHeadParser :: OrgParser (Maybe Int)
+    orderedHeadParser = do
+      num <- MP.takeWhile1P (Just "ordered list number") isDigit
+      _ <- char ')'
+      let n = readMaybe (T.unpack num) :: Maybe Int
+      when (isNothing n) $ do
+        fail $ "could not parse " <> show (T.unpack num) <> " as Int"
+      pure n
+    unorderedHeadParser :: OrgParser (Maybe Int)
+    unorderedHeadParser = do
+      _ <- char '-'
+      pure Nothing
+    afterListHead :: OrgParser ()
+    afterListHead =
+      void
+        . MP.lookAhead
+        $ MP.choice
+          [ MP.eof,
+            string "\n" >> pure (),
+            char ' ' >> MP.notFollowedBy (char ' ')
+          ]
+
+listItemStartParser :: OrgParser Cell
+listItemStartParser = do
+  orgParserState <- get
+  let levels = orgParserState.listLevels
+      markers = orgParserState.listMarkers
+  level <- indentLevelParser
+  listMarkers <-
+    if
+      | nests level.indent levels -> listItemNester level levels markers
+      | fits level.indent levels -> listItemFitter level levels
+      | otherwise -> fail "list item: invalid indentation"
+  pure $ CListItem listMarkers
+  where
+    fits :: Int -> [Level] -> Bool
+    fits indent levels = elem indent $ map (.indent) levels
+    nests :: Int -> [Level] -> Bool
+    nests _ [] = True
+    nests indent (level : _) = indent == getBodyIndent level
+
+getBodyIndent :: Level -> Int
+getBodyIndent level = level.indent + maybeNum + punctuation + space
+  where
+    punctuation :: Int
+    punctuation = 1
+    space :: Int
+    space = 1
+    maybeNum :: Int
+    maybeNum = case level.number of
+      Just n -> length $ (show n :: String)
+      Nothing -> 0
+
+listItemNester :: Level -> [Level] -> [ListMarker] -> OrgParser [ListMarker]
+listItemNester level levels markers = do
+  when (null levels && level.indent /= 2) $ do
+    fail "starting indent must be 2 spaces"
+  case level.number of
+    Just 0 -> pure ()
+    Just 1 -> pure ()
+    Just _ -> fail "starting number must be 0 or 1"
+    Nothing -> pure ()
+  let newMarker = case level.number of
+        Just _ -> LOrderedStart
+        Nothing -> LUnorderedStart
+  orgParserState <- get
+  put
+    orgParserState
+      { listLevels = level : levels,
+        listMarkers = LItemStart : newMarker : markers
+      }
+  pure $ case level.number of
+    Just _ -> [LOrderedStart, LItemStart]
+    Nothing -> [LUnorderedStart, LItemStart]
+
+listItemFitter :: Level -> [Level] -> OrgParser [ListMarker]
+listItemFitter level levels' = foldlM f [] levels'
+  where
+    f :: [ListMarker] -> Level -> OrgParser [ListMarker]
+    f acc existingLevel
+      | existingLevel.indent == level.indent = do
+          pure $ acc <> [LItemEnd, LItemStart]
+      | existingLevel.indent < level.indent = pure acc
+      | otherwise = do
+          orgParserState <- get
+          let levels = orgParserState.listLevels
+              markers = orgParserState.listMarkers
+          put
+            orgParserState
+              { listLevels = drop 1 levels,
+                listMarkers = drop 2 markers
+              }
+          let newMarkers = case existingLevel.number of
+                Nothing -> [LItemEnd, LUnorderedEnd]
+                Just _ -> [LItemEnd, LOrderedEnd]
+          pure $ acc <> newMarkers
+
+listItemParser :: OrgParser Cell
+listItemParser = listItemsEndParser <|> MP.try listItemStartParser
 
 blockMetaEntryParser :: OrgParser (T.Text, T.Text)
 blockMetaEntryParser = do
