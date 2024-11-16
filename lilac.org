@@ -1577,11 +1577,12 @@ import Data.Char (isAsciiLower, isSpace)
 import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
 import Data.Text qualified as T
 import Relude
 import Relude.Extra.Map qualified as EM
 import Text.Megaparsec qualified as MP
-import Text.Megaparsec.Char (char, space1, string)
+import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude qualified (show)
 
@@ -1649,29 +1650,27 @@ whitespace to separate meaningful tokens from each other. One way to deal with
 (necessary) whitespace is to bake in whitespace parsers into each token we want
 to parse. This gets cumbersome so we want to instead be able to teach parsers to
 be able to skip over trailing whitespace. This way, these parsers will all know
-how to deal with whitespace in a uniform way. Leading whitespace is a special
-consideration because they can have meaningful information (e.g., indentation
-for list items), so we will handle that case separately.
+how to deal with whitespace in a uniform way. This is what we do in
+[[func:cellParser]] where we wrap all of the major =Cell= parsers with a =lexeme=.
 
 A slightly separate problem is how to deal with comments. In a sense they are
 just like whitespace because they hold no meaningful information on their own.
 Luckily, =Text.Megaparsec.Char.Lexer= provides a =space= helper which can create a
-space-consuming function. This function produces a parser which is able to skip
-over any combination of whitespace and comments (both single-line and block
-comments). This is what we use below to create the =spaceConsumer= function below.
-See https://markkarpov.com/tutorial/megaparsec.html#lexing for more information.
+parser which can skip over whitespace as well as comments. This is what we use
+below to define =skipNewlinesAndComments=. See
+https://markkarpov.com/tutorial/megaparsec.html#lexing for more information.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-spaceConsumer :: OrgParser ()
-spaceConsumer =
+skipNewlinesAndComments :: OrgParser ()
+skipNewlinesAndComments =
   L.space
     whiteSpaceParser
     singleLineCommentParser
     blockCommentParser
   where
     whiteSpaceParser :: OrgParser ()
-    whiteSpaceParser = space1
+    whiteSpaceParser = void $ MP.takeWhile1P (Just "newline") (== '\n')
     singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = L.skipLineComment "# "
     blockCommentParser :: OrgParser ()
@@ -1680,9 +1679,18 @@ spaceConsumer =
 
 The three arguments to =L.space= (where =L= stands for =Text.Megaparsec.Char.Lexer=)
 are the parsers for whitespace, single-line comments, and block comments.
-It's important that we use =space1= here (where the =1= denotes that it requires at
-least 1 space character) because otherwise if it accepts 0 or more spaces, it
-may loop forever upon seeing non-space input.
+=L.space= will try to repeatedly apply the three given parsers; it only stops
+parsing when faced with input where all three parsers fail.
+
+We only parse newline characters in =whiteSpaceParser= above. We don't parse
+spaces. This is because we do not want to skip over any /indentation/ --- that is,
+space characters immediately following a newline. Such indentation could be an
+error (for example, for headings or paragraphs), or a necessary part of a cell
+(for =ListItem= cells), and so we leave that determination up to other parsers.
+
+It's important that we use =takeWhile1P= for =whiteSpaceParser= (where the =1= denotes
+that it requires at least 1 newline character) because otherwise if it accepts 0
+or more newlines, it may loop forever upon seeing non-newline input.
 
 The ="# "= for =singleLineCommentParser= signifies that single-line comments start
 with a pound sign and a space. The =blockCommentParser= uses =L.skipBlockComment= to
@@ -1691,86 +1699,20 @@ explicit newlines in =blockCommentParser= because we want to ensure that block
 comment lines are always on their own (without any trailing text on the same
 line right after it).
 
-=L.space= will try to repeatedly apply the three given parsers over and over
-again; it only stops parsing (skipping over the spaces) when none of the three
-parsers can consume input.
-
-We have two more helpers for us. The first is =symbol=, which parses any trailing
-spaces or comments after parsing the given text.
-
-#+header: :noweb-ref Parsing mechanism
-#+begin_src haskell
-symbol :: T.Text -> OrgParser T.Text
-symbol = L.symbol spaceConsumer
-#+end_src
+=Text.Megaparsec.Char.Lexer= also defines a =L.skipBlockCommentNested= helper, which
+is able to understand if the ending marker of a block (=#+end_comment\n= for us)
+should be ignored because it's nested and instead skip past it to find the true
+(non-nested) ending marker. We use the non-nested =L.skipBlockComment= to keep the
+syntax simple.
 
 Lastly we have =lexeme=, which wraps around any other parser to make it consume
-trailing spaces and comments.
+trailing newlines and comments. This is used in [[func:cellParser]].
 
+#+name: func:lexeme
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 lexeme :: OrgParser a -> OrgParser a
-lexeme = L.lexeme spaceConsumer
-#+end_src
-
-***** Treading carefully around newlines
-
-The =spaceConsumer= is somewhat "aggressive" because it uses =space1= which consumes
-all kinds of whitespace, including newlines. We define two other types of
-space-consuming parsers. One which does not consume newlines at all, and another
-which consumes everything except a double-newline (two newlines in a row).
-
-The first case is easy because we just need to tweak the =whiteSpaceParser= to
-only allow a space or tab character.
-
-#+name: func:spaceConsumerNoNewline
-#+header: :noweb-ref Parsing mechanism
-#+begin_src haskell
-spaceConsumerNoNewline :: OrgParser ()
-spaceConsumerNoNewline =
-  L.space
-    whiteSpaceParser
-    singleLineCommentParser
-    empty
-  where
-    whiteSpaceParser :: OrgParser ()
-    whiteSpaceParser = void $ some (char ' ' <|> char '\t')
-    singleLineCommentParser :: OrgParser ()
-    singleLineCommentParser = (L.skipLineComment "# ")
-
-symbolNoNewline :: T.Text -> OrgParser T.Text
-symbolNoNewline = L.symbol spaceConsumerNoNewline
-
-lexemeNoNewline :: OrgParser a -> OrgParser a
-lexemeNoNewline = L.lexeme spaceConsumerNoNewline
-#+end_src
-
-For the second case, the =whiteSpaceParser= is a bit more involved. We need to
-look ahead to see that the newline is not followed by another newline.
-
-#+header: :noweb-ref Parsing mechanism
-#+begin_src haskell
-spaceConsumerNoDoubleNewline :: OrgParser ()
-spaceConsumerNoDoubleNewline =
-  L.space
-    whiteSpaceParser
-    singleLineCommentParser
-    empty
-  where
-    whiteSpaceParser :: OrgParser ()
-    whiteSpaceParser = void $ some f
-    f :: OrgParser ()
-    f = do
-      MP.notFollowedBy (string "\n\n")
-      void $ char ' ' <|> char '\t' <|> char '\n'
-    singleLineCommentParser :: OrgParser ()
-    singleLineCommentParser = (L.skipLineComment "# ")
-
-symbolNoDoubleNewline :: T.Text -> OrgParser T.Text
-symbolNoDoubleNewline = L.symbol spaceConsumerNoDoubleNewline
-
-lexemeNoDoubleNewline :: OrgParser a -> OrgParser a
-lexemeNoDoubleNewline = L.lexeme spaceConsumerNoDoubleNewline
+lexeme = L.lexeme skipNewlinesAndComments
 #+end_src
 
 **** =orgDocParser=
@@ -1787,7 +1729,7 @@ deal with it here separately.
 #+begin_src haskell
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
-  _ <- optional spaceConsumer
+  _ <- optional skipNewlinesAndComments
   meta <- docMetaParser
   cells <- many cellParser
   MP.eof
@@ -1832,8 +1774,9 @@ docMetaEntryParser = do
   avoidParsingBlockMetadata
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
-  _ <- L.symbol spaceConsumerNoNewline ":"
-  value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
+  _ <- MP.label "(doc meta) separator" $ string ": "
+  _ <- many $ char ' '
+  value <- MP.takeWhile1P (Just "(doc meta) value letter") (\c -> c /= '\n')
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
@@ -1897,7 +1840,7 @@ sprinkled in between.
 ,#+title: An Org Document
 # This is a comment line.
 ,#+author: A. U. Thor
-     # This is another comment line.
+# This is another comment line.
 
 
 # Note the whitespace above this line.
@@ -1929,6 +1872,56 @@ p
     ]
 #+end_src
 
+Indentation is invalid, except for =ListItem= cells. Even single-line comments may
+not be indented.
+
+#+name: test:0008-indentation-comment
+#+header: :tangle test/Lilac/ParseSpec/0008-indentation-comment
+#+begin_src org
+ # invalid comment (it's indented)
+#+end_src
+
+#+header: :noweb-ref Test indentation detection
+#+begin_src haskell
+pf
+  "detects indentation (comment line)"
+  "test/Lilac/ParseSpec/0008-indentation-comment"
+  "invalid indentation"
+  1
+#+end_src
+
+Similarly, a space before a heading star is also invalid.
+
+#+header: :tangle test/Lilac/ParseSpec/0008-indentation-headings
+#+begin_src org
+ * space before star is not allowed for headings
+#+end_src
+
+#+header: :noweb-ref Test indentation detection
+#+begin_src haskell
+pf
+  "detects indentation (heading)"
+  "test/Lilac/ParseSpec/0008-indentation-headings"
+  "invalid indentation"
+  1
+#+end_src
+
+For that matter, indentation is also invalid for paragraphs.
+
+#+header: :tangle test/Lilac/ParseSpec/0008-indentation-paragraph
+#+begin_src org
+ foo bar
+#+end_src
+
+#+header: :noweb-ref Test indentation detection
+#+begin_src haskell
+pf
+  "detects indentation (paragraph)"
+  "test/Lilac/ParseSpec/0008-indentation-paragraph"
+  "invalid indentation"
+  1
+#+end_src
+
 Ignore leading whitespace just before the metadata value.
 
 #+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value
@@ -1956,8 +1949,8 @@ Fail if the value part is missing.
 pfm
   "detects missing document metadata value"
   "test/Lilac/ParseSpec/0002-doc-metadata-missing-value"
-  (utok '\n' <> elabel "value letter")
-  8
+  (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
+  7
 #+end_src
 
 ***** Cells
@@ -1974,9 +1967,43 @@ cellParser =
     $ MP.choice
       [ headingParser,
         blockParser,
-        paragraphParser
+        paragraphParser,
+        detectInvalidIndentation
       ]
 #+end_src
+
+Cells (except for =CListItem= cells) shouldn't have any indentation. To enforce
+this, we put in a =detectInvalidIndentation= parser which technically isn't a
+parser but which will throw an error if it is able to successfully parse
+indentation. The idea is that if none of the other parsers in the list are able
+to consume indentation, then this will allow =detectInvalidIndentation= to see
+such indentation.
+
+#+name: func:detectInvalidIndentation
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+detectInvalidIndentation :: OrgParser Cell
+detectInvalidIndentation = do
+  _ <- MP.hidden $ MP.takeWhile1P (Just "indentation") (== ' ')
+  void
+    $ MP.fancyFailure
+    . Set.singleton
+    . MP.ErrorFail
+    $ "invalid indentation"
+  pure
+    $ CHeading
+      Heading
+        { level = 1,
+          body = [],
+          meta = M.fromList []
+        }
+#+end_src
+
+We signal the error with "invalid" so as to not shadow the typical "unexpected
+..." language from Megaparsec's usual parse failures. Note also that the
+=CHeading= bit above is only there to satisfy the type checker --- we will always
+fail if the =takeWhile1P= succeeds (the =MP.fancyFailure= will not be executed if
+=takeWhile1P= fails).
 
 ****** Headings
 
@@ -1991,7 +2018,7 @@ headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  prose <- MP.some $ pTokenParser spaceConsumer'
+  prose <- proseParser spaceConsumer'
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
@@ -2004,8 +2031,7 @@ headingParser = do
         }
   where
     spaceConsumer' :: OrgParser T.Text
-    spaceConsumer' = MP.takeWhile1P (Just "non-newline whitespace") isNonNewlineWhitespace
-    isNonNewlineWhitespace c = isSpace c && c /= '\n'
+    spaceConsumer' = MP.takeWhile1P (Just "space") (== ' ')
 #+end_src
 
 The body text of a heading is a series of prose tokens, or =PToken= values, which
@@ -2021,24 +2047,35 @@ We consider prose in detail in the next section, where we'll also discuss
 
 A [[PToken ADT][PToken]] can be a styled string, link, or inline math fragment.
 
-#+name: func:pTokenParser
+#+name: func:proseParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-pTokenParser :: OrgParser T.Text -> OrgParser PToken
-pTokenParser spaceConsumer' = do
-  MP.choice
-    [ PTokenLink <$> linkParser,
-      PTokenMathFragment <$> mathFragmentInlineParser,
-      PTokenStyledText <$> styledTextParser,
-      PTokenStyledText <$> trailingWhitespaceParser spaceConsumer'
-    ]
+proseParser :: OrgParser T.Text -> OrgParser [PToken]
+proseParser spaceConsumer' = do
+  a <- MP.choice baseParsers
+  b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
+  pure $ a : b
+  where
+    spacePTokenParser = PTokenStyledText <$> whitespaceParser spaceConsumer'
+    baseParsers =
+      [ PTokenLink <$> linkParser,
+        PTokenMathFragment <$> mathFragmentInlineParser,
+        PTokenStyledText <$> styledTextParser
+      ]
 #+end_src
 
-Note that we parse whitespace explicitly with =trailingWhitespaceParser=
-which consumes whitespace based on the provided =spaceConsumer=. The
-alternative is to implicitly skip past whitespace by wrapping =lexemeNoNewline=
-(see [[func:spaceConsumerNoNewline]]) around =pTokenParser=. However, that
-approach has a problem. Consider the case of parsing something like
+Note that we parse whitespace explicitly with =whitespaceParser= which consumes
+whitespace based on the provided =spaceConsumer'=. We first parse among the
+non-whitespace parsers in =baseParsers=, then parse additional tokens that may
+include whitespace with =spacePTokenParser=. This way, we force the prose to
+initially start out without any indentation; otherwise,
+[[func:detectInvalidIndentation]] would not get a chance to detect this (invalid)
+indentation.
+
+It may appear that we could alternatively skip past spaces inside prose text
+by making a =lexeme=-like wrapper which skips newlines /and spaces/ for each parser
+in =baseParser=. However, that approach has a problem. Consider the case of
+parsing something like
 
 #+begin_src org
 =foo=...
@@ -2053,19 +2090,18 @@ because we'll also parse
 #+end_src
 
 exactly the same way as two =PTokenStyledText= objects. This is because the space
-between the =foo= and "..." will get eaten up by =lexemeNoNewline=, /and discarded/.
+between the =foo= and "..." will get eaten up by the wrapper /and discarded/.
 And now we're in the position where we have to, on export, guess (due to
 information loss) if we need to insert whitespace between the =foo= and "...".
 
-Instead, explicitly parsing the whitespace with
-=trailingWhitespaceParser= lets us parse the two cases above
-differently, because we save all whitespace we parsed as their own
-=PTokenStyledText= objects.
+Instead, explicitly parsing the whitespace with =whitespaceParser= lets us parse
+the two cases above differently, because we save all whitespace we parsed as
+their own =PTokenStyledText= objects.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-trailingWhitespaceParser :: OrgParser T.Text -> OrgParser StyledText
-trailingWhitespaceParser spaceConsumer' = do
+whitespaceParser :: OrgParser T.Text -> OrgParser StyledText
+whitespaceParser spaceConsumer' = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
@@ -3004,7 +3040,7 @@ p
 ****** Paragraphs (standalone prose)
 
 The =paragraphParser= below is similar to =headingParser= because it's also powered
-mostly by [[func:pTokenParser]]. However a key difference is how it handles trailing
+mostly by [[func:proseParser]]. However a key difference is how it handles trailing
 whitespace --- it will parse any whitespace except for two consecutive newline
 characters.
 
@@ -3013,7 +3049,7 @@ characters.
 #+begin_src haskell
 paragraphParser :: OrgParser Cell
 paragraphParser = do
-  prose <- MP.some $ pTokenParser spaceConsumer'
+  prose <- proseParser spaceConsumer'
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
   where
@@ -3542,7 +3578,7 @@ import Test.Hspec.Megaparsec
     fancy,
     shouldFailWith,
     shouldParse,
-    utok,
+    utoks,
   )
 import Text.Megaparsec qualified as MP
 #+end_src
@@ -3625,6 +3661,7 @@ spec =
     <<Test link parsing>>
     <<Test drawer parsing>>
     <<Test block parsing>>
+    <<Test indentation detection>>
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0001-blankline

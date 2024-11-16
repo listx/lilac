@@ -26,11 +26,12 @@ import Data.Char (isAsciiLower, isSpace)
 import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
 import Data.Text qualified as T
 import Relude
 import Relude.Extra.Map qualified as EM
 import Text.Megaparsec qualified as MP
-import Text.Megaparsec.Char (char, space1, string)
+import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude qualified (show)
 
@@ -240,69 +241,26 @@ defaultOrgParserState =
     { styleMask = styleMaskFrom []
     }
 
-spaceConsumer :: OrgParser ()
-spaceConsumer =
+skipNewlinesAndComments :: OrgParser ()
+skipNewlinesAndComments =
   L.space
     whiteSpaceParser
     singleLineCommentParser
     blockCommentParser
   where
     whiteSpaceParser :: OrgParser ()
-    whiteSpaceParser = space1
+    whiteSpaceParser = void $ MP.takeWhile1P (Just "newline") (== '\n')
     singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = L.skipLineComment "# "
     blockCommentParser :: OrgParser ()
     blockCommentParser = L.skipBlockComment "#+begin_comment\n" "#+end_comment\n"
 
-symbol :: T.Text -> OrgParser T.Text
-symbol = L.symbol spaceConsumer
-
 lexeme :: OrgParser a -> OrgParser a
-lexeme = L.lexeme spaceConsumer
-
-spaceConsumerNoNewline :: OrgParser ()
-spaceConsumerNoNewline =
-  L.space
-    whiteSpaceParser
-    singleLineCommentParser
-    empty
-  where
-    whiteSpaceParser :: OrgParser ()
-    whiteSpaceParser = void $ some (char ' ' <|> char '\t')
-    singleLineCommentParser :: OrgParser ()
-    singleLineCommentParser = (L.skipLineComment "# ")
-
-symbolNoNewline :: T.Text -> OrgParser T.Text
-symbolNoNewline = L.symbol spaceConsumerNoNewline
-
-lexemeNoNewline :: OrgParser a -> OrgParser a
-lexemeNoNewline = L.lexeme spaceConsumerNoNewline
-
-spaceConsumerNoDoubleNewline :: OrgParser ()
-spaceConsumerNoDoubleNewline =
-  L.space
-    whiteSpaceParser
-    singleLineCommentParser
-    empty
-  where
-    whiteSpaceParser :: OrgParser ()
-    whiteSpaceParser = void $ some f
-    f :: OrgParser ()
-    f = do
-      MP.notFollowedBy (string "\n\n")
-      void $ char ' ' <|> char '\t' <|> char '\n'
-    singleLineCommentParser :: OrgParser ()
-    singleLineCommentParser = (L.skipLineComment "# ")
-
-symbolNoDoubleNewline :: T.Text -> OrgParser T.Text
-symbolNoDoubleNewline = L.symbol spaceConsumerNoDoubleNewline
-
-lexemeNoDoubleNewline :: OrgParser a -> OrgParser a
-lexemeNoDoubleNewline = L.lexeme spaceConsumerNoDoubleNewline
+lexeme = L.lexeme skipNewlinesAndComments
 
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
-  _ <- optional spaceConsumer
+  _ <- optional skipNewlinesAndComments
   meta <- docMetaParser
   cells <- many cellParser
   MP.eof
@@ -337,8 +295,9 @@ docMetaEntryParser = do
   avoidParsingBlockMetadata
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
-  _ <- L.symbol spaceConsumerNoNewline ":"
-  value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
+  _ <- MP.label "(doc meta) separator" $ string ": "
+  _ <- many $ char ' '
+  value <- MP.takeWhile1P (Just "(doc meta) value letter") (\c -> c /= '\n')
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
@@ -362,14 +321,31 @@ cellParser =
     $ MP.choice
       [ headingParser,
         blockParser,
-        paragraphParser
+        paragraphParser,
+        detectInvalidIndentation
       ]
+
+detectInvalidIndentation :: OrgParser Cell
+detectInvalidIndentation = do
+  _ <- MP.hidden $ MP.takeWhile1P (Just "indentation") (== ' ')
+  void
+    $ MP.fancyFailure
+    . Set.singleton
+    . MP.ErrorFail
+    $ "invalid indentation"
+  pure
+    $ CHeading
+      Heading
+        { level = 1,
+          body = [],
+          meta = M.fromList []
+        }
 
 headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  prose <- MP.some $ pTokenParser spaceConsumer'
+  prose <- proseParser spaceConsumer'
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
@@ -382,20 +358,23 @@ headingParser = do
         }
   where
     spaceConsumer' :: OrgParser T.Text
-    spaceConsumer' = MP.takeWhile1P (Just "non-newline whitespace") isNonNewlineWhitespace
-    isNonNewlineWhitespace c = isSpace c && c /= '\n'
+    spaceConsumer' = MP.takeWhile1P (Just "space") (== ' ')
 
-pTokenParser :: OrgParser T.Text -> OrgParser PToken
-pTokenParser spaceConsumer' = do
-  MP.choice
-    [ PTokenLink <$> linkParser,
-      PTokenMathFragment <$> mathFragmentInlineParser,
-      PTokenStyledText <$> styledTextParser,
-      PTokenStyledText <$> trailingWhitespaceParser spaceConsumer'
-    ]
+proseParser :: OrgParser T.Text -> OrgParser [PToken]
+proseParser spaceConsumer' = do
+  a <- MP.choice baseParsers
+  b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
+  pure $ a : b
+  where
+    spacePTokenParser = PTokenStyledText <$> whitespaceParser spaceConsumer'
+    baseParsers =
+      [ PTokenLink <$> linkParser,
+        PTokenMathFragment <$> mathFragmentInlineParser,
+        PTokenStyledText <$> styledTextParser
+      ]
 
-trailingWhitespaceParser :: OrgParser T.Text -> OrgParser StyledText
-trailingWhitespaceParser spaceConsumer' = do
+whitespaceParser :: OrgParser T.Text -> OrgParser StyledText
+whitespaceParser spaceConsumer' = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
@@ -569,7 +548,7 @@ drawerParser = do
 
 paragraphParser :: OrgParser Cell
 paragraphParser = do
-  prose <- MP.some $ pTokenParser spaceConsumer'
+  prose <- proseParser spaceConsumer'
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
   where

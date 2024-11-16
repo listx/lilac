@@ -14,7 +14,7 @@ import Test.Hspec.Megaparsec
     fancy,
     shouldFailWith,
     shouldParse,
-    utok,
+    utoks,
   )
 import Text.Megaparsec qualified as MP
 
@@ -87,8 +87,8 @@ spec =
     pfm
       "detects missing document metadata value"
       "test/Lilac/ParseSpec/0002-doc-metadata-missing-value"
-      (utok '\n' <> elabel "value letter")
-      8
+      (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
+      7
     pf
       "detects unbalanced style markers (redundant activations)"
       "test/Lilac/ParseSpec/0005-styled-strings-redundant-activations"
@@ -572,3 +572,20 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
+    pf
+      "detects indentation (comment line)"
+      "test/Lilac/ParseSpec/0008-indentation-comment"
+      "invalid indentation"
+      1
+
+    pf
+      "detects indentation (heading)"
+      "test/Lilac/ParseSpec/0008-indentation-headings"
+      "invalid indentation"
+      1
+
+    pf
+      "detects indentation (paragraph)"
+      "test/Lilac/ParseSpec/0008-indentation-paragraph"
+      "invalid indentation"
+      1
