@@ -687,3 +687,50 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
+
+    p
+      "parses list with content (simple)"
+      "test/Lilac/ParseSpec/0009-list-content-simple"
+      $ L.OrgDoc
+        { cells =
+            [ L.CListItem
+                [ L.LOrderedStart,
+                  L.LItemStart
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "First paragraph.",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "Second paragraph.",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LItemStart
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "Another paragraph. ",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LOrderedEnd
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }

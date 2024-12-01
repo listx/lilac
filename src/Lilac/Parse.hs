@@ -334,10 +334,11 @@ cellParser :: OrgParser Cell
 cellParser =
   lexeme
     $ MP.choice
-      [ listItemParser,
+      [ MP.try listItemStartParser,
         headingParser,
         blockParser,
         paragraphParser,
+        listItemsEndParser,
         detectInvalidIndentation
       ]
 
@@ -564,6 +565,9 @@ drawerParser = do
 
 paragraphParser :: OrgParser Cell
 paragraphParser = do
+  orgParserState <- get
+  let n = sum . map getBodyIndent . take 1 $ orgParserState.listLevels
+  _ <- MP.optional $ MP.count n (char ' ')
   prose <- proseParser spaceConsumer'
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
@@ -600,6 +604,7 @@ listItemsEndParser = do
 
 indentLevelParser :: OrgParser Level
 indentLevelParser = do
+  minimalIndentation
   spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
   listHead <- orderedHeadParser <|> unorderedHeadParser
   afterListHead
@@ -624,12 +629,18 @@ indentLevelParser = do
     afterListHead :: OrgParser ()
     afterListHead =
       void
-        . MP.lookAhead
         $ MP.choice
           [ MP.eof,
-            string "\n" >> pure (),
+            void $ string "\n",
             char ' ' >> MP.notFollowedBy (char ' ')
           ]
+    minimalIndentation :: OrgParser ()
+    minimalIndentation =
+      void
+        . MP.try
+        . MP.lookAhead
+        . MP.label "minimal indentation"
+        $ MP.count 2 (char ' ')
 
 listItemStartParser :: OrgParser Cell
 listItemStartParser = do
@@ -669,7 +680,7 @@ listItemNester level levels markers = do
   case level.number of
     Just 0 -> pure ()
     Just 1 -> pure ()
-    Just _ -> fail "starting number must be 0 or 1"
+    Just n -> fail $ "starting number must be 0 or 1; got " <> show n
     Nothing -> pure ()
   let newMarker = case level.number of
         Just _ -> LOrderedStart
@@ -705,9 +716,6 @@ listItemFitter level levels' = foldlM f [] levels'
                 Nothing -> [LItemEnd, LUnorderedEnd]
                 Just _ -> [LItemEnd, LOrderedEnd]
           pure $ acc <> newMarkers
-
-listItemParser :: OrgParser Cell
-listItemParser = listItemsEndParser <|> MP.try listItemStartParser
 
 blockMetaEntryParser :: OrgParser (T.Text, T.Text)
 blockMetaEntryParser = do

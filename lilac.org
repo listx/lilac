@@ -1770,7 +1770,9 @@ should be ignored because it's nested and instead skip past it to find the true
 syntax simple.
 
 Lastly we have =lexeme=, which wraps around any other parser to make it consume
-trailing newlines and comments. This is used in [[func:cellParser]].
+trailing newlines and comments. This is used in [[func:cellParser]]. Note that it
+does not consume any trailing spaces, because space characters are important for
+detecting indentation and we wouldn't want to skip past such space characters.
 
 #+name: func:lexeme
 #+header: :noweb-ref Parsing mechanism
@@ -2029,15 +2031,22 @@ cellParser :: OrgParser Cell
 cellParser =
   lexeme
     $ MP.choice
-      [ listItemParser,
+      [ MP.try listItemStartParser,
         headingParser,
         blockParser,
         paragraphParser,
+        listItemsEndParser,
         detectInvalidIndentation
       ]
 #+end_src
 
-Cells (except for =CListItem= cells) shouldn't have any indentation. To enforce
+The =listItemStartParser= can parse indentation, but also the same goes for
+=paragraphParser= which is able to skip over leading indentation if it lines up
+with the indentation of an existing list environment. We have to wrap
+=listItemParser= with =MP.try= because otherwise we may end up being greedy and
+expect any indented text to always be a list item, when it can be a paragraph.
+
+However, other indentation levels should be detected as invalid. To enforce
 this, we put in a =detectInvalidIndentation= parser which technically isn't a
 parser but which will throw an error if it is able to successfully parse
 indentation. The idea is that if none of the other parsers in the list are able
@@ -2133,9 +2142,10 @@ Note that we parse whitespace explicitly with =whitespaceParser= which consumes
 whitespace based on the provided =spaceConsumer'=. We first parse among the
 non-whitespace parsers in =baseParsers=, then parse additional tokens that may
 include whitespace with =spacePTokenParser=. This way, we force the prose to
-initially start out without any indentation; otherwise,
-[[func:detectInvalidIndentation]] would not get a chance to detect this (invalid)
-indentation.
+initially start out without any indentation (because the preceding cell, if any,
+would have swallowed up trailing whitespace automatically via =lexeme= in
+[[func:cellParser]]); otherwise, [[func:detectInvalidIndentation]] would not get a
+chance to detect this (invalid) indentation.
 
 It may appear that we could alternatively skip past spaces inside prose text
 by making a =lexeme=-like wrapper which skips newlines /and spaces/ for each parser
@@ -3114,6 +3124,9 @@ characters.
 #+begin_src haskell
 paragraphParser :: OrgParser Cell
 paragraphParser = do
+  orgParserState <- get
+  let n = sum . map getBodyIndent . take 1 $ orgParserState.listLevels
+  _ <- MP.optional $ MP.count n (char ' ')
   prose <- proseParser spaceConsumer'
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
@@ -3320,12 +3333,12 @@ them of the current level of indentation. Thankfully we can separate these two
 concerns via the [[data:ListMarker]] and [[data:OrgParserState]] (=listLevels=),
 respectively.
 
-The top-level parser is =listItemParser=. Before getting into parsing the list
-items and taking into account all of these rules, let's first consider the
-simplest case --- where we detect no indentation. Here we simply want to close
-off all pending list items we've already seen. The list items we've already seen
-are encoded in =listMarkers= (as we shall soon see), so we just have to go through
-these and close them off.
+Before getting into parsing the list items and taking into account all of these
+rules, let's first consider the simplest case --- where we detect no
+indentation. Here we simply want to close off all pending list items we've
+already seen. The list items we've already seen are encoded in =listMarkers= (as
+we shall soon see), so we just have to go through these and close them off. This
+is what we do in =listItemsEndParser= below.
 
 #+name: func:listItemsEndParser
 #+header: :noweb-ref Parsing mechanism
@@ -3374,6 +3387,7 @@ These considerations are encoded in =indentLevelParser= below.
 #+begin_src haskell
 indentLevelParser :: OrgParser Level
 indentLevelParser = do
+  minimalIndentation
   spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
   listHead <- orderedHeadParser <|> unorderedHeadParser
   afterListHead
@@ -3398,12 +3412,18 @@ indentLevelParser = do
     afterListHead :: OrgParser ()
     afterListHead =
       void
-        . MP.lookAhead
         $ MP.choice
           [ MP.eof,
-            string "\n" >> pure (),
+            void $ string "\n",
             char ' ' >> MP.notFollowedBy (char ' ')
           ]
+    minimalIndentation :: OrgParser ()
+    minimalIndentation =
+      void
+        . MP.try
+        . MP.lookAhead
+        . MP.label "minimal indentation"
+        $ MP.count 2 (char ' ')
 #+end_src
 
 Note, however, that this only checks for textual correctness. It doesn't check
@@ -3469,7 +3489,7 @@ listItemNester level levels markers = do
   case level.number of
     Just 0 -> pure ()
     Just 1 -> pure ()
-    Just _ -> fail "starting number must be 0 or 1"
+    Just n -> fail $ "starting number must be 0 or 1; got " <> show n
     Nothing -> pure ()
   let newMarker = case level.number of
         Just _ -> LOrderedStart
@@ -3540,15 +3560,9 @@ listItemFitter level levels' = foldlM f [] levels'
           pure $ acc <> newMarkers
 #+end_src
 
-Finally we can combine the two types of list item parsers into a single
-=listItemParser=. This is the parser we use inside [[func:cellParser]].
-
-#+name: func:listItemParser
-#+header: :noweb-ref Parsing mechanism
-#+begin_src haskell
-listItemParser :: OrgParser Cell
-listItemParser = listItemsEndParser <|> MP.try listItemStartParser
-#+end_src
+We use [[func:listItemStartParser]] and [[func:listItemsEndParser]] inside
+[[func:cellParser]]; the former identifies and the beginnings of list items, while
+the latter recognizes their (complete) end when there is no more indentation.
 
 ****** Tests
 
@@ -3693,6 +3707,70 @@ p
           L.CListItem
             [ L.LItemEnd, --------- End of outer "3)".
               L.LOrderedEnd ------- End outer ordered list.
+            ]
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+That's just for the structural portion. Now we test whether list items can also
+hold content (other cells) inside it.
+
+#+name: test:0009-list-content-simple
+#+header: :tangle test/Lilac/ParseSpec/0009-list-content-simple
+#+begin_src org
+  1) First
+     paragraph.
+
+     Second paragraph.
+
+  2) Another paragraph.
+#+end_src
+
+#+header: :noweb-ref Test lists
+#+begin_src haskell
+p
+  "parses list with content (simple)"
+  "test/Lilac/ParseSpec/0009-list-content-simple"
+  $ L.OrgDoc
+    { cells =
+        [ L.CListItem
+            [ L.LOrderedStart,
+              L.LItemStart
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "First paragraph.",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "Second paragraph.",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          L.CListItem
+            [ L.LItemEnd,
+              L.LItemStart
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "Another paragraph. ",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          L.CListItem
+            [ L.LItemEnd,
+              L.LOrderedEnd
             ]
         ],
       code = [],
