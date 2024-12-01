@@ -734,3 +734,116 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
+
+    p
+      "parses nested list (with text)"
+      "test/Lilac/ParseSpec/0009-list-indentation-nested-with-text"
+      $ L.OrgDoc
+        { cells =
+            [ L.CListItem
+                [ L.LOrderedStart, ---- Start outer ordered list.
+                  L.LItemStart -------- Start outer "1)".
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "one",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LUnorderedStart, -- Start inner bullets under "1)".
+                  L.LItemStart -------- Inner bullet start.
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "a",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LItemEnd, --------- Inner bullet end.
+                  L.LItemStart -------- Inner bullet start.
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "b",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LItemEnd, --------- Inner bullet end.
+                  L.LUnorderedEnd, ---- End of inner bullets under "1)".
+                  L.LItemEnd, --------- End of outer "1)".
+                  L.LItemStart -------- Start of outer "2)".
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "two",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LOrderedStart, ---- Start of nested ordered list.
+                  L.LItemStart -------- Start of nested "1)".
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "two-point-one",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "hello",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LUnorderedStart, -- Start deeply nested bullets.
+                  L.LItemStart -------- Deeply nested bullet start.
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "X",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LItemEnd, --------- Deeply nested bullet end.
+                  L.LUnorderedEnd, ---- End of deeply nested bullets.
+                  L.LItemEnd, --------- End of nested "1)".
+                  L.LOrderedEnd, ------ End of nested ordered list.
+                  L.LItemEnd, --------- End of outer "2)".
+                  L.LItemStart -------- Start of outer "3)".
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "three",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LItemEnd, --------- End of outer "3)".
+                  L.LOrderedEnd ------- End outer ordered list.
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
