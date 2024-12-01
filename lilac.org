@@ -3319,7 +3319,7 @@ Here's an example of mixing ordered and unordered lists:
 
        - quux
 
-       Note how this paragraph is under item "2", because it is not indented the
+       Note how this paragraph is under item "2", because it is indented the
        same way as "two", not "quux", above.
 
     3) three
@@ -3388,7 +3388,7 @@ Note that if there are no pending =ListMarker= objects, we fail the parser by
 calling =fail=. This is important because the parser itself does not consume input
 and would otherwise always be "stuck" looking at the same point of the input.
 
-Now consider the other case, where we see some indentation along with a a list
+Now consider the other case, where we see some indentation along with a list
 head (ordered or unordered). This task is straightforward, as we just want to
 see some number of spaces, followed by a dash for unordered lists or a number
 and closing parenthesis for ordered lists. For both cases we also parse an
