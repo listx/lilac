@@ -605,7 +605,7 @@ spec =
               L.CParagraph
                 [ L.PTokenStyledText
                     ( L.StyledText
-                        { body = "2) ",
+                        { body = "2)",
                           style = L.styleMaskFrom []
                         }
                     )
@@ -720,7 +720,7 @@ spec =
               L.CParagraph
                 [ L.PTokenStyledText
                     ( L.StyledText
-                        { body = "Another paragraph. ",
+                        { body = "Another paragraph.",
                           style = L.styleMaskFrom []
                         }
                     )

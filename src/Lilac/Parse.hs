@@ -398,9 +398,16 @@ whitespaceParser spaceConsumer' = do
 
   _ <- spaceConsumer'
 
+  ws <-
+    MP.lookAhead
+      $ MP.choice
+        [ MP.eof >> pure "",
+          MP.anySingle >> pure " "
+        ]
+
   pure
     StyledText
-      { body = " ",
+      { body = ws,
         style = mask
       }
 
@@ -478,7 +485,7 @@ styledTextParser = do
       | otherwise = MP.takeWhile1P (Just "prose word") isProseWord
 
 compressProse :: [PToken] -> [PToken]
-compressProse = reverse . dropTrailingWhitespace . foldl' f []
+compressProse = reverse . dropUnnecessary . foldl' f []
   where
     f :: [PToken] -> PToken -> [PToken]
     f [] token = token : []
@@ -493,9 +500,10 @@ compressProse = reverse . dropTrailingWhitespace . foldl' f []
         where
           styles = concatMap maskToStyles [style1, style2]
     f acc token = token : acc
-    dropTrailingWhitespace [] = []
-    dropTrailingWhitespace (((PTokenStyledText (StyledText " " _))) : rest) = rest
-    dropTrailingWhitespace tokens = tokens
+    dropUnnecessary [] = []
+    dropUnnecessary (((PTokenStyledText (StyledText " " _))) : rest) = rest
+    dropUnnecessary (((PTokenStyledText (StyledText "" _))) : rest) = rest
+    dropUnnecessary tokens = tokens
 
 linkParser :: OrgParser Link
 linkParser = do

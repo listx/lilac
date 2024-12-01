@@ -2173,6 +2173,7 @@ Instead, explicitly parsing the whitespace with =whitespaceParser= lets us parse
 the two cases above differently, because we save all whitespace we parsed as
 their own =PTokenStyledText= objects.
 
+#+name: func:whitespaceParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 whitespaceParser :: OrgParser T.Text -> OrgParser StyledText
@@ -2183,17 +2184,26 @@ whitespaceParser spaceConsumer' = do
 
   _ <- spaceConsumer'
 
+  ws <-
+    MP.lookAhead
+      $ MP.choice
+        [ MP.eof >> pure "",
+          MP.anySingle >> pure " "
+        ]
+
   pure
     StyledText
-      { body = " ",
+      { body = ws,
         style = mask
       }
 #+end_src
 
 This parser only succeeds if it finds at least one non-newline whitespace
 character. Each time it succeeds, it "compresses" the whitespace to a single
-space character. Note that we also do a second level of "compression" in
-[[func:compressProse]].
+space character --- unless it sees that the input stream ends, in which case we
+use an empty string instead. Note that we also do a second level of
+"compression" in [[func:compressProse]], where we will drop =StyledText= objects with
+an empty string as the body.
 
 ******* Styled strings
 
@@ -2560,7 +2570,7 @@ single =StyledText= object. For this purpose, we have =compressProse=.
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 compressProse :: [PToken] -> [PToken]
-compressProse = reverse . dropTrailingWhitespace . foldl' f []
+compressProse = reverse . dropUnnecessary . foldl' f []
   where
     f :: [PToken] -> PToken -> [PToken]
     f [] token = token : []
@@ -2575,12 +2585,13 @@ compressProse = reverse . dropTrailingWhitespace . foldl' f []
         where
           styles = concatMap maskToStyles [style1, style2]
     f acc token = token : acc
-    dropTrailingWhitespace [] = []
-    dropTrailingWhitespace (((PTokenStyledText (StyledText " " _))) : rest) = rest
-    dropTrailingWhitespace tokens = tokens
+    dropUnnecessary [] = []
+    dropUnnecessary (((PTokenStyledText (StyledText " " _))) : rest) = rest
+    dropUnnecessary (((PTokenStyledText (StyledText "" _))) : rest) = rest
+    dropUnnecessary tokens = tokens
 #+end_src
 
-=compressProse= also eliminates trailing whitespace, with =dropTrailingWhitespace=.
+=compressProse= also eliminates trailing whitespace, with =dropUnnecessary=.
 Trailing whitespace can occur if the last word of a paragraph (at the end of the
 file) ends with an active =StyleMask= (trailing whitespace between paragraphs
 can't occur because the =lexeme= in [[func:cellParser]] will skip past them). For
@@ -2596,7 +2607,11 @@ to edit this file is UNIX-friendly and appends a trailing newline), in which
 case that newline would get parsed by the =spaceConsumer'= in
 [[func:paragraphParser]] as its own separate =StyledText= object as a single space
 character. We want to eliminate these objects because they don't add any useful
-information, and so we use =dropTrailingWhitespace= above to filter them out.
+information, and so we use =dropUnnecessary= above to filter them out.
+
+=dropUnnecessary= also removes tokens with an empty string as the =StyledText=
+object. This can occur when we parse trailing newlines at the end of the line
+even without style markers, from [[func:whitespaceParser]].
 
 Here we test how we minimize the number of =PToken= objects; although the
 individual letters (without any styling, and with bold styling) are spaced out
@@ -3595,7 +3610,7 @@ p
           L.CParagraph
             [ L.PTokenStyledText
                 ( L.StyledText
-                    { body = "2) ",
+                    { body = "2)",
                       style = L.styleMaskFrom []
                     }
                 )
@@ -3763,7 +3778,7 @@ p
           L.CParagraph
             [ L.PTokenStyledText
                 ( L.StyledText
-                    { body = "Another paragraph. ",
+                    { body = "Another paragraph.",
                       style = L.styleMaskFrom []
                     }
                 )
