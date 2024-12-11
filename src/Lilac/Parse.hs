@@ -171,7 +171,8 @@ type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { styleMask :: StyleMask,
     listLevels :: [Level],
-    listMarkers :: [ListMarker]
+    listMarkers :: [ListMarker],
+    column :: Int
   }
   deriving stock (Eq, Show)
 
@@ -253,7 +254,8 @@ defaultOrgParserState =
   OrgParserState
     { styleMask = styleMaskFrom [],
       listLevels = [],
-      listMarkers = []
+      listMarkers = [],
+      column = 1
     }
 
 skipNewlinesAndComments :: OrgParser ()
@@ -335,12 +337,18 @@ cellParser =
   lexeme
     $ MP.choice
       [ MP.try listItemStartParser,
-        headingParser,
-        blockParser,
-        paragraphParser,
         listItemsEndParser,
+        resetColumn headingParser,
+        resetColumn blockParser,
+        resetColumn paragraphParser,
         detectInvalidIndentation
       ]
+  where
+    resetColumn :: OrgParser a -> OrgParser a
+    resetColumn p = do
+      a <- p
+      modify (\s -> s {column = 1})
+      pure a
 
 detectInvalidIndentation :: OrgParser Cell
 detectInvalidIndentation = do
@@ -590,7 +598,7 @@ listItemsEndParser = do
   orgParserState <- get
   when (null orgParserState.listMarkers) $ do
     fail "no pending ListMarker objects to close off"
-  _ <- MP.eof <|> MP.notFollowedBy (char ' ')
+  _ <- MP.eof <|> seeingNonIndentedContent
   markers <- mapM getEndingMarker orgParserState.listMarkers
   put
     orgParserState
@@ -609,18 +617,26 @@ listItemsEndParser = do
           $ "programmer error: list marker "
           <> (show lm)
           <> " is not supported"
+    seeingNonIndentedContent :: OrgParser ()
+    seeingNonIndentedContent = do
+      MP.notFollowedBy (char ' ')
+      orgParserState <- get
+      if orgParserState.column == 1
+        then pure ()
+        else fail "not at beginning of line"
 
 indentLevelParser :: OrgParser Level
 indentLevelParser = do
   minimalIndentation
   spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
   listHead <- orderedHeadParser <|> unorderedHeadParser
-  afterListHead
-  pure
-    Level
-      { indent = T.length spaces,
-        number = listHead
-      }
+  let level =
+        Level
+          { indent = T.length spaces,
+            number = listHead
+          }
+  afterListHead level
+  pure level
   where
     orderedHeadParser :: OrgParser (Maybe Int)
     orderedHeadParser = do
@@ -634,14 +650,19 @@ indentLevelParser = do
     unorderedHeadParser = do
       _ <- char '-'
       pure Nothing
-    afterListHead :: OrgParser ()
-    afterListHead =
+    afterListHead :: Level -> OrgParser ()
+    afterListHead level =
       void
         $ MP.choice
           [ MP.eof,
             void $ string "\n",
-            char ' ' >> MP.notFollowedBy (char ' ')
+            void $ seeingContentAfterListHead level
           ]
+    seeingContentAfterListHead :: Level -> OrgParser ()
+    seeingContentAfterListHead level = do
+      _ <- char ' '
+      MP.notFollowedBy (char ' ')
+      modify (\s -> s {column = getBodyIndent level})
     minimalIndentation :: OrgParser ()
     minimalIndentation =
       void

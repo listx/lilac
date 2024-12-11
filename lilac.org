@@ -1680,7 +1680,10 @@ type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
 
 The =OrgParserState= is the custom state we want to use to read and write from
 while parsing. The =styleMask= is discussed in [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the section on parsing styles]]. The
-=listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]].
+=listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The =column= is used by
+parsers to keep track of whether the parser is currently at the beginning of a
+new line (where =1= is the very first column of a line); see
+[[func:indentLevelParser]] for a usage example.
 
 #+name: data:OrgParserState
 #+header: :noweb-ref Parsing mechanism
@@ -1689,7 +1692,8 @@ type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { styleMask :: StyleMask,
     listLevels :: [Level],
-    listMarkers :: [ListMarker]
+    listMarkers :: [ListMarker],
+    column :: Int
   }
   deriving stock (Eq, Show)
 
@@ -1700,7 +1704,8 @@ defaultOrgParserState =
   OrgParserState
     { styleMask = styleMaskFrom [],
       listLevels = [],
-      listMarkers = []
+      listMarkers = [],
+      column = 1
     }
 #+end_src
 
@@ -2032,13 +2037,23 @@ cellParser =
   lexeme
     $ MP.choice
       [ MP.try listItemStartParser,
-        headingParser,
-        blockParser,
-        paragraphParser,
         listItemsEndParser,
+        resetColumn headingParser,
+        resetColumn blockParser,
+        resetColumn paragraphParser,
         detectInvalidIndentation
       ]
+  where
+    resetColumn :: OrgParser a -> OrgParser a
+    resetColumn p = do
+      a <- p
+      modify (\s -> s {column = 1})
+      pure a
 #+end_src
+
+The =resetColumn= wrapper sets the =column= attribute back to =1=; this column
+information is useful for parsers that need to understand indentation precisely.
+See [[func:listItemsEndParser]] for how it's used by that function.
 
 The =listItemStartParser= can parse indentation, but also the same goes for
 =paragraphParser= which is able to skip over leading indentation if it lines up
@@ -3350,10 +3365,12 @@ respectively.
 
 Before getting into parsing the list items and taking into account all of these
 rules, let's first consider the simplest case --- where we detect no
-indentation. Here we simply want to close off all pending list items we've
-already seen. The list items we've already seen are encoded in =listMarkers= (as
-we shall soon see), so we just have to go through these and close them off. This
-is what we do in =listItemsEndParser= below.
+indentation. "No indentation" just means that we are either at the end of input
+(=MP.eof=) or at the very beginning of the the line where we detect some non-space
+input (=seeingNonIndentedContent=). In this case we simply want to close off all
+pending list items we've already seen. The list items we've already seen are
+encoded in =listMarkers= (as we shall soon see), so we just have to go through
+these and close them off. This is what we do in =listItemsEndParser= below.
 
 #+name: func:listItemsEndParser
 #+header: :noweb-ref Parsing mechanism
@@ -3363,7 +3380,7 @@ listItemsEndParser = do
   orgParserState <- get
   when (null orgParserState.listMarkers) $ do
     fail "no pending ListMarker objects to close off"
-  _ <- MP.eof <|> MP.notFollowedBy (char ' ')
+  _ <- MP.eof <|> seeingNonIndentedContent
   markers <- mapM getEndingMarker orgParserState.listMarkers
   put
     orgParserState
@@ -3382,11 +3399,25 @@ listItemsEndParser = do
           $ "programmer error: list marker "
           <> (show lm)
           <> " is not supported"
+    seeingNonIndentedContent :: OrgParser ()
+    seeingNonIndentedContent = do
+      MP.notFollowedBy (char ' ')
+      orgParserState <- get
+      if orgParserState.column == 1
+        then pure ()
+        else fail "not at beginning of line"
 #+end_src
 
 Note that if there are no pending =ListMarker= objects, we fail the parser by
 calling =fail=. This is important because the parser itself does not consume input
 and would otherwise always be "stuck" looking at the same point of the input.
+
+The ceremony with =orgParserState.column= is required for
+=seeingNonIndentedContent=, because there is no easy way to check for the
+just-parsed token (or character) in Megaparsec --- all parsers only see what's
+in front of it. So then it's up to other parsers to set this to some value
+greater than =1= (we do this in [[func:indentLevelParser]] which is part of
+[[func:listItemStartParser]])
 
 Now consider the other case, where we see some indentation along with a list
 head (ordered or unordered). This task is straightforward, as we just want to
@@ -3405,12 +3436,13 @@ indentLevelParser = do
   minimalIndentation
   spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
   listHead <- orderedHeadParser <|> unorderedHeadParser
-  afterListHead
-  pure
-    Level
-      { indent = T.length spaces,
-        number = listHead
-      }
+  let level =
+        Level
+          { indent = T.length spaces,
+            number = listHead
+          }
+  afterListHead level
+  pure level
   where
     orderedHeadParser :: OrgParser (Maybe Int)
     orderedHeadParser = do
@@ -3424,14 +3456,19 @@ indentLevelParser = do
     unorderedHeadParser = do
       _ <- char '-'
       pure Nothing
-    afterListHead :: OrgParser ()
-    afterListHead =
+    afterListHead :: Level -> OrgParser ()
+    afterListHead level =
       void
         $ MP.choice
           [ MP.eof,
             void $ string "\n",
-            char ' ' >> MP.notFollowedBy (char ' ')
+            void $ seeingContentAfterListHead level
           ]
+    seeingContentAfterListHead :: Level -> OrgParser ()
+    seeingContentAfterListHead level = do
+      _ <- char ' '
+      MP.notFollowedBy (char ' ')
+      modify (\s -> s {column = getBodyIndent level})
     minimalIndentation :: OrgParser ()
     minimalIndentation =
       void
@@ -3440,6 +3477,18 @@ indentLevelParser = do
         . MP.label "minimal indentation"
         $ MP.count 2 (char ' ')
 #+end_src
+
+The =afterListHead= parser preemptively checks what's in the input /after/ parsing
+the list head. In the case where it sees some other non-empty content, it
+expects some other parser) to continue parsing. So inside
+=seeingContentAfterListHead= we set the =column= attribute to indentation of the
+current level, because we expect another parser to help us finish parsing the
+line. Then at the [[func:cellParser]] level, we set this back to =1= for any parser
+that is expected to consume content and end with a newline. This lets
+[[func:listItemsEndParser]] know whether it is looking at EOF or at the beginning of
+a line with some content in it in its =seeingContentAfterListHead= function. If
+Megaparsec let us easily check the previous character that was parsed, this
+scheme using a stateful =column= field wouldn't be necessary.
 
 Note, however, that this only checks for textual correctness. It doesn't check
 whether what's parsed is semantically correct. For example, we wouldn't want to
@@ -3802,6 +3851,8 @@ between them.
 #+name: test:0009-list-indentation-nested-with-text
 #+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-nested-with-text
 #+begin_src org
+Foo.
+
   1) one
 
      - a
@@ -3817,6 +3868,8 @@ between them.
         - X
 
   3) three
+
+Bar.
 #+end_src
 
 #+header: :noweb-ref Test lists
@@ -3826,7 +3879,15 @@ p
   "test/Lilac/ParseSpec/0009-list-indentation-nested-with-text"
   $ L.OrgDoc
     { cells =
-        [ L.CListItem
+        [ L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "Foo.",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          L.CListItem
             [ L.LOrderedStart, ---- Start outer ordered list.
               L.LItemStart -------- Start outer "1)".
             ],
@@ -3927,6 +3988,14 @@ p
           L.CListItem
             [ L.LItemEnd, --------- End of outer "3)".
               L.LOrderedEnd ------- End outer ordered list.
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "Bar.",
+                      style = L.styleMaskFrom []
+                    }
+                )
             ]
         ],
       code = [],

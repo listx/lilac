@@ -740,7 +740,15 @@ spec =
       "test/Lilac/ParseSpec/0009-list-indentation-nested-with-text"
       $ L.OrgDoc
         { cells =
-            [ L.CListItem
+            [ L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "Foo.",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
                 [ L.LOrderedStart, ---- Start outer ordered list.
                   L.LItemStart -------- Start outer "1)".
                 ],
@@ -841,6 +849,14 @@ spec =
               L.CListItem
                 [ L.LItemEnd, --------- End of outer "3)".
                   L.LOrderedEnd ------- End outer ordered list.
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "Bar.",
+                          style = L.styleMaskFrom []
+                        }
+                    )
                 ]
             ],
           code = [],
