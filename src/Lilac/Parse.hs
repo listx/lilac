@@ -370,7 +370,7 @@ headingParser :: OrgParser Cell
 headingParser = do
   stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
   _ <- char ' '
-  prose <- proseParser spaceConsumer'
+  prose <- proseParser spaceConsumer
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
@@ -382,16 +382,16 @@ headingParser = do
           meta = drawers
         }
   where
-    spaceConsumer' :: OrgParser T.Text
-    spaceConsumer' = MP.takeWhile1P (Just "space") (== ' ')
+    spaceConsumer :: OrgParser T.Text
+    spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
 
 proseParser :: OrgParser T.Text -> OrgParser [PToken]
-proseParser spaceConsumer' = do
+proseParser spaceConsumer = do
   a <- MP.choice baseParsers
   b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
   pure $ a : b
   where
-    spacePTokenParser = PTokenStyledText <$> whitespaceParser spaceConsumer'
+    spacePTokenParser = PTokenStyledText <$> whitespaceParser spaceConsumer
     baseParsers =
       [ PTokenLink <$> linkParser,
         PTokenMathFragment <$> mathFragmentInlineParser,
@@ -399,12 +399,12 @@ proseParser spaceConsumer' = do
       ]
 
 whitespaceParser :: OrgParser T.Text -> OrgParser StyledText
-whitespaceParser spaceConsumer' = do
+whitespaceParser spaceConsumer = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
 
-  _ <- spaceConsumer'
+  _ <- spaceConsumer
 
   ws <-
     MP.lookAhead
@@ -584,12 +584,12 @@ paragraphParser = do
   orgParserState <- get
   let n = sum . map getBodyIndent . take 1 $ orgParserState.listLevels
   _ <- MP.optional $ MP.count n (char ' ')
-  prose <- proseParser spaceConsumer'
+  prose <- proseParser spaceConsumer
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
   where
-    spaceConsumer' :: OrgParser T.Text
-    spaceConsumer' = do
+    spaceConsumer :: OrgParser T.Text
+    spaceConsumer = do
       MP.notFollowedBy (string "\n\n")
       MP.takeWhile1P (Just "whitespace (newlines allowed)") isSpace
 
