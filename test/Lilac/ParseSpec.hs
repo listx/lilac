@@ -11,6 +11,8 @@ import Test.Hspec.Megaparsec
     elabel,
     err,
     errFancy,
+    etok,
+    etoks,
     fancy,
     shouldFailWith,
     shouldParse,
@@ -863,3 +865,32 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
+    pfm
+      "detects over-indentation for paragraph continuation line (list body)"
+      "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over-list-body"
+      (utoks " ")
+      14
+
+    pfm
+      "detects over-indentation for paragraph continuation line"
+      "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over"
+      (utoks " ")
+      4
+
+    pfm
+      "detects under-indentation for paragraph continuation line (list body)"
+      "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-under-list-body"
+      (utoks "b" <> etoks " ")
+      12
+
+    pfm
+      "detects invalid initial indentation for paragraph"
+      "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid"
+      (utoks "I" <> etoks " ")
+      21
+
+    pfm
+      "detects invalid initial indentation for paragraph (between list levels)"
+      "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
+      (utoks "I" <> etok '-' <> elabel "indentation" <> elabel "ordered list number" <> etok ' ')
+      36

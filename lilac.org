@@ -1680,9 +1680,9 @@ type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
 
 The =OrgParserState= is the custom state we want to use to read and write from
 while parsing. The =styleMask= is discussed in [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the section on parsing styles]]. The
-=listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The =column= is used by
-parsers to keep track of whether the parser is currently at the beginning of a
-new line (where =1= is the very first column of a line); see
+=listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The =continuationIndent=
+is used to keep track of how much indentation to expect inside a single
+(contiguous) piece of content; see [[func:paragraphParser]] and
 [[func:indentLevelParser]] for a usage example.
 
 #+name: data:OrgParserState
@@ -1693,7 +1693,7 @@ data OrgParserState = OrgParserState
   { styleMask :: StyleMask,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
-    column :: Int
+    continuationIndent :: Int
   }
   deriving stock (Eq, Show)
 
@@ -1705,7 +1705,7 @@ defaultOrgParserState =
     { styleMask = styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
-      column = 1
+      continuationIndent = 0
     }
 #+end_src
 
@@ -2038,22 +2038,22 @@ cellParser =
     $ MP.choice
       [ MP.try listItemStartParser,
         listItemsEndParser,
-        resetColumn headingParser,
-        resetColumn blockParser,
-        resetColumn paragraphParser,
+        resetContinuationIndent headingParser,
+        resetContinuationIndent blockParser,
+        resetContinuationIndent paragraphParser,
         detectInvalidIndentation
       ]
   where
-    resetColumn :: OrgParser a -> OrgParser a
-    resetColumn p = do
+    resetContinuationIndent :: OrgParser a -> OrgParser a
+    resetContinuationIndent p = do
       a <- p
-      modify (\s -> s {column = 1})
+      modify (\s -> s {continuationIndent = 0})
       pure a
 #+end_src
 
-The =resetColumn= wrapper sets the =column= attribute back to =1=; this column
-information is useful for parsers that need to understand indentation precisely.
-See [[func:listItemsEndParser]] for how it's used by that function.
+The =resetContinuationIndent= wrapper sets the =continuationIndent= attribute back
+to =0=; this information is useful for parsers that need to understand indentation
+precisely. See [[func:listItemsEndParser]] for how it's used by that function.
 
 The =listItemStartParser= can parse indentation, but also the same goes for
 =paragraphParser= which is able to skip over leading indentation if it lines up
@@ -3147,9 +3147,23 @@ p
 ****** Paragraphs (standalone prose)
 
 The =paragraphParser= below is similar to =headingParser= because it's also powered
-mostly by [[func:proseParser]]. However a key difference is how it handles trailing
-whitespace --- it will parse any whitespace except for two consecutive newline
-characters.
+mostly by [[func:proseParser]]. However a key difference is that it is aware of the
+nuances between newlines, indentation, and spaces.
+
+The main concern is to understand where the paragraph starts. Paragraphs can
+start in three ways:
+
+  1) without indentation,
+
+  2) with indentation, or
+
+  3) after a list head (which is essentially indentation).
+
+In all three cases, we would like to check whether a paragraph's inner lines
+have consistent indentation. This way, a paragraph's lines all line up
+vertically on the same column, and is visually pleasing. Doing this check means
+understanding what is the expected indentation (if at all) for lines inside the
+paragraph.
 
 #+name: func:paragraphParser
 #+header: :noweb-ref Parsing mechanism
@@ -3158,18 +3172,46 @@ paragraphParser :: OrgParser Cell
 paragraphParser = do
   orgParserState <- get
   let n = sum . map getBodyIndent . take 1 $ orgParserState.listLevels
-  _ <- MP.optional $ MP.count n (char ' ')
-  prose <- proseParser spaceConsumer
+  parsedIndent <- MP.optional $ MP.count n (char ' ')
+  if (isJust parsedIndent)
+    then modify (\s -> s {continuationIndent = n})
+    else pure ()
+  let expectedIndentLen =
+        if isJust parsedIndent
+          then n
+          else orgParserState.continuationIndent
+  prose <- proseParser $ spaceConsumer expectedIndentLen
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
   where
-    spaceConsumer :: OrgParser T.Text
-    spaceConsumer = do
+    spaceConsumer :: Int -> OrgParser T.Text
+    spaceConsumer expectedIndentLen =
+      MP.choice
+        [ newlineAndIndent expectedIndentLen,
+          spaces
+        ]
+    newlineAndIndent :: Int -> OrgParser T.Text
+    newlineAndIndent expectedIndentLen = do
       MP.notFollowedBy (string "\n\n")
-      MP.takeWhile1P (Just "whitespace (newlines allowed)") isSpace
+      _ <- string "\n"
+      _ <-
+        if (expectedIndentLen == 0)
+          then MP.notFollowedBy (char ' ')
+          else MP.eof <|> indent expectedIndentLen
+      pure " "
+    indent :: Int -> OrgParser ()
+    indent expectedIndentLen = do
+      _ <-
+        MP.label "indentation for paragraph continuation"
+          $ MP.count expectedIndentLen (char ' ')
+      MP.notFollowedBy (char ' ')
+      MP.notFollowedBy (char '\n')
+      pure ()
+    spaces :: OrgParser T.Text
+    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 #+end_src
 
-Below we check several types of paragraphs.
+Below we check several types of paragraphs without regard to indentation.
 
 #+name: test:0005-prose-paragraphs
 #+header: :tangle test/Lilac/ParseSpec/0005-prose-paragraphs
@@ -3218,6 +3260,9 @@ p
     ]
 ]
 #+end_src
+
+For tests involving paragraphs and indentation, see those prefixed with
+=0005-paragraph-indentation-*=.
 
 ****** List items
 :PROPERTIES:
@@ -3405,7 +3450,7 @@ listItemsEndParser = do
     seeingNonIndentedContent = do
       MP.notFollowedBy (char ' ')
       orgParserState <- get
-      if orgParserState.column == 1
+      if orgParserState.continuationIndent == 0
         then pure ()
         else fail "not at beginning of line"
 #+end_src
@@ -3414,7 +3459,7 @@ Note that if there are no pending =ListMarker= objects, we fail the parser by
 calling =fail=. This is important because the parser itself does not consume input
 and would otherwise always be "stuck" looking at the same point of the input.
 
-The ceremony with =orgParserState.column= is required for
+The ceremony with =orgParserState.continuationIndent= is required for
 =seeingNonIndentedContent=, because there is no easy way to check for the
 just-parsed token (or character) in Megaparsec --- all parsers only see what's
 in front of it. So then it's up to other parsers to set this to some value
@@ -3470,7 +3515,7 @@ indentLevelParser = do
     seeingContentAfterListHead level = do
       _ <- char ' '
       MP.notFollowedBy (char ' ')
-      modify (\s -> s {column = getBodyIndent level})
+      modify (\s -> s {continuationIndent = getBodyIndent level})
     minimalIndentation :: OrgParser ()
     minimalIndentation =
       void
@@ -3483,14 +3528,15 @@ indentLevelParser = do
 The =afterListHead= parser preemptively checks what's in the input /after/ parsing
 the list head. In the case where it sees some other non-empty content, it
 expects some other parser) to continue parsing. So inside
-=seeingContentAfterListHead= we set the =column= attribute to indentation of the
-current level, because we expect another parser to help us finish parsing the
-line. Then at the [[func:cellParser]] level, we set this back to =1= for any parser
-that is expected to consume content and end with a newline. This lets
-[[func:listItemsEndParser]] know whether it is looking at EOF or at the beginning of
-a line with some content in it in its =seeingContentAfterListHead= function. If
-Megaparsec let us easily check the previous character that was parsed, this
-scheme using a stateful =column= field wouldn't be necessary.
+=seeingContentAfterListHead= we set the =continuationIndent= attribute to
+indentation of the current level, because we expect another parser to help us
+finish parsing the line. Then at the [[func:cellParser]] level, we set this back to
+=0= for any parser that is expected to consume content and end with a newline.
+This lets [[func:listItemsEndParser]] know whether it is looking at EOF or at the
+beginning of a line with some content in it in its =seeingContentAfterListHead=
+function. If Megaparsec let us easily check the previous character that was
+parsed, this scheme using a stateful =continuationIndent= field wouldn't be
+necessary.
 
 Note, however, that this only checks for textual correctness. It doesn't check
 whether what's parsed is semantically correct. For example, we wouldn't want to
@@ -4006,6 +4052,103 @@ p
     }
 #+end_src
 
+Check whether we can detect invalid indentations for paragraphs that are
+indented (indented due to them being inside a list). The first case is when the
+line is indented too much in the list body.
+
+#+header: :tangle test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over-list-body
+#+begin_src org
+  1) Foo
+       bar
+     baz.
+#+end_src
+
+#+header: :noweb-ref Test paragraph indentation
+#+begin_src haskell
+pfm
+  "detects over-indentation for paragraph continuation line (list body)"
+  "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over-list-body"
+  (utoks " ")
+  14
+#+end_src
+
+The same rule about keeping the same indentation applies for plain paragraphs.
+
+#+header: :tangle test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over
+#+begin_src org
+Foo
+  bar
+baz.
+#+end_src
+
+#+header: :noweb-ref Test paragraph indentation
+#+begin_src haskell
+pfm
+  "detects over-indentation for paragraph continuation line"
+  "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over"
+  (utoks " ")
+  4
+#+end_src
+
+Under-indentation is also a problem for continuation lines inside a single
+paragraph block.
+
+#+header: :tangle test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-under-list-body
+#+begin_src org
+  1) Foo
+   bar
+     baz.
+#+end_src
+
+#+header: :noweb-ref Test paragraph indentation
+#+begin_src haskell
+pfm
+  "detects under-indentation for paragraph continuation line (list body)"
+  "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-under-list-body"
+  (utoks "b" <> etoks " ")
+  12
+#+end_src
+
+If we have some number of list levels already, then the paragraph must start at
+one of those levels (it cannot have some arbitrary level of indentation) if
+there is non-zero indentation.
+
+#+header: :tangle test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid
+#+begin_src org
+  1) Foo
+     bar.
+
+ Invalid.
+#+end_src
+
+#+header: :noweb-ref Test paragraph indentation
+#+begin_src haskell
+pfm
+  "detects invalid initial indentation for paragraph"
+  "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid"
+  (utoks "I" <> etoks " ")
+  21
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels
+#+begin_src org
+  1) Foo
+     bar.
+
+     - Baz.
+
+   Invalid.
+#+end_src
+
+#+header: :noweb-ref Test paragraph indentation
+#+begin_src haskell
+pfm
+  "detects invalid initial indentation for paragraph (between list levels)"
+  "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
+  (utoks "I" <> etok '-' <> elabel "indentation" <> elabel "ordered list number" <> etok ' ')
+  36
+#+end_src
+
 ****** Blocks
 
 A [[data:Block][Block]] is anything that sits between =#+begin_...= and =#+end_...= lines. Some
@@ -4472,6 +4615,8 @@ import Test.Hspec.Megaparsec
     elabel,
     err,
     errFancy,
+    etok,
+    etoks,
     fancy,
     shouldFailWith,
     shouldParse,
@@ -4560,6 +4705,7 @@ spec =
     <<Test block parsing>>
     <<Test indentation detection>>
     <<Test lists>>
+    <<Test paragraph indentation>>
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0001-blankline

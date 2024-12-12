@@ -172,7 +172,7 @@ data OrgParserState = OrgParserState
   { styleMask :: StyleMask,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
-    column :: Int
+    continuationIndent :: Int
   }
   deriving stock (Eq, Show)
 
@@ -255,7 +255,7 @@ defaultOrgParserState =
     { styleMask = styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
-      column = 1
+      continuationIndent = 0
     }
 
 skipNewlinesAndComments :: OrgParser ()
@@ -338,16 +338,16 @@ cellParser =
     $ MP.choice
       [ MP.try listItemStartParser,
         listItemsEndParser,
-        resetColumn headingParser,
-        resetColumn blockParser,
-        resetColumn paragraphParser,
+        resetContinuationIndent headingParser,
+        resetContinuationIndent blockParser,
+        resetContinuationIndent paragraphParser,
         detectInvalidIndentation
       ]
   where
-    resetColumn :: OrgParser a -> OrgParser a
-    resetColumn p = do
+    resetContinuationIndent :: OrgParser a -> OrgParser a
+    resetContinuationIndent p = do
       a <- p
-      modify (\s -> s {column = 1})
+      modify (\s -> s {continuationIndent = 0})
       pure a
 
 detectInvalidIndentation :: OrgParser Cell
@@ -583,15 +583,43 @@ paragraphParser :: OrgParser Cell
 paragraphParser = do
   orgParserState <- get
   let n = sum . map getBodyIndent . take 1 $ orgParserState.listLevels
-  _ <- MP.optional $ MP.count n (char ' ')
-  prose <- proseParser spaceConsumer
+  parsedIndent <- MP.optional $ MP.count n (char ' ')
+  if (isJust parsedIndent)
+    then modify (\s -> s {continuationIndent = n})
+    else pure ()
+  let expectedIndentLen =
+        if isJust parsedIndent
+          then n
+          else orgParserState.continuationIndent
+  prose <- proseParser $ spaceConsumer expectedIndentLen
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
   where
-    spaceConsumer :: OrgParser T.Text
-    spaceConsumer = do
+    spaceConsumer :: Int -> OrgParser T.Text
+    spaceConsumer expectedIndentLen =
+      MP.choice
+        [ newlineAndIndent expectedIndentLen,
+          spaces
+        ]
+    newlineAndIndent :: Int -> OrgParser T.Text
+    newlineAndIndent expectedIndentLen = do
       MP.notFollowedBy (string "\n\n")
-      MP.takeWhile1P (Just "whitespace (newlines allowed)") isSpace
+      _ <- string "\n"
+      _ <-
+        if (expectedIndentLen == 0)
+          then MP.notFollowedBy (char ' ')
+          else MP.eof <|> indent expectedIndentLen
+      pure " "
+    indent :: Int -> OrgParser ()
+    indent expectedIndentLen = do
+      _ <-
+        MP.label "indentation for paragraph continuation"
+          $ MP.count expectedIndentLen (char ' ')
+      MP.notFollowedBy (char ' ')
+      MP.notFollowedBy (char '\n')
+      pure ()
+    spaces :: OrgParser T.Text
+    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 
 listItemsEndParser :: OrgParser Cell
 listItemsEndParser = do
@@ -621,7 +649,7 @@ listItemsEndParser = do
     seeingNonIndentedContent = do
       MP.notFollowedBy (char ' ')
       orgParserState <- get
-      if orgParserState.column == 1
+      if orgParserState.continuationIndent == 0
         then pure ()
         else fail "not at beginning of line"
 
@@ -662,7 +690,7 @@ indentLevelParser = do
     seeingContentAfterListHead level = do
       _ <- char ' '
       MP.notFollowedBy (char ' ')
-      modify (\s -> s {column = getBodyIndent level})
+      modify (\s -> s {continuationIndent = getBodyIndent level})
     minimalIndentation :: OrgParser ()
     minimalIndentation =
       void
