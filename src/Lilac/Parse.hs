@@ -391,15 +391,15 @@ proseParser spaceConsumer = do
   b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
   pure $ a : b
   where
-    spacePTokenParser = PTokenStyledText <$> whitespaceParser spaceConsumer
+    spacePTokenParser = PTokenStyledText <$> whitespaceCompressor spaceConsumer
     baseParsers =
       [ PTokenLink <$> linkParser,
         PTokenMathFragment <$> mathFragmentInlineParser,
         PTokenStyledText <$> styledTextParser
       ]
 
-whitespaceParser :: OrgParser T.Text -> OrgParser StyledText
-whitespaceParser spaceConsumer = do
+whitespaceCompressor :: OrgParser T.Text -> OrgParser StyledText
+whitespaceCompressor spaceConsumer = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask

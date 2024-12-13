@@ -2145,7 +2145,7 @@ proseParser spaceConsumer = do
   b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
   pure $ a : b
   where
-    spacePTokenParser = PTokenStyledText <$> whitespaceParser spaceConsumer
+    spacePTokenParser = PTokenStyledText <$> whitespaceCompressor spaceConsumer
     baseParsers =
       [ PTokenLink <$> linkParser,
         PTokenMathFragment <$> mathFragmentInlineParser,
@@ -2153,9 +2153,9 @@ proseParser spaceConsumer = do
       ]
 #+end_src
 
-Note that we parse whitespace explicitly with =whitespaceParser= which consumes
-whitespace based on the provided =spaceConsumer=. We first parse among the
-non-whitespace parsers in =baseParsers=, then parse additional tokens that may
+Note that we parse whitespace explicitly with =whitespaceCompressor= which
+consumes whitespace based on the provided =spaceConsumer=. We first parse among
+the non-whitespace parsers in =baseParsers=, then parse additional tokens that may
 include whitespace with =spacePTokenParser=. This way, we force the prose to
 initially start out without any indentation (because the preceding cell, if any,
 would have swallowed up trailing whitespace automatically via =lexeme= in
@@ -2184,15 +2184,17 @@ between the =foo= and "..." will get eaten up by the wrapper /and discarded/.
 And now we're in the position where we have to, on export, guess (due to
 information loss) if we need to insert whitespace between the =foo= and "...".
 
-Instead, explicitly parsing the whitespace with =whitespaceParser= lets us parse
-the two cases above differently, because we save all whitespace we parsed as
-their own =PTokenStyledText= objects.
+Instead, explicitly parsing the whitespace with =whitespaceCompressor= lets us
+parse the two cases above differently, because we save all whitespace we parsed
+as their own =PTokenStyledText= objects. We call it a "compressor" because no
+matter how many spaces the =spaceConsumer= consumes, we construct only 0 or 1
+space characters in the =StyledText= object.
 
-#+name: func:whitespaceParser
+#+name: func:whitespaceCompressor
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
-whitespaceParser :: OrgParser T.Text -> OrgParser StyledText
-whitespaceParser spaceConsumer = do
+whitespaceCompressor :: OrgParser T.Text -> OrgParser StyledText
+whitespaceCompressor spaceConsumer = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
@@ -2626,7 +2628,7 @@ information, and so we use =dropUnnecessary= above to filter them out.
 
 =dropUnnecessary= also removes tokens with an empty string as the =StyledText=
 object. This can occur when we parse trailing newlines at the end of the line
-even without style markers, from [[func:whitespaceParser]].
+even without style markers, from [[func:whitespaceCompressor]].
 
 Here we test how we minimize the number of =PToken= objects; although the
 individual letters (without any styling, and with bold styling) are spaced out
