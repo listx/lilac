@@ -347,10 +347,13 @@ orgDocParser = do
   _ <- optional skipNewlinesAndComments
   meta <- docMetaParser
   cells <- many cellParser
+  let meaningfulCell :: Cell -> Bool
+      meaningfulCell (CListItem []) = False
+      meaningfulCell _ = True
   MP.eof
   pure
     $ OrgDoc
-      { cells = cells,
+      { cells = filter meaningfulCell cells,
         code = [],
         codeBlocks = IM.fromList [],
         meta = meta
@@ -649,16 +652,7 @@ drawerParser = do
 paragraphParser :: OrgParser Cell
 paragraphParser = do
   orgParserState <- get
-  let n = sum . map getBodyIndent . take 1 $ orgParserState.listLevels
-  parsedIndent <- MP.optional $ MP.count n (char ' ')
-  if (isJust parsedIndent)
-    then modify (\s -> s {continuationIndent = n})
-    else pure ()
-  let expectedIndentLen =
-        if isJust parsedIndent
-          then n
-          else orgParserState.continuationIndent
-  prose <- proseParser $ spaceConsumer expectedIndentLen
+  prose <- proseParser $ spaceConsumer orgParserState.continuationIndent
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
   where
@@ -693,12 +687,18 @@ listItemsEndParser = do
   orgParserState <- get
   when (null orgParserState.listMarkers) $ do
     fail "no pending ListMarker objects to close off"
-  _ <- MP.eof <|> seeingNonIndentedContent
-  markers <- mapM getEndingMarker orgParserState.listMarkers
+  when (orgParserState.continuationIndent /= 0) $ do
+    fail "not at beginning of line"
+  (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
+  let markersToDrop = levelsToDrop * 2
+  markers <-
+    mapM getEndingMarker
+      $ take markersToDrop orgParserState.listMarkers
   put
     orgParserState
-      { listLevels = [],
-        listMarkers = []
+      { listLevels = drop levelsToDrop orgParserState.listLevels,
+        listMarkers = drop markersToDrop orgParserState.listMarkers,
+        continuationIndent = continuationIndent
       }
   pure $ CListItem markers
   where
@@ -712,13 +712,30 @@ listItemsEndParser = do
           $ "programmer error: list marker "
           <> (show lm)
           <> " is not supported"
-    seeingNonIndentedContent :: OrgParser ()
-    seeingNonIndentedContent = do
-      MP.notFollowedBy (char ' ')
+    zeroIndent :: OrgParser (Int, Int)
+    zeroIndent = do
       orgParserState <- get
-      if orgParserState.continuationIndent == 0
-        then pure ()
-        else fail "not at beginning of line"
+      _ <- MP.eof <|> MP.notFollowedBy (char ' ')
+      pure (length orgParserState.listLevels, 0)
+    someIndent :: OrgParser (Int, Int)
+    someIndent = do
+      orgParserState <- get
+      spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
+      _ <- MP.notFollowedBy (char ' ')
+      let existingLevels = orgParserState.listLevels
+          levelsToDropPerIndentationIncrement :: [(Int, Int)]
+          levelsToDropPerIndentationIncrement =
+            zip [0 ..]
+              . map getBodyIndent
+              $ existingLevels
+          indent = T.length spaces
+          matchingIndent =
+            find
+              (\(_, bodyIndent) -> indent == bodyIndent)
+              levelsToDropPerIndentationIncrement
+      case matchingIndent of
+        Nothing -> fail "indentation does not fit into existing levels"
+        Just x -> pure x
 
 listHeadIndentLevelParser :: OrgParser Level
 listHeadIndentLevelParser = do

@@ -22,7 +22,6 @@ import Test.Hspec.Megaparsec
     elabel,
     err,
     errFancy,
-    etok,
     etoks,
     fancy,
     shouldFailWith,
@@ -876,6 +875,87 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
+
+    p
+      "parses paragraphs which can close deeper list levels"
+      "test/Lilac/ParseSpec/0009-paragraph-can-close-deeper-levels"
+      $ L.OrgDoc
+        { cells =
+            [ L.CListItem
+                [ L.LOrderedStart,
+                  L.LItemStart
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "One",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "Two x",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LUnorderedStart,
+                  L.LItemStart
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "Bar",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LUnorderedStart,
+                  L.LItemStart
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "Baz",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LUnorderedEnd,
+                  L.LItemEnd,
+                  L.LUnorderedEnd
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "Three a b c",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LOrderedEnd
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "Four",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
     pfm
       "detects over-indentation for paragraph continuation line (list body)"
       "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over-list-body"
@@ -894,14 +974,14 @@ spec =
       (utoks "b" <> etoks " ")
       12
 
-    pfm
+    pf
       "detects invalid initial indentation for paragraph"
       "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid"
-      (utoks "I" <> etoks " ")
+      "indentation does not fit into existing levels"
       21
 
-    pfm
+    pf
       "detects invalid initial indentation for paragraph (between list levels)"
       "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
-      (utoks "I" <> etok '-' <> elabel "indentation" <> elabel "ordered list number" <> etok ' ')
+      "indentation does not fit into existing levels"
       36

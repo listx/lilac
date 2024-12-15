@@ -1863,6 +1863,7 @@ skipping over as much trailing whitespace as possible. In other words, none of
 the parsers are able to deal with leading whitespace/comments, so we have to
 deal with it here separately.
 
+#+name: func:orgDocParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 orgDocParser :: OrgParser OrgDoc
@@ -1870,10 +1871,13 @@ orgDocParser = do
   _ <- optional skipNewlinesAndComments
   meta <- docMetaParser
   cells <- many cellParser
+  let meaningfulCell :: Cell -> Bool
+      meaningfulCell (CListItem []) = False
+      meaningfulCell _ = True
   MP.eof
   pure
     $ OrgDoc
-      { cells = cells,
+      { cells = filter meaningfulCell cells,
         code = [],
         codeBlocks = IM.fromList [],
         meta = meta
@@ -1897,6 +1901,10 @@ defaultOrgDocWithMeta metas =
       meta = M.fromList metas
     }
 #+end_src
+
+We have to filter out cells that look like =CListItem []= because that can happen
+when [[func:listItemsEndParser]] detects maximum indentation that matches the
+most-deeply-nested item (in which case no list items end).
 
 ***** Document metadata
 
@@ -3238,16 +3246,7 @@ paragraph.
 paragraphParser :: OrgParser Cell
 paragraphParser = do
   orgParserState <- get
-  let n = sum . map getBodyIndent . take 1 $ orgParserState.listLevels
-  parsedIndent <- MP.optional $ MP.count n (char ' ')
-  if (isJust parsedIndent)
-    then modify (\s -> s {continuationIndent = n})
-    else pure ()
-  let expectedIndentLen =
-        if isJust parsedIndent
-          then n
-          else orgParserState.continuationIndent
-  prose <- proseParser $ spaceConsumer expectedIndentLen
+  prose <- proseParser $ spaceConsumer orgParserState.continuationIndent
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
   where
@@ -3478,13 +3477,24 @@ concerns via the [[data:ListMarker]] and [[data:OrgParserState]] (=listLevels=),
 respectively.
 
 Before getting into parsing the list items and taking into account all of these
-rules, let's first consider the simplest case --- where we detect no
-indentation. "No indentation" just means that we are either at the end of input
-(=MP.eof=) or at the very beginning of the the line where we detect some non-space
-input (=seeingNonIndentedContent=). In this case we simply want to close off all
-pending list items we've already seen. The list items we've already seen are
-encoded in =listMarkers= (as we shall soon see), so we just have to go through
-these and close them off. This is what we do in =listItemsEndParser= below.
+rules, let's first consider case where we just want to /close off/ the list items.
+The idea is basically as follows:
+
+  1) if there is no indentation, we close off all list items;
+
+  2) if there is maximum indentation (to line up with the most-nested list
+     item), we don't close off any list items because we're just continuing the
+     most-nested list item;
+
+  3) otherwise, we have some amount of indentation and we only want to close off
+     some list levels, depending on how much indentation we detect.
+
+Point 1 is captured by =zeroIndent= in [[func:listItemsEndParser]]. Points 2 and 3 are
+captured by =someIndent= in the same function. For =someIndent=, we just try to
+line up the amount of indentation with the existing list levels we have and how
+much indentation they expect. Once we determine the amount of levels we need to
+close off, we just go through the list markers we've already seen
+in =listMarkers= and close them off by using =getEndingMarker=.
 
 #+name: func:listItemsEndParser
 #+header: :noweb-ref Parsing mechanism
@@ -3494,12 +3504,18 @@ listItemsEndParser = do
   orgParserState <- get
   when (null orgParserState.listMarkers) $ do
     fail "no pending ListMarker objects to close off"
-  _ <- MP.eof <|> seeingNonIndentedContent
-  markers <- mapM getEndingMarker orgParserState.listMarkers
+  when (orgParserState.continuationIndent /= 0) $ do
+    fail "not at beginning of line"
+  (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
+  let markersToDrop = levelsToDrop * 2
+  markers <-
+    mapM getEndingMarker
+      $ take markersToDrop orgParserState.listMarkers
   put
     orgParserState
-      { listLevels = [],
-        listMarkers = []
+      { listLevels = drop levelsToDrop orgParserState.listLevels,
+        listMarkers = drop markersToDrop orgParserState.listMarkers,
+        continuationIndent = continuationIndent
       }
   pure $ CListItem markers
   where
@@ -3513,27 +3529,53 @@ listItemsEndParser = do
           $ "programmer error: list marker "
           <> (show lm)
           <> " is not supported"
-    seeingNonIndentedContent :: OrgParser ()
-    seeingNonIndentedContent = do
-      MP.notFollowedBy (char ' ')
+    zeroIndent :: OrgParser (Int, Int)
+    zeroIndent = do
       orgParserState <- get
-      if orgParserState.continuationIndent == 0
-        then pure ()
-        else fail "not at beginning of line"
+      _ <- MP.eof <|> MP.notFollowedBy (char ' ')
+      pure (length orgParserState.listLevels, 0)
+    someIndent :: OrgParser (Int, Int)
+    someIndent = do
+      orgParserState <- get
+      spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
+      _ <- MP.notFollowedBy (char ' ')
+      let existingLevels = orgParserState.listLevels
+          levelsToDropPerIndentationIncrement :: [(Int, Int)]
+          levelsToDropPerIndentationIncrement =
+            zip [0 ..]
+              . map getBodyIndent
+              $ existingLevels
+          indent = T.length spaces
+          matchingIndent =
+            find
+              (\(_, bodyIndent) -> indent == bodyIndent)
+              levelsToDropPerIndentationIncrement
+      case matchingIndent of
+        Nothing -> fail "indentation does not fit into existing levels"
+        Just x -> pure x
 #+end_src
 
-Note that if there are no pending =ListMarker= objects, we fail the parser by
-calling =fail=. This is important because the parser itself does not consume input
-and would otherwise always be "stuck" looking at the same point of the input.
+Note that we initially fail the parser if there are no pending =ListMarker=
+objects (no list levels to close off), or if we're not at the beginning of the
+line (because otherwise we cannot measure indentation accurately), by checking
+=orgParserState.continuationIndent=. This check of
+=orgParserState.continuationIndent= is required because there is no easy way to
+check for the just-parsed token (or character) in Megaparsec --- all parsers
+only see what's in front of it. So then it's up to other parsers to set this to
+some value greater than =1= (we do this in [[func:listHeadIndentLevelParser]] which is
+part of [[func:listItemStartParser]])
 
-The ceremony with =orgParserState.continuationIndent= is required for
-=seeingNonIndentedContent=, because there is no easy way to check for the
-just-parsed token (or character) in Megaparsec --- all parsers only see what's
-in front of it. So then it's up to other parsers to set this to some value
-greater than =1= (we do this in [[func:listHeadIndentLevelParser]] which is part of
-[[func:listItemStartParser]])
+The =markersToDrop= is always twice the number of =levelsToDrop= because we always
+add 2 for each level (see [[func:listItemNester]]).
 
-Now consider the other case, where we see some indentation along with a list
+If we detect the maximum allowed indentation, then there are no levels to drop,
+and hence, we'll end up returning =CListItem []= which doesn't hold any meaning.
+Avoiding this is a bit difficult; if we just fail the parser outright, then the
+amount of parsed indentation will have to be parsed by another downstream
+parser. So, instead we just return =CListItem []= and then filter these out in
+[[func:orgDocParser]].
+
+Now consider the case where we see some indentation along with a list
 head (ordered or unordered). This task is straightforward, as we just want to
 see some number of spaces, followed by a dash for unordered lists or a number
 and closing parenthesis for ordered lists. For both cases we also parse an
@@ -3657,6 +3699,11 @@ getBodyIndent level = level.indent + maybeNum + punctuation + space
 continuing some existing list (via [[func:listItemFitter]]). The =getBodyIndent=
 function just computes what the indentation would have to be for some body of
 text for it to be considered part of the item.
+
+=listItemNester= appends starting markers to =listMarkers=. We use this information
+in other places when we want to know how to un-nest and item (close it off),
+where we'll add corresponding closing markers with =getEndingMarker= in
+[[func:listItemsEndParser]].
 
 #+name: func:listItemNester
 #+header: :noweb-ref Parsing mechanism
@@ -4190,10 +4237,10 @@ there is non-zero indentation.
 
 #+header: :noweb-ref Test paragraph indentation
 #+begin_src haskell
-pfm
+pf
   "detects invalid initial indentation for paragraph"
   "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid"
-  (utoks "I" <> etoks " ")
+  "indentation does not fit into existing levels"
   21
 #+end_src
 
@@ -4209,11 +4256,117 @@ pfm
 
 #+header: :noweb-ref Test paragraph indentation
 #+begin_src haskell
-pfm
+pf
   "detects invalid initial indentation for paragraph (between list levels)"
   "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
-  (utoks "I" <> etok '-' <> elabel "indentation" <> elabel "ordered list number" <> etok ' ')
+  "indentation does not fit into existing levels"
   36
+#+end_src
+
+Paragraphs should be able to close list environments, depending on their
+indentation. For example, in the test below the paragraph "Three" should be able
+to close off the unordered list items.
+
+#+header: :tangle test/Lilac/ParseSpec/0009-paragraph-can-close-deeper-levels
+#+begin_src org
+  1) One
+
+     Two
+     x
+
+     - Bar
+
+       - Baz
+
+     Three
+     a b
+     c
+
+Four
+#+end_src
+
+#+header: :noweb-ref Test lists
+#+begin_src haskell
+p
+  "parses paragraphs which can close deeper list levels"
+  "test/Lilac/ParseSpec/0009-paragraph-can-close-deeper-levels"
+  $ L.OrgDoc
+    { cells =
+        [ L.CListItem
+            [ L.LOrderedStart,
+              L.LItemStart
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "One",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "Two x",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          L.CListItem
+            [ L.LUnorderedStart,
+              L.LItemStart
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "Bar",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          L.CListItem
+            [ L.LUnorderedStart,
+              L.LItemStart
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "Baz",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          L.CListItem
+            [ L.LItemEnd,
+              L.LUnorderedEnd,
+              L.LItemEnd,
+              L.LUnorderedEnd
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "Three a b c",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          L.CListItem
+            [ L.LItemEnd,
+              L.LOrderedEnd
+            ],
+          L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "Four",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ]
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
 #+end_src
 
 ****** Blocks
@@ -4693,7 +4846,6 @@ import Test.Hspec.Megaparsec
     elabel,
     err,
     errFancy,
-    etok,
     etoks,
     fancy,
     shouldFailWith,
