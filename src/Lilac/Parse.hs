@@ -653,8 +653,8 @@ listItemsEndParser = do
         then pure ()
         else fail "not at beginning of line"
 
-indentLevelParser :: OrgParser Level
-indentLevelParser = do
+listHeadIndentLevelParser :: OrgParser Level
+listHeadIndentLevelParser = do
   minimalIndentation
   spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
   listHead <- orderedHeadParser <|> unorderedHeadParser
@@ -704,7 +704,7 @@ listItemStartParser = do
   orgParserState <- get
   let levels = orgParserState.listLevels
       markers = orgParserState.listMarkers
-  level <- indentLevelParser
+  level <- listHeadIndentLevelParser
   listMarkers <-
     if
       | nests level.indent levels -> listItemNester level levels markers
