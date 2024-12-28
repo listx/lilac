@@ -5,6 +5,17 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse qualified as L
 import Relude
+  ( FilePath,
+    Int,
+    String,
+    decodeUtf8,
+    fromList,
+    readFileBS,
+    runStateT,
+    ($),
+    (.),
+    (<>),
+  )
 import Test.Hspec (Spec, before, describe, it)
 import Test.Hspec.Megaparsec
   ( ET,
