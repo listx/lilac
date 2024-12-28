@@ -606,22 +606,8 @@ spec =
       "test/Lilac/ParseSpec/0009-list-indentation-no-indent"
       $ L.OrgDoc
         { cells =
-            [ L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "1)",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "2)",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ]
+            [ plainParagraph "1)",
+              plainParagraph "2)"
             ],
           code = [],
           codeBlocks = fromList [],
@@ -709,34 +695,13 @@ spec =
                 [ L.LOrderedStart,
                   L.LItemStart
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "First paragraph.",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "Second paragraph.",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "First paragraph.",
+              plainParagraph "Second paragraph.",
               L.CListItem
                 [ L.LItemEnd,
                   L.LItemStart
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "Another paragraph.",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "Another paragraph.",
               L.CListItem
                 [ L.LItemEnd,
                   L.LOrderedEnd
@@ -752,96 +717,40 @@ spec =
       "test/Lilac/ParseSpec/0009-list-indentation-nested-with-text"
       $ L.OrgDoc
         { cells =
-            [ L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "Foo.",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+            [ plainParagraph "Foo.",
               L.CListItem
                 [ L.LOrderedStart, ---- Start outer ordered list.
                   L.LItemStart -------- Start outer "1)".
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "one",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "one",
               L.CListItem
                 [ L.LUnorderedStart, -- Start inner bullets under "1)".
                   L.LItemStart -------- Inner bullet start.
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "a",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "a",
               L.CListItem
                 [ L.LItemEnd, --------- Inner bullet end.
                   L.LItemStart -------- Inner bullet start.
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "b",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "b",
               L.CListItem
                 [ L.LItemEnd, --------- Inner bullet end.
                   L.LUnorderedEnd, ---- End of inner bullets under "1)".
                   L.LItemEnd, --------- End of outer "1)".
                   L.LItemStart -------- Start of outer "2)".
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "two",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "two",
               L.CListItem
                 [ L.LOrderedStart, ---- Start of nested ordered list.
                   L.LItemStart -------- Start of nested "1)".
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "two-point-one",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "hello",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "two-point-one",
+              plainParagraph "hello",
               L.CListItem
                 [ L.LUnorderedStart, -- Start deeply nested bullets.
                   L.LItemStart -------- Deeply nested bullet start.
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "X",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "X",
               L.CListItem
                 [ L.LItemEnd, --------- Deeply nested bullet end.
                   L.LUnorderedEnd, ---- End of deeply nested bullets.
@@ -850,26 +759,12 @@ spec =
                   L.LItemEnd, --------- End of outer "2)".
                   L.LItemStart -------- Start of outer "3)".
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "three",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "three",
               L.CListItem
                 [ L.LItemEnd, --------- End of outer "3)".
                   L.LOrderedEnd ------- End outer ordered list.
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "Bar.",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ]
+              plainParagraph "Bar."
             ],
           code = [],
           codeBlocks = fromList [],
@@ -885,72 +780,30 @@ spec =
                 [ L.LOrderedStart,
                   L.LItemStart
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "One",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "Two x",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "One",
+              plainParagraph "Two x",
               L.CListItem
                 [ L.LUnorderedStart,
                   L.LItemStart
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "Bar",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "Bar",
               L.CListItem
                 [ L.LUnorderedStart,
                   L.LItemStart
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "Baz",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "Baz",
               L.CListItem
                 [ L.LItemEnd,
                   L.LUnorderedEnd,
                   L.LItemEnd,
                   L.LUnorderedEnd
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "Three a b c",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ],
+              plainParagraph "Three a b c",
               L.CListItem
                 [ L.LItemEnd,
                   L.LOrderedEnd
                 ],
-              L.CParagraph
-                [ L.PTokenStyledText
-                    ( L.StyledText
-                        { body = "Four",
-                          style = L.styleMaskFrom []
-                        }
-                    )
-                ]
+              plainParagraph "Four"
             ],
           code = [],
           codeBlocks = fromList [],
@@ -985,3 +838,14 @@ spec =
       "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
       "indentation does not fit into existing levels"
       36
+
+plainParagraph :: T.Text -> L.Cell
+plainParagraph body =
+  L.CParagraph
+    [ L.PTokenStyledText
+        ( L.StyledText
+            { body = body,
+              style = L.styleMaskFrom []
+            }
+        )
+    ]
