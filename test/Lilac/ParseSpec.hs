@@ -447,6 +447,12 @@ spec =
       "expected ORDERED list item at this level"
       23
 
+    pf
+      "detects slightly wrong indentation"
+      "test/Lilac/ParseSpec/0009-lists-require-precise-indentation"
+      "list item: invalid indentation"
+      15
+
     p
       "parses blocks with noweb references"
       "test/Lilac/ParseSpec/0007-blocks-noweb"

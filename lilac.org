@@ -4354,6 +4354,27 @@ pf
   23
 #+end_src
 
+List items have to be precisely indented; otherwise they'll hit an indentation
+error. In the test below, the "1)" for the "b" item has only 4 spaces of
+indentation instead of 5 (to line up with the "a" above it), so that should
+trigger an indentation error.
+
+#+header: :tangle test/Lilac/ParseSpec/0009-lists-require-precise-indentation
+#+begin_src org
+  1) a
+
+    1) b
+#+end_src
+
+#+header: :noweb-ref Test block parsing
+#+begin_src haskell
+pf
+  "detects slightly wrong indentation"
+  "test/Lilac/ParseSpec/0009-lists-require-precise-indentation"
+  "list item: invalid indentation"
+  15
+#+end_src
+
 ****** Blocks
 
 A [[data:Block][Block]] is anything that sits between =#+begin_...= and =#+end_...= lines. Some
