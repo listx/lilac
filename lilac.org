@@ -1668,6 +1668,7 @@ import Relude
     fromEnum,
     fromMaybe,
     get,
+    isJust,
     isNothing,
     length,
     many,
@@ -3671,12 +3672,20 @@ listItemStartParser = do
   listMarkers <-
     if
       | nests level.indent levels -> listItemNester level levels markers
-      | fits level.indent levels -> listItemFitter level levels
-      | otherwise -> fail "list item: invalid indentation"
+      | otherwise -> case fits level levels of
+          Right True -> listItemFitter level levels
+          Right False -> fail "list item: invalid indentation"
+          Left msg -> fail msg
   pure $ CListItem listMarkers
   where
-    fits :: Int -> [Level] -> Bool
-    fits indent levels = elem indent $ map (.indent) levels
+    fits :: Level -> [Level] -> Either String Bool
+    fits level levels = case find (\l -> l.indent == level.indent) levels of
+      Nothing -> Right False
+      Just lvl
+        | isJust level.number && isJust lvl.number -> Right True
+        | isNothing level.number && isNothing lvl.number -> Right True
+        | isJust lvl.number -> Left "expected ORDERED list item at this level"
+        | otherwise -> Left "expected UNORDERED list item at this level"
     nests :: Int -> [Level] -> Bool
     nests _ [] = True
     nests indent (level : _) = indent == getBodyIndent level
@@ -4220,6 +4229,129 @@ p
       codeBlocks = fromList [],
       meta = fromList []
     }
+#+end_src
+
+Paragraphs can close off list items, so we can mix ordered and unordered list
+items at the same level, as long as the differing list type is closed off by a
+paragraph. In the test below, the "Two" closes off the unordered list, so we're
+allowed to start a new ordered list with =1) a=.
+
+#+header: :tangle test/Lilac/ParseSpec/0009-paragraph-can-separate-mixed-lists
+#+begin_src org
+  1) One
+
+     - Bar
+
+       - Baz
+
+     Two
+
+     1) a
+
+     2) b
+
+     Three
+
+Four
+#+end_src
+
+#+header: :noweb-ref Test lists
+#+begin_src haskell
+p
+  "parses paragraphs which can separate mixed lists"
+  "test/Lilac/ParseSpec/0009-paragraph-can-separate-mixed-lists"
+  $ L.OrgDoc
+    { cells =
+        [ L.CListItem
+            [ L.LOrderedStart,
+              L.LItemStart
+            ],
+          plainParagraph "One",
+          L.CListItem
+            [ L.LUnorderedStart,
+              L.LItemStart
+            ],
+          plainParagraph "Bar",
+          L.CListItem
+            [ L.LUnorderedStart,
+              L.LItemStart
+            ],
+          plainParagraph "Baz",
+          L.CListItem
+            [ L.LItemEnd,
+              L.LUnorderedEnd,
+              L.LItemEnd,
+              L.LUnorderedEnd
+            ],
+          plainParagraph "Two",
+          L.CListItem
+            [ L.LOrderedStart,
+              L.LItemStart
+            ],
+          plainParagraph "a",
+          L.CListItem
+            [ L.LItemEnd,
+              L.LItemStart
+            ],
+          plainParagraph "b",
+          L.CListItem
+            [ L.LItemEnd,
+              L.LOrderedEnd
+            ],
+          plainParagraph "Three",
+          L.CListItem
+            [ L.LItemEnd,
+              L.LOrderedEnd
+            ],
+          plainParagraph "Four"
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+It's an error if there is no separation between list types (if we suddenly try
+to change list types at the same level). In the test below, the =1) c= is
+unexpected because the unordered list has not been closed off yet.
+
+#+header: :tangle test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own
+#+begin_src org
+  - a
+
+    - b
+
+  1) c
+#+end_src
+
+#+header: :noweb-ref Test block parsing
+#+begin_src haskell
+pf
+  "detects mixed list types (unordered)"
+  "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own"
+  "expected UNORDERED list item at this level"
+  21
+#+end_src
+
+The same applies for going the other way (trying to fit an unordered list into
+an ordered one at the same level).
+
+#+header: :tangle test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own-ordered
+#+begin_src org
+  1) a
+
+     1) b
+
+  - c
+#+end_src
+
+#+header: :noweb-ref Test block parsing
+#+begin_src haskell
+pf
+  "detects mixed list types (ordered)"
+  "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own-ordered"
+  "expected ORDERED list item at this level"
+  23
 #+end_src
 
 ****** Blocks

@@ -435,6 +435,18 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
+    pf
+      "detects mixed list types (unordered)"
+      "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own"
+      "expected UNORDERED list item at this level"
+      21
+
+    pf
+      "detects mixed list types (ordered)"
+      "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own-ordered"
+      "expected ORDERED list item at this level"
+      23
+
     p
       "parses blocks with noweb references"
       "test/Lilac/ParseSpec/0007-blocks-noweb"
@@ -799,6 +811,59 @@ spec =
                   L.LUnorderedEnd
                 ],
               plainParagraph "Three a b c",
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LOrderedEnd
+                ],
+              plainParagraph "Four"
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    p
+      "parses paragraphs which can separate mixed lists"
+      "test/Lilac/ParseSpec/0009-paragraph-can-separate-mixed-lists"
+      $ L.OrgDoc
+        { cells =
+            [ L.CListItem
+                [ L.LOrderedStart,
+                  L.LItemStart
+                ],
+              plainParagraph "One",
+              L.CListItem
+                [ L.LUnorderedStart,
+                  L.LItemStart
+                ],
+              plainParagraph "Bar",
+              L.CListItem
+                [ L.LUnorderedStart,
+                  L.LItemStart
+                ],
+              plainParagraph "Baz",
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LUnorderedEnd,
+                  L.LItemEnd,
+                  L.LUnorderedEnd
+                ],
+              plainParagraph "Two",
+              L.CListItem
+                [ L.LOrderedStart,
+                  L.LItemStart
+                ],
+              plainParagraph "a",
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LItemStart
+                ],
+              plainParagraph "b",
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LOrderedEnd
+                ],
+              plainParagraph "Three",
               L.CListItem
                 [ L.LItemEnd,
                   L.LOrderedEnd

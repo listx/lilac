@@ -60,6 +60,7 @@ import Relude
     fromEnum,
     fromMaybe,
     get,
+    isJust,
     isNothing,
     length,
     many,
@@ -792,12 +793,20 @@ listItemStartParser = do
   listMarkers <-
     if
       | nests level.indent levels -> listItemNester level levels markers
-      | fits level.indent levels -> listItemFitter level levels
-      | otherwise -> fail "list item: invalid indentation"
+      | otherwise -> case fits level levels of
+          Right True -> listItemFitter level levels
+          Right False -> fail "list item: invalid indentation"
+          Left msg -> fail msg
   pure $ CListItem listMarkers
   where
-    fits :: Int -> [Level] -> Bool
-    fits indent levels = elem indent $ map (.indent) levels
+    fits :: Level -> [Level] -> Either String Bool
+    fits level levels = case find (\l -> l.indent == level.indent) levels of
+      Nothing -> Right False
+      Just lvl
+        | isJust level.number && isJust lvl.number -> Right True
+        | isNothing level.number && isNothing lvl.number -> Right True
+        | isJust lvl.number -> Left "expected ORDERED list item at this level"
+        | otherwise -> Left "expected UNORDERED list item at this level"
     nests :: Int -> [Level] -> Bool
     nests _ [] = True
     nests indent (level : _) = indent == getBodyIndent level
