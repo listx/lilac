@@ -55,6 +55,7 @@ import Relude
     fail,
     filter,
     find,
+    fmap,
     foldl',
     foldlM,
     fromEnum,
@@ -100,6 +101,7 @@ import Relude
     (>>),
   )
 import Relude.Extra.Map qualified as EM
+import Relude.Unsafe (fromJust)
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
@@ -803,7 +805,16 @@ listItemStartParser = do
     fits level levels = case find (\l -> l.indent == level.indent) levels of
       Nothing -> Right False
       Just lvl
-        | isJust level.number && isJust lvl.number -> Right True
+        | isJust level.number && isJust lvl.number ->
+            let expectedNum = fmap (+ 1) lvl.number
+             in if level.number == expectedNum
+                  then Right True
+                  else
+                    Left
+                      $ "expected incremented list head "
+                      <> (show . fromJust $ expectedNum)
+                      <> " but got "
+                      <> (show . fromJust $ level.number)
         | isNothing level.number && isNothing lvl.number -> Right True
         | isJust lvl.number -> Left "expected ORDERED list item at this level"
         | otherwise -> Left "expected UNORDERED list item at this level"
@@ -851,6 +862,7 @@ listItemFitter level levels' = foldlM f [] levels'
     f :: [ListMarker] -> Level -> OrgParser [ListMarker]
     f acc existingLevel
       | existingLevel.indent == level.indent = do
+          modify (\s -> s {listLevels = level : drop 1 s.listLevels})
           pure $ acc <> [LItemEnd, LItemStart]
       | existingLevel.indent < level.indent = pure acc
       | otherwise = do

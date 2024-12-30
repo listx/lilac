@@ -473,6 +473,12 @@ spec =
           meta = fromList []
         }
 
+    pf
+      "detects non-incrementing ordered list item"
+      "test/Lilac/ParseSpec/0009-ordered-lists-require-increment"
+      "expected incremented list head 2 but got 1"
+      13
+
     p
       "parses blocks with noweb references"
       "test/Lilac/ParseSpec/0007-blocks-noweb"
