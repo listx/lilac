@@ -454,6 +454,26 @@ spec =
       15
 
     p
+      "requires blank line separator for list items"
+      "test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator"
+      $ L.OrgDoc
+        { cells =
+            [ L.CListItem
+                [ L.LOrderedStart,
+                  L.LItemStart
+                ],
+              plainParagraph "a 1) b",
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LOrderedEnd
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    p
       "parses blocks with noweb references"
       "test/Lilac/ParseSpec/0007-blocks-noweb"
       $ L.OrgDoc

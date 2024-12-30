@@ -4375,6 +4375,39 @@ pf
   15
 #+end_src
 
+List items must be separated by at least one blank line. In the test case below,
+there is not enough space so the "1) b" gets interpreted as regular paragraph
+text, as part of the "a" above it.
+
+#+header: :tangle test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator
+#+begin_src org
+  1) a
+     1) b
+#+end_src
+
+#+header: :noweb-ref Test block parsing
+#+begin_src haskell
+p
+  "requires blank line separator for list items"
+  "test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator"
+  $ L.OrgDoc
+    { cells =
+        [ L.CListItem
+            [ L.LOrderedStart,
+              L.LItemStart
+            ],
+          plainParagraph "a 1) b",
+          L.CListItem
+            [ L.LItemEnd,
+              L.LOrderedEnd
+            ]
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
 ****** Blocks
 
 A [[data:Block][Block]] is anything that sits between =#+begin_...= and =#+end_...= lines. Some
