@@ -1497,7 +1497,7 @@ simple to reason about.
 
 In summary when we parse a list item, we parse it as a combination of =CListItem=
 and other cell types for the list structure and content, respectively. This lets
-us parse things into a single global list of cells in [[func:cellParser]], without a
+us parse things into a single global list of cells in [[f:cellParser]], without a
 need to nest them inside a recursive data structure (as shown in
 https://markkarpov.com/tutorial/megaparsec.html#nested-indented-list).
 
@@ -1752,8 +1752,8 @@ The =OrgParserState= is the custom state we want to use to read and write from
 while parsing. The =styleMask= is discussed in [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the section on parsing styles]]. The
 =listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The =continuationIndent=
 is used to keep track of how much indentation to expect inside a single
-(contiguous) piece of content; see [[func:paragraphParser]] and
-[[func:listHeadIndentLevelParser]] for a usage example.
+(contiguous) piece of content; see [[f:paragraphParser]] and
+[[f:listHeadIndentLevelParser]] for a usage example.
 
 #+name: data:OrgParserState
 #+header: :noweb-ref Parsing mechanism
@@ -1790,7 +1790,7 @@ whitespace to separate meaningful tokens from each other. One way to deal with
 to parse. This gets cumbersome so we want to instead be able to teach parsers to
 be able to skip over trailing whitespace. This way, these parsers will all know
 how to deal with whitespace in a uniform way. This is what we do in
-[[func:cellParser]] where we wrap all of the major =Cell= parsers with a =lexeme=.
+[[f:cellParser]] where we wrap all of the major =Cell= parsers with a =lexeme=.
 
 A slightly separate problem is how to deal with comments. In a sense they are
 just like whitespace because they hold no meaningful information on their own.
@@ -1845,11 +1845,11 @@ should be ignored because it's nested and instead skip past it to find the true
 syntax simple.
 
 Lastly we have =lexeme=, which wraps around any other parser to make it consume
-trailing newlines and comments. This is used in [[func:cellParser]]. Note that it
+trailing newlines and comments. This is used in [[f:cellParser]]. Note that it
 does not consume any trailing spaces, because space characters are important for
 detecting indentation and we wouldn't want to skip past such space characters.
 
-#+name: func:lexeme
+#+name: f:lexeme
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 lexeme :: OrgParser a -> OrgParser a
@@ -1866,7 +1866,7 @@ skipping over as much trailing whitespace as possible. In other words, none of
 the parsers are able to deal with leading whitespace/comments, so we have to
 deal with it here separately.
 
-#+name: func:orgDocParser
+#+name: f:orgDocParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 orgDocParser :: OrgParser OrgDoc
@@ -1906,7 +1906,7 @@ defaultOrgDocWithMeta metas =
 #+end_src
 
 We have to filter out cells that look like =CListItem []= because that can happen
-when [[func:listItemsEndParser]] detects maximum indentation that matches the
+when [[f:listItemsEndParser]] detects maximum indentation that matches the
 most-deeply-nested item (in which case no list items end).
 
 ***** Document metadata
@@ -2107,7 +2107,7 @@ pfm
 As seen in [[data:Cell][the Cell ADT]], there are many different types of cells. The
 =cellParser= is responsible for parsing these different types.
 
-#+name: func:cellParser
+#+name: f:cellParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 cellParser :: OrgParser Cell
@@ -2131,7 +2131,7 @@ cellParser =
 
 The =resetContinuationIndent= wrapper sets the =continuationIndent= attribute back
 to =0=; this information is useful for parsers that need to understand indentation
-precisely. See [[func:listItemsEndParser]] for how it's used by that function.
+precisely. See [[f:listItemsEndParser]] for how it's used by that function.
 
 The =listItemStartParser= can parse indentation, but also the same goes for
 =listItemsEndParser=; these are the only parsers that can consume leading
@@ -2145,7 +2145,7 @@ indentation. The idea is that if none of the other parsers in the list are able
 to consume indentation, then this will allow =detectInvalidIndentation= to see
 such indentation.
 
-#+name: func:detectInvalidIndentation
+#+name: f:detectInvalidIndentation
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 detectInvalidIndentation :: OrgParser Cell
@@ -2177,7 +2177,7 @@ A heading basically starts with some asterisks, followed by a space and then
 some number of non-newline characters (the body). It can also have drawers
 immediately under it.
 
-#+name: func:headingParser
+#+name: f:headingParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 headingParser :: OrgParser Cell
@@ -2204,7 +2204,7 @@ The body text of a heading is a series of prose tokens, or =PToken= values, whic
 we call =Prose=.
 
 We consider prose in detail in the next section, where we'll also discuss
-[[func:failIfLeftoverActiveStyles]] and also [[func:compressProse]].
+[[f:failIfLeftoverActiveStyles]] and also [[f:compressProse]].
 
 ****** Prose (inside a heading)
 :PROPERTIES:
@@ -2213,7 +2213,7 @@ We consider prose in detail in the next section, where we'll also discuss
 
 A [[PToken ADT][PToken]] can be a styled string, link, or inline math fragment.
 
-#+name: func:proseParser
+#+name: f:proseParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 proseParser :: OrgParser T.Text -> OrgParser [PToken]
@@ -2236,7 +2236,7 @@ the non-whitespace parsers in =baseParsers=, then parse additional tokens that m
 include whitespace with =spacePTokenParser=. This way, we force the prose to
 initially start out without any indentation (because the preceding cell, if any,
 would have swallowed up trailing whitespace automatically via =lexeme= in
-[[func:cellParser]]); otherwise, [[func:detectInvalidIndentation]] would not get a
+[[f:cellParser]]); otherwise, [[f:detectInvalidIndentation]] would not get a
 chance to detect this (invalid) indentation.
 
 It may appear that we could alternatively skip past spaces inside prose text
@@ -2267,7 +2267,7 @@ as their own =PTokenStyledText= objects. We call it a "compressor" because no
 matter how many spaces the =spaceConsumer= consumes, we construct only 0 or 1
 space characters in the =StyledText= object.
 
-#+name: func:whitespaceCompressor
+#+name: f:whitespaceCompressor
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 whitespaceCompressor :: OrgParser T.Text -> OrgParser StyledText
@@ -2296,7 +2296,7 @@ This parser only succeeds if it finds at least one non-newline whitespace
 character. Each time it succeeds, it "compresses" the whitespace to a single
 space character --- unless it sees that the input stream ends, in which case we
 use an empty string instead. Note that we also do a second level of
-"compression" in [[func:compressProse]], where we will drop =StyledText= objects with
+"compression" in [[f:compressProse]], where we will drop =StyledText= objects with
 an empty string as the body.
 
 ******* Styled strings
@@ -2308,7 +2308,7 @@ through+.
 The =styleMap= keeps track of the characters that activate and deactivate each
 style. The full list of =Style= data constructors can be seen at [[data:Style]].
 
-#+name: func:styleMap
+#+name: f:styleMap
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 styleMap :: M.Map Char Style
@@ -2375,11 +2375,11 @@ pf
 
 If the input is such that the markers are not balanced, such that by the time we
 finish parsing a paragraph (or end of a heading) and the mask still has active
-styles in it, we throw an error ([[func:failIfLeftoverActiveStyles]]). That is, we
+styles in it, we throw an error ([[f:failIfLeftoverActiveStyles]]). That is, we
 expect style starting and ending markers to always be balanced. This deviates
 from vanilla Org, which does not have this restriction.
 
-#+name: func:failIfLeftoverActiveStyles
+#+name: f:failIfLeftoverActiveStyles
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 failIfLeftoverActiveStyles :: OrgParser ()
@@ -2429,7 +2429,7 @@ Step 2, we know what the =StyleMask= looks like, so we can use that information
 to stylize the text we found in Step 2. The function =StyledTextParser=
 implements the above algorithm.
 
-#+name: func:styledTextParser
+#+name: f:styledTextParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 styledTextParser :: OrgParser StyledText
@@ -2487,7 +2487,7 @@ styledTextParser = do
 #+end_src
 
 Because of the way =isStyleMarker= and =isProseWord= checks membership of the
-characters used for activating (and deactivating) styles in [[func:styleMap]], there
+characters used for activating (and deactivating) styles in [[f:styleMap]], there
 is no way to "escape" these characters. Using any of them will immediately try
 to activate or deactivate a style. So if you need to use a style marker
 character, but don't want Lilac to interpret it as a style marker, you'd have to
@@ -2656,11 +2656,11 @@ start parsing styled text. While this is true, the downside is that by the time
 we construct a =StyledText=, we have no knowledge of future =StyledText= objects
 that have not yet been parsed. This can lead to a proliferation of =StyledText=
 objects that all share the same style, but are parsed into separate =PToken=
-objects back in [[func:headingParser]]. We want to join up sequences of styled text
+objects back in [[f:headingParser]]. We want to join up sequences of styled text
 that share the same style (except for =Code= and =Verbatim=), and make them use a
 single =StyledText= object. For this purpose, we have =compressProse=.
 
-#+name: func:compressProse
+#+name: f:compressProse
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 compressProse :: [PToken] -> [PToken]
@@ -2688,7 +2688,7 @@ compressProse = reverse . dropUnnecessary . foldl' f []
 =compressProse= also eliminates trailing whitespace, with =dropUnnecessary=.
 Trailing whitespace can occur if the last word of a paragraph (at the end of the
 file) ends with an active =StyleMask= (trailing whitespace between paragraphs
-can't occur because the =lexeme= in [[func:cellParser]] will skip past them). For
+can't occur because the =lexeme= in [[f:cellParser]] will skip past them). For
 example, if the input text looks like
 
 #+begin_src org
@@ -2699,13 +2699,13 @@ bar_
 then the last underscore can be followed by a newline (assuming the editor used
 to edit this file is UNIX-friendly and appends a trailing newline), in which
 case that newline would get parsed by the =spaceConsumer= in
-[[func:paragraphParser]] as its own separate =StyledText= object as a single space
+[[f:paragraphParser]] as its own separate =StyledText= object as a single space
 character. We want to eliminate these objects because they don't add any useful
 information, and so we use =dropUnnecessary= above to filter them out.
 
 =dropUnnecessary= also removes tokens with an empty string as the =StyledText=
 object. This can occur when we parse trailing newlines at the end of the line
-even without style markers, from [[func:whitespaceCompressor]].
+even without style markers, from [[f:whitespaceCompressor]].
 
 Here we test how we minimize the number of =PToken= objects; although the
 individual letters (without any styling, and with bold styling) are spaced out
@@ -3224,7 +3224,7 @@ p
 ****** Paragraphs (standalone prose)
 
 The =paragraphParser= below is similar to =headingParser= because it's also powered
-mostly by [[func:proseParser]]. However a key difference is that it is aware of the
+mostly by [[f:proseParser]]. However a key difference is that it is aware of the
 nuances between newlines, indentation, and spaces.
 
 The main concern is to understand where the paragraph starts. Paragraphs can
@@ -3242,7 +3242,7 @@ vertically on the same column, and is visually pleasing. Doing this check means
 understanding what is the expected indentation (if at all) for lines inside the
 paragraph.
 
-#+name: func:paragraphParser
+#+name: f:paragraphParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 paragraphParser :: OrgParser Cell
@@ -3491,14 +3491,14 @@ The idea is basically as follows:
   3) otherwise, we have some amount of indentation and we only want to close off
      some list levels, depending on how much indentation we detect.
 
-Point 1 is captured by =zeroIndent= in [[func:listItemsEndParser]]. Points 2 and 3 are
+Point 1 is captured by =zeroIndent= in [[f:listItemsEndParser]]. Points 2 and 3 are
 captured by =someIndent= in the same function. For =someIndent=, we just try to
 line up the amount of indentation with the existing list levels we have and how
 much indentation they expect. Once we determine the amount of levels we need to
 close off, we just go through the list markers we've already seen
 in =listMarkers= and close them off by using =getEndingMarker=.
 
-#+name: func:listItemsEndParser
+#+name: f:listItemsEndParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 listItemsEndParser :: OrgParser Cell
@@ -3564,18 +3564,18 @@ line (because otherwise we cannot measure indentation accurately), by checking
 =orgParserState.continuationIndent= is required because there is no easy way to
 check for the just-parsed token (or character) in Megaparsec --- all parsers
 only see what's in front of it. So then it's up to other parsers to set this to
-some value greater than =1= (we do this in [[func:listHeadIndentLevelParser]] which is
-part of [[func:listItemStartParser]])
+some value greater than =1= (we do this in [[f:listHeadIndentLevelParser]] which is
+part of [[f:listItemStartParser]])
 
 The =markersToDrop= is always twice the number of =levelsToDrop= because we always
-add 2 for each level (see [[func:listItemNester]]).
+add 2 for each level (see [[f:listItemNester]]).
 
 If we detect the maximum allowed indentation, then there are no levels to drop,
 and hence, we'll end up returning =CListItem []= which doesn't hold any meaning.
 Avoiding this is a bit difficult; if we just fail the parser outright, then the
 amount of parsed indentation will have to be parsed by another downstream
 parser. So, instead we just return =CListItem []= and then filter these out in
-[[func:orgDocParser]].
+[[f:orgDocParser]].
 
 Now consider the case where we see some indentation along with a list
 head (ordered or unordered). This task is straightforward, as we just want to
@@ -3586,7 +3586,7 @@ ordered list heads, we can check if the number looks like an Int with =readMaybe
 
 These considerations are encoded in =listHeadIndentLevelParser= below.
 
-#+name: func:listHeadIndentLevelParser
+#+name: f:listHeadIndentLevelParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 listHeadIndentLevelParser :: OrgParser Level
@@ -3641,9 +3641,9 @@ the list head. In the case where it sees some other non-empty content, it
 expects some other parser) to continue parsing. So inside
 =seeingContentAfterListHead= we set the =continuationIndent= attribute to
 indentation of the current level, because we expect another parser to help us
-finish parsing the line. Then at the [[func:cellParser]] level, we set this back to
+finish parsing the line. Then at the [[f:cellParser]] level, we set this back to
 =0= for any parser that is expected to consume content and end with a newline.
-This lets [[func:listItemsEndParser]] know whether it is looking at EOF or at the
+This lets [[f:listItemsEndParser]] know whether it is looking at EOF or at the
 beginning of a line with some content in it in its =seeingContentAfterListHead=
 function. If Megaparsec let us easily check the previous character that was
 parsed, this scheme using a stateful =continuationIndent= field wouldn't be
@@ -3661,7 +3661,7 @@ We have to perform these additional checks by comparing the output of
 =listHeadIndentLevelParser= against the existing [[data:OrgParserState]] (=listLevels=).
 This is what we do in =listItemStartParser= below.
 
-#+name: func:listItemStartParser
+#+name: f:listItemStartParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 listItemStartParser :: OrgParser Cell
@@ -3715,17 +3715,17 @@ getBodyIndent level = level.indent + maybeNum + punctuation + space
 #+end_src
 
 =listItemStartParser= checks to see whether the list item is indenting into a new,
-/nested/ list (via [[func:listItemNester]]), or whether the list item is merely
-continuing some existing list (via [[func:listItemFitter]]). The =getBodyIndent=
+/nested/ list (via [[f:listItemNester]]), or whether the list item is merely
+continuing some existing list (via [[f:listItemFitter]]). The =getBodyIndent=
 function just computes what the indentation would have to be for some body of
 text for it to be considered part of the item.
 
 =listItemNester= appends starting markers to =listMarkers=. We use this information
 in other places when we want to know how to un-nest and item (close it off),
 where we'll add corresponding closing markers with =getEndingMarker= in
-[[func:listItemsEndParser]].
+[[f:listItemsEndParser]].
 
-#+name: func:listItemNester
+#+name: f:listItemNester
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 listItemNester :: Level -> [Level] -> [ListMarker] -> OrgParser [ListMarker]
@@ -3751,7 +3751,7 @@ listItemNester level levels markers = do
     Nothing -> [LUnorderedStart, LItemStart]
 #+end_src
 
-The goal of [[func:listItemFitter]] is twofold:
+The goal of [[f:listItemFitter]] is twofold:
 
   1) continue an existing list, and
 
@@ -3776,11 +3776,11 @@ when we hit "quux" we have to close off the list environments for "baz", then
 "bar".
 
 We use =foldlM= to go over the existing levels. Because we cons additional nested
-levels into the existing levels in [[func:listItemNester]], this means that when we
+levels into the existing levels in [[f:listItemNester]], this means that when we
 traverse left-to-right, we take care of the innermost (most nested) levels
 first, to close them off if the level we have at hand doesn't "fit" into it.
 
-#+name: func:listItemFitter
+#+name: f:listItemFitter
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 listItemFitter :: Level -> [Level] -> OrgParser [ListMarker]
@@ -3807,8 +3807,8 @@ listItemFitter level levels' = foldlM f [] levels'
           pure $ acc <> newMarkers
 #+end_src
 
-We use [[func:listItemStartParser]] and [[func:listItemsEndParser]] inside
-[[func:cellParser]]; the former identifies and the beginnings of list items, while
+We use [[f:listItemStartParser]] and [[f:listItemsEndParser]] inside
+[[f:cellParser]]; the former identifies and the beginnings of list items, while
 the latter recognizes their (complete) end when there is no more indentation.
 
 ****** Tests
@@ -4498,7 +4498,7 @@ metaNameParser = do
 With the metadata out of the way, let's see how we parse the block itself with
 =blockParser=.
 
-#+name: func:blockParser
+#+name: f:blockParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 blockParser :: OrgParser Cell
@@ -4555,7 +4555,7 @@ the beginning of a line. To work around this, we do the simplest thing possible
 --- we just check whether the block is empty with =zeroBTokensParser=. Otherwise,
 we end up expecting =someBTokensParser= to succeed.
 
-#+name: func:bTokenParser
+#+name: f:bTokenParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 bTokenParser :: Bool -> Bool -> OrgParser BToken
@@ -4575,8 +4575,8 @@ bTokenParser isSrcBlock nowebOn = MP.choice parsers
 A token inside a block is basically text or a Noweb link. However, the Noweb
 link is only allowed inside =src= blocks, which is why =bTokenParser= takes a
 boolean argument. The =baseParsers= parse the usual (raw) text inside the block
-(which are themselves compressed with [[func:compressBTokens]]), and
-[[func:nowebLinkParser]] takes care of Noweb references.
+(which are themselves compressed with [[f:compressBTokens]]), and
+[[f:nowebLinkParser]] takes care of Noweb references.
 
 A Noweb reference is surrounded by the classic double-angle-bracket delimiters
 =<<= and =>>=. We wrap this with =MP.try=, because we need to backtrack if we fail
@@ -4584,7 +4584,7 @@ A Noweb reference is surrounded by the classic double-angle-bracket delimiters
 other parsers in =baseParsers= to parse the text that failed to be parsed as a
 valid Noweb link.
 
-#+name: func:nowebLinkParser
+#+name: f:nowebLinkParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 nowebLinkParser :: OrgParser Link
@@ -4612,11 +4612,11 @@ nowebLinkParser = do
     isNowebReferenceChar c = c /= '\n' && c /= '>'
 #+end_src
 
-=compressBTokens= is similar to [[func:compressProse]], but it's simpler because it
+=compressBTokens= is similar to [[f:compressProse]], but it's simpler because it
 doesn't have to deal with styled text. Instead it only deals with raw =T.Text=
 values directly.
 
-#+name: func:compressBTokens
+#+name: f:compressBTokens
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 compressBTokens :: [BToken] -> [BToken]
