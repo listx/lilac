@@ -479,6 +479,12 @@ spec =
       "expected incremented list head 2 but got 1"
       13
 
+    pf
+      "detects invalid initial ordered list number of 2"
+      "test/Lilac/ParseSpec/0009-ordered-lists-start-from-0-or-1"
+      "starting list head number must be 0 or 1; got 20"
+      25
+
     p
       "parses blocks with noweb references"
       "test/Lilac/ParseSpec/0007-blocks-noweb"

@@ -409,7 +409,7 @@ cellParser :: OrgParser Cell
 cellParser =
   lexeme
     $ MP.choice
-      [ MP.try listItemStartParser,
+      [ listItemStartParser,
         listItemsEndParser,
         resetContinuationIndent headingParser,
         resetContinuationIndent blockParser,
@@ -788,6 +788,7 @@ listHeadIndentLevelParser = do
 
 listItemStartParser :: OrgParser Cell
 listItemStartParser = do
+  _ <- MP.try $ MP.lookAhead listHeadIndentLevelParser
   orgParserState <- get
   let levels = orgParserState.listLevels
       markers = orgParserState.listMarkers
@@ -841,7 +842,7 @@ listItemNester level levels markers = do
   case level.number of
     Just 0 -> pure ()
     Just 1 -> pure ()
-    Just n -> fail $ "starting number must be 0 or 1; got " <> show n
+    Just n -> fail $ "starting list head number must be 0 or 1; got " <> show n
     Nothing -> pure ()
   let newMarker = case level.number of
         Just _ -> LOrderedStart
