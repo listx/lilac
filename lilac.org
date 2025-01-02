@@ -2134,10 +2134,11 @@ to =0=; this information is useful for parsers that need to understand indentati
 precisely. See [[func:listItemsEndParser]] for how it's used by that function.
 
 The =listItemStartParser= can parse indentation, but also the same goes for
-=paragraphParser= which is able to skip over leading indentation if it lines up
-with the indentation of an existing list environment.
+=listItemsEndParser=; these are the only parsers that can consume leading
+indentation. =paragraphParser= can consume leading indentation, but only on lines
+except the first one.
 
-However, other indentation levels should be detected as invalid. To enforce
+Other indentation levels should be detected as invalid. To enforce
 this, we put in a =detectInvalidIndentation= parser which technically isn't a
 parser but which will throw an error if it is able to successfully parse
 indentation. The idea is that if none of the other parsers in the list are able
