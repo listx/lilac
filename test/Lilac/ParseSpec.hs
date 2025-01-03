@@ -101,6 +101,21 @@ spec =
       "test/Lilac/ParseSpec/0002-doc-metadata-missing-value"
       (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
       7
+    p
+      "parses styled strings (slash inside word)"
+      "test/Lilac/ParseSpec/0005-styled-strings-ignore-marker-inside-word"
+      $ L.OrgDoc
+        { cells =
+            [ L.CParagraph
+                [ L.PTokenStyledText
+                    (L.StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = L.styleMaskFrom [L.Italic]})
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
     pf
       "detects unbalanced style markers (redundant activations)"
       "test/Lilac/ParseSpec/0005-styled-strings-redundant-activations"

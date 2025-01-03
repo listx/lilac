@@ -60,6 +60,9 @@ export).
 We also do not support non-math Latex fragments (vanilla Org supports [[https://orgmode.org/manual/LaTeX-fragments.html][non-math
 Latex fragments]]).
 
+We support escaping formatting characters, as seen in
+[[test:0005-styled-strings-ignore-marker-inside-word]].
+
 ** Tangling
 
 *** =#+include= support
@@ -1707,6 +1710,7 @@ import Relude
     (=<<),
     (==),
     (>>),
+    (||),
   )
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
@@ -2323,6 +2327,40 @@ styleMap =
     ]
 #+end_src
 
+Characters in the =styleMap= can be escaped with a backslash. For example, the
+slashes inside "1\/2" and "and\/or" should not be interpreted as style markers
+but as slashes. If you want to write a literal backslash, you must use "\\".
+This use of the backslash as an escape character deviates from Org mode.
+
+#+name: test:0005-styled-strings-ignore-marker-inside-word
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-ignore-marker-inside-word
+#+begin_src org
+/foo and\/or 1\/2 bar \\ a\\b/
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+p
+  "parses styled strings (slash inside word)"
+  "test/Lilac/ParseSpec/0005-styled-strings-ignore-marker-inside-word"
+  $ L.OrgDoc
+    { cells =
+        [ L.CParagraph
+            <<Expected prose for 0005-styled-strings-ignore-marker-inside-word>>
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+#+header: :noweb-ref Expected prose for 0005-styled-strings-ignore-marker-inside-word
+#+begin_src haskell
+[ L.PTokenStyledText
+    (L.StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = L.styleMaskFrom [L.Italic]})
+]
+#+end_src
+
 Styled strings (for headings) are somewhat tricky, because of two main problems
 
   1) the markers use the same character for both activation and deactivation,
@@ -2476,14 +2514,29 @@ styledTextParser = do
       }
   where
     isStyleMarker c = M.member c styleMap
-    isProseWord c = M.notMember c styleMap && (not $ isSpace c)
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
     textParser :: StyleMask -> OrgParser T.Text
     textParser styleMask
       | isVerbatim styleMask = MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
       | isCode styleMask = MP.takeWhile1P (Just "code") isNotCodeMarker
-      | otherwise = MP.takeWhile1P (Just "prose word") isProseWord
+      | otherwise = do
+          ws <-
+            MP.some
+              $ MP.choice
+                [ MP.takeWhile1P (Just "normal characters") isNormalChar,
+                  escapedStyleParser
+                ]
+          pure $ T.concat ws
+    escapedStyleParser :: OrgParser T.Text
+    escapedStyleParser = do
+      _ <- char '\\'
+      s <- MP.satisfy (\c -> isStyleMarker c || c == '\\')
+      pure $ T.singleton s
+    isNormalChar c =
+      M.notMember c styleMap
+        && (not $ isSpace c)
+        && (not $ c == '\\')
 #+end_src
 
 Because of the way =isStyleMarker= and =isProseWord= checks membership of the

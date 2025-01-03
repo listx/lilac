@@ -99,6 +99,7 @@ import Relude
     (=<<),
     (==),
     (>>),
+    (||),
   )
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
@@ -556,14 +557,29 @@ styledTextParser = do
       }
   where
     isStyleMarker c = M.member c styleMap
-    isProseWord c = M.notMember c styleMap && (not $ isSpace c)
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
     textParser :: StyleMask -> OrgParser T.Text
     textParser styleMask
       | isVerbatim styleMask = MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
       | isCode styleMask = MP.takeWhile1P (Just "code") isNotCodeMarker
-      | otherwise = MP.takeWhile1P (Just "prose word") isProseWord
+      | otherwise = do
+          ws <-
+            MP.some
+              $ MP.choice
+                [ MP.takeWhile1P (Just "normal characters") isNormalChar,
+                  escapedStyleParser
+                ]
+          pure $ T.concat ws
+    escapedStyleParser :: OrgParser T.Text
+    escapedStyleParser = do
+      _ <- char '\\'
+      s <- MP.satisfy (\c -> isStyleMarker c || c == '\\')
+      pure $ T.singleton s
+    isNormalChar c =
+      M.notMember c styleMap
+        && (not $ isSpace c)
+        && (not $ c == '\\')
 
 compressProse :: [PToken] -> [PToken]
 compressProse = reverse . dropUnnecessary . foldl' f []
