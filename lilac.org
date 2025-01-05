@@ -774,6 +774,25 @@ we want code blocks in woven output to still look decent and consistent.
 #+header: :tangle treefmt.toml
 #+begin_src toml
 # One CLI to format the code tree - https://github.com/numtide/treefmt
+[global]
+excludes = [
+  "*.cabal",
+  "*.gitkeep",
+  "*.json",
+  "*.org",
+  "*.toml",
+  "*.yml",
+  ".envrc",
+  ".gitignore",
+  "cabal.project",
+  "doc/*",
+  "image/*",
+  "LICENSE",
+  "Makefile",
+  "nix/packages/*.nix",
+  "nix/sources.nix",
+  "test/Lilac/ParseSpec/*",
+]
 
 [formatter.haskell]
 command = "ormolu"
@@ -786,10 +805,6 @@ includes = ["*.hs"]
 [formatter.nix]
 command = "alejandra"
 includes = ["*.nix"]
-excludes = [
-  "nix/packages/*.nix",
-  "nix/sources.nix",
-]
 
 [formatter.shell]
 command = "shfmt"
