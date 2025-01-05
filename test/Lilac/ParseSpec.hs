@@ -91,7 +91,7 @@ spec =
           ("title", "An Org Document")
         ]
 
-    p "parses document metadata" "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
+    p "parses document metadata (title without leading whitespace)" "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
       $ L.defaultOrgDocWithMeta
         [ ("title", "Parse me without leading whitespace")
         ]
