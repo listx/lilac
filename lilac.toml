@@ -2,7 +2,7 @@
 # Warning: if you don't choose one from the currently available versions
 # https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/compilers/ghc
 # you will most likely have to compile *everything* yourself.
-version = "9.4.8"
+version = "9.10.1"
 # optimise = true
 # profiling = false
 # benckmark = false
@@ -12,8 +12,6 @@ version = "9.4.8"
 
 # We want these tools to be built with our haskell
 haskell_tools = [
-  "haskell-language-server",
-  "hlint",
   "ormolu",
 ]
 
@@ -26,14 +24,6 @@ tools = [
   "shellcheck",
   "shfmt",
   "treefmt",
-]
-
-# List of plugins the you don't want to build
-[hls]
-disable_plugins = [
-  "fourmolu",
-  "floskell",
-  "stan",
 ]
 
 # These files and directories will be excluded from the nix build,

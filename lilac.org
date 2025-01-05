@@ -203,7 +203,7 @@ For the Haskell compiler, we use the following GHC version:
 
 #+header: :noweb-ref GHC version
 #+begin_src txt
-9.4.8
+9.10.1
 #+end_src
 
 The above version is used throughout other configuration files and such in the
@@ -346,10 +346,6 @@ for its =conf= variable.
   in
     lib.pipe pkg confFns;
 
-  hlsDisablePlugins =
-    pkgs.lib.foldr
-    (plugin: hls: hlib.disableCabalFlag (hls.override {${"hls-" + plugin + "-plugin"} = null;}) plugin);
-
   # Create your own setup using the choosen GHC version (in the config) as a starting point
   ourHaskell = let
     # https://github.com/pwm/nixkell#direct-hackagegithub-dependencies
@@ -358,9 +354,6 @@ for its =conf= variable.
     };
 
     manual = hfinal: hprev: {
-      haskell-language-server =
-        hlsDisablePlugins hprev.haskell-language-server conf.hls.disable_plugins;
-
       lilac = let
         cleanSource = util.filterSrc {
           path = ../.; # Root of the project
@@ -511,8 +504,6 @@ version = "<<GHC version>>"
 
 # We want these tools to be built with our haskell
 haskell_tools = [
-  "haskell-language-server",
-  "hlint",
   "ormolu",
 ]
 
@@ -525,14 +516,6 @@ tools = [
   "shellcheck",
   "shfmt",
   "treefmt",
-]
-
-# List of plugins the you don't want to build
-[hls]
-disable_plugins = [
-  "fourmolu",
-  "floskell",
-  "stan",
 ]
 
 # These files and directories will be excluded from the nix build,
@@ -780,33 +763,6 @@ main()
 }
 
 main "$@"
-#+end_src
-
-**** =HLint= (Haskell)
-
-#+header: :tangle .hlint.yaml
-#+begin_src yaml
-- arguments:
-    - -XTypeApplications
-    - -XNumericUnderscores
-    - -XBangPatterns
-    - -XPatternSynonyms
-    - -XOverloadedLabels
-
-- modules:
-    - { name: [Data.List], as: List }
-    - { name: [Data.List.NonEmpty], as: NonEmpty }
-    - { name: [Data.Vector], as: Vector }
-    - { name: [Data.Set], as: Set }
-    - { name: [Data.HashSet], as: HSet }
-    - { name: [Data.Set.Ordered], as: OSet }
-    - { name: [Data.Map, Data.Map.Strict], as: Map }
-    - { name: [Data.HashMap.Strict, Data.HashMap.Lazy], as: HMap }
-    - { name: [Data.Sequence], as: Sequence }
-    - { name: [Data.ByteString, Data.ByteString.Builder, Data.ByteString.Char8], as: BS }
-    - { name: [Data.ByteString.Lazy, Data.ByteString.Lazy.Char8], as: BSL }
-    - { name: [Data.Text, Data.Text.Encoding], as: T }
-    - { name: [Data.Text.Lazy, Data.Text.Lazy.Encoding], as: TL }
 #+end_src
 
 **** Formatters
@@ -1109,7 +1065,6 @@ package *
 write-ghc-environment-files: always
 
 -- Define -O0 by default so that all dev processes are faster.
--- This also affects HLS which will pick up on this (otherwise it'll use -O1)
 -- CI Nix builds are unaffected by this and will use the default -O1
 optimization: False
 

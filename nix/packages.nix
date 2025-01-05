@@ -45,10 +45,6 @@
   in
     lib.pipe pkg confFns;
 
-  hlsDisablePlugins =
-    pkgs.lib.foldr
-    (plugin: hls: hlib.disableCabalFlag (hls.override {${"hls-" + plugin + "-plugin"} = null;}) plugin);
-
   # Create your own setup using the choosen GHC version (in the config) as a starting point
   ourHaskell = let
     # https://github.com/pwm/nixkell#direct-hackagegithub-dependencies
@@ -57,9 +53,6 @@
     };
 
     manual = hfinal: hprev: {
-      haskell-language-server =
-        hlsDisablePlugins hprev.haskell-language-server conf.hls.disable_plugins;
-
       lilac = let
         cleanSource = util.filterSrc {
           path = ../.; # Root of the project
