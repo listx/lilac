@@ -9,3 +9,5 @@ lint: lilac.org
 	treefmt --fail-on-change
 test: lilac.org
 	cabal test --ghc-options="-fforce-recomp"
+update-nix:
+	niv update nixpkgs --branch nixos-24.11
