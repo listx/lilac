@@ -937,7 +937,7 @@ library
     , megaparsec
     , relude
     , text
-  default-language: Haskell2010
+  default-language: <<Language edition>>
 
 executable lilac
   main-is: Main.hs
@@ -954,7 +954,7 @@ executable lilac
       base >=4.7 && <5
     , lilac
     , relude
-  default-language: Haskell2010
+  default-language: <<Language edition>>
 
 test-suite spec
   type: exitcode-stdio-1.0
@@ -977,7 +977,7 @@ test-suite spec
     , lilac
     , megaparsec
     , relude
-  default-language: Haskell2010
+  default-language: <<Language edition>>
 #+end_src
 
 We save ourselves some repetition (at least in the Org file) by declaring the
@@ -1048,6 +1048,22 @@ pursuing in this program.
 #+header: :noweb-ref GHC warning flags
 #+begin_src txt
 -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode
+#+end_src
+
+*** Language edition
+
+Several options are available to pick the "flavor" of Haskell, such as:
+
+  - Haskell98
+  - Haskell2010
+  - GHC2021
+  - GHC2024
+
+We use the latest available edition, because we can.
+
+#+header: :noweb-ref Language edition
+#+begin_src txt
+GHC2024
 #+end_src
 
 *** Cabal project file
