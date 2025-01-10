@@ -40,6 +40,16 @@ p behavior path expected = do
         (decodeUtf8 input)
         `shouldParse` (expected, L.defaultOrgParserState)
 
+ps :: String -> FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
+ps behavior path expected state = do
+  before (readFileBS path) $ do
+    it behavior $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        path
+        (decodeUtf8 input)
+        `shouldParse` (expected, state)
+
 pf :: String -> FilePath -> String -> Int -> Spec
 pf behavior path errMsg pos = do
   before (readFileBS path) $ do
@@ -334,6 +344,50 @@ spec =
           code = [],
           codeBlocks = fromList [],
           meta = fromList []
+        }
+
+    ps
+      "parses standalone math fragments"
+      "test/Lilac/ParseSpec/0010-standalone-math-fragments"
+      L.OrgDoc
+        { cells =
+            [ L.CMathFragment
+                L.MathFragment
+                  { meta =
+                      fromList
+                        [ ("__equation_number", "1")
+                        ],
+                    body = "1 + 1 = 2\n"
+                  },
+              L.CMathFragment
+                L.MathFragment
+                  { meta =
+                      fromList
+                        [ ("__equation_number", "2")
+                        ],
+                    body = "1 + 1 = 2\n"
+                  },
+              L.CMathFragment
+                L.MathFragment
+                  { meta = fromList [],
+                    body = "2 + 2 = 4\n"
+                  },
+              L.CMathFragment
+                L.MathFragment
+                  { meta = fromList [],
+                    body = "2 + 2 = 4\n"
+                  }
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+      L.OrgParserState
+        { styleMask = L.styleMaskFrom [],
+          listLevels = [],
+          listMarkers = [],
+          continuationIndent = 0,
+          equationNumber = 2
         }
     p
       "parses links (target only)"

@@ -6,6 +6,7 @@ module Lilac.Parse
     parseOrgDoc,
     styleMaskFrom,
     OrgDoc (..),
+    OrgParserState (..),
     Cell (..),
     Heading (..),
     Link (..),
@@ -243,7 +244,8 @@ data OrgParserState = OrgParserState
   { styleMask :: StyleMask,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
-    continuationIndent :: Int
+    continuationIndent :: Int,
+    equationNumber :: Int
   }
   deriving stock (Eq, Show)
 
@@ -326,7 +328,8 @@ defaultOrgParserState =
     { styleMask = styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
-      continuationIndent = 0
+      continuationIndent = 0,
+      equationNumber = 0
     }
 
 skipNewlinesAndComments :: OrgParser ()
@@ -414,6 +417,7 @@ cellParser =
         listItemsEndParser,
         resetContinuationIndent headingParser,
         resetContinuationIndent blockParser,
+        resetContinuationIndent mathFragmentStandaloneParser,
         resetContinuationIndent paragraphParser,
         detectInvalidIndentation
       ]
@@ -999,3 +1003,36 @@ compressBTokens = reverse . foldl' f []
     f ((BTokenString text1) : rest) (BTokenString text2) =
       (BTokenString $ T.append text1 text2) : rest
     f acc token = token : acc
+
+mathFragmentNumberedParser :: OrgParser MathFragment
+mathFragmentNumberedParser = do
+  orgParserState <- get
+  let number = orgParserState.equationNumber + 1
+
+  _ <- lexeme $ string "\\begin{equation}"
+  latex <- MP.someTill (MP.label "LaTeX standalone numbered math input" MP.anySingle) (string "\\end{equation}")
+
+  modify (\s -> s {equationNumber = number})
+  pure
+    MathFragment
+      { meta =
+          M.fromList
+            [ ("__equation_number", T.pack $ show number)
+            ],
+        body = T.pack latex
+      }
+
+mathFragmentUnnumberedParser :: OrgParser MathFragment
+mathFragmentUnnumberedParser = do
+  _ <- lexeme $ string "\\["
+  latex <- MP.someTill (MP.label "LaTeX standalone unnumbered math input" MP.anySingle) (string "\\]")
+  pure
+    MathFragment
+      { meta = M.fromList [],
+        body = T.pack latex
+      }
+
+mathFragmentStandaloneParser :: OrgParser Cell
+mathFragmentStandaloneParser =
+  CMathFragment
+    <$> (MP.try mathFragmentNumberedParser <|> mathFragmentUnnumberedParser)

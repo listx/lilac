@@ -1514,15 +1514,22 @@ support them here.
 Instead Lilac only supports Latex fragments for typesetting math. Because we
 only support math, we call them /math/ fragments.
 
-There are two ways to write math fragments: using =\begin{equation}= and
-=\end{equation}= for a standalone equation like this
+There are three ways to write math fragments: using =\begin{equation}= and
+=\end{equation}=, =\[ ... \]=, or =\( ... \)=.
+
+Use the first form for a standalone equation like this
 
 \begin{equation}
 2 + 2 = 4.
 \end{equation}
 
-or by using inline math delimiters like this: \(1 - 1 = 0\) which can be placed
-inside of some prose text.
+where the equation will get numbered and centered on its own. Use
+
+\[2 + 2 = 4\]
+
+to achieve the same effect, but without numbering. Finally, use inline math
+delimiters like this: \(1 - 1 = 0\) which can be placed inside prose text (and
+displayed inside the paragraph).
 
 When using the standalone form, you can assign a =#+name= keyword to it to refer
 to the equation using a human-friendly name, like this:
@@ -1534,6 +1541,7 @@ a^2 + b^2 = c^2
 
 and you can link back to it using an internal link like [[eq:Pythagorean Theorem]].
 
+#+name: data:MathFragment
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type MathFragment :: Type
@@ -1614,6 +1622,7 @@ module Lilac.Parse
     parseOrgDoc,
     styleMaskFrom,
     OrgDoc (..),
+    OrgParserState (..),
     Cell (..),
     Heading (..),
     Link (..),
@@ -1764,7 +1773,8 @@ data OrgParserState = OrgParserState
   { styleMask :: StyleMask,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
-    continuationIndent :: Int
+    continuationIndent :: Int,
+    equationNumber :: Int
   }
   deriving stock (Eq, Show)
 
@@ -1776,7 +1786,8 @@ defaultOrgParserState =
     { styleMask = styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
-      continuationIndent = 0
+      continuationIndent = 0,
+      equationNumber = 0
     }
 #+end_src
 
@@ -2119,6 +2130,7 @@ cellParser =
         listItemsEndParser,
         resetContinuationIndent headingParser,
         resetContinuationIndent blockParser,
+        resetContinuationIndent mathFragmentStandaloneParser,
         resetContinuationIndent paragraphParser,
         detectInvalidIndentation
       ]
@@ -3153,6 +3165,7 @@ p
 
 Inline math fragments are delimited by =\(= and =\)=.
 
+#+name: f:mathFragmentInlineParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 mathFragmentInlineParser :: OrgParser MathFragment
@@ -4956,6 +4969,141 @@ p
 ]
 #+end_src
 
+****** Math fragments
+
+A [[data:MathFragment][MathFragment]] can be written three ways; using =\begin{equation}=, =\[= or =\(=. The
+first two ways requires them to start at the beginning of the line, while the
+third way allows them to be embedded inside prose text (and displayed inside the
+paragraph). The third way has already been discussed in
+[[f:mathFragmentInlineParser]], where it is used in [[f:proseParser]].
+
+Let's first see how to parse =\begin{equation}=.
+
+#+name: f:mathFragmentNumberedParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+mathFragmentNumberedParser :: OrgParser MathFragment
+mathFragmentNumberedParser = do
+  orgParserState <- get
+  let number = orgParserState.equationNumber + 1
+
+  _ <- lexeme $ string "\\begin{equation}"
+  latex <- MP.someTill (MP.label "LaTeX standalone numbered math input" MP.anySingle) (string "\\end{equation}")
+
+  modify (\s -> s {equationNumber = number})
+  pure
+    MathFragment
+      { meta =
+          M.fromList
+            [ ("__equation_number", T.pack $ show number)
+            ],
+        body = T.pack latex
+      }
+#+end_src
+
+Parsing unnumbered equations is almost the same.
+
+#+name: f:mathFragmentUnnumberedParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+mathFragmentUnnumberedParser :: OrgParser MathFragment
+mathFragmentUnnumberedParser = do
+  _ <- lexeme $ string "\\["
+  latex <- MP.someTill (MP.label "LaTeX standalone unnumbered math input" MP.anySingle) (string "\\]")
+  pure
+    MathFragment
+      { meta = M.fromList [],
+        body = T.pack latex
+      }
+#+end_src
+
+We simply combine these parsers together to parse either one.
+
+#+name: f:mathFragmentStandaloneParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+mathFragmentStandaloneParser :: OrgParser Cell
+mathFragmentStandaloneParser =
+  CMathFragment
+    <$> (MP.try mathFragmentNumberedParser <|> mathFragmentUnnumberedParser)
+#+end_src
+
+Let's check that we can parse multiple math fragments. We discard any trailing
+whitespace after the initial opening =\begin{equation}= or =\[=, but otherwise
+retain whitespace for the contents inside.
+
+#+name: test:0010-standalone-math-fragments
+#+header: :tangle test/Lilac/ParseSpec/0010-standalone-math-fragments
+#+begin_src org
+\begin{equation}
+1 + 1 = 2
+\end{equation}
+
+\begin{equation}
+
+
+
+1 + 1 = 2
+\end{equation}
+
+\[
+2 + 2 = 4
+\]
+
+\[
+
+
+2 + 2 = 4
+\]
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+ps
+  "parses standalone math fragments"
+  "test/Lilac/ParseSpec/0010-standalone-math-fragments"
+  L.OrgDoc
+    { cells =
+        [ L.CMathFragment
+            L.MathFragment
+              { meta =
+                  fromList
+                    [ ("__equation_number", "1")
+                    ],
+                body = "1 + 1 = 2\n"
+              },
+          L.CMathFragment
+            L.MathFragment
+              { meta =
+                  fromList
+                    [ ("__equation_number", "2")
+                    ],
+                body = "1 + 1 = 2\n"
+              },
+          L.CMathFragment
+            L.MathFragment
+              { meta = fromList [],
+                body = "2 + 2 = 4\n"
+              },
+          L.CMathFragment
+            L.MathFragment
+              { meta = fromList [],
+                body = "2 + 2 = 4\n"
+              }
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+  L.OrgParserState
+    { styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 2
+    }
+#+end_src
+
 **** Tests
 :PROPERTIES:
 :ID:       ebf0d269-79d3-408a-a6e7-baf720d73837
@@ -5010,6 +5158,22 @@ p behavior path expected = do
         path
         (decodeUtf8 input)
         `shouldParse` (expected, L.defaultOrgParserState)
+#+end_src
+
+If we want to check the state (the parsing operation is stateful), we need to
+check the expected end state as well. We do this with =ps= below.
+
+#+header: :tangle test/Lilac/ParseSpec.hs
+#+begin_src haskell
+ps :: String -> FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
+ps behavior path expected state = do
+  before (readFileBS path) $ do
+    it behavior $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        path
+        (decodeUtf8 input)
+        `shouldParse` (expected, state)
 #+end_src
 
 Sometimes we want to test that a file will fail to parse. We do this with =pf=
