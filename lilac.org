@@ -1962,7 +1962,7 @@ at block-related syntax with =avoidParsingBlockMetadata=.
 #+begin_src haskell
 docMetaParser :: OrgParser (M.Map T.Text T.Text)
 docMetaParser = do
-  metaKVs <- many (lexeme docMetaEntryParser)
+  metaKVs <- many $ lexeme docMetaEntryParser
   pure $ M.fromList metaKVs
 #+end_src
 
@@ -1978,7 +1978,9 @@ Below are some unit test cases for parsing metadata.
 
 #+header: :noweb-ref Test parsing document metadata
 #+begin_src haskell
-p "parses document metadata" "test/Lilac/ParseSpec/0002-doc-metadata"
+p
+  "parses document metadata"
+  "test/Lilac/ParseSpec/0002-doc-metadata"
   $ L.defaultOrgDocWithMeta
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
@@ -2092,7 +2094,9 @@ Ignore leading whitespace just before the metadata value.
 
 #+header: :noweb-ref Test parsing document metadata
 #+begin_src haskell
-p "parses document metadata (title without leading whitespace)" "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
+p
+  "parses document metadata (title without leading whitespace)"
+  "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
   $ L.defaultOrgDocWithMeta
     [ ("title", "Parse me without leading whitespace")
     ]
@@ -2352,7 +2356,7 @@ This use of the backslash as an escape character deviates from Org mode.
 p
   "parses styled strings (slash inside word)"
   "test/Lilac/ParseSpec/0005-styled-strings-ignore-marker-inside-word"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-ignore-marker-inside-word>>
@@ -2785,7 +2789,7 @@ another for the bold text.
 p
   "parses styled strings (compression)"
   "test/Lilac/ParseSpec/0005-styled-strings-compression"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CHeading
             ( L.Heading
@@ -2825,7 +2829,7 @@ The simple case with no style markers.
 p
   "parses styled strings (no style)"
   "test/Lilac/ParseSpec/0005-styled-strings-no-style"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CHeading
             ( L.Heading
@@ -2860,7 +2864,7 @@ The next case tests a simple case where one word is bolded.
 p
   "parses styled strings (bold style)"
   "test/Lilac/ParseSpec/0005-styled-strings-bold"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CHeading
             ( L.Heading
@@ -2921,7 +2925,7 @@ we mix things up a bit more, using more styles.
 p
   "parses styled strings (complex)"
   "test/Lilac/ParseSpec/0005-styled-strings-complex"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CHeading
             ( L.Heading
@@ -2990,7 +2994,7 @@ Here's another test, which checks some edge cases when dealing with punctuation.
 p
   "parses styled strings (complex punctuation)"
   "test/Lilac/ParseSpec/0005-styled-strings-complex-punctuation"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CHeading
             ( L.Heading
@@ -3088,7 +3092,7 @@ linkExternalParser = do
 p
   "parses links (target only)"
   "test/Lilac/ParseSpec/0006-links"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CHeading
             ( L.Heading
@@ -3200,7 +3204,7 @@ with the drawer name as the key and the contents inside the drawer as the value.
 #+begin_src haskell
 drawersParser :: OrgParser (Map T.Text T.Text)
 drawersParser = do
-  kvs <- many (lexeme drawerParser)
+  kvs <- many $ lexeme drawerParser
   pure $ M.fromList kvs
 
 drawerParser :: OrgParser (T.Text, T.Text)
@@ -3232,7 +3236,7 @@ drawerParser = do
 p
   "parses drawers (empty)"
   "test/Lilac/ParseSpec/0004-drawers-empty"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CHeading
             ( L.Heading
@@ -3265,7 +3269,7 @@ p
 p
   "parses drawers (not empty)"
   "test/Lilac/ParseSpec/0004-drawers-not-empty"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CHeading
             ( L.Heading
@@ -3364,7 +3368,7 @@ underscore_
 p
   "parses paragraphs"
   "test/Lilac/ParseSpec/0005-prose-paragraphs"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         <<Expected prose for 0005-prose-paragraphs>>,
       code = [],
@@ -3892,7 +3896,7 @@ here.
 p
   "does not recognize list without enough indentation"
   "test/Lilac/ParseSpec/0009-list-indentation-no-indent"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ plainParagraph "1)",
           plainParagraph "2)"
@@ -3918,7 +3922,7 @@ Here's a list with the (proper) 2-space indent.
 p
   "parses 2-space indented list"
   "test/Lilac/ParseSpec/0009-list-indentation-proper-indent"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CListItem
             [ L.LOrderedStart,
@@ -3964,7 +3968,7 @@ Here's a nested example.
 p
   "parses nested list"
   "test/Lilac/ParseSpec/0009-list-indentation-nested"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CListItem
             [ L.LOrderedStart, ---- Start outer ordered list.
@@ -4030,7 +4034,7 @@ hold content (other cells) inside it.
 p
   "parses list with content (simple)"
   "test/Lilac/ParseSpec/0009-list-content-simple"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CListItem
             [ L.LOrderedStart,
@@ -4088,7 +4092,7 @@ Bar.
 p
   "parses nested list (with text)"
   "test/Lilac/ParseSpec/0009-list-indentation-nested-with-text"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ plainParagraph "Foo.",
           L.CListItem
@@ -4269,7 +4273,7 @@ Four
 p
   "parses paragraphs which can close deeper list levels"
   "test/Lilac/ParseSpec/0009-paragraph-can-close-deeper-levels"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CListItem
             [ L.LOrderedStart,
@@ -4335,7 +4339,7 @@ Four
 p
   "parses paragraphs which can separate mixed lists"
   "test/Lilac/ParseSpec/0009-paragraph-can-separate-mixed-lists"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CListItem
             [ L.LOrderedStart,
@@ -4465,7 +4469,7 @@ text, as part of the "a" above it.
 p
   "requires blank line separator for list items"
   "test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         [ L.CListItem
             [ L.LOrderedStart,
@@ -4567,7 +4571,7 @@ With the metadata out of the way, let's see how we parse the block itself with
 blockParser :: OrgParser Cell
 blockParser = do
   blockName <- MP.optional metaNameParser
-  metaKVs <- many (lexeme blockMetaEntryParser)
+  metaKVs <- many $ lexeme blockMetaEntryParser
   _ <- string "#+begin_"
   blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
   srcLang <- MP.optional $ do
@@ -4721,7 +4725,7 @@ with =>>= on the same line.
 p
   "parses blocks with noweb references"
   "test/Lilac/ParseSpec/0007-blocks-noweb"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-noweb>>,
       code = [],
@@ -4799,7 +4803,7 @@ echo <<bar>> x y z
 p
   "parses blocks with noweb references, but treats them if ':noweb' is 'off'"
   "test/Lilac/ParseSpec/0007-blocks-noweb-off"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-noweb-off>>,
       code = [],
@@ -4853,7 +4857,7 @@ Empty blocks are allowed.
 p
   "parses blocks"
   "test/Lilac/ParseSpec/0007-blocks-empty"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-empty>>,
       code = [],
@@ -4933,7 +4937,7 @@ Check that we can parse block metadata.
 p
   "parses block metadata"
   "test/Lilac/ParseSpec/0007-blocks-metadata"
-  $ L.OrgDoc
+  L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-metadata>>,
       code = [],

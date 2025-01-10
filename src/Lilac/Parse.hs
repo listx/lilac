@@ -406,7 +406,7 @@ docMetaEntryParser = do
 
 docMetaParser :: OrgParser (M.Map T.Text T.Text)
 docMetaParser = do
-  metaKVs <- many (lexeme docMetaEntryParser)
+  metaKVs <- many $ lexeme docMetaEntryParser
   pure $ M.fromList metaKVs
 
 cellParser :: OrgParser Cell
@@ -655,7 +655,7 @@ mathFragmentInlineParser = do
 
 drawersParser :: OrgParser (Map T.Text T.Text)
 drawersParser = do
-  kvs <- many (lexeme drawerParser)
+  kvs <- many $ lexeme drawerParser
   pure $ M.fromList kvs
 
 drawerParser :: OrgParser (T.Text, T.Text)
@@ -920,7 +920,7 @@ metaNameParser = do
 blockParser :: OrgParser Cell
 blockParser = do
   blockName <- MP.optional metaNameParser
-  metaKVs <- many (lexeme blockMetaEntryParser)
+  metaKVs <- many $ lexeme blockMetaEntryParser
   _ <- string "#+begin_"
   blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
   srcLang <- MP.optional $ do

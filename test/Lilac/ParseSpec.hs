@@ -83,7 +83,9 @@ spec =
       "parses blank line as defaultOrgDoc"
       "test/Lilac/ParseSpec/0001-blankline"
       L.defaultOrgDoc
-    p "parses document metadata" "test/Lilac/ParseSpec/0002-doc-metadata"
+    p
+      "parses document metadata"
+      "test/Lilac/ParseSpec/0002-doc-metadata"
       $ L.defaultOrgDocWithMeta
         [ ("author", "A. U. Thor"),
           ("auto_tangle", "t"),
@@ -101,7 +103,9 @@ spec =
           ("title", "An Org Document")
         ]
 
-    p "parses document metadata (title without leading whitespace)" "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
+    p
+      "parses document metadata (title without leading whitespace)"
+      "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
       $ L.defaultOrgDocWithMeta
         [ ("title", "Parse me without leading whitespace")
         ]
@@ -114,7 +118,7 @@ spec =
     p
       "parses styled strings (slash inside word)"
       "test/Lilac/ParseSpec/0005-styled-strings-ignore-marker-inside-word"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CParagraph
                 [ L.PTokenStyledText
@@ -153,7 +157,7 @@ spec =
     p
       "parses styled strings (compression)"
       "test/Lilac/ParseSpec/0005-styled-strings-compression"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CHeading
                 ( L.Heading
@@ -176,7 +180,7 @@ spec =
     p
       "parses styled strings (no style)"
       "test/Lilac/ParseSpec/0005-styled-strings-no-style"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CHeading
                 ( L.Heading
@@ -201,7 +205,7 @@ spec =
     p
       "parses styled strings (bold style)"
       "test/Lilac/ParseSpec/0005-styled-strings-bold"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CHeading
                 ( L.Heading
@@ -238,7 +242,7 @@ spec =
     p
       "parses styled strings (complex)"
       "test/Lilac/ParseSpec/0005-styled-strings-complex"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CHeading
                 ( L.Heading
@@ -291,7 +295,7 @@ spec =
     p
       "parses styled strings (complex punctuation)"
       "test/Lilac/ParseSpec/0005-styled-strings-complex-punctuation"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CHeading
                 ( L.Heading
@@ -324,7 +328,7 @@ spec =
     p
       "parses paragraphs"
       "test/Lilac/ParseSpec/0005-prose-paragraphs"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CParagraph
                 [ L.PTokenStyledText
@@ -392,7 +396,7 @@ spec =
     p
       "parses links (target only)"
       "test/Lilac/ParseSpec/0006-links"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CHeading
                 ( L.Heading
@@ -466,7 +470,7 @@ spec =
     p
       "parses drawers (empty)"
       "test/Lilac/ParseSpec/0004-drawers-empty"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CHeading
                 ( L.Heading
@@ -487,7 +491,7 @@ spec =
     p
       "parses drawers (not empty)"
       "test/Lilac/ParseSpec/0004-drawers-not-empty"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CHeading
                 ( L.Heading
@@ -525,7 +529,7 @@ spec =
     p
       "requires blank line separator for list items"
       "test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CListItem
                 [ L.LOrderedStart,
@@ -557,7 +561,7 @@ spec =
     p
       "parses blocks with noweb references"
       "test/Lilac/ParseSpec/0007-blocks-noweb"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CBlock
                 ( L.Block
@@ -605,7 +609,7 @@ spec =
     p
       "parses blocks with noweb references, but treats them if ':noweb' is 'off'"
       "test/Lilac/ParseSpec/0007-blocks-noweb-off"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CBlock
                 ( L.Block
@@ -629,7 +633,7 @@ spec =
     p
       "parses blocks"
       "test/Lilac/ParseSpec/0007-blocks-empty"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CBlock
                 ( L.Block
@@ -674,7 +678,7 @@ spec =
     p
       "parses block metadata"
       "test/Lilac/ParseSpec/0007-blocks-metadata"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CBlock
                 ( L.Block
@@ -723,7 +727,7 @@ spec =
     p
       "does not recognize list without enough indentation"
       "test/Lilac/ParseSpec/0009-list-indentation-no-indent"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ plainParagraph "1)",
               plainParagraph "2)"
@@ -736,7 +740,7 @@ spec =
     p
       "parses 2-space indented list"
       "test/Lilac/ParseSpec/0009-list-indentation-proper-indent"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CListItem
                 [ L.LOrderedStart,
@@ -759,7 +763,7 @@ spec =
     p
       "parses nested list"
       "test/Lilac/ParseSpec/0009-list-indentation-nested"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CListItem
                 [ L.LOrderedStart, ---- Start outer ordered list.
@@ -808,7 +812,7 @@ spec =
     p
       "parses list with content (simple)"
       "test/Lilac/ParseSpec/0009-list-content-simple"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CListItem
                 [ L.LOrderedStart,
@@ -834,7 +838,7 @@ spec =
     p
       "parses nested list (with text)"
       "test/Lilac/ParseSpec/0009-list-indentation-nested-with-text"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ plainParagraph "Foo.",
               L.CListItem
@@ -893,7 +897,7 @@ spec =
     p
       "parses paragraphs which can close deeper list levels"
       "test/Lilac/ParseSpec/0009-paragraph-can-close-deeper-levels"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CListItem
                 [ L.LOrderedStart,
@@ -932,7 +936,7 @@ spec =
     p
       "parses paragraphs which can separate mixed lists"
       "test/Lilac/ParseSpec/0009-paragraph-can-separate-mixed-lists"
-      $ L.OrgDoc
+      L.OrgDoc
         { cells =
             [ L.CListItem
                 [ L.LOrderedStart,
