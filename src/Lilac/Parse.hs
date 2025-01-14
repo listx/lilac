@@ -18,6 +18,7 @@ module Lilac.Parse
     StyleMask (..),
     Block (..),
     BToken (..),
+    Figure (..),
     ListMarker (..),
     Level (..),
   )
@@ -417,6 +418,7 @@ cellParser =
         listItemsEndParser,
         resetContinuationIndent headingParser,
         resetContinuationIndent blockParser,
+        resetContinuationIndent figureParser,
         resetContinuationIndent mathFragmentStandaloneParser,
         resetContinuationIndent paragraphParser,
         detectInvalidIndentation
@@ -919,6 +921,7 @@ metaNameParser = do
 
 blockParser :: OrgParser Cell
 blockParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
   blockName <- MP.optional metaNameParser
   metaKVs <- many $ lexeme blockMetaEntryParser
   _ <- string "#+begin_"
@@ -1036,3 +1039,32 @@ mathFragmentStandaloneParser :: OrgParser Cell
 mathFragmentStandaloneParser =
   CMathFragment
     <$> (MP.try mathFragmentNumberedParser <|> mathFragmentUnnumberedParser)
+
+figureParser :: OrgParser Cell
+figureParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> linkParser)
+  metaKVs <- metaParser
+  link <- linkParser
+  pure
+    . CFigure
+    $ Figure
+      { meta = metaKVs,
+        link = link
+      }
+
+metaParser :: OrgParser (M.Map T.Text T.Text)
+metaParser = do
+  metaKVs <- many $ lexeme metaEntryParser
+  pure $ M.fromList metaKVs
+
+metaEntryParser :: OrgParser (T.Text, T.Text)
+metaEntryParser = do
+  _ <- MP.notFollowedBy $ string "#+begin_"
+  _ <- string "#+"
+  key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
+  _ <- MP.label "(meta) separator" $ string ": "
+  _ <- many $ char ' '
+  value <- MP.takeWhile1P (Just "(meta) value letter") (\c -> c /= '\n')
+  pure (key, value)
+  where
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]

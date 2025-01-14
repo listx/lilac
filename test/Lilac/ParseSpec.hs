@@ -393,6 +393,73 @@ spec =
           continuationIndent = 0,
           equationNumber = 2
         }
+
+    p
+      "parses figures (plays nicely with blocks)"
+      "test/Lilac/ParseSpec/0011-figures-and-blocks"
+      L.OrgDoc
+        { cells =
+            [ L.CBlock
+                L.Block
+                  { meta =
+                      fromList
+                        [ ("__block_type", "src"),
+                          ("__src_language", "haskell"),
+                          ("name", "f:f"),
+                          ("noweb-ref", "bar")
+                        ],
+                    body = [L.BTokenString "f = 1 + 1"]
+                  },
+              L.CFigure
+                L.Figure
+                  { meta =
+                      fromList
+                        [ ("attr_html", ":width 100%"),
+                          ("name", "fig:hello")
+                        ],
+                    link =
+                      L.Link
+                        { typ = L.LinkExternal,
+                          target = "./image/hello.png",
+                          name =
+                            [ L.StyledText
+                                { body = "./image/hello.png",
+                                  style = L.styleMaskFrom []
+                                }
+                            ]
+                        }
+                  },
+              L.CBlock
+                L.Block
+                  { meta =
+                      fromList
+                        [ ("__block_type", "src"),
+                          ("__src_language", "haskell"),
+                          ("name", "f:g"),
+                          ("noweb-ref", "bar")
+                        ],
+                    body = [L.BTokenString "g x = x + 1"]
+                  },
+              L.CFigure
+                L.Figure
+                  { meta = fromList [],
+                    link =
+                      L.Link
+                        { typ = L.LinkExternal,
+                          target = "./image/world.png",
+                          name =
+                            [ L.StyledText
+                                { body = "./image/world.png",
+                                  style = L.styleMaskFrom []
+                                }
+                            ]
+                        }
+                  }
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
     p
       "parses links (target only)"
       "test/Lilac/ParseSpec/0006-links"

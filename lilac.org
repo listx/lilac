@@ -1557,8 +1557,10 @@ data MathFragment = MathFragment
 Figures are external links to images. Below is an example:
 
 #+name: fig:Portable Network Graphics sample image
+#+attr_html: :width 100%
 [[./image/PNG-Gradient.png]]
 
+#+name: data:Figure
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type Figure :: Type
@@ -1634,6 +1636,7 @@ module Lilac.Parse
     StyleMask (..),
     Block (..),
     BToken (..),
+    Figure (..),
     ListMarker (..),
     Level (..),
   )
@@ -1928,6 +1931,7 @@ that looks like =#+key: value= where =key= is a string and =value= is a series o
 tokens (it can have multiple words in it). This is what the =docMetaEntryParser=
 parses.
 
+#+name: f:docMetaEntryParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 docMetaEntryParser :: OrgParser (T.Text, T.Text)
@@ -1958,6 +1962,7 @@ consuming any trailing whitespace or comments with the =lexeme= helper from
 Note how it also has to tiptoe around blocks by checking that it is not looking
 at block-related syntax with =avoidParsingBlockMetadata=.
 
+#+name: f:docMetaParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 docMetaParser :: OrgParser (M.Map T.Text T.Text)
@@ -2134,6 +2139,7 @@ cellParser =
         listItemsEndParser,
         resetContinuationIndent headingParser,
         resetContinuationIndent blockParser,
+        resetContinuationIndent figureParser,
         resetContinuationIndent mathFragmentStandaloneParser,
         resetContinuationIndent paragraphParser,
         detectInvalidIndentation
@@ -4570,6 +4576,7 @@ With the metadata out of the way, let's see how we parse the block itself with
 #+begin_src haskell
 blockParser :: OrgParser Cell
 blockParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
   blockName <- MP.optional metaNameParser
   metaKVs <- many $ lexeme blockMetaEntryParser
   _ <- string "#+begin_"
@@ -4609,6 +4616,11 @@ blockParser = do
         (bTokenParser (blockType == "src") nowebOn)
         (string $ T.concat ["\n#+end_", blockType, "\n"])
 #+end_src
+
+We first have to use the same try\/lookAhead trick we use in [[f:figureParser]] at
+the beginning, because otherwise our parser thinks that as soon as we parse a
+=#+name=, that it will be a block. This is not true because other things (like
+figures) can have a =#+name= associated with them.
 
 The somewhat tricky part is the use of =zeroBTokensParser= and =someBTokensParser=.
 We need this distinction because we require blocks to end with ="\n#+end_..."=
@@ -5105,6 +5117,160 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 2
+    }
+#+end_src
+
+****** Figures
+
+A [[data:Figure][Figure]] is just a link to an image file, with some metadata. First we have
+parse for the metadata, and then the link.
+
+#+name: f:figureParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+figureParser :: OrgParser Cell
+figureParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> linkParser)
+  metaKVs <- metaParser
+  link <- linkParser
+  pure
+    . CFigure
+    $ Figure
+      { meta = metaKVs,
+        link = link
+      }
+#+end_src
+
+The metadata is parsed with =metaParser= which relies on =metaEntryParser=.
+
+#+name: f:metaParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+metaParser :: OrgParser (M.Map T.Text T.Text)
+metaParser = do
+  metaKVs <- many $ lexeme metaEntryParser
+  pure $ M.fromList metaKVs
+#+end_src
+
+The [[f:metaEntryParser]] is similar to [[f:docMetaEntryParser]]. In the
+latter, we use =avoidParsingBlockMetadata= to avoid touching on the toes of
+=blockMetaEntryParser=, but here we don't need to do that because we use =lookAhead=
+in =figureParser= to look for a link that follows metadata --- so we are
+guaranteed (after we parse some metadata) that it will only be for a link
+(figure), not a [[data:Block]] or some other type.
+
+We still have to check that each metadata line does not start with =#+begin_=
+because otherwise this will also succeed for blocks (even inside the =lookAhead=
+in =figureParser=).
+
+#+name: f:metaEntryParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+metaEntryParser :: OrgParser (T.Text, T.Text)
+metaEntryParser = do
+  _ <- MP.notFollowedBy $ string "#+begin_"
+  _ <- string "#+"
+  key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
+  _ <- MP.label "(meta) separator" $ string ": "
+  _ <- many $ char ' '
+  value <- MP.takeWhile1P (Just "(meta) value letter") (\c -> c /= '\n')
+  pure (key, value)
+  where
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+#+end_src
+
+Let's check our reasoning above by parsing a doc that has figures and blocks,
+both with metadata.
+
+#+name: test:0011-figures
+#+header: :tangle test/Lilac/ParseSpec/0011-figures-and-blocks
+#+begin_src org
+,#+name: f:f
+,#+header: :noweb-ref bar
+,#+begin_src haskell
+f = 1 + 1
+,#+end_src
+
+,#+name: fig:hello
+,#+attr_html: :width 100%
+[[./image/hello.png]]
+
+,#+name: f:g
+,#+header: :noweb-ref bar
+,#+begin_src haskell
+g x = x + 1
+,#+end_src
+
+[[./image/world.png]]
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+p
+  "parses figures (plays nicely with blocks)"
+  "test/Lilac/ParseSpec/0011-figures-and-blocks"
+  L.OrgDoc
+    { cells =
+        [ L.CBlock
+            L.Block
+              { meta =
+                  fromList
+                    [ ("__block_type", "src"),
+                      ("__src_language", "haskell"),
+                      ("name", "f:f"),
+                      ("noweb-ref", "bar")
+                    ],
+                body = [L.BTokenString "f = 1 + 1"]
+              },
+          L.CFigure
+            L.Figure
+              { meta =
+                  fromList
+                    [ ("attr_html", ":width 100%"),
+                      ("name", "fig:hello")
+                    ],
+                link =
+                  L.Link
+                    { typ = L.LinkExternal,
+                      target = "./image/hello.png",
+                      name =
+                        [ L.StyledText
+                            { body = "./image/hello.png",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+              },
+          L.CBlock
+            L.Block
+              { meta =
+                  fromList
+                    [ ("__block_type", "src"),
+                      ("__src_language", "haskell"),
+                      ("name", "f:g"),
+                      ("noweb-ref", "bar")
+                    ],
+                body = [L.BTokenString "g x = x + 1"]
+              },
+          L.CFigure
+            L.Figure
+              { meta = fromList [],
+                link =
+                  L.Link
+                    { typ = L.LinkExternal,
+                      target = "./image/world.png",
+                      name =
+                        [ L.StyledText
+                            { body = "./image/world.png",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+              }
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
     }
 #+end_src
 
