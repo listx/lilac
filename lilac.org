@@ -1584,13 +1584,13 @@ Tables are 2-dimensional grids holding information. Below is an example:
 
 Because we named the above with a =#+name= keyword, we can refer to it as [[tbl:Programming languages][this]].
 
+#+name: data:Table
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type Table :: Type
 data Table = Table
   { meta :: M.Map T.Text T.Text,
-    grid :: M.Map (Int, Int) Prose,
-    gridSize :: (Int, Int)
+    grid :: M.Map (Int, Int) Prose
   }
   deriving stock (Eq, Show)
 #+end_src
@@ -1637,6 +1637,7 @@ module Lilac.Parse
     Block (..),
     BToken (..),
     Figure (..),
+    Table (..),
     ListMarker (..),
     Level (..),
   )
@@ -1680,6 +1681,7 @@ import Relude
     foldlM,
     fromEnum,
     fromMaybe,
+    fst,
     get,
     isJust,
     isNothing,
@@ -2140,6 +2142,7 @@ cellParser =
         resetContinuationIndent headingParser,
         resetContinuationIndent blockParser,
         resetContinuationIndent figureParser,
+        resetContinuationIndent tableParser,
         resetContinuationIndent mathFragmentStandaloneParser,
         resetContinuationIndent paragraphParser,
         detectInvalidIndentation
@@ -2544,14 +2547,22 @@ styledTextParser = do
             MP.some
               $ MP.choice
                 [ MP.takeWhile1P (Just "normal characters") isNormalChar,
-                  escapedStyleParser
+                  escapedSymbolParser
                 ]
           pure $ T.concat ws
-    escapedStyleParser :: OrgParser T.Text
-    escapedStyleParser = do
+    escapedSymbolParser :: OrgParser T.Text
+    escapedSymbolParser = do
       _ <- char '\\'
-      s <- MP.satisfy (\c -> isStyleMarker c || c == '\\')
-      pure $ T.singleton s
+      s <-
+        MP.choice
+          [ do
+              c <- MP.satisfy (\c -> isStyleMarker c || c == '\\')
+              pure $ T.singleton c,
+            string "vert{}"
+          ]
+      if s == "vert{}"
+        then pure "|"
+        else pure s
     isNormalChar c =
       M.notMember c styleMap
         && (not $ isSpace c)
@@ -2559,13 +2570,17 @@ styledTextParser = do
 #+end_src
 
 Because of the way =isStyleMarker= and =isProseWord= checks membership of the
-characters used for activating (and deactivating) styles in [[f:styleMap]], there
-is no way to "escape" these characters. Using any of them will immediately try
-to activate or deactivate a style. So if you need to use a style marker
-character, but don't want Lilac to interpret it as a style marker, you'd have to
-enclose it inside verbatim or code styles. Like this =snake_case_word= with
-underscores in it (because otherwise the underscores would get interpreted as a
-style marker for underlined text).
+characters used for activating (and deactivating) styles in [[f:styleMap]], we take
+special care to  escape these characters with =escapedSymbolParser=. If the style
+markers are not escaped, using any of them will immediately try to activate or
+deactivate a style.
+
+The word =\vert{}= can be used to escape a pipe character inside [[data:Table][table]] cells,
+because although our Megaparsec-powered parser is powerful enough to handle
+escaping pipe characters with =\|= (for consistency with =\/= to escape the italic
+style marker), Org is unable to deal with this. For this reason, we use =\vert{}=
+instead. But outside of tables the pipe character can be written raw like this
+"|" without issue.
 
 That's it for the high level overview of how we parse styled strings. We now get
 into the lower-level details of the =StyleMask= itself. The =StyleMask= is an 8-bit
@@ -5266,6 +5281,265 @@ p
                             }
                         ]
                     }
+              }
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+****** Tables
+
+[[Tables][Tables]] are like [[data:Figure][figures]] in that they have some metadata. Unlike a figure which
+is just a link, a table has a two-dimensional grid with some information in each
+row\/column. The requirement is that the first non-whitespace character starts
+with a vertical bar (=|=), also known as the pipe character in UNIX.
+
+The very first line of the table determines the number of expected columns. Org
+syntax allows for horizontal lines inside the table, but these are ignored.
+
+#+name: f:tableParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+tableParser :: OrgParser Cell
+tableParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
+  metaKVs <- metaParser
+  rows <- MP.some $ tableLineParser <|> tableRowParser
+  pure
+    . CTable
+    $ Table
+      { meta = metaKVs,
+        grid = M.fromList $ rowsToTuples rows
+      }
+#+end_src
+
+The =tableLineParser= skips over horizontal rules that typically separate the
+table heading (column names) from the rest of the rows that hold the actual
+data.
+
+#+name: f:tableLineParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+tableLineParser :: OrgParser [Prose]
+tableLineParser = do
+  _ <- string "|-"
+  _ <- MP.takeWhile1P (Just "table line characters") isTableLineChar
+  _ <- char '\n'
+  pure []
+  where
+    isTableLineChar c = c == '-' || c == '+' || c == '|'
+#+end_src
+
+The =tableRowParser= parses rows with data in them.
+
+#+name: f:tableRowParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+tableRowParser :: OrgParser [Prose]
+tableRowParser = do
+  _ <- char '|'
+  _ <- MP.takeWhile1P (Just "table whitespace") (== ' ')
+  tableCells <- MP.some tableCellParser
+  _ <- char '\n'
+  pure tableCells
+#+end_src
+
+The =tableCellParser= just parses text inside a single row and column combination
+--- which we call a "table cell". The main idea is that we parse each table
+cell, which may not contain pipe characters in it (otherwise it confuses
+=org-mode= in Emacs, which results in the table becoming formatted with extra
+columns that we don't want).
+
+#+name: f:tableCellParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+tableCellParser :: OrgParser Prose
+tableCellParser = do
+  prose <- proseParser spacesInsideProse
+  _ <- MP.optional spaces
+  _ <- char '|'
+  _ <- MP.optional spaces
+  pure $ compressProse prose
+  where
+    spacesInsideProse :: OrgParser T.Text
+    spacesInsideProse = do
+      _ <- MP.try $ MP.lookAhead (spaces >> tableCellContent)
+      spaces
+    spaces :: OrgParser T.Text
+    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
+    tableCellContent :: OrgParser ()
+    tableCellContent = void $ MP.noneOf (" \n|" :: String)
+#+end_src
+
+The =spacesInsideProse= is a special space consumer inside table cells, where
+newlines and pipe characters are not allowed. If we pass in a "dumb" space
+consumer that only parses spaces, we end up with a table cell with trailing
+whitespace inside it, which is undesirable.
+
+After the rows are parsed, we need to convert them to a =grid=. We do this with
+=rowsToTuples=.
+
+#+name: f:rowsToTuples
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+rowsToTuples :: [[Prose]] -> [((Int, Int), Prose)]
+rowsToTuples rows = concatMap rowToTuples $ zip [1 ..] rows
+#+end_src
+
+=rowsToTuples= assigns each row its row index with =zip [1 ..]=, then delegates most
+of the work to =rowToTuples= where each row's table cells are given its column
+index as well to form a completed table cell. These are simply accumulated and
+returned as a list. The order of accumulation (consing) does not matter because
+this is ultimately fed into a =M.Map= type (which is an unordered container).
+
+#+name: f:rowsToTuples
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+rowToTuples :: (Int, [Prose]) -> [((Int, Int), Prose)]
+rowToTuples (rowIndex, row)
+  | null row = [((rowIndex, 1), [])]
+  | otherwise = fst $ foldl' f ([], 1) row
+  where
+    f :: ([((Int, Int), Prose)], Int) -> Prose -> ([((Int, Int), Prose)], Int)
+    f (acc, colIndex) tableCell =
+      ( ((rowIndex, colIndex), tableCell) : acc,
+        colIndex + 1
+      )
+#+end_src
+
+The test below checks that we can parse a table with all 3 types of prose text
+(styled text, links, and math fragments).
+
+#+name: test:0012-tables-and-prose
+#+header: :tangle test/Lilac/ParseSpec/0012-tables-and-prose
+#+begin_src org
+,#+name: tbl:famous-equations
+| Name            | Equation            | Link |
+|-----------------+---------------------+------|
+| Pythagoras \vert{} Foo     | \(a^2 + b^2 = c^2\) | [[https://en.wikipedia.org/wiki/Pythagorean_theorem][Wiki]] |
+| Albert *Einstein* | \(E = mc^2\)        | [[https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence][Wiki]] |
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+p
+  "parses tables (plays nicely with prose)"
+  "test/Lilac/ParseSpec/0012-tables-and-prose"
+  L.OrgDoc
+    { cells =
+        [ L.CTable
+            L.Table
+              { meta =
+                  fromList
+                    [ ("name", "tbl:famous-equations")
+                    ],
+                grid =
+                  fromList
+                    [ ( (1, 1),
+                        [ L.PTokenStyledText
+                            ( L.StyledText
+                                { body = "Name",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (1, 2),
+                        [ L.PTokenStyledText
+                            ( L.StyledText
+                                { body = "Equation",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (1, 3),
+                        [ L.PTokenStyledText
+                            ( L.StyledText
+                                { body = "Link",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (2, 1),
+                        []
+                      ),
+                      ( (3, 1),
+                        [ L.PTokenStyledText
+                            ( L.StyledText
+                                { body = "Pythagoras | Foo",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (3, 2),
+                        [ L.PTokenMathFragment
+                            ( L.MathFragment
+                                { meta = fromList [],
+                                  body = "a^2 + b^2 = c^2"
+                                }
+                            )
+                        ]
+                      ),
+                      ( (3, 3),
+                        [ L.PTokenLink
+                            ( L.Link
+                                { typ = L.LinkExternal,
+                                  target = "https://en.wikipedia.org/wiki/Pythagorean_theorem",
+                                  name =
+                                    [ L.StyledText
+                                        { body = "Wiki",
+                                          style = L.styleMaskFrom []
+                                        }
+                                    ]
+                                }
+                            )
+                        ]
+                      ),
+                      ( (4, 1),
+                        [ L.PTokenStyledText
+                            ( L.StyledText
+                                { body = "Albert ",
+                                  style = L.styleMaskFrom []
+                                }
+                            ),
+                          L.PTokenStyledText
+                            ( L.StyledText
+                                { body = "Einstein",
+                                  style = L.styleMaskFrom [L.Bold]
+                                }
+                            )
+                        ]
+                      ),
+                      ( (4, 2),
+                        [ L.PTokenMathFragment
+                            ( L.MathFragment
+                                { meta = fromList [],
+                                  body = "E = mc^2"
+                                }
+                            )
+                        ]
+                      ),
+                      ( (4, 3),
+                        [ L.PTokenLink
+                            ( L.Link
+                                { typ = L.LinkExternal,
+                                  target = "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
+                                  name =
+                                    [ L.StyledText
+                                        { body = "Wiki",
+                                          style = L.styleMaskFrom []
+                                        }
+                                    ]
+                                }
+                            )
+                        ]
+                      )
+                    ]
               }
         ],
       code = [],

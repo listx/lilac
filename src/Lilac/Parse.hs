@@ -19,6 +19,7 @@ module Lilac.Parse
     Block (..),
     BToken (..),
     Figure (..),
+    Table (..),
     ListMarker (..),
     Level (..),
   )
@@ -62,6 +63,7 @@ import Relude
     foldlM,
     fromEnum,
     fromMaybe,
+    fst,
     get,
     isJust,
     isNothing,
@@ -224,8 +226,7 @@ data Figure = Figure
 type Table :: Type
 data Table = Table
   { meta :: M.Map T.Text T.Text,
-    grid :: M.Map (Int, Int) Prose,
-    gridSize :: (Int, Int)
+    grid :: M.Map (Int, Int) Prose
   }
   deriving stock (Eq, Show)
 
@@ -419,6 +420,7 @@ cellParser =
         resetContinuationIndent headingParser,
         resetContinuationIndent blockParser,
         resetContinuationIndent figureParser,
+        resetContinuationIndent tableParser,
         resetContinuationIndent mathFragmentStandaloneParser,
         resetContinuationIndent paragraphParser,
         detectInvalidIndentation
@@ -574,14 +576,22 @@ styledTextParser = do
             MP.some
               $ MP.choice
                 [ MP.takeWhile1P (Just "normal characters") isNormalChar,
-                  escapedStyleParser
+                  escapedSymbolParser
                 ]
           pure $ T.concat ws
-    escapedStyleParser :: OrgParser T.Text
-    escapedStyleParser = do
+    escapedSymbolParser :: OrgParser T.Text
+    escapedSymbolParser = do
       _ <- char '\\'
-      s <- MP.satisfy (\c -> isStyleMarker c || c == '\\')
-      pure $ T.singleton s
+      s <-
+        MP.choice
+          [ do
+              c <- MP.satisfy (\c -> isStyleMarker c || c == '\\')
+              pure $ T.singleton c,
+            string "vert{}"
+          ]
+      if s == "vert{}"
+        then pure "|"
+        else pure s
     isNormalChar c =
       M.notMember c styleMap
         && (not $ isSpace c)
@@ -1068,3 +1078,63 @@ metaEntryParser = do
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+
+tableParser :: OrgParser Cell
+tableParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
+  metaKVs <- metaParser
+  rows <- MP.some $ tableLineParser <|> tableRowParser
+  pure
+    . CTable
+    $ Table
+      { meta = metaKVs,
+        grid = M.fromList $ rowsToTuples rows
+      }
+
+tableLineParser :: OrgParser [Prose]
+tableLineParser = do
+  _ <- string "|-"
+  _ <- MP.takeWhile1P (Just "table line characters") isTableLineChar
+  _ <- char '\n'
+  pure []
+  where
+    isTableLineChar c = c == '-' || c == '+' || c == '|'
+
+tableRowParser :: OrgParser [Prose]
+tableRowParser = do
+  _ <- char '|'
+  _ <- MP.takeWhile1P (Just "table whitespace") (== ' ')
+  tableCells <- MP.some tableCellParser
+  _ <- char '\n'
+  pure tableCells
+
+tableCellParser :: OrgParser Prose
+tableCellParser = do
+  prose <- proseParser spacesInsideProse
+  _ <- MP.optional spaces
+  _ <- char '|'
+  _ <- MP.optional spaces
+  pure $ compressProse prose
+  where
+    spacesInsideProse :: OrgParser T.Text
+    spacesInsideProse = do
+      _ <- MP.try $ MP.lookAhead (spaces >> tableCellContent)
+      spaces
+    spaces :: OrgParser T.Text
+    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
+    tableCellContent :: OrgParser ()
+    tableCellContent = void $ MP.noneOf (" \n|" :: String)
+
+rowsToTuples :: [[Prose]] -> [((Int, Int), Prose)]
+rowsToTuples rows = concatMap rowToTuples $ zip [1 ..] rows
+
+rowToTuples :: (Int, [Prose]) -> [((Int, Int), Prose)]
+rowToTuples (rowIndex, row)
+  | null row = [((rowIndex, 1), [])]
+  | otherwise = fst $ foldl' f ([], 1) row
+  where
+    f :: ([((Int, Int), Prose)], Int) -> Prose -> ([((Int, Int), Prose)], Int)
+    f (acc, colIndex) tableCell =
+      ( ((rowIndex, colIndex), tableCell) : acc,
+        colIndex + 1
+      )
