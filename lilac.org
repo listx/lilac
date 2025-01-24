@@ -923,6 +923,7 @@ library
   other-modules:
       Paths_lilac
   exposed-modules:
+      Lilac.Version
       Lilac.Parse
   hs-source-dirs:
       src
@@ -935,8 +936,11 @@ library
     , bitwise
     , containers
     , megaparsec
+    , process
     , relude
+    , template-haskell
     , text
+    , time
   default-language: <<Language edition>>
 
 executable lilac
@@ -947,12 +951,15 @@ executable lilac
       bin
   default-extensions:
       <<Default GHC extensions>>
+      TemplateHaskell
   ghc-options:
       <<GHC warning flags>>
       -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , lilac
+    , optparse-applicative
+    , megaparsec
     , relude
   default-language: <<Language edition>>
 
@@ -1614,6 +1621,7 @@ discuss each parser and interleave some tests for the smaller parsers, so if you
 are curious about where and how these tests are executed, you may want to take a
 a look at [[id:ebf0d269-79d3-408a-a6e7-baf720d73837][this section]].
 
+#+name: module:Lilac.Parse
 #+header: :tangle src/Lilac/Parse.hs
 #+begin_src haskell
 module Lilac.Parse
@@ -5709,15 +5717,283 @@ plainParagraph body =
 
 ** Main
 
+There are a couple bits of boilerplate needed to build our =lilac= CLI program.
+One is option handling (where we use [[https://hackage.haskell.org/package/optparse-applicative][optparse-applicative]]), and the other is
+injecting the Git version information into the version string.
+
 #+header: :tangle bin/Main.hs
 #+begin_src haskell
 module Main (main) where
 
+import Data.Version (showVersion)
+import Lilac.Parse qualified as L
+import Lilac.Version (lilacVersion)
+import Options.Applicative
+  ( Parser,
+    argument,
+    command,
+    customExecParser,
+    fullDesc,
+    header,
+    help,
+    helper,
+    hsubparser,
+    info,
+    infoOption,
+    long,
+    metavar,
+    prefs,
+    progDesc,
+    short,
+    showHelpOnEmpty,
+    str,
+    (<*>),
+  )
+import Options.Applicative.Builder (InfoMod)
+import Paths_lilac (version)
 import Relude
+  ( Either (Left, Right),
+    FilePath,
+    IO,
+    Type,
+    concat,
+    decodeUtf8,
+    pure,
+    putStrLn,
+    readFileBS,
+    runStateT,
+    ($),
+    (<$>),
+    (<>),
+  )
+import Text.Megaparsec qualified as MP
 
-main :: IO ()
-main = putStrLn "Hello literate lilac!"
+<<Execution flow>>
+
+<<Option handling>>
 #+end_src
+
+In Haskell, like C, execution starts with =main=.
+
+#+name: f:lilac
+#+header: :noweb-ref Execution flow
+#+begin_src haskell
+main :: IO ()
+main = do
+  opts <- customExecParser (prefs showHelpOnEmpty) mainOptions
+  lilac opts
+  where
+    mainOptions =
+      info
+        (helper <*> versionOption <*> programOptions)
+        programDescription
+    programDescription :: InfoMod a
+    programDescription =
+      fullDesc
+        <> header "lilac - literate programming with Org and Noweb-style blocks"
+    versionOption :: OptionHandler (a -> a)
+    versionOption =
+      let cabalVersion = version
+       in infoOption
+            (concat [showVersion cabalVersion, "-g", $(lilacVersion)])
+            (long "version" <> short 'v' <> help "Show version")
+#+end_src
+
+Once the CLI arguments and options are handled, we call [[f:lilac]].
+
+#+name: f:lilac
+#+header: :noweb-ref Execution flow
+#+begin_src haskell
+lilac :: GlobalOpts -> IO ()
+lilac globalOpts = case globalOpts.subcommand of
+  Check checkOpts -> lilacCheck checkOpts
+  Tangle -> putStrLn "'tangle' is not implemented yet"
+  Weave -> putStrLn "'weave' is not implemented yet"
+#+end_src
+
+For now we only implement the =check= subcommand, which is handled by
+[[f:lilacCheck]].
+
+#+name: f:lilacCheck
+#+header: :noweb-ref Execution flow
+#+begin_src haskell
+lilacCheck :: CheckOpts -> IO ()
+lilacCheck checkOpts = do
+  bytes <- readFileBS checkOpts.input
+  let parseResult =
+        MP.runParser
+          (runStateT L.orgDocParser L.defaultOrgParserState)
+          checkOpts.input
+          (decodeUtf8 bytes)
+  case parseResult of
+    Left errBundle -> putStrLn $ MP.errorBundlePretty errBundle
+    Right _ -> putStrLn $ checkOpts.input <> ": OK"
+#+end_src
+
+*** Option handling boilerplate
+
+The option handling uses types to capture what the allowed global options,
+subcommands, and options (for those subcommands) are.
+
+#+header: :noweb-ref Option handling
+#+begin_src haskell
+type GlobalOpts :: Type
+data GlobalOpts = GlobalOpts
+  { subcommand :: Subcommand
+  }
+
+type Subcommand :: Type
+data Subcommand
+  = Check CheckOpts
+  | Tangle
+  | Weave
+
+type CheckOpts :: Type
+data CheckOpts = CheckOpts
+  { input :: FilePath
+  }
+#+end_src
+
+We use the type =OptionHandler= to mean the option handling (parsing), because the
+alternative of using =Parser= feels a bit confusing, given how we already use the
+word =OrgParser= (and the concept of a "parser" in general) to mean the Org
+parsing mechanism we have in [[module:Lilac.Parse]]).
+
+#+header: :noweb-ref Option handling
+#+begin_src haskell
+type OptionHandler :: Type -> Type
+type OptionHandler = Options.Applicative.Parser
+#+end_src
+
+The [[f:programOptions]] is the handler for all global options (apart from the help
+and version flags which we add into =mainOptions= in [[f:lilac]]).
+
+#+name: f:programOptions
+#+header: :noweb-ref Option handling
+#+begin_src haskell
+programOptions :: OptionHandler GlobalOpts
+programOptions =
+  GlobalOpts
+    <$> subcommandHandler
+#+end_src
+
+For now [[f:programOptions]] is pretty barren, because the =GlobalOpts= only has
+subcommands (and no other global options that would apply for the subcommands).
+
+#+name: f:subcommandHandler
+#+header: :noweb-ref Option handling
+#+begin_src haskell
+subcommandHandler :: OptionHandler Subcommand
+subcommandHandler =
+  hsubparser
+    $ metavar "SUBCOMMAND"
+    <> cmdCheck
+    <> cmdTangle
+    <> cmdWeave
+  where
+    cmdCheck =
+      command
+        "check"
+        $ info
+          (Check <$> checkOptsHandler)
+          (progDesc "check input Org file for errors")
+    cmdTangle =
+      command
+        "tangle"
+        $ info
+          (pure Tangle)
+          (progDesc "generate source code")
+    cmdWeave =
+      command
+        "weave"
+        $ info
+          (pure Weave)
+          (progDesc "generate documentation")
+#+end_src
+
+The [[f:subcommandHandler]] is where we specify each of the different behaviors
+(subcommands) of =lilac=. For now we only implement the =check= subcommand in
+[[f:lilacCheck]], so we only have a single =checkOptsHandler= to handle the options
+for that subcommand.
+
+#+header: :noweb-ref Option handling
+#+begin_src haskell
+checkOptsHandler :: OptionHandler CheckOpts
+checkOptsHandler =
+  CheckOpts
+    <$> (argument str (metavar "FILE"))
+#+end_src
+
+Notice that the option handling boilerplate does not describe error handling
+(what to do when a required option is missing, etc), because all of that is
+abstracted away by =Options.Applicative=.
+
+*** Git version injection
+
+The code here is our own custom way of invoking the =git= binary needed to extract
+the underlying version information from the Git repo we are in.
+The code drew inspiration from
+https://stackoverflow.com/questions/5713418/templatehaskell-and-io#comment7962237_5713551
+and https://stackoverflow.com/a/20871010/437583 which explains how to work with
+Template Haskell.
+
+We use a =lilacVersion= which combines Git information with the timestamp of when
+the binary was built.
+
+#+header: :tangle src/Lilac/Version.hs
+#+begin_src haskell
+module Lilac.Version
+  ( lilacVersion,
+  )
+where
+
+import Data.Time.LocalTime (getZonedTime)
+import Language.Haskell.TH (Exp, Q, runIO, stringE)
+import Relude
+  ( IO,
+    Maybe (Just, Nothing),
+    String,
+    concat,
+    filter,
+    pure,
+    show,
+    ($),
+    (/=),
+    (<$>),
+    (<>),
+    (=<<),
+  )
+import System.Environment (lookupEnv)
+import System.Process (readProcess)
+
+lilacVersion :: Q Exp
+lilacVersion = stringE =<< runIO getCombinedVersion
+
+getCombinedVersion :: IO String
+getCombinedVersion = do
+  gi <- filter (/= '\n') <$> getGitVersion
+  ti <- getTimestamp
+  pure $ concat [gi, "  (", ti, ")"]
+
+getGitVersion :: IO String
+getGitVersion = do
+  maybeProjectRoot <- lookupEnv "LILAC_PROJECT_ROOT"
+  let changeDir = case maybeProjectRoot of
+        Just projectRoot -> ["-C", projectRoot]
+        Nothing -> []
+      cmd = changeDir <> ["describe", "--abbrev=10", "--always", "--dirty"]
+  readProcess "git" cmd ""
+
+getTimestamp :: IO String
+getTimestamp = show <$> getZonedTime
+#+end_src
+
+The star of the show here is =getGitVersion=. The one advantage it has over
+=tGitInfoCwd= from the [[https://github.com/snoyberg/githash][GitHash]] library is that it can handle the case where the
+build takes place inside a temporary directory that may not be the original Git
+repo, such as in a sandboxed environment, by the use of the =LILAC_PROJECT_ROOT=
+environment variable. Plus, we can control exactly how we invoke =git= by
+supplying the Git CLI flags ourselves.
 
 ** Tests
 

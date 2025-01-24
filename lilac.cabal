@@ -10,6 +10,7 @@ library
   other-modules:
       Paths_lilac
   exposed-modules:
+      Lilac.Version
       Lilac.Parse
   hs-source-dirs:
       src
@@ -64,8 +65,11 @@ library
     , bitwise
     , containers
     , megaparsec
+    , process
     , relude
+    , template-haskell
     , text
+    , time
   default-language: GHC2024
 
 executable lilac
@@ -116,6 +120,7 @@ executable lilac
       TypeApplications
       TypeOperators
       ViewPatterns
+      TemplateHaskell
   ghc-options:
       -Weverything
 
@@ -124,6 +129,8 @@ executable lilac
   build-depends:
       base >=4.7 && <5
     , lilac
+    , optparse-applicative
+    , megaparsec
     , relude
   default-language: GHC2024
 
