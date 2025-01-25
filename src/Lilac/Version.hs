@@ -27,9 +27,9 @@ lilacVersion = stringE =<< runIO getCombinedVersion
 
 getCombinedVersion :: IO String
 getCombinedVersion = do
-  gi <- filter (/= '\n') <$> getGitVersion
-  ti <- getTimestamp
-  pure $ concat [gi, " (", ti, ")"]
+  gitVersion <- filter (/= '\n') <$> getGitVersion
+  timestamp <- getTimestamp
+  pure $ concat [gitVersion, " (", timestamp, ")"]
 
 getGitVersion :: IO String
 getGitVersion = do
