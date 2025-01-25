@@ -319,6 +319,12 @@ spec =
           meta = fromList []
         }
 
+    pf
+      "cannot (yet) parse style markers in the middle of a word"
+      "test/Lilac/ParseSpec/0005-styled-strings-verbatim"
+      "overzealous style deactivations: [Verbatim]"
+      2
+
     p
       "parses paragraphs"
       "test/Lilac/ParseSpec/0005-prose-paragraphs"

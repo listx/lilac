@@ -3078,6 +3078,31 @@ Note how we preserve the information of having no space character between the
 ]
 #+end_src
 
+This is another test, involving the =Verbatim= style. It captures an issue where
+we are unable to cope with style markers (such as =Verbatim= in this case) where
+we start out with a non-style character, immediately followed by the equal sign
+to begin verbatim text.
+
+#+name: test:0005-styled-strings-verbatim
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-verbatim
+#+begin_src org
+(=import ./.=) hello
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+pf
+  "cannot (yet) parse style markers in the middle of a word"
+  "test/Lilac/ParseSpec/0005-styled-strings-verbatim"
+  "overzealous style deactivations: [Verbatim]"
+  2
+#+end_src
+
+The problem is that we first read ~(~ (as =textParser= in [[f:styledTextParser]]) and
+then ~=~ and immediately think that this ~=~ character is deactivating the style.
+Instead, in this case this ~=~ should act as an activator of verbatim text because
+we have not yet activated it yet.
+
 ******* Links
 
 There are many kinds of links. For now we only support external links.
