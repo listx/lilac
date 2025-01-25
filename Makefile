@@ -1,4 +1,4 @@
-build-quick: lilac.org lilac.cabal
+build: lilac.org lilac.cabal
 	cabal build
 
 build-release: lilac.org lilac.cabal
