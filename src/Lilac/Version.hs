@@ -29,7 +29,7 @@ getCombinedVersion :: IO String
 getCombinedVersion = do
   gi <- filter (/= '\n') <$> getGitVersion
   ti <- getTimestamp
-  pure $ concat [gi, "  (", ti, ")"]
+  pure $ concat [gi, " (", ti, ")"]
 
 getGitVersion :: IO String
 getGitVersion = do
