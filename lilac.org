@@ -1266,7 +1266,7 @@ styles, for simplicity.
 #+header: :noweb-ref Data structures
 #+begin_src haskell
 type Style :: Type
-data Style = Bold | Italic | Underline | Verbatim | Code | Strikethrough
+data Style = Bold | Italic | Underline | Verbatim | Code
   deriving stock (Enum, Eq, Ord, Show)
 #+end_src
 
@@ -2336,8 +2336,7 @@ an empty string as the body.
 ******* Styled strings
 
 Styled strings are text strings with special formatting markers around them.
-Here are some examples: *bold*, /italic/, _underline_, =verbatim=, ~code~, and +strike
-through+.
+Here are some examples: *bold*, /italic/, _underline_, =verbatim=, and ~code~.
 
 The =styleMap= keeps track of the characters that activate and deactivate each
 style. The full list of =Style= data constructors can be seen at [[data:Style]].
@@ -2352,8 +2351,7 @@ styleMap =
       ('/', Italic),
       ('_', Underline),
       ('=', Verbatim),
-      ('~', Code),
-      ('+', Strikethrough)
+      ('~', Code)
     ]
 #+end_src
 
@@ -2946,7 +2944,7 @@ we mix things up a bit more, using more styles.
 #+name: test:0005-styled-strings-complex
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-complex
 #+begin_src org
-,* *foo /bar _underlined  bold  and  italic_/ baz* =verbatim  text= ~x  y  z~ +strikethrough *bold*+
+,* *foo /bar _underlined  bold  and  italic_/ baz* =verbatim  text= ~x  y  z~ *bold*
 #+end_src
 
 #+header: :noweb-ref Test styled string parsing
@@ -2997,14 +2995,8 @@ p
     (L.StyledText {body = " ", style = L.styleMaskFrom []}),
   L.PTokenStyledText
     ( L.StyledText
-        { body = "strikethrough ",
-          style = L.styleMaskFrom [L.Strikethrough]
-        }
-    ),
-  L.PTokenStyledText
-    ( L.StyledText
         { body = "bold",
-          style = L.styleMaskFrom [L.Bold, L.Strikethrough]
+          style = L.styleMaskFrom [L.Bold]
         }
     )
 ]

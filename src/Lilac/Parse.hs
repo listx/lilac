@@ -158,7 +158,7 @@ data StyledText = StyledText
   deriving stock (Eq, Show)
 
 type Style :: Type
-data Style = Bold | Italic | Underline | Verbatim | Code | Strikethrough
+data Style = Bold | Italic | Underline | Verbatim | Code
   deriving stock (Enum, Eq, Ord, Show)
 
 type Link :: Type
@@ -508,8 +508,7 @@ styleMap =
       ('/', Italic),
       ('_', Underline),
       ('=', Verbatim),
-      ('~', Code),
-      ('+', Strikethrough)
+      ('~', Code)
     ]
 
 failIfLeftoverActiveStyles :: OrgParser ()

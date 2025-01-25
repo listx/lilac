@@ -272,14 +272,8 @@ spec =
                             (L.StyledText {body = " ", style = L.styleMaskFrom []}),
                           L.PTokenStyledText
                             ( L.StyledText
-                                { body = "strikethrough ",
-                                  style = L.styleMaskFrom [L.Strikethrough]
-                                }
-                            ),
-                          L.PTokenStyledText
-                            ( L.StyledText
                                 { body = "bold",
-                                  style = L.styleMaskFrom [L.Bold, L.Strikethrough]
+                                  style = L.styleMaskFrom [L.Bold]
                                 }
                             )
                         ],
