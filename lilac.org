@@ -3084,10 +3084,10 @@ links like https://kernel.org.
 #+begin_src haskell
 linkParser :: OrgParser Link
 linkParser = do
-  MP.choice [linkExternalParser]
+  MP.choice [bracketedLinkParser]
 
-linkExternalParser :: OrgParser Link
-linkExternalParser = do
+bracketedLinkParser :: OrgParser Link
+bracketedLinkParser = do
   _ <- string "["
   target <-
     MP.between

@@ -619,10 +619,10 @@ compressProse = reverse . dropUnnecessary . foldl' f []
 
 linkParser :: OrgParser Link
 linkParser = do
-  MP.choice [linkExternalParser]
+  MP.choice [bracketedLinkParser]
 
-linkExternalParser :: OrgParser Link
-linkExternalParser = do
+bracketedLinkParser :: OrgParser Link
+bracketedLinkParser = do
   _ <- string "["
   target <-
     MP.between
