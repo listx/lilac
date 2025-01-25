@@ -606,6 +606,26 @@ build: lilac.org lilac.cabal
 	cabal build
 #+end_src
 
+This results in building the binary. The binary will end up in an obscure path
+like
+=./dist-newstyle/build/aarch64-osx/ghc-9.10.1/lilac-0.1.0.0/x/lilac/noopt/build/lilac/lilac=.
+You can get this path with =cabal list-bin lilac=. To run the binary from that
+path, use =cabal run lilac -- [LILAC OPTIONS...]= where =[LILAC OPTIONS ...]= are
+the options for =lilac=. The double dash is required to tell =cabal= to stop
+interpreting command line options (to leave them to be handled by =lilac=).
+
+The above ceremony with =cabal run= might be a little bit annoying during
+development. So there is a helper script =lilac.sh= which just wraps around it. So
+you can just run =./lilac.sh ...= instead.
+
+#+header: :tangle lilac.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src bash
+set -euo pipefail
+
+cabal run lilac -- "$@"
+#+end_src
+
 Another option is to build with Nix, which wraps everything up for public
 consumption. This allows us to check locally that our Nix build pipeline is in
 working order.
