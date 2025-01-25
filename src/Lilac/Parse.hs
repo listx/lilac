@@ -33,6 +33,7 @@ import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Char,
@@ -98,10 +99,12 @@ import Relude
     (/=),
     (<),
     (<$>),
+    (<=),
     (<>),
     (<|>),
     (=<<),
     (==),
+    (>=),
     (>>),
     (||),
   )
@@ -619,7 +622,10 @@ compressProse = reverse . dropUnnecessary . foldl' f []
 
 linkParser :: OrgParser Link
 linkParser = do
-  MP.choice [bracketedLinkParser]
+  MP.choice
+    [ MP.try rawLinkParser,
+      bracketedLinkParser
+    ]
 
 bracketedLinkParser :: OrgParser Link
 bracketedLinkParser = do
@@ -653,6 +659,40 @@ bracketedLinkParser = do
               }
           ]
       }
+
+rawLinkParser :: OrgParser Link
+rawLinkParser = do
+  protocol <- MP.takeWhile1P (Just "raw link protocol") isAsciiLower
+  separator <- string "://"
+  remainder <- T.pack <$> MP.some (MP.try remainderChar)
+  let url = protocol <> separator <> remainder
+  pure
+    Link
+      { typ = LinkExternal,
+        target = url,
+        name =
+          [ StyledText
+              { body = url,
+                style = styleMaskFrom []
+              }
+          ]
+      }
+  where
+    remainderChar :: OrgParser Char
+    remainderChar = do
+      c <- MP.satisfy N.isAllowedInURI
+      when (isPunctuation c) $ do
+        MP.notFollowedBy (char ' ')
+        MP.notFollowedBy (char '\n')
+      pure c
+    isPunctuation :: Char -> Bool
+    isPunctuation = not . isAlphaNumChar
+    isAlphaNumChar :: Char -> Bool
+    isAlphaNumChar c = isAlphaChar c || isDigitChar c
+    isAlphaChar :: Char -> Bool
+    isAlphaChar c = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+    isDigitChar :: Char -> Bool
+    isDigitChar c = c >= '0' && c <= '9'
 
 mathFragmentInlineParser :: OrgParser MathFragment
 mathFragmentInlineParser = do
@@ -1051,9 +1091,9 @@ mathFragmentStandaloneParser =
 
 figureParser :: OrgParser Cell
 figureParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> linkParser)
+  _ <- MP.try $ MP.lookAhead (metaParser >> bracketedLinkParser)
   metaKVs <- metaParser
-  link <- linkParser
+  link <- bracketedLinkParser
   pure
     . CFigure
     $ Figure

@@ -651,6 +651,97 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
+
+    p
+      "parses links (target only)"
+      "test/Lilac/ParseSpec/0006-links-raw"
+      L.OrgDoc
+        { cells =
+            [ L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "See ",
+                          style = L.styleMaskFrom []
+                        }
+                    ),
+                  L.PTokenLink
+                    ( L.Link
+                        { typ = L.LinkExternal,
+                          target = "https://foo.org",
+                          name =
+                            [ L.StyledText
+                                { body = "https://foo.org",
+                                  style = L.styleMaskFrom []
+                                }
+                            ]
+                        }
+                    ),
+                  L.PTokenStyledText
+                    ( L.StyledText
+                        { body = ", or ",
+                          style = L.styleMaskFrom []
+                        }
+                    ),
+                  L.PTokenLink
+                    ( L.Link
+                        { typ = L.LinkExternal,
+                          target = "https://bar.net",
+                          name =
+                            [ L.StyledText
+                                { body = "https://bar.net",
+                                  style = L.styleMaskFrom []
+                                }
+                            ]
+                        }
+                    ),
+                  L.PTokenStyledText
+                    ( L.StyledText
+                        { body = ". Try ",
+                          style = L.styleMaskFrom []
+                        }
+                    ),
+                  L.PTokenLink
+                    ( L.Link
+                        { typ = L.LinkExternal,
+                          target = "http://localhost:3000",
+                          name =
+                            [ L.StyledText
+                                { body = "http://localhost:3000",
+                                  style = L.styleMaskFrom []
+                                }
+                            ]
+                        }
+                    ),
+                  L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "? Go to ",
+                          style = L.styleMaskFrom []
+                        }
+                    ),
+                  L.PTokenLink
+                    ( L.Link
+                        { typ = L.LinkExternal,
+                          target = "ftp://10.0.0.1",
+                          name =
+                            [ L.StyledText
+                                { body = "ftp://10.0.0.1",
+                                  style = L.styleMaskFrom []
+                                }
+                            ]
+                        }
+                    ),
+                  L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "!",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+            ],
+          code = [],
+          codeBlocks = IM.fromList [],
+          meta = M.fromList []
+        }
     p
       "parses drawers (empty)"
       "test/Lilac/ParseSpec/0004-drawers-empty"

@@ -956,6 +956,7 @@ library
     , bitwise
     , containers
     , megaparsec
+    , network-uri
     , process
     , relude
     , template-haskell
@@ -1679,6 +1680,7 @@ import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Char,
@@ -1744,10 +1746,12 @@ import Relude
     (/=),
     (<),
     (<$>),
+    (<=),
     (<>),
     (<|>),
     (=<<),
     (==),
+    (>=),
     (>>),
     (||),
   )
@@ -3076,16 +3080,23 @@ Note how we preserve the information of having no space character between the
 
 ******* Links
 
-There are many kinds of links. For now we only support external links. Even so,
-the current definition is incomplete because it doesn't cover the case of raw
-links like https://kernel.org.
+There are many kinds of links. For now we only support external links.
 
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 linkParser :: OrgParser Link
 linkParser = do
-  MP.choice [bracketedLinkParser]
+  MP.choice
+    [ MP.try rawLinkParser,
+      bracketedLinkParser
+    ]
+#+end_src
 
+The [[f:bracketedLinkParser]] parses links that uses brackets.
+
+#+name: f:bracketedLinkParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
 bracketedLinkParser :: OrgParser Link
 bracketedLinkParser = do
   _ <- string "["
@@ -3119,8 +3130,6 @@ bracketedLinkParser = do
           ]
       }
 #+end_src
-
-******** Tests
 
 #+header: :tangle test/Lilac/ParseSpec/0006-links
 #+begin_src org
@@ -3199,6 +3208,155 @@ p
                   meta = fromList []
                 }
             )
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+#+end_src
+
+The [[f:rawLinkParser]] parses links that look like URLs.
+
+#+name: f:rawLinkParser
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+rawLinkParser :: OrgParser Link
+rawLinkParser = do
+  protocol <- MP.takeWhile1P (Just "raw link protocol") isAsciiLower
+  separator <- string "://"
+  remainder <- T.pack <$> MP.some (MP.try remainderChar)
+  let url = protocol <> separator <> remainder
+  pure
+    Link
+      { typ = LinkExternal,
+        target = url,
+        name =
+          [ StyledText
+              { body = url,
+                style = styleMaskFrom []
+              }
+          ]
+      }
+  where
+    remainderChar :: OrgParser Char
+    remainderChar = do
+      c <- MP.satisfy N.isAllowedInURI
+      when (isPunctuation c) $ do
+        MP.notFollowedBy (char ' ')
+        MP.notFollowedBy (char '\n')
+      pure c
+    isPunctuation :: Char -> Bool
+    isPunctuation = not . isAlphaNumChar
+    isAlphaNumChar :: Char -> Bool
+    isAlphaNumChar c = isAlphaChar c || isDigitChar c
+    isAlphaChar :: Char -> Bool
+    isAlphaChar c = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+    isDigitChar :: Char -> Bool
+    isDigitChar c = c >= '0' && c <= '9'
+#+end_src
+
+The tricky part is in the =remainderChar=. Essentially, if we see a raw link
+followed by some punctuation, like https://funloop.org, then we want the
+punctuation plus the whitespace immediately after it to be excluded from the
+link. The punctuation may or may not be part of the allowed characters in
+=N.isAllowedInURI=. We fix this problem by running some additional checks if we
+ever encounter punctuation, with =isPunctuation=. The =isAlphaNumChar= helper is
+taken from [[https://hackage.haskell.org/package/network-uri][network-uri]].
+
+#+header: :tangle test/Lilac/ParseSpec/0006-links-raw
+#+begin_src org
+See https://foo.org, or https://bar.net.
+Try http://localhost:3000?
+Go to ftp://10.0.0.1!
+#+end_src
+
+#+header: :noweb-ref Test link parsing
+#+begin_src haskell
+p
+  "parses links (target only)"
+  "test/Lilac/ParseSpec/0006-links-raw"
+  L.OrgDoc
+    { cells =
+        [ L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "See ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              L.PTokenLink
+                ( L.Link
+                    { typ = L.LinkExternal,
+                      target = "https://foo.org",
+                      name =
+                        [ L.StyledText
+                            { body = "https://foo.org",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              L.PTokenStyledText
+                ( L.StyledText
+                    { body = ", or ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              L.PTokenLink
+                ( L.Link
+                    { typ = L.LinkExternal,
+                      target = "https://bar.net",
+                      name =
+                        [ L.StyledText
+                            { body = "https://bar.net",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              L.PTokenStyledText
+                ( L.StyledText
+                    { body = ". Try ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              L.PTokenLink
+                ( L.Link
+                    { typ = L.LinkExternal,
+                      target = "http://localhost:3000",
+                      name =
+                        [ L.StyledText
+                            { body = "http://localhost:3000",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              L.PTokenStyledText
+                ( L.StyledText
+                    { body = "? Go to ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              L.PTokenLink
+                ( L.Link
+                    { typ = L.LinkExternal,
+                      target = "ftp://10.0.0.1",
+                      name =
+                        [ L.StyledText
+                            { body = "ftp://10.0.0.1",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              L.PTokenStyledText
+                ( L.StyledText
+                    { body = "!",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ]
         ],
       code = [],
       codeBlocks = IM.fromList [],
@@ -5165,9 +5323,9 @@ parse for the metadata, and then the link.
 #+begin_src haskell
 figureParser :: OrgParser Cell
 figureParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> linkParser)
+  _ <- MP.try $ MP.lookAhead (metaParser >> bracketedLinkParser)
   metaKVs <- metaParser
-  link <- linkParser
+  link <- bracketedLinkParser
   pure
     . CFigure
     $ Figure
