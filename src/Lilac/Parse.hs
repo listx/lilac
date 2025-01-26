@@ -25,7 +25,7 @@ module Lilac.Parse
   )
 where
 
-import Data.Bits (complement, setBit, testBit, (.&.), (.^.), (.|.))
+import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
 import Data.Graph qualified as G
@@ -309,17 +309,8 @@ stylesToStyleMask ss = pure . StyleMask =<< foldlM f (0 :: Word8) ss
       where
         sInt = fromEnum s
 
-styleMaskIntersect :: StyleMask -> StyleMask -> StyleMask
-styleMaskIntersect (StyleMask a) (StyleMask b) = StyleMask $ a .&. b
-
-styleMaskAdd :: StyleMask -> StyleMask -> StyleMask
-styleMaskAdd (StyleMask a) (StyleMask b) = StyleMask $ a .|. b
-
-styleMaskSubtract :: StyleMask -> StyleMask -> StyleMask
-styleMaskSubtract (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
-
-invalidDeactivations :: StyleMask -> StyleMask -> StyleMask
-invalidDeactivations (StyleMask a) (StyleMask b) = StyleMask $ (complement a) .&. b
+styleMaskFlip :: StyleMask -> StyleMask -> StyleMask
+styleMaskFlip (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
 
 isVerbatim :: StyleMask -> Bool
 isVerbatim (StyleMask a) = testBit a (fromEnum Verbatim)
@@ -474,14 +465,19 @@ proseParser :: OrgParser T.Text -> OrgParser [PToken]
 proseParser spaceConsumer = do
   a <- MP.choice baseParsers
   b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
-  pure $ a : b
+  pure . filter nonEmpty $ a : b
   where
     spacePTokenParser = PTokenStyledText <$> whitespaceCompressor spaceConsumer
     baseParsers =
       [ PTokenLink <$> linkParser,
         PTokenMathFragment <$> mathFragmentInlineParser,
+        PTokenStyledText <$> styleMarkerParser,
         PTokenStyledText <$> styledTextParser
       ]
+    nonEmpty :: PToken -> Bool
+    nonEmpty = \case
+      PTokenStyledText styledText -> not $ T.null styledText.body
+      _ -> True
 
 whitespaceCompressor :: OrgParser T.Text -> OrgParser StyledText
 whitespaceCompressor spaceConsumer = do
@@ -523,50 +519,40 @@ failIfLeftoverActiveStyles = do
       $ "leftover active styles: "
       ++ (show $ maskToStyles $ StyleMask mask)
 
+styleMarkerParser :: OrgParser StyledText
+styleMarkerParser = do
+  orgParserState <- get
+
+  let mask = orgParserState.styleMask
+  c <- MP.satisfy isStyleMarker
+  style <- toStyleMask [c]
+
+  let newMask = styleMaskFlip mask style
+
+  put orgParserState {styleMask = newMask}
+  pure
+    StyledText
+      { body = "",
+        style = newMask
+      }
+
+isStyleMarker :: Char -> Bool
+isStyleMarker c = M.member c styleMap
+
 styledTextParser :: OrgParser StyledText
 styledTextParser = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
-  startingMask <-
-    toStyleMask
-      =<< T.unpack
-      <$> MP.takeWhileP
-        (Just "starting style marker")
-        isStyleMarker
 
-  let (StyleMask overlappingBits) = styleMaskIntersect mask startingMask
-  when (overlappingBits /= 0)
-    $ fail
-    $ "redundant style activations: "
-    <> (show $ maskToStyles $ StyleMask overlappingBits)
-
-  let activeMask = styleMaskAdd mask startingMask
-
-  text <- textParser activeMask
-
-  endingMask <-
-    toStyleMask
-      =<< T.unpack
-      <$> MP.takeWhileP
-        (Just "ending style marker")
-        isStyleMarker
-
-  let (StyleMask overzealousBits) = invalidDeactivations activeMask endingMask
-  when (overzealousBits /= 0)
-    $ fail
-    $ "overzealous style deactivations: "
-    <> (show $ maskToStyles $ StyleMask overzealousBits)
-
-  put orgParserState {styleMask = styleMaskSubtract activeMask endingMask}
+  text <- textParser mask
 
   pure
     StyledText
       { body = text,
-        style = activeMask
+        style = mask
       }
   where
-    isStyleMarker c = M.member c styleMap
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
     textParser :: StyleMask -> OrgParser T.Text

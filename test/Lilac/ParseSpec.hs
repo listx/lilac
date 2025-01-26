@@ -130,17 +130,34 @@ spec =
           meta = fromList []
         }
 
-    pf
-      "detects unbalanced style markers (redundant activations)"
+    p
+      "parses style markers multiple times at the beginning"
       "test/Lilac/ParseSpec/0005-styled-strings-redundant-activations"
-      "redundant style activations: [Bold]"
-      8
+      L.OrgDoc
+        { cells =
+            [ L.CHeading
+                ( L.Heading
+                    { level = 1,
+                      body =
+                        [ L.PTokenStyledText
+                            (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = "bar baz", style = L.styleMaskFrom []})
+                        ],
+                      meta = fromList []
+                    }
+                )
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
 
     pf
       "detects unbalanced style markers (overzealous deactivations)"
       "test/Lilac/ParseSpec/0005-styled-strings-overzealous-deactivations"
-      "overzealous style deactivations: [Bold]"
-      10
+      "leftover active styles: [Bold]"
+      15
 
     pf
       "detects unbalanced style markers (leftover active styles)"
@@ -148,11 +165,26 @@ spec =
       "leftover active styles: [Bold]"
       15
 
-    pf
-      "detects unbalanced style markers (redundant style marker)"
+    p
+      "parses style markers (redundant style marker)"
       "test/Lilac/ParseSpec/0005-styled-strings-redundant-style-marker"
-      "stylesToStyleMask: redundant style marker: Bold"
-      8
+      L.OrgDoc
+        { cells =
+            [ L.CHeading
+                ( L.Heading
+                    { level = 1,
+                      body =
+                        [ L.PTokenStyledText
+                            (L.StyledText {body = "foo bar baz", style = L.styleMaskFrom []})
+                        ],
+                      meta = fromList []
+                    }
+                )
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
 
     p
       "parses styled strings (compression)"
@@ -319,11 +351,24 @@ spec =
           meta = fromList []
         }
 
-    pf
-      "cannot (yet) parse style markers in the middle of a word"
+    p
+      "parses style markers in the middle of a word"
       "test/Lilac/ParseSpec/0005-styled-strings-verbatim"
-      "overzealous style deactivations: [Verbatim]"
-      2
+      L.OrgDoc
+        { cells =
+            [ L.CParagraph
+                [ L.PTokenStyledText
+                    (L.StyledText {body = "(", style = L.styleMaskFrom []}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = "import ./.", style = L.styleMaskFrom [L.Verbatim]}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = ") hello", style = L.styleMaskFrom []})
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
 
     p
       "parses paragraphs"
