@@ -2539,7 +2539,7 @@ styleMarkerParser = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
-  c <- MP.satisfy isStyleMarker
+  c <- MP.satisfy $ isStyleMarker mask
   style <- toStyleMask [c]
 
   let newMask = styleMaskFlip mask style
@@ -2550,9 +2550,6 @@ styleMarkerParser = do
       { body = "",
         style = newMask
       }
-
-isStyleMarker :: Char -> Bool
-isStyleMarker c = M.member c styleMap
 #+end_src
 
 We parse a single style marker character, and flip the bit for it as either on
@@ -2561,6 +2558,24 @@ at the end of [[f:styleMarkerParser]] (because we've updated the ~orgParserState
 that's the only essential thing we must do). But because of the way it is used
 in [[f:proseParser]], we have to return a ~StyledText~. We return an empty ~body~ field
 though, so that we can filter it out in the ~nonEmpty~ helper in [[f:proseParser]].
+
+[[f:isStyleMarker]] changes behavior depending on the current active style mask. If
+we are in a verbatim or code style, we ignore all other style markers except for
+those that will end the current (verbatim or code) style.
+
+#+name: f:isStyleMarker
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+isStyleMarker :: StyleMask -> Char -> Bool
+isStyleMarker styleMask c
+  | isVerbatim styleMask = c == '='
+  | isCode styleMask = c == '~'
+  | otherwise = M.member c styleMap
+#+end_src
+
+[[f:styledTextParser]] is careful not to step on other parsers' toes, because in a
+sense it is the most "greedy" parser, as it can parse many different types of
+input.
 
 #+name: f:styledTextParser
 #+header: :noweb-ref Parsing mechanism
@@ -2590,7 +2605,7 @@ styledTextParser = do
             MP.some
               $ MP.choice
                 [ MP.label "normal characters" normalChars,
-                  escapedSymbolParser
+                  escapedSymbolParser styleMask
                 ]
           pure $ T.concat ws
     normalChars :: OrgParser T.Text
@@ -2601,13 +2616,13 @@ styledTextParser = do
     normalChar = do
       MP.notFollowedBy $ string "[["
       MP.satisfy isNormalChar
-    escapedSymbolParser :: OrgParser T.Text
-    escapedSymbolParser = do
+    escapedSymbolParser :: StyleMask -> OrgParser T.Text
+    escapedSymbolParser styleMask = do
       _ <- char '\\'
       s <-
         MP.choice
           [ do
-              c <- MP.satisfy (\c -> isStyleMarker c || c == '\\')
+              c <- MP.satisfy (\c -> isStyleMarker styleMask c || c == '\\')
               pure $ T.singleton c,
             string "vert{}"
           ]
@@ -3081,6 +3096,50 @@ p
     (L.StyledText {body = "import ./.", style = L.styleMaskFrom [L.Verbatim]}),
   L.PTokenStyledText
     (L.StyledText {body = ") hello", style = L.styleMaskFrom []})
+]
+#+end_src
+
+This is another test to check that the bold style marker (asterisk) is ignored
+if it immediately follows a verbatim or code marker.
+
+#+name: test:0005-styled-strings-verbatim-code-ignore-immediate-bold
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-verbatim-code-ignore-immediate-bold
+#+begin_src org
+=*a= =b*= ~*c~ ~d*~
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+p
+  "suppresses immediate or latent bold style"
+  "test/Lilac/ParseSpec/0005-styled-strings-verbatim-code-ignore-immediate-bold"
+  L.OrgDoc
+    { cells =
+        [ L.CParagraph
+            <<Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold>>
+        ],
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+#+header: :noweb-ref Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold
+#+begin_src haskell
+[ L.PTokenStyledText
+    (L.StyledText {body = "*a", style = L.styleMaskFrom [L.Verbatim]}),
+  L.PTokenStyledText
+    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+  L.PTokenStyledText
+    (L.StyledText {body = "b*", style = L.styleMaskFrom [L.Verbatim]}),
+  L.PTokenStyledText
+    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+  L.PTokenStyledText
+    (L.StyledText {body = "*c", style = L.styleMaskFrom [L.Code]}),
+  L.PTokenStyledText
+    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+  L.PTokenStyledText
+    (L.StyledText {body = "d*", style = L.styleMaskFrom [L.Code]})
 ]
 #+end_src
 

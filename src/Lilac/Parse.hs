@@ -520,7 +520,7 @@ styleMarkerParser = do
   orgParserState <- get
 
   let mask = orgParserState.styleMask
-  c <- MP.satisfy isStyleMarker
+  c <- MP.satisfy $ isStyleMarker mask
   style <- toStyleMask [c]
 
   let newMask = styleMaskFlip mask style
@@ -532,8 +532,11 @@ styleMarkerParser = do
         style = newMask
       }
 
-isStyleMarker :: Char -> Bool
-isStyleMarker c = M.member c styleMap
+isStyleMarker :: StyleMask -> Char -> Bool
+isStyleMarker styleMask c
+  | isVerbatim styleMask = c == '='
+  | isCode styleMask = c == '~'
+  | otherwise = M.member c styleMap
 
 styledTextParser :: OrgParser StyledText
 styledTextParser = do
@@ -560,7 +563,7 @@ styledTextParser = do
             MP.some
               $ MP.choice
                 [ MP.label "normal characters" normalChars,
-                  escapedSymbolParser
+                  escapedSymbolParser styleMask
                 ]
           pure $ T.concat ws
     normalChars :: OrgParser T.Text
@@ -571,13 +574,13 @@ styledTextParser = do
     normalChar = do
       MP.notFollowedBy $ string "[["
       MP.satisfy isNormalChar
-    escapedSymbolParser :: OrgParser T.Text
-    escapedSymbolParser = do
+    escapedSymbolParser :: StyleMask -> OrgParser T.Text
+    escapedSymbolParser styleMask = do
       _ <- char '\\'
       s <-
         MP.choice
           [ do
-              c <- MP.satisfy (\c -> isStyleMarker c || c == '\\')
+              c <- MP.satisfy (\c -> isStyleMarker styleMask c || c == '\\')
               pure $ T.singleton c,
             string "vert{}"
           ]

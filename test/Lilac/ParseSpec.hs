@@ -352,6 +352,33 @@ spec =
         }
 
     p
+      "suppresses immediate or latent bold style"
+      "test/Lilac/ParseSpec/0005-styled-strings-verbatim-code-ignore-immediate-bold"
+      L.OrgDoc
+        { cells =
+            [ L.CParagraph
+                [ L.PTokenStyledText
+                    (L.StyledText {body = "*a", style = L.styleMaskFrom [L.Verbatim]}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = "b*", style = L.styleMaskFrom [L.Verbatim]}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = "*c", style = L.styleMaskFrom [L.Code]}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = "d*", style = L.styleMaskFrom [L.Code]})
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    p
       "parses paragraphs"
       "test/Lilac/ParseSpec/0005-prose-paragraphs"
       L.OrgDoc
