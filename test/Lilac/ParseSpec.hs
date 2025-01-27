@@ -775,11 +775,42 @@ spec =
           meta = M.fromList []
         }
 
-    pf
-      "cannot (yet) parse a link if it is preceded by non-whitespace"
+    p
+      "parse a link even if it is preceded by non-whitespace"
       "test/Lilac/ParseSpec/0006-links-inside-parentheses"
-      "leftover active styles: [Italic]"
-      19
+      L.OrgDoc
+        { cells =
+            [ L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "(",
+                          style = L.styleMaskFrom []
+                        }
+                    ),
+                  L.PTokenLink
+                    ( L.Link
+                        { typ = L.LinkExternal,
+                          target = "file:foo/bar",
+                          name =
+                            [ L.StyledText
+                                { body = "file:foo/bar",
+                                  style = L.styleMaskFrom []
+                                }
+                            ]
+                        }
+                    ),
+                  L.PTokenStyledText
+                    ( L.StyledText
+                        { body = ")",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+            ],
+          code = [],
+          codeBlocks = IM.fromList [],
+          meta = M.fromList []
+        }
     p
       "parses drawers (empty)"
       "test/Lilac/ParseSpec/0004-drawers-empty"

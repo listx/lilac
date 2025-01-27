@@ -559,10 +559,18 @@ styledTextParser = do
           ws <-
             MP.some
               $ MP.choice
-                [ MP.takeWhile1P (Just "normal characters") isNormalChar,
+                [ MP.label "normal characters" normalChars,
                   escapedSymbolParser
                 ]
           pure $ T.concat ws
+    normalChars :: OrgParser T.Text
+    normalChars = do
+      cs <- MP.some $ normalChar
+      pure $ T.pack cs
+    normalChar :: OrgParser Char
+    normalChar = do
+      MP.notFollowedBy $ string "[["
+      MP.satisfy isNormalChar
     escapedSymbolParser :: OrgParser T.Text
     escapedSymbolParser = do
       _ <- char '\\'

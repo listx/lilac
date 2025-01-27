@@ -2589,10 +2589,18 @@ styledTextParser = do
           ws <-
             MP.some
               $ MP.choice
-                [ MP.takeWhile1P (Just "normal characters") isNormalChar,
+                [ MP.label "normal characters" normalChars,
                   escapedSymbolParser
                 ]
           pure $ T.concat ws
+    normalChars :: OrgParser T.Text
+    normalChars = do
+      cs <- MP.some $ normalChar
+      pure $ T.pack cs
+    normalChar :: OrgParser Char
+    normalChar = do
+      MP.notFollowedBy $ string "[["
+      MP.satisfy isNormalChar
     escapedSymbolParser :: OrgParser T.Text
     escapedSymbolParser = do
       _ <- char '\\'
@@ -3362,10 +3370,11 @@ p
     }
 #+end_src
 
-The following test is expected to fail because we currently only detect links
-that are preceded by whitespace. Here the link is preceded by ~(~ which means
-[[f:bracketedLinkParser]] won't be able to parse it (it sees the opening ~(~ and
-immediately fails because it is not ~[~).
+Links can be preceded by ~(~ which means [[f:bracketedLinkParser]] won't be able to
+parse it directly; however, in [[f:styledTextParser]] (specifically ~normalChar~) we
+take care to ensure to stop consuming input if we see a double left bracket ~[[~.
+This way, the input will look like ~[[...~ which will then let
+[[f:bracketedLinkParser]] pick it up.
 
 #+header: :tangle test/Lilac/ParseSpec/0006-links-inside-parentheses
 #+begin_src org
@@ -3374,11 +3383,42 @@ immediately fails because it is not ~[~).
 
 #+header: :noweb-ref Test link parsing
 #+begin_src haskell
-pf
-  "cannot (yet) parse a link if it is preceded by non-whitespace"
+p
+  "parse a link even if it is preceded by non-whitespace"
   "test/Lilac/ParseSpec/0006-links-inside-parentheses"
-  "leftover active styles: [Italic]"
-  19
+  L.OrgDoc
+    { cells =
+        [ L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "(",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              L.PTokenLink
+                ( L.Link
+                    { typ = L.LinkExternal,
+                      target = "file:foo/bar",
+                      name =
+                        [ L.StyledText
+                            { body = "file:foo/bar",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              L.PTokenStyledText
+                ( L.StyledText
+                    { body = ")",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ]
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
 #+end_src
 
 ******* Inline math fragments
