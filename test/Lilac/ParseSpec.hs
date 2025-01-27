@@ -132,7 +132,7 @@ spec =
 
     p
       "parses style markers multiple times at the beginning"
-      "test/Lilac/ParseSpec/0005-styled-strings-redundant-activations"
+      "test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries"
       L.OrgDoc
         { cells =
             [ L.CHeading
@@ -142,7 +142,15 @@ spec =
                         [ L.PTokenStyledText
                             (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
                           L.PTokenStyledText
-                            (L.StyledText {body = "bar baz", style = L.styleMaskFrom []})
+                            (L.StyledText {body = "bar baz a", style = L.styleMaskFrom []}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = "b", style = L.styleMaskFrom [L.Bold]}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = "c (", style = L.styleMaskFrom []}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = "ok", style = L.styleMaskFrom [L.Bold]}),
+                          L.PTokenStyledText
+                            (L.StyledText {body = ")", style = L.styleMaskFrom []})
                         ],
                       meta = fromList []
                     }

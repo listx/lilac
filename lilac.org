@@ -2458,36 +2458,24 @@ is any sequence of non-whitespace characters). The only thing we check is that
 by the end of the cell (heading of paragraph) that all styles must have been
 turned off.
 
-Since [[https://github.com/listx/lilac-ng/commit/d6f27cd95aeb8e36927402ce29d14754f643e147][d6f27cd (use bit mask for parsing styled strings, 2024-11-02)]], if we saw
-that the user was trying to turn on a style which is already active, we would
-fail with an error in [[test:0005-styled-strings-redundant-activations]]. This is
-because if a style marker was at the beginning of a word it was treated as only
-turning /on/ the style (and if at the end of a word, treated as only turning /off/
-the style).
-
-However this is no longer the case because we no longer care about the exact
-location of where the style markers are placed. And so no longer expect the
-above test to fail. In the future we will rename this test to move away from the
-"activations" language.
-
-#+name: test:0005-styled-strings-redundant-activations
-#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-redundant-activations
+#+name: test:0005-styled-strings-messy-boundaries
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries
 #+begin_src org
-,* *foo *bar baz
+,* *foo *bar baz a*b*c (*ok*)
 #+end_src
 
 #+header: :noweb-ref Test styled string parsing
 #+begin_src haskell
 p
   "parses style markers multiple times at the beginning"
-  "test/Lilac/ParseSpec/0005-styled-strings-redundant-activations"
+  "test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries"
   L.OrgDoc
     { cells =
         [ L.CHeading
             ( L.Heading
                 { level = 1,
                   body =
-                    <<Expected prose for 0005-styled-strings-redundant-activations>>,
+                    <<Expected prose for 0005-styled-strings-messy-boundaries>>,
                   meta = fromList []
                 }
             )
@@ -2498,12 +2486,20 @@ p
     }
 #+end_src
 
-#+header: :noweb-ref Expected prose for 0005-styled-strings-redundant-activations
+#+header: :noweb-ref Expected prose for 0005-styled-strings-messy-boundaries
 #+begin_src haskell
 [ L.PTokenStyledText
     (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
   L.PTokenStyledText
-    (L.StyledText {body = "bar baz", style = L.styleMaskFrom []})
+    (L.StyledText {body = "bar baz a", style = L.styleMaskFrom []}),
+  L.PTokenStyledText
+    (L.StyledText {body = "b", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledText
+    (L.StyledText {body = "c (", style = L.styleMaskFrom []}),
+  L.PTokenStyledText
+    (L.StyledText {body = "ok", style = L.styleMaskFrom [L.Bold]}),
+  L.PTokenStyledText
+    (L.StyledText {body = ")", style = L.styleMaskFrom []})
 ]
 #+end_src
 
