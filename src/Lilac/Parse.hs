@@ -303,11 +303,7 @@ stylesToStyleMask :: (MonadFail m) => [Style] -> m StyleMask
 stylesToStyleMask ss = pure . StyleMask =<< foldlM f (0 :: Word8) ss
   where
     f :: (MonadFail m) => Word8 -> Style -> m Word8
-    f acc s
-      | testBit acc sInt = fail $ "stylesToStyleMask: redundant style marker: " <> (show s)
-      | otherwise = pure $ setBit acc sInt
-      where
-        sInt = fromEnum s
+    f acc s = pure . setBit acc $ fromEnum s
 
 styleMaskFlip :: StyleMask -> StyleMask -> StyleMask
 styleMaskFlip (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
