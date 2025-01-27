@@ -3094,7 +3094,7 @@ linkParser :: OrgParser Link
 linkParser = do
   MP.choice
     [ MP.try rawLinkParser,
-      bracketedLinkParser
+      MP.try bracketedLinkParser
     ]
 #+end_src
 
@@ -3410,6 +3410,36 @@ p
               L.PTokenStyledText
                 ( L.StyledText
                     { body = ")",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ]
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+#+end_src
+
+Sometimes we have text that look like links initially but turn out to be
+non-links.
+
+#+header: :tangle test/Lilac/ParseSpec/0006-links-nonlink
+#+begin_src org
+[hi]
+#+end_src
+
+#+header: :noweb-ref Test link parsing
+#+begin_src haskell
+p
+  "parse text that may initially look like a link (initial opening bracket)"
+  "test/Lilac/ParseSpec/0006-links-nonlink"
+  L.OrgDoc
+    { cells =
+        [ L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "[hi]",
                       style = L.styleMaskFrom []
                     }
                 )

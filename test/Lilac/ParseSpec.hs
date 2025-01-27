@@ -811,6 +811,25 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
+
+    p
+      "parse text that may initially look like a link (initial opening bracket)"
+      "test/Lilac/ParseSpec/0006-links-nonlink"
+      L.OrgDoc
+        { cells =
+            [ L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "[hi]",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+            ],
+          code = [],
+          codeBlocks = IM.fromList [],
+          meta = M.fromList []
+        }
     p
       "parses drawers (empty)"
       "test/Lilac/ParseSpec/0004-drawers-empty"

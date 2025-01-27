@@ -614,7 +614,7 @@ linkParser :: OrgParser Link
 linkParser = do
   MP.choice
     [ MP.try rawLinkParser,
-      bracketedLinkParser
+      MP.try bracketedLinkParser
     ]
 
 bracketedLinkParser :: OrgParser Link
