@@ -3213,6 +3213,8 @@ bracketedLinkParser = do
 #+begin_src org
 ,* \(foo\) [[link-target-only]]
 ,* \(bar\) [[link-target][link-name]]
+
+[[a]] b
 #+end_src
 
 #+header: :noweb-ref Test link parsing
@@ -3285,7 +3287,27 @@ p
                     ],
                   meta = fromList []
                 }
-            )
+            ),
+          L.CParagraph
+            [ L.PTokenLink
+                ( L.Link
+                    { typ = L.LinkExternal,
+                      target = "a",
+                      name =
+                        [ L.StyledText
+                            { body = "a",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              L.PTokenStyledText
+                ( L.StyledText
+                    { body = " b",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ]
         ],
       code = [],
       codeBlocks = IM.fromList [],
@@ -5483,7 +5505,7 @@ parse for the metadata, and then the link.
 #+begin_src haskell
 figureParser :: OrgParser Cell
 figureParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> bracketedLinkParser)
+  _ <- MP.try $ MP.lookAhead (metaParser >> bracketedLinkParser >> endOfCell)
   metaKVs <- metaParser
   link <- bracketedLinkParser
   pure
@@ -5492,7 +5514,20 @@ figureParser = do
       { meta = metaKVs,
         link = link
       }
+  where
+    endOfCell :: OrgParser ()
+    endOfCell =
+      MP.choice
+        [ void . MP.try $ string "\n\n",
+          char '\n' >> MP.eof
+        ]
 #+end_src
+
+It's important that we expect the end of the cell (double newline or newline and
+~MP.eof~), because otherwise we'll end up parsing the link at the start of a
+paragraph cell as a figure. This parser still has plenty of room for making the
+input stricter (as it should be the case anyway for figures), but for now we
+keep things simple.
 
 The metadata is parsed with =metaParser= which relies on =metaEntryParser=.
 

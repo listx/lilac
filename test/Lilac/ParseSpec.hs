@@ -704,7 +704,27 @@ spec =
                         ],
                       meta = fromList []
                     }
-                )
+                ),
+              L.CParagraph
+                [ L.PTokenLink
+                    ( L.Link
+                        { typ = L.LinkExternal,
+                          target = "a",
+                          name =
+                            [ L.StyledText
+                                { body = "a",
+                                  style = L.styleMaskFrom []
+                                }
+                            ]
+                        }
+                    ),
+                  L.PTokenStyledText
+                    ( L.StyledText
+                        { body = " b",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
             ],
           code = [],
           codeBlocks = IM.fromList [],

@@ -1085,7 +1085,7 @@ mathFragmentStandaloneParser =
 
 figureParser :: OrgParser Cell
 figureParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> bracketedLinkParser)
+  _ <- MP.try $ MP.lookAhead (metaParser >> bracketedLinkParser >> endOfCell)
   metaKVs <- metaParser
   link <- bracketedLinkParser
   pure
@@ -1094,6 +1094,13 @@ figureParser = do
       { meta = metaKVs,
         link = link
       }
+  where
+    endOfCell :: OrgParser ()
+    endOfCell =
+      MP.choice
+        [ void . MP.try $ string "\n\n",
+          char '\n' >> MP.eof
+        ]
 
 metaParser :: OrgParser (M.Map T.Text T.Text)
 metaParser = do
