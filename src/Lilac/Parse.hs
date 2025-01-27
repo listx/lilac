@@ -967,7 +967,7 @@ blockParser = do
   blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
   srcLang <- MP.optional $ do
     _ <- MP.skipSome $ char ' '
-    src <- MP.takeWhile1P (Just "src language") isAsciiLower
+    src <- MP.takeWhile1P (Just "src language") isSrcLanguageChar
     pure ("__src_language", src)
   when (blockType == "src" && srcLang == Nothing)
     $ fail "block type src requires a language specifier"
@@ -999,6 +999,7 @@ blockParser = do
       MP.someTill
         (bTokenParser (blockType == "src") nowebOn)
         (string $ T.concat ["\n#+end_", blockType, "\n"])
+    isSrcLanguageChar c = isAsciiLower c || c == '-'
 
 bTokenParser :: Bool -> Bool -> OrgParser BToken
 bTokenParser isSrcBlock nowebOn = MP.choice parsers
