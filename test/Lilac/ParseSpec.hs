@@ -162,12 +162,6 @@ spec =
         }
 
     pf
-      "detects unbalanced style markers (overzealous deactivations)"
-      "test/Lilac/ParseSpec/0005-styled-strings-overzealous-deactivations"
-      "leftover active styles: [Bold]"
-      15
-
-    pf
       "detects unbalanced style markers (leftover active styles)"
       "test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles"
       "leftover active styles: [Bold]"

@@ -2503,30 +2503,6 @@ p
 ]
 #+end_src
 
-The following test ([[test:0005-styled-strings-overzealous-deactivations]]) still
-fails not because the ~*~ in ~bar*~ is seen as an "overzealous deactivation" of the
-~Bold~ style, but because it is unbalanced (no second ~*~ to end the ~Bold~ style).
-
-#+name: test:0005-styled-strings-overzealous-deactivations
-#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-overzealous-deactivations
-#+begin_src org
-,* foo bar* baz
-#+end_src
-
-#+header: :noweb-ref Test styled string parsing
-#+begin_src haskell
-pf
-  "detects unbalanced style markers (overzealous deactivations)"
-  "test/Lilac/ParseSpec/0005-styled-strings-overzealous-deactivations"
-  "leftover active styles: [Bold]"
-  15
-#+end_src
-
-Note that this test is somewhat redundant now, given the similarity with
-[[test:0005-styled-strings-leftover-active-styles]]. In the future we will retire
-[[test:0005-styled-strings-overzealous-deactivations]] because the "deactivations"
-language is obsolete.
-
 In =0005-styled-strings-leftover-active-styles= we keep parsing to the end of the
 heading, expecting to see the ending style marker for bold text, but never see
 it. So the failure from =failIfLeftoverActiveStyles= gets triggered.
