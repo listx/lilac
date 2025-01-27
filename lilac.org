@@ -5378,6 +5378,7 @@ mathFragmentNumberedParser = do
   orgParserState <- get
   let number = orgParserState.equationNumber + 1
 
+  metaKVs <- metaParser
   _ <- lexeme $ string "\\begin{equation}"
   latex <- MP.someTill (MP.label "LaTeX standalone numbered math input" MP.anySingle) (string "\\end{equation}")
 
@@ -5385,9 +5386,7 @@ mathFragmentNumberedParser = do
   pure
     MathFragment
       { meta =
-          M.fromList
-            [ ("__equation_number", T.pack $ show number)
-            ],
+          M.insert "__equation_number" (T.pack $ show number) metaKVs,
         body = T.pack latex
       }
 #+end_src
@@ -5399,11 +5398,12 @@ Parsing unnumbered equations is almost the same.
 #+begin_src haskell
 mathFragmentUnnumberedParser :: OrgParser MathFragment
 mathFragmentUnnumberedParser = do
+  metaKVs <- metaParser
   _ <- lexeme $ string "\\["
   latex <- MP.someTill (MP.label "LaTeX standalone unnumbered math input" MP.anySingle) (string "\\]")
   pure
     MathFragment
-      { meta = M.fromList [],
+      { meta = metaKVs,
         body = T.pack latex
       }
 #+end_src
@@ -5441,11 +5441,17 @@ retain whitespace for the contents inside.
 2 + 2 = 4
 \]
 
+,#+name: eq:x
 \[
 
 
 2 + 2 = 4
 \]
+
+,#+name: eq:y
+\begin{equation}
+1 + 1 = 2
+\end{equation}
 #+end_src
 
 #+header: :noweb-ref Test styled string parsing
@@ -5478,8 +5484,20 @@ ps
               },
           L.CMathFragment
             L.MathFragment
-              { meta = fromList [],
+              { meta =
+                  fromList
+                    [ ("name", "eq:x")
+                    ],
                 body = "2 + 2 = 4\n"
+              },
+          L.CMathFragment
+            L.MathFragment
+              { meta =
+                  fromList
+                    [ ("__equation_number", "3"),
+                      ("name", "eq:y")
+                    ],
+                body = "1 + 1 = 2\n"
               }
         ],
       code = [],
@@ -5491,7 +5509,7 @@ ps
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
-      equationNumber = 2
+      equationNumber = 3
     }
 #+end_src
 

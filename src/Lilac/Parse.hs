@@ -1055,6 +1055,7 @@ mathFragmentNumberedParser = do
   orgParserState <- get
   let number = orgParserState.equationNumber + 1
 
+  metaKVs <- metaParser
   _ <- lexeme $ string "\\begin{equation}"
   latex <- MP.someTill (MP.label "LaTeX standalone numbered math input" MP.anySingle) (string "\\end{equation}")
 
@@ -1062,19 +1063,18 @@ mathFragmentNumberedParser = do
   pure
     MathFragment
       { meta =
-          M.fromList
-            [ ("__equation_number", T.pack $ show number)
-            ],
+          M.insert "__equation_number" (T.pack $ show number) metaKVs,
         body = T.pack latex
       }
 
 mathFragmentUnnumberedParser :: OrgParser MathFragment
 mathFragmentUnnumberedParser = do
+  metaKVs <- metaParser
   _ <- lexeme $ string "\\["
   latex <- MP.someTill (MP.label "LaTeX standalone unnumbered math input" MP.anySingle) (string "\\]")
   pure
     MathFragment
-      { meta = M.fromList [],
+      { meta = metaKVs,
         body = T.pack latex
       }
 

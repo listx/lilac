@@ -431,8 +431,20 @@ spec =
                   },
               L.CMathFragment
                 L.MathFragment
-                  { meta = fromList [],
+                  { meta =
+                      fromList
+                        [ ("name", "eq:x")
+                        ],
                     body = "2 + 2 = 4\n"
+                  },
+              L.CMathFragment
+                L.MathFragment
+                  { meta =
+                      fromList
+                        [ ("__equation_number", "3"),
+                          ("name", "eq:y")
+                        ],
+                    body = "1 + 1 = 2\n"
                   }
             ],
           code = [],
@@ -444,7 +456,7 @@ spec =
           listLevels = [],
           listMarkers = [],
           continuationIndent = 0,
-          equationNumber = 2
+          equationNumber = 3
         }
 
     p
