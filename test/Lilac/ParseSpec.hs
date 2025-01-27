@@ -150,7 +150,7 @@ spec =
                           L.PTokenStyledText
                             (L.StyledText {body = "ok", style = L.styleMaskFrom [L.Bold]}),
                           L.PTokenStyledText
-                            (L.StyledText {body = ")", style = L.styleMaskFrom []})
+                            (L.StyledText {body = ") yes", style = L.styleMaskFrom []})
                         ],
                       meta = fromList []
                     }
@@ -166,27 +166,6 @@ spec =
       "test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles"
       "leftover active styles: [Bold]"
       15
-
-    p
-      "parses style markers (redundant style marker)"
-      "test/Lilac/ParseSpec/0005-styled-strings-redundant-style-marker"
-      L.OrgDoc
-        { cells =
-            [ L.CHeading
-                ( L.Heading
-                    { level = 1,
-                      body =
-                        [ L.PTokenStyledText
-                            (L.StyledText {body = "foo bar baz", style = L.styleMaskFrom []})
-                        ],
-                      meta = fromList []
-                    }
-                )
-            ],
-          code = [],
-          codeBlocks = fromList [],
-          meta = fromList []
-        }
 
     p
       "parses styled strings (compression)"

@@ -2461,7 +2461,7 @@ turned off.
 #+name: test:0005-styled-strings-messy-boundaries
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries
 #+begin_src org
-,* *foo *bar baz a*b*c (*ok*)
+,* *foo *bar baz a*b*c (*ok*) **yes
 #+end_src
 
 #+header: :noweb-ref Test styled string parsing
@@ -2499,7 +2499,7 @@ p
   L.PTokenStyledText
     (L.StyledText {body = "ok", style = L.styleMaskFrom [L.Bold]}),
   L.PTokenStyledText
-    (L.StyledText {body = ")", style = L.styleMaskFrom []})
+    (L.StyledText {body = ") yes", style = L.styleMaskFrom []})
 ]
 #+end_src
 
@@ -2723,49 +2723,6 @@ stylesToStyleMask ss = pure . StyleMask =<< foldlM f (0 :: Word8) ss
       where
         sInt = fromEnum s
 #+end_src
-
-Test =0005-styled-strings-redundant-style-marker= used to fail, but we don't get a
-parse error any more because the code path in =stylesToStyleMask= for the
-"redundant style marker" never triggers (because we only ever parse a single
-style marker character at a time in [[f:styleMarkerParser]]).
-
-#+name: test:0005-styled-strings-redundant-style-marker
-#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-redundant-style-marker
-#+begin_src org
-,* foo **bar baz
-#+end_src
-
-#+header: :noweb-ref Test styled string parsing
-#+begin_src haskell
-p
-  "parses style markers (redundant style marker)"
-  "test/Lilac/ParseSpec/0005-styled-strings-redundant-style-marker"
-  L.OrgDoc
-    { cells =
-        [ L.CHeading
-            ( L.Heading
-                { level = 1,
-                  body =
-                    <<Expected prose for 0005-styled-strings-redundant-style-marker>>,
-                  meta = fromList []
-                }
-            )
-        ],
-      code = [],
-      codeBlocks = fromList [],
-      meta = fromList []
-    }
-#+end_src
-
-#+header: :noweb-ref Expected prose for 0005-styled-strings-redundant-style-marker
-#+begin_src haskell
-[ L.PTokenStyledText
-    (L.StyledText {body = "foo bar baz", style = L.styleMaskFrom []})
-]
-#+end_src
-
-Test =0005-styled-strings-redundant-style-marker= should be renamed in the future
-to reflect the fact that it no longer fails.
 
 [[f:styleMaskFlip]] is a helper to perform a binary XOR operation on two =StyleMask=
 objects, so that callers don't have to perform the deconstruction and
