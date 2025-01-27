@@ -3362,6 +3362,25 @@ p
     }
 #+end_src
 
+The following test is expected to fail because we currently only detect links
+that are preceded by whitespace. Here the link is preceded by ~(~ which means
+[[f:bracketedLinkParser]] won't be able to parse it (it sees the opening ~(~ and
+immediately fails because it is not ~[~).
+
+#+header: :tangle test/Lilac/ParseSpec/0006-links-inside-parentheses
+#+begin_src org
+([[file:foo/bar]])
+#+end_src
+
+#+header: :noweb-ref Test link parsing
+#+begin_src haskell
+pf
+  "cannot (yet) parse a link if it is preceded by non-whitespace"
+  "test/Lilac/ParseSpec/0006-links-inside-parentheses"
+  "leftover active styles: [Italic]"
+  19
+#+end_src
+
 ******* Inline math fragments
 
 Inline math fragments are delimited by =\(= and =\)=.

@@ -774,6 +774,12 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
+
+    pf
+      "cannot (yet) parse a link if it is preceded by non-whitespace"
+      "test/Lilac/ParseSpec/0006-links-inside-parentheses"
+      "leftover active styles: [Italic]"
+      19
     p
       "parses drawers (empty)"
       "test/Lilac/ParseSpec/0004-drawers-empty"
