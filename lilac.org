@@ -3156,18 +3156,107 @@ p
 ]
 #+end_src
 
+Verbatim and code styles take precedence over links. So even if you have text
+that looks like a link, they will not be parsed as such if surrounded by
+verbatim or code styles. The same applies for inline math, whose parser should
+not apply if we're in a verbatim (or code) zone.
+
+#+name: test:0005-styled-strings-verbatim-precedence
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-verbatim-precedence
+#+begin_src org
+=[[foo=
+
+[[hello]] there
+
+=\(1 + 1 = ~\(2 * 2\)~
+
+~[[bar]]~
+#+end_src
+
+#+header: :noweb-ref Test styled string parsing
+#+begin_src haskell
+p
+  "treats verbatim and code style with higher prcedence"
+  "test/Lilac/ParseSpec/0005-styled-strings-verbatim-precedence"
+  L.OrgDoc
+    { cells =
+        <<Expected prose for 0005-styled-strings-verbatim-precedence>>,
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+#+header: :noweb-ref Expected prose for 0005-styled-strings-verbatim-precedence
+#+begin_src haskell
+[ L.CParagraph
+    [ L.PTokenStyledText
+        (L.StyledText {body = "[[foo", style = L.styleMaskFrom [L.Verbatim]})
+    ],
+  L.CParagraph
+    [ L.PTokenLink
+        ( L.Link
+            { typ = L.LinkExternal,
+              target = "hello",
+              name =
+                [ L.StyledText
+                    { body = "hello",
+                      style = L.styleMaskFrom []
+                    }
+                ]
+            }
+        ),
+      L.PTokenStyledText
+        (L.StyledText {body = " there", style = L.styleMaskFrom []})
+    ],
+  L.CParagraph
+    [ L.PTokenStyledText
+        (L.StyledText {body = "\\(1 + 1 ", style = L.styleMaskFrom [L.Verbatim]}),
+      L.PTokenStyledText
+        (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+      L.PTokenStyledText
+        (L.StyledText {body = "\\(2 * 2\\)", style = L.styleMaskFrom [L.Code]})
+    ],
+  L.CParagraph
+    [ L.PTokenStyledText
+        (L.StyledText {body = "[[bar]]", style = L.styleMaskFrom [L.Code]})
+    ]
+]
+#+end_src
+
 ******* Links
 
 There are many kinds of links. For now we only support external links.
 
+#+name: f:linkParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 linkParser :: OrgParser Link
 linkParser = do
+  failIfVerbatimOrCode
+
   MP.choice
     [ MP.try rawLinkParser,
       MP.try bracketedLinkParser
     ]
+#+end_src
+
+The call to [[f:failIfVerbatimOrCode]] fails the parser if either the verbatim or
+code style is active. This is because those parsers take precedence. See, for
+example [[test:0005-styled-strings-verbatim-precedence]] of the sort of behavior we
+expect. By failing this parser, we allow other parsers (such as
+[[f:styledTextParser]]) to succeed (see [[f:proseParser]] for the interaction of this
+parser with these other parsers).
+
+#+name: f:failIfVerbatimOrCode
+#+header: :noweb-ref Parsing mechanism
+#+begin_src haskell
+failIfVerbatimOrCode :: OrgParser ()
+failIfVerbatimOrCode = do
+  orgParserState <- get
+  let mask = orgParserState.styleMask
+  when (isVerbatim mask || isCode mask)
+    $ fail "aborting because verbatim or code style is active"
 #+end_src
 
 The [[f:bracketedLinkParser]] parses links that uses brackets.
@@ -3547,13 +3636,16 @@ p
 
 ******* Inline math fragments
 
-Inline math fragments are delimited by =\(= and =\)=.
+Inline math fragments are delimited by =\(= and =\)=. Just like [[f:linkParser]], we
+fail the parser if we detect that verbatim or code styles are active.
 
 #+name: f:mathFragmentInlineParser
 #+header: :noweb-ref Parsing mechanism
 #+begin_src haskell
 mathFragmentInlineParser :: OrgParser MathFragment
 mathFragmentInlineParser = do
+  failIfVerbatimOrCode
+
   _ <- string "\\("
   latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
   pure

@@ -379,6 +379,49 @@ spec =
         }
 
     p
+      "treats verbatim and code style with higher prcedence"
+      "test/Lilac/ParseSpec/0005-styled-strings-verbatim-precedence"
+      L.OrgDoc
+        { cells =
+            [ L.CParagraph
+                [ L.PTokenStyledText
+                    (L.StyledText {body = "[[foo", style = L.styleMaskFrom [L.Verbatim]})
+                ],
+              L.CParagraph
+                [ L.PTokenLink
+                    ( L.Link
+                        { typ = L.LinkExternal,
+                          target = "hello",
+                          name =
+                            [ L.StyledText
+                                { body = "hello",
+                                  style = L.styleMaskFrom []
+                                }
+                            ]
+                        }
+                    ),
+                  L.PTokenStyledText
+                    (L.StyledText {body = " there", style = L.styleMaskFrom []})
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    (L.StyledText {body = "\\(1 + 1 ", style = L.styleMaskFrom [L.Verbatim]}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+                  L.PTokenStyledText
+                    (L.StyledText {body = "\\(2 * 2\\)", style = L.styleMaskFrom [L.Code]})
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    (L.StyledText {body = "[[bar]]", style = L.styleMaskFrom [L.Code]})
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    p
       "parses paragraphs"
       "test/Lilac/ParseSpec/0005-prose-paragraphs"
       L.OrgDoc

@@ -615,10 +615,19 @@ compressProse = reverse . dropUnnecessary . foldl' f []
 
 linkParser :: OrgParser Link
 linkParser = do
+  failIfVerbatimOrCode
+
   MP.choice
     [ MP.try rawLinkParser,
       MP.try bracketedLinkParser
     ]
+
+failIfVerbatimOrCode :: OrgParser ()
+failIfVerbatimOrCode = do
+  orgParserState <- get
+  let mask = orgParserState.styleMask
+  when (isVerbatim mask || isCode mask)
+    $ fail "aborting because verbatim or code style is active"
 
 bracketedLinkParser :: OrgParser Link
 bracketedLinkParser = do
@@ -689,6 +698,8 @@ rawLinkParser = do
 
 mathFragmentInlineParser :: OrgParser MathFragment
 mathFragmentInlineParser = do
+  failIfVerbatimOrCode
+
   _ <- string "\\("
   latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
   pure
