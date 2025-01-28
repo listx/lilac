@@ -8,6 +8,7 @@ import Options.Applicative
     argument,
     command,
     customExecParser,
+    flag,
     fullDesc,
     header,
     help,
@@ -27,7 +28,8 @@ import Options.Applicative
 import Options.Applicative.Builder (InfoMod)
 import Paths_lilac (version)
 import Relude
-  ( Either (Left, Right),
+  ( Bool (False, True),
+    Either (Left, Right),
     FilePath,
     IO,
     Type,
@@ -37,11 +39,13 @@ import Relude
     putStrLn,
     readFileBS,
     runStateT,
+    when,
     ($),
     (<$>),
     (<>),
   )
 import Text.Megaparsec qualified as MP
+import Text.Pretty.Simple qualified as PP
 
 main :: IO ()
 main = do
@@ -65,12 +69,12 @@ main = do
 
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
-  Check checkOpts -> lilacCheck checkOpts
+  Check checkOpts -> lilacCheck globalOpts checkOpts
   Tangle -> putStrLn "'tangle' is not implemented yet"
   Weave -> putStrLn "'weave' is not implemented yet"
 
-lilacCheck :: CheckOpts -> IO ()
-lilacCheck checkOpts = do
+lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
+lilacCheck globalOpts checkOpts = do
   bytes <- readFileBS checkOpts.input
   let parseResult =
         MP.runParser
@@ -79,11 +83,20 @@ lilacCheck checkOpts = do
           (decodeUtf8 bytes)
   case parseResult of
     Left errBundle -> putStrLn $ MP.errorBundlePretty errBundle
-    Right _ -> putStrLn $ checkOpts.input <> ": OK"
+    Right orgDoc -> do
+      putStrLn $ checkOpts.input <> ": OK"
+      when (globalOpts.verbose) $ do
+        let prettyPrint =
+              if globalOpts.color
+                then PP.pPrint
+                else PP.pPrintNoColor
+        prettyPrint orgDoc
 
 type GlobalOpts :: Type
 data GlobalOpts = GlobalOpts
-  { subcommand :: Subcommand
+  { subcommand :: Subcommand,
+    color :: Bool,
+    verbose :: Bool
   }
 
 type Subcommand :: Type
@@ -104,6 +117,20 @@ programOptions :: OptionHandler GlobalOpts
 programOptions =
   GlobalOpts
     <$> subcommandHandler
+    <*> ( flag
+            True
+            False
+            ( long "no-color"
+                <> help "do not print in color (i.e., suppress ANSI escape codes)"
+            )
+        )
+    <*> ( flag
+            False
+            True
+            ( long "verbose"
+                <> help "be more descriptive about what's happening"
+            )
+        )
 
 subcommandHandler :: OptionHandler Subcommand
 subcommandHandler =
