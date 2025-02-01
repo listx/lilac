@@ -88,7 +88,7 @@ lilacCheck globalOpts checkOpts = do
       when (globalOpts.verbose) $ do
         let prettyPrint =
               if globalOpts.color
-                then PP.pPrint
+                then PP.pPrintForceColor
                 else PP.pPrintNoColor
         prettyPrint orgDoc
 
