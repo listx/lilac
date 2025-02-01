@@ -332,7 +332,14 @@ skipNewlinesAndComments =
     blockCommentParser
   where
     whiteSpaceParser :: OrgParser ()
-    whiteSpaceParser = void $ MP.takeWhile1P (Just "newline") (== '\n')
+    whiteSpaceParser = do
+      _ <- MP.takeWhile1P (Just "newline") (== '\n')
+      orgParserState <- get
+      _ <-
+        MP.optional
+          . MP.label "indentation for next thing"
+          $ MP.count orgParserState.continuationIndent (char ' ')
+      pure ()
     singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = L.skipLineComment "# "
     blockCommentParser :: OrgParser ()
@@ -1147,6 +1154,10 @@ tableLineParser = do
   _ <- string "|-"
   _ <- MP.takeWhile1P (Just "table line characters") isTableLineChar
   _ <- char '\n'
+  orgParserState <- get
+  _ <-
+    MP.label "indentation for next table line"
+      $ MP.count orgParserState.continuationIndent (char ' ')
   pure []
   where
     isTableLineChar c = c == '-' || c == '+' || c == '|'
@@ -1157,6 +1168,11 @@ tableRowParser = do
   _ <- MP.takeWhile1P (Just "table whitespace") (== ' ')
   tableCells <- MP.some tableCellParser
   _ <- char '\n'
+  orgParserState <- get
+  _ <-
+    MP.optional
+      . MP.label "indentation for next table line"
+      $ MP.count orgParserState.continuationIndent (char ' ')
   pure tableCells
 
 tableCellParser :: OrgParser Prose

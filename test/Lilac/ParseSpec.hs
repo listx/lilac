@@ -691,6 +691,146 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
+
+    p
+      "parses tables (plays nicely with lists)"
+      "test/Lilac/ParseSpec/0012-tables-inside-lists"
+      L.OrgDoc
+        { cells =
+            [ L.CListItem
+                [ L.LOrderedStart,
+                  L.LItemStart
+                ],
+              L.CParagraph
+                [ L.PTokenStyledText
+                    ( L.StyledText
+                        { body = "foo",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              L.CTable
+                L.Table
+                  { meta =
+                      fromList
+                        [ ("name", "tbl:famous-equations"),
+                          ("bar", "baz")
+                        ],
+                    grid =
+                      fromList
+                        [ ( (1, 1),
+                            [ L.PTokenStyledText
+                                ( L.StyledText
+                                    { body = "Name",
+                                      style = L.styleMaskFrom []
+                                    }
+                                )
+                            ]
+                          ),
+                          ( (1, 2),
+                            [ L.PTokenStyledText
+                                ( L.StyledText
+                                    { body = "Equation",
+                                      style = L.styleMaskFrom []
+                                    }
+                                )
+                            ]
+                          ),
+                          ( (1, 3),
+                            [ L.PTokenStyledText
+                                ( L.StyledText
+                                    { body = "Link",
+                                      style = L.styleMaskFrom []
+                                    }
+                                )
+                            ]
+                          ),
+                          ( (2, 1),
+                            []
+                          ),
+                          ( (3, 1),
+                            [ L.PTokenStyledText
+                                ( L.StyledText
+                                    { body = "Pythagoras | Foo",
+                                      style = L.styleMaskFrom []
+                                    }
+                                )
+                            ]
+                          ),
+                          ( (3, 2),
+                            [ L.PTokenMathFragment
+                                ( L.MathFragment
+                                    { meta = fromList [],
+                                      body = "a^2 + b^2 = c^2"
+                                    }
+                                )
+                            ]
+                          ),
+                          ( (3, 3),
+                            [ L.PTokenLink
+                                ( L.Link
+                                    { typ = L.LinkExternal,
+                                      target = "https://en.wikipedia.org/wiki/Pythagorean_theorem",
+                                      name =
+                                        [ L.StyledText
+                                            { body = "Wiki",
+                                              style = L.styleMaskFrom []
+                                            }
+                                        ]
+                                    }
+                                )
+                            ]
+                          ),
+                          ( (4, 1),
+                            [ L.PTokenStyledText
+                                ( L.StyledText
+                                    { body = "Albert ",
+                                      style = L.styleMaskFrom []
+                                    }
+                                ),
+                              L.PTokenStyledText
+                                ( L.StyledText
+                                    { body = "Einstein",
+                                      style = L.styleMaskFrom [L.Bold]
+                                    }
+                                )
+                            ]
+                          ),
+                          ( (4, 2),
+                            [ L.PTokenMathFragment
+                                ( L.MathFragment
+                                    { meta = fromList [],
+                                      body = "E = mc^2"
+                                    }
+                                )
+                            ]
+                          ),
+                          ( (4, 3),
+                            [ L.PTokenLink
+                                ( L.Link
+                                    { typ = L.LinkExternal,
+                                      target = "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
+                                      name =
+                                        [ L.StyledText
+                                            { body = "Wiki",
+                                              style = L.styleMaskFrom []
+                                            }
+                                        ]
+                                    }
+                                )
+                            ]
+                          )
+                        ]
+                  },
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LOrderedEnd
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
     p
       "parses links (target only)"
       "test/Lilac/ParseSpec/0006-links"
