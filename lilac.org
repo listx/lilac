@@ -975,7 +975,7 @@ executable lilac
       TemplateHaskell
   ghc-options:
       <<GHC warning flags>>
-      -threaded -rtsopts -with-rtsopts=-N
+      <<GHC threaded flags>>
   build-depends:
       base >=4.7 && <5
     , lilac
@@ -997,7 +997,7 @@ test-suite spec
       <<Default GHC extensions>>
   ghc-options:
       <<GHC warning flags>>
-      -threaded -rtsopts -with-rtsopts=-N
+      <<GHC threaded flags>>
   build-depends:
       base >=4.7 && <5
     , containers
@@ -1077,6 +1077,34 @@ pursuing in this program.
 #+header: :noweb-ref GHC warning flags
 #+begin_src txt
 -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode
+#+end_src
+
+*** GHC threaded runtime flags
+
+The ~-threaded~ flag links the executable with the threaded runtime, which can
+manage multiple OS threads (as opposed to the default runtime which is
+single-threaded).
+
+#+header: :noweb-ref GHC threaded flags
+#+begin_src txt
+-threaded
+#+end_src
+
+The ~-rtsopts~ option allows the processing of RTS control options given either
+on the command line or via the =GHCRTS= environment variable.
+
+#+header: :noweb-ref GHC threaded flags
+#+begin_src txt
+-rtsopts
+#+end_src
+
+The ~-with-rtsopts=-N~ option lets the runtime choose how many simultaneous
+threads to use (at runtime). Typically this means using all cores on the
+machines.
+
+#+header: :noweb-ref GHC threaded flags
+#+begin_src txt
+-with-rtsopts=-N
 #+end_src
 
 *** Language edition
