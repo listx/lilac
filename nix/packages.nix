@@ -1,4 +1,4 @@
-{ pkgs, compiler, }:
+{ pkgs, compiler, lilac_git_version }:
 let
   lib = pkgs.lib;
 
@@ -39,7 +39,10 @@ let
           "--ghc-option=-fwhole-archive-hs-libs");
     in lib.pipe pkg confFns;
 
-  # Create your own setup using the choosen GHC version (in the config) as a starting point
+  # Create your own setup using the choosen GHC version (in the config) as a starting point.
+  #
+  # ourHaskell is the attrset of all Haskell packages, including our own "lilac"
+  # attrset.
   ourHaskell = let
     # https://github.com/pwm/nixkell#direct-hackagegithub-dependencies
     depsFromDir = hlib.packagesFromDirectory { directory = ./packages; };
@@ -80,10 +83,24 @@ let
 
   scripts = import ./scripts.nix { inherit pkgs; };
 in {
-  inherit conf ourHaskell ghc confPkg; # TODO: remove
+  # We don't need these attrsets here to build Lilac. We only need "bin" for
+  # building Lilac (release.nix) and "shell" for setting up the environment
+  # (shell.nix). However they are kept here for debugging purposes in "nix
+  # repl". Nix is lazy so exposing these additional attrsets does not cost us
+  # anything.
+  inherit conf ourHaskell ghc confPkg;
 
-  bin = ourHaskell.lilac;
+  # Derivation for Lilac (packaged up and ready to go; inspect it with
+  # builtins.attrNames in "nix repl").
+  bin = ourHaskell.lilac.overrideAttrs (drv: {
+    buildPhase = ''
+      export LILAC_GIT_VERSION=${lilac_git_version}
+      echo "Using LILAC_GIT_VERSION $LILAC_GIT_VERSION"
+    '' + drv.buildPhase or "";
+  });
 
+  # Derivation for the shell environment. This is fed into "pkgs.mkShell" to
+  # give us the final shell environment.
   shell = pkgs.buildEnv {
     name = "lilac-env";
     paths = [ ghc ] ++ haskellTools ++ tools ++ scripts ++ [ tex ];

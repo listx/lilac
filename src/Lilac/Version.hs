@@ -16,7 +16,6 @@ import Relude
     ($),
     (/=),
     (<$>),
-    (<>),
     (=<<),
   )
 import System.Environment (lookupEnv)
@@ -33,12 +32,22 @@ getCombinedVersion = do
 
 getGitVersion :: IO String
 getGitVersion = do
-  maybeProjectRoot <- lookupEnv "LILAC_PROJECT_ROOT"
-  let changeDir = case maybeProjectRoot of
-        Just projectRoot -> ["-C", projectRoot]
-        Nothing -> []
-      cmd = changeDir <> ["describe", "--abbrev=10", "--always", "--dirty"]
-  readProcess "git" cmd ""
+  -- LILAC_GIT_VERSION is used in nix-build. In a nix-build, we cannot use
+  -- LILAC_PROJECT_ROOT because the nix-build process (or its "git" subprocess)
+  -- won't have permission to enter the LILAC_PROJECT_ROOT.
+  maybeGitVersion <- lookupEnv "LILAC_GIT_VERSION"
+  case maybeGitVersion of
+    Just version -> pure version
+    Nothing -> do
+      -- LILAC_PROJECT_ROOT is used by cabal.
+      maybeProjectRoot <- lookupEnv "LILAC_PROJECT_ROOT"
+      case maybeProjectRoot of
+        Just projectRoot ->
+          readProcess
+            "git"
+            ["-C", projectRoot, "describe", "--abbrev=10", "--always", "--dirty"]
+            ""
+        Nothing -> pure "unknown"
 
 getTimestamp :: IO String
 getTimestamp = show <$> getZonedTime

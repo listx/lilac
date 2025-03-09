@@ -1,4 +1,4 @@
-{ sources, compiler, }: [
+{ sources, compiler, lilac_git_version }: [
   (final: prev: {
     inherit (import sources.gitignore { inherit (prev) lib; }) gitignoreFilter;
   })
@@ -6,6 +6,7 @@
     lilac = import ./packages.nix {
       pkgs = prev;
       inherit compiler;
+      inherit lilac_git_version;
     };
   })
 ]

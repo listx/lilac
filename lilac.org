@@ -44,6 +44,8 @@ in pkgs.mkShell {
   buildInputs = [ pkgs.lilac.shell ];
   shellHook = ''
     export LD_LIBRARY_PATH=${pkgs.lilac.shell}/lib:$LD_LIBRARY_PATH
+    # Used when building with cabal.
+    export LILAC_PROJECT_ROOT=$PWD
     logo
   '';
 }
@@ -105,8 +107,9 @@ folder.
 
 #+header: :tangle nix/release.nix
 #+begin_src nix
-{ system ? builtins.currentSystem, compiler ? null, }:
-let pkgs = import ./. { inherit system compiler; };
+{ system ? builtins.currentSystem, compiler ? null
+, lilac_git_version ? "unknown" }:
+let pkgs = import ./. { inherit system compiler lilac_git_version; };
 in pkgs.lilac
 #+end_src
 
@@ -116,12 +119,13 @@ The =default.nix= is the default file used when invoking =nix-build .= (just as 
 
 #+header: :tangle nix/default.nix
 #+begin_src nix
-{ system, compiler, }:
+{ system, compiler, lilac_git_version }:
 let sources = import ./sources.nix;
 in import sources.nixpkgs {
   inherit system;
   config = { };
-  overlays = import ./overlays.nix { inherit sources compiler; };
+  overlays =
+    import ./overlays.nix { inherit sources compiler lilac_git_version; };
 }
 #+end_src
 
@@ -130,7 +134,7 @@ modified by us.
 
 #+header: :tangle nix/overlays.nix
 #+begin_src nix
-{ sources, compiler, }: [
+{ sources, compiler, lilac_git_version }: [
   (final: prev: {
     inherit (import sources.gitignore { inherit (prev) lib; }) gitignoreFilter;
   })
@@ -138,6 +142,7 @@ modified by us.
     lilac = import ./packages.nix {
       pkgs = prev;
       inherit compiler;
+      inherit lilac_git_version;
     };
   })
 ]
@@ -148,7 +153,7 @@ for its =conf= variable.
 
 #+header: :tangle nix/packages.nix
 #+begin_src nix
-{ pkgs, compiler, }:
+{ pkgs, compiler, lilac_git_version }:
 let
   lib = pkgs.lib;
 
@@ -189,7 +194,10 @@ let
           "--ghc-option=-fwhole-archive-hs-libs");
     in lib.pipe pkg confFns;
 
-  # Create your own setup using the choosen GHC version (in the config) as a starting point
+  # Create your own setup using the choosen GHC version (in the config) as a starting point.
+  #
+  # ourHaskell is the attrset of all Haskell packages, including our own "lilac"
+  # attrset.
   ourHaskell = let
     # https://github.com/pwm/nixkell#direct-hackagegithub-dependencies
     depsFromDir = hlib.packagesFromDirectory { directory = ./packages; };
@@ -230,10 +238,24 @@ let
 
   scripts = import ./scripts.nix { inherit pkgs; };
 in {
-  inherit conf ourHaskell ghc confPkg; # TODO: remove
+  # We don't need these attrsets here to build Lilac. We only need "bin" for
+  # building Lilac (release.nix) and "shell" for setting up the environment
+  # (shell.nix). However they are kept here for debugging purposes in "nix
+  # repl". Nix is lazy so exposing these additional attrsets does not cost us
+  # anything.
+  inherit conf ourHaskell ghc confPkg;
 
-  bin = ourHaskell.lilac;
+  # Derivation for Lilac (packaged up and ready to go; inspect it with
+  # builtins.attrNames in "nix repl").
+  bin = ourHaskell.lilac.overrideAttrs (drv: {
+    buildPhase = ''
+      export LILAC_GIT_VERSION=${lilac_git_version}
+      echo "Using LILAC_GIT_VERSION $LILAC_GIT_VERSION"
+    '' + drv.buildPhase or "";
+  });
 
+  # Derivation for the shell environment. This is fed into "pkgs.mkShell" to
+  # give us the final shell environment.
   shell = pkgs.buildEnv {
     name = "lilac-env";
     paths = [ ghc ] ++ haskellTools ++ tools ++ scripts ++ [ tex ];
@@ -363,8 +385,11 @@ working order.
 
 #+header: :noweb-ref Build lilac
 #+begin_src makefile
+LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
 build-release: lilac.org lilac.cabal
-	nix-build ./nix/release.nix --argstr compiler <<GHC version>>
+	nix-build ./nix/release.nix \
+	  --argstr compiler <<GHC version>> \
+	  --argstr lilac_git_version $(LILAC_GIT_VERSION)
 #+end_src
 
 *** Run linters
@@ -6253,7 +6278,7 @@ main = do
     versionOption =
       let cabalVersion = version
        in infoOption
-            (concat [showVersion cabalVersion, "-g", $(lilacVersion)])
+            (concat [showVersion cabalVersion, "-", $(lilacVersion)])
             (long "version" <> short 'v' <> help "Show version")
 #+end_src
 
@@ -6444,7 +6469,6 @@ import Relude
     ($),
     (/=),
     (<$>),
-    (<>),
     (=<<),
   )
 import System.Environment (lookupEnv)
@@ -6461,12 +6485,22 @@ getCombinedVersion = do
 
 getGitVersion :: IO String
 getGitVersion = do
-  maybeProjectRoot <- lookupEnv "LILAC_PROJECT_ROOT"
-  let changeDir = case maybeProjectRoot of
-        Just projectRoot -> ["-C", projectRoot]
-        Nothing -> []
-      cmd = changeDir <> ["describe", "--abbrev=10", "--always", "--dirty"]
-  readProcess "git" cmd ""
+  -- LILAC_GIT_VERSION is used in nix-build. In a nix-build, we cannot use
+  -- LILAC_PROJECT_ROOT because the nix-build process (or its "git" subprocess)
+  -- won't have permission to enter the LILAC_PROJECT_ROOT.
+  maybeGitVersion <- lookupEnv "LILAC_GIT_VERSION"
+  case maybeGitVersion of
+    Just version -> pure version
+    Nothing -> do
+      -- LILAC_PROJECT_ROOT is used by cabal.
+      maybeProjectRoot <- lookupEnv "LILAC_PROJECT_ROOT"
+      case maybeProjectRoot of
+        Just projectRoot ->
+          readProcess
+            "git"
+            ["-C", projectRoot, "describe", "--abbrev=10", "--always", "--dirty"]
+            ""
+        Nothing -> pure "unknown"
 
 getTimestamp :: IO String
 getTimestamp = show <$> getZonedTime

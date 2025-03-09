@@ -64,7 +64,7 @@ main = do
     versionOption =
       let cabalVersion = version
        in infoOption
-            (concat [showVersion cabalVersion, "-g", $(lilacVersion)])
+            (concat [showVersion cabalVersion, "-", $(lilacVersion)])
             (long "version" <> short 'v' <> help "Show version")
 
 lilac :: GlobalOpts -> IO ()
