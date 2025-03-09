@@ -11,7 +11,7 @@ let
 
   ghcVersion = if compiler != null then compiler else conf.ghc.version;
 
-  ghcVer = "ghc" + util.removeChar "." ghcVersion;
+  ghcVer = "ghc" + lib.replaceStrings [ "." ] [ "" ] ghcVersion;
 
   hlib = pkgs.haskell.lib;
 

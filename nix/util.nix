@@ -1,29 +1,4 @@
 { pkgs, lib, gitignoreFilter, }: {
-  /* Check whether a given list has an element
-
-     > has "b" [ "a" "b" "c" ]
-     true
-     > has "d" [ "a" "b" "c" ]
-     false
-  */
-  has = e: xs: lib.any (x: x == e) xs;
-
-  /* Remove an element from a list
-
-     > remove "b" ["a" "b" "c"]
-     [ "a" "c" ]
-     > remove "d" ["a" "b" "c"]
-     [ "a" "b" "c" ]
-  */
-  remove = e: builtins.filter (x: e != x);
-
-  /* Remove dots from strings
-
-     > removeChar "." "9.2.3"
-     "923"
-  */
-  removeChar = c: s: lib.replaceStrings [ c ] [ "" ] s;
-
   /* Given a package return its derivation
 
      > getDrv "haskellPackages.implicit-hie"
