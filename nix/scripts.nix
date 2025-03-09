@@ -1,4 +1,5 @@
-{pkgs}: let
+{ pkgs }:
+let
   logo = pkgs.writeShellScriptBin "logo" ''
     set -euo pipefail
     echo -e "\n$(tput setaf 4)"
@@ -9,4 +10,4 @@
     set -euo pipefail
     result/bin/lilac "$@"
   '';
-in [logo lilac]
+in [ logo lilac ]

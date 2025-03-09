@@ -1,7 +1,5 @@
-{
-  pkgs,
-  compiler,
-}: let
+{ pkgs, compiler, }:
+let
   lib = pkgs.lib;
 
   util = import ./util.nix {
@@ -11,22 +9,16 @@
 
   conf = lib.importTOML ../lilac.toml;
 
-  ghcVersion =
-    if compiler != null
-    then compiler
-    else conf.ghc.version;
+  ghcVersion = if compiler != null then compiler else conf.ghc.version;
 
   ghcVer = "ghc" + util.removeChar "." ghcVersion;
 
   hlib = pkgs.haskell.lib;
 
-  confPkg = pkg: let
-    usingOr = x: b:
-      if conf.ghc ? ${x}
-      then conf.ghc.${x}
-      else b;
-    confFns =
-      [
+  confPkg = pkg:
+    let
+      usingOr = x: b: if conf.ghc ? ${x} then conf.ghc.${x} else b;
+      confFns = [
         hlib.dontHyperlinkSource
         hlib.dontCoverage
         hlib.dontHaddock
@@ -37,20 +29,20 @@
           "--ghc-option=-n2m" # allocation area chunksize
           "--ghc-option=-RTS"
         ])
-      ]
-      ++ pkgs.lib.optional (! (usingOr "optimise" true)) hlib.disableOptimization
-      ++ pkgs.lib.optional (usingOr "profiling" false) hlib.enableExecutableProfiling
-      ++ pkgs.lib.optional (usingOr "benckmark" false) hlib.doBenchmark
-      ++ pkgs.lib.optional pkgs.stdenv.isAarch64 (hlib.compose.appendConfigureFlag "--ghc-option=-fwhole-archive-hs-libs");
-  in
-    lib.pipe pkg confFns;
+      ] ++ pkgs.lib.optional (!(usingOr "optimise" true))
+        hlib.disableOptimization
+        ++ pkgs.lib.optional (usingOr "profiling" false)
+        hlib.enableExecutableProfiling
+        ++ pkgs.lib.optional (usingOr "benckmark" false) hlib.doBenchmark
+        ++ pkgs.lib.optional pkgs.stdenv.isAarch64
+        (hlib.compose.appendConfigureFlag
+          "--ghc-option=-fwhole-archive-hs-libs");
+    in lib.pipe pkg confFns;
 
   # Create your own setup using the choosen GHC version (in the config) as a starting point
   ourHaskell = let
     # https://github.com/pwm/nixkell#direct-hackagegithub-dependencies
-    depsFromDir = hlib.packagesFromDirectory {
-      directory = ./packages;
-    };
+    depsFromDir = hlib.packagesFromDirectory { directory = ./packages; };
 
     manual = hfinal: hprev: {
       lilac = let
@@ -59,50 +51,34 @@
           files = conf.ignore.files;
           paths = conf.ignore.paths;
         };
-      in
-        confPkg (hprev.callCabal2nix "lilac" cleanSource {});
+      in confPkg (hprev.callCabal2nix "lilac" cleanSource { });
     };
-  in
-    pkgs.haskell.packages.${ghcVer}.extend (
-      lib.composeManyExtensions [
-        depsFromDir
-        manual
-      ]
-    );
+  in pkgs.haskell.packages.${ghcVer}.extend
+  (lib.composeManyExtensions [ depsFromDir manual ]);
 
   # Add our package with its dependencies to GHC
   ghc = ourHaskell.ghc.withPackages (_:
     hlib.getHaskellBuildInputs (
       # Tell getHaskellBuildInputs to include benchmarkHaskellDepends
       # so that they are available in the shell for cabal to use them
-      hlib.doBenchmark ourHaskell.lilac
-    ));
+      hlib.doBenchmark ourHaskell.lilac));
 
   # Compile haskell tools with ourHaskell to ensure compatibility
-  haskellTools = builtins.map (p: ourHaskell.${lib.removePrefix "haskellPackages." p}) conf.env.haskell_tools;
+  haskellTools =
+    builtins.map (p: ourHaskell.${lib.removePrefix "haskellPackages." p})
+    conf.env.haskell_tools;
 
   tools = builtins.map util.getDrv conf.env.tools;
 
   # See https://nixos.wiki/wiki/TexLive for customizing texlive packages
   # (picking only those packages we need as in here).
   tex = pkgs.texlive.combine {
-    inherit
-      (pkgs.texlive)
-      scheme-basic
-      dvisvgm
-      etoolbox
-      fontspec
-      hyperref
-      luatex85
-      metafont
-      pgf
-      sourcesanspro
-      standalone
-      xkeyval
-      ;
+    inherit (pkgs.texlive)
+      scheme-basic dvisvgm etoolbox fontspec hyperref luatex85 metafont pgf
+      sourcesanspro standalone xkeyval;
   };
 
-  scripts = import ./scripts.nix {inherit pkgs;};
+  scripts = import ./scripts.nix { inherit pkgs; };
 in {
   inherit conf ourHaskell ghc confPkg; # TODO: remove
 
@@ -110,6 +86,6 @@ in {
 
   shell = pkgs.buildEnv {
     name = "lilac-env";
-    paths = [ghc] ++ haskellTools ++ tools ++ scripts ++ [tex];
+    paths = [ ghc ] ++ haskellTools ++ tools ++ scripts ++ [ tex ];
   };
 }
