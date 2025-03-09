@@ -1,4 +1,4 @@
-#+title: Lilac (version 2)
+#+title: Lilac
 
 # Set default header argument for all code blocks. The "no-export" means
 # that we do not expand noweb references when exporting (weaving) --- the fact
@@ -9,186 +9,9 @@
 
 * Introduction
 
-Lilac v1 (LV1) is an Org extension, in that it does all of its work as
-Emacs Lisp on top of Org.
-
-Lilac v2 (LV2) is a native program which understands a strict subset of Org and
-which runs very fast. Notably, it can tangle [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][Noweb]] references and also weave
-HTML in under a second for all but the largest Org files. This speed allows us
-to have rapid feedback.
-
-We say /strict/ subset because we often require things to be a certain way,
-whereas Org can be more generous. For example, Lilac requires all internal links
-to be named uniquely whereas Org does not.
-
-** Motivation
-
-Although LV1 can fix most of the nondeterminism issues of Org, the Org HTML
-export can still be very slow. It can take 10+ seconds on large documents.
-Performance is the main reason for LV2.
-
-The other problem with Org is that the syntax highlighting of code blocks
-only works properly if you are exporting to HTML interactively. If you use Emacs
-in batch mode (non-interactively), the syntax highlighting won't work.
-
-Yet another problem is that tangling doesn't work very well with =#+include=
-statements; that is, if you use =#+include= you must tangle each included file
-separately from the main one.
-
-LV2 is designed to fix these shortcomings, while still using Org's syntax;
-this way users can edit Org files in Emacs and still enjoy most of the benefits
-of using Org interactively for day-to-day writing.
-
-** Why not extend Pandoc?
-
-Tangling code is beyond the scope of Pandoc.
-
-** Why not use org-parser?
-
-[[https://github.com/200ok-ch/org-parser/issues/56][Performance is too slow.]]
-
-* Differences with vanilla Org
-
-** Org subset
-
-We only support a subset of Org, just enough to make it viable for doing
-Literate Programming with Noweb references. Many of Org's other features like
-timestamps and planning lines (TODO keyword, etc) are not given special meaning
-during parsing (they will be output as plain text without any styling during
-export).
-
-We also do not support non-math Latex fragments (vanilla Org supports [[https://orgmode.org/manual/LaTeX-fragments.html][non-math
-Latex fragments]]).
-
-We support escaping formatting characters, as seen in
-[[test:0005-styled-strings-ignore-marker-inside-word]].
-
-** Tangling
-
-*** =#+include= support
-
-Org does not support including other files when tangling. That is, if you
-=#+include= other Org files into a bigger Org file, and tangle the bigger one, the
-nested Org files' code blocks do not get tangled.
-
-LV2 supports this.
-
-** Noweb behaviors
-
-*** Padding between Noweb references
-
-Org supports adding blank lines between tangled source code blocks that share
-the same path name with the [[https://orgmode.org/manual/Extracting-Source-Code.html][=padline= header argument]]; and by default a blank
-line is used to separate those blocks. However, concatenation of Noweb
-references that share the same name do not get a blank line added between them,
-unless =noweb-sep: "\n\n"= is used. In Lilac this is the default behavior.
-
-For example, a blank line is inserted between =foo= and =bar= and =bar= and =baz=:
-
-#+header: :tangle doc/tangling-padline.txt
-#+begin_src txt
-foo
-#+end_src
-
-#+header: :tangle doc/tangling-padline.txt
-#+begin_src txt
-bar
-#+end_src
-
-#+header: :tangle doc/tangling-padline.txt
-#+begin_src txt
-baz
-#+end_src
-
-And to get the same blank lines inserted for the following case using =Noweb
-chunk= as a Noweb reference, users in vanilla Org have to use =:noweb-sep "\n\n"=
-as a header argument:
-
-#+header: :tangle doc/tangling-padline-noweb.txt
-#+begin_src txt
-<<Noweb chunk>>
-#+end_src
-
-#+header: :noweb-ref Noweb chunk
-#+header: :noweb-sep "\n\n"
-#+begin_src txt
-foo
-#+end_src
-
-#+header: :noweb-ref Noweb chunk
-#+header: :noweb-sep "\n\n"
-#+begin_src txt
-bar
-#+end_src
-
-#+header: :noweb-ref Noweb chunk
-#+begin_src txt
-baz
-#+end_src
-
-In Lilac these =:noweb-sep= headers are unnecessary.
-
-** Weaving
-
-*** HTML only
-
-We only support weaving HTML output. Other exporters don't exist yet.
-
-*** Noweb expansion disabled
-
-Noweb references are never expanded during weaving. This is equivalent to the
-=no-export= option described at
-https://orgmode.org/manual/Noweb-Reference-Syntax.html.
-
-* Design
-
-** Language and libraries
-
-We use Haskell for speed and Megaparsec for parsing Org syntax.
-
-** Features
-
-  - HTML export
-
-  - syntax highlighting for code blocks
-
-  - internal link checker (checks if links to headings and other files are
-    broken)
-
-** Summary of main parts
-
-*** Org parser
-
-This step parses the raw =.org= text into something more usable. These data
-structures remain the source of truth for all subsequent operations.
-
-*** Input validation
-
-The first step before doing anything is to check that the input conforms to our
-expectations. If there are any problems, we say so during parsing and reject the
-input.
-
-*** Tangling
-
-Tangling requires two main things:
-
-  1) finding all =:tangle= targets defined in code blocks
-
-  2) expanding all Noweb references
-
-The second step involves doing a topological sort, so that we know which
-reference we can expand first.
-
-*** Weaving
-
-Weaving requires adding markup to the output so that things get displayed in an
-aesthetically pleasing way. This part isn't very interesting and is quite
-mechanical.
-
-**** Split output
-
-We allow the user to specify whether they want the entire Org file to be
-woven as a single HTML page, or as a collection of smaller pages.
+This is Lilac, a performance-minded rewrite of an [[https://github.com/listx/lilac][Emacs Lisp extension of the
+same name]]. It is written in Haskell, and is designed specifically for Literate
+Programming (using [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][Noweb]] references).
 
 * Implementation
 
@@ -6721,8 +6544,8 @@ The tests are discovered by Hspec automatically.
 {-# OPTIONS_GHC -F -pgmF hspec-discover #-}
 #+end_src
 
-* Housekeeping
-** .gitignore
+** Housekeeping
+*** .gitignore
 
 #+header: :tangle .gitignore
 #+begin_src gitignore
@@ -6734,13 +6557,6 @@ dist-newstyle
 result*
 *~
 #+end_src
-
-* Future work
-
-** Propagation of PROPERTIES metadata to subtrees
-
-For example, we'd like to be able to turn off Noweb links for all blocks in a
-subtree instead of doing it per-block, as in [[test:0007-blocks-noweb-off]].
 
 * Footnotes
 
