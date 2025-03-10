@@ -856,6 +856,18 @@ pursuing in this program.
 -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode
 #+end_src
 
+**** Missing specialisations
+
+These warnings are not really useful for us because we don't (as of yet) care
+too much about performance. Plus they seem to be about library functions we are
+importing.
+
+#+header: :noweb-ref GHC warning flags
+#+begin_src txt
+-Wno-missed-specialisations
+-Wno-all-missed-specialisations
+#+end_src
+
 *** GHC threaded runtime flags
 
 The ~-threaded~ flag links the executable with the threaded runtime, which can
