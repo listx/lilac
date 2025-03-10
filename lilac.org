@@ -383,6 +383,7 @@ Another option is to build with Nix, which wraps everything up for public
 consumption. This allows us to check locally that our Nix build pipeline is in
 working order.
 
+#+name: Makefile:build-release
 #+header: :noweb-ref Build lilac
 #+begin_src makefile
 LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
@@ -6440,15 +6441,20 @@ abstracted away by =Options.Applicative=.
 
 *** Git version injection
 
-The code here is our own custom way of invoking the =git= binary needed to extract
-the underlying version information from the Git repo we are in.
-The code drew inspiration from
+We want to inject Git version information (as it was detected during the build)
+into the =lilac= binary.
+
+The traditional way of doing this is with Template Haskell, by invoking =git=
+during compile time. See
 https://stackoverflow.com/questions/5713418/templatehaskell-and-io#comment7962237_5713551
-and https://stackoverflow.com/a/20871010/437583 which explains how to work with
+and https://stackoverflow.com/a/20871010/437583 for an overview of working with
 Template Haskell.
 
-We use a =lilacVersion= which combines Git information with the timestamp of when
-the binary was built.
+However, invoking =git= doesn't work in all cases, especially when building with
+Nix because when Nix builds things it doesn't use the Git repo (it uses a
+sandboxed build environment). So we have to handle both of these cases.
+
+First let's get the imports out of the way.
 
 #+header: :tangle src/Lilac/Version.hs
 #+begin_src haskell
@@ -6483,6 +6489,18 @@ import Relude
 import System.Environment (lookupEnv)
 import System.Process (readProcess)
 
+<<Version functions>>
+
+<<f:getEnv>>
+#+end_src
+
+The entrypoint is [[f:lilacVersion]], which combines Git information with the
+timestamp of when the binary was built. That in turn calls [[f:getGitVersion]] where
+most of the heavy lifting happens.
+
+#+name: f:lilacVersion
+#+header: :noweb-ref Version functions
+#+begin_src haskell
 lilacVersion :: Q Exp
 lilacVersion = stringE =<< runIO getCombinedVersion
 
@@ -6492,18 +6510,62 @@ getCombinedVersion = do
   timestamp <- getTimestamp
   pure $ concat [gitVersion, " (", timestamp, ")"]
 
+getTimestamp :: IO String
+getTimestamp = show <$> getZonedTime
+#+end_src
+
+In [[f:getGitVersion]] we use the continuation monad transformer to make the IO
+computations be able to return early, with ~escapeWith~ (without executing the
+rest of the do-block). ~escapeWith~ itself isn't anything special (we don't define
+it), and it is called an "escape continuation" according to the [[https://hackage.haskell.org/package/transformers-0.6.1.2/docs/Control-Monad-Trans-Cont.html#v:callCC][=transformers=
+library]] and is built into ~ContT~. For our purposes we just know that invoking
+~escapeWith~ means we'll escape the computation early with the provided argument.
+
+#+name: f:getGitVersion
+#+header: :noweb-ref Version functions
+#+begin_src haskell
+getGitVersion :: IO String
+getGitVersion = evalContT $ callCC $ \escapeWith -> do
+<<Try LILAC_GIT_VERSION>>
+<<Try LILAC_PROJECT_ROOT>>
+<<Version fallback>>
+#+end_src
+
+The first thing we check is for ~LILAC_GIT_VERSION~, which is used by =nix-build=.
+Here, we cannot use ~LILAC_PROJECT_ROOT~ because the =nix-build= process (and also
+any child process such as =git=) won't have permission to enter the
+~LILAC_PROJECT_ROOT~.
+
+So instead we have to defer the responsibility of looking up this Git
+information to the build process itself (see [[Makefile:build-release]]). We simply
+read the value of ~LILAC_GIT_VERSION~ and use this string (as long as it's not
+empty) as is.
+
+#+name: Try LILAC_GIT_VERSION
+#+begin_src haskell
+  gitVersion <- lift $ getEnv "LILAC_GIT_VERSION"
+  when (not $ null gitVersion) $ escapeWith gitVersion
+#+end_src
+
+~getEnv~ is a basic helper to look up an environment variable, but which returns
+the empty string if the environment variable was not found.
+
+#+name: f:getEnv
+#+begin_src haskell
 getEnv :: String -> IO String
 getEnv env = fromMaybe "" <$> lookupEnv env
+#+end_src
 
-getGitVersion :: IO String
-getGitVersion = evalContT $ callCC $ \earlyReturn -> do
-  -- LILAC_GIT_VERSION is used in nix-build. In a nix-build, we cannot use
-  -- LILAC_PROJECT_ROOT because the nix-build process (or its "git" subprocess)
-  -- won't have permission to enter the LILAC_PROJECT_ROOT.
-  gitVersion <- lift $ getEnv "LILAC_GIT_VERSION"
-  when (not $ null gitVersion) $ earlyReturn gitVersion
+That's it for the first case of building inside a Nix build process.
 
-  -- LILAC_PROJECT_ROOT is used by cabal.
+If we're not inside a Nix build process (such as in a =cabal= build), we are not
+bound by any of the sandboxing rules involved. So we can invoke the =git= binary
+ourselves. This is what we do below, but only if the ~LILAC_PROJECT_ROOT~ is set.
+Again, we expect the build environment to have set this value to a valid Git
+repository path that houses the Lilac code.
+
+#+name: Try LILAC_PROJECT_ROOT
+#+begin_src haskell
   projectRoot <- lift $ getEnv "LILAC_PROJECT_ROOT"
   when (not $ null projectRoot) $ do
     gitOutput <-
@@ -6512,21 +6574,18 @@ getGitVersion = evalContT $ callCC $ \earlyReturn -> do
           "git"
           ["-C", projectRoot, "describe", "--abbrev=10", "--always", "--dirty"]
           ""
-    earlyReturn gitOutput
-
-  -- Give up if no LILAC_* env var was found.
-  pure "unknown"
-
-getTimestamp :: IO String
-getTimestamp = show <$> getZonedTime
+    escapeWith gitOutput
 #+end_src
 
-The star of the show here is =getGitVersion=. The one advantage it has over
-=tGitInfoCwd= from the [[https://github.com/snoyberg/githash][GitHash]] library is that it can handle the case where the
-build takes place inside a temporary directory that may not be the original Git
-repo, such as in a sandboxed environment, by the use of the =LILAC_PROJECT_ROOT=
-environment variable. Plus, we can control exactly how we invoke =git= by
-supplying the Git CLI flags ourselves.
+Lastly if neither ~LILAC_GIT_VERSION~ nor ~LILAC_PROJECT_ROOT~ were found, we just
+return ~unknown-build-env~. This will never happen as long as our build
+environment is working correctly. Still, it's good to have a fallback that can
+inform the user how this version information came to be.
+
+#+name: Version fallback
+#+begin_src haskell
+  pure "unknown-build-env"
+#+end_src
 
 ** Tests
 

@@ -38,18 +38,13 @@ getCombinedVersion = do
   timestamp <- getTimestamp
   pure $ concat [gitVersion, " (", timestamp, ")"]
 
-getEnv :: String -> IO String
-getEnv env = fromMaybe "" <$> lookupEnv env
+getTimestamp :: IO String
+getTimestamp = show <$> getZonedTime
 
 getGitVersion :: IO String
-getGitVersion = evalContT $ callCC $ \earlyReturn -> do
-  -- LILAC_GIT_VERSION is used in nix-build. In a nix-build, we cannot use
-  -- LILAC_PROJECT_ROOT because the nix-build process (or its "git" subprocess)
-  -- won't have permission to enter the LILAC_PROJECT_ROOT.
+getGitVersion = evalContT $ callCC $ \escapeWith -> do
   gitVersion <- lift $ getEnv "LILAC_GIT_VERSION"
-  when (not $ null gitVersion) $ earlyReturn gitVersion
-
-  -- LILAC_PROJECT_ROOT is used by cabal.
+  when (not $ null gitVersion) $ escapeWith gitVersion
   projectRoot <- lift $ getEnv "LILAC_PROJECT_ROOT"
   when (not $ null projectRoot) $ do
     gitOutput <-
@@ -58,10 +53,8 @@ getGitVersion = evalContT $ callCC $ \earlyReturn -> do
           "git"
           ["-C", projectRoot, "describe", "--abbrev=10", "--always", "--dirty"]
           ""
-    earlyReturn gitOutput
+    escapeWith gitOutput
+  pure "unknown-build-env"
 
-  -- Give up if no LILAC_* env var was found.
-  pure "unknown"
-
-getTimestamp :: IO String
-getTimestamp = show <$> getZonedTime
+getEnv :: String -> IO String
+getEnv env = fromMaybe "" <$> lookupEnv env
