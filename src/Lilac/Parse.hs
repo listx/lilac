@@ -182,6 +182,25 @@ data LinkType
   | LinkExternal
   deriving stock (Eq, Show)
 
+type StyleMask :: Type
+newtype StyleMask = StyleMask Word8
+  deriving stock (Eq)
+
+instance Show StyleMask where
+  show (StyleMask a) = "styleMaskFrom " <> x
+    where
+      x =
+        Prelude.show
+          . catMaybes
+          . map
+            ( \(i, b) ->
+                if b
+                  then (Just $ (toEnum i :: Style))
+                  else Nothing
+            )
+          . zip [0 ..]
+          $ toListLE a
+
 type Block :: Type
 data Block = Block
   { meta :: M.Map T.Text T.Text,
@@ -233,97 +252,6 @@ data Table = Table
   }
   deriving stock (Eq, Show)
 
-parseOrgDoc :: T.Text -> Either T.Text OrgDoc
-parseOrgDoc input = case MP.runParser
-  (runStateT orgDocParser defaultOrgParserState)
-  ""
-  input of
-  Left err -> Left . T.pack $ MP.errorBundlePretty err
-  Right (orgDoc, _orgParserState) -> Right orgDoc
-
-type OrgParser :: Type -> Type
-type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
-
-type OrgParserState :: Type
-data OrgParserState = OrgParserState
-  { styleMask :: StyleMask,
-    listLevels :: [Level],
-    listMarkers :: [ListMarker],
-    continuationIndent :: Int,
-    equationNumber :: Int
-  }
-  deriving stock (Eq, Show)
-
-type StyleMask :: Type
-newtype StyleMask = StyleMask Word8
-  deriving stock (Eq)
-
-instance Show StyleMask where
-  show (StyleMask a) = "styleMaskFrom " <> x
-    where
-      x =
-        Prelude.show
-          . catMaybes
-          . map
-            ( \(i, b) ->
-                if b
-                  then (Just $ (toEnum i :: Style))
-                  else Nothing
-            )
-          . zip [0 ..]
-          $ toListLE a
-
-styleMaskFrom :: [Style] -> StyleMask
-styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
-  where
-    f :: Word8 -> Style -> Word8
-    f acc s = setBit acc (fromEnum s)
-
-maskToStyles :: StyleMask -> [Style]
-maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask
-  where
-    f :: [Style] -> (Int, Bool) -> [Style]
-    f acc (idx, b) =
-      if b
-        then (toEnum idx) : acc
-        else acc
-
-toStyleMask :: (MonadFail m) => [Char] -> m StyleMask
-toStyleMask cs = pure =<< stylesToStyleMask =<< charToStyles cs
-
-charToStyles :: (MonadFail m) => [Char] -> m [Style]
-charToStyles chars = foldlM f [] chars
-  where
-    f :: (MonadFail m) => [Style] -> Char -> m [Style]
-    f acc c = case EM.lookup c styleMap of
-      Just style -> pure (style : acc)
-      Nothing -> fail $ "programmer error: unrecognized style marker " <> (show c)
-
-stylesToStyleMask :: (MonadFail m) => [Style] -> m StyleMask
-stylesToStyleMask ss = pure . StyleMask =<< foldlM f (0 :: Word8) ss
-  where
-    f :: (MonadFail m) => Word8 -> Style -> m Word8
-    f acc s = pure . setBit acc $ fromEnum s
-
-styleMaskFlip :: StyleMask -> StyleMask -> StyleMask
-styleMaskFlip (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
-
-isVerbatim :: StyleMask -> Bool
-isVerbatim (StyleMask a) = testBit a (fromEnum Verbatim)
-
-isCode :: StyleMask -> Bool
-isCode (StyleMask a) = testBit a (fromEnum Code)
-
-defaultOrgParserState :: OrgParserState
-defaultOrgParserState =
-  OrgParserState
-    { styleMask = styleMaskFrom [],
-      listLevels = [],
-      listMarkers = [],
-      continuationIndent = 0,
-      equationNumber = 0
-    }
-
 skipNewlinesAndComments :: OrgParser ()
 skipNewlinesAndComments =
   L.space
@@ -347,6 +275,37 @@ skipNewlinesAndComments =
 
 lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme skipNewlinesAndComments
+
+parseOrgDoc :: T.Text -> Either T.Text OrgDoc
+parseOrgDoc input = case MP.runParser
+  (runStateT orgDocParser defaultOrgParserState)
+  ""
+  input of
+  Left err -> Left . T.pack $ MP.errorBundlePretty err
+  Right (orgDoc, _orgParserState) -> Right orgDoc
+
+type OrgParser :: Type -> Type
+type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
+
+type OrgParserState :: Type
+data OrgParserState = OrgParserState
+  { styleMask :: StyleMask,
+    listLevels :: [Level],
+    listMarkers :: [ListMarker],
+    continuationIndent :: Int,
+    equationNumber :: Int
+  }
+  deriving stock (Eq, Show)
+
+defaultOrgParserState :: OrgParserState
+defaultOrgParserState =
+  OrgParserState
+    { styleMask = styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0
+    }
 
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
@@ -463,6 +422,25 @@ headingParser = do
   where
     spaceConsumer :: OrgParser T.Text
     spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
+
+drawersParser :: OrgParser (Map T.Text T.Text)
+drawersParser = do
+  kvs <- many $ lexeme drawerParser
+  pure $ M.fromList kvs
+
+drawerParser :: OrgParser (T.Text, T.Text)
+drawerParser = do
+  _ <- char ':'
+  drawerName <- MP.takeWhile1P (Just "drawer name") isDrawerLetter
+  _ <- char ':'
+  _ <- char '\n'
+  drawerContents <-
+    MP.manyTill
+      (MP.label "drawer contents" MP.anySingle)
+      (string ":END:\n")
+  pure (drawerName, T.pack drawerContents)
+  where
+    isDrawerLetter c = and $ map ($ c) [(/= '\n'), (/= ':'), (/= ' ')]
 
 proseParser :: OrgParser T.Text -> OrgParser [PToken]
 proseParser spaceConsumer = do
@@ -599,6 +577,47 @@ styledTextParser = do
         && (not $ isSpace c)
         && (not $ c == '\\')
 
+styleMaskFrom :: [Style] -> StyleMask
+styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
+  where
+    f :: Word8 -> Style -> Word8
+    f acc s = setBit acc (fromEnum s)
+
+maskToStyles :: StyleMask -> [Style]
+maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask
+  where
+    f :: [Style] -> (Int, Bool) -> [Style]
+    f acc (idx, b) =
+      if b
+        then (toEnum idx) : acc
+        else acc
+
+toStyleMask :: (MonadFail m) => [Char] -> m StyleMask
+toStyleMask cs = pure =<< stylesToStyleMask =<< charToStyles cs
+
+charToStyles :: (MonadFail m) => [Char] -> m [Style]
+charToStyles chars = foldlM f [] chars
+  where
+    f :: (MonadFail m) => [Style] -> Char -> m [Style]
+    f acc c = case EM.lookup c styleMap of
+      Just style -> pure (style : acc)
+      Nothing -> fail $ "programmer error: unrecognized style marker " <> (show c)
+
+stylesToStyleMask :: (MonadFail m) => [Style] -> m StyleMask
+stylesToStyleMask ss = pure . StyleMask =<< foldlM f (0 :: Word8) ss
+  where
+    f :: (MonadFail m) => Word8 -> Style -> m Word8
+    f acc s = pure . setBit acc $ fromEnum s
+
+styleMaskFlip :: StyleMask -> StyleMask -> StyleMask
+styleMaskFlip (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
+
+isVerbatim :: StyleMask -> Bool
+isVerbatim (StyleMask a) = testBit a (fromEnum Verbatim)
+
+isCode :: StyleMask -> Bool
+isCode (StyleMask a) = testBit a (fromEnum Code)
+
 compressProse :: [PToken] -> [PToken]
 compressProse = reverse . dropUnnecessary . foldl' f []
   where
@@ -715,25 +734,6 @@ mathFragmentInlineParser = do
         body = T.pack latex
       }
 
-drawersParser :: OrgParser (Map T.Text T.Text)
-drawersParser = do
-  kvs <- many $ lexeme drawerParser
-  pure $ M.fromList kvs
-
-drawerParser :: OrgParser (T.Text, T.Text)
-drawerParser = do
-  _ <- char ':'
-  drawerName <- MP.takeWhile1P (Just "drawer name") isDrawerLetter
-  _ <- char ':'
-  _ <- char '\n'
-  drawerContents <-
-    MP.manyTill
-      (MP.label "drawer contents" MP.anySingle)
-      (string ":END:\n")
-  pure (drawerName, T.pack drawerContents)
-  where
-    isDrawerLetter c = and $ map ($ c) [(/= '\n'), (/= ':'), (/= ' ')]
-
 paragraphParser :: OrgParser Cell
 paragraphParser = do
   orgParserState <- get
@@ -766,6 +766,112 @@ paragraphParser = do
       pure ()
     spaces :: OrgParser T.Text
     spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
+
+blockMetaEntryParser :: OrgParser (T.Text, T.Text)
+blockMetaEntryParser = do
+  _ <- string "#+header: :"
+  key <- MP.takeWhile1P (Just "(block meta) keyword letter") isKeywordLetter
+  _ <- char ' '
+  value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
+  _ <- char '\n'
+  pure (key, value)
+  where
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')]
+
+metaNameParser :: OrgParser (T.Text, T.Text)
+metaNameParser = do
+  _ <- string "#+name: "
+  name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
+  pure ("name", name)
+
+blockParser :: OrgParser Cell
+blockParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
+  blockName <- MP.optional metaNameParser
+  metaKVs <- many $ lexeme blockMetaEntryParser
+  _ <- string "#+begin_"
+  blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
+  srcLang <- MP.optional $ do
+    _ <- MP.skipSome $ char ' '
+    src <- MP.takeWhile1P (Just "src language") isSrcLanguageChar
+    pure ("__src_language", src)
+  when (blockType == "src" && srcLang == Nothing)
+    $ fail "block type src requires a language specifier"
+  _ <- char '\n'
+  let nowebOff =
+        (== Just "off")
+          . EM.lookup "noweb"
+          $ M.fromList metaKVs
+  bTokens <-
+    MP.choice
+      [ zeroBTokensParser blockType,
+        someBTokensParser blockType (not nowebOff)
+      ]
+  pure
+    . CBlock
+    $ Block
+      { meta =
+          M.fromList
+            $ (("__block_type", blockType) : metaKVs)
+            <> concatMap maybeToList [blockName, srcLang],
+        body = compressBTokens bTokens
+      }
+  where
+    zeroBTokensParser :: T.Text -> OrgParser [BToken]
+    zeroBTokensParser blockType = do
+      _ <- string $ T.concat ["#+end_", blockType, "\n"]
+      pure []
+    someBTokensParser blockType nowebOn =
+      MP.someTill
+        (bTokenParser (blockType == "src") nowebOn)
+        (string $ T.concat ["\n#+end_", blockType, "\n"])
+    isSrcLanguageChar c = isAsciiLower c || c == '-'
+
+bTokenParser :: Bool -> Bool -> OrgParser BToken
+bTokenParser isSrcBlock nowebOn = MP.choice parsers
+  where
+    baseParsers :: [OrgParser BToken]
+    baseParsers =
+      [ BTokenString <$> (MP.takeWhile1P (Just "block token") (not . isSpace)),
+        BTokenString <$> (MP.takeWhile1P (Just "spaces inside block") isSpace)
+      ]
+    parsers =
+      if isSrcBlock && nowebOn
+        then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
+        else baseParsers
+
+nowebLinkParser :: OrgParser Link
+nowebLinkParser = do
+  linkName <-
+    MP.between
+      (string "<<")
+      (string ">>")
+      ( MP.takeWhile1P
+          (Just "Noweb reference name")
+          isNowebReferenceChar
+      )
+  pure
+    $ Link
+      { typ = LinkNoweb,
+        target = linkName,
+        name =
+          [ StyledText
+              { body = linkName,
+                style = styleMaskFrom []
+              }
+          ]
+      }
+  where
+    isNowebReferenceChar c = c /= '\n' && c /= '>'
+
+compressBTokens :: [BToken] -> [BToken]
+compressBTokens = reverse . foldl' f []
+  where
+    f :: [BToken] -> BToken -> [BToken]
+    f [] token = token : []
+    f ((BTokenString text1) : rest) (BTokenString text2) =
+      (BTokenString $ T.append text1 text2) : rest
+    f acc token = token : acc
 
 listItemsEndParser :: OrgParser Cell
 listItemsEndParser = do
@@ -961,112 +1067,6 @@ listItemFitter level levels' = foldlM f [] levels'
                 Nothing -> [LItemEnd, LUnorderedEnd]
                 Just _ -> [LItemEnd, LOrderedEnd]
           pure $ acc <> newMarkers
-
-blockMetaEntryParser :: OrgParser (T.Text, T.Text)
-blockMetaEntryParser = do
-  _ <- string "#+header: :"
-  key <- MP.takeWhile1P (Just "(block meta) keyword letter") isKeywordLetter
-  _ <- char ' '
-  value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
-  _ <- char '\n'
-  pure (key, value)
-  where
-    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')]
-
-metaNameParser :: OrgParser (T.Text, T.Text)
-metaNameParser = do
-  _ <- string "#+name: "
-  name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
-  pure ("name", name)
-
-blockParser :: OrgParser Cell
-blockParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
-  blockName <- MP.optional metaNameParser
-  metaKVs <- many $ lexeme blockMetaEntryParser
-  _ <- string "#+begin_"
-  blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
-  srcLang <- MP.optional $ do
-    _ <- MP.skipSome $ char ' '
-    src <- MP.takeWhile1P (Just "src language") isSrcLanguageChar
-    pure ("__src_language", src)
-  when (blockType == "src" && srcLang == Nothing)
-    $ fail "block type src requires a language specifier"
-  _ <- char '\n'
-  let nowebOff =
-        (== Just "off")
-          . EM.lookup "noweb"
-          $ M.fromList metaKVs
-  bTokens <-
-    MP.choice
-      [ zeroBTokensParser blockType,
-        someBTokensParser blockType (not nowebOff)
-      ]
-  pure
-    . CBlock
-    $ Block
-      { meta =
-          M.fromList
-            $ (("__block_type", blockType) : metaKVs)
-            <> concatMap maybeToList [blockName, srcLang],
-        body = compressBTokens bTokens
-      }
-  where
-    zeroBTokensParser :: T.Text -> OrgParser [BToken]
-    zeroBTokensParser blockType = do
-      _ <- string $ T.concat ["#+end_", blockType, "\n"]
-      pure []
-    someBTokensParser blockType nowebOn =
-      MP.someTill
-        (bTokenParser (blockType == "src") nowebOn)
-        (string $ T.concat ["\n#+end_", blockType, "\n"])
-    isSrcLanguageChar c = isAsciiLower c || c == '-'
-
-bTokenParser :: Bool -> Bool -> OrgParser BToken
-bTokenParser isSrcBlock nowebOn = MP.choice parsers
-  where
-    baseParsers :: [OrgParser BToken]
-    baseParsers =
-      [ BTokenString <$> (MP.takeWhile1P (Just "block token") (not . isSpace)),
-        BTokenString <$> (MP.takeWhile1P (Just "spaces inside block") isSpace)
-      ]
-    parsers =
-      if isSrcBlock && nowebOn
-        then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
-        else baseParsers
-
-nowebLinkParser :: OrgParser Link
-nowebLinkParser = do
-  linkName <-
-    MP.between
-      (string "<<")
-      (string ">>")
-      ( MP.takeWhile1P
-          (Just "Noweb reference name")
-          isNowebReferenceChar
-      )
-  pure
-    $ Link
-      { typ = LinkNoweb,
-        target = linkName,
-        name =
-          [ StyledText
-              { body = linkName,
-                style = styleMaskFrom []
-              }
-          ]
-      }
-  where
-    isNowebReferenceChar c = c /= '\n' && c /= '>'
-
-compressBTokens :: [BToken] -> [BToken]
-compressBTokens = reverse . foldl' f []
-  where
-    f :: [BToken] -> BToken -> [BToken]
-    f [] token = token : []
-    f ((BTokenString text1) : rest) (BTokenString text2) =
-      (BTokenString $ T.append text1 text2) : rest
-    f acc token = token : acc
 
 mathFragmentNumberedParser :: OrgParser MathFragment
 mathFragmentNumberedParser = do

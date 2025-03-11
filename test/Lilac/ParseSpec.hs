@@ -1113,56 +1113,6 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
-    pf
-      "detects mixed list types (unordered)"
-      "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own"
-      "expected UNORDERED list item at this level"
-      21
-
-    pf
-      "detects mixed list types (ordered)"
-      "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own-ordered"
-      "expected ORDERED list item at this level"
-      23
-
-    pf
-      "detects slightly wrong indentation"
-      "test/Lilac/ParseSpec/0009-lists-require-precise-indentation"
-      "list item: invalid indentation"
-      15
-
-    p
-      "requires blank line separator for list items"
-      "test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator"
-      L.OrgDoc
-        { cells =
-            [ L.CListItem
-                [ L.LOrderedStart,
-                  L.LItemStart
-                ],
-              plainParagraph "a 1) b",
-              L.CListItem
-                [ L.LItemEnd,
-                  L.LOrderedEnd
-                ]
-            ],
-          code = [],
-          codeBlocks = fromList [],
-          meta = fromList []
-        }
-
-    pf
-      "detects non-incrementing ordered list item"
-      "test/Lilac/ParseSpec/0009-ordered-lists-require-increment"
-      "expected incremented list head 2 but got 1"
-      13
-
-    pf
-      "detects invalid initial ordered list number of 2"
-      "test/Lilac/ParseSpec/0009-ordered-lists-start-from-0-or-1"
-      "starting list head number must be 0 or 1; got 20"
-      25
-
     p
       "parses blocks with noweb references"
       "test/Lilac/ParseSpec/0007-blocks-noweb"
@@ -1312,6 +1262,56 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
+
+    pf
+      "detects mixed list types (unordered)"
+      "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own"
+      "expected UNORDERED list item at this level"
+      21
+
+    pf
+      "detects mixed list types (ordered)"
+      "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own-ordered"
+      "expected ORDERED list item at this level"
+      23
+
+    pf
+      "detects slightly wrong indentation"
+      "test/Lilac/ParseSpec/0009-lists-require-precise-indentation"
+      "list item: invalid indentation"
+      15
+
+    p
+      "requires blank line separator for list items"
+      "test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator"
+      L.OrgDoc
+        { cells =
+            [ L.CListItem
+                [ L.LOrderedStart,
+                  L.LItemStart
+                ],
+              plainParagraph "a 1) b",
+              L.CListItem
+                [ L.LItemEnd,
+                  L.LOrderedEnd
+                ]
+            ],
+          code = [],
+          codeBlocks = fromList [],
+          meta = fromList []
+        }
+
+    pf
+      "detects non-incrementing ordered list item"
+      "test/Lilac/ParseSpec/0009-ordered-lists-require-increment"
+      "expected incremented list head 2 but got 1"
+      13
+
+    pf
+      "detects invalid initial ordered list number of 2"
+      "test/Lilac/ParseSpec/0009-ordered-lists-start-from-0-or-1"
+      "starting list head number must be 0 or 1; got 20"
+      25
     pf
       "detects indentation (comment line)"
       "test/Lilac/ParseSpec/0008-indentation-comment"
