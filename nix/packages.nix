@@ -1,108 +1,107 @@
-{ pkgs, compiler, lilac_git_version }:
+{ pkgs, lilacGitVersion }:
 let
-  lib = pkgs.lib;
-
-  util = import ./util.nix {
-    inherit pkgs;
-    inherit (pkgs) lib gitignoreFilter;
+  devShellEnv = pkgs.buildEnv {
+    name = "lilac-devShellEnv";
+    paths = scripts ++ tools ++ [ ghc ];
   };
 
-  conf = lib.importTOML ../lilac.toml;
+  scripts = import ./scripts.nix { inherit pkgs; };
 
-  ghcVersion = if compiler != null then compiler else conf.ghc.version;
-
-  ghcVer = "ghc" + lib.replaceStrings [ "." ] [ "" ] ghcVersion;
+  tools = [
+    pkgs.cabal-install
+    pkgs.niv
+    pkgs.shfmt
+    pkgs.treefmt
+    ourHaskell.nixfmt
+    ourHaskell.ormolu
+  ];
 
   hlib = pkgs.haskell.lib;
+  ghc = ourHaskell.ghc.withPackages
+    (_: hlib.getHaskellBuildInputs ourHaskell.lilac);
 
-  confPkg = pkg:
+  lib = pkgs.lib;
+  ourHaskell = pkgs.haskell.packages.${ghcVersion}.extend
+    (lib.composeManyExtensions haskellOverlays);
+
+  ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.10.1";
+  ghcVersion = "ghc" + ghcVersionWithoutDots;
+
+  haskellOverlays = [ injectLilac tweakLilacBuild ];
+
+  injectLilac = final: prev: {
+    lilac = configureHaskellPkg (prev.callCabal2nix "lilac" lilacSource { });
+  };
+
+  tweakLilacBuild = final: prev: {
+    lilac = prev.lilac.overrideAttrs (drv: {
+      buildPhase = ''
+        export LILAC_GIT_VERSION=${lilacGitVersion}
+        echo "Using LILAC_GIT_VERSION $LILAC_GIT_VERSION"
+      '' + drv.buildPhase;
+    });
+  };
+
+  projectRoot = ../.;
+
+  gnf = import (import ./sources.nix)."gitignore.nix" { inherit lib; };
+  lilacSource = lib.cleanSourceWith {
+    src = projectRoot;
+    name = baseNameOf projectRoot + "-src";
+    filter = let
+      filterFunc = gnf.gitignoreFilterWith {
+        basePath = projectRoot;
+        extraRules = ''
+          .*
+          ,,*.html
+          ,,*.nix
+          ,,*.org
+          ,,*.sh
+          ,,*.toml
+          Makefile
+          image
+          nix
+        '';
+      };
+    in path: type: filterFunc path type;
+  };
+
+  configureHaskellPkg = haskellPkg:
     let
-      usingOr = x: b: if conf.ghc ? ${x} then conf.ghc.${x} else b;
       confFns = [
         hlib.dontHyperlinkSource
         hlib.dontCoverage
         hlib.dontHaddock
-        # https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html
         (hlib.compose.appendConfigureFlags [
           "--ghc-option=+RTS"
-          "--ghc-option=-A256m" # allocation area size
-          "--ghc-option=-n2m" # allocation area chunksize
+          "--ghc-option=-A256m"
+          "--ghc-option=-n2m"
           "--ghc-option=-RTS"
         ])
-      ] ++ pkgs.lib.optional (!(usingOr "optimise" true))
-        hlib.disableOptimization
-        ++ pkgs.lib.optional (usingOr "profiling" false)
-        hlib.enableExecutableProfiling
-        ++ pkgs.lib.optional (usingOr "benckmark" false) hlib.doBenchmark
-        ++ pkgs.lib.optional pkgs.stdenv.isAarch64
-        (hlib.compose.appendConfigureFlag
+      ]
+
+        ++ lib.optional false hlib.disableOptimization
+
+        ++ lib.optional false hlib.enableExecutableProfiling
+
+        ++ lib.optional false hlib.doBenchmark
+
+        ++ lib.optional pkgs.stdenv.isAarch64 (hlib.compose.appendConfigureFlag
           "--ghc-option=-fwhole-archive-hs-libs");
-    in lib.pipe pkg confFns;
 
-  # Create your own setup using the choosen GHC version (in the config) as a starting point.
-  #
-  # ourHaskell is the attrset of all Haskell packages, including our own "lilac"
-  # attrset.
-  ourHaskell = let
-    # https://github.com/pwm/nixkell#direct-hackagegithub-dependencies
-    depsFromDir = hlib.packagesFromDirectory { directory = ./packages; };
-
-    manual = hfinal: hprev: {
-      lilac = let
-        cleanSource = util.filterSrc {
-          path = ../.; # Root of the project
-          files = conf.ignore.files;
-          paths = conf.ignore.paths;
-        };
-      in confPkg (hprev.callCabal2nix "lilac" cleanSource { });
-    };
-  in pkgs.haskell.packages.${ghcVer}.extend
-  (lib.composeManyExtensions [ depsFromDir manual ]);
-
-  # Add our package with its dependencies to GHC
-  ghc = ourHaskell.ghc.withPackages (_:
-    hlib.getHaskellBuildInputs (
-      # Tell getHaskellBuildInputs to include benchmarkHaskellDepends
-      # so that they are available in the shell for cabal to use them
-      hlib.doBenchmark ourHaskell.lilac));
-
-  # Compile haskell tools with ourHaskell to ensure compatibility
-  haskellTools =
-    builtins.map (p: ourHaskell.${lib.removePrefix "haskellPackages." p})
-    conf.env.haskell_tools;
-
-  tools = builtins.map util.getDrv conf.env.tools;
-
-  # See https://nixos.wiki/wiki/TexLive for customizing texlive packages
-  # (picking only those packages we need as in here).
-  tex = pkgs.texlive.combine {
-    inherit (pkgs.texlive)
-      scheme-basic dvisvgm etoolbox fontspec hyperref luatex85 metafont pgf
-      sourcesanspro standalone xkeyval;
-  };
-
-  scripts = import ./scripts.nix { inherit pkgs; };
+    in lib.pipe haskellPkg confFns;
 in {
-  # We don't need these attrsets here to build Lilac. We only need "bin" for
-  # building Lilac (release.nix) and "shell" for setting up the environment
-  # (shell.nix). However they are kept here for debugging purposes in "nix
-  # repl". Nix is lazy so exposing these additional attrsets does not cost us
-  # anything.
-  inherit conf ourHaskell ghc confPkg;
-
-  # Derivation for Lilac (packaged up and ready to go; inspect it with
-  # builtins.attrNames in "nix repl").
-  bin = ourHaskell.lilac.overrideAttrs (drv: {
-    buildPhase = ''
-      export LILAC_GIT_VERSION=${lilac_git_version}
-      echo "Using LILAC_GIT_VERSION $LILAC_GIT_VERSION"
-    '' + drv.buildPhase or "";
-  });
-
   # Derivation for the shell environment. This is fed into "pkgs.mkShell" to
   # give us the final shell environment.
-  shell = pkgs.buildEnv {
-    name = "lilac-env";
-    paths = [ ghc ] ++ haskellTools ++ tools ++ scripts ++ [ tex ];
+  devShell = pkgs.mkShell {
+    buildInputs = [ devShellEnv ];
+    shellHook = ''
+      export LD_LIBRARY_PATH=${devShellEnv}/lib:$LD_LIBRARY_PATH
+      # Used when building with cabal.
+      export LILAC_PROJECT_ROOT=$PWD
+      logo
+    '';
   };
+
+  lilac = ourHaskell.lilac;
 }

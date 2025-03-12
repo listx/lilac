@@ -15,10 +15,6 @@ known_not_tangled=(
 
 	# Images.
 	image/PNG-Gradient.png
-
-	# Will become obsolete when we start pulling in Haskell packages from
-	# Hackage or GitHub directly.
-	nix/packages/.gitkeep
 )
 
 # List all files we explicitly tangle from Org files.

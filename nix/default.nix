@@ -1,8 +1,14 @@
-{ system, compiler, lilac_git_version }:
+{ lilacGitVersion ? "unknown" }:
 let sources = import ./sources.nix;
 in import sources.nixpkgs {
-  inherit system;
+  system = builtins.currentSystem;
   config = { };
-  overlays =
-    import ./overlays.nix { inherit sources compiler lilac_git_version; };
+  overlays = [
+    (final: prev: {
+      lilacPkgs = import ./packages.nix {
+        pkgs = prev;
+        inherit lilacGitVersion;
+      };
+    })
+  ];
 }
