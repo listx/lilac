@@ -12,4 +12,5 @@ build-release: lilac.org lilac.cabal
 	nix-build ./nix/release.nix \
 	  --argstr lilacGitVersion $(LILAC_GIT_VERSION)
 update-nix:
+	niv init
 	niv update nixpkgs --branch nixos-24.11

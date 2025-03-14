@@ -41,8 +41,12 @@ periodically (for example, to use a newer [[GHC version]]).
 #+name: Update Nix dependencies
 #+begin_src makefile
 update-nix:
+	niv init
 	niv update nixpkgs --branch <<Nixpkgs version>>
 #+end_src
+
+The ~niv init~ updates the ~niv~-generated [[file:nix/sources.nix]]. The ~niv update~
+updates the [[file:nix/sources.json]].
 
 In =niv='s terminology, the =nixpkgs= above is a "package" ([[file:nix/sources.json]]
 declares all /packages/ we want to use). The =--branch ...= flag tells =niv= to use a
