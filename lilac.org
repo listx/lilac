@@ -73,13 +73,14 @@ The [[file:nix/sources.nix]] references [[file:nix/sources.json]].
 nix-repl> sources = import ./nix/sources.nix
 
 nix-repl> sources
-{ __functor = «lambda @ /Users/l/prog/lilac/nix/sources.nix:194:42»; "gitignore.nix" = { ... }; nixpkgs = { ... }; }
+{ __functor = «lambda @ /Users/l/prog/lilac/nix/sources.nix:198:43»; "git-hooks.nix" = { ... }; "gitignore.nix" = { ... }; nixpkgs = { ... }; }
 #+end_example
 
-Importing =sources.nix= gives us ~nixpkgs~ and ~gitignore.nix~ (we can ignore
-~__functor~ as that appears to be an internal thing). The latter is in quotes
-because it has a dot in its name (and the Nix language normally treats the dot
-as an attribute access operator).
+Importing =sources.nix= gives us ~git-hooks.nix~, ~gitignore.nix~, and ~nixpkgs~ (we can
+ignore ~__functor~ as that appears to be an internal thing). This is because
+[[file:nix/sources.json]] has those three entries (you use ~niv add~ to add new
+entries). The latter is in quotes because it has a dot in its name (and the Nix
+language normally treats the dot as an attribute access operator).
 
 The ~nixpkgs~ is a tarball of the set of all Nixpkgs packages we have access to.
 
@@ -176,6 +177,9 @@ in {
 #+end_src
 
 *** =devShell=
+:PROPERTIES:
+:ID:       73b60692-f369-4707-a7ee-434cc7a4549f
+:END:
 
 The ~devShell~ is the development environment.
 
@@ -190,6 +194,8 @@ devShell = pkgs.mkShell {
     export LD_LIBRARY_PATH=${devShellEnv}/lib:$LD_LIBRARY_PATH
     # Used when building with cabal.
     export LILAC_PROJECT_ROOT=$PWD
+    # Set up Git pre-commit hooks.
+    ${pre-commit-check.shellHook}
     logo
   '';
 };
@@ -199,6 +205,7 @@ The ~devShellEnv~ is another derivation, which is just a collection of symlinks 
 all build dependencies for Lilac, plus some additional scripts and tools, and
 GHC (~ghc~).
 
+#+name: code:devShellEnv
 #+header: :noweb-ref Bindings
 #+begin_src nix
 devShellEnv = pkgs.buildEnv {
@@ -226,6 +233,7 @@ version]].
 tools = [
   pkgs.cabal-install
   pkgs.niv
+  pkgs.shellcheck
   pkgs.shfmt
   pkgs.treefmt
   ourHaskell.nixfmt
@@ -353,10 +361,11 @@ file at the root of the project.
 .direnv
 .ghc.environment*
 .hie
+<<Generated pre-commit config>>
 cabal.project.local
 dist-newstyle
 result*
-*~
+,*~
 #+end_src
 
 The ~gnf~ stands for "gitignore Nix functions". Using ~nix repl~ we can inspect it
@@ -549,10 +558,14 @@ test: lilac.org
 lint: lilac.org
 	./check-tangled.sh
 	./check-newlines.sh
+	pre-commit run --all-files
 	treefmt --fail-on-change
 #+end_src
 
 See [[Linters]] for details on what the various linters do.
+
+Note that =pre-commit= isn't defined in the [[devShellEnv]]. This is because we only
+define it in the =mkShell= wrapper in [[devShell definition]].
 
 *** Build =lilac=
 
@@ -725,6 +738,7 @@ We use =treefmt= to format everything. While this isn't important for tangling
 (the computer doesn't care about formatting), it's important for weaving because
 we want code blocks in woven output to still look decent and consistent.
 
+#+name: treefmt.toml
 #+header: :tangle treefmt.toml
 #+begin_src toml
 # One CLI to format the code tree - https://github.com/numtide/treefmt
@@ -769,6 +783,79 @@ options = [
     "--write",
 ]
 includes = ["*.sh"]
+#+end_src
+
+** Pre-commit hooks
+
+Git has an elaborate system of hooks that it can run every time you do something
+important with Git. A common hook is a pre-commit hook, which will run just
+before creating a new commit. It's useful to add linters and other things in
+here.
+
+There is a project called https://pre-commit.com which is in the business of
+standardizing Git hooks. The https://github.com/cachix/git-hooks.nix project
+brings it into Nix, so that we can define all of the hook infrastructure
+in a reproducible way with Nix (such as using specific versions of linters,
+formatters, etc).
+
+For us we already have the set of linters and formatters we are interested in
+defined inside our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][dev shell environment]] in [[code:devShellEnv]], so we tell
+~git-hooks~ to reuse those same tools.
+
+We also use the same tool options as the ones we already defined in
+[[treefmt.toml]], for consistency.
+
+#+header: :noweb-ref Bindings
+#+begin_src nix
+gitHooksPkgs = import (import ./sources.nix)."git-hooks.nix";
+pre-commit-check = gitHooksPkgs.run {
+  src = projectRoot;
+  hooks = {
+    nixfmt-rfc-style = {
+      enable = true;
+      package = devShellEnv;
+      excludes = [ "nix/sources.nix" ];
+    };
+
+    ormolu = {
+      enable = true;
+      package = devShellEnv;
+      entry = "${devShellEnv}/bin/ormolu ${
+          toolOpts treefmtConf.formatter.haskell.options
+        }";
+    };
+
+    shfmt = {
+      enable = true;
+      package = devShellEnv;
+      entry = "${devShellEnv}/bin/shfmt ${
+          toolOpts treefmtConf.formatter.shell.options
+        }";
+    };
+
+    shellcheck = {
+      enable = true;
+      package = devShellEnv;
+    };
+  };
+};
+
+treefmtConf = lib.importTOML ../treefmt.toml;
+toolOpts = opts: builtins.concatStringsSep " " opts;
+#+end_src
+
+By default the above tools will only run on changed files going into a new
+commit. If you want to run against all files to check for any existing
+violations, run ~pre-commit run --all-files~.
+
+The =pre-commit= tool writes a configuration file at =.pre-commit-config.yaml=. We
+ignore this for Git because it has local machine-specific paths in it (and
+because it's also just autogenerated by =pre-commit= based on our Nix
+configuration above).
+
+#+name: Generated pre-commit config
+#+begin_src gitignore
+.pre-commit-config.yaml
 #+end_src
 
 ** GitHub Actions

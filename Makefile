@@ -3,6 +3,7 @@ test: lilac.org
 lint: lilac.org
 	./check-tangled.sh
 	./check-newlines.sh
+	pre-commit run --all-files
 	treefmt --fail-on-change
 build: lilac.org lilac.cabal
 	cabal build

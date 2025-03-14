@@ -10,6 +10,7 @@ let
   tools = [
     pkgs.cabal-install
     pkgs.niv
+    pkgs.shellcheck
     pkgs.shfmt
     pkgs.treefmt
     ourHaskell.nixfmt
@@ -90,6 +91,42 @@ let
           "--ghc-option=-fwhole-archive-hs-libs");
 
     in lib.pipe haskellPkg confFns;
+
+  gitHooksPkgs = import (import ./sources.nix)."git-hooks.nix";
+  pre-commit-check = gitHooksPkgs.run {
+    src = projectRoot;
+    hooks = {
+      nixfmt-rfc-style = {
+        enable = true;
+        package = devShellEnv;
+        excludes = [ "nix/sources.nix" ];
+      };
+
+      ormolu = {
+        enable = true;
+        package = devShellEnv;
+        entry = "${devShellEnv}/bin/ormolu ${
+            toolOpts treefmtConf.formatter.haskell.options
+          }";
+      };
+
+      shfmt = {
+        enable = true;
+        package = devShellEnv;
+        entry = "${devShellEnv}/bin/shfmt ${
+            toolOpts treefmtConf.formatter.shell.options
+          }";
+      };
+
+      shellcheck = {
+        enable = true;
+        package = devShellEnv;
+      };
+    };
+  };
+
+  treefmtConf = lib.importTOML ../treefmt.toml;
+  toolOpts = opts: builtins.concatStringsSep " " opts;
 in {
   # Derivation for the shell environment. This is fed into "pkgs.mkShell" to
   # give us the final shell environment.
@@ -99,6 +136,8 @@ in {
       export LD_LIBRARY_PATH=${devShellEnv}/lib:$LD_LIBRARY_PATH
       # Used when building with cabal.
       export LILAC_PROJECT_ROOT=$PWD
+      # Set up Git pre-commit hooks.
+      ${pre-commit-check.shellHook}
       logo
     '';
   };
