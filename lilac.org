@@ -13,6 +13,15 @@ This is Lilac, a performance-minded rewrite of an [[https://github.com/listx/lil
 same name]]. It is written in [[https://www.haskell.org/][Haskell]], and is designed specifically for [[https://en.wikipedia.org/wiki/Literate_programming][Literate
 Programming]] using [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][Noweb]] references.
 
+The current Lilac version is
+
+#+name: Lilac version
+#+begin_src txt
+0.1.0.0
+#+end_src
+
+See [[lilac.cabal]] where we reference this version information.
+
 * Nix build and development environment
 
 Originally this project started out as a fork of the [[https://github.com/pwm/nixkell][Nixkell]] project skeleton at
@@ -854,12 +863,13 @@ To update GHC to a newer version, we have to first check the path
 versions are defined (to see which GHC versions are available), then update the
 branch we are using with [[https://github.com/nmattia/niv][Niv]] (see [[Update Nix dependencies]]).
 
+#+name: lilac.cabal
 #+header: :tangle lilac.cabal
 #+begin_src haskell-cabal
 cabal-version:  2.2
 
 name:           lilac
-version:        0.1.0.0
+version:        <<Lilac version>>
 license:        GPL-2.0-only
 license-file:   LICENSE
 build-type:     Simple
