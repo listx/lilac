@@ -460,9 +460,13 @@ let
   '';
   lilac = pkgs.writeShellScriptBin "lilac" ''
     set -euo pipefail
+    cabal run lilac -- "$@"
+  '';
+  lilac-nix = pkgs.writeShellScriptBin "lilac-nix" ''
+    set -euo pipefail
     result/bin/lilac "$@"
   '';
-in [ logo lilac ]
+in [ logo lilac lilac-nix ]
 #+end_src
 
 You can use the traditional ~nix-shell~ command to use this environment, or use
@@ -512,16 +516,8 @@ the options for =lilac=. The double dash is required to tell =cabal= to stop
 interpreting command line options (to leave them to be handled by =lilac=).
 
 The above ceremony with =cabal run= might be a little bit annoying during
-development. So there is a helper script =lilac.sh= which just wraps around it. So
-you can just run =./lilac.sh ...= instead.
-
-#+header: :tangle lilac.sh
-#+header: :shebang #!/usr/bin/env bash
-#+begin_src bash
-set -euo pipefail
-
-cabal run lilac -- "$@"
-#+end_src
+development. This is why the [[Nix dev env scripts]] includes ~lilac~ which does this
+ceremony for us.
 
 Another option is to build with Nix, which wraps everything up for public
 consumption. This allows us to check locally that our Nix build pipeline is in
@@ -535,6 +531,9 @@ build-release: lilac.org lilac.cabal
 	nix-build ./nix/release.nix \
 	  --argstr lilacGitVersion $(LILAC_GIT_VERSION)
 #+end_src
+
+You can run the version of Lilac built by Nix with ~result/bin/lilac~, which we
+codify in ~lilac-nix~ in the [[Nix dev env scripts]] as well.
 
 *** Run linters
 

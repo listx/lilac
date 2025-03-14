@@ -8,6 +8,10 @@ let
   '';
   lilac = pkgs.writeShellScriptBin "lilac" ''
     set -euo pipefail
+    cabal run lilac -- "$@"
+  '';
+  lilac-nix = pkgs.writeShellScriptBin "lilac-nix" ''
+    set -euo pipefail
     result/bin/lilac "$@"
   '';
-in [ logo lilac ]
+in [ logo lilac lilac-nix ]
