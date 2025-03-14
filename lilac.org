@@ -514,11 +514,41 @@ we don't have to memorize exactly how to invoke certain commands.
 
 #+header: :tangle Makefile
 #+begin_src makefile
-<<Build lilac>>
-<<Run linters>>
 <<Run tests>>
+<<Run linters>>
+<<Build lilac>>
 <<Update Nix dependencies>>
 #+end_src
+
+*** Run tests
+
+The tests are discovered by Hspec automatically.
+
+#+header: :tangle test/Spec.hs
+#+begin_src haskell
+{-# OPTIONS_GHC -F -pgmF hspec-discover #-}
+#+end_src
+
+This allows ~cabal test~ to run all of the tests without having to specify them
+manually.
+
+#+header: :noweb-ref Run tests
+#+begin_src makefile
+test: lilac.org
+	cabal test --ghc-options="-fforce-recomp"
+#+end_src
+
+*** Run linters
+
+#+header: :noweb-ref Run linters
+#+begin_src makefile
+lint: lilac.org
+	./check-tangled.sh
+	./check-newlines.sh
+	treefmt --fail-on-change
+#+end_src
+
+See [[Linters]] for details on what the various linters do.
 
 *** Build =lilac=
 
@@ -532,12 +562,11 @@ build: lilac.org lilac.cabal
 #+end_src
 
 This results in building the binary. The binary will end up in an obscure path
-like
-=./dist-newstyle/build/aarch64-osx/ghc-9.10.1/lilac-0.1.0.0/x/lilac/noopt/build/lilac/lilac=.
-You can get this path with =cabal list-bin lilac=. To run the binary from that
-path, use =cabal run lilac -- [LILAC OPTIONS...]= where =[LILAC OPTIONS ...]= are
-the options for =lilac=. The double dash is required to tell =cabal= to stop
-interpreting command line options (to leave them to be handled by =lilac=).
+like =./dist-newstyle/build/.../lilac=. You can get this path with =cabal list-bin
+lilac=. To run the binary from that path, use =cabal run lilac -- [LILAC
+OPTIONS...]= where =[LILAC OPTIONS ...]= are the options for =lilac=. The double dash
+is required to tell =cabal= to stop interpreting command line options (to leave
+them to be handled by =lilac=).
 
 The above ceremony with =cabal run= might be a little bit annoying during
 development. This is why the [[Nix dev env scripts]] includes ~lilac~ which does this
@@ -558,36 +587,6 @@ build-release: lilac.org lilac.cabal
 
 You can run the version of Lilac built by Nix with ~result/bin/lilac~, which we
 codify in ~lilac-nix~ in the [[Nix dev env scripts]] as well.
-
-*** Run linters
-
-#+header: :noweb-ref Run linters
-#+begin_src makefile
-lint: lilac.org
-	./check-tangled.sh
-	./check-newlines.sh
-	treefmt --fail-on-change
-#+end_src
-
-See [[Linters]] for details on what the various linters do.
-
-*** Run tests
-
-The tests are discovered by Hspec automatically.
-
-#+header: :tangle test/Spec.hs
-#+begin_src haskell
-{-# OPTIONS_GHC -F -pgmF hspec-discover #-}
-#+end_src
-
-This allows ~cabal test~ to run all of the tests without having to specify them
-manually.
-
-#+header: :noweb-ref Run tests
-#+begin_src makefile
-test: lilac.org
-	cabal test --ghc-options="-fforce-recomp"
-#+end_src
 
 ** Linters
 
