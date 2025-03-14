@@ -341,6 +341,20 @@ lilacSource = lib.cleanSourceWith {
 };
 #+end_src
 
+As for the actual [[file:.gitignore]] itself, we prefer to use a single ~.gitignore~
+file at the root of the project.
+
+#+header: :tangle .gitignore
+#+begin_src gitignore
+.direnv
+.ghc.environment*
+.hie
+cabal.project.local
+dist-newstyle
+result*
+*~
+#+end_src
+
 The ~gnf~ stands for "gitignore Nix functions". Using ~nix repl~ we can inspect it
 directly:
 
@@ -1124,21 +1138,6 @@ This file is needed for Cabal.
 import Distribution.Simple
 
 main = defaultMain
-#+end_src
-
-*** .gitignore
-
-We prefer to use a single ~.gitignore~ file at the root of the project.
-
-#+header: :tangle .gitignore
-#+begin_src gitignore
-.direnv
-.ghc.environment*
-.hie
-cabal.project.local
-dist-newstyle
-result*
-*~
 #+end_src
 
 * Org parser
