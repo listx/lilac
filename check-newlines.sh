@@ -27,6 +27,11 @@ check_trailing_newlines()
 			continue
 		fi
 
+		# Ignore the warning for "line" which we don't use; we do use it
+		# in the sense that we check whether the overall "tail -c 1 ..."
+		# command succeeds.
+		#
+		# shellcheck disable=SC2034
 		if ! tail -c 1 "$f" | read -r line; then
 			echo >&2 "$0: $f does not end in a trailing newline"
 			res=1
