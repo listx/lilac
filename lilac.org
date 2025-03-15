@@ -366,6 +366,8 @@ cabal.project.local
 dist-newstyle
 result*
 ,*~
+
+<<Makefile sentinels>>
 #+end_src
 
 The ~gnf~ stands for "gitignore Nix functions". Using ~nix repl~ we can inspect it
@@ -533,6 +535,27 @@ we don't have to memorize exactly how to invoke certain commands.
 <<Update Nix dependencies>>
 #+end_src
 
+*** Sentinels
+:PROPERTIES:
+:ID:       b649d761-1103-47be-86e4-56a7362a5ecc
+:END:
+
+In a Makefile, given a rule
+
+#+begin_src makefile
+thing: dep1 dep2
+	do-something
+#+end_src
+
+=make= will assume that the output of ~do-something~ will be a file named =thing= and
+will only run ~do-something~ if either =dep1= =dep2= have a newer timestamp than
+=thing=.
+
+For cases where ~do-something~ does /not/ result in generating the file =thing=, we
+use "sentinel" files (files that we ~touch~ at the end of a build rule) so that
+=make= won't re-run the rule if it sees that the sentinel file is still newer than
+the listed dependencies.
+
 *** Run tests
 
 The tests are discovered by Hspec automatically.
@@ -549,7 +572,11 @@ manually.
 #+begin_src makefile
 test: lilac.org
 	cabal test --ghc-options="-fforce-recomp"
+	touch test
 #+end_src
+
+We don't have to ignore the =test= sentinel file like in [[Makefile:sentinel lint]]
+because we already have a folder named [[file:test]].
 
 *** Run linters
 
@@ -557,6 +584,13 @@ test: lilac.org
 #+begin_src makefile
 lint: lilac.org
 	pre-commit run --all-files
+	touch lint
+#+end_src
+
+#+name: Makefile:sentinel lint
+#+header: :noweb-ref Makefile sentinels
+#+begin_src gitignore
+lint
 #+end_src
 
 See [[Linters]] for details on what the various linters do.
@@ -573,6 +607,7 @@ There are two ways to build =lilac=. The first option, =build=, builds with
 #+begin_src makefile
 build: lilac.org lilac.cabal
 	cabal build
+	touch build
 #+end_src
 
 This results in building the binary. The binary will end up in an obscure path
@@ -586,6 +621,13 @@ The above ceremony with =cabal run= might be a little bit annoying during
 development. This is why the [[Nix dev env scripts]] includes ~lilac~ which does this
 ceremony for us.
 
+We have to ignore the =build= file because it's just a [[id:b649d761-1103-47be-86e4-56a7362a5ecc][sentinel file]].
+
+#+header: :noweb-ref Makefile sentinels
+#+begin_src gitignore
+build
+#+end_src
+
 Another option is to build with Nix, which wraps everything up for public
 consumption. This allows us to check locally that our Nix build pipeline is in
 working order.
@@ -597,6 +639,12 @@ LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
 build-release: lilac.org lilac.cabal
 	nix-build ./nix/release.nix \
 	  --argstr lilacGitVersion $(LILAC_GIT_VERSION)
+	touch build-release
+#+end_src
+
+#+header: :noweb-ref Makefile sentinels
+#+begin_src gitignore
+build-release
 #+end_src
 
 You can run the version of Lilac built by Nix with ~result/bin/lilac~, which we
