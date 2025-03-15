@@ -27,6 +27,8 @@ check_trailing_newlines()
 			continue
 		fi
 
+		# Check the last byte.
+		#
 		# Ignore the warning for "line" which we don't use; we do use it
 		# in the sense that we check whether the overall "tail -c 1 ..."
 		# command succeeds.
