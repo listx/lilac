@@ -132,6 +132,15 @@ let
         enable = true;
         package = devShellEnv;
       };
+
+      check-tangled = {
+        name = "check-tangled.sh";
+        enable = true;
+        always_run = true;
+        entry = "./check-tangled.sh";
+        # Do not pass the changed files to the command.
+        pass_filenames = false;
+      };
     };
   };
 

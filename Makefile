@@ -1,7 +1,6 @@
 test: lilac.org
 	cabal test --ghc-options="-fforce-recomp"
 lint: lilac.org
-	./check-tangled.sh
 	pre-commit run --all-files
 build: lilac.org lilac.cabal
 	cabal build

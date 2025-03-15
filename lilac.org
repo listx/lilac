@@ -556,7 +556,6 @@ test: lilac.org
 #+header: :noweb-ref Run linters
 #+begin_src makefile
 lint: lilac.org
-	./check-tangled.sh
 	pre-commit run --all-files
 #+end_src
 
@@ -731,6 +730,15 @@ pre-commit-check = gitHooksPkgs.run {
     shellcheck = {
       enable = true;
       package = devShellEnv;
+    };
+
+    check-tangled = {
+      name = "check-tangled.sh";
+      enable = true;
+      always_run = true;
+      entry = "./check-tangled.sh";
+      # Do not pass the changed files to the command.
+      pass_filenames = false;
     };
   };
 };
