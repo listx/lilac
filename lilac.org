@@ -236,7 +236,6 @@ tools = [
   pkgs.niv
   pkgs.shellcheck
   pkgs.shfmt
-  pkgs.treefmt
   ourHaskell.nixfmt
   ourHaskell.ormolu
 ];
@@ -559,7 +558,6 @@ test: lilac.org
 lint: lilac.org
 	./check-tangled.sh
 	pre-commit run --all-files
-	treefmt --fail-on-change
 #+end_src
 
 See [[Linters]] for details on what the various linters do.
@@ -671,59 +669,6 @@ main "$@"
 
 Eventually this script's features should be implemented in Lilac natively.
 
-*** Formatters
-
-We use =treefmt= to format everything. While this isn't important for tangling
-(the computer doesn't care about formatting), it's important for weaving because
-we want code blocks in woven output to still look decent and consistent.
-
-#+name: treefmt.toml
-#+header: :tangle treefmt.toml
-#+begin_src toml
-# One CLI to format the code tree - https://github.com/numtide/treefmt
-[global]
-excludes = [
-  "*.cabal",
-  "*.gitkeep",
-  "*.json",
-  "*.org",
-  "*.toml",
-  "*.yml",
-  ".envrc",
-  ".gitignore",
-  "cabal.project",
-  "doc/*",
-  "image/*",
-  "LICENSE",
-  "Makefile",
-  "nix/packages/*.nix",
-  "nix/sources.nix",
-  "test/Lilac/ParseSpec/*",
-]
-
-[formatter.haskell]
-command = "ormolu"
-options = [
-  "--mode", "inplace",
-  "--check-idempotence"
-]
-includes = ["*.hs"]
-
-[formatter.nix]
-command = "nixfmt"
-includes = ["*.nix"]
-
-[formatter.shell]
-command = "shfmt"
-options = [
-    "--binary-next-line",
-    "--indent", "0",
-    "--func-next-line",
-    "--write",
-]
-includes = ["*.sh"]
-#+end_src
-
 ** Pre-commit hooks
 
 Git has an elaborate system of hooks that it can run every time you do something
@@ -741,8 +686,9 @@ For us we already have the set of linters and formatters we are interested in
 defined inside our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][dev shell environment]] in [[code:devShellEnv]], so we tell
 ~git-hooks~ to reuse those same tools.
 
-We also use the same tool options as the ones we already defined in
-[[treefmt.toml]], for consistency.
+While formatting isn't important for tangling (the computer doesn't care about
+formatting), it's important for weaving because we want code blocks in woven
+output to still look decent and consistent.
 
 #+header: :noweb-ref Bindings
 #+begin_src nix
@@ -764,17 +710,22 @@ pre-commit-check = gitHooksPkgs.run {
     ormolu = {
       enable = true;
       package = devShellEnv;
-      entry = "${devShellEnv}/bin/ormolu ${
-          toolOpts treefmtConf.formatter.haskell.options
-        }";
+      entry = let opts = [ "--mode" "inplace" "--check-idempotence" ];
+      in "${devShellEnv}/bin/ormolu ${toolOpts opts}";
     };
 
     shfmt = {
       enable = true;
       package = devShellEnv;
-      entry = "${devShellEnv}/bin/shfmt ${
-          toolOpts treefmtConf.formatter.shell.options
-        }";
+      entry = let
+        opts = [
+          "--binary-next-line"
+          "--indent"
+          "0"
+          "--func-next-line"
+          "--write"
+        ];
+      in "${devShellEnv}/bin/shfmt ${toolOpts opts}";
     };
 
     shellcheck = {
@@ -784,7 +735,6 @@ pre-commit-check = gitHooksPkgs.run {
   };
 };
 
-treefmtConf = lib.importTOML ../treefmt.toml;
 toolOpts = opts: builtins.concatStringsSep " " opts;
 #+end_src
 

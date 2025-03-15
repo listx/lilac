@@ -13,7 +13,6 @@ let
     pkgs.niv
     pkgs.shellcheck
     pkgs.shfmt
-    pkgs.treefmt
     ourHaskell.nixfmt
     ourHaskell.ormolu
   ];
@@ -111,17 +110,22 @@ let
       ormolu = {
         enable = true;
         package = devShellEnv;
-        entry = "${devShellEnv}/bin/ormolu ${
-            toolOpts treefmtConf.formatter.haskell.options
-          }";
+        entry = let opts = [ "--mode" "inplace" "--check-idempotence" ];
+        in "${devShellEnv}/bin/ormolu ${toolOpts opts}";
       };
 
       shfmt = {
         enable = true;
         package = devShellEnv;
-        entry = "${devShellEnv}/bin/shfmt ${
-            toolOpts treefmtConf.formatter.shell.options
-          }";
+        entry = let
+          opts = [
+            "--binary-next-line"
+            "--indent"
+            "0"
+            "--func-next-line"
+            "--write"
+          ];
+        in "${devShellEnv}/bin/shfmt ${toolOpts opts}";
       };
 
       shellcheck = {
@@ -131,7 +135,6 @@ let
     };
   };
 
-  treefmtConf = lib.importTOML ../treefmt.toml;
   toolOpts = opts: builtins.concatStringsSep " " opts;
 in {
   # Derivation for the shell environment. This is fed into "pkgs.mkShell" to

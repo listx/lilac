@@ -3,7 +3,6 @@ test: lilac.org
 lint: lilac.org
 	./check-tangled.sh
 	pre-commit run --all-files
-	treefmt --fail-on-change
 build: lilac.org lilac.cabal
 	cabal build
 
