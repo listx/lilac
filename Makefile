@@ -2,7 +2,6 @@ test: lilac.org
 	cabal test --ghc-options="-fforce-recomp"
 lint: lilac.org
 	./check-tangled.sh
-	./check-newlines.sh
 	pre-commit run --all-files
 	treefmt --fail-on-change
 build: lilac.org lilac.cabal

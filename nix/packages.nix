@@ -9,6 +9,7 @@ let
 
   tools = [
     pkgs.cabal-install
+    pkgs.editorconfig-checker
     pkgs.niv
     pkgs.shellcheck
     pkgs.shfmt
@@ -96,6 +97,11 @@ let
   pre-commit-check = gitHooksPkgs.run {
     src = projectRoot;
     hooks = {
+      editorconfig-checker = {
+        enable = true;
+        package = devShellEnv;
+      };
+
       nixfmt-rfc-style = {
         enable = true;
         package = devShellEnv;

@@ -232,6 +232,7 @@ version]].
 #+begin_src nix
 tools = [
   pkgs.cabal-install
+  <<editorconfig-checker>>
   pkgs.niv
   pkgs.shellcheck
   pkgs.shfmt
@@ -557,7 +558,6 @@ test: lilac.org
 #+begin_src makefile
 lint: lilac.org
 	./check-tangled.sh
-	./check-newlines.sh
 	pre-commit run --all-files
 	treefmt --fail-on-change
 #+end_src
@@ -671,71 +671,6 @@ main "$@"
 
 Eventually this script's features should be implemented in Lilac natively.
 
-*** Audit missing newlines
-
-Except for generated files, all files should have a trailing newline (line feed
-character). That is, the last byte should be =\n=.
-
-#+header: :tangle check-newlines.sh
-#+header: :shebang #!/usr/bin/env bash
-#+begin_src bash
-set -euo pipefail
-
-SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
-
-# Generated files (and binary files) should be excluded from this check.
-excluded=(
-	image/PNG-Gradient.png
-)
-
-check_trailing_newlines()
-{
-	local res=0
-	mapfile -t files < <(git -C "${SCRIPT_ROOT}" ls-tree -r HEAD \
-		| awk '{print $2,$4}' \
-		| grep '^blob' \
-		| awk '{print $2}')
-
-	for f in "${files[@]}"; do
-		# Skip empty files.
-		if [[ ! -s "$f" ]]; then
-			continue
-		fi
-
-		# Skip excluded files.
-		if [[ " ${excluded[*]} " =~ [[:space:]]${f}[[:space:]] ]]; then
-			continue
-		fi
-
-		# Check the last byte.
-		#
-		# Ignore the warning for "line" which we don't use; we do use it
-		# in the sense that we check whether the overall "tail -c 1 ..."
-		# command succeeds.
-		#
-		# shellcheck disable=SC2034
-		if ! tail -c 1 "$f" | read -r line; then
-			echo >&2 "$0: $f does not end in a trailing newline"
-			res=1
-		fi
-	done
-	return "${res}"
-}
-
-main()
-{
-	echo >&2 -n "$0: checking trailing newlines... "
-	if check_trailing_newlines; then
-		echo >&2 "OK"
-	else
-		echo >&2 "$0: failed"
-		return 1
-	fi
-}
-
-main "$@"
-#+end_src
-
 *** Formatters
 
 We use =treefmt= to format everything. While this isn't important for tangling
@@ -815,6 +750,11 @@ gitHooksPkgs = import (import ./sources.nix)."git-hooks.nix";
 pre-commit-check = gitHooksPkgs.run {
   src = projectRoot;
   hooks = {
+    editorconfig-checker = {
+      enable = true;
+      package = devShellEnv;
+    };
+
     nixfmt-rfc-style = {
       enable = true;
       package = devShellEnv;
@@ -860,6 +800,40 @@ configuration above).
 #+name: Generated pre-commit config
 #+begin_src gitignore
 .pre-commit-config.yaml
+#+end_src
+
+** =EditorConfig=
+
+[[https://editorconfig.org/][EditorConfig]] is a specification for setting some universal properties about
+files in a project.
+
+#+header: :tangle .editorconfig
+#+begin_src txt
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{sh},Makefile]
+indent_style = tab
+tab_width = 8
+#+end_src
+
+The ~root = true~ is required because the EditorConfig specification is
+version-control agnostic and does not understand Git's notion of a project or
+repository root. When EditorConfig plugins check whether a file complies with
+EditorConfig configuration, it simply searches for the current or any parent
+folders for the ~.editorconfig~ file. Setting the ~root = true~ tells the plugin to
+stop searching upwards beyond the current file.
+
+We use the standalone [[https://github.com/editorconfig-checker/editorconfig-checker][editorconfig-checker]] Go tool to check for conformance.
+
+#+name: editorconfig-checker
+#+begin_src nix
+pkgs.editorconfig-checker
 #+end_src
 
 ** GitHub Actions
