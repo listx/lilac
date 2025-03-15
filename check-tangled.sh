@@ -28,11 +28,8 @@ tangled_files()
 # List all files checked into version control.
 tracked_files()
 {
-	git -C "${SCRIPT_ROOT}" ls-tree -r HEAD \
-		| awk '{print $2,$4}' \
-		| grep '^blob' \
-		| grep -v '\.\(html\|org\)$' \
-		| awk '{print $2}'
+	git -C "${SCRIPT_ROOT}" ls-files \
+		| grep -v '\.\(html\|org\)$'
 }
 
 main()
