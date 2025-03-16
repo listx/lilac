@@ -398,6 +398,7 @@ lilacSource = lib.cleanSourceWith {
 As for the actual [[file:.gitignore]] itself, we prefer to use a single ~.gitignore~
 file at the root of the project.
 
+#+name: .gitignore
 #+header: :tangle .gitignore
 #+begin_src gitignore
 .direnv
@@ -496,6 +497,7 @@ which is just a derivation (an installable Nix package).
 
 The entrypoint of our Nix dev environment is the following ~shell.nix~ file.
 
+#+name: shell.nix
 #+header: :tangle shell.nix
 #+begin_src nix
 let pkgs = import ./nix/default.nix { }; in pkgs.lilacPkgs.devShell
@@ -511,7 +513,7 @@ Lilac logo when we enter the development environment. The interesting thing
 about these scripts is that they are in the =$PATH=, so they can be more
 convenient to use.
 
-#+name: Nix dev env scripts
+#+name: nix/scripts.nix
 #+header: :tangle nix/scripts.nix
 #+begin_src nix
 { pkgs }:
@@ -539,6 +541,7 @@ your existing shell whenever you enter the project root. Direnv will also
 automatically reload =shell.nix= if any of it or its dependencies change, based on
 the =.envrc= file below:
 
+#+name: .envrc
 #+header: :tangle .envrc
 #+begin_src bash
 #!/usr/bin/env bash
@@ -553,6 +556,7 @@ watch_dir nix
 We use the traditional =make= command to encode some common operations. This way
 we don't have to memorize exactly how to invoke certain commands.
 
+#+name: Makefile
 #+header: :tangle Makefile
 #+begin_src makefile
 <<make:Run tests>>
@@ -652,7 +656,7 @@ is required to tell =cabal= to stop interpreting command line options (to leave
 them to be handled by =lilac=).
 
 The above ceremony with =cabal run= might be a little bit annoying during
-development. This is why the [[Nix dev env scripts]] includes ~lilac~ which does this
+development. This is why [[nix/scripts.nix]] includes ~lilac~ which does this
 ceremony for us.
 
 We have to ignore the =build= file because it's just a [[id:b649d761-1103-47be-86e4-56a7362a5ecc][sentinel file]].
@@ -681,7 +685,7 @@ build-release
 #+end_src
 
 You can run the version of Lilac built by Nix with ~result/bin/lilac~, which we
-codify in ~lilac-nix~ in the [[Nix dev env scripts]] as well.
+codify in ~lilac-nix~ in the [[nix/scripts.nix]] as well.
 
 ** Linters
 
@@ -691,6 +695,7 @@ Run a script which can detect whether we've accounted for all tracked files via
 Literate Programming. That is, we want to detect any files that are checked into
 source control without being tangled from an Org file.
 
+#+name: check-tangled.sh
 #+header: :tangle check-tangled.sh
 #+header: :shebang #!/usr/bin/env bash
 #+begin_src bash
@@ -847,6 +852,7 @@ configuration above).
 [[https://editorconfig.org/][EditorConfig]] is a specification for setting some universal properties about
 files in a project.
 
+#+name: .editorconfig
 #+header: :tangle .editorconfig
 #+begin_src txt
 root = true
@@ -883,6 +889,7 @@ pkgs.editorconfig-checker
 We only have one action so far for this, which runs the build with =nix-build=, on
 both Linux and Mac.
 
+#+name: .github/workflows/nix.yml
 #+header: :tangle .github/workflows/nix.yml
 #+begin_src yaml
 name: CI
@@ -955,6 +962,7 @@ jobs:
 
 Invoke Dependabot weekly to check for library updates.
 
+#+name: .github/dependabot.yml
 #+header: :tangle .github/dependabot.yml
 #+begin_src yaml
 version: 2
@@ -1238,6 +1246,7 @@ active-repositories: none
 
 This file is needed for Cabal.
 
+#+name: Setup.hs
 #+header: :tangle Setup.hs
 #+begin_src haskell
 import Distribution.Simple
@@ -6314,6 +6323,7 @@ corresponds to the index of the cell containing the code block in the cell list.
 :ID:       ebf0d269-79d3-408a-a6e7-baf720d73837
 :END:
 
+#+name: module:Lilac.ParseSpec
 #+header: :tangle test/Lilac/ParseSpec.hs
 #+begin_src haskell
 module Lilac.ParseSpec (spec) where
