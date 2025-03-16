@@ -1272,7 +1272,7 @@ everything in a single Org file.
 The parsing mechanism is in [[file:src/Lilac/Parse.hs]], which we describe below. We
 discuss each parser and interleave some tests for the smaller parsers. If you
 are curious about the overall testing framework itself (where and how these
-interleaved tests are executed), take a look at [[id:ebf0d269-79d3-408a-a6e7-baf720d73837][this section]].
+interleaved tests are executed), take a look at the [[Testing framework]].
 
 #+name: module:Lilac.Parse
 #+header: :tangle src/Lilac/Parse.hs
@@ -1725,6 +1725,31 @@ We have to filter out cells that look like =CListItem []= because that can happe
 when [[f:listItemsEndParser]] detects maximum indentation that matches the
 most-deeply-nested item (in which case no list items end).
 
+We should be able to parse empty input.
+
+#+name: t:empty-input
+#+begin_src haskell
+it "empty input" $ do
+  MP.runParser
+    (runStateT L.orgDocParser L.defaultOrgParserState)
+    "empty input"
+    ""
+    `shouldParse` (L.defaultOrgDoc, L.defaultOrgParserState)
+#+end_src
+
+We should also be able to parse blank documents (whitespace only).
+
+#+name: t:0001-blankline
+#+begin_src haskell
+p
+  "0001-blankline"
+  L.defaultOrgDoc
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0001-blankline
+#+begin_src org
+#+end_src
+
 ** =docMetaParser=
 
 The first thing we need to parse is the document metadata. Metadata is a line
@@ -1781,11 +1806,10 @@ Below are some unit test cases for parsing metadata.
 ,#+auto_tangle: t
 #+end_src
 
-#+name: Test parsing document metadata:basic
+#+name: t:0002-doc-metadata:basic
 #+begin_src haskell
 p
-  "parses document metadata"
-  "test/Lilac/ParseSpec/0002-doc-metadata"
+  "0002-doc-metadata"
   $ L.defaultOrgDocWithMeta
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
@@ -1827,11 +1851,10 @@ Yet another comment.
 
 #+end_src
 
-#+name: Test parsing document metadata:skips comments
+#+name: t:0003-doc-metadata-with-comments
 #+begin_src haskell
 p
-  "parses document metadata (skips comments)"
-  "test/Lilac/ParseSpec/0003-doc-metadata-with-comments"
+  "0003-doc-metadata-with-comments"
   $ L.defaultOrgDocWithMeta
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
@@ -1843,17 +1866,15 @@ p
 Indentation is invalid, except for =CListItem= cells. Even single-line comments
 may not be indented.
 
-#+name: test:0008-indentation-comment
 #+header: :tangle test/Lilac/ParseSpec/0008-indentation-comment
 #+begin_src org
  # invalid comment (it's indented)
 #+end_src
 
-#+name: Test indentation detection:comment line
+#+name: t:0008-indentation-comment
 #+begin_src haskell
 pf
-  "detects indentation (comment line)"
-  "test/Lilac/ParseSpec/0008-indentation-comment"
+  "0008-indentation-comment"
   "invalid indentation"
   1
 #+end_src
@@ -1865,11 +1886,10 @@ Similarly, a space before a heading star is also invalid.
  * space before star is not allowed for headings
 #+end_src
 
-#+name: Test indentation detection:heading
+#+name: t:0008-indentation-headings
 #+begin_src haskell
 pf
-  "detects indentation (heading)"
-  "test/Lilac/ParseSpec/0008-indentation-headings"
+  "0008-indentation-headings"
   "invalid indentation"
   1
 #+end_src
@@ -1881,11 +1901,10 @@ For that matter, indentation is also invalid for paragraphs.
  foo bar
 #+end_src
 
-#+name: Test indentation detection:paragraph
+#+name: t:0008-indentation-paragraph
 #+begin_src haskell
 pf
-  "detects indentation (paragraph)"
-  "test/Lilac/ParseSpec/0008-indentation-paragraph"
+  "0008-indentation-paragraph"
   "invalid indentation"
   1
 #+end_src
@@ -1897,11 +1916,10 @@ Ignore leading whitespace just before the metadata value.
 ,#+title:             Parse me without leading whitespace
 #+end_src
 
-#+name: Test parsing document metadata:title without leading whitespace
+#+name: t:0002-doc-metadata-whitespace-before-value
 #+begin_src haskell
 p
-  "parses document metadata (title without leading whitespace)"
-  "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
+  "0002-doc-metadata-whitespace-before-value"
   $ L.defaultOrgDocWithMeta
     [ ("title", "Parse me without leading whitespace")
     ]
@@ -1914,11 +1932,10 @@ Fail if the value part is missing.
 ,#+title:
 #+end_src
 
-#+name: Test parsing document metadata:detect missing value
+#+name: t:0002-doc-metadata-missing-value
 #+begin_src haskell
 pfm
-  "detects missing document metadata value"
-  "test/Lilac/ParseSpec/0002-doc-metadata-missing-value"
+  "0002-doc-metadata-missing-value"
   (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
   7
 #+end_src
@@ -2124,11 +2141,10 @@ Test for empty drawers.
 :END:
 #+end_src
 
-#+name: Test drawer parsing:empty
+#+name: t:0004-drawers-empty
 #+begin_src haskell
 p
-  "parses drawers (empty)"
-  "test/Lilac/ParseSpec/0004-drawers-empty"
+  "0004-drawers-empty"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -2159,11 +2175,10 @@ Test for drawers with some content.
 :END:
 #+end_src
 
-#+name: Test drawer parsing:not empty
+#+name: t:0004-drawers-not-empty
 #+begin_src haskell
 p
-  "parses drawers (not empty)"
-  "test/Lilac/ParseSpec/0004-drawers-not-empty"
+  "0004-drawers-not-empty"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -2385,17 +2400,15 @@ slashes inside "1\/2" and "and\/or" should not be interpreted as style markers
 but as slashes. If you want to write a literal backslash, you must use "\\".
 This use of the backslash as an escape character deviates from Org mode.
 
-#+name: test:0005-styled-strings-ignore-marker-inside-word
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-ignore-marker-inside-word
 #+begin_src org
 /foo and\/or 1\/2 bar \\ a\\b/
 #+end_src
 
-#+name: Test styled string parsing:slash inside word
+#+name: t:0005-styled-strings-ignore-marker-inside-word
 #+begin_src haskell
 p
-  "parses styled strings (slash inside word)"
-  "test/Lilac/ParseSpec/0005-styled-strings-ignore-marker-inside-word"
+  "0005-styled-strings-ignore-marker-inside-word"
   L.OrgDoc
     { cells =
         [ L.CParagraph
@@ -2454,17 +2467,15 @@ is any sequence of non-whitespace characters). The only thing we check is that
 by the end of the cell (heading of paragraph) that all styles must have been
 turned off.
 
-#+name: test:0005-styled-strings-messy-boundaries
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries
 #+begin_src org
 ,* *foo *bar baz a*b*c (*ok*) **yes
 #+end_src
 
-#+name: Test styled string parsing:messy boundaries
+#+name: t:0005-styled-strings-messy-boundaries
 #+begin_src haskell
 p
-  "parses style markers multiple times at the beginning"
-  "test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries"
+  "0005-styled-strings-messy-boundaries"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -2503,17 +2514,15 @@ In =0005-styled-strings-leftover-active-styles= we keep parsing to the end of th
 heading, expecting to see the ending style marker for bold text, but never see
 it. So the failure from =failIfLeftoverActiveStyles= gets triggered.
 
-#+name: test:0005-styled-strings-leftover-active-styles
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles
 #+begin_src org
 ,* foo *bar baz
 #+end_src
 
-#+name: Test styled string parsing:leftover active styles
+#+name: t:0005-styled-strings-leftover-active-styles
 #+begin_src haskell
 pf
-  "detects unbalanced style markers (leftover active styles)"
-  "test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles"
+  "0005-styled-strings-leftover-active-styles"
   "leftover active styles: [Bold]"
   15
 #+end_src
@@ -2829,17 +2838,15 @@ individual letters (without any styling, and with bold styling) are spaced out
 with multiple spaces, we only use two =PToken= objects, one for the plain text and
 another for the bold text.
 
-#+name: test:0005-styled-strings-compression
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-compression
 #+begin_src org
 ,* a b  c   d    e      *f g  h   i    j*
 #+end_src
 
-#+name: Test styled string parsing:compression
+#+name: t:0005-styled-strings-compression
 #+begin_src haskell
 p
-  "parses styled strings (compression)"
-  "test/Lilac/ParseSpec/0005-styled-strings-compression"
+  "0005-styled-strings-compression"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -2875,11 +2882,10 @@ The simple case with no style markers.
 ,* foo
 #+end_src
 
-#+name: Test styled string parsing:no style
+#+name: t:0005-styled-strings-no-style
 #+begin_src haskell
 p
-  "parses styled strings (no style)"
-  "test/Lilac/ParseSpec/0005-styled-strings-no-style"
+  "0005-styled-strings-no-style"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -2910,11 +2916,10 @@ The next case tests a simple case where one word is bolded.
 ,* foo *bar* baz
 #+end_src
 
-#+name: Test styled string parsing:bold
+#+name: t:0005-styled-strings-bold
 #+begin_src haskell
 p
-  "parses styled strings (bold style)"
-  "test/Lilac/ParseSpec/0005-styled-strings-bold"
+  "0005-styled-strings-bold"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -2952,17 +2957,15 @@ p
 
 Below we mix things up a bit more, using more styles.
 
-#+name: test:0005-styled-strings-complex
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-complex
 #+begin_src org
 ,* *foo /bar _underlined  bold  and  italic_/ baz* =verbatim  text= ~x  y  z~ *bold*
 #+end_src
 
-#+name: Test styled string parsing:complex
+#+name: t:0005-styled-strings-complex
 #+begin_src haskell
 p
-  "parses styled strings (complex)"
-  "test/Lilac/ParseSpec/0005-styled-strings-complex"
+  "0005-styled-strings-complex"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -3015,17 +3018,15 @@ p
 
 Here's another test, which checks some edge cases when dealing with punctuation.
 
-#+name: test:0005-styled-strings-complex-punctuation
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-complex-punctuation
 #+begin_src org
 ,* (foo =bar=). What's up? and *that!* /(italic)/. It's #1!
 #+end_src
 
-#+name: Test styled string parsing:complex punctuation
+#+name: t:0005-styled-strings-complex-punctuation
 #+begin_src haskell
 p
-  "parses styled strings (complex punctuation)"
-  "test/Lilac/ParseSpec/0005-styled-strings-complex-punctuation"
+  "0005-styled-strings-complex-punctuation"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -3068,17 +3069,15 @@ Note how we preserve the information of having no space character between the
 This is another test, involving the =Verbatim= style. It checks the case where we
 have a style marker inside a word (not at the usual beginning or end of a word).
 
-#+name: test:0005-styled-strings-verbatim
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-verbatim
 #+begin_src org
 (=import ./.=) hello
 #+end_src
 
-#+name: Test styled string parsing:markers in middle of word
+#+name: t:0005-styled-strings-verbatim
 #+begin_src haskell
 p
-  "parses style markers in the middle of a word"
-  "test/Lilac/ParseSpec/0005-styled-strings-verbatim"
+  "0005-styled-strings-verbatim"
   L.OrgDoc
     { cells =
         [ L.CParagraph
@@ -3104,17 +3103,15 @@ p
 This is another test to check that the bold style marker (asterisk) is ignored
 if it immediately follows a verbatim or code marker.
 
-#+name: test:0005-styled-strings-verbatim-code-ignore-immediate-bold
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-verbatim-code-ignore-immediate-bold
 #+begin_src org
 =*a= =b*= ~*c~ ~d*~
 #+end_src
 
-#+name: Test styled string parsing:immediate bold
+#+name: t:0005-styled-strings-verbatim-code-ignore-immediate-bold
 #+begin_src haskell
 p
-  "suppresses immediate or latent bold style"
-  "test/Lilac/ParseSpec/0005-styled-strings-verbatim-code-ignore-immediate-bold"
+  "0005-styled-strings-verbatim-code-ignore-immediate-bold"
   L.OrgDoc
     { cells =
         [ L.CParagraph
@@ -3150,7 +3147,6 @@ that looks like a link, they will not be parsed as such if surrounded by
 verbatim or code styles. The same applies for inline math, whose parser should
 not apply if we're in a verbatim (or code) zone.
 
-#+name: test:0005-styled-strings-verbatim-precedence
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-verbatim-precedence
 #+begin_src org
 =[[foo=
@@ -3162,11 +3158,10 @@ not apply if we're in a verbatim (or code) zone.
 ~[[bar]]~
 #+end_src
 
-#+name: Test styled string parsing:verbatim precedence
+#+name: t:0005-styled-strings-verbatim-precedence
 #+begin_src haskell
 p
-  "treats verbatim and code style with higher prcedence"
-  "test/Lilac/ParseSpec/0005-styled-strings-verbatim-precedence"
+  "0005-styled-strings-verbatim-precedence"
   L.OrgDoc
     { cells =
         <<Expected prose for 0005-styled-strings-verbatim-precedence>>,
@@ -3319,7 +3314,7 @@ linkParser = do
 
 The call to [[f:failIfVerbatimOrCode]] fails the parser if either the verbatim or
 code style is active. This is because those parsers take precedence. See, for
-example [[test:0005-styled-strings-verbatim-precedence]] of the sort of behavior we
+example [[t:0005-styled-strings-verbatim-precedence]] of the sort of behavior we
 expect. By failing this parser, we allow other parsers (such as
 [[f:styledTextParser]]) to succeed (see [[f:proseParser]] for the interaction of this
 parser with these other parsers).
@@ -3382,11 +3377,10 @@ bracketedLinkParser = do
 [[a]] b
 #+end_src
 
-#+name: Test link parsing:target only
+#+name: t:0006-links
 #+begin_src haskell
 p
-  "parses links (target only)"
-  "test/Lilac/ParseSpec/0006-links"
+  "0006-links"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -3535,11 +3529,10 @@ Try http://localhost:3000?
 Go to ftp://10.0.0.1!
 #+end_src
 
-#+name: Test link parsing:target only raw
+#+name: t:0006-links-raw
 #+begin_src haskell
 p
-  "parses links (target only)"
-  "test/Lilac/ParseSpec/0006-links-raw"
+  "0006-links-raw"
   L.OrgDoc
     { cells =
         [ L.CParagraph
@@ -3640,11 +3633,10 @@ This way, the input will look like ~[[...~ which will then let
 ([[file:foo/bar]])
 #+end_src
 
-#+name: Test link parsing:links inside parentheses
+#+name: t:0006-links-inside-parentheses
 #+begin_src haskell
 p
-  "parse a link even if it is preceded by non-whitespace"
-  "test/Lilac/ParseSpec/0006-links-inside-parentheses"
+  "0006-links-inside-parentheses"
   L.OrgDoc
     { cells =
         [ L.CParagraph
@@ -3688,11 +3680,10 @@ non-links.
 [hi]
 #+end_src
 
-#+name: Test link parsing:nonlink
+#+name: t:0006-links-nonlink
 #+begin_src haskell
 p
-  "parse text that may initially look like a link (initial opening bracket)"
-  "test/Lilac/ParseSpec/0006-links-nonlink"
+  "0006-links-nonlink"
   L.OrgDoc
     { cells =
         [ L.CParagraph
@@ -3791,7 +3782,6 @@ paragraphParser = do
 
 Below we check several types of paragraphs without regard to indentation.
 
-#+name: test:0005-prose-paragraphs
 #+header: :tangle test/Lilac/ParseSpec/0005-prose-paragraphs
 #+begin_src org
 a b  c   d    e      *f g  h   i    j*
@@ -3806,11 +3796,10 @@ with
 underscore_
 #+end_src
 
-#+name: Test styled string parsing:prose paragraphs
+#+name: t:0005-prose-paragraphs
 #+begin_src haskell
 p
-  "parses paragraphs"
-  "test/Lilac/ParseSpec/0005-prose-paragraphs"
+  "0005-prose-paragraphs"
   L.OrgDoc
     { cells =
         <<Expected prose for 0005-prose-paragraphs>>,
@@ -4056,7 +4045,6 @@ Orgmode thinks that it thinks =<<foo>>= and =<<bar>>= are Noweb references that
 exist in this doc, and because they don't exist, will just result in those
 strings not being inserted into [[file:test/Lilac/ParseSpec/0007-blocks-noweb]].
 
-#+name: test:0007-blocks-noweb
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-noweb
 #+header: :noweb off
 #+begin_src org
@@ -4072,11 +4060,10 @@ echo <<bar>> x y z
 Note how =<<quux= is not interpreted as a Noweb reference, because it doesn't end
 with =>>= on the same line.
 
-#+name: Test block parsing:noweb
+#+name: t:0007-blocks-noweb
 #+begin_src haskell
 p
-  "parses blocks with noweb references"
-  "test/Lilac/ParseSpec/0007-blocks-noweb"
+  "0007-blocks-noweb"
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-noweb>>,
@@ -4136,7 +4123,6 @@ Speaking of =#+header: :noweb off=, we also want to test this for Lilac as well.
 That is, if Lilac sees this header, it should not treat text that look like
 =<<foo>>= as a Noweb link, but as a literal =<<foo>>= string.
 
-#+name: test:0007-blocks-noweb-off
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-noweb-off
 #+header: :noweb off
 #+begin_src org
@@ -4150,11 +4136,10 @@ echo <<bar>> x y z
 ,#+end_src
 #+end_src
 
-#+name: Test block parsing:noweb off
+#+name: t:0007-blocks-noweb-off
 #+begin_src haskell
 p
-  "parses blocks with noweb references, but treats them if ':noweb' is 'off'"
-  "test/Lilac/ParseSpec/0007-blocks-noweb-off"
+  "0007-blocks-noweb-off"
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-noweb-off>>,
@@ -4191,7 +4176,6 @@ for each block where you'd want it disabled.
 
 Empty blocks are allowed.
 
-#+name: test:0007-blocks-empty
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-empty
 #+begin_src org
 ,#+begin_src haskell
@@ -4204,11 +4188,10 @@ Empty blocks are allowed.
 ,#+end_quote
 #+end_src
 
-#+name: Test block parsing:blocks empty
+#+name: t:0007-blocks-empty
 #+begin_src haskell
 p
-  "parses blocks"
-  "test/Lilac/ParseSpec/0007-blocks-empty"
+  "0007-blocks-empty"
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-empty>>,
@@ -4253,25 +4236,22 @@ p
 
 A "src" without an accompanying language should trigger an error.
 
-#+name: test:0007-block-src-without-lang
 #+header: :tangle test/Lilac/ParseSpec/0007-block-src-without-lang
 #+begin_src org
 ,#+begin_src
 ,#+end_src
 #+end_src
 
-#+name: Test block parsing:src without lang
+#+name: t:0007-block-src-without-lang
 #+begin_src haskell
 pf
-  "detects missing language specifier in src blocks"
-  "test/Lilac/ParseSpec/0007-block-src-without-lang"
+  "0007-block-src-without-lang"
   "block type src requires a language specifier"
   11
 #+end_src
 
 Check that we can parse block metadata.
 
-#+name: test:0007-blocks-metadata
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-metadata
 #+begin_src org
 ,#+name: some-code
@@ -4283,11 +4263,10 @@ Check that we can parse block metadata.
 ,#+end_example
 #+end_src
 
-#+name: Test block parsing:metadata
+#+name: t:0007-blocks-metadata
 #+begin_src haskell
 p
-  "parses block metadata"
-  "test/Lilac/ParseSpec/0007-blocks-metadata"
+  "0007-blocks-metadata"
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-metadata>>,
@@ -4886,7 +4865,6 @@ the latter recognizes their (complete) end when there is no more indentation.
 There are [[id:910d5a04-739c-4125-9a94-803ea0ebeaee][so many rules]] associated with lists; we try to check a few of them
 here.
 
-#+name: test:0009-list-indentation-no-indent
 #+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-no-indent
 #+begin_src org
 1)
@@ -4894,11 +4872,10 @@ here.
 2)
 #+end_src
 
-#+name: Test lists:not enough indent
+#+name: t:0009-list-indentation-no-indent
 #+begin_src haskell
 p
-  "does not recognize list without enough indentation"
-  "test/Lilac/ParseSpec/0009-list-indentation-no-indent"
+  "0009-list-indentation-no-indent"
   L.OrgDoc
     { cells =
         [ plainParagraph "1)",
@@ -4912,7 +4889,6 @@ p
 
 Here's a list with the (proper) 2-space indent.
 
-#+name: test:0009-list-indentation-proper-indent
 #+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-proper-indent
 #+begin_src org
   1)
@@ -4920,11 +4896,10 @@ Here's a list with the (proper) 2-space indent.
   2)
 #+end_src
 
-#+name: Test lists:proper indent
+#+name: t:0009-list-indentation-proper-indent
 #+begin_src haskell
 p
-  "parses 2-space indented list"
-  "test/Lilac/ParseSpec/0009-list-indentation-proper-indent"
+  "0009-list-indentation-proper-indent"
   L.OrgDoc
     { cells =
         [ L.CListItem
@@ -4948,7 +4923,6 @@ p
 
 Here's a nested example.
 
-#+name: test:0009-list-indentation-nested
 #+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-nested
 #+begin_src org
   1)
@@ -4966,11 +4940,10 @@ Here's a nested example.
   3)
 #+end_src
 
-#+name: Test lists:nested
+#+name: t:0009-list-indentation-nested
 #+begin_src haskell
 p
-  "parses nested list"
-  "test/Lilac/ParseSpec/0009-list-indentation-nested"
+  "0009-list-indentation-nested"
   L.OrgDoc
     { cells =
         [ L.CListItem
@@ -5021,7 +4994,6 @@ p
 That's just for the structural portion. Now we test whether list items can also
 hold content (other cells) inside it.
 
-#+name: test:0009-list-content-simple
 #+header: :tangle test/Lilac/ParseSpec/0009-list-content-simple
 #+begin_src org
   1) First
@@ -5032,11 +5004,10 @@ hold content (other cells) inside it.
   2) Another paragraph.
 #+end_src
 
-#+name: Test lists:content simple
+#+name: t:0009-list-content-simple
 #+begin_src haskell
 p
-  "parses list with content (simple)"
-  "test/Lilac/ParseSpec/0009-list-content-simple"
+  "0009-list-content-simple"
   L.OrgDoc
     { cells =
         [ L.CListItem
@@ -5062,11 +5033,10 @@ p
 #+end_src
 
 Here's a more involved example using paragraph text for list items, following
-the pattern from [[test:0009-list-indentation-nested]]. Note how the parsed list
+the pattern from [[t:0009-list-indentation-nested]]. Note how the parsed list
 structure is still there, except now we have =CParagraph= cells interspersed in
 between them.
 
-#+name: test:0009-list-indentation-nested-with-text
 #+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-nested-with-text
 #+begin_src org
 Foo.
@@ -5090,11 +5060,10 @@ Foo.
 Bar.
 #+end_src
 
-#+name: Test lists:nested with text
+#+name: t:0009-list-indentation-nested-with-text
 #+begin_src haskell
 p
-  "parses nested list (with text)"
-  "test/Lilac/ParseSpec/0009-list-indentation-nested-with-text"
+  "0009-list-indentation-nested-with-text"
   L.OrgDoc
     { cells =
         [ plainParagraph "Foo.",
@@ -5163,11 +5132,10 @@ line is indented too much in the list body.
      baz.
 #+end_src
 
-#+name: Test paragraph indentation:over-indentation list body
+#+name: t:0005-paragraph-indentation-mismatch-over-list-body
 #+begin_src haskell
 pfm
-  "detects over-indentation for paragraph continuation line (list body)"
-  "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over-list-body"
+  "0005-paragraph-indentation-mismatch-over-list-body"
   (utoks " ")
   14
 #+end_src
@@ -5181,11 +5149,10 @@ Foo
 baz.
 #+end_src
 
-#+name: Test paragraph indentation:over-indentation
+#+name: t:0005-paragraph-indentation-mismatch-over
 #+begin_src haskell
 pfm
-  "detects over-indentation for paragraph continuation line"
-  "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over"
+  "0005-paragraph-indentation-mismatch-over"
   (utoks " ")
   4
 #+end_src
@@ -5200,11 +5167,10 @@ paragraph block.
      baz.
 #+end_src
 
-#+name: Test paragraph indentation:under-indentation list body
+#+name: t:0005-paragraph-indentation-mismatch-under-list-body
 #+begin_src haskell
 pfm
-  "detects under-indentation for paragraph continuation line (list body)"
-  "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-under-list-body"
+  "0005-paragraph-indentation-mismatch-under-list-body"
   (utoks "b" <> etoks " ")
   12
 #+end_src
@@ -5221,11 +5187,10 @@ there is non-zero indentation.
  Invalid.
 #+end_src
 
-#+name: Test paragraph indentation:initial invalid
+#+name: t:0005-paragraph-indentation-mismatch-initial-indent-invalid
 #+begin_src haskell
 pf
-  "detects invalid initial indentation for paragraph"
-  "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid"
+  "0005-paragraph-indentation-mismatch-initial-indent-invalid"
   "indentation does not fit into existing levels"
   21
 #+end_src
@@ -5240,11 +5205,10 @@ pf
    Invalid.
 #+end_src
 
-#+name: Test paragraph indentation:initial invalid between levels
+#+name: t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels
 #+begin_src haskell
 pf
-  "detects invalid initial indentation for paragraph (between list levels)"
-  "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
+  "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
   "indentation does not fit into existing levels"
   36
 #+end_src
@@ -5271,11 +5235,10 @@ to close off the unordered list items.
 Four
 #+end_src
 
-#+name: Test lists:paragraphs can close deeper levels
+#+name: t:0009-paragraph-can-close-deeper-levels
 #+begin_src haskell
 p
-  "parses paragraphs which can close deeper list levels"
-  "test/Lilac/ParseSpec/0009-paragraph-can-close-deeper-levels"
+  "0009-paragraph-can-close-deeper-levels"
   L.OrgDoc
     { cells =
         [ L.CListItem
@@ -5337,11 +5300,10 @@ allowed to start a new ordered list with =1) a=.
 Four
 #+end_src
 
-#+name: Test lists:paragraphs can separate mixed lists
+#+name: t:0009-paragraph-can-separate-mixed-lists
 #+begin_src haskell
 p
-  "parses paragraphs which can separate mixed lists"
-  "test/Lilac/ParseSpec/0009-paragraph-can-separate-mixed-lists"
+  "0009-paragraph-can-separate-mixed-lists"
   L.OrgDoc
     { cells =
         [ L.CListItem
@@ -5406,11 +5368,10 @@ unexpected because the unordered list has not been closed off yet.
   1) c
 #+end_src
 
-#+name: Test list parsing:detects mixed lists, unordered
+#+name: t:0009-lists-cannot-be-mixed-on-their-own
 #+begin_src haskell
 pf
-  "detects mixed list types (unordered)"
-  "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own"
+  "0009-lists-cannot-be-mixed-on-their-own"
   "expected UNORDERED list item at this level"
   21
 #+end_src
@@ -5427,11 +5388,10 @@ an ordered one at the same level).
   - c
 #+end_src
 
-#+name: Test list parsing:detects mixed lists, ordered
+#+name: t:0009-lists-cannot-be-mixed-on-their-own-ordered
 #+begin_src haskell
 pf
-  "detects mixed list types (ordered)"
-  "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own-ordered"
+  "0009-lists-cannot-be-mixed-on-their-own-ordered"
   "expected ORDERED list item at this level"
   23
 #+end_src
@@ -5448,11 +5408,10 @@ trigger an indentation error.
     1) b
 #+end_src
 
-#+name: Test list parsing:slightly wrong indent
+#+name: t:0009-lists-require-precise-indentation
 #+begin_src haskell
 pf
-  "detects slightly wrong indentation"
-  "test/Lilac/ParseSpec/0009-lists-require-precise-indentation"
+  "0009-lists-require-precise-indentation"
   "list item: invalid indentation"
   15
 #+end_src
@@ -5467,11 +5426,10 @@ text, as part of the "a" above it.
      1) b
 #+end_src
 
-#+name: Test list parsing:require blank separator
+#+name: t:0009-list-items-need-blank-line-separator
 #+begin_src haskell
 p
-  "requires blank line separator for list items"
-  "test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator"
+  "0009-list-items-need-blank-line-separator"
   L.OrgDoc
     { cells =
         [ L.CListItem
@@ -5501,11 +5459,10 @@ instead.
   1) b
 #+end_src
 
-#+name: Test list parsing:ordered lists increment
+#+name: t:0009-ordered-lists-require-increment
 #+begin_src haskell
 pf
-  "detects non-incrementing ordered list item"
-  "test/Lilac/ParseSpec/0009-ordered-lists-require-increment"
+  "0009-ordered-lists-require-increment"
   "expected incremented list head 2 but got 1"
   13
 #+end_src
@@ -5521,11 +5478,10 @@ Ordered list items must start from either 0 or 1.
      20) c
 #+end_src
 
-#+name: Test list parsing:invalid initial number 20
+#+name: t:0009-ordered-lists-start-from-0-or-1
 #+begin_src haskell
 pf
-  "detects invalid initial ordered list number of 20"
-  "test/Lilac/ParseSpec/0009-ordered-lists-start-from-0-or-1"
+  "0009-ordered-lists-start-from-0-or-1"
   "starting list head number must be 0 or 1; got 20"
   25
 #+end_src
@@ -5640,7 +5596,6 @@ Let's check that we can parse multiple math fragments. We discard any trailing
 whitespace after the initial opening =\begin{equation}= or =\[=, but otherwise
 retain whitespace for the contents inside.
 
-#+name: test:0010-standalone-math-fragments
 #+header: :tangle test/Lilac/ParseSpec/0010-standalone-math-fragments
 #+begin_src org
 \begin{equation}
@@ -5671,11 +5626,10 @@ retain whitespace for the contents inside.
 \end{equation}
 #+end_src
 
-#+name: Test styled string parsing:standalone math
+#+name: t:0010-standalone-math-fragments
 #+begin_src haskell
 ps
-  "parses standalone math fragments"
-  "test/Lilac/ParseSpec/0010-standalone-math-fragments"
+  "0010-standalone-math-fragments"
   L.OrgDoc
     { cells =
         [ L.CMathFragment
@@ -5822,7 +5776,6 @@ metaEntryParser = do
 Let's check our reasoning above by parsing a doc that has figures and blocks,
 both with metadata.
 
-#+name: test:0011-figures
 #+header: :tangle test/Lilac/ParseSpec/0011-figures-and-blocks
 #+begin_src org
 ,#+name: f:f
@@ -5844,11 +5797,10 @@ g x = x + 1
 [[./image/world.png]]
 #+end_src
 
-#+name: Test figures:plays nicely with blocks
+#+name: t:0011-figures-and-blocks
 #+begin_src haskell
 p
-  "parses figures (plays nicely with blocks)"
-  "test/Lilac/ParseSpec/0011-figures-and-blocks"
+  "0011-figures-and-blocks"
   L.OrgDoc
     { cells =
         [ L.CBlock
@@ -6074,7 +6026,6 @@ rowToTuples (rowIndex, row)
 The test below checks that we can parse a table with all 3 types of prose text
 (styled text, links, and math fragments).
 
-#+name: test:0012-tables-and-prose
 #+header: :tangle test/Lilac/ParseSpec/0012-tables-and-prose
 #+begin_src org
 ,#+name: tbl:famous-equations
@@ -6084,11 +6035,10 @@ The test below checks that we can parse a table with all 3 types of prose text
 | Albert *Einstein* | \(E = mc^2\)        | [[https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence][Wiki]] |
 #+end_src
 
-#+name: Test table parsing:plays nicely with prose
+#+name: t:0012-tables-and-prose
 #+begin_src haskell
 p
-  "parses tables (plays nicely with prose)"
-  "test/Lilac/ParseSpec/0012-tables-and-prose"
+  "0012-tables-and-prose"
   L.OrgDoc
     { cells =
         [ L.CTable
@@ -6210,10 +6160,9 @@ p
     }
 #+end_src
 
-Below is the same as [[test:0012-tables-and-prose]], but for the case where we are
+Below is the same as [[t:0012-tables-and-prose]], but for the case where we are
 indented as a list item.
 
-#+name: test:0012-tables-inside-lists
 #+header: :tangle test/Lilac/ParseSpec/0012-tables-inside-lists
 #+begin_src org
   1) foo
@@ -6227,11 +6176,10 @@ indented as a list item.
      | Albert *Einstein* | \(E = mc^2\)        | [[https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence][Wiki]] |
 #+end_src
 
-#+name: Test table parsing:plays nicely with lists
+#+name: t:0012-tables-inside-lists
 #+begin_src haskell
 p
-  "parses tables (plays nicely with lists)"
-  "test/Lilac/ParseSpec/0012-tables-inside-lists"
+  "0012-tables-inside-lists"
   L.OrgDoc
     { cells =
         [ L.CListItem
@@ -6394,8 +6342,10 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse qualified as L
 import Relude
-  ( FilePath,
+  ( ByteString,
+    FilePath,
     Int,
+    MonadIO,
     String,
     decodeUtf8,
     fromList,
@@ -6419,6 +6369,7 @@ import Test.Hspec.Megaparsec
   )
 import Text.Megaparsec qualified as MP
 
+<<f:readFrom>>
 <<f:p>>
 <<f:ps>>
 <<f:pf>>
@@ -6427,15 +6378,22 @@ import Text.Megaparsec qualified as MP
 <<f:spec>>
 #+end_src
 
+#+name: f:readFrom
+#+begin_src haskell
+readFrom :: (MonadIO m) => FilePath -> FilePath -> m ByteString
+readFrom prefix path = readFileBS $ prefix <> path
+
+#+end_src
+
 We need a helper function around =parseOrgDoc=, which will read in a file from a
 given path (to feed to =parseOrgDoc=). We name this helper just =p=.
 
 #+name: f:p
 #+begin_src haskell
-p :: String -> FilePath -> L.OrgDoc -> Spec
-p behavior path expected = do
-  before (readFileBS path) $ do
-    it behavior $ \input -> do
+p :: FilePath -> L.OrgDoc -> Spec
+p path expected = do
+  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
@@ -6449,10 +6407,10 @@ check the expected end state as well. We do this with =ps= below.
 
 #+name: f:ps
 #+begin_src haskell
-ps :: String -> FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
-ps behavior path expected state = do
-  before (readFileBS path) $ do
-    it behavior $ \input -> do
+ps :: FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
+ps path expected state = do
+  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
@@ -6466,10 +6424,10 @@ Sometimes we want to test that a file will fail to parse. We do this with =pf=
 
 #+name: f:pf
 #+begin_src haskell
-pf :: String -> FilePath -> String -> Int -> Spec
-pf behavior path errMsg pos = do
-  before (readFileBS path) $ do
-    it behavior $ \input -> do
+pf :: FilePath -> String -> Int -> Spec
+pf path errMsg pos = do
+  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
@@ -6491,10 +6449,10 @@ trivial parse errors.".
 
 #+name: f:pfm
 #+begin_src haskell
-pfm :: String -> FilePath -> ET T.Text -> Int -> Spec
-pfm behavior path errorTrivial pos = do
-  before (readFileBS path) $ do
-    it behavior $ \input -> do
+pfm :: FilePath -> ET T.Text -> Int -> Spec
+pfm path errorTrivial pos = do
+  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
@@ -6527,86 +6485,60 @@ Below are all of the individual test cases.
 spec :: Spec
 spec =
   describe "parse" $ do
-    <<Test cases>>
-#+end_src
-
-See [[Testing areas]] for an overview of all of the different tests.
-
-*** Testing areas
-
-#+name: Test blank doc
-#+begin_src haskell
-it "parses empty input as defaultOrgDoc" $ do
-  MP.runParser
-    (runStateT L.orgDocParser L.defaultOrgParserState)
-    "empty input"
-    ""
-    `shouldParse` (L.defaultOrgDoc, L.defaultOrgParserState)
-p
-  "parses blank line as defaultOrgDoc"
-  "test/Lilac/ParseSpec/0001-blankline"
-  L.defaultOrgDoc
-#+end_src
-
-#+header: :tangle test/Lilac/ParseSpec/0001-blankline
-#+begin_src org
-#+end_src
-
-#+name: Test cases
-#+begin_src haskell
-<<Test blank doc>>
-<<Test parsing document metadata:basic>>
-<<Test parsing document metadata:skips comments>>
-<<Test parsing document metadata:title without leading whitespace>>
-<<Test parsing document metadata:detect missing value>>
-<<Test styled string parsing:slash inside word>>
-<<Test styled string parsing:messy boundaries>>
-<<Test styled string parsing:leftover active styles>>
-<<Test styled string parsing:compression>>
-<<Test styled string parsing:no style>>
-<<Test styled string parsing:bold>>
-<<Test styled string parsing:complex>>
-<<Test styled string parsing:complex punctuation>>
-<<Test styled string parsing:markers in middle of word>>
-<<Test styled string parsing:immediate bold>>
-<<Test styled string parsing:verbatim precedence>>
-<<Test styled string parsing:prose paragraphs>>
-<<Test styled string parsing:standalone math>>
-<<Test figures:plays nicely with blocks>>
-<<Test table parsing:plays nicely with prose>>
-<<Test table parsing:plays nicely with lists>>
-<<Test link parsing:target only>>
-<<Test link parsing:target only raw>>
-<<Test link parsing:links inside parentheses>>
-<<Test link parsing:nonlink>>
-<<Test drawer parsing:empty>>
-<<Test drawer parsing:not empty>>
-<<Test block parsing:noweb>>
-<<Test block parsing:noweb off>>
-<<Test block parsing:blocks empty>>
-<<Test block parsing:src without lang>>
-<<Test block parsing:metadata>>
-<<Test list parsing:detects mixed lists, unordered>>
-<<Test list parsing:detects mixed lists, ordered>>
-<<Test list parsing:slightly wrong indent>>
-<<Test list parsing:require blank separator>>
-<<Test list parsing:ordered lists increment>>
-<<Test list parsing:invalid initial number 20>>
-<<Test indentation detection:comment line>>
-<<Test indentation detection:heading>>
-<<Test indentation detection:paragraph>>
-<<Test lists:not enough indent>>
-<<Test lists:proper indent>>
-<<Test lists:nested>>
-<<Test lists:content simple>>
-<<Test lists:nested with text>>
-<<Test lists:paragraphs can close deeper levels>>
-<<Test lists:paragraphs can separate mixed lists>>
-<<Test paragraph indentation:over-indentation list body>>
-<<Test paragraph indentation:over-indentation>>
-<<Test paragraph indentation:under-indentation list body>>
-<<Test paragraph indentation:initial invalid>>
-<<Test paragraph indentation:initial invalid between levels>>
+    <<t:empty-input>>
+    <<t:0001-blankline>>
+    <<t:0002-doc-metadata:basic>>
+    <<t:0003-doc-metadata-with-comments>>
+    <<t:0002-doc-metadata-whitespace-before-value>>
+    <<t:0002-doc-metadata-missing-value>>
+    <<t:0005-styled-strings-ignore-marker-inside-word>>
+    <<t:0005-styled-strings-messy-boundaries>>
+    <<t:0005-styled-strings-leftover-active-styles>>
+    <<t:0005-styled-strings-compression>>
+    <<t:0005-styled-strings-no-style>>
+    <<t:0005-styled-strings-bold>>
+    <<t:0005-styled-strings-complex>>
+    <<t:0005-styled-strings-complex-punctuation>>
+    <<t:0005-styled-strings-verbatim>>
+    <<t:0005-styled-strings-verbatim-code-ignore-immediate-bold>>
+    <<t:0005-styled-strings-verbatim-precedence>>
+    <<t:0005-prose-paragraphs>>
+    <<t:0010-standalone-math-fragments>>
+    <<t:0011-figures-and-blocks>>
+    <<t:0012-tables-and-prose>>
+    <<t:0012-tables-inside-lists>>
+    <<t:0006-links>>
+    <<t:0006-links-raw>>
+    <<t:0006-links-inside-parentheses>>
+    <<t:0006-links-nonlink>>
+    <<t:0004-drawers-empty>>
+    <<t:0004-drawers-not-empty>>
+    <<t:0007-blocks-noweb>>
+    <<t:0007-blocks-noweb-off>>
+    <<t:0007-blocks-empty>>
+    <<t:0007-block-src-without-lang>>
+    <<t:0007-blocks-metadata>>
+    <<t:0009-lists-cannot-be-mixed-on-their-own>>
+    <<t:0009-lists-cannot-be-mixed-on-their-own-ordered>>
+    <<t:0009-lists-require-precise-indentation>>
+    <<t:0009-list-items-need-blank-line-separator>>
+    <<t:0009-ordered-lists-require-increment>>
+    <<t:0009-ordered-lists-start-from-0-or-1>>
+    <<t:0008-indentation-comment>>
+    <<t:0008-indentation-headings>>
+    <<t:0008-indentation-paragraph>>
+    <<t:0009-list-indentation-no-indent>>
+    <<t:0009-list-indentation-proper-indent>>
+    <<t:0009-list-indentation-nested>>
+    <<t:0009-list-content-simple>>
+    <<t:0009-list-indentation-nested-with-text>>
+    <<t:0009-paragraph-can-close-deeper-levels>>
+    <<t:0009-paragraph-can-separate-mixed-lists>>
+    <<t:0005-paragraph-indentation-mismatch-over-list-body>>
+    <<t:0005-paragraph-indentation-mismatch-over>>
+    <<t:0005-paragraph-indentation-mismatch-under-list-body>>
+    <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid>>
+    <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels>>
 #+end_src
 
 * CLI

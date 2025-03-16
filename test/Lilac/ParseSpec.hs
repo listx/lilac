@@ -5,8 +5,10 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse qualified as L
 import Relude
-  ( FilePath,
+  ( ByteString,
+    FilePath,
     Int,
+    MonadIO,
     String,
     decodeUtf8,
     fromList,
@@ -30,40 +32,43 @@ import Test.Hspec.Megaparsec
   )
 import Text.Megaparsec qualified as MP
 
-p :: String -> FilePath -> L.OrgDoc -> Spec
-p behavior path expected = do
-  before (readFileBS path) $ do
-    it behavior $ \input -> do
+readFrom :: (MonadIO m) => FilePath -> FilePath -> m ByteString
+readFrom prefix path = readFileBS $ prefix <> path
+
+p :: FilePath -> L.OrgDoc -> Spec
+p path expected = do
+  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
         (decodeUtf8 input)
         `shouldParse` (expected, L.defaultOrgParserState)
 
-ps :: String -> FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
-ps behavior path expected state = do
-  before (readFileBS path) $ do
-    it behavior $ \input -> do
+ps :: FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
+ps path expected state = do
+  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
         (decodeUtf8 input)
         `shouldParse` (expected, state)
 
-pf :: String -> FilePath -> String -> Int -> Spec
-pf behavior path errMsg pos = do
-  before (readFileBS path) $ do
-    it behavior $ \input -> do
+pf :: FilePath -> String -> Int -> Spec
+pf path errMsg pos = do
+  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
         (decodeUtf8 input)
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
 
-pfm :: String -> FilePath -> ET T.Text -> Int -> Spec
-pfm behavior path errorTrivial pos = do
-  before (readFileBS path) $ do
-    it behavior $ \input -> do
+pfm :: FilePath -> ET T.Text -> Int -> Spec
+pfm path errorTrivial pos = do
+  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
@@ -84,19 +89,17 @@ plainParagraph body =
 spec :: Spec
 spec =
   describe "parse" $ do
-    it "parses empty input as defaultOrgDoc" $ do
+    it "empty input" $ do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         "empty input"
         ""
         `shouldParse` (L.defaultOrgDoc, L.defaultOrgParserState)
     p
-      "parses blank line as defaultOrgDoc"
-      "test/Lilac/ParseSpec/0001-blankline"
+      "0001-blankline"
       L.defaultOrgDoc
     p
-      "parses document metadata"
-      "test/Lilac/ParseSpec/0002-doc-metadata"
+      "0002-doc-metadata"
       $ L.defaultOrgDocWithMeta
         [ ("author", "A. U. Thor"),
           ("auto_tangle", "t"),
@@ -104,8 +107,7 @@ spec =
           ("title", "An Org Document")
         ]
     p
-      "parses document metadata (skips comments)"
-      "test/Lilac/ParseSpec/0003-doc-metadata-with-comments"
+      "0003-doc-metadata-with-comments"
       $ L.defaultOrgDocWithMeta
         [ ("author", "A. U. Thor"),
           ("auto_tangle", "t"),
@@ -113,19 +115,16 @@ spec =
           ("title", "An Org Document")
         ]
     p
-      "parses document metadata (title without leading whitespace)"
-      "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
+      "0002-doc-metadata-whitespace-before-value"
       $ L.defaultOrgDocWithMeta
         [ ("title", "Parse me without leading whitespace")
         ]
     pfm
-      "detects missing document metadata value"
-      "test/Lilac/ParseSpec/0002-doc-metadata-missing-value"
+      "0002-doc-metadata-missing-value"
       (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
       7
     p
-      "parses styled strings (slash inside word)"
-      "test/Lilac/ParseSpec/0005-styled-strings-ignore-marker-inside-word"
+      "0005-styled-strings-ignore-marker-inside-word"
       L.OrgDoc
         { cells =
             [ L.CParagraph
@@ -138,8 +137,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses style markers multiple times at the beginning"
-      "test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries"
+      "0005-styled-strings-messy-boundaries"
       L.OrgDoc
         { cells =
             [ L.CHeading
@@ -168,13 +166,11 @@ spec =
           meta = fromList []
         }
     pf
-      "detects unbalanced style markers (leftover active styles)"
-      "test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles"
+      "0005-styled-strings-leftover-active-styles"
       "leftover active styles: [Bold]"
       15
     p
-      "parses styled strings (compression)"
-      "test/Lilac/ParseSpec/0005-styled-strings-compression"
+      "0005-styled-strings-compression"
       L.OrgDoc
         { cells =
             [ L.CHeading
@@ -195,8 +191,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses styled strings (no style)"
-      "test/Lilac/ParseSpec/0005-styled-strings-no-style"
+      "0005-styled-strings-no-style"
       L.OrgDoc
         { cells =
             [ L.CHeading
@@ -219,8 +214,7 @@ spec =
           meta = M.fromList []
         }
     p
-      "parses styled strings (bold style)"
-      "test/Lilac/ParseSpec/0005-styled-strings-bold"
+      "0005-styled-strings-bold"
       L.OrgDoc
         { cells =
             [ L.CHeading
@@ -255,8 +249,7 @@ spec =
           meta = M.fromList []
         }
     p
-      "parses styled strings (complex)"
-      "test/Lilac/ParseSpec/0005-styled-strings-complex"
+      "0005-styled-strings-complex"
       L.OrgDoc
         { cells =
             [ L.CHeading
@@ -301,8 +294,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses styled strings (complex punctuation)"
-      "test/Lilac/ParseSpec/0005-styled-strings-complex-punctuation"
+      "0005-styled-strings-complex-punctuation"
       L.OrgDoc
         { cells =
             [ L.CHeading
@@ -333,8 +325,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses style markers in the middle of a word"
-      "test/Lilac/ParseSpec/0005-styled-strings-verbatim"
+      "0005-styled-strings-verbatim"
       L.OrgDoc
         { cells =
             [ L.CParagraph
@@ -351,8 +342,7 @@ spec =
           meta = fromList []
         }
     p
-      "suppresses immediate or latent bold style"
-      "test/Lilac/ParseSpec/0005-styled-strings-verbatim-code-ignore-immediate-bold"
+      "0005-styled-strings-verbatim-code-ignore-immediate-bold"
       L.OrgDoc
         { cells =
             [ L.CParagraph
@@ -377,8 +367,7 @@ spec =
           meta = fromList []
         }
     p
-      "treats verbatim and code style with higher prcedence"
-      "test/Lilac/ParseSpec/0005-styled-strings-verbatim-precedence"
+      "0005-styled-strings-verbatim-precedence"
       L.OrgDoc
         { cells =
             [ L.CParagraph
@@ -419,8 +408,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses paragraphs"
-      "test/Lilac/ParseSpec/0005-prose-paragraphs"
+      "0005-prose-paragraphs"
       L.OrgDoc
         { cells =
             [ L.CParagraph
@@ -443,8 +431,7 @@ spec =
           meta = fromList []
         }
     ps
-      "parses standalone math fragments"
-      "test/Lilac/ParseSpec/0010-standalone-math-fragments"
+      "0010-standalone-math-fragments"
       L.OrgDoc
         { cells =
             [ L.CMathFragment
@@ -498,8 +485,7 @@ spec =
           equationNumber = 3
         }
     p
-      "parses figures (plays nicely with blocks)"
-      "test/Lilac/ParseSpec/0011-figures-and-blocks"
+      "0011-figures-and-blocks"
       L.OrgDoc
         { cells =
             [ L.CBlock
@@ -564,8 +550,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses tables (plays nicely with prose)"
-      "test/Lilac/ParseSpec/0012-tables-and-prose"
+      "0012-tables-and-prose"
       L.OrgDoc
         { cells =
             [ L.CTable
@@ -686,8 +671,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses tables (plays nicely with lists)"
-      "test/Lilac/ParseSpec/0012-tables-inside-lists"
+      "0012-tables-inside-lists"
       L.OrgDoc
         { cells =
             [ L.CListItem
@@ -825,8 +809,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses links (target only)"
-      "test/Lilac/ParseSpec/0006-links"
+      "0006-links"
       L.OrgDoc
         { cells =
             [ L.CHeading
@@ -919,8 +902,7 @@ spec =
           meta = M.fromList []
         }
     p
-      "parses links (target only)"
-      "test/Lilac/ParseSpec/0006-links-raw"
+      "0006-links-raw"
       L.OrgDoc
         { cells =
             [ L.CParagraph
@@ -1009,8 +991,7 @@ spec =
           meta = M.fromList []
         }
     p
-      "parse a link even if it is preceded by non-whitespace"
-      "test/Lilac/ParseSpec/0006-links-inside-parentheses"
+      "0006-links-inside-parentheses"
       L.OrgDoc
         { cells =
             [ L.CParagraph
@@ -1045,8 +1026,7 @@ spec =
           meta = M.fromList []
         }
     p
-      "parse text that may initially look like a link (initial opening bracket)"
-      "test/Lilac/ParseSpec/0006-links-nonlink"
+      "0006-links-nonlink"
       L.OrgDoc
         { cells =
             [ L.CParagraph
@@ -1063,8 +1043,7 @@ spec =
           meta = M.fromList []
         }
     p
-      "parses drawers (empty)"
-      "test/Lilac/ParseSpec/0004-drawers-empty"
+      "0004-drawers-empty"
       L.OrgDoc
         { cells =
             [ L.CHeading
@@ -1083,8 +1062,7 @@ spec =
           meta = M.fromList []
         }
     p
-      "parses drawers (not empty)"
-      "test/Lilac/ParseSpec/0004-drawers-not-empty"
+      "0004-drawers-not-empty"
       L.OrgDoc
         { cells =
             [ L.CHeading
@@ -1103,8 +1081,7 @@ spec =
           meta = M.fromList []
         }
     p
-      "parses blocks with noweb references"
-      "test/Lilac/ParseSpec/0007-blocks-noweb"
+      "0007-blocks-noweb"
       L.OrgDoc
         { cells =
             [ L.CBlock
@@ -1150,8 +1127,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses blocks with noweb references, but treats them if ':noweb' is 'off'"
-      "test/Lilac/ParseSpec/0007-blocks-noweb-off"
+      "0007-blocks-noweb-off"
       L.OrgDoc
         { cells =
             [ L.CBlock
@@ -1173,8 +1149,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses blocks"
-      "test/Lilac/ParseSpec/0007-blocks-empty"
+      "0007-blocks-empty"
       L.OrgDoc
         { cells =
             [ L.CBlock
@@ -1211,13 +1186,11 @@ spec =
           meta = fromList []
         }
     pf
-      "detects missing language specifier in src blocks"
-      "test/Lilac/ParseSpec/0007-block-src-without-lang"
+      "0007-block-src-without-lang"
       "block type src requires a language specifier"
       11
     p
-      "parses block metadata"
-      "test/Lilac/ParseSpec/0007-blocks-metadata"
+      "0007-blocks-metadata"
       L.OrgDoc
         { cells =
             [ L.CBlock
@@ -1247,23 +1220,19 @@ spec =
           meta = fromList []
         }
     pf
-      "detects mixed list types (unordered)"
-      "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own"
+      "0009-lists-cannot-be-mixed-on-their-own"
       "expected UNORDERED list item at this level"
       21
     pf
-      "detects mixed list types (ordered)"
-      "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own-ordered"
+      "0009-lists-cannot-be-mixed-on-their-own-ordered"
       "expected ORDERED list item at this level"
       23
     pf
-      "detects slightly wrong indentation"
-      "test/Lilac/ParseSpec/0009-lists-require-precise-indentation"
+      "0009-lists-require-precise-indentation"
       "list item: invalid indentation"
       15
     p
-      "requires blank line separator for list items"
-      "test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator"
+      "0009-list-items-need-blank-line-separator"
       L.OrgDoc
         { cells =
             [ L.CListItem
@@ -1281,33 +1250,27 @@ spec =
           meta = fromList []
         }
     pf
-      "detects non-incrementing ordered list item"
-      "test/Lilac/ParseSpec/0009-ordered-lists-require-increment"
+      "0009-ordered-lists-require-increment"
       "expected incremented list head 2 but got 1"
       13
     pf
-      "detects invalid initial ordered list number of 20"
-      "test/Lilac/ParseSpec/0009-ordered-lists-start-from-0-or-1"
+      "0009-ordered-lists-start-from-0-or-1"
       "starting list head number must be 0 or 1; got 20"
       25
     pf
-      "detects indentation (comment line)"
-      "test/Lilac/ParseSpec/0008-indentation-comment"
+      "0008-indentation-comment"
       "invalid indentation"
       1
     pf
-      "detects indentation (heading)"
-      "test/Lilac/ParseSpec/0008-indentation-headings"
+      "0008-indentation-headings"
       "invalid indentation"
       1
     pf
-      "detects indentation (paragraph)"
-      "test/Lilac/ParseSpec/0008-indentation-paragraph"
+      "0008-indentation-paragraph"
       "invalid indentation"
       1
     p
-      "does not recognize list without enough indentation"
-      "test/Lilac/ParseSpec/0009-list-indentation-no-indent"
+      "0009-list-indentation-no-indent"
       L.OrgDoc
         { cells =
             [ plainParagraph "1)",
@@ -1318,8 +1281,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses 2-space indented list"
-      "test/Lilac/ParseSpec/0009-list-indentation-proper-indent"
+      "0009-list-indentation-proper-indent"
       L.OrgDoc
         { cells =
             [ L.CListItem
@@ -1340,8 +1302,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses nested list"
-      "test/Lilac/ParseSpec/0009-list-indentation-nested"
+      "0009-list-indentation-nested"
       L.OrgDoc
         { cells =
             [ L.CListItem
@@ -1388,8 +1349,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses list with content (simple)"
-      "test/Lilac/ParseSpec/0009-list-content-simple"
+      "0009-list-content-simple"
       L.OrgDoc
         { cells =
             [ L.CListItem
@@ -1413,8 +1373,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses nested list (with text)"
-      "test/Lilac/ParseSpec/0009-list-indentation-nested-with-text"
+      "0009-list-indentation-nested-with-text"
       L.OrgDoc
         { cells =
             [ plainParagraph "Foo.",
@@ -1471,8 +1430,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses paragraphs which can close deeper list levels"
-      "test/Lilac/ParseSpec/0009-paragraph-can-close-deeper-levels"
+      "0009-paragraph-can-close-deeper-levels"
       L.OrgDoc
         { cells =
             [ L.CListItem
@@ -1509,8 +1467,7 @@ spec =
           meta = fromList []
         }
     p
-      "parses paragraphs which can separate mixed lists"
-      "test/Lilac/ParseSpec/0009-paragraph-can-separate-mixed-lists"
+      "0009-paragraph-can-separate-mixed-lists"
       L.OrgDoc
         { cells =
             [ L.CListItem
@@ -1561,27 +1518,22 @@ spec =
           meta = fromList []
         }
     pfm
-      "detects over-indentation for paragraph continuation line (list body)"
-      "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over-list-body"
+      "0005-paragraph-indentation-mismatch-over-list-body"
       (utoks " ")
       14
     pfm
-      "detects over-indentation for paragraph continuation line"
-      "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over"
+      "0005-paragraph-indentation-mismatch-over"
       (utoks " ")
       4
     pfm
-      "detects under-indentation for paragraph continuation line (list body)"
-      "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-under-list-body"
+      "0005-paragraph-indentation-mismatch-under-list-body"
       (utoks "b" <> etoks " ")
       12
     pf
-      "detects invalid initial indentation for paragraph"
-      "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid"
+      "0005-paragraph-indentation-mismatch-initial-indent-invalid"
       "indentation does not fit into existing levels"
       21
     pf
-      "detects invalid initial indentation for paragraph (between list levels)"
-      "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
+      "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
       "indentation does not fit into existing levels"
       36
