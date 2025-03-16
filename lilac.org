@@ -6378,6 +6378,10 @@ import Text.Megaparsec qualified as MP
 <<f:spec>>
 #+end_src
 
+[[f:readFrom]] reads a path from the given prefix, and returns a =ByteString=. We'll
+be using this a lot because most of the tests here are based on parsing some
+input file path.
+
 #+name: f:readFrom
 #+begin_src haskell
 readFrom :: (MonadIO m) => FilePath -> FilePath -> m ByteString
