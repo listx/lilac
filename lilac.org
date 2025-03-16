@@ -730,6 +730,7 @@ known_not_tangled=(
 # List all files we explicitly tangle from Org files.
 tangled_files()
 {
+	unset GIT_LITERAL_PATHSPECS
 	git -C "${SCRIPT_ROOT}" grep -P '^#\+header: :tangle' -- '*.org' \
 		| awk '{print $3}' \
 		| sort -u
