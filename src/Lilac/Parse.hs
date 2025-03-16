@@ -833,7 +833,9 @@ bTokenParser isSrcBlock nowebOn = MP.choice parsers
     baseParsers :: [OrgParser BToken]
     baseParsers =
       [ BTokenString <$> (MP.takeWhile1P (Just "block token") (not . isSpace)),
-        BTokenString <$> (MP.takeWhile1P (Just "spaces inside block") isSpace)
+        BTokenString
+          . T.singleton
+          <$> (MP.label "space inside block" $ MP.satisfy isSpace)
       ]
     parsers =
       if isSrcBlock && nowebOn

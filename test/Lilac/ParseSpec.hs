@@ -763,6 +763,70 @@ spec = do
         meta = fromList []
       }
   p
+    "0007-blocks-ending"
+    L.OrgDoc
+      { cells =
+          [ L.CBlock
+              ( L.Block
+                  { meta =
+                      fromList
+                        [ ("__block_type", "src"),
+                          ("__src_language", "sh"),
+                          ("name", "empty")
+                        ],
+                    body = []
+                  }
+              ),
+            L.CBlock
+              ( L.Block
+                  { meta =
+                      fromList
+                        [ ("__block_type", "src"),
+                          ("__src_language", "sh"),
+                          ("name", "end not in beginning of line")
+                        ],
+                    body = [L.BTokenString " #+end_src"]
+                  }
+              ),
+            L.CBlock
+              ( L.Block
+                  { meta =
+                      fromList
+                        [ ("__block_type", "src"),
+                          ("__src_language", "sh"),
+                          ("name", "end has no preceding newline")
+                        ],
+                    body = [L.BTokenString "foo"]
+                  }
+              ),
+            L.CBlock
+              ( L.Block
+                  { meta =
+                      fromList
+                        [ ("__block_type", "src"),
+                          ("__src_language", "sh"),
+                          ("name", "end has preceding newline")
+                        ],
+                    body = [L.BTokenString "foo\n"]
+                  }
+              ),
+            L.CBlock
+              ( L.Block
+                  { meta =
+                      fromList
+                        [ ("__block_type", "src"),
+                          ("__src_language", "sh"),
+                          ("name", "end has preceding newline (multiple)")
+                        ],
+                    body = [L.BTokenString "foo\n\n"]
+                  }
+              )
+          ],
+        code = [],
+        codeBlocks = fromList [],
+        meta = fromList []
+      }
+  p
     "0007-blocks-metadata"
     L.OrgDoc
       { cells =

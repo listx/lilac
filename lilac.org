@@ -3961,13 +3961,125 @@ bTokenParser isSrcBlock nowebOn = MP.choice parsers
     baseParsers :: [OrgParser BToken]
     baseParsers =
       [ BTokenString <$> (MP.takeWhile1P (Just "block token") (not . isSpace)),
-        BTokenString <$> (MP.takeWhile1P (Just "spaces inside block") isSpace)
+        BTokenString
+          . T.singleton
+          <$> (MP.label "space inside block" $ MP.satisfy isSpace)
       ]
     parsers =
       if isSrcBlock && nowebOn
         then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
         else baseParsers
 
+#+end_src
+
+It's important that the space parser in ~baseParsers~ above does /not/ use
+~MP.takeWhile1P~. Otherwise, it'll greedily consume all spaces including newlines,
+robbing it from the ending condition in ~someBTokensParser~ (where we expect a
+newline before ~#+end_~). Below we test the edge cases around detecting the end of
+a block.
+
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-ending
+#+begin_src org
+,#+name: empty
+,#+begin_src sh
+,#+end_src
+
+,#+name: end not in beginning of line
+,#+begin_src sh
+ ,#+end_src
+,#+end_src
+
+,#+name: end has no preceding newline
+,#+begin_src sh
+foo
+,#+end_src
+
+,#+name: end has preceding newline
+,#+begin_src sh
+foo
+
+,#+end_src
+
+,#+name: end has preceding newline (multiple)
+,#+begin_src sh
+foo
+
+
+,#+end_src
+#+end_src
+
+#+name: t:0007-blocks-ending
+#+begin_src haskell
+p
+  "0007-blocks-ending"
+  L.OrgDoc
+    { cells =
+        <<Expected blocks for 0007-blocks-ending>>,
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
+
+#+name: Expected blocks for 0007-blocks-ending
+#+header: :noweb off
+#+begin_src haskell
+[ L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("name", "empty")
+              ],
+          body = []
+        }
+    ),
+  L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("name", "end not in beginning of line")
+              ],
+          body = [L.BTokenString " #+end_src"]
+        }
+    ),
+  L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("name", "end has no preceding newline")
+              ],
+          body = [L.BTokenString "foo"]
+        }
+    ),
+  L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("name", "end has preceding newline")
+              ],
+          body = [L.BTokenString "foo\n"]
+        }
+    ),
+  L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("name", "end has preceding newline (multiple)")
+              ],
+          body = [L.BTokenString "foo\n\n"]
+        }
+    )
+]
 #+end_src
 
 A token inside a block is basically text or a Noweb link. However, the Noweb
@@ -6510,6 +6622,7 @@ spec = do
   <<t:0006-links>>
   <<t:0007-block-src-without-lang>>
   <<t:0007-blocks-empty>>
+  <<t:0007-blocks-ending>>
   <<t:0007-blocks-metadata>>
   <<t:0007-blocks-noweb-off>>
   <<t:0007-blocks-noweb>>
