@@ -6,9 +6,9 @@ let
   };
   scripts = import ./scripts.nix { inherit pkgs; };
   tools = [
+    pkgs.niv
     pkgs.cabal-install
     pkgs.editorconfig-checker
-    pkgs.niv
     pkgs.shellcheck
     pkgs.shfmt
     ourHaskell.nixfmt
@@ -77,45 +77,39 @@ let
         enable = true;
         package = devShellEnv;
       };
-
       nixfmt-rfc-style = {
         enable = true;
         package = devShellEnv;
         excludes = [ "nix/sources.nix" ];
       };
-
       ormolu = {
         enable = true;
         package = devShellEnv;
         entry = let opts = [ "--mode" "inplace" "--check-idempotence" ];
         in "${devShellEnv}/bin/ormolu ${toolOpts opts}";
       };
-
       shfmt = {
         enable = true;
         package = devShellEnv;
         entry = let
           opts = [
-            "--binary-next-line"
             "--indent"
             "0"
+            "--binary-next-line"
             "--func-next-line"
             "--write"
           ];
         in "${devShellEnv}/bin/shfmt ${toolOpts opts}";
       };
-
       shellcheck = {
         enable = true;
         package = devShellEnv;
       };
-
       check-tangled = {
         name = "check-tangled.sh";
         enable = true;
         always_run = true;
         entry = "./check-tangled.sh";
-        # Do not pass the changed files to the command.
         pass_filenames = false;
       };
     };
