@@ -64,22 +64,9 @@ let
         hlib.dontHyperlinkSource
         hlib.dontCoverage
         hlib.dontHaddock
-        (hlib.compose.appendConfigureFlags [
-          "--ghc-option=+RTS"
-          "--ghc-option=-A256m"
-          "--ghc-option=-n2m"
-          "--ghc-option=-RTS"
-        ])
-      ]
-
-        ++ lib.optional false hlib.disableOptimization
-
-        ++ lib.optional false hlib.enableExecutableProfiling
-
-        ++ lib.optional false hlib.doBenchmark
-
-        ++ lib.optional pkgs.stdenv.isAarch64 (hlib.compose.appendConfigureFlag
-          "--ghc-option=-fwhole-archive-hs-libs");
+        hlib.disableExecutableProfiling
+        hlib.disableLibraryProfiling
+      ];
 
     in lib.pipe haskellPkg confFns;
   gitHooksPkgs = import (import ./sources.nix)."git-hooks.nix";

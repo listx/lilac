@@ -1,5 +1,5 @@
 test: lilac.org
-	cabal test --ghc-options="-fforce-recomp"
+	cabal test
 	touch test
 lint: lilac.org
 	pre-commit run --all-files

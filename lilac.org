@@ -455,27 +455,12 @@ configureHaskellPkg = haskellPkg:
       hlib.dontHyperlinkSource
       hlib.dontCoverage
       hlib.dontHaddock
-      (hlib.compose.appendConfigureFlags [
-        "--ghc-option=+RTS"
-        "--ghc-option=<<RTS-A>>"
-        "--ghc-option=<<RTS-n>>"
-        "--ghc-option=-RTS"
-      ])
-    ]
-
-      ++ lib.optional false hlib.disableOptimization
-
-      ++ lib.optional false hlib.enableExecutableProfiling
-
-      ++ lib.optional false hlib.doBenchmark
-
-      ++ lib.optional pkgs.stdenv.isAarch64 (hlib.compose.appendConfigureFlag
-        "--ghc-option=-fwhole-archive-hs-libs");
+      hlib.disableExecutableProfiling
+      hlib.disableLibraryProfiling
+    ];
 
   in lib.pipe haskellPkg confFns;
 #+end_src
-
-The RTS flags are sourced from [[Cabal project file]] to keep things a bit DRY.
 
 *** =lilac= attribute
 
@@ -621,7 +606,7 @@ manually.
 #+name: make:Run tests
 #+begin_src makefile
 test: lilac.org
-	cabal test --ghc-options="-fforce-recomp"
+	cabal test
 	touch test
 #+end_src
 
@@ -1210,47 +1195,43 @@ GHC2024
 
 *** Cabal project file
 
+For options that should only affect Cabal builds, we want to specify such
+options inside [[cabal.project]] because these settings won't bleed over into
+=cabal2nix= (see [[code:Haskell overlays]]).
+
+#+name: cabal.project
 #+header: :tangle cabal.project
 #+begin_src haskell-cabal
 packages: *.cabal
 
-package *
-  test-show-details: direct
-  ghc-options:
-    -j8
-    +RTS
-    <<RTS-A>>
-    <<RTS-n>>
-    -RTS
-    -- The following sets -all_load and -dead_strip for ld in cctools
-    -- without it we get intermittent linker error on aarch64
-    -fwhole-archive-hs-libs
-    -fwrite-ide-info
-    -hiedir=.hie
+<<cabal-write-env-file>>
+<<cabal-faster-dev-build>>
+<<cabal-offline>>
+#+end_src
 
--- tell ghc to write the package environment file
+Write the GHC environment file to disk. This file is useful for seeing the
+packages that are available to load inside ~ghci~.
+
+#+name: cabal-write-env-file
+#+begin_src haskell-cabal
 write-ghc-environment-files: always
 
--- Define -O0 by default so that all dev processes are faster.
--- CI Nix builds are unaffected by this and will use the default -O1
+#+end_src
+
+Define =-O0= to speed up Cabal builds.
+
+#+name: cabal-faster-dev-build
+#+begin_src haskell-cabal
 optimization: False
 
--- Nix handles dependencies.
--- It is generally a bug if cabal has to download anything
--- In other words ~/.cabal should be empty (modulo some meta files)
+#+end_src
+
+Nix handles dependencies, so tell Cabal to work offline (it won't download any
+packages from Hackage).
+
+#+name: cabal-offline
+#+begin_src haskell-cabal
 active-repositories: none
-#+end_src
-
-The runtime system (RTS) flags are ~-A~ and ~-n~.
-
-#+name: RTS-A
-#+begin_src txt
--A256m
-#+end_src
-
-#+name: RTS-n
-#+begin_src txt
--n2m
 #+end_src
 
 *** =Setup.hs= file
