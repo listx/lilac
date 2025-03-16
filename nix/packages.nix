@@ -4,9 +4,7 @@ let
     name = "lilac-devShellEnv";
     paths = scripts ++ tools ++ [ ghc ];
   };
-
   scripts = import ./scripts.nix { inherit pkgs; };
-
   tools = [
     pkgs.cabal-install
     pkgs.editorconfig-checker
@@ -16,18 +14,14 @@ let
     ourHaskell.nixfmt
     ourHaskell.ormolu
   ];
-
   hlib = pkgs.haskell.lib;
   ghc = ourHaskell.ghc.withPackages
     (_: hlib.getHaskellBuildInputs ourHaskell.lilac);
-
   lib = pkgs.lib;
   ourHaskell = pkgs.haskell.packages.${ghcVersion}.extend
     (lib.composeManyExtensions haskellOverlays);
-
   ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.10.1";
   ghcVersion = "ghc" + ghcVersionWithoutDots;
-
   haskellOverlays = [ injectLilac tweakLilacBuild ];
 
   injectLilac = final: prev: {
@@ -42,9 +36,7 @@ let
       '' + drv.buildPhase;
     });
   };
-
   projectRoot = ../.;
-
   gnf = import (import ./sources.nix)."gitignore.nix" { inherit lib; };
   lilacSource = lib.cleanSourceWith {
     src = projectRoot;
@@ -66,7 +58,6 @@ let
       };
     in path: type: filterFunc path type;
   };
-
   configureHaskellPkg = haskellPkg:
     let
       confFns = [
@@ -91,7 +82,6 @@ let
           "--ghc-option=-fwhole-archive-hs-libs");
 
     in lib.pipe haskellPkg confFns;
-
   gitHooksPkgs = import (import ./sources.nix)."git-hooks.nix";
   pre-commit-check = gitHooksPkgs.run {
     src = projectRoot;
@@ -159,6 +149,5 @@ in {
       logo
     '';
   };
-
   lilac = ourHaskell.lilac;
 }

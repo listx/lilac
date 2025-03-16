@@ -115,6 +115,29 @@ import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude qualified (show)
 
+type OrgParser :: Type -> Type
+type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
+
+type OrgParserState :: Type
+data OrgParserState = OrgParserState
+  { styleMask :: StyleMask,
+    listLevels :: [Level],
+    listMarkers :: [ListMarker],
+    continuationIndent :: Int,
+    equationNumber :: Int
+  }
+  deriving stock (Eq, Show)
+
+defaultOrgParserState :: OrgParserState
+defaultOrgParserState =
+  OrgParserState
+    { styleMask = styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0
+    }
+
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { cells :: [Cell],
@@ -283,29 +306,6 @@ parseOrgDoc input = case MP.runParser
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
   Right (orgDoc, _orgParserState) -> Right orgDoc
-
-type OrgParser :: Type -> Type
-type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
-
-type OrgParserState :: Type
-data OrgParserState = OrgParserState
-  { styleMask :: StyleMask,
-    listLevels :: [Level],
-    listMarkers :: [ListMarker],
-    continuationIndent :: Int,
-    equationNumber :: Int
-  }
-  deriving stock (Eq, Show)
-
-defaultOrgParserState :: OrgParserState
-defaultOrgParserState =
-  OrgParserState
-    { styleMask = styleMaskFrom [],
-      listLevels = [],
-      listMarkers = [],
-      continuationIndent = 0,
-      equationNumber = 0
-    }
 
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do

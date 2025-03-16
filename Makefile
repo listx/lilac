@@ -7,7 +7,6 @@ lint: lilac.org
 build: lilac.org lilac.cabal
 	cabal build
 	touch build
-
 LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
 build-release: lilac.org lilac.cabal
 	nix-build ./nix/release.nix \

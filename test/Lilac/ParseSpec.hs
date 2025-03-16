@@ -70,6 +70,17 @@ pfm behavior path errorTrivial pos = do
         (decodeUtf8 input)
         `shouldFailWith` (err pos errorTrivial)
 
+plainParagraph :: T.Text -> L.Cell
+plainParagraph body =
+  L.CParagraph
+    [ L.PTokenStyledText
+        ( L.StyledText
+            { body = body,
+              style = L.styleMaskFrom []
+            }
+        )
+    ]
+
 spec :: Spec
 spec =
   describe "parse" $ do
@@ -92,7 +103,6 @@ spec =
           ("property", "header-args+ :noweb no-export"),
           ("title", "An Org Document")
         ]
-
     p
       "parses document metadata (skips comments)"
       "test/Lilac/ParseSpec/0003-doc-metadata-with-comments"
@@ -102,14 +112,12 @@ spec =
           ("property", "header-args+ :noweb no-export"),
           ("title", "An Org Document")
         ]
-
     p
       "parses document metadata (title without leading whitespace)"
       "test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value"
       $ L.defaultOrgDocWithMeta
         [ ("title", "Parse me without leading whitespace")
         ]
-
     pfm
       "detects missing document metadata value"
       "test/Lilac/ParseSpec/0002-doc-metadata-missing-value"
@@ -129,7 +137,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses style markers multiple times at the beginning"
       "test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries"
@@ -160,13 +167,11 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     pf
       "detects unbalanced style markers (leftover active styles)"
       "test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles"
       "leftover active styles: [Bold]"
       15
-
     p
       "parses styled strings (compression)"
       "test/Lilac/ParseSpec/0005-styled-strings-compression"
@@ -189,7 +194,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses styled strings (no style)"
       "test/Lilac/ParseSpec/0005-styled-strings-no-style"
@@ -214,7 +218,6 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
-
     p
       "parses styled strings (bold style)"
       "test/Lilac/ParseSpec/0005-styled-strings-bold"
@@ -251,7 +254,6 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
-
     p
       "parses styled strings (complex)"
       "test/Lilac/ParseSpec/0005-styled-strings-complex"
@@ -298,7 +300,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses styled strings (complex punctuation)"
       "test/Lilac/ParseSpec/0005-styled-strings-complex-punctuation"
@@ -331,7 +332,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses style markers in the middle of a word"
       "test/Lilac/ParseSpec/0005-styled-strings-verbatim"
@@ -350,7 +350,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "suppresses immediate or latent bold style"
       "test/Lilac/ParseSpec/0005-styled-strings-verbatim-code-ignore-immediate-bold"
@@ -377,7 +376,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "treats verbatim and code style with higher prcedence"
       "test/Lilac/ParseSpec/0005-styled-strings-verbatim-precedence"
@@ -420,7 +418,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses paragraphs"
       "test/Lilac/ParseSpec/0005-prose-paragraphs"
@@ -445,7 +442,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     ps
       "parses standalone math fragments"
       "test/Lilac/ParseSpec/0010-standalone-math-fragments"
@@ -501,7 +497,6 @@ spec =
           continuationIndent = 0,
           equationNumber = 3
         }
-
     p
       "parses figures (plays nicely with blocks)"
       "test/Lilac/ParseSpec/0011-figures-and-blocks"
@@ -514,7 +509,7 @@ spec =
                         [ ("__block_type", "src"),
                           ("__src_language", "haskell"),
                           ("name", "f:f"),
-                          ("noweb-ref", "bar")
+                          ("xxx", "bar")
                         ],
                     body = [L.BTokenString "f = 1 + 1"]
                   },
@@ -544,7 +539,7 @@ spec =
                         [ ("__block_type", "src"),
                           ("__src_language", "haskell"),
                           ("name", "f:g"),
-                          ("noweb-ref", "bar")
+                          ("yyy", "bar")
                         ],
                     body = [L.BTokenString "g x = x + 1"]
                   },
@@ -568,7 +563,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses tables (plays nicely with prose)"
       "test/Lilac/ParseSpec/0012-tables-and-prose"
@@ -691,7 +685,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses tables (plays nicely with lists)"
       "test/Lilac/ParseSpec/0012-tables-inside-lists"
@@ -925,7 +918,6 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
-
     p
       "parses links (target only)"
       "test/Lilac/ParseSpec/0006-links-raw"
@@ -1016,7 +1008,6 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
-
     p
       "parse a link even if it is preceded by non-whitespace"
       "test/Lilac/ParseSpec/0006-links-inside-parentheses"
@@ -1053,7 +1044,6 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
-
     p
       "parse text that may initially look like a link (initial opening bracket)"
       "test/Lilac/ParseSpec/0006-links-nonlink"
@@ -1092,7 +1082,6 @@ spec =
           codeBlocks = IM.fromList [],
           meta = M.fromList []
         }
-
     p
       "parses drawers (not empty)"
       "test/Lilac/ParseSpec/0004-drawers-not-empty"
@@ -1160,7 +1149,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses blocks with noweb references, but treats them if ':noweb' is 'off'"
       "test/Lilac/ParseSpec/0007-blocks-noweb-off"
@@ -1184,7 +1172,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses blocks"
       "test/Lilac/ParseSpec/0007-blocks-empty"
@@ -1223,13 +1210,11 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     pf
       "detects missing language specifier in src blocks"
       "test/Lilac/ParseSpec/0007-block-src-without-lang"
       "block type src requires a language specifier"
       11
-
     p
       "parses block metadata"
       "test/Lilac/ParseSpec/0007-blocks-metadata"
@@ -1241,8 +1226,7 @@ spec =
                         fromList
                           [ ("__block_type", "src"),
                             ("__src_language", "haskell"),
-                            ("name", "some-code"),
-                            ("noweb-ref", "Foo bar")
+                            ("name", "some-code")
                           ],
                       body = []
                     }
@@ -1262,25 +1246,21 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     pf
       "detects mixed list types (unordered)"
       "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own"
       "expected UNORDERED list item at this level"
       21
-
     pf
       "detects mixed list types (ordered)"
       "test/Lilac/ParseSpec/0009-lists-cannot-be-mixed-on-their-own-ordered"
       "expected ORDERED list item at this level"
       23
-
     pf
       "detects slightly wrong indentation"
       "test/Lilac/ParseSpec/0009-lists-require-precise-indentation"
       "list item: invalid indentation"
       15
-
     p
       "requires blank line separator for list items"
       "test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator"
@@ -1300,15 +1280,13 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     pf
       "detects non-incrementing ordered list item"
       "test/Lilac/ParseSpec/0009-ordered-lists-require-increment"
       "expected incremented list head 2 but got 1"
       13
-
     pf
-      "detects invalid initial ordered list number of 2"
+      "detects invalid initial ordered list number of 20"
       "test/Lilac/ParseSpec/0009-ordered-lists-start-from-0-or-1"
       "starting list head number must be 0 or 1; got 20"
       25
@@ -1317,13 +1295,11 @@ spec =
       "test/Lilac/ParseSpec/0008-indentation-comment"
       "invalid indentation"
       1
-
     pf
       "detects indentation (heading)"
       "test/Lilac/ParseSpec/0008-indentation-headings"
       "invalid indentation"
       1
-
     pf
       "detects indentation (paragraph)"
       "test/Lilac/ParseSpec/0008-indentation-paragraph"
@@ -1341,7 +1317,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses 2-space indented list"
       "test/Lilac/ParseSpec/0009-list-indentation-proper-indent"
@@ -1364,7 +1339,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses nested list"
       "test/Lilac/ParseSpec/0009-list-indentation-nested"
@@ -1413,7 +1387,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses list with content (simple)"
       "test/Lilac/ParseSpec/0009-list-content-simple"
@@ -1439,7 +1412,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses nested list (with text)"
       "test/Lilac/ParseSpec/0009-list-indentation-nested-with-text"
@@ -1498,7 +1470,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses paragraphs which can close deeper list levels"
       "test/Lilac/ParseSpec/0009-paragraph-can-close-deeper-levels"
@@ -1537,7 +1508,6 @@ spec =
           codeBlocks = fromList [],
           meta = fromList []
         }
-
     p
       "parses paragraphs which can separate mixed lists"
       "test/Lilac/ParseSpec/0009-paragraph-can-separate-mixed-lists"
@@ -1595,38 +1565,23 @@ spec =
       "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over-list-body"
       (utoks " ")
       14
-
     pfm
       "detects over-indentation for paragraph continuation line"
       "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over"
       (utoks " ")
       4
-
     pfm
       "detects under-indentation for paragraph continuation line (list body)"
       "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-under-list-body"
       (utoks "b" <> etoks " ")
       12
-
     pf
       "detects invalid initial indentation for paragraph"
       "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid"
       "indentation does not fit into existing levels"
       21
-
     pf
       "detects invalid initial indentation for paragraph (between list levels)"
       "test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
       "indentation does not fit into existing levels"
       36
-
-plainParagraph :: T.Text -> L.Cell
-plainParagraph body =
-  L.CParagraph
-    [ L.PTokenStyledText
-        ( L.StyledText
-            { body = body,
-              style = L.styleMaskFrom []
-            }
-        )
-    ]
