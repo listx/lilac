@@ -6355,7 +6355,7 @@ import Relude
     (.),
     (<>),
   )
-import Test.Hspec (Spec, before, describe, it)
+import Test.Hspec (Spec, before, it)
 import Test.Hspec.Megaparsec
   ( ET,
     elabel,
@@ -6483,62 +6483,61 @@ Below are all of the individual test cases.
 #+name: f:spec
 #+begin_src haskell
 spec :: Spec
-spec =
-  describe "parse" $ do
-    <<t:empty-input>>
-    <<t:0001-blankline>>
-    <<t:0002-doc-metadata:basic>>
-    <<t:0003-doc-metadata-with-comments>>
-    <<t:0002-doc-metadata-whitespace-before-value>>
-    <<t:0002-doc-metadata-missing-value>>
-    <<t:0005-styled-strings-ignore-marker-inside-word>>
-    <<t:0005-styled-strings-messy-boundaries>>
-    <<t:0005-styled-strings-leftover-active-styles>>
-    <<t:0005-styled-strings-compression>>
-    <<t:0005-styled-strings-no-style>>
-    <<t:0005-styled-strings-bold>>
-    <<t:0005-styled-strings-complex>>
-    <<t:0005-styled-strings-complex-punctuation>>
-    <<t:0005-styled-strings-verbatim>>
-    <<t:0005-styled-strings-verbatim-code-ignore-immediate-bold>>
-    <<t:0005-styled-strings-verbatim-precedence>>
-    <<t:0005-prose-paragraphs>>
-    <<t:0010-standalone-math-fragments>>
-    <<t:0011-figures-and-blocks>>
-    <<t:0012-tables-and-prose>>
-    <<t:0012-tables-inside-lists>>
-    <<t:0006-links>>
-    <<t:0006-links-raw>>
-    <<t:0006-links-inside-parentheses>>
-    <<t:0006-links-nonlink>>
-    <<t:0004-drawers-empty>>
-    <<t:0004-drawers-not-empty>>
-    <<t:0007-blocks-noweb>>
-    <<t:0007-blocks-noweb-off>>
-    <<t:0007-blocks-empty>>
-    <<t:0007-block-src-without-lang>>
-    <<t:0007-blocks-metadata>>
-    <<t:0009-lists-cannot-be-mixed-on-their-own>>
-    <<t:0009-lists-cannot-be-mixed-on-their-own-ordered>>
-    <<t:0009-lists-require-precise-indentation>>
-    <<t:0009-list-items-need-blank-line-separator>>
-    <<t:0009-ordered-lists-require-increment>>
-    <<t:0009-ordered-lists-start-from-0-or-1>>
-    <<t:0008-indentation-comment>>
-    <<t:0008-indentation-headings>>
-    <<t:0008-indentation-paragraph>>
-    <<t:0009-list-indentation-no-indent>>
-    <<t:0009-list-indentation-proper-indent>>
-    <<t:0009-list-indentation-nested>>
-    <<t:0009-list-content-simple>>
-    <<t:0009-list-indentation-nested-with-text>>
-    <<t:0009-paragraph-can-close-deeper-levels>>
-    <<t:0009-paragraph-can-separate-mixed-lists>>
-    <<t:0005-paragraph-indentation-mismatch-over-list-body>>
-    <<t:0005-paragraph-indentation-mismatch-over>>
-    <<t:0005-paragraph-indentation-mismatch-under-list-body>>
-    <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid>>
-    <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels>>
+spec = do
+  <<t:empty-input>>
+  <<t:0001-blankline>>
+  <<t:0002-doc-metadata-missing-value>>
+  <<t:0002-doc-metadata-whitespace-before-value>>
+  <<t:0002-doc-metadata:basic>>
+  <<t:0003-doc-metadata-with-comments>>
+  <<t:0004-drawers-empty>>
+  <<t:0004-drawers-not-empty>>
+  <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels>>
+  <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid>>
+  <<t:0005-paragraph-indentation-mismatch-over-list-body>>
+  <<t:0005-paragraph-indentation-mismatch-over>>
+  <<t:0005-paragraph-indentation-mismatch-under-list-body>>
+  <<t:0005-prose-paragraphs>>
+  <<t:0005-styled-strings-bold>>
+  <<t:0005-styled-strings-complex-punctuation>>
+  <<t:0005-styled-strings-complex>>
+  <<t:0005-styled-strings-compression>>
+  <<t:0005-styled-strings-ignore-marker-inside-word>>
+  <<t:0005-styled-strings-leftover-active-styles>>
+  <<t:0005-styled-strings-messy-boundaries>>
+  <<t:0005-styled-strings-no-style>>
+  <<t:0005-styled-strings-verbatim-code-ignore-immediate-bold>>
+  <<t:0005-styled-strings-verbatim-precedence>>
+  <<t:0005-styled-strings-verbatim>>
+  <<t:0006-links-inside-parentheses>>
+  <<t:0006-links-nonlink>>
+  <<t:0006-links-raw>>
+  <<t:0006-links>>
+  <<t:0007-block-src-without-lang>>
+  <<t:0007-blocks-empty>>
+  <<t:0007-blocks-metadata>>
+  <<t:0007-blocks-noweb-off>>
+  <<t:0007-blocks-noweb>>
+  <<t:0008-indentation-comment>>
+  <<t:0008-indentation-headings>>
+  <<t:0008-indentation-paragraph>>
+  <<t:0009-list-content-simple>>
+  <<t:0009-list-indentation-nested-with-text>>
+  <<t:0009-list-indentation-nested>>
+  <<t:0009-list-indentation-no-indent>>
+  <<t:0009-list-indentation-proper-indent>>
+  <<t:0009-list-items-need-blank-line-separator>>
+  <<t:0009-lists-cannot-be-mixed-on-their-own-ordered>>
+  <<t:0009-lists-cannot-be-mixed-on-their-own>>
+  <<t:0009-lists-require-precise-indentation>>
+  <<t:0009-ordered-lists-require-increment>>
+  <<t:0009-ordered-lists-start-from-0-or-1>>
+  <<t:0009-paragraph-can-close-deeper-levels>>
+  <<t:0009-paragraph-can-separate-mixed-lists>>
+  <<t:0010-standalone-math-fragments>>
+  <<t:0011-figures-and-blocks>>
+  <<t:0012-tables-and-prose>>
+  <<t:0012-tables-inside-lists>>
 #+end_src
 
 * CLI
