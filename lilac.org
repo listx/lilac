@@ -1557,12 +1557,6 @@ import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude qualified (show)
 
-<<Data structures>>
-<<Parsing mechanism>>
-#+end_src
-
-#+name: Data structures
-#+begin_src haskell
 <<type:OrgParser>>
 <<data:OrgParserState>>
 <<data:OrgDoc>>
@@ -1582,10 +1576,7 @@ import Prelude qualified (show)
 <<data:MathFragment>>
 <<data:Figure>>
 <<data:Table>>
-#+end_src
 
-#+name: Parsing mechanism
-#+begin_src haskell
 <<f:skipNewlinesAndComments>>
 <<f:lexeme>>
 <<f:parseOrgDoc>>
@@ -6176,7 +6167,6 @@ data Table = Table
     grid :: M.Map (Int, Int) Prose
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 [[Tables][Tables]] are like [[data:Figure][figures]] in that they have some metadata. Unlike a figure which
