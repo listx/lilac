@@ -112,6 +112,14 @@ let
         entry = "./check-tangled.sh";
         pass_filenames = false;
       };
+      unit-test = {
+        name = "unit-test.sh";
+        enable = true;
+        always_run = true;
+        entry = "./unit-test.sh";
+        pass_filenames = false;
+        stages = [ "pre-push" ];
+      };
     };
   };
 

@@ -736,6 +736,7 @@ pre-commit-check = gitHooksPkgs.run {
     <<hook-shfmt>>
     <<hook-shellcheck>>
     <<hook-check-tangled>>
+    <<hook-unit-test>>
   };
 };
 
@@ -957,6 +958,94 @@ check-tangled = {
 
 We set ~pass_filenames = false~ because [[check-tangled.sh]] runs against the entire
 index and tree, regardless of the changed files in the index.
+
+*** Run lilac unit test before pushing
+
+Running unit tests requires compiling the tests, which takes more than a few
+seconds. So it's a little bit resource intensive and we don't want to run it on
+every commit. So run it when we ~git push~ to save our work to a remote.
+
+#+name: hook-unit-test
+#+begin_src nix
+unit-test = {
+  name = "unit-test.sh";
+  enable = true;
+  always_run = true;
+  entry = "./unit-test.sh";
+  pass_filenames = false;
+  stages = [ "pre-push" ];
+};
+#+end_src
+
+#+name: unit-test.sh
+#+header: :tangle unit-test.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src bash
+set -euo pipefail
+
+SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
+
+<<unit-test-is-wip>>
+
+main()
+{
+	>/dev/null pushd "${SCRIPT_ROOT}"
+
+	<<unit-test-skip-if-wip>>
+
+	<<unit-test-fail-if-dirty-tree>>
+
+	<<unit-test-run>>
+}
+
+main "$@"
+#+end_src
+
+We don't want to run unit tests if the current commit (~HEAD~ in Git) is a
+work-in-progress (WIP) commit.
+
+#+name: unit-test-is-wip
+#+begin_src sh
+is_wip()
+{
+	git show -s --format=%s HEAD \
+		| grep -qi '^\(update\|wip\|fixup\|f \|s \)'
+}
+#+end_src
+
+#+name: unit-test-skip-if-wip
+#+begin_src sh
+if is_wip; then
+	echo >&2 "skipping (WIP commit)"
+	return
+fi
+#+end_src
+
+We can't just invoke ~make test~ directly to run unit tests for this hook, because
+it may be the case that the working tree is dirty. If the tree is dirty, the
+results of the unit test no longer reflect what we are pushing to the remote, so
+we need to abort if the tree is dirty.
+
+#+name: unit-test-fail-if-dirty-tree
+#+begin_src sh
+if [[ -n $(git status --porcelain) ]]; then
+	echo >&2 "$0: dirty tree"
+	return 1
+fi
+#+end_src
+
+For invoking the unit tests, we run ~make test~ (like we normally do during
+development).
+
+#+name: unit-test-run
+#+begin_src sh
+if make test; then
+	echo >&2 "OK"
+else
+	echo >&2 "$0: failed"
+	return 1
+fi
+#+end_src
 
 ** GitHub Actions
 
@@ -1822,6 +1911,19 @@ p
 
 #+header: :tangle test/Lilac/ParseSpec/0001-blankline
 #+begin_src org
+#+end_src
+
+At the other end of the spectrum, Lilac should be able to parse itself
+(=lilac.org=).
+
+#+name: t:self-parse
+#+begin_src haskell
+before (readFrom "" "lilac.org") $ do
+  it "self-parse" $ \input -> do
+    MP.runParser
+      (runStateT L.orgDocParser L.defaultOrgParserState)
+      "lilac.org"
+      `shouldSucceedOn` (decodeUtf8 input)
 #+end_src
 
 ** =docMetaParser=
@@ -6552,6 +6654,7 @@ import Test.Hspec.Megaparsec
     fancy,
     shouldFailWith,
     shouldParse,
+    shouldSucceedOn,
     utoks,
   )
 import Text.Megaparsec qualified as MP
@@ -6676,6 +6779,7 @@ Below are all of the individual test cases.
 spec :: Spec
 spec = do
   <<t:empty-input>>
+  <<t:self-parse>>
   <<t:0001-blankline>>
   <<t:0002-doc-metadata-missing-value>>
   <<t:0002-doc-metadata-whitespace-before-value>>

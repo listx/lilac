@@ -28,6 +28,7 @@ import Test.Hspec.Megaparsec
     fancy,
     shouldFailWith,
     shouldParse,
+    shouldSucceedOn,
     utoks,
   )
 import Text.Megaparsec qualified as MP
@@ -94,6 +95,12 @@ spec = do
       "empty input"
       ""
       `shouldParse` (L.defaultOrgDoc, L.defaultOrgParserState)
+  before (readFrom "" "lilac.org") $ do
+    it "self-parse" $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        "lilac.org"
+        `shouldSucceedOn` (decodeUtf8 input)
   p
     "0001-blankline"
     L.defaultOrgDoc
