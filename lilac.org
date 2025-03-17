@@ -1515,7 +1515,7 @@ main = defaultMain
 
 * Org parser
 
-We use Megaparsec to parse an Org document. The parsing requires us to read in
+We use [[https://github.com/mrkkrp/megaparsec][Megaparsec]] to parse an Org document. The parsing requires us to read in
 everything in a single Org file.
 
 The parsing mechanism is in [[file:src/Lilac/Parse.hs]], which we describe below. We
@@ -1726,15 +1726,15 @@ whitespace to separate meaningful tokens from each other. One way to deal with
 (necessary) whitespace is to bake in whitespace parsers into each token we want
 to parse. This gets cumbersome so we want to instead be able to teach parsers to
 be able to skip over trailing whitespace. This way, these parsers will all know
-how to deal with whitespace in a uniform way. This is what we do in
+how to deal with whitespace in a uniform way. For example, this is what we do in
 [[f:cellParser]] where we wrap all of the major =Cell= parsers with a =lexeme=.
 
 A slightly separate problem is how to deal with comments. In a sense they are
 just like whitespace because they hold no meaningful information on their own.
 Luckily, =Text.Megaparsec.Char.Lexer= provides a =space= helper which can create a
-parser which can skip over whitespace as well as comments. This is what we use
-below to define =skipNewlinesAndComments=. See
-https://markkarpov.com/tutorial/megaparsec.html#lexing for more information.
+parser that skips over whitespace as well as comments. This is what we use below
+to define =skipNewlinesAndComments=. See [[https://markkarpov.com/tutorial/megaparsec.html#lexing][the Megaparsec tutorial]] for more
+information.
 
 #+name: f:skipNewlinesAndComments
 #+begin_src haskell
@@ -1770,29 +1770,31 @@ We only parse newline characters in =whiteSpaceParser= above. We don't parse
 spaces. This is because we do not want to skip over any /indentation/ --- that is,
 space characters immediately following a newline. Such indentation could be an
 error (for example, for headings or paragraphs), or a necessary part of a cell
-(for =CListItem= cells), and so we leave that determination up to other parsers.
+(such as =CListItem= cells in [[f:listItemsEndParser]]), and so we leave that
+determination up to other parsers.
 
 It's important that we use =takeWhile1P= for =whiteSpaceParser= (where the =1= denotes
-that it requires at least 1 newline character) because otherwise if it accepts 0
-or more newlines, it may loop forever upon seeing non-newline input.
+that it requires at least 1 newline character) because otherwise if it is
+allowed to accept 0 newlines, it may loop forever upon seeing non-newline input.
 
 The ="# "= for =singleLineCommentParser= signifies that single-line comments start
 with a pound sign and a space. The =blockCommentParser= uses =L.skipBlockComment= to
 denote a region of text which is considered a commented area. We include
 explicit newlines in =blockCommentParser= because we want to ensure that block
-comment lines are always on their own (without any trailing text on the same
-line right after it).
+comment markers are always on their own line (e.g., ~#+end_comment~ is valid, but
+~#+end_comment foo~ is not).
 
 =Text.Megaparsec.Char.Lexer= also defines a =L.skipBlockCommentNested= helper, which
 is able to understand if the ending marker of a block (=#+end_comment\n= for us)
 should be ignored because it's nested and instead skip past it to find the true
-(non-nested) ending marker. We use the non-nested =L.skipBlockComment= to keep the
-syntax simple.
+(non-nested) ending marker. That's a little too complicated (and it's probably
+not very commonly needed). So we use the non-nested =L.skipBlockComment= to keep
+the syntax simple.
 
 Lastly we have =lexeme=, which wraps around any other parser to make it consume
-trailing newlines and comments. This is used in [[f:cellParser]]. Note that it
+trailing /newlines and comments/. This is used in [[f:cellParser]]. Note that it
 does not consume any trailing spaces, because space characters are important for
-detecting indentation and we wouldn't want to skip past such space characters.
+detecting indentation and we wouldn't want to skip past them.
 
 #+name: f:lexeme
 #+begin_src haskell
@@ -1820,22 +1822,21 @@ We use two major data structures for parsing. The first is a *list of
 
   - LaTeX fragments (typically equations).
 
-This scheme is good for quickly making sense of the overall document
-structure in linear fashion, start to finish. It also simplifies the parsing
-data structure (we just parse one cell after the other). It's worth mentioning
-that using a tree data structure for the headings (which naturally form a
-tree-like hierarchy) could be useful for situations where tree-based
-manipulations are desirable; however we will never need to do this for purposes
-of weaving the Org input into HTML (or any other format). Hence our preference
-of for a list instead of a tree.
+This scheme is good for quickly making sense of the overall document structure
+in linear fashion, start to finish. It also simplifies the parsing data
+structure --- we just parse one cell after the other. It's worth mentioning that
+using a tree data structure for the headings could be useful for situations
+where tree-based manipulations are desirable; however we will never need to do
+such manipulations for purposes of weaving the Org input into HTML (or any other
+format). Hence our preference for arranging the cells as a list instead of a
+tree.
 
 The second major data structure is a *directed acyclic graph (DAG) for tangled
 code blocks*, which we call a *code graph*, for handling Noweb references. Noweb
 code blocks can reference other Noweb code blocks, so we create a dependency
 graph for each code block which will get tangled to a file. That is, each
-would-be-tangled file has its own code graph. Note that multiple code blocks can
-reference (depend on) the same code block, which is why this is a graph and not
-a tree.
+would-be-tangled file has its own code graph. These code graphs are discussed
+later in [[id:b449a097-d702-4fd6-98de-cb81f7e49177][Code graphs]].
 
 In summary an Org document is made up of cells and code graphs, as well as some
 metadata (the title, author name, etc).
@@ -1883,12 +1884,12 @@ type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
 
 #+end_src
 
-The =OrgParserState= is the custom state we want to use to read and write from
-while parsing. The =styleMask= is discussed in [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the section on parsing styles]]. The
-=listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The =continuationIndent=
-is used to keep track of how much indentation to expect inside a single
-(contiguous) piece of content; see [[f:paragraphParser]] and
-[[f:listHeadIndentLevelParser]] for a usage example.
+The =OrgParserState= is the custom state we want to use while parsing. The
+=styleMask= is discussed in [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the section on parsing styles]]. The =listLevels= and
+=listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The =continuationIndent= is used to keep
+track of how much indentation to expect inside a single (contiguous) piece of
+content; see [[f:paragraphParser]] and [[f:listHeadIndentLevelParser]] for a usage
+example.
 
 #+name: data:OrgParserState
 #+begin_src haskell
@@ -1916,10 +1917,10 @@ defaultOrgParserState =
 
 The =orgDocParser= first needs to parse any metadata associated with the document,
 such as the title and author. It starts by skipping any leading
-whitespace/comments. We have to do this first because all of the other parsers
+whitespace\/comments. We have to do this first because all of the other parsers
 we use will follow the pattern of parsing the thing we want, followed by
 skipping over as much trailing whitespace as possible. In other words, none of
-the parsers are able to deal with leading whitespace/comments, so we have to
+the parsers are able to deal with leading whitespace\/comments, so we have to
 deal with it here separately.
 
 #+name: f:orgDocParser
