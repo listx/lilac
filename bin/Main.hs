@@ -44,6 +44,7 @@ import Relude
     (<$>),
     (<>),
   )
+import System.Exit (die)
 import Text.Megaparsec qualified as MP
 import Text.Pretty.Simple qualified as PP
 
@@ -82,7 +83,8 @@ lilacCheck globalOpts checkOpts = do
           checkOpts.input
           (decodeUtf8 bytes)
   case parseResult of
-    Left errBundle -> putStrLn $ MP.errorBundlePretty errBundle
+    Left errBundle -> do
+      die $ MP.errorBundlePretty errBundle
     Right orgDoc -> do
       putStrLn $ checkOpts.input <> ": OK"
       when (globalOpts.verbose) $ do
