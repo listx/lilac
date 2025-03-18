@@ -331,7 +331,7 @@ ghcVersion = "ghc" + ghcVersionWithoutDots;
 
 Going back to ~ourHaskell~, the ~haskellOverlays~ are straightforward enough. The
 first overlay ~injectLilac~ adds a new Haskell package called ~lilac~. The other one
-is ~tweakLilacBuild~ which adjusts the the build process so that the [[id:3c576a02-418b-431b-ab96-e4936e977fb7][Template
+is ~tweakLilacBuild~ which adjusts the build process so that the [[id:3c576a02-418b-431b-ab96-e4936e977fb7][Template
 Haskell code]] can use the ~LILAC_GIT_VERSION~ environment variable to use as the
 output for the ~--version~ flag.
 
@@ -703,7 +703,7 @@ before creating a new commit. It's useful to add linters and other things in
 here.
 
 There is a project called https://pre-commit.com which is in the business of
-standardizing Git hooks. One of the selling points is that that for the various
+standardizing Git hooks. One of the selling points is that for the various
 formatters and linters that it already supports, it only runs them against
 changed files in the Git index by default. This optimization is annoying to set
 up separately for each formatter or linter, so it's nice to let ~pre-commit~
