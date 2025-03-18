@@ -125,6 +125,11 @@ let
         enable = true;
         package = devShellEnv;
       };
+      sort-file-contents = {
+        enable = true;
+        files = "\\.vale/styles/config/vocabularies/Lilac/accept\\.txt$";
+        settings = { ignore-case = true; };
+      };
     };
   };
 

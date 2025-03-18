@@ -740,6 +740,7 @@ pre-commit-check = gitHooksPkgs.run {
     <<hook-check-tangled-vs-tracked>>
     <<hook-unit-test>>
     <<hook-vale>>
+    <<hook-sort-file-contents>>
   };
 };
 
@@ -1085,6 +1086,7 @@ pkgs.vale
 Use a custom "Lilac" vocabulary that has some words that Vale doesn't recognize
 by default. We expect this list to grow over time.
 
+#+name: .vale/styles/config/vocabularies/Lilac/accept.txt
 #+header: :tangle .vale/styles/config/vocabularies/Lilac/accept.txt
 #+begin_src txt
 autogenerate
@@ -1114,6 +1116,21 @@ Relude
 sandbox
 src
 subcommand
+#+end_src
+
+*** Sort file contents
+
+=pre-commit= comes with a hook to check that a file's contents are sorted. This is
+useful for checking that [[.vale/styles/config/vocabularies/Lilac/accept.txt]] stays
+sorted.
+
+#+name: hook-sort-file-contents
+#+begin_src nix
+sort-file-contents = {
+  enable = true;
+  files = "\\.vale/styles/config/vocabularies/Lilac/accept\\.txt$";
+  settings = { ignore-case = true; };
+};
 #+end_src
 
 ** GitHub Actions
