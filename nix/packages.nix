@@ -13,6 +13,7 @@ let
     pkgs.shfmt
     ourHaskell.nixfmt
     ourHaskell.ormolu
+    pkgs.vale
   ];
   hlib = pkgs.haskell.lib;
   ghc = ourHaskell.ghc.withPackages
@@ -119,6 +120,10 @@ let
         entry = "./unit-test.sh";
         pass_filenames = false;
         stages = [ "pre-push" ];
+      };
+      vale = {
+        enable = true;
+        package = devShellEnv;
       };
     };
   };

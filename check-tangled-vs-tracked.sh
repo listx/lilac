@@ -15,6 +15,8 @@ known_not_tangled=(
 
 	# Images.
 	image/PNG-Gradient.png
+
+	.vale/styles/.gitkeep
 )
 
 # List all files we explicitly tangle from Org files.

@@ -288,6 +288,7 @@ tools = [
   <<tool-shfmt>>
   <<tool-nixfmt>>
   <<tool-ormolu>>
+  <<tool-vale>>
 ];
 #+end_src
 
@@ -737,6 +738,7 @@ pre-commit-check = gitHooksPkgs.run {
     <<hook-shellcheck>>
     <<hook-check-tangled-vs-tracked>>
     <<hook-unit-test>>
+    <<hook-vale>>
   };
 };
 
@@ -905,6 +907,8 @@ known_not_tangled=(
 
 	# Images.
 	image/PNG-Gradient.png
+
+	.vale/styles/.gitkeep
 )
 
 # List all files we explicitly tangle from Org files.
@@ -1045,6 +1049,65 @@ else
 	echo >&2 "$0: failed"
 	return 1
 fi
+#+end_src
+
+*** General prose style check
+
+Use [[https://vale.sh/][Vale]] to check basic prose style and spelling. The great thing about Vale is
+that it understands Org syntax, so it knows to skip over words inside code
+blocks and ~code~ or =verbatim= styles. This obviously helps with only checking
+spelling in the places we care about.
+
+#+name: hook-vale
+#+begin_src nix
+vale = {
+  enable = true;
+  package = devShellEnv;
+};
+#+end_src
+
+#+header: :tangle .vale.ini
+#+begin_src txt
+StylesPath = .vale/styles
+MinAlertLevel = suggestion
+Vocab = Lilac
+
+[*.{org}]
+BasedOnStyles = Vale
+#+end_src
+
+#+name: tool-vale
+#+begin_src nix
+pkgs.vale
+#+end_src
+
+Use a custom "Lilac" vocabulary that has some words that Vale doesn't recognize
+by default. We expect this list to grow over time.
+
+#+header: :tangle .vale/styles/config/vocabularies/Lilac/accept.txt
+#+begin_src txt
+autogenerate
+boolean
+combinator
+declaratively
+dedent
+Dependabot
+Direnv
+formatter
+Git
+Hackage
+hardcode
+hashmap
+Hspec
+Megaparsec
+memoize
+Niv
+Nixkell
+Nixpkgs
+Noweb
+Orgmode
+sandbox
+subcommand
 #+end_src
 
 ** GitHub Actions
