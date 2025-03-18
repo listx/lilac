@@ -105,11 +105,11 @@ let
         enable = true;
         package = devShellEnv;
       };
-      check-tangled = {
-        name = "check-tangled.sh";
+      check-tangled-vs-tracked = {
+        name = "check-tangled-vs-tracked.sh";
         enable = true;
         always_run = true;
-        entry = "./check-tangled.sh";
+        entry = "./check-tangled-vs-tracked.sh";
         pass_filenames = false;
       };
       unit-test = {

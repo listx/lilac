@@ -735,7 +735,7 @@ pre-commit-check = gitHooksPkgs.run {
     <<hook-ormolu>>
     <<hook-shfmt>>
     <<hook-shellcheck>>
-    <<hook-check-tangled>>
+    <<hook-check-tangled-vs-tracked>>
     <<hook-unit-test>>
   };
 };
@@ -885,8 +885,8 @@ Run a script which can detect whether we've accounted for all tracked files via
 Literate Programming. That is, we want to detect any files that are checked into
 source control without being tangled from an Org file.
 
-#+name: check-tangled.sh
-#+header: :tangle check-tangled.sh
+#+name: check-tangled-vs-tracked.sh
+#+header: :tangle check-tangled-vs-tracked.sh
 #+header: :shebang #!/usr/bin/env bash
 #+begin_src bash
 set -euo pipefail
@@ -945,19 +945,19 @@ main "$@"
 
 Eventually this script's features should be implemented in Lilac natively.
 
-#+name: hook-check-tangled
+#+name: hook-check-tangled-vs-tracked
 #+begin_src nix
-check-tangled = {
-  name = "check-tangled.sh";
+check-tangled-vs-tracked = {
+  name = "check-tangled-vs-tracked.sh";
   enable = true;
   always_run = true;
-  entry = "./check-tangled.sh";
+  entry = "./check-tangled-vs-tracked.sh";
   pass_filenames = false;
 };
 #+end_src
 
-We set ~pass_filenames = false~ because [[check-tangled.sh]] runs against the entire
-index and tree, regardless of the changed files in the index.
+We set ~pass_filenames = false~ because [[check-tangled-vs-tracked.sh]] runs against
+the entire index and tree, regardless of the changed files in the index.
 
 *** Run lilac unit test before pushing
 
