@@ -94,7 +94,7 @@ spec = do
       (runStateT L.orgDocParser L.defaultOrgParserState)
       "empty input"
       ""
-      `shouldParse` (L.defaultOrgDoc, L.defaultOrgParserState)
+      `shouldParse` (L.defaultOrgDoc [], L.defaultOrgParserState)
   before (readFrom "" "lilac.org") $ do
     it "self-parse" $ \input -> do
       MP.runParser
@@ -103,19 +103,19 @@ spec = do
         `shouldSucceedOn` (decodeUtf8 input)
   p
     "0001-blankline"
-    L.defaultOrgDoc
+    (L.defaultOrgDoc [])
   pfm
     "0002-doc-metadata-missing-value"
     (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
     7
   p
     "0002-doc-metadata-whitespace-before-value"
-    $ L.defaultOrgDocWithMeta
+    $ L.defaultOrgDoc
       [ ("title", "Parse me without leading whitespace")
       ]
   p
     "0002-doc-metadata"
-    $ L.defaultOrgDocWithMeta
+    $ L.defaultOrgDoc
       [ ("author", "A. U. Thor"),
         ("auto_tangle", "t"),
         ("property", "header-args+ :noweb no-export"),
@@ -123,7 +123,7 @@ spec = do
       ]
   p
     "0003-doc-metadata-with-comments"
-    $ L.defaultOrgDocWithMeta
+    $ L.defaultOrgDoc
       [ ("author", "A. U. Thor"),
         ("auto_tangle", "t"),
         ("property", "header-args+ :noweb no-export"),

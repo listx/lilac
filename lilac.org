@@ -1528,7 +1528,6 @@ interleaved tests are executed), take a look at the [[Testing framework]].
 #+begin_src haskell
 module Lilac.Parse
   ( defaultOrgDoc,
-    defaultOrgDocWithMeta,
     defaultOrgParserState,
     orgDocParser,
     parseOrgDoc,
@@ -1667,6 +1666,7 @@ import Prelude qualified (show)
 <<f:lexeme>>
 <<f:parseOrgDoc>>
 <<f:orgDocParser>>
+<<f:defaultOrgDoc>>
 <<f:docMetaEntryParser>>
 <<f:docMetaParser>>
 <<f:cellParser>>
@@ -1942,17 +1942,15 @@ orgDocParser = do
         meta = meta
       }
 
-defaultOrgDoc :: OrgDoc
-defaultOrgDoc =
-  OrgDoc
-    { cells = [],
-      code = [],
-      codeBlocks = IM.fromList [],
-      meta = M.fromList []
-    }
+#+end_src
 
-defaultOrgDocWithMeta :: [(T.Text, T.Text)] -> OrgDoc
-defaultOrgDocWithMeta metas =
+The =defaultOrgDoc= is useful for constructing a default (mostly blank) ~OrgDoc~. It
+is used mainly in testing.
+
+#+name: f:defaultOrgDoc
+#+begin_src haskell
+defaultOrgDoc :: [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDoc metas =
   OrgDoc
     { cells = [],
       code = [],
@@ -1975,7 +1973,7 @@ it "empty input" $ do
     (runStateT L.orgDocParser L.defaultOrgParserState)
     "empty input"
     ""
-    `shouldParse` (L.defaultOrgDoc, L.defaultOrgParserState)
+    `shouldParse` (L.defaultOrgDoc [], L.defaultOrgParserState)
 #+end_src
 
 We should also be able to parse blank documents (whitespace only).
@@ -1984,7 +1982,7 @@ We should also be able to parse blank documents (whitespace only).
 #+begin_src haskell
 p
   "0001-blankline"
-  L.defaultOrgDoc
+  (L.defaultOrgDoc [])
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0001-blankline
@@ -2064,7 +2062,7 @@ Below are some unit test cases for parsing metadata.
 #+begin_src haskell
 p
   "0002-doc-metadata"
-  $ L.defaultOrgDocWithMeta
+  $ L.defaultOrgDoc
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
       ("property", "header-args+ :noweb no-export"),
@@ -2109,7 +2107,7 @@ Yet another comment.
 #+begin_src haskell
 p
   "0003-doc-metadata-with-comments"
-  $ L.defaultOrgDocWithMeta
+  $ L.defaultOrgDoc
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
       ("property", "header-args+ :noweb no-export"),
@@ -2174,7 +2172,7 @@ Ignore leading whitespace just before the metadata value.
 #+begin_src haskell
 p
   "0002-doc-metadata-whitespace-before-value"
-  $ L.defaultOrgDocWithMeta
+  $ L.defaultOrgDoc
     [ ("title", "Parse me without leading whitespace")
     ]
 #+end_src

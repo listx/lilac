@@ -1,6 +1,5 @@
 module Lilac.Parse
   ( defaultOrgDoc,
-    defaultOrgDocWithMeta,
     defaultOrgParserState,
     orgDocParser,
     parseOrgDoc,
@@ -324,17 +323,8 @@ orgDocParser = do
         meta = meta
       }
 
-defaultOrgDoc :: OrgDoc
-defaultOrgDoc =
-  OrgDoc
-    { cells = [],
-      code = [],
-      codeBlocks = IM.fromList [],
-      meta = M.fromList []
-    }
-
-defaultOrgDocWithMeta :: [(T.Text, T.Text)] -> OrgDoc
-defaultOrgDocWithMeta metas =
+defaultOrgDoc :: [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDoc metas =
   OrgDoc
     { cells = [],
       code = [],
