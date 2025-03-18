@@ -79,7 +79,7 @@ update-nix:
 	niv update nixpkgs --branch <<Nixpkgs version>>
 #+end_src
 
-The ~niv~ tool is available in our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][dev shell]].
+The ~niv~ tool is available in our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][development shell]].
 
 #+name: tool-niv
 #+begin_src nix
@@ -91,12 +91,12 @@ updates the [[file:nix/sources.json]].
 
 In =niv='s terminology, the =nixpkgs= above is a "package" ([[file:nix/sources.json]]
 declares all /packages/ we want to use). The =--branch ...= flag tells =niv= to use a
-particular Git branch for the update (because  [[https://github.com/NixOS/nixpkgs][Nixpkgs]] is a Git repo, we can use
-Git branches to track a particular version). Of course, the branch is mutable,
-so we have to also track the particular Git SHA that the branch was pointing to
-at the time of running the =niv update= command; this information is also stored
-in [[file:nix/sources.json]]. For now we track the ~nixos-YY.MM~ release branch
-because it's the stable branch.
+particular Git branch for the update (because [[https://github.com/NixOS/nixpkgs][Nixpkgs]] is a Git repository, we
+can use Git branches to track a particular version). Of course, the branch is
+mutable, so we have to also track the particular Git SHA that the branch was
+pointing to at the time of running the =niv update= command; this information is
+also stored in [[file:nix/sources.json]]. For now we track the ~nixos-YY.MM~ release
+branch because it's the stable branch.
 
 #+name: Nixpkgs version
 #+begin_src txt
@@ -264,7 +264,7 @@ devShellEnv = pkgs.buildEnv {
 };
 #+end_src
 
-The ~scripts~ are the custom shell scripts we defined earlier in [[Nix dev env
+The ~scripts~ are the custom shell scripts we defined earlier in [[nix/scripts.nix]].
 scripts]].
 
 #+name: code:scripts
@@ -272,7 +272,7 @@ scripts]].
 scripts = import ./scripts.nix { inherit pkgs; };
 #+end_src
 
-The ~tools~ are packages from Nixpkgs that we want available in our dev
+The ~tools~ are packages from Nixpkgs that we want available in our development
 environment. Some tools are categorized as Haskell packages (under the
 =haskellPackages= prefix). We use ~ourHaskell~ to specify these tools, to make Nix
 compile these tools with the same version of GHC that we are using in [[GHC
@@ -433,7 +433,7 @@ nix-repl> builtins.attrNames gnf
 [ "gitignoreFilter" "gitignoreFilterWith" "gitignoreSource" "gitignoreSourceWith" ]
 #+end_example
 
-Back to ~lilacSource~, it has a ~name~ of the basename of the project root, plus a
+Back to ~lilacSource~, it has a ~name~ consisting of the project root folder, plus a
 =-src= suffix. When building Lilac, this name will be used for generating a Nix
 store entry for all of the source code used for building the project:
 
@@ -503,7 +503,8 @@ which is just a derivation (an installable Nix package).
 
 ** =shell.nix=
 
-The entrypoint of our Nix dev environment is the following ~shell.nix~ file.
+The entrypoint of our Nix development environment is the following ~shell.nix~
+file.
 
 #+name: shell.nix
 #+header: :tangle shell.nix
@@ -511,10 +512,10 @@ The entrypoint of our Nix dev environment is the following ~shell.nix~ file.
 let pkgs = import ./nix/default.nix { }; in pkgs.lilacPkgs.devShell
 #+end_src
 
-See [[=packages.nix=]] for a deeper discussion of the underlying Nix
-infrastructure, including the [[devShell definition]], which shows how we
-declaratively define which particular executables are made available to our dev
-environment (including =scripts.nix=).
+See [[=packages.nix=]] for a deeper discussion of the underlying Nix infrastructure,
+including the [[devShell definition]], which shows how we declaratively define which
+particular executables are made available to our development environment
+(including =scripts.nix=).
 
 The "logo" in the =shellHook= section is just a custom script to show an ASCII-art
 Lilac logo when we enter the development environment. The interesting thing
@@ -544,7 +545,7 @@ in [ logo lilac lilac-nix ]
 #+end_src
 
 You can use the traditional ~nix-shell~ command to use this environment, or use
-[[https://github.com/direnv/direnv][direnv]] (recommended), which will automatically reset environment variables in
+[[https://github.com/direnv/direnv][Direnv]] (recommended), which will automatically reset environment variables in
 your existing shell whenever you enter the project root. Direnv will also
 automatically reload =shell.nix= if any of it or its dependencies change, based on
 the =.envrc= file below:
@@ -559,7 +560,7 @@ watch_file shell.nix
 watch_dir nix
 #+end_src
 
-** Makefile
+** =Makefile=
 
 We use the traditional =make= command to encode some common operations. This way
 we don't have to memorize exactly how to invoke certain commands.
@@ -579,7 +580,7 @@ we don't have to memorize exactly how to invoke certain commands.
 :ID:       b649d761-1103-47be-86e4-56a7362a5ecc
 :END:
 
-In a Makefile, given a rule
+In a =Makefile=, given a rule
 
 #+begin_src makefile
 thing: dep1 dep2
@@ -718,7 +719,7 @@ so that we can define all of the hook infrastructure in a reproducible way with
 Nix (such as using specific versions of linters, formatters, etc).
 
 For us we already have the set of linters and formatters we are interested in
-defined inside our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][dev shell environment]] in [[code:devShellEnv]], so we tell
+defined inside our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][development shell environment]] in [[code:devShellEnv]], so we tell
 ~git-hooks~ to reuse those same tools.
 
 While formatting isn't important for tangling (the computer doesn't care about
@@ -805,7 +806,7 @@ pkgs.editorconfig-checker
 
 *** Nix
 
-[[https://github.com/NixOS/nixfmt][nixfmt]] is the official formatter for the Nix language.
+[[https://github.com/NixOS/nixfmt][=nixfmt=]] is the official formatter for the Nix language.
 
 #+name: hook-nixfmt
 #+begin_src nix
@@ -844,7 +845,7 @@ ourHaskell.ormolu
 
 *** Shell
 
-We use [[https://github.com/mvdan/sh][shfmt]] for formatting and [[https://github.com/koalaman/shellcheck][ShellCheck]] for linting.
+We use [[https://github.com/mvdan/sh][=shfmt=]] for formatting and [[https://github.com/koalaman/shellcheck][ShellCheck]] for linting.
 
 #+name: hook-shfmt
 #+begin_src nix
@@ -1087,12 +1088,14 @@ by default. We expect this list to grow over time.
 #+header: :tangle .vale/styles/config/vocabularies/Lilac/accept.txt
 #+begin_src txt
 autogenerate
+baz
 boolean
 combinator
 declaratively
 dedent
 Dependabot
 Direnv
+Elisp
 formatter
 Git
 Hackage
@@ -1106,6 +1109,8 @@ Nixkell
 Nixpkgs
 Noweb
 Orgmode
+quux
+Relude
 sandbox
 subcommand
 #+end_src
@@ -2510,7 +2515,7 @@ data LinkType
 
 Math fragments are discussed in [[*Math fragments]].
 
-A [[PToken ADT][PToken]] can be a styled string, link, or inline math fragment.
+A [[data:PToken]] can be a styled string, link, or inline math fragment.
 
 #+name: f:proseParser
 #+begin_src haskell
@@ -3139,7 +3144,7 @@ p
     }
 #+end_src
 
-The next case tests a simple case where one word is bolded.
+The next case tests a simple case where one word is in bold.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-bold
 #+begin_src org
@@ -3469,7 +3474,7 @@ brackets.
 
 =LinkIdProp= lets us link to a heading by using a UUID. This is useful when
 multiple headings can share the same name. To add a UUID to an existing header,
-run the =org-id-store-link= elisp function. This will add a =:PROPERTIES:= drawer
+run the =org-id-store-link= Elisp function. This will add a =:PROPERTIES:= drawer
 with a special =:ID:= field that has a UUID. Then from elsewhere you can link to
 it by using ~[[id:...]]~ where ~...~ is the UUID. For example, [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][this]] is such a link.
 
@@ -4576,7 +4581,7 @@ p
 ]
 #+end_src
 
-A "src" without an accompanying language should trigger an error.
+A =#+begin_src= without an accompanying language should trigger an error.
 
 #+header: :tangle test/Lilac/ParseSpec/0007-block-src-without-lang
 #+begin_src org
@@ -7167,7 +7172,7 @@ and https://stackoverflow.com/a/20871010/437583 for an overview of working with
 Template Haskell.
 
 However, invoking =git= doesn't work in all cases, especially when building with
-Nix because when Nix builds things it doesn't use the Git repo (it uses a
+Nix because when Nix builds things it doesn't use the Git repository (it uses a
 sandboxed build environment). So we have to handle both of these cases.
 
 First let's get the imports out of the way.
