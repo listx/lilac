@@ -271,42 +271,36 @@ spec = do
     "0005-styled-strings-complex"
     L.OrgDoc
       { cells =
-          [ L.CHeading
-              ( L.Heading
-                  { level = 1,
-                    body =
-                      [ L.PTokenStyledText
-                          (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = "bar ", style = L.styleMaskFrom [L.Bold, L.Italic]}),
-                        L.PTokenStyledText
-                          ( L.StyledText
-                              { body = "underlined bold and italic",
-                                style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
-                              }
-                          ),
-                        L.PTokenStyledText
-                          (L.StyledText {body = " baz", style = L.styleMaskFrom [L.Bold]}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                        L.PTokenStyledText
-                          ( L.StyledText
-                              { body = "bold",
-                                style = L.styleMaskFrom [L.Bold]
-                              }
-                          )
-                      ],
-                    meta = fromList []
-                  }
-              )
+          [ L.CParagraph
+              [ L.PTokenStyledText
+                  (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
+                L.PTokenStyledText
+                  (L.StyledText {body = "bar ", style = L.styleMaskFrom [L.Bold, L.Italic]}),
+                L.PTokenStyledText
+                  ( L.StyledText
+                      { body = "underlined bold and italic",
+                        style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
+                      }
+                  ),
+                L.PTokenStyledText
+                  (L.StyledText {body = " baz", style = L.styleMaskFrom [L.Bold]}),
+                L.PTokenStyledText
+                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+                L.PTokenStyledText
+                  (L.StyledText {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
+                L.PTokenStyledText
+                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+                L.PTokenStyledText
+                  (L.StyledText {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
+                L.PTokenStyledText
+                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
+                L.PTokenStyledText
+                  ( L.StyledText
+                      { body = "bold",
+                        style = L.styleMaskFrom [L.Bold]
+                      }
+                  )
+              ]
           ],
         code = [],
         codeBlocks = fromList [],

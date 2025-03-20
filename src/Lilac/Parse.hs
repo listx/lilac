@@ -389,7 +389,8 @@ detectInvalidIndentation = do
 
 headingParser :: OrgParser Cell
 headingParser = do
-  stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
+  _ <- MP.try $ MP.lookAhead (starsParser >> char ' ')
+  stars <- starsParser
   _ <- char ' '
   prose <- proseParser spaceConsumer
   _ <- char '\n'
@@ -405,6 +406,8 @@ headingParser = do
   where
     spaceConsumer :: OrgParser T.Text
     spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
+    starsParser :: OrgParser T.Text
+    starsParser = MP.takeWhile1P (Just "heading star") (\c -> c == '*')
 
 drawersParser :: OrgParser (Map T.Text T.Text)
 drawersParser = do

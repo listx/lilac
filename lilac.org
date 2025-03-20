@@ -3054,7 +3054,7 @@ Below we mix things up a bit more, using more styles.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-complex
 #+begin_src org
-,* *foo /bar _underlined  bold  and  italic_/ baz* =verbatim  text= ~x  y  z~ *bold*
+,*foo /bar _underlined  bold  and  italic_/ baz* =verbatim  text= ~x  y  z~ *bold*
 #+end_src
 
 #+name: t:0005-styled-strings-complex
@@ -3063,14 +3063,8 @@ p
   "0005-styled-strings-complex"
   L.OrgDoc
     { cells =
-        [ L.CHeading
-            ( L.Heading
-                { level = 1,
-                  body =
-                    <<Expected prose for 0005-styled-strings-complex>>,
-                  meta = fromList []
-                }
-            )
+        [ L.CParagraph
+            <<Expected prose for 0005-styled-strings-complex>>
         ],
       code = [],
       codeBlocks = fromList [],
@@ -4015,7 +4009,8 @@ easy to have simple rules for it.
 #+begin_src haskell
 headingParser :: OrgParser Cell
 headingParser = do
-  stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
+  _ <- MP.try $ MP.lookAhead (starsParser >> char ' ')
+  stars <- starsParser
   _ <- char ' '
   prose <- proseParser spaceConsumer
   _ <- char '\n'
@@ -4031,6 +4026,8 @@ headingParser = do
   where
     spaceConsumer :: OrgParser T.Text
     spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
+    starsParser :: OrgParser T.Text
+    starsParser = MP.takeWhile1P (Just "heading star") (\c -> c == '*')
 
 #+end_src
 
