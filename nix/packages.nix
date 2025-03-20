@@ -121,6 +121,12 @@ let
         pass_filenames = false;
         stages = [ "pre-push" ];
       };
+      no-fixme = {
+        name = "no-FIXME.sh";
+        enable = true;
+        entry = "./no-FIXME.sh";
+        stages = [ "commit-msg" ];
+      };
       vale = {
         enable = true;
         package = devShellEnv;

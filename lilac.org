@@ -717,6 +717,9 @@ In addition, ~pre-commit~ supports all of the usual Git hooks, not just
 frequent operations, such as pushing to a remote.
 
 *** =git-hooks.nix=
+:PROPERTIES:
+:ID:       e2a2e1b9-bc08-4b17-9826-e8ac1f5df13b
+:END:
 
 The https://github.com/cachix/git-hooks.nix project brings ~pre-commit~ into Nix,
 so that we can define all of the hook infrastructure in a reproducible way with
@@ -743,6 +746,7 @@ pre-commit-check = gitHooksPkgs.run {
     <<hook-shellcheck>>
     <<hook-check-tangled-vs-tracked>>
     <<hook-unit-test>>
+    <<hook-no-fixme>>
     <<hook-vale>>
     <<hook-sort-file-contents>>
   };
@@ -995,15 +999,15 @@ set -euo pipefail
 
 SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
 
-<<unit-test-is-wip>>
+<<shell-func-is-wip>>
 
 main()
 {
 	>/dev/null pushd "${SCRIPT_ROOT}"
 
-	<<unit-test-skip-if-wip>>
+	<<shell-skip-if-wip>>
 
-	<<unit-test-fail-if-dirty-tree>>
+	<<shell-fail-if-dirty-tree>>
 
 	<<unit-test-run>>
 }
@@ -1014,7 +1018,7 @@ main "$@"
 We don't want to run unit tests if the current commit (~HEAD~ in Git) is a
 work-in-progress (WIP) commit.
 
-#+name: unit-test-is-wip
+#+name: shell-func-is-wip
 #+begin_src sh
 is_wip()
 {
@@ -1023,7 +1027,7 @@ is_wip()
 }
 #+end_src
 
-#+name: unit-test-skip-if-wip
+#+name: shell-skip-if-wip
 #+begin_src sh
 if is_wip; then
 	echo >&2 "skipping (WIP commit)"
@@ -1036,7 +1040,7 @@ it may be the case that the working tree is dirty. If the tree is dirty, the
 results of the unit test no longer reflect what we are pushing to the remote, so
 we need to abort if the tree is dirty.
 
-#+name: unit-test-fail-if-dirty-tree
+#+name: shell-fail-if-dirty-tree
 #+begin_src sh
 if [[ -n $(git status --porcelain) ]]; then
 	echo >&2 "$0: dirty tree"
@@ -1056,6 +1060,107 @@ else
 	return 1
 fi
 #+end_src
+
+*** No FIXME text
+
+Fail if we detect a ~FIXME~ at the very beginning of the line in any Org file.
+This encourages a way of working where we can write something like ~FIXME: ...~ to
+start off how we want to fix something. Then we can delete it once we arrive at
+a solution and draft a non-WIP commit.
+
+We reuse [[shell-func-is-wip]] and [[shell-skip-if-wip]] here from [[f:unit-test.sh]].
+
+#+name: hook-no-fixme
+#+begin_src nix
+no-fixme = {
+  name = "no-FIXME.sh";
+  enable = true;
+  entry = "./no-FIXME.sh";
+  stages = [ "commit-msg" ];
+};
+#+end_src
+
+We want to skip this check if this is a WIP commit. However we cannot check the
+~HEAD~ Git commit like in [[shell-func-is-wip]] (used for the ~pre-push~ stage), because
+the commit hasn't been created yet. The solution is to check after the commit
+message has been authored, but before the commit has been created with it ---
+the Git hook for this is the ~commit-msg~ hook.
+
+This way, we can tell whether the commit is a WIP commit or not in like in a
+~pre-commit~ hook (the criteria for a WIP commit is that its commit message title
+has some WIP-like text in it).
+
+#+name: no-FIXME.sh
+#+header: :tangle no-FIXME.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src bash
+set -euo pipefail
+
+SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
+
+<<shell-func-is-wip-commit-msg>>
+
+main()
+{
+	>/dev/null pushd "${SCRIPT_ROOT}"
+
+	<<shell-skip-if-wip-commit-msg>>
+
+	<<shell-fail-if-FIXME>>
+
+	echo >&2 "OK"
+}
+
+main "$@"
+#+end_src
+
+Skipping the commit message if it's a WIP commit just means that we check the
+commit message contents for any special words.
+
+#+name: shell-func-is-wip-commit-msg
+#+begin_src sh
+is_wip_commit_msg()
+{
+	cat "$@" \
+		| grep -qi '^\(update\|wip\|fixup\|f \|s \)'
+}
+#+end_src
+
+For ~commit-msg~ hooks, Git passes the filename that contains the Git commit
+message to us; that's why we pass this along as is to
+[[shell-func-is-wip-commit-msg]] from [[shell-skip-if-wip-commit-msg]].
+
+#+name: shell-skip-if-wip-commit-msg
+#+begin_src sh
+if is_wip_commit_msg "$@"; then
+	echo >&2 "skipping (WIP commit)"
+	return
+fi
+#+end_src
+
+We look at all top-level Org files for any ~FIXME~ markers in it. This isn't the
+most accurate method, but it's good enough for now.
+
+#+name: shell-fail-if-FIXME
+#+begin_src sh
+if grep --line-number '^FIXME' ./*.org; then
+	echo >&2 "$0: FIXME marker(s) found --- please remove"
+	return 1
+fi
+#+end_src
+
+This check will raise an error if ~FIXME~ is found at the beginning of /any/ line,
+even if it's inside a code block (which may have an independent legitimate use
+case). As a workaround, you can skip this check in such a situation with
+
+#+begin_src sh
+git commit --no-verify
+#+end_src
+
+It appears that the [[id:e2a2e1b9-bc08-4b17-9826-e8ac1f5df13b][=git-hooks.nix=]] integration of ~pre-commit~ does not support
+the ~SKIP~ environment variable being passed, so we cannot use the guidance to use
+~SKIP~ as explained in the ~pre-commit~ docs [[https://pre-commit.com/#temporarily-disabling-hooks][here]]. That's why we use the blanket
+~--no-verify~ flag in the above workaround.
 
 *** General prose style check
 
@@ -7442,3 +7547,4 @@ the terms /element/ and /object/ are used. This is to avoid any unintentional
 overlap of meaning.
 
 [fn:2] Footnote example.
+
