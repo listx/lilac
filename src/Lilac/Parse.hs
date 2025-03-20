@@ -54,7 +54,6 @@ import Relude
     catMaybes,
     concatMap,
     drop,
-    elem,
     fail,
     filter,
     find,
@@ -465,8 +464,8 @@ whitespaceCompressor spaceConsumer = do
         style = mask
       }
 
-styleMap :: M.Map Char Style
-styleMap =
+styleMarkers :: M.Map Char Style
+styleMarkers =
   M.fromList
     [ ('*', Bold),
       ('/', Italic),
@@ -490,9 +489,9 @@ styleMarkerParser = do
 
   let mask = orgParserState.styleMask
   c <- MP.satisfy $ isStyleMarker mask
-  style <- toStyleMask [c]
+  styleMask <- toStyleMask c
 
-  let newMask = styleMaskFlip mask style
+  let newMask = styleMaskFlip mask styleMask
 
   put orgParserState {styleMask = newMask}
   pure
@@ -505,7 +504,7 @@ isStyleMarker :: StyleMask -> Char -> Bool
 isStyleMarker styleMask c
   | isVerbatim styleMask = c == '='
   | isCode styleMask = c == '~'
-  | otherwise = M.member c styleMap
+  | otherwise = M.member c styleMarkers
 
 styledTextParser :: OrgParser StyledText
 styledTextParser = do
@@ -520,21 +519,24 @@ styledTextParser = do
       { body = text,
         style = mask
       }
+
+textParser :: StyleMask -> OrgParser T.Text
+textParser styleMask
+  | isVerbatim styleMask =
+      MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
+  | isCode styleMask =
+      MP.takeWhile1P (Just "code") isNotCodeMarker
+  | otherwise = do
+      ws <-
+        MP.some
+          $ MP.choice
+            [ MP.label "normal characters" normalChars,
+              escapedSymbolParser styleMask
+            ]
+      pure $ T.concat ws
   where
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
-    textParser :: StyleMask -> OrgParser T.Text
-    textParser styleMask
-      | isVerbatim styleMask = MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
-      | isCode styleMask = MP.takeWhile1P (Just "code") isNotCodeMarker
-      | otherwise = do
-          ws <-
-            MP.some
-              $ MP.choice
-                [ MP.label "normal characters" normalChars,
-                  escapedSymbolParser styleMask
-                ]
-          pure $ T.concat ws
     normalChars :: OrgParser T.Text
     normalChars = do
       cs <- MP.some $ normalChar
@@ -543,23 +545,24 @@ styledTextParser = do
     normalChar = do
       MP.notFollowedBy $ string "[["
       MP.satisfy isNormalChar
-    escapedSymbolParser :: StyleMask -> OrgParser T.Text
-    escapedSymbolParser styleMask = do
-      _ <- char '\\'
-      s <-
-        MP.choice
-          [ do
-              c <- MP.satisfy (\c -> isStyleMarker styleMask c || c == '\\')
-              pure $ T.singleton c,
-            string "vert{}"
-          ]
-      if s == "vert{}"
-        then pure "|"
-        else pure s
     isNormalChar c =
-      M.notMember c styleMap
+      M.notMember c styleMarkers
         && (not $ isSpace c)
         && (not $ c == '\\')
+
+escapedSymbolParser :: StyleMask -> OrgParser T.Text
+escapedSymbolParser styleMask = do
+  _ <- char '\\'
+  s <-
+    MP.choice
+      [ do
+          c <- MP.satisfy (\c -> isStyleMarker styleMask c || c == '\\')
+          pure $ T.singleton c,
+        string "vert{}"
+      ]
+  if s == "vert{}"
+    then pure "|"
+    else pure s
 
 styleMaskFrom :: [Style] -> StyleMask
 styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
@@ -576,22 +579,16 @@ maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask
         then (toEnum idx) : acc
         else acc
 
-toStyleMask :: (MonadFail m) => [Char] -> m StyleMask
-toStyleMask cs = pure =<< stylesToStyleMask =<< charToStyles cs
+toStyleMask :: (MonadFail m) => Char -> m StyleMask
+toStyleMask cs = pure =<< styleToStyleMask =<< charToStyle cs
 
-charToStyles :: (MonadFail m) => [Char] -> m [Style]
-charToStyles chars = foldlM f [] chars
-  where
-    f :: (MonadFail m) => [Style] -> Char -> m [Style]
-    f acc c = case EM.lookup c styleMap of
-      Just style -> pure (style : acc)
-      Nothing -> fail $ "programmer error: unrecognized style marker " <> (show c)
+charToStyle :: (MonadFail m) => Char -> m Style
+charToStyle c = case EM.lookup c styleMarkers of
+  Just style -> pure style
+  Nothing -> fail $ "programmer error: unrecognized style marker " <> (show c)
 
-stylesToStyleMask :: (MonadFail m) => [Style] -> m StyleMask
-stylesToStyleMask ss = pure . StyleMask =<< foldlM f (0 :: Word8) ss
-  where
-    f :: (MonadFail m) => Word8 -> Style -> m Word8
-    f acc s = pure . setBit acc $ fromEnum s
+styleToStyleMask :: (MonadFail m) => Style -> m StyleMask
+styleToStyleMask s = pure $ StyleMask (setBit 0 $ fromEnum s)
 
 styleMaskFlip :: StyleMask -> StyleMask -> StyleMask
 styleMaskFlip (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
@@ -610,13 +607,9 @@ compressProse = reverse . dropUnnecessary . foldl' f []
     f
       ((t1@(PTokenStyledText (StyledText body1 style1))) : rest)
       t2@(PTokenStyledText (StyledText body2 style2))
-        | elem Code styles = t2 : t1 : rest
-        | elem Verbatim styles = t2 : t1 : rest
-        | style1 /= style2 = t2 : t1 : rest
-        | otherwise =
+        | style1 == style2 =
             (PTokenStyledText $ StyledText (T.concat [body1, body2]) style1) : rest
-        where
-          styles = concatMap maskToStyles [style1, style2]
+        | otherwise = t2 : t1 : rest
     f acc token = token : acc
     dropUnnecessary [] = []
     dropUnnecessary (((PTokenStyledText (StyledText " " _))) : rest) = rest

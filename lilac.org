@@ -1586,7 +1586,6 @@ import Relude
     catMaybes,
     concatMap,
     drop,
-    elem,
     fail,
     filter,
     find,
@@ -1679,11 +1678,13 @@ import Prelude qualified (show)
 <<f:drawersParser>>
 <<f:proseParser>>
 <<f:whitespaceCompressor>>
-<<f:styleMap>>
+<<f:styleMarkers>>
 <<f:failIfLeftoverActiveStyles>>
 <<f:styleMarkerParser>>
 <<f:isStyleMarker>>
 <<f:styledTextParser>>
+<<f:textParser>>
+<<f:escapedSymbolParser>>
 <<f:styleMaskFrom>>
 <<f:maskToStyles>>
 <<f:toStyleMask>>
@@ -2425,8 +2426,8 @@ with an empty string as the body.
 :ID:       b616c1e2-6b42-41cf-8e5d-c1832f95b59b
 :END:
 
-The =StyledText= is just some text that has one or more styles attached to it.
-If the string has no style, then it's not stylized at all (plain style).
+A =StyledText= is just some text that has one or more styles attached to it.  Here
+are some examples: *bold*, /italic/, _underline_, =verbatim=, and ~code~.
 
 #+name: data:StyledText
 #+begin_src haskell
@@ -2439,10 +2440,17 @@ data StyledText = StyledText
 
 #+end_src
 
-The =Style= type is straightforward enough. For now we don't support all possible
-styles supported by Orgmode (such as strike-through text), for both simplicity
-but also prescriptive reasons. For example, strike-through text should never be
-needed during exposition.
+The [[newtype:StyleMask]] is a low-level bit mask that can store multiple boolean
+values of each of the supported [[data:Style]] bits. If the string has no style,
+then it's not stylized at all and the =StyleMask= will be 0 (no bits set). See
+[[id:87cd7d62-1f5c-4442-87ff-e1f2a68a8e56][=StyleMask= details]] for a discussion of how this data structure is used and
+transformed into a list of =Style= values. For now, we can just pretend that the
+=StyleMask= is like a list of [[data:Style]] values.
+
+The [[data:Style]] type is straightforward enough. For now we don't support all
+possible styles supported by Orgmode (such as strike-through text), for both
+simplicity but also prescriptive reasons. For example, strike-through text
+should never be needed during exposition.
 
 #+name: data:Style
 #+begin_src haskell
@@ -2452,16 +2460,14 @@ data Style = Bold | Italic | Underline | Verbatim | Code
 
 #+end_src
 
-Styled strings are text strings with special formatting markers around them.
-Here are some examples: *bold*, /italic/, _underline_, =verbatim=, and ~code~.
+The =styleMarkers= keeps track of the characters that activate and deactivate each
+style. It has the syntactic characters we use to /mark/ text with the a supported
+/style/. Hence the term /style markers/.
 
-The =styleMap= keeps track of the characters that activate and deactivate each
-style. The full list of =Style= data constructors can be seen at [[data:Style]].
-
-#+name: f:styleMap
+#+name: f:styleMarkers
 #+begin_src haskell
-styleMap :: M.Map Char Style
-styleMap =
+styleMarkers :: M.Map Char Style
+styleMarkers =
   M.fromList
     [ ('*', Bold),
       ('/', Italic),
@@ -2472,7 +2478,7 @@ styleMap =
 
 #+end_src
 
-Characters in the =styleMap= can be escaped with a backslash. For example, the
+Characters in the =styleMarkers= can be escaped with a backslash. For example, the
 slashes inside "1\/2" and "and\/or" should not be interpreted as style markers
 but as slashes. If you want to write a literal backslash, you must use "\\".
 This use of the backslash as an escape character deviates from Org mode.
@@ -2504,7 +2510,9 @@ p
 ]
 #+end_src
 
-Styled strings are somewhat tricky, because of two main problems
+*** Parsing
+
+Parsing styled strings is somewhat tricky, because of two main problems:
 
   1) the markers use the same character for both activation and deactivation,
      and
@@ -2514,16 +2522,17 @@ Styled strings are somewhat tricky, because of two main problems
 You can have, for example, lines that are /italicized like this but also have
 *bold text inside* of it/.
 
-We approach these problems with a simple idea: use a *bit mask*, or =StyleMask=, to
-keep track of markers. Every time we see a starting marker, we turn on the bit
-in the mask to activate that style (if it's off), or turn it off (if it's on),
-by calling [[f:styleMaskFlip]].
+We approach these problems with a simple idea: use a *bit mask*
+([[newtype:StyleMask]]) to keep track of markers. Every time we see a starting
+marker, we turn on the bit in the mask to activate that style (if it's off), or
+turn it off (if it's on), by calling [[f:styleMaskFlip]].
 
 If the input is such that the markers are not balanced, such that by the time we
 finish parsing a paragraph (or end of a heading) and the mask still has active
-styles in it, we throw an error ([[f:failIfLeftoverActiveStyles]]). That is, we
-expect style starting and ending markers to always be balanced. This deviates
-from vanilla Org, which does not have this restriction.
+styles in it, we throw an error with [[f:failIfLeftoverActiveStyles]]. That is, we
+expect style starting and ending markers to always be balanced by the end of
+every paragraph or heading. This deviates from vanilla Org, which does not have
+this restriction.
 
 #+name: f:failIfLeftoverActiveStyles
 #+begin_src haskell
@@ -2541,8 +2550,7 @@ failIfLeftoverActiveStyles = do
 We don't really care which styles are turned on or off at which point (the style
 markers can be used at the beginning, middle, or end of a word --- where a word
 is any sequence of non-whitespace characters). The only thing we check is that
-by the end of the cell (heading of paragraph) that all styles must have been
-turned off.
+by the end of the cell (heading or paragraph), all styles must be turned off.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries
 #+begin_src org
@@ -2587,9 +2595,9 @@ p
 ]
 #+end_src
 
-In =0005-styled-strings-leftover-active-styles= we keep parsing to the end of the
-heading, expecting to see the ending style marker for bold text, but never see
-it. So the failure from =failIfLeftoverActiveStyles= gets triggered.
+In [[t:0005-styled-strings-leftover-active-styles]] we keep parsing to the end of
+the heading, expecting to see the ending style marker for bold text, but never
+see it. So the failure from [[f:failIfLeftoverActiveStyles]] gets triggered.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-leftover-active-styles
 #+begin_src org
@@ -2607,11 +2615,13 @@ pf
 Note that we don't wait until seeing the closing marker to see if we should
 stylize the text at hand; the =StyleMask= is "strict" in this sense. This way, we
 can start parsing stylized text without needing to see a corresponding ending
-marker.
+marker. This imperative style is easier to think about, and is one of the
+reasons why we decided to go with having the =StyleMask= in the
+[[data:OrgParserState]].
 
-The algorithm requires parsing style markers (and only style markers), or
-parsing other text that will be affected by style markers. Let's look at the
-parsing style markers first in [[f:styleMarkerParser]].
+The algorithm for parsing [[data:StyledText]] requires parsing style markers (and
+only style markers), or parsing other text that will be affected by style
+markers. Let's first look at the simpler case, that of parsing style markers.
 
 #+name: f:styleMarkerParser
 #+begin_src haskell
@@ -2621,9 +2631,9 @@ styleMarkerParser = do
 
   let mask = orgParserState.styleMask
   c <- MP.satisfy $ isStyleMarker mask
-  style <- toStyleMask [c]
+  styleMask <- toStyleMask c
 
-  let newMask = styleMaskFlip mask style
+  let newMask = styleMaskFlip mask styleMask
 
   put orgParserState {styleMask = newMask}
   pure
@@ -2634,16 +2644,20 @@ styleMarkerParser = do
 
 #+end_src
 
-We parse a single style marker character, and flip the bit for it as either on
-or off, with [[f:styleMaskFlip]]. Ideally we wouldn't even bother returning anything
-at the end of [[f:styleMarkerParser]] (because we've updated the ~orgParserState~ and
-that's the only essential thing we must do). But because of the way it is used
-in [[f:proseParser]], we have to return a ~StyledText~. We return an empty ~body~ field
-though, so that we can filter it out in the ~nonEmpty~ helper in [[f:proseParser]].
+All we do is parse a single style marker character, and flip the bit for it as
+either on or off, with [[f:styleMaskFlip]]. Ideally we wouldn't even bother
+returning anything at the end of [[f:styleMarkerParser]] (because we've updated the
+~orgParserState~ and that's the only essential thing we must do). But because of
+the way it is used in [[f:proseParser]], we have to return a ~StyledText~. We return
+an empty ~body~ field though, so that we can filter it out in the ~nonEmpty~ helper
+in [[f:proseParser]].
 
-[[f:isStyleMarker]] changes behavior depending on the current active style mask. If
-we are in a verbatim or code style, we ignore all other style markers except for
-those that will end the current (verbatim or code) style.
+We cannot parse multiple style markers in one go, because [[f:isStyleMarker]]
+changes behavior depending on the current active style mask. If we are in a
+verbatim or code style, we ignore all other style markers except for those that
+will end the current (verbatim or code) style. Otherwise, we won't be able to
+write stuff like ~*~ because we would think that the asterisk in there is starting
+a bold style (which it is not because it is surrounded by =~= to mark code).
 
 #+name: f:isStyleMarker
 #+begin_src haskell
@@ -2651,13 +2665,13 @@ isStyleMarker :: StyleMask -> Char -> Bool
 isStyleMarker styleMask c
   | isVerbatim styleMask = c == '='
   | isCode styleMask = c == '~'
-  | otherwise = M.member c styleMap
+  | otherwise = M.member c styleMarkers
 
 #+end_src
 
-[[f:styledTextParser]] is careful not to step on other parsers' toes, because in a
-sense it is the most "greedy" parser, as it can parse many different types of
-input.
+Parsing actual styled text requires reading the state of the =StyleMask=, and then
+reading some text. This is done in [[f:styledTextParser]]. It delegates essentially
+all of the work to [[f:textParser]].
 
 #+name: f:styledTextParser
 #+begin_src haskell
@@ -2674,21 +2688,32 @@ styledTextParser = do
       { body = text,
         style = mask
       }
+
+#+end_src
+
+The [[f:textParser]] is careful not to step on other parsers' toes, because in a
+sense it is the most "greedy" parser, as it can parse many different types of
+input.
+
+#+name: f:textParser
+#+begin_src haskell
+textParser :: StyleMask -> OrgParser T.Text
+textParser styleMask
+  | isVerbatim styleMask =
+      MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
+  | isCode styleMask =
+      MP.takeWhile1P (Just "code") isNotCodeMarker
+  | otherwise = do
+      ws <-
+        MP.some
+          $ MP.choice
+            [ MP.label "normal characters" normalChars,
+              escapedSymbolParser styleMask
+            ]
+      pure $ T.concat ws
   where
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
-    textParser :: StyleMask -> OrgParser T.Text
-    textParser styleMask
-      | isVerbatim styleMask = MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
-      | isCode styleMask = MP.takeWhile1P (Just "code") isNotCodeMarker
-      | otherwise = do
-          ws <-
-            MP.some
-              $ MP.choice
-                [ MP.label "normal characters" normalChars,
-                  escapedSymbolParser styleMask
-                ]
-          pure $ T.concat ws
     normalChars :: OrgParser T.Text
     normalChars = do
       cs <- MP.some $ normalChar
@@ -2697,45 +2722,60 @@ styledTextParser = do
     normalChar = do
       MP.notFollowedBy $ string "[["
       MP.satisfy isNormalChar
-    escapedSymbolParser :: StyleMask -> OrgParser T.Text
-    escapedSymbolParser styleMask = do
-      _ <- char '\\'
-      s <-
-        MP.choice
-          [ do
-              c <- MP.satisfy (\c -> isStyleMarker styleMask c || c == '\\')
-              pure $ T.singleton c,
-            string "vert{}"
-          ]
-      if s == "vert{}"
-        then pure "|"
-        else pure s
     isNormalChar c =
-      M.notMember c styleMap
+      M.notMember c styleMarkers
         && (not $ isSpace c)
         && (not $ c == '\\')
 
 #+end_src
 
 Because of the way =isStyleMarker= and =isProseWord= checks membership of the
-characters used for activating (and deactivating) styles in [[f:styleMap]], we take
-special care to  escape these characters with =escapedSymbolParser=. If the style
-markers are not escaped, using any of them will immediately try to activate or
-deactivate a style.
+characters used for activating (and deactivating) styles in [[f:styleMarkers]], we
+take special care to escape these characters with [[f:escapedSymbolParser]]. If the
+style markers are not escaped, using any of them will immediately try to
+activate or deactivate a style (modulo the special consideration for verbatim
+and code markers as discussed in [[f:isStyleMarker]]).
+
+#+name: f:escapedSymbolParser
+#+begin_src haskell
+escapedSymbolParser :: StyleMask -> OrgParser T.Text
+escapedSymbolParser styleMask = do
+  _ <- char '\\'
+  s <-
+    MP.choice
+      [ do
+          c <- MP.satisfy (\c -> isStyleMarker styleMask c || c == '\\')
+          pure $ T.singleton c,
+        string "vert{}"
+      ]
+  if s == "vert{}"
+    then pure "|"
+    else pure s
+
+#+end_src
 
 The word =\vert{}= can be used to escape a pipe character inside [[data:Table][table]] cells,
 because although our Megaparsec-powered parser is powerful enough to handle
 escaping pipe characters with =\|= (for consistency with =\/= to escape the italic
-style marker), Org is unable to deal with this. For this reason, we use =\vert{}=
-instead. But outside of tables the pipe character can be written raw like this
-"|" without issue.
+style marker), Orgmode is unable to deal with this in Emacs (so pressing ~TAB~
+will mess up the alignment of table cells). For this reason, we use =\vert{}=
+instead. Of course, outside of tables the pipe character can be written raw like
+this "|" without issue.
 
-That's it for the high level overview of how we parse styled strings. We now get
-into the lower-level details of the =StyleMask= itself. The =StyleMask= is an 8-bit
-word, which can hold boolean values for the 6 different =Style= data constructors,
-e.g. [[data:Style][Bold, Italic]]. It's a space-efficient type to replace an equivalent map
-or list of =[Style]= values. We use a =newtype= around a =Word8= (an 8-bit word) so as
-to keep it distinct from =Word8= itself.
+*** =StyleMask= details
+:PROPERTIES:
+:ID:       87cd7d62-1f5c-4442-87ff-e1f2a68a8e56
+:END:
+
+The previous section explained how we parse styled strings without getting into
+the implementation behind the =StyleMask=. We now get into these implementation
+details.
+
+The =StyleMask= is an 8-bit word, which can hold boolean values for the 6
+different =Style= data constructors, e.g. [[data:Style][Bold, Italic, etc]]. It's a
+space-efficient type to replace an equivalent map or list of =[Style]= values. We
+use a =newtype= around a =Word8= (an 8-bit word) so as to keep it distinct from
+=Word8= itself.
 
 #+name: newtype:StyleMask
 #+begin_src haskell
@@ -2771,10 +2811,12 @@ instance Show StyleMask where
 
 #+end_src
 
-The shown text string is prefixed with =styleMaskFrom= because that function is
-used as a constructor function to create a =StyleMask= easily from scratch; it's
-also used in test cases. This follows the tradition used in =Data.Map= where they
-also use a constructor function (=fromList=) when =show=-ing a =Map= data structure.
+The shown text string is prefixed with [[f:styleMaskFrom]] because that function is
+used as a constructor function to create a =StyleMask= easily from scratch;
+otherwise we'd have to write magic-looking numbers to construct =StyleMask=
+values, such as in test cases like [[t:0005-styled-strings-messy-boundaries]]. This
+follows the tradition used in =Data.Map= where they also use a constructor
+function (=fromList=) when =show=-ing a =Map= data structure.
 
 #+name: f:styleMaskFrom
 #+begin_src haskell
@@ -2787,7 +2829,7 @@ styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
 #+end_src
 
 Similarly, we sometimes want to go the other direction --- that is, deconstruct
-a =StyleMask= into =Style=. So we have =maskToStyles=.
+a =StyleMask= into =[Style]=. So we have [[f:maskToStyles]].
 
 #+name: f:maskToStyles
 #+begin_src haskell
@@ -2802,31 +2844,25 @@ maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask
 
 #+end_src
 
-We have a helper function =toStyleMask= to convert =[Char]= into a =StyleMask=. This
-is used to construct style masks as they are read in from the input text. The
-function runs inside a =MonadFail= monad, because the =Char= type could hold values
-that are not valid (unrecognized) style markers. The use of =MonadFail= is
-seamless inside =ParsecT= (the monad we use inside =OrgParser=), because =ParsecT= has
-a =MonadFail= instance.
+We have a helper function [[f:toStyleMask]] to convert =Char= into a =StyleMask=. This
+is used to [[f:styleMarkerParser][construct a style mask from a style marker]] in the input Org doc. The
+=toStyleMask= function runs inside a =MonadFail= monad, because the =Char= type could
+hold a value that is not a valid style marker. The use of =MonadFail= is seamless
+inside =ParsecT= (the monad we use inside =OrgParser=), because =ParsecT= has a
+=MonadFail= instance.
 
 #+name: f:toStyleMask
 #+begin_src haskell
-toStyleMask :: (MonadFail m) => [Char] -> m StyleMask
-toStyleMask cs = pure =<< stylesToStyleMask =<< charToStyles cs
+toStyleMask :: (MonadFail m) => Char -> m StyleMask
+toStyleMask cs = pure =<< styleToStyleMask =<< charToStyle cs
 
-charToStyles :: (MonadFail m) => [Char] -> m [Style]
-charToStyles chars = foldlM f [] chars
-  where
-    f :: (MonadFail m) => [Style] -> Char -> m [Style]
-    f acc c = case EM.lookup c styleMap of
-      Just style -> pure (style : acc)
-      Nothing -> fail $ "programmer error: unrecognized style marker " <> (show c)
+charToStyle :: (MonadFail m) => Char -> m Style
+charToStyle c = case EM.lookup c styleMarkers of
+  Just style -> pure style
+  Nothing -> fail $ "programmer error: unrecognized style marker " <> (show c)
 
-stylesToStyleMask :: (MonadFail m) => [Style] -> m StyleMask
-stylesToStyleMask ss = pure . StyleMask =<< foldlM f (0 :: Word8) ss
-  where
-    f :: (MonadFail m) => Word8 -> Style -> m Word8
-    f acc s = pure . setBit acc $ fromEnum s
+styleToStyleMask :: (MonadFail m) => Style -> m StyleMask
+styleToStyleMask s = pure $ StyleMask (setBit 0 $ fromEnum s)
 
 #+end_src
 
@@ -2854,14 +2890,20 @@ isCode (StyleMask a) = testBit a (fromEnum Code)
 
 #+end_src
 
-We stated earlier that we don't have to wait to see the ending style marker to
-start parsing styled text. While this is true, the downside is that by the time
-we construct a =StyledText=, we have no knowledge of future =StyledText= objects
-that have not yet been parsed. This can lead to a proliferation of =StyledText=
-objects that all share the same style, but are parsed into separate =PToken=
-objects back in [[f:headingParser]]. We want to join up sequences of styled text
-that share the same style (except for =Code= and =Verbatim=), and make them use a
-single =StyledText= object. For this purpose, we have =compressProse=.
+We stated earlier in [[t:0005-styled-strings-leftover-active-styles]] that we don't
+have to wait to see the ending style marker to start parsing styled text. While
+this is true, the downside is that by the time we construct a =StyledText=, we
+have no knowledge of future =StyledText= objects that have not yet been parsed.
+This can lead to a proliferation of =StyledText= objects that all share the same
+style, but are still parsed into separate =PToken= objects. That is, instead of
+just one =PToken= with a single =StyledText= object with a sizable ~body~ field, we
+could end up with ~[PToken]~ where each of the elements has a small ~body~, but with
+the same overall meaning.
+
+Obviously, having a list of =PToken= objects when we can just have a single one is
+problematic, if not wasteful. We want to join up sequences of styled text that
+share the same style, and make them use a single =StyledText= object. For this
+purpose, we have =compressProse=.
 
 #+name: f:compressProse
 #+begin_src haskell
@@ -2873,13 +2915,9 @@ compressProse = reverse . dropUnnecessary . foldl' f []
     f
       ((t1@(PTokenStyledText (StyledText body1 style1))) : rest)
       t2@(PTokenStyledText (StyledText body2 style2))
-        | elem Code styles = t2 : t1 : rest
-        | elem Verbatim styles = t2 : t1 : rest
-        | style1 /= style2 = t2 : t1 : rest
-        | otherwise =
+        | style1 == style2 =
             (PTokenStyledText $ StyledText (T.concat [body1, body2]) style1) : rest
-        where
-          styles = concatMap maskToStyles [style1, style2]
+        | otherwise = t2 : t1 : rest
     f acc token = token : acc
     dropUnnecessary [] = []
     dropUnnecessary (((PTokenStyledText (StyledText " " _))) : rest) = rest
@@ -2888,11 +2926,16 @@ compressProse = reverse . dropUnnecessary . foldl' f []
 
 #+end_src
 
+This function works by looking at two consecutive ~PTokenStyledText~ elements at a
+time (one that's already in the accumulator (~acc~) from the previous iteration
+and one from the current ~token~ at hand), joining them if they share the same
+style.
+
 =compressProse= also eliminates trailing whitespace, with =dropUnnecessary=.
-Trailing whitespace can occur if the last word of a paragraph (at the end of the
-file) ends with an active =StyleMask= (trailing whitespace between paragraphs
-can't occur because the =lexeme= in [[f:cellParser]] will skip past them). For
-example, if the input text looks like
+Trailing whitespace can occur if the last word of a paragraph at the end of the
+file ends with an active =StyleMask= followed by a newline (trailing whitespace
+between paragraphs can't occur because the =lexeme= in [[f:cellParser]] will skip past
+them). For example, if the input text looks like
 
 #+begin_src org
 _foo
@@ -2901,10 +2944,10 @@ bar_
 
 then the last underscore can be followed by a newline (assuming the editor used
 to edit this file is UNIX-friendly and appends a trailing newline), in which
-case that newline would get parsed by the =spaceConsumer= in
-[[f:paragraphParser]] as its own separate =StyledText= object as a single space
-character. We want to eliminate these objects because they don't add any useful
-information, and so we use =dropUnnecessary= above to filter them out.
+case that newline would get parsed by the =spaceConsumer= in [[f:paragraphParser]] as
+its own separate =StyledText= object as a single space character. We want to
+eliminate these objects because they don't add any useful information for Lilac
+itself, and so we use =dropUnnecessary= above to filter them out.
 
 =dropUnnecessary= also removes tokens with an empty string as the =StyledText=
 object. This can occur when we parse trailing newlines at the end of the line
@@ -2917,7 +2960,7 @@ another for the bold text.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-compression
 #+begin_src org
-,* a b  c   d    e      *f g  h   i    j*
+a b  c   d    e      *f g  h   i    j*
 #+end_src
 
 #+name: t:0005-styled-strings-compression
@@ -2926,14 +2969,8 @@ p
   "0005-styled-strings-compression"
   L.OrgDoc
     { cells =
-        [ L.CHeading
-            ( L.Heading
-                { level = 1,
-                  body =
-                    <<Expected prose for 0005-styled-strings-compression>>,
-                  meta = fromList []
-                }
-            )
+        [ L.CParagraph
+            <<Expected prose for 0005-styled-strings-compression>>
         ],
       code = [],
       codeBlocks = fromList [],
@@ -2956,7 +2993,7 @@ The simple case with no style markers.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-no-style
 #+begin_src org
-,* foo
+foo
 #+end_src
 
 #+name: t:0005-styled-strings-no-style
@@ -2965,20 +3002,7 @@ p
   "0005-styled-strings-no-style"
   L.OrgDoc
     { cells =
-        [ L.CHeading
-            ( L.Heading
-                { level = 1,
-                  body =
-                    [ L.PTokenStyledText
-                        ( L.StyledText
-                            { body = "foo",
-                              style = L.styleMaskFrom []
-                            }
-                        )
-                    ],
-                  meta = fromList []
-                }
-            )
+        [ plainParagraph "foo"
         ],
       code = [],
       codeBlocks = IM.fromList [],
@@ -2990,7 +3014,7 @@ The next case tests a simple case where one word is in bold.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-bold
 #+begin_src org
-,* foo *bar* baz
+foo *bar* baz
 #+end_src
 
 #+name: t:0005-styled-strings-bold
@@ -2999,32 +3023,26 @@ p
   "0005-styled-strings-bold"
   L.OrgDoc
     { cells =
-        [ L.CHeading
-            ( L.Heading
-                { level = 1,
-                  body =
-                    [ L.PTokenStyledText
-                        ( L.StyledText
-                            { body = "foo ",
-                              style = L.styleMaskFrom []
-                            }
-                        ),
-                      L.PTokenStyledText
-                        ( L.StyledText
-                            { body = "bar",
-                              style = L.styleMaskFrom [L.Bold]
-                            }
-                        ),
-                      L.PTokenStyledText
-                        ( L.StyledText
-                            { body = " baz",
-                              style = L.styleMaskFrom []
-                            }
-                        )
-                    ],
-                  meta = fromList []
-                }
-            )
+        [ L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "foo ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              L.PTokenStyledText
+                ( L.StyledText
+                    { body = "bar",
+                      style = L.styleMaskFrom [L.Bold]
+                    }
+                ),
+              L.PTokenStyledText
+                ( L.StyledText
+                    { body = " baz",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ]
         ],
       code = [],
       codeBlocks = IM.fromList [],
@@ -3097,7 +3115,7 @@ Here's another test, which checks some edge cases when dealing with punctuation.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-complex-punctuation
 #+begin_src org
-,* (foo =bar=). What's up? and *that!* /(italic)/. It's #1!
+(foo =bar=). What's up? and *that!* /(italic)/. It's #1!
 #+end_src
 
 #+name: t:0005-styled-strings-complex-punctuation
@@ -3106,14 +3124,8 @@ p
   "0005-styled-strings-complex-punctuation"
   L.OrgDoc
     { cells =
-        [ L.CHeading
-            ( L.Heading
-                { level = 1,
-                  body =
-                    <<Expected prose for 0005-styled-strings-complex-punctuation>>,
-                  meta = fromList []
-                }
-            )
+        [ L.CParagraph
+            <<Expected prose for 0005-styled-strings-complex-punctuation>>
         ],
       code = [],
       codeBlocks = fromList [],
