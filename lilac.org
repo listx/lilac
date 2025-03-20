@@ -716,6 +716,8 @@ In addition, ~pre-commit~ supports all of the usual Git hooks, not just
 =pre-commit=. This is handy for assigning resource-heavy checks to the less
 frequent operations, such as pushing to a remote.
 
+*** =git-hooks.nix=
+
 The https://github.com/cachix/git-hooks.nix project brings ~pre-commit~ into Nix,
 so that we can define all of the hook infrastructure in a reproducible way with
 Nix (such as using specific versions of linters, formatters, etc).
@@ -2954,9 +2956,9 @@ object. This can occur when we parse trailing newlines at the end of the line
 even without style markers, from [[f:whitespaceCompressor]].
 
 Here we test how we minimize the number of =PToken= objects; although the
-individual letters (without any styling, and with bold styling) are spaced out
-with multiple spaces, we only use two =PToken= objects, one for the plain text and
-another for the bold text.
+individual letters are spaced out with multiple spaces, we only use two =PToken=
+objects (one for the plain text and another for the bold text) and each of these
+objects have just single spaces between the letters.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-compression
 #+begin_src org
@@ -3225,10 +3227,10 @@ p
 ]
 #+end_src
 
-Verbatim and code styles take precedence over links. So even if you have text
+Verbatim and code styles take precedence over [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][links]]. So even if you have text
 that looks like a link, they will not be parsed as such if surrounded by
-verbatim or code styles. The same applies for inline math, whose parser should
-not apply if we're in a verbatim (or code) zone.
+verbatim or code styles. The same applies for [[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][inline math]], whose parser should
+not apply if we're inside a verbatim (or code) region.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-verbatim-precedence
 #+begin_src org
@@ -3810,6 +3812,9 @@ p
 #+end_src
 
 ** Inline math fragments
+:PROPERTIES:
+:ID:       216e94b7-e037-4f3e-856a-2040d0d0a75a
+:END:
 
 Inline math fragments are delimited by =\(= and =\)=. Just like [[f:linkParser]], we
 fail the parser if we detect that verbatim or code styles are active.
