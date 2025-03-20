@@ -1888,12 +1888,13 @@ type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
 
 #+end_src
 
-The =OrgParserState= is the custom state we want to use while parsing. The
-=styleMask= is discussed in [[id:dc1cc132-eecb-4fd3-aae7-14131109a148][the section on parsing styles]]. The =listLevels= and
-=listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The =continuationIndent= is used to keep
-track of how much indentation to expect inside a single (contiguous) piece of
-content; see [[f:paragraphParser]] and [[f:listHeadIndentLevelParser]] for a usage
-example.
+The =OrgParserState= is the custom state we want to use while parsing. You can
+think of it as a mutable variable we keep modifying as we make progress during
+parsing. The =styleMask= is discussed in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][the section on parsing styled strings]].
+The =listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The
+=continuationIndent= is used to keep track of how much indentation to expect
+inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
+[[f:listHeadIndentLevelParser]] for a usage example.
 
 #+name: data:OrgParserState
 #+begin_src haskell
@@ -1918,6 +1919,8 @@ defaultOrgParserState =
     }
 
 #+end_src
+
+** =orgDocParser=
 
 The =orgDocParser= first needs to parse any metadata associated with the document,
 such as the title and author. It starts by skipping any leading
@@ -1948,8 +1951,28 @@ orgDocParser = do
 
 #+end_src
 
-The =defaultOrgDoc= is useful for constructing a default (mostly blank) ~OrgDoc~. It
-is used mainly in testing.
+The =orgDocParser= delegates most of the work to the [[f:cellParser]], which in turn
+delegates work again to the individual parsers that know how to parse different
+cells. We have to filter out cells that look like =CListItem []= in ~meaningfulCell~
+because that can happen when [[f:listItemsEndParser]] detects maximum indentation
+that matches the most-deeply-nested item (in which case no list items end).
+
+See [[f:docMetaParser]] to see how ~docMetaParser~ works.
+
+We should be able to parse empty input.
+
+#+name: t:empty-input
+#+begin_src haskell
+it "empty input" $ do
+  MP.runParser
+    (runStateT L.orgDocParser L.defaultOrgParserState)
+    "empty input"
+    ""
+    `shouldParse` (L.defaultOrgDoc [], L.defaultOrgParserState)
+#+end_src
+
+The =defaultOrgDoc= is just a default (mostly blank) ~OrgDoc~. It's useful for
+testing.
 
 #+name: f:defaultOrgDoc
 #+begin_src haskell
@@ -1964,23 +1987,12 @@ defaultOrgDoc metas =
 
 #+end_src
 
-We have to filter out cells that look like =CListItem []= because that can happen
-when [[f:listItemsEndParser]] detects maximum indentation that matches the
-most-deeply-nested item (in which case no list items end).
+We should also be able to parse blank documents (not empty, but only has
+whitespace).
 
-We should be able to parse empty input.
-
-#+name: t:empty-input
-#+begin_src haskell
-it "empty input" $ do
-  MP.runParser
-    (runStateT L.orgDocParser L.defaultOrgParserState)
-    "empty input"
-    ""
-    `shouldParse` (L.defaultOrgDoc [], L.defaultOrgParserState)
+#+header: :tangle test/Lilac/ParseSpec/0001-blankline
+#+begin_src org
 #+end_src
-
-We should also be able to parse blank documents (whitespace only).
 
 #+name: t:0001-blankline
 #+begin_src haskell
@@ -1989,8 +2001,23 @@ p
   (L.defaultOrgDoc [])
 #+end_src
 
-#+header: :tangle test/Lilac/ParseSpec/0001-blankline
+Parsing comments should also result in a blank document.
+
+#+header: :tangle test/Lilac/ParseSpec/0001-comments-only
 #+begin_src org
+# This is a single-line comment.
+
+,#+begin_comment
+This is inside
+a block comment.
+,#+end_comment
+#+end_src
+
+#+name: t:0001-comments-only
+#+begin_src haskell
+p
+  "0001-comments-only"
+  (L.defaultOrgDoc [])
 #+end_src
 
 At the other end of the spectrum, Lilac should be able to parse itself
@@ -2008,10 +2035,10 @@ before (readFrom "" "lilac.org") $ do
 
 ** =docMetaParser=
 
-The first thing we need to parse is the document metadata. Metadata is a line
-that looks like =#+key: value= where =key= is a string and =value= is a series of
-tokens (it can have multiple words in it). This is what the =docMetaEntryParser=
-parses.
+An Org document's metadata is the first meaningful thing that could be parsed.
+Metadata is a line that looks like =#+key: value= where =key= is a string and =value=
+is a series of tokens (it can have multiple words in it). The
+=docMetaEntryParser= parses a single key and value pair.
 
 #+name: f:docMetaEntryParser
 #+begin_src haskell
@@ -2037,11 +2064,15 @@ docMetaEntryParser = do
 
 #+end_src
 
-The =docMetaParser= just parses =docMetaEntryParser= one or more times, while
-consuming any trailing whitespace or comments with [[f:lexeme]]
-
 Note how it also has to tiptoe around blocks by checking that it is not looking
-at block-related syntax with =avoidParsingBlockMetadata=.
+at block-related syntax with =avoidParsingBlockMetadata=. This is important
+because otherwise if an Org document begins with a [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code block]] as the first
+thing (before [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][headings]] or anything else), we may consume that as part of
+~docMetaParser~ and fail because we think we are expecting ~: ~ followed by a
+value.
+
+The =docMetaParser= just parses =docMetaEntryParser= multiple times, while consuming
+any trailing whitespace or comments with [[f:lexeme]].
 
 #+name: f:docMetaParser
 #+begin_src haskell
@@ -2051,6 +2082,8 @@ docMetaParser = do
   pure $ M.fromList metaKVs
 
 #+end_src
+
+*** Tests
 
 Below are some unit test cases for parsing metadata.
 
@@ -2075,10 +2108,8 @@ p
 #+end_src
 
 Note that we currently don't do any intelligent processing of the metadata
-fields. For example, all values are strings even though the "t" for =auto_tangle=
-above represents a boolean "true" value. Similarly the value of the =property= key
-above is a mess because it itself contains a key and value (=:noweb= and
-=no-export=).
+fields. For example, the value of the =property= key above is a mess because it
+itself contains a key and value (=:noweb= and =no-export=).
 
 Below is the same as the test above, but with some whitespace and comments
 sprinkled in between.
@@ -2119,8 +2150,8 @@ p
     ]
 #+end_src
 
-Indentation is invalid, except for =CListItem= cells. Even single-line comments
-may not be indented.
+Indentation is invalid for document metadata. Even single-line comments may not
+be indented.
 
 #+header: :tangle test/Lilac/ParseSpec/0008-indentation-comment
 #+begin_src org
@@ -2135,37 +2166,7 @@ pf
   1
 #+end_src
 
-Similarly, a space before a heading star is also invalid.
-
-#+header: :tangle test/Lilac/ParseSpec/0008-indentation-headings
-#+begin_src org
- * space before star is not allowed for headings
-#+end_src
-
-#+name: t:0008-indentation-headings
-#+begin_src haskell
-pf
-  "0008-indentation-headings"
-  "invalid indentation"
-  1
-#+end_src
-
-For that matter, indentation is also invalid for paragraphs.
-
-#+header: :tangle test/Lilac/ParseSpec/0008-indentation-paragraph
-#+begin_src org
- foo bar
-#+end_src
-
-#+name: t:0008-indentation-paragraph
-#+begin_src haskell
-pf
-  "0008-indentation-paragraph"
-  "invalid indentation"
-  1
-#+end_src
-
-Ignore leading whitespace just before the metadata value.
+Metadata values can have leading whitespace. We ignore such whitespace.
 
 #+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value
 #+begin_src org
@@ -2181,7 +2182,7 @@ p
     ]
 #+end_src
 
-Fail if the value part is missing.
+Metadata values are required (there must be some non-whitespace text for it).
 
 #+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-missing-value
 #+begin_src org
@@ -2198,9 +2199,8 @@ pfm
 
 ** Cells
 
-A cell is roughly any newline-delimited region of text. The only exception is
-the =CListItem= which is purely structural (it only describes itself and relies on
-other cells for displaying much of the information).
+The /cell/ is the main building block of an Org document --- it is roughly any
+region of text surrounded by blank lines.
 
 #+name: data:Cell
 #+begin_src haskell
@@ -2217,8 +2217,13 @@ data Cell
 
 #+end_src
 
-As you can see, there are many different types of cells. The =cellParser= is
-responsible for parsing these different types.
+All of the different cell types describe some sort of content, except for one,
+=CListItem=. The =CListItem= is purely structural because it only describes itself
+and relies on /other cells/ for displaying any useful information. See
+[[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]] to see how this is used.
+
+The =cellParser= is responsible for parsing these different recognized values of
+[[data:Cell]].
 
 #+name: f:cellParser
 #+begin_src haskell
@@ -2245,21 +2250,29 @@ cellParser =
 
 #+end_src
 
-The =resetContinuationIndent= wrapper sets the =continuationIndent= attribute back
-to =0=; this information is useful for parsers that need to understand indentation
-precisely. See [[f:listItemsEndParser]] for how it's used by that function.
+The =resetContinuationIndent= wrapper sets the =continuationIndent= attribute in the
+[[data:OrgParserState]] back to =0=; this information is useful for parsers that need
+to understand indentation precisely. See [[f:listItemsEndParser]] for how it's used
+by that function.
 
-The =listItemStartParser= can parse indentation, but also the same goes for
-=listItemsEndParser=; these are the only parsers that can consume leading
-indentation. =paragraphParser= can consume leading indentation, but only on lines
-except the first one.
+The [[f:listItemStartParser]] and [[f:listItemsEndParser]] are the only parsers that can
+consume leading indentation! The [[f:paragraphParser]] can consume leading
+indentation, but /only/ on lines except the first one (so that it can ensure that
+paragraphs that are part of a list item can have all of its lines line up
+together). For example, the following paragraph is inside a list item
 
-Other indentation levels should be detected as invalid. To enforce
-this, we put in a =detectInvalidIndentation= parser which technically isn't a
-parser but which will throw an error if it is able to successfully parse
-indentation. The idea is that if none of the other parsers in the list are able
-to consume indentation, then this will allow =detectInvalidIndentation= to see
-such indentation.
+  - Hello
+    world.
+
+and will be parsed as a string ~Hello world~ and not as ~Hello    world~ (the
+leading indent for ~world~ will be ignored).
+
+Any other indentation should be detected as invalid. To enforce this, we put in
+a =detectInvalidIndentation= parser which technically isn't a parser but which
+will throw an error if it is able to successfully parse indentation. The idea is
+that if none of the other parsers in the list are able to consume indentation,
+then this will allow =detectInvalidIndentation= to see such indentation and fail
+the overall parser.
 
 #+name: f:detectInvalidIndentation
 #+begin_src haskell
@@ -2271,197 +2284,24 @@ detectInvalidIndentation = do
     . Set.singleton
     . MP.ErrorFail
     $ "invalid indentation"
-  pure
-    $ CHeading
-      Heading
-        { level = 1,
-          body = [],
-          meta = M.fromList []
-        }
+  pure $ CListItem []
 
 #+end_src
 
-We signal the error with "invalid" so as to not shadow the typical "unexpected
-..." language from Megaparsec's usual parse failures. Note also that the
-=CHeading= bit above is only there to satisfy the type checker --- we will always
-fail if the =takeWhile1P= succeeds (the =MP.fancyFailure= will not be executed if
-=takeWhile1P= fails).
-
-** Headings
-
-Headings start with asterisks without any indentation, followed by some prose
-text (see the [[id:c8616126-215d-49be-8874-c2aca7d93a54][discussion of prose text]]). The number of asterisks determine the
-(nesting) level. There can be any number of levels, although there should be
-probably no more than 6 in a section that will be exported as a single HTML page
-or PDF file.
-
-The heading may also have some metadata associated with it. In practice this
-will be keys and values from a =:PROPERTIES:= [[https://orgmode.org/manual/Drawers.html][drawer]], although other drawers are
-possible. We store drawer information inside the =meta= hashmap, with the drawer
-name acting as a key prefix (this way we can store multiple drawers, if there
-are any, in a single hashmap).
-
-Other than the level, each heading is made up of =Prose= text, which we consider
-in the next section.
-
-#+name: data:Heading
-#+begin_src haskell
-type Heading :: Type
-data Heading = Heading
-  { level :: Int,
-    body :: Prose,
-    meta :: M.Map T.Text T.Text
-  }
-  deriving stock (Eq, Show)
-
-#+end_src
-
-The parser for a heading is straightforward as the strict requirements make it
-easy to have simple rules for it.
-
-#+name: f:headingParser
-#+begin_src haskell
-headingParser :: OrgParser Cell
-headingParser = do
-  stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
-  _ <- char ' '
-  prose <- proseParser spaceConsumer
-  _ <- char '\n'
-  failIfLeftoverActiveStyles
-  drawers <- drawersParser
-  pure
-    $ CHeading
-      Heading
-        { level = T.length stars,
-          body = compressProse prose,
-          meta = drawers
-        }
-  where
-    spaceConsumer :: OrgParser T.Text
-    spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
-
-#+end_src
-
-The body text of a heading is a series of prose tokens, or =PToken= values, which
-we call =Prose=.
-
-We consider prose in detail in the next section, where we'll also discuss
-[[f:failIfLeftoverActiveStyles]] and also [[f:compressProse]].
-
-** Drawers
-
-Drawers look like
-
-#+begin_example
-:DRAWER_NAME:
-...content...
-:END:
-#+end_example
-
-and the =:PROPERTIES:= drawer is a special drawer that can contain values that Org
-recognizes, such as an =:ID:= key and value to encode a UUID which can be used as
-a link target from elsewhere in the document.
-
-For simplicity we capture all of the values of a drawer inside a single map,
-with the drawer name as the key and the contents inside the drawer as the value.
-
-#+name: f:drawersParser
-#+begin_src haskell
-drawersParser :: OrgParser (Map T.Text T.Text)
-drawersParser = do
-  kvs <- many $ lexeme drawerParser
-  pure $ M.fromList kvs
-
-drawerParser :: OrgParser (T.Text, T.Text)
-drawerParser = do
-  _ <- char ':'
-  drawerName <- MP.takeWhile1P (Just "drawer name") isDrawerLetter
-  _ <- char ':'
-  _ <- char '\n'
-  drawerContents <-
-    MP.manyTill
-      (MP.label "drawer contents" MP.anySingle)
-      (string ":END:\n")
-  pure (drawerName, T.pack drawerContents)
-  where
-    isDrawerLetter c = and $ map ($ c) [(/= '\n'), (/= ':'), (/= ' ')]
-
-#+end_src
-
-Test for empty drawers.
-
-#+header: :tangle test/Lilac/ParseSpec/0004-drawers-empty
-#+begin_src org
-,* foo
-:FOO:
-:END:
-#+end_src
-
-#+name: t:0004-drawers-empty
-#+begin_src haskell
-p
-  "0004-drawers-empty"
-  L.OrgDoc
-    { cells =
-        [ L.CHeading
-            ( L.Heading
-                { level = 1,
-                  body =
-                    [ L.PTokenStyledText
-                        (L.StyledText {body = "foo", style = L.styleMaskFrom []})
-                    ],
-                  meta = fromList [("FOO", "")]
-                }
-            )
-        ],
-      code = [],
-      codeBlocks = IM.fromList [],
-      meta = M.fromList []
-    }
-#+end_src
-
-Test for drawers with some content.
-
-#+header: :tangle test/Lilac/ParseSpec/0004-drawers-not-empty
-#+begin_src org
-,* foo
-:FOO:
-- a
-- b
-:END:
-#+end_src
-
-#+name: t:0004-drawers-not-empty
-#+begin_src haskell
-p
-  "0004-drawers-not-empty"
-  L.OrgDoc
-    { cells =
-        [ L.CHeading
-            ( L.Heading
-                { level = 1,
-                  body =
-                    [ L.PTokenStyledText
-                        (L.StyledText {body = "foo", style = L.styleMaskFrom []})
-                    ],
-                  meta = fromList [("FOO", "- a\n- b\n")]
-                }
-            )
-        ],
-      code = [],
-      codeBlocks = IM.fromList [],
-      meta = M.fromList []
-    }
-#+end_src
+We signal the error with ~invalid ...~ so as to not shadow the typical ~unexpected
+...~ language from Megaparsec's usual parse failures. Note also that the last
+line in the function above (~pure $ CListItem []~) is only there to satisfy the
+type checker --- we will always fail if the =takeWhile1P= succeeds (the
+=MP.fancyFailure= will not be executed if =takeWhile1P= fails).
 
 ** Prose
 :PROPERTIES:
 :ID:       c8616126-215d-49be-8874-c2aca7d93a54
 :END:
 
-Prose is the simplest. It's a series of contiguous prose text, which can have
-some styling (bold, italic, etc) as well as links, citations, footnote links,
-etc, or /tokens/.
+Prose is a series of contiguous prose text, which can have some styling (bold,
+italic, etc) as well as links, citations, footnote links, etc, or /tokens/. So
+it's just a list of these /prose/ tokens (~PToken~).
 
 #+name: type:Prose
 #+begin_src haskell
@@ -2470,8 +2310,9 @@ type Prose = [PToken]
 
 #+end_src
 
-A prose token, or =PToken=, can be a string (styled or otherwise), a link of some
-sort, or a Latex fragment.
+A =PToken= can be a string (styled or otherwise), a link of some sort, or a Latex
+fragment. See [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][Styled strings]], [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][Links]], and [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][Math fragments]] for details on how these
+lower-level bits are parsed.
 
 #+name: data:PToken
 #+begin_src haskell
@@ -2484,59 +2325,9 @@ data PToken
 
 #+end_src
 
-The =StyledText= is just some text that has one or more styles attached to it.
-If the string has no style, then it's not stylized at all (plain style).
-
-#+name: data:StyledText
-#+begin_src haskell
-type StyledText :: Type
-data StyledText = StyledText
-  { body :: T.Text,
-    style :: StyleMask
-  }
-  deriving stock (Eq, Show)
-
-#+end_src
-
-The =Style= type is straightforward enough. For now we don't support all possible
-styles, for simplicity.
-
-#+name: data:Style
-#+begin_src haskell
-type Style :: Type
-data Style = Bold | Italic | Underline | Verbatim | Code
-  deriving stock (Enum, Eq, Ord, Show)
-
-#+end_src
-
-A link just has the display text and its target. The =LinkType= can refer to a
-link to another area of the Org document, or an external link (URL).
-
-#+name: data:Link
-#+begin_src haskell
-type Link :: Type
-data Link = Link
-  { typ :: LinkType,
-    target :: T.Text,
-    name :: [StyledText]
-  }
-  deriving stock (Eq, Show)
-
-type LinkType :: Type
-data LinkType
-  = LinkNoweb
-  | LinkHeading
-  | LinkIdProp
-  | LinkNameKeyword
-  | LinkFootnote
-  | LinkExternal
-  deriving stock (Eq, Show)
-
-#+end_src
-
-Math fragments are discussed in [[*Math fragments]].
-
-A [[data:PToken]] can be a styled string, link, or inline math fragment.
+The ~proseParser~ can parse a series of [[data:PToken]] values. It is used by both
+[[f:headingParser]] and [[f:paragraphParser]], because they both allow prose text in
+them.
 
 #+name: f:proseParser
 #+begin_src haskell
@@ -2560,26 +2351,26 @@ proseParser spaceConsumer = do
 
 #+end_src
 
-Note that we parse whitespace explicitly with =whitespaceCompressor= which
+In [[f:proseParser]], we parse whitespace explicitly with =whitespaceCompressor= which
 consumes whitespace based on the provided =spaceConsumer=. We first parse among
 the non-whitespace parsers in =baseParsers=, then parse additional tokens that may
 include whitespace with =spacePTokenParser=. This way, we force the prose to
 initially start out without any indentation (because the preceding cell, if any,
 would have swallowed up trailing whitespace automatically via =lexeme= in
-[[f:cellParser]]); otherwise, [[f:detectInvalidIndentation]] would not get a
-chance to detect this (invalid) indentation.
+[[f:cellParser]]); otherwise, [[f:detectInvalidIndentation]] would not get a chance to
+detect this (invalid) indentation.
 
 It may appear that we could alternatively skip past spaces inside prose text
 by making a =lexeme=-like wrapper which skips newlines /and spaces/ for each parser
-in =baseParser=. However, that approach has a problem. Consider the case of
+in =baseParsers=. However, that approach has a problem. Consider the case of
 parsing something like
 
 #+begin_src org
 =foo=...
 #+end_src
 
-where the "..." will get parsed separately from the =foo=. We'll end up with two
-=PTokenStyledText= objects, one for =foo= and another for "...". This is a problem
+where the ~...~ will get parsed separately from the =foo=. We'll end up with two
+=PTokenStyledText= objects, one for =foo= and another for ~...~. This is a problem
 because we'll also parse
 
 #+begin_src org
@@ -2587,9 +2378,9 @@ because we'll also parse
 #+end_src
 
 exactly the same way as two =PTokenStyledText= objects. This is because the space
-between the =foo= and "..." will get eaten up by the wrapper /and discarded/.
+between the =foo= and ~...~ will get eaten up by the wrapper /and discarded/.
 And now we're in the position where we have to, on export, guess (due to
-information loss) if we need to insert whitespace between the =foo= and "...".
+information loss) if we need to insert whitespace between the =foo= and ~...~.
 
 Instead, explicitly parsing the whitespace with =whitespaceCompressor= lets us
 parse the two cases above differently, because we save all whitespace we parsed
@@ -2625,11 +2416,41 @@ whitespaceCompressor spaceConsumer = do
 This parser only succeeds if it finds at least one non-newline whitespace
 character. Each time it succeeds, it "compresses" the whitespace to a single
 space character --- unless it sees that the input stream ends, in which case we
-use an empty string instead. Note that we also do a second level of
-"compression" in [[f:compressProse]], where we will drop =StyledText= objects with
-an empty string as the body.
+use an empty string instead (0 space characters). Note that we also do a second
+level of "compression" in [[f:compressProse]], where we will drop =StyledText= objects
+with an empty string as the body.
 
 ** Styled strings
+:PROPERTIES:
+:ID:       b616c1e2-6b42-41cf-8e5d-c1832f95b59b
+:END:
+
+The =StyledText= is just some text that has one or more styles attached to it.
+If the string has no style, then it's not stylized at all (plain style).
+
+#+name: data:StyledText
+#+begin_src haskell
+type StyledText :: Type
+data StyledText = StyledText
+  { body :: T.Text,
+    style :: StyleMask
+  }
+  deriving stock (Eq, Show)
+
+#+end_src
+
+The =Style= type is straightforward enough. For now we don't support all possible
+styles supported by Orgmode (such as strike-through text), for both simplicity
+but also prescriptive reasons. For example, strike-through text should never be
+needed during exposition.
+
+#+name: data:Style
+#+begin_src haskell
+type Style :: Type
+data Style = Bold | Italic | Underline | Verbatim | Code
+  deriving stock (Enum, Eq, Ord, Show)
+
+#+end_src
 
 Styled strings are text strings with special formatting markers around them.
 Here are some examples: *bold*, /italic/, _underline_, =verbatim=, and ~code~.
@@ -3469,6 +3290,31 @@ p
 :ID:       f8254d58-7a3d-4595-a265-e0d6255e6ab5
 :END:
 
+A link just has the display text and its target. The =LinkType= can refer to a
+link to another area of the Org document, or an external link (URL).
+
+#+name: data:Link
+#+begin_src haskell
+type Link :: Type
+data Link = Link
+  { typ :: LinkType,
+    target :: T.Text,
+    name :: [StyledText]
+  }
+  deriving stock (Eq, Show)
+
+type LinkType :: Type
+data LinkType
+  = LinkNoweb
+  | LinkHeading
+  | LinkIdProp
+  | LinkNameKeyword
+  | LinkFootnote
+  | LinkExternal
+  deriving stock (Eq, Show)
+
+#+end_src
+
 =LinkNoweb= links to Noweb references. We've been using Noweb references already
 in this document, but here's an isolated example.
 
@@ -3978,7 +3824,7 @@ mathFragmentInlineParser = do
 
 #+end_src
 
-** Paragraphs (standalone prose)
+** Paragraphs
 
 The =paragraphParser= below is similar to =headingParser= because it's also powered
 mostly by [[f:proseParser]]. However a key difference is that it is aware of the
@@ -3989,9 +3835,9 @@ start in three ways:
 
   1) without indentation,
 
-  2) with indentation, or
+  2) after a list head (which is essentially indentation), or
 
-  3) after a list head (which is essentially indentation).
+  3) with indentation (as part of a list).
 
 In all three cases, we would like to check whether a paragraph's inner lines
 have consistent indentation. This way, a paragraph's lines all line up
@@ -4084,10 +3930,214 @@ p
 ]
 #+end_src
 
-For tests involving paragraphs and indentation, see those prefixed with
+The paragraphs in the test case above all start without any indentation. This is
+because indentation is invalid for standalone paragraphs that are not part of a
+list in some way.
+
+#+header: :tangle test/Lilac/ParseSpec/0008-indentation-paragraph
+#+begin_src org
+ foo bar
+#+end_src
+
+#+name: t:0008-indentation-paragraph
+#+begin_src haskell
+pf
+  "0008-indentation-paragraph"
+  "invalid indentation"
+  1
+#+end_src
+
+For tests involving paragraphs and lists, see those prefixed with
 =0005-paragraph-indentation-*=.
 
+** Headings
+:PROPERTIES:
+:ID:       16a68a74-d4cc-41a4-ac77-cbca77de2a31
+:END:
+
+Headings start with asterisks without any indentation, followed by some prose
+text (see the [[id:c8616126-215d-49be-8874-c2aca7d93a54][discussion of prose text]]).
+
+#+header: :tangle test/Lilac/ParseSpec/0008-indentation-headings
+#+begin_src org
+ * space before star is not allowed for headings
+#+end_src
+
+#+name: t:0008-indentation-headings
+#+begin_src haskell
+pf
+  "0008-indentation-headings"
+  "invalid indentation"
+  1
+#+end_src
+
+The number of asterisks determine the (nesting) level. There can be any number
+of levels, although there should be probably no more than 6 in a section that
+will be exported as a single HTML page or PDF file.
+
+The heading may also have some metadata associated with it. In practice this
+will be keys and values from a =:PROPERTIES:= [[https://orgmode.org/manual/Drawers.html][drawer]], although other drawers are
+possible. We store drawer information inside the =meta= hashmap, with the drawer
+name acting as a key prefix (this way we can store multiple drawers, if there
+are any, in a single hashmap).
+
+Other than the level, each heading is made up of =Prose= text, which we consider
+in the next section.
+
+#+name: data:Heading
+#+begin_src haskell
+type Heading :: Type
+data Heading = Heading
+  { level :: Int,
+    body :: Prose,
+    meta :: M.Map T.Text T.Text
+  }
+  deriving stock (Eq, Show)
+
+#+end_src
+
+The parser for a heading is straightforward as the strict requirements make it
+easy to have simple rules for it.
+
+#+name: f:headingParser
+#+begin_src haskell
+headingParser :: OrgParser Cell
+headingParser = do
+  stars <- MP.takeWhile1P (Just "heading star") (\c -> c == '*')
+  _ <- char ' '
+  prose <- proseParser spaceConsumer
+  _ <- char '\n'
+  failIfLeftoverActiveStyles
+  drawers <- drawersParser
+  pure
+    $ CHeading
+      Heading
+        { level = T.length stars,
+          body = compressProse prose,
+          meta = drawers
+        }
+  where
+    spaceConsumer :: OrgParser T.Text
+    spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
+
+#+end_src
+
+The body text of a heading is a series of prose tokens, or =PToken= values, which
+we call =Prose=.
+
+We consider prose in detail in the next section, where we'll also discuss
+[[f:failIfLeftoverActiveStyles]] and also [[f:compressProse]].
+
+** Drawers
+
+Drawers look like
+
+#+begin_example
+:DRAWER_NAME:
+...content...
+:END:
+#+end_example
+
+and the =:PROPERTIES:= drawer is a special drawer that can contain values that Org
+recognizes, such as an =:ID:= key and value to encode a UUID which can be used as
+a link target from elsewhere in the document.
+
+For simplicity we capture all of the values of a drawer inside a single map,
+with the drawer name as the key and the contents inside the drawer as the value.
+
+#+name: f:drawersParser
+#+begin_src haskell
+drawersParser :: OrgParser (Map T.Text T.Text)
+drawersParser = do
+  kvs <- many $ lexeme drawerParser
+  pure $ M.fromList kvs
+
+drawerParser :: OrgParser (T.Text, T.Text)
+drawerParser = do
+  _ <- char ':'
+  drawerName <- MP.takeWhile1P (Just "drawer name") isDrawerLetter
+  _ <- char ':'
+  _ <- char '\n'
+  drawerContents <-
+    MP.manyTill
+      (MP.label "drawer contents" MP.anySingle)
+      (string ":END:\n")
+  pure (drawerName, T.pack drawerContents)
+  where
+    isDrawerLetter c = and $ map ($ c) [(/= '\n'), (/= ':'), (/= ' ')]
+
+#+end_src
+
+Test for empty drawers.
+
+#+header: :tangle test/Lilac/ParseSpec/0004-drawers-empty
+#+begin_src org
+,* foo
+:FOO:
+:END:
+#+end_src
+
+#+name: t:0004-drawers-empty
+#+begin_src haskell
+p
+  "0004-drawers-empty"
+  L.OrgDoc
+    { cells =
+        [ L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    [ L.PTokenStyledText
+                        (L.StyledText {body = "foo", style = L.styleMaskFrom []})
+                    ],
+                  meta = fromList [("FOO", "")]
+                }
+            )
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+#+end_src
+
+Test for drawers with some content.
+
+#+header: :tangle test/Lilac/ParseSpec/0004-drawers-not-empty
+#+begin_src org
+,* foo
+:FOO:
+- a
+- b
+:END:
+#+end_src
+
+#+name: t:0004-drawers-not-empty
+#+begin_src haskell
+p
+  "0004-drawers-not-empty"
+  L.OrgDoc
+    { cells =
+        [ L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    [ L.PTokenStyledText
+                        (L.StyledText {body = "foo", style = L.styleMaskFrom []})
+                    ],
+                  meta = fromList [("FOO", "- a\n- b\n")]
+                }
+            )
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+#+end_src
+
 ** Blocks
+:PROPERTIES:
+:ID:       cae993e5-02bd-4f89-a6d3-20b41adaff8f
+:END:
 
 /Blocks/ are regions of text that start with =#+begin<...>= and end with =#+end<...>=.
 They are used to delineate source code (used for Noweb references), examples,
@@ -5855,6 +5905,9 @@ pf
 #+end_src
 
 ** Math fragments
+:PROPERTIES:
+:ID:       d1064535-5c98-4c80-a901-5cdc1fd5297f
+:END:
 
 In vanilla Org, Latex fragments begin with =\begin{<ENVIRONMENT>}= and
 =\end{<ENVIRONMENT>}=, where =<ENVIRONMENT>= can be anything. Presumably you could
@@ -6892,6 +6945,7 @@ spec = do
   <<t:empty-input>>
   <<t:self-parse>>
   <<t:0001-blankline>>
+  <<t:0001-comments-only>>
   <<t:0002-doc-metadata-missing-value>>
   <<t:0002-doc-metadata-whitespace-before-value>>
   <<t:0002-doc-metadata:basic>>

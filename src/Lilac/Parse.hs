@@ -386,13 +386,7 @@ detectInvalidIndentation = do
     . Set.singleton
     . MP.ErrorFail
     $ "invalid indentation"
-  pure
-    $ CHeading
-      Heading
-        { level = 1,
-          body = [],
-          meta = M.fromList []
-        }
+  pure $ CListItem []
 
 headingParser :: OrgParser Cell
 headingParser = do

@@ -104,6 +104,9 @@ spec = do
   p
     "0001-blankline"
     (L.defaultOrgDoc [])
+  p
+    "0001-comments-only"
+    (L.defaultOrgDoc [])
   pfm
     "0002-doc-metadata-missing-value"
     (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
