@@ -64,6 +64,8 @@ development environment with many of the infrastructural issues sorted out with
 Nix. The Nixkell project encourages wiping the Nixkell-specific history, but we
 decided to keep that history for additional context.
 
+** Nix
+
 Using [[https://github.com/NixOS/nix][Nix]] helps us set up a reproducible development environment, as well as
 package up Lilac as a full-fledged Nix package (so that anyone with Nix can
 install it).
@@ -389,11 +391,11 @@ lilacSource = lib.cleanSourceWith {
       basePath = projectRoot;
       extraRules = ''
         .*
-        ,,,*.html
-        ,,,*.nix
-        ,,,*.org
-        ,,,*.sh
-        ,,,*.toml
+        ,*.html
+        ,*.nix
+        ,*.org
+        ,*.sh
+        ,*.toml
         Makefile
         image
         nix
@@ -1336,7 +1338,7 @@ test-suite spec
   default-language: <<Language edition>>
 #+end_src
 
-We save ourselves some repetition (at least in the Org file) by declaring the
+We save ourselves some repetition (at least in the Org file) by declaring
 default GHC extensions in one place:
 
 #+name: Default GHC extensions
@@ -1517,6 +1519,8 @@ main = defaultMain
 
 We use [[https://github.com/mrkkrp/megaparsec][Megaparsec]] to parse an Org document. The parsing requires us to read in
 everything in a single Org file.
+
+** =Lilac.Parse= module
 
 The parsing mechanism is in [[file:src/Lilac/Parse.hs]], which we describe below. We
 discuss each parser and interleave some tests for the smaller parsers. If you
@@ -6696,6 +6700,28 @@ corresponds to the index of the cell containing the code block in the cell list.
 :ID:       ebf0d269-79d3-408a-a6e7-baf720d73837
 :END:
 
+The tests here are all designed to read from Org source documents. There are
+some benefits of writing tests this way:
+
+  1) The raw input file (on disk) for test cases can be looked at if necessary.
+     This is especially useful if the input has any special Org characters in it
+     we have to escape. See the inputs for [[t:0007-blocks-ending]] and
+     [[t:0004-drawers-empty]] where we need to escape some parts of the input with a
+     leading comma (so as to distinguish between the Org syntax of this document
+     vs the nested Org syntax of the input file we are defining).
+
+  2) We can organize the input files in a systematic way. We use a
+     ~NNNN-<description>~ naming scheme for the inputs, which all live under
+     [[file:test/Lilac/ParseSpec]]. Each unique ~NNNN~ number groups together files
+     meant to test similar functionality. This makes it easy to see at a glance
+     what sorts of things we test.
+
+The downside is that we have to perform lots of small read operations (IO) to
+run the unit tests. But this cost is small enough that we can ignore it (we
+spend far more time compiling the tests themselves).
+
+*** Test module and helpers
+
 #+name: module:Lilac.ParseSpec
 #+header: :tangle test/Lilac/ParseSpec.hs
 #+begin_src haskell
@@ -6734,13 +6760,22 @@ import Test.Hspec.Megaparsec
   )
 import Text.Megaparsec qualified as MP
 
+<<Test helpers>>
+
+<<f:spec>>
+#+end_src
+
+Most of the test helpers are concerned about reading a raw input file from disk,
+and then running the [[f:orgDocParser]] against it.
+
+#+name: Test helpers
+#+begin_src haskell
 <<f:readFrom>>
 <<f:p>>
 <<f:ps>>
 <<f:pf>>
 <<f:pfm>>
 <<f:plainParagraph>>
-<<f:spec>>
 #+end_src
 
 [[f:readFrom]] reads a path from the given prefix, and returns a =ByteString=. We'll
@@ -6830,7 +6865,7 @@ pfm path errorTrivial pos = do
 
 #+end_src
 
-=plainParagraph= is a helper to cut down on some of the repetition.
+The function =plainParagraph= helps to cut down on some of the repetition.
 
 #+name: f:plainParagraph
 #+begin_src haskell
@@ -6844,8 +6879,9 @@ plainParagraph body =
             }
         )
     ]
-
 #+end_src
+
+*** All test cases
 
 Below are all of the individual test cases.
 
@@ -6913,8 +6949,10 @@ spec = do
 
 * CLI
 
-There are a couple bits of boilerplate needed to build our =lilac= CLI program.
-One is option handling (where we use [[https://hackage.haskell.org/package/optparse-applicative][optparse-applicative]]), and the other is
+The CLI has two main parts: the boilerplate and use of the modules (libraries)
+that Lilac provides. In this sense it's a somewhat thin wrapper.
+
+The boilerplate involves option handling (where we use [[https://hackage.haskell.org/package/optparse-applicative][optparse-applicative]]) and
 injecting the Git version information into the version string.
 
 #+name: module:Main
@@ -6970,25 +7008,14 @@ import System.Exit (die)
 import Text.Megaparsec qualified as MP
 import Text.Pretty.Simple qualified as PP
 
-<<Execution flow>>
 <<Option handling>>
-#+end_src
 
-#+name: Execution flow
-#+begin_src haskell
 <<f:lilac-main>>
 <<f:lilac>>
 <<f:lilacCheck>>
 #+end_src
 
-#+name: Option handling
-#+begin_src haskell
-<<data:GlobalOpts>>
-<<data:OptionHandler>>
-<<f:programOptions>>
-<<f:subcommandHandler>>
-<<f:checkOptsHandler>>
-#+end_src
+** Main
 
 In Haskell, like C, execution starts with =main=.
 
@@ -7001,14 +7028,14 @@ main = do
   where
     mainOptions =
       info
-        (helper <*> versionOption <*> programOptions)
-        programDescription
-    programDescription :: InfoMod a
-    programDescription =
+        (helper <*> versionOptionHandler <*> globalOptionsHandler)
+        lilacDesc
+    lilacDesc :: InfoMod a
+    lilacDesc =
       fullDesc
         <> header "lilac - literate programming with Org and Noweb-style blocks"
-    versionOption :: OptionHandler (a -> a)
-    versionOption =
+    versionOptionHandler :: OptionHandler (a -> a)
+    versionOptionHandler =
       let cabalVersion = version
        in infoOption
             (concat [showVersion cabalVersion, "-", $(lilacVersion)])
@@ -7016,7 +7043,8 @@ main = do
 
 #+end_src
 
-Once the CLI arguments and options are handled, we call [[f:lilac]].
+Once the CLI arguments and options are handled, we call [[f:lilac]], which branches
+out into the =check=, =tangle= and =weave= subcommands.
 
 #+name: f:lilac
 #+begin_src haskell
@@ -7061,6 +7089,18 @@ be printed with colored braces, but you can suppress this with ~--no-color~.
 
 ** Option handling boilerplate
 
+The option handling code is made up of some declarative configuration of the
+options, and the functions that operate on them.
+
+#+name: Option handling
+#+begin_src haskell
+<<data:GlobalOpts>>
+<<data:OptionHandler>>
+<<f:globalOptionsHandler>>
+<<f:subcommandHandler>>
+<<f:checkOptsHandler>>
+#+end_src
+
 The option handling uses types to capture what the allowed global options,
 subcommands, and subcommand options are.
 
@@ -7087,9 +7127,9 @@ data CheckOpts = CheckOpts
 #+end_src
 
 We use the type =OptionHandler= to mean the option handling (parsing), because the
-alternative of using =Parser= feels a bit confusing, given how we already use the
-word =OrgParser= (and the concept of a "parser" in general) to mean the Org
-parsing mechanism we have in [[module:Lilac.Parse]]).
+alternative of calling it as =Parser= feels a bit confusing, given how we already
+use the word =OrgParser= (and the concept of a "parser" in general) to mean the
+Org parsing mechanism we have in [[module:Lilac.Parse]]).
 
 #+name: data:OptionHandler
 #+begin_src haskell
@@ -7098,13 +7138,13 @@ type OptionHandler = Options.Applicative.Parser
 
 #+end_src
 
-The [[f:programOptions]] is the handler for all global options (apart from the help
-and version flags which we add into =mainOptions= in [[f:lilac]]).
+The [[f:globalOptionsHandler]] is the handler for all global options (apart from the
+help and version flags which we add into =mainOptions= in [[f:lilac-main]]).
 
-#+name: f:programOptions
+#+name: f:globalOptionsHandler
 #+begin_src haskell
-programOptions :: OptionHandler GlobalOpts
-programOptions =
+globalOptionsHandler :: OptionHandler GlobalOpts
+globalOptionsHandler =
   GlobalOpts
     <$> subcommandHandler
     <*> ( flag
@@ -7124,7 +7164,8 @@ programOptions =
 
 #+end_src
 
-The options in [[f:programOptions]] can be provided anywhere.
+The global options in [[f:globalOptionsHandler]] can be provided anywhere on the
+command line (unlike subcommand options which must come /after/ the subcommand).
 
 #+name: f:subcommandHandler
 #+begin_src haskell
@@ -7172,7 +7213,7 @@ checkOptsHandler =
 
 Notice that the option handling boilerplate does not describe error handling
 (what to do when a required option is missing, etc), because all of that is
-abstracted away by =Options.Applicative=.
+given to us for free by =Options.Applicative=.
 
 ** Git version injection
 :PROPERTIES:
@@ -7180,17 +7221,16 @@ abstracted away by =Options.Applicative=.
 :END:
 
 We want to inject Git version information (as it was detected during the build)
-into the =lilac= binary.
+into the =lilac= binary. There is some complication because we want to do this for
+both Cabal and Nix.
 
-The traditional way of doing this is with Template Haskell, by invoking =git=
-during compile time. See
-https://stackoverflow.com/questions/5713418/templatehaskell-and-io#comment7962237_5713551
-and https://stackoverflow.com/a/20871010/437583 for an overview of working with
-Template Haskell.
+The traditional way of doing Git version injection is with Template Haskell, by
+invoking =git= during compile time. For an overview of working with Template
+Haskell, see [[https://stackoverflow.com/questions/5713418/templatehaskell-and-io#comment7962237_5713551][this SO comment]] and [[https://stackoverflow.com/a/20871010/437583][this SO answer]].
 
 However, invoking =git= doesn't work in all cases, especially when building with
 Nix because when Nix builds things it doesn't use the Git repository (it uses a
-sandboxed build environment). So we have to handle both of these cases.
+sandboxed build environment).
 
 First let's get the imports out of the way.
 
@@ -7254,11 +7294,12 @@ getTimestamp = show <$> getZonedTime
 #+end_src
 
 In [[f:getGitVersion]] we use the continuation monad transformer to make the IO
-computations be able to return early, with ~escapeWith~ (without executing the
-rest of the do-block). ~escapeWith~ itself isn't anything special (we don't define
-it), and it is called an "escape continuation" according to the [[https://hackage.haskell.org/package/transformers-0.6.1.2/docs/Control-Monad-Trans-Cont.html#v:callCC][=transformers=
-library]] and is built into ~ContT~. For our purposes we just know that invoking
-~escapeWith~ means we'll escape the computation early with the provided argument.
+computations be able to return early (without executing the rest of the
+do-block), with ~escapeWith~. The ~escapeWith~ function itself isn't anything
+special (we don't define it), and it is called an "escape continuation"
+according to the [[https://hackage.haskell.org/package/transformers-0.6.1.2/docs/Control-Monad-Trans-Cont.html#v:callCC][=transformers= library]] and this behavior is built into ~ContT~.
+For our purposes we just know that invoking ~escapeWith~ means we'll escape the
+computation early with the provided argument.
 
 #+name: f:getGitVersion
 #+begin_src haskell
@@ -7286,8 +7327,8 @@ not empty) as is.
   when (not $ null gitVersion) $ escapeWith gitVersion
 #+end_src
 
-~getEnv~ is a basic helper to look up an environment variable, but which returns
-the empty string if the environment variable was not found.
+~getEnv~ looks up an environment variable, but returns the empty string if the
+environment variable was not found.
 
 #+name: f:getEnv
 #+begin_src haskell

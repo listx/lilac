@@ -48,52 +48,6 @@ import System.Exit (die)
 import Text.Megaparsec qualified as MP
 import Text.Pretty.Simple qualified as PP
 
-main :: IO ()
-main = do
-  opts <- customExecParser (prefs showHelpOnEmpty) mainOptions
-  lilac opts
-  where
-    mainOptions =
-      info
-        (helper <*> versionOption <*> programOptions)
-        programDescription
-    programDescription :: InfoMod a
-    programDescription =
-      fullDesc
-        <> header "lilac - literate programming with Org and Noweb-style blocks"
-    versionOption :: OptionHandler (a -> a)
-    versionOption =
-      let cabalVersion = version
-       in infoOption
-            (concat [showVersion cabalVersion, "-", $(lilacVersion)])
-            (long "version" <> short 'v' <> help "Show version")
-
-lilac :: GlobalOpts -> IO ()
-lilac globalOpts = case globalOpts.subcommand of
-  Check checkOpts -> lilacCheck globalOpts checkOpts
-  Tangle -> putStrLn "'tangle' is not implemented yet"
-  Weave -> putStrLn "'weave' is not implemented yet"
-
-lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
-lilacCheck globalOpts checkOpts = do
-  bytes <- readFileBS checkOpts.input
-  let parseResult =
-        MP.runParser
-          (runStateT L.orgDocParser L.defaultOrgParserState)
-          checkOpts.input
-          (decodeUtf8 bytes)
-  case parseResult of
-    Left errBundle -> do
-      die $ MP.errorBundlePretty errBundle
-    Right orgDoc -> do
-      putStrLn $ checkOpts.input <> ": OK"
-      when (globalOpts.verbose) $ do
-        let prettyPrint =
-              if globalOpts.color
-                then PP.pPrintForceColor
-                else PP.pPrintNoColor
-        prettyPrint orgDoc
-
 type GlobalOpts :: Type
 data GlobalOpts = GlobalOpts
   { subcommand :: Subcommand,
@@ -115,8 +69,8 @@ data CheckOpts = CheckOpts
 type OptionHandler :: Type -> Type
 type OptionHandler = Options.Applicative.Parser
 
-programOptions :: OptionHandler GlobalOpts
-programOptions =
+globalOptionsHandler :: OptionHandler GlobalOpts
+globalOptionsHandler =
   GlobalOpts
     <$> subcommandHandler
     <*> ( flag
@@ -165,3 +119,49 @@ checkOptsHandler :: OptionHandler CheckOpts
 checkOptsHandler =
   CheckOpts
     <$> (argument str (metavar "FILE"))
+
+main :: IO ()
+main = do
+  opts <- customExecParser (prefs showHelpOnEmpty) mainOptions
+  lilac opts
+  where
+    mainOptions =
+      info
+        (helper <*> versionOptionHandler <*> globalOptionsHandler)
+        lilacDesc
+    lilacDesc :: InfoMod a
+    lilacDesc =
+      fullDesc
+        <> header "lilac - literate programming with Org and Noweb-style blocks"
+    versionOptionHandler :: OptionHandler (a -> a)
+    versionOptionHandler =
+      let cabalVersion = version
+       in infoOption
+            (concat [showVersion cabalVersion, "-", $(lilacVersion)])
+            (long "version" <> short 'v' <> help "Show version")
+
+lilac :: GlobalOpts -> IO ()
+lilac globalOpts = case globalOpts.subcommand of
+  Check checkOpts -> lilacCheck globalOpts checkOpts
+  Tangle -> putStrLn "'tangle' is not implemented yet"
+  Weave -> putStrLn "'weave' is not implemented yet"
+
+lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
+lilacCheck globalOpts checkOpts = do
+  bytes <- readFileBS checkOpts.input
+  let parseResult =
+        MP.runParser
+          (runStateT L.orgDocParser L.defaultOrgParserState)
+          checkOpts.input
+          (decodeUtf8 bytes)
+  case parseResult of
+    Left errBundle -> do
+      die $ MP.errorBundlePretty errBundle
+    Right orgDoc -> do
+      putStrLn $ checkOpts.input <> ": OK"
+      when (globalOpts.verbose) $ do
+        let prettyPrint =
+              if globalOpts.color
+                then PP.pPrintForceColor
+                else PP.pPrintNoColor
+        prettyPrint orgDoc

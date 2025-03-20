@@ -47,11 +47,11 @@ let
         basePath = projectRoot;
         extraRules = ''
           .*
-          ,,*.html
-          ,,*.nix
-          ,,*.org
-          ,,*.sh
-          ,,*.toml
+          *.html
+          *.nix
+          *.org
+          *.sh
+          *.toml
           Makefile
           image
           nix
