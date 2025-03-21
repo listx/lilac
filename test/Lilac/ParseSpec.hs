@@ -3,6 +3,7 @@ module Lilac.ParseSpec (spec) where
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
+import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Relude
   ( ByteString,
@@ -10,6 +11,7 @@ import Relude
     Int,
     MonadIO,
     String,
+    Type,
     decodeUtf8,
     fromList,
     readFileBS,
@@ -32,6 +34,10 @@ import Test.Hspec.Megaparsec
     utoks,
   )
 import Text.Megaparsec qualified as MP
+import Text.Megaparsec.Char (char)
+
+type Parser :: Type -> Type
+type Parser = MP.Parsec Void T.Text
 
 readFrom :: (MonadIO m) => FilePath -> FilePath -> m ByteString
 readFrom prefix path = readFileBS $ prefix <> path
@@ -213,6 +219,11 @@ spec = do
         codeBlocks = fromList [],
         meta = fromList []
       }
+  it "accepts empty input for \"notFollowedBy (char ' ')\"" $ do
+    MP.parse
+      (MP.notFollowedBy (char ' ') :: Parser ())
+      "empty input"
+      `shouldSucceedOn` ""
   p
     "0005-styled-strings-bold"
     L.OrgDoc

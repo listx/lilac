@@ -720,28 +720,35 @@ paragraphParser = do
     spaceConsumer :: Int -> OrgParser T.Text
     spaceConsumer expectedIndentLen =
       MP.choice
-        [ newlineAndIndent expectedIndentLen,
+        [ newlineAndIndentParser expectedIndentLen,
           spaces
         ]
-    newlineAndIndent :: Int -> OrgParser T.Text
-    newlineAndIndent expectedIndentLen = do
-      MP.notFollowedBy (string "\n\n")
-      _ <- string "\n"
-      _ <-
-        if (expectedIndentLen == 0)
-          then MP.notFollowedBy (char ' ')
-          else MP.eof <|> indent expectedIndentLen
-      pure " "
-    indent :: Int -> OrgParser ()
-    indent expectedIndentLen = do
+    spaces :: OrgParser T.Text
+    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
+
+newlineAndIndentParser :: Int -> OrgParser T.Text
+newlineAndIndentParser expectedIndentLen = do
+  MP.notFollowedBy cellBoundary
+  _ <- string "\n"
+  maybeIndent
+  pure " "
+  where
+    cellBoundary :: OrgParser T.Text
+    cellBoundary = string "\n\n"
+    maybeIndent =
+      if (expectedIndentLen == 0)
+        then nonSpace
+        else MP.eof <|> exactIndent
+    nonSpace :: OrgParser ()
+    nonSpace = MP.notFollowedBy (char ' ')
+    exactIndent :: OrgParser ()
+    exactIndent = do
       _ <-
         MP.label "indentation for paragraph continuation"
           $ MP.count expectedIndentLen (char ' ')
       MP.notFollowedBy (char ' ')
       MP.notFollowedBy (char '\n')
       pure ()
-    spaces :: OrgParser T.Text
-    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 
 blockMetaEntryParser :: OrgParser (T.Text, T.Text)
 blockMetaEntryParser = do

@@ -1805,6 +1805,7 @@ import Prelude qualified (show)
 <<f:rawLinkParser>>
 <<f:mathFragmentInlineParser>>
 <<f:paragraphParser>>
+<<f:newlineAndIndentParser>>
 <<f:blockMetaEntryParser>>
 <<f:blockParser>>
 <<f:bTokenParser>>
@@ -1993,13 +1994,24 @@ handling mechanism that ships with Megaparsec.
 #+name: type:OrgParser
 #+begin_src haskell
 type OrgParser :: Type -> Type
-type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
+type OrgParser = StateT OrgParserState (<<Concrete type for Megaparsec>>)
 
 #+end_src
 
 The =OrgParserState= is the custom state we want to use while parsing. You can
 think of it as a mutable variable we keep modifying as we make progress during
-parsing. The =styleMask= is discussed in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][the section on parsing styled strings]].
+parsing.
+
+The [[Concrete type for Megaparsec]] feeds the concrete ~T.Text~ type to use as the
+stream for Megaparsec. Megaparsec defines a polymorphic API and expects users to
+use concrete types like this for speed optimizations.
+
+#+name: Concrete type for Megaparsec
+#+begin_src haskell
+MP.Parsec Void T.Text
+#+end_src
+
+The =styleMask= is discussed in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][the section on parsing styled strings]].
 The =listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The
 =continuationIndent= is used to keep track of how much indentation to expect
 inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
@@ -3900,7 +3912,7 @@ mathFragmentInlineParser = do
 
 ** Paragraphs
 
-The =paragraphParser= below is similar to =headingParser= because it's also powered
+The [[f:paragraphParser]] is similar to [[f:headingParser]] because it's also powered
 mostly by [[f:proseParser]]. However a key difference is that it is aware of the
 nuances between newlines, indentation, and spaces.
 
@@ -3931,30 +3943,69 @@ paragraphParser = do
     spaceConsumer :: Int -> OrgParser T.Text
     spaceConsumer expectedIndentLen =
       MP.choice
-        [ newlineAndIndent expectedIndentLen,
+        [ newlineAndIndentParser expectedIndentLen,
           spaces
         ]
-    newlineAndIndent :: Int -> OrgParser T.Text
-    newlineAndIndent expectedIndentLen = do
-      MP.notFollowedBy (string "\n\n")
-      _ <- string "\n"
-      _ <-
-        if (expectedIndentLen == 0)
-          then MP.notFollowedBy (char ' ')
-          else MP.eof <|> indent expectedIndentLen
-      pure " "
-    indent :: Int -> OrgParser ()
-    indent expectedIndentLen = do
+    spaces :: OrgParser T.Text
+    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
+
+#+end_src
+
+The tricky bit is with ~spaceConsumer~ here. It chooses between either a newline
+followed by an indent of length ~expectedIndentLen~ (in [[f:newlineAndIndentParser]]),
+or just ~spaces~ which we define to be one or more space characters.
+
+#+name: f:newlineAndIndentParser
+#+begin_src haskell
+newlineAndIndentParser :: Int -> OrgParser T.Text
+newlineAndIndentParser expectedIndentLen = do
+  MP.notFollowedBy cellBoundary
+  _ <- string "\n"
+  maybeIndent
+  pure " "
+  where
+    cellBoundary :: OrgParser T.Text
+    cellBoundary = string "\n\n"
+    maybeIndent =
+      if (expectedIndentLen == 0)
+        then nonSpace
+        else MP.eof <|> exactIndent
+    nonSpace :: OrgParser ()
+    nonSpace = MP.notFollowedBy (char ' ')
+    exactIndent :: OrgParser ()
+    exactIndent = do
       _ <-
         MP.label "indentation for paragraph continuation"
           $ MP.count expectedIndentLen (char ' ')
       MP.notFollowedBy (char ' ')
       MP.notFollowedBy (char '\n')
       pure ()
-    spaces :: OrgParser T.Text
-    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 
 #+end_src
+
+The ~MP.notFollowedBy cellBoundary~ bit is required to stay clear of cell
+boundaries (paragraph cells are separated from each other by a blank line, or in
+other words a sequence of two consecutive newlines). If we don't do this, our
+parser will see a newline and immediately think that there should follow some
+spaces for the indent portion, which may not be true if the newline was part of
+a cell boundary.
+
+The ~maybeIndent~ handles the case where there is no indentation (with ~nonSpace~),
+or where there is indentation (with ~MP.eof <|> exactIndent~). The first case does
+not need ~MP.eof <|>~ because it's redundant --- ~MP.notFollowedBy (char ' ')~ will
+succeed for ~MP.eof~ as well, as [[t:0005-notFollowedBy-behavior-for-empty-input]]
+demonstrates.
+
+#+name: t:0005-notFollowedBy-behavior-for-empty-input
+#+begin_src haskell
+it "accepts empty input for \"notFollowedBy (char ' ')\"" $ do
+  MP.parse
+    (MP.notFollowedBy (char ' ') :: Parser ())
+    "empty input"
+    `shouldSucceedOn` ""
+#+end_src
+
+*** Tests
 
 Below we check several types of paragraphs without regard to indentation.
 
@@ -4022,7 +4073,8 @@ pf
 #+end_src
 
 For tests involving paragraphs and lists, see those prefixed with
-=0005-paragraph-indentation-*=.
+=0005-paragraph-indentation-*=, such as
+[[t:0005-paragraph-indentation-mismatch-over]].
 
 ** Headings
 :PROPERTIES:
@@ -6860,6 +6912,7 @@ module Lilac.ParseSpec (spec) where
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
+import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Relude
   ( ByteString,
@@ -6867,6 +6920,7 @@ import Relude
     Int,
     MonadIO,
     String,
+    Type,
     decodeUtf8,
     fromList,
     readFileBS,
@@ -6889,6 +6943,7 @@ import Test.Hspec.Megaparsec
     utoks,
   )
 import Text.Megaparsec qualified as MP
+import Text.Megaparsec.Char (char)
 
 <<Test helpers>>
 
@@ -6900,6 +6955,9 @@ and then running the [[f:orgDocParser]] against it.
 
 #+name: Test helpers
 #+begin_src haskell
+type Parser :: Type -> Type
+type Parser = <<Concrete type for Megaparsec>>
+
 <<f:readFrom>>
 <<f:p>>
 <<f:ps>>
@@ -6907,6 +6965,10 @@ and then running the [[f:orgDocParser]] against it.
 <<f:pfm>>
 <<f:plainParagraph>>
 #+end_src
+
+The ~Parser~ type synonym uses the same [[Concrete type for Megaparsec][concrete types]] as we do for
+[[type:OrgParser]]. The ~Parser~ type synonym is used in tests such as
+[[t:0005-notFollowedBy-behavior-for-empty-input]].
 
 [[f:readFrom]] reads a path from the given prefix, and returns a =ByteString=. We'll
 be using this a lot because most of the tests here are based on parsing some
@@ -7035,6 +7097,7 @@ spec = do
   <<t:0005-paragraph-indentation-mismatch-over>>
   <<t:0005-paragraph-indentation-mismatch-under-list-body>>
   <<t:0005-prose-paragraphs>>
+  <<t:0005-notFollowedBy-behavior-for-empty-input>>
   <<t:0005-styled-strings-bold>>
   <<t:0005-styled-strings-complex-punctuation>>
   <<t:0005-styled-strings-complex>>
