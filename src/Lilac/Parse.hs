@@ -187,20 +187,16 @@ data Style = Bold | Italic | Underline | Verbatim | Code
 
 type Link :: Type
 data Link = Link
-  { typ :: LinkType,
+  { name :: [StyledText],
     target :: T.Text,
-    name :: [StyledText]
+    typ :: LinkType
   }
   deriving stock (Eq, Show)
 
 type LinkType :: Type
 data LinkType
-  = LinkNoweb
-  | LinkHeading
-  | LinkIdProp
-  | LinkNameKeyword
-  | LinkFootnote
-  | LinkExternal
+  = LinkBracketed
+  | LinkNoweb
   deriving stock (Eq, Show)
 
 type StyleMask :: Type
@@ -624,8 +620,8 @@ linkParser = do
   failIfVerbatimOrCode
 
   MP.choice
-    [ MP.try rawLinkParser,
-      MP.try bracketedLinkParser
+    [ MP.try bracketedLinkParser,
+      MP.try rawLinkParser
     ]
 
 failIfVerbatimOrCode :: OrgParser ()
@@ -658,7 +654,7 @@ bracketedLinkParser = do
   _ <- string "]"
   pure
     Link
-      { typ = LinkExternal,
+      { typ = LinkBracketed,
         target = T.pack target,
         name =
           [ StyledText
@@ -676,7 +672,7 @@ rawLinkParser = do
   let url = protocol <> separator <> remainder
   pure
     Link
-      { typ = LinkExternal,
+      { typ = LinkBracketed,
         target = url,
         name =
           [ StyledText

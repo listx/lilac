@@ -1762,6 +1762,7 @@ import Prelude qualified (show)
 <<data:StyledText>>
 <<data:Style>>
 <<data:Link>>
+<<data:LinkType>>
 <<newtype:StyleMask>>
 <<instance:Show Stylemask>>
 <<data:Block>>
@@ -3370,7 +3371,7 @@ p
   L.CParagraph
     [ L.PTokenLink
         ( L.Link
-            { typ = L.LinkExternal,
+            { typ = L.LinkBracketed,
               target = "hello",
               name =
                 [ L.StyledText
@@ -3403,116 +3404,53 @@ p
 :ID:       f8254d58-7a3d-4595-a265-e0d6255e6ab5
 :END:
 
-A link just has the display text and its target. The =LinkType= can refer to a
-link to another area of the Org document, or an external link (URL).
+A link has
+
+  - a name :: what's displayed to the reader,
+
+  - a target :: where we want to take the reader when the click on the link, and
+
+  - the type :: some additional metadata about the link itself.
 
 #+name: data:Link
 #+begin_src haskell
 type Link :: Type
 data Link = Link
-  { typ :: LinkType,
+  { name :: [StyledText],
     target :: T.Text,
-    name :: [StyledText]
+    typ :: LinkType
   }
   deriving stock (Eq, Show)
 
+#+end_src
+
+In summary we support the following link types:
+
+  - ~LinkBracketed~ :: a link that uses square brackets (e.g., ~[[target]]~ or
+    ~[[target][name]]~).
+
+  - ~LinkNoweb~ :: a link to a Noweb reference inside another code block. These
+    use angle brackets (e.g., ~<<foo>>~).
+
+There are also [[Raw links]] which is prose text that looks like a URL. For example,
+https://www.haskell.org is an example of a raw link. This is a convenience
+facility because ~[[https://www.haskell.org]]~ behaves the same way as
+~https://www.haskell.org~.
+
+#+name: data:LinkType
+#+begin_src haskell
 type LinkType :: Type
 data LinkType
-  = LinkNoweb
-  | LinkHeading
-  | LinkIdProp
-  | LinkNameKeyword
-  | LinkFootnote
-  | LinkExternal
+  = LinkBracketed
+  | LinkNoweb
   deriving stock (Eq, Show)
 
 #+end_src
 
-=LinkNoweb= links to Noweb references. We've been using Noweb references already
-in this document, but here's an isolated example.
+*** Standalone link parser
 
-#+begin_src sh
-echo <<LinkNoweb example>>
-#+end_src
-
-The block above refers to a Noweb reference named =LinkNoweb example=. We define
-it below:
-
-#+name: LinkNoweb example
-#+begin_src sh
-hello world
-#+end_src
-
-Note that if no such Noweb reference is defined, Lilac will error out.
-
-=LinkHeading= links to headings. For example, [[*Blocks]] links to the next heading
-named "Blocks" in this document.
-
-Unlike in vanilla Org, a =LinkHeading= link must start with an asterisk. This is
-why the example above says =*Blocks= and not just =Blocks= inside the double
-brackets.
-
-=LinkIdProp= lets us link to a heading by using a UUID. This is useful when
-multiple headings can share the same name. To add a UUID to an existing header,
-run the =org-id-store-link= Elisp function. This will add a =:PROPERTIES:= drawer
-with a special =:ID:= field that has a UUID. Then from elsewhere you can link to
-it by using ~[[id:...]]~ where ~...~ is the UUID. For example, [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][this]] is such a link.
-
-=LinkNameKeyword= links to an entry with a =#+name: ...= property. They can be used
-for blocks, figures, and tables.
-
-#+name: ex:LinkNameKeyword
-#+begin_example
-foo bar
-#+end_example
-
-The link [[ex:LinkNameKeyword]] is an example.
-
-Note that by default Org allows you to use the syntax =[[foo]]= to refer to
-multiple kinds of links. Lilac is more restrictive and requires you to use the
-format =category:name= where =category= can be one of:
-
-  - ex :: example block
-
-  - q :: quote block
-
-  - src :: code block
-
-  - * :: headings (as seen in LinkHeading, although note that there is no colon
-    after the asterisk)
-
-  - ... or something else
-
-In other words the =category= is required. Using a category like this helps to
-keep link names unique.
-
-The link [[ex:LinkNameKeyword][here]] is an example.
-
-One thing to keep in mind is that if the material is printed on physical paper,
-the links named "here" won't make much sense to the reader. So if you are
-writing for physical media, you should try to avoid "hiding" the target of links
-behind names, and instead only use the link target.
-
-=LinkFootnote= links to footnotes. A footnote is constructed specially and only
-requires single instead of double brackets. This sentence ends with a footnote
-link.[fn:2]
-
-=LinkExternal= links to some external resource, such as a web page on the internet
-or a file on disk. That is, the link points to something that exists /externally/
-to the Org document at hand.
-
-A web link looks [[https://kernel.org][like this]]. A link to a file can look [[./README.org][like this]]. Note that their
-format allows them to be named differently than the raw address. That's why the
-two links earlier in this paragraph are displayed as "like this". The format is
-
-#+begin_example
-[[target][name]]
-#+end_example
-
-where =[name]= is optional. If it is omitted, then the =target= part is used as the
-name.
-
-As for parsing links, for now we only support external links.
+The standalone link parser [[f:linkParser]] can parse links that can be embedded
+inside prose text.
 
 #+name: f:linkParser
 #+begin_src haskell
@@ -3521,18 +3459,16 @@ linkParser = do
   failIfVerbatimOrCode
 
   MP.choice
-    [ MP.try rawLinkParser,
-      MP.try bracketedLinkParser
+    [ MP.try bracketedLinkParser,
+      MP.try rawLinkParser
     ]
 
 #+end_src
 
-The call to [[f:failIfVerbatimOrCode]] fails the parser if either the verbatim or
-code style is active. This is because those parsers take precedence. See, for
-example [[t:0005-styled-strings-verbatim-precedence]] of the sort of behavior we
-expect. By failing this parser, we allow other parsers (such as
-[[f:styledTextParser]]) to succeed (see [[f:proseParser]] for the interaction of this
-parser with these other parsers).
+The call to [[f:failIfVerbatimOrCode]] fails the parser if either the [[f:isVerbatim][verbatim or
+code style is active]]. This is because the verbatim and code styles take
+precedence over parsing links. See, for example
+[[t:0005-styled-strings-verbatim-precedence]] of the sort of behavior we expect.
 
 #+name: f:failIfVerbatimOrCode
 #+begin_src haskell
@@ -3545,7 +3481,29 @@ failIfVerbatimOrCode = do
 
 #+end_src
 
-The [[f:bracketedLinkParser]] parses links that uses brackets.
+By conditionally failing [[f:linkParser]] with [[f:failIfVerbatimOrCode]], we also allow
+other parsers (such as [[f:styledTextParser]]) to succeed (see [[f:proseParser]] for the
+interaction of this parser with these other parsers).
+
+Note that in [[f:linkParser]] we don't parse [[Noweb links]] here because they can only
+exist inside [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code blocks]].
+
+*** Bracketed links
+
+=LinkBracketed= links are probably the most prevalent. They can target both
+external resources, such as a web page on the internet or a file on disk, or
+internal ones (to some other point in the Org document).
+
+A URL link looks [[https://kernel.org][like this]]. A link to a file can look [[./README.org][like this]]. Note that their
+format allows them to be named differently than the raw address. That's why the
+two links earlier in this paragraph are displayed as "like this". The format is
+
+#+begin_src org
+[[target][name]]
+#+end_src
+
+where ~[name]~ is optional. If it is omitted, then the ~target~ part is used as the
+name.
 
 #+name: f:bracketedLinkParser
 #+begin_src haskell
@@ -3572,7 +3530,7 @@ bracketedLinkParser = do
   _ <- string "]"
   pure
     Link
-      { typ = LinkExternal,
+      { typ = LinkBracketed,
         target = T.pack target,
         name =
           [ StyledText
@@ -3586,8 +3544,9 @@ bracketedLinkParser = do
 
 #+header: :tangle test/Lilac/ParseSpec/0006-links
 #+begin_src org
-,* \(foo\) [[link-target-only]]
-,* \(bar\) [[link-target][link-name]]
+foo [[link-target-only]]
+
+,* [[link-target][link-name]]
 
 [[a]] b
 #+end_src
@@ -3598,57 +3557,33 @@ p
   "0006-links"
   L.OrgDoc
     { cells =
-        [ L.CHeading
-            ( L.Heading
-                { level = 1,
-                  body =
-                    [ L.PTokenMathFragment
-                        ( L.MathFragment
-                            { meta = fromList [],
-                              body = "foo"
-                            }
-                        ),
-                      L.PTokenStyledText
-                        ( L.StyledText
-                            { body = " ",
+        [ L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "foo ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              L.PTokenLink
+                ( L.Link
+                    { typ = L.LinkBracketed,
+                      target = "link-target-only",
+                      name =
+                        [ L.StyledText
+                            { body = "link-target-only",
                               style = L.styleMaskFrom []
                             }
-                        ),
-                      L.PTokenLink
-                        ( L.Link
-                            { typ = L.LinkExternal,
-                              target = "link-target-only",
-                              name =
-                                [ L.StyledText
-                                    { body = "link-target-only",
-                                      style = L.styleMaskFrom []
-                                    }
-                                ]
-                            }
-                        )
-                    ],
-                  meta = fromList []
-                }
-            ),
+                        ]
+                    }
+                )
+            ],
           L.CHeading
             ( L.Heading
                 { level = 1,
                   body =
-                    [ L.PTokenMathFragment
-                        ( L.MathFragment
-                            { meta = fromList [],
-                              body = "bar"
-                            }
-                        ),
-                      L.PTokenStyledText
-                        ( L.StyledText
-                            { body = " ",
-                              style = L.styleMaskFrom []
-                            }
-                        ),
-                      L.PTokenLink
+                    [ L.PTokenLink
                         ( L.Link
-                            { typ = L.LinkExternal,
+                            { typ = L.LinkBracketed,
                               target = "link-target",
                               name =
                                 [ L.StyledText
@@ -3665,7 +3600,7 @@ p
           L.CParagraph
             [ L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkExternal,
+                    { typ = L.LinkBracketed,
                       target = "a",
                       name =
                         [ L.StyledText
@@ -3689,7 +3624,88 @@ p
     }
 #+end_src
 
-The [[f:rawLinkParser]] parses links that look like URLs.
+Bracketed links can be preceded by ~(~ which means [[f:bracketedLinkParser]] won't be
+able to parse it directly; however, in [[f:textParser]] (specifically ~normalChar~) we
+take care to ensure to stop consuming input if we see a double left bracket ~[[~.
+This way, the input will look like ~[[...~ which will then allow
+[[f:bracketedLinkParser]] to parse it.
+
+#+header: :tangle test/Lilac/ParseSpec/0006-links-inside-parentheses
+#+begin_src org
+([[file:foo/bar]])
+#+end_src
+
+#+name: t:0006-links-inside-parentheses
+#+begin_src haskell
+p
+  "0006-links-inside-parentheses"
+  L.OrgDoc
+    { cells =
+        [ L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "(",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              L.PTokenLink
+                ( L.Link
+                    { typ = L.LinkBracketed,
+                      target = "file:foo/bar",
+                      name =
+                        [ L.StyledText
+                            { body = "file:foo/bar",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              L.PTokenStyledText
+                ( L.StyledText
+                    { body = ")",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ]
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+#+end_src
+
+Sometimes we have text that look like links initially but turn out to be
+non-links.
+
+#+header: :tangle test/Lilac/ParseSpec/0006-links-nonlink
+#+begin_src org
+[hi]
+#+end_src
+
+#+name: t:0006-links-nonlink
+#+begin_src haskell
+p
+  "0006-links-nonlink"
+  L.OrgDoc
+    { cells =
+        [ L.CParagraph
+            [ L.PTokenStyledText
+                ( L.StyledText
+                    { body = "[hi]",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ]
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+#+end_src
+
+*** Raw links
+
+The [[f:rawLinkParser]] parses text that look like URLs into ~LinkBracketed~.
 
 #+name: f:rawLinkParser
 #+begin_src haskell
@@ -3701,7 +3717,7 @@ rawLinkParser = do
   let url = protocol <> separator <> remainder
   pure
     Link
-      { typ = LinkExternal,
+      { typ = LinkBracketed,
         target = url,
         name =
           [ StyledText
@@ -3759,7 +3775,7 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkExternal,
+                    { typ = L.LinkBracketed,
                       target = "https://foo.org",
                       name =
                         [ L.StyledText
@@ -3777,7 +3793,7 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkExternal,
+                    { typ = L.LinkBracketed,
                       target = "https://bar.net",
                       name =
                         [ L.StyledText
@@ -3795,7 +3811,7 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkExternal,
+                    { typ = L.LinkBracketed,
                       target = "http://localhost:3000",
                       name =
                         [ L.StyledText
@@ -3813,7 +3829,7 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkExternal,
+                    { typ = L.LinkBracketed,
                       target = "ftp://10.0.0.1",
                       name =
                         [ L.StyledText
@@ -3837,84 +3853,26 @@ p
     }
 #+end_src
 
-Links can be preceded by ~(~ which means [[f:bracketedLinkParser]] won't be able to
-parse it directly; however, in [[f:styledTextParser]] (specifically ~normalChar~) we
-take care to ensure to stop consuming input if we see a double left bracket ~[[~.
-This way, the input will look like ~[[...~ which will then let
-[[f:bracketedLinkParser]] pick it up.
+*** Noweb links
 
-#+header: :tangle test/Lilac/ParseSpec/0006-links-inside-parentheses
-#+begin_src org
-([[file:foo/bar]])
+=LinkNoweb= links to Noweb references. We've been using Noweb references already
+in this document, but here's an isolated example.
+
+#+begin_src sh
+echo <<LinkNoweb example>>
 #+end_src
 
-#+name: t:0006-links-inside-parentheses
-#+begin_src haskell
-p
-  "0006-links-inside-parentheses"
-  L.OrgDoc
-    { cells =
-        [ L.CParagraph
-            [ L.PTokenStyledText
-                ( L.StyledText
-                    { body = "(",
-                      style = L.styleMaskFrom []
-                    }
-                ),
-              L.PTokenLink
-                ( L.Link
-                    { typ = L.LinkExternal,
-                      target = "file:foo/bar",
-                      name =
-                        [ L.StyledText
-                            { body = "file:foo/bar",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              L.PTokenStyledText
-                ( L.StyledText
-                    { body = ")",
-                      style = L.styleMaskFrom []
-                    }
-                )
-            ]
-        ],
-      code = [],
-      codeBlocks = IM.fromList [],
-      meta = M.fromList []
-    }
+The block above refers to a Noweb reference named =LinkNoweb example=. We define
+it below:
+
+#+name: LinkNoweb example
+#+begin_src sh
+hello world
 #+end_src
 
-Sometimes we have text that look like links initially but turn out to be
-non-links.
-
-#+header: :tangle test/Lilac/ParseSpec/0006-links-nonlink
-#+begin_src org
-[hi]
-#+end_src
-
-#+name: t:0006-links-nonlink
-#+begin_src haskell
-p
-  "0006-links-nonlink"
-  L.OrgDoc
-    { cells =
-        [ L.CParagraph
-            [ L.PTokenStyledText
-                ( L.StyledText
-                    { body = "[hi]",
-                      style = L.styleMaskFrom []
-                    }
-                )
-            ]
-        ],
-      code = [],
-      codeBlocks = IM.fromList [],
-      meta = M.fromList []
-    }
-#+end_src
+Note that if no such Noweb reference is defined, Lilac will error out. See
+[[f:nowebLinkParser]] for parsing details (it is discussed along with [[Blocks]] because
+that's the only place where these links may be defined).
 
 ** Inline math fragments
 :PROPERTIES:
@@ -6363,7 +6321,7 @@ p
                     ],
                 link =
                   L.Link
-                    { typ = L.LinkExternal,
+                    { typ = L.LinkBracketed,
                       target = "./image/hello.png",
                       name =
                         [ L.StyledText
@@ -6389,7 +6347,7 @@ p
               { meta = fromList [],
                 link =
                   L.Link
-                    { typ = L.LinkExternal,
+                    { typ = L.LinkBracketed,
                       target = "./image/world.png",
                       name =
                         [ L.StyledText
@@ -6639,7 +6597,7 @@ p
                       ( (3, 3),
                         [ L.PTokenLink
                             ( L.Link
-                                { typ = L.LinkExternal,
+                                { typ = L.LinkBracketed,
                                   target = "https://en.wikipedia.org/wiki/Pythagorean_theorem",
                                   name =
                                     [ L.StyledText
@@ -6678,7 +6636,7 @@ p
                       ( (4, 3),
                         [ L.PTokenLink
                             ( L.Link
-                                { typ = L.LinkExternal,
+                                { typ = L.LinkBracketed,
                                   target = "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
                                   name =
                                     [ L.StyledText
@@ -6793,7 +6751,7 @@ p
                       ( (3, 3),
                         [ L.PTokenLink
                             ( L.Link
-                                { typ = L.LinkExternal,
+                                { typ = L.LinkBracketed,
                                   target = "https://en.wikipedia.org/wiki/Pythagorean_theorem",
                                   name =
                                     [ L.StyledText
@@ -6832,7 +6790,7 @@ p
                       ( (4, 3),
                         [ L.PTokenLink
                             ( L.Link
-                                { typ = L.LinkExternal,
+                                { typ = L.LinkBracketed,
                                   target = "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
                                   name =
                                     [ L.StyledText
@@ -7545,6 +7503,3 @@ inform the user how this version information came to be.
 [fn:1] We deviate from the terminology used in the [[https://orgmode.org/worg/org-syntax.html][Org syntax description]], where
 the terms /element/ and /object/ are used. This is to avoid any unintentional
 overlap of meaning.
-
-[fn:2] Footnote example.
-

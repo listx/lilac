@@ -413,7 +413,7 @@ spec = do
             L.CParagraph
               [ L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkExternal,
+                      { typ = L.LinkBracketed,
                         target = "hello",
                         name =
                           [ L.StyledText
@@ -473,7 +473,7 @@ spec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkExternal,
+                      { typ = L.LinkBracketed,
                         target = "file:foo/bar",
                         name =
                           [ L.StyledText
@@ -525,7 +525,7 @@ spec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkExternal,
+                      { typ = L.LinkBracketed,
                         target = "https://foo.org",
                         name =
                           [ L.StyledText
@@ -543,7 +543,7 @@ spec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkExternal,
+                      { typ = L.LinkBracketed,
                         target = "https://bar.net",
                         name =
                           [ L.StyledText
@@ -561,7 +561,7 @@ spec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkExternal,
+                      { typ = L.LinkBracketed,
                         target = "http://localhost:3000",
                         name =
                           [ L.StyledText
@@ -579,7 +579,7 @@ spec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkExternal,
+                      { typ = L.LinkBracketed,
                         target = "ftp://10.0.0.1",
                         name =
                           [ L.StyledText
@@ -605,57 +605,33 @@ spec = do
     "0006-links"
     L.OrgDoc
       { cells =
-          [ L.CHeading
-              ( L.Heading
-                  { level = 1,
-                    body =
-                      [ L.PTokenMathFragment
-                          ( L.MathFragment
-                              { meta = fromList [],
-                                body = "foo"
-                              }
-                          ),
-                        L.PTokenStyledText
-                          ( L.StyledText
-                              { body = " ",
+          [ L.CParagraph
+              [ L.PTokenStyledText
+                  ( L.StyledText
+                      { body = "foo ",
+                        style = L.styleMaskFrom []
+                      }
+                  ),
+                L.PTokenLink
+                  ( L.Link
+                      { typ = L.LinkBracketed,
+                        target = "link-target-only",
+                        name =
+                          [ L.StyledText
+                              { body = "link-target-only",
                                 style = L.styleMaskFrom []
                               }
-                          ),
-                        L.PTokenLink
-                          ( L.Link
-                              { typ = L.LinkExternal,
-                                target = "link-target-only",
-                                name =
-                                  [ L.StyledText
-                                      { body = "link-target-only",
-                                        style = L.styleMaskFrom []
-                                      }
-                                  ]
-                              }
-                          )
-                      ],
-                    meta = fromList []
-                  }
-              ),
+                          ]
+                      }
+                  )
+              ],
             L.CHeading
               ( L.Heading
                   { level = 1,
                     body =
-                      [ L.PTokenMathFragment
-                          ( L.MathFragment
-                              { meta = fromList [],
-                                body = "bar"
-                              }
-                          ),
-                        L.PTokenStyledText
-                          ( L.StyledText
-                              { body = " ",
-                                style = L.styleMaskFrom []
-                              }
-                          ),
-                        L.PTokenLink
+                      [ L.PTokenLink
                           ( L.Link
-                              { typ = L.LinkExternal,
+                              { typ = L.LinkBracketed,
                                 target = "link-target",
                                 name =
                                   [ L.StyledText
@@ -672,7 +648,7 @@ spec = do
             L.CParagraph
               [ L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkExternal,
+                      { typ = L.LinkBracketed,
                         target = "a",
                         name =
                           [ L.StyledText
@@ -1273,7 +1249,7 @@ spec = do
                       ],
                   link =
                     L.Link
-                      { typ = L.LinkExternal,
+                      { typ = L.LinkBracketed,
                         target = "./image/hello.png",
                         name =
                           [ L.StyledText
@@ -1299,7 +1275,7 @@ spec = do
                 { meta = fromList [],
                   link =
                     L.Link
-                      { typ = L.LinkExternal,
+                      { typ = L.LinkBracketed,
                         target = "./image/world.png",
                         name =
                           [ L.StyledText
@@ -1377,7 +1353,7 @@ spec = do
                         ( (3, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { typ = L.LinkExternal,
+                                  { typ = L.LinkBracketed,
                                     target = "https://en.wikipedia.org/wiki/Pythagorean_theorem",
                                     name =
                                       [ L.StyledText
@@ -1416,7 +1392,7 @@ spec = do
                         ( (4, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { typ = L.LinkExternal,
+                                  { typ = L.LinkBracketed,
                                     target = "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
                                     name =
                                       [ L.StyledText
@@ -1511,7 +1487,7 @@ spec = do
                         ( (3, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { typ = L.LinkExternal,
+                                  { typ = L.LinkBracketed,
                                     target = "https://en.wikipedia.org/wiki/Pythagorean_theorem",
                                     name =
                                       [ L.StyledText
@@ -1550,7 +1526,7 @@ spec = do
                         ( (4, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { typ = L.LinkExternal,
+                                  { typ = L.LinkBracketed,
                                     target = "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
                                     name =
                                       [ L.StyledText
