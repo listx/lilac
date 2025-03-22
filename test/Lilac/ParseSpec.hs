@@ -151,7 +151,7 @@ spec = do
         ("property", "header-args+ :noweb no-export"),
         ("title", "An Org Document")
       ]
-  p
+  ps
     "0004-headings"
     L.OrgDoc
       { cells =
@@ -172,7 +172,19 @@ spec = do
         codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
-  p
+    L.OrgParserState
+      { headingLevel = 12,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0
+      }
+  pf
+    "0004-headings-cannot-skip-level"
+    "headings may not skip levels (expected to see level 1 or 2, not 4)"
+    8
+  ps
     "0004-drawers-empty"
     L.OrgDoc
       { cells =
@@ -191,7 +203,15 @@ spec = do
         codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
-  p
+    L.OrgParserState
+      { headingLevel = 1,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0
+      }
+  ps
     "0004-drawers-not-empty"
     L.OrgDoc
       { cells =
@@ -209,6 +229,14 @@ spec = do
         code = [],
         codeBlocks = IM.fromList [],
         meta = M.fromList []
+      }
+    L.OrgParserState
+      { headingLevel = 1,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0
       }
   pf
     "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
@@ -383,7 +411,7 @@ spec = do
     "0005-styled-strings-leftover-active-styles"
     "leftover active styles: [Bold]"
     15
-  p
+  ps
     "0005-styled-strings-messy-boundaries"
     L.OrgDoc
       { cells =
@@ -411,6 +439,14 @@ spec = do
         code = [],
         codeBlocks = fromList [],
         meta = fromList []
+      }
+    L.OrgParserState
+      { headingLevel = 1,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0
       }
   p
     "0005-styled-strings-no-style"
@@ -646,7 +682,7 @@ spec = do
         codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
-  p
+  ps
     "0006-links"
     L.OrgDoc
       { cells =
@@ -714,6 +750,14 @@ spec = do
         code = [],
         codeBlocks = IM.fromList [],
         meta = M.fromList []
+      }
+    L.OrgParserState
+      { headingLevel = 1,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0
       }
   pf
     "0007-block-src-without-lang"
@@ -1264,7 +1308,8 @@ spec = do
         meta = fromList []
       }
     L.OrgParserState
-      { styleMask = L.styleMaskFrom [],
+      { headingLevel = 0,
+        styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,

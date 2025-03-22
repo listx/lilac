@@ -1741,6 +1741,7 @@ import Relude
     (<|>),
     (=<<),
     (==),
+    (>),
     (>=),
     (>>),
     (||),
@@ -1783,6 +1784,7 @@ import Prelude qualified (show)
 <<f:cellParser>>
 <<f:detectInvalidIndentation>>
 <<f:headingParser>>
+<<f:failIfHeadingNestsWithoutDirectParent>>
 <<f:drawersParser>>
 <<f:proseParser>>
 <<f:whitespaceCompressor>>
@@ -1998,10 +2000,6 @@ type OrgParser = StateT OrgParserState (<<Concrete type for Megaparsec>>)
 
 #+end_src
 
-The =OrgParserState= is the custom state we want to use while parsing. You can
-think of it as a mutable variable we keep modifying as we make progress during
-parsing.
-
 The [[Concrete type for Megaparsec]] feeds the concrete ~T.Text~ type to use as the
 stream for Megaparsec. Megaparsec defines a polymorphic API and expects users to
 use concrete types like this for speed optimizations.
@@ -2010,6 +2008,13 @@ use concrete types like this for speed optimizations.
 #+begin_src haskell
 MP.Parsec Void T.Text
 #+end_src
+
+The =OrgParserState= is the custom state we want to use while parsing. You can
+think of it as a mutable variable we keep modifying as we make progress during
+parsing.
+
+The ~headingLevel~ is the last-seen heading level we parsed. See
+[[t:0004-headings-cannot-skip-level]] for how we use it.
 
 The =styleMask= is discussed in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][the section on parsing styled strings]].
 The =listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The
@@ -2021,7 +2026,8 @@ inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { styleMask :: StyleMask,
+  { headingLevel :: Int,
+    styleMask :: StyleMask,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
@@ -2032,7 +2038,8 @@ data OrgParserState = OrgParserState
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { styleMask = styleMaskFrom [],
+    { headingLevel = 0,
+      styleMask = styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -2679,7 +2686,7 @@ by the end of the cell (heading or paragraph), all styles must be turned off.
 
 #+name: t:0005-styled-strings-messy-boundaries
 #+begin_src haskell
-p
+ps
   "0005-styled-strings-messy-boundaries"
   L.OrgDoc
     { cells =
@@ -2695,6 +2702,14 @@ p
       code = [],
       codeBlocks = fromList [],
       meta = fromList []
+    }
+  L.OrgParserState
+    { headingLevel = 1,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0
     }
 #+end_src
 
@@ -3565,7 +3580,7 @@ foo [[link-target-only]]
 
 #+name: t:0006-links
 #+begin_src haskell
-p
+ps
   "0006-links"
   L.OrgDoc
     { cells =
@@ -3633,6 +3648,14 @@ p
       code = [],
       codeBlocks = IM.fromList [],
       meta = M.fromList []
+    }
+  L.OrgParserState
+    { headingLevel = 1,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0
     }
 #+end_src
 
@@ -4130,13 +4153,21 @@ easy to have simple rules for it.
 #+begin_src haskell
 headingParser :: OrgParser Cell
 headingParser = do
+  orgParserState <- get
   _ <- MP.try $ MP.lookAhead (starsParser >> char ' ')
   stars <- starsParser
+  let lenStars = T.length stars
+      currentHeadingLevel = orgParserState.headingLevel
+  failIfHeadingNestsWithoutDirectParent currentHeadingLevel lenStars
   _ <- char ' '
   prose <- proseParser spaceConsumer
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
+  put
+    orgParserState
+      { headingLevel = lenStars
+      }
   pure
     $ CHeading
       Heading
@@ -4149,6 +4180,26 @@ headingParser = do
     spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
     starsParser :: OrgParser T.Text
     starsParser = MP.takeWhile1P (Just "heading star") (\c -> c == '*')
+
+#+end_src
+
+We fail if we try to nest the heading too much in
+[[f:failIfHeadingNestsWithoutDirectParent]]. See [[t:0004-headings-cannot-skip-level]]
+for an example.
+
+#+name: f:failIfHeadingNestsWithoutDirectParent
+#+begin_src haskell
+failIfHeadingNestsWithoutDirectParent :: Int -> Int -> OrgParser ()
+failIfHeadingNestsWithoutDirectParent current found =
+  when (found > current + 1) $ do
+    fail
+      $ "headings may not skip levels (expected to see level "
+      <> show current
+      <> " or "
+      <> (show $ current + 1)
+      <> ", not "
+      <> show found
+      <> ")"
 
 #+end_src
 
@@ -4180,7 +4231,7 @@ We can have many levels of headings.
 
 #+name: t:0004-headings
 #+begin_src haskell
-p
+ps
   "0004-headings"
   L.OrgDoc
     { cells =
@@ -4201,6 +4252,31 @@ p
       codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
+  L.OrgParserState
+    { headingLevel = 12,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0
+    }
+#+end_src
+
+However, we may not skip over any intermediate levels. For example, you cannot
+go from level 1 to level 4 (skipping over levels 2 and 3).
+
+#+header: :tangle test/Lilac/ParseSpec/0004-headings-cannot-skip-level
+#+begin_src org
+,* a
+,**** d
+#+end_src
+
+#+name: t:0004-headings-cannot-skip-level
+#+begin_src haskell
+pf
+  "0004-headings-cannot-skip-level"
+  "headings may not skip levels (expected to see level 1 or 2, not 4)"
+  8
 #+end_src
 
 ** Drawers
@@ -4254,7 +4330,7 @@ Test for empty drawers.
 
 #+name: t:0004-drawers-empty
 #+begin_src haskell
-p
+ps
   "0004-drawers-empty"
   L.OrgDoc
     { cells =
@@ -4273,6 +4349,14 @@ p
       codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
+  L.OrgParserState
+    { headingLevel = 1,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0
+    }
 #+end_src
 
 Test for drawers with some content.
@@ -4288,7 +4372,7 @@ Test for drawers with some content.
 
 #+name: t:0004-drawers-not-empty
 #+begin_src haskell
-p
+ps
   "0004-drawers-not-empty"
   L.OrgDoc
     { cells =
@@ -4306,6 +4390,14 @@ p
       code = [],
       codeBlocks = IM.fromList [],
       meta = M.fromList []
+    }
+  L.OrgParserState
+    { headingLevel = 1,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0
     }
 #+end_src
 
@@ -6272,7 +6364,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { styleMask = L.styleMaskFrom [],
+    { headingLevel = 0,
+      styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -7156,6 +7249,7 @@ spec = do
   <<t:0002-doc-metadata:basic>>
   <<t:0003-doc-metadata-with-comments>>
   <<t:0004-headings>>
+  <<t:0004-headings-cannot-skip-level>>
   <<t:0004-drawers-empty>>
   <<t:0004-drawers-not-empty>>
   <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels>>

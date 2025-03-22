@@ -102,6 +102,7 @@ import Relude
     (<|>),
     (=<<),
     (==),
+    (>),
     (>=),
     (>>),
     (||),
@@ -118,7 +119,8 @@ type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { styleMask :: StyleMask,
+  { headingLevel :: Int,
+    styleMask :: StyleMask,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
@@ -129,7 +131,8 @@ data OrgParserState = OrgParserState
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { styleMask = styleMaskFrom [],
+    { headingLevel = 0,
+      styleMask = styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -385,13 +388,21 @@ detectInvalidIndentation = do
 
 headingParser :: OrgParser Cell
 headingParser = do
+  orgParserState <- get
   _ <- MP.try $ MP.lookAhead (starsParser >> char ' ')
   stars <- starsParser
+  let lenStars = T.length stars
+      currentHeadingLevel = orgParserState.headingLevel
+  failIfHeadingNestsWithoutDirectParent currentHeadingLevel lenStars
   _ <- char ' '
   prose <- proseParser spaceConsumer
   _ <- char '\n'
   failIfLeftoverActiveStyles
   drawers <- drawersParser
+  put
+    orgParserState
+      { headingLevel = lenStars
+      }
   pure
     $ CHeading
       Heading
@@ -404,6 +415,18 @@ headingParser = do
     spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
     starsParser :: OrgParser T.Text
     starsParser = MP.takeWhile1P (Just "heading star") (\c -> c == '*')
+
+failIfHeadingNestsWithoutDirectParent :: Int -> Int -> OrgParser ()
+failIfHeadingNestsWithoutDirectParent current found =
+  when (found > current + 1) $ do
+    fail
+      $ "headings may not skip levels (expected to see level "
+      <> show current
+      <> " or "
+      <> (show $ current + 1)
+      <> ", not "
+      <> show found
+      <> ")"
 
 drawersParser :: OrgParser (Map T.Text T.Text)
 drawersParser = do
