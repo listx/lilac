@@ -4097,9 +4097,10 @@ pf
   1
 #+end_src
 
-The number of asterisks determine the (nesting) level. There can be any number
-of levels, although there should be probably no more than 6 in a section that
-will be exported as a single HTML page or PDF file.
+The number of asterisks determine the nesting level. There can be any number of
+levels, although there should be probably no more than 6 in a section that will
+be exported as a single HTML page (because the heading tags ~<h1>~, ~<h2>~, etc only
+go up to ~<h6>~). This Org document itself only uses 3 sections.
 
 The heading may also have some metadata associated with it. In practice this
 will be keys and values from a =:PROPERTIES:= [[https://orgmode.org/manual/Drawers.html][drawer]], although other drawers are
@@ -4156,6 +4157,51 @@ we call =Prose=.
 
 We consider prose in detail in the next section, where we'll also discuss
 [[f:failIfLeftoverActiveStyles]] and also [[f:compressProse]].
+
+*** Tests
+
+We can have many levels of headings.
+
+#+header: :tangle test/Lilac/ParseSpec/0004-headings
+#+begin_src org
+,* a
+,** b
+,*** c
+,**** d
+,***** e
+,****** f
+,******* g
+,******** h
+,********* i
+,********** j
+,*********** k
+,************ l
+#+end_src
+
+#+name: t:0004-headings
+#+begin_src haskell
+p
+  "0004-headings"
+  L.OrgDoc
+    { cells =
+        [ plainHeading 1 "a",
+          plainHeading 2 "b",
+          plainHeading 3 "c",
+          plainHeading 4 "d",
+          plainHeading 5 "e",
+          plainHeading 6 "f",
+          plainHeading 7 "g",
+          plainHeading 8 "h",
+          plainHeading 9 "i",
+          plainHeading 10 "j",
+          plainHeading 11 "k",
+          plainHeading 12 "l"
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+#+end_src
 
 ** Drawers
 
@@ -6964,6 +7010,7 @@ type Parser = <<Concrete type for Megaparsec>>
 <<f:pf>>
 <<f:pfm>>
 <<f:plainParagraph>>
+<<f:plainHeading>>
 #+end_src
 
 The ~Parser~ type synonym uses the same [[Concrete type for Megaparsec][concrete types]] as we do for
@@ -7071,6 +7118,25 @@ plainParagraph body =
             }
         )
     ]
+
+#+end_src
+
+The same goes for function ~plainHeading~.
+
+#+name: f:plainHeading
+#+begin_src haskell
+plainHeading :: Int -> T.Text -> L.Cell
+plainHeading level body =
+  L.CHeading
+    ( L.Heading
+        { level = level,
+          body =
+            [ L.PTokenStyledText
+                (L.StyledText {body = body, style = L.styleMaskFrom []})
+            ],
+          meta = fromList []
+        }
+    )
 #+end_src
 
 *** All test cases
@@ -7089,6 +7155,7 @@ spec = do
   <<t:0002-doc-metadata-whitespace-before-value>>
   <<t:0002-doc-metadata:basic>>
   <<t:0003-doc-metadata-with-comments>>
+  <<t:0004-headings>>
   <<t:0004-drawers-empty>>
   <<t:0004-drawers-not-empty>>
   <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels>>

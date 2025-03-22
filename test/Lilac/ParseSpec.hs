@@ -93,6 +93,19 @@ plainParagraph body =
         )
     ]
 
+plainHeading :: Int -> T.Text -> L.Cell
+plainHeading level body =
+  L.CHeading
+    ( L.Heading
+        { level = level,
+          body =
+            [ L.PTokenStyledText
+                (L.StyledText {body = body, style = L.styleMaskFrom []})
+            ],
+          meta = fromList []
+        }
+    )
+
 spec :: Spec
 spec = do
   it "empty input" $ do
@@ -138,6 +151,27 @@ spec = do
         ("property", "header-args+ :noweb no-export"),
         ("title", "An Org Document")
       ]
+  p
+    "0004-headings"
+    L.OrgDoc
+      { cells =
+          [ plainHeading 1 "a",
+            plainHeading 2 "b",
+            plainHeading 3 "c",
+            plainHeading 4 "d",
+            plainHeading 5 "e",
+            plainHeading 6 "f",
+            plainHeading 7 "g",
+            plainHeading 8 "h",
+            plainHeading 9 "i",
+            plainHeading 10 "j",
+            plainHeading 11 "k",
+            plainHeading 12 "l"
+          ],
+        code = [],
+        codeBlocks = IM.fromList [],
+        meta = M.fromList []
+      }
   p
     "0004-drawers-empty"
     L.OrgDoc
