@@ -49,7 +49,6 @@ let
           .*
           *.html
           *.nix
-          *.org
           *.sh
           *.toml
           Makefile
