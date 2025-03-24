@@ -5,6 +5,7 @@
 # that this is not the default option is odd.
 #+property: header-args+ :noweb no-export
 #+auto_tangle: t
+#+lilac_maxHeadingLevel: 3
 
 * Introduction
 
@@ -1639,11 +1640,13 @@ interleaved tests are executed), take a look at the [[Testing framework]].
 #+begin_src haskell
 module Lilac.Parse
   ( defaultOrgDoc,
+    defaultOrgParserConf,
     defaultOrgParserState,
     orgDocParser,
     parseOrgDoc,
     styleMaskFrom,
     OrgDoc (..),
+    OrgParserConf (..),
     OrgParserState (..),
     Cell (..),
     Heading (..),
@@ -1749,12 +1752,13 @@ import Relude
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
 import Text.Megaparsec qualified as MP
-import Text.Megaparsec.Char (char, string)
+import Text.Megaparsec.Char (char, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude qualified (show)
 
 <<type:OrgParser>>
 <<data:OrgParserState>>
+<<data:OrgParserConf>>
 <<data:OrgDoc>>
 <<data:Cell>>
 <<data:Heading>>
@@ -1781,6 +1785,9 @@ import Prelude qualified (show)
 <<f:defaultOrgDoc>>
 <<f:docMetaEntryParser>>
 <<f:docMetaParser>>
+<<f:lilacExtensionsParser>>
+<<f:maxHeadingLevelParser>>
+<<f:signedIntParser>>
 <<f:cellParser>>
 <<f:detectInvalidIndentation>>
 <<f:headingParser>>
@@ -2031,7 +2038,8 @@ data OrgParserState = OrgParserState
     listLevels :: [Level],
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
-    equationNumber :: Int
+    equationNumber :: Int,
+    orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
 
@@ -2043,7 +2051,8 @@ defaultOrgParserState =
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
-      equationNumber = 0
+      equationNumber = 0,
+      orgParserConf = defaultOrgParserConf
     }
 
 #+end_src
@@ -2064,6 +2073,7 @@ orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
   meta <- docMetaParser
+  _ <- lilacExtensionsParser
   cells <- many cellParser
   let meaningfulCell :: Cell -> Bool
       meaningfulCell (CListItem []) = False
@@ -2173,6 +2183,7 @@ is a series of tokens (it can have multiple words in it). The
 docMetaEntryParser :: OrgParser (T.Text, T.Text)
 docMetaEntryParser = do
   avoidParsingBlockMetadata
+  avoidParsingLilacExtensions
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
   _ <- MP.label "(doc meta) separator" $ string ": "
@@ -2189,6 +2200,8 @@ docMetaEntryParser = do
             string "#+name: ",
             string "#+header: "
           ]
+    avoidParsingLilacExtensions :: OrgParser ()
+    avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
 
 #+end_src
 
@@ -2198,6 +2211,9 @@ because otherwise if an Org document begins with a [[id:cae993e5-02bd-4f89-a6d3-
 thing (before [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][headings]] or anything else), we may consume that as part of
 ~docMetaParser~ and fail because we think we are expecting ~: ~ followed by a
 value.
+
+Similarly, we also do not parse any [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extensions]] because they can only be
+parsed by the [[f:lilacExtensionsParser]].
 
 The =docMetaParser= just parses =docMetaEntryParser= multiple times, while consuming
 any trailing whitespace or comments with [[f:lexeme]].
@@ -2210,6 +2226,94 @@ docMetaParser = do
   pure $ M.fromList metaKVs
 
 #+end_src
+
+*** Lilac extensions
+:PROPERTIES:
+:ID:       84edd33a-a146-4a46-ac0a-cd1c3d0926d3
+:END:
+
+Lilac supports extensions to alter the behavior of the parser for the
+document being parsed. These extensions are all prefixed by ~lilac_~ and are set
+like other document metadata; they must come *after* the other (typical) Org metadata.
+
+Below is a list of supported extensions:
+
+  - ~lilac_maxHeadingLevel~ :: [[f:maxHeadingLevelParser]] This takes an integer as a
+    value. Using ~-1~ means no headings are allowed at all. Using ~0~ means headings
+    can have as many asterisks as desired. Using a positive integer means
+    headings may only have that many (or less) asterisks; otherwise Lilac will
+    fail the parse.
+
+#+name: data:OrgParserConf
+#+begin_src haskell
+type OrgParserConf :: Type
+data OrgParserConf = OrgParserConf
+  { maxHeadingLevel :: Int
+  }
+  deriving stock (Eq, Show)
+
+defaultOrgParserConf :: OrgParserConf
+defaultOrgParserConf =
+  OrgParserConf
+    { maxHeadingLevel = 6
+    }
+
+#+end_src
+
+Parsing Lilac extensions involves parsing known key\/value combinations, and
+updating the ~OrgParserState~ accordingly.
+
+#+name: f:lilacExtensionsParser
+#+begin_src haskell
+lilacExtensionsParser :: OrgParser ()
+lilacExtensionsParser = do
+  void
+    . many
+    . lexeme
+    $ MP.choice
+      [ maxHeadingLevelParser
+      ]
+
+#+end_src
+
+The [[f:maxHeadingLevelParser]] resembles the [[f:docMetaEntryParser]], but the main
+difference is that it does not return anything (its type is ~OrgParser ()~).
+Instead it just modifies the ~orgParserState~.
+
+#+name: f:maxHeadingLevelParser
+#+begin_src haskell
+maxHeadingLevelParser :: OrgParser ()
+maxHeadingLevelParser = do
+  orgParserState <- get
+  _ <- string $ "#+lilac_maxHeadingLevel: "
+  _ <- many $ char ' '
+  val <- signedIntParser
+  let opc = orgParserState.orgParserConf {maxHeadingLevel = val}
+  put orgParserState {orgParserConf = opc}
+
+#+end_src
+
+The ~signedIntParser~ knows how to parse a signed integer. The
+~parserBetweenSignAndNumber~ is the parser for parsing the area between the sign
+(~-~) and the number. Here we define it as ~pure ()~ meaning that nothing is
+allowed. The usual use case here is to use a whitespace parser, so as to allow a
+space between the sign and number, but we don't do this here for simplicity.
+
+#+name: f:signedIntParser
+#+begin_src haskell
+signedIntParser :: OrgParser Int
+signedIntParser = L.signed parserBetweenSignAndNumber number
+  where
+    number :: OrgParser Int
+    number = L.lexeme space1 $ L.decimal
+    parserBetweenSignAndNumber :: OrgParser ()
+    parserBetweenSignAndNumber = pure ()
+
+#+end_src
+
+Although we don't "return" anything (the type signature of
+[[f:lilacExtensionsParser]] is just ~OrgParser ()~), we still use ~put~ inside the
+parsers so that they modify the [[data:OrgParserState]].
 
 *** Tests
 
@@ -2709,7 +2813,8 @@ ps
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
-      equationNumber = 0
+      equationNumber = 0,
+      orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
 
@@ -3655,7 +3760,8 @@ ps
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
-      equationNumber = 0
+      equationNumber = 0,
+      orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
 
@@ -4155,9 +4261,20 @@ headingParser :: OrgParser Cell
 headingParser = do
   orgParserState <- get
   _ <- MP.try $ MP.lookAhead (starsParser >> char ' ')
+  let opc = orgParserState.orgParserConf
   stars <- starsParser
+  when (opc.maxHeadingLevel < 0) $ do
+    fail
+      $ "headings prohibited because lilac_maxHeadingLevel < 0"
   let lenStars = T.length stars
       currentHeadingLevel = orgParserState.headingLevel
+  when (opc.maxHeadingLevel > 0 && lenStars > opc.maxHeadingLevel) $ do
+    fail
+      $ "found "
+      <> show lenStars
+      <> " asterisks found for this heading, but "
+      <> "lilac_maxHeadingLevel = "
+      <> show opc.maxHeadingLevel
   failIfHeadingNestsWithoutDirectParent currentHeadingLevel lenStars
   _ <- char ' '
   prose <- proseParser spaceConsumer
@@ -4183,7 +4300,11 @@ headingParser = do
 
 #+end_src
 
-We fail if we try to nest the heading too much in
+We fail if the heading level is not compliant with the setting of
+~lilac_maxHeadingLevel~, which is accessed via ~opc.maxHeadingLevel~ (see [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac
+extensions]]).
+
+We also fail if we try to nest the heading too much in
 [[f:failIfHeadingNestsWithoutDirectParent]]. See [[t:0004-headings-cannot-skip-level]]
 for an example.
 
@@ -4211,42 +4332,66 @@ We consider prose in detail in the next section, where we'll also discuss
 
 *** Tests
 
-We can have many levels of headings.
+By default we only allow 6 levels of headings.
 
 #+header: :tangle test/Lilac/ParseSpec/0004-headings
 #+begin_src org
-,* a
-,** b
-,*** c
-,**** d
-,***** e
-,****** f
-,******* g
-,******** h
-,********* i
-,********** j
-,*********** k
-,************ l
+,* 1
+,** 2
+,*** 3
+,**** 4
+,***** 5
+,****** 6
+,******* 7
 #+end_src
 
 #+name: t:0004-headings
 #+begin_src haskell
-ps
+pf
   "0004-headings"
+  "found 7 asterisks found for this heading, but lilac_maxHeadingLevel = 6"
+  46
+#+end_src
+
+We can have many levels of headings beyond the 6 that we have by default, by
+setting the [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][~lilac_maxHeadingLevel~]] metadata. We can set it to some high number,
+or set it to 0 (unlimited). First we demonstrate using a higher number, 20.
+
+#+header: :tangle test/Lilac/ParseSpec/0004-headings-20
+#+begin_src org
+,#+lilac_maxHeadingLevel: 20
+,* 1
+,** 2
+,*** 3
+,**** 4
+,***** 5
+,****** 6
+,******* 7
+,******** 8
+,********* 9
+,********** 10
+,*********** 11
+,************ 12
+#+end_src
+
+#+name: t:0004-headings-20
+#+begin_src haskell
+ps
+  "0004-headings-20"
   L.OrgDoc
     { cells =
-        [ plainHeading 1 "a",
-          plainHeading 2 "b",
-          plainHeading 3 "c",
-          plainHeading 4 "d",
-          plainHeading 5 "e",
-          plainHeading 6 "f",
-          plainHeading 7 "g",
-          plainHeading 8 "h",
-          plainHeading 9 "i",
-          plainHeading 10 "j",
-          plainHeading 11 "k",
-          plainHeading 12 "l"
+        [ plainHeading 1,
+          plainHeading 2,
+          plainHeading 3,
+          plainHeading 4,
+          plainHeading 5,
+          plainHeading 6,
+          plainHeading 7,
+          plainHeading 8,
+          plainHeading 9,
+          plainHeading 10,
+          plainHeading 11,
+          plainHeading 12
         ],
       code = [],
       codeBlocks = IM.fromList [],
@@ -4258,12 +4403,103 @@ ps
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
-      equationNumber = 0
+      equationNumber = 0,
+      orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 20}
     }
 #+end_src
 
-However, we may not skip over any intermediate levels. For example, you cannot
-go from level 1 to level 4 (skipping over levels 2 and 3).
+Now we check using ~0~ for unlimited nesting.
+
+#+header: :tangle test/Lilac/ParseSpec/0004-headings-unlimited
+#+begin_src org
+,#+lilac_maxHeadingLevel: 0
+,* 1
+,** 2
+,*** 3
+,**** 4
+,***** 5
+,****** 6
+,******* 7
+,******** 8
+,********* 9
+,********** 10
+,*********** 11
+,************ 12
+#+end_src
+
+#+name: t:0004-headings-unlimited
+#+begin_src haskell
+ps
+  "0004-headings-unlimited"
+  L.OrgDoc
+    { cells =
+        [ plainHeading 1,
+          plainHeading 2,
+          plainHeading 3,
+          plainHeading 4,
+          plainHeading 5,
+          plainHeading 6,
+          plainHeading 7,
+          plainHeading 8,
+          plainHeading 9,
+          plainHeading 10,
+          plainHeading 11,
+          plainHeading 12
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+  L.OrgParserState
+    { headingLevel = 12,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 0}
+    }
+#+end_src
+
+Here we set it to a number less than 6. This is useful for ensuring that we
+don't have too much nesting.
+
+#+header: :tangle test/Lilac/ParseSpec/0004-headings-limited
+#+begin_src org
+,#+lilac_maxHeadingLevel: 3
+,* a
+,** b
+,*** c
+,**** d
+#+end_src
+
+#+name: t:0004-headings-limited
+#+begin_src haskell
+pf
+  "0004-headings-limited"
+  "found 4 asterisks found for this heading, but lilac_maxHeadingLevel = 3"
+  46
+#+end_src
+
+We can also prohibit headings entirely, by setting ~lilac_maxHeadingLevel~ to ~-1~.
+
+#+header: :tangle test/Lilac/ParseSpec/0004-headings-prohibited
+#+begin_src org
+,#+lilac_maxHeadingLevel: -1
+,* a
+,**** d
+#+end_src
+
+#+name: t:0004-headings-prohibited
+#+begin_src haskell
+pf
+  "0004-headings-prohibited"
+  "headings prohibited because lilac_maxHeadingLevel < 0"
+  29
+#+end_src
+
+We may not skip over any intermediate levels when we nest. For example, you
+cannot go from level 1 to level 4 (skipping over levels 2 and 3).
 
 #+header: :tangle test/Lilac/ParseSpec/0004-headings-cannot-skip-level
 #+begin_src org
@@ -4355,7 +4591,8 @@ ps
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
-      equationNumber = 0
+      equationNumber = 0,
+      orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
 
@@ -4397,7 +4634,8 @@ ps
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
-      equationNumber = 0
+      equationNumber = 0,
+      orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
 
@@ -6369,7 +6607,8 @@ ps
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
-      equationNumber = 3
+      equationNumber = 3,
+      orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
 
@@ -7064,6 +7303,7 @@ import Relude
     fromList,
     readFileBS,
     runStateT,
+    show,
     ($),
     (.),
     (<>),
@@ -7218,14 +7458,18 @@ The same goes for function ~plainHeading~.
 
 #+name: f:plainHeading
 #+begin_src haskell
-plainHeading :: Int -> T.Text -> L.Cell
-plainHeading level body =
+plainHeading :: Int -> L.Cell
+plainHeading level =
   L.CHeading
     ( L.Heading
         { level = level,
           body =
             [ L.PTokenStyledText
-                (L.StyledText {body = body, style = L.styleMaskFrom []})
+                ( L.StyledText
+                    { body = T.pack $ show level,
+                      style = L.styleMaskFrom []
+                    }
+                )
             ],
           meta = fromList []
         }
@@ -7249,6 +7493,10 @@ spec = do
   <<t:0002-doc-metadata:basic>>
   <<t:0003-doc-metadata-with-comments>>
   <<t:0004-headings>>
+  <<t:0004-headings-20>>
+  <<t:0004-headings-unlimited>>
+  <<t:0004-headings-limited>>
+  <<t:0004-headings-prohibited>>
   <<t:0004-headings-cannot-skip-level>>
   <<t:0004-drawers-empty>>
   <<t:0004-drawers-not-empty>>

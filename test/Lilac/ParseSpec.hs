@@ -16,6 +16,7 @@ import Relude
     fromList,
     readFileBS,
     runStateT,
+    show,
     ($),
     (.),
     (<>),
@@ -93,14 +94,18 @@ plainParagraph body =
         )
     ]
 
-plainHeading :: Int -> T.Text -> L.Cell
-plainHeading level body =
+plainHeading :: Int -> L.Cell
+plainHeading level =
   L.CHeading
     ( L.Heading
         { level = level,
           body =
             [ L.PTokenStyledText
-                (L.StyledText {body = body, style = L.styleMaskFrom []})
+                ( L.StyledText
+                    { body = T.pack $ show level,
+                      style = L.styleMaskFrom []
+                    }
+                )
             ],
           meta = fromList []
         }
@@ -151,22 +156,26 @@ spec = do
         ("property", "header-args+ :noweb no-export"),
         ("title", "An Org Document")
       ]
-  ps
+  pf
     "0004-headings"
+    "found 7 asterisks found for this heading, but lilac_maxHeadingLevel = 6"
+    46
+  ps
+    "0004-headings-20"
     L.OrgDoc
       { cells =
-          [ plainHeading 1 "a",
-            plainHeading 2 "b",
-            plainHeading 3 "c",
-            plainHeading 4 "d",
-            plainHeading 5 "e",
-            plainHeading 6 "f",
-            plainHeading 7 "g",
-            plainHeading 8 "h",
-            plainHeading 9 "i",
-            plainHeading 10 "j",
-            plainHeading 11 "k",
-            plainHeading 12 "l"
+          [ plainHeading 1,
+            plainHeading 2,
+            plainHeading 3,
+            plainHeading 4,
+            plainHeading 5,
+            plainHeading 6,
+            plainHeading 7,
+            plainHeading 8,
+            plainHeading 9,
+            plainHeading 10,
+            plainHeading 11,
+            plainHeading 12
           ],
         code = [],
         codeBlocks = IM.fromList [],
@@ -178,8 +187,47 @@ spec = do
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
-        equationNumber = 0
+        equationNumber = 0,
+        orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 20}
       }
+  ps
+    "0004-headings-unlimited"
+    L.OrgDoc
+      { cells =
+          [ plainHeading 1,
+            plainHeading 2,
+            plainHeading 3,
+            plainHeading 4,
+            plainHeading 5,
+            plainHeading 6,
+            plainHeading 7,
+            plainHeading 8,
+            plainHeading 9,
+            plainHeading 10,
+            plainHeading 11,
+            plainHeading 12
+          ],
+        code = [],
+        codeBlocks = IM.fromList [],
+        meta = M.fromList []
+      }
+    L.OrgParserState
+      { headingLevel = 12,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0,
+        orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 0}
+      }
+  pf
+    "0004-headings-limited"
+    "found 4 asterisks found for this heading, but lilac_maxHeadingLevel = 3"
+    46
+  pf
+    "0004-headings-prohibited"
+    "headings prohibited because lilac_maxHeadingLevel < 0"
+    29
   pf
     "0004-headings-cannot-skip-level"
     "headings may not skip levels (expected to see level 1 or 2, not 4)"
@@ -209,7 +257,8 @@ spec = do
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
-        equationNumber = 0
+        equationNumber = 0,
+        orgParserConf = L.defaultOrgParserConf
       }
   ps
     "0004-drawers-not-empty"
@@ -236,7 +285,8 @@ spec = do
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
-        equationNumber = 0
+        equationNumber = 0,
+        orgParserConf = L.defaultOrgParserConf
       }
   pf
     "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
@@ -446,7 +496,8 @@ spec = do
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
-        equationNumber = 0
+        equationNumber = 0,
+        orgParserConf = L.defaultOrgParserConf
       }
   p
     "0005-styled-strings-no-style"
@@ -757,7 +808,8 @@ spec = do
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
-        equationNumber = 0
+        equationNumber = 0,
+        orgParserConf = L.defaultOrgParserConf
       }
   pf
     "0007-block-src-without-lang"
@@ -1313,7 +1365,8 @@ spec = do
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
-        equationNumber = 3
+        equationNumber = 3,
+        orgParserConf = L.defaultOrgParserConf
       }
   p
     "0011-figures-and-blocks"

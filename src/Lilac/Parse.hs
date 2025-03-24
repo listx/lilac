@@ -1,10 +1,12 @@
 module Lilac.Parse
   ( defaultOrgDoc,
+    defaultOrgParserConf,
     defaultOrgParserState,
     orgDocParser,
     parseOrgDoc,
     styleMaskFrom,
     OrgDoc (..),
+    OrgParserConf (..),
     OrgParserState (..),
     Cell (..),
     Heading (..),
@@ -110,7 +112,7 @@ import Relude
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
 import Text.Megaparsec qualified as MP
-import Text.Megaparsec.Char (char, string)
+import Text.Megaparsec.Char (char, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude qualified (show)
 
@@ -124,7 +126,8 @@ data OrgParserState = OrgParserState
     listLevels :: [Level],
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
-    equationNumber :: Int
+    equationNumber :: Int,
+    orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
 
@@ -136,7 +139,20 @@ defaultOrgParserState =
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
-      equationNumber = 0
+      equationNumber = 0,
+      orgParserConf = defaultOrgParserConf
+    }
+
+type OrgParserConf :: Type
+data OrgParserConf = OrgParserConf
+  { maxHeadingLevel :: Int
+  }
+  deriving stock (Eq, Show)
+
+defaultOrgParserConf :: OrgParserConf
+defaultOrgParserConf =
+  OrgParserConf
+    { maxHeadingLevel = 6
     }
 
 type OrgDoc :: Type
@@ -308,6 +324,7 @@ orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
   meta <- docMetaParser
+  _ <- lilacExtensionsParser
   cells <- many cellParser
   let meaningfulCell :: Cell -> Bool
       meaningfulCell (CListItem []) = False
@@ -333,6 +350,7 @@ defaultOrgDoc metas =
 docMetaEntryParser :: OrgParser (T.Text, T.Text)
 docMetaEntryParser = do
   avoidParsingBlockMetadata
+  avoidParsingLilacExtensions
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
   _ <- MP.label "(doc meta) separator" $ string ": "
@@ -349,11 +367,39 @@ docMetaEntryParser = do
             string "#+name: ",
             string "#+header: "
           ]
+    avoidParsingLilacExtensions :: OrgParser ()
+    avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
 
 docMetaParser :: OrgParser (M.Map T.Text T.Text)
 docMetaParser = do
   metaKVs <- many $ lexeme docMetaEntryParser
   pure $ M.fromList metaKVs
+
+lilacExtensionsParser :: OrgParser ()
+lilacExtensionsParser = do
+  void
+    . many
+    . lexeme
+    $ MP.choice
+      [ maxHeadingLevelParser
+      ]
+
+maxHeadingLevelParser :: OrgParser ()
+maxHeadingLevelParser = do
+  orgParserState <- get
+  _ <- string $ "#+lilac_maxHeadingLevel: "
+  _ <- many $ char ' '
+  val <- signedIntParser
+  let opc = orgParserState.orgParserConf {maxHeadingLevel = val}
+  put orgParserState {orgParserConf = opc}
+
+signedIntParser :: OrgParser Int
+signedIntParser = L.signed parserBetweenSignAndNumber number
+  where
+    number :: OrgParser Int
+    number = L.lexeme space1 $ L.decimal
+    parserBetweenSignAndNumber :: OrgParser ()
+    parserBetweenSignAndNumber = pure ()
 
 cellParser :: OrgParser Cell
 cellParser =
@@ -390,9 +436,20 @@ headingParser :: OrgParser Cell
 headingParser = do
   orgParserState <- get
   _ <- MP.try $ MP.lookAhead (starsParser >> char ' ')
+  let opc = orgParserState.orgParserConf
   stars <- starsParser
+  when (opc.maxHeadingLevel < 0) $ do
+    fail
+      $ "headings prohibited because lilac_maxHeadingLevel < 0"
   let lenStars = T.length stars
       currentHeadingLevel = orgParserState.headingLevel
+  when (opc.maxHeadingLevel > 0 && lenStars > opc.maxHeadingLevel) $ do
+    fail
+      $ "found "
+      <> show lenStars
+      <> " asterisks found for this heading, but "
+      <> "lilac_maxHeadingLevel = "
+      <> show opc.maxHeadingLevel
   failIfHeadingNestsWithoutDirectParent currentHeadingLevel lenStars
   _ <- char ' '
   prose <- proseParser spaceConsumer
