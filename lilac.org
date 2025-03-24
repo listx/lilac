@@ -1691,7 +1691,6 @@ import Relude
     Type,
     Void,
     Word8,
-    and,
     catMaybes,
     concatMap,
     drop,
@@ -1791,7 +1790,9 @@ import Prelude qualified (show)
 <<f:detectInvalidIndentation>>
 <<f:headingParser>>
 <<f:failIfHeadingNestsWithoutDirectParent>>
-<<f:drawersParser>>
+<<f:propertiesDrawerParser>>
+<<f:propertiesParser>>
+<<f:propertiesEntryParser>>
 <<f:proseParser>>
 <<f:whitespaceCompressor>>
 <<f:styleMarkers>>
@@ -4279,7 +4280,7 @@ headingParser = do
   prose <- proseParser spaceConsumer
   _ <- char '\n'
   failIfLeftoverActiveStyles
-  drawers <- drawersParser
+  props <- propertiesDrawerParser
   put
     orgParserState
       { headingLevel = lenStars
@@ -4289,7 +4290,7 @@ headingParser = do
       Heading
         { level = T.length stars,
           body = compressProse prose,
-          meta = drawers
+          meta = props
         }
   where
     spaceConsumer :: OrgParser T.Text
@@ -4326,8 +4327,9 @@ failIfHeadingNestsWithoutDirectParent current found =
 The body text of a heading is a series of prose tokens, or =PToken= values, which
 we call =Prose=.
 
-We consider prose in detail in the next section, where we'll also discuss
-[[f:failIfLeftoverActiveStyles]] and also [[f:compressProse]].
+We consider prose in detail in [[id:c8616126-215d-49be-8874-c2aca7d93a54][Prose]], where we also discuss
+[[f:failIfLeftoverActiveStyles]] and also [[f:compressProse]]. Drawers are discussed
+separately [[id:ca12051e-cd17-4d8d-996a-767695441d48][here]].
 
 *** Tests
 
@@ -4515,58 +4517,91 @@ pf
 #+end_src
 
 ** Drawers
+:PROPERTIES:
+:ID:       ca12051e-cd17-4d8d-996a-767695441d48
+:END:
 
-Drawers look like
+In vanilla Orgmode, drawers look like
 
 #+begin_example
 :DRAWER_NAME:
-...content...
+...contents...
 :END:
 #+end_example
 
-and the =:PROPERTIES:= drawer is a special drawer that can contain values that Org
-recognizes, such as an =:ID:= key and value to encode a UUID which can be used as
-a link target from elsewhere in the document.
+and the contents may be anything but another [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][heading]] or another (nested) drawer.
+In Lilac, we only parse the =:PROPERTIES:= drawer, which is a special drawer that
+can contain key\/value pairs that Org recognizes. One of these is the =:ID:= key,
+which can have a UUID as the value, and which can be used as a link target from
+elsewhere in the document (in Orgmode this can be done with ~org-id-store-link~).
 
-For simplicity we capture all of the values of a drawer inside a single map,
-with the drawer name as the key and the contents inside the drawer as the value.
-
-#+name: f:drawersParser
+#+name: f:propertiesDrawerParser
 #+begin_src haskell
-drawersParser :: OrgParser (Map T.Text T.Text)
-drawersParser = do
-  kvs <- many $ lexeme drawerParser
-  pure $ M.fromList kvs
-
-drawerParser :: OrgParser (T.Text, T.Text)
-drawerParser = do
-  _ <- char ':'
-  drawerName <- MP.takeWhile1P (Just "drawer name") isDrawerLetter
-  _ <- char ':'
-  _ <- char '\n'
-  drawerContents <-
-    MP.manyTill
-      (MP.label "drawer contents" MP.anySingle)
-      (string ":END:\n")
-  pure (drawerName, T.pack drawerContents)
-  where
-    isDrawerLetter c = and $ map ($ c) [(/= '\n'), (/= ':'), (/= ' ')]
+propertiesDrawerParser :: OrgParser (Map T.Text T.Text)
+propertiesDrawerParser = propertiesParser <|> (pure $ M.fromList [])
 
 #+end_src
 
-Test for empty drawers.
+The [[f:propertiesDrawerParser]] tries to parse a =:PROPERTIES:= drawer with
+[[f:propertiesParser]], but if it fails it returns an empty ~Map~.
 
-#+header: :tangle test/Lilac/ParseSpec/0004-drawers-empty
+#+name: f:propertiesParser
+#+begin_src haskell
+propertiesParser :: OrgParser (Map T.Text T.Text)
+propertiesParser =
+  M.fromList
+    <$> MP.between
+      (lexeme $ string ":PROPERTIES:\n")
+      (string ":END:\n")
+      (many $ lexeme propertiesEntryParser)
+
+#+end_src
+
+The [[f:propertiesParser]] is just a thin wrapper around [[f:propertiesEntryParser]]
+which does the heavy lifting of figuring out the key value parts.
+
+The uses of [[f:lexeme]] allow this parser to ignore comments it finds inside the
+drawer area. There is no need to use [[f:lexeme]] for the closing ~:END:~ bit because
+we already wrap all cells with [[f:lexeme]] in [[f:cellParser]], and the last thing
+[[f:headingParser]] parses is [[f:propertiesParser]] (if [[f:headingParser]] parsed
+something else after calling [[f:propertiesParser]], we would need to wrap ~:END:~
+with [[f:lexeme]] as well).
+
+#+name: f:propertiesEntryParser
+#+begin_src haskell
+propertiesEntryParser :: OrgParser (T.Text, T.Text)
+propertiesEntryParser = do
+  MP.notFollowedBy $ string ":END:"
+  _ <- char ':'
+  key <- MP.label "property key" . MP.some $ MP.noneOf ['\n', ':', ' ']
+  _ <- char ':'
+  _ <- MP.takeWhile1P (Just "space") (== ' ')
+  value <-
+    MP.manyTill
+      (MP.label "property value" MP.anySingle)
+      (char '\n')
+  pure (T.pack key, T.pack value)
+
+#+end_src
+
+The main tricky bit is ~MP.notFollowedBy $ string ":END:"~; we need this because
+otherwise we will think that the string ~:END:~ is just another key.
+
+*** Tests
+
+The =:PROPERTIES:= drawer may be empty.
+
+#+header: :tangle test/Lilac/ParseSpec/0004-properties-drawer-empty
 #+begin_src org
 ,* foo
-:FOO:
+:PROPERTIES:
 :END:
 #+end_src
 
-#+name: t:0004-drawers-empty
+#+name: t:0004-properties-drawer-empty
 #+begin_src haskell
 ps
-  "0004-drawers-empty"
+  "0004-properties-drawer-empty"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -4576,7 +4611,7 @@ ps
                     [ L.PTokenStyledText
                         (L.StyledText {body = "foo", style = L.styleMaskFrom []})
                     ],
-                  meta = fromList [("FOO", "")]
+                  meta = fromList []
                 }
             )
         ],
@@ -4595,21 +4630,20 @@ ps
     }
 #+end_src
 
-Test for drawers with some content.
+Check we can pick up keys and value from the =:PROPERTIES:= drawer.
 
-#+header: :tangle test/Lilac/ParseSpec/0004-drawers-not-empty
+#+header: :tangle test/Lilac/ParseSpec/0004-properties-drawer-not-empty
 #+begin_src org
 ,* foo
-:FOO:
-- a
-- b
+:PROPERTIES:
+:ID:       b949ea2e-e6d1-453d-9352-5e85a82cd4e6
 :END:
 #+end_src
 
-#+name: t:0004-drawers-not-empty
+#+name: t:0004-properties-drawer-not-empty
 #+begin_src haskell
 ps
-  "0004-drawers-not-empty"
+  "0004-properties-drawer-not-empty"
   L.OrgDoc
     { cells =
         [ L.CHeading
@@ -4619,7 +4653,65 @@ ps
                     [ L.PTokenStyledText
                         (L.StyledText {body = "foo", style = L.styleMaskFrom []})
                     ],
-                  meta = fromList [("FOO", "- a\n- b\n")]
+                  meta =
+                    fromList
+                      [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                      ]
+                }
+            )
+        ],
+      code = [],
+      codeBlocks = IM.fromList [],
+      meta = M.fromList []
+    }
+  L.OrgParserState
+    { headingLevel = 1,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      orgParserConf = L.defaultOrgParserConf
+    }
+#+end_src
+
+Adding comments inside drawers is allowed (we ignore them because we use
+[[f:lexeme]] in [[f:propertiesParser]]).
+
+#+header: :tangle test/Lilac/ParseSpec/0004-properties-drawer-not-empty-with-comments
+#+begin_src org
+,* foo
+:PROPERTIES:
+
+# Comment.
+
+:ID:       b949ea2e-e6d1-453d-9352-5e85a82cd4e6
+
+,#+begin_comment
+This ":KEY:" ignored because it's inside a comment block.
+:KEY: value
+,#+end_comment
+
+:END:
+#+end_src
+
+#+name: t:0004-properties-drawer-not-empty-with-comments
+#+begin_src haskell
+ps
+  "0004-properties-drawer-not-empty-with-comments"
+  L.OrgDoc
+    { cells =
+        [ L.CHeading
+            ( L.Heading
+                { level = 1,
+                  body =
+                    [ L.PTokenStyledText
+                        (L.StyledText {body = "foo", style = L.styleMaskFrom []})
+                    ],
+                  meta =
+                    fromList
+                      [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                      ]
                 }
             )
         ],
@@ -7497,8 +7589,9 @@ spec = do
   <<t:0004-headings-limited>>
   <<t:0004-headings-prohibited>>
   <<t:0004-headings-cannot-skip-level>>
-  <<t:0004-drawers-empty>>
-  <<t:0004-drawers-not-empty>>
+  <<t:0004-properties-drawer-empty>>
+  <<t:0004-properties-drawer-not-empty>>
+  <<t:0004-properties-drawer-not-empty-with-comments>>
   <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels>>
   <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid>>
   <<t:0005-paragraph-indentation-mismatch-over-list-body>>

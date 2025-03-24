@@ -233,7 +233,7 @@ spec = do
     "headings may not skip levels (expected to see level 1 or 2, not 4)"
     8
   ps
-    "0004-drawers-empty"
+    "0004-properties-drawer-empty"
     L.OrgDoc
       { cells =
           [ L.CHeading
@@ -243,7 +243,7 @@ spec = do
                       [ L.PTokenStyledText
                           (L.StyledText {body = "foo", style = L.styleMaskFrom []})
                       ],
-                    meta = fromList [("FOO", "")]
+                    meta = fromList []
                   }
               )
           ],
@@ -261,7 +261,7 @@ spec = do
         orgParserConf = L.defaultOrgParserConf
       }
   ps
-    "0004-drawers-not-empty"
+    "0004-properties-drawer-not-empty"
     L.OrgDoc
       { cells =
           [ L.CHeading
@@ -271,7 +271,41 @@ spec = do
                       [ L.PTokenStyledText
                           (L.StyledText {body = "foo", style = L.styleMaskFrom []})
                       ],
-                    meta = fromList [("FOO", "- a\n- b\n")]
+                    meta =
+                      fromList
+                        [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                        ]
+                  }
+              )
+          ],
+        code = [],
+        codeBlocks = IM.fromList [],
+        meta = M.fromList []
+      }
+    L.OrgParserState
+      { headingLevel = 1,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0,
+        orgParserConf = L.defaultOrgParserConf
+      }
+  ps
+    "0004-properties-drawer-not-empty-with-comments"
+    L.OrgDoc
+      { cells =
+          [ L.CHeading
+              ( L.Heading
+                  { level = 1,
+                    body =
+                      [ L.PTokenStyledText
+                          (L.StyledText {body = "foo", style = L.styleMaskFrom []})
+                      ],
+                    meta =
+                      fromList
+                        [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                        ]
                   }
               )
           ],

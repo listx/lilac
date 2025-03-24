@@ -52,7 +52,6 @@ import Relude
     Type,
     Void,
     Word8,
-    and,
     catMaybes,
     concatMap,
     drop,
@@ -455,7 +454,7 @@ headingParser = do
   prose <- proseParser spaceConsumer
   _ <- char '\n'
   failIfLeftoverActiveStyles
-  drawers <- drawersParser
+  props <- propertiesDrawerParser
   put
     orgParserState
       { headingLevel = lenStars
@@ -465,7 +464,7 @@ headingParser = do
       Heading
         { level = T.length stars,
           body = compressProse prose,
-          meta = drawers
+          meta = props
         }
   where
     spaceConsumer :: OrgParser T.Text
@@ -485,24 +484,29 @@ failIfHeadingNestsWithoutDirectParent current found =
       <> show found
       <> ")"
 
-drawersParser :: OrgParser (Map T.Text T.Text)
-drawersParser = do
-  kvs <- many $ lexeme drawerParser
-  pure $ M.fromList kvs
+propertiesDrawerParser :: OrgParser (Map T.Text T.Text)
+propertiesDrawerParser = propertiesParser <|> (pure $ M.fromList [])
 
-drawerParser :: OrgParser (T.Text, T.Text)
-drawerParser = do
-  _ <- char ':'
-  drawerName <- MP.takeWhile1P (Just "drawer name") isDrawerLetter
-  _ <- char ':'
-  _ <- char '\n'
-  drawerContents <-
-    MP.manyTill
-      (MP.label "drawer contents" MP.anySingle)
+propertiesParser :: OrgParser (Map T.Text T.Text)
+propertiesParser =
+  M.fromList
+    <$> MP.between
+      (lexeme $ string ":PROPERTIES:\n")
       (string ":END:\n")
-  pure (drawerName, T.pack drawerContents)
-  where
-    isDrawerLetter c = and $ map ($ c) [(/= '\n'), (/= ':'), (/= ' ')]
+      (many $ lexeme propertiesEntryParser)
+
+propertiesEntryParser :: OrgParser (T.Text, T.Text)
+propertiesEntryParser = do
+  MP.notFollowedBy $ string ":END:"
+  _ <- char ':'
+  key <- MP.label "property key" . MP.some $ MP.noneOf ['\n', ':', ' ']
+  _ <- char ':'
+  _ <- MP.takeWhile1P (Just "space") (== ' ')
+  value <-
+    MP.manyTill
+      (MP.label "property value" MP.anySingle)
+      (char '\n')
+  pure (T.pack key, T.pack value)
 
 proseParser :: OrgParser T.Text -> OrgParser [PToken]
 proseParser spaceConsumer = do
