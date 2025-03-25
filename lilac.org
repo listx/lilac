@@ -5425,72 +5425,39 @@ are two list items for the top-level ordered list =1)= and =2)=.
 
 List heads encode the structure of cells that sit in the list bodies. So list
 items encode both structure and content. In this manner they are similar to
-headings. However unlike headings, a list item can have multiple other cells
+[[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][headings]]. However unlike headings, a list item can have multiple other cells
 (paragraphs, tables, or even code blocks) in its body, whereas a heading can
 only have a single line of prose.
 
-Keeping track of the current level of indentation requires additional state
-during parsing, which we encode with =Level= (used by =listLevels= in
-[[data:OrgParserState]]).
+Another difference is that a list item can have content for it /after/ backing out
+of a nested list item. For example in the list shown above the ~d~ paragraph is
+part of the ordered list item ~1)~ even though the nested item ~c~ is just above it;
+this sort of structure is now allowed for headings. For example, in the
+following situation
 
-#+name: data:Level
-#+begin_src haskell
-type Level :: Type
-data Level = Level
-  { indent :: Int,
-    number :: Maybe Int
-  }
-  deriving stock (Eq, Show)
-
+#+begin_src org
+,* a
+,** b
 #+end_src
 
-This keeps track of the indentations and the last seen number of each (nested)
-level of indentation seen thus far during parsing. Whenever we see a list head
-like =1)= or ~-~, we can record the number used as well as the indentations we
-expect for the list head and list body. The main point of =listLevels= is to ensure
-that the input is correctly formatted, as well as to detect whenever we start
-nesting an additional level, or if we back out (finish) one or more levels of
-nesting (when we see dedented text).
+anything that comes after ~** b~ will be part of the ~** b~ heading; there is no way
+to make it belong to ~* a~ (any such content must be placed /before/ ~** b~).
 
-If we parse a list item, we update the =listLevels= entry for that
-level. The idea is to check (during parsing) how these levels change, so that we
-can create "start" and "end" markers for list items at a particular level. We
-take this model from HTML, which uses =<ol>= and =</ol>= to encode the start and
-end of ordered lists (=<ul>= and =</ul>= for unordered lists), and =<li>= and =</li>= to
-mark the start and en of a single list item. We encoded changes of these levels
-by parsing =ListMarker= objects as a =CListItem= cell (see [[data:Cell]]).
+Below we have a look at some more detailed rules around how lists may be written
+in an Org file.
 
-#+name: data:ListMarker
-#+begin_src haskell
-type ListMarker :: Type
-data ListMarker
-  = LOrderedStart
-  | LOrderedEnd
-  | LUnorderedStart
-  | LUnorderedEnd
-  | LItemStart
-  | LItemEnd
-  deriving stock (Eq, Show)
-
-#+end_src
-
-The =ListMarker= is equivalent to HTML's notion of ordered lists, unordered lists,
-and list items (their start and ending tags). We reuse them here because they're
-simple to reason about.
-
-In summary when we parse a list item, we parse it as a combination of =CListItem=
-and other cell types for the list structure and content, respectively. This lets
-us parse things into a single global list of cells in [[f:cellParser]], without a
-need to nest them inside a recursive data structure (as shown in
-https://markkarpov.com/tutorial/megaparsec.html#nested-indented-list).
+*** Detailed rules
+:PROPERTIES:
+:ID:       32d34523-2148-4f2f-b2f3-2a2543a7d57c
+:END:
 
 Below are some detailed rules around /ordered/ list items, themselves expressed as
 ordered list items, which are important for parsing:
 
-  1) List items start out with 2-space indentation. This is because this makes
-     list items easier to read from the raw Org file. The amount of additional
-     indentation (in order to have nested list items) depends on where the text
-     began in the parent item. See items "5)" and "10)" below for examples.
+  1) List items start out with 2-space indentation. This makes them easier to
+     read from the raw Org file. The amount of additional indentation (in order
+     to have nested list items) depends on where the text began in the parent
+     item. See items "5)" and "10)" below for examples.
 
   2) List items must be separate from each other with a blank line. This makes
      them easier to read when reading the Org file in plain text.
@@ -5619,24 +5586,90 @@ paragraph below):
 
     - b
 
-On top of all this, list items are somewhat complicated because they encode
-structure and also modify the behavior of the other cell parsers by informing
-them of the current level of indentation. Thankfully we can separate these two
-concerns via the [[data:ListMarker]] and [[data:OrgParserState]] (=listLevels=),
-respectively.
+*** Indentation and =ListMarker=
 
-Before getting into parsing the list items and taking into account all of these
-rules, let's first consider case where we just want to /close off/ the list items.
-The idea is basically as follows:
+Parsing list items is tricky because of meaningful indentation (whitespace).
+Keeping track of the current level of indentation requires additional state
+during parsing, which we encode with =Level= (used by =listLevels= in
+[[data:OrgParserState]]).
 
-  1) if there is no indentation, we close off all list items;
+#+name: data:Level
+#+begin_src haskell
+type Level :: Type
+data Level = Level
+  { indent :: Int,
+    number :: Maybe Int
+  }
+  deriving stock (Eq, Show)
 
-  2) if there is maximum indentation (to line up with the most-nested list
-     item), we don't close off any list items because we're just continuing the
-     most-nested list item;
+#+end_src
+
+This keeps track of the indentations and the last seen number of each (nested)
+level of indentation thus far during parsing. Whenever we see a list head like
+=1)= or ~-~, we record the number used as well as the indentations we expect for the
+list head and list body. The main point of =listLevels= is to ensure that the
+input is correctly formatted, as well as to detect whenever we start nesting an
+additional level, or if we back out (finish) one or more levels of nesting (when
+we see dedented text).
+
+As we observe how these =listLevels= change during parsing, we create "start" and
+"end" markers for list items at a particular level, which are the values of the
+[[data:ListMarker]] type. The =ListMarker= objects are parsed as their own cell as a
+=CListItem= (see [[data:Cell]]).
+
+#+name: data:ListMarker
+#+begin_src haskell
+type ListMarker :: Type
+data ListMarker
+  = LOrderedStart
+  | LOrderedEnd
+  | LUnorderedStart
+  | LUnorderedEnd
+  | LItemStart
+  | LItemEnd
+  deriving stock (Eq, Show)
+
+#+end_src
+
+We take this model from HTML, which uses =<ol>= and =</ol>= to encode the start and
+end of ordered lists (=<ul>= and =</ul>= for unordered lists), and =<li>= and =</li>= to
+mark the start and en of a single list item.
+
+#+name: tbl:List markers
+| ListMarker      | HTML equivalent |
+|-----------------+-----------------|
+| LOrderedStart   | ~<ol>~            |
+| LOrderedEnd     | ~</ol>~           |
+| LUnorderedStart | ~<ul>~            |
+| LUnorderedEnd   | ~</ul>~           |
+| LItemStart      | ~<li>~            |
+| LItemEnd        | ~</li>~           |
+
+In summary when we parse a list item, we parse it as a combination of =CListItem=
+and other cell types for the list structure and content, respectively. This lets
+us parse things into a single global list of cells in [[f:cellParser]], without a
+need to nest them inside a recursive data structure (as shown in
+https://markkarpov.com/tutorial/megaparsec.html#nested-indented-list).
+
+*** Parsing the end of a list
+
+Before getting into parsing the list items and taking into account all of the
+[[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][detailed rules]], let's first consider case where we just want to /close off/ the
+list items. Closing off just means knowing if we need to insert appropriate
+ending markers:
+
+  1) if there is no indentation, we close off /all/ list items;
+
+  2) if there is maximum (already-seen) indentation (to line up with the
+     most-nested list item), we don't close off any list items because we're
+     just continuing the most-nested list item;
 
   3) otherwise, we have some amount of indentation and we only want to close off
      some list levels, depending on how much indentation we detect.
+
+If there is more indentation than the maximum, then we are nesting another level
+and don't need to close off anything. That's why this situation is not listed
+above.
 
 Point 1 is captured by =zeroIndent= in [[f:listItemsEndParser]]. Points 2 and 3 are
 captured by =someIndent= in the same function. For =someIndent=, we just try to
