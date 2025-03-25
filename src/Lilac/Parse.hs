@@ -74,6 +74,7 @@ import Relude
     maybeToList,
     modify,
     not,
+    notElem,
     null,
     optional,
     or,
@@ -899,7 +900,11 @@ bTokenParser isSrcBlock nowebOn = MP.choice parsers
   where
     baseParsers :: [OrgParser BToken]
     baseParsers =
-      [ BTokenString <$> (MP.takeWhile1P (Just "block token") (not . isSpace)),
+      [ BTokenString
+          <$> (MP.takeWhile1P (Just "block token") (`notElem` ['\n', ' ', '<'])),
+        BTokenString
+          . T.singleton
+          <$> (MP.label "left angle bracket" $ MP.satisfy (== '<')),
         BTokenString
           . T.singleton
           <$> (MP.label "space inside block" $ MP.satisfy isSpace)
@@ -917,7 +922,7 @@ nowebLinkParser = do
       (string ">>")
       ( MP.takeWhile1P
           (Just "Noweb reference name")
-          isNowebReferenceChar
+          (`notElem` ['\n', '<', '>'])
       )
   pure
     $ Link
@@ -930,8 +935,6 @@ nowebLinkParser = do
               }
           ]
       }
-  where
-    isNowebReferenceChar c = c /= '\n' && c /= '>'
 
 compressBTokens :: [BToken] -> [BToken]
 compressBTokens = reverse . foldl' f []

@@ -867,7 +867,8 @@ spec = do
               ( L.Block
                   { meta =
                       fromList
-                        [ ("__block_type", "example")
+                        [ ("__block_type", "example"),
+                          ("name", "foo")
                         ],
                     body = []
                   }
@@ -918,7 +919,7 @@ spec = do
                       fromList
                         [ ("__block_type", "src"),
                           ("__src_language", "sh"),
-                          ("name", "end has no preceding newline")
+                          ("name", "end has no preceding blank line")
                         ],
                     body = [L.BTokenString "foo"]
                   }
@@ -929,7 +930,7 @@ spec = do
                       fromList
                         [ ("__block_type", "src"),
                           ("__src_language", "sh"),
-                          ("name", "end has preceding newline")
+                          ("name", "end has preceding blank line")
                         ],
                     body = [L.BTokenString "foo\n"]
                   }
@@ -944,35 +945,16 @@ spec = do
                         ],
                     body = [L.BTokenString "foo\n\n"]
                   }
-              )
-          ],
-        code = [],
-        codeBlocks = fromList [],
-        meta = fromList []
-      }
-  p
-    "0007-blocks-metadata"
-    L.OrgDoc
-      { cells =
-          [ L.CBlock
-              ( L.Block
-                  { meta =
-                      fromList
-                        [ ("__block_type", "src"),
-                          ("__src_language", "haskell"),
-                          ("name", "some-code")
-                        ],
-                    body = []
-                  }
               ),
             L.CBlock
               ( L.Block
                   { meta =
                       fromList
-                        [ ("__block_type", "example"),
-                          ("name", "some-example")
+                        [ ("__block_type", "src"),
+                          ("__src_language", "sh"),
+                          ("name", "ignore #+end_example because this is a src block")
                         ],
-                    body = []
+                    body = [L.BTokenString "#+end_example"]
                   }
               )
           ],
@@ -1040,6 +1022,66 @@ spec = do
                               }
                           ),
                         L.BTokenString " x y z"
+                      ]
+                  }
+              )
+          ],
+        code = [],
+        codeBlocks = fromList [],
+        meta = fromList []
+      }
+  p
+    "0007-blocks-noweb-intraline"
+    L.OrgDoc
+      { cells =
+          [ L.CBlock
+              ( L.Block
+                  { meta =
+                      fromList
+                        [ ("__block_type", "src"),
+                          ("__src_language", "sh")
+                        ],
+                    body =
+                      [ L.BTokenString "(",
+                        L.BTokenLink
+                          ( L.Link
+                              { typ = L.LinkNoweb,
+                                target = "foo",
+                                name =
+                                  [ L.StyledText
+                                      { body = "foo",
+                                        style = L.styleMaskFrom []
+                                      }
+                                  ]
+                              }
+                          ),
+                        L.BTokenString ") and \"",
+                        L.BTokenLink
+                          ( L.Link
+                              { typ = L.LinkNoweb,
+                                target = "bar",
+                                name =
+                                  [ L.StyledText
+                                      { body = "bar",
+                                        style = L.styleMaskFrom []
+                                      }
+                                  ]
+                              }
+                          ),
+                        L.BTokenString "\" and <",
+                        L.BTokenLink
+                          ( L.Link
+                              { typ = L.LinkNoweb,
+                                target = "ok",
+                                name =
+                                  [ L.StyledText
+                                      { body = "ok",
+                                        style = L.styleMaskFrom []
+                                      }
+                                  ]
+                              }
+                          ),
+                        L.BTokenString ">"
                       ]
                   }
               )

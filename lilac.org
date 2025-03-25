@@ -1205,6 +1205,7 @@ combinator
 declaratively
 dedent
 Dependabot
+dereference
 Direnv
 Elisp
 formatter
@@ -1713,6 +1714,7 @@ import Relude
     maybeToList,
     modify,
     not,
+    notElem,
     null,
     optional,
     or,
@@ -4736,9 +4738,12 @@ ps
 :END:
 
 /Blocks/ are regions of text that start with =#+begin<...>= and end with =#+end<...>=.
-They are used to delineate source code (used for Noweb references), examples,
-quotes, and others. They have associated metadata, and their contents are a list
-of =BToken= types, which are quite similar to =Prose= (a list of =PToken= types).
+They are used to delineate source code (such as those used for Noweb
+references), examples, quotes, and others. Some examples are =src= or =example= (as
+in =#+begin_src= and =#+begin_example=), although technically Org allows for any
+arbitrary keyword here.
+
+*** =Block= type
 
 #+name: data:Block
 #+begin_src haskell
@@ -4751,27 +4756,75 @@ data Block = Block
 
 #+end_src
 
-A =BToken= can be either some raw piece of text, or a link. The link is only for
-the case of Noweb references.
+Below are some examples of valid (empty) code blocks.
 
-#+name: data:BToken
-#+begin_src haskell
-type BToken :: Type
-data BToken
-  = BTokenString T.Text
-  | BTokenLink Link
-  deriving stock (Eq, Show)
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-empty
+#+begin_src org
+,#+begin_src haskell
+,#+end_src
 
+,#+name: foo
+,#+begin_example
+,#+end_example
+
+,#+begin_quote
+,#+end_quote
 #+end_src
 
-A [[data:Block][Block]] is anything that sits between =#+begin_...= and =#+end_...= lines. Some
-examples are =src= or =example= (as in =#+begin_src= and =#+begin_example=), although
-technically Org allows for any arbitrary keyword here.
+#+name: t:0007-blocks-empty
+#+begin_src haskell
+p
+  "0007-blocks-empty"
+  L.OrgDoc
+    { cells =
+        <<Expected blocks for 0007-blocks-empty>>,
+      code = [],
+      codeBlocks = fromList [],
+      meta = fromList []
+    }
+#+end_src
 
-The block can be preceded by any number of special key\/value pairs in the form
-of =#+header: :key value= lines. The special line =#+name: foo= gives the block a
-unique name (if it's not globally unique, we'll complain about it), which can be
-the target of an internal link.
+#+name: Expected blocks for 0007-blocks-empty
+#+begin_src haskell
+[ L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "haskell")
+              ],
+          body = []
+        }
+    ),
+  L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "example"),
+                ("name", "foo")
+              ],
+          body = []
+        }
+    ),
+  L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "quote")
+              ],
+          body = []
+        }
+    )
+]
+#+end_src
+
+*** Metadata
+
+Blocks can have associated metadata, as we can see from the test case above. The
+metadata is made up of any number of special key\/value pairs that are written
+in the form of =#+header: :key value= lines. The special line =#+name: foo= gives
+the block a unique name (if it's not globally unique, we'll complain about it),
+which can be the target of an internal link.
 
 Vanilla Org allows you to place these key\/value pairs on the same line as the
 =#+begin_...= line, but we don't allow this. This enforces a cleaner style and
@@ -4798,8 +4851,28 @@ metaNameParser = do
 
 #+end_src
 
-With the metadata out of the way, let's see how we parse the block itself with
-=blockParser=.
+*** Body
+
+The contents or ~body~ of a [[data:Block]] is list of =BToken= values, which are quite
+similar to =Prose= (a list of =PToken= types). A =BToken= can be either some raw piece
+of text, or a link. The link is only for the case of Noweb references. For
+example, if a block contains a Noweb reference, then it needs to be a link such
+that the Noweb reference can be dereferenced, and its contents replaced with the
+source of the referenced code block during tangling.
+
+#+name: data:BToken
+#+begin_src haskell
+type BToken :: Type
+data BToken
+  = BTokenString T.Text
+  | BTokenLink Link
+  deriving stock (Eq, Show)
+
+#+end_src
+
+*** Overall parser
+
+Let's see how we parse the block itself with =blockParser=.
 
 #+name: f:blockParser
 #+begin_src haskell
@@ -4853,190 +4926,31 @@ the beginning, because otherwise our parser thinks that as soon as we parse a
 =#+name=, that it will be a block. This is not true because other things (like
 figures) can have a =#+name= associated with them.
 
-The somewhat tricky part is the use of =zeroBTokensParser= and =someBTokensParser=.
-We need this distinction because we require blocks to end with ="\n#+end_..."=
-(that is, the =#+end_...= must occur at the beginning of a line). This means that
-for empty blocks, this newline character just preceding the =#+end_...= will come
-from the newline at the end of the =#+begin_...= part. This then interferes with
-the =char '\n'= parser we already have just before we start parsing for =bTokens=.
+We fail the parse if we detect a ~#+begin_src~ block without an accompanying
+language; see [[t:0007-block-src-without-lang]].
+
+The ~nowebOff~ bit controls how we perceive text that looks like ~<<foo>>~; see the
+discussion for [[t:0007-blocks-noweb]] and [[t:0007-blocks-noweb-off]].
+
+The tricky part is the use of =zeroBTokensParser= and =someBTokensParser=. We need
+this distinction because we require blocks to end with ="\n#+end_..."= (that is,
+the =#+end_...= must occur at the beginning of a line). This means that for empty
+blocks, this newline character just preceding the =#+end_...= will come from the
+newline at the end of the =#+begin_...= part. This then interferes with the =char
+'\n'= parser we already have just before we start parsing for =bTokens=.
 
 In other words, there is no easy way to tell Megaparsec to ensure that we are at
-the beginning of a line. To work around this, we do the simplest thing possible
---- we just check whether the block is empty with =zeroBTokensParser=. Otherwise,
-we end up expecting =someBTokensParser= to succeed.
+the beginning of a line. To work around this, we check whether the block is
+empty with =zeroBTokensParser=. Otherwise, we end up expecting =someBTokensParser=
+to succeed. See [[t:0007-blocks-ending]] which checks the various edge cases around
+making sure we can detect the ="\n#+end_..."= bit.
 
-#+name: f:bTokenParser
-#+begin_src haskell
-bTokenParser :: Bool -> Bool -> OrgParser BToken
-bTokenParser isSrcBlock nowebOn = MP.choice parsers
-  where
-    baseParsers :: [OrgParser BToken]
-    baseParsers =
-      [ BTokenString <$> (MP.takeWhile1P (Just "block token") (not . isSpace)),
-        BTokenString
-          . T.singleton
-          <$> (MP.label "space inside block" $ MP.satisfy isSpace)
-      ]
-    parsers =
-      if isSrcBlock && nowebOn
-        then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
-        else baseParsers
-
-#+end_src
-
-It's important that the space parser in ~baseParsers~ above does /not/ use
-~MP.takeWhile1P~. Otherwise, it'll greedily consume all spaces including newlines,
-robbing it from the ending condition in ~someBTokensParser~ (where we expect a
-newline before ~#+end_~). Below we test the edge cases around detecting the end of
-a block.
-
-#+header: :tangle test/Lilac/ParseSpec/0007-blocks-ending
-#+begin_src org
-,#+name: empty
-,#+begin_src sh
-,#+end_src
-
-,#+name: end not in beginning of line
-,#+begin_src sh
- ,#+end_src
-,#+end_src
-
-,#+name: end has no preceding newline
-,#+begin_src sh
-foo
-,#+end_src
-
-,#+name: end has preceding newline
-,#+begin_src sh
-foo
-
-,#+end_src
-
-,#+name: end has preceding newline (multiple)
-,#+begin_src sh
-foo
-
-
-,#+end_src
-#+end_src
-
-#+name: t:0007-blocks-ending
-#+begin_src haskell
-p
-  "0007-blocks-ending"
-  L.OrgDoc
-    { cells =
-        <<Expected blocks for 0007-blocks-ending>>,
-      code = [],
-      codeBlocks = fromList [],
-      meta = fromList []
-    }
-#+end_src
-
-#+name: Expected blocks for 0007-blocks-ending
-#+header: :noweb off
-#+begin_src haskell
-[ L.CBlock
-    ( L.Block
-        { meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "empty")
-              ],
-          body = []
-        }
-    ),
-  L.CBlock
-    ( L.Block
-        { meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "end not in beginning of line")
-              ],
-          body = [L.BTokenString " #+end_src"]
-        }
-    ),
-  L.CBlock
-    ( L.Block
-        { meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "end has no preceding newline")
-              ],
-          body = [L.BTokenString "foo"]
-        }
-    ),
-  L.CBlock
-    ( L.Block
-        { meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "end has preceding newline")
-              ],
-          body = [L.BTokenString "foo\n"]
-        }
-    ),
-  L.CBlock
-    ( L.Block
-        { meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "end has preceding newline (multiple)")
-              ],
-          body = [L.BTokenString "foo\n\n"]
-        }
-    )
-]
-#+end_src
-
-A token inside a block is basically text or a Noweb link. However, the Noweb
-link is only allowed inside =src= blocks, which is why =bTokenParser= takes a
-boolean argument. The =baseParsers= parse the usual (raw) text inside the block
-(which are themselves compressed with [[f:compressBTokens]]), and
-[[f:nowebLinkParser]] takes care of Noweb references.
-
-A Noweb reference is surrounded by the classic double-angle-bracket delimiters
-=<<= and =>>=. We wrap this with =MP.try=, because we need to backtrack if we fail
-(after parsing, and consuming, the initial =<<= bit). Backtracking allows the
-other parsers in =baseParsers= to parse the text that failed to be parsed as a
-valid Noweb link.
-
-#+name: f:nowebLinkParser
-#+begin_src haskell
-nowebLinkParser :: OrgParser Link
-nowebLinkParser = do
-  linkName <-
-    MP.between
-      (string "<<")
-      (string ">>")
-      ( MP.takeWhile1P
-          (Just "Noweb reference name")
-          isNowebReferenceChar
-      )
-  pure
-    $ Link
-      { typ = LinkNoweb,
-        target = linkName,
-        name =
-          [ StyledText
-              { body = linkName,
-                style = styleMaskFrom []
-              }
-          ]
-      }
-  where
-    isNowebReferenceChar c = c /= '\n' && c /= '>'
-
-#+end_src
-
-=compressBTokens= is similar to [[f:compressProse]], but it's simpler because it
-doesn't have to deal with styled text. Instead it only deals with raw =T.Text=
-values directly.
+We call =compressBTokens= for the parsed ~bTokens~; this function is similar to
+[[f:compressProse]], but it's simpler because it doesn't have to deal with styled
+text. Instead it only deals with raw =T.Text= values directly. We need to use
+=compressBTokens= because otherwise we'll end up with many separate =BToken=
+values (because [[f:bTokenParser]] uses multiple separate parsers that all use the
+same =BTokenString= constructor for parsing text tokens).
 
 #+name: f:compressBTokens
 #+begin_src haskell
@@ -5051,13 +4965,89 @@ compressBTokens = reverse . foldl' f []
 
 #+end_src
 
-Check a typical case with some Noweb references in it. Note also how the
-=#+end_src= in the middle of the block does not trigger the end of the block
-(because such markers should only work when they are at the beginning of the
-line). Note that we have to set =#+header: :noweb off= here because otherwise
-Orgmode thinks that it thinks =<<foo>>= and =<<bar>>= are Noweb references that
-exist in this doc, and because they don't exist, will just result in those
-strings not being inserted into [[file:test/Lilac/ParseSpec/0007-blocks-noweb]].
+*** =bTokenParser= (code block contents)
+
+Now let's dig into the actual block tokens (~[BToken]~) which form the contents of
+the code block. These ~BToken~ values can be either text (~BTokenString~) or a Noweb
+link (~BTokenLink~). Essentially all of the complexity around [[f:bTokenParser]] is
+due to the need to detect Noweb references in a robust way.
+
+#+name: f:bTokenParser
+#+begin_src haskell
+bTokenParser :: Bool -> Bool -> OrgParser BToken
+bTokenParser isSrcBlock nowebOn = MP.choice parsers
+  where
+    baseParsers :: [OrgParser BToken]
+    baseParsers =
+      [ BTokenString
+          <$> (MP.takeWhile1P (Just "block token") (`notElem` ['\n', ' ', '<'])),
+        BTokenString
+          . T.singleton
+          <$> (MP.label "left angle bracket" $ MP.satisfy (== '<')),
+        BTokenString
+          . T.singleton
+          <$> (MP.label "space inside block" $ MP.satisfy isSpace)
+      ]
+    parsers =
+      if isSrcBlock && nowebOn
+        then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
+        else baseParsers
+
+#+end_src
+
+The need to detect Noweb references is why ~baseParsers~ has individual (separate)
+parsers; having these smaller separate parsers breaks up the parsing of block
+tokens into multiple separate steps. That way, no single parser is too greedy
+and we can handle the edge cases such as in [[t:0007-blocks-noweb-intraline]].
+
+Along the same vein, it's important that the space parser (~MP.satisfy isSpace~)
+in ~baseParsers~ in [[f:bTokenParser]] does /not/ use ~MP.takeWhile1P~. Otherwise, it'll
+greedily consume all spaces including newlines, robbing it from the ending
+condition in ~someBTokensParser~ (where we expect a newline before ~#+end_~). The
+parser for the ~left angle bracket~ is there to take care of an edge case where a
+Noweb reference is immediately preceded by another left angle bracket ~<~; see
+[[t:0007-blocks-noweb-intraline]] for details.
+
+*** =nowebLinkParser=
+
+The last piece is the business of parsing Noweb references. A Noweb reference is
+surrounded by the double-angle-bracket delimiters =<<= and =>>=. The name itself can
+be anything other than a newline or angle brackets. We wrap this with =MP.try=,
+because we need to backtrack if we fail (after parsing, and consuming, the
+initial =<<= bit). Backtracking allows the other parsers in =baseParsers= to parse
+the remaining text that failed to be parsed as a valid Noweb link.
+
+#+name: f:nowebLinkParser
+#+begin_src haskell
+nowebLinkParser :: OrgParser Link
+nowebLinkParser = do
+  linkName <-
+    MP.between
+      (string "<<")
+      (string ">>")
+      ( MP.takeWhile1P
+          (Just "Noweb reference name")
+          (`notElem` ['\n', '<', '>'])
+      )
+  pure
+    $ Link
+      { typ = LinkNoweb,
+        target = linkName,
+        name =
+          [ StyledText
+              { body = linkName,
+                style = styleMaskFrom []
+              }
+          ]
+      }
+
+#+end_src
+
+Below we check a typical case with some Noweb references in it. Note that we
+have to set =#+header: :noweb off= here because otherwise Orgmode will think
+=<<foo>>= and =<<bar>>= are Noweb references that exist in this doc (=lilac.org=), and
+because they don't exist, will just result in those strings not being inserted
+into [[file:test/Lilac/ParseSpec/0007-blocks-noweb]].
 
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-noweb
 #+header: :noweb off
@@ -5071,8 +5061,8 @@ echo <<bar>> x y z
 ,#+end_src
 #+end_src
 
-Note how =<<quux= is not interpreted as a Noweb reference, because it doesn't end
-with =>>= on the same line.
+The ~<<quux~ is not interpreted as a Noweb reference, because it doesn't end
+with ~>>~ on the same line.
 
 #+name: t:0007-blocks-noweb
 #+begin_src haskell
@@ -5130,11 +5120,12 @@ p
 ]
 #+end_src
 
-We had to set =#+header: :noweb off= here as well, to avoid the =<<quux\n>>= bit
-from becoming interpreted as a Noweb reference.
+We have to set =#+header: :noweb off= in [[Expected blocks for 0007-blocks-noweb]] as
+well, to avoid the ~<<quux\n>>~ bit from becoming interpreted as a Noweb
+reference.
 
-Speaking of =#+header: :noweb off=, we also want to test this for Lilac as well.
-That is, if Lilac sees this header, it should not treat text that look like
+The test below checks the ~nowebOff~ boolean behavior from [[f:blockParser]]. That is,
+if Lilac sees =#+header: :noweb off=, it should not treat text that look like
 =<<foo>>= as a Noweb link, but as a literal =<<foo>>= string.
 
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-noweb-off
@@ -5186,67 +5177,90 @@ Because Lilac relies heavily on Noweb references (links), it will be turned on
 by default. So the only way to disable them would be to set =#+header: :noweb off=
 for each block where you'd want it disabled.
 
-*** Additional tests
+Sometimes we'll have Noweb references surrounded by punctuation. For example,
+see how we use ~<<GHC version>>~ in [[code:ghcVersion]]. This is a typical use case
+when the referenced block only has 1 line of text in it and we want to inject
+those contents into an existing line.
 
-Empty blocks are allowed.
-
-#+header: :tangle test/Lilac/ParseSpec/0007-blocks-empty
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-noweb-intraline
+#+header: :noweb off
 #+begin_src org
-,#+begin_src haskell
+,#+begin_src sh
+(<<foo>>) and "<<bar>>" and <<<ok>>>
 ,#+end_src
-
-,#+begin_example
-,#+end_example
-
-,#+begin_quote
-,#+end_quote
 #+end_src
 
-#+name: t:0007-blocks-empty
+#+name: t:0007-blocks-noweb-intraline
 #+begin_src haskell
 p
-  "0007-blocks-empty"
+  "0007-blocks-noweb-intraline"
   L.OrgDoc
     { cells =
-        <<Expected blocks for 0007-blocks-empty>>,
+        <<Expected blocks for 0007-blocks-noweb-intraline>>,
       code = [],
       codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
 
-#+name: Expected blocks for 0007-blocks-empty
+#+name: Expected blocks for 0007-blocks-noweb-intraline
+#+header: :noweb off
 #+begin_src haskell
 [ L.CBlock
     ( L.Block
         { meta =
             fromList
               [ ("__block_type", "src"),
-                ("__src_language", "haskell")
+                ("__src_language", "sh")
               ],
-          body = []
-        }
-    ),
-  L.CBlock
-    ( L.Block
-        { meta =
-            fromList
-              [ ("__block_type", "example")
-              ],
-          body = []
-        }
-    ),
-  L.CBlock
-    ( L.Block
-        { meta =
-            fromList
-              [ ("__block_type", "quote")
-              ],
-          body = []
+          body =
+            [ L.BTokenString "(",
+              L.BTokenLink
+                ( L.Link
+                    { typ = L.LinkNoweb,
+                      target = "foo",
+                      name =
+                        [ L.StyledText
+                            { body = "foo",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              L.BTokenString ") and \"",
+              L.BTokenLink
+                ( L.Link
+                    { typ = L.LinkNoweb,
+                      target = "bar",
+                      name =
+                        [ L.StyledText
+                            { body = "bar",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              L.BTokenString "\" and <",
+              L.BTokenLink
+                ( L.Link
+                    { typ = L.LinkNoweb,
+                      target = "ok",
+                      name =
+                        [ L.StyledText
+                            { body = "ok",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              L.BTokenString ">"
+            ]
         }
     )
 ]
 #+end_src
+
+*** Additional tests
 
 A =#+begin_src= without an accompanying language should trigger an error.
 
@@ -5264,41 +5278,65 @@ pf
   11
 #+end_src
 
-Check that we can parse block metadata.
+Below we test the edge cases around detecting the end of a block.
 
-#+header: :tangle test/Lilac/ParseSpec/0007-blocks-metadata
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-ending
 #+begin_src org
-,#+name: some-code
-,#+begin_src haskell
+,#+name: empty
+,#+begin_src sh
 ,#+end_src
 
-,#+name: some-example
-,#+begin_example
+,#+name: end not in beginning of line
+,#+begin_src sh
+ ,#+end_src
+,#+end_src
+
+,#+name: end has no preceding blank line
+,#+begin_src sh
+foo
+,#+end_src
+
+,#+name: end has preceding blank line
+,#+begin_src sh
+foo
+
+,#+end_src
+
+,#+name: end has preceding newline (multiple)
+,#+begin_src sh
+foo
+
+
+,#+end_src
+
+,#+name: ignore #+end_example because this is a src block
+,#+begin_src sh
 ,#+end_example
+,#+end_src
 #+end_src
 
-#+name: t:0007-blocks-metadata
+#+name: t:0007-blocks-ending
 #+begin_src haskell
 p
-  "0007-blocks-metadata"
+  "0007-blocks-ending"
   L.OrgDoc
     { cells =
-        <<Expected blocks for 0007-blocks-metadata>>,
+        <<Expected blocks for 0007-blocks-ending>>,
       code = [],
       codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
 
-#+name: Expected blocks for 0007-blocks-metadata
+#+name: Expected blocks for 0007-blocks-ending
 #+begin_src haskell
 [ L.CBlock
     ( L.Block
         { meta =
             fromList
               [ ("__block_type", "src"),
-                ("__src_language", "haskell"),
-                ("name", "some-code")
+                ("__src_language", "sh"),
+                ("name", "empty")
               ],
           body = []
         }
@@ -5307,10 +5345,55 @@ p
     ( L.Block
         { meta =
             fromList
-              [ ("__block_type", "example"),
-                ("name", "some-example")
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("name", "end not in beginning of line")
               ],
-          body = []
+          body = [L.BTokenString " #+end_src"]
+        }
+    ),
+  L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("name", "end has no preceding blank line")
+              ],
+          body = [L.BTokenString "foo"]
+        }
+    ),
+  L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("name", "end has preceding blank line")
+              ],
+          body = [L.BTokenString "foo\n"]
+        }
+    ),
+  L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("name", "end has preceding newline (multiple)")
+              ],
+          body = [L.BTokenString "foo\n\n"]
+        }
+    ),
+  L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh"),
+                ("name", "ignore #+end_example because this is a src block")
+              ],
+          body = [L.BTokenString "#+end_example"]
         }
     )
 ]
@@ -7617,9 +7700,9 @@ spec = do
   <<t:0007-block-src-without-lang>>
   <<t:0007-blocks-empty>>
   <<t:0007-blocks-ending>>
-  <<t:0007-blocks-metadata>>
   <<t:0007-blocks-noweb-off>>
   <<t:0007-blocks-noweb>>
+  <<t:0007-blocks-noweb-intraline>>
   <<t:0008-indentation-comment>>
   <<t:0008-indentation-headings>>
   <<t:0008-indentation-paragraph>>
