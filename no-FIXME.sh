@@ -19,7 +19,8 @@ main()
 	fi
 
 	if grep --line-number '^FIXME' ./*.org; then
-		echo >&2 "$0: FIXME marker(s) found --- please remove"
+		echo >&2 -n "$0: FIXME marker(s) found; "
+		echo >&2 "please remove marker(s) or prefix commit title with 'wip'"
 		return 1
 	fi
 
