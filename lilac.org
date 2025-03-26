@@ -1222,6 +1222,7 @@ Nixkell
 Nixpkgs
 Noweb
 Orgmode
+prepend
 quux
 Relude
 sandbox
@@ -1823,6 +1824,9 @@ import Prelude qualified (show)
 <<f:bTokenParser>>
 <<f:nowebLinkParser>>
 <<f:compressBTokens>>
+<<f:zeroIndent>>
+<<f:someIndent>>
+<<f:getContinuationIndentForLevel>>
 <<f:listItemsEndParser>>
 <<f:listHeadIndentLevelParser>>
 <<f:listItemStartParser>>
@@ -5651,12 +5655,13 @@ us parse things into a single global list of cells in [[f:cellParser]], without 
 need to nest them inside a recursive data structure (as shown in
 https://markkarpov.com/tutorial/megaparsec.html#nested-indented-list).
 
-*** Parsing the end of a list
+*** Parsing initial indentation to close list items
 
 Before getting into parsing the list items and taking into account all of the
 [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][detailed rules]], let's first consider case where we just want to /close off/ the
-list items. Closing off just means knowing if we need to insert appropriate
-ending markers:
+list items. We want to do this every time we parse initial indentation; i.e.,
+before we think about creating list items, we first have to close off existing
+ones, depending on the amount of indentation:
 
   1) if there is no indentation, we close off /all/ list items;
 
@@ -5672,11 +5677,93 @@ and don't need to close off anything. That's why this situation is not listed
 above.
 
 Point 1 is captured by =zeroIndent= in [[f:listItemsEndParser]]. Points 2 and 3 are
-captured by =someIndent= in the same function. For =someIndent=, we just try to
-line up the amount of indentation with the existing list levels we have and how
-much indentation they expect. Once we determine the amount of levels we need to
-close off, we just go through the list markers we've already seen
-in =listMarkers= and close them off by using =getEndingMarker=.
+captured by =someIndent= in the same function.
+
+#+name: f:zeroIndent
+#+begin_src haskell
+zeroIndent :: OrgParser (Int, Int)
+zeroIndent = do
+  orgParserState <- get
+  _ <- MP.eof <|> MP.notFollowedBy (char ' ')
+  let listLevelsToClose = length orgParserState.listLevels
+      continuationIndent = 0 :: Int
+  pure (listLevelsToClose, continuationIndent)
+
+#+end_src
+
+In [[f:zeroIndent]] we return the number of list levels to close off (in this case
+all levels that we've detected so far), and the continuation indent. The
+continuation indent is used by other parsers such as the [[f:paragraphParser]] to
+see how to join up multiple lines into the same cell, assuming those lines have
+the same continuation indent (the lines /continue/ if it's the same indent, hence
+the name). For the case of [[f:zeroIndent]], we set the continuation indent to 0
+because there is no indentation, and any subsequent lines belonging to the same
+cell should /not/ have any indentation (it is considered invalid input if we see
+surprise indentation; see [[t:0005-paragraph-indentation-mismatch-over]]).
+
+For =someIndent=, we just try to line up the amount of indentation found with the
+existing list levels we have and how much indentation they expect.
+
+#+name: f:someIndent
+#+begin_src haskell
+someIndent :: OrgParser (Int, Int)
+someIndent = do
+  orgParserState <- get
+  indentFound <- T.length <$> MP.takeWhile1P (Just "indentation") (== ' ')
+  let existingLevels = orgParserState.listLevels
+      levelsToDropPerIndentationIncrement :: [(Int, Int)]
+      levelsToDropPerIndentationIncrement =
+        zip [0 ..]
+          . map getContinuationIndentForLevel
+          $ existingLevels
+      matchingIndent =
+        find
+          (\(_, continuationIndent) -> indentFound == continuationIndent)
+          levelsToDropPerIndentationIncrement
+  case matchingIndent of
+    Nothing -> fail "indentation does not fit into existing levels"
+    Just x -> pure x
+
+#+end_src
+
+It should be noted that the ~existingLevels~ is grown by prepending to the list in
+[[f:listItemNester]]. So the most-deeply-nested level will be at the head of the
+list in ~orgParserState.listLevels~. That's why we use ~zip [0 ..]~ --- we want to
+drop 0 levels if we see indentation matching the most deeply-nested list item.
+
+The [[f:getContinuationIndentForLevel]] just computes the total indentation for a
+list level. For example, in
+
+#+begin_src org
+  1) foo
+#+end_src
+
+we compute the initial 2 spaces before the ~1)~, the ~1)~ itself (two characters),
+plus a space character, or a total continuation indent of 5. The dynamic portion
+here is the number, which will grow as the list grows (e.g., ~10)~ will have a
+total continuation indent of 6), which is why we use a function here instead of
+a constant.
+
+#+name: f:getContinuationIndentForLevel
+#+begin_src haskell
+getContinuationIndentForLevel :: Level -> Int
+getContinuationIndentForLevel level = level.indent + maybeNum + punctuation + space
+  where
+    punctuation :: Int
+    punctuation = 1
+    space :: Int
+    space = 1
+    maybeNum :: Int
+    maybeNum = case level.number of
+      Just n -> length $ (show n :: String)
+      Nothing -> 0
+
+#+end_src
+
+Once we determine the amount of levels we need to close off (by parsing
+[[f:zeroIndent]] or [[f:someIndent]]), we just go through the list markers we've already
+seen in =listMarkers= and close them off (via ~getEndingListMarker~). This is what
+we do in [[f:listItemsEndParser]].
 
 #+name: f:listItemsEndParser
 #+begin_src haskell
@@ -5690,7 +5777,7 @@ listItemsEndParser = do
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
   let markersToDrop = levelsToDrop * 2
   markers <-
-    mapM getEndingMarker
+    mapM getEndingListMarker
       $ take markersToDrop orgParserState.listMarkers
   put
     orgParserState
@@ -5700,8 +5787,8 @@ listItemsEndParser = do
       }
   pure $ CListItem markers
   where
-    getEndingMarker :: (MonadFail m) => ListMarker -> m ListMarker
-    getEndingMarker = \case
+    getEndingListMarker :: (MonadFail m) => ListMarker -> m ListMarker
+    getEndingListMarker = \case
       LOrderedStart -> pure LOrderedEnd
       LUnorderedStart -> pure LUnorderedEnd
       LItemStart -> pure LItemEnd
@@ -5710,29 +5797,6 @@ listItemsEndParser = do
           $ "programmer error: list marker "
           <> (show lm)
           <> " is not supported"
-    zeroIndent :: OrgParser (Int, Int)
-    zeroIndent = do
-      orgParserState <- get
-      _ <- MP.eof <|> MP.notFollowedBy (char ' ')
-      pure (length orgParserState.listLevels, 0)
-    someIndent :: OrgParser (Int, Int)
-    someIndent = do
-      orgParserState <- get
-      spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
-      let existingLevels = orgParserState.listLevels
-          levelsToDropPerIndentationIncrement :: [(Int, Int)]
-          levelsToDropPerIndentationIncrement =
-            zip [0 ..]
-              . map getBodyIndent
-              $ existingLevels
-          indent = T.length spaces
-          matchingIndent =
-            find
-              (\(_, bodyIndent) -> indent == bodyIndent)
-              levelsToDropPerIndentationIncrement
-      case matchingIndent of
-        Nothing -> fail "indentation does not fit into existing levels"
-        Just x -> pure x
 
 #+end_src
 
@@ -5752,9 +5816,13 @@ add 2 for each level (see [[f:listItemNester]]).
 If we detect the maximum allowed indentation, then there are no levels to drop,
 and hence, we'll end up returning =CListItem []= which doesn't hold any meaning.
 Avoiding this is a bit difficult; if we just fail the parser outright, then the
-amount of parsed indentation will have to be parsed by another downstream
-parser. So, instead we just return =CListItem []= and then filter these out in
-[[f:orgDocParser]].
+amount of parsed indentation will have to be parsed by another downstream parser
+(this can get messy). So instead we just return =CListItem []= and then filter
+these out in [[f:orgDocParser]]. This way we decide once and for all how to deal
+with leading indentation (and how this closes off existing list items) in
+[[f:listItemsEndParser]].
+
+*** Parsing the start of a list
 
 Now consider the case where we see some indentation along with a list
 head (ordered or unordered). This task is straightforward, as we just want to
@@ -5804,7 +5872,7 @@ listHeadIndentLevelParser = do
     seeingContentAfterListHead level = do
       _ <- char ' '
       MP.notFollowedBy (char ' ')
-      modify (\s -> s {continuationIndent = getBodyIndent level})
+      modify (\s -> s {continuationIndent = getContinuationIndentForLevel level})
     minimalIndentation :: OrgParser ()
     minimalIndentation =
       void
@@ -5877,25 +5945,13 @@ listItemStartParser = do
         | otherwise -> Left "expected UNORDERED list item at this level"
     nests :: Int -> [Level] -> Bool
     nests _ [] = True
-    nests indent (level : _) = indent == getBodyIndent level
-
-getBodyIndent :: Level -> Int
-getBodyIndent level = level.indent + maybeNum + punctuation + space
-  where
-    punctuation :: Int
-    punctuation = 1
-    space :: Int
-    space = 1
-    maybeNum :: Int
-    maybeNum = case level.number of
-      Just n -> length $ (show n :: String)
-      Nothing -> 0
+    nests indent (level : _) = indent == getContinuationIndentForLevel level
 
 #+end_src
 
 =listItemStartParser= checks to see whether the list item is indenting into a new,
 /nested/ list (via [[f:listItemNester]]), or whether the list item is merely
-continuing some existing list (via [[f:listItemFitter]]). The =getBodyIndent=
+continuing some existing list (via [[f:listItemFitter]]). The =getContinuationIndentForLevel=
 function just computes what the indentation would have to be for some body of
 text for it to be considered part of the item.
 

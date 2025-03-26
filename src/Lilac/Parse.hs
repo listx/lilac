@@ -945,6 +945,44 @@ compressBTokens = reverse . foldl' f []
       (BTokenString $ T.append text1 text2) : rest
     f acc token = token : acc
 
+zeroIndent :: OrgParser (Int, Int)
+zeroIndent = do
+  orgParserState <- get
+  _ <- MP.eof <|> MP.notFollowedBy (char ' ')
+  let listLevelsToClose = length orgParserState.listLevels
+      continuationIndent = 0 :: Int
+  pure (listLevelsToClose, continuationIndent)
+
+someIndent :: OrgParser (Int, Int)
+someIndent = do
+  orgParserState <- get
+  indentFound <- T.length <$> MP.takeWhile1P (Just "indentation") (== ' ')
+  let existingLevels = orgParserState.listLevels
+      levelsToDropPerIndentationIncrement :: [(Int, Int)]
+      levelsToDropPerIndentationIncrement =
+        zip [0 ..]
+          . map getContinuationIndentForLevel
+          $ existingLevels
+      matchingIndent =
+        find
+          (\(_, continuationIndent) -> indentFound == continuationIndent)
+          levelsToDropPerIndentationIncrement
+  case matchingIndent of
+    Nothing -> fail "indentation does not fit into existing levels"
+    Just x -> pure x
+
+getContinuationIndentForLevel :: Level -> Int
+getContinuationIndentForLevel level = level.indent + maybeNum + punctuation + space
+  where
+    punctuation :: Int
+    punctuation = 1
+    space :: Int
+    space = 1
+    maybeNum :: Int
+    maybeNum = case level.number of
+      Just n -> length $ (show n :: String)
+      Nothing -> 0
+
 listItemsEndParser :: OrgParser Cell
 listItemsEndParser = do
   orgParserState <- get
@@ -955,7 +993,7 @@ listItemsEndParser = do
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
   let markersToDrop = levelsToDrop * 2
   markers <-
-    mapM getEndingMarker
+    mapM getEndingListMarker
       $ take markersToDrop orgParserState.listMarkers
   put
     orgParserState
@@ -965,8 +1003,8 @@ listItemsEndParser = do
       }
   pure $ CListItem markers
   where
-    getEndingMarker :: (MonadFail m) => ListMarker -> m ListMarker
-    getEndingMarker = \case
+    getEndingListMarker :: (MonadFail m) => ListMarker -> m ListMarker
+    getEndingListMarker = \case
       LOrderedStart -> pure LOrderedEnd
       LUnorderedStart -> pure LUnorderedEnd
       LItemStart -> pure LItemEnd
@@ -975,29 +1013,6 @@ listItemsEndParser = do
           $ "programmer error: list marker "
           <> (show lm)
           <> " is not supported"
-    zeroIndent :: OrgParser (Int, Int)
-    zeroIndent = do
-      orgParserState <- get
-      _ <- MP.eof <|> MP.notFollowedBy (char ' ')
-      pure (length orgParserState.listLevels, 0)
-    someIndent :: OrgParser (Int, Int)
-    someIndent = do
-      orgParserState <- get
-      spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
-      let existingLevels = orgParserState.listLevels
-          levelsToDropPerIndentationIncrement :: [(Int, Int)]
-          levelsToDropPerIndentationIncrement =
-            zip [0 ..]
-              . map getBodyIndent
-              $ existingLevels
-          indent = T.length spaces
-          matchingIndent =
-            find
-              (\(_, bodyIndent) -> indent == bodyIndent)
-              levelsToDropPerIndentationIncrement
-      case matchingIndent of
-        Nothing -> fail "indentation does not fit into existing levels"
-        Just x -> pure x
 
 listHeadIndentLevelParser :: OrgParser Level
 listHeadIndentLevelParser = do
@@ -1036,7 +1051,7 @@ listHeadIndentLevelParser = do
     seeingContentAfterListHead level = do
       _ <- char ' '
       MP.notFollowedBy (char ' ')
-      modify (\s -> s {continuationIndent = getBodyIndent level})
+      modify (\s -> s {continuationIndent = getContinuationIndentForLevel level})
     minimalIndentation :: OrgParser ()
     minimalIndentation =
       void
@@ -1080,19 +1095,7 @@ listItemStartParser = do
         | otherwise -> Left "expected UNORDERED list item at this level"
     nests :: Int -> [Level] -> Bool
     nests _ [] = True
-    nests indent (level : _) = indent == getBodyIndent level
-
-getBodyIndent :: Level -> Int
-getBodyIndent level = level.indent + maybeNum + punctuation + space
-  where
-    punctuation :: Int
-    punctuation = 1
-    space :: Int
-    space = 1
-    maybeNum :: Int
-    maybeNum = case level.number of
-      Just n -> length $ (show n :: String)
-      Nothing -> 0
+    nests indent (level : _) = indent == getContinuationIndentForLevel level
 
 listItemNester :: Level -> [Level] -> [ListMarker] -> OrgParser [ListMarker]
 listItemNester level levels markers = do
