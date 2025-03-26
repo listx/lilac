@@ -1300,6 +1300,10 @@ spec = do
     "0009-ordered-lists-start-from-0-or-1"
     "starting list head number must be 0 or 1; got 20"
     25
+  pfm
+    "0009-ordered-list-head-needs-parenthesis"
+    (utoks "." <> etoks ")" <> elabel "ordered list number")
+    3
   p
     "0009-paragraph-can-close-deeper-levels"
     L.OrgDoc

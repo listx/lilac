@@ -5464,16 +5464,34 @@ ordered list items, which are important for parsing:
      to have nested list items) depends on where the text began in the parent
      item. See items "5)" and "10)" below for examples.
 
+     - [[t:0009-list-indentation-no-indent]]
+
+     - [[t:0009-list-indentation-proper-indent]]
+
   2) List items must be separate from each other with a blank line. This makes
      them easier to read when reading the Org file in plain text.
 
+     - [[t:0009-list-items-need-blank-line-separator]]
+
   3) Additional hard-wrapped lines for a list item must be aligned with the text
      of the first line. This list item is an example of such a line.
+
+     - [[t:0005-paragraph-indentation-mismatch-over-list-body]]
+
+     - [[t:0005-paragraph-indentation-mismatch-over]]
+
+     - [[t:0005-paragraph-indentation-mismatch-under-list-body]]
+
+     - [[t:0005-paragraph-indentation-mismatch-initial-indent-invalid]]
+
+     - [[t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels]]
 
   4) List items can have more than one paragraph associated with them.
 
      This is an example of another paragraph which is still part of the "4)"
      list item, and has 5 spaces of indentation.
+
+     - [[t:0009-list-content-simple]]
 
   5) List items can be nested.
 
@@ -5482,10 +5500,22 @@ ordered list items, which are important for parsing:
         "L" in "5) List" in the parent item. Subsequent lines of this paragraph
         have 8 spaces of indentation to line up with the text above it.
 
+     See:
+
+     - [[t:0009-list-indentation-nested]]
+
+     - [[t:0009-list-indentation-nested-with-text]]
+
+     - [[t:0009-paragraph-can-close-deeper-levels]]
+
   6) Unlike Markdown, the numbers of the list item must increase by one if there
      are additional items at the same level. The first number of a level may
      start from any non-negative number; for example, 0, 1, 5, 12 are all valid
      starting numbers.
+
+     - [[t:0009-ordered-lists-require-increment]]
+
+     - [[t:0009-ordered-lists-start-from-0-or-1]]
 
   7) The format for ordered list items requires a closing parenthesis
      immediately after the number. So =1)= is valid, but =1.= is invalid.
@@ -5502,17 +5532,25 @@ ordered list items, which are important for parsing:
       paragraphs in item "4)" above, which uses 5 spaces.
 
       1) Similarly, this child item has text which has 9 spaces of indentation,
-         unlike the 8 spaces of indentation in the child item under item "5)"
-         above.
+         unlike the 8 spaces of indentation in the ordered child item under item
+         "5)" above.
+
+      See:
+
+      - [[t:0009-lists-require-precise-indentation]]
 
   11) There can only be up to 5 additional levels of nesting (for a total of 6
-      levels of items). This is because excessive nesting is an anti-pattern. If
-      you need more levels, consider using headings instead (which can have an
-      arbitrary level of nesting).
+      levels of items). This is because excessive nesting is an anti-pattern.
 
   12) Ordered list items may have unordered list items (discussed next) as
       children, and vice versa. However you may not mix the two types of items
       at the same level.
+
+      - [[t:0009-paragraph-can-separate-mixed-lists]]
+
+      - [[t:0009-lists-cannot-be-mixed-on-their-own]]
+
+      - [[t:0009-lists-cannot-be-mixed-on-their-own-ordered]]
 
   13) A list item may include a table. However the table cannot be on the same
       line as the list item head. Below is an example of such a table:
@@ -6110,6 +6148,10 @@ p
     }
 #+end_src
 
+The list-like text is parsed as plain paragraphs in
+[[t:0009-list-indentation-no-indent]], because the lack of indentation means we
+don't recognize the ~1)~ and ~2)~ as list items.
+
 Here's a list with the (proper) 2-space indent.
 
 #+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-proper-indent
@@ -6142,6 +6184,21 @@ p
       codeBlocks = fromList [],
       meta = fromList []
     }
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0009-ordered-list-head-needs-parenthesis
+#+begin_src org
+  1.
+
+  2.
+#+end_src
+
+#+name: t:0009-ordered-list-head-needs-parenthesis
+#+begin_src haskell
+pfm
+  "0009-ordered-list-head-needs-parenthesis"
+  (utoks "." <> etoks ")" <> elabel "ordered list number")
+  3
 #+end_src
 
 Here's a nested example.
@@ -6214,8 +6271,7 @@ p
     }
 #+end_src
 
-That's just for the structural portion. Now we test whether list items can also
-hold content (other cells) inside it.
+Now we test whether list items can also hold content (other cells) inside it.
 
 #+header: :tangle test/Lilac/ParseSpec/0009-list-content-simple
 #+begin_src org
@@ -6363,7 +6419,8 @@ pfm
   14
 #+end_src
 
-The same rule about keeping the same indentation applies for plain paragraphs.
+The same rule about keeping the same indentation applies for plain paragraphs
+outside of list environments.
 
 #+header: :tangle test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-over
 #+begin_src org
@@ -6398,7 +6455,7 @@ pfm
   12
 #+end_src
 
-If we have some number of list levels already, then the paragraph must start at
+If we have some number of list levels already, then the paragraph must fit into
 one of those levels (it cannot have some arbitrary level of indentation) if
 there is non-zero indentation.
 
@@ -7843,6 +7900,7 @@ spec = do
   <<t:0009-lists-require-precise-indentation>>
   <<t:0009-ordered-lists-require-increment>>
   <<t:0009-ordered-lists-start-from-0-or-1>>
+  <<t:0009-ordered-list-head-needs-parenthesis>>
   <<t:0009-paragraph-can-close-deeper-levels>>
   <<t:0009-paragraph-can-separate-mixed-lists>>
   <<t:0010-standalone-math-fragments>>
