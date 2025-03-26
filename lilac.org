@@ -1829,6 +1829,8 @@ import Prelude qualified (show)
 <<f:getContinuationIndentForLevel>>
 <<f:listItemsEndParser>>
 <<f:listHeadIndentLevelParser>>
+<<f:orderedHeadParser>>
+<<f:unorderedHeadParser>>
 <<f:listItemStartParser>>
 <<f:listItemNester>>
 <<f:listItemFitter>>
@@ -5656,12 +5658,25 @@ need to nest them inside a recursive data structure (as shown in
 https://markkarpov.com/tutorial/megaparsec.html#nested-indented-list).
 
 *** Parsing initial indentation to close list items
+:PROPERTIES:
+:ID:       5990dd7f-2f37-4a9e-96ea-6cc6b2e20dc0
+:END:
 
 Before getting into parsing the list items and taking into account all of the
 [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][detailed rules]], let's first consider case where we just want to /close off/ the
-list items. We want to do this every time we parse initial indentation; i.e.,
-before we think about creating list items, we first have to close off existing
-ones, depending on the amount of indentation:
+list items, as this is simpler than creating list items. We want to do this
+every time we parse initial indentation where there is no list head. For
+example, in the following
+
+  1) a
+
+     - b
+
+     c
+
+the indentation for paragraph =c= should by itself close off the preceding
+unordered list item (~- b~). We can close off existing list items depending on the
+amount of indentation:
 
   1) if there is no indentation, we close off /all/ list items;
 
@@ -5822,16 +5837,46 @@ these out in [[f:orgDocParser]]. This way we decide once and for all how to deal
 with leading indentation (and how this closes off existing list items) in
 [[f:listItemsEndParser]].
 
-*** Parsing the start of a list
+*** Parsing list heads
 
-Now consider the case where we see some indentation along with a list
-head (ordered or unordered). This task is straightforward, as we just want to
-see some number of spaces, followed by a dash for unordered lists or a number
-and closing parenthesis for ordered lists. For both cases we also parse an
-additional space at the end to separate this list head from the body. For
-ordered list heads, we can check if the number looks like an Int with =readMaybe=.
+In the [[id:5990dd7f-2f37-4a9e-96ea-6cc6b2e20dc0][previous section]] we considered how to close off list items based purely
+on indentation. Parsing list heads is similar (because list heads can also close
+off list items), but more complicated because we also have to take into account
+how to create list items (list levels). This means we have to deal with all of
+the possible values of [[data:ListMarker]] here.
 
-These considerations are encoded in =listHeadIndentLevelParser= below.
+Parsing the list head (and therefore the [[data:Level]] of a list item) is
+straightforward. For unordered lists we just want to see a dash.
+
+#+name: f:unorderedHeadParser
+#+begin_src haskell
+unorderedHeadParser :: OrgParser (Maybe Int)
+unorderedHeadParser = do
+  _ <- char '-'
+  pure Nothing
+
+#+end_src
+
+For ordered lists we want to see the number and closing parenthesis.
+
+#+name: f:orderedHeadParser
+#+begin_src haskell
+orderedHeadParser :: OrgParser (Maybe Int)
+orderedHeadParser = do
+  num <- MP.takeWhile1P (Just "ordered list number") isDigit
+  _ <- char ')'
+  let n = readMaybe (T.unpack num) :: Maybe Int
+  when (isNothing n) $ do
+    fail $ "could not parse " <> show (T.unpack num) <> " as Int"
+  pure n
+
+#+end_src
+
+We check if the number looks like an =Int= with =readMaybe=.
+
+For both cases we also parse leading indentation and also an additional space at
+the end to separate the list head from the body. These considerations are
+encoded in =listHeadIndentLevelParser= below.
 
 #+name: f:listHeadIndentLevelParser
 #+begin_src haskell
@@ -5839,7 +5884,7 @@ listHeadIndentLevelParser :: OrgParser Level
 listHeadIndentLevelParser = do
   minimalIndentation
   spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
-  listHead <- orderedHeadParser <|> unorderedHeadParser
+  listHead <- unorderedHeadParser <|> orderedHeadParser
   let level =
         Level
           { indent = T.length spaces,
@@ -5848,18 +5893,13 @@ listHeadIndentLevelParser = do
   afterListHead level
   pure level
   where
-    orderedHeadParser :: OrgParser (Maybe Int)
-    orderedHeadParser = do
-      num <- MP.takeWhile1P (Just "ordered list number") isDigit
-      _ <- char ')'
-      let n = readMaybe (T.unpack num) :: Maybe Int
-      when (isNothing n) $ do
-        fail $ "could not parse " <> show (T.unpack num) <> " as Int"
-      pure n
-    unorderedHeadParser :: OrgParser (Maybe Int)
-    unorderedHeadParser = do
-      _ <- char '-'
-      pure Nothing
+    minimalIndentation :: OrgParser ()
+    minimalIndentation =
+      void
+        . MP.try
+        . MP.lookAhead
+        . MP.label "minimal indentation"
+        $ MP.count 2 (char ' ')
     afterListHead :: Level -> OrgParser ()
     afterListHead level =
       void
@@ -5873,36 +5913,32 @@ listHeadIndentLevelParser = do
       _ <- char ' '
       MP.notFollowedBy (char ' ')
       modify (\s -> s {continuationIndent = getContinuationIndentForLevel level})
-    minimalIndentation :: OrgParser ()
-    minimalIndentation =
-      void
-        . MP.try
-        . MP.lookAhead
-        . MP.label "minimal indentation"
-        $ MP.count 2 (char ' ')
 
 #+end_src
 
+The ~minimalIndentation~ expects there to be at least 2 spaces preceding a list
+item. This follows Rule 1 from [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][Detailed rules]].
+
 The =afterListHead= parser preemptively checks what's in the input /after/ parsing
 the list head. In the case where it sees some other non-empty content, it
-expects some other parser) to continue parsing. So inside
+expects some other parser to continue parsing. So inside
 =seeingContentAfterListHead= we set the =continuationIndent= attribute to
 indentation of the current level, because we expect another parser to help us
-finish parsing the line. Then at the [[f:cellParser]] level, we set this back to
-=0= for any parser that is expected to consume content and end with a newline.
-This lets [[f:listItemsEndParser]] know whether it is looking at EOF or at the
-beginning of a line with some content in it in its =seeingContentAfterListHead=
-function. If Megaparsec let us easily check the previous character that was
-parsed, this scheme using a stateful =continuationIndent= field wouldn't be
-necessary.
+finish parsing the line. Then at the [[f:cellParser]] level, we set this back to =0=
+for any parser that is expected to consume content and end with a newline. This
+lets [[f:listItemsEndParser]] know whether it is looking at EOF or at the beginning
+of a line when it inspects =continuationIndent=. If Megaparsec can let us easily
+check the previous character that was parsed, this scheme of using a stateful
+=continuationIndent= field wouldn't be necessary.
 
-Note, however, that this only checks for textual correctness. It doesn't check
-whether what's parsed is semantically correct. For example, we wouldn't want to
-blindly parse the number of spaces in the indent (instead we would want to check
-which indents are expected, given any previous list items). Similarly we
-would want to check whether the list head number (for ordered lists) is the
-expected (incremented) number from the previously-seen list head number, if any
-(or if there is no previous number, that this number is 0 or 1).
+Note, however, that [[f:listHeadIndentLevelParser]] only checks for textual
+correctness. It doesn't check whether what's parsed is semantically correct. For
+example, we wouldn't want to blindly parse the number of spaces in the indent
+(instead we would want to check which indents are expected, given any previous
+list items). Similarly we would want to check whether the list head number (for
+ordered lists) is the expected (incremented) number from the previously-seen
+list head number, if any (or if there is no previous number, that this number is
+0 or 1).
 
 We have to perform these additional checks by comparing the output of
 =listHeadIndentLevelParser= against the existing [[data:OrgParserState]] (=listLevels=).
@@ -5915,57 +5951,45 @@ listItemStartParser = do
   _ <- MP.try $ MP.lookAhead listHeadIndentLevelParser
   orgParserState <- get
   let levels = orgParserState.listLevels
-      markers = orgParserState.listMarkers
   level <- listHeadIndentLevelParser
   listMarkers <-
-    if
-      | nests level.indent levels -> listItemNester level levels markers
-      | otherwise -> case fits level levels of
-          Right True -> listItemFitter level levels
-          Right False -> fail "list item: invalid indentation"
-          Left msg -> fail msg
+    if nestsBeyond levels level
+      then listItemNester level levels
+      else listItemFitter level levels
   pure $ CListItem listMarkers
   where
-    fits :: Level -> [Level] -> Either String Bool
-    fits level levels = case find (\l -> l.indent == level.indent) levels of
-      Nothing -> Right False
-      Just lvl
-        | isJust level.number && isJust lvl.number ->
-            let expectedNum = fmap (+ 1) lvl.number
-             in if level.number == expectedNum
-                  then Right True
-                  else
-                    Left
-                      $ "expected incremented list head "
-                      <> (show . fromJust $ expectedNum)
-                      <> " but got "
-                      <> (show . fromJust $ level.number)
-        | isNothing level.number && isNothing lvl.number -> Right True
-        | isJust lvl.number -> Left "expected ORDERED list item at this level"
-        | otherwise -> Left "expected UNORDERED list item at this level"
-    nests :: Int -> [Level] -> Bool
-    nests _ [] = True
-    nests indent (level : _) = indent == getContinuationIndentForLevel level
+    nestsBeyond :: [Level] -> Level -> Bool
+    nestsBeyond [] _ = True
+    nestsBeyond (deepestLevel : _) level =
+      getContinuationIndentForLevel deepestLevel == level.indent
 
 #+end_src
 
-=listItemStartParser= checks to see whether the list item is indenting into a new,
-/nested/ list (via [[f:listItemNester]]), or whether the list item is merely
-continuing some existing list (via [[f:listItemFitter]]). The =getContinuationIndentForLevel=
-function just computes what the indentation would have to be for some body of
-text for it to be considered part of the item.
+The first line ~_ <- MP.try $ MP.lookAhead listHeadIndentLevelParser~ is needed
+because otherwise as soon as Megaparsec sees any indentation (as part of
+invoking [[f:listHeadIndentLevelParser]]) it will expect to see a list head;
+obviously this is not always the case as not all indentation leads to a list
+head. This is why we have to perform this look-ahead preemptively.
+
+The ~nestsBeyond~ function just checks whether the indentation we found in the
+(just-parsed) level is the same as the continuation indent of the
+most-deeply-nested level we have so far. This is how we nest one level deeper
+than the current level. If this is the case, we delegate to [[f:listItemNester]].
+
+Otherwise the list item is merely continuing some existing list, for which we
+delegate to [[f:listItemFitter]].
+
+*** Nesting the list item beyond the deepest existing level
 
 =listItemNester= appends starting markers to =listMarkers=. We use this information
-in other places when we want to know how to un-nest and item (close it off),
-where we'll add corresponding closing markers with =getEndingMarker= in
-[[f:listItemsEndParser]].
+in other places when we want to know how to un-nest an item (close it off),
+such as in [[f:listItemsEndParser]] where we add corresponding closing markers with
+=getEndingMarker=. The other place we use =listMarkers= is in [[f:listItemFitter]].
 
 #+name: f:listItemNester
 #+begin_src haskell
-listItemNester :: Level -> [Level] -> [ListMarker] -> OrgParser [ListMarker]
-listItemNester level levels markers = do
-  when (null levels && level.indent /= 2) $ do
-    fail "starting indent must be 2 spaces"
+listItemNester :: Level -> [Level] -> OrgParser [ListMarker]
+listItemNester level levels = do
   case level.number of
     Just 0 -> pure ()
     Just 1 -> pure ()
@@ -5978,13 +6002,18 @@ listItemNester level levels markers = do
   put
     orgParserState
       { listLevels = level : levels,
-        listMarkers = LItemStart : newMarker : markers
+        listMarkers = LItemStart : newMarker : orgParserState.listMarkers
       }
   pure $ case level.number of
     Just _ -> [LOrderedStart, LItemStart]
     Nothing -> [LUnorderedStart, LItemStart]
 
 #+end_src
+
+We enforce some additional rules here, such as forcing the nesting list head
+to start off with either 0 or 1 (see [[t:0009-ordered-lists-start-from-0-or-1]]).
+
+*** Fitting the list item into an existing level
 
 The goal of [[f:listItemFitter]] is twofold:
 
@@ -6018,8 +6047,25 @@ first, to close them off if the level we have at hand doesn't "fit" into it.
 #+name: f:listItemFitter
 #+begin_src haskell
 listItemFitter :: Level -> [Level] -> OrgParser [ListMarker]
-listItemFitter level levels' = foldlM f [] levels'
+listItemFitter level levels = case find (\l -> l.indent == level.indent) levels of
+  Nothing -> fail "list item: invalid indentation"
+  Just lvl
+    | isJust level.number && isJust lvl.number ->
+        let expectedNum = fmap (+ 1) lvl.number
+         in if level.number == expectedNum
+              then fitter
+              else
+                fail
+                  $ "expected incremented list head "
+                  <> (show . fromJust $ expectedNum)
+                  <> " but got "
+                  <> (show . fromJust $ level.number)
+    | isNothing level.number && isNothing lvl.number -> fitter
+    | isJust lvl.number -> fail "expected ORDERED list item at this level"
+    | otherwise -> fail "expected UNORDERED list item at this level"
   where
+    fitter :: OrgParser [ListMarker]
+    fitter = foldlM f [] levels
     f :: [ListMarker] -> Level -> OrgParser [ListMarker]
     f acc existingLevel
       | existingLevel.indent == level.indent = do
@@ -6028,12 +6074,10 @@ listItemFitter level levels' = foldlM f [] levels'
       | existingLevel.indent < level.indent = pure acc
       | otherwise = do
           orgParserState <- get
-          let levels = orgParserState.listLevels
-              markers = orgParserState.listMarkers
           put
             orgParserState
-              { listLevels = drop 1 levels,
-                listMarkers = drop 2 markers
+              { listLevels = drop 1 orgParserState.listLevels,
+                listMarkers = drop 2 orgParserState.listMarkers
               }
           let newMarkers = case existingLevel.number of
                 Nothing -> [LItemEnd, LUnorderedEnd]
