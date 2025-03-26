@@ -5719,7 +5719,6 @@ listItemsEndParser = do
     someIndent = do
       orgParserState <- get
       spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
-      _ <- MP.notFollowedBy (char ' ')
       let existingLevels = orgParserState.listLevels
           levelsToDropPerIndentationIncrement :: [(Int, Int)]
           levelsToDropPerIndentationIncrement =
