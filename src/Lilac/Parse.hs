@@ -60,7 +60,6 @@ import Relude
     find,
     fmap,
     foldl',
-    foldlM,
     fromEnum,
     fromMaybe,
     fst,
@@ -70,7 +69,6 @@ import Relude
     length,
     many,
     map,
-    mapM,
     maybeToList,
     modify,
     not,
@@ -957,12 +955,11 @@ someIndent :: OrgParser (Int, Int)
 someIndent = do
   orgParserState <- get
   indentFound <- T.length <$> MP.takeWhile1P (Just "indentation") (== ' ')
-  let existingLevels = orgParserState.listLevels
-      levelsToDropPerIndentationIncrement :: [(Int, Int)]
+  let levelsToDropPerIndentationIncrement :: [(Int, Int)]
       levelsToDropPerIndentationIncrement =
         zip [0 ..]
           . map getContinuationIndentForLevel
-          $ existingLevels
+          $ orgParserState.listLevels
       matchingIndent =
         find
           (\(_, continuationIndent) -> indentFound == continuationIndent)
@@ -991,28 +988,22 @@ listItemsEndParser = do
   when (orgParserState.continuationIndent /= 0) $ do
     fail "not at beginning of line"
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
-  let markersToDrop = levelsToDrop * 2
-  markers <-
-    mapM getEndingListMarker
-      $ take markersToDrop orgParserState.listMarkers
+  let markers = getEndingListMarkers levelsToDrop orgParserState.listLevels
   put
     orgParserState
       { listLevels = drop levelsToDrop orgParserState.listLevels,
-        listMarkers = drop markersToDrop orgParserState.listMarkers,
+        listMarkers = drop (levelsToDrop * 2) orgParserState.listMarkers,
         continuationIndent = continuationIndent
       }
   pure $ CListItem markers
+
+getEndingListMarkers :: Int -> [Level] -> [ListMarker]
+getEndingListMarkers levelsToDrop = concatMap f . take levelsToDrop
   where
-    getEndingListMarker :: (MonadFail m) => ListMarker -> m ListMarker
-    getEndingListMarker = \case
-      LOrderedStart -> pure LOrderedEnd
-      LUnorderedStart -> pure LUnorderedEnd
-      LItemStart -> pure LItemEnd
-      lm ->
-        fail
-          $ "programmer error: list marker "
-          <> (show lm)
-          <> " is not supported"
+    f :: Level -> [ListMarker]
+    f level = case level.number of
+      Nothing -> [LItemEnd, LUnorderedEnd]
+      Just _ -> [LItemEnd, LOrderedEnd]
 
 listHeadIndentLevelParser :: OrgParser Level
 listHeadIndentLevelParser = do
@@ -1095,47 +1086,36 @@ listItemNester level levels = do
       { listLevels = level : levels,
         listMarkers = LItemStart : newMarker : orgParserState.listMarkers
       }
-  pure $ case level.number of
-    Just _ -> [LOrderedStart, LItemStart]
-    Nothing -> [LUnorderedStart, LItemStart]
+  pure [newMarker, LItemStart]
 
 listItemFitter :: Level -> [Level] -> OrgParser [ListMarker]
-listItemFitter level levels = case find (\l -> l.indent == level.indent) levels of
+listItemFitter level levels = case find (\(_, l) -> l.indent == level.indent) (zip [0 ..] levels) of
   Nothing -> fail "list item: invalid indentation"
-  Just lvl
+  Just (levelsToDrop, lvl)
     | isJust level.number && isJust lvl.number ->
         let expectedNum = fmap (+ 1) lvl.number
          in if level.number == expectedNum
-              then fitter
+              then fitter levelsToDrop
               else
                 fail
                   $ "expected incremented list head "
                   <> (show . fromJust $ expectedNum)
                   <> " but got "
                   <> (show . fromJust $ level.number)
-    | isNothing level.number && isNothing lvl.number -> fitter
+    | isNothing level.number && isNothing lvl.number -> fitter levelsToDrop
     | isJust lvl.number -> fail "expected ORDERED list item at this level"
     | otherwise -> fail "expected UNORDERED list item at this level"
   where
-    fitter :: OrgParser [ListMarker]
-    fitter = foldlM f [] levels
-    f :: [ListMarker] -> Level -> OrgParser [ListMarker]
-    f acc existingLevel
-      | existingLevel.indent == level.indent = do
-          modify (\s -> s {listLevels = level : drop 1 s.listLevels})
-          pure $ acc <> [LItemEnd, LItemStart]
-      | existingLevel.indent < level.indent = pure acc
-      | otherwise = do
-          orgParserState <- get
-          put
-            orgParserState
-              { listLevels = drop 1 orgParserState.listLevels,
-                listMarkers = drop 2 orgParserState.listMarkers
-              }
-          let newMarkers = case existingLevel.number of
-                Nothing -> [LItemEnd, LUnorderedEnd]
-                Just _ -> [LItemEnd, LOrderedEnd]
-          pure $ acc <> newMarkers
+    fitter :: Int -> OrgParser [ListMarker]
+    fitter levelsToDrop = do
+      orgParserState <- get
+      let markers = getEndingListMarkers levelsToDrop orgParserState.listLevels
+      put
+        orgParserState
+          { listLevels = level : drop (levelsToDrop + 1) orgParserState.listLevels,
+            listMarkers = drop (levelsToDrop * 2) orgParserState.listMarkers
+          }
+      pure $ markers <> [LItemEnd, LItemStart]
 
 mathFragmentNumberedParser :: OrgParser MathFragment
 mathFragmentNumberedParser = do

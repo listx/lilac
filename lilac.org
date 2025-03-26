@@ -1702,7 +1702,6 @@ import Relude
     find,
     fmap,
     foldl',
-    foldlM,
     fromEnum,
     fromMaybe,
     fst,
@@ -1712,7 +1711,6 @@ import Relude
     length,
     many,
     map,
-    mapM,
     maybeToList,
     modify,
     not,
@@ -1828,6 +1826,7 @@ import Prelude qualified (show)
 <<f:someIndent>>
 <<f:getContinuationIndentForLevel>>
 <<f:listItemsEndParser>>
+<<f:getEndingListMarkers>>
 <<f:listHeadIndentLevelParser>>
 <<f:orderedHeadParser>>
 <<f:unorderedHeadParser>>
@@ -5725,12 +5724,11 @@ someIndent :: OrgParser (Int, Int)
 someIndent = do
   orgParserState <- get
   indentFound <- T.length <$> MP.takeWhile1P (Just "indentation") (== ' ')
-  let existingLevels = orgParserState.listLevels
-      levelsToDropPerIndentationIncrement :: [(Int, Int)]
+  let levelsToDropPerIndentationIncrement :: [(Int, Int)]
       levelsToDropPerIndentationIncrement =
         zip [0 ..]
           . map getContinuationIndentForLevel
-          $ existingLevels
+          $ orgParserState.listLevels
       matchingIndent =
         find
           (\(_, continuationIndent) -> indentFound == continuationIndent)
@@ -5741,10 +5739,11 @@ someIndent = do
 
 #+end_src
 
-It should be noted that the ~existingLevels~ is grown by prepending to the list in
-[[f:listItemNester]]. So the most-deeply-nested level will be at the head of the
-list in ~orgParserState.listLevels~. That's why we use ~zip [0 ..]~ --- we want to
-drop 0 levels if we see indentation matching the most deeply-nested list item.
+It should be noted that the ~orgParserState.listLevels~ is grown by prepending to
+the list in [[f:listItemNester]]. So the most-deeply-nested level will be at the
+head of the list in ~orgParserState.listLevels~. That's why we use ~zip [0 ..]~ ---
+we want to drop 0 levels if we see indentation matching the most deeply-nested
+list item.
 
 The [[f:getContinuationIndentForLevel]] just computes the total indentation for a
 list level. For example, in
@@ -5777,7 +5776,7 @@ getContinuationIndentForLevel level = level.indent + maybeNum + punctuation + sp
 
 Once we determine the amount of levels we need to close off (by parsing
 [[f:zeroIndent]] or [[f:someIndent]]), we just go through the list markers we've already
-seen in =listMarkers= and close them off (via ~getEndingListMarker~). This is what
+seen in =listMarkers= and close them off via [[f:getEndingListMarkers]]. This is what
 we do in [[f:listItemsEndParser]].
 
 #+name: f:listItemsEndParser
@@ -5790,35 +5789,21 @@ listItemsEndParser = do
   when (orgParserState.continuationIndent /= 0) $ do
     fail "not at beginning of line"
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
-  let markersToDrop = levelsToDrop * 2
-  markers <-
-    mapM getEndingListMarker
-      $ take markersToDrop orgParserState.listMarkers
+  let markers = getEndingListMarkers levelsToDrop orgParserState.listLevels
   put
     orgParserState
       { listLevels = drop levelsToDrop orgParserState.listLevels,
-        listMarkers = drop markersToDrop orgParserState.listMarkers,
+        listMarkers = drop (levelsToDrop * 2) orgParserState.listMarkers,
         continuationIndent = continuationIndent
       }
   pure $ CListItem markers
-  where
-    getEndingListMarker :: (MonadFail m) => ListMarker -> m ListMarker
-    getEndingListMarker = \case
-      LOrderedStart -> pure LOrderedEnd
-      LUnorderedStart -> pure LUnorderedEnd
-      LItemStart -> pure LItemEnd
-      lm ->
-        fail
-          $ "programmer error: list marker "
-          <> (show lm)
-          <> " is not supported"
 
 #+end_src
 
-Note that we initially fail the parser if there are no pending =ListMarker=
-objects (no list levels to close off), or if we're not at the beginning of the
-line (because otherwise we cannot measure indentation accurately), by checking
-=orgParserState.continuationIndent=. This check of
+In [[f:listItemsEndParser]], note that we initially fail the parser if there are no
+pending =ListMarker= objects (no list levels to close off), or if we're not at the
+beginning of the line (because otherwise we cannot measure indentation
+accurately), by checking =orgParserState.continuationIndent=. This check of
 =orgParserState.continuationIndent= is required because there is no easy way to
 check for the just-parsed token (or character) in Megaparsec --- all parsers
 only see what's in front of it. So then it's up to other parsers to set this to
@@ -5836,6 +5821,21 @@ amount of parsed indentation will have to be parsed by another downstream parser
 these out in [[f:orgDocParser]]. This way we decide once and for all how to deal
 with leading indentation (and how this closes off existing list items) in
 [[f:listItemsEndParser]].
+
+The [[f:getEndingListMarkers]] function understands how to close off list levels
+based on whether the level uses an ordered or unordered list item.
+
+#+name: f:getEndingListMarkers
+#+begin_src haskell
+getEndingListMarkers :: Int -> [Level] -> [ListMarker]
+getEndingListMarkers levelsToDrop = concatMap f . take levelsToDrop
+  where
+    f :: Level -> [ListMarker]
+    f level = case level.number of
+      Nothing -> [LItemEnd, LUnorderedEnd]
+      Just _ -> [LItemEnd, LOrderedEnd]
+
+#+end_src
 
 *** Parsing list heads
 
@@ -6004,14 +6004,15 @@ listItemNester level levels = do
       { listLevels = level : levels,
         listMarkers = LItemStart : newMarker : orgParserState.listMarkers
       }
-  pure $ case level.number of
-    Just _ -> [LOrderedStart, LItemStart]
-    Nothing -> [LUnorderedStart, LItemStart]
+  pure [newMarker, LItemStart]
 
 #+end_src
 
-We enforce some additional rules here, such as forcing the nesting list head
-to start off with either 0 or 1 (see [[t:0009-ordered-lists-start-from-0-or-1]]).
+We enforce some additional rules here, such as forcing the nesting list head to
+start off with either 0 or 1 (see [[t:0009-ordered-lists-start-from-0-or-1]]). The
+rest of the function just updates the ~orgParserState~ to have the additional
+~level~ as the new most-deeply-nested level, and also grows the ~listMarkers~
+accordingly.
 
 *** Fitting the list item into an existing level
 
@@ -6026,63 +6027,55 @@ we are closing off the existing list item (at the same level), and starting a
 new list item (also at the same level).
 
 The second task is a bit more involved. We have to "close" any existing levels
-that are more deeply nested. For example, in the following list
+that are more deeply nested, just like in [[f:listItemsEndParser]]. For example, in
+the following list
 
   1) foo
 
-     1) bar
+     - bar
 
-        1) baz
+       1) baz
 
   2) quux
 
 when we hit "quux" we have to close off the list environments for "baz", then
-"bar".
-
-We use =foldlM= to go over the existing levels. Because we cons additional nested
-levels into the existing levels in [[f:listItemNester]], this means that when we
-traverse left-to-right, we take care of the innermost (most nested) levels
-first, to close them off if the level we have at hand doesn't "fit" into it.
+"bar". However, unlike [[f:listItemsEndParser]], we have to /continue/ the list level
+that we fit into. For ordered list items, this means keeping the latest
+incremented ordered list item at the current level. This is why we have to drop
+an extra level in ~listLevels~ in the ~fitter~ function, and then replace it with
+the current level; if we don't do this then our ordered list items will never
+get incremented.
 
 #+name: f:listItemFitter
 #+begin_src haskell
 listItemFitter :: Level -> [Level] -> OrgParser [ListMarker]
-listItemFitter level levels = case find (\l -> l.indent == level.indent) levels of
+listItemFitter level levels = case find (\(_, l) -> l.indent == level.indent) (zip [0 ..] levels) of
   Nothing -> fail "list item: invalid indentation"
-  Just lvl
+  Just (levelsToDrop, lvl)
     | isJust level.number && isJust lvl.number ->
         let expectedNum = fmap (+ 1) lvl.number
          in if level.number == expectedNum
-              then fitter
+              then fitter levelsToDrop
               else
                 fail
                   $ "expected incremented list head "
                   <> (show . fromJust $ expectedNum)
                   <> " but got "
                   <> (show . fromJust $ level.number)
-    | isNothing level.number && isNothing lvl.number -> fitter
+    | isNothing level.number && isNothing lvl.number -> fitter levelsToDrop
     | isJust lvl.number -> fail "expected ORDERED list item at this level"
     | otherwise -> fail "expected UNORDERED list item at this level"
   where
-    fitter :: OrgParser [ListMarker]
-    fitter = foldlM f [] levels
-    f :: [ListMarker] -> Level -> OrgParser [ListMarker]
-    f acc existingLevel
-      | existingLevel.indent == level.indent = do
-          modify (\s -> s {listLevels = level : drop 1 s.listLevels})
-          pure $ acc <> [LItemEnd, LItemStart]
-      | existingLevel.indent < level.indent = pure acc
-      | otherwise = do
-          orgParserState <- get
-          put
-            orgParserState
-              { listLevels = drop 1 orgParserState.listLevels,
-                listMarkers = drop 2 orgParserState.listMarkers
-              }
-          let newMarkers = case existingLevel.number of
-                Nothing -> [LItemEnd, LUnorderedEnd]
-                Just _ -> [LItemEnd, LOrderedEnd]
-          pure $ acc <> newMarkers
+    fitter :: Int -> OrgParser [ListMarker]
+    fitter levelsToDrop = do
+      orgParserState <- get
+      let markers = getEndingListMarkers levelsToDrop orgParserState.listLevels
+      put
+        orgParserState
+          { listLevels = level : drop (levelsToDrop + 1) orgParserState.listLevels,
+            listMarkers = drop (levelsToDrop * 2) orgParserState.listMarkers
+          }
+      pure $ markers <> [LItemEnd, LItemStart]
 
 #+end_src
 
@@ -6090,7 +6083,7 @@ We use [[f:listItemStartParser]] and [[f:listItemsEndParser]] inside
 [[f:cellParser]]; the former identifies and the beginnings of list items, while
 the latter recognizes their (complete) end when there is no more indentation.
 
-*** Additional tests
+*** Tests
 
 There are [[id:910d5a04-739c-4125-9a94-803ea0ebeaee][so many rules]] associated with lists; we try to check a few of them
 here.
