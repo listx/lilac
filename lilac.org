@@ -7034,6 +7034,13 @@ mathFragmentStandaloneParser =
 
 #+end_src
 
+Unlike [[f:tableLineParser]] and [[f:tableRowParser]], we don't use
+~orgParserState.continuationIndent~ to check which lines are part of the math
+fragment; we simply parse everything up until the end marker (~\end{equation}~ or
+~\]~). This simplifies the parsing implementation. The downside is that we may
+accept input where the indentation across multiple math lines looks messy, but
+this is something the user should take care of anyway.
+
 Let's check that we can parse multiple math fragments. We discard any trailing
 whitespace after the initial opening =\begin{equation}= or =\[=, as well as trailing
 whitespace for the contents inside (just before the =\end{equation}= marker).
