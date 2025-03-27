@@ -7205,11 +7205,7 @@ ps
 
 ** Figures
 
-Figures are external links to images. Below is an example:
-
-#+name: fig:Portable Network Graphics sample image
-#+attr_html: :width 100%
-[[./image/PNG-Gradient.png]]
+A [[data:Figure][Figure]] is just a link to an image file, with some metadata.
 
 #+name: data:Figure
 #+begin_src haskell
@@ -7222,8 +7218,13 @@ data Figure = Figure
 
 #+end_src
 
-A [[data:Figure][Figure]] is just a link to an image file, with some metadata. First we have
-parse for the metadata, and then the link.
+Below is an example of a figure:
+
+#+name: fig:Portable Network Graphics sample image
+#+attr_html: :width 100%
+[[./image/PNG-Gradient.png]]
+
+First we have parse for the metadata, and then the link.
 
 #+name: f:figureParser
 #+begin_src haskell
@@ -7250,9 +7251,9 @@ figureParser = do
 
 It's important that we expect the end of the cell (double newline or newline and
 ~MP.eof~), because otherwise we'll end up parsing the link at the start of a
-paragraph cell as a figure. This parser still has plenty of room for making the
-input stricter (as it should be the case anyway for figures), but for now we
-keep things simple.
+paragraph cell as a figure. This parser can be even more strict with the input
+(as it should be the case anyway for figures), but for now we keep things
+simple with this ~endOfCell~ rule.
 
 The metadata is parsed with =metaParser= which relies on =metaEntryParser=.
 
@@ -7265,16 +7266,16 @@ metaParser = do
 
 #+end_src
 
-The [[f:metaEntryParser]] is similar to [[f:docMetaEntryParser]]. In the
-latter, we use =avoidParsingBlockMetadata= to avoid touching on the toes of
-=blockMetaEntryParser=, but here we don't need to do that because we use =lookAhead=
-in =figureParser= to look for a link that follows metadata --- so we are
-guaranteed (after we parse some metadata) that it will only be for a link
-(figure), not a [[data:Block]] or some other type.
+The [[f:metaEntryParser]] is similar to [[f:docMetaEntryParser]]. In the latter, we use
+=avoidParsingBlockMetadata= to avoid touching on the toes of =blockMetaEntryParser=,
+but here we don't need to do that because we use =lookAhead= in [[f:figureParser]] to
+look for a link that follows metadata --- so we are guaranteed (after we parse
+some metadata) that it will only be for a link (figure), not a [[data:Block]] or
+some other type.
 
 We still have to check that each metadata line does not start with =#+begin_=
 because otherwise this will also succeed for blocks (even inside the =lookAhead=
-in =figureParser=).
+in [[f:figureParser]]).
 
 #+name: f:metaEntryParser
 #+begin_src haskell
@@ -7292,8 +7293,7 @@ metaEntryParser = do
 
 #+end_src
 
-Let's check our reasoning above by parsing a doc that has figures and blocks,
-both with metadata.
+Below we parse a doc that has figures and blocks, both with metadata.
 
 #+header: :tangle test/Lilac/ParseSpec/0011-figures-and-blocks
 #+begin_src org
