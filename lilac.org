@@ -7394,17 +7394,10 @@ p
 
 ** Tables
 
-Tables are 2-dimensional grids holding information. Below is an example:
-
-#+name: tbl:Programming languages
-| Language | Typing          |
-|----------+-----------------|
-| LISP     | dynamic, strong |
-| C        | static, weak    |
-| Haskell  | static, strong  |
-
-Because we named the above with a =#+name= keyword, we can refer to it as
-[[tbl:Programming languages]].
+[[Tables][Tables]] are like [[data:Figure][figures]] in that they have some metadata. Unlike a figure which
+is just a link, a table has a two-dimensional grid with some information in each
+row\/column. The requirement is that the first non-whitespace character starts
+with a vertical bar (=|=), also known as the pipe character in UNIX.
 
 #+name: data:Table
 #+begin_src haskell
@@ -7416,13 +7409,21 @@ data Table = Table
   deriving stock (Eq, Show)
 #+end_src
 
-[[Tables][Tables]] are like [[data:Figure][figures]] in that they have some metadata. Unlike a figure which
-is just a link, a table has a two-dimensional grid with some information in each
-row\/column. The requirement is that the first non-whitespace character starts
-with a vertical bar (=|=), also known as the pipe character in UNIX.
+Below is an example of a table:
+
+#+name: tbl:Programming languages
+| Language | Typing          |
+|----------+-----------------|
+| LISP     | dynamic, strong |
+| C        | static, weak    |
+| Haskell  | static, strong  |
+
+Because we named the above with a ~#+name~ keyword, we can refer to it as
+[[tbl:Programming languages]].
 
 The very first line of the table determines the number of expected columns. Org
-syntax allows for horizontal lines inside the table, but these are ignored.
+syntax allows for horizontal lines inside the table like ~|---+-----|~, but these
+are ignored.
 
 #+name: f:tableParser
 #+begin_src haskell
@@ -7440,10 +7441,10 @@ tableParser = do
 
 #+end_src
 
-The =tableLineParser= skips over horizontal rules that typically separate the
+The [[f:tableLineParser]] skips over horizontal rules that typically separate the
 table heading (column names) from the rest of the rows that hold the actual
 data. It also skips over any leading indentation in the subsequent line, based
-on the =continuationIndent= which is set by [[f:listHeadIndentLevelParser]]. This way,
+on the ~continuationIndent~ which is set by [[f:listHeadIndentLevelParser]]. This way,
 we can parse tables inside list items.
 
 #+name: f:tableLineParser
@@ -7463,11 +7464,11 @@ tableLineParser = do
 
 #+end_src
 
-The =tableRowParser= parses rows with data in them. It also skips over indentation
-found in the subsequent line (if any). Unlike ~tableLineParser~, we wrap this
-indentation parsing with ~MP.optional~ because we cannot tell if there are more
-table rows after this or not. Contrast this with the ~tableLineParser~, which is
-never expected to be the last line of a table.
+The [[f:tableRowParser]] parses rows with data in them. It also skips over
+indentation found in the subsequent line (if any). Unlike ~tableLineParser~, we
+wrap this indentation parsing with ~MP.optional~ because we cannot tell if there
+are more table rows after this or not. Contrast this with the ~tableLineParser~,
+which is never expected to be the last line of a table.
 
 #+name: f:tableRowParser
 #+begin_src haskell
@@ -7486,11 +7487,11 @@ tableRowParser = do
 
 #+end_src
 
-The =tableCellParser= just parses text inside a single row and column combination
---- which we call a "table cell". The main idea is that we parse each table
-cell, which may not contain pipe characters in it (otherwise it confuses
-=org-mode= in Emacs, which results in the table becoming formatted with extra
-columns that we don't want).
+The [[f:tableCellParser]] just parses text inside a single row and column
+combination --- which we call a "table cell". The main idea is that we parse
+each table cell, which may not contain pipe characters in it (otherwise it
+confuses =org-mode= in Emacs, which results in the table becoming formatted with
+extra columns that we don't want).
 
 #+name: f:tableCellParser
 #+begin_src haskell
@@ -7502,24 +7503,25 @@ tableCellParser = do
   _ <- MP.optional spaces
   pure $ compressProse prose
   where
+    spaces :: OrgParser T.Text
+    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
     spacesInsideProse :: OrgParser T.Text
     spacesInsideProse = do
       _ <- MP.try $ MP.lookAhead (spaces >> tableCellContent)
       spaces
-    spaces :: OrgParser T.Text
-    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
     tableCellContent :: OrgParser ()
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
 
 #+end_src
 
-The =spacesInsideProse= is a special space consumer inside table cells, where
-newlines and pipe characters are not allowed. If we pass in a "dumb" space
-consumer that only parses spaces, we end up with a table cell with trailing
-whitespace inside it, which is undesirable.
+The ~spacesInsideProse~ is a special space consumer inside table cells, where
+newlines and pipe characters are prohibited. This way, when [[f:proseParser]] uses
+it to find some contiguous amount of text, it will know to stop when it sees the
+pipe character (as that function does not treat pipe characters differently than
+any other non-space character).
 
-After the rows are parsed, we need to convert them to a =grid=. We do this with
-=rowsToTuples=.
+After the rows are parsed, we need to convert them to a =grid= (as part of
+[[data:Table]]. We do this with [[f:rowsToTuples]].
 
 #+name: f:rowsToTuples
 #+begin_src haskell
@@ -7528,11 +7530,11 @@ rowsToTuples rows = concatMap rowToTuples $ zip [1 ..] rows
 
 #+end_src
 
-=rowsToTuples= assigns each row its row index with =zip [1 ..]=, then delegates most
-of the work to =rowToTuples= where each row's table cells are given its column
-index as well to form a completed table cell. These are simply accumulated and
-returned as a list. The order of accumulation (consing) does not matter because
-this is ultimately fed into a =M.Map= type (which is an unordered container).
+We assign each row its row index with ~zip [1 ..]~, then delegate most of the work
+to [[f:rowToTuples]] where each row's table cells are given its column index to form
+a completed table cell. These are simply accumulated and returned as a list. The
+order of accumulation (consing) does not matter because this is ultimately fed
+into a =M.Map= type, an unordered container.
 
 #+name: f:rowToTuples
 #+begin_src haskell
@@ -7548,7 +7550,7 @@ rowToTuples (rowIndex, row)
       )
 #+end_src
 
-The test below checks that we can parse a table with all 3 types of prose text
+The test below checks if we can parse a table with all 3 types of prose text
 (styled text, links, and math fragments).
 
 #+header: :tangle test/Lilac/ParseSpec/0012-tables-and-prose

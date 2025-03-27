@@ -1258,12 +1258,12 @@ tableCellParser = do
   _ <- MP.optional spaces
   pure $ compressProse prose
   where
+    spaces :: OrgParser T.Text
+    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
     spacesInsideProse :: OrgParser T.Text
     spacesInsideProse = do
       _ <- MP.try $ MP.lookAhead (spaces >> tableCellContent)
       spaces
-    spaces :: OrgParser T.Text
-    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
     tableCellContent :: OrgParser ()
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
 
