@@ -1148,8 +1148,11 @@ mathFragmentNumberedParser = do
     MathFragment
       { meta =
           M.insert "__equation_number" (T.pack $ show number) metaKVs,
-        body = T.pack latex
+        body = trimTrailingWhitespace $ T.pack latex
       }
+
+trimTrailingWhitespace :: T.Text -> T.Text
+trimTrailingWhitespace = T.dropWhileEnd (\c -> T.elem c " \n\r\t")
 
 mathFragmentUnnumberedParser :: OrgParser MathFragment
 mathFragmentUnnumberedParser = do
@@ -1159,7 +1162,7 @@ mathFragmentUnnumberedParser = do
   pure
     MathFragment
       { meta = metaKVs,
-        body = T.pack latex
+        body = trimTrailingWhitespace $ T.pack latex
       }
 
 mathFragmentStandaloneParser :: OrgParser Cell

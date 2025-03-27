@@ -1414,7 +1414,7 @@ spec = do
                     fromList
                       [ ("__equation_number", "1")
                       ],
-                  body = "1 + 1 = 2\n"
+                  body = "1 + 1 = 2"
                 },
             L.CMathFragment
               L.MathFragment
@@ -1422,12 +1422,12 @@ spec = do
                     fromList
                       [ ("__equation_number", "2")
                       ],
-                  body = "1 + 1 = 2\n"
+                  body = "1 + 1 = 2"
                 },
             L.CMathFragment
               L.MathFragment
                 { meta = fromList [],
-                  body = "2 + 2 = 4\n"
+                  body = "2 + 2 = 4"
                 },
             L.CMathFragment
               L.MathFragment
@@ -1435,7 +1435,7 @@ spec = do
                     fromList
                       [ ("name", "eq:x")
                       ],
-                  body = "2 + 2 = 4\n"
+                  body = "2 + 2 = 4"
                 },
             L.CMathFragment
               L.MathFragment
@@ -1444,7 +1444,7 @@ spec = do
                       [ ("__equation_number", "3"),
                         ("name", "eq:y")
                       ],
-                  body = "1 + 1 = 2\n"
+                  body = "1 + 1 = 2"
                 }
           ],
         code = [],
@@ -1482,7 +1482,7 @@ spec = do
                     fromList
                       [ ("name", "eq:x")
                       ],
-                  body = "2 + 2 = 4\n     "
+                  body = "2 + 2 = 4"
                 },
             L.CMathFragment
               L.MathFragment
@@ -1491,7 +1491,7 @@ spec = do
                       [ ("__equation_number", "1"),
                         ("name", "eq:y")
                       ],
-                  body = "1 + 1 = 2\n     "
+                  body = "1 + 1 = 2"
                 },
             L.CListItem
               [ L.LItemEnd,

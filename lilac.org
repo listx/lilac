@@ -1835,6 +1835,7 @@ import Prelude qualified (show)
 <<f:listItemNester>>
 <<f:listItemFitter>>
 <<f:mathFragmentNumberedParser>>
+<<f:trimTrailingWhitespace>>
 <<f:mathFragmentUnnumberedParser>>
 <<f:mathFragmentStandaloneParser>>
 <<f:figureParser>>
@@ -6982,8 +6983,18 @@ mathFragmentNumberedParser = do
     MathFragment
       { meta =
           M.insert "__equation_number" (T.pack $ show number) metaKVs,
-        body = T.pack latex
+        body = trimTrailingWhitespace $ T.pack latex
       }
+
+#+end_src
+
+The call to [[f:trimTrailingWhitespace]] cleans up any trailing whitespace we parsed
+into ~latex~.
+
+#+name: f:trimTrailingWhitespace
+#+begin_src haskell
+trimTrailingWhitespace :: T.Text -> T.Text
+trimTrailingWhitespace = T.dropWhileEnd (\c -> T.elem c " \n\r\t")
 
 #+end_src
 
@@ -6999,7 +7010,7 @@ mathFragmentUnnumberedParser = do
   pure
     MathFragment
       { meta = metaKVs,
-        body = T.pack latex
+        body = trimTrailingWhitespace $ T.pack latex
       }
 
 #+end_src
@@ -7061,7 +7072,7 @@ ps
                   fromList
                     [ ("__equation_number", "1")
                     ],
-                body = "1 + 1 = 2\n"
+                body = "1 + 1 = 2"
               },
           L.CMathFragment
             L.MathFragment
@@ -7069,12 +7080,12 @@ ps
                   fromList
                     [ ("__equation_number", "2")
                     ],
-                body = "1 + 1 = 2\n"
+                body = "1 + 1 = 2"
               },
           L.CMathFragment
             L.MathFragment
               { meta = fromList [],
-                body = "2 + 2 = 4\n"
+                body = "2 + 2 = 4"
               },
           L.CMathFragment
             L.MathFragment
@@ -7082,7 +7093,7 @@ ps
                   fromList
                     [ ("name", "eq:x")
                     ],
-                body = "2 + 2 = 4\n"
+                body = "2 + 2 = 4"
               },
           L.CMathFragment
             L.MathFragment
@@ -7091,7 +7102,7 @@ ps
                     [ ("__equation_number", "3"),
                       ("name", "eq:y")
                     ],
-                body = "1 + 1 = 2\n"
+                body = "1 + 1 = 2"
               }
         ],
       code = [],
@@ -7150,7 +7161,7 @@ ps
                   fromList
                     [ ("name", "eq:x")
                     ],
-                body = "2 + 2 = 4\n     "
+                body = "2 + 2 = 4"
               },
           L.CMathFragment
             L.MathFragment
@@ -7159,7 +7170,7 @@ ps
                     [ ("__equation_number", "1"),
                       ("name", "eq:y")
                     ],
-                body = "1 + 1 = 2\n     "
+                body = "1 + 1 = 2"
               },
           L.CListItem
             [ L.LItemEnd,
