@@ -1312,6 +1312,10 @@ spec = do
     "0009-ordered-list-head-needs-parenthesis"
     (utoks "." <> etoks ")" <> elabel "ordered list number")
     3
+  pf
+    "0009-ordered-list-head-cannot-use-letters"
+    "invalid indentation"
+    2
   p
     "0009-paragraph-can-close-deeper-levels"
     L.OrgDoc
@@ -1454,6 +1458,57 @@ spec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 3,
+        orgParserConf = L.defaultOrgParserConf
+      }
+  ps
+    "0010-standalone-math-inside-lists"
+    L.OrgDoc
+      { cells =
+          [ L.CListItem
+              [ L.LOrderedStart,
+                L.LItemStart
+              ],
+            L.CParagraph
+              [ L.PTokenStyledText
+                  ( L.StyledText
+                      { body = "foo",
+                        style = L.styleMaskFrom []
+                      }
+                  )
+              ],
+            L.CMathFragment
+              L.MathFragment
+                { meta =
+                    fromList
+                      [ ("name", "eq:x")
+                      ],
+                  body = "2 + 2 = 4\n     "
+                },
+            L.CMathFragment
+              L.MathFragment
+                { meta =
+                    fromList
+                      [ ("__equation_number", "1"),
+                        ("name", "eq:y")
+                      ],
+                  body = "1 + 1 = 2\n     "
+                },
+            L.CListItem
+              [ L.LItemEnd,
+                L.LOrderedEnd
+              ]
+          ],
+        code = [],
+        codeBlocks = fromList [],
+        meta = fromList []
+      }
+    L.OrgParserState
+      { headingLevel = 0,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 1,
         orgParserConf = L.defaultOrgParserConf
       }
   p
