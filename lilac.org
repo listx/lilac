@@ -6921,8 +6921,26 @@ support them here.
 Instead Lilac only supports Latex fragments for typesetting math. Because we
 only support math, we call them /math/ fragments.
 
+#+name: data:MathFragment
+#+begin_src haskell
+type MathFragment :: Type
+data MathFragment = MathFragment
+  { meta :: M.Map T.Text T.Text,
+    body :: T.Text
+  }
+  deriving stock (Eq, Show)
+
+#+end_src
+
 There are three ways to write math fragments: using =\begin{equation}= and
-=\end{equation}=, =\[ ... \]=, or =\( ... \)=.
+=\end{equation}=, =\[ ... \]=, or =\( ... \)=. The first two ways requires them to
+start at the beginning of the line, while the third way allows them to be
+embedded inside prose text (and displayed inside the paragraph). The third way
+has already been discussed in [[f:mathFragmentInlineParser]], where it is used in
+[[f:proseParser]]. So we limit our discussion here to parsing the first two ways,
+which are /standalone/ math fragments. They are called standalone because they are
+their own [[data:Cell][cells]] (as ~CMathFragment~ in [[f:mathFragmentStandaloneParser]]) and don't
+need to be part of another cell.
 
 Use the first form for a standalone equation like this
 
@@ -6948,23 +6966,6 @@ a^2 + b^2 = c^2
 
 and you can link back to it using an internal link like [[eq:Pythagorean Theorem]].
 
-#+name: data:MathFragment
-#+begin_src haskell
-type MathFragment :: Type
-data MathFragment = MathFragment
-  { meta :: M.Map T.Text T.Text,
-    body :: T.Text
-  }
-  deriving stock (Eq, Show)
-
-#+end_src
-
-A [[data:MathFragment][MathFragment]] can be written three ways; using =\begin{equation}=, =\[= or =\(=. The
-first two ways requires them to start at the beginning of the line, while the
-third way allows them to be embedded inside prose text (and displayed inside the
-paragraph). The third way has already been discussed in
-[[f:mathFragmentInlineParser]], where it is used in [[f:proseParser]].
-
 Let's first see how to parse =\begin{equation}=.
 
 #+name: f:mathFragmentNumberedParser
@@ -6976,7 +6977,10 @@ mathFragmentNumberedParser = do
 
   metaKVs <- metaParser
   _ <- lexeme $ string "\\begin{equation}"
-  latex <- MP.someTill (MP.label "LaTeX standalone numbered math input" MP.anySingle) (string "\\end{equation}")
+  latex <-
+    MP.someTill
+      (MP.label "LaTeX standalone numbered math input" MP.anySingle)
+      (string "\\end{equation}")
 
   modify (\s -> s {equationNumber = number})
   pure
@@ -7006,7 +7010,10 @@ mathFragmentUnnumberedParser :: OrgParser MathFragment
 mathFragmentUnnumberedParser = do
   metaKVs <- metaParser
   _ <- lexeme $ string "\\["
-  latex <- MP.someTill (MP.label "LaTeX standalone unnumbered math input" MP.anySingle) (string "\\]")
+  latex <-
+    MP.someTill
+      (MP.label "LaTeX standalone unnumbered math input" MP.anySingle)
+      (string "\\]")
   pure
     MathFragment
       { meta = metaKVs,
@@ -7015,7 +7022,8 @@ mathFragmentUnnumberedParser = do
 
 #+end_src
 
-We simply combine these parsers together to parse either one.
+We simply combine the numbered and unnumbered parsers together in the top-level
+[[f:mathFragmentStandaloneParser]].
 
 #+name: f:mathFragmentStandaloneParser
 #+begin_src haskell
@@ -7027,8 +7035,8 @@ mathFragmentStandaloneParser =
 #+end_src
 
 Let's check that we can parse multiple math fragments. We discard any trailing
-whitespace after the initial opening =\begin{equation}= or =\[=, but otherwise
-retain whitespace for the contents inside.
+whitespace after the initial opening =\begin{equation}= or =\[=, as well as trailing
+whitespace for the contents inside (just before the =\end{equation}= marker).
 
 #+header: :tangle test/Lilac/ParseSpec/0010-standalone-math-fragments
 #+begin_src org
@@ -7041,6 +7049,9 @@ retain whitespace for the contents inside.
 
 
 1 + 1 = 2
+
+
+
 \end{equation}
 
 \[

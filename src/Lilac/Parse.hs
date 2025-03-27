@@ -1141,7 +1141,10 @@ mathFragmentNumberedParser = do
 
   metaKVs <- metaParser
   _ <- lexeme $ string "\\begin{equation}"
-  latex <- MP.someTill (MP.label "LaTeX standalone numbered math input" MP.anySingle) (string "\\end{equation}")
+  latex <-
+    MP.someTill
+      (MP.label "LaTeX standalone numbered math input" MP.anySingle)
+      (string "\\end{equation}")
 
   modify (\s -> s {equationNumber = number})
   pure
@@ -1158,7 +1161,10 @@ mathFragmentUnnumberedParser :: OrgParser MathFragment
 mathFragmentUnnumberedParser = do
   metaKVs <- metaParser
   _ <- lexeme $ string "\\["
-  latex <- MP.someTill (MP.label "LaTeX standalone unnumbered math input" MP.anySingle) (string "\\]")
+  latex <-
+    MP.someTill
+      (MP.label "LaTeX standalone unnumbered math input" MP.anySingle)
+      (string "\\]")
   pure
     MathFragment
       { meta = metaKVs,
