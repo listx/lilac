@@ -110,7 +110,7 @@ import Relude
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
 import Text.Megaparsec qualified as MP
-import Text.Megaparsec.Char (char, space1, string)
+import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude qualified (show)
 
@@ -143,14 +143,16 @@ defaultOrgParserState =
 
 type OrgParserConf :: Type
 data OrgParserConf = OrgParserConf
-  { maxHeadingLevel :: Int
+  { maxHeadingLevel :: Int,
+    maxListLevel :: Int
   }
   deriving stock (Eq, Show)
 
 defaultOrgParserConf :: OrgParserConf
 defaultOrgParserConf =
   OrgParserConf
-    { maxHeadingLevel = 6
+    { maxHeadingLevel = 6,
+      maxListLevel = 6
     }
 
 type OrgDoc :: Type
@@ -377,9 +379,9 @@ lilacExtensionsParser :: OrgParser ()
 lilacExtensionsParser = do
   void
     . many
-    . lexeme
     $ MP.choice
-      [ maxHeadingLevelParser
+      [ maxHeadingLevelParser,
+        maxListLevelParser
       ]
 
 maxHeadingLevelParser :: OrgParser ()
@@ -391,11 +393,20 @@ maxHeadingLevelParser = do
   let opc = orgParserState.orgParserConf {maxHeadingLevel = val}
   put orgParserState {orgParserConf = opc}
 
+maxListLevelParser :: OrgParser ()
+maxListLevelParser = do
+  orgParserState <- get
+  _ <- string $ "#+lilac_maxListLevel: "
+  _ <- many $ char ' '
+  val <- signedIntParser
+  let opc = orgParserState.orgParserConf {maxListLevel = val}
+  put orgParserState {orgParserConf = opc}
+
 signedIntParser :: OrgParser Int
 signedIntParser = L.signed parserBetweenSignAndNumber number
   where
     number :: OrgParser Int
-    number = L.lexeme space1 $ L.decimal
+    number = L.lexeme skipNewlinesAndComments $ L.decimal
     parserBetweenSignAndNumber :: OrgParser ()
     parserBetweenSignAndNumber = pure ()
 
@@ -1077,10 +1088,16 @@ listItemNester level levels = do
     Just 1 -> pure ()
     Just n -> fail $ "starting list head number must be 0 or 1; got " <> show n
     Nothing -> pure ()
+  orgParserState <- get
   let newMarker = case level.number of
         Just _ -> LOrderedStart
         Nothing -> LUnorderedStart
-  orgParserState <- get
+      opc = orgParserState.orgParserConf
+  when (opc.maxListLevel > 0 && length levels == opc.maxListLevel) $ do
+    fail
+      $ "max nesting depth exceeded: cannot have more than "
+      <> show opc.maxListLevel
+      <> " levels of list items"
   put
     orgParserState
       { listLevels = level : levels,

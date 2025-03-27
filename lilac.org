@@ -1752,7 +1752,7 @@ import Relude
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
 import Text.Megaparsec qualified as MP
-import Text.Megaparsec.Char (char, space1, string)
+import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude qualified (show)
 
@@ -1787,6 +1787,7 @@ import Prelude qualified (show)
 <<f:docMetaParser>>
 <<f:lilacExtensionsParser>>
 <<f:maxHeadingLevelParser>>
+<<f:maxListLevelParser>>
 <<f:signedIntParser>>
 <<f:cellParser>>
 <<f:detectInvalidIndentation>>
@@ -2252,18 +2253,23 @@ Below is a list of supported extensions:
     headings may only have that many (or less) asterisks; otherwise Lilac will
     fail the parse.
 
+  - ~lilac_maxListLevel~ :: [[f:maxListLevelParser]] This has the same semantics as
+    ~lilac_maxHeadingLevel~ but is for list items, not headings.
+
 #+name: data:OrgParserConf
 #+begin_src haskell
 type OrgParserConf :: Type
 data OrgParserConf = OrgParserConf
-  { maxHeadingLevel :: Int
+  { maxHeadingLevel :: Int,
+    maxListLevel :: Int
   }
   deriving stock (Eq, Show)
 
 defaultOrgParserConf :: OrgParserConf
 defaultOrgParserConf =
   OrgParserConf
-    { maxHeadingLevel = 6
+    { maxHeadingLevel = 6,
+      maxListLevel = 6
     }
 
 #+end_src
@@ -2277,9 +2283,9 @@ lilacExtensionsParser :: OrgParser ()
 lilacExtensionsParser = do
   void
     . many
-    . lexeme
     $ MP.choice
-      [ maxHeadingLevelParser
+      [ maxHeadingLevelParser,
+        maxListLevelParser
       ]
 
 #+end_src
@@ -2313,7 +2319,7 @@ signedIntParser :: OrgParser Int
 signedIntParser = L.signed parserBetweenSignAndNumber number
   where
     number :: OrgParser Int
-    number = L.lexeme space1 $ L.decimal
+    number = L.lexeme skipNewlinesAndComments $ L.decimal
     parserBetweenSignAndNumber :: OrgParser ()
     parserBetweenSignAndNumber = pure ()
 
@@ -2322,6 +2328,21 @@ signedIntParser = L.signed parserBetweenSignAndNumber number
 Although we don't "return" anything (the type signature of
 [[f:lilacExtensionsParser]] is just ~OrgParser ()~), we still use ~put~ inside the
 parsers so that they modify the [[data:OrgParserState]].
+
+#+name: f:maxListLevelParser
+#+begin_src haskell
+maxListLevelParser :: OrgParser ()
+maxListLevelParser = do
+  orgParserState <- get
+  _ <- string $ "#+lilac_maxListLevel: "
+  _ <- many $ char ' '
+  val <- signedIntParser
+  let opc = orgParserState.orgParserConf {maxListLevel = val}
+  put orgParserState {orgParserConf = opc}
+
+#+end_src
+
+Unsurprisingly, [[f:maxListLevelParser]] closely resembles [[f:maxHeadingLevelParser]].
 
 *** Tests
 
@@ -5541,6 +5562,13 @@ ordered list items, which are important for parsing:
 
   11) There can only be up to 5 additional levels of nesting (for a total of 6
       levels of items). This is because excessive nesting is an anti-pattern.
+      See the ~lilac_maxListLevel~ [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extension]] for customizing this behavior.
+
+      - [[t:0009-list-nesting-max]]
+
+      - [[t:0009-list-nesting-max-8]]
+
+      - [[t:0009-lists-prohibited]]
 
   12) Ordered list items may have unordered list items (discussed next) as
       children, and vice versa. However you may not mix the two types of items
@@ -6017,7 +6045,7 @@ than the current level. If this is the case, we delegate to [[f:listItemNester]]
 Otherwise the list item is merely continuing some existing list, for which we
 delegate to [[f:listItemFitter]].
 
-*** Nesting the list item beyond the deepest existing level
+*** Nesting the list item beyond the current level
 
 =listItemNester= appends starting markers to =listMarkers=. We use this information
 in other places when we want to know how to un-nest an item (close it off),
@@ -6033,10 +6061,16 @@ listItemNester level levels = do
     Just 1 -> pure ()
     Just n -> fail $ "starting list head number must be 0 or 1; got " <> show n
     Nothing -> pure ()
+  orgParserState <- get
   let newMarker = case level.number of
         Just _ -> LOrderedStart
         Nothing -> LUnorderedStart
-  orgParserState <- get
+      opc = orgParserState.orgParserConf
+  when (opc.maxListLevel > 0 && length levels == opc.maxListLevel) $ do
+    fail
+      $ "max nesting depth exceeded: cannot have more than "
+      <> show opc.maxListLevel
+      <> " levels of list items"
   put
     orgParserState
       { listLevels = level : levels,
@@ -6269,6 +6303,83 @@ p
       codeBlocks = fromList [],
       meta = fromList []
     }
+#+end_src
+
+Nesting is limited to 5 levels, for a total of 6 levels by default.
+
+#+header: :tangle test/Lilac/ParseSpec/0009-list-nesting-max
+#+begin_src org
+  - 1
+
+    - 2
+
+      - 3
+
+        - 4
+
+          - 5
+
+            - 6
+
+              - 7
+#+end_src
+
+#+name: t:0009-list-nesting-max
+#+begin_src haskell
+pf
+  "0009-list-nesting-max"
+  "max nesting depth exceeded: cannot have more than 6 levels of list items"
+  88
+#+end_src
+
+You can change this behavior with the ~lilac_maxListLevel~ [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extension]]. In the
+test below we increase the nesting level slightly.
+
+#+header: :tangle test/Lilac/ParseSpec/0009-list-nesting-max-8
+#+begin_src org
+,#+lilac_maxListLevel: 8
+  - 1
+
+    - 2
+
+      - 3
+
+        - 4
+
+          - 5
+
+            - 6
+
+              - 7
+
+                - 8
+
+                  - 9
+#+end_src
+
+#+name: t:0009-list-nesting-max-8
+#+begin_src haskell
+pf
+  "0009-list-nesting-max-8"
+  "max nesting depth exceeded: cannot have more than 8 levels of list items"
+  156
+#+end_src
+
+We can prohibit list items entirely, much like how we can prohibit them in
+[[t:0004-headings-prohibited]].
+
+#+header: :tangle test/Lilac/ParseSpec/0009-lists-prohibited
+#+begin_src org
+,#+lilac_maxListLevel: -1
+  - 1
+#+end_src
+
+#+name: t:0009-lists-prohibited
+#+begin_src haskell
+pf
+  "0009-list-prohibited"
+  "lists prohibited because lilac_maxListLevel < 0"
+  29
 #+end_src
 
 Now we test whether list items can also hold content (other cells) inside it.
@@ -7892,6 +8003,8 @@ spec = do
   <<t:0009-list-content-simple>>
   <<t:0009-list-indentation-nested-with-text>>
   <<t:0009-list-indentation-nested>>
+  <<t:0009-list-nesting-max>>
+  <<t:0009-list-nesting-max-8>>
   <<t:0009-list-indentation-no-indent>>
   <<t:0009-list-indentation-proper-indent>>
   <<t:0009-list-items-need-blank-line-separator>>

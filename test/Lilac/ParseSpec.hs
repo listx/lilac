@@ -1230,6 +1230,14 @@ spec = do
         codeBlocks = fromList [],
         meta = fromList []
       }
+  pf
+    "0009-list-nesting-max"
+    "max nesting depth exceeded: cannot have more than 6 levels of list items"
+    88
+  pf
+    "0009-list-nesting-max-8"
+    "max nesting depth exceeded: cannot have more than 8 levels of list items"
+    156
   p
     "0009-list-indentation-no-indent"
     L.OrgDoc
