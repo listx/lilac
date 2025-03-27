@@ -8161,8 +8161,10 @@ spec = do
 The CLI has two main parts: the boilerplate and use of the modules (libraries)
 that Lilac provides. In this sense it's a somewhat thin wrapper.
 
-The boilerplate involves option handling (where we use [[https://hackage.haskell.org/package/optparse-applicative][optparse-applicative]]) and
-injecting the Git version information into the version string.
+** =Main= module
+
+The boilerplate involves [[id:ce9af5ef-6559-4ffb-82c1-a439214eda6d][option handling]] (where we use [[https://hackage.haskell.org/package/optparse-applicative][optparse-applicative]]) and
+[[id:3c576a02-418b-431b-ab96-e4936e977fb7][injecting the Git version information]] into the version string.
 
 #+name: module:Main
 #+header: :tangle bin/Main.hs
@@ -8224,7 +8226,7 @@ import Text.Pretty.Simple qualified as PP
 <<f:lilacCheck>>
 #+end_src
 
-** Main
+** =main= entrypoint
 
 In Haskell, like C, execution starts with =main=.
 
@@ -8266,7 +8268,8 @@ lilac globalOpts = case globalOpts.subcommand of
 #+end_src
 
 For now we only implement the =check= subcommand, which is handled by
-[[f:lilacCheck]].
+[[f:lilacCheck]]. This just parses the input, checking if we can parse it by
+examining ~parseResult~.
 
 #+name: f:lilacCheck
 #+begin_src haskell
@@ -8297,6 +8300,9 @@ flag is given. This is useful for debugging. By default the data structure will
 be printed with colored braces, but you can suppress this with ~--no-color~.
 
 ** Option handling boilerplate
+:PROPERTIES:
+:ID:       ce9af5ef-6559-4ffb-82c1-a439214eda6d
+:END:
 
 The option handling code is made up of some declarative configuration of the
 options, and the functions that operate on them.
@@ -8304,14 +8310,15 @@ options, and the functions that operate on them.
 #+name: Option handling
 #+begin_src haskell
 <<data:GlobalOpts>>
+<<data:Subcommand>>
+<<data:CheckOpts>>
 <<data:OptionHandler>>
 <<f:globalOptionsHandler>>
 <<f:subcommandHandler>>
 <<f:checkOptsHandler>>
 #+end_src
 
-The option handling uses types to capture what the allowed global options,
-subcommands, and subcommand options are.
+The global options are encoded in [[data:GlobalOpts]].
 
 #+name: data:GlobalOpts
 #+begin_src haskell
@@ -8322,12 +8329,25 @@ data GlobalOpts = GlobalOpts
     verbose :: Bool
   }
 
+#+end_src
+
+We use subcommands to capture major behaviors --- =check=, =tangle=, and =weave=.
+
+#+name: data:Subcommand
+#+begin_src haskell
 type Subcommand :: Type
 data Subcommand
   = Check CheckOpts
   | Tangle
   | Weave
 
+#+end_src
+
+For now we only support the =check= subcommand, which requires a file to check in
+[[f:lilacCheck]].
+
+#+name: data:CheckOpts
+#+begin_src haskell
 type CheckOpts :: Type
 data CheckOpts = CheckOpts
   { input :: FilePath
@@ -8335,10 +8355,15 @@ data CheckOpts = CheckOpts
 
 #+end_src
 
-We use the type =OptionHandler= to mean the option handling (parsing), because the
+That's it for the data structures for option handling. The next concern is
+understanding how to display and parse these options on the command line (that
+is, how we can perform option parsing on the CLI so that they end up as these
+data structures we've defined above).
+
+We use the type [[data:OptionHandler]] for option parsing on the CLI, because the
 alternative of calling it as =Parser= feels a bit confusing, given how we already
-use the word =OrgParser= (and the concept of a "parser" in general) to mean the
-Org parsing mechanism we have in [[module:Lilac.Parse]]).
+use [[type:OrgParser]] (and the concept of a "parser" in general) to mean the Org
+parsing mechanism we have in [[module:Lilac.Parse]]).
 
 #+name: data:OptionHandler
 #+begin_src haskell
@@ -8348,7 +8373,7 @@ type OptionHandler = Options.Applicative.Parser
 #+end_src
 
 The [[f:globalOptionsHandler]] is the handler for all global options (apart from the
-help and version flags which we add into =mainOptions= in [[f:lilac-main]]).
+help and version flags which we add into ~mainOptions~ in [[f:lilac-main]]).
 
 #+name: f:globalOptionsHandler
 #+begin_src haskell
@@ -8409,7 +8434,7 @@ subcommandHandler =
 
 The [[f:subcommandHandler]] is where we specify each of the different behaviors
 (subcommands) of =lilac=. For now we only implement the =check= subcommand in
-[[f:lilacCheck]], so we only have a single =checkOptsHandler= to handle the options
+[[f:lilacCheck]], so we only have a single [[f:checkOptsHandler]] to handle the options
 for that subcommand.
 
 #+name: f:checkOptsHandler
@@ -8435,11 +8460,11 @@ both Cabal and Nix.
 
 The traditional way of doing Git version injection is with Template Haskell, by
 invoking =git= during compile time. For an overview of working with Template
-Haskell, see [[https://stackoverflow.com/questions/5713418/templatehaskell-and-io#comment7962237_5713551][this SO comment]] and [[https://stackoverflow.com/a/20871010/437583][this SO answer]].
+Haskell, see [[https://stackoverflow.com/questions/5713418/templatehaskell-and-io#comment7962237_5713551][this StackOverflow comment]] and [[https://stackoverflow.com/a/20871010/437583][answer]].
 
 However, invoking =git= doesn't work in all cases, especially when building with
-Nix because when Nix builds things it doesn't use the Git repository (it uses a
-sandboxed build environment).
+Nix because when Nix builds things it doesn't use the Git repository (see
+[[code:lilacSource]]).
 
 First let's get the imports out of the way.
 
@@ -8452,13 +8477,15 @@ module Lilac.Version
 where
 
 import Control.Monad.Trans.Cont
-  ( callCC,
+  ( ContT,
+    callCC,
     evalContT,
   )
 import Data.Time.LocalTime (getZonedTime)
 import Language.Haskell.TH (Exp, Q, runIO, stringE)
 import Relude
   ( IO,
+    MonadTrans,
     String,
     concat,
     filter,
@@ -8479,6 +8506,9 @@ import System.Process (readProcess)
 
 <<f:lilacVersion>>
 <<f:getGitVersion>>
+<<f:tryLilacGitVersion>>
+<<f:tryLilacProjectRoot>>
+<<f:versionFallback>>
 <<f:getEnv>>
 #+end_src
 
@@ -8514,26 +8544,29 @@ computation early with the provided argument.
 #+begin_src haskell
 getGitVersion :: IO String
 getGitVersion = evalContT $ callCC $ \escapeWith -> do
-<<Try LILAC_GIT_VERSION>>
-<<Try LILAC_PROJECT_ROOT>>
-<<Version fallback>>
+  tryLilacGitVersion escapeWith
+  tryLilacProjectRoot escapeWith
+  versionFallback
 
 #+end_src
 
-The first thing we check is for ~LILAC_GIT_VERSION~, which is used by =nix-build=.
-Here, we cannot use ~LILAC_PROJECT_ROOT~ because the =nix-build= process (and also
-any child process such as =git=) won't have permission to enter the
-~LILAC_PROJECT_ROOT~.
+The first thing we check is for ~LILAC_GIT_VERSION~ via [[f:tryLilacGitVersion]],
+which is used by =nix-build=. This is because in Nix we cannot use
+~LILAC_PROJECT_ROOT~ because the =nix-build= process (and also any child process
+such as =git=) won't have permission to enter the ~LILAC_PROJECT_ROOT~.
 
 So instead we have to defer the responsibility of looking up this Git
 information to the build process itself (see [[make:Build lilac with Nix]]). We
 simply read the value of ~LILAC_GIT_VERSION~ and use this string (as long as it's
 not empty) as is.
 
-#+name: Try LILAC_GIT_VERSION
+#+name: f:tryLilacGitVersion
 #+begin_src haskell
+tryLilacGitVersion :: (MonadTrans t) => (String -> t IO ()) -> t IO ()
+tryLilacGitVersion escapeWith = do
   gitVersion <- lift $ getEnv "LILAC_GIT_VERSION"
   when (not $ null gitVersion) $ escapeWith gitVersion
+
 #+end_src
 
 ~getEnv~ looks up an environment variable, but returns the empty string if the
@@ -8549,12 +8582,14 @@ That's it for the first case of building inside a Nix build process.
 
 If we're not inside a Nix build process (such as in a =cabal= build), we are not
 bound by any of the sandboxing rules involved. So we can invoke the =git= binary
-ourselves. This is what we do below, but only if the ~LILAC_PROJECT_ROOT~ is set.
-Again, we expect the build environment to have set this value to a valid Git
-repository path that houses the Lilac code.
+ourselves. This is what we do in [[f:tryLilacProjectRoot]], but only if the
+~LILAC_PROJECT_ROOT~ is set. Again, we expect the build environment to have set
+this value to a valid Git repository path that houses the Lilac code.
 
-#+name: Try LILAC_PROJECT_ROOT
+#+name: f:tryLilacProjectRoot
 #+begin_src haskell
+tryLilacProjectRoot :: (MonadTrans t) => (String -> t IO ()) -> t IO ()
+tryLilacProjectRoot escapeWith = do
   projectRoot <- lift $ getEnv "LILAC_PROJECT_ROOT"
   when (not $ null projectRoot) $ do
     gitOutput <-
@@ -8564,16 +8599,19 @@ repository path that houses the Lilac code.
           ["-C", projectRoot, "describe", "--abbrev=10", "--always", "--dirty"]
           ""
     escapeWith gitOutput
+
 #+end_src
 
-Lastly if neither ~LILAC_GIT_VERSION~ nor ~LILAC_PROJECT_ROOT~ were found, we just
-return ~unknown-build-env~. This will never happen as long as our build
-environment is working correctly. Still, it's good to have a fallback that can
-inform the user how this version information came to be.
+Lastly if neither ~LILAC_GIT_VERSION~ nor ~LILAC_PROJECT_ROOT~ are found, we return
+~unknown-build-env~. This will never happen as long as our build environment is
+working correctly. Still, it's good to have a fallback that can inform the user
+how this version information came to be.
 
-#+name: Version fallback
+#+name: f:versionFallback
 #+begin_src haskell
-  pure "unknown-build-env"
+versionFallback :: ContT String IO String
+versionFallback = pure "unknown-build-env"
+
 #+end_src
 
 * Footnotes

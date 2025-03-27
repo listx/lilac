@@ -4,13 +4,15 @@ module Lilac.Version
 where
 
 import Control.Monad.Trans.Cont
-  ( callCC,
+  ( ContT,
+    callCC,
     evalContT,
   )
 import Data.Time.LocalTime (getZonedTime)
 import Language.Haskell.TH (Exp, Q, runIO, stringE)
 import Relude
   ( IO,
+    MonadTrans,
     String,
     concat,
     filter,
@@ -43,8 +45,17 @@ getTimestamp = show <$> getZonedTime
 
 getGitVersion :: IO String
 getGitVersion = evalContT $ callCC $ \escapeWith -> do
+  tryLilacGitVersion escapeWith
+  tryLilacProjectRoot escapeWith
+  versionFallback
+
+tryLilacGitVersion :: (MonadTrans t) => (String -> t IO ()) -> t IO ()
+tryLilacGitVersion escapeWith = do
   gitVersion <- lift $ getEnv "LILAC_GIT_VERSION"
   when (not $ null gitVersion) $ escapeWith gitVersion
+
+tryLilacProjectRoot :: (MonadTrans t) => (String -> t IO ()) -> t IO ()
+tryLilacProjectRoot escapeWith = do
   projectRoot <- lift $ getEnv "LILAC_PROJECT_ROOT"
   when (not $ null projectRoot) $ do
     gitOutput <-
@@ -54,7 +65,9 @@ getGitVersion = evalContT $ callCC $ \escapeWith -> do
           ["-C", projectRoot, "describe", "--abbrev=10", "--always", "--dirty"]
           ""
     escapeWith gitOutput
-  pure "unknown-build-env"
+
+versionFallback :: ContT String IO String
+versionFallback = pure "unknown-build-env"
 
 getEnv :: String -> IO String
 getEnv env = fromMaybe "" <$> lookupEnv env
