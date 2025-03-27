@@ -1943,17 +1943,17 @@ We use two major data structures for parsing. The first is a *list of
 
   - [[https://orgmode.org/worg/org-syntax.html#Headings][headings]] (aka [[https://orgmode.org/manual/Headlines.html][headlines]]),
 
-  - paragraphs (prose text),
+  - [[id:272567ab-4077-4a47-ae78-dfe77243ccc0][paragraphs]] ([[id:c8616126-215d-49be-8874-c2aca7d93a54][prose]] text),
 
-  - ordered and unordered list items (can be nested),
+  - ordered and unordered [[id:58f69993-599d-4389-ba47-3056b1bb2350][list items]] (can be nested),
 
-  - blocks (code blocks, quotations, examples, etc),
+  - [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][blocks]] (code blocks, quotations, examples, etc),
 
-  - tables,
+  - [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][tables]],
 
-  - images, and
+  - [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][figures]] (images), and
 
-  - LaTeX fragments (typically equations).
+  - LaTeX math fragments ([[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][inline]] and [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][standalone]]).
 
 This scheme is good for quickly making sense of the overall document structure
 in linear fashion, start to finish. It also simplifies the parsing data
@@ -4070,6 +4070,9 @@ mathFragmentInlineParser = do
 #+end_src
 
 ** Paragraphs
+:PROPERTIES:
+:ID:       272567ab-4077-4a47-ae78-dfe77243ccc0
+:END:
 
 The [[f:paragraphParser]] is similar to [[f:headingParser]] because it's also powered
 mostly by [[f:proseParser]]. However a key difference is that it is aware of the
@@ -6907,7 +6910,7 @@ pf
   25
 #+end_src
 
-** Math fragments
+** Standalone math fragments
 :PROPERTIES:
 :ID:       d1064535-5c98-4c80-a901-5cdc1fd5297f
 :END:
@@ -7211,6 +7214,9 @@ ps
 #+end_src
 
 ** Figures
+:PROPERTIES:
+:ID:       a090bf9c-0e52-422b-b0f0-51e3b1bf1698
+:END:
 
 A [[data:Figure][Figure]] is just a link to an image file, with some metadata.
 
@@ -7393,6 +7399,9 @@ p
 #+end_src
 
 ** Tables
+:PROPERTIES:
+:ID:       d0f60631-8b30-4ae1-992d-49c7b0ea38fb
+:END:
 
 [[Tables][Tables]] are like [[data:Figure][figures]] in that they have some metadata. Unlike a figure which
 is just a link, a table has a two-dimensional grid with some information in each
