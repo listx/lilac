@@ -1,6 +1,5 @@
 module Lilac.ParseSpec (spec) where
 
-import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Void (Void)
@@ -36,6 +35,9 @@ import Test.Hspec.Megaparsec
   )
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char)
+
+spec :: Spec
+spec = parseSpec
 
 type Parser :: Type -> Type
 type Parser = MP.Parsec Void T.Text
@@ -111,8 +113,8 @@ plainHeading level =
         }
     )
 
-spec :: Spec
-spec = do
+parseSpec :: Spec
+parseSpec = do
   it "empty input" $ do
     MP.runParser
       (runStateT L.orgDocParser L.defaultOrgParserState)
@@ -177,8 +179,6 @@ spec = do
             plainHeading 11,
             plainHeading 12
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
     L.OrgParserState
@@ -207,8 +207,6 @@ spec = do
             plainHeading 11,
             plainHeading 12
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
     L.OrgParserState
@@ -247,8 +245,6 @@ spec = do
                   }
               )
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
     L.OrgParserState
@@ -278,8 +274,6 @@ spec = do
                   }
               )
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
     L.OrgParserState
@@ -309,8 +303,6 @@ spec = do
                   }
               )
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
     L.OrgParserState
@@ -361,8 +353,6 @@ spec = do
                   (L.StyledText {body = "multiple lines with underscore", style = L.styleMaskFrom [L.Underline]})
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   it "accepts empty input for \"notFollowedBy (char ' ')\"" $ do
@@ -395,8 +385,6 @@ spec = do
                   )
               ]
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
   p
@@ -420,8 +408,6 @@ spec = do
                   (L.StyledText {body = ". It's #1!", style = L.styleMaskFrom []})
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -459,8 +445,6 @@ spec = do
                   )
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -474,8 +458,6 @@ spec = do
                   (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -487,8 +469,6 @@ spec = do
                   (L.StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = L.styleMaskFrom [L.Italic]})
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   pf
@@ -520,8 +500,6 @@ spec = do
                   }
               )
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
     L.OrgParserState
@@ -539,8 +517,6 @@ spec = do
       { cells =
           [ plainParagraph "foo"
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
   p
@@ -564,8 +540,6 @@ spec = do
                   (L.StyledText {body = "d*", style = L.styleMaskFrom [L.Code]})
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -605,8 +579,6 @@ spec = do
                   (L.StyledText {body = "[[bar]]", style = L.styleMaskFrom [L.Code]})
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -622,8 +594,6 @@ spec = do
                   (L.StyledText {body = ") hello", style = L.styleMaskFrom []})
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -657,8 +627,6 @@ spec = do
                   )
               ]
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
   p
@@ -674,8 +642,6 @@ spec = do
                   )
               ]
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
   p
@@ -763,8 +729,6 @@ spec = do
                   )
               ]
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
   ps
@@ -832,8 +796,6 @@ spec = do
                   )
               ]
           ],
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = M.fromList []
       }
     L.OrgParserState
@@ -883,8 +845,6 @@ spec = do
                   }
               )
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -958,8 +918,6 @@ spec = do
                   }
               )
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -980,8 +938,6 @@ spec = do
                   }
               )
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -1026,8 +982,6 @@ spec = do
                   }
               )
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -1086,8 +1040,6 @@ spec = do
                   }
               )
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   pf
@@ -1122,8 +1074,6 @@ spec = do
                 L.LOrderedEnd
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -1179,8 +1129,6 @@ spec = do
               ],
             plainParagraph "Bar."
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -1226,8 +1174,6 @@ spec = do
                 L.LOrderedEnd ------- End outer ordered list.
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   pf
@@ -1245,8 +1191,6 @@ spec = do
           [ plainParagraph "1)",
             plainParagraph "2)"
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -1266,8 +1210,6 @@ spec = do
                 L.LOrderedEnd
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -1284,8 +1226,6 @@ spec = do
                 L.LOrderedEnd
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   pf
@@ -1349,8 +1289,6 @@ spec = do
               ],
             plainParagraph "Four"
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -1400,8 +1338,6 @@ spec = do
               ],
             plainParagraph "Four"
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   ps
@@ -1447,8 +1383,6 @@ spec = do
                   body = "1 + 1 = 2"
                 }
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
     L.OrgParserState
@@ -1498,8 +1432,6 @@ spec = do
                 L.LOrderedEnd
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
     L.OrgParserState
@@ -1572,8 +1504,6 @@ spec = do
                       }
                 }
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -1693,8 +1623,6 @@ spec = do
                       ]
                 }
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }
   p
@@ -1831,7 +1759,5 @@ spec = do
                 L.LOrderedEnd
               ]
           ],
-        code = [],
-        codeBlocks = fromList [],
         meta = fromList []
       }

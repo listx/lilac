@@ -1215,6 +1215,7 @@ Hackage
 hardcode
 hashmap
 Hspec
+Makefile
 Megaparsec
 memoize
 Niv
@@ -1228,6 +1229,7 @@ Relude
 sandbox
 src
 subcommand
+subgraph
 #+end_src
 
 *** Sort file contents
@@ -1383,6 +1385,7 @@ library
   exposed-modules:
       Lilac.Version
       Lilac.Parse
+      Lilac.Tangle
   hs-source-dirs:
       src
   default-extensions:
@@ -1429,6 +1432,7 @@ test-suite spec
   main-is: Spec.hs
   other-modules:
       Lilac.ParseSpec
+      Lilac.TangleSpec
       Paths_lilac
   hs-source-dirs:
       test
@@ -1671,8 +1675,6 @@ where
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
-import Data.Graph qualified as G
-import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -1979,8 +1981,6 @@ metadata (the title, author name, etc).
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { cells :: [Cell],
-    code :: [G.Graph],
-    codeBlocks :: IM.IntMap Block,
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Show)
@@ -2092,8 +2092,6 @@ orgDocParser = do
   pure
     $ OrgDoc
       { cells = filter meaningfulCell cells,
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = meta
       }
 
@@ -2128,8 +2126,6 @@ defaultOrgDoc :: [(T.Text, T.Text)] -> OrgDoc
 defaultOrgDoc metas =
   OrgDoc
     { cells = [],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList metas
     }
 
@@ -2758,8 +2754,6 @@ p
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-ignore-marker-inside-word>>
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -2833,8 +2827,6 @@ ps
                 }
             )
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
   L.OrgParserState
@@ -3242,8 +3234,6 @@ p
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-compression>>
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -3274,8 +3264,6 @@ p
     { cells =
         [ plainParagraph "foo"
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
 #+end_src
@@ -3314,8 +3302,6 @@ p
                 )
             ]
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
 #+end_src
@@ -3336,8 +3322,6 @@ p
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-complex>>
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -3391,8 +3375,6 @@ p
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-complex-punctuation>>
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -3436,8 +3418,6 @@ p
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-verbatim>>
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -3470,8 +3450,6 @@ p
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold>>
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -3518,8 +3496,6 @@ p
   L.OrgDoc
     { cells =
         <<Expected prose for 0005-styled-strings-verbatim-precedence>>,
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -3780,8 +3756,6 @@ ps
                 )
             ]
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
   L.OrgParserState
@@ -3839,8 +3813,6 @@ p
                 )
             ]
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
 #+end_src
@@ -3868,8 +3840,6 @@ p
                 )
             ]
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
 #+end_src
@@ -4018,8 +3988,6 @@ p
                 )
             ]
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
 #+end_src
@@ -4192,8 +4160,6 @@ p
   L.OrgDoc
     { cells =
         <<Expected prose for 0005-prose-paragraphs>>,
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -4427,8 +4393,6 @@ ps
           plainHeading 11,
           plainHeading 12
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
   L.OrgParserState
@@ -4480,8 +4444,6 @@ ps
           plainHeading 11,
           plainHeading 12
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
   L.OrgParserState
@@ -4648,8 +4610,6 @@ ps
                 }
             )
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
   L.OrgParserState
@@ -4693,8 +4653,6 @@ ps
                 }
             )
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
   L.OrgParserState
@@ -4748,8 +4706,6 @@ ps
                 }
             )
         ],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList []
     }
   L.OrgParserState
@@ -4809,8 +4765,6 @@ p
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-empty>>,
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -5102,8 +5056,6 @@ p
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-noweb>>,
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -5179,8 +5131,6 @@ p
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-noweb-off>>,
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -5228,8 +5178,6 @@ p
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-noweb-intraline>>,
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -5353,8 +5301,6 @@ p
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-ending>>,
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -6192,8 +6138,6 @@ p
         [ plainParagraph "1)",
           plainParagraph "2)"
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -6230,8 +6174,6 @@ p
               L.LOrderedEnd
             ]
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -6332,8 +6274,6 @@ p
               L.LOrderedEnd ------- End outer ordered list.
             ]
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -6449,8 +6389,6 @@ p
               L.LOrderedEnd
             ]
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -6538,8 +6476,6 @@ p
             ],
           plainParagraph "Bar."
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -6694,8 +6630,6 @@ p
             ],
           plainParagraph "Four"
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -6773,8 +6707,6 @@ p
             ],
           plainParagraph "Four"
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -6866,8 +6798,6 @@ p
               L.LOrderedEnd
             ]
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -7126,8 +7056,6 @@ ps
                 body = "1 + 1 = 2"
               }
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
   L.OrgParserState
@@ -7198,8 +7126,6 @@ ps
               L.LOrderedEnd
             ]
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
   L.OrgParserState
@@ -7392,8 +7318,6 @@ p
                     }
               }
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -7690,8 +7614,6 @@ p
                     ]
               }
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
@@ -7848,21 +7770,9 @@ p
               L.LOrderedEnd
             ]
         ],
-      code = [],
-      codeBlocks = fromList [],
       meta = fromList []
     }
 #+end_src
-
-** Code graphs
-:PROPERTIES:
-:ID:       b449a097-d702-4fd6-98de-cb81f7e49177
-:END:
-
-The code graph is just a =Graph= (from =Data.Graph= in the =containers= Haskell
-library), where a =Graph= is an adjacency list of integers. The integers
-correspond to unique IDs assigned to each logical code block. The integer ID
-corresponds to the index of the cell containing the code block in the cell list.
 
 ** Testing framework
 :PROPERTIES:
@@ -7896,7 +7806,6 @@ spend far more time compiling the tests themselves).
 #+begin_src haskell
 module Lilac.ParseSpec (spec) where
 
-import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Void (Void)
@@ -7933,15 +7842,26 @@ import Test.Hspec.Megaparsec
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char)
 
-<<Test helpers>>
+<<parseSpec discovery>>
 
-<<f:spec>>
+<<ParseSpec helpers>>
+
+<<f:parseSpec>>
+#+end_src
+
+We have to export a function named ~spec~ for discovery of test cases to happen
+automatically, so we define it in [[parseSpec discovery]].
+
+#+name: parseSpec discovery
+#+begin_src haskell
+spec :: Spec
+spec = parseSpec
 #+end_src
 
 Most of the test helpers are concerned about reading a raw input file from disk,
 and then running the [[f:orgDocParser]] against it.
 
-#+name: Test helpers
+#+name: ParseSpec helpers
 #+begin_src haskell
 type Parser :: Type -> Type
 type Parser = <<Concrete type for Megaparsec>>
@@ -8089,10 +8009,10 @@ plainHeading level =
 
 Below are all of the individual test cases.
 
-#+name: f:spec
+#+name: f:parseSpec
 #+begin_src haskell
-spec :: Spec
-spec = do
+parseSpec :: Spec
+parseSpec = do
   <<t:empty-input>>
   <<t:self-parse>>
   <<t:0001-blankline>>
@@ -8163,6 +8083,531 @@ spec = do
   <<t:0011-figures-and-blocks>>
   <<t:0012-tables-and-prose>>
   <<t:0012-tables-inside-lists>>
+#+end_src
+
+* Tangling
+:PROPERTIES:
+:ID:       b449a097-d702-4fd6-98de-cb81f7e49177
+:END:
+
+In Literate Programming, /tangling/ is the act of extracting the source code out
+of a literate document. It is the opposite of documentation generation found in
+many programming language environments, such as =javadoc=, where documentation is
+extracted from source code.
+
+** =Lilac.Tangle= module
+
+Tangling concerns are captured in [[file:src/Lilac/Tangle.hs]].
+
+#+name: module:Lilac.Tangle
+#+header: :tangle src/Lilac/Tangle.hs
+#+begin_src haskell
+module Lilac.Tangle
+  ( BlockName,
+    SourceCode (..),
+    findCycles,
+    getSourceCode,
+  )
+where
+
+import Data.Graph qualified as G
+import Data.Map.Strict qualified as M
+import Data.Text qualified as T
+import Lilac.Parse
+  ( BToken (BTokenLink),
+    Block (body, meta),
+    Cell (CBlock),
+    Link (Link),
+    LinkType (LinkNoweb),
+    OrgDoc (cells),
+  )
+import Relude
+  ( Maybe (Just, Nothing),
+    Type,
+    catMaybes,
+    elem,
+    fmap,
+    foldl',
+    length,
+    map,
+    otherwise,
+    ($),
+    (.),
+    (>),
+  )
+import Relude.Extra.Map qualified as EM
+import Relude.Nub
+  ( hashNub,
+  )
+
+<<data:SourceCode>>
+<<type:BlockName>>
+<<f:defaultSourceCode>>
+<<f:getSourceCode>>
+<<f:buildGraph>>
+<<f:findCycles>>
+<<f:tangle>>
+#+end_src
+
+** Tangling overview
+
+Tangling essentially boils down to the following:
+
+  1) find all code blocks that need to get tangled (they have ~#+header: :tangle
+     ...~ in their metadata), and
+
+  2) for each of these code blocks expand any Noweb references in them until
+     none are left, and finally
+
+  3) write the files to disk (but only for those files that are different than
+     what we already have on disk).
+
+The first two steps are the bare minimum required in order to feed source code
+to the computer for interpretation by it, while the third is a way to avoid
+unnecessarily busting the modification timestamp cache for Makefiles (because
+they use file modification timestamps to see whether we need to rerun a rule).
+
+The [[data:SourceCode]] data structure captures the information needed from the
+first two steps.
+
+#+name: data:SourceCode
+#+begin_src haskell
+type SourceCode :: Type
+data SourceCode = SourceCode
+  { roots :: [BlockName],
+    nameToCodeBlock :: M.Map BlockName Block
+  }
+
+#+end_src
+
+#+name: f:defaultSourceCode
+#+begin_src haskell
+defaultSourceCode :: SourceCode
+defaultSourceCode =
+  SourceCode
+    { roots = [],
+      nameToCodeBlock = M.fromList []
+    }
+
+#+end_src
+
+The ~roots~ field has a list of file paths that need to be tangled. The
+~nameToCodeBlock~ field is a simple mapping from the name of the block to the
+block itself. The [[type:BlockName]] is just a convenience type to help readability.
+
+#+name: type:BlockName
+#+begin_src haskell
+type BlockName :: Type
+type BlockName = T.Text
+
+#+end_src
+
+** Find code blocks to tangle
+
+The function [[f:getSourceCode]] goes through the cells inside a [[data:OrgDoc]] to
+populate [[data:SourceCode]].
+
+#+name: f:getSourceCode
+#+begin_src haskell
+getSourceCode :: OrgDoc -> SourceCode
+getSourceCode od = foldl' f defaultSourceCode od.cells
+  where
+    f :: SourceCode -> Cell -> SourceCode
+    f sc (CBlock b)
+      | Just name <- EM.lookup "name" b.meta,
+        Just tangleMe <- EM.lookup "tangle" b.meta =
+          sc
+            { roots = tangleMe : sc.roots,
+              nameToCodeBlock = M.insert name b sc.nameToCodeBlock
+            }
+      | Just name <- EM.lookup "name" b.meta =
+          sc
+            { nameToCodeBlock = M.insert name b sc.nameToCodeBlock
+            }
+      | otherwise = sc
+    f sc _ = sc
+
+#+end_src
+
+Most of the work is done by the ~f~ helper, which just makes sure
+that we only use blocks that have a name (and a ~tangle~ path for those ones
+that are tangled).
+
+** Detect cyclic Noweb links
+
+We want to build up a graph using the Noweb link information embedded in each
+block. Using a graph data structure allows us to easily detect cycles, which are
+not allowed for tangling because they cannot be resolved.
+
+You may think we could avoid using graphs entirely, and just use an algorithm
+like "keep expanding all Noweb links recursively; if we see a Noweb link being
+used more than once, error out" to detect cycles. However this won't work
+because you can technically reference the same block multiple times at different
+points in the tree.
+
+Specifically, we want to build a /directed/ graph where we treat all blocks as
+nodes (vertices) and the dependency of Noweb links as edges. So if a block =x=
+depends on a Noweb link =y=, then =x= would point to =y=.
+
+From CLRS 3rd, Ch 22 p. 614 we can find a more formal definition of cycles in a
+directed graph:
+
+#+begin_quote
+A directed graph G is acyclic if and only if a depth-first search of G yields no
+back edges.
+#+end_quote
+
+And a back edge is defined like this in CLRS p. 609:
+
+#+begin_quote
+Back edges are those edges (u, v) connecting a vertex u to an ancestor v in a
+depth-first tree. We consider self-loops, which may occur in directed graphs, to
+be back edges.
+#+end_quote
+
+Note that a back edge can be either an edge that points back to an ancestor, or
+a self-loop. Whether an edge points back to an ancestor can be determined by
+finding strongly connected components with more than one vertex. And we can
+check for self-loops by just seeing if a block links to itself.
+
+Checking for strongly connected components can be done with the =scc= function
+provided by the =Data.Graph= library. This library also lets us create a /single/
+graph with all of the blocks in it because the library doesn't care whether the
+edges we feed into it are connected.
+
+The [[f:buildGraph]] function looks at all code blocks and generates the necessary
+edges to build up a directed graph. Multiple links to the same code block are
+de-duplicated with ~hashNub~.
+
+#+name: f:buildGraph
+#+begin_src haskell
+buildGraph ::
+  [Block] ->
+  ( G.Graph,
+    G.Vertex -> (Block, BlockName, [BlockName]),
+    BlockName -> Maybe G.Vertex
+  )
+buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
+  where
+    f ::
+      [(Block, BlockName, [BlockName])] ->
+      Block ->
+      [(Block, BlockName, [BlockName])]
+    f acc block
+      | Just name <- EM.lookup "name" block.meta =
+          (\targets -> (block, name, targets) : acc)
+            . hashNub
+            . catMaybes
+            $ map getLinkTarget block.body
+      | otherwise = acc
+    getLinkTarget = \case
+      (BTokenLink (Link _ target LinkNoweb)) -> Just target
+      _ -> Nothing
+
+#+end_src
+
+The [[f:findCycles]] function then takes the output of [[f:buildGraph]] and uses that to
+run the =scc= function to get the strongly connected components.
+
+#+name: f:findCycles
+#+begin_src haskell
+findCycles :: [Block] -> [G.Tree BlockName]
+findCycles blocks = map (fmap toBlockName) . foldl' f [] $ G.scc graph
+  where
+    (graph, vertexToNode, _) = buildGraph blocks
+    toBlockName vertex =
+      let (_, blockName, _) = vertexToNode vertex
+       in blockName
+    f acc tree@(G.Node vertex _)
+      | length tree > 1 = tree : acc
+      | (_, name, targets) <- vertexToNode vertex,
+        elem name targets =
+          tree : acc
+      | otherwise = acc
+
+#+end_src
+
+Checking for back edges means just seeing whether there is more than one vertex,
+or if there are any self-loops; these concerns are encoded in the ~f~ helper
+function.
+
+*** Tests
+
+We use the [[f:checkCycles]] helper (powered by [[f:findCycles]] underneath) to detect
+cycles (or lack thereof).
+
+First let's check for the happy path where there are no cycles. Note the use of
+~:noweb off~ so as to preserve the Noweb link declaration (see
+[[f:nowebLinkParser]] and [[t:0007-blocks-noweb]] for more sample usage of ~:noweb off~).
+
+#+header: :tangle test/Lilac/TangleSpec/0100-dag-no-loops
+#+header: :noweb off
+#+begin_src org
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+
+,#+name: f:b
+,#+begin_src haskell
+g = 2 + 2
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-no-loops
+#+begin_src haskell
+checkCycles
+  "0100-dag-no-loops"
+  []
+#+end_src
+
+Now check for the simplest case of a single self-loop.
+
+#+header: :tangle test/Lilac/TangleSpec/0100-dag-self-loop
+#+header: :noweb off
+#+begin_src org
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-self-loop
+#+begin_src haskell
+checkCycles
+  "0100-dag-self-loop"
+  [G.Node "f:a" []]
+#+end_src
+
+Check whether we can detect two independent self-loops.
+
+#+header: :tangle test/Lilac/TangleSpec/0100-dag-self-loops
+#+header: :noweb off
+#+begin_src org
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+
+,#+name: f:b
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-self-loops
+#+begin_src haskell
+checkCycles
+  "0100-dag-self-loops"
+  [G.Node "f:a" [], G.Node "f:b" []]
+#+end_src
+
+Check whether we can detect a back edge to an ancestor. In
+[[t:0100-dag-2-node-loop]] we have a cycle involving 2 nodes.
+
+#+header: :tangle test/Lilac/TangleSpec/0100-dag-2-node-loop
+#+header: :noweb off
+#+begin_src org
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+
+,#+name: f:b
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-2-node-loop
+#+begin_src haskell
+checkCycles
+  "0100-dag-2-node-loop"
+  [G.Node "f:a" [G.Node "f:b" []]]
+#+end_src
+
+Test case [[t:0100-dag-3-node-loop]] is like the previous one, but where the loop is
+one node longer (involves 3 nodes instead of 2).
+
+#+header: :tangle test/Lilac/TangleSpec/0100-dag-3-node-loop
+#+header: :noweb off
+#+begin_src org
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+
+,#+name: f:b
+,#+begin_src haskell
+f = 1 + 1
+<<f:c>>
+,#+end_src
+
+,#+name: f:c
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-3-node-loop
+#+begin_src haskell
+checkCycles
+  "0100-dag-3-node-loop"
+  [G.Node "f:a" [G.Node "f:b" [G.Node "f:c" []]]]
+#+end_src
+
+Lastly, we have a test case involving complex loops. There are many back edges
+involved here; we just want to make sure that our algorithm for finding cycles
+is still able to handle such pathological input.
+
+#+header: :tangle test/Lilac/TangleSpec/0100-dag-complex-loops
+#+header: :noweb off
+#+begin_src org
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+
+,#+name: f:b
+,#+begin_src haskell
+f = 1 + 1
+<<f:c>>
+<<f:d>>
+,#+end_src
+
+,#+name: f:c
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+
+,#+name: f:d
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+<<f:d>>
+,#+end_src
+
+,#+name: f:e
+,#+begin_src haskell
+f = 1 + 1
+<<f:e>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-complex-loops
+#+begin_src haskell
+checkCycles
+  "0100-dag-complex-loops"
+  [G.Node "f:a" [G.Node "f:b" [G.Node "f:c" [], G.Node "f:d" []]], G.Node "f:e" []]
+#+end_src
+
+** Testing framework
+
+The testing framework here is modeled closely after [[module:Lilac.ParseSpec]].
+
+*** Test module and helpers
+
+#+name: module:Lilac.TangleSpec
+#+header: :tangle test/Lilac/TangleSpec.hs
+#+begin_src haskell
+module Lilac.TangleSpec (spec) where
+
+import Data.Graph qualified as G
+import Data.Map.Strict qualified as M
+import Data.Text qualified as T
+import Lilac.Parse qualified as LP
+import Lilac.Tangle qualified as LT
+import Relude
+  ( ByteString,
+    Either (Left, Right),
+    FilePath,
+    MonadIO,
+    decodeUtf8,
+    pure,
+    readFileBS,
+    ($),
+    (.),
+    (<>),
+  )
+import Test.Hspec (Spec, it, shouldBe)
+
+<<tangleSpec discovery>>
+
+<<TangleSpec helpers>>
+
+<<f:tangleSpec>>
+#+end_src
+
+Just like [[module:Lilac.ParseSpec]], we define a ~spec~ function for automatic
+discovery (and running) of the test cases here (in ~tangleSpec~) in [[tangleSpec discovery]].
+
+#+name: tangleSpec discovery
+#+begin_src haskell
+spec :: Spec
+spec = tangleSpec
+#+end_src
+
+On to the helpers. The test cases in [[f:tangleSpec]] will be defined with these
+helpers.
+
+#+name: TangleSpec helpers
+#+begin_src haskell
+<<f:readFrom>>
+<<f:getSourceCodeFromPath>>
+<<f:checkCycles>>
+#+end_src
+
+The [[data:SourceCode]] data structure is critical for tangling. The function
+[[f:getSourceCodeFromPath]] reads a complete Org document from disk and converts it
+to a [[data:SourceCode]] type.
+
+#+name: f:getSourceCodeFromPath
+#+begin_src haskell
+getSourceCodeFromPath :: (MonadIO m) => FilePath -> m (Either T.Text LT.SourceCode)
+getSourceCodeFromPath path = do
+  input <- readFrom "test/Lilac/TangleSpec/" path
+  case LP.parseOrgDoc (decodeUtf8 input) of
+    Left errMsg -> pure $ Left errMsg
+    Right od -> pure . Right $ LT.getSourceCode od
+
+#+end_src
+
+The [[f:checkCycles]] function uses [[f:findCycles]] to see if the Org document at the
+given path has any cycles.
+
+#+name: f:checkCycles
+#+begin_src haskell
+checkCycles :: FilePath -> [G.Tree LT.BlockName] -> Spec
+checkCycles path expectedCycles = do
+  it path $ do
+    (Right sc) <- getSourceCodeFromPath path
+    (LT.findCycles $ M.elems sc.nameToCodeBlock) `shouldBe` expectedCycles
+#+end_src
+
+*** All test cases
+
+Below are all of the individual test cases.
+
+#+name: f:tangleSpec
+#+begin_src haskell
+tangleSpec :: Spec
+tangleSpec = do
+  <<t:0100-dag-no-loops>>
+  <<t:0100-dag-self-loop>>
+  <<t:0100-dag-self-loops>>
+  <<t:0100-dag-2-node-loop>>
+  <<t:0100-dag-3-node-loop>>
+  <<t:0100-dag-complex-loops>>
 #+end_src
 
 * CLI

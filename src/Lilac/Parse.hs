@@ -29,8 +29,6 @@ where
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
-import Data.Graph qualified as G
-import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -158,8 +156,6 @@ defaultOrgParserConf =
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { cells :: [Cell],
-    code :: [G.Graph],
-    codeBlocks :: IM.IntMap Block,
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Show)
@@ -333,8 +329,6 @@ orgDocParser = do
   pure
     $ OrgDoc
       { cells = filter meaningfulCell cells,
-        code = [],
-        codeBlocks = IM.fromList [],
         meta = meta
       }
 
@@ -342,8 +336,6 @@ defaultOrgDoc :: [(T.Text, T.Text)] -> OrgDoc
 defaultOrgDoc metas =
   OrgDoc
     { cells = [],
-      code = [],
-      codeBlocks = IM.fromList [],
       meta = M.fromList metas
     }
 
