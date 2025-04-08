@@ -1,7 +1,6 @@
 module Lilac.TangleSpec (spec) where
 
 import Data.Graph qualified as G
-import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
@@ -30,7 +29,7 @@ checkCycles :: FilePath -> [G.Tree LT.BlockName] -> Spec
 checkCycles path expectedCycles = do
   it path $ do
     (Right sc) <- getSourceCodeFromPath path
-    (LT.findCycles $ M.elems sc.nameToCodeBlock) `shouldBe` expectedCycles
+    (LT.findCycles sc) `shouldBe` expectedCycles
 
 tangleSpec :: Spec
 tangleSpec = do

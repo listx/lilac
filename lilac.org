@@ -8297,10 +8297,10 @@ run the =scc= function to get the strongly connected components.
 
 #+name: f:findCycles
 #+begin_src haskell
-findCycles :: [Block] -> [G.Tree BlockName]
-findCycles blocks = map (fmap toBlockName) . foldl' f [] $ G.scc graph
+findCycles :: SourceCode -> [G.Tree BlockName]
+findCycles sc = map (fmap toBlockName) . foldl' f [] $ G.scc graph
   where
-    (graph, vertexToNode, _) = buildGraph blocks
+    (graph, vertexToNode, _) = buildGraph $ M.elems sc.nameToCodeBlock
     toBlockName vertex =
       let (_, blockName, _) = vertexToNode vertex
        in blockName
@@ -8312,6 +8312,10 @@ findCycles blocks = map (fmap toBlockName) . foldl' f [] $ G.scc graph
       | otherwise = acc
 
 #+end_src
+
+The line ~M.elems sc.nameToCodeBlock~ just gets all code blocks from the
+~nameToCodeBlock~ field (perhaps ~M.elems~ is a poor name and should have been
+called ~M.values~ instead, but that's another matter).
 
 Checking for back edges means just seeing whether there is more than one vertex,
 or if there are any self-loops; these concerns are encoded in the ~f~ helper
@@ -8509,7 +8513,6 @@ The testing framework here is modeled closely after [[module:Lilac.ParseSpec]].
 module Lilac.TangleSpec (spec) where
 
 import Data.Graph qualified as G
-import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
@@ -8573,7 +8576,7 @@ checkCycles :: FilePath -> [G.Tree LT.BlockName] -> Spec
 checkCycles path expectedCycles = do
   it path $ do
     (Right sc) <- getSourceCodeFromPath path
-    (LT.findCycles $ M.elems sc.nameToCodeBlock) `shouldBe` expectedCycles
+    (LT.findCycles sc) `shouldBe` expectedCycles
 #+end_src
 
 *** All test cases

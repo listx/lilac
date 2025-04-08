@@ -93,10 +93,10 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
       (BTokenLink (Link _ target LinkNoweb)) -> Just target
       _ -> Nothing
 
-findCycles :: [Block] -> [G.Tree BlockName]
-findCycles blocks = map (fmap toBlockName) . foldl' f [] $ G.scc graph
+findCycles :: SourceCode -> [G.Tree BlockName]
+findCycles sc = map (fmap toBlockName) . foldl' f [] $ G.scc graph
   where
-    (graph, vertexToNode, _) = buildGraph blocks
+    (graph, vertexToNode, _) = buildGraph $ M.elems sc.nameToCodeBlock
     toBlockName vertex =
       let (_, blockName, _) = vertexToNode vertex
        in blockName
