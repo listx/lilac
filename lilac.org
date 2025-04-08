@@ -1386,6 +1386,7 @@ library
       Lilac.Version
       Lilac.Parse
       Lilac.Tangle
+      Lilac.Util
   hs-source-dirs:
       src
   default-extensions:
@@ -2169,7 +2170,7 @@ At the other end of the spectrum, Lilac should be able to parse itself
 
 #+name: t:self-parse
 #+begin_src haskell
-before (readFrom "" "lilac.org") $ do
+before (LU.readFrom "" "lilac.org") $ do
   it "self-parse" $ \input -> do
     MP.runParser
       (runStateT L.orgDocParser L.defaultOrgParserState)
@@ -7810,16 +7811,13 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Void (Void)
 import Lilac.Parse qualified as L
+import Lilac.Util qualified as LU
 import Relude
   ( FilePath,
     Int,
-    MonadIO,
     String,
     Type,
-    decodeUtf8,
     fromList,
-    pure,
-    readFileBS,
     runStateT,
     show,
     ($),
@@ -7866,7 +7864,6 @@ and then running the [[f:orgDocParser]] against it.
 type Parser :: Type -> Type
 type Parser = <<Concrete type for Megaparsec>>
 
-<<f:readFrom>>
 <<f:p>>
 <<f:ps>>
 <<f:pf>>
@@ -7879,19 +7876,6 @@ The ~Parser~ type synonym uses the same [[Concrete type for Megaparsec][concrete
 [[type:OrgParser]]. The ~Parser~ type synonym is used in tests such as
 [[t:0005-notFollowedBy-behavior-for-empty-input]].
 
-[[f:readFrom]] reads a path from the given prefix, and returns a =T.Text=. We'll
-be using this a lot because most of the tests here are based on parsing some
-input file path.
-
-#+name: f:readFrom
-#+begin_src haskell
-readFrom :: (MonadIO m) => FilePath -> FilePath -> m T.Text
-readFrom prefix path = do
-  byteString <- readFileBS $ prefix <> path
-  pure $ decodeUtf8 byteString
-
-#+end_src
-
 We need a helper function around =parseOrgDoc=, which will read in a file from a
 given path (to feed to =parseOrgDoc=). We name this helper just =p=.
 
@@ -7899,7 +7883,7 @@ given path (to feed to =parseOrgDoc=). We name this helper just =p=.
 #+begin_src haskell
 p :: FilePath -> L.OrgDoc -> Spec
 p path expected = do
-  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
@@ -7916,7 +7900,7 @@ check the expected end state as well. We do this with =ps= below.
 #+begin_src haskell
 ps :: FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
 ps path expected state = do
-  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
@@ -7933,7 +7917,7 @@ Sometimes we want to test that a file will fail to parse. We do this with =pf=
 #+begin_src haskell
 pf :: FilePath -> String -> Int -> Spec
 pf path errMsg pos = do
-  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
@@ -7958,7 +7942,7 @@ trivial parse errors.".
 #+begin_src haskell
 pfm :: FilePath -> ET T.Text -> Int -> Spec
 pfm path errorTrivial pos = do
-  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
@@ -8529,16 +8513,14 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
+import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
     FilePath,
-    MonadIO,
-    decodeUtf8,
+    IO,
     pure,
-    readFileBS,
     ($),
     (.),
-    (<>),
   )
 import Test.Hspec (Spec, it, shouldBe)
 
@@ -8563,7 +8545,6 @@ helpers.
 
 #+name: TangleSpec helpers
 #+begin_src haskell
-<<f:readFrom>>
 <<f:getSourceCodeFromPath>>
 <<f:checkCycles>>
 #+end_src
@@ -8574,9 +8555,9 @@ to a [[data:SourceCode]] type.
 
 #+name: f:getSourceCodeFromPath
 #+begin_src haskell
-getSourceCodeFromPath :: (MonadIO m) => FilePath -> m (Either T.Text LT.SourceCode)
+getSourceCodeFromPath :: FilePath -> IO (Either T.Text LT.SourceCode)
 getSourceCodeFromPath path = do
-  input <- readFrom "test/Lilac/TangleSpec/" path
+  input <- LU.readFrom "test/Lilac/TangleSpec/" path
   case LP.parseOrgDoc input of
     Left errMsg -> pure $ Left errMsg
     Right od -> pure . Right $ LT.getSourceCode od
@@ -9066,6 +9047,39 @@ how this version information came to be.
 #+begin_src haskell
 versionFallback :: ContT String IO String
 versionFallback = pure "unknown-build-env"
+
+#+end_src
+
+* Common utility functions
+
+#+name: module:Lilac.Util
+#+header: :tangle src/Lilac/Util.hs
+#+begin_src haskell
+module Lilac.Util
+  ( readFrom,
+  )
+where
+
+import Data.Text qualified as T
+import Data.Text.IO.Utf8 (readFile)
+import Relude
+  ( FilePath,
+    IO,
+    ($),
+    (<>),
+  )
+
+<<f:readFrom>>
+#+end_src
+
+[[f:readFrom]] reads a path from the given prefix, and returns a =T.Text=. We'll
+be using this a lot because most of the tests here are based on parsing some
+input file path.
+
+#+name: f:readFrom
+#+begin_src haskell
+readFrom :: FilePath -> FilePath -> IO T.Text
+readFrom prefix path = readFile $ prefix <> path
 
 #+end_src
 

@@ -4,16 +4,13 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Void (Void)
 import Lilac.Parse qualified as L
+import Lilac.Util qualified as LU
 import Relude
   ( FilePath,
     Int,
-    MonadIO,
     String,
     Type,
-    decodeUtf8,
     fromList,
-    pure,
-    readFileBS,
     runStateT,
     show,
     ($),
@@ -42,14 +39,9 @@ spec = parseSpec
 type Parser :: Type -> Type
 type Parser = MP.Parsec Void T.Text
 
-readFrom :: (MonadIO m) => FilePath -> FilePath -> m T.Text
-readFrom prefix path = do
-  byteString <- readFileBS $ prefix <> path
-  pure $ decodeUtf8 byteString
-
 p :: FilePath -> L.OrgDoc -> Spec
 p path expected = do
-  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
@@ -59,7 +51,7 @@ p path expected = do
 
 ps :: FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
 ps path expected state = do
-  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
@@ -69,7 +61,7 @@ ps path expected state = do
 
 pf :: FilePath -> String -> Int -> Spec
 pf path errMsg pos = do
-  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
@@ -79,7 +71,7 @@ pf path errMsg pos = do
 
 pfm :: FilePath -> ET T.Text -> Int -> Spec
 pfm path errorTrivial pos = do
-  before (readFrom "test/Lilac/ParseSpec/" path) $ do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
@@ -123,7 +115,7 @@ parseSpec = do
       "empty input"
       ""
       `shouldParse` (L.defaultOrgDoc [], L.defaultOrgParserState)
-  before (readFrom "" "lilac.org") $ do
+  before (LU.readFrom "" "lilac.org") $ do
     it "self-parse" $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
