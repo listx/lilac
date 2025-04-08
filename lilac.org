@@ -1814,7 +1814,7 @@ import Prelude qualified (show)
 <<f:styleMaskFlip>>
 <<f:isVerbatim>>
 <<f:compressProse>>
-<<f:rememberBlockName>>
+<<f:assertUniqueBlockName>>
 <<f:linkParser>>
 <<f:failIfVerbatimOrCode>>
 <<f:bracketedLinkParser>>
@@ -4841,7 +4841,7 @@ Blocks can have associated metadata, as we can see from the test case above. The
 metadata is made up of any number of special key\/value pairs that are written
 in the form of =#+header: :key value= lines. The special line =#+name: foo= gives
 the block a unique name (if it's not globally unique, we'll complain about it
-[[f:rememberBlockName]]), which can be the target of an internal link.
+[[f:assertUniqueBlockName]]), which can be the target of an internal link.
 
 Vanilla Org allows you to place these key\/value pairs on the same line as the
 =#+begin_...= line, but we don't allow this. This enforces a cleaner style and
@@ -4865,7 +4865,7 @@ metaNameParser :: OrgParser (T.Text, T.Text)
 metaNameParser = do
   _ <- string "#+name: "
   name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
-  rememberBlockName name
+  assertUniqueBlockName name
   pure ("name", name)
 
 #+end_src
@@ -4915,14 +4915,14 @@ pf
   114
 #+end_src
 
-The [[f:rememberBlockName]] function keeps track of all the named code
+The [[f:assertUniqueBlockName]] function keeps track of all the named code
 blocks we've seen so far. This is used to detect whether we've seen a code block
 name more than once, which is not allowed.
 
-#+name: f:rememberBlockName
+#+name: f:assertUniqueBlockName
 #+begin_src haskell
-rememberBlockName :: T.Text -> OrgParser ()
-rememberBlockName blockName = do
+assertUniqueBlockName :: T.Text -> OrgParser ()
+assertUniqueBlockName blockName = do
   orgParserState <- get
   when (Set.member blockName orgParserState.blockNames)
     . fail

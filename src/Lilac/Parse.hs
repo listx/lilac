@@ -705,8 +705,8 @@ compressProse = reverse . dropUnnecessary . foldl' f []
     dropUnnecessary (((PTokenStyledText (StyledText "" _))) : rest) = rest
     dropUnnecessary tokens = tokens
 
-rememberBlockName :: T.Text -> OrgParser ()
-rememberBlockName blockName = do
+assertUniqueBlockName :: T.Text -> OrgParser ()
+assertUniqueBlockName blockName = do
   orgParserState <- get
   when (Set.member blockName orgParserState.blockNames)
     . fail
@@ -869,7 +869,7 @@ metaNameParser :: OrgParser (T.Text, T.Text)
 metaNameParser = do
   _ <- string "#+name: "
   name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
-  rememberBlockName name
+  assertUniqueBlockName name
   pure ("name", name)
 
 assertUniqueTanglePath :: T.Text -> T.Text -> OrgParser ()
