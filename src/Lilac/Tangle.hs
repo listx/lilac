@@ -1,6 +1,7 @@
 module Lilac.Tangle
   ( BlockName,
     SourceCode (..),
+    expandRootBlocks,
     findCycles,
     getSourceCode,
   )
@@ -10,7 +11,7 @@ import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse
-  ( BToken (BTokenLink),
+  ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
     Cell (CBlock),
     Link (Link),
@@ -18,17 +19,24 @@ import Lilac.Parse
     OrgDoc (cells),
   )
 import Relude
-  ( Maybe (Just, Nothing),
+  ( Bool (False, True),
+    Maybe (Just, Nothing),
     Type,
     catMaybes,
     elem,
+    error,
     fmap,
     foldl',
+    fst,
     length,
     map,
     otherwise,
+    reverse,
     ($),
     (.),
+    (/=),
+    (<>),
+    (==),
     (>),
   )
 import Relude.Extra.Map qualified as EM
@@ -58,9 +66,9 @@ getSourceCode od = foldl' f defaultSourceCode od.cells
     f :: SourceCode -> Cell -> SourceCode
     f sc (CBlock b)
       | Just name <- EM.lookup "name" b.meta,
-        Just tangleMe <- EM.lookup "tangle" b.meta =
+        Just _ <- EM.lookup "tangle" b.meta =
           sc
-            { roots = tangleMe : sc.roots,
+            { roots = name : sc.roots,
               nameToCodeBlock = M.insert name b sc.nameToCodeBlock
             }
       | Just name <- EM.lookup "name" b.meta =
@@ -106,3 +114,51 @@ findCycles sc = map (fmap toBlockName) . foldl' f [] $ G.scc graph
         elem name targets =
           tree : acc
       | otherwise = acc
+
+expandRootBlocks :: SourceCode -> [(T.Text, T.Text)]
+expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
+  where
+    expandRootBlock :: T.Text -> Maybe (T.Text, T.Text)
+    expandRootBlock rootBlockName
+      | Just rootBlock <- EM.lookup rootBlockName sc.nameToCodeBlock =
+          Just
+            ( tanglePathOf rootBlock,
+              trimTrailingSpaces $ expandBlock sc rootBlock ""
+            )
+      | otherwise = Nothing
+    trimTrailingSpaces :: T.Text -> T.Text
+    trimTrailingSpaces text =
+      T.unlines
+        . map (T.dropWhileEnd (== ' '))
+        $ T.lines text
+
+expandBlock :: SourceCode -> Block -> T.Text -> T.Text
+expandBlock sc block existingPrefix =
+  let acc = "" :: T.Text
+      prefix = "" :: T.Text
+   in fst $ foldl' expand (acc, prefix) block.body
+  where
+    expand (acc, _) (BTokenString text) =
+      (acc <> prependExistingPrefix text, getPrefix text)
+    expand (acc, prefix) (BTokenLink (Link _ target LinkNoweb))
+      | Just targetBlock <- EM.lookup target sc.nameToCodeBlock =
+          ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
+            prefix
+          )
+      | otherwise = (acc, prefix)
+    expand (acc, prefix) _ = (acc, prefix)
+    getPrefix text = T.takeWhileEnd (/= '\n') text
+    prependExistingPrefix text =
+      T.intercalate "\n"
+        . reverse
+        . fst
+        . foldl' prefixTailLines ([], True)
+        $ T.split (== '\n') text
+    prefixTailLines (acc, isFirstLine) line
+      | isFirstLine = (line : acc, False)
+      | otherwise = (T.append existingPrefix line : acc, False)
+
+tanglePathOf :: Block -> T.Text
+tanglePathOf block
+  | Just path <- EM.lookup "tangle" block.meta = path
+  | otherwise = error "programmer error"

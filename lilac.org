@@ -5052,6 +5052,12 @@ empty with =zeroBTokensParser=. Otherwise, we end up expecting =someBTokensParse
 to succeed. See [[t:0007-blocks-ending]] which checks the various edge cases around
 making sure we can detect the ="\n#+end_..."= bit.
 
+Note that because we treat the trailing newline as a part of the =#+end_...=
+marker, we leave it out of the parsed contents. This actually helps us when we
+have to tangle blocks in [[f:expandBlock]]. If we parsed in the trailing newlines,
+these newlines would build up every time we nested into a block (e.g.,
+[[t:0101-block-expansion-deeply-nested]]).
+
 We call =compressBTokens= for the parsed ~bTokens~; this function is similar to
 [[f:compressProse]], but it's simpler because it doesn't have to deal with styled
 text. Instead it only deals with raw =T.Text= values directly. We need to use
@@ -8253,6 +8259,7 @@ Tangling concerns are captured in [[file:src/Lilac/Tangle.hs]].
 module Lilac.Tangle
   ( BlockName,
     SourceCode (..),
+    expandRootBlocks,
     findCycles,
     getSourceCode,
   )
@@ -8262,7 +8269,7 @@ import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse
-  ( BToken (BTokenLink),
+  ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
     Cell (CBlock),
     Link (Link),
@@ -8270,17 +8277,24 @@ import Lilac.Parse
     OrgDoc (cells),
   )
 import Relude
-  ( Maybe (Just, Nothing),
+  ( Bool (False, True),
+    Maybe (Just, Nothing),
     Type,
     catMaybes,
     elem,
+    error,
     fmap,
     foldl',
+    fst,
     length,
     map,
     otherwise,
+    reverse,
     ($),
     (.),
+    (/=),
+    (<>),
+    (==),
     (>),
   )
 import Relude.Extra.Map qualified as EM
@@ -8294,6 +8308,9 @@ import Relude.Nub
 <<f:getSourceCode>>
 <<f:buildGraph>>
 <<f:findCycles>>
+<<f:expandRootBlocks>>
+<<f:expandBlock>>
+<<f:tanglePathOf>>
 <<f:tangle>>
 #+end_src
 
@@ -8363,9 +8380,9 @@ getSourceCode od = foldl' f defaultSourceCode od.cells
     f :: SourceCode -> Cell -> SourceCode
     f sc (CBlock b)
       | Just name <- EM.lookup "name" b.meta,
-        Just tangleMe <- EM.lookup "tangle" b.meta =
+        Just _ <- EM.lookup "tangle" b.meta =
           sc
-            { roots = tangleMe : sc.roots,
+            { roots = name : sc.roots,
               nameToCodeBlock = M.insert name b sc.nameToCodeBlock
             }
       | Just name <- EM.lookup "name" b.meta =
@@ -8663,6 +8680,256 @@ checkCycles
   [G.Node "f:a" [G.Node "f:b" [G.Node "f:c" [], G.Node "f:d" []]], G.Node "f:e" []]
 #+end_src
 
+** Tangle each file
+
+For tangling, we can't use the graph information from [[f:buildGraph]] directly
+because it doesn't handle the case where we have multiple links to the same code
+block. Instead we look at all of the root blocks, and expand each one in turn.
+We also trim lines with only spaces in them, because these can happen from the
+~prependExistingPrefix~ function in [[f:expandBlock]].
+
+#+name: f:expandRootBlocks
+#+begin_src haskell
+expandRootBlocks :: SourceCode -> [(T.Text, T.Text)]
+expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
+  where
+    expandRootBlock :: T.Text -> Maybe (T.Text, T.Text)
+    expandRootBlock rootBlockName
+      | Just rootBlock <- EM.lookup rootBlockName sc.nameToCodeBlock =
+          Just
+            ( tanglePathOf rootBlock,
+              trimTrailingSpaces $ expandBlock sc rootBlock ""
+            )
+      | otherwise = Nothing
+    trimTrailingSpaces :: T.Text -> T.Text
+    trimTrailingSpaces text =
+      T.unlines
+        . map (T.dropWhileEnd (== ' '))
+        $ T.lines text
+
+#+end_src
+
+In [[f:expandBlock]], we recursively expand all Noweb links until there are none.
+
+#+name: f:expandBlock
+#+begin_src haskell
+expandBlock :: SourceCode -> Block -> T.Text -> T.Text
+expandBlock sc block existingPrefix =
+  let acc = "" :: T.Text
+      prefix = "" :: T.Text
+   in fst $ foldl' expand (acc, prefix) block.body
+  where
+    expand (acc, _) (BTokenString text) =
+      (acc <> prependExistingPrefix text, getPrefix text)
+    expand (acc, prefix) (BTokenLink (Link _ target LinkNoweb))
+      | Just targetBlock <- EM.lookup target sc.nameToCodeBlock =
+          ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
+            prefix
+          )
+      | otherwise = (acc, prefix)
+    expand (acc, prefix) _ = (acc, prefix)
+    getPrefix text = T.takeWhileEnd (/= '\n') text
+    prependExistingPrefix text =
+      T.intercalate "\n"
+        . reverse
+        . fst
+        . foldl' prefixTailLines ([], True)
+        $ T.split (== '\n') text
+    prefixTailLines (acc, isFirstLine) line
+      | isFirstLine = (line : acc, False)
+      | otherwise = (T.append existingPrefix line : acc, False)
+
+#+end_src
+
+We use ~T.intercalate~ and ~T.split~ to avoid losing any information about the exact
+locations of newlines. If we used ~T.lines~ we would lose information about
+whether the last line actually had a trailing newline, because ~T.lines "a\nb"~
+and ~T.lines "a\nb\n"~ both give ~["a", "b"]~.
+
+#+name: t:lines-unlines-info-loss
+#+begin_src haskell
+it "loses information" $ do
+  let withoutNewline = T.lines "a\nb"
+      withNewline = T.lines "a\nb\n"
+  T.unlines withoutNewline `shouldBe` T.unlines withNewline
+#+end_src
+
+#+name: f:tanglePathOf
+#+begin_src haskell
+tanglePathOf :: Block -> T.Text
+tanglePathOf block
+  | Just path <- EM.lookup "tangle" block.meta = path
+  | otherwise = error "programmer error"
+#+end_src
+
+*** Tests
+
+Expand a single code block.
+
+#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion
+#+header: :noweb off
+#+begin_src org
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+a1
+<<b>>
+a2
+,#+end_src
+
+,#+name: b
+,#+begin_src haskell
+b
+,#+end_src
+#+end_src
+
+#+name: t:0101-block-expansion
+#+begin_src haskell
+checkExpansion
+  "0101-block-expansion"
+  [ ( "equations.txt",
+      T.unlines
+        [ "a1",
+          "b",
+          "a2"
+        ]
+    )
+  ]
+#+end_src
+
+Expand many code blocks in the same place, but the number of repeated expansions
+shouldn't result in a cumulative number of newlines; we should expect just one
+newline for the expanded content.
+
+#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-deeply-nested
+#+header: :noweb off
+#+begin_src org
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+a1
+<<b>>
+a2
+,#+end_src
+
+,#+name: b
+,#+begin_src haskell
+<<c>>
+,#+end_src
+
+,#+name: c
+,#+begin_src haskell
+<<d>>
+,#+end_src
+
+,#+name: d
+,#+begin_src haskell
+<<e>>
+,#+end_src
+
+,#+name: e
+,#+begin_src haskell
+e
+,#+end_src
+#+end_src
+
+#+name: t:0101-block-expansion-deeply-nested
+#+begin_src haskell
+checkExpansion
+  "0101-block-expansion-deeply-nested"
+  [ ( "equations.txt",
+      T.unlines
+        [ "a1",
+          "e",
+          "a2"
+        ]
+    )
+  ]
+#+end_src
+
+Complex expansions.
+
+#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-complex
+#+header: :noweb off
+#+begin_src org
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+a1
+<<b>>
+a2
+  <<c>>
+a3
+<<g>>
+<<h>>
+,#+end_src
+
+,#+name: b
+,#+begin_src haskell
+b
+,#+end_src
+
+,#+name: c
+,#+begin_src haskell
+c
+c
+  <<d>>
+c
+,#+end_src
+
+,#+name: d
+,#+begin_src haskell
+d
+
+d
+<<e>>
+,#+end_src
+
+,#+name: e
+,#+begin_src haskell
+e <<f>>!
+,#+end_src
+
+,#+name: f
+,#+begin_src haskell
+hello
+,#+end_src
+
+,#+name: g
+,#+begin_src haskell
+g
+,#+end_src
+
+,#+name: h
+,#+begin_src haskell
+h
+,#+end_src
+#+end_src
+
+#+name: t:0101-block-expansion-complex
+#+begin_src haskell
+checkExpansion
+  "0101-block-expansion-complex"
+  [ ( "equations.txt",
+      T.unlines
+        [ "a1",
+          "b",
+          "a2",
+          "  c",
+          "  c",
+          "    d",
+          "",
+          "    d",
+          "    e hello!",
+          "  c",
+          "a3",
+          "g",
+          "h"
+        ]
+    )
+  ]
+#+end_src
+
 ** Testing framework
 
 The testing framework here is modeled closely after [[module:Lilac.ParseSpec]].
@@ -8712,6 +8979,7 @@ helpers.
 #+begin_src haskell
 <<f:getSourceCodeFromPath>>
 <<f:checkCycles>>
+<<f:checkExpansion>>
 #+end_src
 
 The [[data:SourceCode]] data structure is critical for tangling. The function
@@ -8739,6 +9007,19 @@ checkCycles path expectedCycles = do
   it path $ do
     (Right sc) <- getSourceCodeFromPath path
     (LT.findCycles sc) `shouldBe` expectedCycles
+
+#+end_src
+
+The [[f:checkExpansion]] function expands all source code blocks and compares them
+with the expected output.
+
+#+name: f:checkExpansion
+#+begin_src haskell
+checkExpansion :: FilePath -> [(T.Text, T.Text)] -> Spec
+checkExpansion path expectedExpansions = do
+  it path $ do
+    (Right sc) <- getSourceCodeFromPath path
+    (LT.expandRootBlocks sc) `shouldBe` expectedExpansions
 #+end_src
 
 *** All test cases
@@ -8755,6 +9036,10 @@ tangleSpec = do
   <<t:0100-dag-2-node-loop>>
   <<t:0100-dag-3-node-loop>>
   <<t:0100-dag-complex-loops>>
+  <<t:0101-block-expansion>>
+  <<t:0101-block-expansion-deeply-nested>>
+  <<t:0101-block-expansion-complex>>
+  <<t:lines-unlines-info-loss>>
 #+end_src
 
 * CLI
