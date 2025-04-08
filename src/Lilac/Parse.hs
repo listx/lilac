@@ -124,6 +124,7 @@ data OrgParserState = OrgParserState
     continuationIndent :: Int,
     equationNumber :: Int,
     blockNames :: Set.Set T.Text,
+    tanglePaths :: Set.Set T.Text,
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
@@ -138,6 +139,7 @@ defaultOrgParserState =
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
 
@@ -858,6 +860,7 @@ blockMetaEntryParser = do
   _ <- char ' '
   value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
   _ <- char '\n'
+  assertUniqueTanglePath key value
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')]
@@ -868,6 +871,20 @@ metaNameParser = do
   name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
   rememberBlockName name
   pure ("name", name)
+
+assertUniqueTanglePath :: T.Text -> T.Text -> OrgParser ()
+assertUniqueTanglePath "tangle" path = do
+  orgParserState <- get
+  when (Set.member path orgParserState.tanglePaths)
+    . fail
+    $ "tangle path "
+    <> show path
+    <> " is not unique"
+  put
+    orgParserState
+      { tanglePaths = Set.insert path orgParserState.tanglePaths
+      }
+assertUniqueTanglePath _ _ = pure ()
 
 blockParser :: OrgParser Cell
 blockParser = do

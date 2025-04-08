@@ -1823,6 +1823,7 @@ import Prelude qualified (show)
 <<f:paragraphParser>>
 <<f:newlineAndIndentParser>>
 <<f:blockMetaEntryParser>>
+<<f:assertUniqueTanglePath>>
 <<f:blockParser>>
 <<f:bTokenParser>>
 <<f:nowebLinkParser>>
@@ -2052,6 +2053,7 @@ data OrgParserState = OrgParserState
     continuationIndent :: Int,
     equationNumber :: Int,
     blockNames :: Set.Set T.Text,
+    tanglePaths :: Set.Set T.Text,
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
@@ -2066,6 +2068,7 @@ defaultOrgParserState =
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
 
@@ -2841,6 +2844,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -3771,6 +3775,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -4409,6 +4414,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 20}
     }
 #+end_src
@@ -4461,6 +4467,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 0}
     }
 #+end_src
@@ -4628,6 +4635,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -4672,6 +4680,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -4726,6 +4735,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -4786,6 +4796,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.fromList ["foo"],
+      tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -4845,6 +4856,7 @@ blockMetaEntryParser = do
   _ <- char ' '
   value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
   _ <- char '\n'
+  assertUniqueTanglePath key value
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')]
@@ -4856,6 +4868,51 @@ metaNameParser = do
   rememberBlockName name
   pure ("name", name)
 
+#+end_src
+
+The [[f:assertUniqueTanglePath]] function checks that all tangle paths are unique;
+that is, no two code blocks may share the same tangle path.
+
+#+name: f:assertUniqueTanglePath
+#+begin_src haskell
+assertUniqueTanglePath :: T.Text -> T.Text -> OrgParser ()
+assertUniqueTanglePath "tangle" path = do
+  orgParserState <- get
+  when (Set.member path orgParserState.tanglePaths)
+    . fail
+    $ "tangle path "
+    <> show path
+    <> " is not unique"
+  put
+    orgParserState
+      { tanglePaths = Set.insert path orgParserState.tanglePaths
+      }
+assertUniqueTanglePath _ _ = pure ()
+
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-duplicate-tangle-paths
+#+header: :noweb off
+#+begin_src org
+,#+name: foo
+,#+header: :tangle some/path.sh
+,#+begin_src sh
+a
+,#+end_src
+
+,#+name: bar
+,#+header: :tangle some/path.sh
+,#+begin_src sh
+b
+,#+end_src
+#+end_src
+
+#+name: t:0007-blocks-duplicate-tangle-paths
+#+begin_src haskell
+pf
+  "0007-blocks-duplicate-tangle-paths"
+  "tangle path \"some/path.sh\" is not unique"
+  114
 #+end_src
 
 The [[f:rememberBlockName]] function keeps track of all the named code
@@ -5384,6 +5441,7 @@ ps
             "end not in beginning of line",
             "ignore #+end_example because this is a src block"
           ],
+      tanglePaths = Set.fromList [],
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -7149,6 +7207,7 @@ ps
       continuationIndent = 0,
       equationNumber = 3,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -7220,6 +7279,7 @@ ps
       continuationIndent = 0,
       equationNumber = 1,
       blockNames = Set.empty,
+      tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -7417,6 +7477,7 @@ ps
           [ "f:f",
             "f:g"
           ],
+      tanglePaths = Set.fromList [],
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -8144,6 +8205,7 @@ parseSpec = do
   <<t:0007-blocks-noweb>>
   <<t:0007-blocks-noweb-intraline>>
   <<t:0007-blocks-duplicate-names>>
+  <<t:0007-blocks-duplicate-tangle-paths>>
   <<t:0008-indentation-comment>>
   <<t:0008-indentation-headings>>
   <<t:0008-indentation-paragraph>>

@@ -184,6 +184,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 20}
       }
   ps
@@ -213,6 +214,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 0}
       }
   pf
@@ -252,6 +254,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   ps
@@ -282,6 +285,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   ps
@@ -312,6 +316,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   pf
@@ -510,6 +515,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   p
@@ -807,6 +813,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   pf
@@ -857,6 +864,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.fromList ["foo"],
+        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   ps
@@ -948,6 +956,7 @@ parseSpec = do
               "end not in beginning of line",
               "ignore #+end_example because this is a src block"
             ],
+        tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
   p
@@ -1076,6 +1085,10 @@ parseSpec = do
     "0007-blocks-duplicate-names"
     "block name \"foo\" is not unique"
     52
+  pf
+    "0007-blocks-duplicate-tangle-paths"
+    "tangle path \"some/path.sh\" is not unique"
+    114
   pf
     "0008-indentation-comment"
     "invalid indentation"
@@ -1427,6 +1440,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 3,
         blockNames = Set.empty,
+        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   ps
@@ -1477,6 +1491,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 1,
         blockNames = Set.empty,
+        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   ps
@@ -1554,6 +1569,7 @@ parseSpec = do
             [ "f:f",
               "f:g"
             ],
+        tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
   p
