@@ -8609,6 +8609,7 @@ module Main (main) where
 
 import Data.Version (showVersion)
 import Lilac.Parse qualified as L
+import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
 import Options.Applicative
   ( Parser,
@@ -8641,10 +8642,8 @@ import Relude
     IO,
     Type,
     concat,
-    decodeUtf8,
     pure,
     putStrLn,
-    readFileBS,
     runStateT,
     when,
     ($),
@@ -8711,12 +8710,12 @@ examining ~parseResult~.
 #+begin_src haskell
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
-  bytes <- readFileBS checkOpts.input
+  input <- LU.readFrom "" checkOpts.input
   let parseResult =
         MP.runParser
           (runStateT L.orgDocParser L.defaultOrgParserState)
           checkOpts.input
-          (decodeUtf8 bytes)
+          input
   case parseResult of
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
