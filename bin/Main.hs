@@ -2,6 +2,7 @@ module Main (main) where
 
 import Data.Version (showVersion)
 import Lilac.Parse qualified as LP
+import Lilac.Tangle qualified as LT
 import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
 import Options.Applicative
@@ -35,9 +36,12 @@ import Relude
     IO,
     Type,
     concat,
+    not,
+    null,
     pure,
     putStrLn,
     runStateT,
+    show,
     when,
     ($),
     (<$>),
@@ -156,7 +160,10 @@ lilacCheck globalOpts checkOpts = do
   case parseResult of
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
-    Right orgDoc -> do
+    Right (orgDoc, _) -> do
+      let cycles = LT.findCycles $ LT.getSourceCode orgDoc
+      when (not $ null cycles) $ do
+        die $ "Found cycles: " <> show cycles
       putStrLn $ checkOpts.input <> ": OK"
       when (globalOpts.verbose) $ do
         let prettyPrint =

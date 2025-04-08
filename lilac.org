@@ -8612,6 +8612,7 @@ module Main (main) where
 
 import Data.Version (showVersion)
 import Lilac.Parse qualified as LP
+import Lilac.Tangle qualified as LT
 import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
 import Options.Applicative
@@ -8645,9 +8646,12 @@ import Relude
     IO,
     Type,
     concat,
+    not,
+    null,
     pure,
     putStrLn,
     runStateT,
+    show,
     when,
     ($),
     (<$>),
@@ -8722,7 +8726,10 @@ lilacCheck globalOpts checkOpts = do
   case parseResult of
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
-    Right orgDoc -> do
+    Right (orgDoc, _) -> do
+      let cycles = LT.findCycles $ LT.getSourceCode orgDoc
+      when (not $ null cycles) $ do
+        die $ "Found cycles: " <> show cycles
       putStrLn $ checkOpts.input <> ": OK"
       when (globalOpts.verbose) $ do
         let prettyPrint =
@@ -8733,9 +8740,12 @@ lilacCheck globalOpts checkOpts = do
 
 #+end_src
 
-~check~ will also pretty-print the resulting [[data:OrgDoc]] if the global ~--verbose~
-flag is given. This is useful for debugging. By default the data structure will
-be printed with colored braces, but you can suppress this with ~--no-color~.
+The [[f:lilacCheck]] function checks for any cycles and dies if it detects them.
+
+The [[f:lilacCheck]] function also pretty-prints the resulting [[data:OrgDoc]] if
+the global ~--verbose~ flag is given. This is useful for debugging. By default the
+data structure will be printed with colored braces, but you can suppress this
+with ~--no-color~.
 
 ** Option handling boilerplate
 :PROPERTIES:
