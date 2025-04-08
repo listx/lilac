@@ -1,6 +1,7 @@
 module Lilac.ParseSpec (spec) where
 
 import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.Void (Void)
 import Lilac.Parse qualified as L
@@ -182,6 +183,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        blockNames = Set.empty,
         orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 20}
       }
   ps
@@ -210,6 +212,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        blockNames = Set.empty,
         orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 0}
       }
   pf
@@ -248,6 +251,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        blockNames = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   ps
@@ -277,6 +281,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        blockNames = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   ps
@@ -306,6 +311,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        blockNames = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   pf
@@ -503,6 +509,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        blockNames = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   p
@@ -799,13 +806,14 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        blockNames = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   pf
     "0007-block-src-without-lang"
     "block type src requires a language specifier"
     11
-  p
+  ps
     "0007-blocks-empty"
     L.OrgDoc
       { cells =
@@ -841,7 +849,17 @@ parseSpec = do
           ],
         meta = fromList []
       }
-  p
+    L.OrgParserState
+      { headingLevel = 0,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0,
+        blockNames = Set.fromList ["foo"],
+        orgParserConf = L.defaultOrgParserConf
+      }
+  ps
     "0007-blocks-ending"
     L.OrgDoc
       { cells =
@@ -913,6 +931,24 @@ parseSpec = do
               )
           ],
         meta = fromList []
+      }
+    L.OrgParserState
+      { headingLevel = 0,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0,
+        blockNames =
+          Set.fromList
+            [ "empty",
+              "end has no preceding blank line",
+              "end has preceding blank line",
+              "end has preceding newline (multiple)",
+              "end not in beginning of line",
+              "ignore #+end_example because this is a src block"
+            ],
+        orgParserConf = L.defaultOrgParserConf
       }
   p
     "0007-blocks-noweb-off"
@@ -1036,6 +1072,10 @@ parseSpec = do
           ],
         meta = fromList []
       }
+  pf
+    "0007-blocks-duplicate-names"
+    "block name \"foo\" is not unique"
+    52
   pf
     "0008-indentation-comment"
     "invalid indentation"
@@ -1386,6 +1426,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 3,
+        blockNames = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
   ps
@@ -1435,9 +1476,10 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 1,
+        blockNames = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
-  p
+  ps
     "0011-figures-and-blocks"
     L.OrgDoc
       { cells =
@@ -1499,6 +1541,20 @@ parseSpec = do
                 }
           ],
         meta = fromList []
+      }
+    L.OrgParserState
+      { headingLevel = 0,
+        styleMask = L.styleMaskFrom [],
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0,
+        blockNames =
+          Set.fromList
+            [ "f:f",
+              "f:g"
+            ],
+        orgParserConf = L.defaultOrgParserConf
       }
   p
     "0012-tables-and-prose"

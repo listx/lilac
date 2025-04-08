@@ -1814,6 +1814,7 @@ import Prelude qualified (show)
 <<f:styleMaskFlip>>
 <<f:isVerbatim>>
 <<f:compressProse>>
+<<f:rememberBlockName>>
 <<f:linkParser>>
 <<f:failIfVerbatimOrCode>>
 <<f:bracketedLinkParser>>
@@ -2050,6 +2051,7 @@ data OrgParserState = OrgParserState
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
     equationNumber :: Int,
+    blockNames :: Set.Set T.Text,
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
@@ -2063,6 +2065,7 @@ defaultOrgParserState =
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      blockNames = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
 
@@ -2837,6 +2840,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      blockNames = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -3766,6 +3770,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      blockNames = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -4403,6 +4408,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      blockNames = Set.empty,
       orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 20}
     }
 #+end_src
@@ -4454,6 +4460,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      blockNames = Set.empty,
       orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 0}
     }
 #+end_src
@@ -4620,6 +4627,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      blockNames = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -4663,6 +4671,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      blockNames = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -4716,6 +4725,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      blockNames = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -4761,12 +4771,22 @@ Below are some examples of valid (empty) code blocks.
 
 #+name: t:0007-blocks-empty
 #+begin_src haskell
-p
+ps
   "0007-blocks-empty"
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-empty>>,
       meta = fromList []
+    }
+  L.OrgParserState
+    { headingLevel = 0,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      blockNames = Set.fromList ["foo"],
+      orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
 
@@ -4809,8 +4829,8 @@ p
 Blocks can have associated metadata, as we can see from the test case above. The
 metadata is made up of any number of special key\/value pairs that are written
 in the form of =#+header: :key value= lines. The special line =#+name: foo= gives
-the block a unique name (if it's not globally unique, we'll complain about it),
-which can be the target of an internal link.
+the block a unique name (if it's not globally unique, we'll complain about it
+[[f:rememberBlockName]]), which can be the target of an internal link.
 
 Vanilla Org allows you to place these key\/value pairs on the same line as the
 =#+begin_...= line, but we don't allow this. This enforces a cleaner style and
@@ -4833,8 +4853,52 @@ metaNameParser :: OrgParser (T.Text, T.Text)
 metaNameParser = do
   _ <- string "#+name: "
   name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
+  rememberBlockName name
   pure ("name", name)
 
+#+end_src
+
+The [[f:rememberBlockName]] function keeps track of all the named code
+blocks we've seen so far. This is used to detect whether we've seen a code block
+name more than once, which is not allowed.
+
+#+name: f:rememberBlockName
+#+begin_src haskell
+rememberBlockName :: T.Text -> OrgParser ()
+rememberBlockName blockName = do
+  orgParserState <- get
+  when (Set.member blockName orgParserState.blockNames)
+    . fail
+    $ "block name "
+    <> show blockName
+    <> " is not unique"
+  put
+    orgParserState
+      { blockNames = Set.insert blockName orgParserState.blockNames
+      }
+
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-duplicate-names
+#+header: :noweb off
+#+begin_src org
+,#+name: foo
+,#+begin_src sh
+a
+,#+end_src
+
+,#+name: foo
+,#+begin_src sh
+b
+,#+end_src
+#+end_src
+
+#+name: t:0007-blocks-duplicate-names
+#+begin_src haskell
+pf
+  "0007-blocks-duplicate-names"
+  "block name \"foo\" is not unique"
+  52
 #+end_src
 
 *** Body
@@ -5297,12 +5361,30 @@ foo
 
 #+name: t:0007-blocks-ending
 #+begin_src haskell
-p
+ps
   "0007-blocks-ending"
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-ending>>,
       meta = fromList []
+    }
+  L.OrgParserState
+    { headingLevel = 0,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      blockNames =
+        Set.fromList
+          [ "empty",
+            "end has no preceding blank line",
+            "end has preceding blank line",
+            "end has preceding newline (multiple)",
+            "end not in beginning of line",
+            "ignore #+end_example because this is a src block"
+          ],
+      orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
 
@@ -7066,6 +7148,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 3,
+      blockNames = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -7136,6 +7219,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 1,
+      blockNames = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
@@ -7258,7 +7342,7 @@ g x = x + 1
 
 #+name: t:0011-figures-and-blocks
 #+begin_src haskell
-p
+ps
   "0011-figures-and-blocks"
   L.OrgDoc
     { cells =
@@ -7320,6 +7404,20 @@ p
               }
         ],
       meta = fromList []
+    }
+  L.OrgParserState
+    { headingLevel = 0,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      blockNames =
+        Set.fromList
+          [ "f:f",
+            "f:g"
+          ],
+      orgParserConf = L.defaultOrgParserConf
     }
 #+end_src
 
@@ -7808,6 +7906,7 @@ spend far more time compiling the tests themselves).
 module Lilac.ParseSpec (spec) where
 
 import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.Void (Void)
 import Lilac.Parse qualified as L
@@ -8044,6 +8143,7 @@ parseSpec = do
   <<t:0007-blocks-noweb-off>>
   <<t:0007-blocks-noweb>>
   <<t:0007-blocks-noweb-intraline>>
+  <<t:0007-blocks-duplicate-names>>
   <<t:0008-indentation-comment>>
   <<t:0008-indentation-headings>>
   <<t:0008-indentation-paragraph>>
@@ -8740,9 +8840,7 @@ lilacCheck globalOpts checkOpts = do
 
 #+end_src
 
-The [[f:lilacCheck]] function checks for any cycles and dies if it detects them.
-
-The [[f:lilacCheck]] function also pretty-prints the resulting [[data:OrgDoc]] if
+The [[f:lilacCheck]] function checks for any cycles and dies if it detects them. The [[f:lilacCheck]] function also pretty-prints the resulting [[data:OrgDoc]] if
 the global ~--verbose~ flag is given. This is useful for debugging. By default the
 data structure will be printed with colored braces, but you can suppress this
 with ~--no-color~.

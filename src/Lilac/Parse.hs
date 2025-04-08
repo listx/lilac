@@ -123,6 +123,7 @@ data OrgParserState = OrgParserState
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
     equationNumber :: Int,
+    blockNames :: Set.Set T.Text,
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
@@ -136,6 +137,7 @@ defaultOrgParserState =
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      blockNames = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
 
@@ -701,6 +703,19 @@ compressProse = reverse . dropUnnecessary . foldl' f []
     dropUnnecessary (((PTokenStyledText (StyledText "" _))) : rest) = rest
     dropUnnecessary tokens = tokens
 
+rememberBlockName :: T.Text -> OrgParser ()
+rememberBlockName blockName = do
+  orgParserState <- get
+  when (Set.member blockName orgParserState.blockNames)
+    . fail
+    $ "block name "
+    <> show blockName
+    <> " is not unique"
+  put
+    orgParserState
+      { blockNames = Set.insert blockName orgParserState.blockNames
+      }
+
 linkParser :: OrgParser Link
 linkParser = do
   failIfVerbatimOrCode
@@ -851,6 +866,7 @@ metaNameParser :: OrgParser (T.Text, T.Text)
 metaNameParser = do
   _ <- string "#+name: "
   name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
+  rememberBlockName name
   pure ("name", name)
 
 blockParser :: OrgParser Cell
