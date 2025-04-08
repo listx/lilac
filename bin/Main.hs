@@ -1,7 +1,7 @@
 module Main (main) where
 
 import Data.Version (showVersion)
-import Lilac.Parse qualified as L
+import Lilac.Parse qualified as LP
 import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
 import Options.Applicative
@@ -150,7 +150,7 @@ lilacCheck globalOpts checkOpts = do
   input <- LU.readFrom "" checkOpts.input
   let parseResult =
         MP.runParser
-          (runStateT L.orgDocParser L.defaultOrgParserState)
+          (runStateT LP.orgDocParser LP.defaultOrgParserState)
           checkOpts.input
           input
   case parseResult of
