@@ -6,8 +6,7 @@ import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Relude
-  ( ByteString,
-    Either (Left, Right),
+  ( Either (Left, Right),
     FilePath,
     MonadIO,
     decodeUtf8,
@@ -22,13 +21,15 @@ import Test.Hspec (Spec, it, shouldBe)
 spec :: Spec
 spec = tangleSpec
 
-readFrom :: (MonadIO m) => FilePath -> FilePath -> m ByteString
-readFrom prefix path = readFileBS $ prefix <> path
+readFrom :: (MonadIO m) => FilePath -> FilePath -> m T.Text
+readFrom prefix path = do
+  byteString <- readFileBS $ prefix <> path
+  pure $ decodeUtf8 byteString
 
 getSourceCodeFromPath :: (MonadIO m) => FilePath -> m (Either T.Text LT.SourceCode)
 getSourceCodeFromPath path = do
   input <- readFrom "test/Lilac/TangleSpec/" path
-  case LP.parseOrgDoc (decodeUtf8 input) of
+  case LP.parseOrgDoc input of
     Left errMsg -> pure $ Left errMsg
     Right od -> pure . Right $ LT.getSourceCode od
 

@@ -2174,7 +2174,7 @@ before (readFrom "" "lilac.org") $ do
     MP.runParser
       (runStateT L.orgDocParser L.defaultOrgParserState)
       "lilac.org"
-      `shouldSucceedOn` (decodeUtf8 input)
+      `shouldSucceedOn` input
 #+end_src
 
 ** =docMetaParser=
@@ -7811,14 +7811,14 @@ import Data.Text qualified as T
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Relude
-  ( ByteString,
-    FilePath,
+  ( FilePath,
     Int,
     MonadIO,
     String,
     Type,
     decodeUtf8,
     fromList,
+    pure,
     readFileBS,
     runStateT,
     show,
@@ -7879,14 +7879,16 @@ The ~Parser~ type synonym uses the same [[Concrete type for Megaparsec][concrete
 [[type:OrgParser]]. The ~Parser~ type synonym is used in tests such as
 [[t:0005-notFollowedBy-behavior-for-empty-input]].
 
-[[f:readFrom]] reads a path from the given prefix, and returns a =ByteString=. We'll
+[[f:readFrom]] reads a path from the given prefix, and returns a =T.Text=. We'll
 be using this a lot because most of the tests here are based on parsing some
 input file path.
 
 #+name: f:readFrom
 #+begin_src haskell
-readFrom :: (MonadIO m) => FilePath -> FilePath -> m ByteString
-readFrom prefix path = readFileBS $ prefix <> path
+readFrom :: (MonadIO m) => FilePath -> FilePath -> m T.Text
+readFrom prefix path = do
+  byteString <- readFileBS $ prefix <> path
+  pure $ decodeUtf8 byteString
 
 #+end_src
 
@@ -7902,7 +7904,7 @@ p path expected = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        (decodeUtf8 input)
+        input
         `shouldParse` (expected, L.defaultOrgParserState)
 
 #+end_src
@@ -7919,7 +7921,7 @@ ps path expected state = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        (decodeUtf8 input)
+        input
         `shouldParse` (expected, state)
 
 #+end_src
@@ -7936,7 +7938,7 @@ pf path errMsg pos = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        (decodeUtf8 input)
+        input
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
 
 #+end_src
@@ -7961,7 +7963,7 @@ pfm path errorTrivial pos = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        (decodeUtf8 input)
+        input
         `shouldFailWith` (err pos errorTrivial)
 
 #+end_src
@@ -8528,8 +8530,7 @@ import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Relude
-  ( ByteString,
-    Either (Left, Right),
+  ( Either (Left, Right),
     FilePath,
     MonadIO,
     decodeUtf8,
@@ -8576,7 +8577,7 @@ to a [[data:SourceCode]] type.
 getSourceCodeFromPath :: (MonadIO m) => FilePath -> m (Either T.Text LT.SourceCode)
 getSourceCodeFromPath path = do
   input <- readFrom "test/Lilac/TangleSpec/" path
-  case LP.parseOrgDoc (decodeUtf8 input) of
+  case LP.parseOrgDoc input of
     Left errMsg -> pure $ Left errMsg
     Right od -> pure . Right $ LT.getSourceCode od
 

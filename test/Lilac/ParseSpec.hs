@@ -5,14 +5,14 @@ import Data.Text qualified as T
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Relude
-  ( ByteString,
-    FilePath,
+  ( FilePath,
     Int,
     MonadIO,
     String,
     Type,
     decodeUtf8,
     fromList,
+    pure,
     readFileBS,
     runStateT,
     show,
@@ -42,8 +42,10 @@ spec = parseSpec
 type Parser :: Type -> Type
 type Parser = MP.Parsec Void T.Text
 
-readFrom :: (MonadIO m) => FilePath -> FilePath -> m ByteString
-readFrom prefix path = readFileBS $ prefix <> path
+readFrom :: (MonadIO m) => FilePath -> FilePath -> m T.Text
+readFrom prefix path = do
+  byteString <- readFileBS $ prefix <> path
+  pure $ decodeUtf8 byteString
 
 p :: FilePath -> L.OrgDoc -> Spec
 p path expected = do
@@ -52,7 +54,7 @@ p path expected = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        (decodeUtf8 input)
+        input
         `shouldParse` (expected, L.defaultOrgParserState)
 
 ps :: FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
@@ -62,7 +64,7 @@ ps path expected state = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        (decodeUtf8 input)
+        input
         `shouldParse` (expected, state)
 
 pf :: FilePath -> String -> Int -> Spec
@@ -72,7 +74,7 @@ pf path errMsg pos = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        (decodeUtf8 input)
+        input
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
 
 pfm :: FilePath -> ET T.Text -> Int -> Spec
@@ -82,7 +84,7 @@ pfm path errorTrivial pos = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        (decodeUtf8 input)
+        input
         `shouldFailWith` (err pos errorTrivial)
 
 plainParagraph :: T.Text -> L.Cell
@@ -126,7 +128,7 @@ parseSpec = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         "lilac.org"
-        `shouldSucceedOn` (decodeUtf8 input)
+        `shouldSucceedOn` input
   p
     "0001-blankline"
     (L.defaultOrgDoc [])
