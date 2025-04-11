@@ -29,6 +29,7 @@ where
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
+import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -78,6 +79,8 @@ import Relude
     pure,
     put,
     readMaybe,
+    repeat,
+    replicate,
     reverse,
     runStateT,
     show,
@@ -91,6 +94,7 @@ import Relude
     (*),
     (+),
     (++),
+    (-),
     (.),
     (/=),
     (<),
@@ -904,7 +908,7 @@ blockParser = do
               M.fromList
                 $ (("__block_type", blockType) : metaKVs)
                 <> concatMap maybeToList [blockName, srcLang],
-            body = compressBTokens bTokens
+            body = compressBTokens $ padConsecutiveNowebLinks bTokens
           }
   pure $ CBlock block
 
@@ -986,6 +990,47 @@ compressBTokens = reverse . foldl' f []
     f ((BTokenString text1) : rest) (BTokenString text2) =
       (BTokenString $ T.append text1 text2) : rest
     f acc token = token : acc
+
+padConsecutiveNowebLinks :: [BToken] -> [BToken]
+padConsecutiveNowebLinks blockBody =
+  reverse
+    . fst
+    $ foldl' f ([], getLinkPaddingBools blockBody) blockBody
+  where
+    f (acc, bools) text@(BTokenString _) = (text : acc, bools)
+    f (acc, bools) link@(BTokenLink _) =
+      case bools of
+        (padLink : rest)
+          | padLink -> ((BTokenString "\n") : link : acc, rest)
+          | otherwise -> (link : acc, rest)
+        [] -> (link : acc, [])
+
+getLinkPaddingBools :: [BToken] -> [Bool]
+getLinkPaddingBools blockBody =
+  concatMap (concatMap distributeBools)
+    . map (reverse . (zip $ False : repeat True) . reverse)
+    . groupBy consecutiveNowebLines
+    . T.lines
+    $ getBlockContents blockBody
+  where
+    consecutiveNowebLines :: T.Text -> T.Text -> Bool
+    consecutiveNowebLines a b = (countLinks a > 0) && (countLinks b > 0)
+    distributeBools (False, line) =
+      replicate (countLinks line) False
+    distributeBools (True, line) =
+      case countLinks line of
+        1 -> [True]
+        n -> reverse $ True : replicate (n - 1) False
+    countLinks = T.count "\NUL_link"
+
+getBlockContents :: [BToken] -> T.Text
+getBlockContents blockBody = T.concat $ map bTokenToText blockBody
+  where
+    bTokenToText :: BToken -> T.Text
+    bTokenToText = \case
+      BTokenString text -> text
+      BTokenLink (Link _name target LinkNoweb) -> "\NUL_link" <> target
+      _ -> ""
 
 zeroIndent :: OrgParser (Int, Int)
 zeroIndent = do

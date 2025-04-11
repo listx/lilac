@@ -78,6 +78,57 @@ tangleSpec = do
       )
     ]
   checkExpansion
+    "0101-block-expansion-prefix"
+    [ ( "equations.txt",
+        T.unlines
+          [ "  b1",
+            "  b2",
+            "  b3",
+            "a1",
+            "  b1",
+            "  b2",
+            "  b3"
+          ]
+      )
+    ]
+  checkExpansion
+    "0101-block-expansion-prefix-nested"
+    [ ( "equations.txt",
+        T.unlines
+          [ "a1",
+            "  b1",
+            "  b2",
+            "  b3",
+            "    c1",
+            "    c2"
+          ]
+      )
+    ]
+  checkExpansion
+    "0101-block-expansion-prefix-nonspace"
+    [ ( "equations.txt",
+        T.unlines
+          [ "a1",
+            "  -> b1",
+            "  -> b2",
+            "  -> b3"
+          ]
+      )
+    ]
+  checkExpansion
+    "0101-block-expansion-prefix-nonspace-nested"
+    [ ( "equations.txt",
+        T.unlines
+          [ "a1",
+            "  -> b1",
+            "  -> b2",
+            "  -> b3",
+            "  -> -- c1",
+            "  -> -- c2"
+          ]
+      )
+    ]
+  checkExpansion
     "0101-block-expansion-complex"
     [ ( "equations.txt",
         T.unlines
@@ -93,6 +144,7 @@ tangleSpec = do
             "  c",
             "a3",
             "g",
+            "",
             "h"
           ]
       )
@@ -101,3 +153,45 @@ tangleSpec = do
     let withoutNewline = T.lines "a\nb"
         withNewline = T.lines "a\nb\n"
     T.unlines withoutNewline `shouldBe` T.unlines withNewline
+  checkExpansion
+    "0102-pad-between-consecutive-links"
+    [ ( "equations.txt",
+        T.unlines
+          [ "a1",
+            "b1",
+            "",
+            "b2",
+            "a2",
+            "  b1",
+            "",
+            "  b2",
+            "",
+            "  b3",
+            "Even if indentation is different, still pad between them.",
+            "  b1",
+            "",
+            "    b2",
+            "",
+            "      b3",
+            "Even pad for the same block repeated multiple times.",
+            "  b1",
+            "",
+            "  b1",
+            "",
+            "  b1",
+            "Lines with multiple links still count as being consecutive.",
+            "  b3",
+            "",
+            "  b3",
+            "",
+            "  b1 b2",
+            "",
+            "  b3",
+            "",
+            "  b3",
+            "No padding if only one link...",
+            "  b1",
+            "...is by itself."
+          ]
+      )
+    ]

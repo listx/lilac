@@ -1676,6 +1676,7 @@ where
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
+import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -1725,6 +1726,8 @@ import Relude
     pure,
     put,
     readMaybe,
+    repeat,
+    replicate,
     reverse,
     runStateT,
     show,
@@ -1738,6 +1741,7 @@ import Relude
     (*),
     (+),
     (++),
+    (-),
     (.),
     (/=),
     (<),
@@ -1831,6 +1835,9 @@ import Prelude qualified (show)
 <<f:someBTokensParser>>
 <<f:nowebLinkParser>>
 <<f:compressBTokens>>
+<<f:padConsecutiveNowebLinks>>
+<<f:getLinkPaddingBools>>
+<<f:getBlockContents>>
 <<f:zeroIndent>>
 <<f:someIndent>>
 <<f:getContinuationIndentForLevel>>
@@ -5004,7 +5011,7 @@ blockParser = do
               M.fromList
                 $ (("__block_type", blockType) : metaKVs)
                 <> concatMap maybeToList [blockName, srcLang],
-            body = compressBTokens bTokens
+            body = compressBTokens $ padConsecutiveNowebLinks bTokens
           }
   pure $ CBlock block
 
@@ -5079,8 +5086,8 @@ compressBTokens = reverse . foldl' f []
 
 #+end_src
 
-That's the overall overview of [[f:blockParser]]. Now let's look at how
-[[f:blockStartParser]] in detail.
+Except for [[id:51f2edd8-5f8e-4c63-841f-da6c5c41680a][inserting padding between consecutive Noweb links]], that's the overall
+overview of [[f:blockParser]]. Now let's look at how [[f:blockStartParser]] in detail.
 
 #+name: f:blockStartParser
 #+begin_src haskell
@@ -5400,6 +5407,169 @@ p
     )
 ]
 #+end_src
+
+*** Add padding between consecutive Noweb links
+:PROPERTIES:
+:ID:       51f2edd8-5f8e-4c63-841f-da6c5c41680a
+:END:
+
+When we eventually tangle blocks, we want to inject some padding (a newline)
+between Noweb links because each Noweb block is its own "unit" and it makes
+sense to add some separation between consecutive Noweb blocks, to get some
+visual separation in the final output.
+
+We only want to add this padding for cases where there are /consecutive/ Noweb
+links. For example, in
+
+#+header: :noweb off
+#+begin_src txt
+<<a>>
+
+<<b>>
+<<c>>
+<<d>>
+
+  <<e>>
+  <<f>>
+
+<<g>>
+#+end_src
+
+only ~<<b>>~ ~<<c>>~ ~<<d>>~ and ~<<e>>~ ~<<f>>~ are consecutive. And in the final tangled
+output we would want to make it as if we had originally written
+
+#+header: :noweb off
+#+begin_src txt
+<<a>>
+
+<<b>>
+
+<<c>>
+
+<<d>>
+
+  <<e>>
+
+  <<f>>
+
+<<g>>
+#+end_src
+
+This allows us to write in a bit more compact manner in the Org source document,
+while still giving each Noweb link (and associated block) some separation from
+the other blocks in the tangled output.
+
+The way we do this automatic padding is by injecting newlines into the parsed
+block's body ~BToken~ values, as ~BTokenString "\n"~. This is what we do by calling
+[[f:padConsecutiveNowebLinks]] in [[f:blockParser]].
+
+The high-level algorithm is as follows:
+
+  1) Concatenate the ~BToken~ values together (using the ~T.Text~ representation).
+     For ~BTokenString~ values we use the inner text information as is. For
+     ~BTokenLink~ we use the target, but also inject a special [[link-marker]] which
+     uses an ASCII ~NUL~ character.
+
+  2) Split the contents by newline.
+
+  3) Group together the lines that have Noweb links. In other words, consecutive
+     lines that have Noweb links are grouped together.
+
+  4) Within each group, only mark the links at the end of the line (because
+     there may be more than one link in a line) as needing a newline. By marking
+     links as needing (or not needing) a newline, we can easily inject newlines
+     at the right spots in the next step.
+
+     We can't add a newline for the very last line in the group though, because
+     that would be superfluous (we want to add newlines *between* consecutive
+     blocks, not after every consecutive block).
+
+  5) Using the information from the previous step, iterate through all ~BToken~
+     values and whenever we see a ~BTokenLink~, inject the newline (if the link
+     was marked as needing a newline).
+
+The markers are just simple boolean values (one for each Noweb link found in the
+block).
+
+Now let's look at the implementation in detail. Step 1 is done in
+[[f:getBlockContents]].
+
+#+name: f:getBlockContents
+#+begin_src haskell
+getBlockContents :: [BToken] -> T.Text
+getBlockContents blockBody = T.concat $ map bTokenToText blockBody
+  where
+    bTokenToText :: BToken -> T.Text
+    bTokenToText = \case
+      BTokenString text -> text
+      BTokenLink (Link _name target LinkNoweb) -> <<link-marker>> <> target
+      _ -> ""
+
+#+end_src
+
+The ~<<link-marker>>~ is just a special marker we use to keep track of where the
+links are inside the concatenated (single) ~T.Text~ value representing all of the
+block contents.
+
+#+name: link-marker
+#+begin_src haskell
+"\NUL_link"
+#+end_src
+
+Steps 2, 3, and 4 are all done inside [[f:getLinkPaddingBools]]. This function
+returns a list of booleans that correspond to each of the Noweb links found. If
+~True~, this means the link needs a trailing newline (padding) added to it.
+
+The line ~map (reverse . (zip $ False : repeat True) . reverse)~ says to only pad
+the lines except for the last one, and ~distributeBools~ only pads the very last
+link found in the line.
+
+#+name: f:getLinkPaddingBools
+#+begin_src haskell
+getLinkPaddingBools :: [BToken] -> [Bool]
+getLinkPaddingBools blockBody =
+  concatMap (concatMap distributeBools)
+    . map (reverse . (zip $ False : repeat True) . reverse)
+    . groupBy consecutiveNowebLines
+    . T.lines
+    $ getBlockContents blockBody
+  where
+    consecutiveNowebLines :: T.Text -> T.Text -> Bool
+    consecutiveNowebLines a b = (countLinks a > 0) && (countLinks b > 0)
+    distributeBools (False, line) =
+      replicate (countLinks line) False
+    distributeBools (True, line) =
+      case countLinks line of
+        1 -> [True]
+        n -> reverse $ True : replicate (n - 1) False
+    countLinks = T.count <<link-marker>>
+
+#+end_src
+
+Now that we have a list of booleans to mark whether a link needs a newline
+appended to it, all we have to do is go through all of the links in the block,
+adding a ~BTokenString "\n"~ every time we see a ~True~ boolean (~padLink~).
+
+#+name: f:padConsecutiveNowebLinks
+#+begin_src haskell
+padConsecutiveNowebLinks :: [BToken] -> [BToken]
+padConsecutiveNowebLinks blockBody =
+  reverse
+    . fst
+    $ foldl' f ([], getLinkPaddingBools blockBody) blockBody
+  where
+    f (acc, bools) text@(BTokenString _) = (text : acc, bools)
+    f (acc, bools) link@(BTokenLink _) =
+      case bools of
+        (padLink : rest)
+          | padLink -> ((BTokenString "\n") : link : acc, rest)
+          | otherwise -> (link : acc, rest)
+        [] -> (link : acc, [])
+
+#+end_src
+
+See [[t:0102-pad-between-consecutive-links][t:0102-pad-between-consecutive-links]] for an example of this padding
+behavior.
 
 *** Additional tests
 
@@ -8344,7 +8514,6 @@ import Relude.Nub
 <<f:findCycles>>
 <<f:expandRootBlocks>>
 <<f:expandBlock>>
-<<f:tanglePathOf>>
 <<f:tangle>>
 #+end_src
 
@@ -8740,6 +8909,10 @@ expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
       T.unlines
         . map (T.dropWhileEnd (== ' '))
         $ T.lines text
+    tanglePathOf :: Block -> T.Text
+    tanglePathOf block
+      | Just path <- EM.lookup "tangle" block.meta = path
+      | otherwise = error "programmer error"
 
 #+end_src
 
@@ -8775,10 +8948,36 @@ expandBlock sc block existingPrefix =
 
 #+end_src
 
-We use ~T.intercalate~ and ~T.split~ to avoid losing any information about the exact
-locations of newlines. If we used ~T.lines~ we would lose information about
-whether the last line actually had a trailing newline, because ~T.lines "a\nb"~
-and ~T.lines "a\nb\n"~ both give ~["a", "b"]~.
+The ~expand~ function recursively calls ~expandBlock~ if it detects a ~LinkNoweb~ type
+link. Otherwise, for ~BTokenString~ tokens it searches for a prefix with
+~getPrefix~. We need the prefix because we want to indent entire blocks if the
+name of the link referring to it is indented. See [[t:0101-block-expansion-prefix]]
+and [[t:0101-block-expansion-prefix-nested]] for examples.
+
+The ~getPrefix~ function is simple and uses any characters it finds, not just
+spaces, looking backwards and stopping at a newline. See
+[[t:0101-block-expansion-prefix-nonspace]] and
+[[t:0101-block-expansion-prefix-nonspace-nested]] for examples.
+
+The ~prependExistingPrefix~ function splits up the given text, and injects the
+prefix on every line in the text except the very first line. This is because
+given the text
+
+#+header: :noweb off
+#+begin_src txt
+xx<<a>>
+#+end_src
+
+where ~xx~ is the prefix, we only want to give this prefix to the lines in ~<<a>>~
+except the first line (because the first line of ~<<a>>~ is already prefixed (from
+the outer block) with ~xx~); so only the lines after the first line in ~<<a>>~ need
+the ~xx~ prefix. This is what we do in ~prefixTailLines~, where we avoid adding the
+prefix to the "head", and instead only add it to the "tail."
+
+We use ~T.intercalate~ and ~T.split~ in ~prependExistingPrefix~ to avoid losing any
+information about the exact locations of newlines. If we used ~T.lines~ we would
+lose information about whether the last line actually had a trailing newline,
+because ~T.lines "a\nb"~ and ~T.lines "a\nb\n"~ both give ~["a", "b"]~.
 
 #+name: t:lines-unlines-info-loss
 #+begin_src haskell
@@ -8786,14 +8985,6 @@ it "loses information" $ do
   let withoutNewline = T.lines "a\nb"
       withNewline = T.lines "a\nb\n"
   T.unlines withoutNewline `shouldBe` T.unlines withNewline
-#+end_src
-
-#+name: f:tanglePathOf
-#+begin_src haskell
-tanglePathOf :: Block -> T.Text
-tanglePathOf block
-  | Just path <- EM.lookup "tangle" block.meta = path
-  | otherwise = error "programmer error"
 #+end_src
 
 *** Tests
@@ -8881,6 +9072,171 @@ checkExpansion
   ]
 #+end_src
 
+If the link name is indented, we have to indent the contents of that block.
+
+#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix
+#+header: :noweb off
+#+begin_src org
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+  <<b>>
+a1
+  <<b>>
+,#+end_src
+
+,#+name: b
+,#+begin_src haskell
+b1
+b2
+b3
+,#+end_src
+#+end_src
+
+#+name: t:0101-block-expansion-prefix
+#+begin_src haskell
+checkExpansion
+  "0101-block-expansion-prefix"
+  [ ( "equations.txt",
+      T.unlines
+        [ "  b1",
+          "  b2",
+          "  b3",
+          "a1",
+          "  b1",
+          "  b2",
+          "  b3"
+        ]
+    )
+  ]
+#+end_src
+
+The indentation can be nested. For example if the named block itself links to
+other blocks with an indent, those inner blocks should be indented with the sum
+of the indent found in the current and outer surrounding blocks.
+
+#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix-nested
+#+header: :noweb off
+#+begin_src org
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+a1
+  <<b>>
+,#+end_src
+
+,#+name: b
+,#+begin_src haskell
+b1
+b2
+b3
+  <<c>>
+,#+end_src
+
+,#+name: c
+,#+begin_src haskell
+c1
+c2
+,#+end_src
+#+end_src
+
+#+name: t:0101-block-expansion-prefix-nested
+#+begin_src haskell
+checkExpansion
+  "0101-block-expansion-prefix-nested"
+  [ ( "equations.txt",
+      T.unlines
+        [ "a1",
+          "  b1",
+          "  b2",
+          "  b3",
+          "    c1",
+          "    c2"
+        ]
+    )
+  ]
+#+end_src
+
+The prefix is any string, up to the (preceding) newline. So this mean it can
+have non-space characters in it as well.
+
+#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix-nonspace
+#+header: :noweb off
+#+begin_src org
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+a1
+  -> <<b>>
+,#+end_src
+
+,#+name: b
+,#+begin_src haskell
+b1
+b2
+b3
+,#+end_src
+#+end_src
+
+#+name: t:0101-block-expansion-prefix-nonspace
+#+begin_src haskell
+checkExpansion
+  "0101-block-expansion-prefix-nonspace"
+  [ ( "equations.txt",
+      T.unlines
+        [ "a1",
+          "  -> b1",
+          "  -> b2",
+          "  -> b3"
+        ]
+    )
+  ]
+#+end_src
+
+Non-space prefixes can also be nested.
+
+#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix-nonspace-nested
+#+header: :noweb off
+#+begin_src org
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+a1
+  -> <<b>>
+,#+end_src
+
+,#+name: b
+,#+begin_src haskell
+b1
+b2
+b3
+-- <<c>>
+,#+end_src
+
+,#+name: c
+,#+begin_src haskell
+c1
+c2
+,#+end_src
+#+end_src
+
+#+name: t:0101-block-expansion-prefix-nonspace-nested
+#+begin_src haskell
+checkExpansion
+  "0101-block-expansion-prefix-nonspace-nested"
+  [ ( "equations.txt",
+      T.unlines
+        [ "a1",
+          "  -> b1",
+          "  -> b2",
+          "  -> b3",
+          "  -> -- c1",
+          "  -> -- c2"
+        ]
+    )
+  ]
+#+end_src
+
 Complex expansions.
 
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-complex
@@ -8958,7 +9314,105 @@ checkExpansion
           "  c",
           "a3",
           "g",
+          "",
           "h"
+        ]
+    )
+  ]
+#+end_src
+
+Due to [[f:padConsecutiveNowebLinks]], insert extra newlines between consecutive
+Noweb links.
+
+#+header: :tangle test/Lilac/TangleSpec/0102-pad-between-consecutive-links
+#+header: :noweb off
+#+begin_src org
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+a1
+<<b1>>
+<<b2>>
+a2
+  <<b1>>
+  <<b2>>
+  <<b3>>
+Even if indentation is different, still pad between them.
+  <<b1>>
+    <<b2>>
+      <<b3>>
+Even pad for the same block repeated multiple times.
+  <<b1>>
+  <<b1>>
+  <<b1>>
+Lines with multiple links still count as being consecutive.
+  <<b3>>
+  <<b3>>
+  <<b1>> <<b2>>
+  <<b3>>
+  <<b3>>
+No padding if only one link...
+  <<b1>>
+...is by itself.
+,#+end_src
+
+,#+name: b1
+,#+begin_src haskell
+b1
+,#+end_src
+
+,#+name: b2
+,#+begin_src haskell
+b2
+,#+end_src
+
+,#+name: b3
+,#+begin_src haskell
+b3
+,#+end_src
+#+end_src
+
+#+name: t:0102-pad-between-consecutive-links
+#+begin_src haskell
+checkExpansion
+  "0102-pad-between-consecutive-links"
+  [ ( "equations.txt",
+      T.unlines
+        [ "a1",
+          "b1",
+          "",
+          "b2",
+          "a2",
+          "  b1",
+          "",
+          "  b2",
+          "",
+          "  b3",
+          "Even if indentation is different, still pad between them.",
+          "  b1",
+          "",
+          "    b2",
+          "",
+          "      b3",
+          "Even pad for the same block repeated multiple times.",
+          "  b1",
+          "",
+          "  b1",
+          "",
+          "  b1",
+          "Lines with multiple links still count as being consecutive.",
+          "  b3",
+          "",
+          "  b3",
+          "",
+          "  b1 b2",
+          "",
+          "  b3",
+          "",
+          "  b3",
+          "No padding if only one link...",
+          "  b1",
+          "...is by itself."
         ]
     )
   ]
@@ -9072,8 +9526,13 @@ tangleSpec = do
   <<t:0100-dag-complex-loops>>
   <<t:0101-block-expansion>>
   <<t:0101-block-expansion-deeply-nested>>
+  <<t:0101-block-expansion-prefix>>
+  <<t:0101-block-expansion-prefix-nested>>
+  <<t:0101-block-expansion-prefix-nonspace>>
+  <<t:0101-block-expansion-prefix-nonspace-nested>>
   <<t:0101-block-expansion-complex>>
   <<t:lines-unlines-info-loss>>
+  <<t:0102-pad-between-consecutive-links>>
 #+end_src
 
 * CLI

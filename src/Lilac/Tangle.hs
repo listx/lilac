@@ -131,6 +131,10 @@ expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
       T.unlines
         . map (T.dropWhileEnd (== ' '))
         $ T.lines text
+    tanglePathOf :: Block -> T.Text
+    tanglePathOf block
+      | Just path <- EM.lookup "tangle" block.meta = path
+      | otherwise = error "programmer error"
 
 expandBlock :: SourceCode -> Block -> T.Text -> T.Text
 expandBlock sc block existingPrefix =
@@ -157,8 +161,3 @@ expandBlock sc block existingPrefix =
     prefixTailLines (acc, isFirstLine) line
       | isFirstLine = (line : acc, False)
       | otherwise = (T.append existingPrefix line : acc, False)
-
-tanglePathOf :: Block -> T.Text
-tanglePathOf block
-  | Just path <- EM.lookup "tangle" block.meta = path
-  | otherwise = error "programmer error"
