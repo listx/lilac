@@ -1825,7 +1825,10 @@ import Prelude qualified (show)
 <<f:blockMetaEntryParser>>
 <<f:assertUniqueTanglePath>>
 <<f:blockParser>>
+<<f:blockStartParser>>
 <<f:bTokenParser>>
+<<f:zeroBTokensParser>>
+<<f:someBTokensParser>>
 <<f:nowebLinkParser>>
 <<f:compressBTokens>>
 <<f:zeroIndent>>
@@ -4985,18 +4988,7 @@ Let's see how we parse the block itself with =blockParser=.
 #+begin_src haskell
 blockParser :: OrgParser Cell
 blockParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
-  blockName <- MP.optional metaNameParser
-  metaKVs <- many $ lexeme blockMetaEntryParser
-  _ <- string "#+begin_"
-  blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
-  srcLang <- MP.optional $ do
-    _ <- MP.skipSome $ char ' '
-    src <- MP.takeWhile1P (Just "src language") isSrcLanguageChar
-    pure ("__src_language", src)
-  when (blockType == "src" && srcLang == Nothing)
-    $ fail "block type src requires a language specifier"
-  _ <- char '\n'
+  (blockName, metaKVs, blockType, srcLang) <- blockStartParser
   let nowebOff =
         (== Just "off")
           . EM.lookup "noweb"
@@ -5006,51 +4998,60 @@ blockParser = do
       [ zeroBTokensParser blockType,
         someBTokensParser blockType (not nowebOff)
       ]
-  pure
-    . CBlock
-    $ Block
-      { meta =
-          M.fromList
-            $ (("__block_type", blockType) : metaKVs)
-            <> concatMap maybeToList [blockName, srcLang],
-        body = compressBTokens bTokens
-      }
-  where
-    zeroBTokensParser :: T.Text -> OrgParser [BToken]
-    zeroBTokensParser blockType = do
-      _ <- string $ T.concat ["#+end_", blockType, "\n"]
-      pure []
-    someBTokensParser blockType nowebOn =
-      MP.someTill
-        (bTokenParser (blockType == "src") nowebOn)
-        (string $ T.concat ["\n#+end_", blockType, "\n"])
-    isSrcLanguageChar c = isAsciiLower c || c == '-'
+  let block =
+        Block
+          { meta =
+              M.fromList
+                $ (("__block_type", blockType) : metaKVs)
+                <> concatMap maybeToList [blockName, srcLang],
+            body = compressBTokens bTokens
+          }
+  pure $ CBlock block
 
 #+end_src
 
-We first have to use the same try\/lookAhead trick we use in [[f:figureParser]] at
-the beginning, because otherwise our parser thinks that as soon as we parse a
-=#+name=, that it will be a block. This is not true because other things (like
-figures) can have a =#+name= associated with them.
-
-We fail the parse if we detect a ~#+begin_src~ block without an accompanying
-language; see [[t:0007-block-src-without-lang]].
-
+The first thing is to get the start of the block with [[f:blockStartParser]].
 The ~nowebOff~ bit controls how we perceive text that looks like ~<<foo>>~; see the
 discussion for [[t:0007-blocks-noweb]] and [[t:0007-blocks-noweb-off]].
 
-The tricky part is the use of =zeroBTokensParser= and =someBTokensParser=. We need
-this distinction because we require blocks to end with ="\n#+end_..."= (that is,
-the =#+end_...= must occur at the beginning of a line). This means that for empty
-blocks, this newline character just preceding the =#+end_...= will come from the
-newline at the end of the =#+begin_...= part. This then interferes with the =char
-'\n'= parser we already have just before we start parsing for =bTokens=.
+The tricky part is finding out the end of the block. We cannot use a single
+parser and must parse the two cases of whether there is or isn't any content
+inside the block separately, via =zeroBTokensParser= and =someBTokensParser=. We
+need this distinction because we require blocks to end with ="\n#+end_..."= (that
+is, the =#+end_...= must occur at the beginning of a line). This means that for
+empty blocks, this newline character just preceding the =#+end_...= will come from
+the newline at the end of the =#+begin_...= part. This then interferes with the
+=char '\n'= parser we already have in [[f:blockStartParser]] just before we start
+parsing for =bTokens=.
 
 In other words, there is no easy way to tell Megaparsec to ensure that we are at
 the beginning of a line. To work around this, we check whether the block is
-empty with =zeroBTokensParser=. Otherwise, we end up expecting =someBTokensParser=
-to succeed. See [[t:0007-blocks-ending]] which checks the various edge cases around
-making sure we can detect the ="\n#+end_..."= bit.
+empty with =zeroBTokensParser=.
+
+#+name: f:zeroBTokensParser
+#+begin_src haskell
+zeroBTokensParser :: T.Text -> OrgParser [BToken]
+zeroBTokensParser blockType = do
+  _ <- string $ T.concat ["#+end_", blockType, "\n"]
+  pure []
+
+#+end_src
+
+If =zeroBTokensParser= fails, then =someBTokensParser= must succeed (hence the use
+of ~MP.choice~ in [[f:blockParser]]).
+
+#+name: f:someBTokensParser
+#+begin_src haskell
+someBTokensParser :: T.Text -> Bool -> OrgParser [BToken]
+someBTokensParser blockType nowebOn =
+  MP.someTill
+    (bTokenParser (blockType == "src") nowebOn)
+    (string $ T.concat ["\n#+end_", blockType, "\n"])
+
+#+end_src
+
+See [[t:0007-blocks-ending]] which checks the various edge cases around making sure
+we can detect the ="\n#+end_..."= bit.
 
 Note that because we treat the trailing newline as a part of the =#+end_...=
 marker, we leave it out of the parsed contents. This actually helps us when we
@@ -5058,12 +5059,12 @@ have to tangle blocks in [[f:expandBlock]]. If we parsed in the trailing newline
 these newlines would build up every time we nested into a block (e.g.,
 [[t:0101-block-expansion-deeply-nested]]).
 
-We call =compressBTokens= for the parsed ~bTokens~; this function is similar to
-[[f:compressProse]], but it's simpler because it doesn't have to deal with styled
-text. Instead it only deals with raw =T.Text= values directly. We need to use
-=compressBTokens= because otherwise we'll end up with many separate =BToken=
-values (because [[f:bTokenParser]] uses multiple separate parsers that all use the
-same =BTokenString= constructor for parsing text tokens).
+Going back to [[f:blockParser]], we call =compressBTokens= for the parsed ~bTokens~;
+this function is similar to [[f:compressProse]], but it's simpler because it doesn't
+have to deal with styled text. Instead it only deals with raw =T.Text= values
+directly. We need to use =compressBTokens= because otherwise we'll end up with
+many separate =BToken= values (because [[f:bTokenParser]] uses multiple separate
+parsers that all use the same =BTokenString= constructor for parsing text tokens).
 
 #+name: f:compressBTokens
 #+begin_src haskell
@@ -5077,6 +5078,39 @@ compressBTokens = reverse . foldl' f []
     f acc token = token : acc
 
 #+end_src
+
+That's the overall overview of [[f:blockParser]]. Now let's look at how
+[[f:blockStartParser]] in detail.
+
+#+name: f:blockStartParser
+#+begin_src haskell
+blockStartParser :: OrgParser (Maybe (T.Text, T.Text), [(T.Text, T.Text)], T.Text, Maybe (T.Text, T.Text))
+blockStartParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
+  blockName <- MP.optional metaNameParser
+  metaKVs <- many $ lexeme blockMetaEntryParser
+  _ <- string "#+begin_"
+  blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
+  srcLang <- MP.optional $ do
+    _ <- MP.skipSome $ char ' '
+    src <- MP.takeWhile1P (Just "src language") isSrcLanguageChar
+    pure ("__src_language", src)
+  when (blockType == "src" && srcLang == Nothing)
+    $ fail "block type src requires a language specifier"
+  _ <- char '\n'
+  pure (blockName, metaKVs, blockType, srcLang)
+  where
+    isSrcLanguageChar c = isAsciiLower c || c == '-'
+
+#+end_src
+
+We first have to use the same try\/lookAhead trick we use in [[f:figureParser]] at
+the beginning, because otherwise our parser thinks that as soon as we parse a
+=#+name=, that it will be a block. This is not true because other things (like
+figures) can have a =#+name= associated with them.
+
+We fail the parse if we detect a ~#+begin_src~ block without an accompanying
+language; see [[t:0007-block-src-without-lang]].
 
 *** =bTokenParser= (code block contents)
 

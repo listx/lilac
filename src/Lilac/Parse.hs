@@ -888,6 +888,28 @@ assertUniqueTanglePath _ _ = pure ()
 
 blockParser :: OrgParser Cell
 blockParser = do
+  (blockName, metaKVs, blockType, srcLang) <- blockStartParser
+  let nowebOff =
+        (== Just "off")
+          . EM.lookup "noweb"
+          $ M.fromList metaKVs
+  bTokens <-
+    MP.choice
+      [ zeroBTokensParser blockType,
+        someBTokensParser blockType (not nowebOff)
+      ]
+  let block =
+        Block
+          { meta =
+              M.fromList
+                $ (("__block_type", blockType) : metaKVs)
+                <> concatMap maybeToList [blockName, srcLang],
+            body = compressBTokens bTokens
+          }
+  pure $ CBlock block
+
+blockStartParser :: OrgParser (Maybe (T.Text, T.Text), [(T.Text, T.Text)], T.Text, Maybe (T.Text, T.Text))
+blockStartParser = do
   _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
   blockName <- MP.optional metaNameParser
   metaKVs <- many $ lexeme blockMetaEntryParser
@@ -900,33 +922,8 @@ blockParser = do
   when (blockType == "src" && srcLang == Nothing)
     $ fail "block type src requires a language specifier"
   _ <- char '\n'
-  let nowebOff =
-        (== Just "off")
-          . EM.lookup "noweb"
-          $ M.fromList metaKVs
-  bTokens <-
-    MP.choice
-      [ zeroBTokensParser blockType,
-        someBTokensParser blockType (not nowebOff)
-      ]
-  pure
-    . CBlock
-    $ Block
-      { meta =
-          M.fromList
-            $ (("__block_type", blockType) : metaKVs)
-            <> concatMap maybeToList [blockName, srcLang],
-        body = compressBTokens bTokens
-      }
+  pure (blockName, metaKVs, blockType, srcLang)
   where
-    zeroBTokensParser :: T.Text -> OrgParser [BToken]
-    zeroBTokensParser blockType = do
-      _ <- string $ T.concat ["#+end_", blockType, "\n"]
-      pure []
-    someBTokensParser blockType nowebOn =
-      MP.someTill
-        (bTokenParser (blockType == "src") nowebOn)
-        (string $ T.concat ["\n#+end_", blockType, "\n"])
     isSrcLanguageChar c = isAsciiLower c || c == '-'
 
 bTokenParser :: Bool -> Bool -> OrgParser BToken
@@ -947,6 +944,17 @@ bTokenParser isSrcBlock nowebOn = MP.choice parsers
       if isSrcBlock && nowebOn
         then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
         else baseParsers
+
+zeroBTokensParser :: T.Text -> OrgParser [BToken]
+zeroBTokensParser blockType = do
+  _ <- string $ T.concat ["#+end_", blockType, "\n"]
+  pure []
+
+someBTokensParser :: T.Text -> Bool -> OrgParser [BToken]
+someBTokensParser blockType nowebOn =
+  MP.someTill
+    (bTokenParser (blockType == "src") nowebOn)
+    (string $ T.concat ["\n#+end_", blockType, "\n"])
 
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
