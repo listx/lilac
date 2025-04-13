@@ -4,12 +4,14 @@ module Lilac.Tangle
     expandRootBlocks,
     findCycles,
     getSourceCode,
+    tangle,
   )
 where
 
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
+import Data.Text.IO.Utf8 (writeFile)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -20,6 +22,7 @@ import Lilac.Parse
   )
 import Relude
   ( Bool (False, True),
+    IO,
     Maybe (Just, Nothing),
     Type,
     catMaybes,
@@ -30,6 +33,7 @@ import Relude
     fst,
     length,
     map,
+    mapM_,
     otherwise,
     reverse,
     ($),
@@ -161,3 +165,8 @@ expandBlock sc block existingPrefix =
     prefixTailLines (acc, isFirstLine) line
       | isFirstLine = (line : acc, False)
       | otherwise = (T.append existingPrefix line : acc, False)
+
+tangle :: OrgDoc -> IO ()
+tangle od = mapM_ f (expandRootBlocks $ getSourceCode od)
+  where
+    f (tanglePath, content) = writeFile (T.unpack tanglePath) content

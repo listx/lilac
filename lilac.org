@@ -8466,12 +8466,14 @@ module Lilac.Tangle
     expandRootBlocks,
     findCycles,
     getSourceCode,
+    tangle,
   )
 where
 
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
+import Data.Text.IO.Utf8 (writeFile)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -8482,6 +8484,7 @@ import Lilac.Parse
   )
 import Relude
   ( Bool (False, True),
+    IO,
     Maybe (Just, Nothing),
     Type,
     catMaybes,
@@ -8492,6 +8495,7 @@ import Relude
     fst,
     length,
     map,
+    mapM_,
     otherwise,
     reverse,
     ($),
@@ -8883,7 +8887,7 @@ checkCycles
   [G.Node "f:a" [G.Node "f:b" [G.Node "f:c" [], G.Node "f:d" []]], G.Node "f:e" []]
 #+end_src
 
-** Tangle each file
+** Expand blocks for tangling
 
 For tangling, we can't use the graph information from [[f:buildGraph]] directly
 because it doesn't handle the case where we have multiple links to the same code
@@ -9418,6 +9422,19 @@ checkExpansion
   ]
 #+end_src
 
+** Tangle files
+
+In [[f:tangle]] we naively tangle each file, one at a time, in serial fashion.
+
+#+name: f:tangle
+#+begin_src haskell
+tangle :: OrgDoc -> IO ()
+tangle od = mapM_ f (expandRootBlocks $ getSourceCode od)
+  where
+    f (tanglePath, content) = writeFile (T.unpack tanglePath) content
+
+#+end_src
+
 ** Testing framework
 
 The testing framework here is modeled closely after [[module:Lilac.ParseSpec]].
@@ -9606,6 +9623,7 @@ import Text.Pretty.Simple qualified as PP
 <<f:lilac-main>>
 <<f:lilac>>
 <<f:lilacCheck>>
+<<f:lilacTangle>>
 #+end_src
 
 ** =main= entrypoint
@@ -9644,13 +9662,12 @@ out into the =check=, =tangle= and =weave= subcommands.
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
   Check checkOpts -> lilacCheck globalOpts checkOpts
-  Tangle -> putStrLn "'tangle' is not implemented yet"
+  Tangle tangleOpts -> lilacTangle tangleOpts
   Weave -> putStrLn "'weave' is not implemented yet"
 
 #+end_src
 
-For now we only implement the =check= subcommand, which is handled by
-[[f:lilacCheck]]. This just parses the input, checking if we can parse it by
+The [[f:lilacCheck]] function just parses the input, checking if we can parse it by
 examining ~parseResult~.
 
 #+name: f:lilacCheck
@@ -9685,6 +9702,32 @@ the global ~--verbose~ flag is given. This is useful for debugging. By default t
 data structure will be printed with colored braces, but you can suppress this
 with ~--no-color~.
 
+The [[f:lilacTangle]] function tangles all blocks (which have been marked for
+tangling) from a given Org file.
+
+#+name: f:lilacTangle
+#+begin_src haskell
+lilacTangle :: TangleOpts -> IO ()
+lilacTangle tangleOpts = do
+  input <- LU.readFrom "" tangleOpts.input
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          tangleOpts.input
+          input
+  case parseResult of
+    Left errBundle -> do
+      die $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) -> do
+      let sourceCode = LT.getSourceCode orgDoc
+          cycles = LT.findCycles sourceCode
+      when (not $ null cycles) $ do
+        die $ "Found cycles: " <> show cycles
+      LT.tangle orgDoc
+      putStrLn $ tangleOpts.input <> ": Finished tangling."
+
+#+end_src
+
 ** Option handling boilerplate
 :PROPERTIES:
 :ID:       ce9af5ef-6559-4ffb-82c1-a439214eda6d
@@ -9698,10 +9741,12 @@ options, and the functions that operate on them.
 <<data:GlobalOpts>>
 <<data:Subcommand>>
 <<data:CheckOpts>>
+<<data:TangleOpts>>
 <<data:OptionHandler>>
 <<f:globalOptionsHandler>>
 <<f:subcommandHandler>>
 <<f:checkOptsHandler>>
+<<f:tangleOptsHandler>>
 #+end_src
 
 The global options are encoded in [[data:GlobalOpts]].
@@ -9724,13 +9769,14 @@ We use subcommands to capture major behaviors --- =check=, =tangle=, and =weave=
 type Subcommand :: Type
 data Subcommand
   = Check CheckOpts
-  | Tangle
+  | Tangle TangleOpts
   | Weave
 
 #+end_src
 
-For now we only support the =check= subcommand, which requires a file to check in
-[[f:lilacCheck]].
+The =check= subcommand runs [[f:lilacCheck]], and requires an ~input~ option and handler
+[[f:checkOptsHandler]] that knows how to parse the CLI arguments into a
+[[data:CheckOpts]] value.
 
 #+name: data:CheckOpts
 #+begin_src haskell
@@ -9739,6 +9785,34 @@ data CheckOpts = CheckOpts
   { input :: FilePath
   }
 
+#+end_src
+
+#+name: f:checkOptsHandler
+#+begin_src haskell
+checkOptsHandler :: OptionHandler CheckOpts
+checkOptsHandler =
+  CheckOpts
+    <$> (argument str (metavar "FILE"))
+
+#+end_src
+
+Like =check=, the =tangle= subcommand runs [[f:lilacTangle]], and also requires an ~input~ option.
+
+#+name: data:TangleOpts
+#+begin_src haskell
+type TangleOpts :: Type
+data TangleOpts = TangleOpts
+  { input :: FilePath
+  }
+
+#+end_src
+
+#+name: f:tangleOptsHandler
+#+begin_src haskell
+tangleOptsHandler :: OptionHandler TangleOpts
+tangleOptsHandler =
+  TangleOpts
+    <$> (argument str (metavar "FILE"))
 #+end_src
 
 That's it for the data structures for option handling. The next concern is
@@ -9807,7 +9881,7 @@ subcommandHandler =
       command
         "tangle"
         $ info
-          (pure Tangle)
+          (Tangle <$> tangleOptsHandler)
           (progDesc "generate source code")
     cmdWeave =
       command
@@ -9819,17 +9893,7 @@ subcommandHandler =
 #+end_src
 
 The [[f:subcommandHandler]] is where we specify each of the different behaviors
-(subcommands) of =lilac=. For now we only implement the =check= subcommand in
-[[f:lilacCheck]], so we only have a single [[f:checkOptsHandler]] to handle the options
-for that subcommand.
-
-#+name: f:checkOptsHandler
-#+begin_src haskell
-checkOptsHandler :: OptionHandler CheckOpts
-checkOptsHandler =
-  CheckOpts
-    <$> (argument str (metavar "FILE"))
-#+end_src
+(subcommands) of =lilac=.
 
 Notice that the option handling boilerplate does not describe error handling
 (what to do when a required option is missing, etc), because all of that is

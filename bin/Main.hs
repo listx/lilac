@@ -61,11 +61,16 @@ data GlobalOpts = GlobalOpts
 type Subcommand :: Type
 data Subcommand
   = Check CheckOpts
-  | Tangle
+  | Tangle TangleOpts
   | Weave
 
 type CheckOpts :: Type
 data CheckOpts = CheckOpts
+  { input :: FilePath
+  }
+
+type TangleOpts :: Type
+data TangleOpts = TangleOpts
   { input :: FilePath
   }
 
@@ -109,7 +114,7 @@ subcommandHandler =
       command
         "tangle"
         $ info
-          (pure Tangle)
+          (Tangle <$> tangleOptsHandler)
           (progDesc "generate source code")
     cmdWeave =
       command
@@ -121,6 +126,11 @@ subcommandHandler =
 checkOptsHandler :: OptionHandler CheckOpts
 checkOptsHandler =
   CheckOpts
+    <$> (argument str (metavar "FILE"))
+
+tangleOptsHandler :: OptionHandler TangleOpts
+tangleOptsHandler =
+  TangleOpts
     <$> (argument str (metavar "FILE"))
 
 main :: IO ()
@@ -146,7 +156,7 @@ main = do
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
   Check checkOpts -> lilacCheck globalOpts checkOpts
-  Tangle -> putStrLn "'tangle' is not implemented yet"
+  Tangle tangleOpts -> lilacTangle tangleOpts
   Weave -> putStrLn "'weave' is not implemented yet"
 
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
@@ -171,3 +181,22 @@ lilacCheck globalOpts checkOpts = do
                 then PP.pPrintForceColor
                 else PP.pPrintNoColor
         prettyPrint orgDoc
+
+lilacTangle :: TangleOpts -> IO ()
+lilacTangle tangleOpts = do
+  input <- LU.readFrom "" tangleOpts.input
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          tangleOpts.input
+          input
+  case parseResult of
+    Left errBundle -> do
+      die $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) -> do
+      let sourceCode = LT.getSourceCode orgDoc
+          cycles = LT.findCycles sourceCode
+      when (not $ null cycles) $ do
+        die $ "Found cycles: " <> show cycles
+      LT.tangle orgDoc
+      putStrLn $ tangleOpts.input <> ": Finished tangling."
