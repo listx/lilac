@@ -11,7 +11,7 @@ where
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
-import Data.Text.IO.Utf8 (writeFile)
+import Data.Text.IO.Utf8 (readFile, writeFile)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -36,6 +36,7 @@ import Relude
     mapM_,
     otherwise,
     reverse,
+    when,
     ($),
     (.),
     (/=),
@@ -169,4 +170,7 @@ expandBlock sc block existingPrefix =
 tangle :: OrgDoc -> IO ()
 tangle od = mapM_ f (expandRootBlocks $ getSourceCode od)
   where
-    f (tanglePath, content) = writeFile (T.unpack tanglePath) content
+    f (T.unpack -> path, contentToWrite) = do
+      existingContent <- readFile path
+      when (existingContent /= contentToWrite) $ do
+        writeFile path contentToWrite

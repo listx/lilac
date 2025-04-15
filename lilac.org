@@ -8473,7 +8473,7 @@ where
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
-import Data.Text.IO.Utf8 (writeFile)
+import Data.Text.IO.Utf8 (readFile, writeFile)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -8498,6 +8498,7 @@ import Relude
     mapM_,
     otherwise,
     reverse,
+    when,
     ($),
     (.),
     (/=),
@@ -9424,16 +9425,27 @@ checkExpansion
 
 ** Tangle files
 
-In [[f:tangle]] we naively tangle each file, one at a time, in serial fashion.
+In [[f:tangle]] we naively tangle each file, one at a time, in serial fashion. It
+does not write to the file if what would be written is the same as what's
+already there. This way, file modification timestamps can remain the same and
+tools like GNU Make won't get confused by timestamps that have been needlessly
+updated.
 
 #+name: f:tangle
 #+begin_src haskell
 tangle :: OrgDoc -> IO ()
 tangle od = mapM_ f (expandRootBlocks $ getSourceCode od)
   where
-    f (tanglePath, content) = writeFile (T.unpack tanglePath) content
+    f (T.unpack -> path, contentToWrite) = do
+      existingContent <- readFile path
+      when (existingContent /= contentToWrite) $ do
+        writeFile path contentToWrite
 
 #+end_src
+
+The ~T.unpack -> path~ is what's known as a /view pattern/ and allows us to
+transform the incoming argument to something else before we start using it in
+the rest of the function.
 
 ** Testing framework
 
