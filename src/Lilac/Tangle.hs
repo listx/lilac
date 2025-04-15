@@ -35,8 +35,8 @@ import Relude
     map,
     mapM_,
     otherwise,
+    putStrLn,
     reverse,
-    when,
     ($),
     (.),
     (/=),
@@ -179,5 +179,9 @@ tangle od = mapM_ f (expandRootBlocks $ getSourceCode od)
   where
     f (T.unpack -> path, contentToWrite) = do
       existingContent <- readFile path
-      when (existingContent /= contentToWrite) $ do
-        writeFile path contentToWrite
+      if (existingContent /= contentToWrite)
+        then do
+          writeFile path contentToWrite
+          putStrLn $ "Tangled " <> path
+        else
+          putStrLn $ "Skipping " <> path <> " (no change)"
