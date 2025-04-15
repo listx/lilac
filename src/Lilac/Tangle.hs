@@ -128,7 +128,9 @@ expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
       | Just rootBlock <- EM.lookup rootBlockName sc.nameToCodeBlock =
           Just
             ( tanglePathOf rootBlock,
-              trimTrailingSpaces $ expandBlock sc rootBlock ""
+              maybeAddShebang rootBlock
+                . trimTrailingSpaces
+                $ expandBlock sc rootBlock ""
             )
       | otherwise = Nothing
     trimTrailingSpaces :: T.Text -> T.Text
@@ -140,6 +142,11 @@ expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
     tanglePathOf block
       | Just path <- EM.lookup "tangle" block.meta = path
       | otherwise = error "programmer error"
+    maybeAddShebang :: Block -> T.Text -> T.Text
+    maybeAddShebang rootBlock text
+      | Just shebang <- EM.lookup "shebang" rootBlock.meta =
+          shebang <> "\n" <> text
+      | otherwise = text
 
 expandBlock :: SourceCode -> Block -> T.Text -> T.Text
 expandBlock sc block existingPrefix =

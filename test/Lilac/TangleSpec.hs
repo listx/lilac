@@ -195,3 +195,12 @@ tangleSpec = do
           ]
       )
     ]
+  checkExpansion
+    "0103-shebang"
+    [ ( "a.sh",
+        T.unlines
+          [ "#!/usr/bin/env bash",
+            "a1"
+          ]
+      )
+    ]
