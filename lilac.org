@@ -4,7 +4,6 @@
 # that we do not expand noweb references when exporting (weaving) --- the fact
 # that this is not the default option is odd.
 #+property: header-args+ :noweb no-export
-#+auto_tangle: t
 #+lilac_maxHeadingLevel: 3
 
 * Introduction
@@ -1599,7 +1598,6 @@ packages that are available to load inside ~ghci~.
 #+name: cabal-write-env-file
 #+begin_src haskell-cabal
 write-ghc-environment-files: always
-
 #+end_src
 
 Define =-O0= to speed up Cabal builds.
@@ -1607,7 +1605,6 @@ Define =-O0= to speed up Cabal builds.
 #+name: cabal-faster-dev-build
 #+begin_src haskell-cabal
 optimization: False
-
 #+end_src
 
 Nix handles dependencies, so tell Cabal to work offline (it won't download any
@@ -1907,7 +1904,6 @@ skipNewlinesAndComments =
     singleLineCommentParser = L.skipLineComment "# "
     blockCommentParser :: OrgParser ()
     blockCommentParser = L.skipBlockComment "#+begin_comment\n" "#+end_comment\n"
-
 #+end_src
 
 The three arguments to =L.space= (where =L= stands for =Text.Megaparsec.Char.Lexer=)
@@ -1949,7 +1945,6 @@ detecting indentation and we wouldn't want to skip past them.
 #+begin_src haskell
 lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme skipNewlinesAndComments
-
 #+end_src
 
 ** Parsing overview
@@ -1998,7 +1993,6 @@ data OrgDoc = OrgDoc
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 The top-level parsing function is =parseOrgDoc=, which takes some raw text input
@@ -2013,7 +2007,6 @@ parseOrgDoc input = case MP.runParser
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
   Right (orgDoc, _orgParserState) -> Right orgDoc
-
 #+end_src
 
 The [[f:orgDocParser]] is the main parser combinator; it is itself composed of other
@@ -2028,7 +2021,6 @@ handling mechanism that ships with Megaparsec.
 #+begin_src haskell
 type OrgParser :: Type -> Type
 type OrgParser = StateT OrgParserState (<<Concrete type for Megaparsec>>)
-
 #+end_src
 
 The [[Concrete type for Megaparsec]] feeds the concrete ~T.Text~ type to use as the
@@ -2082,7 +2074,6 @@ defaultOrgParserState =
       tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
-
 #+end_src
 
 ** =orgDocParser=
@@ -2112,7 +2103,6 @@ orgDocParser = do
       { cells = filter meaningfulCell cells,
         meta = meta
       }
-
 #+end_src
 
 The =orgDocParser= delegates most of the work to the [[f:cellParser]], which in turn
@@ -2146,7 +2136,6 @@ defaultOrgDoc metas =
     { cells = [],
       meta = M.fromList metas
     }
-
 #+end_src
 
 We should also be able to parse blank documents (not empty, but only has
@@ -2226,7 +2215,6 @@ docMetaEntryParser = do
           ]
     avoidParsingLilacExtensions :: OrgParser ()
     avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
-
 #+end_src
 
 Note how it also has to tiptoe around blocks by checking that it is not looking
@@ -2248,7 +2236,6 @@ docMetaParser :: OrgParser (M.Map T.Text T.Text)
 docMetaParser = do
   metaKVs <- many $ lexeme docMetaEntryParser
   pure $ M.fromList metaKVs
-
 #+end_src
 
 *** Lilac extensions
@@ -2286,7 +2273,6 @@ defaultOrgParserConf =
     { maxHeadingLevel = 6,
       maxListLevel = 6
     }
-
 #+end_src
 
 Parsing Lilac extensions involves parsing known key\/value combinations, and
@@ -2302,7 +2288,6 @@ lilacExtensionsParser = do
       [ maxHeadingLevelParser,
         maxListLevelParser
       ]
-
 #+end_src
 
 The [[f:maxHeadingLevelParser]] resembles the [[f:docMetaEntryParser]], but the main
@@ -2319,7 +2304,6 @@ maxHeadingLevelParser = do
   val <- signedIntParser
   let opc = orgParserState.orgParserConf {maxHeadingLevel = val}
   put orgParserState {orgParserConf = opc}
-
 #+end_src
 
 The ~signedIntParser~ knows how to parse a signed integer. The
@@ -2337,7 +2321,6 @@ signedIntParser = L.signed parserBetweenSignAndNumber number
     number = L.lexeme skipNewlinesAndComments $ L.decimal
     parserBetweenSignAndNumber :: OrgParser ()
     parserBetweenSignAndNumber = pure ()
-
 #+end_src
 
 Although we don't "return" anything (the type signature of
@@ -2354,7 +2337,6 @@ maxListLevelParser = do
   val <- signedIntParser
   let opc = orgParserState.orgParserConf {maxListLevel = val}
   put orgParserState {orgParserConf = opc}
-
 #+end_src
 
 Unsurprisingly, [[f:maxListLevelParser]] closely resembles [[f:maxHeadingLevelParser]].
@@ -2490,7 +2472,6 @@ data Cell
   | CFigure Figure
   | CTable Table
   deriving stock (Eq, Show)
-
 #+end_src
 
 All of the different cell types describe some sort of content, except for one,
@@ -2523,7 +2504,6 @@ cellParser =
       a <- p
       modify (\s -> s {continuationIndent = 0})
       pure a
-
 #+end_src
 
 The =resetContinuationIndent= wrapper sets the =continuationIndent= attribute in the
@@ -2561,7 +2541,6 @@ detectInvalidIndentation = do
     . MP.ErrorFail
     $ "invalid indentation"
   pure $ CListItem []
-
 #+end_src
 
 We signal the error with ~invalid ...~ so as to not shadow the typical ~unexpected
@@ -2583,7 +2562,6 @@ it's just a list of these /prose/ tokens (~PToken~).
 #+begin_src haskell
 type Prose :: Type
 type Prose = [PToken]
-
 #+end_src
 
 A =PToken= can be a string (styled or otherwise), a link of some sort, or a Latex
@@ -2598,7 +2576,6 @@ data PToken
   | PTokenLink Link
   | PTokenMathFragment MathFragment
   deriving stock (Eq, Show)
-
 #+end_src
 
 The ~proseParser~ can parse a series of [[data:PToken]] values. It is used by both
@@ -2624,7 +2601,6 @@ proseParser spaceConsumer = do
     nonEmpty = \case
       PTokenStyledText styledText -> not $ T.null styledText.body
       _ -> True
-
 #+end_src
 
 In [[f:proseParser]], we parse whitespace explicitly with =whitespaceCompressor= which
@@ -2686,7 +2662,6 @@ whitespaceCompressor spaceConsumer = do
       { body = ws,
         style = mask
       }
-
 #+end_src
 
 This parser only succeeds if it finds at least one non-newline whitespace
@@ -2712,7 +2687,6 @@ data StyledText = StyledText
     style :: StyleMask
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 The [[newtype:StyleMask]] is a low-level bit mask that can store multiple boolean
@@ -2732,7 +2706,6 @@ should never be needed during exposition.
 type Style :: Type
 data Style = Bold | Italic | Underline | Verbatim | Code
   deriving stock (Enum, Eq, Ord, Show)
-
 #+end_src
 
 The =styleMarkers= keeps track of the characters that activate and deactivate each
@@ -2750,7 +2723,6 @@ styleMarkers =
       ('=', Verbatim),
       ('~', Code)
     ]
-
 #+end_src
 
 Characters in the =styleMarkers= can be escaped with a backslash. For example, the
@@ -2817,7 +2789,6 @@ failIfLeftoverActiveStyles = do
     fail
       $ "leftover active styles: "
       ++ (show $ maskToStyles $ StyleMask mask)
-
 #+end_src
 
 We don't really care which styles are turned on or off at which point (the style
@@ -2923,7 +2894,6 @@ styleMarkerParser = do
       { body = "",
         style = newMask
       }
-
 #+end_src
 
 All we do is parse a single style marker character, and flip the bit for it as
@@ -2948,7 +2918,6 @@ isStyleMarker styleMask c
   | isVerbatim styleMask = c == '='
   | isCode styleMask = c == '~'
   | otherwise = M.member c styleMarkers
-
 #+end_src
 
 Parsing actual styled text requires reading the state of the =StyleMask=, and then
@@ -2970,7 +2939,6 @@ styledTextParser = do
       { body = text,
         style = mask
       }
-
 #+end_src
 
 The [[f:textParser]] is careful not to step on other parsers' toes, because in a
@@ -3008,7 +2976,6 @@ textParser styleMask
       M.notMember c styleMarkers
         && (not $ isSpace c)
         && (not $ c == '\\')
-
 #+end_src
 
 Because of the way =isStyleMarker= and =isProseWord= checks membership of the
@@ -3033,7 +3000,6 @@ escapedSymbolParser styleMask = do
   if s == "vert{}"
     then pure "|"
     else pure s
-
 #+end_src
 
 The word =\vert{}= can be used to escape a pipe character inside [[data:Table][table]] cells,
@@ -3064,7 +3030,6 @@ use a =newtype= around a =Word8= (an 8-bit word) so as to keep it distinct from
 type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
   deriving stock (Eq)
-
 #+end_src
 
 We have a custom =Show= instance because the default =Show= would just treat the
@@ -3090,7 +3055,6 @@ instance Show StyleMask where
             )
           . zip [0 ..]
           $ toListLE a
-
 #+end_src
 
 The shown text string is prefixed with [[f:styleMaskFrom]] because that function is
@@ -3107,7 +3071,6 @@ styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
   where
     f :: Word8 -> Style -> Word8
     f acc s = setBit acc (fromEnum s)
-
 #+end_src
 
 Similarly, we sometimes want to go the other direction --- that is, deconstruct
@@ -3123,7 +3086,6 @@ maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask
       if b
         then (toEnum idx) : acc
         else acc
-
 #+end_src
 
 We have a helper function [[f:toStyleMask]] to convert =Char= into a =StyleMask=. This
@@ -3145,7 +3107,6 @@ charToStyle c = case EM.lookup c styleMarkers of
 
 styleToStyleMask :: (MonadFail m) => Style -> m StyleMask
 styleToStyleMask s = pure $ StyleMask (setBit 0 $ fromEnum s)
-
 #+end_src
 
 [[f:styleMaskFlip]] is a helper to perform a binary XOR operation on two =StyleMask=
@@ -3157,7 +3118,6 @@ used to either turn on bits, or turn off bits if they're already on.
 #+begin_src haskell
 styleMaskFlip :: StyleMask -> StyleMask -> StyleMask
 styleMaskFlip (StyleMask a) (StyleMask b) = StyleMask $ a .^. b
-
 #+end_src
 
 We also have some helpers to check whether particular styles are active.
@@ -3169,7 +3129,6 @@ isVerbatim (StyleMask a) = testBit a (fromEnum Verbatim)
 
 isCode :: StyleMask -> Bool
 isCode (StyleMask a) = testBit a (fromEnum Code)
-
 #+end_src
 
 We stated earlier in [[t:0005-styled-strings-leftover-active-styles]] that we don't
@@ -3205,7 +3164,6 @@ compressProse = reverse . dropUnnecessary . foldl' f []
     dropUnnecessary (((PTokenStyledText (StyledText " " _))) : rest) = rest
     dropUnnecessary (((PTokenStyledText (StyledText "" _))) : rest) = rest
     dropUnnecessary tokens = tokens
-
 #+end_src
 
 This function works by looking at two consecutive ~PTokenStyledText~ elements at a
@@ -3579,7 +3537,6 @@ data Link = Link
     typ :: LinkType
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 In summary we support the following link types:
@@ -3602,7 +3559,6 @@ data LinkType
   = LinkBracketed
   | LinkNoweb
   deriving stock (Eq, Show)
-
 #+end_src
 
 *** Standalone link parser
@@ -3620,7 +3576,6 @@ linkParser = do
     [ MP.try bracketedLinkParser,
       MP.try rawLinkParser
     ]
-
 #+end_src
 
 The call to [[f:failIfVerbatimOrCode]] fails the parser if either the [[f:isVerbatim][verbatim or
@@ -3636,7 +3591,6 @@ failIfVerbatimOrCode = do
   let mask = orgParserState.styleMask
   when (isVerbatim mask || isCode mask)
     $ fail "aborting because verbatim or code style is active"
-
 #+end_src
 
 By conditionally failing [[f:linkParser]] with [[f:failIfVerbatimOrCode]], we also allow
@@ -3697,7 +3651,6 @@ bracketedLinkParser = do
               }
           ]
       }
-
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0006-links
@@ -3905,7 +3858,6 @@ rawLinkParser = do
     isAlphaChar c = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
     isDigitChar :: Char -> Bool
     isDigitChar c = c >= '0' && c <= '9'
-
 #+end_src
 
 The tricky part is in the =remainderChar=. Essentially, if we see a raw link
@@ -4056,7 +4008,6 @@ mathFragmentInlineParser = do
       { meta = M.fromList [],
         body = T.pack latex
       }
-
 #+end_src
 
 ** Paragraphs
@@ -4100,7 +4051,6 @@ paragraphParser = do
         ]
     spaces :: OrgParser T.Text
     spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
-
 #+end_src
 
 The tricky bit is with ~spaceConsumer~ here. It chooses between either a newline
@@ -4132,7 +4082,6 @@ newlineAndIndentParser expectedIndentLen = do
       MP.notFollowedBy (char ' ')
       MP.notFollowedBy (char '\n')
       pure ()
-
 #+end_src
 
 The ~MP.notFollowedBy cellBoundary~ bit is required to stay clear of cell
@@ -4270,7 +4219,6 @@ data Heading = Heading
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 The parser for a heading is straightforward as the strict requirements make it
@@ -4318,7 +4266,6 @@ headingParser = do
     spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
     starsParser :: OrgParser T.Text
     starsParser = MP.takeWhile1P (Just "heading star") (\c -> c == '*')
-
 #+end_src
 
 We fail if the heading level is not compliant with the setting of
@@ -4342,7 +4289,6 @@ failIfHeadingNestsWithoutDirectParent current found =
       <> ", not "
       <> show found
       <> ")"
-
 #+end_src
 
 The body text of a heading is a series of prose tokens, or =PToken= values, which
@@ -4560,7 +4506,6 @@ elsewhere in the document (in Orgmode this can be done with ~org-id-store-link~)
 #+begin_src haskell
 propertiesDrawerParser :: OrgParser (Map T.Text T.Text)
 propertiesDrawerParser = propertiesParser <|> (pure $ M.fromList [])
-
 #+end_src
 
 The [[f:propertiesDrawerParser]] tries to parse a =:PROPERTIES:= drawer with
@@ -4575,7 +4520,6 @@ propertiesParser =
       (lexeme $ string ":PROPERTIES:\n")
       (string ":END:\n")
       (many $ lexeme propertiesEntryParser)
-
 #+end_src
 
 The [[f:propertiesParser]] is just a thin wrapper around [[f:propertiesEntryParser]]
@@ -4602,7 +4546,6 @@ propertiesEntryParser = do
       (MP.label "property value" MP.anySingle)
       (char '\n')
   pure (T.pack key, T.pack value)
-
 #+end_src
 
 The main tricky bit is ~MP.notFollowedBy $ string ":END:"~; we need this because
@@ -4772,7 +4715,6 @@ data Block = Block
     body :: [BToken]
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 Below are some examples of valid (empty) code blocks.
@@ -4878,7 +4820,6 @@ metaNameParser = do
   name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
   assertUniqueBlockName name
   pure ("name", name)
-
 #+end_src
 
 The [[f:assertUniqueTanglePath]] function checks that all tangle paths are unique;
@@ -4899,7 +4840,6 @@ assertUniqueTanglePath "tangle" path = do
       { tanglePaths = Set.insert path orgParserState.tanglePaths
       }
 assertUniqueTanglePath _ _ = pure ()
-
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-duplicate-tangle-paths
@@ -4944,7 +4884,6 @@ assertUniqueBlockName blockName = do
     orgParserState
       { blockNames = Set.insert blockName orgParserState.blockNames
       }
-
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-duplicate-names
@@ -4985,7 +4924,6 @@ data BToken
   = BTokenString T.Text
   | BTokenLink Link
   deriving stock (Eq, Show)
-
 #+end_src
 
 *** Overall parser
@@ -5018,7 +4956,6 @@ blockParser = do
                 $ padConsecutiveNowebLinks bTokens
           }
   pure $ CBlock block
-
 #+end_src
 
 The first thing is to get the start of the block with [[f:blockStartParser]].
@@ -5045,7 +4982,6 @@ zeroBTokensParser :: T.Text -> OrgParser [BToken]
 zeroBTokensParser blockType = do
   _ <- string $ T.concat ["#+end_", blockType, "\n"]
   pure []
-
 #+end_src
 
 If =zeroBTokensParser= fails, then =someBTokensParser= must succeed (hence the use
@@ -5058,7 +4994,6 @@ someBTokensParser blockType nowebOn =
   MP.someTill
     (bTokenParser (blockType == "src") nowebOn)
     (string $ T.concat ["\n#+end_", blockType, "\n"])
-
 #+end_src
 
 See [[t:0007-blocks-ending]] which checks the various edge cases around making sure
@@ -5091,7 +5026,6 @@ compressBTokens = reverse . foldl' f []
     f ((BTokenString text1) : rest) (BTokenString text2) =
       (BTokenString $ T.append text1 text2) : rest
     f acc token = token : acc
-
 #+end_src
 
 The [[f:ignoreSpecialCommas]] function ignores commas at the beginning of a line
@@ -5130,7 +5064,6 @@ ignoreSpecialCommas = reverse . foldl' f []
     dropLeadingComma line =
       let (indent, commas) = T.breakOn "," line
        in indent <> T.drop 1 commas
-
 #+end_src
 
 See [[file:test/Lilac/ParseSpec/0007-blocks-special-commas]] for the raw text;
@@ -5220,7 +5153,6 @@ blockStartParser = do
   pure (blockName, metaKVs, blockType, srcLang)
   where
     isSrcLanguageChar c = isAsciiLower c || c == '-'
-
 #+end_src
 
 We first have to use the same try\/lookAhead trick we use in [[f:figureParser]] at
@@ -5258,7 +5190,6 @@ bTokenParser isSrcBlock nowebOn = MP.choice parsers
       if isSrcBlock && nowebOn
         then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
         else baseParsers
-
 #+end_src
 
 The need to detect Noweb references is why ~baseParsers~ has individual (separate)
@@ -5306,7 +5237,6 @@ nowebLinkParser = do
               }
           ]
       }
-
 #+end_src
 
 Below we check a typical case with some Noweb references in it. Note that we
@@ -5616,7 +5546,6 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
       BTokenString text -> text
       BTokenLink (Link _name target LinkNoweb) -> <<link-marker>> <> target
       _ -> ""
-
 #+end_src
 
 The ~<<link-marker>>~ is just a special marker we use to keep track of where the
@@ -5655,7 +5584,6 @@ getLinkPaddingBools blockBody =
         1 -> [True]
         n -> reverse $ True : replicate (n - 1) False
     countLinks = T.count <<link-marker>>
-
 #+end_src
 
 Now that we have a list of booleans to mark whether a link needs a newline
@@ -5677,7 +5605,6 @@ padConsecutiveNowebLinks blockBody =
           | padLink -> ((BTokenString "\n") : link : acc, rest)
           | otherwise -> (link : acc, rest)
         [] -> (link : acc, [])
-
 #+end_src
 
 See [[t:0102-pad-between-consecutive-links][t:0102-pad-between-consecutive-links]] for an example of this padding
@@ -6097,7 +6024,6 @@ data Level = Level
     number :: Maybe Int
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 This keeps track of the indentations and the last seen number of each (nested)
@@ -6124,7 +6050,6 @@ data ListMarker
   | LItemStart
   | LItemEnd
   deriving stock (Eq, Show)
-
 #+end_src
 
 We take this model from HTML, which uses =<ol>= and =</ol>= to encode the start and
@@ -6193,7 +6118,6 @@ zeroIndent = do
   let listLevelsToClose = length orgParserState.listLevels
       continuationIndent = 0 :: Int
   pure (listLevelsToClose, continuationIndent)
-
 #+end_src
 
 In [[f:zeroIndent]] we return the number of list levels to close off (in this case
@@ -6227,7 +6151,6 @@ someIndent = do
   case matchingIndent of
     Nothing -> fail "indentation does not fit into existing levels"
     Just x -> pure x
-
 #+end_src
 
 It should be noted that the ~orgParserState.listLevels~ is grown by prepending to
@@ -6262,7 +6185,6 @@ getContinuationIndentForLevel level = level.indent + maybeNum + punctuation + sp
     maybeNum = case level.number of
       Just n -> length $ (show n :: String)
       Nothing -> 0
-
 #+end_src
 
 Once we determine the amount of levels we need to close off (by parsing
@@ -6288,7 +6210,6 @@ listItemsEndParser = do
         continuationIndent = continuationIndent
       }
   pure $ CListItem markers
-
 #+end_src
 
 In [[f:listItemsEndParser]], note that we initially fail the parser if there are no
@@ -6325,7 +6246,6 @@ getEndingListMarkers levelsToDrop = concatMap f . take levelsToDrop
     f level = case level.number of
       Nothing -> [LItemEnd, LUnorderedEnd]
       Just _ -> [LItemEnd, LOrderedEnd]
-
 #+end_src
 
 *** Parsing list heads
@@ -6345,7 +6265,6 @@ unorderedHeadParser :: OrgParser (Maybe Int)
 unorderedHeadParser = do
   _ <- char '-'
   pure Nothing
-
 #+end_src
 
 For ordered lists we want to see the number and closing parenthesis.
@@ -6360,7 +6279,6 @@ orderedHeadParser = do
   when (isNothing n) $ do
     fail $ "could not parse " <> show (T.unpack num) <> " as Int"
   pure n
-
 #+end_src
 
 We check if the number looks like an =Int= with =readMaybe=.
@@ -6404,7 +6322,6 @@ listHeadIndentLevelParser = do
       _ <- char ' '
       MP.notFollowedBy (char ' ')
       modify (\s -> s {continuationIndent = getContinuationIndentForLevel level})
-
 #+end_src
 
 The ~minimalIndentation~ expects there to be at least 2 spaces preceding a list
@@ -6453,7 +6370,6 @@ listItemStartParser = do
     nestsBeyond [] _ = True
     nestsBeyond (deepestLevel : _) level =
       getContinuationIndentForLevel deepestLevel == level.indent
-
 #+end_src
 
 The first line ~_ <- MP.try $ MP.lookAhead listHeadIndentLevelParser~ is needed
@@ -6502,7 +6418,6 @@ listItemNester level levels = do
         listMarkers = LItemStart : newMarker : orgParserState.listMarkers
       }
   pure [newMarker, LItemStart]
-
 #+end_src
 
 We enforce some additional rules here, such as forcing the nesting list head to
@@ -6573,7 +6488,6 @@ listItemFitter level levels = case find (\(_, l) -> l.indent == level.indent) (z
             listMarkers = drop (levelsToDrop * 2) orgParserState.listMarkers
           }
       pure $ markers <> [LItemEnd, LItemStart]
-
 #+end_src
 
 We use [[f:listItemStartParser]] and [[f:listItemsEndParser]] inside
@@ -7325,7 +7239,6 @@ data MathFragment = MathFragment
     body :: T.Text
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 There are three ways to write math fragments: using =\begin{equation}= and
@@ -7385,7 +7298,6 @@ mathFragmentNumberedParser = do
           M.insert "__equation_number" (T.pack $ show number) metaKVs,
         body = trimTrailingWhitespace $ T.pack latex
       }
-
 #+end_src
 
 The call to [[f:trimTrailingWhitespace]] cleans up any trailing whitespace we parsed
@@ -7395,7 +7307,6 @@ into ~latex~.
 #+begin_src haskell
 trimTrailingWhitespace :: T.Text -> T.Text
 trimTrailingWhitespace = T.dropWhileEnd (\c -> T.elem c " \n\r\t")
-
 #+end_src
 
 Parsing unnumbered equations is almost the same.
@@ -7415,7 +7326,6 @@ mathFragmentUnnumberedParser = do
       { meta = metaKVs,
         body = trimTrailingWhitespace $ T.pack latex
       }
-
 #+end_src
 
 We simply combine the numbered and unnumbered parsers together in the top-level
@@ -7427,7 +7337,6 @@ mathFragmentStandaloneParser :: OrgParser Cell
 mathFragmentStandaloneParser =
   CMathFragment
     <$> (MP.try mathFragmentNumberedParser <|> mathFragmentUnnumberedParser)
-
 #+end_src
 
 Unlike [[f:tableLineParser]] and [[f:tableRowParser]], we don't use
@@ -7621,7 +7530,6 @@ data Figure = Figure
     link :: Link
   }
   deriving stock (Eq, Show)
-
 #+end_src
 
 Below is an example of a figure:
@@ -7652,7 +7560,6 @@ figureParser = do
         [ void . MP.try $ string "\n\n",
           char '\n' >> MP.eof
         ]
-
 #+end_src
 
 It's important that we expect the end of the cell (double newline or newline and
@@ -7669,7 +7576,6 @@ metaParser :: OrgParser (M.Map T.Text T.Text)
 metaParser = do
   metaKVs <- many $ lexeme metaEntryParser
   pure $ M.fromList metaKVs
-
 #+end_src
 
 The [[f:metaEntryParser]] is similar to [[f:docMetaEntryParser]]. In the latter, we use
@@ -7696,7 +7602,6 @@ metaEntryParser = do
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
-
 #+end_src
 
 Below we parse a doc that has figures and blocks, both with metadata.
@@ -7853,7 +7758,6 @@ tableParser = do
       { meta = metaKVs,
         grid = M.fromList $ rowsToTuples rows
       }
-
 #+end_src
 
 The [[f:tableLineParser]] skips over horizontal rules that typically separate the
@@ -7876,7 +7780,6 @@ tableLineParser = do
   pure []
   where
     isTableLineChar c = c == '-' || c == '+' || c == '|'
-
 #+end_src
 
 The [[f:tableRowParser]] parses rows with data in them. It also skips over
@@ -7899,7 +7802,6 @@ tableRowParser = do
       . MP.label "indentation for next table line"
       $ MP.count orgParserState.continuationIndent (char ' ')
   pure tableCells
-
 #+end_src
 
 The [[f:tableCellParser]] just parses text inside a single row and column
@@ -7926,7 +7828,6 @@ tableCellParser = do
       spaces
     tableCellContent :: OrgParser ()
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
-
 #+end_src
 
 The ~spacesInsideProse~ is a special space consumer inside table cells, where
@@ -7942,7 +7843,6 @@ After the rows are parsed, we need to convert them to a =grid= (as part of
 #+begin_src haskell
 rowsToTuples :: [[Prose]] -> [((Int, Int), Prose)]
 rowsToTuples rows = concatMap rowToTuples $ zip [1 ..] rows
-
 #+end_src
 
 We assign each row its row index with ~zip [1 ..]~, then delegate most of the work
@@ -8372,7 +8272,6 @@ p path expected = do
         path
         input
         `shouldParse` (expected, L.defaultOrgParserState)
-
 #+end_src
 
 If we want to check the state (the parsing operation is stateful), we need to
@@ -8389,7 +8288,6 @@ ps path expected state = do
         path
         input
         `shouldParse` (expected, state)
-
 #+end_src
 
 Sometimes we want to test that a file will fail to parse. We do this with =pf=
@@ -8406,7 +8304,6 @@ pf path errMsg pos = do
         path
         input
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
-
 #+end_src
 
 Note that we use the =MP.ErrorFail= constructor because that's the only way we can
@@ -8431,7 +8328,6 @@ pfm path errorTrivial pos = do
         path
         input
         `shouldFailWith` (err pos errorTrivial)
-
 #+end_src
 
 The function =plainParagraph= helps to cut down on some of the repetition.
@@ -8448,7 +8344,6 @@ plainParagraph body =
             }
         )
     ]
-
 #+end_src
 
 The same goes for function ~plainHeading~.
@@ -8663,7 +8558,6 @@ data SourceCode = SourceCode
   { roots :: [BlockName],
     nameToCodeBlock :: M.Map BlockName Block
   }
-
 #+end_src
 
 #+name: f:defaultSourceCode
@@ -8674,7 +8568,6 @@ defaultSourceCode =
     { roots = [],
       nameToCodeBlock = M.fromList []
     }
-
 #+end_src
 
 The ~roots~ field has a list of file paths that need to be tangled. The
@@ -8685,7 +8578,6 @@ block itself. The [[type:BlockName]] is just a convenience type to help readabil
 #+begin_src haskell
 type BlockName :: Type
 type BlockName = T.Text
-
 #+end_src
 
 ** Find code blocks to tangle
@@ -8712,7 +8604,6 @@ getSourceCode od = foldl' f defaultSourceCode od.cells
             }
       | otherwise = sc
     f sc _ = sc
-
 #+end_src
 
 Most of the work is done by the ~f~ helper, which just makes sure
@@ -8789,7 +8680,6 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
     getLinkTarget = \case
       (BTokenLink (Link _ target LinkNoweb)) -> Just target
       _ -> Nothing
-
 #+end_src
 
 The [[f:findCycles]] function then takes the output of [[f:buildGraph]] and uses that to
@@ -8810,7 +8700,6 @@ findCycles sc = map (fmap toBlockName) . foldl' f [] $ G.scc graph
         elem name targets =
           tree : acc
       | otherwise = acc
-
 #+end_src
 
 The line ~M.elems sc.nameToCodeBlock~ just gets all code blocks from the
@@ -9044,7 +8933,6 @@ expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
       | Just shebang <- EM.lookup "shebang" rootBlock.meta =
           shebang <> "\n" <> text
       | otherwise = text
-
 #+end_src
 
 In [[f:expandBlock]], we recursively expand all Noweb links until there are none.
@@ -9076,7 +8964,6 @@ expandBlock sc block existingPrefix =
     prefixTailLines (acc, isFirstLine) line
       | isFirstLine = (line : acc, False)
       | otherwise = (T.append existingPrefix line : acc, False)
-
 #+end_src
 
 The ~expand~ function recursively calls ~expandBlock~ if it detects a ~LinkNoweb~ type
@@ -9592,7 +9479,6 @@ tangle od = mapM_ f (expandRootBlocks $ getSourceCode od)
       existingContent <- readFile path
       when (existingContent /= contentToWrite) $ do
         writeFile path contentToWrite
-
 #+end_src
 
 The ~T.unpack -> path~ is what's known as a /view pattern/ and allows us to
@@ -9663,7 +9549,6 @@ getSourceCodeFromPath path = do
   case LP.parseOrgDoc input of
     Left errMsg -> pure $ Left errMsg
     Right od -> pure . Right $ LT.getSourceCode od
-
 #+end_src
 
 The [[f:checkCycles]] function uses [[f:findCycles]] to see if the Org document at the
@@ -9676,7 +9561,6 @@ checkCycles path expectedCycles = do
   it path $ do
     (Right sc) <- getSourceCodeFromPath path
     (LT.findCycles sc) `shouldBe` expectedCycles
-
 #+end_src
 
 The [[f:checkExpansion]] function expands all source code blocks and compares them
@@ -9816,7 +9700,6 @@ main = do
        in infoOption
             (concat [showVersion cabalVersion, "-", $(lilacVersion)])
             (long "version" <> short 'v' <> help "Show version")
-
 #+end_src
 
 Once the CLI arguments and options are handled, we call [[f:lilac]], which branches
@@ -9829,7 +9712,6 @@ lilac globalOpts = case globalOpts.subcommand of
   Check checkOpts -> lilacCheck globalOpts checkOpts
   Tangle tangleOpts -> lilacTangle tangleOpts
   Weave -> putStrLn "'weave' is not implemented yet"
-
 #+end_src
 
 The [[f:lilacCheck]] function just parses the input, checking if we can parse it by
@@ -9859,7 +9741,6 @@ lilacCheck globalOpts checkOpts = do
                 then PP.pPrintForceColor
                 else PP.pPrintNoColor
         prettyPrint orgDoc
-
 #+end_src
 
 The [[f:lilacCheck]] function checks for any cycles and dies if it detects them. The [[f:lilacCheck]] function also pretty-prints the resulting [[data:OrgDoc]] if
@@ -9890,7 +9771,6 @@ lilacTangle tangleOpts = do
         die $ "Found cycles: " <> show cycles
       LT.tangle orgDoc
       putStrLn $ tangleOpts.input <> ": Finished tangling."
-
 #+end_src
 
 ** Option handling boilerplate
@@ -9924,7 +9804,6 @@ data GlobalOpts = GlobalOpts
     color :: Bool,
     verbose :: Bool
   }
-
 #+end_src
 
 We use subcommands to capture major behaviors --- =check=, =tangle=, and =weave=.
@@ -9936,7 +9815,6 @@ data Subcommand
   = Check CheckOpts
   | Tangle TangleOpts
   | Weave
-
 #+end_src
 
 The =check= subcommand runs [[f:lilacCheck]], and requires an ~input~ option and handler
@@ -9949,7 +9827,6 @@ type CheckOpts :: Type
 data CheckOpts = CheckOpts
   { input :: FilePath
   }
-
 #+end_src
 
 #+name: f:checkOptsHandler
@@ -9958,7 +9835,6 @@ checkOptsHandler :: OptionHandler CheckOpts
 checkOptsHandler =
   CheckOpts
     <$> (argument str (metavar "FILE"))
-
 #+end_src
 
 Like =check=, the =tangle= subcommand runs [[f:lilacTangle]], and also requires an ~input~ option.
@@ -9969,7 +9845,6 @@ type TangleOpts :: Type
 data TangleOpts = TangleOpts
   { input :: FilePath
   }
-
 #+end_src
 
 #+name: f:tangleOptsHandler
@@ -9994,7 +9869,6 @@ parsing mechanism we have in [[module:Lilac.Parse]]).
 #+begin_src haskell
 type OptionHandler :: Type -> Type
 type OptionHandler = Options.Applicative.Parser
-
 #+end_src
 
 The [[f:globalOptionsHandler]] is the handler for all global options (apart from the
@@ -10020,7 +9894,6 @@ globalOptionsHandler =
                 <> help "be more descriptive about what's happening"
             )
         )
-
 #+end_src
 
 The global options in [[f:globalOptionsHandler]] can be provided anywhere on the
@@ -10054,7 +9927,6 @@ subcommandHandler =
         $ info
           (pure Weave)
           (progDesc "generate documentation")
-
 #+end_src
 
 The [[f:subcommandHandler]] is where we specify each of the different behaviors
@@ -10144,7 +10016,6 @@ getCombinedVersion = do
 
 getTimestamp :: IO String
 getTimestamp = show <$> getZonedTime
-
 #+end_src
 
 In [[f:getGitVersion]] we use the continuation monad transformer to make the IO
@@ -10162,7 +10033,6 @@ getGitVersion = evalContT $ callCC $ \escapeWith -> do
   tryLilacGitVersion escapeWith
   tryLilacProjectRoot escapeWith
   versionFallback
-
 #+end_src
 
 The first thing we check is for ~LILAC_GIT_VERSION~ via [[f:tryLilacGitVersion]],
@@ -10181,7 +10051,6 @@ tryLilacGitVersion :: (MonadTrans t) => (String -> t IO ()) -> t IO ()
 tryLilacGitVersion escapeWith = do
   gitVersion <- lift $ getEnv "LILAC_GIT_VERSION"
   when (not $ null gitVersion) $ escapeWith gitVersion
-
 #+end_src
 
 ~getEnv~ looks up an environment variable, but returns the empty string if the
@@ -10214,7 +10083,6 @@ tryLilacProjectRoot escapeWith = do
           ["-C", projectRoot, "describe", "--abbrev=10", "--always", "--dirty"]
           ""
     escapeWith gitOutput
-
 #+end_src
 
 Lastly if neither ~LILAC_GIT_VERSION~ nor ~LILAC_PROJECT_ROOT~ are found, we return
@@ -10226,7 +10094,6 @@ how this version information came to be.
 #+begin_src haskell
 versionFallback :: ContT String IO String
 versionFallback = pure "unknown-build-env"
-
 #+end_src
 
 * Common utility functions
@@ -10259,7 +10126,6 @@ input file path.
 #+begin_src haskell
 readFrom :: FilePath -> FilePath -> IO T.Text
 readFrom prefix path = readFile $ prefix <> path
-
 #+end_src
 
 * Footnotes

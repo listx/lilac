@@ -116,27 +116,33 @@ parseSpec = do
       "empty input"
       ""
       `shouldParse` (L.defaultOrgDoc [], L.defaultOrgParserState)
+
   before (LU.readFrom "" "lilac.org") $ do
     it "self-parse" $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         "lilac.org"
         `shouldSucceedOn` input
+
   p
     "0001-blankline"
     (L.defaultOrgDoc [])
+
   p
     "0001-comments-only"
     (L.defaultOrgDoc [])
+
   pfm
     "0002-doc-metadata-missing-value"
     (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
     7
+
   p
     "0002-doc-metadata-whitespace-before-value"
     $ L.defaultOrgDoc
       [ ("title", "Parse me without leading whitespace")
       ]
+
   p
     "0002-doc-metadata"
     $ L.defaultOrgDoc
@@ -145,6 +151,7 @@ parseSpec = do
         ("property", "header-args+ :noweb no-export"),
         ("title", "An Org Document")
       ]
+
   p
     "0003-doc-metadata-with-comments"
     $ L.defaultOrgDoc
@@ -153,10 +160,12 @@ parseSpec = do
         ("property", "header-args+ :noweb no-export"),
         ("title", "An Org Document")
       ]
+
   pf
     "0004-headings"
     "found 7 asterisks found for this heading, but lilac_maxHeadingLevel = 6"
     46
+
   ps
     "0004-headings-20"
     L.OrgDoc
@@ -187,6 +196,7 @@ parseSpec = do
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 20}
       }
+
   ps
     "0004-headings-unlimited"
     L.OrgDoc
@@ -217,18 +227,22 @@ parseSpec = do
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 0}
       }
+
   pf
     "0004-headings-limited"
     "found 4 asterisks found for this heading, but lilac_maxHeadingLevel = 3"
     46
+
   pf
     "0004-headings-prohibited"
     "headings prohibited because lilac_maxHeadingLevel < 0"
     29
+
   pf
     "0004-headings-cannot-skip-level"
     "headings may not skip levels (expected to see level 1 or 2, not 4)"
     8
+
   ps
     "0004-properties-drawer-empty"
     L.OrgDoc
@@ -257,6 +271,7 @@ parseSpec = do
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
+
   ps
     "0004-properties-drawer-not-empty"
     L.OrgDoc
@@ -288,6 +303,7 @@ parseSpec = do
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
+
   ps
     "0004-properties-drawer-not-empty-with-comments"
     L.OrgDoc
@@ -319,26 +335,32 @@ parseSpec = do
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
+
   pf
     "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
     "indentation does not fit into existing levels"
     36
+
   pf
     "0005-paragraph-indentation-mismatch-initial-indent-invalid"
     "indentation does not fit into existing levels"
     21
+
   pfm
     "0005-paragraph-indentation-mismatch-over-list-body"
     (utoks " ")
     14
+
   pfm
     "0005-paragraph-indentation-mismatch-over"
     (utoks " ")
     4
+
   pfm
     "0005-paragraph-indentation-mismatch-under-list-body"
     (utoks "b" <> etoks " ")
     12
+
   p
     "0005-prose-paragraphs"
     L.OrgDoc
@@ -360,11 +382,13 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   it "accepts empty input for \"notFollowedBy (char ' ')\"" $ do
     MP.parse
       (MP.notFollowedBy (char ' ') :: Parser ())
       "empty input"
       `shouldSucceedOn` ""
+
   p
     "0005-styled-strings-bold"
     L.OrgDoc
@@ -392,6 +416,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
+
   p
     "0005-styled-strings-complex-punctuation"
     L.OrgDoc
@@ -415,6 +440,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0005-styled-strings-complex"
     L.OrgDoc
@@ -452,6 +478,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0005-styled-strings-compression"
     L.OrgDoc
@@ -465,6 +492,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0005-styled-strings-ignore-marker-inside-word"
     L.OrgDoc
@@ -476,10 +504,12 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   pf
     "0005-styled-strings-leftover-active-styles"
     "leftover active styles: [Bold]"
     15
+
   ps
     "0005-styled-strings-messy-boundaries"
     L.OrgDoc
@@ -518,6 +548,7 @@ parseSpec = do
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
+
   p
     "0005-styled-strings-no-style"
     L.OrgDoc
@@ -526,6 +557,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
+
   p
     "0005-styled-strings-verbatim-code-ignore-immediate-bold"
     L.OrgDoc
@@ -549,6 +581,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0005-styled-strings-verbatim-precedence"
     L.OrgDoc
@@ -588,6 +621,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0005-styled-strings-verbatim"
     L.OrgDoc
@@ -603,6 +637,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0006-links-inside-parentheses"
     L.OrgDoc
@@ -636,6 +671,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
+
   p
     "0006-links-nonlink"
     L.OrgDoc
@@ -651,6 +687,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
+
   p
     "0006-links-raw"
     L.OrgDoc
@@ -738,6 +775,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
+
   ps
     "0006-links"
     L.OrgDoc
@@ -816,10 +854,12 @@ parseSpec = do
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
+
   pf
     "0007-block-src-without-lang"
     "block type src requires a language specifier"
     11
+
   ps
     "0007-blocks-empty"
     L.OrgDoc
@@ -867,6 +907,7 @@ parseSpec = do
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
+
   ps
     "0007-blocks-ending"
     L.OrgDoc
@@ -959,6 +1000,7 @@ parseSpec = do
         tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
+
   p
     "0007-blocks-noweb-off"
     L.OrgDoc
@@ -979,6 +1021,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0007-blocks-noweb"
     L.OrgDoc
@@ -1023,6 +1066,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0007-blocks-noweb-intraline"
     L.OrgDoc
@@ -1081,14 +1125,17 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   pf
     "0007-blocks-duplicate-names"
     "block name \"foo\" is not unique"
     52
+
   pf
     "0007-blocks-duplicate-tangle-paths"
     "tangle path \"some/path.sh\" is not unique"
     114
+
   p
     "0007-blocks-special-commas"
     L.OrgDoc
@@ -1122,18 +1169,22 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   pf
     "0008-indentation-comment"
     "invalid indentation"
     1
+
   pf
     "0008-indentation-headings"
     "invalid indentation"
     1
+
   pf
     "0008-indentation-paragraph"
     "invalid indentation"
     1
+
   p
     "0009-list-content-simple"
     L.OrgDoc
@@ -1156,6 +1207,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0009-list-indentation-nested-with-text"
     L.OrgDoc
@@ -1211,6 +1263,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0009-list-indentation-nested"
     L.OrgDoc
@@ -1256,14 +1309,17 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   pf
     "0009-list-nesting-max"
     "max nesting depth exceeded: cannot have more than 6 levels of list items"
     88
+
   pf
     "0009-list-nesting-max-8"
     "max nesting depth exceeded: cannot have more than 8 levels of list items"
     156
+
   p
     "0009-list-indentation-no-indent"
     L.OrgDoc
@@ -1273,6 +1329,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0009-list-indentation-proper-indent"
     L.OrgDoc
@@ -1292,6 +1349,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0009-list-items-need-blank-line-separator"
     L.OrgDoc
@@ -1308,34 +1366,42 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   pf
     "0009-lists-cannot-be-mixed-on-their-own-ordered"
     "expected ORDERED list item at this level"
     23
+
   pf
     "0009-lists-cannot-be-mixed-on-their-own"
     "expected UNORDERED list item at this level"
     21
+
   pf
     "0009-lists-require-precise-indentation"
     "list item: invalid indentation"
     15
+
   pf
     "0009-ordered-lists-require-increment"
     "expected incremented list head 2 but got 1"
     13
+
   pf
     "0009-ordered-lists-start-from-0-or-1"
     "starting list head number must be 0 or 1; got 20"
     25
+
   pfm
     "0009-ordered-list-head-needs-parenthesis"
     (utoks "." <> etoks ")" <> elabel "ordered list number")
     3
+
   pf
     "0009-ordered-list-head-cannot-use-letters"
     "invalid indentation"
     2
+
   p
     "0009-paragraph-can-close-deeper-levels"
     L.OrgDoc
@@ -1371,6 +1437,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0009-paragraph-can-separate-mixed-lists"
     L.OrgDoc
@@ -1420,6 +1487,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   ps
     "0010-standalone-math-fragments"
     L.OrgDoc
@@ -1476,6 +1544,7 @@ parseSpec = do
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
+
   ps
     "0010-standalone-math-inside-lists"
     L.OrgDoc
@@ -1527,6 +1596,7 @@ parseSpec = do
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
+
   ps
     "0011-figures-and-blocks"
     L.OrgDoc
@@ -1605,6 +1675,7 @@ parseSpec = do
         tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
+
   p
     "0012-tables-and-prose"
     L.OrgDoc
@@ -1724,6 +1795,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
   p
     "0012-tables-inside-lists"
     L.OrgDoc

@@ -4,25 +4,38 @@ let
     name = "lilac-devShellEnv";
     paths = scripts ++ tools ++ [ ghc ];
   };
+
   scripts = import ./scripts.nix { inherit pkgs; };
+
   tools = [
     pkgs.niv
+
     pkgs.cabal-install
+
     pkgs.editorconfig-checker
+
     pkgs.shellcheck
+
     pkgs.shfmt
+
     ourHaskell.nixfmt
+
     ourHaskell.ormolu
+
     pkgs.vale
   ];
+
   hlib = pkgs.haskell.lib;
   ghc = ourHaskell.ghc.withPackages
     (_: hlib.getHaskellBuildInputs ourHaskell.lilac);
+
   lib = pkgs.lib;
   ourHaskell = pkgs.haskell.packages.${ghcVersion}.extend
     (lib.composeManyExtensions haskellOverlays);
+
   ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.10.1";
   ghcVersion = "ghc" + ghcVersionWithoutDots;
+
   haskellOverlays = [ injectLilac tweakLilacBuild ];
 
   injectLilac = final: prev: {
@@ -37,7 +50,9 @@ let
       '' + drv.buildPhase;
     });
   };
+
   projectRoot = ../.;
+
   gnf = import (import ./sources.nix)."gitignore.nix" { inherit lib; };
   lilacSource = lib.cleanSourceWith {
     src = projectRoot;
@@ -58,6 +73,7 @@ let
       };
     in path: type: filterFunc path type;
   };
+
   configureHaskellPkg = haskellPkg:
     let
       confFns = [
@@ -69,6 +85,7 @@ let
       ];
 
     in lib.pipe haskellPkg confFns;
+
   gitHooksPkgs = import (import ./sources.nix)."git-hooks.nix";
   pre-commit-check = gitHooksPkgs.run {
     src = projectRoot;
@@ -77,17 +94,20 @@ let
         enable = true;
         package = devShellEnv;
       };
+
       nixfmt-rfc-style = {
         enable = true;
         package = devShellEnv;
         excludes = [ "nix/sources.nix" ];
       };
+
       ormolu = {
         enable = true;
         package = devShellEnv;
         entry = let opts = [ "--mode" "inplace" "--check-idempotence" ];
         in "${devShellEnv}/bin/ormolu ${toolOpts opts}";
       };
+
       shfmt = {
         enable = true;
         package = devShellEnv;
@@ -101,10 +121,12 @@ let
           ];
         in "${devShellEnv}/bin/shfmt ${toolOpts opts}";
       };
+
       shellcheck = {
         enable = true;
         package = devShellEnv;
       };
+
       check-tangled-vs-tracked = {
         name = "check-tangled-vs-tracked.sh";
         enable = true;
@@ -112,6 +134,7 @@ let
         entry = "./check-tangled-vs-tracked.sh";
         pass_filenames = false;
       };
+
       unit-test = {
         name = "unit-test.sh";
         enable = true;
@@ -120,16 +143,19 @@ let
         pass_filenames = false;
         stages = [ "pre-push" ];
       };
+
       no-fixme = {
         name = "no-FIXME.sh";
         enable = true;
         entry = "./no-FIXME.sh";
         stages = [ "commit-msg" ];
       };
+
       vale = {
         enable = true;
         package = devShellEnv;
       };
+
       sort-file-contents = {
         enable = true;
         files = "\\.vale/styles/config/vocabularies/Lilac/accept\\.txt$";
@@ -153,5 +179,6 @@ in {
       logo
     '';
   };
+
   lilac = ourHaskell.lilac;
 }

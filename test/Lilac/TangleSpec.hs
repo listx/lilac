@@ -42,21 +42,27 @@ tangleSpec = do
   checkCycles
     "0100-dag-no-loops"
     []
+
   checkCycles
     "0100-dag-self-loop"
     [G.Node "f:a" []]
+
   checkCycles
     "0100-dag-self-loops"
     [G.Node "f:a" [], G.Node "f:b" []]
+
   checkCycles
     "0100-dag-2-node-loop"
     [G.Node "f:a" [G.Node "f:b" []]]
+
   checkCycles
     "0100-dag-3-node-loop"
     [G.Node "f:a" [G.Node "f:b" [G.Node "f:c" []]]]
+
   checkCycles
     "0100-dag-complex-loops"
     [G.Node "f:a" [G.Node "f:b" [G.Node "f:c" [], G.Node "f:d" []]], G.Node "f:e" []]
+
   checkExpansion
     "0101-block-expansion"
     [ ( "equations.txt",
@@ -67,6 +73,7 @@ tangleSpec = do
           ]
       )
     ]
+
   checkExpansion
     "0101-block-expansion-deeply-nested"
     [ ( "equations.txt",
@@ -77,6 +84,7 @@ tangleSpec = do
           ]
       )
     ]
+
   checkExpansion
     "0101-block-expansion-prefix"
     [ ( "equations.txt",
@@ -91,6 +99,7 @@ tangleSpec = do
           ]
       )
     ]
+
   checkExpansion
     "0101-block-expansion-prefix-nested"
     [ ( "equations.txt",
@@ -104,6 +113,7 @@ tangleSpec = do
           ]
       )
     ]
+
   checkExpansion
     "0101-block-expansion-prefix-nonspace"
     [ ( "equations.txt",
@@ -115,6 +125,7 @@ tangleSpec = do
           ]
       )
     ]
+
   checkExpansion
     "0101-block-expansion-prefix-nonspace-nested"
     [ ( "equations.txt",
@@ -128,6 +139,7 @@ tangleSpec = do
           ]
       )
     ]
+
   checkExpansion
     "0101-block-expansion-complex"
     [ ( "equations.txt",
@@ -149,10 +161,12 @@ tangleSpec = do
           ]
       )
     ]
+
   it "loses information" $ do
     let withoutNewline = T.lines "a\nb"
         withNewline = T.lines "a\nb\n"
     T.unlines withoutNewline `shouldBe` T.unlines withNewline
+
   checkExpansion
     "0102-pad-between-consecutive-links"
     [ ( "equations.txt",
@@ -195,6 +209,7 @@ tangleSpec = do
           ]
       )
     ]
+
   checkExpansion
     "0103-shebang"
     [ ( "a.sh",
