@@ -8598,6 +8598,12 @@ getSourceCode od = foldl' f defaultSourceCode od.cells
             { roots = name : sc.roots,
               nameToCodeBlock = M.insert name b sc.nameToCodeBlock
             }
+      | Just path <- EM.lookup "tangle" b.meta =
+          let name = path <> "\NUL"
+           in sc
+                { roots = name : sc.roots,
+                  nameToCodeBlock = M.insert name b sc.nameToCodeBlock
+                }
       | Just name <- EM.lookup "name" b.meta =
           sc
             { nameToCodeBlock = M.insert name b sc.nameToCodeBlock
@@ -8606,9 +8612,14 @@ getSourceCode od = foldl' f defaultSourceCode od.cells
     f sc _ = sc
 #+end_src
 
-Most of the work is done by the ~f~ helper, which just makes sure
-that we only use blocks that have a name (and a ~tangle~ path for those ones
-that are tangled).
+Most of the work is done by the ~f~ helper. It's important to note that we give
+anonymous tangled blocks a default name with a ASCII NUL character. This is
+because our tangling machinery in [[f:expandRootBlocks]] requires looking up blocks
+(including root blocks) by their name. Anonymous blocks that are tangled are
+still considered root blocks, and so we use the tangle path as the name, plus a
+NUL character at the end to virtually guarantee that this does not conflict with
+the name of another block (because Org files should not have any NUL character
+in them).
 
 ** Detect cyclic Noweb links
 

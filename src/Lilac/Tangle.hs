@@ -76,6 +76,12 @@ getSourceCode od = foldl' f defaultSourceCode od.cells
             { roots = name : sc.roots,
               nameToCodeBlock = M.insert name b sc.nameToCodeBlock
             }
+      | Just path <- EM.lookup "tangle" b.meta =
+          let name = path <> "\NUL"
+           in sc
+                { roots = name : sc.roots,
+                  nameToCodeBlock = M.insert name b sc.nameToCodeBlock
+                }
       | Just name <- EM.lookup "name" b.meta =
           sc
             { nameToCodeBlock = M.insert name b sc.nameToCodeBlock
