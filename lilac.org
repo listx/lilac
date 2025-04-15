@@ -2143,7 +2143,14 @@ whitespace).
 
 #+header: :tangle test/Lilac/ParseSpec/0001-blankline
 #+begin_src org
+
+
 #+end_src
+
+We have to put in two newlines above because during parsing we will lose one
+newline (it is used to parse the ~"\n#+end_src"~ string; see [[f:someBTokensParser]]).
+This leaves us with just one newline in
+[[file:test/Lilac/ParseSpec/0001-blankline]].
 
 #+name: t:0001-blankline
 #+begin_src haskell
