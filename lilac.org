@@ -1834,6 +1834,7 @@ import Prelude qualified (show)
 <<f:zeroBTokensParser>>
 <<f:someBTokensParser>>
 <<f:nowebLinkParser>>
+<<f:ignoreSpecialCommas>>
 <<f:compressBTokens>>
 <<f:padConsecutiveNowebLinks>>
 <<f:getLinkPaddingBools>>
@@ -5011,7 +5012,10 @@ blockParser = do
               M.fromList
                 $ (("__block_type", blockType) : metaKVs)
                 <> concatMap maybeToList [blockName, srcLang],
-            body = compressBTokens $ padConsecutiveNowebLinks bTokens
+            body =
+              ignoreSpecialCommas
+                . compressBTokens
+                $ padConsecutiveNowebLinks bTokens
           }
   pure $ CBlock block
 
@@ -5066,12 +5070,16 @@ have to tangle blocks in [[f:expandBlock]]. If we parsed in the trailing newline
 these newlines would build up every time we nested into a block (e.g.,
 [[t:0101-block-expansion-deeply-nested]]).
 
-Going back to [[f:blockParser]], we call =compressBTokens= for the parsed ~bTokens~;
-this function is similar to [[f:compressProse]], but it's simpler because it doesn't
-have to deal with styled text. Instead it only deals with raw =T.Text= values
-directly. We need to use =compressBTokens= because otherwise we'll end up with
-many separate =BToken= values (because [[f:bTokenParser]] uses multiple separate
-parsers that all use the same =BTokenString= constructor for parsing text tokens).
+Going back to [[f:blockParser]], there are three transformations we do for the
+parsed ~bTokens~ --- [[f:ignoreSpecialCommas]], [[f:compressBTokens]], and
+[[f:padConsecutiveNowebLinks]].
+
+The [[f:compressBTokens]] function is similar to [[f:compressProse]], but it's simpler
+because it doesn't have to deal with styled text. Instead it only deals with raw
+=T.Text= values directly. We need to use =compressBTokens= because otherwise we'll
+end up with many separate =BToken= values (because [[f:bTokenParser]] uses multiple
+separate parsers that all use the same =BTokenString= constructor for parsing text
+tokens).
 
 #+name: f:compressBTokens
 #+begin_src haskell
@@ -5086,8 +5094,112 @@ compressBTokens = reverse . foldl' f []
 
 #+end_src
 
-Except for [[id:51f2edd8-5f8e-4c63-841f-da6c5c41680a][inserting padding between consecutive Noweb links]], that's the overall
-overview of [[f:blockParser]]. Now let's look at how [[f:blockStartParser]] in detail.
+The [[f:ignoreSpecialCommas]] function ignores commas at the beginning of a line
+(with or without indentation), when they are used to escape asterisks (~*~) and
+hash signs followed by a plus character (~#+~). This is because the =org-mode= major
+mode in Emacs is unable to cope with these special characters, and requires
+users to put in leading commas to help the parser in that mode. Our Haskell
+implementation does not need such help; however we teach our parser about this
+behavior here so that we can remain compatible with =org-mode= (otherwise when
+users tangle their Org file using Lilac, they might get confused why we don't
+escape such leading commas).
+
+#+name: f:ignoreSpecialCommas
+#+begin_src haskell
+ignoreSpecialCommas :: [BToken] -> [BToken]
+ignoreSpecialCommas = reverse . foldl' f []
+  where
+    f acc (BTokenString text) = (BTokenString $ removeSpecialCommas text) : acc
+    f acc link = link : acc
+    removeSpecialCommas text =
+      T.intercalate "\n"
+        . map removeSpecialComma
+        $ T.split (== '\n') text
+    removeSpecialComma line
+      | hasSpecialComma line = dropLeadingComma line
+      | otherwise = line
+    hasSpecialComma line
+      | (indentAndCommas, rest) <- T.breakOnEnd "," line,
+        (indent, commas) <- T.breakOn "," indentAndCommas,
+        T.stripStart indent == "",
+        not $ T.null commas,
+        T.all (== ',') commas,
+        T.take 1 rest == "*" || T.take 2 rest == "#+" =
+          True
+      | otherwise = False
+    dropLeadingComma line =
+      let (indent, commas) = T.breakOn "," line
+       in indent <> T.drop 1 commas
+
+#+end_src
+
+See [[file:test/Lilac/ParseSpec/0007-blocks-special-commas]] for the raw text;
+seeing the escaped version here (where we have to put an extra comma ourselves
+so that we can tangle the right number of leading commas) may make things a bit
+confusing.
+
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-special-commas
+#+begin_src org
+,#+begin_src sh
+Special commas get removed:
+,,*
+,,#+
+,,,*
+,,,#+
+Special commas may have leading whitespace:
+ ,,*
+Non-special commas stay put:
+,
+,.
+, x
+,#+end_src
+#+end_src
+
+#+name: t:0007-blocks-special-commas
+#+begin_src haskell
+p
+  "0007-blocks-special-commas"
+  L.OrgDoc
+    { cells =
+        <<Expected blocks for 0007-blocks-special-commas>>,
+      meta = fromList []
+    }
+#+end_src
+
+#+name: Expected blocks for 0007-blocks-special-commas
+#+begin_src haskell
+[ L.CBlock
+    ( L.Block
+        { meta =
+            fromList
+              [ ("__block_type", "src"),
+                ("__src_language", "sh")
+              ],
+          body =
+            [ L.BTokenString
+                . T.stripEnd
+                $ T.unlines
+                  [ "Special commas get removed:",
+                    "*",
+                    "#+",
+                    ",*",
+                    ",#+",
+                    "Special commas may have leading whitespace:",
+                    " *",
+                    "Non-special commas stay put:",
+                    ",",
+                    ",.",
+                    ", x"
+                  ]
+            ]
+        }
+    )
+]
+#+end_src
+
+The [[f:padConsecutiveNowebLinks]] function is discussed in [[id:51f2edd8-5f8e-4c63-841f-da6c5c41680a][inserting padding
+between consecutive Noweb links]]. That's the overall overview of [[f:blockParser]].
+Now let's look at how [[f:blockStartParser]] in detail.
 
 #+name: f:blockStartParser
 #+begin_src haskell
@@ -8416,6 +8528,7 @@ parseSpec = do
   <<t:0007-blocks-noweb-intraline>>
   <<t:0007-blocks-duplicate-names>>
   <<t:0007-blocks-duplicate-tangle-paths>>
+  <<t:0007-blocks-special-commas>>
   <<t:0008-indentation-comment>>
   <<t:0008-indentation-headings>>
   <<t:0008-indentation-paragraph>>

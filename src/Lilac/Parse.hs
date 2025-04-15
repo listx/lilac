@@ -908,7 +908,10 @@ blockParser = do
               M.fromList
                 $ (("__block_type", blockType) : metaKVs)
                 <> concatMap maybeToList [blockName, srcLang],
-            body = compressBTokens $ padConsecutiveNowebLinks bTokens
+            body =
+              ignoreSpecialCommas
+                . compressBTokens
+                $ padConsecutiveNowebLinks bTokens
           }
   pure $ CBlock block
 
@@ -981,6 +984,31 @@ nowebLinkParser = do
               }
           ]
       }
+
+ignoreSpecialCommas :: [BToken] -> [BToken]
+ignoreSpecialCommas = reverse . foldl' f []
+  where
+    f acc (BTokenString text) = (BTokenString $ removeSpecialCommas text) : acc
+    f acc link = link : acc
+    removeSpecialCommas text =
+      T.intercalate "\n"
+        . map removeSpecialComma
+        $ T.split (== '\n') text
+    removeSpecialComma line
+      | hasSpecialComma line = dropLeadingComma line
+      | otherwise = line
+    hasSpecialComma line
+      | (indentAndCommas, rest) <- T.breakOnEnd "," line,
+        (indent, commas) <- T.breakOn "," indentAndCommas,
+        T.stripStart indent == "",
+        not $ T.null commas,
+        T.all (== ',') commas,
+        T.take 1 rest == "*" || T.take 2 rest == "#+" =
+          True
+      | otherwise = False
+    dropLeadingComma line =
+      let (indent, commas) = T.breakOn "," line
+       in indent <> T.drop 1 commas
 
 compressBTokens :: [BToken] -> [BToken]
 compressBTokens = reverse . foldl' f []

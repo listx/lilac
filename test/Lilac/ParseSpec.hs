@@ -1089,6 +1089,39 @@ parseSpec = do
     "0007-blocks-duplicate-tangle-paths"
     "tangle path \"some/path.sh\" is not unique"
     114
+  p
+    "0007-blocks-special-commas"
+    L.OrgDoc
+      { cells =
+          [ L.CBlock
+              ( L.Block
+                  { meta =
+                      fromList
+                        [ ("__block_type", "src"),
+                          ("__src_language", "sh")
+                        ],
+                    body =
+                      [ L.BTokenString
+                          . T.stripEnd
+                          $ T.unlines
+                            [ "Special commas get removed:",
+                              "*",
+                              "#+",
+                              ",*",
+                              ",#+",
+                              "Special commas may have leading whitespace:",
+                              " *",
+                              "Non-special commas stay put:",
+                              ",",
+                              ",.",
+                              ", x"
+                            ]
+                      ]
+                  }
+              )
+          ],
+        meta = fromList []
+      }
   pf
     "0008-indentation-comment"
     "invalid indentation"
