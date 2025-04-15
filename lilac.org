@@ -571,6 +571,7 @@ we don't have to memorize exactly how to invoke certain commands.
 #+begin_src makefile
 <<make:Run tests>>
 <<make:Run linters>>
+<<make:Tangle sources>>
 <<make:Build lilac with Cabal>>
 <<make:Build lilac with Nix>>
 <<make:Update Nix dependencies>>
@@ -645,6 +646,60 @@ See [[Linters via pre-commit]] for details on what the various linters do.
 
 Note that =pre-commit= isn't defined as a [[code:tools][tool]] in the [[devShellEnv]]. This is because
 we only define it in the =mkShell= wrapper in [[devShell definition]].
+
+*** Tangle Lilac with Lilac
+
+We can tangle Lilac with Lilac itself.
+
+#+name: make:Tangle sources
+#+begin_src makefile
+tangle: lilac.org
+	lilac tangle lilac.org
+#+end_src
+
+The =lilac= script is the one we created in [[nix/scripts.nix]] to automatically build
+Lilac with Cabal and tangle =lilac.org=.
+
+Making Lilac tangle itself is advantageous because it's faster than running
+=org-babel-tangle= inside Orgmode in Emacs. However, doing this means we lose out
+on being able to run the tangling function automatically on save, which we
+historically did with [[https://github.com/yilkalargaw/org-auto-tangle][org-auto-tangle]] by having ~#+auto_tangle: t~ in our Org
+file.
+
+So we need another way of tangling every time this file (=lilac.org=) is changed.
+We can do that with [[https://facebook.github.io/watchman/][Watchman]], but that would be unnecessarily heavy-handed
+because we don't need to watch a directory or multiple files. Instead we can
+just have a script which sleeps one second and checks the timestamp of
+=lilac.org=, and if it's different than before, run =lilac tangle lilac.org=.
+
+#+name: tangle-loop.sh
+#+header: :tangle tangle-loop.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src bash
+set -euo pipefail
+
+SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
+
+main()
+{
+	local t1
+	local t2
+
+	t1=$(date -r "${SCRIPT_ROOT}/lilac.org" +%s)
+
+	while true; do
+		t2=$(date -r "${SCRIPT_ROOT}/lilac.org" +%s)
+		if [[ ! "${t1}" == "${t2}" ]]; then
+			t1="${t2}"
+			time make -C "${SCRIPT_ROOT}" tangle
+			echo
+		fi
+		sleep 1
+	done
+}
+
+main "$@"
+#+end_src
 
 *** Build =lilac=
 
