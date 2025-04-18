@@ -8567,6 +8567,7 @@ import Relude
     map,
     mapM_,
     otherwise,
+    pure,
     putStrLn,
     reverse,
     show,
@@ -9560,10 +9561,11 @@ tangle od = do
           writeFile path contentToWrite
           putStrLn $ "Tangled " <> path
         else
-          putStrLn $ "Skipping " <> path <> " (no change)"
+          pure ()
 #+end_src
 
-We sort the paths first so that the output is less confusing.
+We sort the paths first so that the output is less confusing. Only tangled paths
+are printed, because otherwise the output can be overly verbose.
 
 The ~T.unpack -> path~ in the ~f~ helper is what's known as a /view pattern/ and
 allows us to transform the incoming argument to something else before we start

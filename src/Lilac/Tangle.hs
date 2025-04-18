@@ -35,6 +35,7 @@ import Relude
     map,
     mapM_,
     otherwise,
+    pure,
     putStrLn,
     reverse,
     show,
@@ -195,4 +196,4 @@ tangle od = do
           writeFile path contentToWrite
           putStrLn $ "Tangled " <> path
         else
-          putStrLn $ "Skipping " <> path <> " (no change)"
+          pure ()
