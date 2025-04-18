@@ -37,6 +37,7 @@ import Relude
     otherwise,
     putStrLn,
     reverse,
+    show,
     sort,
     ($),
     (.),
@@ -182,7 +183,10 @@ expandBlock sc block existingPrefix =
       | otherwise = (T.append existingPrefix line : acc, False)
 
 tangle :: OrgDoc -> IO ()
-tangle od = mapM_ f (sort . expandRootBlocks $ getSourceCode od)
+tangle od = do
+  let blocks = sort . expandRootBlocks $ getSourceCode od
+  putStrLn $ "Blocks to process: " <> (show $ length blocks)
+  mapM_ f blocks
   where
     f (T.unpack -> path, contentToWrite) = do
       existingContent <- readFile path
