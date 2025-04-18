@@ -25,6 +25,7 @@ import Relude
     IO,
     Int,
     Maybe (Just, Nothing),
+    String,
     Type,
     catMaybes,
     elem,
@@ -35,12 +36,14 @@ import Relude
     fst,
     length,
     map,
+    mapM_,
     otherwise,
     pure,
     putStrLn,
     reverse,
     show,
     sort,
+    when,
     ($),
     (+),
     (.),
@@ -189,17 +192,19 @@ tangle :: OrgDoc -> IO ()
 tangle od = do
   let blocks = sort . expandRootBlocks $ getSourceCode od
   putStrLn $ "Blocks to process: " <> (show $ length blocks)
-  (tangled, skipped) <- foldlM f (0, 0) blocks
+  (tangled, tangledPaths, skipped) <- foldlM f (0, [], 0) blocks
   putStrLn $ "Tangled: " <> (show tangled)
+  when (tangled > 0) $ mapM_ printTangled $ reverse tangledPaths
   putStrLn $ "Skipped: " <> (show skipped)
   where
-    f :: (Int, Int) -> (T.Text, T.Text) -> IO (Int, Int)
-    f (tangled, skipped) (T.unpack -> path, contentToWrite) = do
+    f :: (Int, [String], Int) -> (T.Text, T.Text) -> IO (Int, [String], Int)
+    f (tangled, tangledPaths, skipped) (T.unpack -> path, contentToWrite) = do
       existingContent <- readFile path
       if (existingContent /= contentToWrite)
         then do
           writeFile path contentToWrite
-          putStrLn $ "Tangled " <> path
-          pure (tangled + 1, skipped)
+          pure (tangled + 1, path : tangledPaths, skipped)
         else
-          pure (tangled, skipped + 1)
+          pure (tangled, tangledPaths, skipped + 1)
+    printTangled :: String -> IO ()
+    printTangled path = putStrLn $ "  " <> path
