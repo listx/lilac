@@ -23,6 +23,7 @@ import Lilac.Parse
 import Relude
   ( Bool (False, True),
     IO,
+    Int,
     Maybe (Just, Nothing),
     Type,
     catMaybes,
@@ -30,10 +31,10 @@ import Relude
     error,
     fmap,
     foldl',
+    foldlM,
     fst,
     length,
     map,
-    mapM_,
     otherwise,
     pure,
     putStrLn,
@@ -41,6 +42,7 @@ import Relude
     show,
     sort,
     ($),
+    (+),
     (.),
     (/=),
     (<>),
@@ -187,13 +189,17 @@ tangle :: OrgDoc -> IO ()
 tangle od = do
   let blocks = sort . expandRootBlocks $ getSourceCode od
   putStrLn $ "Blocks to process: " <> (show $ length blocks)
-  mapM_ f blocks
+  (tangled, skipped) <- foldlM f (0, 0) blocks
+  putStrLn $ "Tangled: " <> (show tangled)
+  putStrLn $ "Skipped: " <> (show skipped)
   where
-    f (T.unpack -> path, contentToWrite) = do
+    f :: (Int, Int) -> (T.Text, T.Text) -> IO (Int, Int)
+    f (tangled, skipped) (T.unpack -> path, contentToWrite) = do
       existingContent <- readFile path
       if (existingContent /= contentToWrite)
         then do
           writeFile path contentToWrite
           putStrLn $ "Tangled " <> path
+          pure (tangled + 1, skipped)
         else
-          pure ()
+          pure (tangled, skipped + 1)
