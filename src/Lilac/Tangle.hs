@@ -23,6 +23,8 @@ import Lilac.Parse
   )
 import Relude
   ( Bool (False, True),
+    Either (Right),
+    FilePath,
     IO,
     Int,
     Maybe (Just, Nothing),
@@ -59,6 +61,7 @@ import Relude.Nub
   )
 import System.Directory.OsPath qualified as D
 import System.File.OsPath qualified as P.IO
+import System.IO (utf8)
 import System.IO.Error (IOError)
 import System.OsPath qualified as P
 
@@ -78,22 +81,26 @@ defaultSourceCode =
       nameToCodeBlock = M.fromList []
     }
 
-getSourceCode :: OrgDoc -> SourceCode
-getSourceCode od = foldl' f defaultSourceCode od.cells
+getSourceCode :: OrgDoc -> FilePath -> SourceCode
+getSourceCode od odPath = foldl' f defaultSourceCode od.cells
   where
     f :: SourceCode -> Cell -> SourceCode
     f sc (CBlock b)
       | Just name <- EM.lookup "name" b.meta,
-        Just _ <- EM.lookup "tangle" b.meta =
-          sc
-            { roots = name : sc.roots,
-              nameToCodeBlock = M.insert name b sc.nameToCodeBlock
-            }
-      | Just path <- EM.lookup "tangle" b.meta =
-          let name = path <> "\NUL"
+        Just path <- EM.lookup "tangle" b.meta,
+        Right filePath <- qualify path =
+          let newBlock = useQualifiedTanglePath filePath b
            in sc
                 { roots = name : sc.roots,
-                  nameToCodeBlock = M.insert name b sc.nameToCodeBlock
+                  nameToCodeBlock = M.insert name newBlock sc.nameToCodeBlock
+                }
+      | Just path <- EM.lookup "tangle" b.meta,
+        Right filePath <- qualify path =
+          let name = (T.pack filePath) <> "\NUL"
+              newBlock = useQualifiedTanglePath filePath b
+           in sc
+                { roots = name : sc.roots,
+                  nameToCodeBlock = M.insert name newBlock sc.nameToCodeBlock
                 }
       | Just name <- EM.lookup "name" b.meta =
           sc
@@ -101,6 +108,17 @@ getSourceCode od = foldl' f defaultSourceCode od.cells
             }
       | otherwise = sc
     f sc _ = sc
+    tanglePathPrefix = P.takeDirectory $ P.unsafeEncodeUtf odPath
+    qualify =
+      P.decodeWith utf8 utf8
+        . P.combine tanglePathPrefix
+        . P.unsafeEncodeUtf
+        . T.unpack
+    useQualifiedTanglePath qualifiedFilePath block =
+      block
+        { meta = M.insert "tangle" (T.pack qualifiedFilePath) block.meta,
+          body = block.body
+        }
 
 buildGraph ::
   [Block] ->
@@ -193,9 +211,9 @@ expandBlock sc block existingPrefix =
       | isFirstLine = (line : acc, False)
       | otherwise = (T.append existingPrefix line : acc, False)
 
-tangle :: OrgDoc -> IO ()
-tangle od = do
-  let blocks = sort . expandRootBlocks $ getSourceCode od
+tangle :: SourceCode -> IO ()
+tangle sc = do
+  let blocks = sort $ expandRootBlocks sc
   putStrLn $ "Blocks to process: " <> (show $ length blocks)
   (tangled, tangledPaths, skipped) <- foldlM f (0, [], 0) blocks
   putStrLn $ "Tangled: " <> (show tangled)

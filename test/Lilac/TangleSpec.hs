@@ -14,6 +14,7 @@ import Relude
     pure,
     ($),
     (.),
+    (<>),
   )
 import System.OsPath qualified as P
 import Test.Hspec (Spec, it, shouldBe)
@@ -26,7 +27,12 @@ getSourceCodeFromPath path = do
   input <- LU.readFrom "test/Lilac/TangleSpec/" path
   case LP.parseOrgDoc input of
     Left errMsg -> pure $ Left errMsg
-    Right od -> pure . Right $ LT.getSourceCode od
+    Right od ->
+      pure
+        . Right
+        . LT.getSourceCode od
+        $ "test/Lilac/TangleSpec/"
+        <> path
 
 checkCycles :: FilePath -> [G.Tree LT.BlockName] -> Spec
 checkCycles path expectedCycles = do
@@ -69,7 +75,7 @@ tangleSpec = do
 
   checkExpansion
     "0101-block-expansion"
-    [ ( "equations.txt",
+    [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
             "b",
@@ -80,7 +86,7 @@ tangleSpec = do
 
   checkExpansion
     "0101-block-expansion-deeply-nested"
-    [ ( "equations.txt",
+    [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
             "e",
@@ -91,7 +97,7 @@ tangleSpec = do
 
   checkExpansion
     "0101-block-expansion-prefix"
-    [ ( "equations.txt",
+    [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "  b1",
             "  b2",
@@ -106,7 +112,7 @@ tangleSpec = do
 
   checkExpansion
     "0101-block-expansion-prefix-nested"
-    [ ( "equations.txt",
+    [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
             "  b1",
@@ -120,7 +126,7 @@ tangleSpec = do
 
   checkExpansion
     "0101-block-expansion-prefix-nonspace"
-    [ ( "equations.txt",
+    [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
             "  -> b1",
@@ -132,7 +138,7 @@ tangleSpec = do
 
   checkExpansion
     "0101-block-expansion-prefix-nonspace-nested"
-    [ ( "equations.txt",
+    [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
             "  -> b1",
@@ -146,7 +152,7 @@ tangleSpec = do
 
   checkExpansion
     "0101-block-expansion-complex"
-    [ ( "equations.txt",
+    [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
             "b",
@@ -173,7 +179,7 @@ tangleSpec = do
 
   checkExpansion
     "0102-pad-between-consecutive-links"
-    [ ( "equations.txt",
+    [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
             "b1",
@@ -216,7 +222,7 @@ tangleSpec = do
 
   checkExpansion
     "0103-shebang"
-    [ ( "a.sh",
+    [ ( "test/Lilac/TangleSpec/a.sh",
         T.unlines
           [ "#!/usr/bin/env bash",
             "a1"

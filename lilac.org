@@ -8626,6 +8626,8 @@ import Lilac.Parse
   )
 import Relude
   ( Bool (False, True),
+    Either (Right),
+    FilePath,
     IO,
     Int,
     Maybe (Just, Nothing),
@@ -8662,6 +8664,7 @@ import Relude.Nub
   )
 import System.Directory.OsPath qualified as D
 import System.File.OsPath qualified as P.IO
+import System.IO (utf8)
 import System.IO.Error (IOError)
 import System.OsPath qualified as P
 
@@ -8735,22 +8738,26 @@ populate [[data:SourceCode]].
 
 #+name: f:getSourceCode
 #+begin_src haskell
-getSourceCode :: OrgDoc -> SourceCode
-getSourceCode od = foldl' f defaultSourceCode od.cells
+getSourceCode :: OrgDoc -> FilePath -> SourceCode
+getSourceCode od odPath = foldl' f defaultSourceCode od.cells
   where
     f :: SourceCode -> Cell -> SourceCode
     f sc (CBlock b)
       | Just name <- EM.lookup "name" b.meta,
-        Just _ <- EM.lookup "tangle" b.meta =
-          sc
-            { roots = name : sc.roots,
-              nameToCodeBlock = M.insert name b sc.nameToCodeBlock
-            }
-      | Just path <- EM.lookup "tangle" b.meta =
-          let name = path <> "\NUL"
+        Just path <- EM.lookup "tangle" b.meta,
+        Right filePath <- qualify path =
+          let newBlock = useQualifiedTanglePath filePath b
            in sc
                 { roots = name : sc.roots,
-                  nameToCodeBlock = M.insert name b sc.nameToCodeBlock
+                  nameToCodeBlock = M.insert name newBlock sc.nameToCodeBlock
+                }
+      | Just path <- EM.lookup "tangle" b.meta,
+        Right filePath <- qualify path =
+          let name = (T.pack filePath) <> "\NUL"
+              newBlock = useQualifiedTanglePath filePath b
+           in sc
+                { roots = name : sc.roots,
+                  nameToCodeBlock = M.insert name newBlock sc.nameToCodeBlock
                 }
       | Just name <- EM.lookup "name" b.meta =
           sc
@@ -8758,6 +8765,17 @@ getSourceCode od = foldl' f defaultSourceCode od.cells
             }
       | otherwise = sc
     f sc _ = sc
+    tanglePathPrefix = P.takeDirectory $ P.unsafeEncodeUtf odPath
+    qualify =
+      P.decodeWith utf8 utf8
+        . P.combine tanglePathPrefix
+        . P.unsafeEncodeUtf
+        . T.unpack
+    useQualifiedTanglePath qualifiedFilePath block =
+      block
+        { meta = M.insert "tangle" (T.pack qualifiedFilePath) block.meta,
+          body = block.body
+        }
 #+end_src
 
 Most of the work is done by the ~f~ helper. It's important to note that we give
@@ -8768,6 +8786,14 @@ still considered root blocks, and so we use the tangle path as the name, plus a
 NUL character at the end to virtually guarantee that this does not conflict with
 the name of another block (because Org files should not have any NUL character
 in them).
+
+The ~useQualifiedTanglePath~ helper prefixes all tangle paths with the directory
+that contains the Org file from which we generated the =OrgDoc=. Because the
+~odPath~ is itself canonicalized in [[f:getSourceCodeFromPath]], this basically
+results in a canonicalized path (because users aren't going to put in convoluted
+paths for the ~:tangle~ header). This is more intuitive, because the tangle paths
+should be relative to the location of the Org file, not the present working
+directory from where the =lilac= binary is invoked.
 
 ** Detect cyclic Noweb links
 
@@ -9189,7 +9215,7 @@ b
 #+begin_src haskell
 checkExpansion
   "0101-block-expansion"
-  [ ( "equations.txt",
+  [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
           "b",
@@ -9239,7 +9265,7 @@ e
 #+begin_src haskell
 checkExpansion
   "0101-block-expansion-deeply-nested"
-  [ ( "equations.txt",
+  [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
           "e",
@@ -9274,7 +9300,7 @@ b3
 #+begin_src haskell
 checkExpansion
   "0101-block-expansion-prefix"
-  [ ( "equations.txt",
+  [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "  b1",
           "  b2",
@@ -9321,7 +9347,7 @@ c2
 #+begin_src haskell
 checkExpansion
   "0101-block-expansion-prefix-nested"
-  [ ( "equations.txt",
+  [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
           "  b1",
@@ -9359,7 +9385,7 @@ b3
 #+begin_src haskell
 checkExpansion
   "0101-block-expansion-prefix-nonspace"
-  [ ( "equations.txt",
+  [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
           "  -> b1",
@@ -9401,7 +9427,7 @@ c2
 #+begin_src haskell
 checkExpansion
   "0101-block-expansion-prefix-nonspace-nested"
-  [ ( "equations.txt",
+  [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
           "  -> b1",
@@ -9477,7 +9503,7 @@ h
 #+begin_src haskell
 checkExpansion
   "0101-block-expansion-complex"
-  [ ( "equations.txt",
+  [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
           "b",
@@ -9553,7 +9579,7 @@ b3
 #+begin_src haskell
 checkExpansion
   "0102-pad-between-consecutive-links"
-  [ ( "equations.txt",
+  [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
           "b1",
@@ -9612,7 +9638,7 @@ a1
 #+begin_src haskell
 checkExpansion
   "0103-shebang"
-  [ ( "a.sh",
+  [ ( "test/Lilac/TangleSpec/a.sh",
       T.unlines
         [ "#!/usr/bin/env bash",
           "a1"
@@ -9631,9 +9657,9 @@ updated.
 
 #+name: f:tangle
 #+begin_src haskell
-tangle :: OrgDoc -> IO ()
-tangle od = do
-  let blocks = sort . expandRootBlocks $ getSourceCode od
+tangle :: SourceCode -> IO ()
+tangle sc = do
+  let blocks = sort $ expandRootBlocks sc
   putStrLn $ "Blocks to process: " <> (show $ length blocks)
   (tangled, tangledPaths, skipped) <- foldlM f (0, [], 0) blocks
   putStrLn $ "Tangled: " <> (show tangled)
@@ -9718,6 +9744,7 @@ import Relude
     pure,
     ($),
     (.),
+    (<>),
   )
 import System.OsPath qualified as P
 import Test.Hspec (Spec, it, shouldBe)
@@ -9759,8 +9786,20 @@ getSourceCodeFromPath path = do
   input <- LU.readFrom "test/Lilac/TangleSpec/" path
   case LP.parseOrgDoc input of
     Left errMsg -> pure $ Left errMsg
-    Right od -> pure . Right $ LT.getSourceCode od
+    Right od ->
+      pure
+        . Right
+        . LT.getSourceCode od
+        $ "test/Lilac/TangleSpec/"
+        <> path
 #+end_src
+
+We pass on ~"test/Lilac/TangleSpec/" <> path~ to [[f:getSourceCode][LT.getSourceCode]] because if we
+were to use the ~canonicalPath~ here, we would have to capture the absolute path
+in our test case expectations, which would break portability of the test cases
+(because the test case expectations would have to capture the absolute path,
+meaning all developers would have to clone the Lilac repository into the same
+path).
 
 The [[f:checkCycles]] function uses [[f:findCycles]] to see if the Org document at the
 given path has any cycles.
@@ -9943,7 +9982,7 @@ lilacCheck globalOpts checkOpts = do
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      let cycles = LT.findCycles $ LT.getSourceCode orgDoc
+      let cycles = LT.findCycles $ LT.getSourceCode orgDoc checkOpts.input
       when (not $ null cycles) $ do
         die $ "Found cycles: " <> show cycles
       putStrLn $ checkOpts.input <> ": OK"
@@ -9977,12 +10016,12 @@ lilacTangle tangleOpts = do
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      let sourceCode = LT.getSourceCode orgDoc
+      let sourceCode = LT.getSourceCode orgDoc tangleOpts.input
           cycles = LT.findCycles sourceCode
       when (not $ null cycles) $ do
         die $ "Found cycles: " <> show cycles
       putStrLn $ "Tangling " <> tangleOpts.input
-      LT.tangle orgDoc
+      LT.tangle sourceCode
       putStrLn "Finished tangling."
 #+end_src
 
