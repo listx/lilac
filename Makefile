@@ -1,5 +1,5 @@
 test: lilac.org
-	cabal test
+	cabal test --test-show-details=direct --test-option=--format=progress
 	touch test
 
 lint: lilac.org

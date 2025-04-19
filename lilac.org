@@ -631,12 +631,16 @@ hook :: Spec -> Spec
 hook = parallel
 #+end_src
 
-The Makefile rule just calls ~cabal test~ for running these tests.
+The Makefile rule just calls ~cabal test~ for running these tests. The options
+passed to ~cabal test~ are [[https://hspec.github.io/options.html][recommended by Hspec]]. In particular, the
+~--format=progress~ option condenses the output to just show periods (~.~) when a
+test case is passing, because most of the time, most tests are passing and it's
+too verbose to list all passing tests on each line (as is the default behavior).
 
 #+name: make:Run tests
 #+begin_src makefile
 test: lilac.org
-	cabal test
+	cabal test --test-show-details=direct --test-option=--format=progress
 	touch test
 #+end_src
 
