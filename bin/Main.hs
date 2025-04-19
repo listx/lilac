@@ -198,5 +198,6 @@ lilacTangle tangleOpts = do
           cycles = LT.findCycles sourceCode
       when (not $ null cycles) $ do
         die $ "Found cycles: " <> show cycles
+      putStrLn $ "Tangling " <> tangleOpts.input
       LT.tangle orgDoc
-      putStrLn $ tangleOpts.input <> ": Finished tangling."
+      putStrLn "Finished tangling."
