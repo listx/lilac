@@ -19,10 +19,11 @@ tangle()
 	fi
 }
 
-tangle_twice()
+tangle_and_test()
 {
 	tangle
 	tangle
+	make -C "${SCRIPT_ROOT}" test || true
 	echo "----------------------------------------"
 }
 
@@ -33,12 +34,12 @@ main()
 
 	t1=$(date -r "${SCRIPT_ROOT}/lilac.org" +%s)
 
-	tangle_twice
+	tangle_and_test
 	while true; do
 		t2=$(date -r "${SCRIPT_ROOT}/lilac.org" +%s)
 		if [[ ! "${t1}" == "${t2}" ]]; then
 			t1="${t2}"
-			tangle_twice
+			tangle_and_test
 		fi
 		sleep 1
 	done
