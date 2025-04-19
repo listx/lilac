@@ -1492,6 +1492,9 @@ library
       base >=4.7 && <5
     , bitwise
     , containers
+    , directory
+    , filepath
+    , file-io
     , megaparsec
     , network-uri
     , process
@@ -8581,10 +8584,12 @@ module Lilac.Tangle
   )
 where
 
+import Control.Exception (catch)
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
-import Data.Text.IO.Utf8 (readFile, writeFile)
+import Data.Text.Encoding qualified as TE
+import Data.Text.IO.Utf8 (readFile)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -8595,6 +8600,7 @@ import Lilac.Parse
   )
 import Relude
   ( Bool (False, True),
+    FilePath,
     IO,
     Int,
     Maybe (Just, Nothing),
@@ -8629,6 +8635,10 @@ import Relude.Extra.Map qualified as EM
 import Relude.Nub
   ( hashNub,
   )
+import System.Directory.OsPath qualified as D
+import System.File.OsPath qualified as P.IO
+import System.IO.Error (IOError)
+import System.OsPath qualified as P
 
 <<data:SourceCode>>
 <<type:BlockName>>
@@ -8639,6 +8649,8 @@ import Relude.Nub
 <<f:expandRootBlocks>>
 <<f:expandBlock>>
 <<f:tangle>>
+<<f:readFileRobustly>>
+<<f:writeFileRobustly>>
 #+end_src
 
 ** Tangling overview
@@ -9605,10 +9617,10 @@ tangle od = do
   where
     f :: (Int, [String], Int) -> (T.Text, T.Text) -> IO (Int, [String], Int)
     f (tangled, tangledPaths, skipped) (T.unpack -> path, contentToWrite) = do
-      existingContent <- readFile path
+      existingContent <- readFileRobustly path
       if (existingContent /= contentToWrite)
         then do
-          writeFile path contentToWrite
+          writeFileRobustly path contentToWrite
           pure (tangled + 1, path : tangledPaths, skipped)
         else
           pure (tangled, tangledPaths, skipped + 1)
@@ -9622,6 +9634,41 @@ are printed, because otherwise the output can be overly verbose.
 The ~T.unpack -> path~ in the ~f~ helper is what's known as a /view pattern/ and
 allows us to transform the incoming argument to something else before we start
 using it in the rest of the function.
+
+The functions [[f:readFileRobustly]] and [[f:writeFileRobustly]] are able to handle
+errors. This helps us to avoid crashing the program in an embarrassing fashion.
+
+#+name: f:readFileRobustly
+#+begin_src haskell
+readFileRobustly :: FilePath -> IO T.Text
+readFileRobustly path = catch (readFile path) readHandler
+  where
+    readHandler :: IOError -> IO T.Text
+    readHandler _ = pure ""
+#+end_src
+
+The function [[f:readFileRobustly]] will return the empty string if there was any
+error encountered while reading the file. One common scenario is if the file
+does not exist yet. Returning the empty string in this (or other error-raising
+scenarios) is fine because it will most likely result in the comparison
+~existingContent /= contentToWrite~ in [[f:tangle]] failing (assuming the
+~contentToWrite~ is not empty), resulting in the file being marked for tangling.
+
+For writing, the main thing [[f:writeFileRobustly]] will do is create paths
+(directories) if they are missing. If the write operation itself otherwise
+fails, we print an error message but otherwise do nothing.
+
+#+name: f:writeFileRobustly
+#+begin_src haskell
+writeFileRobustly :: FilePath -> T.Text -> IO ()
+writeFileRobustly path contentToWrite = do
+  pathUtf <- P.encodeUtf path
+  D.createDirectoryIfMissing True $ P.takeDirectory pathUtf
+  catch (P.IO.writeFile' pathUtf $ TE.encodeUtf8 contentToWrite) writeHandler
+  where
+    writeHandler :: IOError -> IO ()
+    writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
+#+end_src
 
 ** Testing framework
 

@@ -8,10 +8,12 @@ module Lilac.Tangle
   )
 where
 
+import Control.Exception (catch)
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
-import Data.Text.IO.Utf8 (readFile, writeFile)
+import Data.Text.Encoding qualified as TE
+import Data.Text.IO.Utf8 (readFile)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -22,6 +24,7 @@ import Lilac.Parse
   )
 import Relude
   ( Bool (False, True),
+    FilePath,
     IO,
     Int,
     Maybe (Just, Nothing),
@@ -56,6 +59,10 @@ import Relude.Extra.Map qualified as EM
 import Relude.Nub
   ( hashNub,
   )
+import System.Directory.OsPath qualified as D
+import System.File.OsPath qualified as P.IO
+import System.IO.Error (IOError)
+import System.OsPath qualified as P
 
 type SourceCode :: Type
 data SourceCode = SourceCode
@@ -199,12 +206,27 @@ tangle od = do
   where
     f :: (Int, [String], Int) -> (T.Text, T.Text) -> IO (Int, [String], Int)
     f (tangled, tangledPaths, skipped) (T.unpack -> path, contentToWrite) = do
-      existingContent <- readFile path
+      existingContent <- readFileRobustly path
       if (existingContent /= contentToWrite)
         then do
-          writeFile path contentToWrite
+          writeFileRobustly path contentToWrite
           pure (tangled + 1, path : tangledPaths, skipped)
         else
           pure (tangled, tangledPaths, skipped + 1)
     printTangled :: String -> IO ()
     printTangled path = putStrLn $ "  " <> path
+
+readFileRobustly :: FilePath -> IO T.Text
+readFileRobustly path = catch (readFile path) readHandler
+  where
+    readHandler :: IOError -> IO T.Text
+    readHandler _ = pure ""
+
+writeFileRobustly :: FilePath -> T.Text -> IO ()
+writeFileRobustly path contentToWrite = do
+  pathUtf <- P.encodeUtf path
+  D.createDirectoryIfMissing True $ P.takeDirectory pathUtf
+  catch (P.IO.writeFile' pathUtf $ TE.encodeUtf8 contentToWrite) writeHandler
+  where
+    writeHandler :: IOError -> IO ()
+    writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
