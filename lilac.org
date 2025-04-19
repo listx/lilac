@@ -618,6 +618,21 @@ The tests are discovered by Hspec automatically.
 This allows ~cabal test~ to run all of the tests without having to specify them
 manually.
 
+We make use of a [[https://hspec.github.io/parallel-spec-execution.html][spec hook]] to run the discovered tests in parallel.
+
+#+name: module:SpecHook
+#+header: :tangle test/SpecHook.hs
+#+begin_src haskell
+module SpecHook (hook) where
+
+import Test.Hspec (Spec, parallel)
+
+hook :: Spec -> Spec
+hook = parallel
+#+end_src
+
+The Makefile rule just calls ~cabal test~ for running these tests.
+
 #+name: make:Run tests
 #+begin_src makefile
 test: lilac.org
@@ -1538,6 +1553,7 @@ test-suite spec
   other-modules:
       Lilac.ParseSpec
       Lilac.TangleSpec
+      SpecHook
       Paths_lilac
   hs-source-dirs:
       test
