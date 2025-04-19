@@ -13,7 +13,6 @@ import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
-import Data.Text.IO.Utf8 (readFile)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -24,11 +23,9 @@ import Lilac.Parse
   )
 import Relude
   ( Bool (False, True),
-    FilePath,
     IO,
     Int,
     Maybe (Just, Nothing),
-    String,
     Type,
     catMaybes,
     elem,
@@ -51,6 +48,7 @@ import Relude
     (+),
     (.),
     (/=),
+    (<$>),
     (<>),
     (==),
     (>),
@@ -141,10 +139,10 @@ findCycles sc = map (fmap toBlockName) . foldl' f [] $ G.scc graph
           tree : acc
       | otherwise = acc
 
-expandRootBlocks :: SourceCode -> [(T.Text, T.Text)]
+expandRootBlocks :: SourceCode -> [(P.OsPath, T.Text)]
 expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
   where
-    expandRootBlock :: T.Text -> Maybe (T.Text, T.Text)
+    expandRootBlock :: T.Text -> Maybe (P.OsPath, T.Text)
     expandRootBlock rootBlockName
       | Just rootBlock <- EM.lookup rootBlockName sc.nameToCodeBlock =
           Just
@@ -159,9 +157,9 @@ expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
       T.unlines
         . map (T.dropWhileEnd (== ' '))
         $ T.lines text
-    tanglePathOf :: Block -> T.Text
+    tanglePathOf :: Block -> P.OsPath
     tanglePathOf block
-      | Just path <- EM.lookup "tangle" block.meta = path
+      | Just path <- EM.lookup "tangle" block.meta = P.unsafeEncodeUtf $ T.unpack path
       | otherwise = error "programmer error"
     maybeAddShebang :: Block -> T.Text -> T.Text
     maybeAddShebang rootBlock text
@@ -204,8 +202,8 @@ tangle od = do
   when (tangled > 0) $ mapM_ printTangled $ reverse tangledPaths
   putStrLn $ "Skipped: " <> (show skipped)
   where
-    f :: (Int, [String], Int) -> (T.Text, T.Text) -> IO (Int, [String], Int)
-    f (tangled, tangledPaths, skipped) (T.unpack -> path, contentToWrite) = do
+    f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
+    f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
       existingContent <- readFileRobustly path
       if (existingContent /= contentToWrite)
         then do
@@ -213,20 +211,22 @@ tangle od = do
           pure (tangled + 1, path : tangledPaths, skipped)
         else
           pure (tangled, tangledPaths, skipped + 1)
-    printTangled :: String -> IO ()
-    printTangled path = putStrLn $ "  " <> path
+    printTangled :: P.OsPath -> IO ()
+    printTangled path = putStrLn $ "  " <> show path
 
-readFileRobustly :: FilePath -> IO T.Text
-readFileRobustly path = catch (readFile path) readHandler
+readFileRobustly :: P.OsPath -> IO T.Text
+readFileRobustly path =
+  catch
+    (TE.decodeUtf8 <$> P.IO.readFile' path)
+    readHandler
   where
     readHandler :: IOError -> IO T.Text
     readHandler _ = pure ""
 
-writeFileRobustly :: FilePath -> T.Text -> IO ()
+writeFileRobustly :: P.OsPath -> T.Text -> IO ()
 writeFileRobustly path contentToWrite = do
-  pathUtf <- P.encodeUtf path
-  D.createDirectoryIfMissing True $ P.takeDirectory pathUtf
-  catch (P.IO.writeFile' pathUtf $ TE.encodeUtf8 contentToWrite) writeHandler
+  D.createDirectoryIfMissing True $ P.takeDirectory path
+  catch (P.IO.writeFile' path $ TE.encodeUtf8 contentToWrite) writeHandler
   where
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e

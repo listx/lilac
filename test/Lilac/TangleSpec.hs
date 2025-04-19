@@ -9,10 +9,13 @@ import Relude
   ( Either (Left, Right),
     FilePath,
     IO,
+    first,
+    fmap,
     pure,
     ($),
     (.),
   )
+import System.OsPath qualified as P
 import Test.Hspec (Spec, it, shouldBe)
 
 spec :: Spec
@@ -31,11 +34,12 @@ checkCycles path expectedCycles = do
     (Right sc) <- getSourceCodeFromPath path
     (LT.findCycles sc) `shouldBe` expectedCycles
 
-checkExpansion :: FilePath -> [(T.Text, T.Text)] -> Spec
+checkExpansion :: FilePath -> [(FilePath, T.Text)] -> Spec
 checkExpansion path expectedExpansions = do
   it path $ do
     (Right sc) <- getSourceCodeFromPath path
-    (LT.expandRootBlocks sc) `shouldBe` expectedExpansions
+    (LT.expandRootBlocks sc)
+      `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
 
 tangleSpec :: Spec
 tangleSpec = do
