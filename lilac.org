@@ -708,14 +708,17 @@ tangle()
 	if ! time make -C "${SCRIPT_ROOT}" tangle; then
 		echo >&2 "Tangle failed; cleaning Haskell tangle paths."
 		>/dev/null git checkout -- "${tangled_haskell_files[@]}"
+		return 1
 	fi
+	return 0
 }
 
 tangle_and_test()
 {
 	tangle
-	tangle
-	make -C "${SCRIPT_ROOT}" test || true
+	if tangle; then
+		make -C "${SCRIPT_ROOT}" test || true
+	fi
 	echo "----------------------------------------"
 }
 
@@ -755,9 +758,10 @@ use the new Lilac version to tangle itself again. It's a simple (albeit ugly)
 way of ensuring that we're always tangling with the latest Lilac version.
 
 The ~tangle_and_test()~ function also runs the unit tests, as a convenience
-function. The exist code is ignored with ~|| true~ because oftentimes the tests
-break when we're adding new tests, but we don't want to break out of the ~while~
-loop.
+function, but only if the previous call to ~tangle~ succeeds. This way, we only
+try to run the unit tests if Lilac can tangle itself. As for the unit tests, the
+exist code is ignored with ~|| true~ because oftentimes the tests break when we're
+adding new tests, but we don't want to break out of the ~while~ loop.
 
 The initial call to ~tangle_and_test()~ outside of the ~while~ loop is there as a
 convenience function, just in case we've modified the =lilac.org= file outside of

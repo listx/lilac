@@ -16,14 +16,17 @@ tangle()
 	if ! time make -C "${SCRIPT_ROOT}" tangle; then
 		echo >&2 "Tangle failed; cleaning Haskell tangle paths."
 		>/dev/null git checkout -- "${tangled_haskell_files[@]}"
+		return 1
 	fi
+	return 0
 }
 
 tangle_and_test()
 {
 	tangle
-	tangle
-	make -C "${SCRIPT_ROOT}" test || true
+	if tangle; then
+		make -C "${SCRIPT_ROOT}" test || true
+	fi
 	echo "----------------------------------------"
 }
 
