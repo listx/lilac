@@ -5,6 +5,7 @@ import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
+import Lilac.Weave qualified as LW
 import Options.Applicative
   ( Parser,
     argument,
@@ -23,8 +24,11 @@ import Options.Applicative
     prefs,
     progDesc,
     short,
+    showDefault,
     showHelpOnEmpty,
     str,
+    strOption,
+    value,
     (<*>),
   )
 import Options.Applicative.Builder (InfoMod)
@@ -36,9 +40,9 @@ import Relude
     IO,
     Type,
     concat,
+    map,
     not,
     null,
-    pure,
     putStrLn,
     runStateT,
     show,
@@ -48,6 +52,7 @@ import Relude
     (<>),
   )
 import System.Exit (die)
+import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Pretty.Simple qualified as PP
 
@@ -62,7 +67,7 @@ type Subcommand :: Type
 data Subcommand
   = Check CheckOpts
   | Tangle TangleOpts
-  | Weave
+  | Weave WeaveOpts
 
 type CheckOpts :: Type
 data CheckOpts = CheckOpts
@@ -72,6 +77,12 @@ data CheckOpts = CheckOpts
 type TangleOpts :: Type
 data TangleOpts = TangleOpts
   { input :: FilePath
+  }
+
+type WeaveOpts :: Type
+data WeaveOpts = WeaveOpts
+  { input :: FilePath,
+    outDir :: FilePath
   }
 
 type OptionHandler :: Type -> Type
@@ -120,8 +131,8 @@ subcommandHandler =
       command
         "weave"
         $ info
-          (pure Weave)
-          (progDesc "generate documentation")
+          (Weave <$> weaveOptsHandler)
+          (progDesc "generate JSON representation")
 
 checkOptsHandler :: OptionHandler CheckOpts
 checkOptsHandler =
@@ -132,6 +143,19 @@ tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
   TangleOpts
     <$> (argument str (metavar "FILE"))
+
+weaveOptsHandler :: OptionHandler WeaveOpts
+weaveOptsHandler =
+  WeaveOpts
+    <$> (argument str (metavar "FILE"))
+    <*> ( strOption
+            ( long "out-dir"
+                <> metavar "DIR"
+                <> value "."
+                <> showDefault
+                <> help "directory for saving the orgdoc.json file"
+            )
+        )
 
 main :: IO ()
 main = do
@@ -157,7 +181,7 @@ lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
   Check checkOpts -> lilacCheck globalOpts checkOpts
   Tangle tangleOpts -> lilacTangle tangleOpts
-  Weave -> putStrLn "'weave' is not implemented yet"
+  Weave weaveOpts -> lilacWeave weaveOpts
 
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
@@ -201,3 +225,23 @@ lilacTangle tangleOpts = do
       putStrLn $ "Tangling " <> tangleOpts.input
       LT.tangle sourceCode
       putStrLn "Finished tangling."
+
+lilacWeave :: WeaveOpts -> IO ()
+lilacWeave weaveOpts = do
+  input <- LU.readFrom "" weaveOpts.input
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          weaveOpts.input
+          input
+  case parseResult of
+    Left errBundle -> do
+      die $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) -> do
+      putStrLn $ "Weaving " <> weaveOpts.input
+      let outPath =
+            P.joinPath
+              $ map P.unsafeEncodeUtf [weaveOpts.outDir, "orgdoc.json"]
+      outPath' <- P.decodeUtf outPath
+      LW.weaveToDisk outPath' orgDoc
+      putStrLn "Finished weaving."

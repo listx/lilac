@@ -13,6 +13,7 @@ library
       Lilac.Version
       Lilac.Parse
       Lilac.Tangle
+      Lilac.Weave
       Lilac.Util
   hs-source-dirs:
       src
@@ -66,8 +67,10 @@ library
       -Wno-missed-specialisations
       -Wno-all-missed-specialisations
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
     , bitwise
+    , bytestring
     , containers
     , directory
     , filepath
@@ -144,6 +147,7 @@ executable lilac
       -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , filepath
     , lilac
     , optparse-applicative
     , megaparsec

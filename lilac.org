@@ -416,6 +416,7 @@ file at the root of the project.
 <<Generated pre-commit config>>
 cabal.project.local
 dist-newstyle
+orgdoc.json
 result*
 ,*~
 
@@ -703,7 +704,7 @@ get_tangled_haskell_files()
 {
 	git -C "${SCRIPT_ROOT}" grep -P '^#\+header: :tangle' -- '*.org' \
 		| awk '{print $3}' \
-		| grep '\.\(hs\)$'
+		| grep '\.\(cabal\|hs\)$'
 }
 
 tangle()
@@ -1347,7 +1348,9 @@ Nixkell
 Nixpkgs
 Noweb
 Orgmode
+PDF
 prepend
+Protobuf
 quux
 Relude
 sandbox
@@ -1510,6 +1513,7 @@ library
       Lilac.Version
       Lilac.Parse
       Lilac.Tangle
+      Lilac.Weave
       Lilac.Util
   hs-source-dirs:
       src
@@ -1518,8 +1522,10 @@ library
   ghc-options:
       <<GHC warning flags>>
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
     , bitwise
+    , bytestring
     , containers
     , directory
     , filepath
@@ -1548,6 +1554,7 @@ executable lilac
       <<GHC threaded flags>>
   build-depends:
       base >=4.7 && <5
+    , filepath
     , lilac
     , optparse-applicative
     , megaparsec
@@ -1800,6 +1807,7 @@ module Lilac.Parse
   )
 where
 
+import Data.Aeson (ToJSON)
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
@@ -1807,6 +1815,7 @@ import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
@@ -2122,8 +2131,15 @@ data OrgDoc = OrgDoc
   { cells :: [Cell],
     meta :: M.Map T.Text T.Text
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON OrgDoc
 #+end_src
+
+The ~instance ToJSON OrgDoc~ is needed to create the default implementation for
+JSON conversion automatically for us. All child types also require the same
+~instance~ declaration for this to work. At the end of it though, we can use the
+~encode~ and ~encodeFile~ functions from =Data.Aeson=.
 
 The top-level parsing function is =parseOrgDoc=, which takes some raw text input
 and parses it into a rich =OrgDoc= type.
@@ -2608,7 +2624,9 @@ data Cell
   | CMathFragment MathFragment
   | CFigure Figure
   | CTable Table
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Cell
 #+end_src
 
 All of the different cell types describe some sort of content, except for one,
@@ -2712,7 +2730,9 @@ data PToken
   = PTokenStyledText StyledText
   | PTokenLink Link
   | PTokenMathFragment MathFragment
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON PToken
 #+end_src
 
 The ~proseParser~ can parse a series of [[data:PToken]] values. It is used by both
@@ -2823,7 +2843,9 @@ data StyledText = StyledText
   { body :: T.Text,
     style :: StyleMask
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON StyledText
 #+end_src
 
 The [[newtype:StyleMask]] is a low-level bit mask that can store multiple boolean
@@ -2842,7 +2864,9 @@ should never be needed during exposition.
 #+begin_src haskell
 type Style :: Type
 data Style = Bold | Italic | Underline | Verbatim | Code
-  deriving stock (Enum, Eq, Ord, Show)
+  deriving stock (Enum, Eq, Generic, Ord, Show)
+
+instance ToJSON Style
 #+end_src
 
 The =styleMarkers= keeps track of the characters that activate and deactivate each
@@ -3166,7 +3190,9 @@ use a =newtype= around a =Word8= (an 8-bit word) so as to keep it distinct from
 #+begin_src haskell
 type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
-  deriving stock (Eq)
+  deriving stock (Eq, Generic)
+
+instance ToJSON StyleMask
 #+end_src
 
 We have a custom =Show= instance because the default =Show= would just treat the
@@ -3673,7 +3699,9 @@ data Link = Link
     target :: T.Text,
     typ :: LinkType
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Link
 #+end_src
 
 In summary we support the following link types:
@@ -3695,7 +3723,9 @@ type LinkType :: Type
 data LinkType
   = LinkBracketed
   | LinkNoweb
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON LinkType
 #+end_src
 
 *** Standalone link parser
@@ -4355,7 +4385,9 @@ data Heading = Heading
     body :: Prose,
     meta :: M.Map T.Text T.Text
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Heading
 #+end_src
 
 The parser for a heading is straightforward as the strict requirements make it
@@ -4851,7 +4883,9 @@ data Block = Block
   { meta :: M.Map T.Text T.Text,
     body :: [BToken]
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Block
 #+end_src
 
 Below are some examples of valid (empty) code blocks.
@@ -5060,7 +5094,9 @@ type BToken :: Type
 data BToken
   = BTokenString T.Text
   | BTokenLink Link
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON BToken
 #+end_src
 
 *** Overall parser
@@ -6186,7 +6222,9 @@ data ListMarker
   | LUnorderedEnd
   | LItemStart
   | LItemEnd
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON ListMarker
 #+end_src
 
 We take this model from HTML, which uses =<ol>= and =</ol>= to encode the start and
@@ -7375,7 +7413,9 @@ data MathFragment = MathFragment
   { meta :: M.Map T.Text T.Text,
     body :: T.Text
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON MathFragment
 #+end_src
 
 There are three ways to write math fragments: using =\begin{equation}= and
@@ -7666,7 +7706,9 @@ data Figure = Figure
   { meta :: M.Map T.Text T.Text,
     link :: Link
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Figure
 #+end_src
 
 Below is an example of a figure:
@@ -7863,7 +7905,9 @@ data Table = Table
   { meta :: M.Map T.Text T.Text,
     grid :: M.Map (Int, Int) Prose
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Table
 #+end_src
 
 Below is an example of a table:
@@ -9856,6 +9900,96 @@ tangleSpec = do
   <<t:0103-shebang>>
 #+end_src
 
+* Weaving
+
+In most Literate Programming systems, /weaving/ is the act of generating a
+human-readable document. This usually means writing a PDF or an HTML page.
+
+For now, Lilac's main goal is to generate HTML pages. There are several
+reasons:
+
+  1) HTML is easier to consume on the web than PDFs.
+
+  2) PDFs are obsessed with page numbers because they are designed to be printed
+     on real physical paper; we don't care about those things.
+
+  3) We want to eventually make our HTML pages interactive, and interactivity is
+     easier in HTML.
+
+** Architecture
+
+Generating HTML ultimately means having three components: HTML elements,
+CSS, and JavaScript (JS). HTML and CSS alone can be used to create a static
+document, but JS is necessary for making things dynamic.
+
+At this stage, the architecture we have in mind for weaving is the following:
+
+  1) Convert the [[data:OrgDoc]] into a JSON file.
+
+  2) Use the ~OrgDoc~ JSON data as the source of truth to build up the HTML at
+     runtime with JS.
+
+  3) Sprinkle in some CSS for styling.
+
+Step 2 will be done with [[https://clojurescript.org/][ClojureScript]], which compiles to JS. This way, when we
+"weave" a document, we'll only generate the ~OrgDoc~ JSON file and everything will
+be driven by this data.
+
+One main advantage of this model is that other "viewers" can be created, as long
+as they understand the same JSON. While we would prefer to use something more
+"typed" like [[https://protobuf.dev/][Protobufs]], [[https://github.com/cognitect/transit-clj][Transit]], or [[https://github.com/edn-format/edn][EDN]], we choose JSON for its universality.
+Also, none of these alternative formats support both Haskell and ClojureScript
+well.
+
+Another advantage of using JSON this way is that because we don't generate HTML
+with things like section numbers baked into the output, changing one small
+heading (adding or removing one near the beginning of the document) won't result
+in a huge diff where everything following that small change gets renumbered.
+
+In the future if it turns out that generating the HTML this way is too slow,
+we'll have to do most of the HTML generation at weave time (and probably abandon
+writing a JSON altogether). Time will tell.
+
+** =Lilac.Weave= module
+
+Weaving concerns are captured in [[file:src/Lilac/Weave.hs]].
+
+#+name: module:Lilac.Weave
+#+header: :tangle src/Lilac/Weave.hs
+#+begin_src haskell
+module Lilac.Weave (weave, weaveToDisk) where
+
+import Data.Aeson (encode, encodeFile)
+import Data.ByteString.Lazy.Char8 qualified as BL
+import Lilac.Parse (OrgDoc)
+import Relude (FilePath, IO)
+
+<<f:weave>>
+<<f:weaveToDisk>>
+#+end_src
+
+** Write ~OrgDoc~ JSON
+
+Weaving just means converting the [[data:OrgDoc]] into JSON.
+
+#+name: f:weave
+#+begin_src haskell
+weave :: OrgDoc -> BL.ByteString
+weave = encode
+#+end_src
+
+We don't have tests here because converting an existing, already-well-formed
+~OrgDoc~ into JSON doesn't make sense (it would be testing whether the Haskell
+=Data.Aeson= library is robust enough to handle the ~OrgDoc~).
+
+Weaving to disk is used when we want to choose where to write the JSON.
+
+#+name: f:weaveToDisk
+#+begin_src haskell
+weaveToDisk :: FilePath -> OrgDoc -> IO ()
+weaveToDisk = encodeFile
+#+end_src
+
 * CLI
 
 The CLI has two main parts: the boilerplate and use of the modules (libraries)
@@ -9876,6 +10010,7 @@ import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
+import Lilac.Weave qualified as LW
 import Options.Applicative
   ( Parser,
     argument,
@@ -9894,8 +10029,11 @@ import Options.Applicative
     prefs,
     progDesc,
     short,
+    showDefault,
     showHelpOnEmpty,
     str,
+    strOption,
+    value,
     (<*>),
   )
 import Options.Applicative.Builder (InfoMod)
@@ -9907,9 +10045,9 @@ import Relude
     IO,
     Type,
     concat,
+    map,
     not,
     null,
-    pure,
     putStrLn,
     runStateT,
     show,
@@ -9919,6 +10057,7 @@ import Relude
     (<>),
   )
 import System.Exit (die)
+import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Pretty.Simple qualified as PP
 
@@ -9928,6 +10067,7 @@ import Text.Pretty.Simple qualified as PP
 <<f:lilac>>
 <<f:lilacCheck>>
 <<f:lilacTangle>>
+<<f:lilacWeave>>
 #+end_src
 
 ** =main= entrypoint
@@ -9966,7 +10106,7 @@ lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
   Check checkOpts -> lilacCheck globalOpts checkOpts
   Tangle tangleOpts -> lilacTangle tangleOpts
-  Weave -> putStrLn "'weave' is not implemented yet"
+  Weave weaveOpts -> lilacWeave weaveOpts
 #+end_src
 
 The [[f:lilacCheck]] function just parses the input, checking if we can parse it by
@@ -10029,6 +10169,32 @@ lilacTangle tangleOpts = do
       putStrLn "Finished tangling."
 #+end_src
 
+The [[f:lilacWeave]] function weaves the [[data:OrgDoc]] into JSON. We hardcode this to
+just ~orgdoc.json~ for now.
+
+#+name: f:lilacWeave
+#+begin_src haskell
+lilacWeave :: WeaveOpts -> IO ()
+lilacWeave weaveOpts = do
+  input <- LU.readFrom "" weaveOpts.input
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          weaveOpts.input
+          input
+  case parseResult of
+    Left errBundle -> do
+      die $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) -> do
+      putStrLn $ "Weaving " <> weaveOpts.input
+      let outPath =
+            P.joinPath
+              $ map P.unsafeEncodeUtf [weaveOpts.outDir, "orgdoc.json"]
+      outPath' <- P.decodeUtf outPath
+      LW.weaveToDisk outPath' orgDoc
+      putStrLn "Finished weaving."
+#+end_src
+
 ** Option handling boilerplate
 :PROPERTIES:
 :ID:       ce9af5ef-6559-4ffb-82c1-a439214eda6d
@@ -10043,11 +10209,13 @@ options, and the functions that operate on them.
 <<data:Subcommand>>
 <<data:CheckOpts>>
 <<data:TangleOpts>>
+<<data:WeaveOpts>>
 <<data:OptionHandler>>
 <<f:globalOptionsHandler>>
 <<f:subcommandHandler>>
 <<f:checkOptsHandler>>
 <<f:tangleOptsHandler>>
+<<f:weaveOptsHandler>>
 #+end_src
 
 The global options are encoded in [[data:GlobalOpts]].
@@ -10070,7 +10238,7 @@ type Subcommand :: Type
 data Subcommand
   = Check CheckOpts
   | Tangle TangleOpts
-  | Weave
+  | Weave WeaveOpts
 #+end_src
 
 The =check= subcommand runs [[f:lilacCheck]], and requires an ~input~ option and handler
@@ -10109,6 +10277,33 @@ tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
   TangleOpts
     <$> (argument str (metavar "FILE"))
+#+end_src
+
+The =weave= subcommand requires an ~input~ option as well.
+
+#+name: data:WeaveOpts
+#+begin_src haskell
+type WeaveOpts :: Type
+data WeaveOpts = WeaveOpts
+  { input :: FilePath,
+    outDir :: FilePath
+  }
+#+end_src
+
+#+name: f:weaveOptsHandler
+#+begin_src haskell
+weaveOptsHandler :: OptionHandler WeaveOpts
+weaveOptsHandler =
+  WeaveOpts
+    <$> (argument str (metavar "FILE"))
+    <*> ( strOption
+            ( long "out-dir"
+                <> metavar "DIR"
+                <> value "."
+                <> showDefault
+                <> help "directory for saving the orgdoc.json file"
+            )
+        )
 #+end_src
 
 That's it for the data structures for option handling. The next concern is
@@ -10181,8 +10376,8 @@ subcommandHandler =
       command
         "weave"
         $ info
-          (pure Weave)
-          (progDesc "generate documentation")
+          (Weave <$> weaveOptsHandler)
+          (progDesc "generate JSON representation")
 #+end_src
 
 The [[f:subcommandHandler]] is where we specify each of the different behaviors

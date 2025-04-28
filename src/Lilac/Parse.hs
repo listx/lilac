@@ -26,6 +26,7 @@ module Lilac.Parse
   )
 where
 
+import Data.Aeson (ToJSON)
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
@@ -33,6 +34,7 @@ import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
@@ -166,7 +168,9 @@ data OrgDoc = OrgDoc
   { cells :: [Cell],
     meta :: M.Map T.Text T.Text
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON OrgDoc
 
 type Cell :: Type
 data Cell
@@ -177,7 +181,9 @@ data Cell
   | CMathFragment MathFragment
   | CFigure Figure
   | CTable Table
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Cell
 
 type Heading :: Type
 data Heading = Heading
@@ -185,7 +191,9 @@ data Heading = Heading
     body :: Prose,
     meta :: M.Map T.Text T.Text
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Heading
 
 type Prose :: Type
 type Prose = [PToken]
@@ -195,18 +203,24 @@ data PToken
   = PTokenStyledText StyledText
   | PTokenLink Link
   | PTokenMathFragment MathFragment
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON PToken
 
 type StyledText :: Type
 data StyledText = StyledText
   { body :: T.Text,
     style :: StyleMask
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON StyledText
 
 type Style :: Type
 data Style = Bold | Italic | Underline | Verbatim | Code
-  deriving stock (Enum, Eq, Ord, Show)
+  deriving stock (Enum, Eq, Generic, Ord, Show)
+
+instance ToJSON Style
 
 type Link :: Type
 data Link = Link
@@ -214,17 +228,23 @@ data Link = Link
     target :: T.Text,
     typ :: LinkType
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Link
 
 type LinkType :: Type
 data LinkType
   = LinkBracketed
   | LinkNoweb
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON LinkType
 
 type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
-  deriving stock (Eq)
+  deriving stock (Eq, Generic)
+
+instance ToJSON StyleMask
 
 instance Show StyleMask where
   show (StyleMask a) = "styleMaskFrom " <> x
@@ -246,13 +266,17 @@ data Block = Block
   { meta :: M.Map T.Text T.Text,
     body :: [BToken]
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Block
 
 type BToken :: Type
 data BToken
   = BTokenString T.Text
   | BTokenLink Link
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON BToken
 
 type Level :: Type
 data Level = Level
@@ -269,28 +293,36 @@ data ListMarker
   | LUnorderedEnd
   | LItemStart
   | LItemEnd
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON ListMarker
 
 type MathFragment :: Type
 data MathFragment = MathFragment
   { meta :: M.Map T.Text T.Text,
     body :: T.Text
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON MathFragment
 
 type Figure :: Type
 data Figure = Figure
   { meta :: M.Map T.Text T.Text,
     link :: Link
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Figure
 
 type Table :: Type
 data Table = Table
   { meta :: M.Map T.Text T.Text,
     grid :: M.Map (Int, Int) Prose
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Table
 
 skipNewlinesAndComments :: OrgParser ()
 skipNewlinesAndComments =

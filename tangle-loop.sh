@@ -7,7 +7,7 @@ get_tangled_haskell_files()
 {
 	git -C "${SCRIPT_ROOT}" grep -P '^#\+header: :tangle' -- '*.org' \
 		| awk '{print $3}' \
-		| grep '\.\(hs\)$'
+		| grep '\.\(cabal\|hs\)$'
 }
 
 tangle()
