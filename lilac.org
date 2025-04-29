@@ -606,6 +606,7 @@ the listed dependencies.
 <<Makefile sentinel:lint>>
 <<Makefile sentinel:build>>
 <<Makefile sentinel:build-release>>
+<<Makefile sentinel:tangle>>
 #+end_src
 
 *** Run tests
@@ -677,10 +678,16 @@ We can tangle Lilac with Lilac itself.
 #+begin_src makefile
 tangle: lilac.org
 	lilac tangle lilac.org
+	touch tangle
 #+end_src
 
 The =lilac= script is the one we created in [[nix/scripts.nix]] to automatically build
-Lilac with Cabal and tangle =lilac.org=.
+Lilac with Cabal and tangle =lilac.org=. The ~tangle~ is a sentinel file.
+
+#+name: Makefile sentinel:tangle
+#+begin_src gitignore
+tangle
+#+end_src
 
 Making Lilac tangle itself is advantageous because it's faster than running
 =org-babel-tangle= inside Orgmode in Emacs. However, doing this means we lose out

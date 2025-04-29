@@ -8,6 +8,7 @@ lint: lilac.org
 
 tangle: lilac.org
 	lilac tangle lilac.org
+	touch tangle
 
 build: lilac.org lilac.cabal
 	cabal build
