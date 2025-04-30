@@ -30,22 +30,30 @@ tangle_and_test()
 	echo "----------------------------------------"
 }
 
-main()
+watch()
 {
-	local t1
-	local t2
+	local s1
+	local s2
+	local files=("$@")
 
-	t1=$(date -r "${SCRIPT_ROOT}/lilac.org" +%s)
+	s1="$(stat -c %Y "${files[@]}")"
 
 	tangle_and_test
 	while true; do
-		t2=$(date -r "${SCRIPT_ROOT}/lilac.org" +%s)
-		if [[ ! "${t1}" == "${t2}" ]]; then
-			t1="${t2}"
+		s2="$(stat -c %Y "${files[@]}")"
+		if [[ ! "${s1}" == "${s2}" ]]; then
+			s1="${s2}"
 			tangle_and_test
 		fi
 		sleep 1
 	done
+}
+
+main()
+{
+	watch \
+		"${SCRIPT_ROOT}/lilac.org" \
+		"${SCRIPT_ROOT}/fe.org"
 }
 
 main "$@"

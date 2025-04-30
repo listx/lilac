@@ -6,9 +6,12 @@ lint: lilac.org
 	pre-commit run --all-files
 	touch lint
 
-tangle: lilac.org
+tangle: lilac.org tangle-fe
 	lilac tangle lilac.org
 	touch tangle
+tangle-fe: fe.org
+	lilac tangle fe.org
+	touch tangle-fe
 
 build: lilac.org lilac.cabal
 	cabal build

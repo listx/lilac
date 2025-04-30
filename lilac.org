@@ -676,17 +676,24 @@ We can tangle Lilac with Lilac itself.
 
 #+name: make:Tangle sources
 #+begin_src makefile
-tangle: lilac.org
+tangle: lilac.org tangle-fe
 	lilac tangle lilac.org
 	touch tangle
+tangle-fe: fe.org
+	lilac tangle fe.org
+	touch tangle-fe
 #+end_src
 
 The =lilac= script is the one we created in [[nix/scripts.nix]] to automatically build
-Lilac with Cabal and tangle =lilac.org=. The ~tangle~ is a sentinel file.
+Lilac with Cabal. We use it to tangle =lilac.org= and =fe.org= (the frontend).
+
+The ~tangle~ and ~tangle-fe~ are [[id:b649d761-1103-47be-86e4-56a7362a5ecc][sentinel files]] to help GNU Make avoid running the
+tangling operation if there is nothing to do.
 
 #+name: Makefile sentinel:tangle
 #+begin_src gitignore
 tangle
+tangle-fe
 #+end_src
 
 Making Lilac tangle itself is advantageous because it's faster than running
@@ -736,22 +743,30 @@ tangle_and_test()
 	echo "----------------------------------------"
 }
 
-main()
+watch()
 {
-	local t1
-	local t2
+	local s1
+	local s2
+	local files=("$@")
 
-	t1=$(date -r "${SCRIPT_ROOT}/lilac.org" +%s)
+	s1="$(stat -c %Y "${files[@]}")"
 
 	tangle_and_test
 	while true; do
-		t2=$(date -r "${SCRIPT_ROOT}/lilac.org" +%s)
-		if [[ ! "${t1}" == "${t2}" ]]; then
-			t1="${t2}"
+		s2="$(stat -c %Y "${files[@]}")"
+		if [[ ! "${s1}" == "${s2}" ]]; then
+			s1="${s2}"
 			tangle_and_test
 		fi
 		sleep 1
 	done
+}
+
+main()
+{
+	watch \
+		"${SCRIPT_ROOT}/lilac.org" \
+		"${SCRIPT_ROOT}/fe.org"
 }
 
 main "$@"
@@ -777,9 +792,9 @@ try to run the unit tests if Lilac can tangle itself. As for the unit tests, the
 exist code is ignored with ~|| true~ because oftentimes the tests break when we're
 adding new tests, but we don't want to break out of the ~while~ loop.
 
-The initial call to ~tangle_and_test()~ outside of the ~while~ loop is there as a
-convenience function, just in case we've modified the =lilac.org= file outside of
-the call to =tangle-loop.sh=.
+The initial call to ~tangle_and_test()~ outside of the ~while~ loop in the ~watch()~
+function is there for convenience, just in case we've modified the =lilac.org=
+file outside of the call to =tangle-loop.sh=.
 
 *** Build =lilac=
 
@@ -9926,6 +9941,9 @@ reasons:
      easier in HTML.
 
 ** Architecture
+:PROPERTIES:
+:ID:       8f5752c0-6162-4de6-9ceb-f78ba584722c
+:END:
 
 Generating HTML ultimately means having three components: HTML elements,
 CSS, and JavaScript (JS). HTML and CSS alone can be used to create a static
@@ -9979,7 +9997,8 @@ import Relude (FilePath, IO)
 
 ** Write ~OrgDoc~ JSON
 
-Weaving just means converting the [[data:OrgDoc]] into JSON.
+Weaving just means converting the [[data:OrgDoc]] into JSON, as part of "Step 1" in
+[[id:8f5752c0-6162-4de6-9ceb-f78ba584722c][Architecture]].
 
 #+name: f:weave
 #+begin_src haskell
