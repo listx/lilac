@@ -4,13 +4,16 @@ module Lilac.Tangle
     expandRootBlocks,
     findCycles,
     getSourceCode,
+    getSourceCodeMulti,
     tangle,
   )
 where
 
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.UUID.Types (UUID)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -20,11 +23,12 @@ import Lilac.Parse
     LinkTarget (LinkTargetNoweb),
     OrgDoc (cells),
     getOrgId,
+    parseOrgDoc,
   )
 import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
-    Either (Right),
+    Either (Left, Right),
     FilePath,
     IO,
     Int,
@@ -33,6 +37,7 @@ import Relude
     catMaybes,
     elem,
     error,
+    filter,
     fmap,
     foldl',
     foldlM,
@@ -127,6 +132,73 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
         { meta = M.insert "tangle" (T.pack qualifiedFilePath) block.meta,
           body = block.body
         }
+
+growBlockUniverse ::
+  Set.Set UUID ->
+  Set.Set FQBN ->
+  M.Map UUID P.OsPath ->
+  M.Map FQBN Block ->
+  [FQBN] ->
+  IO (M.Map FQBN Block)
+growBlockUniverse _ _ _ blockUniverse [] = pure blockUniverse
+growBlockUniverse parsedUuids seenFqbns uuidToOsPath blockUniverse (root : roots)
+  | Just block <- EM.lookup root blockUniverse = do
+      let nowebLinks = catMaybes $ map getLinkTarget block.body
+          fqbns =
+            map
+              (\(LinkNoweb uuid targetName) -> LU.prefixWithId uuid targetName)
+              nowebLinks
+          newFqbns = filter (\fqbn -> not $ Set.member fqbn seenFqbns) fqbns
+      (newlyParsedUuids, grownBlockUniverse, toGrowFrom) <-
+        foldlM f (parsedUuids, blockUniverse, []) nowebLinks
+      growBlockUniverse
+        newlyParsedUuids
+        (Set.union seenFqbns $ Set.fromList newFqbns)
+        uuidToOsPath
+        grownBlockUniverse
+        (roots <> newFqbns <> toGrowFrom)
+  | otherwise = growBlockUniverse parsedUuids seenFqbns uuidToOsPath blockUniverse roots
+  where
+    f ::
+      (Set.Set UUID, M.Map FQBN Block, [FQBN]) ->
+      LinkNoweb ->
+      IO (Set.Set UUID, M.Map FQBN Block, [FQBN])
+    f (pu, bu, tgf) (LinkNoweb uuid targetName)
+      | Set.member (LU.prefixWithId uuid targetName) seenFqbns = pure (pu, bu, tgf)
+      | Set.member uuid pu = pure (pu, bu, (LU.prefixWithId uuid targetName) : tgf)
+      | Just uuidOsPath <- EM.lookup uuid uuidToOsPath = do
+          input <- LU.readFileRobustly uuidOsPath
+          case parseOrgDoc input of
+            Right od -> do
+              uuidFilePath <- P.decodeUtf uuidOsPath
+              let sc = getSourceCode od uuidFilePath
+              pure
+                ( Set.insert uuid pu,
+                  M.union bu sc.fqbnToCodeBlock,
+                  (LU.prefixWithId uuid targetName) : tgf
+                )
+            Left err -> do
+              putStrLn $ show err
+              pure (pu, bu, tgf)
+      | otherwise = pure (pu, bu, tgf)
+    getLinkTarget = \case
+      (BTokenLink (Link _ (LinkTargetNoweb linkNoweb))) ->
+        Just linkNoweb
+      _ -> Nothing
+
+getSourceCodeMulti ::
+  OrgDoc ->
+  FilePath ->
+  M.Map UUID P.OsPath ->
+  IO SourceCode
+getSourceCodeMulti od odPath uuidToOsPath = do
+  let sc = getSourceCode od odPath
+  bu <- growBlockUniverse Set.empty Set.empty uuidToOsPath sc.fqbnToCodeBlock sc.roots
+  pure
+    $ sc
+      { roots = sc.roots,
+        fqbnToCodeBlock = bu
+      }
 
 buildGraph ::
   [Block] ->

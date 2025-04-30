@@ -255,7 +255,8 @@ lilacCheck globalOpts checkOpts = do
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      let cycles = LT.findCycles $ LT.getSourceCode orgDoc checkOpts.input
+      sourceCode <- LT.getSourceCodeMulti orgDoc checkOpts.input goids
+      let cycles = LT.findCycles sourceCode
       when (not $ null cycles) $ do
         die $ "Found cycles: " <> show cycles
       putStrLn $ checkOpts.input <> ": OK"
@@ -279,8 +280,8 @@ lilacTangle globalOpts tangleOpts = do
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      let sourceCode = LT.getSourceCode orgDoc tangleOpts.input
-          cycles = LT.findCycles sourceCode
+      sourceCode <- LT.getSourceCodeMulti orgDoc tangleOpts.input goids
+      let cycles = LT.findCycles sourceCode
       when (not $ null cycles) $ do
         die $ "Found cycles: " <> show cycles
       putStrLn $ "Tangling " <> tangleOpts.input

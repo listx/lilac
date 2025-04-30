@@ -9456,13 +9456,16 @@ module Lilac.Tangle
     expandRootBlocks,
     findCycles,
     getSourceCode,
+    getSourceCodeMulti,
     tangle,
   )
 where
 
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.UUID.Types (UUID)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -9472,11 +9475,12 @@ import Lilac.Parse
     LinkTarget (LinkTargetNoweb),
     OrgDoc (cells),
     getOrgId,
+    parseOrgDoc,
   )
 import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
-    Either (Right),
+    Either (Left, Right),
     FilePath,
     IO,
     Int,
@@ -9485,6 +9489,7 @@ import Relude
     catMaybes,
     elem,
     error,
+    filter,
     fmap,
     foldl',
     foldlM,
@@ -9523,6 +9528,8 @@ import System.OsPath qualified as P
 <<type:FQBN>>
 <<f:defaultSourceCode>>
 <<f:getSourceCode>>
+<<f:growBlockUniverse>>
+<<f:getSourceCodeMulti>>
 <<f:buildGraph>>
 <<f:findCycles>>
 <<f:expandRootBlocks>>
@@ -9651,6 +9658,149 @@ results in a canonicalized path (because users aren't going to put in convoluted
 paths for the ~:tangle~ header). This is more intuitive, because the tangle paths
 should be relative to the location of the Org file, not the present working
 directory from where the =lilac= binary is invoked.
+
+The [[f:getSourceCode]] function can only extract code blocks from a single Org
+document. However, unlike vanilla Org mode, we allow users to specify code
+blocks that refer to other code blocks in *other* (external) documents. So we need
+a way to get the full ~SourceCode~ we need, across /multiple files/ if necessary.
+The [[f:getSourceCodeMulti]] function calls ~getSourceCode~ first on the initial Org
+file, and then calls ~growBlockUniverse~ to augment it with all code blocks from
+external files as needed.
+
+#+name: f:getSourceCodeMulti
+#+begin_src haskell
+getSourceCodeMulti ::
+  OrgDoc ->
+  FilePath ->
+  M.Map UUID P.OsPath ->
+  IO SourceCode
+getSourceCodeMulti od odPath uuidToOsPath = do
+  let sc = getSourceCode od odPath
+  bu <- growBlockUniverse Set.empty Set.empty uuidToOsPath sc.fqbnToCodeBlock sc.roots
+  pure
+    $ sc
+      { roots = sc.roots,
+        fqbnToCodeBlock = bu
+      }
+#+end_src
+
+Most of the heavy lifting here (of detecting external Org files, and then
+parsing them to grow the "block universe") is done inside [[f:growBlockUniverse]],
+which we examine in the next section.
+
+*** Blocks from external files
+
+Code blocks themselves can reference other blocks. Most of the time, these other
+blocks are in the same file and can be "dereferenced" without any additional
+parsing.
+
+But what if a code block depends on a code block in /another file/, as we've seen
+in [[f:blockOriginSignatureParser]]? We must bring those code blocks into our known
+universe of code blocks. In a sense we are building up a "super" Org file with
+all the code blocks we need for tangling.
+
+As long as we build up a ~SourceCode~ data structure with all of the code blocks
+we need (whether those code blocks come from a single Org file or multiple Org
+files), we can perform tangling without any problems.
+
+The tricky part here is parsing additional Org files, but also limiting the
+search so that we are only parsing those Org files that we need to resolve
+tangling the current file. That is, we only parse another Org file if a code
+block /needed by a root block/ refers to a code block in that other Org file.
+
+The [[f:growBlockUniverse]] function builds up the critical ~M.Map FQBN Block~ portion
+of a [[data:SourceCode]], teaching it all about the code blocks from relevant
+external files. It does this by doing a breadth-first search of the code blocks,
+starting from each root block in the [[data:SourceCode]] as a starting point (where
+a root block is a block that we want to tangle). We skip the search if the code
+block cannot be found in the block universe; this is the ~otherwise~ case in
+[[f:growBlockUniverse]] and can happen if we get a nonsensical Noweb link.
+
+Whenever we encounter a Noweb link that refers to another Org file, we parse
+that file if we haven't already and call [[f:getSourceCode]] to get the code blocks
+from that file. We have to use ~newFqbns~ to keep track of which code blocks have
+been visited; otherwise we'll end up in an infinite loop if there are any
+cycles.
+
+This last bit is done in the ~f~ helper function for [[f:growBlockUniverse]].
+
+#+name: f:growBlockUniverse
+#+begin_src haskell
+growBlockUniverse ::
+  Set.Set UUID ->
+  Set.Set FQBN ->
+  M.Map UUID P.OsPath ->
+  M.Map FQBN Block ->
+  [FQBN] ->
+  IO (M.Map FQBN Block)
+growBlockUniverse _ _ _ blockUniverse [] = pure blockUniverse
+growBlockUniverse parsedUuids seenFqbns uuidToOsPath blockUniverse (root : roots)
+  | Just block <- EM.lookup root blockUniverse = do
+      let nowebLinks = catMaybes $ map getLinkTarget block.body
+          fqbns =
+            map
+              (\(LinkNoweb uuid targetName) -> LU.prefixWithId uuid targetName)
+              nowebLinks
+          newFqbns = filter (\fqbn -> not $ Set.member fqbn seenFqbns) fqbns
+      (newlyParsedUuids, grownBlockUniverse, toGrowFrom) <-
+        foldlM f (parsedUuids, blockUniverse, []) nowebLinks
+      growBlockUniverse
+        newlyParsedUuids
+        (Set.union seenFqbns $ Set.fromList newFqbns)
+        uuidToOsPath
+        grownBlockUniverse
+        (roots <> newFqbns <> toGrowFrom)
+  | otherwise = growBlockUniverse parsedUuids seenFqbns uuidToOsPath blockUniverse roots
+  where
+    f ::
+      (Set.Set UUID, M.Map FQBN Block, [FQBN]) ->
+      LinkNoweb ->
+      IO (Set.Set UUID, M.Map FQBN Block, [FQBN])
+    f (pu, bu, tgf) (LinkNoweb uuid targetName)
+      | Set.member (LU.prefixWithId uuid targetName) seenFqbns = pure (pu, bu, tgf)
+      | Set.member uuid pu = pure (pu, bu, (LU.prefixWithId uuid targetName) : tgf)
+      | Just uuidOsPath <- EM.lookup uuid uuidToOsPath = do
+          input <- LU.readFileRobustly uuidOsPath
+          case parseOrgDoc input of
+            Right od -> do
+              uuidFilePath <- P.decodeUtf uuidOsPath
+              let sc = getSourceCode od uuidFilePath
+              pure
+                ( Set.insert uuid pu,
+                  M.union bu sc.fqbnToCodeBlock,
+                  (LU.prefixWithId uuid targetName) : tgf
+                )
+            Left err -> do
+              putStrLn $ show err
+              pure (pu, bu, tgf)
+      | otherwise = pure (pu, bu, tgf)
+    getLinkTarget = \case
+      (BTokenLink (Link _ (LinkTargetNoweb linkNoweb))) ->
+        Just linkNoweb
+      _ -> Nothing
+#+end_src
+
+The ~f~ helper does quite a lot. The main concern it has is to avoid performing
+the parse of the external Org file more than once:
+
+  - If we've seen this link before from a previous iteration, skip it (because
+    we must've already done everything we needed in the previous iteration).
+
+  - If we haven't seen this link before, but we've seen the Org doc containing
+    it before, record that the link needs to be explored further, but do not
+    parse the Org doc containing this link (because we're already parsed it
+    previously).
+
+  - If we haven't seen this link before, nor the Org doc containing it, only
+    then parse this new (external) Org doc to grow the block universe.
+
+  - If we cannot figure out how to locate the external Org doc, skip it.
+
+These four cases are encoded in the ~f~ helper above.
+
+Note that [[f:growBlockUniverse]] leaves out edge generation and does not build up a
+dependency graph like we do in our existing function [[f:findCycles]]. This is
+because we want to keep things simple.
 
 ** Detect cyclic Noweb links
 
@@ -9962,7 +10112,10 @@ checkCycles
 For tangling, we can't use the graph information from [[f:buildGraph]] directly
 because it doesn't handle the case where we have multiple links to the same code
 block. Instead we look at all of the root blocks, and expand each one in turn in
-[[f:expandRootBlocks]].
+[[f:expandRootBlocks]]. The output is a list of tuples, where each tuple encodes the
+filesystem path where we want to write some text (as a result of tangling), and
+the contents of the text itself which we want to write there --- hence the type
+is ~(P.OsPath, T.Text)~.
 
 The call to ~maybeAddShebang~ adds a special shebang line at the beginning of the
 file, if one was specified using the ~:shebang~ header. See [[unit-test.sh]] for an
@@ -10955,7 +11108,8 @@ lilacCheck globalOpts checkOpts = do
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      let cycles = LT.findCycles $ LT.getSourceCode orgDoc checkOpts.input
+      sourceCode <- LT.getSourceCodeMulti orgDoc checkOpts.input goids
+      let cycles = LT.findCycles sourceCode
       when (not $ null cycles) $ do
         die $ "Found cycles: " <> show cycles
       putStrLn $ checkOpts.input <> ": OK"
@@ -10992,8 +11146,8 @@ lilacTangle globalOpts tangleOpts = do
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      let sourceCode = LT.getSourceCode orgDoc tangleOpts.input
-          cycles = LT.findCycles sourceCode
+      sourceCode <- LT.getSourceCodeMulti orgDoc tangleOpts.input goids
+      let cycles = LT.findCycles sourceCode
       when (not $ null cycles) $ do
         die $ "Found cycles: " <> show cycles
       putStrLn $ "Tangling " <> tangleOpts.input
