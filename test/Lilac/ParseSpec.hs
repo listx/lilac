@@ -8,6 +8,7 @@ import Lilac.Parse qualified as L
 import Lilac.Util qualified as LU
 import Relude
   ( FilePath,
+    Identity,
     Int,
     String,
     Type,
@@ -38,7 +39,7 @@ spec :: Spec
 spec = parseSpec
 
 type Parser :: Type -> Type
-type Parser = MP.Parsec Void T.Text
+type Parser = MP.ParsecT Void T.Text Identity
 
 p :: FilePath -> L.OrgDoc -> Spec
 p path expected = do

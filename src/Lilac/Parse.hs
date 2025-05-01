@@ -44,6 +44,7 @@ import Relude
     Enum,
     Eq,
     FilePath,
+    Identity,
     Int,
     Map,
     Maybe (Just, Nothing),
@@ -121,7 +122,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude qualified (show)
 
 type OrgParser :: Type -> Type
-type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
+type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState

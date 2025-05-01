@@ -1858,6 +1858,7 @@ import Relude
     Enum,
     Eq,
     FilePath,
+    Identity,
     Int,
     Map,
     Maybe (Just, Nothing),
@@ -2211,7 +2212,7 @@ use concrete types like this for speed optimizations.
 
 #+name: Concrete type for Megaparsec
 #+begin_src haskell
-MP.Parsec Void T.Text
+MP.ParsecT Void T.Text Identity
 #+end_src
 
 The =OrgParserState= is the custom state we want to use while parsing. You can
@@ -8464,6 +8465,7 @@ import Lilac.Parse qualified as L
 import Lilac.Util qualified as LU
 import Relude
   ( FilePath,
+    Identity,
     Int,
     String,
     Type,
