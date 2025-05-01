@@ -247,6 +247,7 @@ instance ToJSON LinkTarget
 type LinkNoweb :: Type
 data LinkNoweb = LinkNoweb
   { path :: T.Text,
+    isCanonicalPath :: Bool,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Show)
@@ -1008,21 +1009,16 @@ someBTokensParser blockType nowebOn =
 
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
-  orgParserState <- get
-  linkName <-
-    MP.between
-      (string "<<")
-      (string ">>")
-      ( MP.takeWhile1P
-          (Just "Noweb reference name")
-          (`notElem` ['\n', '<', '>'])
-      )
+  _ <- string "<<"
+  (path, linkName, canonical) <- blockOriginSignatureParser
+  _ <- string ">>"
   pure
     $ Link
       { target =
           LinkTargetNoweb
             LinkNoweb
-              { path = T.pack $ orgParserState.sourcePath,
+              { path = path,
+                isCanonicalPath = canonical,
                 name = linkName
               },
         name =
@@ -1032,6 +1028,28 @@ nowebLinkParser = do
               }
           ]
       }
+
+blockOriginSignatureParser :: OrgParser (T.Text, T.Text, Bool)
+blockOriginSignatureParser = MP.choice [external, internal]
+  where
+    blockNameOnly :: OrgParser T.Text
+    blockNameOnly =
+      MP.takeWhile1P
+        (Just "Noweb reference name")
+        (`notElem` ['\n', '<', '>'])
+    external = do
+      _ <- string "file:"
+      file <-
+        MP.takeWhile1P
+          (Just "file char")
+          (`notElem` [':', '\n', '<', '>'])
+      _ <- string "::"
+      blockName <- blockNameOnly
+      pure (file, blockName, False)
+    internal = do
+      orgParserState <- get
+      blockName <- blockNameOnly
+      pure (T.pack orgParserState.sourcePath, blockName, True)
 
 ignoreSpecialCommas :: [BToken] -> [BToken]
 ignoreSpecialCommas = reverse . foldl' f []
@@ -1105,7 +1123,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText :: BToken -> T.Text
     bTokenToText = \case
       BTokenString text -> text
-      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _path targetName))) -> "\NUL_link" <> targetName
+      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _path _ targetName))) -> "\NUL_link" <> targetName
       _ -> ""
 
 zeroIndent :: OrgParser (Int, Int)

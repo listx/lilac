@@ -1358,6 +1358,8 @@ by default. We expect this list to grow over time.
 autogenerate
 baz
 boolean
+canonicalization
+canonicalize
 combinator
 declaratively
 dedent
@@ -1388,6 +1390,7 @@ sandbox
 src
 subcommand
 subgraph
+UUIDs
 #+end_src
 
 *** Sort file contents
@@ -2007,6 +2010,7 @@ import Prelude qualified (show)
 <<f:zeroBTokensParser>>
 <<f:someBTokensParser>>
 <<f:nowebLinkParser>>
+<<f:blockOriginSignatureParser>>
 <<f:ignoreSpecialCommas>>
 <<f:compressBTokens>>
 <<f:padConsecutiveNowebLinks>>
@@ -3767,6 +3771,7 @@ same name.
 type LinkNoweb :: Type
 data LinkNoweb = LinkNoweb
   { path :: T.Text,
+    isCanonicalPath :: Bool,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Show)
@@ -5447,30 +5452,26 @@ Noweb reference is immediately preceded by another left angle bracket ~<~; see
 
 The last piece is the business of parsing Noweb references. A Noweb reference is
 surrounded by the double-angle-bracket delimiters =<<= and =>>=. The name itself can
-be anything other than a newline or angle brackets. We wrap this with =MP.try=,
-because we need to backtrack if we fail (after parsing, and consuming, the
-initial =<<= bit). Backtracking allows the other parsers in =baseParsers= to parse
-the remaining text that failed to be parsed as a valid Noweb link.
+be anything other than a newline or angle brackets. We wrap this with =MP.try= in
+[[f:bTokenParser]], because we need to backtrack if we fail (after parsing, and
+consuming, the initial =<<= bit). Backtracking allows the other parsers in
+=baseParsers= to parse the remaining text that failed to be parsed as a valid
+Noweb link.
 
 #+name: f:nowebLinkParser
 #+begin_src haskell
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
-  orgParserState <- get
-  linkName <-
-    MP.between
-      (string "<<")
-      (string ">>")
-      ( MP.takeWhile1P
-          (Just "Noweb reference name")
-          (`notElem` ['\n', '<', '>'])
-      )
+  _ <- string "<<"
+  (path, linkName, canonical) <- blockOriginSignatureParser
+  _ <- string ">>"
   pure
     $ Link
       { target =
           LinkTargetNoweb
             LinkNoweb
-              { path = T.pack $ orgParserState.sourcePath,
+              { path = path,
+                isCanonicalPath = canonical,
                 name = linkName
               },
         name =
@@ -5480,6 +5481,53 @@ nowebLinkParser = do
               }
           ]
       }
+#+end_src
+
+The [[f:blockOriginSignatureParser]] parses information about the origin of the
+block being referenced, which we call the block origin signature. For now the
+origin can be either the current Org file, or an external Org file, along with
+the name of the code block itself. If an external file is involved, it saves
+that file name instead of the current file that's being parsed.
+
+These external paths are expected to be relative to the current Org file being
+parsed; they are "incomplete" because they need to be canonicalized to an
+absolute path. Keeping canonical paths allows us to essentially treat the block
+origin signatures as UUIDs, which is a simpler mental model than having relative
+paths everywhere.
+
+However we don't do the canonicalization here during the parsing process because
+=System.Directory.canonicalizePath= requires =IO= and we don't want to taint the
+signature of =OrgParser= with =IO= in it --- because this would break all of our
+tests (we rely on =Test.Hspec.Megaparsec= which does not expose any helper
+functions that can be used with =runParserT=). In lieu of canonicalization, simply
+record whether the path is already canonical with a boolean. For external paths,
+set this to ~False~. For internal paths, set it to ~True~ because we assume that
+canonicalization has already happened by the time the source path is fed to us
+in the ~sourcePath~ of [[data:OrgParserState]].
+
+#+name: f:blockOriginSignatureParser
+#+begin_src haskell
+blockOriginSignatureParser :: OrgParser (T.Text, T.Text, Bool)
+blockOriginSignatureParser = MP.choice [external, internal]
+  where
+    blockNameOnly :: OrgParser T.Text
+    blockNameOnly =
+      MP.takeWhile1P
+        (Just "Noweb reference name")
+        (`notElem` ['\n', '<', '>'])
+    external = do
+      _ <- string "file:"
+      file <-
+        MP.takeWhile1P
+          (Just "file char")
+          (`notElem` [':', '\n', '<', '>'])
+      _ <- string "::"
+      blockName <- blockNameOnly
+      pure (file, blockName, False)
+    internal = do
+      orgParserState <- get
+      blockName <- blockNameOnly
+      pure (T.pack orgParserState.sourcePath, blockName, True)
 #+end_src
 
 Below we check a typical case with some Noweb references in it. Note that we
@@ -5531,6 +5579,7 @@ p
                         L.LinkTargetNoweb
                           L.LinkNoweb
                             { path = "test/Lilac/ParseSpec/0007-blocks-noweb",
+                              isCanonicalPath = True,
                               name = "foo"
                             },
                       name =
@@ -5548,6 +5597,7 @@ p
                         L.LinkTargetNoweb
                           L.LinkNoweb
                             { path = "test/Lilac/ParseSpec/0007-blocks-noweb",
+                              isCanonicalPath = True,
                               name = "bar"
                             },
                       name =
@@ -5662,6 +5712,7 @@ p
                         L.LinkTargetNoweb
                           L.LinkNoweb
                             { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
+                              isCanonicalPath = True,
                               name = "foo"
                             },
                       name =
@@ -5679,6 +5730,7 @@ p
                         L.LinkTargetNoweb
                           L.LinkNoweb
                             { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
+                              isCanonicalPath = True,
                               name = "bar"
                             },
                       name =
@@ -5696,6 +5748,7 @@ p
                         L.LinkTargetNoweb
                           L.LinkNoweb
                             { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
+                              isCanonicalPath = True,
                               name = "ok"
                             },
                       name =
@@ -5807,7 +5860,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText :: BToken -> T.Text
     bTokenToText = \case
       BTokenString text -> text
-      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _path targetName))) -> <<link-marker>> <> targetName
+      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _path _ targetName))) -> <<link-marker>> <> targetName
       _ -> ""
 #+end_src
 
@@ -8464,7 +8517,8 @@ import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Util qualified as LU
 import Relude
-  ( FilePath,
+  ( Bool (True),
+    FilePath,
     Identity,
     Int,
     String,
@@ -9017,7 +9071,7 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
             $ map getLinkTarget block.body
       | otherwise = acc
     getLinkTarget = \case
-      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _path targetName)))) -> Just targetName
+      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _path _ targetName)))) -> Just targetName
       _ -> Nothing
 #+end_src
 
@@ -9286,7 +9340,7 @@ expandBlock sc block existingPrefix =
   where
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _ target))))
+    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _ _ target))))
       | Just targetBlock <- EM.lookup target sc.nameToCodeBlock =
           ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
             prefix
@@ -9900,7 +9954,7 @@ import Relude
     (.),
     (<>),
   )
-import System.Directory (makeAbsolute)
+import System.Directory (canonicalizePath)
 import System.OsPath qualified as P
 import Test.Hspec (Spec, it, shouldBe)
 
@@ -9939,8 +9993,8 @@ to a [[data:SourceCode]] type.
 getSourceCodeFromPath :: FilePath -> IO (Either T.Text LT.SourceCode)
 getSourceCodeFromPath path = do
   input <- LU.readFrom "test/Lilac/TangleSpec/" path
-  absolutePath <- makeAbsolute path
-  case LP.parseOrgDoc absolutePath input of
+  canonicalPath <- canonicalizePath path
+  case LP.parseOrgDoc canonicalPath input of
     Left errMsg -> pure $ Left errMsg
     Right od ->
       pure
@@ -10172,7 +10226,7 @@ import Relude
     (<$>),
     (<>),
   )
-import System.Directory (makeAbsolute)
+import System.Directory (canonicalizePath)
 import System.Exit (die)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -10234,10 +10288,10 @@ examining ~parseResult~.
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
   input <- LU.readFrom "" checkOpts.input
-  absolutePath <- makeAbsolute checkOpts.input
+  canonicalPath <- canonicalizePath checkOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = absolutePath})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = canonicalPath})
           checkOpts.input
           input
   case parseResult of
@@ -10269,10 +10323,10 @@ tangling) from a given Org file.
 lilacTangle :: TangleOpts -> IO ()
 lilacTangle tangleOpts = do
   input <- LU.readFrom "" tangleOpts.input
-  absolutePath <- makeAbsolute tangleOpts.input
+  canonicalPath <- canonicalizePath tangleOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = absolutePath})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = canonicalPath})
           tangleOpts.input
           input
   case parseResult of
@@ -10296,10 +10350,10 @@ just ~orgdoc.json~ for now.
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
   input <- LU.readFrom "" weaveOpts.input
-  absolutePath <- makeAbsolute weaveOpts.input
+  canonicalPath <- canonicalizePath weaveOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = absolutePath})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = canonicalPath})
           weaveOpts.input
           input
   case parseResult of

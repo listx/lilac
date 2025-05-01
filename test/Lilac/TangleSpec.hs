@@ -16,7 +16,7 @@ import Relude
     (.),
     (<>),
   )
-import System.Directory (makeAbsolute)
+import System.Directory (canonicalizePath)
 import System.OsPath qualified as P
 import Test.Hspec (Spec, it, shouldBe)
 
@@ -26,8 +26,8 @@ spec = tangleSpec
 getSourceCodeFromPath :: FilePath -> IO (Either T.Text LT.SourceCode)
 getSourceCodeFromPath path = do
   input <- LU.readFrom "test/Lilac/TangleSpec/" path
-  absolutePath <- makeAbsolute path
-  case LP.parseOrgDoc absolutePath input of
+  canonicalPath <- canonicalizePath path
+  case LP.parseOrgDoc canonicalPath input of
     Left errMsg -> pure $ Left errMsg
     Right od ->
       pure

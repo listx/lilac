@@ -7,7 +7,8 @@ import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Util qualified as LU
 import Relude
-  ( FilePath,
+  ( Bool (True),
+    FilePath,
     Identity,
     Int,
     String,
@@ -1057,6 +1058,7 @@ parseSpec = do
                                   L.LinkTargetNoweb
                                     L.LinkNoweb
                                       { path = "test/Lilac/ParseSpec/0007-blocks-noweb",
+                                        isCanonicalPath = True,
                                         name = "foo"
                                       },
                                 name =
@@ -1074,6 +1076,7 @@ parseSpec = do
                                   L.LinkTargetNoweb
                                     L.LinkNoweb
                                       { path = "test/Lilac/ParseSpec/0007-blocks-noweb",
+                                        isCanonicalPath = True,
                                         name = "bar"
                                       },
                                 name =
@@ -1111,6 +1114,7 @@ parseSpec = do
                                   L.LinkTargetNoweb
                                     L.LinkNoweb
                                       { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
+                                        isCanonicalPath = True,
                                         name = "foo"
                                       },
                                 name =
@@ -1128,6 +1132,7 @@ parseSpec = do
                                   L.LinkTargetNoweb
                                     L.LinkNoweb
                                       { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
+                                        isCanonicalPath = True,
                                         name = "bar"
                                       },
                                 name =
@@ -1145,6 +1150,7 @@ parseSpec = do
                                   L.LinkTargetNoweb
                                     L.LinkNoweb
                                       { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
+                                        isCanonicalPath = True,
                                         name = "ok"
                                       },
                                 name =
