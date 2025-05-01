@@ -10,12 +10,17 @@ get_tangled_haskell_files()
 		| grep '\.\(cabal\|hs\)$'
 }
 
+reset_tangled_haskell_files()
+{
+	echo >&2 "Error encountered; cleaning Haskell tangle paths."
+	>/dev/null git checkout -- "${tangled_haskell_files[@]}"
+}
+
 tangle()
 {
 	mapfile -t tangled_haskell_files < <(get_tangled_haskell_files)
 	if ! time make -C "${SCRIPT_ROOT}" tangle; then
-		echo >&2 "Tangle failed; cleaning Haskell tangle paths."
-		>/dev/null git checkout -- "${tangled_haskell_files[@]}"
+		reset_tangled_haskell_files
 		return 1
 	fi
 	return 0
@@ -25,7 +30,9 @@ tangle_and_test()
 {
 	tangle
 	if tangle; then
-		make -C "${SCRIPT_ROOT}" test || true
+		if ! make -C "${SCRIPT_ROOT}" test; then
+			reset_tangled_haskell_files
+		fi
 	fi
 	echo "----------------------------------------"
 }
