@@ -18,7 +18,8 @@ import Lilac.Parse
     Block (body, meta),
     Cell (CBlock),
     Link (Link),
-    LinkType (LinkNoweb),
+    LinkNoweb (LinkNoweb),
+    LinkTarget (LinkTargetNoweb),
     OrgDoc (cells),
   )
 import Relude
@@ -140,7 +141,7 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
             $ map getLinkTarget block.body
       | otherwise = acc
     getLinkTarget = \case
-      (BTokenLink (Link _ target LinkNoweb)) -> Just target
+      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _path targetName)))) -> Just targetName
       _ -> Nothing
 
 findCycles :: SourceCode -> [G.Tree BlockName]
@@ -193,7 +194,7 @@ expandBlock sc block existingPrefix =
   where
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ target LinkNoweb))
+    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _ target))))
       | Just targetBlock <- EM.lookup target sc.nameToCodeBlock =
           ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
             prefix

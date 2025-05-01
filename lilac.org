@@ -1823,7 +1823,8 @@ module Lilac.Parse
     Cell (..),
     Heading (..),
     Link (..),
-    LinkType (..),
+    LinkNoweb (..),
+    LinkTarget (..),
     MathFragment (..),
     PToken (..),
     Style (..),
@@ -1941,7 +1942,8 @@ import Prelude qualified (show)
 <<data:StyledText>>
 <<data:Style>>
 <<data:Link>>
-<<data:LinkType>>
+<<data:LinkTarget>>
+<<data:LinkNoweb>>
 <<newtype:StyleMask>>
 <<instance:Show Stylemask>>
 <<data:Block>>
@@ -3681,8 +3683,7 @@ p
   L.CParagraph
     [ L.PTokenLink
         ( L.Link
-            { typ = L.LinkBracketed,
-              target = "hello",
+            { target = L.LinkTargetOther "hello",
               name =
                 [ L.StyledText
                     { body = "hello",
@@ -3716,48 +3717,74 @@ p
 
 A link has
 
-  - a name :: what's displayed to the reader,
+  - a name :: what's displayed to the reader, and
 
-  - a target :: where we want to take the reader when the click on the link, and
-
-  - the type :: some additional metadata about the link itself.
+  - a target :: where we want to take the reader when the click on the link
+    (including any metadata).
 
 #+name: data:Link
 #+begin_src haskell
 type Link :: Type
 data Link = Link
   { name :: [StyledText],
-    target :: T.Text,
-    typ :: LinkType
+    target :: LinkTarget
   }
   deriving stock (Eq, Generic, Show)
 
 instance ToJSON Link
 #+end_src
 
+The target is a rich definition of the kind of target we are linking to.
+Currently we only recognize [[data:LinkNoweb]]. All other links are just captured in
+the generic ~LinkTargetOther~ constructor.
+
+#+name: data:LinkTarget
+#+begin_src haskell
+type LinkTarget :: Type
+data LinkTarget
+  = LinkTargetNoweb LinkNoweb
+  | LinkTargetOther T.Text
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON LinkTarget
+#+end_src
+
+A Noweb link points to a code block with the given =name=, as well as the
+=path= of the Org file where the code block is defined. The path acts as a
+/namespace/, so that each Org file is free to choose any name it wants for code
+blocks without fear of other Org files that might have a code block with the
+same name.
+
+#+name: data:LinkNoweb
+#+begin_src haskell
+type LinkNoweb :: Type
+data LinkNoweb = LinkNoweb
+  { path :: T.Text,
+    name :: T.Text
+  }
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON LinkNoweb
+#+end_src
+
 In summary we support the following link types:
 
-  - ~LinkBracketed~ :: a link that uses square brackets (e.g., ~[[target]]~ or
-    ~[[target][name]]~).
+  - ~LinkTargetNoweb~ :: a link to a Noweb reference inside another code block.
+    These use angle brackets (e.g., ~<<foo>>~), where the text inside the brackets
+    refers to a code block in the current file. If there is a double colon like
+    ~<<file:bar.org::foo>>~ then this refers to the ~<<foo>>~ defined inside the
+    ~bar.org~ file.
 
-  - ~LinkNoweb~ :: a link to a Noweb reference inside another code block. These
-    use angle brackets (e.g., ~<<foo>>~).
+  - ~LinkTargetOther~ :: all other links. Typical ways to define such links are
+    with uses square brackets (e.g., ~[[target]]~ or ~[[target][name]]~) where
+    ~target~ is just a plain text string (such as a URL or some other entity in
+    the document), and ~name~ is what is displayed to the user when the link is
+    rendered.
 
 There are also [[Raw links]] which is prose text that looks like a URL. For example,
 https://www.haskell.org is an example of a raw link. This is a convenience
 facility because ~[[https://www.haskell.org]]~ behaves the same way as
 ~https://www.haskell.org~.
-
-#+name: data:LinkType
-#+begin_src haskell
-type LinkType :: Type
-data LinkType
-  = LinkBracketed
-  | LinkNoweb
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON LinkType
-#+end_src
 
 *** Standalone link parser
 
@@ -3798,11 +3825,14 @@ interaction of this parser with these other parsers).
 Note that in [[f:linkParser]] we don't parse [[Noweb links]] here because they can only
 exist inside [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code blocks]].
 
-*** Bracketed links
+*** Other links
 
-=LinkBracketed= links are probably the most prevalent. They can target both
-external resources, such as a web page on the internet or a file on disk, or
-internal ones (to some other point in the Org document).
+All other links are simply called ~LinkTargetOther~. For now, these links are any
+links found in double brackets. They can target both external resources, such as
+a web page on the internet or a file on disk, or internal ones (to some other
+point in the Org document). In the future it is expected that we will enrich the
+different kinds of links in [[data:LinkTarget]], such that the percentage of
+~LinkTargetOther~ is very low when we finish parsing an Org file.
 
 A URL link looks [[https://kernel.org][like this]]. A link to a file can look [[./README.org][like this]]. Note that their
 format allows them to be named differently than the raw address. That's why the
@@ -3840,8 +3870,7 @@ bracketedLinkParser = do
   _ <- string "]"
   pure
     Link
-      { typ = LinkBracketed,
-        target = T.pack target,
+      { target = LinkTargetOther $ T.pack target,
         name =
           [ StyledText
               { body = T.pack (fromMaybe target name),
@@ -3875,8 +3904,7 @@ ps
                 ),
               L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkBracketed,
-                      target = "link-target-only",
+                    { target = L.LinkTargetOther "link-target-only",
                       name =
                         [ L.StyledText
                             { body = "link-target-only",
@@ -3892,8 +3920,7 @@ ps
                   body =
                     [ L.PTokenLink
                         ( L.Link
-                            { typ = L.LinkBracketed,
-                              target = "link-target",
+                            { target = L.LinkTargetOther "link-target",
                               name =
                                 [ L.StyledText
                                     { body = "link-name",
@@ -3909,8 +3936,7 @@ ps
           L.CParagraph
             [ L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkBracketed,
-                      target = "a",
+                    { target = L.LinkTargetOther "a",
                       name =
                         [ L.StyledText
                             { body = "a",
@@ -3968,8 +3994,7 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkBracketed,
-                      target = "file:foo/bar",
+                    { target = L.LinkTargetOther "file:foo/bar",
                       name =
                         [ L.StyledText
                             { body = "file:foo/bar",
@@ -4031,8 +4056,7 @@ rawLinkParser = do
   let url = protocol <> separator <> remainder
   pure
     Link
-      { typ = LinkBracketed,
-        target = url,
+      { target = LinkTargetOther url,
         name =
           [ StyledText
               { body = url,
@@ -4088,8 +4112,7 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkBracketed,
-                      target = "https://foo.org",
+                    { target = L.LinkTargetOther "https://foo.org",
                       name =
                         [ L.StyledText
                             { body = "https://foo.org",
@@ -4106,8 +4129,7 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkBracketed,
-                      target = "https://bar.net",
+                    { target = L.LinkTargetOther "https://bar.net",
                       name =
                         [ L.StyledText
                             { body = "https://bar.net",
@@ -4124,8 +4146,7 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkBracketed,
-                      target = "http://localhost:3000",
+                    { target = L.LinkTargetOther "http://localhost:3000",
                       name =
                         [ L.StyledText
                             { body = "http://localhost:3000",
@@ -4142,8 +4163,7 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { typ = L.LinkBracketed,
-                      target = "ftp://10.0.0.1",
+                    { target = L.LinkTargetOther "ftp://10.0.0.1",
                       name =
                         [ L.StyledText
                             { body = "ftp://10.0.0.1",
@@ -5432,8 +5452,12 @@ nowebLinkParser = do
       )
   pure
     $ Link
-      { typ = LinkNoweb,
-        target = linkName,
+      { target =
+          LinkTargetNoweb
+            LinkNoweb
+              { path = "",
+                name = linkName
+              },
         name =
           [ StyledText
               { body = linkName,
@@ -5488,8 +5512,12 @@ p
           body =
             [ L.BTokenLink
                 ( L.Link
-                    { typ = L.LinkNoweb,
-                      target = "foo",
+                    { target =
+                        L.LinkTargetNoweb
+                          L.LinkNoweb
+                            { path = "",
+                              name = "foo"
+                            },
                       name =
                         [ L.StyledText
                             { body = "foo",
@@ -5501,8 +5529,12 @@ p
               L.BTokenString "\n\n<<quux\n>>\necho ",
               L.BTokenLink
                 ( L.Link
-                    { typ = L.LinkNoweb,
-                      target = "bar",
+                    { target =
+                        L.LinkTargetNoweb
+                          L.LinkNoweb
+                            { path = "",
+                              name = "bar"
+                            },
                       name =
                         [ L.StyledText
                             { body = "bar",
@@ -5611,8 +5643,12 @@ p
             [ L.BTokenString "(",
               L.BTokenLink
                 ( L.Link
-                    { typ = L.LinkNoweb,
-                      target = "foo",
+                    { target =
+                        L.LinkTargetNoweb
+                          L.LinkNoweb
+                            { path = "",
+                              name = "foo"
+                            },
                       name =
                         [ L.StyledText
                             { body = "foo",
@@ -5624,8 +5660,12 @@ p
               L.BTokenString ") and \"",
               L.BTokenLink
                 ( L.Link
-                    { typ = L.LinkNoweb,
-                      target = "bar",
+                    { target =
+                        L.LinkTargetNoweb
+                          L.LinkNoweb
+                            { path = "",
+                              name = "bar"
+                            },
                       name =
                         [ L.StyledText
                             { body = "bar",
@@ -5637,8 +5677,12 @@ p
               L.BTokenString "\" and <",
               L.BTokenLink
                 ( L.Link
-                    { typ = L.LinkNoweb,
-                      target = "ok",
+                    { target =
+                        L.LinkTargetNoweb
+                          L.LinkNoweb
+                            { path = "",
+                              name = "ok"
+                            },
                       name =
                         [ L.StyledText
                             { body = "ok",
@@ -5748,7 +5792,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText :: BToken -> T.Text
     bTokenToText = \case
       BTokenString text -> text
-      BTokenLink (Link _name target LinkNoweb) -> <<link-marker>> <> target
+      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _path targetName))) -> <<link-marker>> <> targetName
       _ -> ""
 #+end_src
 
@@ -7863,8 +7907,7 @@ ps
                     ],
                 link =
                   L.Link
-                    { typ = L.LinkBracketed,
-                      target = "./image/hello.png",
+                    { target = L.LinkTargetOther "./image/hello.png",
                       name =
                         [ L.StyledText
                             { body = "./image/hello.png",
@@ -7889,8 +7932,7 @@ ps
               { meta = fromList [],
                 link =
                   L.Link
-                    { typ = L.LinkBracketed,
-                      target = "./image/world.png",
+                    { target = L.LinkTargetOther "./image/world.png",
                       name =
                         [ L.StyledText
                             { body = "./image/world.png",
@@ -8154,8 +8196,7 @@ p
                       ( (3, 3),
                         [ L.PTokenLink
                             ( L.Link
-                                { typ = L.LinkBracketed,
-                                  target = "https://en.wikipedia.org/wiki/Pythagorean_theorem",
+                                { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Pythagorean_theorem",
                                   name =
                                     [ L.StyledText
                                         { body = "Wiki",
@@ -8193,8 +8234,7 @@ p
                       ( (4, 3),
                         [ L.PTokenLink
                             ( L.Link
-                                { typ = L.LinkBracketed,
-                                  target = "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
+                                { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
                                   name =
                                     [ L.StyledText
                                         { body = "Wiki",
@@ -8306,8 +8346,7 @@ p
                       ( (3, 3),
                         [ L.PTokenLink
                             ( L.Link
-                                { typ = L.LinkBracketed,
-                                  target = "https://en.wikipedia.org/wiki/Pythagorean_theorem",
+                                { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Pythagorean_theorem",
                                   name =
                                     [ L.StyledText
                                         { body = "Wiki",
@@ -8345,8 +8384,7 @@ p
                       ( (4, 3),
                         [ L.PTokenLink
                             ( L.Link
-                                { typ = L.LinkBracketed,
-                                  target = "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
+                                { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
                                   name =
                                     [ L.StyledText
                                         { body = "Wiki",
@@ -8700,7 +8738,8 @@ import Lilac.Parse
     Block (body, meta),
     Cell (CBlock),
     Link (Link),
-    LinkType (LinkNoweb),
+    LinkNoweb (LinkNoweb),
+    LinkTarget (LinkTargetNoweb),
     OrgDoc (cells),
   )
 import Relude
@@ -8942,7 +8981,7 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
             $ map getLinkTarget block.body
       | otherwise = acc
     getLinkTarget = \case
-      (BTokenLink (Link _ target LinkNoweb)) -> Just target
+      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _path targetName)))) -> Just targetName
       _ -> Nothing
 #+end_src
 
@@ -9211,7 +9250,7 @@ expandBlock sc block existingPrefix =
   where
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ target LinkNoweb))
+    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _ target))))
       | Just targetBlock <- EM.lookup target sc.nameToCodeBlock =
           ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
             prefix

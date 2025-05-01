@@ -11,7 +11,8 @@ module Lilac.Parse
     Cell (..),
     Heading (..),
     Link (..),
-    LinkType (..),
+    LinkNoweb (..),
+    LinkTarget (..),
     MathFragment (..),
     PToken (..),
     Style (..),
@@ -225,20 +226,28 @@ instance ToJSON Style
 type Link :: Type
 data Link = Link
   { name :: [StyledText],
-    target :: T.Text,
-    typ :: LinkType
+    target :: LinkTarget
   }
   deriving stock (Eq, Generic, Show)
 
 instance ToJSON Link
 
-type LinkType :: Type
-data LinkType
-  = LinkBracketed
-  | LinkNoweb
+type LinkTarget :: Type
+data LinkTarget
+  = LinkTargetNoweb LinkNoweb
+  | LinkTargetOther T.Text
   deriving stock (Eq, Generic, Show)
 
-instance ToJSON LinkType
+instance ToJSON LinkTarget
+
+type LinkNoweb :: Type
+data LinkNoweb = LinkNoweb
+  { path :: T.Text,
+    name :: T.Text
+  }
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON LinkNoweb
 
 type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
@@ -793,8 +802,7 @@ bracketedLinkParser = do
   _ <- string "]"
   pure
     Link
-      { typ = LinkBracketed,
-        target = T.pack target,
+      { target = LinkTargetOther $ T.pack target,
         name =
           [ StyledText
               { body = T.pack (fromMaybe target name),
@@ -811,8 +819,7 @@ rawLinkParser = do
   let url = protocol <> separator <> remainder
   pure
     Link
-      { typ = LinkBracketed,
-        target = url,
+      { target = LinkTargetOther url,
         name =
           [ StyledText
               { body = url,
@@ -1007,8 +1014,12 @@ nowebLinkParser = do
       )
   pure
     $ Link
-      { typ = LinkNoweb,
-        target = linkName,
+      { target =
+          LinkTargetNoweb
+            LinkNoweb
+              { path = "",
+                name = linkName
+              },
         name =
           [ StyledText
               { body = linkName,
@@ -1089,7 +1100,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText :: BToken -> T.Text
     bTokenToText = \case
       BTokenString text -> text
-      BTokenLink (Link _name target LinkNoweb) -> "\NUL_link" <> target
+      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _path targetName))) -> "\NUL_link" <> targetName
       _ -> ""
 
 zeroIndent :: OrgParser (Int, Int)

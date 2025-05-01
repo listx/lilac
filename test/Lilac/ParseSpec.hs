@@ -593,8 +593,7 @@ parseSpec = do
             L.CParagraph
               [ L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkBracketed,
-                        target = "hello",
+                      { target = L.LinkTargetOther "hello",
                         name =
                           [ L.StyledText
                               { body = "hello",
@@ -651,8 +650,7 @@ parseSpec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkBracketed,
-                        target = "file:foo/bar",
+                      { target = L.LinkTargetOther "file:foo/bar",
                         name =
                           [ L.StyledText
                               { body = "file:foo/bar",
@@ -701,8 +699,7 @@ parseSpec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkBracketed,
-                        target = "https://foo.org",
+                      { target = L.LinkTargetOther "https://foo.org",
                         name =
                           [ L.StyledText
                               { body = "https://foo.org",
@@ -719,8 +716,7 @@ parseSpec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkBracketed,
-                        target = "https://bar.net",
+                      { target = L.LinkTargetOther "https://bar.net",
                         name =
                           [ L.StyledText
                               { body = "https://bar.net",
@@ -737,8 +733,7 @@ parseSpec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkBracketed,
-                        target = "http://localhost:3000",
+                      { target = L.LinkTargetOther "http://localhost:3000",
                         name =
                           [ L.StyledText
                               { body = "http://localhost:3000",
@@ -755,8 +750,7 @@ parseSpec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkBracketed,
-                        target = "ftp://10.0.0.1",
+                      { target = L.LinkTargetOther "ftp://10.0.0.1",
                         name =
                           [ L.StyledText
                               { body = "ftp://10.0.0.1",
@@ -789,8 +783,7 @@ parseSpec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkBracketed,
-                        target = "link-target-only",
+                      { target = L.LinkTargetOther "link-target-only",
                         name =
                           [ L.StyledText
                               { body = "link-target-only",
@@ -806,8 +799,7 @@ parseSpec = do
                     body =
                       [ L.PTokenLink
                           ( L.Link
-                              { typ = L.LinkBracketed,
-                                target = "link-target",
+                              { target = L.LinkTargetOther "link-target",
                                 name =
                                   [ L.StyledText
                                       { body = "link-name",
@@ -823,8 +815,7 @@ parseSpec = do
             L.CParagraph
               [ L.PTokenLink
                   ( L.Link
-                      { typ = L.LinkBracketed,
-                        target = "a",
+                      { target = L.LinkTargetOther "a",
                         name =
                           [ L.StyledText
                               { body = "a",
@@ -1036,8 +1027,12 @@ parseSpec = do
                     body =
                       [ L.BTokenLink
                           ( L.Link
-                              { typ = L.LinkNoweb,
-                                target = "foo",
+                              { target =
+                                  L.LinkTargetNoweb
+                                    L.LinkNoweb
+                                      { path = "",
+                                        name = "foo"
+                                      },
                                 name =
                                   [ L.StyledText
                                       { body = "foo",
@@ -1049,8 +1044,12 @@ parseSpec = do
                         L.BTokenString "\n\n<<quux\n>>\necho ",
                         L.BTokenLink
                           ( L.Link
-                              { typ = L.LinkNoweb,
-                                target = "bar",
+                              { target =
+                                  L.LinkTargetNoweb
+                                    L.LinkNoweb
+                                      { path = "",
+                                        name = "bar"
+                                      },
                                 name =
                                   [ L.StyledText
                                       { body = "bar",
@@ -1082,8 +1081,12 @@ parseSpec = do
                       [ L.BTokenString "(",
                         L.BTokenLink
                           ( L.Link
-                              { typ = L.LinkNoweb,
-                                target = "foo",
+                              { target =
+                                  L.LinkTargetNoweb
+                                    L.LinkNoweb
+                                      { path = "",
+                                        name = "foo"
+                                      },
                                 name =
                                   [ L.StyledText
                                       { body = "foo",
@@ -1095,8 +1098,12 @@ parseSpec = do
                         L.BTokenString ") and \"",
                         L.BTokenLink
                           ( L.Link
-                              { typ = L.LinkNoweb,
-                                target = "bar",
+                              { target =
+                                  L.LinkTargetNoweb
+                                    L.LinkNoweb
+                                      { path = "",
+                                        name = "bar"
+                                      },
                                 name =
                                   [ L.StyledText
                                       { body = "bar",
@@ -1108,8 +1115,12 @@ parseSpec = do
                         L.BTokenString "\" and <",
                         L.BTokenLink
                           ( L.Link
-                              { typ = L.LinkNoweb,
-                                target = "ok",
+                              { target =
+                                  L.LinkTargetNoweb
+                                    L.LinkNoweb
+                                      { path = "",
+                                        name = "ok"
+                                      },
                                 name =
                                   [ L.StyledText
                                       { body = "ok",
@@ -1621,8 +1632,7 @@ parseSpec = do
                       ],
                   link =
                     L.Link
-                      { typ = L.LinkBracketed,
-                        target = "./image/hello.png",
+                      { target = L.LinkTargetOther "./image/hello.png",
                         name =
                           [ L.StyledText
                               { body = "./image/hello.png",
@@ -1647,8 +1657,7 @@ parseSpec = do
                 { meta = fromList [],
                   link =
                     L.Link
-                      { typ = L.LinkBracketed,
-                        target = "./image/world.png",
+                      { target = L.LinkTargetOther "./image/world.png",
                         name =
                           [ L.StyledText
                               { body = "./image/world.png",
@@ -1739,8 +1748,7 @@ parseSpec = do
                         ( (3, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { typ = L.LinkBracketed,
-                                    target = "https://en.wikipedia.org/wiki/Pythagorean_theorem",
+                                  { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Pythagorean_theorem",
                                     name =
                                       [ L.StyledText
                                           { body = "Wiki",
@@ -1778,8 +1786,7 @@ parseSpec = do
                         ( (4, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { typ = L.LinkBracketed,
-                                    target = "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
+                                  { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
                                     name =
                                       [ L.StyledText
                                           { body = "Wiki",
@@ -1872,8 +1879,7 @@ parseSpec = do
                         ( (3, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { typ = L.LinkBracketed,
-                                    target = "https://en.wikipedia.org/wiki/Pythagorean_theorem",
+                                  { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Pythagorean_theorem",
                                     name =
                                       [ L.StyledText
                                           { body = "Wiki",
@@ -1911,8 +1917,7 @@ parseSpec = do
                         ( (4, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { typ = L.LinkBracketed,
-                                    target = "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
+                                  { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
                                     name =
                                       [ L.StyledText
                                           { body = "Wiki",
