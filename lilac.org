@@ -1585,6 +1585,7 @@ executable lilac
       <<GHC threaded flags>>
   build-depends:
       base >=4.7 && <5
+    , directory
     , filepath
     , lilac
     , optparse-applicative
@@ -1611,6 +1612,7 @@ test-suite spec
   build-depends:
       base >=4.7 && <5
     , containers
+    , directory
     , filepath
     , hspec
     , hspec-megaparsec
@@ -1855,6 +1857,7 @@ import Relude
     Either (Left, Right),
     Enum,
     Eq,
+    FilePath,
     Int,
     Map,
     Maybe (Just, Nothing),
@@ -2179,9 +2182,9 @@ and parses it into a rich =OrgDoc= type.
 
 #+name: f:parseOrgDoc
 #+begin_src haskell
-parseOrgDoc :: T.Text -> Either T.Text OrgDoc
-parseOrgDoc input = case MP.runParser
-  (runStateT orgDocParser defaultOrgParserState)
+parseOrgDoc :: FilePath -> T.Text -> Either T.Text OrgDoc
+parseOrgDoc path input = case MP.runParser
+  (runStateT orgDocParser (defaultOrgParserState {sourcePath = path}))
   ""
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
@@ -2228,7 +2231,8 @@ inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { headingLevel :: Int,
+  { sourcePath :: FilePath,
+    headingLevel :: Int,
     styleMask :: StyleMask,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
@@ -2243,7 +2247,8 @@ data OrgParserState = OrgParserState
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { headingLevel = 0,
+    { sourcePath = "",
+      headingLevel = 0,
       styleMask = styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -2365,7 +2370,7 @@ At the other end of the spectrum, Lilac should be able to parse itself
 before (LU.readFrom "" "lilac.org") $ do
   it "self-parse" $ \input -> do
     MP.runParser
-      (runStateT L.orgDocParser L.defaultOrgParserState)
+      (runStateT L.orgDocParser L.defaultOrgParserState {L.sourcePath = "lilac.org"})
       "lilac.org"
       `shouldSucceedOn` input
 #+end_src
@@ -3013,7 +3018,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { headingLevel = 1,
+    { sourcePath = "test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries",
+      headingLevel = 1,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -3956,7 +3962,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { headingLevel = 1,
+    { sourcePath = "test/Lilac/ParseSpec/0006-links",
+      headingLevel = 1,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -4584,7 +4591,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { headingLevel = 12,
+    { sourcePath = "test/Lilac/ParseSpec/0004-headings-20",
+      headingLevel = 12,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -4637,7 +4645,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { headingLevel = 12,
+    { sourcePath = "test/Lilac/ParseSpec/0004-headings-unlimited",
+      headingLevel = 12,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -4802,7 +4811,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { headingLevel = 1,
+    { sourcePath = "test/Lilac/ParseSpec/0004-properties-drawer-empty",
+      headingLevel = 1,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -4847,7 +4857,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { headingLevel = 1,
+    { sourcePath = "test/Lilac/ParseSpec/0004-properties-drawer-not-empty",
+      headingLevel = 1,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -4902,7 +4913,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { headingLevel = 1,
+    { sourcePath = "test/Lilac/ParseSpec/0004-properties-drawer-not-empty-with-comments",
+      headingLevel = 1,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -4964,7 +4976,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { headingLevel = 0,
+    { sourcePath = "test/Lilac/ParseSpec/0007-blocks-empty",
+      headingLevel = 0,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -5442,6 +5455,7 @@ the remaining text that failed to be parsed as a valid Noweb link.
 #+begin_src haskell
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
+  orgParserState <- get
   linkName <-
     MP.between
       (string "<<")
@@ -5455,7 +5469,7 @@ nowebLinkParser = do
       { target =
           LinkTargetNoweb
             LinkNoweb
-              { path = "",
+              { path = T.pack $ orgParserState.sourcePath,
                 name = linkName
               },
         name =
@@ -5515,7 +5529,7 @@ p
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { path = "",
+                            { path = "test/Lilac/ParseSpec/0007-blocks-noweb",
                               name = "foo"
                             },
                       name =
@@ -5532,7 +5546,7 @@ p
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { path = "",
+                            { path = "test/Lilac/ParseSpec/0007-blocks-noweb",
                               name = "bar"
                             },
                       name =
@@ -5646,7 +5660,7 @@ p
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { path = "",
+                            { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
                               name = "foo"
                             },
                       name =
@@ -5663,7 +5677,7 @@ p
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { path = "",
+                            { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
                               name = "bar"
                             },
                       name =
@@ -5680,7 +5694,7 @@ p
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { path = "",
+                            { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
                               name = "ok"
                             },
                       name =
@@ -5923,7 +5937,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { headingLevel = 0,
+    { sourcePath = "test/Lilac/ParseSpec/0007-blocks-ending",
+      headingLevel = 0,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -7683,7 +7698,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { headingLevel = 0,
+    { sourcePath = "test/Lilac/ParseSpec/0010-standalone-math-fragments",
+      headingLevel = 0,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -7755,7 +7771,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { headingLevel = 0,
+    { sourcePath = "test/Lilac/ParseSpec/0010-standalone-math-inside-lists",
+      headingLevel = 0,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -7945,7 +7962,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { headingLevel = 0,
+    { sourcePath = "test/Lilac/ParseSpec/0011-figures-and-blocks",
+      headingLevel = 0,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -8518,10 +8536,17 @@ p path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser st)
         path
         input
-        `shouldParse` (expected, L.defaultOrgParserState)
+        `shouldParse` ( expected,
+                        L.defaultOrgParserState
+                          { L.sourcePath = relPath
+                          }
+                      )
+  where
+    st = L.defaultOrgParserState {L.sourcePath = relPath}
+    relPath = "test/Lilac/ParseSpec/" <> path
 #+end_src
 
 If we want to check the state (the parsing operation is stateful), we need to
@@ -8534,10 +8559,13 @@ ps path expected state = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser st)
         path
         input
         `shouldParse` (expected, state)
+  where
+    st = L.defaultOrgParserState {L.sourcePath = relPath}
+    relPath = "test/Lilac/ParseSpec/" <> path
 #+end_src
 
 Sometimes we want to test that a file will fail to parse. We do this with =pf=
@@ -8550,10 +8578,13 @@ pf path errMsg pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser st)
         path
         input
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
+  where
+    st = L.defaultOrgParserState {L.sourcePath = relPath}
+    relPath = "test/Lilac/ParseSpec/" <> path
 #+end_src
 
 Note that we use the =MP.ErrorFail= constructor because that's the only way we can
@@ -8574,10 +8605,13 @@ pfm path errorTrivial pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser st)
         path
         input
         `shouldFailWith` (err pos errorTrivial)
+  where
+    st = L.defaultOrgParserState {L.sourcePath = relPath}
+    relPath = "test/Lilac/ParseSpec/" <> path
 #+end_src
 
 The function =plainParagraph= helps to cut down on some of the repetition.
@@ -9864,6 +9898,7 @@ import Relude
     (.),
     (<>),
   )
+import System.Directory (makeAbsolute)
 import System.OsPath qualified as P
 import Test.Hspec (Spec, it, shouldBe)
 
@@ -9902,7 +9937,8 @@ to a [[data:SourceCode]] type.
 getSourceCodeFromPath :: FilePath -> IO (Either T.Text LT.SourceCode)
 getSourceCodeFromPath path = do
   input <- LU.readFrom "test/Lilac/TangleSpec/" path
-  case LP.parseOrgDoc input of
+  absolutePath <- makeAbsolute path
+  case LP.parseOrgDoc absolutePath input of
     Left errMsg -> pure $ Left errMsg
     Right od ->
       pure
@@ -10134,6 +10170,7 @@ import Relude
     (<$>),
     (<>),
   )
+import System.Directory (makeAbsolute)
 import System.Exit (die)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -10195,9 +10232,10 @@ examining ~parseResult~.
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
   input <- LU.readFrom "" checkOpts.input
+  absolutePath <- makeAbsolute checkOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = absolutePath})
           checkOpts.input
           input
   case parseResult of
@@ -10229,9 +10267,10 @@ tangling) from a given Org file.
 lilacTangle :: TangleOpts -> IO ()
 lilacTangle tangleOpts = do
   input <- LU.readFrom "" tangleOpts.input
+  absolutePath <- makeAbsolute tangleOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = absolutePath})
           tangleOpts.input
           input
   case parseResult of
@@ -10255,9 +10294,10 @@ just ~orgdoc.json~ for now.
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
   input <- LU.readFrom "" weaveOpts.input
+  absolutePath <- makeAbsolute weaveOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = absolutePath})
           weaveOpts.input
           input
   case parseResult of

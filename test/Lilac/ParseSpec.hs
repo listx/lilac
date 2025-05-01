@@ -45,40 +45,56 @@ p path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser st)
         path
         input
-        `shouldParse` (expected, L.defaultOrgParserState)
+        `shouldParse` ( expected,
+                        L.defaultOrgParserState
+                          { L.sourcePath = relPath
+                          }
+                      )
+  where
+    st = L.defaultOrgParserState {L.sourcePath = relPath}
+    relPath = "test/Lilac/ParseSpec/" <> path
 
 ps :: FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
 ps path expected state = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser st)
         path
         input
         `shouldParse` (expected, state)
+  where
+    st = L.defaultOrgParserState {L.sourcePath = relPath}
+    relPath = "test/Lilac/ParseSpec/" <> path
 
 pf :: FilePath -> String -> Int -> Spec
 pf path errMsg pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser st)
         path
         input
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
+  where
+    st = L.defaultOrgParserState {L.sourcePath = relPath}
+    relPath = "test/Lilac/ParseSpec/" <> path
 
 pfm :: FilePath -> ET T.Text -> Int -> Spec
 pfm path errorTrivial pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser st)
         path
         input
         `shouldFailWith` (err pos errorTrivial)
+  where
+    st = L.defaultOrgParserState {L.sourcePath = relPath}
+    relPath = "test/Lilac/ParseSpec/" <> path
 
 plainParagraph :: T.Text -> L.Cell
 plainParagraph body =
@@ -120,7 +136,7 @@ parseSpec = do
   before (LU.readFrom "" "lilac.org") $ do
     it "self-parse" $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser L.defaultOrgParserState {L.sourcePath = "lilac.org"})
         "lilac.org"
         `shouldSucceedOn` input
 
@@ -186,7 +202,8 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { headingLevel = 12,
+      { sourcePath = "test/Lilac/ParseSpec/0004-headings-20",
+        headingLevel = 12,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -217,7 +234,8 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { headingLevel = 12,
+      { sourcePath = "test/Lilac/ParseSpec/0004-headings-unlimited",
+        headingLevel = 12,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -261,7 +279,8 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { headingLevel = 1,
+      { sourcePath = "test/Lilac/ParseSpec/0004-properties-drawer-empty",
+        headingLevel = 1,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -293,7 +312,8 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { headingLevel = 1,
+      { sourcePath = "test/Lilac/ParseSpec/0004-properties-drawer-not-empty",
+        headingLevel = 1,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -325,7 +345,8 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { headingLevel = 1,
+      { sourcePath = "test/Lilac/ParseSpec/0004-properties-drawer-not-empty-with-comments",
+        headingLevel = 1,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -538,7 +559,8 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { headingLevel = 1,
+      { sourcePath = "test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries",
+        headingLevel = 1,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -835,7 +857,8 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { headingLevel = 1,
+      { sourcePath = "test/Lilac/ParseSpec/0006-links",
+        headingLevel = 1,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -888,7 +911,8 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { headingLevel = 0,
+      { sourcePath = "test/Lilac/ParseSpec/0007-blocks-empty",
+        headingLevel = 0,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -973,7 +997,8 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { headingLevel = 0,
+      { sourcePath = "test/Lilac/ParseSpec/0007-blocks-ending",
+        headingLevel = 0,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -1030,7 +1055,7 @@ parseSpec = do
                               { target =
                                   L.LinkTargetNoweb
                                     L.LinkNoweb
-                                      { path = "",
+                                      { path = "test/Lilac/ParseSpec/0007-blocks-noweb",
                                         name = "foo"
                                       },
                                 name =
@@ -1047,7 +1072,7 @@ parseSpec = do
                               { target =
                                   L.LinkTargetNoweb
                                     L.LinkNoweb
-                                      { path = "",
+                                      { path = "test/Lilac/ParseSpec/0007-blocks-noweb",
                                         name = "bar"
                                       },
                                 name =
@@ -1084,7 +1109,7 @@ parseSpec = do
                               { target =
                                   L.LinkTargetNoweb
                                     L.LinkNoweb
-                                      { path = "",
+                                      { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
                                         name = "foo"
                                       },
                                 name =
@@ -1101,7 +1126,7 @@ parseSpec = do
                               { target =
                                   L.LinkTargetNoweb
                                     L.LinkNoweb
-                                      { path = "",
+                                      { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
                                         name = "bar"
                                       },
                                 name =
@@ -1118,7 +1143,7 @@ parseSpec = do
                               { target =
                                   L.LinkTargetNoweb
                                     L.LinkNoweb
-                                      { path = "",
+                                      { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
                                         name = "ok"
                                       },
                                 name =
@@ -1545,7 +1570,8 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { headingLevel = 0,
+      { sourcePath = "test/Lilac/ParseSpec/0010-standalone-math-fragments",
+        headingLevel = 0,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -1597,7 +1623,8 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { headingLevel = 0,
+      { sourcePath = "test/Lilac/ParseSpec/0010-standalone-math-inside-lists",
+        headingLevel = 0,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -1670,7 +1697,8 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { headingLevel = 0,
+      { sourcePath = "test/Lilac/ParseSpec/0011-figures-and-blocks",
+        headingLevel = 0,
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],

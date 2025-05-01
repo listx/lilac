@@ -51,6 +51,7 @@ import Relude
     (<$>),
     (<>),
   )
+import System.Directory (makeAbsolute)
 import System.Exit (die)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -186,9 +187,10 @@ lilac globalOpts = case globalOpts.subcommand of
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
   input <- LU.readFrom "" checkOpts.input
+  absolutePath <- makeAbsolute checkOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = absolutePath})
           checkOpts.input
           input
   case parseResult of
@@ -209,9 +211,10 @@ lilacCheck globalOpts checkOpts = do
 lilacTangle :: TangleOpts -> IO ()
 lilacTangle tangleOpts = do
   input <- LU.readFrom "" tangleOpts.input
+  absolutePath <- makeAbsolute tangleOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = absolutePath})
           tangleOpts.input
           input
   case parseResult of
@@ -229,9 +232,10 @@ lilacTangle tangleOpts = do
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
   input <- LU.readFrom "" weaveOpts.input
+  absolutePath <- makeAbsolute weaveOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = absolutePath})
           weaveOpts.input
           input
   case parseResult of

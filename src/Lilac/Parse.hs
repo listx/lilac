@@ -43,6 +43,7 @@ import Relude
     Either (Left, Right),
     Enum,
     Eq,
+    FilePath,
     Int,
     Map,
     Maybe (Just, Nothing),
@@ -124,7 +125,8 @@ type OrgParser = StateT OrgParserState (MP.Parsec Void T.Text)
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { headingLevel :: Int,
+  { sourcePath :: FilePath,
+    headingLevel :: Int,
     styleMask :: StyleMask,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
@@ -139,7 +141,8 @@ data OrgParserState = OrgParserState
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { headingLevel = 0,
+    { sourcePath = "",
+      headingLevel = 0,
       styleMask = styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -357,9 +360,9 @@ skipNewlinesAndComments =
 lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme skipNewlinesAndComments
 
-parseOrgDoc :: T.Text -> Either T.Text OrgDoc
-parseOrgDoc input = case MP.runParser
-  (runStateT orgDocParser defaultOrgParserState)
+parseOrgDoc :: FilePath -> T.Text -> Either T.Text OrgDoc
+parseOrgDoc path input = case MP.runParser
+  (runStateT orgDocParser (defaultOrgParserState {sourcePath = path}))
   ""
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
@@ -1004,6 +1007,7 @@ someBTokensParser blockType nowebOn =
 
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
+  orgParserState <- get
   linkName <-
     MP.between
       (string "<<")
@@ -1017,7 +1021,7 @@ nowebLinkParser = do
       { target =
           LinkTargetNoweb
             LinkNoweb
-              { path = "",
+              { path = T.pack $ orgParserState.sourcePath,
                 name = linkName
               },
         name =
