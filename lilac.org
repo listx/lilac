@@ -1,3 +1,6 @@
+:PROPERTIES:
+:ID:       ef1e620c-357a-4350-b85a-ba813dabf8c7
+:END:
 #+title: Lilac
 
 # Set default header argument for all code blocks. The "no-export" means
@@ -2268,7 +2271,7 @@ defaultOrgParserState =
 ** =orgDocParser=
 
 The =orgDocParser= first needs to parse any metadata associated with the document,
-such as the title and author. It starts by skipping any leading
+such as the document ID, title and author. It starts by skipping any leading
 whitespace\/comments. We have to do this first because all of the other parsers
 we use will follow the pattern of parsing the thing we want, followed by
 skipping over as much trailing whitespace as possible. In other words, none of
@@ -2383,9 +2386,10 @@ before (LU.readFrom "" "lilac.org") $ do
 ** =docMetaParser=
 
 An Org document's metadata is the first meaningful thing that could be parsed.
-Metadata is a line that looks like =#+key: value= where =key= is a string and =value=
-is a series of tokens (it can have multiple words in it). The
-=docMetaEntryParser= parses a single key and value pair.
+Metadata can be created with a ~:PROPERTIES:~ drawer, or with a line that looks
+like =#+key: value= where =key= is a string and =value= is a series of tokens (it can
+have multiple words in it). The key and value syntax is trickier, so we look at
+that first with =docMetaEntryParser= below.
 
 #+name: f:docMetaEntryParser
 #+begin_src haskell
@@ -2423,16 +2427,31 @@ value.
 Similarly, we also do not parse any [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extensions]] because they can only be
 parsed by the [[f:lilacExtensionsParser]].
 
-The =docMetaParser= just parses =docMetaEntryParser= multiple times, while consuming
-any trailing whitespace or comments with [[f:lexeme]].
+The [[f:docMetaParser]] first checks for the top-level ~:PROPERTIES:~ drawer with
+[[f:propertiesDrawerParser]]. Then it just parses =docMetaEntryParser= multiple times,
+while consuming any trailing whitespace or comments with [[f:lexeme]].
 
 #+name: f:docMetaParser
 #+begin_src haskell
 docMetaParser :: OrgParser (M.Map T.Text T.Text)
 docMetaParser = do
-  metaKVs <- many $ lexeme docMetaEntryParser
-  pure $ M.fromList metaKVs
+  topLevelDrawerProps <- propertiesDrawerParser
+  _ <- optional skipNewlinesAndComments
+  metaKVs <- M.fromList <$> (many $ lexeme docMetaEntryParser)
+  let conflictingKeys = M.keys $ M.intersection topLevelDrawerProps metaKVs
+  when (not $ null conflictingKeys)
+    $ fail
+    $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
+    <> (show conflictingKeys)
+  pure $ M.union topLevelDrawerProps metaKVs
 #+end_src
+
+Note that using the properties drawer is the main way in which the ~ID~ field of a
+document is created, which is then used by Org mode (see
+~org-id-link-to-org-use-id~, ~org-id-link-consider-parent-id~, and
+~org-id-locations-file~). Using ID's for things (instead of the file name) allows
+us to create links that are more resilient against file name changes (or
+directory changes). See [[id:ca12051e-cd17-4d8d-996a-767695441d48][Drawers]] for more discussion about properties drawers.
 
 *** Lilac extensions
 :PROPERTIES:
@@ -2649,6 +2668,70 @@ pfm
   "0002-doc-metadata-missing-value"
   (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
   7
+#+end_src
+
+Metadata can also come from top-level properties drawers.
+
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer
+#+begin_src org
+:PROPERTIES:
+:ID:       7af1aa3e-41ca-4810-a001-2fdf10768f2f
+:END:
+#+end_src
+
+#+name: t:0002-doc-metadata-properties-drawer
+#+begin_src haskell
+p
+  "0002-doc-metadata-properties-drawer"
+  $ L.defaultOrgDoc
+    [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
+    ]
+#+end_src
+
+Combine metadata together, from the top-level properties drawer and also the
+key\/value metadata lines.
+
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer-combine
+#+begin_src org
+:PROPERTIES:
+:ID:       7af1aa3e-41ca-4810-a001-2fdf10768f2f
+:END:
+,#+title: An Org Document
+,#+author: A. U. Thor
+,#+property: header-args+ :noweb no-export
+#+end_src
+
+#+name: t:0002-doc-metadata-properties-drawer-combine
+#+begin_src haskell
+p
+  "0002-doc-metadata-properties-drawer-combine"
+  $ L.defaultOrgDoc
+    [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
+      ("author", "A. U. Thor"),
+      ("property", "header-args+ :noweb no-export"),
+      ("title", "An Org Document")
+    ]
+#+end_src
+
+If there is a clash, error out instead of silently choosing precedence.
+
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer-clash
+#+begin_src org
+:PROPERTIES:
+:foo:       bar
+:END:
+,#+title: An Org Document
+,#+author: A. U. Thor
+,#+property: header-args+ :noweb no-export
+,#+foo: xyz
+#+end_src
+
+#+name: t:0002-doc-metadata-properties-drawer-clash
+#+begin_src haskell
+pf
+  "0002-doc-metadata-properties-drawer-clash"
+  "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: [\"foo\"]"
+  134
 #+end_src
 
 ** Cells
@@ -8724,6 +8807,9 @@ parseSpec = do
   <<t:0002-doc-metadata-whitespace-before-value>>
   <<t:0002-doc-metadata:basic>>
   <<t:0003-doc-metadata-with-comments>>
+  <<t:0002-doc-metadata-properties-drawer>>
+  <<t:0002-doc-metadata-properties-drawer-combine>>
+  <<t:0002-doc-metadata-properties-drawer-clash>>
   <<t:0004-headings>>
   <<t:0004-headings-20>>
   <<t:0004-headings-unlimited>>

@@ -179,6 +179,26 @@ parseSpec = do
         ("title", "An Org Document")
       ]
 
+  p
+    "0002-doc-metadata-properties-drawer"
+    $ L.defaultOrgDoc
+      [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
+      ]
+
+  p
+    "0002-doc-metadata-properties-drawer-combine"
+    $ L.defaultOrgDoc
+      [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
+        ("author", "A. U. Thor"),
+        ("property", "header-args+ :noweb no-export"),
+        ("title", "An Org Document")
+      ]
+
+  pf
+    "0002-doc-metadata-properties-drawer-clash"
+    "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: [\"foo\"]"
+    134
+
   pf
     "0004-headings"
     "found 7 asterisks found for this heading, but lilac_maxHeadingLevel = 6"

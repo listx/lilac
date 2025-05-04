@@ -418,8 +418,15 @@ docMetaEntryParser = do
 
 docMetaParser :: OrgParser (M.Map T.Text T.Text)
 docMetaParser = do
-  metaKVs <- many $ lexeme docMetaEntryParser
-  pure $ M.fromList metaKVs
+  topLevelDrawerProps <- propertiesDrawerParser
+  _ <- optional skipNewlinesAndComments
+  metaKVs <- M.fromList <$> (many $ lexeme docMetaEntryParser)
+  let conflictingKeys = M.keys $ M.intersection topLevelDrawerProps metaKVs
+  when (not $ null conflictingKeys)
+    $ fail
+    $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
+    <> (show conflictingKeys)
+  pure $ M.union topLevelDrawerProps metaKVs
 
 lilacExtensionsParser :: OrgParser ()
 lilacExtensionsParser = do
