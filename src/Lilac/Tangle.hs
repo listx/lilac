@@ -40,6 +40,7 @@ import Relude
     length,
     map,
     mapM_,
+    not,
     otherwise,
     pure,
     putStrLn,
@@ -48,6 +49,7 @@ import Relude
     sort,
     when,
     ($),
+    (&&),
     (+),
     (.),
     (/=),
@@ -55,6 +57,7 @@ import Relude
     (<>),
     (==),
     (>),
+    (||),
   )
 import Relude.Extra.Map qualified as EM
 import Relude.Nub
@@ -223,13 +226,15 @@ tangle sc = do
   where
     f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
     f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
+      alreadyExists <- D.doesPathExist path
       existingContent <- readFileRobustly path
-      if (existingContent /= contentToWrite)
-        then do
-          writeFileRobustly path contentToWrite
-          pure (tangled + 1, path : tangledPaths, skipped)
-        else
-          pure (tangled, tangledPaths, skipped + 1)
+      let g
+            | (alreadyExists && existingContent /= contentToWrite)
+                || not alreadyExists = do
+                writeFileRobustly path contentToWrite
+                pure (tangled + 1, path : tangledPaths, skipped)
+            | otherwise = pure (tangled, tangledPaths, skipped + 1)
+       in g
     printTangled :: P.OsPath -> IO ()
     printTangled path = putStrLn $ "  " <> show path
 

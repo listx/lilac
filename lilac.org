@@ -8936,6 +8936,7 @@ import Relude
     length,
     map,
     mapM_,
+    not,
     otherwise,
     pure,
     putStrLn,
@@ -8944,6 +8945,7 @@ import Relude
     sort,
     when,
     ($),
+    (&&),
     (+),
     (.),
     (/=),
@@ -8951,6 +8953,7 @@ import Relude
     (<>),
     (==),
     (>),
+    (||),
   )
 import Relude.Extra.Map qualified as EM
 import Relude.Nub
@@ -9947,7 +9950,7 @@ In [[f:tangle]] we naively tangle each file, one at a time, in serial fashion. I
 does not write to the file if what would be written is the same as what's
 already there. This way, file modification timestamps can remain the same and
 tools like GNU Make won't get confused by timestamps that have been needlessly
-updated.
+updated. However, we always do write the file if it doesn't exist on disk.
 
 #+name: f:tangle
 #+begin_src haskell
@@ -9962,13 +9965,15 @@ tangle sc = do
   where
     f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
     f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
+      alreadyExists <- D.doesPathExist path
       existingContent <- readFileRobustly path
-      if (existingContent /= contentToWrite)
-        then do
-          writeFileRobustly path contentToWrite
-          pure (tangled + 1, path : tangledPaths, skipped)
-        else
-          pure (tangled, tangledPaths, skipped + 1)
+      let g
+            | (alreadyExists && existingContent /= contentToWrite)
+                || not alreadyExists = do
+                writeFileRobustly path contentToWrite
+                pure (tangled + 1, path : tangledPaths, skipped)
+            | otherwise = pure (tangled, tangledPaths, skipped + 1)
+       in g
     printTangled :: P.OsPath -> IO ()
     printTangled path = putStrLn $ "  " <> show path
 #+end_src
