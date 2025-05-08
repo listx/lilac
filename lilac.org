@@ -1575,6 +1575,7 @@ library
     , text
     , time
     , transformers
+    , uuid-types
   default-language: <<Language edition>>
 
 executable lilac
@@ -1625,6 +1626,7 @@ test-suite spec
     , lilac
     , megaparsec
     , relude
+    , uuid-types
   default-language: <<Language edition>>
 #+end_src
 
@@ -1820,9 +1822,11 @@ interleaved tests are executed), take a look at the [[Testing framework]].
 #+begin_src haskell
 module Lilac.Parse
   ( defaultOrgDoc,
+    defaultOrgIdsElispParserState,
     defaultOrgParserConf,
     defaultOrgParserState,
     orgDocParser,
+    orgIdsElispParser,
     parseOrgDoc,
     styleMaskFrom,
     OrgDoc (..),
@@ -1855,6 +1859,7 @@ import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.UUID.Types (UUID, fromText)
 import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
@@ -1877,6 +1882,7 @@ import Relude
     Void,
     Word8,
     catMaybes,
+    concat,
     concatMap,
     drop,
     fail,
@@ -1936,6 +1942,7 @@ import Relude
   )
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
+import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
@@ -1963,6 +1970,8 @@ import Prelude qualified (show)
 <<data:MathFragment>>
 <<data:Figure>>
 <<data:Table>>
+<<data:OrgIdsElispParserState>>
+<<type:OrgIdsElispParser>>
 
 <<f:skipNewlinesAndComments>>
 <<f:lexeme>>
@@ -2043,6 +2052,9 @@ import Prelude qualified (show)
 <<f:tableCellParser>>
 <<f:rowsToTuples>>
 <<f:rowToTuples>>
+<<f:orgIdsElispParser>>
+<<f:orgIdsEntryParser>>
+<<f:uuidParser>>
 #+end_src
 
 ** Whitespace and comments
@@ -8596,6 +8608,7 @@ module Lilac.ParseSpec (spec) where
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.UUID.Types (UUID, fromText, nil)
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Util qualified as LU
@@ -8604,15 +8617,19 @@ import Relude
     FilePath,
     Identity,
     Int,
+    Maybe (Just),
     String,
     Type,
     fromList,
+    map,
+    otherwise,
     runStateT,
     show,
     ($),
     (.),
     (<>),
   )
+import System.OsPath qualified as P
 import Test.Hspec (Spec, before, it)
 import Test.Hspec.Megaparsec
   ( ET,
@@ -8659,6 +8676,8 @@ type Parser = <<Concrete type for Megaparsec>>
 <<f:pfm>>
 <<f:plainParagraph>>
 <<f:plainHeading>>
+<<f:pOrgIdsElisp>>
+<<f:pfOrgIdsElisp>>
 #+end_src
 
 The ~Parser~ type synonym uses the same [[Concrete type for Megaparsec][concrete types]] as we do for
@@ -8791,6 +8810,49 @@ plainHeading level =
     )
 #+end_src
 
+This [[f:pOrgIdsElisp]] helper parses [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org
+ID locations files]].
+
+#+name: f:pOrgIdsElisp
+#+begin_src haskell
+pOrgIdsElisp :: FilePath -> [(T.Text, FilePath)] -> Spec
+pOrgIdsElisp path expected = do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
+      MP.runParser
+        (runStateT L.orgIdsElispParser st)
+        path
+        input
+        `shouldParse` ( M.fromList $ map f expected,
+                        L.defaultOrgIdsElispParserState
+                      )
+  where
+    st = L.defaultOrgIdsElispParserState
+    f :: (T.Text, FilePath) -> (UUID, P.OsPath)
+    f (uuidText, filePath)
+      | Just uuid <- fromText uuidText,
+        Just osPath <- P.encodeUtf filePath =
+          (uuid, osPath)
+      | otherwise = (nil, P.pack [])
+#+end_src
+
+The [[f:pfOrgIdsElisp]] helper expects failures.
+
+#+name: f:pfOrgIdsElisp
+#+begin_src haskell
+pfOrgIdsElisp :: FilePath -> String -> Int -> Spec
+pfOrgIdsElisp path errMsg pos = do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
+      MP.runParser
+        (runStateT L.orgIdsElispParser st)
+        path
+        input
+        `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
+  where
+    st = L.defaultOrgIdsElispParserState
+#+end_src
+
 *** All test cases
 
 Below are all of the individual test cases.
@@ -8875,6 +8937,312 @@ parseSpec = do
   <<t:0011-figures-and-blocks>>
   <<t:0012-tables-and-prose>>
   <<t:0012-tables-inside-lists>>
+  <<t:0200-org-ids-elisp-file-empty>>
+  <<t:0200-org-ids-elisp-file-empty-list>>
+  <<t:0200-org-ids-elisp-file>>
+  <<t:0200-org-ids-elisp-file-oneline>>
+  <<t:0200-org-ids-elisp-file-caps>>
+  <<t:0200-org-ids-elisp-file-non-uuid>>
+  <<t:0200-org-ids-elisp-file-non-uuid-x>>
+  <<t:0200-org-ids-elisp-file-duplicate-uuid>>
+#+end_src
+
+* ID locations file parser
+:PROPERTIES:
+:ID:       96f8cbda-abca-48bd-bb89-512aaac61ca8
+:END:
+
+Lilac relies on Org files that are written in Emacs (Emacs is the best
+environment for writing Org files). When the ~org-id-locations-file~ and
+~org-id-track-globally~ variables are set, Emacs remembers which files have which
+Org IDs (where the "ID" is the UUID generated by ~org-id-get-create~ and
+~org-id-store-link~).
+
+We want to be able to read this file because it is automatically updated by
+Emacs for us. Then we can have a good idea of where each ID comes from, so that
+we know how to dereference ID links when we come across them later. Some
+examples of this are:
+
+  - Whenever we see a link with the ~id:~ as the "protocol". This can happen for
+    regular links to headings or anything else.
+
+  - When we come across a Noweb link that uses an ID to reference a code block
+    located in another file.
+
+The ability for Noweb links to reference other files is not part of Orgmode and
+is Lilac's own extension. This allows source code blocks to be defined across
+multiple Org files if needed. One simple example is version information that
+we might want to define only in a single place, but which might be referenced
+in other places, across multiple Org files.
+
+** ID parser
+
+The syntax is of a list of list of strings, in Emacs lisp. The inner lists have
+the relative file path of the Org file as the first element, followed by the
+UUIDs. The UUIDs are in reverse order (probably because Emacs grows the list
+right-to-left, just like Haskell's ~:~ (aka "cons") function).
+
+Below is an example, with newlines inserted for better presentation (Emacs does
+not use newlines here, and so in the wild everything is in one line):
+
+#+name: ex:OrgIdsElispFile
+#+begin_src emacs-lisp
+(("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
+ ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
+                            "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
+                            "8f5752c0-6162-4de6-9ceb-f78ba584722c"
+                            "b449a097-d702-4fd6-98de-cb81f7e49177"))
+#+end_src
+
+Each Org ID is just a UUIDv4 string.
+
+For the monad transformer stack, we don't use the [[type:OrgParser]] because we're
+not parsing an Org file. Instead we use a separate ~OrgIdsElispParser~ type.
+
+#+name: type:OrgIdsElispParser
+#+begin_src haskell
+type OrgIdsElispParser :: Type -> Type
+type OrgIdsElispParser = StateT OrgIdsElispParserState (<<Concrete type for Megaparsec>>)
+#+end_src
+
+When we're parsing these UUIDs, we want to check that we're not parsing in
+duplicate UUIDs that have been seen elsewhere. Presumably Emacs performs this
+check, but it's easy enough to do it ourselves here, so design a stateful type
+we can use during the parser as we see each UUID.
+
+#+name: data:OrgIdsElispParserState
+#+begin_src haskell
+type OrgIdsElispParserState :: Type
+data OrgIdsElispParserState = OrgIdsElispParserState
+  { seenUuids :: Set.Set UUID
+  }
+  deriving stock (Eq, Show)
+
+defaultOrgIdsElispParserState :: OrgIdsElispParserState
+defaultOrgIdsElispParserState =
+  OrgIdsElispParserState
+    { seenUuids = Set.empty
+    }
+#+end_src
+
+The overall parser returns a map of UUIDs to file paths. We reset the embedded
+state before returning, because we don't want to complicate tests by keeping
+around the seen UUIDs.
+
+#+name: f:orgIdsElispParser
+#+begin_src haskell
+orgIdsElispParser :: OrgIdsElispParser (M.Map UUID P.OsPath)
+orgIdsElispParser = do
+  _ <- MP.optional ws
+  ids <-
+    MP.optional
+      $ MP.between
+        (string "(")
+        (string ")")
+        ( MP.label "Org Ids entries"
+            $ MP.many
+            $ orgIdsEntryParser
+        )
+  put defaultOrgIdsElispParserState
+  pure
+    $ case ids of
+      Just x -> M.fromList $ concat x
+      Nothing -> M.fromList []
+  where
+    ws :: OrgIdsElispParser ()
+    ws = void . MP.some $ char ' ' <|> char '\n'
+#+end_src
+
+Within each "entry", we need to parse the file path, and any number of UUIDs.
+
+#+name: f:orgIdsEntryParser
+#+begin_src haskell
+orgIdsEntryParser :: OrgIdsElispParser [(UUID, P.OsPath)]
+orgIdsEntryParser = MP.between (string "(") (string ")" >> MP.optional ws) $ do
+  filepath <-
+    P.unsafeEncodeUtf
+      <$> MP.between
+        (string "\"")
+        (string "\"")
+        (MP.label "filepath" $ MP.some $ MP.anySingleBut '"')
+  uuids <- MP.some $ do
+    _ <- ws
+    uuid <- uuidParser
+    pure uuid
+  pure $ zip uuids (repeat filepath)
+  where
+    ws :: OrgIdsElispParser ()
+    ws = void . MP.some $ char ' ' <|> char '\n'
+#+end_src
+
+When parsing a single UUID, we check whether the UUID has been seen already
+before.
+
+#+name: f:uuidParser
+#+begin_src haskell
+uuidParser :: OrgIdsElispParser UUID
+uuidParser = do
+  uuidText <-
+    MP.between
+      (string "\"")
+      (string "\"")
+      (MP.takeWhile1P (Just "UUID character") (/= '"'))
+  case fromText uuidText of
+    Nothing -> fail $ show uuidText <> " is not a valid UUID"
+    Just uuid -> do
+      orgIdsElispParserState <- get
+      when (Set.member uuid orgIdsElispParserState.seenUuids)
+        $ fail
+        $ "duplicate UUID: \""
+        <> show uuid
+        <> "\""
+      put
+        orgIdsElispParserState
+          { seenUuids = Set.insert uuid orgIdsElispParserState.seenUuids
+          }
+      pure uuid
+#+end_src
+
+** Tests
+
+Parsing an empty file shouldn't result in failure.
+
+#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-empty
+#+begin_src emacs-lisp
+#+end_src
+
+#+name: t:0200-org-ids-elisp-file-empty
+#+begin_src haskell
+pOrgIdsElisp
+  "0200-org-ids-elisp-file-empty"
+  []
+#+end_src
+
+Parsing an empty list should result in an empty result as well.
+
+#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-empty-list
+#+begin_src emacs-lisp
+()
+#+end_src
+
+#+name: t:0200-org-ids-elisp-file-empty-list
+#+begin_src haskell
+pOrgIdsElisp
+  "0200-org-ids-elisp-file-empty-list"
+  []
+#+end_src
+
+Example from [[ex:OrgIdsElispFile]].
+
+#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file
+#+begin_src emacs-lisp
+(("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
+ ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
+                            "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
+                            "8f5752c0-6162-4de6-9ceb-f78ba584722c"
+                            "b449a097-d702-4fd6-98de-cb81f7e49177"))
+#+end_src
+
+#+name: t:0200-org-ids-elisp-file
+#+begin_src haskell
+pOrgIdsElisp
+  "0200-org-ids-elisp-file"
+  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org"),
+    ("3c576a02-418b-431b-ab96-e4936e977fb7", "../prog/lilac/lilac.org"),
+    ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "../prog/lilac/lilac.org"),
+    ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "../prog/lilac/lilac.org"),
+    ("b449a097-d702-4fd6-98de-cb81f7e49177", "../prog/lilac/lilac.org")
+  ]
+#+end_src
+
+Parsing single-line content should also work.
+
+#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-oneline
+#+begin_src emacs-lisp
+(("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb") ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7" "ce9af5ef-6559-4ffb-82c1-a439214eda6d" "8f5752c0-6162-4de6-9ceb-f78ba584722c" "b449a097-d702-4fd6-98de-cb81f7e49177"))
+#+end_src
+
+#+name: t:0200-org-ids-elisp-file-oneline
+#+begin_src haskell
+pOrgIdsElisp
+  "0200-org-ids-elisp-file-oneline"
+  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org"),
+    ("3c576a02-418b-431b-ab96-e4936e977fb7", "../prog/lilac/lilac.org"),
+    ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "../prog/lilac/lilac.org"),
+    ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "../prog/lilac/lilac.org"),
+    ("b449a097-d702-4fd6-98de-cb81f7e49177", "../prog/lilac/lilac.org")
+  ]
+#+end_src
+
+Though Emacs does not use capital letters for the hex digits, we should still
+support them just in case.
+
+#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-caps
+#+begin_src emacs-lisp
+(("note/raw/recreation.org" "A1E6D0D5-4540-423B-864E-B96AD06C56EB"))
+#+end_src
+
+#+name: t:0200-org-ids-elisp-file-caps
+#+begin_src haskell
+pOrgIdsElisp
+  "0200-org-ids-elisp-file-caps"
+  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org")
+  ]
+#+end_src
+
+We should run into an error if a UUID string is corrupted (is not a UUID). The
+last UUID here has an extra ~e~ character at the end and should fail.
+
+#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-non-uuid
+#+begin_src emacs-lisp
+(("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
+ ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
+                            "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
+                            "8f5752c0-6162-4de6-9ceb-f78ba584722c"
+                            "b449a097-d702-4fd6-98de-cb81f7e49177e"))
+#+end_src
+
+#+name: t:0200-org-ids-elisp-file-non-uuid
+#+begin_src haskell
+pfOrgIdsElisp
+  "0200-org-ids-elisp-file-non-uuid"
+  "\"b449a097-d702-4fd6-98de-cb81f7e49177e\" is not a valid UUID"
+  336
+#+end_src
+
+Not having hex digits is also a problem. There is an ~x~ character at the end of
+the UUID below.
+
+#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-non-uuid-x
+#+begin_src emacs-lisp
+(("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56ex"))
+#+end_src
+
+#+name: t:0200-org-ids-elisp-file-non-uuid-x
+#+begin_src haskell
+pfOrgIdsElisp
+  "0200-org-ids-elisp-file-non-uuid-x"
+  "\"a1e6d0d5-4540-423b-864e-b96ad06c56ex\" is not a valid UUID"
+  66
+#+end_src
+
+If the UUID has a duplicate, that should also trigger a failure.
+
+#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-duplicate-uuid
+#+begin_src emacs-lisp
+(("note/raw/recreation.org" "b449a097-d702-4fd6-98de-cb81f7e49177")
+ ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
+                            "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
+                            "8f5752c0-6162-4de6-9ceb-f78ba584722c"
+                            "b449a097-d702-4fd6-98de-cb81f7e49177"))
+#+end_src
+
+#+name: t:0200-org-ids-elisp-file-duplicate-uuid
+#+begin_src haskell
+pfOrgIdsElisp
+  "0200-org-ids-elisp-file-duplicate-uuid"
+  "duplicate UUID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
+  335
 #+end_src
 
 * Tangling

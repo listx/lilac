@@ -3,6 +3,7 @@ module Lilac.ParseSpec (spec) where
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.UUID.Types (UUID, fromText, nil)
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Util qualified as LU
@@ -11,15 +12,19 @@ import Relude
     FilePath,
     Identity,
     Int,
+    Maybe (Just),
     String,
     Type,
     fromList,
+    map,
+    otherwise,
     runStateT,
     show,
     ($),
     (.),
     (<>),
   )
+import System.OsPath qualified as P
 import Test.Hspec (Spec, before, it)
 import Test.Hspec.Megaparsec
   ( ET,
@@ -125,6 +130,38 @@ plainHeading level =
           meta = fromList []
         }
     )
+
+pOrgIdsElisp :: FilePath -> [(T.Text, FilePath)] -> Spec
+pOrgIdsElisp path expected = do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
+      MP.runParser
+        (runStateT L.orgIdsElispParser st)
+        path
+        input
+        `shouldParse` ( M.fromList $ map f expected,
+                        L.defaultOrgIdsElispParserState
+                      )
+  where
+    st = L.defaultOrgIdsElispParserState
+    f :: (T.Text, FilePath) -> (UUID, P.OsPath)
+    f (uuidText, filePath)
+      | Just uuid <- fromText uuidText,
+        Just osPath <- P.encodeUtf filePath =
+          (uuid, osPath)
+      | otherwise = (nil, P.pack [])
+
+pfOrgIdsElisp :: FilePath -> String -> Int -> Spec
+pfOrgIdsElisp path errMsg pos = do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
+      MP.runParser
+        (runStateT L.orgIdsElispParser st)
+        path
+        input
+        `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
+  where
+    st = L.defaultOrgIdsElispParserState
 
 parseSpec :: Spec
 parseSpec = do
@@ -1992,3 +2029,49 @@ parseSpec = do
           ],
         meta = fromList []
       }
+
+  pOrgIdsElisp
+    "0200-org-ids-elisp-file-empty"
+    []
+
+  pOrgIdsElisp
+    "0200-org-ids-elisp-file-empty-list"
+    []
+
+  pOrgIdsElisp
+    "0200-org-ids-elisp-file"
+    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org"),
+      ("3c576a02-418b-431b-ab96-e4936e977fb7", "../prog/lilac/lilac.org"),
+      ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "../prog/lilac/lilac.org"),
+      ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "../prog/lilac/lilac.org"),
+      ("b449a097-d702-4fd6-98de-cb81f7e49177", "../prog/lilac/lilac.org")
+    ]
+
+  pOrgIdsElisp
+    "0200-org-ids-elisp-file-oneline"
+    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org"),
+      ("3c576a02-418b-431b-ab96-e4936e977fb7", "../prog/lilac/lilac.org"),
+      ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "../prog/lilac/lilac.org"),
+      ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "../prog/lilac/lilac.org"),
+      ("b449a097-d702-4fd6-98de-cb81f7e49177", "../prog/lilac/lilac.org")
+    ]
+
+  pOrgIdsElisp
+    "0200-org-ids-elisp-file-caps"
+    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org")
+    ]
+
+  pfOrgIdsElisp
+    "0200-org-ids-elisp-file-non-uuid"
+    "\"b449a097-d702-4fd6-98de-cb81f7e49177e\" is not a valid UUID"
+    336
+
+  pfOrgIdsElisp
+    "0200-org-ids-elisp-file-non-uuid-x"
+    "\"a1e6d0d5-4540-423b-864e-b96ad06c56ex\" is not a valid UUID"
+    66
+
+  pfOrgIdsElisp
+    "0200-org-ids-elisp-file-duplicate-uuid"
+    "duplicate UUID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
+    335

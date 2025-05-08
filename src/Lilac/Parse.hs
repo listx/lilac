@@ -1,8 +1,10 @@
 module Lilac.Parse
   ( defaultOrgDoc,
+    defaultOrgIdsElispParserState,
     defaultOrgParserConf,
     defaultOrgParserState,
     orgDocParser,
+    orgIdsElispParser,
     parseOrgDoc,
     styleMaskFrom,
     OrgDoc (..),
@@ -35,6 +37,7 @@ import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.UUID.Types (UUID, fromText)
 import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
@@ -57,6 +60,7 @@ import Relude
     Void,
     Word8,
     catMaybes,
+    concat,
     concatMap,
     drop,
     fail,
@@ -116,6 +120,7 @@ import Relude
   )
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
+import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
@@ -337,6 +342,21 @@ data Table = Table
   deriving stock (Eq, Generic, Show)
 
 instance ToJSON Table
+
+type OrgIdsElispParserState :: Type
+data OrgIdsElispParserState = OrgIdsElispParserState
+  { seenUuids :: Set.Set UUID
+  }
+  deriving stock (Eq, Show)
+
+defaultOrgIdsElispParserState :: OrgIdsElispParserState
+defaultOrgIdsElispParserState =
+  OrgIdsElispParserState
+    { seenUuids = Set.empty
+    }
+
+type OrgIdsElispParser :: Type -> Type
+type OrgIdsElispParser = StateT OrgIdsElispParserState (MP.ParsecT Void T.Text Identity)
 
 skipNewlinesAndComments :: OrgParser ()
 skipNewlinesAndComments =
@@ -1459,3 +1479,63 @@ rowToTuples (rowIndex, row)
       ( ((rowIndex, colIndex), tableCell) : acc,
         colIndex + 1
       )
+
+orgIdsElispParser :: OrgIdsElispParser (M.Map UUID P.OsPath)
+orgIdsElispParser = do
+  _ <- MP.optional ws
+  ids <-
+    MP.optional
+      $ MP.between
+        (string "(")
+        (string ")")
+        ( MP.label "Org Ids entries"
+            $ MP.many
+            $ orgIdsEntryParser
+        )
+  put defaultOrgIdsElispParserState
+  pure
+    $ case ids of
+      Just x -> M.fromList $ concat x
+      Nothing -> M.fromList []
+  where
+    ws :: OrgIdsElispParser ()
+    ws = void . MP.some $ char ' ' <|> char '\n'
+
+orgIdsEntryParser :: OrgIdsElispParser [(UUID, P.OsPath)]
+orgIdsEntryParser = MP.between (string "(") (string ")" >> MP.optional ws) $ do
+  filepath <-
+    P.unsafeEncodeUtf
+      <$> MP.between
+        (string "\"")
+        (string "\"")
+        (MP.label "filepath" $ MP.some $ MP.anySingleBut '"')
+  uuids <- MP.some $ do
+    _ <- ws
+    uuid <- uuidParser
+    pure uuid
+  pure $ zip uuids (repeat filepath)
+  where
+    ws :: OrgIdsElispParser ()
+    ws = void . MP.some $ char ' ' <|> char '\n'
+
+uuidParser :: OrgIdsElispParser UUID
+uuidParser = do
+  uuidText <-
+    MP.between
+      (string "\"")
+      (string "\"")
+      (MP.takeWhile1P (Just "UUID character") (/= '"'))
+  case fromText uuidText of
+    Nothing -> fail $ show uuidText <> " is not a valid UUID"
+    Just uuid -> do
+      orgIdsElispParserState <- get
+      when (Set.member uuid orgIdsElispParserState.seenUuids)
+        $ fail
+        $ "duplicate UUID: \""
+        <> show uuid
+        <> "\""
+      put
+        orgIdsElispParserState
+          { seenUuids = Set.insert uuid orgIdsElispParserState.seenUuids
+          }
+      pure uuid
