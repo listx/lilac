@@ -60,7 +60,6 @@ import Relude
     Void,
     Word8,
     catMaybes,
-    concat,
     concatMap,
     drop,
     fail,
@@ -345,14 +344,14 @@ instance ToJSON Table
 
 type OrgIdsElispParserState :: Type
 data OrgIdsElispParserState = OrgIdsElispParserState
-  { seenUuids :: Set.Set UUID
+  { seenUuids :: M.Map UUID P.OsPath
   }
   deriving stock (Eq, Show)
 
 defaultOrgIdsElispParserState :: OrgIdsElispParserState
 defaultOrgIdsElispParserState =
   OrgIdsElispParserState
-    { seenUuids = Set.empty
+    { seenUuids = M.fromList []
     }
 
 type OrgIdsElispParser :: Type -> Type
@@ -1483,7 +1482,7 @@ rowToTuples (rowIndex, row)
 orgIdsElispParser :: OrgIdsElispParser (M.Map UUID P.OsPath)
 orgIdsElispParser = do
   _ <- MP.optional ws
-  ids <-
+  _ <-
     MP.optional
       $ MP.between
         (string "(")
@@ -1492,16 +1491,14 @@ orgIdsElispParser = do
             $ MP.many
             $ orgIdsEntryParser
         )
+  orgIdsElispParserState <- get
   put defaultOrgIdsElispParserState
-  pure
-    $ case ids of
-      Just x -> M.fromList $ concat x
-      Nothing -> M.fromList []
+  pure orgIdsElispParserState.seenUuids
   where
     ws :: OrgIdsElispParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'
 
-orgIdsEntryParser :: OrgIdsElispParser [(UUID, P.OsPath)]
+orgIdsEntryParser :: OrgIdsElispParser (P.OsPath, [UUID])
 orgIdsEntryParser = MP.between (string "(") (string ")" >> MP.optional ws) $ do
   filepath <-
     P.unsafeEncodeUtf
@@ -1512,8 +1509,18 @@ orgIdsEntryParser = MP.between (string "(") (string ")" >> MP.optional ws) $ do
   uuids <- MP.some $ do
     _ <- ws
     uuid <- uuidParser
+    orgIdsElispParserState <- get
+    when (M.member uuid orgIdsElispParserState.seenUuids)
+      $ fail
+      $ "duplicate UUID: \""
+      <> show uuid
+      <> "\""
+    put
+      orgIdsElispParserState
+        { seenUuids = M.insert uuid filepath orgIdsElispParserState.seenUuids
+        }
     pure uuid
-  pure $ zip uuids (repeat filepath)
+  pure (filepath, uuids)
   where
     ws :: OrgIdsElispParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'
@@ -1527,15 +1534,4 @@ uuidParser = do
       (MP.takeWhile1P (Just "UUID character") (/= '"'))
   case fromText uuidText of
     Nothing -> fail $ show uuidText <> " is not a valid UUID"
-    Just uuid -> do
-      orgIdsElispParserState <- get
-      when (Set.member uuid orgIdsElispParserState.seenUuids)
-        $ fail
-        $ "duplicate UUID: \""
-        <> show uuid
-        <> "\""
-      put
-        orgIdsElispParserState
-          { seenUuids = Set.insert uuid orgIdsElispParserState.seenUuids
-          }
-      pure uuid
+    Just uuid -> pure uuid

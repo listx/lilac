@@ -1882,7 +1882,6 @@ import Relude
     Void,
     Word8,
     catMaybes,
-    concat,
     concatMap,
     drop,
     fail,
@@ -9014,16 +9013,21 @@ we can use during the parser as we see each UUID.
 #+begin_src haskell
 type OrgIdsElispParserState :: Type
 data OrgIdsElispParserState = OrgIdsElispParserState
-  { seenUuids :: Set.Set UUID
+  { seenUuids :: M.Map UUID P.OsPath
   }
   deriving stock (Eq, Show)
 
 defaultOrgIdsElispParserState :: OrgIdsElispParserState
 defaultOrgIdsElispParserState =
   OrgIdsElispParserState
-    { seenUuids = Set.empty
+    { seenUuids = M.fromList []
     }
 #+end_src
+
+You may be wondering why ~seenUuids~ is a map, not a set of UUIDs. That's because
+we incrementally build up the final data structure (~M.Map UUID P.OsPath~) during
+the parsing stage, and because the map can also check for membership queries
+just like a set. This way we can simplify the data structures involved.
 
 The overall parser returns a map of UUIDs to file paths. We reset the embedded
 state before returning, because we don't want to complicate tests by keeping
@@ -9034,7 +9038,7 @@ around the seen UUIDs.
 orgIdsElispParser :: OrgIdsElispParser (M.Map UUID P.OsPath)
 orgIdsElispParser = do
   _ <- MP.optional ws
-  ids <-
+  _ <-
     MP.optional
       $ MP.between
         (string "(")
@@ -9043,11 +9047,9 @@ orgIdsElispParser = do
             $ MP.many
             $ orgIdsEntryParser
         )
+  orgIdsElispParserState <- get
   put defaultOrgIdsElispParserState
-  pure
-    $ case ids of
-      Just x -> M.fromList $ concat x
-      Nothing -> M.fromList []
+  pure orgIdsElispParserState.seenUuids
   where
     ws :: OrgIdsElispParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'
@@ -9057,7 +9059,7 @@ Within each "entry", we need to parse the file path, and any number of UUIDs.
 
 #+name: f:orgIdsEntryParser
 #+begin_src haskell
-orgIdsEntryParser :: OrgIdsElispParser [(UUID, P.OsPath)]
+orgIdsEntryParser :: OrgIdsElispParser (P.OsPath, [UUID])
 orgIdsEntryParser = MP.between (string "(") (string ")" >> MP.optional ws) $ do
   filepath <-
     P.unsafeEncodeUtf
@@ -9068,8 +9070,18 @@ orgIdsEntryParser = MP.between (string "(") (string ")" >> MP.optional ws) $ do
   uuids <- MP.some $ do
     _ <- ws
     uuid <- uuidParser
+    orgIdsElispParserState <- get
+    when (M.member uuid orgIdsElispParserState.seenUuids)
+      $ fail
+      $ "duplicate UUID: \""
+      <> show uuid
+      <> "\""
+    put
+      orgIdsElispParserState
+        { seenUuids = M.insert uuid filepath orgIdsElispParserState.seenUuids
+        }
     pure uuid
-  pure $ zip uuids (repeat filepath)
+  pure (filepath, uuids)
   where
     ws :: OrgIdsElispParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'
@@ -9089,18 +9101,7 @@ uuidParser = do
       (MP.takeWhile1P (Just "UUID character") (/= '"'))
   case fromText uuidText of
     Nothing -> fail $ show uuidText <> " is not a valid UUID"
-    Just uuid -> do
-      orgIdsElispParserState <- get
-      when (Set.member uuid orgIdsElispParserState.seenUuids)
-        $ fail
-        $ "duplicate UUID: \""
-        <> show uuid
-        <> "\""
-      put
-        orgIdsElispParserState
-          { seenUuids = Set.insert uuid orgIdsElispParserState.seenUuids
-          }
-      pure uuid
+    Just uuid -> pure uuid
 #+end_src
 
 ** Tests
