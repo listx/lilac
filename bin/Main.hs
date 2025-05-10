@@ -205,7 +205,7 @@ runOrgIdsEslipParser globalOpts = do
   input <- LU.readFileRobustly path
   let parseResult =
         MP.runParser
-          (runStateT LP.orgIdsElispParser LP.defaultOrgIdsElispParserState)
+          (runStateT (LP.orgIdsElispParser path) LP.defaultOrgIdsElispParserState)
           globalOpts.orgIdLocationsFile
           input
   case parseResult of

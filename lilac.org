@@ -8824,7 +8824,7 @@ pOrgIdsElisp path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgIdsElispParser st)
+        (runStateT (L.orgIdsElispParser $ P.unsafeEncodeUtf path) st)
         path
         input
         `shouldParse` ( M.fromList $ map f expected,
@@ -8849,7 +8849,7 @@ pfOrgIdsElisp path errMsg pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgIdsElispParser st)
+        (runStateT (L.orgIdsElispParser $ P.unsafeEncodeUtf path) st)
         path
         input
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
@@ -8949,6 +8949,7 @@ parseSpec = do
   <<t:0200-org-ids-elisp-file-non-uuid>>
   <<t:0200-org-ids-elisp-file-non-uuid-x>>
   <<t:0200-org-ids-elisp-file-duplicate-uuid>>
+  <<t:0200-org-ids-elisp-file-absolute>>
 #+end_src
 
 * ID locations file parser
@@ -9040,8 +9041,8 @@ around the seen UUIDs.
 
 #+name: f:orgIdsElispParser
 #+begin_src haskell
-orgIdsElispParser :: OrgIdsElispParser (M.Map UUID P.OsPath)
-orgIdsElispParser = do
+orgIdsElispParser :: P.OsPath -> OrgIdsElispParser (M.Map UUID P.OsPath)
+orgIdsElispParser sourceFile = do
   _ <- MP.optional ws
   _ <-
     MP.optional
@@ -9050,7 +9051,7 @@ orgIdsElispParser = do
         (string ")")
         ( MP.label "Org Ids entries"
             $ MP.many
-            $ orgIdsEntryParser
+            $ orgIdsEntryParser sourceFile
         )
   orgIdsElispParserState <- get
   put defaultOrgIdsElispParserState
@@ -9064,14 +9065,18 @@ Within each "entry", we need to parse the file path, and any number of UUIDs.
 
 #+name: f:orgIdsEntryParser
 #+begin_src haskell
-orgIdsEntryParser :: OrgIdsElispParser (P.OsPath, [UUID])
-orgIdsEntryParser = MP.between (string "(") (string ")" >> MP.optional ws) $ do
+orgIdsEntryParser :: P.OsPath -> OrgIdsElispParser (P.OsPath, [UUID])
+orgIdsEntryParser sourceFile = MP.between (string "(") (string ")" >> MP.optional ws) $ do
   filepath <-
     P.unsafeEncodeUtf
       <$> MP.between
         (string "\"")
         (string "\"")
         (MP.label "filepath" $ MP.some $ MP.anySingleBut '"')
+  let fp =
+        if P.isAbsolute filepath
+          then filepath
+          else P.combine (P.takeDirectory sourceFile) filepath
   uuids <- MP.some $ do
     _ <- ws
     uuid <- uuidParser
@@ -9083,10 +9088,10 @@ orgIdsEntryParser = MP.between (string "(") (string ")" >> MP.optional ws) $ do
       <> "\""
     put
       orgIdsElispParserState
-        { seenUuids = M.insert uuid filepath orgIdsElispParserState.seenUuids
+        { seenUuids = M.insert uuid fp orgIdsElispParserState.seenUuids
         }
     pure uuid
-  pure (filepath, uuids)
+  pure (fp, uuids)
   where
     ws :: OrgIdsElispParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'
@@ -9153,11 +9158,11 @@ Example from [[ex:OrgIdsElispFile]].
 #+begin_src haskell
 pOrgIdsElisp
   "0200-org-ids-elisp-file"
-  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org"),
-    ("3c576a02-418b-431b-ab96-e4936e977fb7", "../prog/lilac/lilac.org"),
-    ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "../prog/lilac/lilac.org"),
-    ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "../prog/lilac/lilac.org"),
-    ("b449a097-d702-4fd6-98de-cb81f7e49177", "../prog/lilac/lilac.org")
+  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
+    ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
+    ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
+    ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "./../prog/lilac/lilac.org"),
+    ("b449a097-d702-4fd6-98de-cb81f7e49177", "./../prog/lilac/lilac.org")
   ]
 #+end_src
 
@@ -9172,11 +9177,11 @@ Parsing single-line content should also work.
 #+begin_src haskell
 pOrgIdsElisp
   "0200-org-ids-elisp-file-oneline"
-  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org"),
-    ("3c576a02-418b-431b-ab96-e4936e977fb7", "../prog/lilac/lilac.org"),
-    ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "../prog/lilac/lilac.org"),
-    ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "../prog/lilac/lilac.org"),
-    ("b449a097-d702-4fd6-98de-cb81f7e49177", "../prog/lilac/lilac.org")
+  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
+    ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
+    ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
+    ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "./../prog/lilac/lilac.org"),
+    ("b449a097-d702-4fd6-98de-cb81f7e49177", "./../prog/lilac/lilac.org")
   ]
 #+end_src
 
@@ -9192,7 +9197,7 @@ support them just in case.
 #+begin_src haskell
 pOrgIdsElisp
   "0200-org-ids-elisp-file-caps"
-  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org")
+  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org")
   ]
 #+end_src
 
@@ -9249,6 +9254,29 @@ pfOrgIdsElisp
   "0200-org-ids-elisp-file-duplicate-uuid"
   "duplicate UUID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
   335
+#+end_src
+
+If the path is absolute, we should leave it as is.
+
+#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-absolute
+#+begin_src emacs-lisp
+(("/foo/bar" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
+ ("/baz"     "3c576a02-418b-431b-ab96-e4936e977fb7"
+             "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
+             "8f5752c0-6162-4de6-9ceb-f78ba584722c"
+             "b449a097-d702-4fd6-98de-cb81f7e49177"))
+#+end_src
+
+#+name: t:0200-org-ids-elisp-file-absolute
+#+begin_src haskell
+pOrgIdsElisp
+  "0200-org-ids-elisp-file-absolute"
+  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "/foo/bar"),
+    ("3c576a02-418b-431b-ab96-e4936e977fb7", "/baz"),
+    ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "/baz"),
+    ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "/baz"),
+    ("b449a097-d702-4fd6-98de-cb81f7e49177", "/baz")
+  ]
 #+end_src
 
 * Tangling
@@ -10797,7 +10825,7 @@ runOrgIdsEslipParser globalOpts = do
   input <- LU.readFileRobustly path
   let parseResult =
         MP.runParser
-          (runStateT LP.orgIdsElispParser LP.defaultOrgIdsElispParserState)
+          (runStateT (LP.orgIdsElispParser path) LP.defaultOrgIdsElispParserState)
           globalOpts.orgIdLocationsFile
           input
   case parseResult of

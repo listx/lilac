@@ -1479,8 +1479,8 @@ rowToTuples (rowIndex, row)
         colIndex + 1
       )
 
-orgIdsElispParser :: OrgIdsElispParser (M.Map UUID P.OsPath)
-orgIdsElispParser = do
+orgIdsElispParser :: P.OsPath -> OrgIdsElispParser (M.Map UUID P.OsPath)
+orgIdsElispParser sourceFile = do
   _ <- MP.optional ws
   _ <-
     MP.optional
@@ -1489,7 +1489,7 @@ orgIdsElispParser = do
         (string ")")
         ( MP.label "Org Ids entries"
             $ MP.many
-            $ orgIdsEntryParser
+            $ orgIdsEntryParser sourceFile
         )
   orgIdsElispParserState <- get
   put defaultOrgIdsElispParserState
@@ -1498,14 +1498,18 @@ orgIdsElispParser = do
     ws :: OrgIdsElispParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'
 
-orgIdsEntryParser :: OrgIdsElispParser (P.OsPath, [UUID])
-orgIdsEntryParser = MP.between (string "(") (string ")" >> MP.optional ws) $ do
+orgIdsEntryParser :: P.OsPath -> OrgIdsElispParser (P.OsPath, [UUID])
+orgIdsEntryParser sourceFile = MP.between (string "(") (string ")" >> MP.optional ws) $ do
   filepath <-
     P.unsafeEncodeUtf
       <$> MP.between
         (string "\"")
         (string "\"")
         (MP.label "filepath" $ MP.some $ MP.anySingleBut '"')
+  let fp =
+        if P.isAbsolute filepath
+          then filepath
+          else P.combine (P.takeDirectory sourceFile) filepath
   uuids <- MP.some $ do
     _ <- ws
     uuid <- uuidParser
@@ -1517,10 +1521,10 @@ orgIdsEntryParser = MP.between (string "(") (string ")" >> MP.optional ws) $ do
       <> "\""
     put
       orgIdsElispParserState
-        { seenUuids = M.insert uuid filepath orgIdsElispParserState.seenUuids
+        { seenUuids = M.insert uuid fp orgIdsElispParserState.seenUuids
         }
     pure uuid
-  pure (filepath, uuids)
+  pure (fp, uuids)
   where
     ws :: OrgIdsElispParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'

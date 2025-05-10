@@ -136,7 +136,7 @@ pOrgIdsElisp path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgIdsElispParser st)
+        (runStateT (L.orgIdsElispParser $ P.unsafeEncodeUtf path) st)
         path
         input
         `shouldParse` ( M.fromList $ map f expected,
@@ -156,7 +156,7 @@ pfOrgIdsElisp path errMsg pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgIdsElispParser st)
+        (runStateT (L.orgIdsElispParser $ P.unsafeEncodeUtf path) st)
         path
         input
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
@@ -2040,25 +2040,25 @@ parseSpec = do
 
   pOrgIdsElisp
     "0200-org-ids-elisp-file"
-    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org"),
-      ("3c576a02-418b-431b-ab96-e4936e977fb7", "../prog/lilac/lilac.org"),
-      ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "../prog/lilac/lilac.org"),
-      ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "../prog/lilac/lilac.org"),
-      ("b449a097-d702-4fd6-98de-cb81f7e49177", "../prog/lilac/lilac.org")
+    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
+      ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
+      ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
+      ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "./../prog/lilac/lilac.org"),
+      ("b449a097-d702-4fd6-98de-cb81f7e49177", "./../prog/lilac/lilac.org")
     ]
 
   pOrgIdsElisp
     "0200-org-ids-elisp-file-oneline"
-    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org"),
-      ("3c576a02-418b-431b-ab96-e4936e977fb7", "../prog/lilac/lilac.org"),
-      ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "../prog/lilac/lilac.org"),
-      ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "../prog/lilac/lilac.org"),
-      ("b449a097-d702-4fd6-98de-cb81f7e49177", "../prog/lilac/lilac.org")
+    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
+      ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
+      ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
+      ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "./../prog/lilac/lilac.org"),
+      ("b449a097-d702-4fd6-98de-cb81f7e49177", "./../prog/lilac/lilac.org")
     ]
 
   pOrgIdsElisp
     "0200-org-ids-elisp-file-caps"
-    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "note/raw/recreation.org")
+    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org")
     ]
 
   pfOrgIdsElisp
@@ -2075,3 +2075,12 @@ parseSpec = do
     "0200-org-ids-elisp-file-duplicate-uuid"
     "duplicate UUID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
     335
+
+  pOrgIdsElisp
+    "0200-org-ids-elisp-file-absolute"
+    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "/foo/bar"),
+      ("3c576a02-418b-431b-ab96-e4936e977fb7", "/baz"),
+      ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "/baz"),
+      ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "/baz"),
+      ("b449a097-d702-4fd6-98de-cb81f7e49177", "/baz")
+    ]
