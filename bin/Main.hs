@@ -1,5 +1,7 @@
 module Main (main) where
 
+import Data.Map.Strict qualified as M
+import Data.UUID.Types (UUID)
 import Data.Version (showVersion)
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
@@ -38,11 +40,13 @@ import Relude
     Either (Left, Right),
     FilePath,
     IO,
+    Maybe (Just, Nothing),
     Type,
     concat,
     map,
     not,
     null,
+    pure,
     putStrLn,
     runStateT,
     show,
@@ -60,6 +64,7 @@ import Text.Pretty.Simple qualified as PP
 type GlobalOpts :: Type
 data GlobalOpts = GlobalOpts
   { subcommand :: Subcommand,
+    orgIdLocationsFile :: FilePath,
     color :: Bool,
     verbose :: Bool
   }
@@ -93,6 +98,14 @@ globalOptionsHandler :: OptionHandler GlobalOpts
 globalOptionsHandler =
   GlobalOpts
     <$> subcommandHandler
+    <*> ( strOption
+            ( long "org-id-locations-file"
+                <> metavar "FILE"
+                <> value ".orgids"
+                <> showDefault
+                <> help "file with Org ID locations; see 'org-id-locations-file' in Emacs"
+            )
+        )
     <*> ( flag
             True
             False
@@ -181,8 +194,24 @@ main = do
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
   Check checkOpts -> lilacCheck globalOpts checkOpts
-  Tangle tangleOpts -> lilacTangle tangleOpts
+  Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
   Weave weaveOpts -> lilacWeave weaveOpts
+
+runOrgIdsEslipParser :: GlobalOpts -> IO (M.Map UUID P.OsPath)
+runOrgIdsEslipParser globalOpts = do
+  let path = case P.encodeUtf globalOpts.orgIdLocationsFile of
+        Nothing -> P.pack []
+        Just p -> p
+  input <- LU.readFileRobustly path
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgIdsElispParser LP.defaultOrgIdsElispParserState)
+          globalOpts.orgIdLocationsFile
+          input
+  case parseResult of
+    Left errBundle -> do
+      die $ MP.errorBundlePretty errBundle
+    Right (ids, _) -> pure ids
 
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
@@ -208,8 +237,9 @@ lilacCheck globalOpts checkOpts = do
                 else PP.pPrintNoColor
         prettyPrint orgDoc
 
-lilacTangle :: TangleOpts -> IO ()
-lilacTangle tangleOpts = do
+lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
+lilacTangle globalOpts tangleOpts = do
+  ids <- runOrgIdsEslipParser globalOpts
   input <- LU.readFrom "" tangleOpts.input
   canonicalPath <- canonicalizePath tangleOpts.input
   let parseResult =

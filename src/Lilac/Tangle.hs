@@ -8,11 +8,9 @@ module Lilac.Tangle
   )
 where
 
-import Control.Exception (catch)
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
-import Data.Text.Encoding qualified as TE
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -22,6 +20,7 @@ import Lilac.Parse
     LinkTarget (LinkTargetNoweb),
     OrgDoc (cells),
   )
+import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
     Either (Right),
@@ -53,7 +52,6 @@ import Relude
     (+),
     (.),
     (/=),
-    (<$>),
     (<>),
     (==),
     (>),
@@ -64,9 +62,7 @@ import Relude.Nub
   ( hashNub,
   )
 import System.Directory.OsPath qualified as D
-import System.File.OsPath qualified as P.IO
 import System.IO (utf8)
-import System.IO.Error (IOError)
 import System.OsPath qualified as P
 
 type SourceCode :: Type
@@ -227,30 +223,13 @@ tangle sc = do
     f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
     f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
       alreadyExists <- D.doesPathExist path
-      existingContent <- readFileRobustly path
+      existingContent <- LU.readFileRobustly path
       let g
             | (alreadyExists && existingContent /= contentToWrite)
                 || not alreadyExists = do
-                writeFileRobustly path contentToWrite
+                LU.writeFileRobustly path contentToWrite
                 pure (tangled + 1, path : tangledPaths, skipped)
             | otherwise = pure (tangled, tangledPaths, skipped + 1)
        in g
     printTangled :: P.OsPath -> IO ()
     printTangled path = putStrLn $ "  " <> show path
-
-readFileRobustly :: P.OsPath -> IO T.Text
-readFileRobustly path =
-  catch
-    (TE.decodeUtf8 <$> P.IO.readFile' path)
-    readHandler
-  where
-    readHandler :: IOError -> IO T.Text
-    readHandler _ = pure ""
-
-writeFileRobustly :: P.OsPath -> T.Text -> IO ()
-writeFileRobustly path contentToWrite = do
-  D.createDirectoryIfMissing True $ P.takeDirectory path
-  catch (P.IO.writeFile' path $ TE.encodeUtf8 contentToWrite) writeHandler
-  where
-    writeHandler :: IOError -> IO ()
-    writeHandler e = putStrLn $ "writeFileRobustly: " <> show e

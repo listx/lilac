@@ -1595,6 +1595,7 @@ executable lilac
       <<GHC threaded flags>>
   build-depends:
       base >=4.7 && <5
+    , containers
     , directory
     , filepath
     , lilac
@@ -1602,6 +1603,7 @@ executable lilac
     , megaparsec
     , pretty-simple
     , relude
+    , uuid-types
   default-language: <<Language edition>>
 
 test-suite spec
@@ -9276,11 +9278,9 @@ module Lilac.Tangle
   )
 where
 
-import Control.Exception (catch)
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
-import Data.Text.Encoding qualified as TE
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
@@ -9290,6 +9290,7 @@ import Lilac.Parse
     LinkTarget (LinkTargetNoweb),
     OrgDoc (cells),
   )
+import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
     Either (Right),
@@ -9321,7 +9322,6 @@ import Relude
     (+),
     (.),
     (/=),
-    (<$>),
     (<>),
     (==),
     (>),
@@ -9332,9 +9332,7 @@ import Relude.Nub
   ( hashNub,
   )
 import System.Directory.OsPath qualified as D
-import System.File.OsPath qualified as P.IO
 import System.IO (utf8)
-import System.IO.Error (IOError)
 import System.OsPath qualified as P
 
 <<data:SourceCode>>
@@ -9346,8 +9344,6 @@ import System.OsPath qualified as P
 <<f:expandRootBlocks>>
 <<f:expandBlock>>
 <<f:tangle>>
-<<f:readFileRobustly>>
-<<f:writeFileRobustly>>
 #+end_src
 
 ** Tangling overview
@@ -10338,11 +10334,11 @@ tangle sc = do
     f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
     f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
       alreadyExists <- D.doesPathExist path
-      existingContent <- readFileRobustly path
+      existingContent <- LU.readFileRobustly path
       let g
             | (alreadyExists && existingContent /= contentToWrite)
                 || not alreadyExists = do
-                writeFileRobustly path contentToWrite
+                LU.writeFileRobustly path contentToWrite
                 pure (tangled + 1, path : tangledPaths, skipped)
             | otherwise = pure (tangled, tangledPaths, skipped + 1)
        in g
@@ -10353,42 +10349,12 @@ tangle sc = do
 We sort the paths first so that the output is less confusing. Only tangled paths
 are printed, because otherwise the output can be overly verbose.
 
-The functions [[f:readFileRobustly]] and [[f:writeFileRobustly]] are able to handle
-errors. This helps us to avoid crashing the program in an embarrassing fashion.
-
-#+name: f:readFileRobustly
-#+begin_src haskell
-readFileRobustly :: P.OsPath -> IO T.Text
-readFileRobustly path =
-  catch
-    (TE.decodeUtf8 <$> P.IO.readFile' path)
-    readHandler
-  where
-    readHandler :: IOError -> IO T.Text
-    readHandler _ = pure ""
-#+end_src
-
 The function [[f:readFileRobustly]] will return the empty string if there was any
 error encountered while reading the file. One common scenario is if the file
 does not exist yet. Returning the empty string in this (or other error-raising
 scenarios) is fine because it will most likely result in the comparison
 ~existingContent /= contentToWrite~ in [[f:tangle]] failing (assuming the
 ~contentToWrite~ is not empty), resulting in the file being marked for tangling.
-
-For writing, the main thing [[f:writeFileRobustly]] will do is create paths
-(directories) if they are missing. If the write operation itself otherwise
-fails, we print an error message but otherwise do nothing.
-
-#+name: f:writeFileRobustly
-#+begin_src haskell
-writeFileRobustly :: P.OsPath -> T.Text -> IO ()
-writeFileRobustly path contentToWrite = do
-  D.createDirectoryIfMissing True $ P.takeDirectory path
-  catch (P.IO.writeFile' path $ TE.encodeUtf8 contentToWrite) writeHandler
-  where
-    writeHandler :: IOError -> IO ()
-    writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
-#+end_src
 
 ** Testing framework
 
@@ -10638,6 +10604,8 @@ The boilerplate involves [[id:ce9af5ef-6559-4ffb-82c1-a439214eda6d][option handl
 #+begin_src haskell
 module Main (main) where
 
+import Data.Map.Strict qualified as M
+import Data.UUID.Types (UUID)
 import Data.Version (showVersion)
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
@@ -10676,11 +10644,13 @@ import Relude
     Either (Left, Right),
     FilePath,
     IO,
+    Maybe (Just, Nothing),
     Type,
     concat,
     map,
     not,
     null,
+    pure,
     putStrLn,
     runStateT,
     show,
@@ -10699,6 +10669,7 @@ import Text.Pretty.Simple qualified as PP
 
 <<f:lilac-main>>
 <<f:lilac>>
+<<f:runOrgIdsEslipParser>>
 <<f:lilacCheck>>
 <<f:lilacTangle>>
 <<f:lilacWeave>>
@@ -10739,9 +10710,11 @@ out into the =check=, =tangle= and =weave= subcommands.
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
   Check checkOpts -> lilacCheck globalOpts checkOpts
-  Tangle tangleOpts -> lilacTangle tangleOpts
+  Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
   Weave weaveOpts -> lilacWeave weaveOpts
 #+end_src
+
+*** Checking
 
 The [[f:lilacCheck]] function just parses the input, checking if we can parse it by
 examining ~parseResult~.
@@ -10778,13 +10751,16 @@ the global ~--verbose~ flag is given. This is useful for debugging. By default t
 data structure will be printed with colored braces, but you can suppress this
 with ~--no-color~.
 
+*** Tangling
+
 The [[f:lilacTangle]] function tangles all blocks (which have been marked for
 tangling) from a given Org file.
 
 #+name: f:lilacTangle
 #+begin_src haskell
-lilacTangle :: TangleOpts -> IO ()
-lilacTangle tangleOpts = do
+lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
+lilacTangle globalOpts tangleOpts = do
+  ids <- runOrgIdsEslipParser globalOpts
   input <- LU.readFrom "" tangleOpts.input
   canonicalPath <- canonicalizePath tangleOpts.input
   let parseResult =
@@ -10804,6 +10780,33 @@ lilacTangle tangleOpts = do
       LT.tangle sourceCode
       putStrLn "Finished tangling."
 #+end_src
+
+As a prerequisite for tangling, we run the [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][ID locations file parser]] to get the
+"universe" of Org IDs. This is necessary for recognizing external Org IDs that
+come from files other than the one we're directly tangling (i.e., if the Org
+file we're tangling is depending on a code block that is defined in another Org
+file).
+
+#+name: f:runOrgIdsEslipParser
+#+begin_src haskell
+runOrgIdsEslipParser :: GlobalOpts -> IO (M.Map UUID P.OsPath)
+runOrgIdsEslipParser globalOpts = do
+  let path = case P.encodeUtf globalOpts.orgIdLocationsFile of
+        Nothing -> P.pack []
+        Just p -> p
+  input <- LU.readFileRobustly path
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgIdsElispParser LP.defaultOrgIdsElispParserState)
+          globalOpts.orgIdLocationsFile
+          input
+  case parseResult of
+    Left errBundle -> do
+      die $ MP.errorBundlePretty errBundle
+    Right (ids, _) -> pure ids
+#+end_src
+
+*** Weaving
 
 The [[f:lilacWeave]] function weaves the [[data:OrgDoc]] into JSON. We hardcode this to
 just ~orgdoc.json~ for now.
@@ -10862,6 +10865,7 @@ The global options are encoded in [[data:GlobalOpts]].
 type GlobalOpts :: Type
 data GlobalOpts = GlobalOpts
   { subcommand :: Subcommand,
+    orgIdLocationsFile :: FilePath,
     color :: Bool,
     verbose :: Bool
   }
@@ -10968,6 +10972,14 @@ globalOptionsHandler :: OptionHandler GlobalOpts
 globalOptionsHandler =
   GlobalOpts
     <$> subcommandHandler
+    <*> ( strOption
+            ( long "org-id-locations-file"
+                <> metavar "FILE"
+                <> value ".orgids"
+                <> showDefault
+                <> help "file with Org ID locations; see 'org-id-locations-file' in Emacs"
+            )
+        )
     <*> ( flag
             True
             False
@@ -11191,22 +11203,35 @@ versionFallback = pure "unknown-build-env"
 #+begin_src haskell
 module Lilac.Util
   ( readFrom,
+    readFileRobustly,
+    writeFileRobustly,
   )
 where
 
+import Control.Exception (catch)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Relude
-  ( FilePath,
+  ( Bool (True),
+    FilePath,
     IO,
+    otherwise,
+    pure,
+    putStrLn,
+    show,
     ($),
     (<$>),
     (<>),
+    (==),
   )
+import System.Directory.OsPath qualified as D
 import System.File.OsPath qualified as P.IO
+import System.IO.Error (IOError)
 import System.OsPath qualified as P
 
 <<f:readFrom>>
+<<f:readFileRobustly>>
+<<f:writeFileRobustly>>
 #+end_src
 
 [[f:readFrom]] reads a path from the given prefix, and returns a =T.Text=. We'll
@@ -11219,6 +11244,38 @@ readFrom :: FilePath -> FilePath -> IO T.Text
 readFrom prefix path = do
   let fullPath = P.unsafeEncodeUtf $ prefix <> path
   TE.decodeUtf8 <$> P.IO.readFile' fullPath
+#+end_src
+
+The functions [[f:readFileRobustly]] and [[f:writeFileRobustly]] are able to handle
+errors. This helps us to avoid crashing the program in an embarrassing fashion.
+
+#+name: f:readFileRobustly
+#+begin_src haskell
+readFileRobustly :: P.OsPath -> IO T.Text
+readFileRobustly path
+  | P.unpack path == [] = pure ""
+  | otherwise = do
+      catch
+        (TE.decodeUtf8 <$> P.IO.readFile' path)
+        readHandler
+  where
+    readHandler :: IOError -> IO T.Text
+    readHandler _ = pure ""
+#+end_src
+
+For writing, the main thing [[f:writeFileRobustly]] will do is create paths
+(directories) if they are missing. If the write operation itself otherwise
+fails, we print an error message but otherwise do nothing.
+
+#+name: f:writeFileRobustly
+#+begin_src haskell
+writeFileRobustly :: P.OsPath -> T.Text -> IO ()
+writeFileRobustly path contentToWrite = do
+  D.createDirectoryIfMissing True $ P.takeDirectory path
+  catch (P.IO.writeFile' path $ TE.encodeUtf8 contentToWrite) writeHandler
+  where
+    writeHandler :: IOError -> IO ()
+    writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
 #+end_src
 
 * Footnotes
