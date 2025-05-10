@@ -742,11 +742,14 @@ tangle()
 	return 0
 }
 
-tangle_and_test()
+tangle_and_test_and_check()
 {
 	tangle
 	if tangle; then
 		if ! make -C "${SCRIPT_ROOT}" test; then
+			reset_tangled_haskell_files
+		fi
+		if ! (cd "${SCRIPT_ROOT}" && lilac check lilac.org); then
 			reset_tangled_haskell_files
 		fi
 	fi
@@ -761,12 +764,12 @@ watch()
 
 	s1="$(stat -c %Y "${files[@]}")"
 
-	tangle_and_test
+	tangle_and_test_and_check
 	while true; do
 		s2="$(stat -c %Y "${files[@]}")"
 		if [[ ! "${s1}" == "${s2}" ]]; then
 			s1="${s2}"
-			tangle_and_test
+			tangle_and_test_and_check
 		fi
 		sleep 1
 	done
