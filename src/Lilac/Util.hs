@@ -1,5 +1,6 @@
 module Lilac.Util
-  ( readFrom,
+  ( prefixWithId,
+    readFrom,
     readFileRobustly,
     writeFileRobustly,
   )
@@ -8,6 +9,7 @@ where
 import Control.Exception (catch)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
+import Data.UUID.Types (UUID)
 import Relude
   ( Bool (True),
     FilePath,
@@ -49,3 +51,6 @@ writeFileRobustly path contentToWrite = do
   where
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
+
+prefixWithId :: UUID -> T.Text -> T.Text
+prefixWithId uuid name = "id:" <> T.pack (show uuid) <> "::" <> name

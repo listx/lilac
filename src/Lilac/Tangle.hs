@@ -1,5 +1,5 @@
 module Lilac.Tangle
-  ( BlockName,
+  ( FQBN,
     SourceCode (..),
     expandRootBlocks,
     findCycles,
@@ -19,6 +19,7 @@ import Lilac.Parse
     LinkNoweb (LinkNoweb),
     LinkTarget (LinkTargetNoweb),
     OrgDoc (cells),
+    getOrgId,
   )
 import Lilac.Util qualified as LU
 import Relude
@@ -52,6 +53,7 @@ import Relude
     (+),
     (.),
     (/=),
+    (<$>),
     (<>),
     (==),
     (>),
@@ -67,18 +69,18 @@ import System.OsPath qualified as P
 
 type SourceCode :: Type
 data SourceCode = SourceCode
-  { roots :: [BlockName],
-    nameToCodeBlock :: M.Map BlockName Block
+  { roots :: [FQBN],
+    fqbnToCodeBlock :: M.Map FQBN Block
   }
 
-type BlockName :: Type
-type BlockName = T.Text
+type FQBN :: Type
+type FQBN = T.Text
 
 defaultSourceCode :: SourceCode
 defaultSourceCode =
   SourceCode
     { roots = [],
-      nameToCodeBlock = M.fromList []
+      fqbnToCodeBlock = M.fromList []
     }
 
 getSourceCode :: OrgDoc -> FilePath -> SourceCode
@@ -86,28 +88,34 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
   where
     f :: SourceCode -> Cell -> SourceCode
     f sc (CBlock b)
-      | Just name <- EM.lookup "name" b.meta,
+      | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta,
         Just path <- EM.lookup "tangle" b.meta,
         Right filePath <- qualify path =
-          let newBlock = useQualifiedTanglePath filePath b
+          let newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
            in sc
-                { roots = name : sc.roots,
-                  nameToCodeBlock = M.insert name newBlock sc.nameToCodeBlock
+                { roots = fqbn : sc.roots,
+                  fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
                 }
       | Just path <- EM.lookup "tangle" b.meta,
         Right filePath <- qualify path =
-          let name = (T.pack filePath) <> "\NUL"
-              newBlock = useQualifiedTanglePath filePath b
+          let fqbn = getFqbn $ (T.pack filePath) <> "\NUL"
+              newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
            in sc
-                { roots = name : sc.roots,
-                  nameToCodeBlock = M.insert name newBlock sc.nameToCodeBlock
+                { roots = fqbn : sc.roots,
+                  fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
                 }
-      | Just name <- EM.lookup "name" b.meta =
+      | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta =
           sc
-            { nameToCodeBlock = M.insert name b sc.nameToCodeBlock
+            { fqbnToCodeBlock =
+                M.insert fqbn (injectFqbn fqbn b) sc.fqbnToCodeBlock
             }
       | otherwise = sc
     f sc _ = sc
+    getFqbn name = LU.prefixWithId (getOrgId od) name
+    injectFqbn fqbn block =
+      block
+        { meta = M.insert "__fqbn" fqbn block.meta
+        }
     tanglePathPrefix = P.takeDirectory $ P.unsafeEncodeUtf odPath
     qualify =
       P.decodeWith utf8 utf8
@@ -123,31 +131,32 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
 buildGraph ::
   [Block] ->
   ( G.Graph,
-    G.Vertex -> (Block, BlockName, [BlockName]),
-    BlockName -> Maybe G.Vertex
+    G.Vertex -> (Block, FQBN, [FQBN]),
+    FQBN -> Maybe G.Vertex
   )
 buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
   where
     f ::
-      [(Block, BlockName, [BlockName])] ->
+      [(Block, FQBN, [FQBN])] ->
       Block ->
-      [(Block, BlockName, [BlockName])]
+      [(Block, FQBN, [FQBN])]
     f acc block
-      | Just name <- EM.lookup "name" block.meta =
-          (\targets -> (block, name, targets) : acc)
+      | Just fqbn <- EM.lookup "__fqbn" block.meta =
+          (\targets -> (block, fqbn, targets) : acc)
             . hashNub
             . catMaybes
             $ map getLinkTarget block.body
       | otherwise = acc
     getLinkTarget = \case
-      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _uuid targetName)))) -> Just targetName
+      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb uuid targetName)))) ->
+        Just $ LU.prefixWithId uuid targetName
       _ -> Nothing
 
-findCycles :: SourceCode -> [G.Tree BlockName]
-findCycles sc = map (fmap toBlockName) . foldl' f [] $ G.scc graph
+findCycles :: SourceCode -> [G.Tree FQBN]
+findCycles sc = map (fmap toFqbn) . foldl' f [] $ G.scc graph
   where
-    (graph, vertexToNode, _) = buildGraph $ M.elems sc.nameToCodeBlock
-    toBlockName vertex =
+    (graph, vertexToNode, _) = buildGraph $ M.elems sc.fqbnToCodeBlock
+    toFqbn vertex =
       let (_, blockName, _) = vertexToNode vertex
        in blockName
     f acc tree@(G.Node vertex _)
@@ -161,8 +170,8 @@ expandRootBlocks :: SourceCode -> [(P.OsPath, T.Text)]
 expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
   where
     expandRootBlock :: T.Text -> Maybe (P.OsPath, T.Text)
-    expandRootBlock rootBlockName
-      | Just rootBlock <- EM.lookup rootBlockName sc.nameToCodeBlock =
+    expandRootBlock rootFqbn
+      | Just rootBlock <- EM.lookup rootFqbn sc.fqbnToCodeBlock =
           Just
             ( tanglePathOf rootBlock,
               maybeAddShebang rootBlock
@@ -193,8 +202,11 @@ expandBlock sc block existingPrefix =
   where
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _uuid target))))
-      | Just targetBlock <- EM.lookup target sc.nameToCodeBlock =
+    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb uuid target))))
+      | Just targetBlock <-
+          EM.lookup
+            (LU.prefixWithId uuid target)
+            sc.fqbnToCodeBlock =
           ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
             prefix
           )

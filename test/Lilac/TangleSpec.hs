@@ -34,7 +34,7 @@ getSourceCodeFromPath path = do
         $ "test/Lilac/TangleSpec/"
         <> path
 
-checkCycles :: FilePath -> [G.Tree LT.BlockName] -> Spec
+checkCycles :: FilePath -> [G.Tree LT.FQBN] -> Spec
 checkCycles path expectedCycles = do
   it path $ do
     (Right sc) <- getSourceCodeFromPath path
@@ -55,23 +55,45 @@ tangleSpec = do
 
   checkCycles
     "0100-dag-self-loop"
-    [G.Node "f:a" []]
+    [G.Node "id:00000000-0000-0000-0000-000000000000::f:a" []]
 
   checkCycles
     "0100-dag-self-loops"
-    [G.Node "f:a" [], G.Node "f:b" []]
+    [ G.Node "id:00000000-0000-0000-0000-000000000000::f:a" [],
+      G.Node "id:00000000-0000-0000-0000-000000000000::f:b" []
+    ]
 
   checkCycles
     "0100-dag-2-node-loop"
-    [G.Node "f:a" [G.Node "f:b" []]]
+    [ G.Node
+        "id:00000000-0000-0000-0000-000000000000::f:a"
+        [ G.Node "id:00000000-0000-0000-0000-000000000000::f:b" []
+        ]
+    ]
 
   checkCycles
     "0100-dag-3-node-loop"
-    [G.Node "f:a" [G.Node "f:b" [G.Node "f:c" []]]]
+    [ G.Node
+        "id:00000000-0000-0000-0000-000000000000::f:a"
+        [ G.Node
+            "id:00000000-0000-0000-0000-000000000000::f:b"
+            [ G.Node "id:00000000-0000-0000-0000-000000000000::f:c" []
+            ]
+        ]
+    ]
 
   checkCycles
     "0100-dag-complex-loops"
-    [G.Node "f:a" [G.Node "f:b" [G.Node "f:c" [], G.Node "f:d" []]], G.Node "f:e" []]
+    [ G.Node
+        "id:00000000-0000-0000-0000-000000000000::f:a"
+        [ G.Node
+            "id:00000000-0000-0000-0000-000000000000::f:b"
+            [ G.Node "id:00000000-0000-0000-0000-000000000000::f:c" [],
+              G.Node "id:00000000-0000-0000-0000-000000000000::f:d" []
+            ]
+        ],
+      G.Node "id:00000000-0000-0000-0000-000000000000::f:e" []
+    ]
 
   checkExpansion
     "0101-block-expansion"

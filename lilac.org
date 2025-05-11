@@ -1828,6 +1828,7 @@ module Lilac.Parse
     defaultOrgIdsElispParserState,
     defaultOrgParserConf,
     defaultOrgParserState,
+    getOrgId,
     orgDocParser,
     orgIdsElispParser,
     parseOrgDoc,
@@ -1864,6 +1865,7 @@ import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.UUID.Types (UUID, fromText, nil)
 import GHC.Generics (Generic)
+import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
@@ -2057,6 +2059,7 @@ import Prelude qualified (show)
 <<f:orgIdsEntryParser>>
 <<f:uuidParser>>
 <<f:validateUuidText>>
+<<f:getOrgId>>
 #+end_src
 
 ** Whitespace and comments
@@ -2474,6 +2477,21 @@ document is created, which is then used by Org mode (see
 us to create links that are more resilient against file name changes (or
 directory changes). See [[id:ca12051e-cd17-4d8d-996a-767695441d48][Drawers]] for more discussion about properties drawers and
 [[t:0002-doc-metadata-properties-drawer]].
+
+*** ID property
+
+We expect Org documents to have a top-level ~:ID:~ property, set to a UUID
+string.
+
+#+name: f:getOrgId
+#+begin_src haskell
+getOrgId :: OrgDoc -> UUID
+getOrgId od
+  | Just uuidText <- EM.lookup "ID" od.meta,
+    Just uuid <- fromText uuidText =
+      uuid
+  | otherwise = nil
+#+end_src
 
 *** Lilac extensions
 :PROPERTIES:
@@ -6010,7 +6028,8 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText :: BToken -> T.Text
     bTokenToText = \case
       BTokenString text -> text
-      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _uuid targetName))) -> <<link-marker>> <> targetName
+      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb uuid targetName))) ->
+        <<link-marker>> <> (LU.prefixWithId uuid targetName)
       _ -> ""
 #+end_src
 
@@ -9344,7 +9363,7 @@ Tangling concerns are captured in [[file:src/Lilac/Tangle.hs]].
 #+header: :tangle src/Lilac/Tangle.hs
 #+begin_src haskell
 module Lilac.Tangle
-  ( BlockName,
+  ( FQBN,
     SourceCode (..),
     expandRootBlocks,
     findCycles,
@@ -9364,6 +9383,7 @@ import Lilac.Parse
     LinkNoweb (LinkNoweb),
     LinkTarget (LinkTargetNoweb),
     OrgDoc (cells),
+    getOrgId,
   )
 import Lilac.Util qualified as LU
 import Relude
@@ -9397,6 +9417,7 @@ import Relude
     (+),
     (.),
     (/=),
+    (<$>),
     (<>),
     (==),
     (>),
@@ -9411,7 +9432,7 @@ import System.IO (utf8)
 import System.OsPath qualified as P
 
 <<data:SourceCode>>
-<<type:BlockName>>
+<<type:FQBN>>
 <<f:defaultSourceCode>>
 <<f:getSourceCode>>
 <<f:buildGraph>>
@@ -9446,8 +9467,8 @@ first two steps.
 #+begin_src haskell
 type SourceCode :: Type
 data SourceCode = SourceCode
-  { roots :: [BlockName],
-    nameToCodeBlock :: M.Map BlockName Block
+  { roots :: [FQBN],
+    fqbnToCodeBlock :: M.Map FQBN Block
   }
 #+end_src
 
@@ -9457,18 +9478,20 @@ defaultSourceCode :: SourceCode
 defaultSourceCode =
   SourceCode
     { roots = [],
-      nameToCodeBlock = M.fromList []
+      fqbnToCodeBlock = M.fromList []
     }
 #+end_src
 
 The ~roots~ field has a list of file paths that need to be tangled. The
-~nameToCodeBlock~ field is a simple mapping from the name of the block to the
-block itself. The [[type:BlockName]] is just a convenience type to help readability.
+~fqbnToCodeBlock~ field is a simple mapping from the /fully qualified block name/
+(or "FQBN") of the block to the block itself. The FQBN is the combination of the
+UUID and the human-friendly name of the block from the ~#+name:~ field of the
+block's metadata. The [[type:FQBN]] is just a convenience type to help readability.
 
-#+name: type:BlockName
+#+name: type:FQBN
 #+begin_src haskell
-type BlockName :: Type
-type BlockName = T.Text
+type FQBN :: Type
+type FQBN = T.Text
 #+end_src
 
 ** Find code blocks to tangle
@@ -9483,28 +9506,34 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
   where
     f :: SourceCode -> Cell -> SourceCode
     f sc (CBlock b)
-      | Just name <- EM.lookup "name" b.meta,
+      | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta,
         Just path <- EM.lookup "tangle" b.meta,
         Right filePath <- qualify path =
-          let newBlock = useQualifiedTanglePath filePath b
+          let newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
            in sc
-                { roots = name : sc.roots,
-                  nameToCodeBlock = M.insert name newBlock sc.nameToCodeBlock
+                { roots = fqbn : sc.roots,
+                  fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
                 }
       | Just path <- EM.lookup "tangle" b.meta,
         Right filePath <- qualify path =
-          let name = (T.pack filePath) <> "\NUL"
-              newBlock = useQualifiedTanglePath filePath b
+          let fqbn = getFqbn $ (T.pack filePath) <> "\NUL"
+              newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
            in sc
-                { roots = name : sc.roots,
-                  nameToCodeBlock = M.insert name newBlock sc.nameToCodeBlock
+                { roots = fqbn : sc.roots,
+                  fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
                 }
-      | Just name <- EM.lookup "name" b.meta =
+      | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta =
           sc
-            { nameToCodeBlock = M.insert name b sc.nameToCodeBlock
+            { fqbnToCodeBlock =
+                M.insert fqbn (injectFqbn fqbn b) sc.fqbnToCodeBlock
             }
       | otherwise = sc
     f sc _ = sc
+    getFqbn name = LU.prefixWithId (getOrgId od) name
+    injectFqbn fqbn block =
+      block
+        { meta = M.insert "__fqbn" fqbn block.meta
+        }
     tanglePathPrefix = P.takeDirectory $ P.unsafeEncodeUtf odPath
     qualify =
       P.decodeWith utf8 utf8
@@ -9578,7 +9607,9 @@ graph with all of the blocks in it because the library doesn't care whether the
 edges we feed into it are connected.
 
 The [[f:buildGraph]] function looks at all code blocks and generates the necessary
-edges to build up a directed graph. Multiple links to the same code block are
+edges to build up a directed graph. It does this by constructing edges that have
+the FQBN of the starting block as one vertex, and the Noweb links found inside
+the body as the other vertices. Multiple links to the same code block are
 de-duplicated with ~hashNub~.
 
 #+name: f:buildGraph
@@ -9586,24 +9617,25 @@ de-duplicated with ~hashNub~.
 buildGraph ::
   [Block] ->
   ( G.Graph,
-    G.Vertex -> (Block, BlockName, [BlockName]),
-    BlockName -> Maybe G.Vertex
+    G.Vertex -> (Block, FQBN, [FQBN]),
+    FQBN -> Maybe G.Vertex
   )
 buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
   where
     f ::
-      [(Block, BlockName, [BlockName])] ->
+      [(Block, FQBN, [FQBN])] ->
       Block ->
-      [(Block, BlockName, [BlockName])]
+      [(Block, FQBN, [FQBN])]
     f acc block
-      | Just name <- EM.lookup "name" block.meta =
-          (\targets -> (block, name, targets) : acc)
+      | Just fqbn <- EM.lookup "__fqbn" block.meta =
+          (\targets -> (block, fqbn, targets) : acc)
             . hashNub
             . catMaybes
             $ map getLinkTarget block.body
       | otherwise = acc
     getLinkTarget = \case
-      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _uuid targetName)))) -> Just targetName
+      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb uuid targetName)))) ->
+        Just $ LU.prefixWithId uuid targetName
       _ -> Nothing
 #+end_src
 
@@ -9612,11 +9644,11 @@ run the =scc= function to get the strongly connected components.
 
 #+name: f:findCycles
 #+begin_src haskell
-findCycles :: SourceCode -> [G.Tree BlockName]
-findCycles sc = map (fmap toBlockName) . foldl' f [] $ G.scc graph
+findCycles :: SourceCode -> [G.Tree FQBN]
+findCycles sc = map (fmap toFqbn) . foldl' f [] $ G.scc graph
   where
-    (graph, vertexToNode, _) = buildGraph $ M.elems sc.nameToCodeBlock
-    toBlockName vertex =
+    (graph, vertexToNode, _) = buildGraph $ M.elems sc.fqbnToCodeBlock
+    toFqbn vertex =
       let (_, blockName, _) = vertexToNode vertex
        in blockName
     f acc tree@(G.Node vertex _)
@@ -9627,8 +9659,8 @@ findCycles sc = map (fmap toBlockName) . foldl' f [] $ G.scc graph
       | otherwise = acc
 #+end_src
 
-The line ~M.elems sc.nameToCodeBlock~ just gets all code blocks from the
-~nameToCodeBlock~ field (perhaps ~M.elems~ is a poor name and should have been
+The line ~M.elems sc.fqbnToCodeBlock~ just gets all code blocks from the
+~fqbnToCodeBlock~ field (perhaps ~M.elems~ is a poor name and should have been
 called ~M.values~ instead, but that's another matter).
 
 Checking for back edges means just seeing whether there is more than one vertex,
@@ -9682,7 +9714,7 @@ f = 1 + 1
 #+begin_src haskell
 checkCycles
   "0100-dag-self-loop"
-  [G.Node "f:a" []]
+  [G.Node "id:00000000-0000-0000-0000-000000000000::f:a" []]
 #+end_src
 
 Check whether we can detect two independent self-loops.
@@ -9707,7 +9739,9 @@ f = 1 + 1
 #+begin_src haskell
 checkCycles
   "0100-dag-self-loops"
-  [G.Node "f:a" [], G.Node "f:b" []]
+  [ G.Node "id:00000000-0000-0000-0000-000000000000::f:a" [],
+    G.Node "id:00000000-0000-0000-0000-000000000000::f:b" []
+  ]
 #+end_src
 
 Check whether we can detect a back edge to an ancestor. In
@@ -9733,7 +9767,11 @@ f = 1 + 1
 #+begin_src haskell
 checkCycles
   "0100-dag-2-node-loop"
-  [G.Node "f:a" [G.Node "f:b" []]]
+  [ G.Node
+      "id:00000000-0000-0000-0000-000000000000::f:a"
+      [ G.Node "id:00000000-0000-0000-0000-000000000000::f:b" []
+      ]
+  ]
 #+end_src
 
 Test case [[t:0100-dag-3-node-loop]] is like the previous one, but where the loop is
@@ -9765,7 +9803,14 @@ f = 1 + 1
 #+begin_src haskell
 checkCycles
   "0100-dag-3-node-loop"
-  [G.Node "f:a" [G.Node "f:b" [G.Node "f:c" []]]]
+  [ G.Node
+      "id:00000000-0000-0000-0000-000000000000::f:a"
+      [ G.Node
+          "id:00000000-0000-0000-0000-000000000000::f:b"
+          [ G.Node "id:00000000-0000-0000-0000-000000000000::f:c" []
+          ]
+      ]
+  ]
 #+end_src
 
 Lastly, we have a test case involving complex loops. There are many back edges
@@ -9812,7 +9857,16 @@ f = 1 + 1
 #+begin_src haskell
 checkCycles
   "0100-dag-complex-loops"
-  [G.Node "f:a" [G.Node "f:b" [G.Node "f:c" [], G.Node "f:d" []]], G.Node "f:e" []]
+  [ G.Node
+      "id:00000000-0000-0000-0000-000000000000::f:a"
+      [ G.Node
+          "id:00000000-0000-0000-0000-000000000000::f:b"
+          [ G.Node "id:00000000-0000-0000-0000-000000000000::f:c" [],
+            G.Node "id:00000000-0000-0000-0000-000000000000::f:d" []
+          ]
+      ],
+    G.Node "id:00000000-0000-0000-0000-000000000000::f:e" []
+  ]
 #+end_src
 
 ** Expand blocks for tangling
@@ -9835,8 +9889,8 @@ expandRootBlocks :: SourceCode -> [(P.OsPath, T.Text)]
 expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
   where
     expandRootBlock :: T.Text -> Maybe (P.OsPath, T.Text)
-    expandRootBlock rootBlockName
-      | Just rootBlock <- EM.lookup rootBlockName sc.nameToCodeBlock =
+    expandRootBlock rootFqbn
+      | Just rootBlock <- EM.lookup rootFqbn sc.fqbnToCodeBlock =
           Just
             ( tanglePathOf rootBlock,
               maybeAddShebang rootBlock
@@ -9872,8 +9926,11 @@ expandBlock sc block existingPrefix =
   where
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _uuid target))))
-      | Just targetBlock <- EM.lookup target sc.nameToCodeBlock =
+    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb uuid target))))
+      | Just targetBlock <-
+          EM.lookup
+            (LU.prefixWithId uuid target)
+            sc.fqbnToCodeBlock =
           ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
             prefix
           )
@@ -10518,7 +10575,7 @@ given path has any cycles.
 
 #+name: f:checkCycles
 #+begin_src haskell
-checkCycles :: FilePath -> [G.Tree LT.BlockName] -> Spec
+checkCycles :: FilePath -> [G.Tree LT.FQBN] -> Spec
 checkCycles path expectedCycles = do
   it path $ do
     (Right sc) <- getSourceCodeFromPath path
@@ -11272,7 +11329,8 @@ versionFallback = pure "unknown-build-env"
 #+header: :tangle src/Lilac/Util.hs
 #+begin_src haskell
 module Lilac.Util
-  ( readFrom,
+  ( prefixWithId,
+    readFrom,
     readFileRobustly,
     writeFileRobustly,
   )
@@ -11281,6 +11339,7 @@ where
 import Control.Exception (catch)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
+import Data.UUID.Types (UUID)
 import Relude
   ( Bool (True),
     FilePath,
@@ -11302,6 +11361,7 @@ import System.OsPath qualified as P
 <<f:readFrom>>
 <<f:readFileRobustly>>
 <<f:writeFileRobustly>>
+<<f:prefixWithId>>
 #+end_src
 
 [[f:readFrom]] reads a path from the given prefix, and returns a =T.Text=. We'll
@@ -11346,6 +11406,16 @@ writeFileRobustly path contentToWrite = do
   where
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
+#+end_src
+
+The [[f:prefixWithId]] function fully qualifies the name of the code block with the
+given UUID, which will typically be the top-level ID for the Org document that
+contains the code block.
+
+#+name: f:prefixWithId
+#+begin_src haskell
+prefixWithId :: UUID -> T.Text -> T.Text
+prefixWithId uuid name = "id:" <> T.pack (show uuid) <> "::" <> name
 #+end_src
 
 * Footnotes

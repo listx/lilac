@@ -3,6 +3,7 @@ module Lilac.Parse
     defaultOrgIdsElispParserState,
     defaultOrgParserConf,
     defaultOrgParserState,
+    getOrgId,
     orgDocParser,
     orgIdsElispParser,
     parseOrgDoc,
@@ -39,6 +40,7 @@ import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.UUID.Types (UUID, fromText, nil)
 import GHC.Generics (Generic)
+import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
@@ -1160,7 +1162,8 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText :: BToken -> T.Text
     bTokenToText = \case
       BTokenString text -> text
-      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _uuid targetName))) -> "\NUL_link" <> targetName
+      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb uuid targetName))) ->
+        "\NUL_link" <> (LU.prefixWithId uuid targetName)
       _ -> ""
 
 zeroIndent :: OrgParser (Int, Int)
@@ -1553,3 +1556,10 @@ validateUuidText :: (MonadFail m) => T.Text -> m UUID
 validateUuidText uuidText = case fromText uuidText of
   Nothing -> fail $ show uuidText <> " is not a valid UUID"
   Just uuid -> pure uuid
+
+getOrgId :: OrgDoc -> UUID
+getOrgId od
+  | Just uuidText <- EM.lookup "ID" od.meta,
+    Just uuid <- fromText uuidText =
+      uuid
+  | otherwise = nil
