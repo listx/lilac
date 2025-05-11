@@ -1596,7 +1596,6 @@ executable lilac
   build-depends:
       base >=4.7 && <5
     , containers
-    , directory
     , filepath
     , lilac
     , optparse-applicative
@@ -1624,7 +1623,6 @@ test-suite spec
   build-depends:
       base >=4.7 && <5
     , containers
-    , directory
     , filepath
     , hspec
     , hspec-megaparsec
@@ -1864,7 +1862,7 @@ import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText)
+import Data.UUID.Types (UUID, fromText, nil)
 import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
@@ -1873,7 +1871,6 @@ import Relude
     Either (Left, Right),
     Enum,
     Eq,
-    FilePath,
     Identity,
     Int,
     Map,
@@ -2059,6 +2056,7 @@ import Prelude qualified (show)
 <<f:orgIdsElispParser>>
 <<f:orgIdsEntryParser>>
 <<f:uuidParser>>
+<<f:validateUuidText>>
 #+end_src
 
 ** Whitespace and comments
@@ -2206,9 +2204,9 @@ and parses it into a rich =OrgDoc= type.
 
 #+name: f:parseOrgDoc
 #+begin_src haskell
-parseOrgDoc :: FilePath -> T.Text -> Either T.Text OrgDoc
-parseOrgDoc path input = case MP.runParser
-  (runStateT orgDocParser (defaultOrgParserState {sourcePath = path}))
+parseOrgDoc :: T.Text -> Either T.Text OrgDoc
+parseOrgDoc input = case MP.runParser
+  (runStateT orgDocParser defaultOrgParserState)
   ""
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
@@ -2255,7 +2253,8 @@ inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { sourcePath :: FilePath,
+  { orgIdsMap :: M.Map UUID P.OsPath,
+    orgId :: UUID,
     headingLevel :: Int,
     styleMask :: StyleMask,
     listLevels :: [Level],
@@ -2271,7 +2270,8 @@ data OrgParserState = OrgParserState
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { sourcePath = "",
+    { orgIdsMap = M.fromList [],
+      orgId = nil,
       headingLevel = 0,
       styleMask = styleMaskFrom [],
       listLevels = [],
@@ -2394,7 +2394,7 @@ At the other end of the spectrum, Lilac should be able to parse itself
 before (LU.readFrom "" "lilac.org") $ do
   it "self-parse" $ \input -> do
     MP.runParser
-      (runStateT L.orgDocParser L.defaultOrgParserState {L.sourcePath = "lilac.org"})
+      (runStateT L.orgDocParser L.defaultOrgParserState)
       "lilac.org"
       `shouldSucceedOn` input
 #+end_src
@@ -2459,6 +2459,11 @@ docMetaParser = do
     $ fail
     $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
     <> (show conflictingKeys)
+  case M.lookup "ID" topLevelDrawerProps of
+    Nothing -> modify (\s -> s {orgId = nil})
+    Just uuidText -> do
+      uuid <- validateUuidText uuidText
+      modify (\s -> s {orgId = uuid})
   pure $ M.union topLevelDrawerProps metaKVs
 #+end_src
 
@@ -2467,7 +2472,8 @@ document is created, which is then used by Org mode (see
 ~org-id-link-to-org-use-id~, ~org-id-link-consider-parent-id~, and
 ~org-id-locations-file~). Using ID's for things (instead of the file name) allows
 us to create links that are more resilient against file name changes (or
-directory changes). See [[id:ca12051e-cd17-4d8d-996a-767695441d48][Drawers]] for more discussion about properties drawers.
+directory changes). See [[id:ca12051e-cd17-4d8d-996a-767695441d48][Drawers]] for more discussion about properties drawers and
+[[t:0002-doc-metadata-properties-drawer]].
 
 *** Lilac extensions
 :PROPERTIES:
@@ -2697,11 +2703,48 @@ Metadata can also come from top-level properties drawers.
 
 #+name: t:0002-doc-metadata-properties-drawer
 #+begin_src haskell
-p
+ps
   "0002-doc-metadata-properties-drawer"
-  $ L.defaultOrgDoc
-    [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
-    ]
+  ( L.defaultOrgDoc
+      [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
+      ]
+  )
+  L.OrgParserState
+    { orgIdsMap = fromList [],
+      orgId = fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+      headingLevel = 0,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      blockNames = Set.empty,
+      tanglePaths = Set.empty,
+      orgParserConf = L.defaultOrgParserConf
+    }
+#+end_src
+
+If the ~:ID:~ is missing, we assign a nil (all zero bits) UUID. We reuse the same
+test case file from [[t:0001-blankline]].
+
+#+name: t:0002-doc-metadata-properties-drawer-empty
+#+begin_src haskell
+ps
+  "0001-blankline"
+  (L.defaultOrgDoc [])
+  L.OrgParserState
+    { orgIdsMap = fromList [],
+      orgId = nil,
+      headingLevel = 0,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      blockNames = Set.empty,
+      tanglePaths = Set.empty,
+      orgParserConf = L.defaultOrgParserConf
+    }
 #+end_src
 
 Combine metadata together, from the top-level properties drawer and also the
@@ -2719,14 +2762,28 @@ key\/value metadata lines.
 
 #+name: t:0002-doc-metadata-properties-drawer-combine
 #+begin_src haskell
-p
+ps
   "0002-doc-metadata-properties-drawer-combine"
-  $ L.defaultOrgDoc
-    [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
-      ("author", "A. U. Thor"),
-      ("property", "header-args+ :noweb no-export"),
-      ("title", "An Org Document")
-    ]
+  ( L.defaultOrgDoc
+      [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
+        ("author", "A. U. Thor"),
+        ("property", "header-args+ :noweb no-export"),
+        ("title", "An Org Document")
+      ]
+  )
+  L.OrgParserState
+    { orgIdsMap = fromList [],
+      orgId = fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+      headingLevel = 0,
+      styleMask = L.styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      blockNames = Set.empty,
+      tanglePaths = Set.empty,
+      orgParserConf = L.defaultOrgParserConf
+    }
 #+end_src
 
 If there is a clash, error out instead of silently choosing precedence.
@@ -3122,7 +3179,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0005-styled-strings-messy-boundaries",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 1,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -3859,18 +3917,16 @@ data LinkTarget
 instance ToJSON LinkTarget
 #+end_src
 
-A Noweb link points to a code block with the given =name=, as well as the
-=path= of the Org file where the code block is defined. The path acts as a
-/namespace/, so that each Org file is free to choose any name it wants for code
-blocks without fear of other Org files that might have a code block with the
-same name.
+A Noweb link points to a code block with the given =name=, as well as the [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org ID
+or =uuid= of the file]] the code block comes from. The UUID acts as a /namespace/, so
+that each Org file is free to choose any name it wants for code blocks without
+fear of other Org files that might have a code block with the same name.
 
 #+name: data:LinkNoweb
 #+begin_src haskell
 type LinkNoweb :: Type
 data LinkNoweb = LinkNoweb
-  { path :: T.Text,
-    isCanonicalPath :: Bool,
+  { uuid :: UUID,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Show)
@@ -3882,9 +3938,10 @@ In summary we support the following link types:
 
   - ~LinkTargetNoweb~ :: a link to a Noweb reference inside another code block.
     These use angle brackets (e.g., ~<<foo>>~), where the text inside the brackets
-    refers to a code block in the current file. If there is a double colon like
-    ~<<file:bar.org::foo>>~ then this refers to the ~<<foo>>~ defined inside the
-    ~bar.org~ file.
+    refers to a code block in the current file. This can reference code blocks
+    in other files by UUID, where the syntax is ~<<id:...::foo>>~ where ~...~ is the
+    UUID and ~<<foo>>~ is the name of the code block at that UUID. We have to use
+    a UUID-to-file map data structure (which is parsed [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][here]]).
 
   - ~LinkTargetOther~ :: all other links. Typical ways to define such links are
     with uses square brackets (e.g., ~[[target]]~ or ~[[target][name]]~) where
@@ -4067,7 +4124,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0006-links",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 1,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -4696,7 +4754,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0004-headings-20",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 12,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -4750,7 +4809,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0004-headings-unlimited",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 12,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -4916,7 +4976,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0004-properties-drawer-empty",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 1,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -4962,7 +5023,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0004-properties-drawer-not-empty",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 1,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -5018,7 +5080,8 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0004-properties-drawer-not-empty-with-comments",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 1,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -5081,7 +5144,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0007-blocks-empty",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -5562,15 +5626,14 @@ Noweb link.
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
   _ <- string "<<"
-  (path, linkName, canonical) <- blockOriginSignatureParser
+  (uuid, linkName) <- blockOriginSignatureParser
   _ <- string ">>"
   pure
     $ Link
       { target =
           LinkTargetNoweb
             LinkNoweb
-              { path = path,
-                isCanonicalPath = canonical,
+              { uuid = uuid,
                 name = linkName
               },
         name =
@@ -5584,49 +5647,42 @@ nowebLinkParser = do
 
 The [[f:blockOriginSignatureParser]] parses information about the origin of the
 block being referenced, which we call the block origin signature. For now the
-origin can be either the current Org file, or an external Org file, along with
-the name of the code block itself. If an external file is involved, it saves
-that file name instead of the current file that's being parsed.
+origin can have an optional UUID, along with the name of the code block itself.
 
-These external paths are expected to be relative to the current Org file being
-parsed; they are "incomplete" because they need to be canonicalized to an
-absolute path. Keeping canonical paths allows us to essentially treat the block
-origin signatures as UUIDs, which is a simpler mental model than having relative
-paths everywhere.
-
-However we don't do the canonicalization here during the parsing process because
-=System.Directory.canonicalizePath= requires =IO= and we don't want to taint the
-signature of =OrgParser= with =IO= in it --- because this would break all of our
-tests (we rely on =Test.Hspec.Megaparsec= which does not expose any helper
-functions that can be used with =runParserT=). In lieu of canonicalization, simply
-record whether the path is already canonical with a boolean. For external paths,
-set this to ~False~. For internal paths, set it to ~True~ because we assume that
-canonicalization has already happened by the time the source path is fed to us
-in the ~sourcePath~ of [[data:OrgParserState]].
+The UUID is prefixed with ~id:~. If it is there (explicitly), we use it after
+running some validation checks. Otherwise we assign the UUID that was parsed at
+the beginning of the document in [[f:docMetaParser]].
 
 #+name: f:blockOriginSignatureParser
 #+begin_src haskell
-blockOriginSignatureParser :: OrgParser (T.Text, T.Text, Bool)
-blockOriginSignatureParser = MP.choice [external, internal]
+blockOriginSignatureParser :: OrgParser (UUID, T.Text)
+blockOriginSignatureParser = MP.choice [explicit, implicit]
   where
     blockNameOnly :: OrgParser T.Text
     blockNameOnly =
       MP.takeWhile1P
         (Just "Noweb reference name")
         (`notElem` ['\n', '<', '>'])
-    external = do
-      _ <- string "file:"
-      file <-
+    explicit = do
+      _ <- string "id:"
+      uuidText <-
         MP.takeWhile1P
-          (Just "file char")
+          (Just "uuid char")
           (`notElem` [':', '\n', '<', '>'])
       _ <- string "::"
+      uuid <- validateUuidText uuidText
+      orgParserState <- get
+      when (not $ M.member uuid orgParserState.orgIdsMap)
+        $ fail
+        $ "UUID "
+        <> show uuidText
+        <> " not found in OrgIds"
       blockName <- blockNameOnly
-      pure (file, blockName, False)
-    internal = do
+      pure (uuid, blockName)
+    implicit = do
       orgParserState <- get
       blockName <- blockNameOnly
-      pure (T.pack orgParserState.sourcePath, blockName, True)
+      pure (orgParserState.orgId, blockName)
 #+end_src
 
 Below we check a typical case with some Noweb references in it. Note that we
@@ -5677,8 +5733,7 @@ p
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { path = "test/Lilac/ParseSpec/0007-blocks-noweb",
-                              isCanonicalPath = True,
+                            { uuid = nil,
                               name = "foo"
                             },
                       name =
@@ -5695,8 +5750,7 @@ p
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { path = "test/Lilac/ParseSpec/0007-blocks-noweb",
-                              isCanonicalPath = True,
+                            { uuid = nil,
                               name = "bar"
                             },
                       name =
@@ -5810,8 +5864,7 @@ p
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
-                              isCanonicalPath = True,
+                            { uuid = nil,
                               name = "foo"
                             },
                       name =
@@ -5828,8 +5881,7 @@ p
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
-                              isCanonicalPath = True,
+                            { uuid = nil,
                               name = "bar"
                             },
                       name =
@@ -5846,8 +5898,7 @@ p
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { path = "test/Lilac/ParseSpec/0007-blocks-noweb-intraline",
-                              isCanonicalPath = True,
+                            { uuid = nil,
                               name = "ok"
                             },
                       name =
@@ -5959,7 +6010,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText :: BToken -> T.Text
     bTokenToText = \case
       BTokenString text -> text
-      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _path _ targetName))) -> <<link-marker>> <> targetName
+      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _uuid targetName))) -> <<link-marker>> <> targetName
       _ -> ""
 #+end_src
 
@@ -6090,7 +6141,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0007-blocks-ending",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -7851,7 +7903,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0010-standalone-math-fragments",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -7924,7 +7977,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0010-standalone-math-inside-lists",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -8115,7 +8169,8 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { sourcePath = "test/Lilac/ParseSpec/0011-figures-and-blocks",
+    { orgIdsMap = fromList [],
+      orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
       listLevels = [],
@@ -8612,13 +8667,12 @@ module Lilac.ParseSpec (spec) where
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText, nil)
+import Data.UUID.Types (UUID, fromText, fromWords64, nil)
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Util qualified as LU
 import Relude
-  ( Bool (True),
-    FilePath,
+  ( FilePath,
     Identity,
     Int,
     Maybe (Just),
@@ -8698,17 +8752,10 @@ p path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser st)
+        (runStateT L.orgDocParser L.defaultOrgParserState)
         path
         input
-        `shouldParse` ( expected,
-                        L.defaultOrgParserState
-                          { L.sourcePath = relPath
-                          }
-                      )
-  where
-    st = L.defaultOrgParserState {L.sourcePath = relPath}
-    relPath = "test/Lilac/ParseSpec/" <> path
+        `shouldParse` (expected, L.defaultOrgParserState)
 #+end_src
 
 If we want to check the state (the parsing operation is stateful), we need to
@@ -8721,13 +8768,10 @@ ps path expected state = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser st)
+        (runStateT L.orgDocParser L.defaultOrgParserState)
         path
         input
         `shouldParse` (expected, state)
-  where
-    st = L.defaultOrgParserState {L.sourcePath = relPath}
-    relPath = "test/Lilac/ParseSpec/" <> path
 #+end_src
 
 Sometimes we want to test that a file will fail to parse. We do this with =pf=
@@ -8740,13 +8784,10 @@ pf path errMsg pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser st)
+        (runStateT L.orgDocParser L.defaultOrgParserState)
         path
         input
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
-  where
-    st = L.defaultOrgParserState {L.sourcePath = relPath}
-    relPath = "test/Lilac/ParseSpec/" <> path
 #+end_src
 
 Note that we use the =MP.ErrorFail= constructor because that's the only way we can
@@ -8767,13 +8808,10 @@ pfm path errorTrivial pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser st)
+        (runStateT L.orgDocParser L.defaultOrgParserState)
         path
         input
         `shouldFailWith` (err pos errorTrivial)
-  where
-    st = L.defaultOrgParserState {L.sourcePath = relPath}
-    relPath = "test/Lilac/ParseSpec/" <> path
 #+end_src
 
 The function =plainParagraph= helps to cut down on some of the repetition.
@@ -8869,6 +8907,7 @@ parseSpec = do
   <<t:self-parse>>
   <<t:0001-blankline>>
   <<t:0001-comments-only>>
+  <<t:0002-doc-metadata-properties-drawer-empty>>
   <<t:0002-doc-metadata-missing-value>>
   <<t:0002-doc-metadata-whitespace-before-value>>
   <<t:0002-doc-metadata:basic>>
@@ -9109,9 +9148,17 @@ uuidParser = do
       (string "\"")
       (string "\"")
       (MP.takeWhile1P (Just "UUID character") (/= '"'))
-  case fromText uuidText of
-    Nothing -> fail $ show uuidText <> " is not a valid UUID"
-    Just uuid -> pure uuid
+  validateUuidText uuidText
+#+end_src
+
+UUID validation delegates to the ~Data.UUID.Types.fromText~ helper.
+
+#+name: f:validateUuidText
+#+begin_src haskell
+validateUuidText :: (MonadFail m) => T.Text -> m UUID
+validateUuidText uuidText = case fromText uuidText of
+  Nothing -> fail $ show uuidText <> " is not a valid UUID"
+  Just uuid -> pure uuid
 #+end_src
 
 ** Tests
@@ -9556,7 +9603,7 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
             $ map getLinkTarget block.body
       | otherwise = acc
     getLinkTarget = \case
-      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _path _ targetName)))) -> Just targetName
+      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _uuid targetName)))) -> Just targetName
       _ -> Nothing
 #+end_src
 
@@ -9825,7 +9872,7 @@ expandBlock sc block existingPrefix =
   where
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _ _ target))))
+    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _uuid target))))
       | Just targetBlock <- EM.lookup target sc.nameToCodeBlock =
           ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
             prefix
@@ -10411,7 +10458,6 @@ import Relude
     (.),
     (<>),
   )
-import System.Directory (canonicalizePath)
 import System.OsPath qualified as P
 import Test.Hspec (Spec, it, shouldBe)
 
@@ -10450,8 +10496,7 @@ to a [[data:SourceCode]] type.
 getSourceCodeFromPath :: FilePath -> IO (Either T.Text LT.SourceCode)
 getSourceCodeFromPath path = do
   input <- LU.readFrom "test/Lilac/TangleSpec/" path
-  canonicalPath <- canonicalizePath path
-  case LP.parseOrgDoc canonicalPath input of
+  case LP.parseOrgDoc input of
     Left errMsg -> pure $ Left errMsg
     Right od ->
       pure
@@ -10687,7 +10732,6 @@ import Relude
     (<$>),
     (<>),
   )
-import System.Directory (canonicalizePath)
 import System.Exit (die)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -10751,11 +10795,11 @@ examining ~parseResult~.
 #+begin_src haskell
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
+  orgIds <- runOrgIdsEslipParser globalOpts
   input <- LU.readFrom "" checkOpts.input
-  canonicalPath <- canonicalizePath checkOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = canonicalPath})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.orgIdsMap = orgIds})
           checkOpts.input
           input
   case parseResult of
@@ -10788,12 +10832,11 @@ tangling) from a given Org file.
 #+begin_src haskell
 lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
 lilacTangle globalOpts tangleOpts = do
-  ids <- runOrgIdsEslipParser globalOpts
+  orgIds <- runOrgIdsEslipParser globalOpts
   input <- LU.readFrom "" tangleOpts.input
-  canonicalPath <- canonicalizePath tangleOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = canonicalPath})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.orgIdsMap = orgIds})
           tangleOpts.input
           input
   case parseResult of
@@ -10844,10 +10887,9 @@ just ~orgdoc.json~ for now.
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
   input <- LU.readFrom "" weaveOpts.input
-  canonicalPath <- canonicalizePath weaveOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = canonicalPath})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState)
           weaveOpts.input
           input
   case parseResult of

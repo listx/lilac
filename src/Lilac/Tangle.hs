@@ -140,7 +140,7 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
             $ map getLinkTarget block.body
       | otherwise = acc
     getLinkTarget = \case
-      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _path _ targetName)))) -> Just targetName
+      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _uuid targetName)))) -> Just targetName
       _ -> Nothing
 
 findCycles :: SourceCode -> [G.Tree BlockName]
@@ -193,7 +193,7 @@ expandBlock sc block existingPrefix =
   where
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _ _ target))))
+    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb _uuid target))))
       | Just targetBlock <- EM.lookup target sc.nameToCodeBlock =
           ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
             prefix

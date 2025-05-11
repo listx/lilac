@@ -37,7 +37,7 @@ import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText)
+import Data.UUID.Types (UUID, fromText, nil)
 import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
@@ -46,7 +46,6 @@ import Relude
     Either (Left, Right),
     Enum,
     Eq,
-    FilePath,
     Identity,
     Int,
     Map,
@@ -130,7 +129,8 @@ type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { sourcePath :: FilePath,
+  { orgIdsMap :: M.Map UUID P.OsPath,
+    orgId :: UUID,
     headingLevel :: Int,
     styleMask :: StyleMask,
     listLevels :: [Level],
@@ -146,7 +146,8 @@ data OrgParserState = OrgParserState
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { sourcePath = "",
+    { orgIdsMap = M.fromList [],
+      orgId = nil,
       headingLevel = 0,
       styleMask = styleMaskFrom [],
       listLevels = [],
@@ -250,8 +251,7 @@ instance ToJSON LinkTarget
 
 type LinkNoweb :: Type
 data LinkNoweb = LinkNoweb
-  { path :: T.Text,
-    isCanonicalPath :: Bool,
+  { uuid :: UUID,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Show)
@@ -381,9 +381,9 @@ skipNewlinesAndComments =
 lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme skipNewlinesAndComments
 
-parseOrgDoc :: FilePath -> T.Text -> Either T.Text OrgDoc
-parseOrgDoc path input = case MP.runParser
-  (runStateT orgDocParser (defaultOrgParserState {sourcePath = path}))
+parseOrgDoc :: T.Text -> Either T.Text OrgDoc
+parseOrgDoc input = case MP.runParser
+  (runStateT orgDocParser defaultOrgParserState)
   ""
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
@@ -445,6 +445,11 @@ docMetaParser = do
     $ fail
     $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
     <> (show conflictingKeys)
+  case M.lookup "ID" topLevelDrawerProps of
+    Nothing -> modify (\s -> s {orgId = nil})
+    Just uuidText -> do
+      uuid <- validateUuidText uuidText
+      modify (\s -> s {orgId = uuid})
   pure $ M.union topLevelDrawerProps metaKVs
 
 lilacExtensionsParser :: OrgParser ()
@@ -1036,15 +1041,14 @@ someBTokensParser blockType nowebOn =
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
   _ <- string "<<"
-  (path, linkName, canonical) <- blockOriginSignatureParser
+  (uuid, linkName) <- blockOriginSignatureParser
   _ <- string ">>"
   pure
     $ Link
       { target =
           LinkTargetNoweb
             LinkNoweb
-              { path = path,
-                isCanonicalPath = canonical,
+              { uuid = uuid,
                 name = linkName
               },
         name =
@@ -1055,27 +1059,34 @@ nowebLinkParser = do
           ]
       }
 
-blockOriginSignatureParser :: OrgParser (T.Text, T.Text, Bool)
-blockOriginSignatureParser = MP.choice [external, internal]
+blockOriginSignatureParser :: OrgParser (UUID, T.Text)
+blockOriginSignatureParser = MP.choice [explicit, implicit]
   where
     blockNameOnly :: OrgParser T.Text
     blockNameOnly =
       MP.takeWhile1P
         (Just "Noweb reference name")
         (`notElem` ['\n', '<', '>'])
-    external = do
-      _ <- string "file:"
-      file <-
+    explicit = do
+      _ <- string "id:"
+      uuidText <-
         MP.takeWhile1P
-          (Just "file char")
+          (Just "uuid char")
           (`notElem` [':', '\n', '<', '>'])
       _ <- string "::"
+      uuid <- validateUuidText uuidText
+      orgParserState <- get
+      when (not $ M.member uuid orgParserState.orgIdsMap)
+        $ fail
+        $ "UUID "
+        <> show uuidText
+        <> " not found in OrgIds"
       blockName <- blockNameOnly
-      pure (file, blockName, False)
-    internal = do
+      pure (uuid, blockName)
+    implicit = do
       orgParserState <- get
       blockName <- blockNameOnly
-      pure (T.pack orgParserState.sourcePath, blockName, True)
+      pure (orgParserState.orgId, blockName)
 
 ignoreSpecialCommas :: [BToken] -> [BToken]
 ignoreSpecialCommas = reverse . foldl' f []
@@ -1149,7 +1160,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText :: BToken -> T.Text
     bTokenToText = \case
       BTokenString text -> text
-      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _path _ targetName))) -> "\NUL_link" <> targetName
+      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb _uuid targetName))) -> "\NUL_link" <> targetName
       _ -> ""
 
 zeroIndent :: OrgParser (Int, Int)
@@ -1536,6 +1547,9 @@ uuidParser = do
       (string "\"")
       (string "\"")
       (MP.takeWhile1P (Just "UUID character") (/= '"'))
-  case fromText uuidText of
-    Nothing -> fail $ show uuidText <> " is not a valid UUID"
-    Just uuid -> pure uuid
+  validateUuidText uuidText
+
+validateUuidText :: (MonadFail m) => T.Text -> m UUID
+validateUuidText uuidText = case fromText uuidText of
+  Nothing -> fail $ show uuidText <> " is not a valid UUID"
+  Just uuid -> pure uuid

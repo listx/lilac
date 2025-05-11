@@ -55,7 +55,6 @@ import Relude
     (<$>),
     (<>),
   )
-import System.Directory (canonicalizePath)
 import System.Exit (die)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -215,11 +214,11 @@ runOrgIdsEslipParser globalOpts = do
 
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
+  orgIds <- runOrgIdsEslipParser globalOpts
   input <- LU.readFrom "" checkOpts.input
-  canonicalPath <- canonicalizePath checkOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = canonicalPath})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.orgIdsMap = orgIds})
           checkOpts.input
           input
   case parseResult of
@@ -239,12 +238,11 @@ lilacCheck globalOpts checkOpts = do
 
 lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
 lilacTangle globalOpts tangleOpts = do
-  ids <- runOrgIdsEslipParser globalOpts
+  orgIds <- runOrgIdsEslipParser globalOpts
   input <- LU.readFrom "" tangleOpts.input
-  canonicalPath <- canonicalizePath tangleOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = canonicalPath})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.orgIdsMap = orgIds})
           tangleOpts.input
           input
   case parseResult of
@@ -262,10 +260,9 @@ lilacTangle globalOpts tangleOpts = do
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
   input <- LU.readFrom "" weaveOpts.input
-  canonicalPath <- canonicalizePath weaveOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.sourcePath = canonicalPath})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState)
           weaveOpts.input
           input
   case parseResult of
