@@ -1,11 +1,11 @@
 module Lilac.Parse
   ( defaultOrgDoc,
-    defaultOrgIdsElispParserState,
+    defaultGOIDsParserState,
     defaultOrgParserConf,
     defaultOrgParserState,
     getOrgId,
     orgDocParser,
-    orgIdsElispParser,
+    goidsParser,
     parseOrgDoc,
     styleMaskFrom,
     OrgDoc (..),
@@ -131,7 +131,7 @@ type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { orgIdsMap :: M.Map UUID P.OsPath,
+  { goids :: M.Map UUID P.OsPath,
     orgId :: UUID,
     headingLevel :: Int,
     styleMask :: StyleMask,
@@ -148,7 +148,7 @@ data OrgParserState = OrgParserState
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { orgIdsMap = M.fromList [],
+    { goids = M.fromList [],
       orgId = nil,
       headingLevel = 0,
       styleMask = styleMaskFrom [],
@@ -344,20 +344,20 @@ data Table = Table
 
 instance ToJSON Table
 
-type OrgIdsElispParserState :: Type
-data OrgIdsElispParserState = OrgIdsElispParserState
+type GOIDsParserState :: Type
+data GOIDsParserState = GOIDsParserState
   { seenUuids :: M.Map UUID P.OsPath
   }
   deriving stock (Eq, Show)
 
-defaultOrgIdsElispParserState :: OrgIdsElispParserState
-defaultOrgIdsElispParserState =
-  OrgIdsElispParserState
+defaultGOIDsParserState :: GOIDsParserState
+defaultGOIDsParserState =
+  GOIDsParserState
     { seenUuids = M.fromList []
     }
 
-type OrgIdsElispParser :: Type -> Type
-type OrgIdsElispParser = StateT OrgIdsElispParserState (MP.ParsecT Void T.Text Identity)
+type GOIDsParser :: Type -> Type
+type GOIDsParser = StateT GOIDsParserState (MP.ParsecT Void T.Text Identity)
 
 skipNewlinesAndComments :: OrgParser ()
 skipNewlinesAndComments =
@@ -1078,11 +1078,11 @@ blockOriginSignatureParser = MP.choice [explicit, implicit]
       _ <- string "::"
       uuid <- validateUuidText uuidText
       orgParserState <- get
-      when (not $ M.member uuid orgParserState.orgIdsMap)
+      when (not $ M.member uuid orgParserState.goids)
         $ fail
         $ "UUID "
         <> show uuidText
-        <> " not found in OrgIds"
+        <> " not found in global OrgIds"
       blockName <- blockNameOnly
       pure (uuid, blockName)
     implicit = do
@@ -1493,8 +1493,8 @@ rowToTuples (rowIndex, row)
         colIndex + 1
       )
 
-orgIdsElispParser :: P.OsPath -> OrgIdsElispParser (M.Map UUID P.OsPath)
-orgIdsElispParser sourceFile = do
+goidsParser :: P.OsPath -> GOIDsParser (M.Map UUID P.OsPath)
+goidsParser sourceFile = do
   _ <- MP.optional ws
   _ <-
     MP.optional
@@ -1503,17 +1503,17 @@ orgIdsElispParser sourceFile = do
         (string ")")
         ( MP.label "Org Ids entries"
             $ MP.many
-            $ orgIdsEntryParser sourceFile
+            $ goidsEntryParser sourceFile
         )
-  orgIdsElispParserState <- get
-  put defaultOrgIdsElispParserState
-  pure orgIdsElispParserState.seenUuids
+  goidsParserState <- get
+  put defaultGOIDsParserState
+  pure goidsParserState.seenUuids
   where
-    ws :: OrgIdsElispParser ()
+    ws :: GOIDsParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'
 
-orgIdsEntryParser :: P.OsPath -> OrgIdsElispParser (P.OsPath, [UUID])
-orgIdsEntryParser sourceFile = MP.between (string "(") (string ")" >> MP.optional ws) $ do
+goidsEntryParser :: P.OsPath -> GOIDsParser (P.OsPath, [UUID])
+goidsEntryParser sourceFile = MP.between (string "(") (string ")" >> MP.optional ws) $ do
   filepath <-
     P.unsafeEncodeUtf
       <$> MP.between
@@ -1527,23 +1527,23 @@ orgIdsEntryParser sourceFile = MP.between (string "(") (string ")" >> MP.optiona
   uuids <- MP.some $ do
     _ <- ws
     uuid <- uuidParser
-    orgIdsElispParserState <- get
-    when (M.member uuid orgIdsElispParserState.seenUuids)
+    goidsParserState <- get
+    when (M.member uuid goidsParserState.seenUuids)
       $ fail
       $ "duplicate UUID: \""
       <> show uuid
       <> "\""
     put
-      orgIdsElispParserState
-        { seenUuids = M.insert uuid fp orgIdsElispParserState.seenUuids
+      goidsParserState
+        { seenUuids = M.insert uuid fp goidsParserState.seenUuids
         }
     pure uuid
   pure (fp, uuids)
   where
-    ws :: OrgIdsElispParser ()
+    ws :: GOIDsParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'
 
-uuidParser :: OrgIdsElispParser UUID
+uuidParser :: GOIDsParser UUID
 uuidParser = do
   uuidText <-
     MP.between

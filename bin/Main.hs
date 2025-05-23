@@ -196,15 +196,15 @@ lilac globalOpts = case globalOpts.subcommand of
   Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
   Weave weaveOpts -> lilacWeave weaveOpts
 
-runOrgIdsEslipParser :: GlobalOpts -> IO (M.Map UUID P.OsPath)
-runOrgIdsEslipParser globalOpts = do
+runGoidsParser :: GlobalOpts -> IO (M.Map UUID P.OsPath)
+runGoidsParser globalOpts = do
   let path = case P.encodeUtf globalOpts.orgIdLocationsFile of
         Nothing -> P.pack []
         Just p -> p
   input <- LU.readFileRobustly path
   let parseResult =
         MP.runParser
-          (runStateT (LP.orgIdsElispParser path) LP.defaultOrgIdsElispParserState)
+          (runStateT (LP.goidsParser path) LP.defaultGOIDsParserState)
           globalOpts.orgIdLocationsFile
           input
   case parseResult of
@@ -214,11 +214,11 @@ runOrgIdsEslipParser globalOpts = do
 
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
-  orgIds <- runOrgIdsEslipParser globalOpts
+  goids <- runGoidsParser globalOpts
   input <- LU.readFrom "" checkOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.orgIdsMap = orgIds})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
           checkOpts.input
           input
   case parseResult of
@@ -238,11 +238,11 @@ lilacCheck globalOpts checkOpts = do
 
 lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
 lilacTangle globalOpts tangleOpts = do
-  orgIds <- runOrgIdsEslipParser globalOpts
+  goids <- runGoidsParser globalOpts
   input <- LU.readFrom "" tangleOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.orgIdsMap = orgIds})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
           tangleOpts.input
           input
   case parseResult of

@@ -1375,6 +1375,7 @@ Direnv
 Elisp
 formatter
 Git
+GOID
 Hackage
 hardcode
 hashmap
@@ -1825,12 +1826,12 @@ interleaved tests are executed), take a look at the [[Testing framework]].
 #+begin_src haskell
 module Lilac.Parse
   ( defaultOrgDoc,
-    defaultOrgIdsElispParserState,
+    defaultGOIDsParserState,
     defaultOrgParserConf,
     defaultOrgParserState,
     getOrgId,
     orgDocParser,
-    orgIdsElispParser,
+    goidsParser,
     parseOrgDoc,
     styleMaskFrom,
     OrgDoc (..),
@@ -1973,8 +1974,8 @@ import Prelude qualified (show)
 <<data:MathFragment>>
 <<data:Figure>>
 <<data:Table>>
-<<data:OrgIdsElispParserState>>
-<<type:OrgIdsElispParser>>
+<<data:GOIDsParserState>>
+<<type:GOIDsParser>>
 
 <<f:skipNewlinesAndComments>>
 <<f:lexeme>>
@@ -2055,8 +2056,8 @@ import Prelude qualified (show)
 <<f:tableCellParser>>
 <<f:rowsToTuples>>
 <<f:rowToTuples>>
-<<f:orgIdsElispParser>>
-<<f:orgIdsEntryParser>>
+<<f:goidsParser>>
+<<f:goidsEntryParser>>
 <<f:uuidParser>>
 <<f:validateUuidText>>
 <<f:getOrgId>>
@@ -2256,7 +2257,7 @@ inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { orgIdsMap :: M.Map UUID P.OsPath,
+  { goids :: M.Map UUID P.OsPath,
     orgId :: UUID,
     headingLevel :: Int,
     styleMask :: StyleMask,
@@ -2273,7 +2274,7 @@ data OrgParserState = OrgParserState
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { orgIdsMap = M.fromList [],
+    { goids = M.fromList [],
       orgId = nil,
       headingLevel = 0,
       styleMask = styleMaskFrom [],
@@ -2286,6 +2287,9 @@ defaultOrgParserState =
       orgParserConf = defaultOrgParserConf
     }
 #+end_src
+
+The ~goids~ is the global map of all known Org IDs. This information is the same
+one encoded by Emacs as discussed in [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][ID locations file parser]].
 
 ** =orgDocParser=
 
@@ -2728,7 +2732,7 @@ ps
       ]
   )
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
@@ -2751,7 +2755,7 @@ ps
   "0001-blankline"
   (L.defaultOrgDoc [])
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
@@ -2790,7 +2794,7 @@ ps
       ]
   )
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
@@ -3197,7 +3201,7 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 1,
       styleMask = L.styleMaskFrom [],
@@ -4142,7 +4146,7 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 1,
       styleMask = L.styleMaskFrom [],
@@ -4772,7 +4776,7 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 12,
       styleMask = L.styleMaskFrom [],
@@ -4827,7 +4831,7 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 12,
       styleMask = L.styleMaskFrom [],
@@ -4994,7 +4998,7 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 1,
       styleMask = L.styleMaskFrom [],
@@ -5041,7 +5045,7 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 1,
       styleMask = L.styleMaskFrom [],
@@ -5098,7 +5102,7 @@ ps
       meta = M.fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 1,
       styleMask = L.styleMaskFrom [],
@@ -5162,7 +5166,7 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
@@ -5690,11 +5694,11 @@ blockOriginSignatureParser = MP.choice [explicit, implicit]
       _ <- string "::"
       uuid <- validateUuidText uuidText
       orgParserState <- get
-      when (not $ M.member uuid orgParserState.orgIdsMap)
+      when (not $ M.member uuid orgParserState.goids)
         $ fail
         $ "UUID "
         <> show uuidText
-        <> " not found in OrgIds"
+        <> " not found in global OrgIds"
       blockName <- blockNameOnly
       pure (uuid, blockName)
     implicit = do
@@ -6160,7 +6164,7 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
@@ -7922,7 +7926,7 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
@@ -7996,7 +8000,7 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
@@ -8188,7 +8192,7 @@ ps
       meta = fromList []
     }
   L.OrgParserState
-    { orgIdsMap = fromList [],
+    { goids = fromList [],
       orgId = nil,
       headingLevel = 0,
       styleMask = L.styleMaskFrom [],
@@ -8753,8 +8757,8 @@ type Parser = <<Concrete type for Megaparsec>>
 <<f:pfm>>
 <<f:plainParagraph>>
 <<f:plainHeading>>
-<<f:pOrgIdsElisp>>
-<<f:pfOrgIdsElisp>>
+<<f:pGOIDs>>
+<<f:pfGOIDs>>
 #+end_src
 
 The ~Parser~ type synonym uses the same [[Concrete type for Megaparsec][concrete types]] as we do for
@@ -8871,24 +8875,23 @@ plainHeading level =
     )
 #+end_src
 
-This [[f:pOrgIdsElisp]] helper parses [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org
-ID locations files]].
+This [[f:pGOIDs]] helper parses [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org ID locations files]].
 
-#+name: f:pOrgIdsElisp
+#+name: f:pGOIDs
 #+begin_src haskell
-pOrgIdsElisp :: FilePath -> [(T.Text, FilePath)] -> Spec
-pOrgIdsElisp path expected = do
+pGOIDs :: FilePath -> [(T.Text, FilePath)] -> Spec
+pGOIDs path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT (L.orgIdsElispParser $ P.unsafeEncodeUtf path) st)
+        (runStateT (L.goidsParser $ P.unsafeEncodeUtf path) st)
         path
         input
         `shouldParse` ( M.fromList $ map f expected,
-                        L.defaultOrgIdsElispParserState
+                        L.defaultGOIDsParserState
                       )
   where
-    st = L.defaultOrgIdsElispParserState
+    st = L.defaultGOIDsParserState
     f :: (T.Text, FilePath) -> (UUID, P.OsPath)
     f (uuidText, filePath)
       | Just uuid <- fromText uuidText,
@@ -8897,21 +8900,21 @@ pOrgIdsElisp path expected = do
       | otherwise = (nil, P.pack [])
 #+end_src
 
-The [[f:pfOrgIdsElisp]] helper expects failures.
+The [[f:pfGOIDs]] helper expects failures.
 
-#+name: f:pfOrgIdsElisp
+#+name: f:pfGOIDs
 #+begin_src haskell
-pfOrgIdsElisp :: FilePath -> String -> Int -> Spec
-pfOrgIdsElisp path errMsg pos = do
+pfGOIDs :: FilePath -> String -> Int -> Spec
+pfGOIDs path errMsg pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT (L.orgIdsElispParser $ P.unsafeEncodeUtf path) st)
+        (runStateT (L.goidsParser $ P.unsafeEncodeUtf path) st)
         path
         input
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
   where
-    st = L.defaultOrgIdsElispParserState
+    st = L.defaultGOIDsParserState
 #+end_src
 
 *** All test cases
@@ -8999,18 +9002,18 @@ parseSpec = do
   <<t:0011-figures-and-blocks>>
   <<t:0012-tables-and-prose>>
   <<t:0012-tables-inside-lists>>
-  <<t:0200-org-ids-elisp-file-empty>>
-  <<t:0200-org-ids-elisp-file-empty-list>>
-  <<t:0200-org-ids-elisp-file>>
-  <<t:0200-org-ids-elisp-file-oneline>>
-  <<t:0200-org-ids-elisp-file-caps>>
-  <<t:0200-org-ids-elisp-file-non-uuid>>
-  <<t:0200-org-ids-elisp-file-non-uuid-x>>
-  <<t:0200-org-ids-elisp-file-duplicate-uuid>>
-  <<t:0200-org-ids-elisp-file-absolute>>
+  <<t:0200-goids-file-empty>>
+  <<t:0200-goids-file-empty-list>>
+  <<t:0200-goids-file>>
+  <<t:0200-goids-file-oneline>>
+  <<t:0200-goids-file-caps>>
+  <<t:0200-goids-file-non-uuid>>
+  <<t:0200-goids-file-non-uuid-x>>
+  <<t:0200-goids-file-duplicate-uuid>>
+  <<t:0200-goids-file-absolute>>
 #+end_src
 
-* ID locations file parser
+* GOIDs file parser
 :PROPERTIES:
 :ID:       96f8cbda-abca-48bd-bb89-512aaac61ca8
 :END:
@@ -9020,6 +9023,10 @@ environment for writing Org files). When the ~org-id-locations-file~ and
 ~org-id-track-globally~ variables are set, Emacs remembers which files have which
 Org IDs (where the "ID" is the UUID generated by ~org-id-get-create~ and
 ~org-id-store-link~).
+
+The information stored in this file is global, because Emacs will update it
+whenever it encounters Org files. For this reason we call the information
+contained within this file as the "global Org IDs" or =GOIDs= for short.
 
 We want to be able to read this file because it is automatically updated by
 Emacs for us. Then we can have a good idea of where each ID comes from, so that
@@ -9038,7 +9045,7 @@ multiple Org files if needed. One simple example is version information that
 we might want to define only in a single place, but which might be referenced
 in other places, across multiple Org files.
 
-** ID parser
+** GOIDs parser
 
 The syntax is of a list of list of strings, in Emacs lisp. The inner lists have
 the relative file path of the Org file as the first element, followed by the
@@ -9048,7 +9055,7 @@ right-to-left, just like Haskell's ~:~ (aka "cons") function).
 Below is an example, with newlines inserted for better presentation (Emacs does
 not use newlines here, and so in the wild everything is in one line):
 
-#+name: ex:OrgIdsElispFile
+#+name: ex:GOIDsFile
 #+begin_src emacs-lisp
 (("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
  ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
@@ -9060,12 +9067,12 @@ not use newlines here, and so in the wild everything is in one line):
 Each Org ID is just a UUIDv4 string.
 
 For the monad transformer stack, we don't use the [[type:OrgParser]] because we're
-not parsing an Org file. Instead we use a separate ~OrgIdsElispParser~ type.
+not parsing an Org file. Instead we use a separate ~GOIDsParser~ type.
 
-#+name: type:OrgIdsElispParser
+#+name: type:GOIDsParser
 #+begin_src haskell
-type OrgIdsElispParser :: Type -> Type
-type OrgIdsElispParser = StateT OrgIdsElispParserState (<<Concrete type for Megaparsec>>)
+type GOIDsParser :: Type -> Type
+type GOIDsParser = StateT GOIDsParserState (<<Concrete type for Megaparsec>>)
 #+end_src
 
 When we're parsing these UUIDs, we want to check that we're not parsing in
@@ -9073,17 +9080,17 @@ duplicate UUIDs that have been seen elsewhere. Presumably Emacs performs this
 check, but it's easy enough to do it ourselves here, so design a stateful type
 we can use during the parser as we see each UUID.
 
-#+name: data:OrgIdsElispParserState
+#+name: data:GOIDsParserState
 #+begin_src haskell
-type OrgIdsElispParserState :: Type
-data OrgIdsElispParserState = OrgIdsElispParserState
+type GOIDsParserState :: Type
+data GOIDsParserState = GOIDsParserState
   { seenUuids :: M.Map UUID P.OsPath
   }
   deriving stock (Eq, Show)
 
-defaultOrgIdsElispParserState :: OrgIdsElispParserState
-defaultOrgIdsElispParserState =
-  OrgIdsElispParserState
+defaultGOIDsParserState :: GOIDsParserState
+defaultGOIDsParserState =
+  GOIDsParserState
     { seenUuids = M.fromList []
     }
 #+end_src
@@ -9097,10 +9104,10 @@ The overall parser returns a map of UUIDs to file paths. We reset the embedded
 state before returning, because we don't want to complicate tests by keeping
 around the seen UUIDs.
 
-#+name: f:orgIdsElispParser
+#+name: f:goidsParser
 #+begin_src haskell
-orgIdsElispParser :: P.OsPath -> OrgIdsElispParser (M.Map UUID P.OsPath)
-orgIdsElispParser sourceFile = do
+goidsParser :: P.OsPath -> GOIDsParser (M.Map UUID P.OsPath)
+goidsParser sourceFile = do
   _ <- MP.optional ws
   _ <-
     MP.optional
@@ -9109,22 +9116,22 @@ orgIdsElispParser sourceFile = do
         (string ")")
         ( MP.label "Org Ids entries"
             $ MP.many
-            $ orgIdsEntryParser sourceFile
+            $ goidsEntryParser sourceFile
         )
-  orgIdsElispParserState <- get
-  put defaultOrgIdsElispParserState
-  pure orgIdsElispParserState.seenUuids
+  goidsParserState <- get
+  put defaultGOIDsParserState
+  pure goidsParserState.seenUuids
   where
-    ws :: OrgIdsElispParser ()
+    ws :: GOIDsParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'
 #+end_src
 
 Within each "entry", we need to parse the file path, and any number of UUIDs.
 
-#+name: f:orgIdsEntryParser
+#+name: f:goidsEntryParser
 #+begin_src haskell
-orgIdsEntryParser :: P.OsPath -> OrgIdsElispParser (P.OsPath, [UUID])
-orgIdsEntryParser sourceFile = MP.between (string "(") (string ")" >> MP.optional ws) $ do
+goidsEntryParser :: P.OsPath -> GOIDsParser (P.OsPath, [UUID])
+goidsEntryParser sourceFile = MP.between (string "(") (string ")" >> MP.optional ws) $ do
   filepath <-
     P.unsafeEncodeUtf
       <$> MP.between
@@ -9138,20 +9145,20 @@ orgIdsEntryParser sourceFile = MP.between (string "(") (string ")" >> MP.optiona
   uuids <- MP.some $ do
     _ <- ws
     uuid <- uuidParser
-    orgIdsElispParserState <- get
-    when (M.member uuid orgIdsElispParserState.seenUuids)
+    goidsParserState <- get
+    when (M.member uuid goidsParserState.seenUuids)
       $ fail
       $ "duplicate UUID: \""
       <> show uuid
       <> "\""
     put
-      orgIdsElispParserState
-        { seenUuids = M.insert uuid fp orgIdsElispParserState.seenUuids
+      goidsParserState
+        { seenUuids = M.insert uuid fp goidsParserState.seenUuids
         }
     pure uuid
   pure (fp, uuids)
   where
-    ws :: OrgIdsElispParser ()
+    ws :: GOIDsParser ()
     ws = void . MP.some $ char ' ' <|> char '\n'
 #+end_src
 
@@ -9160,7 +9167,7 @@ before.
 
 #+name: f:uuidParser
 #+begin_src haskell
-uuidParser :: OrgIdsElispParser UUID
+uuidParser :: GOIDsParser UUID
 uuidParser = do
   uuidText <-
     MP.between
@@ -9184,34 +9191,34 @@ validateUuidText uuidText = case fromText uuidText of
 
 Parsing an empty file shouldn't result in failure.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-empty
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-empty
 #+begin_src emacs-lisp
 #+end_src
 
-#+name: t:0200-org-ids-elisp-file-empty
+#+name: t:0200-goids-file-empty
 #+begin_src haskell
-pOrgIdsElisp
-  "0200-org-ids-elisp-file-empty"
+pGOIDs
+  "0200-goids-file-empty"
   []
 #+end_src
 
 Parsing an empty list should result in an empty result as well.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-empty-list
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-empty-list
 #+begin_src emacs-lisp
 ()
 #+end_src
 
-#+name: t:0200-org-ids-elisp-file-empty-list
+#+name: t:0200-goids-file-empty-list
 #+begin_src haskell
-pOrgIdsElisp
-  "0200-org-ids-elisp-file-empty-list"
+pGOIDs
+  "0200-goids-file-empty-list"
   []
 #+end_src
 
-Example from [[ex:OrgIdsElispFile]].
+Example from [[ex:GOIDsFile]].
 
-#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file
 #+begin_src emacs-lisp
 (("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
  ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
@@ -9220,10 +9227,10 @@ Example from [[ex:OrgIdsElispFile]].
                             "b449a097-d702-4fd6-98de-cb81f7e49177"))
 #+end_src
 
-#+name: t:0200-org-ids-elisp-file
+#+name: t:0200-goids-file
 #+begin_src haskell
-pOrgIdsElisp
-  "0200-org-ids-elisp-file"
+pGOIDs
+  "0200-goids-file"
   [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
     ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
     ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
@@ -9234,15 +9241,15 @@ pOrgIdsElisp
 
 Parsing single-line content should also work.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-oneline
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-oneline
 #+begin_src emacs-lisp
 (("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb") ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7" "ce9af5ef-6559-4ffb-82c1-a439214eda6d" "8f5752c0-6162-4de6-9ceb-f78ba584722c" "b449a097-d702-4fd6-98de-cb81f7e49177"))
 #+end_src
 
-#+name: t:0200-org-ids-elisp-file-oneline
+#+name: t:0200-goids-file-oneline
 #+begin_src haskell
-pOrgIdsElisp
-  "0200-org-ids-elisp-file-oneline"
+pGOIDs
+  "0200-goids-file-oneline"
   [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
     ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
     ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
@@ -9254,15 +9261,15 @@ pOrgIdsElisp
 Though Emacs does not use capital letters for the hex digits, we should still
 support them just in case.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-caps
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-caps
 #+begin_src emacs-lisp
 (("note/raw/recreation.org" "A1E6D0D5-4540-423B-864E-B96AD06C56EB"))
 #+end_src
 
-#+name: t:0200-org-ids-elisp-file-caps
+#+name: t:0200-goids-file-caps
 #+begin_src haskell
-pOrgIdsElisp
-  "0200-org-ids-elisp-file-caps"
+pGOIDs
+  "0200-goids-file-caps"
   [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org")
   ]
 #+end_src
@@ -9270,7 +9277,7 @@ pOrgIdsElisp
 We should run into an error if a UUID string is corrupted (is not a UUID). The
 last UUID here has an extra ~e~ character at the end and should fail.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-non-uuid
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-non-uuid
 #+begin_src emacs-lisp
 (("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
  ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
@@ -9279,10 +9286,10 @@ last UUID here has an extra ~e~ character at the end and should fail.
                             "b449a097-d702-4fd6-98de-cb81f7e49177e"))
 #+end_src
 
-#+name: t:0200-org-ids-elisp-file-non-uuid
+#+name: t:0200-goids-file-non-uuid
 #+begin_src haskell
-pfOrgIdsElisp
-  "0200-org-ids-elisp-file-non-uuid"
+pfGOIDs
+  "0200-goids-file-non-uuid"
   "\"b449a097-d702-4fd6-98de-cb81f7e49177e\" is not a valid UUID"
   336
 #+end_src
@@ -9290,22 +9297,22 @@ pfOrgIdsElisp
 Not having hex digits is also a problem. There is an ~x~ character at the end of
 the UUID below.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-non-uuid-x
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-non-uuid-x
 #+begin_src emacs-lisp
 (("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56ex"))
 #+end_src
 
-#+name: t:0200-org-ids-elisp-file-non-uuid-x
+#+name: t:0200-goids-file-non-uuid-x
 #+begin_src haskell
-pfOrgIdsElisp
-  "0200-org-ids-elisp-file-non-uuid-x"
+pfGOIDs
+  "0200-goids-file-non-uuid-x"
   "\"a1e6d0d5-4540-423b-864e-b96ad06c56ex\" is not a valid UUID"
   66
 #+end_src
 
 If the UUID has a duplicate, that should also trigger a failure.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-duplicate-uuid
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-duplicate-uuid
 #+begin_src emacs-lisp
 (("note/raw/recreation.org" "b449a097-d702-4fd6-98de-cb81f7e49177")
  ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
@@ -9314,17 +9321,17 @@ If the UUID has a duplicate, that should also trigger a failure.
                             "b449a097-d702-4fd6-98de-cb81f7e49177"))
 #+end_src
 
-#+name: t:0200-org-ids-elisp-file-duplicate-uuid
+#+name: t:0200-goids-file-duplicate-uuid
 #+begin_src haskell
-pfOrgIdsElisp
-  "0200-org-ids-elisp-file-duplicate-uuid"
+pfGOIDs
+  "0200-goids-file-duplicate-uuid"
   "duplicate UUID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
   335
 #+end_src
 
 If the path is absolute, we should leave it as is.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-org-ids-elisp-file-absolute
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-absolute
 #+begin_src emacs-lisp
 (("/foo/bar" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
  ("/baz"     "3c576a02-418b-431b-ab96-e4936e977fb7"
@@ -9333,10 +9340,10 @@ If the path is absolute, we should leave it as is.
              "b449a097-d702-4fd6-98de-cb81f7e49177"))
 #+end_src
 
-#+name: t:0200-org-ids-elisp-file-absolute
+#+name: t:0200-goids-file-absolute
 #+begin_src haskell
-pOrgIdsElisp
-  "0200-org-ids-elisp-file-absolute"
+pGOIDs
+  "0200-goids-file-absolute"
   [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "/foo/bar"),
     ("3c576a02-418b-431b-ab96-e4936e977fb7", "/baz"),
     ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "/baz"),
@@ -10798,7 +10805,7 @@ import Text.Pretty.Simple qualified as PP
 
 <<f:lilac-main>>
 <<f:lilac>>
-<<f:runOrgIdsEslipParser>>
+<<f:runGoidsParser>>
 <<f:lilacCheck>>
 <<f:lilacTangle>>
 <<f:lilacWeave>>
@@ -10852,11 +10859,11 @@ examining ~parseResult~.
 #+begin_src haskell
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
-  orgIds <- runOrgIdsEslipParser globalOpts
+  goids <- runGoidsParser globalOpts
   input <- LU.readFrom "" checkOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.orgIdsMap = orgIds})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
           checkOpts.input
           input
   case parseResult of
@@ -10889,11 +10896,11 @@ tangling) from a given Org file.
 #+begin_src haskell
 lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
 lilacTangle globalOpts tangleOpts = do
-  orgIds <- runOrgIdsEslipParser globalOpts
+  goids <- runGoidsParser globalOpts
   input <- LU.readFrom "" tangleOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.orgIdsMap = orgIds})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
           tangleOpts.input
           input
   case parseResult of
@@ -10915,17 +10922,17 @@ come from files other than the one we're directly tangling (i.e., if the Org
 file we're tangling is depending on a code block that is defined in another Org
 file).
 
-#+name: f:runOrgIdsEslipParser
+#+name: f:runGoidsParser
 #+begin_src haskell
-runOrgIdsEslipParser :: GlobalOpts -> IO (M.Map UUID P.OsPath)
-runOrgIdsEslipParser globalOpts = do
+runGoidsParser :: GlobalOpts -> IO (M.Map UUID P.OsPath)
+runGoidsParser globalOpts = do
   let path = case P.encodeUtf globalOpts.orgIdLocationsFile of
         Nothing -> P.pack []
         Just p -> p
   input <- LU.readFileRobustly path
   let parseResult =
         MP.runParser
-          (runStateT (LP.orgIdsElispParser path) LP.defaultOrgIdsElispParserState)
+          (runStateT (LP.goidsParser path) LP.defaultGOIDsParserState)
           globalOpts.orgIdLocationsFile
           input
   case parseResult of

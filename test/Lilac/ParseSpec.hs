@@ -114,19 +114,19 @@ plainHeading level =
         }
     )
 
-pOrgIdsElisp :: FilePath -> [(T.Text, FilePath)] -> Spec
-pOrgIdsElisp path expected = do
+pGOIDs :: FilePath -> [(T.Text, FilePath)] -> Spec
+pGOIDs path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT (L.orgIdsElispParser $ P.unsafeEncodeUtf path) st)
+        (runStateT (L.goidsParser $ P.unsafeEncodeUtf path) st)
         path
         input
         `shouldParse` ( M.fromList $ map f expected,
-                        L.defaultOrgIdsElispParserState
+                        L.defaultGOIDsParserState
                       )
   where
-    st = L.defaultOrgIdsElispParserState
+    st = L.defaultGOIDsParserState
     f :: (T.Text, FilePath) -> (UUID, P.OsPath)
     f (uuidText, filePath)
       | Just uuid <- fromText uuidText,
@@ -134,17 +134,17 @@ pOrgIdsElisp path expected = do
           (uuid, osPath)
       | otherwise = (nil, P.pack [])
 
-pfOrgIdsElisp :: FilePath -> String -> Int -> Spec
-pfOrgIdsElisp path errMsg pos = do
+pfGOIDs :: FilePath -> String -> Int -> Spec
+pfGOIDs path errMsg pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT (L.orgIdsElispParser $ P.unsafeEncodeUtf path) st)
+        (runStateT (L.goidsParser $ P.unsafeEncodeUtf path) st)
         path
         input
         `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
   where
-    st = L.defaultOrgIdsElispParserState
+    st = L.defaultGOIDsParserState
 
 parseSpec :: Spec
 parseSpec = do
@@ -174,7 +174,7 @@ parseSpec = do
     "0001-blankline"
     (L.defaultOrgDoc [])
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
         styleMask = L.styleMaskFrom [],
@@ -223,7 +223,7 @@ parseSpec = do
         ]
     )
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
         styleMask = L.styleMaskFrom [],
@@ -246,7 +246,7 @@ parseSpec = do
         ]
     )
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
         styleMask = L.styleMaskFrom [],
@@ -289,7 +289,7 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 12,
         styleMask = L.styleMaskFrom [],
@@ -322,7 +322,7 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 12,
         styleMask = L.styleMaskFrom [],
@@ -368,7 +368,7 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 1,
         styleMask = L.styleMaskFrom [],
@@ -402,7 +402,7 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 1,
         styleMask = L.styleMaskFrom [],
@@ -436,7 +436,7 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 1,
         styleMask = L.styleMaskFrom [],
@@ -651,7 +651,7 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 1,
         styleMask = L.styleMaskFrom [],
@@ -950,7 +950,7 @@ parseSpec = do
         meta = M.fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 1,
         styleMask = L.styleMaskFrom [],
@@ -1005,7 +1005,7 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
         styleMask = L.styleMaskFrom [],
@@ -1092,7 +1092,7 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
         styleMask = L.styleMaskFrom [],
@@ -1666,7 +1666,7 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
         styleMask = L.styleMaskFrom [],
@@ -1720,7 +1720,7 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
         styleMask = L.styleMaskFrom [],
@@ -1795,7 +1795,7 @@ parseSpec = do
         meta = fromList []
       }
     L.OrgParserState
-      { orgIdsMap = fromList [],
+      { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
         styleMask = L.styleMaskFrom [],
@@ -2065,16 +2065,16 @@ parseSpec = do
         meta = fromList []
       }
 
-  pOrgIdsElisp
-    "0200-org-ids-elisp-file-empty"
+  pGOIDs
+    "0200-goids-file-empty"
     []
 
-  pOrgIdsElisp
-    "0200-org-ids-elisp-file-empty-list"
+  pGOIDs
+    "0200-goids-file-empty-list"
     []
 
-  pOrgIdsElisp
-    "0200-org-ids-elisp-file"
+  pGOIDs
+    "0200-goids-file"
     [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
       ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
       ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
@@ -2082,8 +2082,8 @@ parseSpec = do
       ("b449a097-d702-4fd6-98de-cb81f7e49177", "./../prog/lilac/lilac.org")
     ]
 
-  pOrgIdsElisp
-    "0200-org-ids-elisp-file-oneline"
+  pGOIDs
+    "0200-goids-file-oneline"
     [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
       ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
       ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
@@ -2091,28 +2091,28 @@ parseSpec = do
       ("b449a097-d702-4fd6-98de-cb81f7e49177", "./../prog/lilac/lilac.org")
     ]
 
-  pOrgIdsElisp
-    "0200-org-ids-elisp-file-caps"
+  pGOIDs
+    "0200-goids-file-caps"
     [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org")
     ]
 
-  pfOrgIdsElisp
-    "0200-org-ids-elisp-file-non-uuid"
+  pfGOIDs
+    "0200-goids-file-non-uuid"
     "\"b449a097-d702-4fd6-98de-cb81f7e49177e\" is not a valid UUID"
     336
 
-  pfOrgIdsElisp
-    "0200-org-ids-elisp-file-non-uuid-x"
+  pfGOIDs
+    "0200-goids-file-non-uuid-x"
     "\"a1e6d0d5-4540-423b-864e-b96ad06c56ex\" is not a valid UUID"
     66
 
-  pfOrgIdsElisp
-    "0200-org-ids-elisp-file-duplicate-uuid"
+  pfGOIDs
+    "0200-goids-file-duplicate-uuid"
     "duplicate UUID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
     335
 
-  pOrgIdsElisp
-    "0200-org-ids-elisp-file-absolute"
+  pGOIDs
+    "0200-goids-file-absolute"
     [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "/foo/bar"),
       ("3c576a02-418b-431b-ab96-e4936e977fb7", "/baz"),
       ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "/baz"),
