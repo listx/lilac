@@ -31,6 +31,7 @@ module Lilac.Parse
     orgDocParser,
     goidsParser,
     parseOrgDoc,
+    runGoidsParser,
     styleMaskFrom,
     OrgDoc (..),
     OrgParserConf (..),
@@ -72,6 +73,8 @@ import Relude
     Either (Left, Right),
     Enum,
     Eq,
+    FilePath,
+    IO,
     Identity,
     Int,
     Map,
@@ -144,6 +147,7 @@ import Relude
   )
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
+import System.Exit (die)
 import System.IO (utf8)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -259,6 +263,7 @@ import Prelude qualified (show)
 <<f:goidsEntryParser>>
 <<f:uuidParser>>
 <<f:validateUuidText>>
+<<id:ef1e620c-357a-4350-b85a-ba813dabf8c7::f:runGoidsParser>>
 <<f:getOrgId>>
 <<f:extractGOIDs>>
 #+end_src

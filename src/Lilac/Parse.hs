@@ -8,6 +8,7 @@ module Lilac.Parse
     orgDocParser,
     goidsParser,
     parseOrgDoc,
+    runGoidsParser,
     styleMaskFrom,
     OrgDoc (..),
     OrgParserConf (..),
@@ -49,6 +50,8 @@ import Relude
     Either (Left, Right),
     Enum,
     Eq,
+    FilePath,
+    IO,
     Identity,
     Int,
     Map,
@@ -121,6 +124,7 @@ import Relude
   )
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
+import System.Exit (die)
 import System.IO (utf8)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -1566,6 +1570,22 @@ validateUuidText :: (MonadFail m) => T.Text -> m UUID
 validateUuidText uuidText = case fromText uuidText of
   Nothing -> fail $ show uuidText <> " is not a valid UUID"
   Just uuid -> pure uuid
+
+runGoidsParser :: FilePath -> IO (M.Map UUID P.OsPath)
+runGoidsParser orgIdLocationsFile = do
+  let path = case P.encodeUtf orgIdLocationsFile of
+        Nothing -> P.pack []
+        Just p -> p
+  input <- LU.readFileRobustly path
+  let parseResult =
+        MP.runParser
+          (runStateT (goidsParser path) defaultGOIDsParserState)
+          orgIdLocationsFile
+          input
+  case parseResult of
+    Left errBundle -> do
+      die $ MP.errorBundlePretty errBundle
+    Right (ids, _) -> pure ids
 
 getOrgId :: OrgDoc -> UUID
 getOrgId od

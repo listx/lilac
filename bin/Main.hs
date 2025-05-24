@@ -1,7 +1,5 @@
 module Main (main) where
 
-import Data.Map.Strict qualified as M
-import Data.UUID.Types (UUID)
 import Data.Version (showVersion)
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
@@ -41,7 +39,6 @@ import Relude
     Either (Left, Right),
     FilePath,
     IO,
-    Maybe (Just, Nothing),
     Type,
     concat,
     foldlM,
@@ -226,25 +223,9 @@ lilac globalOpts = case globalOpts.subcommand of
   Weave weaveOpts -> lilacWeave weaveOpts
   WriteGOIDs writeGOIDsOpts -> lilacWriteGOIDs writeGOIDsOpts
 
-runGoidsParser :: GlobalOpts -> IO (M.Map UUID P.OsPath)
-runGoidsParser globalOpts = do
-  let path = case P.encodeUtf globalOpts.orgIdLocationsFile of
-        Nothing -> P.pack []
-        Just p -> p
-  input <- LU.readFileRobustly path
-  let parseResult =
-        MP.runParser
-          (runStateT (LP.goidsParser path) LP.defaultGOIDsParserState)
-          globalOpts.orgIdLocationsFile
-          input
-  case parseResult of
-    Left errBundle -> do
-      die $ MP.errorBundlePretty errBundle
-    Right (ids, _) -> pure ids
-
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
 lilacCheck globalOpts checkOpts = do
-  goids <- runGoidsParser globalOpts
+  goids <- LP.runGoidsParser globalOpts.orgIdLocationsFile
   input <- LU.readFrom "" checkOpts.input
   let parseResult =
         MP.runParser
@@ -269,7 +250,7 @@ lilacCheck globalOpts checkOpts = do
 
 lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
 lilacTangle globalOpts tangleOpts = do
-  goids <- runGoidsParser globalOpts
+  goids <- LP.runGoidsParser globalOpts.orgIdLocationsFile
   input <- LU.readFrom "" tangleOpts.input
   let parseResult =
         MP.runParser

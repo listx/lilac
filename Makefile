@@ -8,8 +8,11 @@ lint: lilac.org lilac-parse.org
 
 tangle: lilac.org lilac-parse.org tangle-fe
 	git ls-files | grep '\.org$$' | xargs lilac write-goids
-	lilac tangle lilac.org
+	cd test && find Lilac/TangleSpec -type f \
+		| sort \
+		| xargs lilac write-goids --out-file .orgids
 	lilac tangle lilac-parse.org
+	lilac tangle lilac.org
 	touch tangle
 tangle-fe: fe.org
 	lilac tangle fe.org
