@@ -28,6 +28,7 @@ import Options.Applicative
     short,
     showDefault,
     showHelpOnEmpty,
+    some,
     str,
     strOption,
     value,
@@ -43,6 +44,7 @@ import Relude
     Maybe (Just, Nothing),
     Type,
     concat,
+    foldlM,
     map,
     not,
     null,
@@ -73,6 +75,7 @@ data Subcommand
   = Check CheckOpts
   | Tangle TangleOpts
   | Weave WeaveOpts
+  | WriteGOIDs WriteGOIDsOpts
 
 type CheckOpts :: Type
 data CheckOpts = CheckOpts
@@ -88,6 +91,12 @@ type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { input :: FilePath,
     outDir :: FilePath
+  }
+
+type WriteGOIDsOpts :: Type
+data WriteGOIDsOpts = WriteGOIDsOpts
+  { outFile :: FilePath,
+    inputs :: [FilePath]
   }
 
 type OptionHandler :: Type -> Type
@@ -127,6 +136,7 @@ subcommandHandler =
     <> cmdCheck
     <> cmdTangle
     <> cmdWeave
+    <> cmdWriteGOIDs
   where
     cmdCheck =
       command
@@ -146,6 +156,12 @@ subcommandHandler =
         $ info
           (Weave <$> weaveOptsHandler)
           (progDesc "generate JSON representation")
+    cmdWriteGOIDs =
+      command
+        "write-goids"
+        $ info
+          (WriteGOIDs <$> writeGOIDsOptsHandler)
+          (progDesc "generate global Org IDs from a list of Org files")
 
 checkOptsHandler :: OptionHandler CheckOpts
 checkOptsHandler =
@@ -169,6 +185,19 @@ weaveOptsHandler =
                 <> help "directory for saving the orgdoc.json file"
             )
         )
+
+writeGOIDsOptsHandler :: OptionHandler WriteGOIDsOpts
+writeGOIDsOptsHandler =
+  WriteGOIDsOpts
+    <$> ( strOption
+            ( long "out-file"
+                <> metavar "FILE"
+                <> value ".orgids"
+                <> showDefault
+                <> help "file to save global Org IDs"
+            )
+        )
+    <*> (some $ argument str (metavar "FILES..."))
 
 main :: IO ()
 main = do
@@ -195,6 +224,7 @@ lilac globalOpts = case globalOpts.subcommand of
   Check checkOpts -> lilacCheck globalOpts checkOpts
   Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
   Weave weaveOpts -> lilacWeave weaveOpts
+  WriteGOIDs writeGOIDsOpts -> lilacWriteGOIDs writeGOIDsOpts
 
 runGoidsParser :: GlobalOpts -> IO (M.Map UUID P.OsPath)
 runGoidsParser globalOpts = do
@@ -276,3 +306,14 @@ lilacWeave weaveOpts = do
       outPath' <- P.decodeUtf outPath
       LW.weaveToDisk outPath' orgDoc
       putStrLn "Finished weaving."
+
+lilacWriteGOIDs :: WriteGOIDsOpts -> IO ()
+lilacWriteGOIDs writeGOIDsOpts = do
+  outFile <- P.encodeUtf $ writeGOIDsOpts.outFile
+  inputs <- foldlM readInputs [] writeGOIDsOpts.inputs
+  LU.writeFileRobustly outFile $ LP.extractGOIDs inputs
+  where
+    readInputs acc orgFileStr = do
+      orgFileOsPath <- P.encodeUtf orgFileStr
+      orgFileContent <- LU.readFileRobustly orgFileOsPath
+      pure $ (orgFileOsPath, orgFileContent) : acc

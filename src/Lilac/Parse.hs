@@ -3,6 +3,7 @@ module Lilac.Parse
     defaultGOIDsParserState,
     defaultOrgParserConf,
     defaultOrgParserState,
+    extractGOIDs,
     getOrgId,
     orgDocParser,
     goidsParser,
@@ -120,6 +121,7 @@ import Relude
   )
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
+import System.IO (utf8)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, string)
@@ -1078,7 +1080,10 @@ blockOriginSignatureParser = MP.choice [explicit, implicit]
       _ <- string "::"
       uuid <- validateUuidText uuidText
       orgParserState <- get
-      when (not $ M.member uuid orgParserState.goids)
+      when
+        ( (M.size orgParserState.goids > 0)
+            && (not $ M.member uuid orgParserState.goids)
+        )
         $ fail
         $ "UUID "
         <> show uuidText
@@ -1495,12 +1500,12 @@ rowToTuples (rowIndex, row)
 
 goidsParser :: P.OsPath -> GOIDsParser (M.Map UUID P.OsPath)
 goidsParser sourceFile = do
-  _ <- MP.optional ws
+  _ <- ws
   _ <-
     MP.optional
       $ MP.between
-        (string "(")
-        (string ")")
+        (string "(" >> ws)
+        (string ")" >> ws)
         ( MP.label "Org Ids entries"
             $ MP.many
             $ goidsEntryParser sourceFile
@@ -1510,23 +1515,23 @@ goidsParser sourceFile = do
   pure goidsParserState.seenUuids
   where
     ws :: GOIDsParser ()
-    ws = void . MP.some $ char ' ' <|> char '\n'
+    ws = void . MP.many $ char ' ' <|> char '\n'
 
 goidsEntryParser :: P.OsPath -> GOIDsParser (P.OsPath, [UUID])
-goidsEntryParser sourceFile = MP.between (string "(") (string ")" >> MP.optional ws) $ do
+goidsEntryParser sourceFile = betweenParens $ do
   filepath <-
     P.unsafeEncodeUtf
       <$> MP.between
         (string "\"")
-        (string "\"")
+        (string "\"" >> ws)
         (MP.label "filepath" $ MP.some $ MP.anySingleBut '"')
   let fp =
         if P.isAbsolute filepath
           then filepath
           else P.combine (P.takeDirectory sourceFile) filepath
   uuids <- MP.some $ do
-    _ <- ws
     uuid <- uuidParser
+    _ <- ws
     goidsParserState <- get
     when (M.member uuid goidsParserState.seenUuids)
       $ fail
@@ -1540,8 +1545,13 @@ goidsEntryParser sourceFile = MP.between (string "(") (string ")" >> MP.optional
     pure uuid
   pure (fp, uuids)
   where
+    betweenParens :: GOIDsParser a -> GOIDsParser a
+    betweenParens =
+      MP.between
+        (string "(" >> ws)
+        (string ")" >> ws)
     ws :: GOIDsParser ()
-    ws = void . MP.some $ char ' ' <|> char '\n'
+    ws = void . MP.many $ char ' ' <|> char '\n'
 
 uuidParser :: GOIDsParser UUID
 uuidParser = do
@@ -1563,3 +1573,44 @@ getOrgId od
     Just uuid <- fromText uuidText =
       uuid
   | otherwise = nil
+
+extractGOIDs :: [(P.OsPath, T.Text)] -> T.Text
+extractGOIDs orgFilesAndContents =
+  let goids = foldl' buildGOIDs M.empty orgFilesAndContents
+      lines = foldl' goidEntryToLines [] $ M.toDescList goids
+   in "(\n" <> (T.unlines $ map ("  " <>) lines) <> ")\n"
+  where
+    buildGOIDs acc (orgFile, orgFileContents)
+      | Right str <- P.decodeWith utf8 utf8 orgFile = case MP.runParser
+          (runStateT orgDocParser defaultOrgParserState)
+          str
+          orgFileContents of
+          Left _err -> acc
+          Right (orgDoc, _orgParserState) -> M.insert orgFile (getOrgIds orgDoc) acc
+      | otherwise = acc
+    getOrgIds od =
+      let docOrgId = getOrgId od
+          acc =
+            if docOrgId == nil
+              then []
+              else [Just docOrgId]
+       in catMaybes $ foldl' f acc od.cells
+    extractOrgId :: M.Map T.Text T.Text -> Maybe UUID
+    extractOrgId meta
+      | Just uuidText <- EM.lookup "ID" meta = fromText uuidText
+      | otherwise = Nothing
+    f acc cell = case cell of
+      (CHeading heading) -> extractOrgId heading.meta : acc
+      (CBlock block) -> extractOrgId block.meta : acc
+      (CMathFragment mathFragment) -> extractOrgId mathFragment.meta : acc
+      (CFigure figure) -> extractOrgId figure.meta : acc
+      (CTable table) -> extractOrgId table.meta : acc
+      _ -> acc
+    goidEntryToLines :: [T.Text] -> (P.OsPath, [UUID]) -> [T.Text]
+    goidEntryToLines acc (orgFile, goids)
+      | goids == [] = acc
+      | Right str <- P.decodeWith utf8 utf8 orgFile,
+        orgFileText <- T.pack $ show str,
+        goidsLines <- map (\goid -> "    \"" <> (T.pack $ show goid) <> "\"") goids =
+          ("(\n    " <> orgFileText <> "\n" <> (T.unlines goidsLines) <> "  )") : acc
+      | otherwise = acc

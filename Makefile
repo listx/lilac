@@ -7,6 +7,7 @@ lint: lilac.org
 	touch lint
 
 tangle: lilac.org tangle-fe
+	git ls-files | grep '\.org$$' | xargs lilac write-goids
 	lilac tangle lilac.org
 	touch tangle
 tangle-fe: fe.org
