@@ -43,6 +43,7 @@ import Relude
     concat,
     foldlM,
     map,
+    mapM_,
     not,
     null,
     pure,
@@ -81,7 +82,7 @@ data CheckOpts = CheckOpts
 
 type TangleOpts :: Type
 data TangleOpts = TangleOpts
-  { input :: FilePath
+  { inputs :: [FilePath]
   }
 
 type WeaveOpts :: Type
@@ -146,7 +147,7 @@ subcommandHandler =
         "tangle"
         $ info
           (Tangle <$> tangleOptsHandler)
-          (progDesc "generate source code")
+          (progDesc "extract source code from files")
     cmdWeave =
       command
         "weave"
@@ -168,7 +169,7 @@ checkOptsHandler =
 tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
   TangleOpts
-    <$> (argument str (metavar "FILE"))
+    <$> (some $ argument str (metavar "FILES..."))
 
 weaveOptsHandler :: OptionHandler WeaveOpts
 weaveOptsHandler =
@@ -251,23 +252,26 @@ lilacCheck globalOpts checkOpts = do
 lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
 lilacTangle globalOpts tangleOpts = do
   goids <- LP.runGoidsParser globalOpts.orgIdLocationsFile
-  input <- LU.readFrom "" tangleOpts.input
-  let parseResult =
-        MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
-          tangleOpts.input
-          input
-  case parseResult of
-    Left errBundle -> do
-      die $ MP.errorBundlePretty errBundle
-    Right (orgDoc, _) -> do
-      sourceCode <- LT.getSourceCodeMulti orgDoc tangleOpts.input goids
-      let cycles = LT.findCycles sourceCode
-      when (not $ null cycles) $ do
-        die $ "Found cycles: " <> show cycles
-      putStrLn $ "Tangling " <> tangleOpts.input
-      LT.tangle sourceCode
-      putStrLn "Finished tangling."
+  mapM_ (tangleOrgFile goids) tangleOpts.inputs
+  where
+    tangleOrgFile goids inputOrgFile = do
+      input <- LU.readFrom "" inputOrgFile
+      let parseResult =
+            MP.runParser
+              (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+              inputOrgFile
+              input
+      case parseResult of
+        Left errBundle -> do
+          die $ MP.errorBundlePretty errBundle
+        Right (orgDoc, _) -> do
+          sourceCode <- LT.getSourceCodeMulti orgDoc inputOrgFile goids
+          let cycles = LT.findCycles sourceCode
+          when (not $ null cycles) $ do
+            die $ "Found cycles: " <> show cycles
+          putStrLn $ "Tangling " <> inputOrgFile
+          LT.tangle sourceCode
+          putStrLn "Finished tangling."
 
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do

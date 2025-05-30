@@ -682,8 +682,9 @@ We can tangle Lilac with Lilac itself.
 tangle: lilac.org lilac-parse.org tangle-fe
 	git ls-files | grep '\.org$$' | xargs lilac write-goids
 	<<Generate GOIDs for tests>>
-	lilac tangle lilac-parse.org
-	lilac tangle lilac.org
+	lilac tangle \
+		lilac-parse.org \
+		lilac.org
 	touch tangle
 tangle-fe: fe.org
 	lilac tangle fe.org
@@ -3677,6 +3678,7 @@ import Relude
     concat,
     foldlM,
     map,
+    mapM_,
     not,
     null,
     pure,
@@ -3784,30 +3786,33 @@ with ~--no-color~.
 *** Tangling
 
 The [[f:lilacTangle]] function tangles all blocks (which have been marked for
-tangling) from a given Org file.
+tangling) from a given list of Org files.
 
 #+name: f:lilacTangle
 #+begin_src haskell
 lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
 lilacTangle globalOpts tangleOpts = do
   goids <- LP.runGoidsParser globalOpts.orgIdLocationsFile
-  input <- LU.readFrom "" tangleOpts.input
-  let parseResult =
-        MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
-          tangleOpts.input
-          input
-  case parseResult of
-    Left errBundle -> do
-      die $ MP.errorBundlePretty errBundle
-    Right (orgDoc, _) -> do
-      sourceCode <- LT.getSourceCodeMulti orgDoc tangleOpts.input goids
-      let cycles = LT.findCycles sourceCode
-      when (not $ null cycles) $ do
-        die $ "Found cycles: " <> show cycles
-      putStrLn $ "Tangling " <> tangleOpts.input
-      LT.tangle sourceCode
-      putStrLn "Finished tangling."
+  mapM_ (tangleOrgFile goids) tangleOpts.inputs
+  where
+    tangleOrgFile goids inputOrgFile = do
+      input <- LU.readFrom "" inputOrgFile
+      let parseResult =
+            MP.runParser
+              (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+              inputOrgFile
+              input
+      case parseResult of
+        Left errBundle -> do
+          die $ MP.errorBundlePretty errBundle
+        Right (orgDoc, _) -> do
+          sourceCode <- LT.getSourceCodeMulti orgDoc inputOrgFile goids
+          let cycles = LT.findCycles sourceCode
+          when (not $ null cycles) $ do
+            die $ "Found cycles: " <> show cycles
+          putStrLn $ "Tangling " <> inputOrgFile
+          LT.tangle sourceCode
+          putStrLn "Finished tangling."
 #+end_src
 
 As a prerequisite for tangling, we run the [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][ID locations file parser]] to get the
@@ -3955,7 +3960,7 @@ Like =check=, the =tangle= subcommand runs [[f:lilacTangle]], and also requires 
 #+begin_src haskell
 type TangleOpts :: Type
 data TangleOpts = TangleOpts
-  { input :: FilePath
+  { inputs :: [FilePath]
   }
 #+end_src
 
@@ -3964,7 +3969,7 @@ data TangleOpts = TangleOpts
 tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
   TangleOpts
-    <$> (argument str (metavar "FILE"))
+    <$> (some $ argument str (metavar "FILES..."))
 #+end_src
 
 The =weave= subcommand requires an ~input~ option as well.
@@ -4096,7 +4101,7 @@ subcommandHandler =
         "tangle"
         $ info
           (Tangle <$> tangleOptsHandler)
-          (progDesc "generate source code")
+          (progDesc "extract source code from files")
     cmdWeave =
       command
         "weave"

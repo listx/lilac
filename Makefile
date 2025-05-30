@@ -11,8 +11,9 @@ tangle: lilac.org lilac-parse.org tangle-fe
 	cd test && find Lilac/TangleSpec -type f \
 		| sort \
 		| xargs lilac write-goids --out-file .orgids
-	lilac tangle lilac-parse.org
-	lilac tangle lilac.org
+	lilac tangle \
+		lilac-parse.org \
+		lilac.org
 	touch tangle
 tangle-fe: fe.org
 	lilac tangle fe.org
