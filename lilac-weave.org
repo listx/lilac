@@ -1,0 +1,105 @@
+:PROPERTIES:
+:ID:       e4cc0d4f-b129-4d94-be1c-3c0212527ae7
+:END:
+#+title: Lilac Weave
+
+#+property: header-args+ :noweb no-export
+#+lilac_maxHeadingLevel: 3
+
+* Weaving
+
+In most Literate Programming systems, /weaving/ is the act of generating a
+human-readable document. This usually means writing a PDF or an HTML page.
+
+For now, Lilac's main goal is to generate HTML pages. There are several
+reasons:
+
+  1) HTML is easier to consume on the web than PDFs.
+
+  2) PDFs are obsessed with page numbers because they are designed to be printed
+     on real physical paper; we don't care about those things.
+
+  3) We want to eventually make our HTML pages interactive, and interactivity is
+     easier in HTML.
+
+** Architecture
+:PROPERTIES:
+:ID:       8f5752c0-6162-4de6-9ceb-f78ba584722c
+:END:
+
+Generating HTML ultimately means having three components: HTML elements,
+CSS, and JavaScript (JS). HTML and CSS alone can be used to create a static
+document, but JS is necessary for making things dynamic.
+
+At this stage, the architecture we have in mind for weaving is the following:
+
+  1) Convert the [[data:OrgDoc]] into a JSON file.
+
+  2) Use the ~OrgDoc~ JSON data as the source of truth to build up the HTML at
+     runtime with JS.
+
+  3) Sprinkle in some CSS for styling.
+
+Step 2 will be done with [[https://clojurescript.org/][ClojureScript]], which compiles to JS. This way, when we
+"weave" a document, we'll only generate the ~OrgDoc~ JSON file and everything will
+be driven by this data.
+
+One main advantage of this model is that other "viewers" can be created, as long
+as they understand the same JSON. While we would prefer to use something more
+"typed" like [[https://protobuf.dev/][Protobufs]], [[https://github.com/cognitect/transit-clj][Transit]], or [[https://github.com/edn-format/edn][EDN]], we choose JSON for its universality.
+Also, none of these alternative formats support both Haskell and ClojureScript
+well.
+
+Another advantage of using JSON this way is that because we don't generate HTML
+with things like section numbers baked into the output, changing one small
+heading (adding or removing one near the beginning of the document) won't result
+in a huge diff where everything following that small change gets renumbered.
+
+In the future if it turns out that generating the HTML this way is too slow,
+we'll have to do most of the HTML generation at weave time (and probably abandon
+writing a JSON altogether). Time will tell.
+
+** =Lilac.Weave= module
+
+Weaving concerns are captured in [[file:src/Lilac/Weave.hs]].
+
+#+name: module:Lilac.Weave
+#+header: :tangle src/Lilac/Weave.hs
+#+begin_src haskell
+module Lilac.Weave (weave, weaveToDisk) where
+
+import Data.Aeson (encode, encodeFile)
+import Data.ByteString.Lazy.Char8 qualified as BL
+import Lilac.Parse (OrgDoc)
+import Relude (FilePath, IO)
+
+<<f:weave>>
+<<f:weaveToDisk>>
+#+end_src
+
+** Write ~OrgDoc~ JSON
+
+Weaving just means converting the [[data:OrgDoc]] into JSON, as part of "Step 1" in
+[[id:8f5752c0-6162-4de6-9ceb-f78ba584722c][Architecture]].
+
+#+name: f:weave
+#+begin_src haskell
+weave :: OrgDoc -> BL.ByteString
+weave = encode
+#+end_src
+
+We don't have tests here because converting an existing, already-well-formed
+~OrgDoc~ into JSON doesn't make sense (it would be testing whether the Haskell
+=Data.Aeson= library is robust enough to handle the ~OrgDoc~).
+
+Weaving to disk is used when we want to choose where to write the JSON.
+
+#+name: f:weaveToDisk
+#+begin_src haskell
+weaveToDisk :: FilePath -> OrgDoc -> IO ()
+weaveToDisk = encodeFile
+#+end_src
+
+** ClojureScript frontend
+
+The ClojureScript frontend is developed in a separate Org file, [[file:fe.org]].

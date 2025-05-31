@@ -1,30 +1,31 @@
-test: lilac.org lilac-parse.org
+test: lilac.org lilac-parse.org lilac-weave.org
 	cabal test --test-show-details=direct --test-option=--format=progress
 	touch test
 
-lint: lilac.org lilac-parse.org
+lint: lilac.org lilac-parse.org lilac-weave.org
 	pre-commit run --all-files
 	touch lint
 
-tangle: lilac.org lilac-parse.org tangle-fe
+tangle: lilac.org lilac-parse.org lilac-weave.org tangle-fe
 	git ls-files | grep '\.org$$' | xargs lilac write-goids
 	cd test && find Lilac/TangleSpec -type f \
 		| sort \
 		| xargs lilac write-goids --out-file .orgids
 	lilac tangle \
 		lilac-parse.org \
+		lilac-weave.org \
 		lilac.org
 	touch tangle
 tangle-fe: fe.org
 	lilac tangle fe.org
 	touch tangle-fe
 
-build: lilac.org lilac-parse.org lilac.cabal
+build: lilac.org lilac-parse.org lilac-weave.org lilac.cabal
 	cabal build
 	touch build
 
 LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
-build-release: lilac.org lilac-parse.org lilac.cabal
+build-release: lilac.org lilac-parse.org lilac-weave.org lilac.cabal
 	nix-build ./nix/release.nix \
 	  --argstr lilacGitVersion $(LILAC_GIT_VERSION)
 	touch build-release
