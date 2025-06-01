@@ -33,7 +33,7 @@ let
   ourHaskell = pkgs.haskell.packages.${ghcVersion}.extend
     (lib.composeManyExtensions haskellOverlays);
 
-  ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.10.1";
+  ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.12.2";
   ghcVersion = "ghc" + ghcVersionWithoutDots;
 
   haskellOverlays = [ injectLilac tweakLilacBuild ];

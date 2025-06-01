@@ -32,4 +32,4 @@ build-release: lilac.org lilac-parse.org lilac-weave.org lilac.cabal
 
 update-nix:
 	niv init
-	niv update nixpkgs --branch nixos-24.11
+	niv update nixpkgs --branch nixos-25.05
