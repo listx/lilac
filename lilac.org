@@ -1690,6 +1690,7 @@ FunctionalDependencies
 GeneralizedNewtypeDeriving
 ImportQualifiedPost
 InstanceSigs
+MultilineStrings
 MultiParamTypeClasses
 MultiWayIf
 NamedFieldPuns
@@ -3651,7 +3652,10 @@ main = do
     lilacDesc :: InfoMod a
     lilacDesc =
       fullDesc
-        <> header "lilac - literate programming with Org and Noweb-style blocks"
+        <> header
+          """
+          lilac - Literate programming with Orgmode and Noweb-style blocks.
+          """
     versionOptionHandler :: OptionHandler (a -> a)
     versionOptionHandler =
       let cabalVersion = version
@@ -3770,8 +3774,7 @@ runGoidsParser orgIdLocationsFile = do
 
 *** Weaving
 
-The [[f:lilacWeave]] function weaves the [[data:OrgDoc]] into JSON. We hardcode this to
-just ~orgdoc.json~ for now.
+The [[f:lilacWeave]] function weaves the [[data:OrgDoc]] into HTML.
 
 #+name: f:lilacWeave
 #+begin_src haskell
@@ -3922,7 +3925,10 @@ weaveOptsHandler =
                 <> metavar "DIR"
                 <> value "."
                 <> showDefault
-                <> help "directory for saving the orgdoc.json file"
+                <> help
+                  """
+                  Directory for saving the HTML file.
+                  """
             )
         )
 #+end_src
@@ -3949,7 +3955,10 @@ writeGOIDsOptsHandler =
                 <> metavar "FILE"
                 <> value ".orgids"
                 <> showDefault
-                <> help "file to save global Org IDs"
+                <> help
+                  """
+                  File to save global Org IDs.
+                  """
             )
         )
     <*> (some $ argument str (metavar "FILES..."))
@@ -3985,21 +3994,31 @@ globalOptionsHandler =
                 <> metavar "FILE"
                 <> value ".orgids"
                 <> showDefault
-                <> help "file with Org ID locations; see 'org-id-locations-file' in Emacs"
+                <> help
+                  """
+                  File with Org ID locations. See 'org-id-locations-file' in
+                  Emacs documentation for more information.
+                  """
             )
         )
     <*> ( flag
             True
             False
             ( long "no-color"
-                <> help "do not print in color (i.e., suppress ANSI escape codes)"
+                <> help
+                  """
+                  Do not print in color (i.e., suppress ANSI escape codes).
+                  """
             )
         )
     <*> ( flag
             False
             True
             ( long "verbose"
-                <> help "be more descriptive about what's happening"
+                <> help
+                  """
+                  Be more descriptive about what's happening.
+                  """
             )
         )
 #+end_src
@@ -4023,25 +4042,25 @@ subcommandHandler =
         "check"
         $ info
           (Check <$> checkOptsHandler)
-          (progDesc "check input Org file for errors")
+          (progDesc "Check input Org file for errors.")
     cmdTangle =
       command
         "tangle"
         $ info
           (Tangle <$> tangleOptsHandler)
-          (progDesc "extract source code from files")
+          (progDesc "Extract source code from files.")
     cmdWeave =
       command
         "weave"
         $ info
           (Weave <$> weaveOptsHandler)
-          (progDesc "generate JSON representation")
+          (progDesc "Generate HTML representation.")
     cmdWriteGOIDs =
       command
         "write-goids"
         $ info
           (WriteGOIDs <$> writeGOIDsOptsHandler)
-          (progDesc "generate global Org IDs from a list of Org files")
+          (progDesc "Generate global Org IDs from a list of Org files.")
 #+end_src
 
 The [[f:subcommandHandler]] is where we specify each of the different behaviors
