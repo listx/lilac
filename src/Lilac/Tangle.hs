@@ -17,7 +17,7 @@ import Data.UUID.Types (UUID)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenString),
     Block (body, meta),
-    Cell (CBlock),
+    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Link (Link),
     LinkNoweb (LinkNoweb),
     LinkTarget (LinkTargetNoweb),
@@ -92,30 +92,36 @@ getSourceCode :: OrgDoc -> FilePath -> SourceCode
 getSourceCode od odPath = foldl' f defaultSourceCode od.cells
   where
     f :: SourceCode -> Cell -> SourceCode
-    f sc (CBlock b)
-      | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta,
-        Just path <- EM.lookup "tangle" b.meta,
-        Right filePath <- qualify path =
-          let newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
-           in sc
-                { roots = fqbn : sc.roots,
-                  fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
-                }
-      | Just path <- EM.lookup "tangle" b.meta,
-        Right filePath <- qualify path =
-          let fqbn = getFqbn $ (T.pack filePath) <> "\NUL"
-              newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
-           in sc
-                { roots = fqbn : sc.roots,
-                  fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
-                }
-      | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta =
-          sc
-            { fqbnToCodeBlock =
-                M.insert fqbn (injectFqbn fqbn b) sc.fqbnToCodeBlock
-            }
-      | otherwise = sc
-    f sc _ = sc
+    f sc cell = case cell of
+      CBlock b
+        | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta,
+          Just path <- EM.lookup "tangle" b.meta,
+          Right filePath <- qualify path ->
+            let newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
+             in sc
+                  { roots = fqbn : sc.roots,
+                    fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
+                  }
+        | Just path <- EM.lookup "tangle" b.meta,
+          Right filePath <- qualify path ->
+            let fqbn = getFqbn $ (T.pack filePath) <> "\NUL"
+                newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
+             in sc
+                  { roots = fqbn : sc.roots,
+                    fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
+                  }
+        | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta ->
+            sc
+              { fqbnToCodeBlock =
+                  M.insert fqbn (injectFqbn fqbn b) sc.fqbnToCodeBlock
+              }
+        | otherwise -> sc
+      CHeading {}
+      CListItem {}
+      CParagraph {}
+      CMathFragment {}
+      CFigure {}
+      CTable {} -> sc
     getFqbn name = LU.prefixWithId (getOrgId od) name
     injectFqbn fqbn block =
       block
@@ -220,9 +226,10 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
             $ map getLinkTarget block.body
       | otherwise = acc
     getLinkTarget = \case
-      (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb uuid targetName)))) ->
+      BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb uuid targetName))) ->
         Just $ LU.prefixWithId uuid targetName
-      _ -> Nothing
+      BTokenLink {}
+      BTokenString {} -> Nothing
 
 findCycles :: SourceCode -> [G.Tree FQBN]
 findCycles sc = map (fmap toFqbn) . foldl' f [] $ G.scc graph

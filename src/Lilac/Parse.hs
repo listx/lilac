@@ -404,8 +404,15 @@ orgDocParser = do
   _ <- lilacExtensionsParser
   cells <- many cellParser
   let meaningfulCell :: Cell -> Bool
-      meaningfulCell (CListItem []) = False
-      meaningfulCell _ = True
+      meaningfulCell = \case
+        CListItem [] -> False
+        CHeading {}
+        CListItem {}
+        CParagraph {}
+        CBlock {}
+        CMathFragment {}
+        CFigure {}
+        CTable {} -> True
   MP.eof
   pure
     $ OrgDoc
@@ -619,7 +626,8 @@ proseParser spaceConsumer = do
     nonEmpty :: PToken -> Bool
     nonEmpty = \case
       PTokenStyledText styledText -> not $ T.null styledText.body
-      _ -> True
+      PTokenLink {}
+      PTokenMathFragment {} -> True
 
 whitespaceCompressor :: OrgParser T.Text -> OrgParser StyledText
 whitespaceCompressor spaceConsumer = do
@@ -1173,7 +1181,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
       BTokenString text -> text
       BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb uuid targetName))) ->
         "\NUL_link" <> (LU.prefixWithId uuid targetName)
-      _ -> ""
+      BTokenLink {} -> ""
 
 zeroIndent :: OrgParser (Int, Int)
 zeroIndent = do
@@ -1620,12 +1628,13 @@ extractGOIDs orgFilesAndContents =
       | Just uuidText <- EM.lookup "ID" meta = fromText uuidText
       | otherwise = Nothing
     f acc cell = case cell of
-      (CHeading heading) -> extractOrgId heading.meta : acc
-      (CBlock block) -> extractOrgId block.meta : acc
-      (CMathFragment mathFragment) -> extractOrgId mathFragment.meta : acc
-      (CFigure figure) -> extractOrgId figure.meta : acc
-      (CTable table) -> extractOrgId table.meta : acc
-      _ -> acc
+      CHeading heading -> extractOrgId heading.meta : acc
+      CBlock block -> extractOrgId block.meta : acc
+      CMathFragment mathFragment -> extractOrgId mathFragment.meta : acc
+      CFigure figure -> extractOrgId figure.meta : acc
+      CTable table -> extractOrgId table.meta : acc
+      CListItem {}
+      CParagraph {} -> acc
     goidEntryToLines :: [T.Text] -> (P.OsPath, [UUID]) -> [T.Text]
     goidEntryToLines acc (orgFile, goids)
       | goids == [] = acc
