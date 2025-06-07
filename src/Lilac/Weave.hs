@@ -4,8 +4,13 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Lilac.Parse
-  ( Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+  ( BToken (BTokenLink, BTokenString),
+    Block (body, meta),
+    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, meta, section),
+    Link (name, target),
+    LinkNoweb (name, uuid),
+    LinkTarget (LinkTargetNoweb, LinkTargetOther),
     ListMarker (LItemEnd, LItemStart, LOrderedEnd, LOrderedStart, LUnorderedEnd, LUnorderedStart),
     OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
@@ -19,6 +24,7 @@ import Relude
     Maybe (Just, Nothing),
     foldl',
     map,
+    pure,
     reverse,
     sequence_,
     ($),
@@ -65,7 +71,7 @@ weaveCell = \case
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> H.p $ do
     sequence_ $ map weavePToken prose
-  CBlock _ -> H.p ""
+  CBlock block -> weaveBlock block
   CMathFragment _ -> H.p ""
   CFigure _ -> H.p ""
   CTable _ -> H.p ""
@@ -124,6 +130,28 @@ weaveListMarker =
     LUnorderedEnd -> "</ul>"
     LItemStart -> "<li>"
     LItemEnd -> "</li>"
+
+weaveBlock :: Block -> H.Html
+weaveBlock block = do
+  H.div ! A.class_ ".code-block-container" $ do
+    maybeAssignName
+    H.pre ! A.class_ ".code-block-body" $ do
+      sequence_ $ map weaveBToken block.body
+  where
+    maybeAssignName =
+      case EM.lookup "name" block.meta of
+        Just name -> H.div ! A.class_ ".code-block-name" $ do
+          H.text name
+        Nothing -> pure ()
+
+weaveBToken :: BToken -> H.Html
+weaveBToken = \case
+  BTokenString txt -> H.preEscapedText txt
+  BTokenLink link -> weaveLink link
+
+weaveLink :: Link -> H.Html
+weaveLink link = do
+  H.a ! A.href "h" $ sequence_ $ map weaveStyledText link.name
 
 weaveToDisk :: P.OsPath -> OrgDoc -> IO ()
 weaveToDisk fp od =
