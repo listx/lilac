@@ -6,6 +6,7 @@ import Data.Text.Lazy qualified as TL
 import Lilac.Parse
   ( Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, meta, section),
+    ListMarker (LItemEnd, LItemStart, LOrderedEnd, LOrderedStart, LUnorderedEnd, LUnorderedStart),
     OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
@@ -61,7 +62,7 @@ weave od = H.docTypeHtml $ do
 weaveCell :: Cell -> H.Html
 weaveCell = \case
   CHeading heading -> weaveHeading heading
-  CListItem _ -> H.p ""
+  CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> H.p $ do
     sequence_ $ map weavePToken prose
   CBlock _ -> H.p ""
@@ -113,6 +114,16 @@ weaveStyledText styledText = do
       Underline -> "underline" : acc
       Verbatim -> "verbatim" : acc
       Code -> "code" : acc
+
+weaveListMarker :: ListMarker -> H.Html
+weaveListMarker =
+  H.preEscapedToMarkup . \case
+    LOrderedStart -> "<ol>" :: T.Text
+    LOrderedEnd -> "</ol>"
+    LUnorderedStart -> "<ul>"
+    LUnorderedEnd -> "</ul>"
+    LItemStart -> "<li>"
+    LItemEnd -> "</li>"
 
 weaveToDisk :: P.OsPath -> OrgDoc -> IO ()
 weaveToDisk fp od =
