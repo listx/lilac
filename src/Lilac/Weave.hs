@@ -146,7 +146,7 @@ weaveBlock block = do
 
 weaveBToken :: BToken -> H.Html
 weaveBToken = \case
-  BTokenString txt -> H.preEscapedText txt
+  BTokenString txt -> H.text txt
   BTokenPadding -> pure ()
   BTokenLink link -> weaveLink link
 
