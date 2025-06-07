@@ -42,7 +42,6 @@ import Relude
     Type,
     concat,
     foldlM,
-    map,
     mapM_,
     not,
     null,
@@ -305,9 +304,12 @@ lilacWeave weaveOpts = do
       die $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
       putStrLn $ "Weaving " <> weaveOpts.input
-      let outPath =
-            P.joinPath
-              $ map P.unsafeEncodeUtf [weaveOpts.outDir, "orgdoc.html"]
+      outPath <- do
+        dir <- P.encodeUtf weaveOpts.outDir
+        base <- P.takeBaseName <$> P.encodeUtf weaveOpts.input
+        let withoutExtension = P.joinPath [dir, base]
+            html = P.unsafeEncodeUtf "html"
+        pure $ P.addExtension withoutExtension html
       LW.weaveToDisk outPath orgDoc
       putStrLn "Finished weaving."
 
