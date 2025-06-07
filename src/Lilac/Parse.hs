@@ -6,6 +6,7 @@ module Lilac.Parse
     extractGOIDs,
     genHeadingSection,
     getOrgId,
+    maskToStyles,
     orgDocParser,
     goidsParser,
     parseOrgDoc,
