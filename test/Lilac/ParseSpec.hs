@@ -2123,10 +2123,7 @@ parseSpec = do
   pGOIDs
     "0200-goids-file-oneline"
     [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
-      ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
-      ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
-      ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "./../prog/lilac/lilac.org"),
-      ("b449a097-d702-4fd6-98de-cb81f7e49177", "./../prog/lilac/lilac.org")
+      ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org")
     ]
 
   pGOIDs
