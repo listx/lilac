@@ -22,6 +22,7 @@ import Relude
     sequence_,
     ($),
     (.),
+    (<>),
     (==),
   )
 import Relude.Extra.Map qualified as EM
@@ -75,7 +76,7 @@ weaveHeading heading = hN $ do
           . map T.show
           . reverse
           $ heading.section
-  H.text $ sectionText
+  H.text $ sectionText <> " "
   sequence_ $ map weavePToken heading.body
   where
     hN =
