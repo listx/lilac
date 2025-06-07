@@ -3,7 +3,7 @@ module Lilac.Weave (weave, weaveToDisk) where
 import Data.Text qualified as T
 import Lilac.Parse
   ( Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
-    Heading (body, level),
+    Heading (body, level, section),
     OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     StyledText (body),
@@ -13,6 +13,7 @@ import Relude
   ( IO,
     Maybe (Just, Nothing),
     map,
+    reverse,
     sequence_,
     ($),
     (.),
@@ -45,6 +46,12 @@ weaveCell = \case
 
 weaveHeading :: Heading -> H.Html
 weaveHeading heading = hN $ do
+  let sectionText =
+        T.intercalate "."
+          . map T.show
+          . reverse
+          $ heading.section
+  H.text $ sectionText
   sequence_ $ map weavePToken heading.body
   where
     hN =
