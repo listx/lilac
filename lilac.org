@@ -1721,6 +1721,7 @@ ViewPatterns
 <<ghc:Warn everything>>
 <<ghc:Disable safe Haskell>>
 <<ghc:Disable missed specialisations>>
+<<ghc:Disable missed extra shared libs>>
 #+end_src
 
 We turn on all warnings with =-Weverything=.
@@ -1750,6 +1751,22 @@ pursuing in this program.
 These warnings are not really useful for us because we don't (as of yet) care
 too much about performance. Plus they seem to be about library functions we are
 importing.
+
+#+name: ghc:Disable missed extra shared libs
+#+begin_src txt
+-Wno-missed-extra-shared-lib
+#+end_src
+
+Since GHC 9.12.2, we've been getting warnings like the following on Mac OS. As
+it's benign, ignore these warnings.
+
+#+begin_example
+<no location info>: warning: [-Wmissed-extra-shared-lib]
+    dlopen(libHSunix-2.8.6.0-0912.dylib, 0x0005): tried: 'libHSunix-2.8.6.0-0912.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OSlibHSunix-2.8.6.0-0912.dylib' (no such file), '/nix/store/b96n0hqpih5rb7cxw7cp8d1bwpq3bah5-ghc-9.12.2/lib/ghc-9.12.2/lib/aarch64-osx-ghc-9.12.2-94b7/libHSunix-2.8.6.0-0912.dylib' (no such file), '/nix/store/b96n0hqpih5rb7cxw7cp8d1bwpq3bah5-ghc-9.12.2/lib/ghc-9.12.2/bin/../lib/aarch64-osx-ghc-9.12.2-94b7/libHSunix-2.8.6.0-0912.dylib' (no such file), '$ORIGIN/../../../lib/aarch64-osx-ghc-9.12.2-94b7/libHSunix-2.8.6.0-0912.dylib' (no such file), '/usr/lib/libHSunix-2.8.6.0-0912.dylib' (no such file, not in dyld cache), 'libHSunix-2.8.6.0-0912.dylib' (no such file), '/usr/local/lib/libHSunix-2.8.6.0-0912.dylib' (no such file), '/usr/lib/libHSunix-2.8.6.0-0912.dylib' (no such file, not in dyld cache)
+    It's OK if you don't want to use symbols from it directly.
+    (the package DLL is loaded by the system linker
+     which manages dependencies by itself).
+#+end_example
 
 *** GHC threaded runtime flags
 
