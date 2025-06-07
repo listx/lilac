@@ -86,7 +86,7 @@ data TangleOpts = TangleOpts
 
 type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
-  { input :: FilePath,
+  { inputs :: [FilePath],
     outDir :: FilePath
   }
 
@@ -183,7 +183,7 @@ tangleOptsHandler =
 weaveOptsHandler :: OptionHandler WeaveOpts
 weaveOptsHandler =
   WeaveOpts
-    <$> (argument str (metavar "FILE"))
+    <$> (some $ argument str (metavar "FILES..."))
     <*> ( strOption
             ( long "out-dir"
                 <> metavar "DIR"
@@ -293,25 +293,28 @@ lilacTangle globalOpts tangleOpts = do
 
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
-  input <- LU.readFrom "" weaveOpts.input
-  let parseResult =
-        MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState)
-          weaveOpts.input
-          input
-  case parseResult of
-    Left errBundle -> do
-      die $ MP.errorBundlePretty errBundle
-    Right (orgDoc, _) -> do
-      putStrLn $ "Weaving " <> weaveOpts.input
-      outPath <- do
-        dir <- P.encodeUtf weaveOpts.outDir
-        base <- P.takeBaseName <$> P.encodeUtf weaveOpts.input
-        let withoutExtension = P.joinPath [dir, base]
-            html = P.unsafeEncodeUtf "html"
-        pure $ P.addExtension withoutExtension html
-      LW.weaveToDisk outPath orgDoc
-      putStrLn "Finished weaving."
+  mapM_ weaveOrgFile $ weaveOpts.inputs
+  where
+    weaveOrgFile inputOrgFile = do
+      input <- LU.readFrom "" inputOrgFile
+      let parseResult =
+            MP.runParser
+              (runStateT LP.orgDocParser LP.defaultOrgParserState)
+              inputOrgFile
+              input
+      case parseResult of
+        Left errBundle -> do
+          die $ MP.errorBundlePretty errBundle
+        Right (orgDoc, _) -> do
+          putStrLn $ "Weaving " <> inputOrgFile
+          outPath <- do
+            dir <- P.encodeUtf weaveOpts.outDir
+            base <- P.takeBaseName <$> P.encodeUtf inputOrgFile
+            let withoutExtension = P.joinPath [dir, base]
+                html = P.unsafeEncodeUtf "html"
+            pure $ P.addExtension withoutExtension html
+          LW.weaveToDisk outPath orgDoc
+          putStrLn "Finished weaving."
 
 lilacWriteGOIDs :: WriteGOIDsOpts -> IO ()
 lilacWriteGOIDs writeGOIDsOpts = do

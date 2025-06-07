@@ -20,8 +20,11 @@ tangle-fe: fe.org
 	lilac tangle fe.org
 	touch tangle-fe
 
-weave: lilac.org
-	lilac weave --out-dir site lilac.org
+weave: lilac.org lilac-parse.org lilac-weave.org fe.org
+	lilac weave --out-dir site \
+		lilac-parse.org \
+		lilac-weave.org \
+		lilac.org
 	touch weave
 
 build: lilac.org lilac-parse.org lilac-weave.org lilac.cabal
