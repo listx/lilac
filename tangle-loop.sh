@@ -26,7 +26,7 @@ tangle()
 	return 0
 }
 
-tangle_and_test_and_check()
+tangle_and_test_and_check_and_weave()
 {
 	tangle
 	if tangle; then
@@ -38,6 +38,7 @@ tangle_and_test_and_check()
 		fi
 	fi
 	echo "----------------------------------------"
+	time make -C "${SCRIPT_ROOT}" weave
 }
 
 watch()
@@ -48,12 +49,12 @@ watch()
 
 	s1="$(stat -c %Y "${files[@]}")"
 
-	tangle_and_test_and_check
+	tangle_and_test_and_check_and_weave
 	while true; do
 		s2="$(stat -c %Y "${files[@]}")"
 		if [[ ! "${s1}" == "${s2}" ]]; then
 			s1="${s2}"
-			tangle_and_test_and_check
+			tangle_and_test_and_check_and_weave
 		fi
 		sleep 1
 	done
