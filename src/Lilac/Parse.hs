@@ -4,6 +4,7 @@ module Lilac.Parse
     defaultOrgParserConf,
     defaultOrgParserState,
     extractGOIDs,
+    genHeadingSection,
     getOrgId,
     orgDocParser,
     goidsParser,
@@ -140,6 +141,7 @@ data OrgParserState = OrgParserState
   { goids :: M.Map UUID P.OsPath,
     orgId :: UUID,
     headingLevel :: Int,
+    headingSection :: [Int],
     styleMask :: StyleMask,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
@@ -157,6 +159,7 @@ defaultOrgParserState =
     { goids = M.fromList [],
       orgId = nil,
       headingLevel = 0,
+      headingSection = [],
       styleMask = styleMaskFrom [],
       listLevels = [],
       listMarkers = [],
@@ -206,6 +209,7 @@ instance ToJSON Cell
 type Heading :: Type
 data Heading = Heading
   { level :: Int,
+    section :: [Int],
     body :: Prose,
     meta :: M.Map T.Text T.Text
   }
@@ -557,14 +561,17 @@ headingParser = do
   _ <- char '\n'
   failIfLeftoverActiveStyles
   props <- propertiesDrawerParser
+  let newHeadingSection = genHeadingSection lenStars orgParserState.headingSection
   put
     orgParserState
-      { headingLevel = lenStars
+      { headingLevel = lenStars,
+        headingSection = newHeadingSection
       }
   pure
     $ CHeading
       Heading
-        { level = T.length stars,
+        { level = lenStars,
+          section = newHeadingSection,
           body = compressProse prose,
           meta = props
         }
@@ -585,6 +592,21 @@ failIfHeadingNestsWithoutDirectParent current found =
       <> ", not "
       <> show found
       <> ")"
+
+genHeadingSection :: Int -> [Int] -> [Int]
+genHeadingSection level prevSection
+  | null prevSection = 1 : (take (level - 1) $ repeat 0)
+  | length prevSection == level = bumpDeepestSection prevSection
+  | length prevSection > level =
+      bumpDeepestSection
+        $ drop (length prevSection - level) prevSection
+  | otherwise =
+      let levelDiff = (level - length prevSection - 1)
+       in (1 : (take levelDiff $ repeat 0)) <> prevSection
+  where
+    bumpDeepestSection :: [Int] -> [Int]
+    bumpDeepestSection [] = []
+    bumpDeepestSection (x : xs) = x + 1 : xs
 
 propertiesDrawerParser :: OrgParser (Map T.Text T.Text)
 propertiesDrawerParser = propertiesParser <|> (pure $ M.fromList [])

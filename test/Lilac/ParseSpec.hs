@@ -24,7 +24,7 @@ import Relude
     (<>),
   )
 import System.OsPath qualified as P
-import Test.Hspec (Spec, before, it)
+import Test.Hspec (Spec, before, describe, it, shouldBe)
 import Test.Hspec.Megaparsec
   ( ET,
     elabel,
@@ -97,11 +97,12 @@ plainParagraph body =
         )
     ]
 
-plainHeading :: Int -> L.Cell
-plainHeading level =
+plainHeading :: Int -> [Int] -> L.Cell
+plainHeading level section =
   L.CHeading
     ( L.Heading
         { level = level,
+          section = section,
           body =
             [ L.PTokenStyledText
                 ( L.StyledText
@@ -177,6 +178,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
+        headingSection = [],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -226,6 +228,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
+        headingSection = [],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -249,6 +252,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
+        headingSection = [],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -273,18 +277,18 @@ parseSpec = do
     "0004-headings-20"
     L.OrgDoc
       { cells =
-          [ plainHeading 1,
-            plainHeading 2,
-            plainHeading 3,
-            plainHeading 4,
-            plainHeading 5,
-            plainHeading 6,
-            plainHeading 7,
-            plainHeading 8,
-            plainHeading 9,
-            plainHeading 10,
-            plainHeading 11,
-            plainHeading 12
+          [ plainHeading 1 [1],
+            plainHeading 2 [1, 1],
+            plainHeading 3 [1, 1, 1],
+            plainHeading 4 [1, 1, 1, 1],
+            plainHeading 5 [1, 1, 1, 1, 1],
+            plainHeading 6 [1, 1, 1, 1, 1, 1],
+            plainHeading 7 [1, 1, 1, 1, 1, 1, 1],
+            plainHeading 8 [1, 1, 1, 1, 1, 1, 1, 1],
+            plainHeading 9 [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            plainHeading 10 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            plainHeading 11 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
           ],
         meta = M.fromList []
       }
@@ -292,6 +296,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 12,
+        headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -306,18 +311,18 @@ parseSpec = do
     "0004-headings-unlimited"
     L.OrgDoc
       { cells =
-          [ plainHeading 1,
-            plainHeading 2,
-            plainHeading 3,
-            plainHeading 4,
-            plainHeading 5,
-            plainHeading 6,
-            plainHeading 7,
-            plainHeading 8,
-            plainHeading 9,
-            plainHeading 10,
-            plainHeading 11,
-            plainHeading 12
+          [ plainHeading 1 [1],
+            plainHeading 2 [1, 1],
+            plainHeading 3 [1, 1, 1],
+            plainHeading 4 [1, 1, 1, 1],
+            plainHeading 5 [1, 1, 1, 1, 1],
+            plainHeading 6 [1, 1, 1, 1, 1, 1],
+            plainHeading 7 [1, 1, 1, 1, 1, 1, 1],
+            plainHeading 8 [1, 1, 1, 1, 1, 1, 1, 1],
+            plainHeading 9 [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            plainHeading 10 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            plainHeading 11 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
           ],
         meta = M.fromList []
       }
@@ -325,6 +330,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 12,
+        headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -350,6 +356,23 @@ parseSpec = do
     "headings may not skip levels (expected to see level 1 or 2, not 4)"
     8
 
+  describe "genHeadingSection" $ do
+    it "gets the base case" $ do
+      L.genHeadingSection 2 [] `shouldBe` [1, 0]
+      L.genHeadingSection 1 [] `shouldBe` [1]
+      L.genHeadingSection 0 [] `shouldBe` [1]
+      L.genHeadingSection (-1) [] `shouldBe` [1]
+    it "bumps the last level if the nesting level matches" $ do
+      L.genHeadingSection 1 [1] `shouldBe` [2]
+      L.genHeadingSection 2 [1, 1] `shouldBe` [2, 1]
+      L.genHeadingSection 3 [1, 1, 1] `shouldBe` [2, 1, 1]
+    it "truncates, and then increments the newest deepest level if the nesting level gets smaller" $ do
+      L.genHeadingSection 1 [3, 5] `shouldBe` [6]
+      L.genHeadingSection 3 [3, 5, 6, 7] `shouldBe` [6, 6, 7]
+    it "grows the section if we nest deeper" $ do
+      L.genHeadingSection 3 [2, 2] `shouldBe` [1, 2, 2]
+      L.genHeadingSection 5 [2, 2] `shouldBe` [1, 0, 0, 2, 2]
+
   ps
     "0004-properties-drawer-empty"
     L.OrgDoc
@@ -357,6 +380,7 @@ parseSpec = do
           [ L.CHeading
               ( L.Heading
                   { level = 1,
+                    section = [1],
                     body =
                       [ L.PTokenStyledText
                           (L.StyledText {body = "foo", style = L.styleMaskFrom []})
@@ -371,6 +395,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 1,
+        headingSection = [1],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -388,6 +413,7 @@ parseSpec = do
           [ L.CHeading
               ( L.Heading
                   { level = 1,
+                    section = [1],
                     body =
                       [ L.PTokenStyledText
                           (L.StyledText {body = "foo", style = L.styleMaskFrom []})
@@ -405,6 +431,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 1,
+        headingSection = [1],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -422,6 +449,7 @@ parseSpec = do
           [ L.CHeading
               ( L.Heading
                   { level = 1,
+                    section = [1],
                     body =
                       [ L.PTokenStyledText
                           (L.StyledText {body = "foo", style = L.styleMaskFrom []})
@@ -439,6 +467,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 1,
+        headingSection = [1],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -630,6 +659,7 @@ parseSpec = do
           [ L.CHeading
               ( L.Heading
                   { level = 1,
+                    section = [1],
                     body =
                       [ L.PTokenStyledText
                           (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
@@ -654,6 +684,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 1,
+        headingSection = [1],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -911,6 +942,7 @@ parseSpec = do
             L.CHeading
               ( L.Heading
                   { level = 1,
+                    section = [1],
                     body =
                       [ L.PTokenLink
                           ( L.Link
@@ -953,6 +985,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 1,
+        headingSection = [1],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -1008,6 +1041,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
+        headingSection = [],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -1095,6 +1129,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
+        headingSection = [],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -1669,6 +1704,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
+        headingSection = [],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -1723,6 +1759,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
+        headingSection = [],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
@@ -1798,6 +1835,7 @@ parseSpec = do
       { goids = fromList [],
         orgId = nil,
         headingLevel = 0,
+        headingSection = [],
         styleMask = L.styleMaskFrom [],
         listLevels = [],
         listMarkers = [],
