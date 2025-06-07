@@ -3648,6 +3648,7 @@ source of the referenced code block during tangling.
 type BToken :: Type
 data BToken
   = BTokenString T.Text
+  | BTokenPadding
   | BTokenLink Link
   deriving stock (Eq, Generic, Show)
 
@@ -3772,6 +3773,7 @@ ignoreSpecialCommas :: [BToken] -> [BToken]
 ignoreSpecialCommas = reverse . foldl' f []
   where
     f acc (BTokenString text) = (BTokenString $ removeSpecialCommas text) : acc
+    f acc BTokenPadding = BTokenPadding : acc
     f acc link = link : acc
     removeSpecialCommas text =
       T.intercalate "\n"
@@ -4335,6 +4337,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText :: BToken -> T.Text
     bTokenToText = \case
       BTokenString text -> text
+      BTokenPadding -> ""
       BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb uuid targetName))) ->
         <<link-marker>> <> (LU.prefixWithId uuid targetName)
       BTokenLink {} -> ""
@@ -4380,7 +4383,7 @@ getLinkPaddingBools blockBody =
 
 Now that we have a list of booleans to mark whether a link needs a newline
 appended to it, all we have to do is go through all of the links in the block,
-adding a ~BTokenString "\n"~ every time we see a ~True~ boolean (~padLink~).
+adding a ~BTokenPaddding~ every time we see a ~True~ boolean (~padLink~).
 
 #+name: f:padConsecutiveNowebLinks
 #+begin_src haskell
@@ -4391,15 +4394,16 @@ padConsecutiveNowebLinks blockBody =
     $ foldl' f ([], getLinkPaddingBools blockBody) blockBody
   where
     f (acc, bools) text@(BTokenString _) = (text : acc, bools)
+    f (acc, bools) BTokenPadding = (acc, bools)
     f (acc, bools) link@(BTokenLink _) =
       case bools of
         (padLink : rest)
-          | padLink -> ((BTokenString "\n") : link : acc, rest)
+          | padLink -> (BTokenPadding : link : acc, rest)
           | otherwise -> (link : acc, rest)
         [] -> (link : acc, [])
 #+end_src
 
-See [[t:0102-pad-between-consecutive-links][t:0102-pad-between-consecutive-links]] for an example of this padding
+See [[id:b449a097-d702-4fd6-98de-cb81f7e49177::t:0102-pad-between-consecutive-links][t:0102-pad-between-consecutive-links]] for an example of this padding
 behavior.
 
 *** Additional tests

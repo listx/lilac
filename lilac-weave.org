@@ -60,7 +60,7 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Lilac.Parse
-  ( BToken (BTokenLink, BTokenString),
+  ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, meta, section),
@@ -298,6 +298,7 @@ weaveBlock block = do
 weaveBToken :: BToken -> H.Html
 weaveBToken = \case
   BTokenString txt -> H.preEscapedText txt
+  BTokenPadding -> pure ()
   BTokenLink link -> weaveLink link
 #+end_src
 

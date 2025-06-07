@@ -304,6 +304,7 @@ instance ToJSON Block
 type BToken :: Type
 data BToken
   = BTokenString T.Text
+  | BTokenPadding
   | BTokenLink Link
   deriving stock (Eq, Generic, Show)
 
@@ -1134,6 +1135,7 @@ ignoreSpecialCommas :: [BToken] -> [BToken]
 ignoreSpecialCommas = reverse . foldl' f []
   where
     f acc (BTokenString text) = (BTokenString $ removeSpecialCommas text) : acc
+    f acc BTokenPadding = BTokenPadding : acc
     f acc link = link : acc
     removeSpecialCommas text =
       T.intercalate "\n"
@@ -1171,10 +1173,11 @@ padConsecutiveNowebLinks blockBody =
     $ foldl' f ([], getLinkPaddingBools blockBody) blockBody
   where
     f (acc, bools) text@(BTokenString _) = (text : acc, bools)
+    f (acc, bools) BTokenPadding = (acc, bools)
     f (acc, bools) link@(BTokenLink _) =
       case bools of
         (padLink : rest)
-          | padLink -> ((BTokenString "\n") : link : acc, rest)
+          | padLink -> (BTokenPadding : link : acc, rest)
           | otherwise -> (link : acc, rest)
         [] -> (link : acc, [])
 
@@ -1202,6 +1205,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText :: BToken -> T.Text
     bTokenToText = \case
       BTokenString text -> text
+      BTokenPadding -> ""
       BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb uuid targetName))) ->
         "\NUL_link" <> (LU.prefixWithId uuid targetName)
       BTokenLink {} -> ""

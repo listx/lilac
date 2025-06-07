@@ -15,7 +15,7 @@ import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.UUID.Types (UUID)
 import Lilac.Parse
-  ( BToken (BTokenLink, BTokenString),
+  ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Link (Link),
@@ -190,7 +190,9 @@ growBlockUniverse parsedUuids seenFqbns uuidToOsPath blockUniverse (root : roots
     getLinkTarget = \case
       (BTokenLink (Link _ (LinkTargetNoweb linkNoweb))) ->
         Just linkNoweb
-      _ -> Nothing
+      BTokenLink {}
+      BTokenPadding {}
+      BTokenString {} -> Nothing
 
 getSourceCodeMulti ::
   OrgDoc ->
@@ -229,6 +231,7 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
       BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb uuid targetName))) ->
         Just $ LU.prefixWithId uuid targetName
       BTokenLink {}
+      BTokenPadding {}
       BTokenString {} -> Nothing
 
 findCycles :: SourceCode -> [G.Tree FQBN]
@@ -279,6 +282,8 @@ expandBlock sc block existingPrefix =
       prefix = "" :: T.Text
    in fst $ foldl' expand (acc, prefix) block.body
   where
+    expand (acc, _) BTokenPadding =
+      (acc <> "\n", "")
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
     expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb uuid target))))
