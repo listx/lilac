@@ -307,9 +307,8 @@ lilacWeave weaveOpts = do
       putStrLn $ "Weaving " <> weaveOpts.input
       let outPath =
             P.joinPath
-              $ map P.unsafeEncodeUtf [weaveOpts.outDir, "orgdoc.json"]
-      outPath' <- P.decodeUtf outPath
-      LW.weaveToDisk outPath' orgDoc
+              $ map P.unsafeEncodeUtf [weaveOpts.outDir, "orgdoc.html"]
+      LW.weaveToDisk outPath orgDoc
       putStrLn "Finished weaving."
 
 lilacWriteGOIDs :: WriteGOIDsOpts -> IO ()

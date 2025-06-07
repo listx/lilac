@@ -33,31 +33,19 @@ document, but JS is necessary for making things dynamic.
 
 At this stage, the architecture we have in mind for weaving is the following:
 
-  1) Convert the [[data:OrgDoc]] into a JSON file.
+  1) Convert the [[data:OrgDoc]] into HTML.
 
-  2) Use the ~OrgDoc~ JSON data as the source of truth to build up the HTML at
-     runtime with JS.
+  2) Generate CSS separately.
 
-  3) Sprinkle in some CSS for styling.
+  3) Sprinkle in some JS for interactivity.
 
-Step 2 will be done with [[https://clojurescript.org/][ClojureScript]], which compiles to JS. This way, when we
-"weave" a document, we'll only generate the ~OrgDoc~ JSON file and everything will
-be driven by this data.
+Step 3 will be done with [[https://clojurescript.org/][ClojureScript]], which compiles to JS.
 
 One main advantage of this model is that other "viewers" can be created, as long
 as they understand the same JSON. While we would prefer to use something more
 "typed" like [[https://protobuf.dev/][Protobufs]], [[https://github.com/cognitect/transit-clj][Transit]], or [[https://github.com/edn-format/edn][EDN]], we choose JSON for its universality.
 Also, none of these alternative formats support both Haskell and ClojureScript
 well.
-
-Another advantage of using JSON this way is that because we don't generate HTML
-with things like section numbers baked into the output, changing one small
-heading (adding or removing one near the beginning of the document) won't result
-in a huge diff where everything following that small change gets renumbered.
-
-In the future if it turns out that generating the HTML this way is too slow,
-we'll have to do most of the HTML generation at weave time (and probably abandon
-writing a JSON altogether). Time will tell.
 
 ** =Lilac.Weave= module
 
@@ -68,38 +56,131 @@ Weaving concerns are captured in [[file:src/Lilac/Weave.hs]].
 #+begin_src haskell
 module Lilac.Weave (weave, weaveToDisk) where
 
-import Data.Aeson (encode, encodeFile)
-import Data.ByteString.Lazy.Char8 qualified as BL
-import Lilac.Parse (OrgDoc)
-import Relude (FilePath, IO)
+import Data.Text qualified as T
+import Lilac.Parse
+  ( Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Heading (body, level),
+    OrgDoc (cells, meta),
+    PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    StyledText (body),
+  )
+import Lilac.Util qualified as LU
+import Relude
+  ( IO,
+    Maybe (Just, Nothing),
+    map,
+    sequence_,
+    ($),
+    (.),
+  )
+import Relude.Extra.Map qualified as EM
+import System.OsPath qualified as P
+import Text.Blaze.Html.Renderer.Pretty (renderHtml)
+import Text.Blaze.Html5 qualified as H
 
 <<f:weave>>
+<<f:weaveCell>>
+<<f:weaveHeading>>
+<<f:weavePToken>>
+<<f:weaveStyledText>>
 <<f:weaveToDisk>>
 #+end_src
 
-** Write ~OrgDoc~ JSON
+** Weave into HTML
 
-Weaving just means converting the [[data:OrgDoc]] into JSON, as part of "Step 1" in
-[[id:8f5752c0-6162-4de6-9ceb-f78ba584722c][Architecture]].
+Weaving mainly means converting the [[data:OrgDoc]] into HTML, as part of "Step 1"
+in [[id:8f5752c0-6162-4de6-9ceb-f78ba584722c][Architecture]].
+
+The top-level function is [[f:weave]], which sets the overall structure. Most of the
+content of [[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:OrgDoc][data:OrgDoc]] is made up of [[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Cell][data:Cell]] values, which we iterate over
+with [[f:weaveCell]].
 
 #+name: f:weave
 #+begin_src haskell
-weave :: OrgDoc -> BL.ByteString
-weave = encode
+weave :: OrgDoc -> H.Html
+weave od = H.docTypeHtml $ do
+  H.head $ do
+    H.title
+      $ H.text
+      $ case EM.lookup "title" od.meta of
+        Just title -> title
+        Nothing -> "Untitled"
+  H.body $ do
+    sequence_ $ map weaveCell od.cells
 #+end_src
 
-We don't have tests here because converting an existing, already-well-formed
-~OrgDoc~ into JSON doesn't make sense (it would be testing whether the Haskell
-=Data.Aeson= library is robust enough to handle the ~OrgDoc~).
+Weaving cells just means delegating to each of the weavers that know how to
+handle each cell type.
 
-Weaving to disk is used when we want to choose where to write the JSON.
+#+name: f:weaveCell
+#+begin_src haskell
+weaveCell :: Cell -> H.Html
+weaveCell = \case
+  CHeading heading -> weaveHeading heading
+  CListItem _ -> H.p ""
+  CParagraph _ -> H.p ""
+  CBlock _ -> H.p ""
+  CMathFragment _ -> H.p ""
+  CFigure _ -> H.p ""
+  CTable _ -> H.p ""
+#+end_src
+
+*** Weave headings
+
+Headings might sound simple, but because they are made up of arbitrary text,
+it's fairly involved. The body of a heading is made up of a list of [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]]
+values. So, we have to weave each type of token separately.
+
+#+name: f:weaveHeading
+#+begin_src haskell
+weaveHeading :: Heading -> H.Html
+weaveHeading heading = hN $ do
+  sequence_ $ map weavePToken heading.body
+  where
+    hN =
+      case heading.level of
+        1 -> H.h1
+        2 -> H.h2
+        3 -> H.h3
+        4 -> H.h4
+        5 -> H.h5
+        _ -> H.h6
+#+end_src
+
+Each [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] value has its own weaver.
+
+#+name: f:weavePToken
+#+begin_src haskell
+weavePToken :: PToken -> H.Html
+weavePToken = \case
+  PTokenStyledText styledText -> weaveStyledText styledText
+  PTokenLink _ -> H.text ""
+  PTokenMathFragment _ -> H.text ""
+#+end_src
+
+*** Weave styled text
+
+#+name: f:weaveStyledText
+#+begin_src haskell
+weaveStyledText :: StyledText -> H.Html
+weaveStyledText styledText = H.text $ styledText.body
+#+end_src
+
+*** Write to disk
+
+Weaving to disk is used when we want to choose where to write the HTML. It's
+just a thin wrapper around [[f:weave]] which does most of the work.
 
 #+name: f:weaveToDisk
 #+begin_src haskell
-weaveToDisk :: FilePath -> OrgDoc -> IO ()
-weaveToDisk = encodeFile
+weaveToDisk :: P.OsPath -> OrgDoc -> IO ()
+weaveToDisk fp od =
+  LU.writeFileRobustly fp
+    . T.pack
+    . renderHtml
+    $ weave od
 #+end_src
 
-** ClojureScript frontend
+* ClojureScript frontend
 
 The ClojureScript frontend is developed in a separate Org file, [[file:fe.org]].

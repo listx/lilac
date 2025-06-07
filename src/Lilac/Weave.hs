@@ -1,12 +1,73 @@
 module Lilac.Weave (weave, weaveToDisk) where
 
-import Data.Aeson (encode, encodeFile)
-import Data.ByteString.Lazy.Char8 qualified as BL
-import Lilac.Parse (OrgDoc)
-import Relude (FilePath, IO)
+import Data.Text qualified as T
+import Lilac.Parse
+  ( Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Heading (body, level),
+    OrgDoc (cells, meta),
+    PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    StyledText (body),
+  )
+import Lilac.Util qualified as LU
+import Relude
+  ( IO,
+    Maybe (Just, Nothing),
+    map,
+    sequence_,
+    ($),
+    (.),
+  )
+import Relude.Extra.Map qualified as EM
+import System.OsPath qualified as P
+import Text.Blaze.Html.Renderer.Pretty (renderHtml)
+import Text.Blaze.Html5 qualified as H
 
-weave :: OrgDoc -> BL.ByteString
-weave = encode
+weave :: OrgDoc -> H.Html
+weave od = H.docTypeHtml $ do
+  H.head $ do
+    H.title
+      $ H.text
+      $ case EM.lookup "title" od.meta of
+        Just title -> title
+        Nothing -> "Untitled"
+  H.body $ do
+    sequence_ $ map weaveCell od.cells
 
-weaveToDisk :: FilePath -> OrgDoc -> IO ()
-weaveToDisk = encodeFile
+weaveCell :: Cell -> H.Html
+weaveCell = \case
+  CHeading heading -> weaveHeading heading
+  CListItem _ -> H.p ""
+  CParagraph _ -> H.p ""
+  CBlock _ -> H.p ""
+  CMathFragment _ -> H.p ""
+  CFigure _ -> H.p ""
+  CTable _ -> H.p ""
+
+weaveHeading :: Heading -> H.Html
+weaveHeading heading = hN $ do
+  sequence_ $ map weavePToken heading.body
+  where
+    hN =
+      case heading.level of
+        1 -> H.h1
+        2 -> H.h2
+        3 -> H.h3
+        4 -> H.h4
+        5 -> H.h5
+        _ -> H.h6
+
+weavePToken :: PToken -> H.Html
+weavePToken = \case
+  PTokenStyledText styledText -> weaveStyledText styledText
+  PTokenLink _ -> H.text ""
+  PTokenMathFragment _ -> H.text ""
+
+weaveStyledText :: StyledText -> H.Html
+weaveStyledText styledText = H.text $ styledText.body
+
+weaveToDisk :: P.OsPath -> OrgDoc -> IO ()
+weaveToDisk fp od =
+  LU.writeFileRobustly fp
+    . T.pack
+    . renderHtml
+    $ weave od
