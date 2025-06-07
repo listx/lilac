@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Data.Aeson (encodeFile)
 import Data.Version (showVersion)
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
@@ -77,7 +78,8 @@ data Subcommand
 
 type CheckOpts :: Type
 data CheckOpts = CheckOpts
-  { input :: FilePath
+  { input :: FilePath,
+    dumpJson :: Bool
   }
 
 type TangleOpts :: Type
@@ -175,6 +177,16 @@ checkOptsHandler :: OptionHandler CheckOpts
 checkOptsHandler =
   CheckOpts
     <$> (argument str (metavar "FILE"))
+    <*> ( flag
+            False
+            True
+            ( long "dump-json"
+                <> help
+                  """
+                  Dump Org file as JSON. This is useful for debugging.
+                  """
+            )
+        )
 
 tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
@@ -261,6 +273,12 @@ lilacCheck globalOpts checkOpts = do
       when (not $ null cycles) $ do
         die $ "Found cycles: " <> show cycles
       putStrLn $ checkOpts.input <> ": OK"
+      when (checkOpts.dumpJson) $ do
+        outPath <- do
+          base <- P.takeBaseName <$> P.encodeUtf checkOpts.input
+          let json = P.unsafeEncodeUtf "json"
+          P.decodeUtf $ P.addExtension base json
+        encodeFile outPath orgDoc
       when (globalOpts.verbose) $ do
         let prettyPrint =
               if globalOpts.color

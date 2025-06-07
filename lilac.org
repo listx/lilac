@@ -1656,7 +1656,8 @@ executable lilac
       <<GHC warning flags>>
       <<GHC threaded flags>>
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
     , filepath
     , lilac
     , optparse-applicative
@@ -3610,6 +3611,7 @@ The boilerplate involves [[id:ce9af5ef-6559-4ffb-82c1-a439214eda6d][option handl
 #+begin_src haskell
 module Main (main) where
 
+import Data.Aeson (encodeFile)
 import Data.Version (showVersion)
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
@@ -3748,6 +3750,12 @@ lilacCheck globalOpts checkOpts = do
       when (not $ null cycles) $ do
         die $ "Found cycles: " <> show cycles
       putStrLn $ checkOpts.input <> ": OK"
+      when (checkOpts.dumpJson) $ do
+        outPath <- do
+          base <- P.takeBaseName <$> P.encodeUtf checkOpts.input
+          let json = P.unsafeEncodeUtf "json"
+          P.decodeUtf $ P.addExtension base json
+        encodeFile outPath orgDoc
       when (globalOpts.verbose) $ do
         let prettyPrint =
               if globalOpts.color
@@ -3760,6 +3768,9 @@ The [[f:lilacCheck]] function checks for any cycles and dies if it detects them.
 the global ~--verbose~ flag is given. This is useful for debugging. By default the
 data structure will be printed with colored braces, but you can suppress this
 with ~--no-color~.
+
+If ~--dump-json~ is given, write out the parsed Org file as a JSON file. This is
+useful for debugging.
 
 *** Tangling
 
@@ -3932,7 +3943,8 @@ The =check= subcommand runs [[f:lilacCheck]], and requires an ~input~ option and
 #+begin_src haskell
 type CheckOpts :: Type
 data CheckOpts = CheckOpts
-  { input :: FilePath
+  { input :: FilePath,
+    dumpJson :: Bool
   }
 #+end_src
 
@@ -3942,6 +3954,16 @@ checkOptsHandler :: OptionHandler CheckOpts
 checkOptsHandler =
   CheckOpts
     <$> (argument str (metavar "FILE"))
+    <*> ( flag
+            False
+            True
+            ( long "dump-json"
+                <> help
+                  """
+                  Dump Org file as JSON. This is useful for debugging.
+                  """
+            )
+        )
 #+end_src
 
 Like =check=, the =tangle= subcommand runs [[f:lilacTangle]], and also requires an ~input~ option.
