@@ -2,6 +2,7 @@ module Lilac.Weave (weave, weaveToDisk) where
 
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
+import Data.Text.Lazy qualified as TL
 import Lilac.Parse
   ( Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, meta, section),
@@ -21,13 +22,14 @@ import Relude
     sequence_,
     ($),
     (.),
+    (==),
   )
 import Relude.Extra.Map qualified as EM
 import System.OsPath qualified as P
 import Text.Blaze
   ( (!),
   )
-import Text.Blaze.Html.Renderer.Pretty (renderHtml)
+import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as A
 
@@ -39,6 +41,19 @@ weave od = H.docTypeHtml $ do
       $ case EM.lookup "title" od.meta of
         Just title -> title
         Nothing -> "Untitled"
+    H.link ! A.rel "stylesheet" ! A.href "./css/default.css"
+    H.link ! A.rel "preconnect" ! A.href "https://fonts.googleapis.com"
+    H.link ! A.rel "preconnect" ! A.href "https://fonts.gstatic.com" ! H.customAttribute "crossorigin" "anonymous"
+    let fontsLink =
+          H.preEscapedTextValue
+            $ T.intercalate
+              ""
+              [ "https://fonts.googleapis.com/css2?display=swap",
+                "&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900",
+                "&family=Source+Sans+3:ital,wght@0,200..900;1,200..900",
+                "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
+              ]
+    H.link ! A.rel "stylesheet" ! A.href fontsLink
   H.body $ do
     sequence_ $ map weaveCell od.cells
 
@@ -46,7 +61,8 @@ weaveCell :: Cell -> H.Html
 weaveCell = \case
   CHeading heading -> weaveHeading heading
   CListItem _ -> H.p ""
-  CParagraph _ -> H.p ""
+  CParagraph prose -> H.p $ do
+    sequence_ $ map weavePToken prose
   CBlock _ -> H.p ""
   CMathFragment _ -> H.p ""
   CFigure _ -> H.p ""
@@ -80,13 +96,15 @@ weavePToken = \case
 
 weaveStyledText :: StyledText -> H.Html
 weaveStyledText styledText = do
-  H.span ! A.class_ styles $ H.text $ styledText.body
+  if styles == []
+    then H.text $ styledText.body
+    else
+      H.span
+        ! A.class_ (H.textValue $ T.unwords styles)
+        $ H.text
+        $ styledText.body
   where
-    styles =
-      H.textValue
-        . T.unwords
-        . foldl' styleToClasses []
-        $ maskToStyles styledText.style
+    styles = foldl' styleToClasses [] $ maskToStyles styledText.style
     styleToClasses :: [T.Text] -> Style -> [T.Text]
     styleToClasses acc = \case
       Bold -> "bold" : acc
@@ -98,7 +116,7 @@ weaveStyledText styledText = do
 weaveToDisk :: P.OsPath -> OrgDoc -> IO ()
 weaveToDisk fp od =
   LU.writeFileRobustly fp
-    . T.pack
+    . TL.toStrict
     . renderHtml
     $ weave od
 

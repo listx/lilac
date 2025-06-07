@@ -6,6 +6,7 @@ import Lilac.Tangle qualified as LT
 import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
 import Lilac.Weave qualified as LW
+import Lilac.Weave.Css qualified as LWC
 import Options.Applicative
   ( Parser,
     argument,
@@ -293,8 +294,16 @@ lilacTangle globalOpts tangleOpts = do
 
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
+  writeCssFile
   mapM_ weaveOrgFile $ weaveOpts.inputs
   where
+    writeCssFile = do
+      cssPath <- do
+        dir <- P.encodeUtf weaveOpts.outDir
+        cssDir <- P.encodeUtf "css"
+        css <- P.encodeUtf "default.css"
+        pure $ P.joinPath [dir, cssDir, css]
+      LU.writeFileRobustly cssPath $ LWC.genCss
     weaveOrgFile inputOrgFile = do
       input <- LU.readFrom "" inputOrgFile
       let parseResult =

@@ -58,6 +58,7 @@ module Lilac.Weave (weave, weaveToDisk) where
 
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
+import Data.Text.Lazy qualified as TL
 import Lilac.Parse
   ( Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, meta, section),
@@ -77,13 +78,14 @@ import Relude
     sequence_,
     ($),
     (.),
+    (==),
   )
 import Relude.Extra.Map qualified as EM
 import System.OsPath qualified as P
 import Text.Blaze
   ( (!),
   )
-import Text.Blaze.Html.Renderer.Pretty (renderHtml)
+import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as A
 
@@ -96,7 +98,10 @@ import Text.Blaze.Html5.Attributes qualified as A
 <<f:maybeAssignId>>
 #+end_src
 
-** Weave into HTML
+* Generate HTML
+:PROPERTIES:
+:ID:       3592f24a-dc14-4ae6-8c06-5680ee7eb9aa
+:END:
 
 Weaving mainly means converting the [[data:OrgDoc]] into HTML, as part of "Step 1"
 in [[id:8f5752c0-6162-4de6-9ceb-f78ba584722c][Architecture]].
@@ -115,8 +120,30 @@ weave od = H.docTypeHtml $ do
       $ case EM.lookup "title" od.meta of
         Just title -> title
         Nothing -> "Untitled"
+    <<Styles and fonts>>
   H.body $ do
     sequence_ $ map weaveCell od.cells
+#+end_src
+
+The [[Styles and fonts]] are just some top-level CSS we need for the document,
+including the default CSS we [[id:8017befd-7628-46cf-a090-72fdbb00fb5a][generate]] and some default fonts we want to load
+from Google Fonts.
+
+#+name: Styles and fonts
+#+begin_src haskell
+H.link ! A.rel "stylesheet" ! A.href "./css/default.css"
+H.link ! A.rel "preconnect" ! A.href "https://fonts.googleapis.com"
+H.link ! A.rel "preconnect" ! A.href "https://fonts.gstatic.com" ! H.customAttribute "crossorigin" "anonymous"
+let fontsLink =
+      H.preEscapedTextValue
+        $ T.intercalate
+          ""
+          [ "https://fonts.googleapis.com/css2?display=swap",
+            "&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900",
+            "&family=Source+Sans+3:ital,wght@0,200..900;1,200..900",
+            "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
+          ]
+H.link ! A.rel "stylesheet" ! A.href fontsLink
 #+end_src
 
 Weaving cells just means delegating to each of the weavers that know how to
@@ -128,14 +155,15 @@ weaveCell :: Cell -> H.Html
 weaveCell = \case
   CHeading heading -> weaveHeading heading
   CListItem _ -> H.p ""
-  CParagraph _ -> H.p ""
+  CParagraph prose -> H.p $ do
+    sequence_ $ map weavePToken prose
   CBlock _ -> H.p ""
   CMathFragment _ -> H.p ""
   CFigure _ -> H.p ""
   CTable _ -> H.p ""
 #+end_src
 
-*** Weave headings
+** Weave headings
 
 Headings might sound simple, but because they are made up of arbitrary text,
 it's fairly involved. The body of a heading is made up of a list of [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]]
@@ -186,19 +214,21 @@ weavePToken = \case
   PTokenMathFragment _ -> H.text ""
 #+end_src
 
-*** Weave styled text
+** Weave styled text
 
 #+name: f:weaveStyledText
 #+begin_src haskell
 weaveStyledText :: StyledText -> H.Html
 weaveStyledText styledText = do
-  H.span ! A.class_ styles $ H.text $ styledText.body
+  if styles == []
+    then H.text $ styledText.body
+    else
+      H.span
+        ! A.class_ (H.textValue $ T.unwords styles)
+        $ H.text
+        $ styledText.body
   where
-    styles =
-      H.textValue
-        . T.unwords
-        . foldl' styleToClasses []
-        $ maskToStyles styledText.style
+    styles = foldl' styleToClasses [] $ maskToStyles styledText.style
     styleToClasses :: [T.Text] -> Style -> [T.Text]
     styleToClasses acc = \case
       Bold -> "bold" : acc
@@ -208,7 +238,7 @@ weaveStyledText styledText = do
       Code -> "code" : acc
 #+end_src
 
-*** Write to disk
+** Write to disk
 
 Weaving to disk is used when we want to choose where to write the HTML. It's
 just a thin wrapper around [[f:weave]] which does most of the work.
@@ -218,9 +248,210 @@ just a thin wrapper around [[f:weave]] which does most of the work.
 weaveToDisk :: P.OsPath -> OrgDoc -> IO ()
 weaveToDisk fp od =
   LU.writeFileRobustly fp
-    . T.pack
+    . TL.toStrict
     . renderHtml
     $ weave od
+#+end_src
+
+* Generate CSS
+:PROPERTIES:
+:ID:       8017befd-7628-46cf-a090-72fdbb00fb5a
+:END:
+
+We use the [[https://hackage.haskell.org/package/clay][Clay]] CSS preprocessor to generate CSS.
+
+Conceptually, [[id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa][weaving HTML]] depends on CSS. That is, the content of whatever Org
+file we are weaving is *not* an input into CSS generation. So that's why we call
+it "generating CSS" instead of "weaving CSS".
+
+** =Lilac.Weave.Css= module
+
+#+name: module:Lilac.Weave.Css
+#+header: :tangle src/Lilac/Weave/Css.hs
+#+begin_src haskell
+module Lilac.Weave.Css (genCss) where
+
+import Clay
+  ( Color,
+    Css,
+    Size,
+    auto,
+    backgroundColor,
+    body,
+    bold,
+    border,
+    borderRadius,
+    color,
+    em,
+    fontFamily,
+    fontStyle,
+    fontWeight,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    html,
+    italic,
+    margin,
+    monospace,
+    overflowY,
+    padding,
+    pretty,
+    px,
+    renderWith,
+    rgb,
+    sansSerif,
+    scroll,
+    serif,
+    solid,
+    textDecoration,
+    underline,
+    width,
+    (&),
+    (?),
+  )
+import Data.Bits
+  ( shiftR,
+    (.&.),
+  )
+import Data.Text qualified as T
+import Data.Text.Lazy qualified as TL
+import Relude
+  ( Int,
+    fromIntegral,
+    otherwise,
+    ($),
+    (<),
+    (>),
+  )
+
+<<f:genCss>>
+<<f:defaultCss>>
+<<f:noMargin>>
+<<f:vh>>
+<<f:ev>>
+<<f:rgbHex>>
+#+end_src
+
+#+name: f:genCss
+#+begin_src haskell
+genCss :: T.Text
+genCss = TL.toStrict $ renderWith pretty [] defaultCss
+#+end_src
+
+#+name: f:defaultCss
+#+begin_src haskell
+defaultCss :: Css
+defaultCss = do
+  html ? do
+    noMargin
+    ev padding $ px 0
+    backgroundColor $ rgbHex hexBg
+    color $ rgbHex hexText
+    body ? do
+      overflowY scroll
+      fontSerif
+      width $ px 900
+      vh margin (px 0) auto
+      h1 ? do
+        fontSans
+      h2 ? do
+        fontSans
+      h3 ? do
+        fontSans
+      h4 ? do
+        fontSans
+      h5 ? do
+        fontSans
+      h6 ? do
+        fontSans
+  ".bold" & do
+    fontWeight bold
+  ".italic" & do
+    fontStyle italic
+  ".underline" & do
+    textDecoration underline
+  ".verbatim" & do
+    fontMono
+  ".code" & do
+    codeStyle
+  where
+    <<Default CSS colors>>
+    fontSerif = fontFamily ["Source Serif 4"] [serif]
+    fontSans = fontFamily ["Source Sans 3"] [sansSerif]
+    fontMono = fontFamily ["Source Code Pro"] [monospace]
+    codeStyle = do
+      fontMono
+      backgroundColor $ rgbHex hexCodeBg
+      border (px 1) solid $ rgbHex hexCodeBorder
+      ev borderRadius (px 4)
+      vh padding 0 (em 0.2)
+#+end_src
+
+** Generic helpers
+
+[[f:noMargin]] removes all margins.
+
+#+name: f:noMargin
+#+begin_src haskell
+noMargin :: Css
+noMargin = ev margin $ px 0
+#+end_src
+
+[[f:vh]] is a horizontal\/vertical size helper. It accepts a function and two sizes
+for the horizontal and vertical parts. E.g., instead of calling
+
+#+begin_src haskell
+padding (px 6) (px 10) (px 6) (px 10)
+#+end_src
+
+you can do
+
+#+begin_src haskell
+vh padding (px 6) (px 10)
+#+end_src
+
+to save some keystrokes and decrease the chance of typos.
+
+#+name: f:vh
+#+begin_src haskell
+vh :: (Size a -> Size a -> Size a -> Size a -> Css) -> Size a -> Size a -> Css
+vh f x y = f x y x y
+#+end_src
+
+[[f:ev]] is like [[f:vh]], but uses the same size for *everything*.
+
+#+name: f:ev
+#+begin_src haskell
+ev :: (Size a -> Size a -> Size a -> Size a -> Css) -> Size a -> Css
+ev f x = f x x x x
+#+end_src
+
+[[f:rgbHex]] converts a hex number into a CSS ~Color~ value.
+
+#+name: f:rgbHex
+#+begin_src haskell
+rgbHex :: Int -> Color
+rgbHex rgb'
+  | rgb' > 0xffffff = rgbHex 0xffffff
+  | rgb' < 0 = rgbHex 0
+  | otherwise = rgb rr gg bb
+  where
+    rr = fromIntegral $ shiftR rgb' 16 .&. 0xFF
+    gg = fromIntegral $ shiftR rgb' 8 .&. 0xFF
+    bb = fromIntegral $ rgb' .&. 0xFF
+#+end_src
+
+** Default colors
+
+#+name: Default CSS colors
+#+begin_src haskell
+hexBg = 0xffffff :: Int
+hexText = 0x000000 :: Int
+hexCodeBg = 0xf7f7f7 :: Int
+hexCodeBorder = 0xcccccc :: Int
 #+end_src
 
 * ClojureScript frontend
