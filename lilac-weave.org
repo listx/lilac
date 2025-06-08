@@ -131,17 +131,53 @@ with [[f:weaveCell]].
 
 #+name: f:weave
 #+begin_src haskell
-weave :: OrgDoc -> H.Html
-weave od = H.docTypeHtml $ do
+weave :: OrgDoc -> Bool -> H.Html
+weave od watch = H.docTypeHtml $ do
   H.head $ do
     H.title
       $ H.text
       $ case EM.lookup "title" od.meta of
         Just title -> title
         Nothing -> "Untitled"
+    <<Hot reload script>>
     <<Styles and fonts>>
   H.body $ do
     sequence_ $ map weaveCell od.cells
+#+end_src
+
+The [[Hot reload script]] is a simple third-party development tool which reloads the
+page if there is a change in the HTML, CSS, or JS. It requires a web server, so
+we pull in
+
+#+name: Hot reload script
+#+begin_src haskell
+when watch
+  $ H.script
+  ! A.type_ "text/javascript"
+  ! A.src "https://livejs.com/live.js"
+  $ ""
+#+end_src
+
+The ~live.js~ script only works with a web server, so we declare Python as a
+dependency because you can easily start up a web server with
+
+#+begin_src sh
+make serve
+#+end_src
+
+because we have a =Makefile= rule which serves the =site= directory.
+
+#+name: make:Serve
+#+begin_src makefile
+serve:
+	python3 -m http.server 8080 -d site
+#+end_src
+
+The Nix dependency for Python is injected into the development shell environment in [[id:73b60692-f369-4707-a7ee-434cc7a4549f::code:tools][code:tools]].
+
+#+name: tool-python3
+#+begin_src nix
+pkgs.python3
 #+end_src
 
 The [[Styles and fonts]] are just some top-level CSS we need for the document,
@@ -367,12 +403,12 @@ just a thin wrapper around [[f:weave]] which does most of the work.
 
 #+name: f:weaveToDisk
 #+begin_src haskell
-weaveToDisk :: P.OsPath -> OrgDoc -> IO ()
-weaveToDisk fp od =
+weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
+weaveToDisk fp od watch =
   LU.writeFileRobustly fp
     . TL.toStrict
     . renderHtml
-    $ weave od
+    $ weave od watch
 #+end_src
 
 * Generate CSS

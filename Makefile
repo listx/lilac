@@ -21,11 +21,14 @@ tangle-fe: fe.org
 	touch tangle-fe
 
 weave: lilac.org lilac-parse.org lilac-weave.org fe.org
-	lilac weave --out-dir site \
+	lilac weave --out-dir site --watch \
 		lilac-parse.org \
 		lilac-weave.org \
 		lilac.org
 	touch weave
+
+serve:
+	python3 -m http.server 8080 -d site
 
 build: lilac.org lilac-parse.org lilac-weave.org lilac.cabal
 	cabal build

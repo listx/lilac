@@ -90,7 +90,8 @@ data TangleOpts = TangleOpts
 type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [FilePath],
-    outDir :: FilePath
+    outDir :: FilePath,
+    watch :: Bool
   }
 
 type WriteGOIDsOpts :: Type
@@ -205,6 +206,17 @@ weaveOptsHandler =
                 <> help
                   """
                   Directory for saving the HTML file.
+                  """
+            )
+        )
+    <*> ( flag
+            False
+            True
+            ( long "watch"
+                <> help
+                  """
+                  Inject JS to make the HTML page live-reload.
+                  Uses https://livejs.com/live.js.
                   """
             )
         )
@@ -340,7 +352,7 @@ lilacWeave weaveOpts = do
             let withoutExtension = P.joinPath [dir, base]
                 html = P.unsafeEncodeUtf "html"
             pure $ P.addExtension withoutExtension html
-          LW.weaveToDisk outPath orgDoc
+          LW.weaveToDisk outPath orgDoc weaveOpts.watch
           putStrLn "Finished weaving."
 
 lilacWriteGOIDs :: WriteGOIDsOpts -> IO ()

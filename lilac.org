@@ -289,6 +289,7 @@ version]].
 #+name: code:tools
 #+begin_src nix
 tools = [
+  <<id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7::tool-python3>>
   <<tool-niv>>
   <<tool-cabal>>
   <<tool-editorconfig-checker>>
@@ -666,6 +667,7 @@ we don't have to memorize exactly how to invoke certain commands.
 <<make:Run linters>>
 <<make:Tangle sources>>
 <<make:Weave>>
+<<id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7::make:Serve>>
 <<make:Build lilac with Cabal>>
 <<make:Build lilac with Nix>>
 <<make:Update Nix dependencies>>
@@ -918,7 +920,7 @@ For weaving, use the =site= directory.
 #+name: make:Weave
 #+begin_src makefile
 weave: lilac.org lilac-parse.org lilac-weave.org fe.org
-	lilac weave --out-dir site \
+	lilac weave --out-dir site --watch \
 		lilac-parse.org \
 		lilac-weave.org \
 		lilac.org
@@ -931,6 +933,10 @@ Ignore the =weave= file because it's a [[id:b649d761-1103-47be-86e4-56a7362a5ecc
 #+begin_src gitignore
 weave
 #+end_src
+
+It's useful to serve the generated pages through a server (instead of making the
+browser fetch it via the ~file://~ protocol), because it gives us access to hot
+reloading. Hot reloading is discussed again at [[id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa::Hot reload script][Hot reload script]].
 
 *** Build =lilac=
 
@@ -3957,7 +3963,7 @@ lilacWeave weaveOpts = do
             let withoutExtension = P.joinPath [dir, base]
                 html = P.unsafeEncodeUtf "html"
             pure $ P.addExtension withoutExtension html
-          LW.weaveToDisk outPath orgDoc
+          LW.weaveToDisk outPath orgDoc weaveOpts.watch
           putStrLn "Finished weaving."
 #+end_src
 
@@ -4083,7 +4089,8 @@ The =weave= subcommand requires an ~input~ option as well.
 type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [FilePath],
-    outDir :: FilePath
+    outDir :: FilePath,
+    watch :: Bool
   }
 #+end_src
 
@@ -4101,6 +4108,17 @@ weaveOptsHandler =
                 <> help
                   """
                   Directory for saving the HTML file.
+                  """
+            )
+        )
+    <*> ( flag
+            False
+            True
+            ( long "watch"
+                <> help
+                  """
+                  Inject JS to make the HTML page live-reload.
+                  Uses https://livejs.com/live.js.
                   """
             )
         )

@@ -8,6 +8,8 @@ let
   scripts = import ./scripts.nix { inherit pkgs; };
 
   tools = [
+    pkgs.python3
+
     pkgs.niv
 
     pkgs.cabal-install

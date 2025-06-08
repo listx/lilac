@@ -47,14 +47,20 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as A
 
-weave :: OrgDoc -> H.Html
-weave od = H.docTypeHtml $ do
+weave :: OrgDoc -> Bool -> H.Html
+weave od watch = H.docTypeHtml $ do
   H.head $ do
     H.title
       $ H.text
       $ case EM.lookup "title" od.meta of
         Just title -> title
         Nothing -> "Untitled"
+    when watch
+      $ H.script
+      ! A.type_ "text/javascript"
+      ! A.src "https://livejs.com/live.js"
+      $ ""
+
     H.link ! A.rel "stylesheet" ! A.href "./css/default.css"
     H.link ! A.rel "preconnect" ! A.href "https://fonts.googleapis.com"
     H.link
@@ -179,12 +185,12 @@ weaveLink :: Link -> H.Html
 weaveLink link = do
   H.a ! A.href "h" $ sequence_ $ map weaveStyledText link.name
 
-weaveToDisk :: P.OsPath -> OrgDoc -> IO ()
-weaveToDisk fp od =
+weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
+weaveToDisk fp od watch =
   LU.writeFileRobustly fp
     . TL.toStrict
     . renderHtml
-    $ weave od
+    $ weave od watch
 
 maybeAssignId :: M.Map T.Text T.Text -> (H.Html -> H.Html) -> (H.Html -> H.Html)
 maybeAssignId meta elt = case EM.lookup "ID" meta of
