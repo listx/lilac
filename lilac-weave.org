@@ -152,7 +152,10 @@ from Google Fonts.
 #+begin_src haskell
 H.link ! A.rel "stylesheet" ! A.href "./css/default.css"
 H.link ! A.rel "preconnect" ! A.href "https://fonts.googleapis.com"
-H.link ! A.rel "preconnect" ! A.href "https://fonts.gstatic.com" ! H.customAttribute "crossorigin" "anonymous"
+H.link
+  ! A.rel "preconnect"
+  ! A.href "https://fonts.gstatic.com"
+  ! H.customAttribute "crossorigin" "anonymous"
 let fontsLink =
       H.preEscapedTextValue
         $ T.intercalate
@@ -408,6 +411,7 @@ import Clay
     display,
     div,
     em,
+    fitContent,
     fontFamily,
     fontSize,
     fontStyle,
@@ -422,6 +426,7 @@ import Clay
     italic,
     lineHeight,
     margin,
+    minWidth,
     monospace,
     overflowY,
     padding,
@@ -526,6 +531,7 @@ defaultCss = do
     borderBottomRightRadius (px 5) (px 5)
     border (px 1) solid $ rgbHex hexCodeBorder
     ev padding (px 5)
+    minWidth fitContent
   ".bold" & do
     fontWeight bold
   ".italic" & do

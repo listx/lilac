@@ -366,7 +366,7 @@ parseSpec = do
       L.genHeadingSection 1 [1] `shouldBe` [2]
       L.genHeadingSection 2 [1, 1] `shouldBe` [2, 1]
       L.genHeadingSection 3 [1, 1, 1] `shouldBe` [2, 1, 1]
-    it "truncates, and then increments the newest deepest level if the nesting level gets smaller" $ do
+    it "truncates, then increments the (newst) deepest level if we unnest" $ do
       L.genHeadingSection 1 [3, 5] `shouldBe` [6]
       L.genHeadingSection 3 [3, 5, 6, 7] `shouldBe` [6, 6, 7]
     it "grows the section if we nest deeper" $ do
@@ -519,7 +519,11 @@ parseSpec = do
               ],
             L.CParagraph
               [ L.PTokenStyledText
-                  (L.StyledText {body = "multiple lines with underscore", style = L.styleMaskFrom [L.Underline]})
+                  ( L.StyledText
+                      { body = "multiple lines with underscore",
+                        style = L.styleMaskFrom [L.Underline]
+                      }
+                  )
               ]
           ],
         meta = fromList []
@@ -1913,7 +1917,7 @@ parseSpec = do
                         ( (3, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Pythagorean_theorem",
+                                  { target = L.LinkTargetOther "https://wiki/x",
                                     name =
                                       [ L.StyledText
                                           { body = "Wiki",
@@ -1951,7 +1955,7 @@ parseSpec = do
                         ( (4, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
+                                  { target = L.LinkTargetOther "https://wiki/y",
                                     name =
                                       [ L.StyledText
                                           { body = "Wiki",
@@ -2044,7 +2048,7 @@ parseSpec = do
                         ( (3, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Pythagorean_theorem",
+                                  { target = L.LinkTargetOther "https://wiki/x",
                                     name =
                                       [ L.StyledText
                                           { body = "Wiki",
@@ -2082,7 +2086,7 @@ parseSpec = do
                         ( (4, 3),
                           [ L.PTokenLink
                               ( L.Link
-                                  { target = L.LinkTargetOther "https://en.wikipedia.org/wiki/Mass%E2%80%93energy_equivalence",
+                                  { target = L.LinkTargetOther "https://wiki/y",
                                     name =
                                       [ L.StyledText
                                           { body = "Wiki",
@@ -2122,8 +2126,8 @@ parseSpec = do
 
   pGOIDs
     "0200-goids-file-oneline"
-    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
-      ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org")
+    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./a"),
+      ("3c576a02-418b-431b-ab96-e4936e977fb7", "./b")
     ]
 
   pGOIDs

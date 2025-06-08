@@ -57,7 +57,10 @@ weave od = H.docTypeHtml $ do
         Nothing -> "Untitled"
     H.link ! A.rel "stylesheet" ! A.href "./css/default.css"
     H.link ! A.rel "preconnect" ! A.href "https://fonts.googleapis.com"
-    H.link ! A.rel "preconnect" ! A.href "https://fonts.gstatic.com" ! H.customAttribute "crossorigin" "anonymous"
+    H.link
+      ! A.rel "preconnect"
+      ! A.href "https://fonts.gstatic.com"
+      ! H.customAttribute "crossorigin" "anonymous"
     let fontsLink =
           H.preEscapedTextValue
             $ T.intercalate

@@ -18,6 +18,7 @@ import Clay
     display,
     div,
     em,
+    fitContent,
     fontFamily,
     fontSize,
     fontStyle,
@@ -32,6 +33,7 @@ import Clay
     italic,
     lineHeight,
     margin,
+    minWidth,
     monospace,
     overflowY,
     padding,
@@ -123,6 +125,7 @@ defaultCss = do
     borderBottomRightRadius (px 5) (px 5)
     border (px 1) solid $ rgbHex hexCodeBorder
     ev padding (px 5)
+    minWidth fitContent
   ".bold" & do
     fontWeight bold
   ".italic" & do

@@ -1030,7 +1030,13 @@ blockParser = do
           }
   pure $ CBlock block
 
-blockStartParser :: OrgParser (Maybe (T.Text, T.Text), [(T.Text, T.Text)], T.Text, Maybe (T.Text, T.Text))
+blockStartParser ::
+  OrgParser
+    ( Maybe (T.Text, T.Text),
+      [(T.Text, T.Text)],
+      T.Text,
+      Maybe (T.Text, T.Text)
+    )
 blockStartParser = do
   _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
   blockName <- MP.optional metaNameParser
@@ -1362,22 +1368,23 @@ listItemNester level levels = do
   pure [newMarker, LItemStart]
 
 listItemFitter :: Level -> [Level] -> OrgParser [ListMarker]
-listItemFitter level levels = case find (\(_, l) -> l.indent == level.indent) (zip [0 ..] levels) of
-  Nothing -> fail "list item: invalid indentation"
-  Just (levelsToDrop, lvl)
-    | isJust level.number && isJust lvl.number ->
-        let expectedNum = fmap (+ 1) lvl.number
-         in if level.number == expectedNum
-              then fitter levelsToDrop
-              else
-                fail
-                  $ "expected incremented list head "
-                  <> (show . fromJust $ expectedNum)
-                  <> " but got "
-                  <> (show . fromJust $ level.number)
-    | isNothing level.number && isNothing lvl.number -> fitter levelsToDrop
-    | isJust lvl.number -> fail "expected ORDERED list item at this level"
-    | otherwise -> fail "expected UNORDERED list item at this level"
+listItemFitter level levels =
+  case find (\(_, l) -> l.indent == level.indent) (zip [0 ..] levels) of
+    Nothing -> fail "list item: invalid indentation"
+    Just (levelsToDrop, lvl)
+      | isJust level.number && isJust lvl.number ->
+          let expectedNum = fmap (+ 1) lvl.number
+           in if level.number == expectedNum
+                then fitter levelsToDrop
+                else
+                  fail
+                    $ "expected incremented list head "
+                    <> (show . fromJust $ expectedNum)
+                    <> " but got "
+                    <> (show . fromJust $ level.number)
+      | isNothing level.number && isNothing lvl.number -> fitter levelsToDrop
+      | isJust lvl.number -> fail "expected ORDERED list item at this level"
+      | otherwise -> fail "expected UNORDERED list item at this level"
   where
     fitter :: Int -> OrgParser [ListMarker]
     fitter levelsToDrop = do
