@@ -20,19 +20,25 @@ import Lilac.Parse
   )
 import Lilac.Util qualified as LU
 import Relude
-  ( IO,
+  ( Bool (False),
+    IO,
     Maybe (Just, Nothing),
+    foldMap',
     foldl',
     map,
+    otherwise,
     pure,
     reverse,
     sequence_,
+    when,
     ($),
     (.),
     (<>),
     (==),
+    (>),
   )
 import Relude.Extra.Map qualified as EM
+import Skylighting qualified as Sky
 import System.OsPath qualified as P
 import Text.Blaze
   ( (!),
@@ -133,22 +139,38 @@ weaveListMarker =
 
 weaveBlock :: Block -> H.Html
 weaveBlock block = do
-  H.div ! A.class_ ".code-block-container" $ do
+  H.div ! A.class_ "code-block-container" $ do
     maybeAssignName
-    H.pre ! A.class_ ".code-block-body" $ do
-      sequence_ $ map weaveBToken block.body
+    H.pre ! A.class_ "code-block-body" $ do
+      let lang = EM.lookup "__src_language" block.meta
+      sequence_ $ map (weaveBToken lang) block.body
   where
     maybeAssignName =
       case EM.lookup "name" block.meta of
-        Just name -> H.div ! A.class_ ".code-block-name" $ do
+        Just name -> H.div ! A.class_ "code-block-name" $ do
           H.text name
         Nothing -> pure ()
 
-weaveBToken :: BToken -> H.Html
-weaveBToken = \case
-  BTokenString txt -> H.text txt
+weaveBToken :: Maybe T.Text -> BToken -> H.Html
+weaveBToken lang = \case
+  BTokenString txt -> case lang of
+    Just l -> do
+      colorizeBlock l txt
+      let trailingNewlines = T.takeWhileEnd (== '\n') txt
+      when (T.length trailingNewlines > 0)
+        $ H.text "\n"
+    Nothing -> H.text txt
   BTokenPadding -> pure ()
-  BTokenLink link -> weaveLink link
+  BTokenLink link -> H.code ! A.class_ "sourceCode" $ weaveLink link
+
+colorizeBlock :: T.Text -> T.Text -> H.Html
+colorizeBlock lang txt
+  | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
+    Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
+      Sky.formatHtmlInline Sky.defaultFormatOpts lines
+  | otherwise = H.text txt
+  where
+    defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 
 weaveLink :: Link -> H.Html
 weaveLink link = do

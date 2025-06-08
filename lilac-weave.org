@@ -76,19 +76,25 @@ import Lilac.Parse
   )
 import Lilac.Util qualified as LU
 import Relude
-  ( IO,
+  ( Bool (False),
+    IO,
     Maybe (Just, Nothing),
+    foldMap',
     foldl',
     map,
+    otherwise,
     pure,
     reverse,
     sequence_,
+    when,
     ($),
     (.),
     (<>),
     (==),
+    (>),
   )
 import Relude.Extra.Map qualified as EM
+import Skylighting qualified as Sky
 import System.OsPath qualified as P
 import Text.Blaze
   ( (!),
@@ -105,6 +111,7 @@ import Text.Blaze.Html5.Attributes qualified as A
 <<f:weaveListMarker>>
 <<f:weaveBlock>>
 <<f:weaveBToken>>
+<<f:colorizeBlock>>
 <<f:weaveLink>>
 <<f:weaveToDisk>>
 <<f:maybeAssignId>>
@@ -277,30 +284,71 @@ weaveListMarker =
 
 ** Weave code blocks
 
+Weaving code blocks requires us to be able to handle both regular text
+(~BTokenString~) and also links (~BTokenLink~). There is some additional work for
+supporting syntax highlighting (see [[f:colorizeBlock]]).
+
 #+name: f:weaveBlock
 #+begin_src haskell
 weaveBlock :: Block -> H.Html
 weaveBlock block = do
-  H.div ! A.class_ ".code-block-container" $ do
+  H.div ! A.class_ "code-block-container" $ do
     maybeAssignName
-    H.pre ! A.class_ ".code-block-body" $ do
-      sequence_ $ map weaveBToken block.body
+    H.pre ! A.class_ "code-block-body" $ do
+      let lang = EM.lookup "__src_language" block.meta
+      sequence_ $ map (weaveBToken lang) block.body
   where
     maybeAssignName =
       case EM.lookup "name" block.meta of
-        Just name -> H.div ! A.class_ ".code-block-name" $ do
+        Just name -> H.div ! A.class_ "code-block-name" $ do
           H.text name
         Nothing -> pure ()
 #+end_src
 
+We ignore the ~BtokenPadding~ token because it's only meant to be used for
+tangling. The business with ~trailingNewlines~ is a hack to make the formatting
+look acceptable; this is because ~Sky.formatHtmlInline~ in [[f:colorizeBlock]] trims
+trailing whitespace, resulting in information loss.
+
+On a similar note, the wrapping of the call to [[f:weaveLink]] with ~H.code~ is to
+make the CSS rules play out the same way for both ~BTokenString~ and ~BTokenLink~
+types; if we don't have the same HTML hierarchy, these get subtly different
+treatment by CSS, even if we don't have relevant CSS rules defined (probably due
+to browser defaults). The call to ~Sky.formatHtmlInline~ results in the use of
+~H.code~ for ~BTokenString~ values, which is why we choose it as the wrapper element
+here around ~BTokenLink~ values.
+
 #+name: f:weaveBToken
 #+begin_src haskell
-weaveBToken :: BToken -> H.Html
-weaveBToken = \case
-  BTokenString txt -> H.text txt
+weaveBToken :: Maybe T.Text -> BToken -> H.Html
+weaveBToken lang = \case
+  BTokenString txt -> case lang of
+    Just l -> do
+      colorizeBlock l txt
+      let trailingNewlines = T.takeWhileEnd (== '\n') txt
+      when (T.length trailingNewlines > 0)
+        $ H.text "\n"
+    Nothing -> H.text txt
   BTokenPadding -> pure ()
-  BTokenLink link -> weaveLink link
+  BTokenLink link -> H.code ! A.class_ "sourceCode" $ weaveLink link
 #+end_src
+
+Block colorization relies on the [[https://hackage.haskell.org/package/skylighting][=skylighting=]] syntax highlighting library.
+
+#+name: f:colorizeBlock
+#+begin_src haskell
+colorizeBlock :: T.Text -> T.Text -> H.Html
+colorizeBlock lang txt
+  | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
+    Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
+      Sky.formatHtmlInline Sky.defaultFormatOpts lines
+  | otherwise = H.text txt
+  where
+    defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
+#+end_src
+
+Weaving links is not yet fully supported (we just have a stub "~h~" target for the
+URL).
 
 #+name: f:weaveLink
 #+begin_src haskell
@@ -348,13 +396,20 @@ import Clay
     Size,
     auto,
     backgroundColor,
+    block,
     body,
     bold,
     border,
+    borderBottomLeftRadius,
+    borderBottomRightRadius,
     borderRadius,
+    code,
     color,
+    display,
+    div,
     em,
     fontFamily,
+    fontSize,
     fontStyle,
     fontWeight,
     h1,
@@ -365,11 +420,14 @@ import Clay
     h6,
     html,
     italic,
+    lineHeight,
     margin,
     monospace,
     overflowY,
     padding,
+    pre,
     pretty,
+    pt,
     px,
     renderWith,
     rgb,
@@ -379,10 +437,13 @@ import Clay
     solid,
     textDecoration,
     underline,
+    whiteSpace,
     width,
     (&),
+    (-:),
     (?),
   )
+import Clay.Text qualified as CT
 import Data.Bits
   ( shiftR,
     (.&.),
@@ -397,6 +458,7 @@ import Relude
     (<),
     (>),
   )
+import Skylighting qualified as Sky
 
 <<f:genCss>>
 <<f:defaultCss>>
@@ -409,7 +471,11 @@ import Relude
 #+name: f:genCss
 #+begin_src haskell
 genCss :: T.Text
-genCss = TL.toStrict $ renderWith pretty [] defaultCss
+genCss =
+  T.unlines
+    [ T.pack $ Sky.styleToCss Sky.kate,
+      TL.toStrict $ renderWith pretty [] defaultCss
+    ]
 #+end_src
 
 #+name: f:defaultCss
@@ -421,23 +487,45 @@ defaultCss = do
     ev padding $ px 0
     backgroundColor $ rgbHex hexBg
     color $ rgbHex hexText
-    body ? do
-      overflowY scroll
-      fontSerif
-      width $ px 900
-      vh margin (px 0) auto
-      h1 ? do
-        fontSans
-      h2 ? do
-        fontSans
-      h3 ? do
-        fontSans
-      h4 ? do
-        fontSans
-      h5 ? do
-        fontSans
-      h6 ? do
-        fontSans
+  body ? do
+    overflowY scroll
+    fontSerif
+    width $ px 800
+    vh margin (px 0) auto
+    h1 ? do
+      fontSans
+    h2 ? do
+      fontSans
+    h3 ? do
+      fontSans
+    h4 ? do
+      fontSans
+    h5 ? do
+      fontSans
+    h6 ? do
+      fontSans
+  pre ? do
+    "all" -: "unset"
+    display block
+    whiteSpace CT.pre
+    noMargin
+  div ? do
+    noMargin
+  code ? do
+    noMargin
+  ".sourceCode" & do
+    noMargin
+  ".code-block-body" & do
+    noMargin
+    fontMono
+    fontSize (pt 10)
+    lineHeight (pt 14)
+    backgroundColor $ rgbHex hexCodeBg
+    color $ rgbHex hexCodeFg
+    borderBottomLeftRadius (px 5) (px 5)
+    borderBottomRightRadius (px 5) (px 5)
+    border (px 1) solid $ rgbHex hexCodeBorder
+    ev padding (px 5)
   ".bold" & do
     fontWeight bold
   ".italic" & do
@@ -450,11 +538,15 @@ defaultCss = do
     codeStyle
   where
     <<Default CSS colors>>
-    fontSerif = fontFamily ["Source Serif 4"] [serif]
-    fontSans = fontFamily ["Source Sans 3"] [sansSerif]
-    fontMono = fontFamily ["Source Code Pro"] [monospace]
+    fontSerif = do
+      fontFamily ["Source Serif 4"] [serif]
+    fontSans = do
+      fontFamily ["Source Sans 3"] [sansSerif]
+    fontMono = do
+      fontFamily ["Source Code Pro"] [monospace]
     codeStyle = do
       fontMono
+      fontSize (pt 10)
       backgroundColor $ rgbHex hexCodeBg
       border (px 1) solid $ rgbHex hexCodeBorder
       ev borderRadius (px 4)
@@ -488,7 +580,7 @@ to save some keystrokes and decrease the chance of typos.
 
 #+name: f:vh
 #+begin_src haskell
-vh :: (Size a -> Size a -> Size a -> Size a -> Css) -> Size a -> Size a -> Css
+vh :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Size sz -> Css
 vh f x y = f x y x y
 #+end_src
 
@@ -496,7 +588,7 @@ vh f x y = f x y x y
 
 #+name: f:ev
 #+begin_src haskell
-ev :: (Size a -> Size a -> Size a -> Size a -> Css) -> Size a -> Css
+ev :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Css
 ev f x = f x x x x
 #+end_src
 
@@ -521,6 +613,7 @@ rgbHex rgb'
 #+begin_src haskell
 hexBg = 0xffffff :: Int
 hexText = 0x000000 :: Int
+hexCodeFg = 0x1f1c1b :: Int
 hexCodeBg = 0xf7f7f7 :: Int
 hexCodeBorder = 0xcccccc :: Int
 #+end_src

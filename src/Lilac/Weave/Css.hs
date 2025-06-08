@@ -6,13 +6,20 @@ import Clay
     Size,
     auto,
     backgroundColor,
+    block,
     body,
     bold,
     border,
+    borderBottomLeftRadius,
+    borderBottomRightRadius,
     borderRadius,
+    code,
     color,
+    display,
+    div,
     em,
     fontFamily,
+    fontSize,
     fontStyle,
     fontWeight,
     h1,
@@ -23,11 +30,14 @@ import Clay
     h6,
     html,
     italic,
+    lineHeight,
     margin,
     monospace,
     overflowY,
     padding,
+    pre,
     pretty,
+    pt,
     px,
     renderWith,
     rgb,
@@ -37,10 +47,13 @@ import Clay
     solid,
     textDecoration,
     underline,
+    whiteSpace,
     width,
     (&),
+    (-:),
     (?),
   )
+import Clay.Text qualified as CT
 import Data.Bits
   ( shiftR,
     (.&.),
@@ -55,9 +68,14 @@ import Relude
     (<),
     (>),
   )
+import Skylighting qualified as Sky
 
 genCss :: T.Text
-genCss = TL.toStrict $ renderWith pretty [] defaultCss
+genCss =
+  T.unlines
+    [ T.pack $ Sky.styleToCss Sky.kate,
+      TL.toStrict $ renderWith pretty [] defaultCss
+    ]
 
 defaultCss :: Css
 defaultCss = do
@@ -66,23 +84,45 @@ defaultCss = do
     ev padding $ px 0
     backgroundColor $ rgbHex hexBg
     color $ rgbHex hexText
-    body ? do
-      overflowY scroll
-      fontSerif
-      width $ px 900
-      vh margin (px 0) auto
-      h1 ? do
-        fontSans
-      h2 ? do
-        fontSans
-      h3 ? do
-        fontSans
-      h4 ? do
-        fontSans
-      h5 ? do
-        fontSans
-      h6 ? do
-        fontSans
+  body ? do
+    overflowY scroll
+    fontSerif
+    width $ px 800
+    vh margin (px 0) auto
+    h1 ? do
+      fontSans
+    h2 ? do
+      fontSans
+    h3 ? do
+      fontSans
+    h4 ? do
+      fontSans
+    h5 ? do
+      fontSans
+    h6 ? do
+      fontSans
+  pre ? do
+    "all" -: "unset"
+    display block
+    whiteSpace CT.pre
+    noMargin
+  div ? do
+    noMargin
+  code ? do
+    noMargin
+  ".sourceCode" & do
+    noMargin
+  ".code-block-body" & do
+    noMargin
+    fontMono
+    fontSize (pt 10)
+    lineHeight (pt 14)
+    backgroundColor $ rgbHex hexCodeBg
+    color $ rgbHex hexCodeFg
+    borderBottomLeftRadius (px 5) (px 5)
+    borderBottomRightRadius (px 5) (px 5)
+    border (px 1) solid $ rgbHex hexCodeBorder
+    ev padding (px 5)
   ".bold" & do
     fontWeight bold
   ".italic" & do
@@ -96,13 +136,18 @@ defaultCss = do
   where
     hexBg = 0xffffff :: Int
     hexText = 0x000000 :: Int
+    hexCodeFg = 0x1f1c1b :: Int
     hexCodeBg = 0xf7f7f7 :: Int
     hexCodeBorder = 0xcccccc :: Int
-    fontSerif = fontFamily ["Source Serif 4"] [serif]
-    fontSans = fontFamily ["Source Sans 3"] [sansSerif]
-    fontMono = fontFamily ["Source Code Pro"] [monospace]
+    fontSerif = do
+      fontFamily ["Source Serif 4"] [serif]
+    fontSans = do
+      fontFamily ["Source Sans 3"] [sansSerif]
+    fontMono = do
+      fontFamily ["Source Code Pro"] [monospace]
     codeStyle = do
       fontMono
+      fontSize (pt 10)
       backgroundColor $ rgbHex hexCodeBg
       border (px 1) solid $ rgbHex hexCodeBorder
       ev borderRadius (px 4)
@@ -111,10 +156,10 @@ defaultCss = do
 noMargin :: Css
 noMargin = ev margin $ px 0
 
-vh :: (Size a -> Size a -> Size a -> Size a -> Css) -> Size a -> Size a -> Css
+vh :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Size sz -> Css
 vh f x y = f x y x y
 
-ev :: (Size a -> Size a -> Size a -> Size a -> Css) -> Size a -> Css
+ev :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Css
 ev f x = f x x x x
 
 rgbHex :: Int -> Color
