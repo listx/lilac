@@ -192,6 +192,7 @@ in import sources.nixpkgs {
     (final: prev: {
       lilacPkgs = import ./packages.nix {
         pkgs = prev;
+        fetchFromGitHub = prev.fetchFromGitHub;
         inherit lilacGitVersion;
       };
     })
@@ -216,7 +217,7 @@ important derivations, ~devShell~ and ~lilac~.
 #+name: nix/packages.nix
 #+header: :tangle nix/packages.nix
 #+begin_src nix
-{ pkgs, lilacGitVersion }:
+{ pkgs, fetchFromGitHub, lilacGitVersion }:
 let
   <<code:devShellEnv>>
   <<code:scripts>>
@@ -344,7 +345,16 @@ output for the ~--version~ flag.
 
 #+name: code:Haskell overlays
 #+begin_src nix
-haskellOverlays = [ injectLilac tweakLilacBuild ];
+haskellOverlays =
+  [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+
+jailbreaks = final: prev: {
+  <<jailbreaks:skylighting-core>>
+};
+
+injectExternalPackages = final: prev: {
+  <<injectExternalPackage:xml-conduit>>
+};
 
 injectLilac = final: prev: {
   lilac = configureHaskellPkg (prev.callCabal2nix "lilac" lilacSource { });
@@ -508,6 +518,82 @@ x.lilacPkgs.lilac
 The first line calls the expression in =default.nix= with the argument for
 ~lilacGitVersion~. The next line =x.lilacPkgs.lilac= accesses the ~lilac~ attribute
 which is just a derivation (an installable Nix package).
+
+*** External Haskell packages from beyond Nixpkgs
+
+Sometimes we might want to use a Haskell package that's not in Nixpkgs (for
+example, if the version in Nixpkgs is broken and the fix for that package is
+already in upstream but not yet in Nixpkgs). Allow users to specify packages by
+the GitHub commit.
+
+To add something directly from GitHub (such if the latest version on Hackage is still
+too old for us), we can put the following inside the ~injectExternalPackages~
+section in [[code:Haskell overlays]].
+
+#+begin_src nix
+  foo-bar =
+    pkgs.haskell.lib.dontCheck (
+      prev.callCabal2nix "foo-bar" (
+        builtins.fetchFromGitHub {
+          owner = "x";
+          repo = "y";
+          rev = "0000000000000000000000000000000000000000";
+          sha256 = "00000";
+        }
+      ) {}
+    );
+#+end_src
+
+For example, the above will override the default version of ~foo-bar~ with the one
+defined via Git.
+
+*** Removing version bounds
+
+You can remove version bound checks on package ~foo-package~ like this inside the
+~jailbreaks~ section of [[code:Haskell overlays]].
+
+#+begin_src nix
+foo-package = pkgs.haskell.lib.doJailbreak(prev.foo-package);
+#+end_src
+
+** Known issues and workarounds
+
+Here we document various breakages and our workarounds for them.
+
+*** =skylighting= and GHC 9.12
+
+The =skylighting-core= package depends on =xml-conduit=, but =xml-conduit= breaks on
+GHC 9.12 on versions 1.9.1.4 and 1.10.0.0. So we have to bring in the version on
+GitHub which has a fix for GHC 9.12:
+
+#+name: injectExternalPackage:xml-conduit
+#+begin_src nix
+xml-conduit = pkgs.haskell.lib.dontCheck (prev.callCabal2nix "xml-conduit"
+  (let
+    repo = fetchFromGitHub {
+      owner = "snoyberg";
+      repo = "xml";
+      rev = "73ce67029c61decaa6525536377a15581325fd9e";
+      sha256 = "sha256-Biu18KM+doPvVX1L+WYB/zgJmVUsSdcyDUfFaZza78E=";
+      sparseCheckout = [ "xml-conduit" ];
+    };
+  in "${repo}/xml-conduit") { });
+#+end_src
+
+Although the above works to build =xml-conduit= on GHC 9.12+, =skylighting-core=
+0.14.5 then breaks because of a version bound error:
+
+#+begin_quote
+      > Encountered missing or private dependencies:
+      >     xml-conduit >=1.9.1.3 && <1.10
+#+end_quote
+
+Make =skylighting-core= ignore the above constraint by allowing it to "jailbreak":
+
+#+name: jailbreaks:skylighting-core
+#+begin_src nix
+skylighting-core = pkgs.haskell.lib.doJailbreak (prev.skylighting-core);
+#+end_src
 
 ** =shell.nix=
 
@@ -1636,6 +1722,7 @@ library
     , network-uri
     , process
     , relude
+    , skylighting
     , template-haskell
     , text
     , time

@@ -1,4 +1,4 @@
-{ pkgs, lilacGitVersion }:
+{ pkgs, fetchFromGitHub, lilacGitVersion }:
 let
   devShellEnv = pkgs.buildEnv {
     name = "lilac-devShellEnv";
@@ -36,7 +36,25 @@ let
   ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.12.2";
   ghcVersion = "ghc" + ghcVersionWithoutDots;
 
-  haskellOverlays = [ injectLilac tweakLilacBuild ];
+  haskellOverlays =
+    [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+
+  jailbreaks = final: prev: {
+    skylighting-core = pkgs.haskell.lib.doJailbreak (prev.skylighting-core);
+  };
+
+  injectExternalPackages = final: prev: {
+    xml-conduit = pkgs.haskell.lib.dontCheck (prev.callCabal2nix "xml-conduit"
+      (let
+        repo = fetchFromGitHub {
+          owner = "snoyberg";
+          repo = "xml";
+          rev = "73ce67029c61decaa6525536377a15581325fd9e";
+          sha256 = "sha256-Biu18KM+doPvVX1L+WYB/zgJmVUsSdcyDUfFaZza78E=";
+          sparseCheckout = [ "xml-conduit" ];
+        };
+      in "${repo}/xml-conduit") { });
+  };
 
   injectLilac = final: prev: {
     lilac = configureHaskellPkg (prev.callCabal2nix "lilac" lilacSource { });

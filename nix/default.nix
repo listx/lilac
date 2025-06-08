@@ -7,6 +7,7 @@ in import sources.nixpkgs {
     (final: prev: {
       lilacPkgs = import ./packages.nix {
         pkgs = prev;
+        fetchFromGitHub = prev.fetchFromGitHub;
         inherit lilacGitVersion;
       };
     })
