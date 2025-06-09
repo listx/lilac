@@ -4,15 +4,18 @@ import Clay
   ( Color,
     Css,
     Size,
+    a,
     auto,
     backgroundColor,
-    block,
     body,
     bold,
     border,
     borderBottomLeftRadius,
     borderBottomRightRadius,
+    borderBottomWidth,
     borderRadius,
+    borderTopLeftRadius,
+    borderTopRightRadius,
     code,
     color,
     display,
@@ -30,12 +33,14 @@ import Clay
     h5,
     h6,
     html,
+    inlineBlock,
     italic,
-    lineHeight,
     margin,
     minWidth,
     monospace,
+    none,
     overflowY,
+    p,
     padding,
     pre,
     pretty,
@@ -47,15 +52,14 @@ import Clay
     scroll,
     serif,
     solid,
+    span,
     textDecoration,
     underline,
-    whiteSpace,
     width,
     (&),
     (-:),
     (?),
   )
-import Clay.Text qualified as CT
 import Data.Bits
   ( shiftR,
     (.&.),
@@ -104,27 +108,50 @@ defaultCss = do
     h6 ? do
       fontSans
   pre ? do
-    "all" -: "unset"
-    display block
-    whiteSpace CT.pre
     noMargin
   div ? do
     noMargin
   code ? do
     noMargin
+    a ? do
+      color $ rgbHex hexNowebLinkFg
+      backgroundColor $ rgbHex hexNowebLinkBg
+      fontStyle italic
+      ev borderRadius (px 5)
+      vh padding 0 (px 5)
+      vh margin (px 2) 0
+      display inlineBlock
+      textDecoration none
+      "transition" -: "all 150ms ease-in-out"
+      ":hover" & do
+        color $ rgbHex hexNowebLinkHoverFg
+        backgroundColor $ rgbHex hexNowebLinkHoverBg
+  p ? do
+    span ? do
+      ".code" & do
+        fontSize (pt 10)
+  a ? do
+    color $ rgbHex hexNowebLinkFg
   ".sourceCode" & do
     noMargin
+  ".code-block-container" & do
+    minWidth fitContent
+  ".code-block-name" & do
+    vh padding 0 (px 8)
+    border (px 1) solid $ rgbHex hexCodeBorder
+    borderBottomWidth 0
+    borderTopLeftRadius (px 5) (px 5)
+    borderTopRightRadius (px 5) (px 5)
+    fontSans
   ".code-block-body" & do
-    noMargin
+    margin 0 0 (em 1) 0
     fontMono
-    fontSize (pt 10)
-    lineHeight (pt 14)
     backgroundColor $ rgbHex hexCodeBg
     color $ rgbHex hexCodeFg
     borderBottomLeftRadius (px 5) (px 5)
     borderBottomRightRadius (px 5) (px 5)
     border (px 1) solid $ rgbHex hexCodeBorder
-    ev padding (px 5)
+    vh padding (px 2) (px 8)
     minWidth fitContent
   ".bold" & do
     fontWeight bold
@@ -135,13 +162,22 @@ defaultCss = do
   ".verbatim" & do
     fontMono
   ".code" & do
+    fontMono
     codeStyle
+  ".sans" & do
+    fontSans
+  ".fully-rounded" & do
+    ev borderRadius (px 5)
   where
     hexBg = 0xffffff :: Int
     hexText = 0x000000 :: Int
     hexCodeFg = 0x1f1c1b :: Int
     hexCodeBg = 0xf7f7f7 :: Int
     hexCodeBorder = 0xcccccc :: Int
+    hexNowebLinkFg = 0x2161ac :: Int
+    hexNowebLinkBg = 0xd8f6ff :: Int
+    hexNowebLinkHoverFg = 0x7d3c98 :: Int
+    hexNowebLinkHoverBg = 0xf8e9ff :: Int
     fontSerif = do
       fontFamily ["Source Serif 4"] [serif]
     fontSans = do
@@ -149,8 +185,6 @@ defaultCss = do
     fontMono = do
       fontFamily ["Source Code Pro"] [monospace]
     codeStyle = do
-      fontMono
-      fontSize (pt 10)
       backgroundColor $ rgbHex hexCodeBg
       border (px 1) solid $ rgbHex hexCodeBorder
       ev borderRadius (px 4)

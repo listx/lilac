@@ -157,14 +157,18 @@ weaveBlock :: Block -> H.Html
 weaveBlock block = do
   H.div ! A.class_ "code-block-container" $ do
     maybeAssignName
-    H.pre ! A.class_ "code-block-body" $ do
+    let bodyBorder = case EM.lookup "name" block.meta of
+          Just _ -> ""
+          Nothing -> " fully-rounded"
+    H.pre ! A.class_ ("code-block-body" <> bodyBorder) $ do
       let lang = EM.lookup "__src_language" block.meta
       sequence_ $ map (weaveBToken lang) block.body
   where
     maybeAssignName =
       case EM.lookup "name" block.meta of
-        Just name -> H.div ! A.class_ "code-block-name" $ do
-          H.text name
+        Just name ->
+          H.div ! A.class_ "code-block-name" $ do
+            H.code $ H.text name
         Nothing -> pure ()
 
 weaveBToken :: Maybe T.Text -> BToken -> H.Html
@@ -174,17 +178,18 @@ weaveBToken lang = \case
       colorizeBlock l txt
       let trailingNewlines = T.takeWhileEnd (== '\n') txt
       when (T.length trailingNewlines > 0)
+        . H.code
         $ H.text "\n"
-    Nothing -> H.text txt
+    Nothing -> H.code $ H.text txt
   BTokenPadding -> pure ()
-  BTokenLink link -> H.code ! A.class_ "sourceCode" $ weaveLink link
+  BTokenLink link -> H.code $ weaveLink link
 
 colorizeBlock :: T.Text -> T.Text -> H.Html
 colorizeBlock lang txt
   | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
     Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
       Sky.formatHtmlInline Sky.defaultFormatOpts lines
-  | otherwise = H.text txt
+  | otherwise = H.code $ H.text txt
   where
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 

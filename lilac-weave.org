@@ -341,21 +341,27 @@ weaveBlock :: Block -> H.Html
 weaveBlock block = do
   H.div ! A.class_ "code-block-container" $ do
     maybeAssignName
-    H.pre ! A.class_ "code-block-body" $ do
+    let bodyBorder = case EM.lookup "name" block.meta of
+          Just _ -> ""
+          Nothing -> " fully-rounded"
+    H.pre ! A.class_ ("code-block-body" <> bodyBorder) $ do
       let lang = EM.lookup "__src_language" block.meta
       sequence_ $ map (weaveBToken lang) block.body
   where
     maybeAssignName =
       case EM.lookup "name" block.meta of
-        Just name -> H.div ! A.class_ "code-block-name" $ do
-          H.text name
+        Just name ->
+          H.div ! A.class_ "code-block-name" $ do
+            H.code $ H.text name
         Nothing -> pure ()
 #+end_src
 
 We ignore the ~BtokenPadding~ token because it's only meant to be used for
 tangling. The business with ~trailingNewlines~ is a hack to make the formatting
 look acceptable; this is because ~Sky.formatHtmlInline~ in [[f:colorizeBlock]] trims
-trailing whitespace, resulting in information loss.
+trailing whitespace, resulting in information loss. The use of ~H.code~ is
+required, because otherwise the newline will get a different sized font than the
+rest of the surrounding bits (which also use code).
 
 On a similar note, the wrapping of the call to [[f:weaveLink]] with ~H.code~ is to
 make the CSS rules play out the same way for both ~BTokenString~ and ~BTokenLink~
@@ -374,10 +380,11 @@ weaveBToken lang = \case
       colorizeBlock l txt
       let trailingNewlines = T.takeWhileEnd (== '\n') txt
       when (T.length trailingNewlines > 0)
+        . H.code
         $ H.text "\n"
-    Nothing -> H.text txt
+    Nothing -> H.code $ H.text txt
   BTokenPadding -> pure ()
-  BTokenLink link -> H.code ! A.class_ "sourceCode" $ weaveLink link
+  BTokenLink link -> H.code $ weaveLink link
 #+end_src
 
 Block colorization relies on the [[https://hackage.haskell.org/package/skylighting][=skylighting=]] syntax highlighting library.
@@ -389,7 +396,7 @@ colorizeBlock lang txt
   | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
     Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
       Sky.formatHtmlInline Sky.defaultFormatOpts lines
-  | otherwise = H.text txt
+  | otherwise = H.code $ H.text txt
   where
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 #+end_src
@@ -441,15 +448,18 @@ import Clay
   ( Color,
     Css,
     Size,
+    a,
     auto,
     backgroundColor,
-    block,
     body,
     bold,
     border,
     borderBottomLeftRadius,
     borderBottomRightRadius,
+    borderBottomWidth,
     borderRadius,
+    borderTopLeftRadius,
+    borderTopRightRadius,
     code,
     color,
     display,
@@ -467,12 +477,14 @@ import Clay
     h5,
     h6,
     html,
+    inlineBlock,
     italic,
-    lineHeight,
     margin,
     minWidth,
     monospace,
+    none,
     overflowY,
+    p,
     padding,
     pre,
     pretty,
@@ -484,15 +496,14 @@ import Clay
     scroll,
     serif,
     solid,
+    span,
     textDecoration,
     underline,
-    whiteSpace,
     width,
     (&),
     (-:),
     (?),
   )
-import Clay.Text qualified as CT
 import Data.Bits
   ( shiftR,
     (.&.),
@@ -554,27 +565,50 @@ defaultCss = do
     h6 ? do
       fontSans
   pre ? do
-    "all" -: "unset"
-    display block
-    whiteSpace CT.pre
     noMargin
   div ? do
     noMargin
   code ? do
     noMargin
+    a ? do
+      color $ rgbHex hexNowebLinkFg
+      backgroundColor $ rgbHex hexNowebLinkBg
+      fontStyle italic
+      ev borderRadius (px 5)
+      vh padding 0 (px 5)
+      vh margin (px 2) 0
+      display inlineBlock
+      textDecoration none
+      "transition" -: "all 150ms ease-in-out"
+      ":hover" & do
+        color $ rgbHex hexNowebLinkHoverFg
+        backgroundColor $ rgbHex hexNowebLinkHoverBg
+  p ? do
+    span ? do
+      ".code" & do
+        fontSize (pt 10)
+  a ? do
+    color $ rgbHex hexNowebLinkFg
   ".sourceCode" & do
     noMargin
+  ".code-block-container" & do
+    minWidth fitContent
+  ".code-block-name" & do
+    vh padding 0 (px 8)
+    border (px 1) solid $ rgbHex hexCodeBorder
+    borderBottomWidth 0
+    borderTopLeftRadius (px 5) (px 5)
+    borderTopRightRadius (px 5) (px 5)
+    fontSans
   ".code-block-body" & do
-    noMargin
+    margin 0 0 (em 1) 0
     fontMono
-    fontSize (pt 10)
-    lineHeight (pt 14)
     backgroundColor $ rgbHex hexCodeBg
     color $ rgbHex hexCodeFg
     borderBottomLeftRadius (px 5) (px 5)
     borderBottomRightRadius (px 5) (px 5)
     border (px 1) solid $ rgbHex hexCodeBorder
-    ev padding (px 5)
+    vh padding (px 2) (px 8)
     minWidth fitContent
   ".bold" & do
     fontWeight bold
@@ -585,7 +619,12 @@ defaultCss = do
   ".verbatim" & do
     fontMono
   ".code" & do
+    fontMono
     codeStyle
+  ".sans" & do
+    fontSans
+  ".fully-rounded" & do
+    ev borderRadius (px 5)
   where
     <<Default CSS colors>>
     fontSerif = do
@@ -595,8 +634,6 @@ defaultCss = do
     fontMono = do
       fontFamily ["Source Code Pro"] [monospace]
     codeStyle = do
-      fontMono
-      fontSize (pt 10)
       backgroundColor $ rgbHex hexCodeBg
       border (px 1) solid $ rgbHex hexCodeBorder
       ev borderRadius (px 4)
@@ -666,6 +703,10 @@ hexText = 0x000000 :: Int
 hexCodeFg = 0x1f1c1b :: Int
 hexCodeBg = 0xf7f7f7 :: Int
 hexCodeBorder = 0xcccccc :: Int
+hexNowebLinkFg = 0x2161ac :: Int
+hexNowebLinkBg = 0xd8f6ff :: Int
+hexNowebLinkHoverFg = 0x7d3c98 :: Int
+hexNowebLinkHoverBg = 0xf8e9ff :: Int
 #+end_src
 
 * ClojureScript frontend
