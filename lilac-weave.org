@@ -67,7 +67,14 @@ import Lilac.Parse
     Link (name, target),
     LinkNoweb (name, uuid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther),
-    ListMarker (LItemEnd, LItemStart, LOrderedEnd, LOrderedStart, LUnorderedEnd, LUnorderedStart),
+    ListMarker
+      ( LItemEnd,
+        LItemStart,
+        LOrderedEnd,
+        LOrderedStart,
+        LUnorderedEnd,
+        LUnorderedStart
+      ),
     OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
@@ -173,7 +180,8 @@ serve:
 	python3 -m http.server 8080 -d site
 #+end_src
 
-The Nix dependency for Python is injected into the development shell environment in [[id:73b60692-f369-4707-a7ee-434cc7a4549f::code:tools][code:tools]].
+The Nix dependency for Python is injected into the development shell environment
+in [[id:73b60692-f369-4707-a7ee-434cc7a4549f::code:tools][code:tools]].
 
 #+name: tool-python3
 #+begin_src nix

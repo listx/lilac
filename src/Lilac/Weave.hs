@@ -11,7 +11,14 @@ import Lilac.Parse
     Link (name, target),
     LinkNoweb (name, uuid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther),
-    ListMarker (LItemEnd, LItemStart, LOrderedEnd, LOrderedStart, LUnorderedEnd, LUnorderedStart),
+    ListMarker
+      ( LItemEnd,
+        LItemStart,
+        LOrderedEnd,
+        LOrderedStart,
+        LUnorderedEnd,
+        LUnorderedStart
+      ),
     OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
