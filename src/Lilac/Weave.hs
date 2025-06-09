@@ -57,6 +57,7 @@ import Text.Blaze.Html5.Attributes qualified as A
 weave :: OrgDoc -> Bool -> H.Html
 weave od watch = H.docTypeHtml $ do
   H.head $ do
+    H.meta ! A.charset "utf-8"
     H.title
       $ H.text
       $ case EM.lookup "title" od.meta of
