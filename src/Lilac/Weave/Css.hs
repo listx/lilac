@@ -63,10 +63,13 @@ import Data.Bits
   ( shiftR,
     (.&.),
   )
+import Data.Map qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Relude
-  ( Int,
+  ( Bool (True),
+    Int,
+    Maybe (Just),
     fromIntegral,
     otherwise,
     ($),
@@ -78,9 +81,23 @@ import Skylighting qualified as Sky
 genCss :: T.Text
 genCss =
   T.unlines
-    [ T.pack $ Sky.styleToCss Sky.kate,
+    [ T.pack $ Sky.styleToCss kateLilac,
       TL.toStrict $ renderWith pretty [] defaultCss
     ]
+
+kateLilac :: Sky.Style
+kateLilac =
+  Sky.kate
+    { Sky.tokenStyles =
+        M.insert
+          Sky.ExtensionTok
+          ( Sky.defStyle
+              { Sky.tokenColor = Just (Sky.RGB 0 0x60 0xa4),
+                Sky.tokenBold = True
+              }
+          )
+          Sky.kate.tokenStyles
+    }
 
 defaultCss :: Css
 defaultCss = do

@@ -530,10 +530,13 @@ import Data.Bits
   ( shiftR,
     (.&.),
   )
+import Data.Map qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Relude
-  ( Int,
+  ( Bool (True),
+    Int,
+    Maybe (Just),
     fromIntegral,
     otherwise,
     ($),
@@ -543,6 +546,7 @@ import Relude
 import Skylighting qualified as Sky
 
 <<f:genCss>>
+<<f:kateLilac>>
 <<f:defaultCss>>
 <<f:noMargin>>
 <<f:vh>>
@@ -550,14 +554,38 @@ import Skylighting qualified as Sky
 <<f:rgbHex>>
 #+end_src
 
+The overall CSS we generate is the syntax highlighting theme which uses a
+modified variation of the =kate= theme from =Skylighting= (see [[f:kateLilac]]), and the
+overall CSS for the rest of Lilac ([[f:defaultCss]]).
+
 #+name: f:genCss
 #+begin_src haskell
 genCss :: T.Text
 genCss =
   T.unlines
-    [ T.pack $ Sky.styleToCss Sky.kate,
+    [ T.pack $ Sky.styleToCss kateLilac,
       TL.toStrict $ renderWith pretty [] defaultCss
     ]
+#+end_src
+
+We make a small tweak to =kate= to make some colors easier on the eyes. The
+~ExtensionTok~ by default is too bright, so we darken it a bit here.
+
+#+name: f:kateLilac
+#+begin_src haskell
+kateLilac :: Sky.Style
+kateLilac =
+  Sky.kate
+    { Sky.tokenStyles =
+        M.insert
+          Sky.ExtensionTok
+          ( Sky.defStyle
+              { Sky.tokenColor = Just (Sky.RGB 0 0x60 0xa4),
+                Sky.tokenBold = True
+              }
+          )
+          Sky.kate.tokenStyles
+    }
 #+end_src
 
 #+name: f:defaultCss
