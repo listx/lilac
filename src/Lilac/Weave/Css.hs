@@ -57,7 +57,6 @@ import Clay
     underline,
     width,
     (&),
-    (-:),
     (?),
   )
 import Data.Bits
@@ -115,6 +114,7 @@ defaultCss = do
     noMargin
     a ? do
       color $ rgbHex hexNowebLinkFg
+      border (px 1) solid $ rgbHex hexNowebLinkFg
       backgroundColor $ rgbHex hexNowebLinkBg
       fontStyle italic
       ev borderRadius (px 5)
@@ -122,9 +122,9 @@ defaultCss = do
       vh margin (px 2) 0
       display inlineBlock
       textDecoration none
-      "transition" -: "all 150ms ease-in-out"
       ":hover" & do
         color $ rgbHex hexNowebLinkHoverFg
+        border (px 1) solid $ rgbHex hexNowebLinkHoverFg
         backgroundColor $ rgbHex hexNowebLinkHoverBg
   p ? do
     span ? do
