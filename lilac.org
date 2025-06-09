@@ -289,7 +289,7 @@ version]].
 #+name: code:tools
 #+begin_src nix
 tools = [
-  <<id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7::tool-python3>>
+  <<id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa::tool-python3>>
   <<tool-niv>>
   <<tool-cabal>>
   <<tool-editorconfig-checker>>
@@ -667,7 +667,7 @@ we don't have to memorize exactly how to invoke certain commands.
 <<make:Run linters>>
 <<make:Tangle sources>>
 <<make:Weave>>
-<<id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7::make:Serve>>
+<<id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa::make:Serve>>
 <<make:Build lilac with Cabal>>
 <<make:Build lilac with Nix>>
 <<make:Update Nix dependencies>>
@@ -2014,7 +2014,7 @@ import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID)
+import Data.UUID.Types (UUID, fromText)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
@@ -2151,27 +2151,42 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
     f :: SourceCode -> Cell -> SourceCode
     f sc cell = case cell of
       CBlock b
-        | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta,
+        | Just name <- EM.lookup "name" b.meta,
           Just path <- EM.lookup "tangle" b.meta,
           Right filePath <- qualify path ->
-            let newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
+            let fqbn1 = getFqbnByDocUUID name
+                fqbn2 = getFqbn b name
+                newBlock1 = useQualifiedTanglePath filePath $ injectFqbn fqbn1 b
+                newBlock2 = useQualifiedTanglePath filePath $ injectFqbn fqbn2 b
              in sc
-                  { roots = fqbn : sc.roots,
-                    fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
+                  { roots = fqbn1 : sc.roots,
+                    fqbnToCodeBlock =
+                      M.insert fqbn1 newBlock1
+                        $ M.insert fqbn2 newBlock2 sc.fqbnToCodeBlock
                   }
         | Just path <- EM.lookup "tangle" b.meta,
           Right filePath <- qualify path ->
-            let fqbn = getFqbn $ (T.pack filePath) <> "\NUL"
-                newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
+            let name = (T.pack filePath) <> "\NUL"
+                fqbn1 = getFqbnByDocUUID name
+                fqbn2 = getFqbn b name
+                newBlock1 = useQualifiedTanglePath filePath $ injectFqbn fqbn1 b
+                newBlock2 = useQualifiedTanglePath filePath $ injectFqbn fqbn2 b
              in sc
-                  { roots = fqbn : sc.roots,
-                    fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
+                  { roots = fqbn1 : sc.roots,
+                    fqbnToCodeBlock =
+                      M.insert fqbn1 newBlock1
+                        $ M.insert fqbn2 newBlock2 sc.fqbnToCodeBlock
                   }
-        | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta ->
-            sc
-              { fqbnToCodeBlock =
-                  M.insert fqbn (injectFqbn fqbn b) sc.fqbnToCodeBlock
-              }
+        | Just name <- EM.lookup "name" b.meta ->
+            let fqbn1 = getFqbnByDocUUID name
+                fqbn2 = getFqbn b name
+                newBlock1 = injectFqbn fqbn1 b
+                newBlock2 = injectFqbn fqbn2 b
+             in sc
+                  { fqbnToCodeBlock =
+                      M.insert fqbn1 newBlock1
+                        $ M.insert fqbn2 newBlock2 sc.fqbnToCodeBlock
+                  }
         | otherwise -> sc
       CHeading {}
       CListItem {}
@@ -2179,7 +2194,12 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
       CMathFragment {}
       CFigure {}
       CTable {} -> sc
-    getFqbn name = LU.prefixWithId (getOrgId od) name
+    getFqbn b name
+      | Just uuidText <- EM.lookup "__closest_UUID" b.meta,
+        Just uuid <- fromText uuidText =
+          LU.prefixWithId uuid name
+      | otherwise = getFqbnByDocUUID name
+    getFqbnByDocUUID name = LU.prefixWithId (getOrgId od) name
     injectFqbn fqbn block =
       block
         { meta = M.insert "__fqbn" fqbn block.meta
@@ -2205,6 +2225,19 @@ still considered root blocks, and so we use the tangle path as the name, plus a
 NUL character at the end to virtually guarantee that this does not conflict with
 the name of another block (because Org files should not have any NUL character
 in them).
+
+The business around using two =FQBN= values (~fqbn1~ and ~fqbn2~) when populating
+~fqbnToCodeBlock~ allows us to refer to blocks either by the UUID of the Org file
+enclosing them (this is used for [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f::f:blockOriginSignatureParser][implicit Noweb links in
+f:blockOriginSignatureParser]], which know about the UUID of the Org file's
+metadata at the top-level but not about UUIDs of other headings in the file), or
+by the UUID of the closest parent.
+
+We need the latter case because the functions =org-store-link= and
+=org-insert-last-stored-link= always refer to the closest UUID of the nearest
+parent heading; these Orgmode functions can be used to retrieve the UUID easily,
+and with minor modification, the inserted link can be tweaked to turn it into a
+Noweb link inside a code block.
 
 The ~useQualifiedTanglePath~ helper prefixes all tangle paths with the directory
 that contains the Org file from which we generated the =OrgDoc=. Because the
@@ -3315,6 +3348,55 @@ checkExpansion
   ]
 #+end_src
 
+The expansion should work for external Noweb links which refer to a block using
+a heading's ID, not the ID that's set at the file level.
+
+#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-parent-headingchild
+#+header: :noweb off
+#+begin_src org
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+a1
+<<id:00000000-0000-0000-0000-00000000f00a::a>>
+a2
+,#+end_src
+#+end_src
+
+#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-headingchild
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f009
+:END:
+
+,* A heading
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f00a
+:END:
+
+,#+name: a
+,#+begin_src haskell
+hello from child
+,#+end_src
+#+end_src
+
+#+name: t:0101-block-expansion-external-headingchild
+#+begin_src haskell
+checkExpansion
+  "0101-block-expansion-external-parent-headingchild"
+  "test/.orgids"
+  [ ( "test/Lilac/TangleSpec/equations.txt",
+      T.unlines
+        [ "a1",
+          "hello from child",
+          "a2"
+        ]
+    )
+  ]
+#+end_src
+
+
 An external block itself can refer to another external block. In
 [[t:0101-block-expansion-external-2-hops]] we use a middleman that itself refers to
 the external child block from [[t:0101-block-expansion-external]].
@@ -3688,6 +3770,7 @@ tangleSpec = do
   <<t:0101-block-expansion-prefix-nonspace-nested>>
   <<t:0101-block-expansion-complex>>
   <<t:0101-block-expansion-external>>
+  <<t:0101-block-expansion-external-headingchild>>
   <<t:0101-block-expansion-external-2-hops>>
   <<t:0101-block-expansion-external-mutual>>
   <<t:lines-unlines-info-loss>>

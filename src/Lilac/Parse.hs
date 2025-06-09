@@ -5,6 +5,7 @@ module Lilac.Parse
     defaultOrgParserState,
     extractGOIDs,
     genHeadingSection,
+    genOrgIdStack,
     getOrgId,
     maskToStyles,
     orgDocParser,
@@ -39,6 +40,7 @@ import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
 import Data.List (groupBy)
+import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -59,6 +61,7 @@ import Relude
     Map,
     Maybe (Just, Nothing),
     MonadFail,
+    NonEmpty ((:|)),
     Ord,
     Show,
     StateT,
@@ -66,6 +69,7 @@ import Relude
     Type,
     Void,
     Word8,
+    abs,
     catMaybes,
     concatMap,
     drop,
@@ -80,6 +84,7 @@ import Relude
     get,
     isJust,
     isNothing,
+    last,
     length,
     many,
     map,
@@ -88,6 +93,7 @@ import Relude
     not,
     notElem,
     null,
+    one,
     optional,
     or,
     otherwise,
@@ -99,6 +105,7 @@ import Relude
     reverse,
     runStateT,
     show,
+    tail,
     take,
     toEnum,
     void,
@@ -140,7 +147,7 @@ type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { goids :: M.Map UUID P.OsPath,
-    orgId :: UUID,
+    orgId :: NonEmpty UUID,
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
@@ -158,7 +165,7 @@ defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
-      orgId = nil,
+      orgId = one nil,
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
@@ -467,10 +474,10 @@ docMetaParser = do
     $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
     <> (show conflictingKeys)
   case M.lookup "ID" topLevelDrawerProps of
-    Nothing -> modify (\s -> s {orgId = nil})
+    Nothing -> modify (\s -> s {orgId = one nil})
     Just uuidText -> do
       uuid <- validateUuidText uuidText
-      modify (\s -> s {orgId = uuid})
+      modify (\s -> s {orgId = one uuid})
   pure $ M.union topLevelDrawerProps metaKVs
 
 lilacExtensionsParser :: OrgParser ()
@@ -564,10 +571,12 @@ headingParser = do
   failIfLeftoverActiveStyles
   props <- propertiesDrawerParser
   let newHeadingSection = genHeadingSection lenStars orgParserState.headingSection
+      newOrgId = genOrgIdStack (EM.lookup "ID" props) lenStars orgParserState.orgId
   put
     orgParserState
       { headingLevel = lenStars,
-        headingSection = newHeadingSection
+        headingSection = newHeadingSection,
+        orgId = newOrgId
       }
   pure
     $ CHeading
@@ -609,6 +618,23 @@ genHeadingSection level prevSection
     bumpDeepestSection :: [Int] -> [Int]
     bumpDeepestSection [] = []
     bumpDeepestSection (x : xs) = x + 1 : xs
+
+genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty UUID -> NonEmpty UUID
+genOrgIdStack maybeId level prevOrgId
+  | length prevOrgId == 1 = newId NE.<| prevOrgId
+  | length prevOrgId == depth = newId :| tail prevOrgId
+  | length prevOrgId < depth =
+      let nils = take (levelDiff - 1) $ repeat nil
+       in (newId :| nils) <> prevOrgId
+  | otherwise = newId :| (NE.drop (abs levelDiff + 1) prevOrgId)
+  where
+    depth = level + 1
+    levelDiff = depth - length prevOrgId
+    newId
+      | Just uuidText <- maybeId,
+        Just uuid <- fromText uuidText =
+          uuid
+      | otherwise = nil
 
 propertiesDrawerParser :: OrgParser (Map T.Text T.Text)
 propertiesDrawerParser = propertiesParser <|> (pure $ M.fromList [])
@@ -1017,11 +1043,19 @@ blockParser = do
       [ zeroBTokensParser blockType,
         someBTokensParser blockType (not nowebOff)
       ]
-  let block =
+  orgParserState <- get
+  let blockMeta = ("__block_type", blockType)
+      closestUuidMeta =
+        ( "__closest_UUID",
+          T.show
+            . firstNonNilParent
+            $ NE.toList orgParserState.orgId
+        )
+      block =
         Block
           { meta =
               M.fromList
-                $ (("__block_type", blockType) : metaKVs)
+                $ (blockMeta : closestUuidMeta : metaKVs)
                 <> concatMap maybeToList [blockName, srcLang],
             body =
               ignoreSpecialCommas
@@ -1029,6 +1063,11 @@ blockParser = do
                 $ padConsecutiveNowebLinks bTokens
           }
   pure $ CBlock block
+  where
+    firstNonNilParent [] = nil
+    firstNonNilParent (oid : oids)
+      | oid == nil = firstNonNilParent oids
+      | otherwise = oid
 
 blockStartParser ::
   OrgParser
@@ -1135,7 +1174,7 @@ blockOriginSignatureParser = MP.choice [explicit, implicit]
     implicit = do
       orgParserState <- get
       blockName <- blockNameOnly
-      pure (orgParserState.orgId, blockName)
+      pure (last orgParserState.orgId, blockName)
 
 ignoreSpecialCommas :: [BToken] -> [BToken]
 ignoreSpecialCommas = reverse . foldl' f []

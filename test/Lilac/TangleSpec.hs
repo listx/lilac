@@ -243,6 +243,18 @@ tangleSpec = do
     ]
 
   checkExpansion
+    "0101-block-expansion-external-parent-headingchild"
+    "test/.orgids"
+    [ ( "test/Lilac/TangleSpec/equations.txt",
+        T.unlines
+          [ "a1",
+            "hello from child",
+            "a2"
+          ]
+      )
+    ]
+
+  checkExpansion
     "0101-block-expansion-external-2-hops-parent"
     "test/.orgids"
     [ ( "test/Lilac/TangleSpec/equations.txt",

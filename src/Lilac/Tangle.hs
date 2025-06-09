@@ -13,7 +13,7 @@ import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID)
+import Data.UUID.Types (UUID, fromText)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
@@ -94,27 +94,42 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
     f :: SourceCode -> Cell -> SourceCode
     f sc cell = case cell of
       CBlock b
-        | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta,
+        | Just name <- EM.lookup "name" b.meta,
           Just path <- EM.lookup "tangle" b.meta,
           Right filePath <- qualify path ->
-            let newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
+            let fqbn1 = getFqbnByDocUUID name
+                fqbn2 = getFqbn b name
+                newBlock1 = useQualifiedTanglePath filePath $ injectFqbn fqbn1 b
+                newBlock2 = useQualifiedTanglePath filePath $ injectFqbn fqbn2 b
              in sc
-                  { roots = fqbn : sc.roots,
-                    fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
+                  { roots = fqbn1 : sc.roots,
+                    fqbnToCodeBlock =
+                      M.insert fqbn1 newBlock1
+                        $ M.insert fqbn2 newBlock2 sc.fqbnToCodeBlock
                   }
         | Just path <- EM.lookup "tangle" b.meta,
           Right filePath <- qualify path ->
-            let fqbn = getFqbn $ (T.pack filePath) <> "\NUL"
-                newBlock = useQualifiedTanglePath filePath $ injectFqbn fqbn b
+            let name = (T.pack filePath) <> "\NUL"
+                fqbn1 = getFqbnByDocUUID name
+                fqbn2 = getFqbn b name
+                newBlock1 = useQualifiedTanglePath filePath $ injectFqbn fqbn1 b
+                newBlock2 = useQualifiedTanglePath filePath $ injectFqbn fqbn2 b
              in sc
-                  { roots = fqbn : sc.roots,
-                    fqbnToCodeBlock = M.insert fqbn newBlock sc.fqbnToCodeBlock
+                  { roots = fqbn1 : sc.roots,
+                    fqbnToCodeBlock =
+                      M.insert fqbn1 newBlock1
+                        $ M.insert fqbn2 newBlock2 sc.fqbnToCodeBlock
                   }
-        | Just fqbn <- getFqbn <$> EM.lookup "name" b.meta ->
-            sc
-              { fqbnToCodeBlock =
-                  M.insert fqbn (injectFqbn fqbn b) sc.fqbnToCodeBlock
-              }
+        | Just name <- EM.lookup "name" b.meta ->
+            let fqbn1 = getFqbnByDocUUID name
+                fqbn2 = getFqbn b name
+                newBlock1 = injectFqbn fqbn1 b
+                newBlock2 = injectFqbn fqbn2 b
+             in sc
+                  { fqbnToCodeBlock =
+                      M.insert fqbn1 newBlock1
+                        $ M.insert fqbn2 newBlock2 sc.fqbnToCodeBlock
+                  }
         | otherwise -> sc
       CHeading {}
       CListItem {}
@@ -122,7 +137,12 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
       CMathFragment {}
       CFigure {}
       CTable {} -> sc
-    getFqbn name = LU.prefixWithId (getOrgId od) name
+    getFqbn b name
+      | Just uuidText <- EM.lookup "__closest_UUID" b.meta,
+        Just uuid <- fromText uuidText =
+          LU.prefixWithId uuid name
+      | otherwise = getFqbnByDocUUID name
+    getFqbnByDocUUID name = LU.prefixWithId (getOrgId od) name
     injectFqbn fqbn block =
       block
         { meta = M.insert "__fqbn" fqbn block.meta

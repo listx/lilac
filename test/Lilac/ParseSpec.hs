@@ -1,5 +1,6 @@
 module Lilac.ParseSpec (spec) where
 
+import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -11,11 +12,12 @@ import Relude
   ( FilePath,
     Identity,
     Int,
-    Maybe (Just),
+    Maybe (Just, Nothing),
     String,
     Type,
     fromList,
     map,
+    one,
     otherwise,
     runStateT,
     show,
@@ -176,7 +178,7 @@ parseSpec = do
     (L.defaultOrgDoc [])
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = one nil,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -226,7 +228,7 @@ parseSpec = do
     )
     L.OrgParserState
       { goids = fromList [],
-        orgId = fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+        orgId = one $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -250,7 +252,7 @@ parseSpec = do
     )
     L.OrgParserState
       { goids = fromList [],
-        orgId = fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+        orgId = one $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -294,7 +296,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = NE.fromList [nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil],
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
@@ -328,7 +330,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = NE.fromList [nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil],
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
@@ -373,6 +375,80 @@ parseSpec = do
       L.genHeadingSection 3 [2, 2] `shouldBe` [1, 2, 2]
       L.genHeadingSection 5 [2, 2] `shouldBe` [1, 0, 0, 2, 2]
 
+  describe "genOrgIdStack" $ do
+    it "replaces the head if the nesting level matches (no heading yet)" $ do
+      L.genOrgIdStack
+        (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        1
+        (NE.fromList [nil])
+        `shouldBe` ( NE.fromList
+                       [ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                         nil
+                       ]
+                   )
+    it "replaces the head if the nesting level matches (one heading exists)" $ do
+      L.genOrgIdStack
+        (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        1
+        (NE.fromList [fromWords64 0x7777777777777777 0x7777777777777777, nil])
+        `shouldBe` ( NE.fromList
+                       [ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                         nil
+                       ]
+                   )
+    it "adds a new head if the heading nests (and this heading has an ID)" $ do
+      L.genOrgIdStack
+        (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        2
+        (NE.fromList [nil, nil])
+        `shouldBe` ( NE.fromList
+                       [ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                         nil,
+                         nil
+                       ]
+                   )
+    it "adds a new head if the heading nests (and this heading does not have an ID)" $ do
+      L.genOrgIdStack
+        Nothing
+        2
+        (NE.fromList [nil, nil])
+        `shouldBe` ( NE.fromList
+                       [ nil,
+                         nil,
+                         nil
+                       ]
+                   )
+    it "truncates if we unnest (difference of 1 level)" $ do
+      L.genOrgIdStack
+        (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        1
+        (NE.fromList [fromWords64 0x7777777777777777 0x7777777777777777, nil, nil])
+        `shouldBe` ( NE.fromList
+                       [ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                         nil
+                       ]
+                   )
+    it "truncates if we unnest (multiple levels)" $ do
+      L.genOrgIdStack
+        Nothing
+        1
+        (NE.fromList [nil, nil, fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa, nil])
+        `shouldBe` ( NE.fromList
+                       [ nil,
+                         nil
+                       ]
+                   )
+    it "truncates if we unnest (multiple levels, new heading has ID)" $ do
+      L.genOrgIdStack
+        (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        1
+        (NE.fromList [nil, nil, fromWords64 0x7777777777777777 0x7777777777777777, nil])
+        `shouldBe` ( NE.fromList
+                       [ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                         nil
+                       ]
+                   )
+
   ps
     "0004-properties-drawer-empty"
     L.OrgDoc
@@ -393,7 +469,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = NE.fromList [nil, nil],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -429,7 +505,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = NE.fromList [fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, nil],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -465,7 +541,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = NE.fromList [fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, nil],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -686,7 +762,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = NE.fromList [nil, nil],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -987,7 +1063,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = NE.fromList [nil, nil],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -1014,6 +1090,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "haskell")
                         ],
                     body = []
@@ -1024,6 +1101,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "example"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("name", "foo")
                         ],
                     body = []
@@ -1033,7 +1111,8 @@ parseSpec = do
               ( L.Block
                   { meta =
                       fromList
-                        [ ("__block_type", "quote")
+                        [ ("__block_type", "quote"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000")
                         ],
                     body = []
                   }
@@ -1043,7 +1122,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = one nil,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1065,6 +1144,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh"),
                           ("name", "empty")
                         ],
@@ -1076,6 +1156,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh"),
                           ("name", "end not in beginning of line")
                         ],
@@ -1087,6 +1168,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh"),
                           ("name", "end has no preceding blank line")
                         ],
@@ -1098,6 +1180,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh"),
                           ("name", "end has preceding blank line")
                         ],
@@ -1109,6 +1192,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh"),
                           ("name", "end has preceding newline (multiple)")
                         ],
@@ -1120,6 +1204,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh"),
                           ("name", "ignore #+end_example because this is a src block")
                         ],
@@ -1131,7 +1216,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = one nil,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1161,6 +1246,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh"),
                           ("noweb", "off")
                         ],
@@ -1182,6 +1268,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh")
                         ],
                     body =
@@ -1235,6 +1322,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh")
                         ],
                     body =
@@ -1316,6 +1404,7 @@ parseSpec = do
                   { meta =
                       fromList
                         [ ("__block_type", "src"),
+                          ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh")
                         ],
                     body =
@@ -1706,7 +1795,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = one nil,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1761,7 +1850,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = one nil,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1783,6 +1872,7 @@ parseSpec = do
                 { meta =
                     fromList
                       [ ("__block_type", "src"),
+                        ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                         ("__src_language", "haskell"),
                         ("name", "f:f"),
                         ("xxx", "bar")
@@ -1812,6 +1902,7 @@ parseSpec = do
                 { meta =
                     fromList
                       [ ("__block_type", "src"),
+                        ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                         ("__src_language", "haskell"),
                         ("name", "f:g"),
                         ("yyy", "bar")
@@ -1837,7 +1928,7 @@ parseSpec = do
       }
     L.OrgParserState
       { goids = fromList [],
-        orgId = nil,
+        orgId = one nil,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
