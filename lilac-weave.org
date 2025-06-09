@@ -64,8 +64,8 @@ import Lilac.Parse
     Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, meta, section),
-    Link (name, target),
-    LinkNoweb (name, uuid),
+    Link (Link, name, target),
+    LinkNoweb (LinkNoweb, name, uuid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther),
     ListMarker
       ( LItemEnd,
@@ -86,19 +86,22 @@ import Relude
   ( Bool (False),
     IO,
     Maybe (Just, Nothing),
+    catMaybes,
+    drop,
     foldMap',
     foldl',
+    fst,
     map,
     otherwise,
     pure,
     reverse,
     sequence_,
+    take,
     when,
     ($),
     (.),
     (<>),
     (==),
-    (>),
   )
 import Relude.Extra.Map qualified as EM
 import Skylighting qualified as Sky
@@ -117,8 +120,8 @@ import Text.Blaze.Html5.Attributes qualified as A
 <<f:weaveStyledText>>
 <<f:weaveListMarker>>
 <<f:weaveBlock>>
-<<f:weaveBToken>>
-<<f:colorizeBlock>>
+<<f:colorizeText>>
+<<f:spliceLinks>>
 <<f:weaveLink>>
 <<f:weaveToDisk>>
 <<f:maybeAssignId>>
@@ -334,7 +337,7 @@ weaveListMarker =
 
 Weaving code blocks requires us to be able to handle both regular text
 (~BTokenString~) and also links (~BTokenLink~). There is some additional work for
-supporting syntax highlighting (see [[f:colorizeBlock]]).
+supporting syntax highlighting (see [[f:colorizeText]]).
 
 #+name: f:weaveBlock
 #+begin_src haskell
@@ -346,8 +349,17 @@ weaveBlock block = do
           Just _ -> ""
           Nothing -> " fully-rounded"
     H.pre ! A.class_ ("code-block-body" <> bodyBorder) $ do
-      let lang = EM.lookup "__src_language" block.meta
-      sequence_ $ map (weaveBToken lang) block.body
+      let bodyText = getBlockContentsWithoutLinks block.body
+      case EM.lookup "__src_language" block.meta of
+        Just lang ->
+          let colorized = TL.toStrict . renderHtml $ colorizeText lang bodyText
+              getLink = \case
+                BTokenLink l -> Just l
+                BTokenString {}
+                BTokenPadding {} -> Nothing
+              links = catMaybes $ map getLink block.body
+           in H.preEscapedText $ spliceLinks colorized links
+        Nothing -> H.code $ H.text bodyText
   where
     maybeAssignName =
       case EM.lookup "name" block.meta of
@@ -355,51 +367,61 @@ weaveBlock block = do
           H.div ! A.class_ "code-block-name" $ do
             H.code $ H.text name
         Nothing -> pure ()
+    getBlockContentsWithoutLinks :: [BToken] -> T.Text
+    getBlockContentsWithoutLinks = T.concat . map bTokenToText
+      where
+        bTokenToText :: BToken -> T.Text
+        bTokenToText = \case
+          BTokenString text -> text
+          BTokenPadding -> ""
+          BTokenLink (Link _name (LinkTargetNoweb _)) -> "\NUL"
+          BTokenLink {} -> ""
 #+end_src
 
-We ignore the ~BtokenPadding~ token because it's only meant to be used for
-tangling. The business with ~trailingNewlines~ is a hack to make the formatting
-look acceptable; this is because ~Sky.formatHtmlInline~ in [[f:colorizeBlock]] trims
-trailing whitespace, resulting in information loss. The use of ~H.code~ is
-required, because otherwise the newline will get a different sized font than the
-rest of the surrounding bits (which also use code).
+The first thing we do is to get the contents of the block with
+~getBlockContentsWithoutLinks~. This function is similar to [[id:51f2edd8-5f8e-4c63-841f-da6c5c41680a::f:getBlockContents][f:getBlockContents]]
+from =Lilac.Parse=, but does not encode the links information directly into the
+text. Instead, links are replaced with the ~\NUL~ character. This is because the
+text is fed into [[f:colorizeText]], and we don't want the links to be dealt with in
+any special way yet. The ~BTokenPadding~ token is ignored in
+~getBlockContentsWithoutLinks~ because ~BTokenPadding~ is only meant to be used for
+tangling.
 
-On a similar note, the wrapping of the call to [[f:weaveLink]] with ~H.code~ is to
-make the CSS rules play out the same way for both ~BTokenString~ and ~BTokenLink~
-types; if we don't have the same HTML hierarchy, these get subtly different
-treatment by CSS, even if we don't have relevant CSS rules defined (probably due
-to browser defaults). The call to ~Sky.formatHtmlInline~ results in the use of
-~H.code~ for ~BTokenString~ values, which is why we choose it as the wrapper element
-here around ~BTokenLink~ values.
-
-#+name: f:weaveBToken
+#+name: f:colorizeText
 #+begin_src haskell
-weaveBToken :: Maybe T.Text -> BToken -> H.Html
-weaveBToken lang = \case
-  BTokenString txt -> case lang of
-    Just l -> do
-      colorizeBlock l txt
-      let trailingNewlines = T.takeWhileEnd (== '\n') txt
-      when (T.length trailingNewlines > 0)
-        . H.code
-        $ H.text "\n"
-    Nothing -> H.code $ H.text txt
-  BTokenPadding -> pure ()
-  BTokenLink link -> H.code $ weaveLink link
-#+end_src
-
-Block colorization relies on the [[https://hackage.haskell.org/package/skylighting][=skylighting=]] syntax highlighting library.
-
-#+name: f:colorizeBlock
-#+begin_src haskell
-colorizeBlock :: T.Text -> T.Text -> H.Html
-colorizeBlock lang txt
+colorizeText :: T.Text -> T.Text -> H.Html
+colorizeText lang txt
   | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
     Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
       Sky.formatHtmlInline Sky.defaultFormatOpts lines
   | otherwise = H.code $ H.text txt
   where
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
+#+end_src
+
+Block colorization relies on the [[https://hackage.haskell.org/package/skylighting][=skylighting=]] syntax highlighting library. This
+library ignores the ~\NUL~ character, which is what we want. Once we have the
+colorized text, we splice in the links with ~spliceLinks~, which relies on
+[[f:weaveLink]] for constructing HTML for each link. The splicing works by splitting
+on the ~\NUL~ character and manually "zipping" up the colorized substrings with
+the woven link HTML fragments.
+
+#+name: f:spliceLinks
+#+begin_src haskell
+spliceLinks :: T.Text -> [Link] -> T.Text
+spliceLinks colorized links =
+  let colorizedStrs = T.splitOn "\NUL" colorized
+      f :: ([T.Text], [Link]) -> T.Text -> ([T.Text], [Link])
+      f (acc, []) colorizedStr = (colorizedStr : acc, [])
+      f (acc, link : links') colorizedStr =
+        ( colorizedStr : (TL.toStrict . renderHtml $ weaveLink link) : acc,
+          links'
+        )
+   in T.intercalate ""
+        . reverse
+        . fst
+        . foldl' f (take 1 colorizedStrs, links)
+        $ drop 1 colorizedStrs
 #+end_src
 
 Weaving links is not yet fully supported (we just have a stub "~h~" target for the

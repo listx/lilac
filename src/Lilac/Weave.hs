@@ -8,8 +8,8 @@ import Lilac.Parse
     Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, meta, section),
-    Link (name, target),
-    LinkNoweb (name, uuid),
+    Link (Link, name, target),
+    LinkNoweb (LinkNoweb, name, uuid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther),
     ListMarker
       ( LItemEnd,
@@ -30,19 +30,22 @@ import Relude
   ( Bool (False),
     IO,
     Maybe (Just, Nothing),
+    catMaybes,
+    drop,
     foldMap',
     foldl',
+    fst,
     map,
     otherwise,
     pure,
     reverse,
     sequence_,
+    take,
     when,
     ($),
     (.),
     (<>),
     (==),
-    (>),
   )
 import Relude.Extra.Map qualified as EM
 import Skylighting qualified as Sky
@@ -162,8 +165,17 @@ weaveBlock block = do
           Just _ -> ""
           Nothing -> " fully-rounded"
     H.pre ! A.class_ ("code-block-body" <> bodyBorder) $ do
-      let lang = EM.lookup "__src_language" block.meta
-      sequence_ $ map (weaveBToken lang) block.body
+      let bodyText = getBlockContentsWithoutLinks block.body
+      case EM.lookup "__src_language" block.meta of
+        Just lang ->
+          let colorized = TL.toStrict . renderHtml $ colorizeText lang bodyText
+              getLink = \case
+                BTokenLink l -> Just l
+                BTokenString {}
+                BTokenPadding {} -> Nothing
+              links = catMaybes $ map getLink block.body
+           in H.preEscapedText $ spliceLinks colorized links
+        Nothing -> H.code $ H.text bodyText
   where
     maybeAssignName =
       case EM.lookup "name" block.meta of
@@ -171,28 +183,39 @@ weaveBlock block = do
           H.div ! A.class_ "code-block-name" $ do
             H.code $ H.text name
         Nothing -> pure ()
+    getBlockContentsWithoutLinks :: [BToken] -> T.Text
+    getBlockContentsWithoutLinks = T.concat . map bTokenToText
+      where
+        bTokenToText :: BToken -> T.Text
+        bTokenToText = \case
+          BTokenString text -> text
+          BTokenPadding -> ""
+          BTokenLink (Link _name (LinkTargetNoweb _)) -> "\NUL"
+          BTokenLink {} -> ""
 
-weaveBToken :: Maybe T.Text -> BToken -> H.Html
-weaveBToken lang = \case
-  BTokenString txt -> case lang of
-    Just l -> do
-      colorizeBlock l txt
-      let trailingNewlines = T.takeWhileEnd (== '\n') txt
-      when (T.length trailingNewlines > 0)
-        . H.code
-        $ H.text "\n"
-    Nothing -> H.code $ H.text txt
-  BTokenPadding -> pure ()
-  BTokenLink link -> H.code $ weaveLink link
-
-colorizeBlock :: T.Text -> T.Text -> H.Html
-colorizeBlock lang txt
+colorizeText :: T.Text -> T.Text -> H.Html
+colorizeText lang txt
   | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
     Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
       Sky.formatHtmlInline Sky.defaultFormatOpts lines
   | otherwise = H.code $ H.text txt
   where
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
+
+spliceLinks :: T.Text -> [Link] -> T.Text
+spliceLinks colorized links =
+  let colorizedStrs = T.splitOn "\NUL" colorized
+      f :: ([T.Text], [Link]) -> T.Text -> ([T.Text], [Link])
+      f (acc, []) colorizedStr = (colorizedStr : acc, [])
+      f (acc, link : links') colorizedStr =
+        ( colorizedStr : (TL.toStrict . renderHtml $ weaveLink link) : acc,
+          links'
+        )
+   in T.intercalate ""
+        . reverse
+        . fst
+        . foldl' f (take 1 colorizedStrs, links)
+        $ drop 1 colorizedStrs
 
 weaveLink :: Link -> H.Html
 weaveLink link = do
