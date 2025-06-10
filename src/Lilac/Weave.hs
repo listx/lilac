@@ -39,6 +39,7 @@ import Relude
     foldMap',
     foldl',
     foldlM,
+    forM_,
     fst,
     map,
     otherwise,
@@ -188,7 +189,12 @@ weaveHeading heading = hN ! (A.id $ H.textValue desiredDomID) $ do
 weavePToken :: PToken -> H.Html
 weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink _ -> H.text ""
+  PTokenLink link ->
+    let targetText = case link.target of
+          LinkTargetNoweb _ -> "UNSUPPORTED"
+          LinkTargetOther t -> t
+     in H.a ! (A.href $ H.textValue targetText) $ do
+          forM_ link.name weaveStyledText
   PTokenMathFragment _ -> H.text ""
 
 weaveStyledText :: StyledText -> H.Html

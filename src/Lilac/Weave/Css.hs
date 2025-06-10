@@ -117,7 +117,6 @@ defaultCss = do
       fontSans
       a ? do
         color $ rgbHex 0
-        textDecoration none
   pre ? do
     noMargin
   div ? do
@@ -133,17 +132,20 @@ defaultCss = do
       vh padding 0 (px 5)
       vh margin (px 2) 0
       display inlineBlock
-      textDecoration none
       ":hover" & do
         color $ rgbHex hexNowebLinkHoverFg
         border (px 1) solid $ rgbHex hexNowebLinkHoverFg
         backgroundColor $ rgbHex hexNowebLinkHoverBg
+        textDecoration none
   p ? do
     span ? do
       ".code" & do
         fontSize (pt 10)
   a ? do
     color $ rgbHex hexNowebLinkFg
+    textDecoration none
+    ":hover" & do
+      textDecoration underline
   ".sourceCode" & do
     noMargin
   ".code-block-container" & do

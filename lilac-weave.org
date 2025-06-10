@@ -95,6 +95,7 @@ import Relude
     foldMap',
     foldl',
     foldlM,
+    forM_,
     fst,
     map,
     otherwise,
@@ -381,7 +382,12 @@ Each [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] value
 weavePToken :: PToken -> H.Html
 weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink _ -> H.text ""
+  PTokenLink link ->
+    let targetText = case link.target of
+          LinkTargetNoweb _ -> "UNSUPPORTED"
+          LinkTargetOther t -> t
+     in H.a ! (A.href $ H.textValue targetText) $ do
+          forM_ link.name weaveStyledText
   PTokenMathFragment _ -> H.text ""
 #+end_src
 
@@ -709,7 +715,6 @@ defaultCss = do
       fontSans
       a ? do
         color $ rgbHex 0
-        textDecoration none
   pre ? do
     noMargin
   div ? do
@@ -725,17 +730,20 @@ defaultCss = do
       vh padding 0 (px 5)
       vh margin (px 2) 0
       display inlineBlock
-      textDecoration none
       ":hover" & do
         color $ rgbHex hexNowebLinkHoverFg
         border (px 1) solid $ rgbHex hexNowebLinkHoverFg
         backgroundColor $ rgbHex hexNowebLinkHoverBg
+        textDecoration none
   p ? do
     span ? do
       ".code" & do
         fontSize (pt 10)
   a ? do
     color $ rgbHex hexNowebLinkFg
+    textDecoration none
+    ":hover" & do
+      textDecoration underline
   ".sourceCode" & do
     noMargin
   ".code-block-container" & do
