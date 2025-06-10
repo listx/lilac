@@ -390,7 +390,7 @@ weavePToken = \case
         linkCategory =
           if isExternalLink link.target
             then "external-link"
-            else ""
+            else "internal-link"
      in H.a ! (A.href $ H.textValue targetText) ! A.class_ linkCategory $ do
           forM_ link.name weaveStyledText
   PTokenMathFragment _ -> H.text ""
@@ -556,7 +556,11 @@ URL).
 #+begin_src haskell
 weaveLink :: Link -> H.Html
 weaveLink link = do
-  H.a ! A.href "h" $ sequence_ $ map weaveStyledText link.name
+  H.a ! (A.href $ H.textValue linkTarget) $ sequence_ $ map weaveStyledText link.name
+  where
+    linkTarget = case link.target of
+      LinkTargetNoweb linkNoweb -> linkNoweb.name
+      LinkTargetOther linkText -> linkText
 #+end_src
 
 ** Write to disk
@@ -739,6 +743,8 @@ defaultCss = do
       fontSans
       a ? do
         color $ rgbHex 0
+        ":visited" & do
+          color $ rgbHex hexText
   pre ? do
     noMargin
   div ? do
@@ -746,19 +752,7 @@ defaultCss = do
   code ? do
     noMargin
     a ? do
-      color $ rgbHex hexNowebLinkFg
-      border (px 1) solid $ rgbHex hexNowebLinkFg
-      backgroundColor $ rgbHex hexNowebLinkBg
-      fontStyle italic
-      ev borderRadius (px 5)
-      vh padding 0 (px 5)
-      vh margin (px 2) 0
-      display inlineBlock
-      ":hover" & do
-        color $ rgbHex hexNowebLinkHoverFg
-        border (px 1) solid $ rgbHex hexNowebLinkHoverFg
-        backgroundColor $ rgbHex hexNowebLinkHoverBg
-        textDecoration none
+      codeButtonLinkStyle
   p ? do
     span ? do
       ".code" & do
@@ -775,6 +769,7 @@ defaultCss = do
     borderTopLeftRadius (px 5) (px 5)
     borderTopRightRadius (px 5) (px 5)
     fontSans
+    fontStyle italic
   ".code-block-body" & do
     margin 0 0 (em 1) 0
     fontMono
@@ -813,6 +808,23 @@ defaultCss = do
       border (px 1) solid $ rgbHex hexCodeBorder
       ev borderRadius (px 4)
       vh padding 0 (em 0.2)
+    codeButtonLinkStyle = do
+      fontSize (pt 10)
+      color $ rgbHex hexNowebLinkFg
+      backgroundColor $ rgbHex hexNowebLinkBg
+      fontStyle italic
+      ev borderRadius (px 5)
+      vh padding 0 (px 5)
+      vh margin (px 2) 0
+      display inlineBlock
+      border (px 1) solid $ rgbHex hexCodeBorder
+      ":hover" & do
+        border (px 1) solid $ rgbHex hexNowebLinkFg
+        textDecoration none
+      ":visited" & do
+        ":hover" & do
+          border (px 1) solid $ rgbHex hexNowebLinkVisitedFg
+          textDecoration none
 #+end_src
 
 *** Links
@@ -824,8 +836,20 @@ a ? do
   textDecoration none
   ":hover" & do
     textDecoration underline
+  ":visited" & do
+    color $ rgbHex hexNowebLinkVisitedFg
+    backgroundColor $ rgbHex hexNowebLinkVisitedBg
+    textDecoration none
+    ":hover" & do
+      textDecoration underline
+      border (px 1) solid $ rgbHex hexNowebLinkVisitedFg
+  ".internal-link" & do
+    fontMono
+    codeButtonLinkStyle
   ".external-link" & do
     color $ rgbHex hexNowebLinkFg
+    ":visited" & do
+      color $ rgbHex hexNowebLinkVisitedFg
     "::after" & do
       let rawSvg :: String
           rawSvg =
@@ -937,8 +961,8 @@ hexCodeBorder = 0xcccccc :: Int
 hexNowebLinkFg = 0x2161ac :: Int
 hexNowebLinkFgTxt = "#2161ac" :: T.Text
 hexNowebLinkBg = 0xd8f6ff :: Int
-hexNowebLinkHoverFg = 0x7d3c98 :: Int
-hexNowebLinkHoverBg = 0xf8e9ff :: Int
+hexNowebLinkVisitedFg = 0x7d3c98 :: Int
+hexNowebLinkVisitedBg = 0xf8e9ff :: Int
 #+end_src
 
 * ClojureScript frontend

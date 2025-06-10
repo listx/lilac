@@ -196,7 +196,7 @@ weavePToken = \case
         linkCategory =
           if isExternalLink link.target
             then "external-link"
-            else ""
+            else "internal-link"
      in H.a ! (A.href $ H.textValue targetText) ! A.class_ linkCategory $ do
           forM_ link.name weaveStyledText
   PTokenMathFragment _ -> H.text ""
@@ -299,7 +299,11 @@ spliceLinks colorized links =
 
 weaveLink :: Link -> H.Html
 weaveLink link = do
-  H.a ! A.href "h" $ sequence_ $ map weaveStyledText link.name
+  H.a ! (A.href $ H.textValue linkTarget) $ sequence_ $ map weaveStyledText link.name
+  where
+    linkTarget = case link.target of
+      LinkTargetNoweb linkNoweb -> linkNoweb.name
+      LinkTargetOther linkText -> linkText
 
 weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
 weaveToDisk fp od watch =
