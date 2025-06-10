@@ -70,6 +70,7 @@ import Relude
   ( Bool (True),
     Int,
     Maybe (Just),
+    forM_,
     fromIntegral,
     otherwise,
     ($),
@@ -111,18 +112,12 @@ defaultCss = do
     fontSerif
     width $ px 800
     vh margin (px 0) auto
-    h1 ? do
+  forM_ [h1, h2, h3, h4, h5, h6] $ \hN -> do
+    hN ? do
       fontSans
-    h2 ? do
-      fontSans
-    h3 ? do
-      fontSans
-    h4 ? do
-      fontSans
-    h5 ? do
-      fontSans
-    h6 ? do
-      fontSans
+      a ? do
+        color $ rgbHex 0
+        textDecoration none
   pre ? do
     noMargin
   div ? do

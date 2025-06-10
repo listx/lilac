@@ -56,6 +56,7 @@ Weaving concerns are captured in [[file:src/Lilac/Weave.hs]].
 #+begin_src haskell
 module Lilac.Weave (weave, weaveToDisk) where
 
+import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
@@ -75,6 +76,7 @@ import Lilac.Parse
         LUnorderedEnd,
         LUnorderedStart
       ),
+    MathFragment (MathFragment, body),
     OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
@@ -85,11 +87,14 @@ import Lilac.Util qualified as LU
 import Relude
   ( Bool (False),
     IO,
+    Int,
     Maybe (Just, Nothing),
+    Type,
     catMaybes,
     drop,
     foldMap',
     foldl',
+    foldlM,
     fst,
     map,
     otherwise,
@@ -102,6 +107,7 @@ import Relude
     (.),
     (<>),
     (==),
+    (||),
   )
 import Relude.Extra.Map qualified as EM
 import Skylighting qualified as Sky
@@ -112,9 +118,14 @@ import Text.Blaze
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as A
+import Text.Blaze.Internal qualified as BI
+
+<<type:DomIDs>>
 
 <<f:weave>>
 <<f:weaveCell>>
+<<f:toSafeHtmlId>>
+<<f:getProseContents>>
 <<f:weaveHeading>>
 <<f:weavePToken>>
 <<f:weaveStyledText>>
@@ -153,7 +164,8 @@ weave od watch = H.docTypeHtml $ do
     <<Hot reload script>>
     <<Styles and fonts>>
   H.body $ do
-    sequence_ $ map weaveCell od.cells
+    _ <- foldlM weaveCell M.empty od.cells
+    pure ()
 #+end_src
 
 The [[Hot reload script]] is a simple third-party development tool which reloads the
@@ -221,16 +233,74 @@ handle each cell type.
 
 #+name: f:weaveCell
 #+begin_src haskell
-weaveCell :: Cell -> H.Html
-weaveCell = \case
-  CHeading heading -> weaveHeading heading
-  CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
-  CParagraph prose -> H.p $ do
-    sequence_ $ map weavePToken prose
-  CBlock block -> weaveBlock block
-  CMathFragment _ -> H.p ""
-  CFigure _ -> H.p ""
-  CTable _ -> H.p ""
+weaveCell ::
+  DomIDs ->
+  Cell ->
+  BI.MarkupM (DomIDs)
+weaveCell domIDs cell = do
+  newDomIDs <- case cell of
+    CHeading heading -> do
+      weaveHeading heading
+      pure domIDs
+    CListItem listMarkers -> do
+      sequence_ $ map weaveListMarker listMarkers
+      pure domIDs
+    CParagraph prose -> do
+      H.p $ do
+        sequence_ $ map weavePToken prose
+      pure domIDs
+    CBlock block -> do
+      weaveBlock block
+      pure domIDs
+    CMathFragment _ -> do
+      H.p ""
+      pure domIDs
+    CFigure _ -> do
+      H.p ""
+      pure domIDs
+    CTable _ -> do
+      H.p ""
+      pure domIDs
+  pure newDomIDs
+#+end_src
+
+** Unique names
+
+To weave unique HTML DOM IDs (for the ~id~ HTML attribute), we need to remember
+previously-generated DOM IDs. For this, we use the [[type:DomIDs]] type. It is keyed
+by a tuple representing the type of cell and the unique name we wanted to use
+for it, and the value is a tuple showing how many uses of it we've had already.
+So if two headings have the same name, then one will be assigned ~h-foo~ and the
+other ~h-foo-2~.
+
+#+name: type:DomIDs
+#+begin_src haskell
+type DomIDs :: Type
+type DomIDs = M.Map T.Text Int
+#+end_src
+
+Generating a unique name suitable for being used as the ~id~ attribute value
+requires us to convert some arbitrary text into a DOM ID-friendly name. For this
+purpose we have [[f:toSafeHtmlId]].
+
+[[https://www.w3.org/TR/html4/types.html][This page]] says:
+
+#+begin_quote
+ID and NAME tokens must begin with a letter ([A-Za-z]) and may be followed by
+any number of letters, digits ([0-9]), hyphens ("-"), underscores ("_"), colons
+(":"), and periods (".").
+#+end_quote
+
+#+name: f:toSafeHtmlId
+#+begin_src haskell
+toSafeHtmlId :: T.Text -> T.Text
+toSafeHtmlId = T.map onlyKeepSomeChars
+  where
+    onlyKeepSomeChars c
+      | isAsciiLower c || isAsciiUpper c = c
+      | isDigit c = c
+      | T.elem c "-_:." = c
+      | otherwise = '-'
 #+end_src
 
 ** Weave headings
@@ -242,14 +312,10 @@ values. So, we have to weave each type of token separately.
 #+name: f:weaveHeading
 #+begin_src haskell
 weaveHeading :: Heading -> H.Html
-weaveHeading heading = hN $ do
-  let sectionText =
-        T.intercalate "."
-          . map T.show
-          . reverse
-          $ heading.section
-  H.text $ sectionText <> " "
-  sequence_ $ map weavePToken heading.body
+weaveHeading heading = hN ! (A.id $ H.textValue desiredDomID) $ do
+  H.a ! (A.href . H.textValue $ "#" <> desiredDomID) $ do
+    H.text $ sectionText <> " "
+    sequence_ $ map weavePToken heading.body
   where
     hN =
       maybeAssignId heading.meta
@@ -260,6 +326,41 @@ weaveHeading heading = hN $ do
           4 -> H.h4
           5 -> H.h5
           _ -> H.h6
+    sectionText =
+      T.intercalate "."
+        . map T.show
+        . reverse
+        $ heading.section
+    desiredDomID =
+      T.intercalate
+        "-"
+        [ "h",
+          sectionText,
+          toSafeHtmlId $ getProseContents heading.body
+        ]
+#+end_src
+
+The ~sectionText~ already makes the heading unique amongst the other ones in the
+Org file, but for human-friendliness we also extract the textual part of it with
+[[f:getProseContents]] (which is fed through [[f:toSafeHtmlId]] for safety).
+
+#+name: f:getProseContents
+#+begin_src haskell
+getProseContents :: [PToken] -> T.Text
+getProseContents = join . foldl' f []
+  where
+    join = T.intercalate "" . reverse
+    f acc = \case
+      PTokenStyledText styledText -> styledText.body : acc
+      PTokenLink link ->
+        let linkText =
+              join
+                $ foldl'
+                  (\acc' n -> n.body : acc')
+                  []
+                  link.name
+         in linkText : acc
+      PTokenMathFragment mathFragment -> mathFragment.body : acc
 #+end_src
 
 The [[f:maybeAssignId]] function assigns an =id= HTML attribute if it detects the "ID"
@@ -537,6 +638,7 @@ import Relude
   ( Bool (True),
     Int,
     Maybe (Just),
+    forM_,
     fromIntegral,
     otherwise,
     ($),
@@ -602,18 +704,12 @@ defaultCss = do
     fontSerif
     width $ px 800
     vh margin (px 0) auto
-    h1 ? do
+  forM_ [h1, h2, h3, h4, h5, h6] $ \hN -> do
+    hN ? do
       fontSans
-    h2 ? do
-      fontSans
-    h3 ? do
-      fontSans
-    h4 ? do
-      fontSans
-    h5 ? do
-      fontSans
-    h6 ? do
-      fontSans
+      a ? do
+        color $ rgbHex 0
+        textDecoration none
   pre ? do
     noMargin
   div ? do

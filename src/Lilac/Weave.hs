@@ -1,5 +1,6 @@
 module Lilac.Weave (weave, weaveToDisk) where
 
+import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
@@ -19,6 +20,7 @@ import Lilac.Parse
         LUnorderedEnd,
         LUnorderedStart
       ),
+    MathFragment (MathFragment, body),
     OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
@@ -29,11 +31,14 @@ import Lilac.Util qualified as LU
 import Relude
   ( Bool (False),
     IO,
+    Int,
     Maybe (Just, Nothing),
+    Type,
     catMaybes,
     drop,
     foldMap',
     foldl',
+    foldlM,
     fst,
     map,
     otherwise,
@@ -46,6 +51,7 @@ import Relude
     (.),
     (<>),
     (==),
+    (||),
   )
 import Relude.Extra.Map qualified as EM
 import Skylighting qualified as Sky
@@ -56,6 +62,10 @@ import Text.Blaze
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as A
+import Text.Blaze.Internal qualified as BI
+
+type DomIDs :: Type
+type DomIDs = M.Map T.Text Int
 
 weave :: OrgDoc -> Bool -> H.Html
 weave od watch = H.docTypeHtml $ do
@@ -89,28 +99,69 @@ weave od watch = H.docTypeHtml $ do
               ]
     H.link ! A.rel "stylesheet" ! A.href fontsLink
   H.body $ do
-    sequence_ $ map weaveCell od.cells
+    _ <- foldlM weaveCell M.empty od.cells
+    pure ()
 
-weaveCell :: Cell -> H.Html
-weaveCell = \case
-  CHeading heading -> weaveHeading heading
-  CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
-  CParagraph prose -> H.p $ do
-    sequence_ $ map weavePToken prose
-  CBlock block -> weaveBlock block
-  CMathFragment _ -> H.p ""
-  CFigure _ -> H.p ""
-  CTable _ -> H.p ""
+weaveCell ::
+  DomIDs ->
+  Cell ->
+  BI.MarkupM (DomIDs)
+weaveCell domIDs cell = do
+  newDomIDs <- case cell of
+    CHeading heading -> do
+      weaveHeading heading
+      pure domIDs
+    CListItem listMarkers -> do
+      sequence_ $ map weaveListMarker listMarkers
+      pure domIDs
+    CParagraph prose -> do
+      H.p $ do
+        sequence_ $ map weavePToken prose
+      pure domIDs
+    CBlock block -> do
+      weaveBlock block
+      pure domIDs
+    CMathFragment _ -> do
+      H.p ""
+      pure domIDs
+    CFigure _ -> do
+      H.p ""
+      pure domIDs
+    CTable _ -> do
+      H.p ""
+      pure domIDs
+  pure newDomIDs
+
+toSafeHtmlId :: T.Text -> T.Text
+toSafeHtmlId = T.map onlyKeepSomeChars
+  where
+    onlyKeepSomeChars c
+      | isAsciiLower c || isAsciiUpper c = c
+      | isDigit c = c
+      | T.elem c "-_:." = c
+      | otherwise = '-'
+
+getProseContents :: [PToken] -> T.Text
+getProseContents = join . foldl' f []
+  where
+    join = T.intercalate "" . reverse
+    f acc = \case
+      PTokenStyledText styledText -> styledText.body : acc
+      PTokenLink link ->
+        let linkText =
+              join
+                $ foldl'
+                  (\acc' n -> n.body : acc')
+                  []
+                  link.name
+         in linkText : acc
+      PTokenMathFragment mathFragment -> mathFragment.body : acc
 
 weaveHeading :: Heading -> H.Html
-weaveHeading heading = hN $ do
-  let sectionText =
-        T.intercalate "."
-          . map T.show
-          . reverse
-          $ heading.section
-  H.text $ sectionText <> " "
-  sequence_ $ map weavePToken heading.body
+weaveHeading heading = hN ! (A.id $ H.textValue desiredDomID) $ do
+  H.a ! (A.href . H.textValue $ "#" <> desiredDomID) $ do
+    H.text $ sectionText <> " "
+    sequence_ $ map weavePToken heading.body
   where
     hN =
       maybeAssignId heading.meta
@@ -121,6 +172,18 @@ weaveHeading heading = hN $ do
           4 -> H.h4
           5 -> H.h5
           _ -> H.h6
+    sectionText =
+      T.intercalate "."
+        . map T.show
+        . reverse
+        $ heading.section
+    desiredDomID =
+      T.intercalate
+        "-"
+        [ "h",
+          sectionText,
+          toSafeHtmlId $ getProseContents heading.body
+        ]
 
 weavePToken :: PToken -> H.Html
 weavePToken = \case
