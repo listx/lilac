@@ -29,7 +29,7 @@ import Lilac.Parse
   )
 import Lilac.Util qualified as LU
 import Relude
-  ( Bool (False),
+  ( Bool (False, True),
     IO,
     Int,
     Maybe (Just, Nothing),
@@ -193,9 +193,20 @@ weavePToken = \case
     let targetText = case link.target of
           LinkTargetNoweb _ -> "UNSUPPORTED"
           LinkTargetOther t -> t
-     in H.a ! (A.href $ H.textValue targetText) $ do
+        linkCategory =
+          if isExternalLink link.target
+            then "external-link"
+            else ""
+     in H.a ! (A.href $ H.textValue targetText) ! A.class_ linkCategory $ do
           forM_ link.name weaveStyledText
   PTokenMathFragment _ -> H.text ""
+
+isExternalLink :: LinkTarget -> Bool
+isExternalLink = \case
+  LinkTargetNoweb _ -> False
+  LinkTargetOther target
+    | T.isPrefixOf "http" target -> True
+    | otherwise -> False
 
 weaveStyledText :: StyledText -> H.Html
 weaveStyledText styledText = do

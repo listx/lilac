@@ -32,6 +32,7 @@ import Clay
     h4,
     h5,
     h6,
+    height,
     html,
     inlineBlock,
     italic,
@@ -57,6 +58,7 @@ import Clay
     underline,
     width,
     (&),
+    (-:),
     (?),
   )
 import Data.Bits
@@ -70,11 +72,15 @@ import Relude
   ( Bool (True),
     Int,
     Maybe (Just),
+    String,
+    concatMap,
     forM_,
     fromIntegral,
     otherwise,
     ($),
+    (.),
     (<),
+    (<>),
     (>),
   )
 import Skylighting qualified as Sky
@@ -146,6 +152,42 @@ defaultCss = do
     textDecoration none
     ":hover" & do
       textDecoration underline
+    ".external-link" & do
+      color $ rgbHex hexNowebLinkFg
+      "::after" & do
+        let rawSvg :: String
+            rawSvg =
+              """
+              <svg xmlns="http://www.w3.org/2000/svg" class="external-link" viewBox="0 0 60 60">
+              <path fill="COLOR" d="M36 24c-1.2 0-2 0.8-2 2v12c0 1.2-0.8 2-2 2h-22c-1.2
+              0-2-0.8-2-2v-22c0-1.2 0.8-2 2-2h12c1.2 0 2-0.8 2-2s-0.8-2-2-2h-12c-3.4 0-6 2.6-6
+              6v22c0 3.4 2.6 6 6 6h22c3.4 0 6-2.6 6-6v-12c0-1.2-0.8-2-2-2z"></path>
+              <path fill="COLOR" d="M43.8
+              5.2c-0.2-0.4-0.6-0.8-1-1-0.2-0.2-0.6-0.2-0.8-0.2h-12c-1.2 0-2 0.8-2 2s0.8 2 2
+              2h7.2l-18.6 18.6c-0.8 0.8-0.8 2 0 2.8 0.4 0.4 0.8 0.6 1.4 0.6s1-0.2
+              1.4-0.6l18.6-18.6v7.2c0 1.2 0.8 2 2 2s2-0.8 2-2v-12c0-0.2
+              0-0.6-0.2-0.8z"></path>
+              </svg>
+              """
+            basicEncoder = \case
+              '"' -> "%22"
+              '\n' -> " "
+              c -> [c]
+            inlineSvg =
+              T.intercalate
+                (T.append "%23" $ T.drop 1 hexNowebLinkFgTxt)
+                . T.splitOn
+                  "COLOR"
+                . T.pack
+                $ concatMap basicEncoder rawSvg
+            cssProp =
+              "url('data:image/svg+xml;charset=UTF-8,"
+                <> inlineSvg
+                <> "')"
+        "content" -: cssProp
+        display inlineBlock
+        width (em 1)
+        height (em 1)
   ".sourceCode" & do
     noMargin
   ".code-block-container" & do
@@ -189,6 +231,7 @@ defaultCss = do
     hexCodeBg = 0xf7f7f7 :: Int
     hexCodeBorder = 0xcccccc :: Int
     hexNowebLinkFg = 0x2161ac :: Int
+    hexNowebLinkFgTxt = "#2161ac" :: T.Text
     hexNowebLinkBg = 0xd8f6ff :: Int
     hexNowebLinkHoverFg = 0x7d3c98 :: Int
     hexNowebLinkHoverBg = 0xf8e9ff :: Int
