@@ -156,27 +156,11 @@ data OrgParserState = OrgParserState
     continuationIndent :: Int,
     equationNumber :: Int,
     blockNames :: Set.Set T.Text,
+    anonBlockNumber :: Int,
     tanglePaths :: Set.Set T.Text,
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
-
-defaultOrgParserState :: OrgParserState
-defaultOrgParserState =
-  OrgParserState
-    { goids = M.fromList [],
-      orgId = one nil,
-      headingLevel = 0,
-      headingSection = [],
-      styleMask = styleMaskFrom [],
-      listLevels = [],
-      listMarkers = [],
-      continuationIndent = 0,
-      equationNumber = 0,
-      blockNames = Set.empty,
-      tanglePaths = Set.empty,
-      orgParserConf = defaultOrgParserConf
-    }
 
 type OrgParserConf :: Type
 data OrgParserConf = OrgParserConf
@@ -438,6 +422,24 @@ defaultOrgDoc metas =
   OrgDoc
     { cells = [],
       meta = M.fromList metas
+    }
+
+defaultOrgParserState :: OrgParserState
+defaultOrgParserState =
+  OrgParserState
+    { goids = M.fromList [],
+      orgId = one nil,
+      headingLevel = 0,
+      headingSection = [],
+      styleMask = styleMaskFrom [],
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      blockNames = Set.empty,
+      anonBlockNumber = 0,
+      tanglePaths = Set.empty,
+      orgParserConf = defaultOrgParserConf
     }
 
 docMetaEntryParser :: OrgParser (T.Text, T.Text)
@@ -1044,7 +1046,13 @@ blockParser = do
         someBTokensParser blockType (not nowebOff)
       ]
   orgParserState <- get
-  let blockMeta = ("__block_type", blockType)
+  let newAnonBlockNumber = case blockName of
+        Just _ -> orgParserState.anonBlockNumber
+        Nothing -> orgParserState.anonBlockNumber + 1
+      anonBlockMeta = case blockName of
+        Just _ -> Nothing
+        Nothing -> Just ("__anon_block_number", T.show newAnonBlockNumber)
+      blockMeta = ("__block_type", blockType)
       closestUuidMeta =
         ( "__closest_UUID",
           T.show
@@ -1056,12 +1064,16 @@ blockParser = do
           { meta =
               M.fromList
                 $ (blockMeta : closestUuidMeta : metaKVs)
-                <> concatMap maybeToList [blockName, srcLang],
+                <> concatMap maybeToList [blockName, srcLang, anonBlockMeta],
             body =
               ignoreSpecialCommas
                 . compressBTokens
                 $ padConsecutiveNowebLinks bTokens
           }
+  put
+    orgParserState
+      { anonBlockNumber = newAnonBlockNumber
+      }
   pure $ CBlock block
   where
     firstNonNilParent [] = nil

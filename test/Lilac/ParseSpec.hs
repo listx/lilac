@@ -187,6 +187,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -237,6 +238,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -261,6 +263,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -305,6 +308,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 20}
       }
@@ -339,6 +343,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 0}
       }
@@ -478,6 +483,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -514,6 +520,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -550,6 +557,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -771,6 +779,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -1072,6 +1081,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -1089,7 +1099,8 @@ parseSpec = do
               ( L.Block
                   { meta =
                       fromList
-                        [ ("__block_type", "src"),
+                        [ ("__anon_block_number", "1"),
+                          ("__block_type", "src"),
                           ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "haskell")
                         ],
@@ -1111,7 +1122,8 @@ parseSpec = do
               ( L.Block
                   { meta =
                       fromList
-                        [ ("__block_type", "quote"),
+                        [ ("__anon_block_number", "2"),
+                          ("__block_type", "quote"),
                           ("__closest_UUID", "00000000-0000-0000-0000-000000000000")
                         ],
                     body = []
@@ -1131,6 +1143,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 0,
         blockNames = Set.fromList ["foo"],
+        anonBlockNumber = 2,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -1233,11 +1246,12 @@ parseSpec = do
               "end not in beginning of line",
               "ignore #+end_example because this is a src block"
             ],
+        anonBlockNumber = 0,
         tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
 
-  p
+  ps
     "0007-blocks-noweb-off"
     L.OrgDoc
       { cells =
@@ -1245,7 +1259,8 @@ parseSpec = do
               ( L.Block
                   { meta =
                       fromList
-                        [ ("__block_type", "src"),
+                        [ ("__anon_block_number", "1"),
+                          ("__block_type", "src"),
                           ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh"),
                           ("noweb", "off")
@@ -1258,8 +1273,11 @@ parseSpec = do
           ],
         meta = fromList []
       }
+    L.defaultOrgParserState
+      { L.anonBlockNumber = 1
+      }
 
-  p
+  ps
     "0007-blocks-noweb"
     L.OrgDoc
       { cells =
@@ -1267,7 +1285,8 @@ parseSpec = do
               ( L.Block
                   { meta =
                       fromList
-                        [ ("__block_type", "src"),
+                        [ ("__anon_block_number", "1"),
+                          ("__block_type", "src"),
                           ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh")
                         ],
@@ -1312,8 +1331,11 @@ parseSpec = do
           ],
         meta = fromList []
       }
+    L.defaultOrgParserState
+      { L.anonBlockNumber = 1
+      }
 
-  p
+  ps
     "0007-blocks-noweb-intraline"
     L.OrgDoc
       { cells =
@@ -1321,7 +1343,8 @@ parseSpec = do
               ( L.Block
                   { meta =
                       fromList
-                        [ ("__block_type", "src"),
+                        [ ("__anon_block_number", "1"),
+                          ("__block_type", "src"),
                           ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh")
                         ],
@@ -1384,6 +1407,9 @@ parseSpec = do
           ],
         meta = fromList []
       }
+    L.defaultOrgParserState
+      { L.anonBlockNumber = 1
+      }
 
   pf
     "0007-blocks-duplicate-names"
@@ -1395,7 +1421,7 @@ parseSpec = do
     "tangle path \"some/path.sh\" is not unique"
     114
 
-  p
+  ps
     "0007-blocks-special-commas"
     L.OrgDoc
       { cells =
@@ -1403,7 +1429,8 @@ parseSpec = do
               ( L.Block
                   { meta =
                       fromList
-                        [ ("__block_type", "src"),
+                        [ ("__anon_block_number", "1"),
+                          ("__block_type", "src"),
                           ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                           ("__src_language", "sh")
                         ],
@@ -1428,6 +1455,9 @@ parseSpec = do
               )
           ],
         meta = fromList []
+      }
+    L.defaultOrgParserState
+      { L.anonBlockNumber = 1
       }
 
   pf
@@ -1804,6 +1834,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 3,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -1859,6 +1890,7 @@ parseSpec = do
         continuationIndent = 0,
         equationNumber = 1,
         blockNames = Set.empty,
+        anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -1941,6 +1973,7 @@ parseSpec = do
             [ "f:f",
               "f:g"
             ],
+        anonBlockNumber = 0,
         tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }

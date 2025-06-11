@@ -194,6 +194,7 @@ import Prelude qualified (show)
 <<f:parseOrgDoc>>
 <<f:orgDocParser>>
 <<f:defaultOrgDoc>>
+<<f:defaultOrgParserState>>
 <<f:docMetaEntryParser>>
 <<f:docMetaParser>>
 <<f:lilacExtensionsParser>>
@@ -486,11 +487,15 @@ data OrgParserState = OrgParserState
     continuationIndent :: Int,
     equationNumber :: Int,
     blockNames :: Set.Set T.Text,
+    anonBlockNumber :: Int,
     tanglePaths :: Set.Set T.Text,
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
+#+end_src
 
+#+name: f:defaultOrgParserState
+#+begin_src haskell
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
@@ -504,6 +509,7 @@ defaultOrgParserState =
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
@@ -511,6 +517,10 @@ defaultOrgParserState =
 
 The ~goids~ is the global map of all known Org IDs. This information is the same
 one encoded by Emacs as discussed in [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][ID locations file parser]].
+
+The ~anonBlockNumber~ is used to give some unique name (in lieu of actual names)
+for anonymous blocks. This is needed for generating link anchors for it during
+weaving.
 
 ** =orgDocParser=
 
@@ -970,6 +980,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -994,6 +1005,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -1034,6 +1046,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -1444,6 +1457,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -2391,6 +2405,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -3195,6 +3210,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 20}
     }
@@ -3251,6 +3267,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 0}
     }
@@ -3420,6 +3437,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -3469,6 +3487,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -3528,6 +3547,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -3593,6 +3613,7 @@ ps
       continuationIndent = 0,
       equationNumber = 0,
       blockNames = Set.fromList ["foo"],
+      anonBlockNumber = 2,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -3604,7 +3625,8 @@ ps
     ( L.Block
         { meta =
             fromList
-              [ ("__block_type", "src"),
+              [ ("__anon_block_number", "1"),
+                ("__block_type", "src"),
                 ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "haskell")
               ],
@@ -3626,7 +3648,8 @@ ps
     ( L.Block
         { meta =
             fromList
-              [ ("__block_type", "quote"),
+              [ ("__anon_block_number", "2"),
+                ("__block_type", "quote"),
                 ("__closest_UUID", "00000000-0000-0000-0000-000000000000")
               ],
           body = []
@@ -3795,7 +3818,13 @@ blockParser = do
         someBTokensParser blockType (not nowebOff)
       ]
   orgParserState <- get
-  let blockMeta = ("__block_type", blockType)
+  let newAnonBlockNumber = case blockName of
+        Just _ -> orgParserState.anonBlockNumber
+        Nothing -> orgParserState.anonBlockNumber + 1
+      anonBlockMeta = case blockName of
+        Just _ -> Nothing
+        Nothing -> Just ("__anon_block_number", T.show newAnonBlockNumber)
+      blockMeta = ("__block_type", blockType)
       closestUuidMeta =
         ( "__closest_UUID",
           T.show
@@ -3807,12 +3836,16 @@ blockParser = do
           { meta =
               M.fromList
                 $ (blockMeta : closestUuidMeta : metaKVs)
-                <> concatMap maybeToList [blockName, srcLang],
+                <> concatMap maybeToList [blockName, srcLang, anonBlockMeta],
             body =
               ignoreSpecialCommas
                 . compressBTokens
                 $ padConsecutiveNowebLinks bTokens
           }
+  put
+    orgParserState
+      { anonBlockNumber = newAnonBlockNumber
+      }
   pure $ CBlock block
   where
     firstNonNilParent [] = nil
@@ -3824,6 +3857,10 @@ blockParser = do
 The first thing is to get the start of the block with [[f:blockStartParser]].
 The ~nowebOff~ bit controls how we perceive text that looks like ~<<foo>>~; see the
 discussion for [[t:0007-blocks-noweb]] and [[t:0007-blocks-noweb-off]].
+
+Blocks that don't have a name are assigned a ~__anon_block_number~ metadata
+property, so that we can use this information to generate a link anchor for it
+during weaving.
 
 The tricky part is finding out the end of the block. We cannot use a single
 parser and must parse the two cases of whether there is or isn't any content
@@ -3954,12 +3991,15 @@ Non-special commas stay put:
 
 #+name: t:0007-blocks-special-commas
 #+begin_src haskell
-p
+ps
   "0007-blocks-special-commas"
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-special-commas>>,
       meta = fromList []
+    }
+  L.defaultOrgParserState
+    { L.anonBlockNumber = 1
     }
 #+end_src
 
@@ -3969,7 +4009,8 @@ p
     ( L.Block
         { meta =
             fromList
-              [ ("__block_type", "src"),
+              [ ("__anon_block_number", "1"),
+                ("__block_type", "src"),
                 ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh")
               ],
@@ -4178,12 +4219,15 @@ with ~>>~ on the same line.
 
 #+name: t:0007-blocks-noweb
 #+begin_src haskell
-p
+ps
   "0007-blocks-noweb"
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-noweb>>,
       meta = fromList []
+    }
+  L.defaultOrgParserState
+    { L.anonBlockNumber = 1
     }
 #+end_src
 
@@ -4194,7 +4238,8 @@ p
     ( L.Block
         { meta =
             fromList
-              [ ("__block_type", "src"),
+              [ ("__anon_block_number", "1"),
+                ("__block_type", "src"),
                 ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh")
               ],
@@ -4262,12 +4307,15 @@ echo <<bar>> x y z
 
 #+name: t:0007-blocks-noweb-off
 #+begin_src haskell
-p
+ps
   "0007-blocks-noweb-off"
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-noweb-off>>,
       meta = fromList []
+    }
+  L.defaultOrgParserState
+    { L.anonBlockNumber = 1
     }
 #+end_src
 
@@ -4278,7 +4326,8 @@ p
     ( L.Block
         { meta =
             fromList
-              [ ("__block_type", "src"),
+              [ ("__anon_block_number", "1"),
+                ("__block_type", "src"),
                 ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh"),
                 ("noweb", "off")
@@ -4310,12 +4359,15 @@ those contents into an existing line.
 
 #+name: t:0007-blocks-noweb-intraline
 #+begin_src haskell
-p
+ps
   "0007-blocks-noweb-intraline"
   L.OrgDoc
     { cells =
         <<Expected blocks for 0007-blocks-noweb-intraline>>,
       meta = fromList []
+    }
+  L.defaultOrgParserState
+    { L.anonBlockNumber = 1
     }
 #+end_src
 
@@ -4326,7 +4378,8 @@ p
     ( L.Block
         { meta =
             fromList
-              [ ("__block_type", "src"),
+              [ ("__anon_block_number", "1"),
+                ("__block_type", "src"),
                 ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh")
               ],
@@ -4635,6 +4688,7 @@ ps
             "end not in beginning of line",
             "ignore #+end_example because this is a src block"
           ],
+      anonBlockNumber = 0,
       tanglePaths = Set.fromList [],
       orgParserConf = L.defaultOrgParserConf
     }
@@ -6397,6 +6451,7 @@ ps
       continuationIndent = 0,
       equationNumber = 3,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -6472,6 +6527,7 @@ ps
       continuationIndent = 0,
       equationNumber = 1,
       blockNames = Set.empty,
+      anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -6671,6 +6727,7 @@ ps
           [ "f:f",
             "f:g"
           ],
+      anonBlockNumber = 0,
       tanglePaths = Set.fromList [],
       orgParserConf = L.defaultOrgParserConf
     }
