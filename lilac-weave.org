@@ -128,6 +128,8 @@ import Text.Blaze.Internal qualified as BI
 <<f:toSafeHtmlId>>
 <<f:getProseContents>>
 <<f:weaveHeading>>
+<<f:getSectionText>>
+<<f:getLinkAnchor>>
 <<f:weavePToken>>
 <<f:isExternalLink>>
 <<f:weaveStyledText>>
@@ -137,7 +139,6 @@ import Text.Blaze.Internal qualified as BI
 <<f:spliceLinks>>
 <<f:weaveLink>>
 <<f:weaveToDisk>>
-<<f:maybeAssignId>>
 #+end_src
 
 * Generate HTML
@@ -305,6 +306,41 @@ toSafeHtmlId = T.map onlyKeepSomeChars
       | otherwise = '-'
 #+end_src
 
+The [[f:getLinkAnchor]] function generates the unique, human-friendly ID of a
+[[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Cell][data:Cell]].
+
+#+name: f:getLinkAnchor
+#+begin_src haskell
+getLinkAnchor :: Cell -> T.Text
+getLinkAnchor = \case
+  CHeading heading ->
+    T.intercalate
+      "-"
+      [ "h",
+        getSectionText heading,
+        toSafeHtmlId $ getProseContents heading.body
+      ]
+  CListItem {} -> ""
+  CParagraph {} -> ""
+  CBlock {} -> ""
+  CMathFragment {} -> ""
+  CFigure {} -> ""
+  CTable {} -> ""
+#+end_src
+
+The [[f:getSectionText]] function just retrieves the numeric heading section number,
+as a ~T.Text~ value.
+
+#+name: f:getSectionText
+#+begin_src haskell
+getSectionText :: Heading -> T.Text
+getSectionText heading =
+  T.intercalate "."
+    . map T.show
+    . reverse
+    $ heading.section
+#+end_src
+
 ** Weave headings
 
 Headings might sound simple, but because they are made up of arbitrary text,
@@ -314,32 +350,20 @@ values. So, we have to weave each type of token separately.
 #+name: f:weaveHeading
 #+begin_src haskell
 weaveHeading :: Heading -> H.Html
-weaveHeading heading = hN ! (A.id $ H.textValue desiredDomID) $ do
-  H.a ! (A.href . H.textValue $ "#" <> desiredDomID) $ do
+weaveHeading heading = hN ! (A.id $ H.textValue linkAnchor) $ do
+  H.a ! (A.href . H.textValue $ "#" <> linkAnchor) $ do
     H.text $ sectionText <> " "
     sequence_ $ map weavePToken heading.body
   where
-    hN =
-      maybeAssignId heading.meta
-        $ case heading.level of
-          1 -> H.h1
-          2 -> H.h2
-          3 -> H.h3
-          4 -> H.h4
-          5 -> H.h5
-          _ -> H.h6
-    sectionText =
-      T.intercalate "."
-        . map T.show
-        . reverse
-        $ heading.section
-    desiredDomID =
-      T.intercalate
-        "-"
-        [ "h",
-          sectionText,
-          toSafeHtmlId $ getProseContents heading.body
-        ]
+    hN = case heading.level of
+      1 -> H.h1
+      2 -> H.h2
+      3 -> H.h3
+      4 -> H.h4
+      5 -> H.h5
+      _ -> H.h6
+    sectionText = getSectionText heading
+    linkAnchor = getLinkAnchor $ CHeading heading
 #+end_src
 
 The ~sectionText~ already makes the heading unique amongst the other ones in the
@@ -363,17 +387,6 @@ getProseContents = join . foldl' f []
                   link.name
          in linkText : acc
       PTokenMathFragment mathFragment -> mathFragment.body : acc
-#+end_src
-
-The [[f:maybeAssignId]] function assigns an =id= HTML attribute if it detects the "ID"
-tag in the given metadata.
-
-#+name: f:maybeAssignId
-#+begin_src haskell
-maybeAssignId :: M.Map T.Text T.Text -> (H.Html -> H.Html) -> (H.Html -> H.Html)
-maybeAssignId meta elt = case EM.lookup "ID" meta of
-  Just uuidText -> elt ! (A.id $ H.textValue uuidText)
-  Nothing -> elt
 #+end_src
 
 Each [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] value has its own weaver.

@@ -159,32 +159,43 @@ getProseContents = join . foldl' f []
       PTokenMathFragment mathFragment -> mathFragment.body : acc
 
 weaveHeading :: Heading -> H.Html
-weaveHeading heading = hN ! (A.id $ H.textValue desiredDomID) $ do
-  H.a ! (A.href . H.textValue $ "#" <> desiredDomID) $ do
+weaveHeading heading = hN ! (A.id $ H.textValue linkAnchor) $ do
+  H.a ! (A.href . H.textValue $ "#" <> linkAnchor) $ do
     H.text $ sectionText <> " "
     sequence_ $ map weavePToken heading.body
   where
-    hN =
-      maybeAssignId heading.meta
-        $ case heading.level of
-          1 -> H.h1
-          2 -> H.h2
-          3 -> H.h3
-          4 -> H.h4
-          5 -> H.h5
-          _ -> H.h6
-    sectionText =
-      T.intercalate "."
-        . map T.show
-        . reverse
-        $ heading.section
-    desiredDomID =
-      T.intercalate
-        "-"
-        [ "h",
-          sectionText,
-          toSafeHtmlId $ getProseContents heading.body
-        ]
+    hN = case heading.level of
+      1 -> H.h1
+      2 -> H.h2
+      3 -> H.h3
+      4 -> H.h4
+      5 -> H.h5
+      _ -> H.h6
+    sectionText = getSectionText heading
+    linkAnchor = getLinkAnchor $ CHeading heading
+
+getSectionText :: Heading -> T.Text
+getSectionText heading =
+  T.intercalate "."
+    . map T.show
+    . reverse
+    $ heading.section
+
+getLinkAnchor :: Cell -> T.Text
+getLinkAnchor = \case
+  CHeading heading ->
+    T.intercalate
+      "-"
+      [ "h",
+        getSectionText heading,
+        toSafeHtmlId $ getProseContents heading.body
+      ]
+  CListItem {} -> ""
+  CParagraph {} -> ""
+  CBlock {} -> ""
+  CMathFragment {} -> ""
+  CFigure {} -> ""
+  CTable {} -> ""
 
 weavePToken :: PToken -> H.Html
 weavePToken = \case
@@ -311,8 +322,3 @@ weaveToDisk fp od watch =
     . TL.toStrict
     . renderHtml
     $ weave od watch
-
-maybeAssignId :: M.Map T.Text T.Text -> (H.Html -> H.Html) -> (H.Html -> H.Html)
-maybeAssignId meta elt = case EM.lookup "ID" meta of
-  Just uuidText -> elt ! (A.id $ H.textValue uuidText)
-  Nothing -> elt
