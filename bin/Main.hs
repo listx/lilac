@@ -264,7 +264,7 @@ lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
   Check checkOpts -> lilacCheck globalOpts checkOpts
   Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
-  Weave weaveOpts -> lilacWeave weaveOpts
+  Weave weaveOpts -> lilacWeave globalOpts weaveOpts
   WriteGOIDs writeGOIDsOpts -> lilacWriteGOIDs writeGOIDsOpts
 
 lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
@@ -322,10 +322,11 @@ lilacTangle globalOpts tangleOpts = do
           LT.tangle sourceCode
           putStrLn "Finished tangling."
 
-lilacWeave :: WeaveOpts -> IO ()
-lilacWeave weaveOpts = do
+lilacWeave :: GlobalOpts -> WeaveOpts -> IO ()
+lilacWeave globalOpts weaveOpts = do
   writeCssFile
-  mapM_ weaveOrgFile $ weaveOpts.inputs
+  goids <- LP.runGoidsParser globalOpts.orgIdLocationsFile
+  mapM_ (weaveOrgFile goids) $ weaveOpts.inputs
   where
     writeCssFile = do
       cssPath <- do
@@ -334,11 +335,11 @@ lilacWeave weaveOpts = do
         css <- P.encodeUtf "default.css"
         pure $ P.joinPath [dir, cssDir, css]
       LU.writeFileRobustly cssPath $ LWC.genCss
-    weaveOrgFile inputOrgFile = do
+    weaveOrgFile goids inputOrgFile = do
       input <- LU.readFrom "" inputOrgFile
       let parseResult =
             MP.runParser
-              (runStateT LP.orgDocParser LP.defaultOrgParserState)
+              (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
               inputOrgFile
               input
       case parseResult of
@@ -352,7 +353,7 @@ lilacWeave weaveOpts = do
             let withoutExtension = P.joinPath [dir, base]
                 html = P.unsafeEncodeUtf "html"
             pure $ P.addExtension withoutExtension html
-          LW.weaveToDisk outPath orgDoc weaveOpts.watch
+          LW.weaveToDisk outPath orgDoc weaveOpts.watch goids
           putStrLn "Finished weaving."
 
 lilacWriteGOIDs :: WriteGOIDsOpts -> IO ()
