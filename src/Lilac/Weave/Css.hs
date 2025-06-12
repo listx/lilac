@@ -5,17 +5,23 @@ import Clay
     Css,
     Size,
     a,
+    absolute,
+    alignSide,
     auto,
     backgroundColor,
+    block,
     body,
     bold,
     border,
     borderBottomLeftRadius,
     borderBottomRightRadius,
     borderBottomWidth,
+    borderBox,
     borderRadius,
     borderTopLeftRadius,
     borderTopRightRadius,
+    bottom,
+    boxSizing,
     code,
     color,
     display,
@@ -33,33 +39,43 @@ import Clay
     h5,
     h6,
     height,
+    hover,
     html,
     inlineBlock,
     italic,
     margin,
+    marginLeft,
     minWidth,
     monospace,
     none,
     overflowY,
     p,
     padding,
+    paddingRight,
+    position,
     pre,
     pretty,
     pt,
     px,
+    relative,
     renderWith,
     rgb,
     sansSerif,
     scroll,
     serif,
+    sideRight,
     solid,
     span,
+    textAlign,
     textDecoration,
+    top,
     underline,
     width,
+    (#),
     (&),
     (-:),
     (?),
+    (|>),
   )
 import Data.Bits
   ( shiftR,
@@ -194,6 +210,21 @@ defaultCss = do
     noMargin
   ".code-block-container" & do
     minWidth fitContent
+    position relative
+  (".code-block-container" # hover) |> ".side-popup" ? do
+    display block
+    a # hover ? do
+      textDecoration none
+  ".side-popup" & do
+    marginLeft (px $ -50)
+    padding (px 2) (px 5) 0 0
+    width (px 50)
+    textAlign $ alignSide sideRight
+    boxSizing borderBox
+    top (px 0)
+    bottom (px 0)
+    position absolute
+    display none
   ".code-block-name" & do
     vh padding 0 (px 8)
     border (px 1) solid $ rgbHex hexCodeBorder

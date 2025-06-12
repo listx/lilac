@@ -192,7 +192,18 @@ getLinkAnchor = \case
       ]
   CListItem {} -> ""
   CParagraph {} -> ""
-  CBlock {} -> ""
+  CBlock block ->
+    let ref
+          | Just name <- EM.lookup "name" block.meta =
+              name
+          | Just anonBlockNum <- EM.lookup "__anon_block_number" block.meta =
+              anonBlockNum
+          | otherwise = "anon-block-error"
+     in T.intercalate
+          "-"
+          [ "b",
+            toSafeHtmlId ref
+          ]
   CMathFragment {} -> ""
   CFigure {} -> ""
   CTable {} -> ""
@@ -250,7 +261,10 @@ weaveListMarker =
 
 weaveBlock :: Block -> H.Html
 weaveBlock block = do
-  H.div ! A.class_ "code-block-container" $ do
+  H.div ! A.class_ "code-block-container" ! (A.id $ H.textValue linkAnchor) $ do
+    H.div ! A.class_ "side-popup" $ do
+      H.a ! (A.href . H.textValue $ "#" <> linkAnchor) $ do
+        H.preEscapedText "&#x1F517;"
     maybeAssignName
     let bodyBorder = case EM.lookup "name" block.meta of
           Just _ -> ""
@@ -283,6 +297,7 @@ weaveBlock block = do
           BTokenPadding -> ""
           BTokenLink (Link _name (LinkTargetNoweb _)) -> "\NUL"
           BTokenLink {} -> ""
+    linkAnchor = getLinkAnchor $ CBlock block
 
 colorizeText :: T.Text -> T.Text -> H.Html
 colorizeText lang txt

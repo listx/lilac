@@ -322,7 +322,18 @@ getLinkAnchor = \case
       ]
   CListItem {} -> ""
   CParagraph {} -> ""
-  CBlock {} -> ""
+  CBlock block ->
+    let ref
+          | Just name <- EM.lookup "name" block.meta =
+              name
+          | Just anonBlockNum <- EM.lookup "__anon_block_number" block.meta =
+              anonBlockNum
+          | otherwise = "anon-block-error"
+     in T.intercalate
+          "-"
+          [ "b",
+            toSafeHtmlId ref
+          ]
   CMathFragment {} -> ""
   CFigure {} -> ""
   CTable {} -> ""
@@ -481,7 +492,10 @@ supporting syntax highlighting (see [[f:colorizeText]]).
 #+begin_src haskell
 weaveBlock :: Block -> H.Html
 weaveBlock block = do
-  H.div ! A.class_ "code-block-container" $ do
+  H.div ! A.class_ "code-block-container" ! (A.id $ H.textValue linkAnchor) $ do
+    H.div ! A.class_ "side-popup" $ do
+      H.a ! (A.href . H.textValue $ "#" <> linkAnchor) $ do
+        H.preEscapedText <<HTML link symbol>>
     maybeAssignName
     let bodyBorder = case EM.lookup "name" block.meta of
           Just _ -> ""
@@ -514,6 +528,7 @@ weaveBlock block = do
           BTokenPadding -> ""
           BTokenLink (Link _name (LinkTargetNoweb _)) -> "\NUL"
           BTokenLink {} -> ""
+    linkAnchor = getLinkAnchor $ CBlock block
 #+end_src
 
 The first thing we do is to get the contents of the block with
@@ -576,6 +591,43 @@ weaveLink link = do
       LinkTargetOther linkText -> linkText
 #+end_src
 
+*** Link anchor
+
+The link anchor uses the link symbol "🔗" with Unicode code point ~U+1F517~.
+
+#+name: HTML link symbol
+#+begin_src haskell
+"&#x1F517;"
+#+end_src
+
+We want to display this symbol inside a containing ~div~, because the symbol
+itself is too small and we want to have the symbol displayed even when we move
+the mouse slightly away from it. For this purpose, we have the ~.side-popup~
+class.
+
+#+name: css:Block link anchor
+#+begin_src haskell
+(".code-block-container" # hover) |> ".side-popup" ? do
+  display block
+  a # hover ? do
+    textDecoration none
+".side-popup" & do
+  marginLeft (px $ -50)
+  padding (px 2) (px 5) 0 0
+  width (px 50)
+  textAlign $ alignSide sideRight
+  boxSizing borderBox
+  top (px 0)
+  bottom (px 0)
+  position absolute
+  display none
+#+end_src
+
+Initially the ~.side-popup~ is not displayed at all (invisible), and it shows up
+only when the containing ~.code-block-container~ is hovered. This keeps the page
+free of clutter (otherwise we'd have these link anchors showing up for all
+blocks at all times, which is noisy).
+
 ** Write to disk
 
 Weaving to disk is used when we want to choose where to write the HTML. It's
@@ -614,17 +666,23 @@ import Clay
     Css,
     Size,
     a,
+    absolute,
+    alignSide,
     auto,
     backgroundColor,
+    block,
     body,
     bold,
     border,
     borderBottomLeftRadius,
     borderBottomRightRadius,
     borderBottomWidth,
+    borderBox,
     borderRadius,
     borderTopLeftRadius,
     borderTopRightRadius,
+    bottom,
+    boxSizing,
     code,
     color,
     display,
@@ -642,33 +700,43 @@ import Clay
     h5,
     h6,
     height,
+    hover,
     html,
     inlineBlock,
     italic,
     margin,
+    marginLeft,
     minWidth,
     monospace,
     none,
     overflowY,
     p,
     padding,
+    paddingRight,
+    position,
     pre,
     pretty,
     pt,
     px,
+    relative,
     renderWith,
     rgb,
     sansSerif,
     scroll,
     serif,
+    sideRight,
     solid,
     span,
+    textAlign,
     textDecoration,
+    top,
     underline,
     width,
+    (#),
     (&),
     (-:),
     (?),
+    (|>),
   )
 import Data.Bits
   ( shiftR,
@@ -775,6 +843,8 @@ defaultCss = do
     noMargin
   ".code-block-container" & do
     minWidth fitContent
+    position relative
+  <<css:Block link anchor>>
   ".code-block-name" & do
     vh padding 0 (px 8)
     border (px 1) solid $ rgbHex hexCodeBorder
