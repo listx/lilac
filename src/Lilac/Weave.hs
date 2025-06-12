@@ -1,7 +1,6 @@
 module Lilac.Weave (weave, weaveToDisk) where
 
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
-import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Lilac.Parse
@@ -31,14 +30,11 @@ import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
     IO,
-    Int,
     Maybe (Just, Nothing),
-    Type,
     catMaybes,
     drop,
     foldMap',
     foldl',
-    foldlM,
     forM_,
     fst,
     map,
@@ -63,10 +59,6 @@ import Text.Blaze
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as A
-import Text.Blaze.Internal qualified as BI
-
-type DomIDs :: Type
-type DomIDs = M.Map T.Text Int
 
 weave :: OrgDoc -> Bool -> H.Html
 weave od watch = H.docTypeHtml $ do
@@ -100,38 +92,21 @@ weave od watch = H.docTypeHtml $ do
               ]
     H.link ! A.rel "stylesheet" ! A.href fontsLink
   H.body $ do
-    _ <- foldlM weaveCell M.empty od.cells
-    pure ()
+    forM_ od.cells weaveCell
 
-weaveCell ::
-  DomIDs ->
-  Cell ->
-  BI.MarkupM (DomIDs)
-weaveCell domIDs cell = do
-  newDomIDs <- case cell of
-    CHeading heading -> do
-      weaveHeading heading
-      pure domIDs
-    CListItem listMarkers -> do
-      sequence_ $ map weaveListMarker listMarkers
-      pure domIDs
-    CParagraph prose -> do
-      H.p $ do
-        sequence_ $ map weavePToken prose
-      pure domIDs
-    CBlock block -> do
-      weaveBlock block
-      pure domIDs
-    CMathFragment _ -> do
-      H.p ""
-      pure domIDs
-    CFigure _ -> do
-      H.p ""
-      pure domIDs
-    CTable _ -> do
-      H.p ""
-      pure domIDs
-  pure newDomIDs
+weaveCell :: Cell -> H.Html
+weaveCell = \case
+  CHeading heading -> weaveHeading heading
+  CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
+  CParagraph prose -> H.p $ do
+    sequence_ $ map weavePToken prose
+  CBlock block -> weaveBlock block
+  CMathFragment _ -> do
+    H.p ""
+  CFigure _ -> do
+    H.p ""
+  CTable _ -> do
+    H.p ""
 
 toSafeHtmlId :: T.Text -> T.Text
 toSafeHtmlId = T.map onlyKeepSomeChars

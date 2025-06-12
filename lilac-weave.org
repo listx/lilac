@@ -57,7 +57,6 @@ Weaving concerns are captured in [[file:src/Lilac/Weave.hs]].
 module Lilac.Weave (weave, weaveToDisk) where
 
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
-import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Lilac.Parse
@@ -87,14 +86,11 @@ import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
     IO,
-    Int,
     Maybe (Just, Nothing),
-    Type,
     catMaybes,
     drop,
     foldMap',
     foldl',
-    foldlM,
     forM_,
     fst,
     map,
@@ -119,9 +115,6 @@ import Text.Blaze
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as A
-import Text.Blaze.Internal qualified as BI
-
-<<type:DomIDs>>
 
 <<f:weave>>
 <<f:weaveCell>>
@@ -167,8 +160,7 @@ weave od watch = H.docTypeHtml $ do
     <<Hot reload script>>
     <<Styles and fonts>>
   H.body $ do
-    _ <- foldlM weaveCell M.empty od.cells
-    pure ()
+    forM_ od.cells weaveCell
 #+end_src
 
 The [[Hot reload script]] is a simple third-party development tool which reloads the
@@ -236,51 +228,22 @@ handle each cell type.
 
 #+name: f:weaveCell
 #+begin_src haskell
-weaveCell ::
-  DomIDs ->
-  Cell ->
-  BI.MarkupM (DomIDs)
-weaveCell domIDs cell = do
-  newDomIDs <- case cell of
-    CHeading heading -> do
-      weaveHeading heading
-      pure domIDs
-    CListItem listMarkers -> do
-      sequence_ $ map weaveListMarker listMarkers
-      pure domIDs
-    CParagraph prose -> do
-      H.p $ do
-        sequence_ $ map weavePToken prose
-      pure domIDs
-    CBlock block -> do
-      weaveBlock block
-      pure domIDs
-    CMathFragment _ -> do
-      H.p ""
-      pure domIDs
-    CFigure _ -> do
-      H.p ""
-      pure domIDs
-    CTable _ -> do
-      H.p ""
-      pure domIDs
-  pure newDomIDs
+weaveCell :: Cell -> H.Html
+weaveCell = \case
+  CHeading heading -> weaveHeading heading
+  CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
+  CParagraph prose -> H.p $ do
+    sequence_ $ map weavePToken prose
+  CBlock block -> weaveBlock block
+  CMathFragment _ -> do
+    H.p ""
+  CFigure _ -> do
+    H.p ""
+  CTable _ -> do
+    H.p ""
 #+end_src
 
 ** Unique names
-
-To weave unique HTML DOM IDs (for the ~id~ HTML attribute), we need to remember
-previously-generated DOM IDs. For this, we use the [[type:DomIDs]] type. It is keyed
-by a tuple representing the type of cell and the unique name we wanted to use
-for it, and the value is a tuple showing how many uses of it we've had already.
-So if two headings have the same name, then one will be assigned ~h-foo~ and the
-other ~h-foo-2~.
-
-#+name: type:DomIDs
-#+begin_src haskell
-type DomIDs :: Type
-type DomIDs = M.Map T.Text Int
-#+end_src
 
 Generating a unique name suitable for being used as the ~id~ attribute value
 requires us to convert some arbitrary text into a DOM ID-friendly name. For this
