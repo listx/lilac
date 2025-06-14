@@ -430,6 +430,60 @@ weaveStyledText styledText = do
       Code -> "code" : acc
 #+end_src
 
+[[t:0300-weave-styled-text]] checks for basic styles, but also whether HTML-sensitive
+characters get escaped (even inside verbatim and code styles)
+
+#+header: :tangle test/Lilac/WeaveSpec/0300-weave-styled-text
+#+begin_src org
+regular *bold* /italic/ _underline_ =verbatim= ~code~
+=<>=
+~<>~
+#+end_src
+
+#+name: t:0300-weave-styled-text
+#+begin_src haskell
+weaveExpect
+  "0300-weave-styled-text"
+  "test/.orgids"
+  [ "regular",
+    """
+    <span class="bold">
+      bold
+    </span>
+    """,
+    """
+    <span class="italic">
+      italic
+    </span>
+    """,
+    """
+    <span class="underline">
+      underline
+    </span>
+    """,
+    """
+    <span class="verbatim">
+      verbatim
+    </span>
+    """,
+    """
+    <span class="code">
+      code
+    </span>
+    """,
+    """
+    <span class="verbatim">
+      &lt;&gt;
+    </span>
+    """,
+    """
+    <span class="code">
+      &lt;&gt;
+    </span>
+    """
+  ]
+#+end_src
+
 ** Weave list markers
 
 The =blaze-html= library we use expects to take care of the starting and closing
@@ -632,6 +686,184 @@ weaveToDisk fp od watch uuidToOsPath =
     . TL.toStrict
     . renderHtml
     $ weave od watch uuidToOsPath
+#+end_src
+
+** Testing framework
+
+The tests here use Org files as input. The output are HTML documents. For the
+test cases, we search for the presence of certain substrings within the HTML.
+
+*** Test module and helpers
+
+The test module here mirrors what we've already seen in [[id:3990627d-69f5-4c30-b3d7-abb3edaa0d13::TangleSpec helpers][TangleSpec helpers]] and [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::ParseSpec
+ helpers][ParseSpec helpers]]. We have the usual bits for setting up automatic test
+discovery in [[weaveSpec discovery]], as well as some test helpers in [[WeaveSpec
+helpers]] to take care of some boilerplate.
+
+#+name: module:Lilac.WeaveSpec
+#+header: :tangle test/Lilac/WeaveSpec.hs
+#+begin_src haskell
+module Lilac.WeaveSpec (spec) where
+
+import Data.Text qualified as T
+import Lilac.Parse qualified as LP
+import Lilac.Util qualified as LU
+import Lilac.Weave qualified as LW
+import Relude
+  ( Bool (True),
+    Either (Left, Right),
+    FilePath,
+    IO,
+    Int,
+    String,
+    foldl',
+    forM_,
+    fst,
+    map,
+    pure,
+    reverse,
+    runStateT,
+    show,
+    zip,
+    ($),
+    (.),
+    (<>),
+    (==),
+  )
+import Test.Hspec
+  ( Expectation,
+    Spec,
+    describe,
+    expectationFailure,
+    it,
+    runIO,
+    shouldStartWith,
+  )
+import Text.Blaze.Html.Renderer.Pretty (renderHtml)
+import Text.Megaparsec qualified as MP
+
+<<weaveSpec discovery>>
+
+<<WeaveSpec helpers>>
+
+<<f:weaveSpec>>
+#+end_src
+
+For the exported =spec= function, we delegate to [[f:weaveSpec]]. Naming it this way
+is not required (we could just avoid the indirection and put the contents of
+[[f:weaveSpec]] directly in =spec=), but it does signify that what we manually define
+is in [[f:weaveSpec]], and that =spec= is something the library expects to be defined.
+Think of it as the private and public interface, respectively.
+
+#+name: weaveSpec discovery
+#+begin_src haskell
+spec :: Spec
+spec = weaveSpec
+#+end_src
+
+These helpers let us be a bit more concise when writing individual test cases.
+
+#+name: WeaveSpec helpers
+#+begin_src haskell
+<<f:getWovenPrettyFromPath>>
+<<f:compareWithoutIndents>>
+<<f:weaveExpect>>
+#+end_src
+
+[[f:getWovenPrettyFromPath]] weaves the given Org file to a =T.Text=. Then in our test
+cases we can check for expected substrings inside it. Note how it uses
+=renderHtml= from the =Text.Blaze.Html.Renderer.Pretty= module, because we want to
+be able to write test cases where we write expected HTML substrings in a
+prettified way (for readability).
+
+#+name: f:getWovenPrettyFromPath
+#+begin_src haskell
+getWovenPrettyFromPath :: FilePath -> FilePath -> IO (Either String T.Text)
+getWovenPrettyFromPath path orgIdLocationsFile = do
+  goids <- LP.runGoidsParser orgIdLocationsFile
+  inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+          path
+          inputOrgFile
+  case parseResult of
+    Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) ->
+      pure
+        . Right
+        . T.pack
+        . renderHtml
+        $ LW.weave orgDoc True goids
+#+end_src
+
+[[f:compareWithoutIndents]] looks through a haystack and searches for all given
+needles to be in the haystack, in order. Before doing the searches, it strips
+all indentation from both the haystack and the needles, because we don't care
+about leading indentation (in HTML, indentation doesn't have any semantic
+meaning).
+
+#+name: f:compareWithoutIndents
+#+begin_src haskell
+compareWithoutIndents :: T.Text -> [T.Text] -> [(String, Expectation)]
+compareWithoutIndents haystackRaw needles =
+  map
+    ( \(num, exp) ->
+        ("sees needle " <> show num, exp)
+    )
+    . zip [(1 :: Int) ..]
+    . reverse
+    . fst
+    $ foldl' f ([], haystackWithoutIndents) needlesWithoutIndents
+  where
+    removeIndents = T.unlines . map T.strip . T.lines
+    haystackWithoutIndents = removeIndents haystackRaw
+    needlesWithoutIndents = map removeIndents needles
+    f ::
+      ([Expectation], T.Text) ->
+      T.Text ->
+      ([Expectation], T.Text)
+    f (testCases, haystack) needle =
+      let (discardMe, foundAndRest) = T.breakOn needle haystack
+          discardLen = T.length discardMe
+          needleStr = T.unpack needle
+          foundAndRestStr = T.unpack foundAndRest
+          expectation = foundAndRestStr `shouldStartWith` needleStr
+          expectationF =
+            expectationFailure
+              $ "could not find "
+              <> (show $ needleStr)
+              <> " in haystack:\n"
+              <> (T.unpack haystack)
+          remainingHaystack = T.drop discardLen haystack
+       in if foundAndRest == T.empty
+            then (expectationF : testCases, remainingHaystack)
+            else (expectation : testCases, remainingHaystack)
+#+end_src
+
+[[f:weaveExpect]] takes a path to an Org file, the global Org ID locations file, and
+finally the list of expected substrings inside the woven result.
+
+#+name: f:weaveExpect
+#+begin_src haskell
+weaveExpect :: FilePath -> FilePath -> [T.Text] -> Spec
+weaveExpect path goidsFile needles = do
+  result <- runIO $ getWovenPrettyFromPath path goidsFile
+  describe path $ do
+    case result of
+      Right haystack -> do
+        let testCases = compareWithoutIndents haystack needles
+        forM_ testCases $ \(name, expectation) -> it name expectation
+      Left errMsg -> it "programmer error" $ expectationFailure errMsg
+#+end_src
+
+*** All test cases
+
+#+name: f:weaveSpec
+#+begin_src haskell
+weaveSpec :: Spec
+weaveSpec = do
+  <<t:0300-weave-styled-text>>
 #+end_src
 
 * Generate CSS

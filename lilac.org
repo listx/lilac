@@ -1766,6 +1766,7 @@ test-suite spec
   other-modules:
       Lilac.ParseSpec
       Lilac.TangleSpec
+      Lilac.WeaveSpec
       SpecHook
       Paths_lilac
   hs-source-dirs:
@@ -1777,6 +1778,7 @@ test-suite spec
       <<GHC threaded flags>>
   build-depends:
       base >=4.7 && <5
+    , blaze-html
     , containers
     , filepath
     , hspec
@@ -3642,6 +3644,9 @@ scenarios) is fine because it will most likely result in the comparison
 The testing framework here is modeled closely after [[module:Lilac.ParseSpec]].
 
 *** Test module and helpers
+:PROPERTIES:
+:ID:       3990627d-69f5-4c30-b3d7-abb3edaa0d13
+:END:
 
 #+name: module:Lilac.TangleSpec
 #+header: :tangle test/Lilac/TangleSpec.hs
