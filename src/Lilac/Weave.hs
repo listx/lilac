@@ -106,10 +106,10 @@ weave od watch uuidToOsPath = H.docTypeHtml $ do
 
 weaveCell :: M.Map UUID P.OsPath -> UUID -> Cell -> H.Html
 weaveCell uuidToOsPath docUuid = \case
-  CHeading heading -> weaveHeading heading
+  CHeading heading -> weaveHeading heading uuidToOsPath docUuid
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> H.p $ do
-    sequence_ $ map weavePToken prose
+    sequence_ $ map (weavePToken uuidToOsPath docUuid) prose
   CBlock block -> weaveBlock block uuidToOsPath docUuid
   CMathFragment _ -> do
     H.p ""
@@ -143,11 +143,12 @@ getProseContents = join . foldl' f []
          in linkText : acc
       PTokenMathFragment mathFragment -> mathFragment.body : acc
 
-weaveHeading :: Heading -> H.Html
-weaveHeading heading = hN ! (A.id $ H.textValue linkAnchor) $ do
-  H.a ! (A.href . H.textValue $ "#" <> linkAnchor) $ do
-    H.text $ sectionText <> " "
-    sequence_ $ map weavePToken heading.body
+weaveHeading :: Heading -> M.Map UUID P.OsPath -> UUID -> H.Html
+weaveHeading heading uuidToOsPath docUuid =
+  hN ! (A.id $ H.textValue linkAnchor) $ do
+    H.a ! (A.href . H.textValue $ "#" <> linkAnchor) $ do
+      H.text $ sectionText <> " "
+      sequence_ $ map (weavePToken uuidToOsPath docUuid) heading.body
   where
     hN = case heading.level of
       1 -> H.h1
@@ -193,19 +194,10 @@ getLinkAnchor = \case
   CFigure {} -> ""
   CTable {} -> ""
 
-weavePToken :: PToken -> H.Html
-weavePToken = \case
+weavePToken :: M.Map UUID P.OsPath -> UUID -> PToken -> H.Html
+weavePToken uuidToOsPath docUuid = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink link ->
-    let targetText = case link.target of
-          LinkTargetNoweb _ -> "UNSUPPORTED"
-          LinkTargetOther t -> t
-        linkCategory =
-          if isExternalLink link.target
-            then "external-link"
-            else "internal-link"
-     in H.a ! (A.href $ H.textValue targetText) ! A.class_ linkCategory $ do
-          forM_ link.name weaveStyledText
+  PTokenLink link -> weaveLink uuidToOsPath docUuid link
   PTokenMathFragment _ -> H.text ""
 
 isExternalLink :: LinkTarget -> Bool
@@ -300,7 +292,7 @@ spliceLinks colorized links uuidToOsPath docUuid =
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
-            : (TL.toStrict . renderHtml $ weaveLink link uuidToOsPath docUuid)
+            : (TL.toStrict . renderHtml $ weaveLink uuidToOsPath docUuid link)
             : acc,
           links'
         )
@@ -310,10 +302,18 @@ spliceLinks colorized links uuidToOsPath docUuid =
         . foldl' f (take 1 colorizedStrs, links)
         $ drop 1 colorizedStrs
 
-weaveLink :: Link -> M.Map UUID P.OsPath -> UUID -> H.Html
-weaveLink link uuidToOsPath docUuid = do
-  H.a ! (A.href $ H.textValue linkTarget) $ sequence_ $ map weaveStyledText link.name
+weaveLink :: M.Map UUID P.OsPath -> UUID -> Link -> H.Html
+weaveLink uuidToOsPath docUuid link = do
+  H.a
+    ! (A.href $ H.textValue linkTarget)
+    ! A.class_ linkCategory
+    $ sequence_
+    $ map weaveStyledText link.name
   where
+    linkCategory =
+      if isExternalLink link.target
+        then "external-link"
+        else "internal-link"
     linkTarget = case link.target of
       LinkTargetNoweb linkNoweb
         | Just orgFile <- EM.lookup linkNoweb.uuid uuidToOsPath,
@@ -332,7 +332,7 @@ weaveLink link uuidToOsPath docUuid = do
                   { meta = M.fromList [("name", linkNoweb.name)],
                     body = []
                   }
-      LinkTargetOther linkText -> linkText
+      LinkTargetOther targetText -> targetText
 
 weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> M.Map UUID P.OsPath -> IO ()
 weaveToDisk fp od watch uuidToOsPath =
