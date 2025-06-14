@@ -445,7 +445,8 @@ regular *bold* /italic/ _underline_ =verbatim= ~code~
 weaveExpect
   "0300-weave-styled-text"
   "test/.orgids"
-  [ "regular",
+  [ "<p>",
+    "regular",
     """
     <span class="bold">
       bold
@@ -480,7 +481,8 @@ weaveExpect
     <span class="code">
       &lt;&gt;
     </span>
-    """
+    """,
+    "</p>"
   ]
 #+end_src
 
@@ -507,6 +509,45 @@ weaveListMarker =
     LUnorderedEnd -> "</ul>"
     LItemStart -> "<li>"
     LItemEnd -> "</li>"
+#+end_src
+
+There isn't much to test here, because these markers are so simple. Still, it
+doesn't hurt.
+
+#+header: :tangle test/Lilac/WeaveSpec/0300-weave-lists
+#+begin_src org
+  1) a
+
+     - b
+
+  2) c
+#+end_src
+
+#+name: t:0300-weave-lists
+#+begin_src haskell
+weaveExpect
+  "0300-weave-lists"
+  "test/.orgids"
+  [ "<ol>",
+    "  <li>",
+    "    <p>",
+    "      a",
+    "    </p>",
+    "    <ul>",
+    "      <li>",
+    "        <p>",
+    "          b",
+    "        </p>",
+    "      </li>",
+    "    </ul>",
+    "  </li>",
+    "  <li>",
+    "    <p>",
+    "      c",
+    "    </p>",
+    "  </li>",
+    "</ol>"
+  ]
 #+end_src
 
 ** Weave code blocks
@@ -864,6 +905,7 @@ weaveExpect path goidsFile needles = do
 weaveSpec :: Spec
 weaveSpec = do
   <<t:0300-weave-styled-text>>
+  <<t:0300-weave-lists>>
 #+end_src
 
 * Generate CSS
