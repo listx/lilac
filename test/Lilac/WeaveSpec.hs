@@ -108,66 +108,62 @@ weaveSpec = do
   weaveExpect
     "0300-weave-styled-text"
     "test/.orgids"
-    [ "<p>",
-      "regular",
-      """
+    [ """
+      <p>
+      regular
       <span class="bold">
         bold
       </span>
-      """,
-      """
+
       <span class="italic">
         italic
       </span>
-      """,
-      """
+
       <span class="underline">
         underline
       </span>
-      """,
-      """
+
       <span class="verbatim">
         verbatim
       </span>
-      """,
-      """
+
       <span class="code">
         code
       </span>
-      """,
-      """
+
       <span class="verbatim">
         &lt;&gt;
       </span>
-      """,
-      """
+
       <span class="code">
         &lt;&gt;
       </span>
-      """,
-      "</p>"
+      </p>
+      """
     ]
 
   weaveExpect
     "0300-weave-lists"
     "test/.orgids"
-    [ "<ol>",
-      "  <li>",
-      "    <p>",
-      "      a",
-      "    </p>",
-      "    <ul>",
-      "      <li>",
-      "        <p>",
-      "          b",
-      "        </p>",
-      "      </li>",
-      "    </ul>",
-      "  </li>",
-      "  <li>",
-      "    <p>",
-      "      c",
-      "    </p>",
-      "  </li>",
-      "</ol>"
+    [ """
+      <ol>
+        <li>
+          <p>
+            a
+          </p>
+          <ul>
+            <li>
+              <p>
+                b
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            c
+          </p>
+        </li>
+      </ol>
+      """
     ]

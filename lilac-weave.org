@@ -424,44 +424,38 @@ regular *bold* /italic/ _underline_ =verbatim= ~code~
 weaveExpect
   "0300-weave-styled-text"
   "test/.orgids"
-  [ "<p>",
-    "regular",
-    """
+  [ """
+    <p>
+    regular
     <span class="bold">
       bold
     </span>
-    """,
-    """
+
     <span class="italic">
       italic
     </span>
-    """,
-    """
+
     <span class="underline">
       underline
     </span>
-    """,
-    """
+
     <span class="verbatim">
       verbatim
     </span>
-    """,
-    """
+
     <span class="code">
       code
     </span>
-    """,
-    """
+
     <span class="verbatim">
       &lt;&gt;
     </span>
-    """,
-    """
+
     <span class="code">
       &lt;&gt;
     </span>
-    """,
-    "</p>"
+    </p>
+    """
   ]
 #+end_src
 
@@ -507,25 +501,27 @@ doesn't hurt.
 weaveExpect
   "0300-weave-lists"
   "test/.orgids"
-  [ "<ol>",
-    "  <li>",
-    "    <p>",
-    "      a",
-    "    </p>",
-    "    <ul>",
-    "      <li>",
-    "        <p>",
-    "          b",
-    "        </p>",
-    "      </li>",
-    "    </ul>",
-    "  </li>",
-    "  <li>",
-    "    <p>",
-    "      c",
-    "    </p>",
-    "  </li>",
-    "</ol>"
+  [ """
+    <ol>
+      <li>
+        <p>
+          a
+        </p>
+        <ul>
+          <li>
+            <p>
+              b
+            </p>
+          </li>
+        </ul>
+      </li>
+      <li>
+        <p>
+          c
+        </p>
+      </li>
+    </ol>
+    """
   ]
 #+end_src
 
@@ -881,6 +877,10 @@ compareWithoutIndents haystackRaw needles =
             then (expectationF : testCases, remainingHaystack)
             else (expectation : testCases, remainingHaystack)
 #+end_src
+
+In practice we will only need multiple needles if we are dealing with a
+complicated haystack (with nested structures) and we only want to check some
+key structures within it.
 
 [[f:weaveExpect]] takes a path to an Org file, the global Org ID locations file, and
 finally the list of expected substrings inside the woven result.
