@@ -66,7 +66,7 @@ import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as A
 
 weave :: OrgDoc -> Bool -> M.Map UUID P.OsPath -> H.Html
-weave od watch uuidToOsPath = H.docTypeHtml $ do
+weave od watch goids = H.docTypeHtml $ do
   H.head $ do
     H.meta ! A.charset "utf-8"
     H.title
@@ -102,15 +102,15 @@ weave od watch uuidToOsPath = H.docTypeHtml $ do
             Just uuid <- validateUuidText uuidText =
               uuid
           | otherwise = nil
-    forM_ od.cells $ weaveCell uuidToOsPath docUuid
+    forM_ od.cells $ weaveCell goids docUuid
 
 weaveCell :: M.Map UUID P.OsPath -> UUID -> Cell -> H.Html
-weaveCell uuidToOsPath docUuid = \case
-  CHeading heading -> weaveHeading heading uuidToOsPath docUuid
+weaveCell goids docUuid = \case
+  CHeading heading -> weaveHeading heading goids docUuid
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> H.p $ do
-    sequence_ $ map (weavePToken uuidToOsPath docUuid) prose
-  CBlock block -> weaveBlock block uuidToOsPath docUuid
+    sequence_ $ map (weavePToken goids docUuid) prose
+  CBlock block -> weaveBlock block goids docUuid
   CMathFragment _ -> do
     H.p ""
   CFigure _ -> do
@@ -144,11 +144,11 @@ getProseContents = join . foldl' f []
       PTokenMathFragment mathFragment -> mathFragment.body : acc
 
 weaveHeading :: Heading -> M.Map UUID P.OsPath -> UUID -> H.Html
-weaveHeading heading uuidToOsPath docUuid =
+weaveHeading heading goids docUuid =
   hN ! (A.id $ H.textValue linkAnchor) $ do
     H.a ! (A.href . H.textValue $ "#" <> linkAnchor) $ do
       H.text $ sectionText <> " "
-      sequence_ $ map (weavePToken uuidToOsPath docUuid) heading.body
+      sequence_ $ map (weavePToken goids docUuid) heading.body
   where
     hN = case heading.level of
       1 -> H.h1
@@ -195,9 +195,9 @@ getLinkAnchor = \case
   CTable {} -> ""
 
 weavePToken :: M.Map UUID P.OsPath -> UUID -> PToken -> H.Html
-weavePToken uuidToOsPath docUuid = \case
+weavePToken goids docUuid = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink link -> weaveLink uuidToOsPath docUuid link
+  PTokenLink link -> weaveLink goids docUuid link
   PTokenMathFragment _ -> H.text ""
 
 isExternalLink :: LinkTarget -> Bool
@@ -237,7 +237,7 @@ weaveListMarker =
     LItemEnd -> "</li>"
 
 weaveBlock :: Block -> M.Map UUID P.OsPath -> UUID -> H.Html
-weaveBlock block uuidToOsPath docUuid = do
+weaveBlock block goids docUuid = do
   H.div ! A.class_ "code-block-container" ! (A.id $ H.textValue linkAnchor) $ do
     H.div ! A.class_ "side-popup" $ do
       H.a ! (A.href . H.textValue $ "#" <> linkAnchor) $ do
@@ -256,7 +256,7 @@ weaveBlock block uuidToOsPath docUuid = do
                 BTokenString {}
                 BTokenPadding {} -> Nothing
               links = catMaybes $ map getLink block.body
-           in H.preEscapedText $ spliceLinks colorized links uuidToOsPath docUuid
+           in H.preEscapedText $ spliceLinks colorized links goids docUuid
         Nothing -> H.code $ H.text bodyText
   where
     maybeAssignName =
@@ -286,13 +286,13 @@ colorizeText lang txt
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 
 spliceLinks :: T.Text -> [Link] -> M.Map UUID P.OsPath -> UUID -> T.Text
-spliceLinks colorized links uuidToOsPath docUuid =
+spliceLinks colorized links goids docUuid =
   let colorizedStrs = T.splitOn "\NUL" colorized
       f :: ([T.Text], [Link]) -> T.Text -> ([T.Text], [Link])
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
-            : (TL.toStrict . renderHtml $ weaveLink uuidToOsPath docUuid link)
+            : (TL.toStrict . renderHtml $ weaveLink goids docUuid link)
             : acc,
           links'
         )
@@ -303,7 +303,7 @@ spliceLinks colorized links uuidToOsPath docUuid =
         $ drop 1 colorizedStrs
 
 weaveLink :: M.Map UUID P.OsPath -> UUID -> Link -> H.Html
-weaveLink uuidToOsPath docUuid link = do
+weaveLink goids docUuid link = do
   H.a
     ! (A.href $ H.textValue linkTarget)
     ! A.class_ linkCategory
@@ -316,8 +316,8 @@ weaveLink uuidToOsPath docUuid link = do
         else "internal-link"
     linkTarget = case link.target of
       LinkTargetNoweb linkNoweb
-        | Just orgFile <- EM.lookup linkNoweb.uuid uuidToOsPath,
-          Just currentOrgFile <- EM.lookup docUuid uuidToOsPath,
+        | Just orgFile <- EM.lookup linkNoweb.uuid goids,
+          Just currentOrgFile <- EM.lookup docUuid goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
             if orgFile == currentOrgFile
               then "#" <> linkAnchor
@@ -335,8 +335,8 @@ weaveLink uuidToOsPath docUuid link = do
       LinkTargetOther targetText -> targetText
 
 weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> M.Map UUID P.OsPath -> IO ()
-weaveToDisk fp od watch uuidToOsPath =
+weaveToDisk fp od watch goids =
   LU.writeFileRobustly fp
     . TL.toStrict
     . renderHtml
-    $ weave od watch uuidToOsPath
+    $ weave od watch goids

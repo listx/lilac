@@ -166,7 +166,7 @@ growBlockUniverse ::
   [FQBN] ->
   IO (M.Map FQBN Block)
 growBlockUniverse _ _ _ blockUniverse [] = pure blockUniverse
-growBlockUniverse parsedUuids seenFqbns uuidToOsPath blockUniverse (root : roots)
+growBlockUniverse parsedUuids seenFqbns goids blockUniverse (root : roots)
   | Just block <- EM.lookup root blockUniverse = do
       let nowebLinks = catMaybes $ map getLinkTarget block.body
           fqbns =
@@ -179,10 +179,10 @@ growBlockUniverse parsedUuids seenFqbns uuidToOsPath blockUniverse (root : roots
       growBlockUniverse
         newlyParsedUuids
         (Set.union seenFqbns $ Set.fromList newFqbns)
-        uuidToOsPath
+        goids
         grownBlockUniverse
         (roots <> newFqbns <> toGrowFrom)
-  | otherwise = growBlockUniverse parsedUuids seenFqbns uuidToOsPath blockUniverse roots
+  | otherwise = growBlockUniverse parsedUuids seenFqbns goids blockUniverse roots
   where
     f ::
       (Set.Set UUID, M.Map FQBN Block, [FQBN]) ->
@@ -191,7 +191,7 @@ growBlockUniverse parsedUuids seenFqbns uuidToOsPath blockUniverse (root : roots
     f (pu, bu, tgf) (LinkNoweb uuid targetName)
       | Set.member (LU.prefixWithId uuid targetName) seenFqbns = pure (pu, bu, tgf)
       | Set.member uuid pu = pure (pu, bu, (LU.prefixWithId uuid targetName) : tgf)
-      | Just uuidOsPath <- EM.lookup uuid uuidToOsPath = do
+      | Just uuidOsPath <- EM.lookup uuid goids = do
           input <- LU.readFileRobustly uuidOsPath
           case parseOrgDoc input of
             Right od -> do
@@ -218,9 +218,9 @@ getSourceCodeMulti ::
   FilePath ->
   M.Map UUID P.OsPath ->
   IO SourceCode
-getSourceCodeMulti od odPath uuidToOsPath = do
+getSourceCodeMulti od odPath goids = do
   let sc = getSourceCode od odPath
-  bu <- growBlockUniverse Set.empty Set.empty uuidToOsPath sc.fqbnToCodeBlock sc.roots
+  bu <- growBlockUniverse Set.empty Set.empty goids sc.fqbnToCodeBlock sc.roots
   pure
     $ sc
       { roots = sc.roots,
