@@ -18,6 +18,7 @@ import Relude
     pure,
     reverse,
     runStateT,
+    sequence_,
     show,
     zip,
     ($),
@@ -58,6 +59,29 @@ getWovenPrettyFromPath path orgIdLocationsFile = do
         . renderHtml
         $ LW.weave orgDoc True goids
 
+getWovenPrettyFromPath' :: FilePath -> FilePath -> IO (Either String T.Text)
+getWovenPrettyFromPath' path orgIdLocationsFile = do
+  goids <- LP.runGoidsParser orgIdLocationsFile
+  inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+          path
+          inputOrgFile
+  case parseResult of
+    Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) -> do
+      let weaveConf =
+            LW.WeaveConf
+              { orgDoc = orgDoc,
+                goids = goids,
+                oid = LW.getOID orgDoc,
+                watch = True
+              }
+      pure
+        . Right
+        $ LW.renderAsText weaveConf LW.weave'
+
 compareWithoutIndents :: T.Text -> [T.Text] -> [(String, Expectation)]
 compareWithoutIndents haystackRaw needles =
   map
@@ -93,6 +117,34 @@ compareWithoutIndents haystackRaw needles =
             then (expectationF : testCases, remainingHaystack)
             else (expectation : testCases, remainingHaystack)
 
+searchOrderedNeedles :: T.Text -> [T.Text] -> (String, [Expectation])
+searchOrderedNeedles haystackRaw needles =
+  (\expectations -> ("sees needles", expectations))
+    . reverse
+    . fst
+    $ foldl' f ([], haystackRaw) needles
+  where
+    f ::
+      ([Expectation], T.Text) ->
+      T.Text ->
+      ([Expectation], T.Text)
+    f (testCases, haystack) needle =
+      let (discardMe, foundAndRest) = T.breakOn needle haystack
+          discardLen = T.length discardMe
+          needleStr = T.unpack needle
+          foundAndRestStr = T.unpack foundAndRest
+          expectation = foundAndRestStr `shouldStartWith` needleStr
+          expectationF =
+            expectationFailure
+              $ "could not find "
+              <> (show $ needleStr)
+              <> " in haystack:\n"
+              <> (T.unpack haystack)
+          remainingHaystack = T.drop discardLen haystack
+       in if foundAndRest == T.empty
+            then (expectationF : testCases, remainingHaystack)
+            else (expectation : testCases, remainingHaystack)
+
 weaveExpect :: FilePath -> FilePath -> [T.Text] -> Spec
 weaveExpect path goidsFile needles = do
   result <- runIO $ getWovenPrettyFromPath path goidsFile
@@ -101,6 +153,16 @@ weaveExpect path goidsFile needles = do
       Right haystack -> do
         let testCases = compareWithoutIndents haystack needles
         forM_ testCases $ \(name, expectation) -> it name expectation
+      Left errMsg -> it "programmer error" $ expectationFailure errMsg
+
+weaveExpect' :: FilePath -> FilePath -> [T.Text] -> Spec
+weaveExpect' path goidsFile needles = do
+  result <- runIO $ getWovenPrettyFromPath' path goidsFile
+  describe path $ do
+    case result of
+      Right haystack -> do
+        let (name, expectations) = searchOrderedNeedles haystack needles
+        it name $ sequence_ expectations
       Left errMsg -> it "programmer error" $ expectationFailure errMsg
 
 weaveSpec :: Spec
@@ -142,6 +204,20 @@ weaveSpec = do
       """
     ]
 
+  weaveExpect'
+    "0300-weave-styled-text"
+    "test/.orgids"
+    [ "<p>regular ",
+      "<span class=\"bold\">bold</span> ",
+      "<span class=\"italic\">italic</span> ",
+      "<span class=\"underline\">underline</span> ",
+      "<span class=\"verbatim\">verbatim</span> ",
+      "<span class=\"code\">code</span> ",
+      "<span class=\"verbatim\">&lt;&gt;</span> ",
+      "<span class=\"code\">&lt;&gt;</span>",
+      "</p>"
+    ]
+
   weaveExpect
     "0300-weave-lists"
     "test/.orgids"
@@ -167,3 +243,31 @@ weaveSpec = do
       </ol>
       """
     ]
+
+  weaveExpect'
+    "0300-weave-lists"
+    "test/.orgids"
+    $ map
+      (T.intercalate "" . map T.strip . T.lines)
+      [ """
+        <ol>
+          <li>
+            <p>
+              a
+            </p>
+            <ul>
+              <li>
+                <p>
+                  b
+                </p>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <p>
+              c
+            </p>
+          </li>
+        </ol>
+        """
+      ]

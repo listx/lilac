@@ -54,7 +54,16 @@ Weaving concerns are captured in [[file:src/Lilac/Weave.hs]].
 #+name: module:Lilac.Weave
 #+header: :tangle src/Lilac/Weave.hs
 #+begin_src haskell
-module Lilac.Weave (weave, weaveToDisk) where
+module Lilac.Weave
+  ( WeaveConf (..),
+    getOID,
+    renderAsText,
+    weave,
+    weave',
+    weaveToDisk,
+    weaveToDisk',
+  )
+where
 
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
@@ -86,27 +95,70 @@ import Lilac.Parse
     validateUuidText,
   )
 import Lilac.Util qualified as LU
+import Lucid
+  ( HtmlT,
+    a_,
+    body_,
+    charset_,
+    class_,
+    code_,
+    crossorigin_,
+    div_,
+    doctypehtml_,
+    h1_,
+    h2_,
+    h3_,
+    h4_,
+    h5_,
+    h6_,
+    head_,
+    href_,
+    id_,
+    link_,
+    meta_,
+    p_,
+    pre_,
+    rel_,
+    renderText,
+    script_,
+    span_,
+    src_,
+    title_,
+    toHtml,
+    toHtmlRaw,
+    type_,
+  )
+import Lucid.Base (hoistHtmlT)
 import Relude
   ( Bool (False, True),
     Either (Right),
     IO,
+    Identity,
     Maybe (Just, Nothing),
+    ReaderT,
+    String,
+    Type,
+    ask,
     catMaybes,
     drop,
+    flip,
     foldMap',
     foldl',
     forM_,
     fst,
+    lift,
     map,
     otherwise,
     pure,
     reverse,
+    runReaderT,
     sequence_,
     take,
     when,
     ($),
     (.),
     (<>),
+    (=<<),
     (==),
     (||),
   )
@@ -121,22 +173,38 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as A
 
+<<data:WeaveConf>>
+<<type:HtmlWeaver>>
+
 <<f:weave>>
+<<f:weave'>>
 <<f:weaveCell>>
+<<f:weaveCell'>>
 <<f:toSafeHtmlId>>
 <<f:getProseContents>>
 <<f:weaveHeading>>
+<<f:weaveHeading'>>
 <<f:getSectionText>>
 <<f:getLinkAnchor>>
 <<f:weavePToken>>
+<<f:weavePToken'>>
 <<f:isExternalLink>>
 <<f:weaveStyledText>>
+<<f:weaveStyledText'>>
 <<f:weaveListMarker>>
+<<f:weaveListMarker'>>
 <<f:weaveBlock>>
+<<f:weaveBlock'>>
 <<f:colorizeText>>
+<<f:colorizeText'>>
 <<f:spliceLinks>>
+<<f:spliceLinks'>>
 <<f:weaveLink>>
+<<f:weaveLink'>>
 <<f:weaveToDisk>>
+<<f:weaveToDisk'>>
+<<f:renderAsText>>
+<<f:getOID>>
 #+end_src
 
 * Generate HTML
@@ -147,9 +215,67 @@ import Text.Blaze.Html5.Attributes qualified as A
 Weaving mainly means converting the [[data:OrgDoc]] into HTML, as part of "Step 1"
 in [[id:8f5752c0-6162-4de6-9ceb-f78ba584722c][Architecture]].
 
-The top-level function is [[f:weave]], which sets the overall structure. Most of the
-content of [[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:OrgDoc][data:OrgDoc]] is made up of [[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Cell][data:Cell]] values, which we iterate over
-with [[f:weaveCell]].
+During the weaving process, we want to access various other settings that may
+not be apparent at the [[data:Cell]] level. To capture these values in one place, we
+use a [[data:WeaveConf]]. Instead of passing this around to all functions, we put it
+inside a ~ReaderT~ so that it is available for all weave-related functions that
+are using the [[type:HtmlWeaver]]. This is analogous to [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgParserState][data:OrgParserState]] which is
+available to all parsing functions in [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::type:OrgParser][type:OrgParser]].
+
+#+name: data:WeaveConf
+#+begin_src haskell
+type WeaveConf :: Type
+data WeaveConf = WeaveConf
+  { orgDoc :: OrgDoc,
+    goids :: M.Map UUID P.OsPath,
+    oid :: UUID,
+    watch :: Bool
+  }
+#+end_src
+
+The [[type:HtmlWeaver]] is a monad that can compute any ~a~ value. We stack ~ReaderT~ on
+top of Lucid's ~HtmlT~ to create the monadic environment where we can read from
+[[data:WeaveConf]] whenever we want.
+
+#+name: type:HtmlWeaver
+#+begin_src haskell
+type HtmlWeaver :: Type -> Type
+type HtmlWeaver a = HtmlT (ReaderT WeaveConf Identity) a
+#+end_src
+
+Note that the inner monad is the ~ReaderT~. This way we don't have to call ~lift~
+every single time we want to use a Lucid combinator like ~head_~ or ~body_~.
+
+Now we just need our starting point for using ~HtmlWeaver~. In our case, the final
+thing we want to generate is a ~Text~ value. Lucid gives us ~renderTextT~, which can
+run inside a monad. This means we can use that to generate ~Text~ from
+[[type:HtmlWeaver]]; this is what [[f:renderAsText]] does.
+
+[[f:renderAsText]] takes a ~WeaveConf~ and an ~HtmlWeaver a~ action, and converts it to
+a ~T.Text~ type. It's there because we cannot use any of the default rendering
+functions that Lucid gives us (because they operate on Lucid's ~HtmlT~, not the
+~HtmlWeaver~ we use).
+
+#+name: f:renderAsText
+#+begin_src haskell
+renderAsText :: WeaveConf -> HtmlWeaver a -> T.Text
+renderAsText weaveConf weaver =
+  TL.toStrict
+    . renderText
+    $ hoistHtmlT (flip runReaderT weaveConf) weaver
+#+end_src
+
+The ~hoistHtmlT~ function is a convenience helper provided by Lucid, which is
+equivalent to ~hoist~ from [[https://hackage.haskell.org/package/mmorph][=Control.Monad.Morph=]]. It applies a function to the
+inner monad of ~HtmlT~ (recall that [[type:HtmlWeaver]] is just a ~HtmlT~ whose inner
+monad is a ~ReaderT~). So in this case the inner monad is ~ReaderT WeaveConf
+Identity~, and running ~runReaderT~ will result in ~Identity ()~ (where ~()~ is the ~a~
+in the type signature for [[f:renderAsText]]). So then the call to ~hoistHtmlT~ gives
+us ~HtmlT Identity a~, which is what Lucid's ~renderText~ expects.
+
+The top-level weaving function is [[f:weave']], which sets up the main HTML bits
+(like the title, head, style sheets, etc), before finally delegating to
+[[f:weaveCell']] for the bulk of the work.
 
 #+name: f:weave
 #+begin_src haskell
@@ -173,6 +299,30 @@ weave od watch goids = H.docTypeHtml $ do
     forM_ od.cells $ weaveCell goids docUuid
 #+end_src
 
+#+name: f:weave'
+#+begin_src haskell
+weave' :: HtmlWeaver ()
+weave' = do
+  weaveConf <- ask
+  let title' = toHtml $ case EM.lookup "title" weaveConf.orgDoc.meta of
+        Just title -> title
+        Nothing -> "Untitled"
+  doctypehtml_ $ do
+    head_ $ do
+      meta_ [charset_ "utf-8"]
+      title_ title'
+      <<Hot reload script'>>
+      <<Styles and fonts'>>
+    body_ $ do
+      forM_ weaveConf.orgDoc.cells weaveCell'
+#+end_src
+
+The use of ~toHtml~ is to help Haskell infer the correct type. This is because
+Lucid will think that regular strings are of type ~Html ()~ (this is how Lucid
+automatically escapes strings to be HTML-safe). The ~title_~ function expects a
+~Html ()~ type, so we have to manually convert the ~Text~ we get out of ~EM.lookup~
+with ~toHtml~.
+
 The [[Hot reload script]] is a simple third-party development tool which reloads the
 page if there is a change in the HTML, CSS, or JS. It requires a web server, so
 we pull in
@@ -184,6 +334,16 @@ when watch
   ! A.type_ "text/javascript"
   ! A.src "https://livejs.com/live.js"
   $ ""
+#+end_src
+
+#+name: Hot reload script'
+#+begin_src haskell
+when weaveConf.watch
+  $ script_
+    [ type_ "text/javascript",
+      src_ "https://livejs.com/live.js"
+    ]
+    ("" :: T.Text)
 #+end_src
 
 The ~live.js~ script only works with a web server, so we declare Python as a
@@ -233,6 +393,26 @@ let fontsLink =
 H.link ! A.rel "stylesheet" ! A.href fontsLink
 #+end_src
 
+#+name: Styles and fonts'
+#+begin_src haskell
+link_ [rel_ "stylesheet", href_ "./css/default.css"]
+link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
+link_
+  [ rel_ "preconnect",
+    href_ "https://fonts.gstatic.com",
+    crossorigin_ "anonymous"
+  ]
+let fontsLink =
+      T.intercalate
+        ""
+        [ "https://fonts.googleapis.com/css2?display=swap",
+          "&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900",
+          "&family=Source+Sans+3:ital,wght@0,200..900;1,200..900",
+          "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
+        ]
+link_ [rel_ "stylesheet", href_ fontsLink]
+#+end_src
+
 Weaving cells just means delegating to each of the weavers that know how to
 handle each cell type.
 
@@ -251,6 +431,22 @@ weaveCell goids docUuid = \case
     H.p ""
   CTable _ -> do
     H.p ""
+#+end_src
+
+#+name: f:weaveCell'
+#+begin_src haskell
+weaveCell' :: Cell -> HtmlWeaver ()
+weaveCell' = \case
+  CHeading heading -> weaveHeading' heading
+  CListItem listMarkers -> sequence_ $ map weaveListMarker' listMarkers
+  CParagraph prose -> p_ $ sequence_ $ map weavePToken' prose
+  CBlock block -> weaveBlock' block
+  CMathFragment _ -> do
+    p_ "FRAGMENT"
+  CFigure _ -> do
+    p_ "FIGURE"
+  CTable _ -> do
+    p_ "TABLE"
 #+end_src
 
 ** Unique names
@@ -351,6 +547,26 @@ weaveHeading heading goids docUuid =
     linkAnchor = getLinkAnchor $ CHeading heading
 #+end_src
 
+#+name: f:weaveHeading'
+#+begin_src haskell
+weaveHeading' :: Heading -> HtmlWeaver ()
+weaveHeading' heading =
+  hN [id_ linkAnchor] $ do
+    a_ [href_ $ "#" <> linkAnchor] $ do
+      toHtml $ sectionText <> " "
+      sequence_ $ map weavePToken' heading.body
+  where
+    hN = case heading.level of
+      1 -> h1_
+      2 -> h2_
+      3 -> h3_
+      4 -> h4_
+      5 -> h5_
+      _ -> h6_
+    sectionText = getSectionText heading
+    linkAnchor = getLinkAnchor $ CHeading heading
+#+end_src
+
 The ~sectionText~ already makes the heading unique amongst the other ones in the
 Org file, but for human-friendliness we also extract the textual part of it with
 [[f:getProseContents]] (which is fed through [[f:toSafeHtmlId]] for safety).
@@ -385,6 +601,15 @@ weavePToken goids docUuid = \case
   PTokenMathFragment _ -> H.text ""
 #+end_src
 
+#+name: f:weavePToken'
+#+begin_src haskell
+weavePToken' :: PToken -> HtmlWeaver ()
+weavePToken' = \case
+  PTokenStyledText styledText -> weaveStyledText' styledText
+  PTokenLink link -> weaveLink' link
+  PTokenMathFragment _ -> p_ ""
+#+end_src
+
 ** Weave styled text
 
 #+name: f:weaveStyledText
@@ -398,6 +623,25 @@ weaveStyledText styledText = do
         ! A.class_ (H.textValue $ T.unwords styles)
         $ H.text
         $ styledText.body
+  where
+    styles = foldl' styleToClasses [] $ maskToStyles styledText.style
+    styleToClasses :: [T.Text] -> Style -> [T.Text]
+    styleToClasses acc = \case
+      Bold -> "bold" : acc
+      Italic -> "italic" : acc
+      Underline -> "underline" : acc
+      Verbatim -> "verbatim" : acc
+      Code -> "code" : acc
+#+end_src
+
+#+name: f:weaveStyledText'
+#+begin_src haskell
+weaveStyledText' :: StyledText -> HtmlWeaver ()
+weaveStyledText' styledText = do
+  let b = toHtml $ styledText.body
+  if styles == []
+    then b
+    else span_ [class_ $ T.unwords styles] b
   where
     styles = foldl' styleToClasses [] $ maskToStyles styledText.style
     styleToClasses :: [T.Text] -> Style -> [T.Text]
@@ -459,6 +703,23 @@ weaveExpect
   ]
 #+end_src
 
+#+name: t:0300-weave-styled-text'
+#+begin_src haskell
+weaveExpect'
+  "0300-weave-styled-text"
+  "test/.orgids"
+  [ "<p>regular ",
+    "<span class=\"bold\">bold</span> ",
+    "<span class=\"italic\">italic</span> ",
+    "<span class=\"underline\">underline</span> ",
+    "<span class=\"verbatim\">verbatim</span> ",
+    "<span class=\"code\">code</span> ",
+    "<span class=\"verbatim\">&lt;&gt;</span> ",
+    "<span class=\"code\">&lt;&gt;</span>",
+    "</p>"
+  ]
+#+end_src
+
 ** Weave list markers
 
 The =blaze-html= library we use expects to take care of the starting and closing
@@ -476,6 +737,19 @@ so it's actually very easy to insert the tags manually. This is what we do in
 weaveListMarker :: ListMarker -> H.Html
 weaveListMarker =
   H.preEscapedToMarkup . \case
+    LOrderedStart -> "<ol>" :: T.Text
+    LOrderedEnd -> "</ol>"
+    LUnorderedStart -> "<ul>"
+    LUnorderedEnd -> "</ul>"
+    LItemStart -> "<li>"
+    LItemEnd -> "</li>"
+#+end_src
+
+#+name: f:weaveListMarker'
+#+begin_src haskell
+weaveListMarker' :: ListMarker -> HtmlWeaver ()
+weaveListMarker' =
+  toHtmlRaw . \case
     LOrderedStart -> "<ol>" :: T.Text
     LOrderedEnd -> "</ol>"
     LUnorderedStart -> "<ul>"
@@ -525,6 +799,37 @@ weaveExpect
   ]
 #+end_src
 
+#+name: t:0300-weave-lists'
+#+begin_src haskell
+weaveExpect'
+  "0300-weave-lists"
+  "test/.orgids"
+  $ map
+    (T.intercalate "" . map T.strip . T.lines)
+    [ """
+      <ol>
+        <li>
+          <p>
+            a
+          </p>
+          <ul>
+            <li>
+              <p>
+                b
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            c
+          </p>
+        </li>
+      </ol>
+      """
+    ]
+#+end_src
+
 ** Weave code blocks
 
 Weaving code blocks requires us to be able to handle both regular text
@@ -547,7 +852,7 @@ weaveBlock block goids docUuid = do
       let bodyText = getBlockContentsWithoutLinks block.body
       case EM.lookup "__src_language" block.meta of
         Just lang ->
-          let colorized = TL.toStrict . renderHtml $ colorizeText lang bodyText
+          let colorized = TL.toStrict . Text.Blaze.Html.Renderer.Text.renderHtml $ colorizeText lang bodyText
               getLink = \case
                 BTokenLink l -> Just l
                 BTokenString {}
@@ -561,6 +866,50 @@ weaveBlock block goids docUuid = do
         Just name ->
           H.div ! A.class_ "code-block-name" $ do
             H.code $ H.text name
+        Nothing -> pure ()
+    getBlockContentsWithoutLinks :: [BToken] -> T.Text
+    getBlockContentsWithoutLinks = T.concat . map bTokenToText
+      where
+        bTokenToText :: BToken -> T.Text
+        bTokenToText = \case
+          BTokenString text -> text
+          BTokenPadding -> ""
+          BTokenLink (Link _name (LinkTargetNoweb _)) -> "\NUL"
+          BTokenLink {} -> ""
+    linkAnchor = getLinkAnchor $ CBlock block
+#+end_src
+
+#+name: f:weaveBlock'
+#+begin_src haskell
+weaveBlock' :: Block -> HtmlWeaver ()
+weaveBlock' block = do
+  weaveConf <- ask
+  div_ [class_ "code-block-container", id_ linkAnchor] $ do
+    div_ [class_ "side-popup"] $ do
+      a_ [href_ $ "#" <> linkAnchor] $ do
+        toHtmlRaw (<<HTML link symbol>> :: String)
+    maybeAssignName
+    let bodyBorder = case EM.lookup "name" block.meta of
+          Just _ -> ""
+          Nothing -> " fully-rounded"
+    pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
+      let bodyText = getBlockContentsWithoutLinks block.body
+      case EM.lookup "__src_language" block.meta of
+        Just lang -> do
+          let colorized = renderAsText weaveConf $ colorizeText' lang bodyText
+              getLink = \case
+                BTokenLink l -> Just l
+                BTokenString {}
+                BTokenPadding {} -> Nothing
+              links = catMaybes $ map getLink block.body
+          toHtmlRaw =<< spliceLinks' colorized links
+        Nothing -> code_ $ toHtml bodyText
+  where
+    maybeAssignName =
+      case EM.lookup "name" block.meta of
+        Just name ->
+          div_ [class_ "code-block-name"] $ do
+            code_ $ toHtml name
         Nothing -> pure ()
     getBlockContentsWithoutLinks :: [BToken] -> T.Text
     getBlockContentsWithoutLinks = T.concat . map bTokenToText
@@ -595,6 +944,20 @@ colorizeText lang txt
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 #+end_src
 
+#+name: f:colorizeText'
+#+begin_src haskell
+colorizeText' :: T.Text -> T.Text -> HtmlWeaver ()
+colorizeText' lang txt
+  | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
+    Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
+      toHtmlRaw
+        . Text.Blaze.Html.Renderer.Text.renderHtml
+        $ Sky.formatHtmlInline Sky.defaultFormatOpts lines
+  | otherwise = code_ $ toHtml txt
+  where
+    defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
+#+end_src
+
 Block colorization relies on the [[https://hackage.haskell.org/package/skylighting][=skylighting=]] syntax highlighting library. This
 library ignores the ~\NUL~ character, which is what we want. Once we have the
 colorized text, we splice in the links with ~spliceLinks~, which relies on
@@ -611,7 +974,7 @@ spliceLinks colorized links goids docUuid =
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
-            : (TL.toStrict . renderHtml $ weaveLink goids docUuid link)
+            : (TL.toStrict . Text.Blaze.Html.Renderer.Text.renderHtml $ weaveLink goids docUuid link)
             : acc,
           links'
         )
@@ -620,6 +983,28 @@ spliceLinks colorized links goids docUuid =
         . fst
         . foldl' f (take 1 colorizedStrs, links)
         $ drop 1 colorizedStrs
+#+end_src
+
+#+name: f:spliceLinks'
+#+begin_src haskell
+spliceLinks' :: T.Text -> [Link] -> HtmlWeaver T.Text
+spliceLinks' colorized links = do
+  weaveConf <- ask
+  let colorizedStrs = T.splitOn "\NUL" colorized
+      f :: ([T.Text], [Link]) -> T.Text -> ([T.Text], [Link])
+      f (acc, []) colorizedStr = (colorizedStr : acc, [])
+      f (acc, link : links') colorizedStr =
+        ( colorizedStr
+            : (renderAsText weaveConf $ weaveLink' link)
+            : acc,
+          links'
+        )
+  pure
+    . T.intercalate ""
+    . reverse
+    . fst
+    . foldl' f (take 1 colorizedStrs, links)
+    $ drop 1 colorizedStrs
 #+end_src
 
 Weaving links is not yet fully supported (in particular ~LinkTargetOther~ is
@@ -643,6 +1028,43 @@ weaveLink goids docUuid link = do
       LinkTargetNoweb linkNoweb
         | Just orgFile <- EM.lookup linkNoweb.uuid goids,
           Just currentOrgFile <- EM.lookup docUuid goids,
+          Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
+            if orgFile == currentOrgFile
+              then "#" <> linkAnchor
+              else (T.pack str) <> "#" <> linkAnchor
+        | otherwise -> "#" <> linkAnchor
+        where
+          htmlExt = P.unsafeEncodeUtf "html"
+          linkAnchor =
+            getLinkAnchor
+              $ CBlock
+                Block
+                  { meta = M.fromList [("name", linkNoweb.name)],
+                    body = []
+                  }
+      LinkTargetOther targetText -> targetText
+#+end_src
+
+#+name: f:weaveLink'
+#+begin_src haskell
+weaveLink' :: Link -> HtmlWeaver ()
+weaveLink' link = do
+  weaveConf <- lift ask
+  a_
+    [ href_ $ linkTarget weaveConf,
+      class_ linkCategory
+    ]
+    $ sequence_
+    $ map weaveStyledText' link.name
+  where
+    linkCategory =
+      if isExternalLink link.target
+        then "external-link"
+        else "internal-link"
+    linkTarget weaveConf = case link.target of
+      LinkTargetNoweb linkNoweb
+        | Just orgFile <- EM.lookup linkNoweb.uuid weaveConf.goids,
+          Just currentOrgFile <- EM.lookup weaveConf.oid weaveConf.goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
             if orgFile == currentOrgFile
               then "#" <> linkAnchor
@@ -721,8 +1143,37 @@ weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> M.Map UUID P.OsPath -> IO ()
 weaveToDisk fp od watch goids =
   LU.writeFileRobustly fp
     . TL.toStrict
-    . renderHtml
+    . Text.Blaze.Html.Renderer.Text.renderHtml
     $ weave od watch goids
+#+end_src
+
+#+name: f:weaveToDisk'
+#+begin_src haskell
+weaveToDisk' :: P.OsPath -> OrgDoc -> Bool -> M.Map UUID P.OsPath -> IO ()
+weaveToDisk' fp od watch goids = do
+  let weaveConf =
+        WeaveConf
+          { orgDoc = od,
+            goids = goids,
+            oid = getOID od,
+            watch = watch
+          }
+  LU.writeFileRobustly fp
+    $ renderAsText weaveConf weave'
+#+end_src
+
+[[f:getOID]] knows how to retrieve the UUID of an ~OrgDoc~. This is useful for
+constructing the initial [[data:WeaveConf]] to feed into a [[type:HtmlWeaver]] or
+[[type:HtmlWeaver]] (as we do in [[f:spliceLinks]]).
+
+#+name: f:getOID
+#+begin_src haskell
+getOID :: OrgDoc -> UUID
+getOID od
+  | Just uuidText <- EM.lookup "ID" od.meta,
+    Just uuid <- validateUuidText uuidText =
+      uuid
+  | otherwise = nil
 #+end_src
 
 ** Testing framework
@@ -760,6 +1211,7 @@ import Relude
     pure,
     reverse,
     runStateT,
+    sequence_,
     show,
     zip,
     ($),
@@ -803,8 +1255,11 @@ These helpers let us be a bit more concise when writing individual test cases.
 #+name: WeaveSpec helpers
 #+begin_src haskell
 <<f:getWovenPrettyFromPath>>
+<<f:getWovenPrettyFromPath'>>
 <<f:compareWithoutIndents>>
+<<f:searchOrderedNeedles>>
 <<f:weaveExpect>>
+<<f:weaveExpect'>>
 #+end_src
 
 [[f:getWovenPrettyFromPath]] weaves the given Org file to a =T.Text=. Then in our test
@@ -832,6 +1287,32 @@ getWovenPrettyFromPath path orgIdLocationsFile = do
         . T.pack
         . renderHtml
         $ LW.weave orgDoc True goids
+#+end_src
+
+#+name: f:getWovenPrettyFromPath'
+#+begin_src haskell
+getWovenPrettyFromPath' :: FilePath -> FilePath -> IO (Either String T.Text)
+getWovenPrettyFromPath' path orgIdLocationsFile = do
+  goids <- LP.runGoidsParser orgIdLocationsFile
+  inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+          path
+          inputOrgFile
+  case parseResult of
+    Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) -> do
+      let weaveConf =
+            LW.WeaveConf
+              { orgDoc = orgDoc,
+                goids = goids,
+                oid = LW.getOID orgDoc,
+                watch = True
+              }
+      pure
+        . Right
+        $ LW.renderAsText weaveConf LW.weave'
 #+end_src
 
 [[f:compareWithoutIndents]] looks through a haystack and searches for all given
@@ -878,6 +1359,37 @@ compareWithoutIndents haystackRaw needles =
             else (expectation : testCases, remainingHaystack)
 #+end_src
 
+#+name: f:searchOrderedNeedles
+#+begin_src haskell
+searchOrderedNeedles :: T.Text -> [T.Text] -> (String, [Expectation])
+searchOrderedNeedles haystackRaw needles =
+  (\expectations -> ("sees needles", expectations))
+    . reverse
+    . fst
+    $ foldl' f ([], haystackRaw) needles
+  where
+    f ::
+      ([Expectation], T.Text) ->
+      T.Text ->
+      ([Expectation], T.Text)
+    f (testCases, haystack) needle =
+      let (discardMe, foundAndRest) = T.breakOn needle haystack
+          discardLen = T.length discardMe
+          needleStr = T.unpack needle
+          foundAndRestStr = T.unpack foundAndRest
+          expectation = foundAndRestStr `shouldStartWith` needleStr
+          expectationF =
+            expectationFailure
+              $ "could not find "
+              <> (show $ needleStr)
+              <> " in haystack:\n"
+              <> (T.unpack haystack)
+          remainingHaystack = T.drop discardLen haystack
+       in if foundAndRest == T.empty
+            then (expectationF : testCases, remainingHaystack)
+            else (expectation : testCases, remainingHaystack)
+#+end_src
+
 In practice we will only need multiple needles if we are dealing with a
 complicated haystack (with nested structures) and we only want to check some
 key structures within it.
@@ -898,6 +1410,19 @@ weaveExpect path goidsFile needles = do
       Left errMsg -> it "programmer error" $ expectationFailure errMsg
 #+end_src
 
+#+name: f:weaveExpect'
+#+begin_src haskell
+weaveExpect' :: FilePath -> FilePath -> [T.Text] -> Spec
+weaveExpect' path goidsFile needles = do
+  result <- runIO $ getWovenPrettyFromPath' path goidsFile
+  describe path $ do
+    case result of
+      Right haystack -> do
+        let (name, expectations) = searchOrderedNeedles haystack needles
+        it name $ sequence_ expectations
+      Left errMsg -> it "programmer error" $ expectationFailure errMsg
+#+end_src
+
 *** All test cases
 
 #+name: f:weaveSpec
@@ -905,7 +1430,9 @@ weaveExpect path goidsFile needles = do
 weaveSpec :: Spec
 weaveSpec = do
   <<t:0300-weave-styled-text>>
+  <<t:0300-weave-styled-text'>>
   <<t:0300-weave-lists>>
+  <<t:0300-weave-lists'>>
 #+end_src
 
 * Generate CSS
