@@ -353,7 +353,7 @@ lilacWeave globalOpts weaveOpts = do
             let withoutExtension = P.joinPath [dir, base]
                 html = P.unsafeEncodeUtf "html"
             pure $ P.addExtension withoutExtension html
-          LW.weaveToDisk' outPath orgDoc weaveOpts.watch goids
+          LW.weaveToDisk outPath orgDoc weaveOpts.watch goids
           putStrLn "Finished weaving."
 
 lilacWriteGOIDs :: WriteGOIDsOpts -> IO ()

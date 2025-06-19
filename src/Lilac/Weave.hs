@@ -3,9 +3,7 @@ module Lilac.Weave
     getOID,
     renderAsText,
     weave,
-    weave',
     weaveToDisk,
-    weaveToDisk',
   )
 where
 
@@ -110,12 +108,7 @@ import Relude.Extra.Map qualified as EM
 import Skylighting qualified as Sky
 import System.IO (utf8)
 import System.OsPath qualified as P
-import Text.Blaze
-  ( (!),
-  )
 import Text.Blaze.Html.Renderer.Text (renderHtml)
-import Text.Blaze.Html5 qualified as H
-import Text.Blaze.Html5.Attributes qualified as A
 
 type WeaveConf :: Type
 data WeaveConf = WeaveConf
@@ -128,47 +121,8 @@ data WeaveConf = WeaveConf
 type HtmlWeaver :: Type -> Type
 type HtmlWeaver a = HtmlT (ReaderT WeaveConf Identity) a
 
-weave :: OrgDoc -> Bool -> M.Map UUID P.OsPath -> H.Html
-weave od watch goids = H.docTypeHtml $ do
-  H.head $ do
-    H.meta ! A.charset "utf-8"
-    H.title
-      $ H.text
-      $ case EM.lookup "title" od.meta of
-        Just title -> title
-        Nothing -> "Untitled"
-    when watch
-      $ H.script
-      ! A.type_ "text/javascript"
-      ! A.src "https://livejs.com/live.js"
-      $ ""
-
-    H.link ! A.rel "stylesheet" ! A.href "./css/default.css"
-    H.link ! A.rel "preconnect" ! A.href "https://fonts.googleapis.com"
-    H.link
-      ! A.rel "preconnect"
-      ! A.href "https://fonts.gstatic.com"
-      ! H.customAttribute "crossorigin" "anonymous"
-    let fontsLink =
-          H.preEscapedTextValue
-            $ T.intercalate
-              ""
-              [ "https://fonts.googleapis.com/css2?display=swap",
-                "&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900",
-                "&family=Source+Sans+3:ital,wght@0,200..900;1,200..900",
-                "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
-              ]
-    H.link ! A.rel "stylesheet" ! A.href fontsLink
-  H.body $ do
-    let docUuid
-          | Just uuidText <- EM.lookup "ID" od.meta,
-            Just uuid <- validateUuidText uuidText =
-              uuid
-          | otherwise = nil
-    forM_ od.cells $ weaveCell goids docUuid
-
-weave' :: HtmlWeaver ()
-weave' = do
+weave :: HtmlWeaver ()
+weave = do
   weaveConf <- ask
   let title' = toHtml $ case EM.lookup "title" weaveConf.orgDoc.meta of
         Just title -> title
@@ -201,28 +155,14 @@ weave' = do
               ]
       link_ [rel_ "stylesheet", href_ fontsLink]
     body_ $ do
-      forM_ weaveConf.orgDoc.cells weaveCell'
+      forM_ weaveConf.orgDoc.cells weaveCell
 
-weaveCell :: M.Map UUID P.OsPath -> UUID -> Cell -> H.Html
-weaveCell goids docUuid = \case
-  CHeading heading -> weaveHeading heading goids docUuid
+weaveCell :: Cell -> HtmlWeaver ()
+weaveCell = \case
+  CHeading heading -> weaveHeading heading
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
-  CParagraph prose -> H.p $ do
-    sequence_ $ map (weavePToken goids docUuid) prose
-  CBlock block -> weaveBlock block goids docUuid
-  CMathFragment _ -> do
-    H.p ""
-  CFigure _ -> do
-    H.p ""
-  CTable _ -> do
-    H.p ""
-
-weaveCell' :: Cell -> HtmlWeaver ()
-weaveCell' = \case
-  CHeading heading -> weaveHeading' heading
-  CListItem listMarkers -> sequence_ $ map weaveListMarker' listMarkers
-  CParagraph prose -> p_ $ sequence_ $ map weavePToken' prose
-  CBlock block -> weaveBlock' block
+  CParagraph prose -> p_ $ sequence_ $ map weavePToken prose
+  CBlock block -> weaveBlock block
   CMathFragment _ -> do
     p_ "FRAGMENT"
   CFigure _ -> do
@@ -255,29 +195,12 @@ getProseContents = join . foldl' f []
          in linkText : acc
       PTokenMathFragment mathFragment -> mathFragment.body : acc
 
-weaveHeading :: Heading -> M.Map UUID P.OsPath -> UUID -> H.Html
-weaveHeading heading goids docUuid =
-  hN ! (A.id $ H.textValue linkAnchor) $ do
-    H.a ! (A.href . H.textValue $ "#" <> linkAnchor) $ do
-      H.text $ sectionText <> " "
-      sequence_ $ map (weavePToken goids docUuid) heading.body
-  where
-    hN = case heading.level of
-      1 -> H.h1
-      2 -> H.h2
-      3 -> H.h3
-      4 -> H.h4
-      5 -> H.h5
-      _ -> H.h6
-    sectionText = getSectionText heading
-    linkAnchor = getLinkAnchor $ CHeading heading
-
-weaveHeading' :: Heading -> HtmlWeaver ()
-weaveHeading' heading =
+weaveHeading :: Heading -> HtmlWeaver ()
+weaveHeading heading =
   hN [id_ linkAnchor] $ do
     a_ [href_ $ "#" <> linkAnchor] $ do
       toHtml $ sectionText <> " "
-      sequence_ $ map weavePToken' heading.body
+      sequence_ $ map weavePToken heading.body
   where
     hN = case heading.level of
       1 -> h1_
@@ -323,16 +246,10 @@ getLinkAnchor = \case
   CFigure {} -> ""
   CTable {} -> ""
 
-weavePToken :: M.Map UUID P.OsPath -> UUID -> PToken -> H.Html
-weavePToken goids docUuid = \case
+weavePToken :: PToken -> HtmlWeaver ()
+weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink link -> weaveLink goids docUuid link
-  PTokenMathFragment _ -> H.text ""
-
-weavePToken' :: PToken -> HtmlWeaver ()
-weavePToken' = \case
-  PTokenStyledText styledText -> weaveStyledText' styledText
-  PTokenLink link -> weaveLink' link
+  PTokenLink link -> weaveLink link
   PTokenMathFragment _ -> p_ ""
 
 isExternalLink :: LinkTarget -> Bool
@@ -342,27 +259,8 @@ isExternalLink = \case
     | T.isPrefixOf "http" target -> True
     | otherwise -> False
 
-weaveStyledText :: StyledText -> H.Html
+weaveStyledText :: StyledText -> HtmlWeaver ()
 weaveStyledText styledText = do
-  if styles == []
-    then H.text $ styledText.body
-    else
-      H.span
-        ! A.class_ (H.textValue $ T.unwords styles)
-        $ H.text
-        $ styledText.body
-  where
-    styles = foldl' styleToClasses [] $ maskToStyles styledText.style
-    styleToClasses :: [T.Text] -> Style -> [T.Text]
-    styleToClasses acc = \case
-      Bold -> "bold" : acc
-      Italic -> "italic" : acc
-      Underline -> "underline" : acc
-      Verbatim -> "verbatim" : acc
-      Code -> "code" : acc
-
-weaveStyledText' :: StyledText -> HtmlWeaver ()
-weaveStyledText' styledText = do
   let b = toHtml $ styledText.body
   if styles == []
     then b
@@ -377,18 +275,8 @@ weaveStyledText' styledText = do
       Verbatim -> "verbatim" : acc
       Code -> "code" : acc
 
-weaveListMarker :: ListMarker -> H.Html
+weaveListMarker :: ListMarker -> HtmlWeaver ()
 weaveListMarker =
-  H.preEscapedToMarkup . \case
-    LOrderedStart -> "<ol>" :: T.Text
-    LOrderedEnd -> "</ol>"
-    LUnorderedStart -> "<ul>"
-    LUnorderedEnd -> "</ul>"
-    LItemStart -> "<li>"
-    LItemEnd -> "</li>"
-
-weaveListMarker' :: ListMarker -> HtmlWeaver ()
-weaveListMarker' =
   toHtmlRaw . \case
     LOrderedStart -> "<ol>" :: T.Text
     LOrderedEnd -> "</ol>"
@@ -397,48 +285,8 @@ weaveListMarker' =
     LItemStart -> "<li>"
     LItemEnd -> "</li>"
 
-weaveBlock :: Block -> M.Map UUID P.OsPath -> UUID -> H.Html
-weaveBlock block goids docUuid = do
-  H.div ! A.class_ "code-block-container" ! (A.id $ H.textValue linkAnchor) $ do
-    H.div ! A.class_ "side-popup" $ do
-      H.a ! (A.href . H.textValue $ "#" <> linkAnchor) $ do
-        H.preEscapedText "&#x1F517;"
-    maybeAssignName
-    let bodyBorder = case EM.lookup "name" block.meta of
-          Just _ -> ""
-          Nothing -> " fully-rounded"
-    H.pre ! A.class_ ("code-block-body" <> bodyBorder) $ do
-      let bodyText = getBlockContentsWithoutLinks block.body
-      case EM.lookup "__src_language" block.meta of
-        Just lang ->
-          let colorized = TL.toStrict . Text.Blaze.Html.Renderer.Text.renderHtml $ colorizeText lang bodyText
-              getLink = \case
-                BTokenLink l -> Just l
-                BTokenString {}
-                BTokenPadding {} -> Nothing
-              links = catMaybes $ map getLink block.body
-           in H.preEscapedText $ spliceLinks colorized links goids docUuid
-        Nothing -> H.code $ H.text bodyText
-  where
-    maybeAssignName =
-      case EM.lookup "name" block.meta of
-        Just name ->
-          H.div ! A.class_ "code-block-name" $ do
-            H.code $ H.text name
-        Nothing -> pure ()
-    getBlockContentsWithoutLinks :: [BToken] -> T.Text
-    getBlockContentsWithoutLinks = T.concat . map bTokenToText
-      where
-        bTokenToText :: BToken -> T.Text
-        bTokenToText = \case
-          BTokenString text -> text
-          BTokenPadding -> ""
-          BTokenLink (Link _name (LinkTargetNoweb _)) -> "\NUL"
-          BTokenLink {} -> ""
-    linkAnchor = getLinkAnchor $ CBlock block
-
-weaveBlock' :: Block -> HtmlWeaver ()
-weaveBlock' block = do
+weaveBlock :: Block -> HtmlWeaver ()
+weaveBlock block = do
   weaveConf <- ask
   div_ [class_ "code-block-container", id_ linkAnchor] $ do
     div_ [class_ "side-popup"] $ do
@@ -452,13 +300,13 @@ weaveBlock' block = do
       let bodyText = getBlockContentsWithoutLinks block.body
       case EM.lookup "__src_language" block.meta of
         Just lang -> do
-          let colorized = renderAsText weaveConf $ colorizeText' lang bodyText
+          let colorized = renderAsText weaveConf $ colorizeText lang bodyText
               getLink = \case
                 BTokenLink l -> Just l
                 BTokenString {}
                 BTokenPadding {} -> Nothing
               links = catMaybes $ map getLink block.body
-          toHtmlRaw =<< spliceLinks' colorized links
+          toHtmlRaw =<< spliceLinks colorized links
         Nothing -> code_ $ toHtml bodyText
   where
     maybeAssignName =
@@ -478,17 +326,8 @@ weaveBlock' block = do
           BTokenLink {} -> ""
     linkAnchor = getLinkAnchor $ CBlock block
 
-colorizeText :: T.Text -> T.Text -> H.Html
+colorizeText :: T.Text -> T.Text -> HtmlWeaver ()
 colorizeText lang txt
-  | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
-    Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
-      Sky.formatHtmlInline Sky.defaultFormatOpts lines
-  | otherwise = H.code $ H.text txt
-  where
-    defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
-
-colorizeText' :: T.Text -> T.Text -> HtmlWeaver ()
-colorizeText' lang txt
   | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
     Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
       toHtmlRaw
@@ -498,32 +337,15 @@ colorizeText' lang txt
   where
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 
-spliceLinks :: T.Text -> [Link] -> M.Map UUID P.OsPath -> UUID -> T.Text
-spliceLinks colorized links goids docUuid =
-  let colorizedStrs = T.splitOn "\NUL" colorized
-      f :: ([T.Text], [Link]) -> T.Text -> ([T.Text], [Link])
-      f (acc, []) colorizedStr = (colorizedStr : acc, [])
-      f (acc, link : links') colorizedStr =
-        ( colorizedStr
-            : (TL.toStrict . Text.Blaze.Html.Renderer.Text.renderHtml $ weaveLink goids docUuid link)
-            : acc,
-          links'
-        )
-   in T.intercalate ""
-        . reverse
-        . fst
-        . foldl' f (take 1 colorizedStrs, links)
-        $ drop 1 colorizedStrs
-
-spliceLinks' :: T.Text -> [Link] -> HtmlWeaver T.Text
-spliceLinks' colorized links = do
+spliceLinks :: T.Text -> [Link] -> HtmlWeaver T.Text
+spliceLinks colorized links = do
   weaveConf <- ask
   let colorizedStrs = T.splitOn "\NUL" colorized
       f :: ([T.Text], [Link]) -> T.Text -> ([T.Text], [Link])
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
-            : (renderAsText weaveConf $ weaveLink' link)
+            : (renderAsText weaveConf $ weaveLink link)
             : acc,
           links'
         )
@@ -534,47 +356,15 @@ spliceLinks' colorized links = do
     . foldl' f (take 1 colorizedStrs, links)
     $ drop 1 colorizedStrs
 
-weaveLink :: M.Map UUID P.OsPath -> UUID -> Link -> H.Html
-weaveLink goids docUuid link = do
-  H.a
-    ! (A.href $ H.textValue linkTarget)
-    ! A.class_ linkCategory
-    $ sequence_
-    $ map weaveStyledText link.name
-  where
-    linkCategory =
-      if isExternalLink link.target
-        then "external-link"
-        else "internal-link"
-    linkTarget = case link.target of
-      LinkTargetNoweb linkNoweb
-        | Just orgFile <- EM.lookup linkNoweb.uuid goids,
-          Just currentOrgFile <- EM.lookup docUuid goids,
-          Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
-            if orgFile == currentOrgFile
-              then "#" <> linkAnchor
-              else (T.pack str) <> "#" <> linkAnchor
-        | otherwise -> "#" <> linkAnchor
-        where
-          htmlExt = P.unsafeEncodeUtf "html"
-          linkAnchor =
-            getLinkAnchor
-              $ CBlock
-                Block
-                  { meta = M.fromList [("name", linkNoweb.name)],
-                    body = []
-                  }
-      LinkTargetOther targetText -> targetText
-
-weaveLink' :: Link -> HtmlWeaver ()
-weaveLink' link = do
+weaveLink :: Link -> HtmlWeaver ()
+weaveLink link = do
   weaveConf <- lift ask
   a_
     [ href_ $ linkTarget weaveConf,
       class_ linkCategory
     ]
     $ sequence_
-    $ map weaveStyledText' link.name
+    $ map weaveStyledText link.name
   where
     linkCategory =
       if isExternalLink link.target
@@ -601,14 +391,7 @@ weaveLink' link = do
       LinkTargetOther targetText -> targetText
 
 weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> M.Map UUID P.OsPath -> IO ()
-weaveToDisk fp od watch goids =
-  LU.writeFileRobustly fp
-    . TL.toStrict
-    . Text.Blaze.Html.Renderer.Text.renderHtml
-    $ weave od watch goids
-
-weaveToDisk' :: P.OsPath -> OrgDoc -> Bool -> M.Map UUID P.OsPath -> IO ()
-weaveToDisk' fp od watch goids = do
+weaveToDisk fp od watch goids = do
   let weaveConf =
         WeaveConf
           { orgDoc = od,
@@ -617,7 +400,7 @@ weaveToDisk' fp od watch goids = do
             watch = watch
           }
   LU.writeFileRobustly fp
-    $ renderAsText weaveConf weave'
+    $ renderAsText weaveConf weave
 
 renderAsText :: WeaveConf -> HtmlWeaver a -> T.Text
 renderAsText weaveConf weaver =

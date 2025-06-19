@@ -1720,7 +1720,6 @@ library
     , base >=4.7 && <5
     , bitwise
     , blaze-html
-    , blaze-markup
     , clay
     , containers
     , directory
@@ -1780,7 +1779,6 @@ test-suite spec
       <<GHC threaded flags>>
   build-depends:
       base >=4.7 && <5
-    , blaze-html
     , containers
     , filepath
     , hspec
@@ -4054,7 +4052,7 @@ lilacWeave globalOpts weaveOpts = do
             let withoutExtension = P.joinPath [dir, base]
                 html = P.unsafeEncodeUtf "html"
             pure $ P.addExtension withoutExtension html
-          LW.weaveToDisk' outPath orgDoc weaveOpts.watch goids
+          LW.weaveToDisk outPath orgDoc weaveOpts.watch goids
           putStrLn "Finished weaving."
 #+end_src
 
