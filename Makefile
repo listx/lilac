@@ -1,17 +1,18 @@
-test: lilac.org lilac-parse.org lilac-weave.org
+test: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org
 	cabal test --test-show-details=direct --test-option=--format=progress
 	touch test
 
-lint: lilac.org lilac-parse.org lilac-weave.org
+lint: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org
 	pre-commit run --all-files
 	touch lint
 
-tangle: lilac.org lilac-parse.org lilac-weave.org tangle-fe
+tangle: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org tangle-fe
 	git ls-files | grep '\.org$$' | xargs lilac write-goids
 	cd test && find Lilac/TangleSpec -type f \
 		| sort \
 		| xargs lilac write-goids --out-file .orgids
 	lilac tangle \
+		lilac-compile.org \
 		lilac-parse.org \
 		lilac-weave.org \
 		lilac.org
@@ -20,8 +21,9 @@ tangle-fe: fe.org
 	lilac tangle fe.org
 	touch tangle-fe
 
-weave: lilac.org lilac-parse.org lilac-weave.org fe.org
+weave: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org fe.org
 	lilac weave --out-dir site --watch \
+		lilac-compile.org \
 		lilac-parse.org \
 		lilac-weave.org \
 		lilac.org
@@ -30,12 +32,12 @@ weave: lilac.org lilac-parse.org lilac-weave.org fe.org
 serve:
 	python3 -m http.server 8080 -d site
 
-build: lilac.org lilac-parse.org lilac-weave.org lilac.cabal
+build: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org lilac.cabal
 	cabal build
 	touch build
 
 LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
-build-release: lilac.org lilac-parse.org lilac-weave.org lilac.cabal
+build-release: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org lilac.cabal
 	nix-build ./nix/release.nix \
 	  --argstr lilacGitVersion $(LILAC_GIT_VERSION)
 	touch build-release

@@ -1,0 +1,215 @@
+:PROPERTIES:
+:ID:       b9c034c1-5499-44e6-855c-6c16e1693cb8
+:END:
+#+title: Lilac Compile
+
+#+property: header-args+ :noweb no-export
+#+lilac_maxHeadingLevel: 3
+
+* Compiling
+
+Compiling is the intermediate step we perform on Org files, such that they can
+be tangled or weaved.
+
+** =Lilac.Compile= module
+
+#+name: module:Lilac.Compile
+#+header: :tangle src/Lilac/Compile.hs
+#+begin_src haskell
+module Lilac.Compile (mkObject) where
+
+import Data.Aeson (ToJSON)
+import Data.Map.Strict qualified as M
+import Data.Text qualified as T
+import GHC.Generics (Generic)
+import Lilac.Parse
+  ( BToken (BTokenLink, BTokenPadding, BTokenString),
+    Block (body, meta),
+    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Figure (meta),
+    Heading (body, meta),
+    Link (target),
+    LinkNoweb (name, uuid),
+    LinkTarget (LinkTargetNoweb, LinkTargetOther),
+    MathFragment (meta),
+    OrgDoc (cells, meta),
+    PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    Table (grid, meta),
+  )
+import Lilac.Util qualified as LU
+import Relude
+  ( Eq,
+    Maybe (Just),
+    Show,
+    Type,
+    catMaybes,
+    concatMap,
+    foldl',
+    hashNub,
+    map,
+    or,
+    otherwise,
+    ($),
+    (<>),
+  )
+import Relude.Extra.Map qualified as EM
+
+<<data:Object>>
+
+<<f:mkObject>>
+<<f:mkSymbols>>
+<<f:findExternalOrgLinkTargets>>
+<<f:webProtocols>>
+<<f:aliasedWebProtocols>>
+#+end_src
+
+** Object generation
+
+The [[data:Object]] encodes information which we want to reuse when building up
+either the "block universe" for tangling, or "cell universe" when weaving. Both
+of these concepts are essentially the same thing (the "block universe" is a
+special case of the "cell universe", such that all cells are code blocks).
+
+#+name: data:Object
+#+begin_src haskell
+type Object :: Type
+data Object = Object
+  { orgDoc :: OrgDoc,
+    symbols :: M.Map T.Text Cell,
+    externalLinkTargets :: [LinkTarget]
+  }
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Object
+#+end_src
+
+The ~symbols~ is a map of either UUIDs (as text strings), or UUIDs plus a unique
+name, which form the basis of internal links (links to either other cells within
+the same Org file or inside other external Org files).
+
+The ~externalLinkTargets~ captures all links that point to some other cell in
+another Org file. A consistent "cell universe" can be constructed when all
+external links are resolved, by getting all other =Object= values for other Org
+files we depend on.
+
+#+name: f:mkObject
+#+begin_src haskell
+mkObject :: OrgDoc -> Object
+mkObject orgDoc =
+  Object
+    { orgDoc = orgDoc,
+      symbols = symbols',
+      externalLinkTargets = targets
+    }
+  where
+    symbols' = mkSymbols orgDoc
+    targets = findExternalOrgLinkTargets orgDoc symbols'
+#+end_src
+
+[[f:mkSymbols]] generates a mapping of all UUIDs to their cells (headings), and also
+any UUID and name combinations to their cells.
+
+#+name: f:mkSymbols
+#+begin_src haskell
+mkSymbols :: OrgDoc -> M.Map T.Text Cell
+mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
+  where
+    f cell = case cell of
+      CBlock block -> getSymbols block.meta cell
+      CHeading heading
+        | Just uuidText <- EM.lookup "ID" heading.meta ->
+            [("id:" <> uuidText, cell)]
+        | otherwise -> []
+      CFigure figure -> getSymbols figure.meta cell
+      CMathFragment mathFragment -> getSymbols mathFragment.meta cell
+      CTable table -> getSymbols table.meta cell
+      CListItem {}
+      CParagraph {} -> []
+    getSymbols cellMeta cell =
+      let uuidClosest = EM.lookup "__closest_UUID" cellMeta
+          uuidDoc = EM.lookup "ID" orgDoc.meta
+       in concatMap requireName
+            $ catMaybes [uuidClosest, uuidDoc]
+      where
+        requireName uuidText
+          | Just name <- EM.lookup "name" cellMeta =
+              [ ("id:" <> uuidText <> "::" <> name, cell),
+                (name, cell)
+              ]
+          | otherwise = []
+#+end_src
+
+The ~(name, cell)~ tuple is important, because otherwise Org links that
+look like ~[[foo bar]]~ will be returned from [[f:findExternalOrgLinkTargets]]. Links
+like ~[[foo bar]]~ shouldn't be considered external, because they refer to cells
+that have been named like ~foo bar~ inside the current Org file, not an external
+Org file.
+
+[[f:findExternalOrgLinkTargets]] looks at all links, and checks if they are pointing
+to a target that exists inside the ~OrgDoc~. If they point somewhere else, then
+it's considered an external link target.
+
+#+name: f:findExternalOrgLinkTargets
+#+begin_src haskell
+findExternalOrgLinkTargets :: OrgDoc -> M.Map T.Text Cell -> [LinkTarget]
+findExternalOrgLinkTargets orgDoc symbols = hashNub $ concatMap f orgDoc.cells
+  where
+    f cell = case cell of
+      CBlock block -> foldl' g [] block.body
+      CHeading heading -> foldl' h [] heading.body
+      CParagraph prose -> foldl' h [] prose
+      CTable table -> M.foldl (foldl' h) [] table.grid
+      CFigure {}
+      CListItem {}
+      CMathFragment {} -> []
+    g acc = \case
+      BTokenLink link -> getExternal acc link
+      BTokenString {}
+      BTokenPadding -> acc
+    h acc = \case
+      PTokenLink link -> getExternal acc link
+      PTokenStyledText {}
+      PTokenMathFragment {} -> acc
+    getExternal acc link = case link.target of
+      LinkTargetNoweb linkNoweb ->
+        let target = LU.prefixWithId linkNoweb.uuid linkNoweb.name
+         in if M.member target symbols
+              then acc
+              else link.target : acc
+      LinkTargetOther raw
+        | or $ map (`T.isPrefixOf` raw) webProtocols -> acc
+        | or $ map (`T.isPrefixOf` raw) aliasedWebProtocols -> acc
+        | M.member raw symbols -> acc
+        | otherwise -> link.target : acc
+#+end_src
+
+The [[f:webProtocols]] are the typical protocols found in links on the
+internet.
+
+#+name: f:webProtocols
+#+begin_src haskell
+webProtocols :: [T.Text]
+webProtocols =
+  map
+    (<> "://")
+    [ "http",
+      "https",
+      "file",
+      "ftp",
+      "mailto",
+      "tel"
+    ]
+#+end_src
+
+The [[f:aliasedWebProtocols]] contains protocols that are used as aliases for their
+more traditional protocols in [[f:webProtocols]].
+
+#+name: f:aliasedWebProtocols
+#+begin_src haskell
+aliasedWebProtocols :: [T.Text]
+aliasedWebProtocols =
+  map
+    (<> ":")
+    [ "file"
+    ]
+#+end_src

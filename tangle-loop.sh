@@ -64,6 +64,7 @@ main()
 {
 	watch \
 		"${SCRIPT_ROOT}/lilac.org" \
+		"${SCRIPT_ROOT}/lilac-compile.org" \
 		"${SCRIPT_ROOT}/lilac-parse.org" \
 		"${SCRIPT_ROOT}/lilac-weave.org" \
 		"${SCRIPT_ROOT}/fe.org"

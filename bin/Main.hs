@@ -1,7 +1,8 @@
 module Main (main) where
 
-import Data.Aeson (encodeFile)
+import Data.Aeson (ToJSON, encodeFile)
 import Data.Version (showVersion)
+import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Util qualified as LU
@@ -44,6 +45,7 @@ import Relude
     Type,
     concat,
     foldlM,
+    mapM,
     mapM_,
     not,
     null,
@@ -74,6 +76,7 @@ data Subcommand
   = Check CheckOpts
   | Tangle TangleOpts
   | Weave WeaveOpts
+  | Compile CompileOpts
   | WriteGOIDs WriteGOIDsOpts
 
 type CheckOpts :: Type
@@ -98,6 +101,11 @@ type WriteGOIDsOpts :: Type
 data WriteGOIDsOpts = WriteGOIDsOpts
   { outFile :: FilePath,
     inputs :: [FilePath]
+  }
+
+type CompileOpts :: Type
+data CompileOpts = CompileOpts
+  { inputs :: [FilePath]
   }
 
 type OptionHandler :: Type -> Type
@@ -145,6 +153,7 @@ subcommandHandler =
   hsubparser
     $ metavar "SUBCOMMAND"
     <> cmdCheck
+    <> cmdCompile
     <> cmdTangle
     <> cmdWeave
     <> cmdWriteGOIDs
@@ -155,6 +164,12 @@ subcommandHandler =
         $ info
           (Check <$> checkOptsHandler)
           (progDesc "Check input Org file for errors.")
+    cmdCompile =
+      command
+        "compile"
+        $ info
+          (Compile <$> compileOptsHandler)
+          (progDesc "Compile Org file into object file.")
     cmdTangle =
       command
         "tangle"
@@ -221,6 +236,11 @@ weaveOptsHandler =
             )
         )
 
+compileOptsHandler :: OptionHandler CompileOpts
+compileOptsHandler =
+  CompileOpts
+    <$> (some $ argument str (metavar "FILES..."))
+
 writeGOIDsOptsHandler :: OptionHandler WriteGOIDsOpts
 writeGOIDsOptsHandler =
   WriteGOIDsOpts
@@ -263,6 +283,7 @@ main = do
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
   Check checkOpts -> lilacCheck globalOpts checkOpts
+  Compile compileOpts -> lilacCompile globalOpts compileOpts
   Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
   Weave weaveOpts -> lilacWeave globalOpts weaveOpts
   WriteGOIDs writeGOIDsOpts -> lilacWriteGOIDs writeGOIDsOpts
@@ -297,6 +318,31 @@ lilacCheck globalOpts checkOpts = do
                 then PP.pPrintForceColor
                 else PP.pPrintNoColor
         prettyPrint orgDoc
+
+lilacCompile :: GlobalOpts -> CompileOpts -> IO ()
+lilacCompile _globalOpts compileOpts = do
+  objsAndFilepaths <- mapM genObject compileOpts.inputs
+  mapM_ writeObjToFilepath objsAndFilepaths
+  where
+    genObject inputOrgFile = do
+      input <- LU.readFrom "" inputOrgFile
+      let parseResult =
+            MP.runParser
+              (runStateT LP.orgDocParser LP.defaultOrgParserState)
+              inputOrgFile
+              input
+      case parseResult of
+        Left errBundle -> do
+          die $ MP.errorBundlePretty errBundle
+        Right (orgDoc, _) -> do
+          pure (LC.mkObject orgDoc, inputOrgFile)
+    writeObjToFilepath :: (ToJSON a) => (a, FilePath) -> IO ()
+    writeObjToFilepath (obj, inputOrgFile) = do
+      outPath <- do
+        base <- P.takeBaseName <$> P.encodeUtf inputOrgFile
+        let objExtension = P.unsafeEncodeUtf "obj"
+        P.decodeUtf $ P.addExtension base objExtension
+      encodeFile outPath obj
 
 lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
 lilacTangle globalOpts tangleOpts = do
