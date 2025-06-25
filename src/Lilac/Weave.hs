@@ -1,6 +1,5 @@
 module Lilac.Weave
   ( WeaveConf (..),
-    getOID,
     renderAsText,
     weave,
     weaveToDisk,
@@ -11,7 +10,7 @@ import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
-import Data.UUID.Types (UUID, nil)
+import Data.UUID.Types (UUID)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta),
@@ -29,7 +28,7 @@ import Lilac.Parse
         LUnorderedStart
       ),
     MathFragment (MathFragment, body),
-    OrgDoc (cells, meta),
+    OrgDoc (cells, meta, uuid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
@@ -114,7 +113,6 @@ type WeaveConf :: Type
 data WeaveConf = WeaveConf
   { orgDoc :: OrgDoc,
     goids :: M.Map UUID P.OsPath,
-    oid :: UUID,
     watch :: Bool
   }
 
@@ -373,7 +371,8 @@ weaveLink link = do
     linkTarget weaveConf = case link.target of
       LinkTargetNoweb linkNoweb
         | Just orgFile <- EM.lookup linkNoweb.uuid weaveConf.goids,
-          Just currentOrgFile <- EM.lookup weaveConf.oid weaveConf.goids,
+          Just docUuid <- weaveConf.orgDoc.uuid,
+          Just currentOrgFile <- EM.lookup docUuid weaveConf.goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
             if orgFile == currentOrgFile
               then "#" <> linkAnchor
@@ -396,7 +395,6 @@ weaveToDisk fp od watch goids = do
         WeaveConf
           { orgDoc = od,
             goids = goids,
-            oid = getOID od,
             watch = watch
           }
   LU.writeFileRobustly fp
@@ -407,10 +405,3 @@ renderAsText weaveConf weaver =
   TL.toStrict
     . renderText
     $ hoistHtmlT (flip runReaderT weaveConf) weaver
-
-getOID :: OrgDoc -> UUID
-getOID od
-  | Just uuidText <- EM.lookup "ID" od.meta,
-    Just uuid <- validateUuidText uuidText =
-      uuid
-  | otherwise = nil

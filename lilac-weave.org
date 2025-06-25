@@ -56,7 +56,6 @@ Weaving concerns are captured in [[file:src/Lilac/Weave.hs]].
 #+begin_src haskell
 module Lilac.Weave
   ( WeaveConf (..),
-    getOID,
     renderAsText,
     weave,
     weaveToDisk,
@@ -67,7 +66,7 @@ import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
-import Data.UUID.Types (UUID, nil)
+import Data.UUID.Types (UUID)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta),
@@ -85,7 +84,7 @@ import Lilac.Parse
         LUnorderedStart
       ),
     MathFragment (MathFragment, body),
-    OrgDoc (cells, meta),
+    OrgDoc (cells, meta, uuid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
@@ -186,7 +185,6 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveLink>>
 <<f:weaveToDisk>>
 <<f:renderAsText>>
-<<f:getOID>>
 #+end_src
 
 * Generate HTML
@@ -210,7 +208,6 @@ type WeaveConf :: Type
 data WeaveConf = WeaveConf
   { orgDoc :: OrgDoc,
     goids :: M.Map UUID P.OsPath,
-    oid :: UUID,
     watch :: Bool
   }
 #+end_src
@@ -735,7 +732,8 @@ weaveLink link = do
     linkTarget weaveConf = case link.target of
       LinkTargetNoweb linkNoweb
         | Just orgFile <- EM.lookup linkNoweb.uuid weaveConf.goids,
-          Just currentOrgFile <- EM.lookup weaveConf.oid weaveConf.goids,
+          Just docUuid <- weaveConf.orgDoc.uuid,
+          Just currentOrgFile <- EM.lookup docUuid weaveConf.goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
             if orgFile == currentOrgFile
               then "#" <> linkAnchor
@@ -816,25 +814,10 @@ weaveToDisk fp od watch goids = do
         WeaveConf
           { orgDoc = od,
             goids = goids,
-            oid = getOID od,
             watch = watch
           }
   LU.writeFileRobustly fp
     $ renderAsText weaveConf weave
-#+end_src
-
-[[f:getOID]] knows how to retrieve the UUID of an ~OrgDoc~. This is useful for
-constructing the initial [[data:WeaveConf]] to feed into a [[type:HtmlWeaver]] or
-[[type:HtmlWeaver]] (as we do in [[f:spliceLinks]]).
-
-#+name: f:getOID
-#+begin_src haskell
-getOID :: OrgDoc -> UUID
-getOID od
-  | Just uuidText <- EM.lookup "ID" od.meta,
-    Just uuid <- validateUuidText uuidText =
-      uuid
-  | otherwise = nil
 #+end_src
 
 ** Testing framework
@@ -940,7 +923,6 @@ getWovenPrettyFromPath path orgIdLocationsFile = do
             LW.WeaveConf
               { orgDoc = orgDoc,
                 goids = goids,
-                oid = LW.getOID orgDoc,
                 watch = True
               }
       pure

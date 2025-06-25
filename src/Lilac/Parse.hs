@@ -180,7 +180,8 @@ defaultOrgParserConf =
 
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
-  { cells :: [Cell],
+  { uuid :: Maybe UUID,
+    cells :: [Cell],
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Generic, Show)
@@ -406,6 +407,8 @@ orgDocParser = do
   meta <- docMetaParser
   _ <- lilacExtensionsParser
   cells <- many cellParser
+  MP.eof
+  orgParserState <- get
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -416,17 +419,21 @@ orgDocParser = do
         CMathFragment {}
         CFigure {}
         CTable {} -> True
-  MP.eof
+      maybeDocUuid
+        | last orgParserState.orgId == nil = Nothing
+        | otherwise = Just $ last orgParserState.orgId
   pure
     $ OrgDoc
-      { cells = filter meaningfulCell cells,
+      { uuid = maybeDocUuid,
+        cells = filter meaningfulCell cells,
         meta = meta
       }
 
-defaultOrgDoc :: [(T.Text, T.Text)] -> OrgDoc
-defaultOrgDoc metas =
+defaultOrgDoc :: Maybe UUID -> [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDoc uuid metas =
   OrgDoc
-    { cells = [],
+    { uuid = uuid,
+      cells = [],
       meta = M.fromList metas
     }
 

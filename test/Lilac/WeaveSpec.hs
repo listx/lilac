@@ -53,7 +53,6 @@ getWovenPrettyFromPath path orgIdLocationsFile = do
             LW.WeaveConf
               { orgDoc = orgDoc,
                 goids = goids,
-                oid = LW.getOID orgDoc,
                 watch = True
               }
       pure

@@ -14,7 +14,7 @@ import Lilac.Parse
     LinkNoweb (name, uuid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther),
     MathFragment (meta),
-    OrgDoc (cells, meta),
+    OrgDoc (cells, uuid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
   )
@@ -32,6 +32,7 @@ import Relude
     or,
     otherwise,
     ($),
+    (<$>),
     (<>),
   )
 import Relude.Extra.Map qualified as EM
@@ -73,7 +74,7 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
       CParagraph {} -> []
     getSymbols cellMeta cell =
       let uuidClosest = EM.lookup "__closest_UUID" cellMeta
-          uuidDoc = EM.lookup "ID" orgDoc.meta
+          uuidDoc = T.show <$> orgDoc.uuid
        in concatMap requireName
             $ catMaybes [uuidClosest, uuidDoc]
       where

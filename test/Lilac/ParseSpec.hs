@@ -156,7 +156,7 @@ parseSpec = do
       (runStateT L.orgDocParser L.defaultOrgParserState)
       "empty input"
       ""
-      `shouldParse` (L.defaultOrgDoc [], L.defaultOrgParserState)
+      `shouldParse` (L.defaultOrgDoc Nothing [], L.defaultOrgParserState)
 
   before (LU.readFrom "" "lilac.org") $ do
     it "self-parse" $ \input -> do
@@ -167,15 +167,15 @@ parseSpec = do
 
   p
     "0001-blankline"
-    (L.defaultOrgDoc [])
+    (L.defaultOrgDoc Nothing [])
 
   p
     "0001-comments-only"
-    (L.defaultOrgDoc [])
+    (L.defaultOrgDoc Nothing [])
 
   ps
     "0001-blankline"
-    (L.defaultOrgDoc [])
+    (L.defaultOrgDoc Nothing [])
     L.OrgParserState
       { goids = fromList [],
         orgId = one nil,
@@ -200,12 +200,14 @@ parseSpec = do
   p
     "0002-doc-metadata-whitespace-before-value"
     $ L.defaultOrgDoc
+      Nothing
       [ ("title", "Parse me without leading whitespace")
       ]
 
   p
     "0002-doc-metadata"
     $ L.defaultOrgDoc
+      Nothing
       [ ("author", "A. U. Thor"),
         ("auto_tangle", "t"),
         ("property", "header-args+ :noweb no-export"),
@@ -215,6 +217,7 @@ parseSpec = do
   p
     "0003-doc-metadata-with-comments"
     $ L.defaultOrgDoc
+      Nothing
       [ ("author", "A. U. Thor"),
         ("auto_tangle", "t"),
         ("property", "header-args+ :noweb no-export"),
@@ -224,6 +227,7 @@ parseSpec = do
   ps
     "0002-doc-metadata-properties-drawer"
     ( L.defaultOrgDoc
+        (Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
         [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
         ]
     )
@@ -246,6 +250,7 @@ parseSpec = do
   ps
     "0002-doc-metadata-properties-drawer-combine"
     ( L.defaultOrgDoc
+        (Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
         [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
           ("author", "A. U. Thor"),
           ("property", "header-args+ :noweb no-export"),
@@ -281,7 +286,8 @@ parseSpec = do
   ps
     "0004-headings-20"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ plainHeading 1 [1],
             plainHeading 2 [1, 1],
             plainHeading 3 [1, 1, 1],
@@ -316,7 +322,8 @@ parseSpec = do
   ps
     "0004-headings-unlimited"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ plainHeading 1 [1],
             plainHeading 2 [1, 1],
             plainHeading 3 [1, 1, 1],
@@ -457,7 +464,8 @@ parseSpec = do
   ps
     "0004-properties-drawer-empty"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CHeading
               ( L.Heading
                   { level = 1,
@@ -491,7 +499,8 @@ parseSpec = do
   ps
     "0004-properties-drawer-not-empty"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CHeading
               ( L.Heading
                   { level = 1,
@@ -528,7 +537,8 @@ parseSpec = do
   ps
     "0004-properties-drawer-not-empty-with-comments"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CHeading
               ( L.Heading
                   { level = 1,
@@ -590,7 +600,8 @@ parseSpec = do
   p
     "0005-prose-paragraphs"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   (L.StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
@@ -622,7 +633,8 @@ parseSpec = do
   p
     "0005-styled-strings-bold"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   ( L.StyledText
@@ -650,7 +662,8 @@ parseSpec = do
   p
     "0005-styled-strings-complex-punctuation"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   (L.StyledText {body = "(foo ", style = L.styleMaskFrom []}),
@@ -674,7 +687,8 @@ parseSpec = do
   p
     "0005-styled-strings-complex"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
@@ -712,7 +726,8 @@ parseSpec = do
   p
     "0005-styled-strings-compression"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   (L.StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
@@ -726,7 +741,8 @@ parseSpec = do
   p
     "0005-styled-strings-ignore-marker-inside-word"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   (L.StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = L.styleMaskFrom [L.Italic]})
@@ -743,7 +759,8 @@ parseSpec = do
   ps
     "0005-styled-strings-messy-boundaries"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CHeading
               ( L.Heading
                   { level = 1,
@@ -787,7 +804,8 @@ parseSpec = do
   p
     "0005-styled-strings-no-style"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ plainParagraph "foo"
           ],
         meta = M.fromList []
@@ -796,7 +814,8 @@ parseSpec = do
   p
     "0005-styled-strings-verbatim-code-ignore-immediate-bold"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   (L.StyledText {body = "*a", style = L.styleMaskFrom [L.Verbatim]}),
@@ -820,7 +839,8 @@ parseSpec = do
   p
     "0005-styled-strings-verbatim-precedence"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   (L.StyledText {body = "[[foo", style = L.styleMaskFrom [L.Verbatim]})
@@ -859,7 +879,8 @@ parseSpec = do
   p
     "0005-styled-strings-verbatim"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   (L.StyledText {body = "(", style = L.styleMaskFrom []}),
@@ -875,7 +896,8 @@ parseSpec = do
   p
     "0006-links-inside-parentheses"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   ( L.StyledText
@@ -908,7 +930,8 @@ parseSpec = do
   p
     "0006-links-nonlink"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   ( L.StyledText
@@ -924,7 +947,8 @@ parseSpec = do
   p
     "0006-links-raw"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   ( L.StyledText
@@ -1008,7 +1032,8 @@ parseSpec = do
   ps
     "0006-links"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CParagraph
               [ L.PTokenStyledText
                   ( L.StyledText
@@ -1094,7 +1119,8 @@ parseSpec = do
   ps
     "0007-blocks-empty"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CBlock
               ( L.Block
                   { meta =
@@ -1151,7 +1177,8 @@ parseSpec = do
   ps
     "0007-blocks-ending"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CBlock
               ( L.Block
                   { meta =
@@ -1254,7 +1281,8 @@ parseSpec = do
   ps
     "0007-blocks-noweb-off"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CBlock
               ( L.Block
                   { meta =
@@ -1280,7 +1308,8 @@ parseSpec = do
   ps
     "0007-blocks-noweb"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CBlock
               ( L.Block
                   { meta =
@@ -1338,7 +1367,8 @@ parseSpec = do
   ps
     "0007-blocks-noweb-intraline"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CBlock
               ( L.Block
                   { meta =
@@ -1424,7 +1454,8 @@ parseSpec = do
   ps
     "0007-blocks-special-commas"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CBlock
               ( L.Block
                   { meta =
@@ -1478,7 +1509,8 @@ parseSpec = do
   p
     "0009-list-content-simple"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CListItem
               [ L.LOrderedStart,
                 L.LItemStart
@@ -1501,7 +1533,8 @@ parseSpec = do
   p
     "0009-list-indentation-nested-with-text"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ plainParagraph "Foo.",
             L.CListItem
               [ L.LOrderedStart, ---- Start outer ordered list.
@@ -1557,7 +1590,8 @@ parseSpec = do
   p
     "0009-list-indentation-nested"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CListItem
               [ L.LOrderedStart, ---- Start outer ordered list.
                 L.LItemStart -------- Start outer "1)".
@@ -1613,7 +1647,8 @@ parseSpec = do
   p
     "0009-list-indentation-no-indent"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ plainParagraph "1)",
             plainParagraph "2)"
           ],
@@ -1623,7 +1658,8 @@ parseSpec = do
   p
     "0009-list-indentation-proper-indent"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CListItem
               [ L.LOrderedStart,
                 L.LItemStart
@@ -1643,7 +1679,8 @@ parseSpec = do
   p
     "0009-list-items-need-blank-line-separator"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CListItem
               [ L.LOrderedStart,
                 L.LItemStart
@@ -1695,7 +1732,8 @@ parseSpec = do
   p
     "0009-paragraph-can-close-deeper-levels"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CListItem
               [ L.LOrderedStart,
                 L.LItemStart
@@ -1731,7 +1769,8 @@ parseSpec = do
   p
     "0009-paragraph-can-separate-mixed-lists"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CListItem
               [ L.LOrderedStart,
                 L.LItemStart
@@ -1781,7 +1820,8 @@ parseSpec = do
   ps
     "0010-standalone-math-fragments"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CMathFragment
               L.MathFragment
                 { meta =
@@ -1842,7 +1882,8 @@ parseSpec = do
   ps
     "0010-standalone-math-inside-lists"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CListItem
               [ L.LOrderedStart,
                 L.LItemStart
@@ -1898,7 +1939,8 @@ parseSpec = do
   ps
     "0011-figures-and-blocks"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CBlock
               L.Block
                 { meta =
@@ -1981,7 +2023,8 @@ parseSpec = do
   p
     "0012-tables-and-prose"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CTable
               L.Table
                 { meta =
@@ -2099,7 +2142,8 @@ parseSpec = do
   p
     "0012-tables-inside-lists"
     L.OrgDoc
-      { cells =
+      { uuid = Nothing,
+        cells =
           [ L.CListItem
               [ L.LOrderedStart,
                 L.LItemStart

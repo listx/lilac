@@ -406,13 +406,16 @@ would-be-tangled file has its own code graph. These code graphs are discussed
 later in [[id:b449a097-d702-4fd6-98de-cb81f7e49177][Code graphs]].
 
 In summary an Org document is made up of cells and code graphs, as well as some
-metadata (the title, author name, etc).
+metadata (the title, author name, etc). The doc also has an optional UUID, which
+will usually be populated to allow other Org files to link to its named cells
+(other files can also link to external headings by their UUID, if they exist).
 
 #+name: data:OrgDoc
 #+begin_src haskell
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
-  { cells :: [Cell],
+  { uuid :: Maybe UUID,
+    cells :: [Cell],
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Generic, Show)
@@ -545,6 +548,8 @@ orgDocParser = do
   meta <- docMetaParser
   _ <- lilacExtensionsParser
   cells <- many cellParser
+  MP.eof
+  orgParserState <- get
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -555,10 +560,13 @@ orgDocParser = do
         CMathFragment {}
         CFigure {}
         CTable {} -> True
-  MP.eof
+      maybeDocUuid
+        | last orgParserState.orgId == nil = Nothing
+        | otherwise = Just $ last orgParserState.orgId
   pure
     $ OrgDoc
-      { cells = filter meaningfulCell cells,
+      { uuid = maybeDocUuid,
+        cells = filter meaningfulCell cells,
         meta = meta
       }
 #+end_src
@@ -580,7 +588,7 @@ it "empty input" $ do
     (runStateT L.orgDocParser L.defaultOrgParserState)
     "empty input"
     ""
-    `shouldParse` (L.defaultOrgDoc [], L.defaultOrgParserState)
+    `shouldParse` (L.defaultOrgDoc Nothing [], L.defaultOrgParserState)
 #+end_src
 
 The =defaultOrgDoc= is just a default (mostly blank) ~OrgDoc~. It's useful for
@@ -588,10 +596,11 @@ testing.
 
 #+name: f:defaultOrgDoc
 #+begin_src haskell
-defaultOrgDoc :: [(T.Text, T.Text)] -> OrgDoc
-defaultOrgDoc metas =
+defaultOrgDoc :: Maybe UUID -> [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDoc uuid metas =
   OrgDoc
-    { cells = [],
+    { uuid = uuid,
+      cells = [],
       meta = M.fromList metas
     }
 #+end_src
@@ -614,7 +623,7 @@ This leaves us with just one newline in
 #+begin_src haskell
 p
   "0001-blankline"
-  (L.defaultOrgDoc [])
+  (L.defaultOrgDoc Nothing [])
 #+end_src
 
 Parsing comments should also result in a blank document.
@@ -633,7 +642,7 @@ a block comment.
 #+begin_src haskell
 p
   "0001-comments-only"
-  (L.defaultOrgDoc [])
+  (L.defaultOrgDoc Nothing [])
 #+end_src
 
 At the other end of the spectrum, Lilac should be able to parse itself
@@ -860,6 +869,7 @@ Below are some unit test cases for parsing metadata.
 p
   "0002-doc-metadata"
   $ L.defaultOrgDoc
+    Nothing
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
       ("property", "header-args+ :noweb no-export"),
@@ -903,6 +913,7 @@ Yet another comment.
 p
   "0003-doc-metadata-with-comments"
   $ L.defaultOrgDoc
+    Nothing
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
       ("property", "header-args+ :noweb no-export"),
@@ -938,6 +949,7 @@ Metadata values can have leading whitespace. We ignore such whitespace.
 p
   "0002-doc-metadata-whitespace-before-value"
   $ L.defaultOrgDoc
+    Nothing
     [ ("title", "Parse me without leading whitespace")
     ]
 #+end_src
@@ -971,6 +983,7 @@ Metadata can also come from top-level properties drawers.
 ps
   "0002-doc-metadata-properties-drawer"
   ( L.defaultOrgDoc
+      (Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
       [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
       ]
   )
@@ -998,7 +1011,7 @@ test case file from [[t:0001-blankline]].
 #+begin_src haskell
 ps
   "0001-blankline"
-  (L.defaultOrgDoc [])
+  (L.defaultOrgDoc Nothing [])
   L.OrgParserState
     { goids = fromList [],
       orgId = one nil,
@@ -1034,6 +1047,7 @@ key\/value metadata lines.
 ps
   "0002-doc-metadata-properties-drawer-combine"
   ( L.defaultOrgDoc
+      (Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
       [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
         ("author", "A. U. Thor"),
         ("property", "header-args+ :noweb no-export"),
@@ -1372,7 +1386,8 @@ This use of the backslash as an escape character deviates from Orgmode.
 p
   "0005-styled-strings-ignore-marker-inside-word"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-ignore-marker-inside-word>>
         ],
@@ -1438,7 +1453,8 @@ by the end of the cell (heading or paragraph), all styles must be turned off.
 ps
   "0005-styled-strings-messy-boundaries"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CHeading
             ( L.Heading
                 { level = 1,
@@ -1847,7 +1863,8 @@ a b  c   d    e      *f g  h   i    j*
 p
   "0005-styled-strings-compression"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-compression>>
         ],
@@ -1878,7 +1895,8 @@ foo
 p
   "0005-styled-strings-no-style"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ plainParagraph "foo"
         ],
       meta = M.fromList []
@@ -1897,7 +1915,8 @@ foo *bar* baz
 p
   "0005-styled-strings-bold"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             [ L.PTokenStyledText
                 ( L.StyledText
@@ -1935,7 +1954,8 @@ Below we mix things up a bit more, using more styles.
 p
   "0005-styled-strings-complex"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-complex>>
         ],
@@ -1988,7 +2008,8 @@ Here's another test, which checks some edge cases when dealing with punctuation.
 p
   "0005-styled-strings-complex-punctuation"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-complex-punctuation>>
         ],
@@ -2031,7 +2052,8 @@ have a style marker inside a word (not at the usual beginning or end of a word).
 p
   "0005-styled-strings-verbatim"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-verbatim>>
         ],
@@ -2063,7 +2085,8 @@ if it immediately follows a verbatim or code marker.
 p
   "0005-styled-strings-verbatim-code-ignore-immediate-bold"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             <<Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold>>
         ],
@@ -2111,7 +2134,8 @@ not apply if we're inside a verbatim (or code) region.
 p
   "0005-styled-strings-verbatim-precedence"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         <<Expected prose for 0005-styled-strings-verbatim-precedence>>,
       meta = fromList []
     }
@@ -2341,7 +2365,8 @@ foo [[link-target-only]]
 ps
   "0006-links"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             [ L.PTokenStyledText
                 ( L.StyledText
@@ -2436,7 +2461,8 @@ This way, the input will look like ~[[...~ which will then allow
 p
   "0006-links-inside-parentheses"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             [ L.PTokenStyledText
                 ( L.StyledText
@@ -2480,7 +2506,8 @@ non-links.
 p
   "0006-links-nonlink"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             [ L.PTokenStyledText
                 ( L.StyledText
@@ -2554,7 +2581,8 @@ Go to ftp://10.0.0.1!
 p
   "0006-links-raw"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CParagraph
             [ L.PTokenStyledText
                 ( L.StyledText
@@ -2799,7 +2827,8 @@ underscore_
 p
   "0005-prose-paragraphs"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         <<Expected prose for 0005-prose-paragraphs>>,
       meta = fromList []
     }
@@ -3192,7 +3221,8 @@ or set it to 0 (unlimited). First we demonstrate using a higher number, 20.
 ps
   "0004-headings-20"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ plainHeading 1 [1],
           plainHeading 2 [1, 1],
           plainHeading 3 [1, 1, 1],
@@ -3249,7 +3279,8 @@ Now we check using ~0~ for unlimited nesting.
 ps
   "0004-headings-unlimited"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ plainHeading 1 [1],
           plainHeading 2 [1, 1],
           plainHeading 3 [1, 1, 1],
@@ -3420,7 +3451,8 @@ The =:PROPERTIES:= drawer may be empty.
 ps
   "0004-properties-drawer-empty"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CHeading
             ( L.Heading
                 { level = 1,
@@ -3467,7 +3499,8 @@ Check we can pick up keys and value from the =:PROPERTIES:= drawer.
 ps
   "0004-properties-drawer-not-empty"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CHeading
             ( L.Heading
                 { level = 1,
@@ -3527,7 +3560,8 @@ This ":KEY:" ignored because it's inside a comment block.
 ps
   "0004-properties-drawer-not-empty-with-comments"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CHeading
             ( L.Heading
                 { level = 1,
@@ -3607,7 +3641,8 @@ Below are some examples of valid (empty) code blocks.
 ps
   "0007-blocks-empty"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         <<Expected blocks for 0007-blocks-empty>>,
       meta = fromList []
     }
@@ -4003,7 +4038,8 @@ Non-special commas stay put:
 ps
   "0007-blocks-special-commas"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         <<Expected blocks for 0007-blocks-special-commas>>,
       meta = fromList []
     }
@@ -4231,7 +4267,8 @@ with ~>>~ on the same line.
 ps
   "0007-blocks-noweb"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         <<Expected blocks for 0007-blocks-noweb>>,
       meta = fromList []
     }
@@ -4319,7 +4356,8 @@ echo <<bar>> x y z
 ps
   "0007-blocks-noweb-off"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         <<Expected blocks for 0007-blocks-noweb-off>>,
       meta = fromList []
     }
@@ -4371,7 +4409,8 @@ those contents into an existing line.
 ps
   "0007-blocks-noweb-intraline"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         <<Expected blocks for 0007-blocks-noweb-intraline>>,
       meta = fromList []
     }
@@ -4674,7 +4713,8 @@ foo
 ps
   "0007-blocks-ending"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         <<Expected blocks for 0007-blocks-ending>>,
       meta = fromList []
     }
@@ -5528,7 +5568,8 @@ here.
 p
   "0009-list-indentation-no-indent"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ plainParagraph "1)",
           plainParagraph "2)"
         ],
@@ -5554,7 +5595,8 @@ Here's a list with the (proper) 2-space indent.
 p
   "0009-list-indentation-proper-indent"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CListItem
             [ L.LOrderedStart,
               L.LItemStart
@@ -5628,7 +5670,8 @@ Here's a nested example.
 p
   "0009-list-indentation-nested"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CListItem
             [ L.LOrderedStart, ---- Start outer ordered list.
               L.LItemStart -------- Start outer "1)".
@@ -5766,7 +5809,8 @@ Now we test whether list items can also hold content (other cells) inside it.
 p
   "0009-list-content-simple"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CListItem
             [ L.LOrderedStart,
               L.LItemStart
@@ -5820,7 +5864,8 @@ Bar.
 p
   "0009-list-indentation-nested-with-text"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ plainParagraph "Foo.",
           L.CListItem
             [ L.LOrderedStart, ---- Start outer ordered list.
@@ -5994,7 +6039,8 @@ Four
 p
   "0009-paragraph-can-close-deeper-levels"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CListItem
             [ L.LOrderedStart,
               L.LItemStart
@@ -6057,7 +6103,8 @@ Four
 p
   "0009-paragraph-can-separate-mixed-lists"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CListItem
             [ L.LOrderedStart,
               L.LItemStart
@@ -6181,7 +6228,8 @@ text, as part of the "a" above it.
 p
   "0009-list-items-need-blank-line-separator"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CListItem
             [ L.LOrderedStart,
               L.LItemStart
@@ -6407,7 +6455,8 @@ whitespace for the contents inside (just before the =\end{equation}= marker).
 ps
   "0010-standalone-math-fragments"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CMathFragment
             L.MathFragment
               { meta =
@@ -6488,7 +6537,8 @@ Standalone math fragments may be included as part of a list item.
 ps
   "0010-standalone-math-inside-lists"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CListItem
             [ L.LOrderedStart,
               L.LItemStart
@@ -6661,7 +6711,8 @@ g x = x + 1
 ps
   "0011-figures-and-blocks"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CBlock
             L.Block
               { meta =
@@ -6917,7 +6968,8 @@ The test below checks if we can parse a table with all 3 types of prose text
 p
   "0012-tables-and-prose"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CTable
             L.Table
               { meta =
@@ -7054,7 +7106,8 @@ indented as a list item.
 p
   "0012-tables-inside-lists"
   L.OrgDoc
-    { cells =
+    { uuid = Nothing,
+      cells =
         [ L.CListItem
             [ L.LOrderedStart,
               L.LItemStart
