@@ -71,9 +71,9 @@ import Lilac.Parse
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
-    Heading (body, level, meta, section),
+    Heading (body, level, section),
     Link (Link, name, target),
-    LinkNoweb (LinkNoweb, name, uuid),
+    LinkNoweb (name, uuid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther),
     ListMarker
       ( LItemEnd,
@@ -83,13 +83,12 @@ import Lilac.Parse
         LUnorderedEnd,
         LUnorderedStart
       ),
-    MathFragment (MathFragment, body),
+    MathFragment (body),
     OrgDoc (cells, meta, uuid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
     maskToStyles,
-    validateUuidText,
   )
 import Lilac.Util qualified as LU
 import Lucid

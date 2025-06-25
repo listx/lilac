@@ -13,7 +13,6 @@ module Lilac.Parse
     parseOrgDoc,
     runGoidsParser,
     styleMaskFrom,
-    validateUuidText,
     OrgDoc (..),
     OrgParserConf (..),
     OrgParserState (..),
