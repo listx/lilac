@@ -29,7 +29,6 @@ module Lilac.Parse
     extractGOIDs,
     genHeadingSection,
     genOrgIdStack,
-    getOrgId,
     maskToStyles,
     orgDocParser,
     goidsParser,
@@ -67,7 +66,7 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText, nil)
+import Data.UUID.Types (UUID, fromText)
 import GHC.Generics (Generic)
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
@@ -277,7 +276,6 @@ import Prelude qualified (show)
 <<f:uuidParser>>
 <<f:validateUuidText>>
 <<id:ef1e620c-357a-4350-b85a-ba813dabf8c7::f:runGoidsParser>>
-<<f:getOrgId>>
 <<f:extractGOIDs>>
 #+end_src
 
@@ -485,7 +483,7 @@ inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { goids :: M.Map UUID P.OsPath,
-    orgId :: NonEmpty UUID,
+    orgId :: NonEmpty (Maybe UUID),
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
@@ -507,7 +505,7 @@ defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
-      orgId = one nil,
+      orgId = one Nothing,
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
@@ -559,9 +557,7 @@ orgDocParser = do
         CMathFragment {}
         CFigure {}
         CTable {} -> True
-      maybeDocUuid
-        | last orgParserState.orgId == nil = Nothing
-        | otherwise = Just $ last orgParserState.orgId
+      maybeDocUuid = last orgParserState.orgId
   pure
     $ OrgDoc
       { uuid = maybeDocUuid,
@@ -718,10 +714,10 @@ docMetaParser = do
     $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
     <> (show conflictingKeys)
   case M.lookup "ID" topLevelDrawerProps of
-    Nothing -> modify (\s -> s {orgId = one nil})
+    Nothing -> modify (\s -> s {orgId = one Nothing})
     Just uuidText -> do
       uuid <- validateUuidText uuidText
-      modify (\s -> s {orgId = one uuid})
+      modify (\s -> s {orgId = one $ Just uuid})
   pure $ M.union topLevelDrawerProps metaKVs
 #+end_src
 
@@ -732,21 +728,6 @@ document is created, which is then used by Orgmode (see
 us to create links that are more resilient against file name changes (or
 directory changes). See [[id:ca12051e-cd17-4d8d-996a-767695441d48][Drawers]] for more discussion about properties drawers and
 [[t:0002-doc-metadata-properties-drawer]].
-
-*** ID property
-
-We expect Org documents to have a top-level ~:ID:~ property, set to a UUID
-string.
-
-#+name: f:getOrgId
-#+begin_src haskell
-getOrgId :: OrgDoc -> UUID
-getOrgId od
-  | Just uuidText <- EM.lookup "ID" od.meta,
-    Just uuid <- fromText uuidText =
-      uuid
-  | otherwise = nil
-#+end_src
 
 *** Lilac extensions
 :PROPERTIES:
@@ -988,7 +969,7 @@ ps
   )
   L.OrgParserState
     { goids = fromList [],
-      orgId = one $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+      orgId = one . Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -1013,7 +994,7 @@ ps
   (L.defaultOrgDoc Nothing [])
   L.OrgParserState
     { goids = fromList [],
-      orgId = one nil,
+      orgId = one Nothing,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -1055,7 +1036,7 @@ ps
   )
   L.OrgParserState
     { goids = fromList [],
-      orgId = one $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+      orgId = one . Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -1468,7 +1449,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [nil, nil],
+      orgId = NE.fromList [Nothing, Nothing],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -2222,11 +2203,17 @@ or =uuid= of the file]] the code block comes from. The UUID acts as a /namespace
 that each Org file is free to choose any name it wants for code blocks without
 fear of other Org files that might have a code block with the same name.
 
+The UUID is wrapped in a =Maybe= because it is possible that an Org file has
+no UUID specified at the top level (see [[data:OrgDoc]]). However if this is the
+case, then none of the code blocks in that document will be able to be
+referenced by the outside world (in other Org files). See
+[[f:blockOriginSignatureParser]] for how we use this information.
+
 #+name: data:LinkNoweb
 #+begin_src haskell
 type LinkNoweb :: Type
 data LinkNoweb = LinkNoweb
-  { uuid :: UUID,
+  { uuid :: Maybe UUID,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Show)
@@ -2429,7 +2416,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [nil, nil],
+      orgId = NE.fromList [Nothing, Nothing],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3076,13 +3063,13 @@ in [[f:blockOriginSignatureParser]].
 
 #+name: f:genOrgIdStack
 #+begin_src haskell
-genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty UUID -> NonEmpty UUID
+genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty (Maybe UUID) -> NonEmpty (Maybe UUID)
 genOrgIdStack maybeId level prevOrgId
   | length prevOrgId == 1 = newId NE.<| prevOrgId
   | length prevOrgId == depth = newId :| tail prevOrgId
   | length prevOrgId < depth =
-      let nils = take (levelDiff - 1) $ repeat nil
-       in (newId :| nils) <> prevOrgId
+      let nothings = take (levelDiff - 1) $ repeat Nothing
+       in (newId :| nothings) <> prevOrgId
   | otherwise = newId :| (NE.drop (abs levelDiff + 1) prevOrgId)
   where
     depth = level + 1
@@ -3090,8 +3077,8 @@ genOrgIdStack maybeId level prevOrgId
     newId
       | Just uuidText <- maybeId,
         Just uuid <- fromText uuidText =
-          uuid
-      | otherwise = nil
+          Just uuid
+      | otherwise = Nothing
 #+end_src
 
 #+name: t:Generate Org ID stack
@@ -3101,72 +3088,72 @@ describe "genOrgIdStack" $ do
     L.genOrgIdStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [nil])
+      (NE.fromList [Nothing])
       `shouldBe` ( NE.fromList
-                     [ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                       nil
+                     [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                       Nothing
                      ]
                  )
   it "replaces the head if the nesting level matches (one heading exists)" $ do
     L.genOrgIdStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [fromWords64 0x7777777777777777 0x7777777777777777, nil])
+      (NE.fromList [Just $ fromWords64 0x7777777777777777 0x7777777777777777, Nothing])
       `shouldBe` ( NE.fromList
-                     [ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                       nil
+                     [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                       Nothing
                      ]
                  )
   it "adds a new head if the heading nests (and this heading has an ID)" $ do
     L.genOrgIdStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       2
-      (NE.fromList [nil, nil])
+      (NE.fromList [Nothing, Nothing])
       `shouldBe` ( NE.fromList
-                     [ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                       nil,
-                       nil
+                     [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                       Nothing,
+                       Nothing
                      ]
                  )
   it "adds a new head if the heading nests (and this heading does not have an ID)" $ do
     L.genOrgIdStack
       Nothing
       2
-      (NE.fromList [nil, nil])
+      (NE.fromList [Nothing, Nothing])
       `shouldBe` ( NE.fromList
-                     [ nil,
-                       nil,
-                       nil
+                     [ Nothing,
+                       Nothing,
+                       Nothing
                      ]
                  )
   it "truncates if we unnest (difference of 1 level)" $ do
     L.genOrgIdStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [fromWords64 0x7777777777777777 0x7777777777777777, nil, nil])
+      (NE.fromList [Just $ fromWords64 0x7777777777777777 0x7777777777777777, Nothing, Nothing])
       `shouldBe` ( NE.fromList
-                     [ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                       nil
+                     [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                       Nothing
                      ]
                  )
   it "truncates if we unnest (multiple levels)" $ do
     L.genOrgIdStack
       Nothing
       1
-      (NE.fromList [nil, nil, fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa, nil])
+      (NE.fromList [Nothing, Nothing, Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa, Nothing])
       `shouldBe` ( NE.fromList
-                     [ nil,
-                       nil
+                     [ Nothing,
+                       Nothing
                      ]
                  )
   it "truncates if we unnest (multiple levels, new heading has ID)" $ do
     L.genOrgIdStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [nil, nil, fromWords64 0x7777777777777777 0x7777777777777777, nil])
+      (NE.fromList [Nothing, Nothing, Just $ fromWords64 0x7777777777777777 0x7777777777777777, Nothing])
       `shouldBe` ( NE.fromList
-                     [ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                       nil
+                     [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                       Nothing
                      ]
                  )
 #+end_src
@@ -3239,7 +3226,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil],
+      orgId = NE.fromList . take 13 $ repeat Nothing,
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
@@ -3297,7 +3284,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil],
+      orgId = NE.fromList . take 13 $ repeat Nothing,
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
@@ -3468,7 +3455,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [nil, nil],
+      orgId = NE.fromList [Nothing, Nothing],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3519,7 +3506,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, nil],
+      orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Nothing],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3580,7 +3567,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, nil],
+      orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Nothing],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3612,7 +3599,8 @@ arbitrary keyword here.
 #+begin_src haskell
 type Block :: Type
 data Block = Block
-  { meta :: M.Map T.Text T.Text,
+  { parentUuid :: Maybe UUID,
+    meta :: M.Map T.Text T.Text,
     body :: [BToken]
   }
   deriving stock (Eq, Generic, Show)
@@ -3647,7 +3635,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = one nil,
+      orgId = one Nothing,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -3666,11 +3654,11 @@ ps
 #+begin_src haskell
 [ L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__anon_block_number", "1"),
                 ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "haskell")
               ],
           body = []
@@ -3678,10 +3666,10 @@ ps
     ),
   L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__block_type", "example"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("name", "foo")
               ],
           body = []
@@ -3689,11 +3677,11 @@ ps
     ),
   L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__anon_block_number", "2"),
-                ("__block_type", "quote"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000")
+                ("__block_type", "quote")
               ],
           body = []
         }
@@ -3868,17 +3856,12 @@ blockParser = do
         Just _ -> Nothing
         Nothing -> Just ("__anon_block_number", T.show newAnonBlockNumber)
       blockMeta = ("__block_type", blockType)
-      closestUuidMeta =
-        ( "__closest_UUID",
-          T.show
-            . firstNonNilParent
-            $ NE.toList orgParserState.orgId
-        )
       block =
         Block
-          { meta =
+          { parentUuid = firstParent $ NE.toList orgParserState.orgId,
+            meta =
               M.fromList
-                $ (blockMeta : closestUuidMeta : metaKVs)
+                $ (blockMeta : metaKVs)
                 <> concatMap maybeToList [blockName, srcLang, anonBlockMeta],
             body =
               ignoreSpecialCommas
@@ -3891,9 +3874,10 @@ blockParser = do
       }
   pure $ CBlock block
   where
-    firstNonNilParent [] = nil
-    firstNonNilParent (oid : oids)
-      | oid == nil = firstNonNilParent oids
+    firstParent :: [Maybe UUID] -> Maybe UUID
+    firstParent [] = Nothing
+    firstParent (oid : oids)
+      | oid == Nothing = firstParent oids
       | otherwise = oid
 #+end_src
 
@@ -4051,11 +4035,11 @@ ps
 #+begin_src haskell
 [ L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__anon_block_number", "1"),
                 ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh")
               ],
           body =
@@ -4207,7 +4191,7 @@ that information at hand.
 
 #+name: f:blockOriginSignatureParser
 #+begin_src haskell
-blockOriginSignatureParser :: OrgParser (UUID, T.Text)
+blockOriginSignatureParser :: OrgParser (Maybe UUID, T.Text)
 blockOriginSignatureParser = MP.choice [explicit, implicit]
   where
     blockNameOnly :: OrgParser T.Text
@@ -4233,7 +4217,7 @@ blockOriginSignatureParser = MP.choice [explicit, implicit]
         <> show uuidText
         <> " not found in global OrgIds"
       blockName <- blockNameOnly
-      pure (uuid, blockName)
+      pure (Just uuid, blockName)
     implicit = do
       orgParserState <- get
       blockName <- blockNameOnly
@@ -4281,11 +4265,11 @@ ps
 #+begin_src haskell
 [ L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__anon_block_number", "1"),
                 ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh")
               ],
           body =
@@ -4294,7 +4278,7 @@ ps
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { uuid = nil,
+                            { uuid = Nothing,
                               name = "foo"
                             },
                       name =
@@ -4311,7 +4295,7 @@ ps
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { uuid = nil,
+                            { uuid = Nothing,
                               name = "bar"
                             },
                       name =
@@ -4370,11 +4354,11 @@ ps
 #+begin_src haskell
 [ L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__anon_block_number", "1"),
                 ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh"),
                 ("noweb", "off")
               ],
@@ -4423,11 +4407,11 @@ ps
 #+begin_src haskell
 [ L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__anon_block_number", "1"),
                 ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh")
               ],
           body =
@@ -4437,7 +4421,7 @@ ps
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { uuid = nil,
+                            { uuid = Nothing,
                               name = "foo"
                             },
                       name =
@@ -4454,7 +4438,7 @@ ps
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { uuid = nil,
+                            { uuid = Nothing,
                               name = "bar"
                             },
                       name =
@@ -4471,7 +4455,7 @@ ps
                     { target =
                         L.LinkTargetNoweb
                           L.LinkNoweb
-                            { uuid = nil,
+                            { uuid = Nothing,
                               name = "ok"
                             },
                       name =
@@ -4719,7 +4703,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = one nil,
+      orgId = one Nothing,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -4746,10 +4730,10 @@ ps
 #+begin_src haskell
 [ L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh"),
                 ("name", "empty")
               ],
@@ -4758,10 +4742,10 @@ ps
     ),
   L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh"),
                 ("name", "end not in beginning of line")
               ],
@@ -4770,10 +4754,10 @@ ps
     ),
   L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh"),
                 ("name", "end has no preceding blank line")
               ],
@@ -4782,10 +4766,10 @@ ps
     ),
   L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh"),
                 ("name", "end has preceding blank line")
               ],
@@ -4794,10 +4778,10 @@ ps
     ),
   L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh"),
                 ("name", "end has preceding newline (multiple)")
               ],
@@ -4806,10 +4790,10 @@ ps
     ),
   L.CBlock
     ( L.Block
-        { meta =
+        { parentUuid = Nothing,
+          meta =
             fromList
               [ ("__block_type", "src"),
-                ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                 ("__src_language", "sh"),
                 ("name", "ignore #+end_example because this is a src block")
               ],
@@ -6499,7 +6483,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = one nil,
+      orgId = one Nothing,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -6576,7 +6560,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = one nil,
+      orgId = one Nothing,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -6714,10 +6698,10 @@ ps
       cells =
         [ L.CBlock
             L.Block
-              { meta =
+              { parentUuid = Nothing,
+                meta =
                   fromList
                     [ ("__block_type", "src"),
-                      ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                       ("__src_language", "haskell"),
                       ("name", "f:f"),
                       ("xxx", "bar")
@@ -6744,10 +6728,10 @@ ps
               },
           L.CBlock
             L.Block
-              { meta =
+              { parentUuid = Nothing,
+                meta =
                   fromList
                     [ ("__block_type", "src"),
-                      ("__closest_UUID", "00000000-0000-0000-0000-000000000000"),
                       ("__src_language", "haskell"),
                       ("name", "f:g"),
                       ("yyy", "bar")
@@ -6773,7 +6757,7 @@ ps
     }
   L.OrgParserState
     { goids = fromList [],
-      orgId = one nil,
+      orgId = one Nothing,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -7293,8 +7277,10 @@ import Relude
     map,
     one,
     otherwise,
+    repeat,
     runStateT,
     show,
+    take,
     ($),
     (.),
     (<>),
@@ -7980,13 +7966,8 @@ extractGOIDs orgFilesAndContents =
           Left _err -> acc
           Right (orgDoc, _orgParserState) -> M.insert orgFile (getOrgIds orgDoc) acc
       | otherwise = acc
-    getOrgIds od =
-      let docOrgId = getOrgId od
-          acc =
-            if docOrgId == nil
-              then []
-              else [Just docOrgId]
-       in catMaybes $ foldl' f acc od.cells
+    getOrgIds :: OrgDoc -> [UUID]
+    getOrgIds od = catMaybes $ foldl' f [od.uuid] od.cells
     extractOrgId :: M.Map T.Text T.Text -> Maybe UUID
     extractOrgId meta
       | Just uuidText <- EM.lookup "ID" meta = fromText uuidText

@@ -57,21 +57,21 @@ tangleSpec = do
   checkCycles
     "0100-dag-self-loop"
     "test/.orgids"
-    [G.Node "id:00000000-0000-0000-0000-000000000000::f:a" []]
+    [G.Node "f:a" []]
 
   checkCycles
     "0100-dag-self-loops"
     "test/.orgids"
-    [ G.Node "id:00000000-0000-0000-0000-000000000000::f:a" [],
-      G.Node "id:00000000-0000-0000-0000-000000000000::f:b" []
+    [ G.Node "f:a" [],
+      G.Node "f:b" []
     ]
 
   checkCycles
     "0100-dag-2-node-loop"
     "test/.orgids"
     [ G.Node
-        "id:00000000-0000-0000-0000-000000000000::f:a"
-        [ G.Node "id:00000000-0000-0000-0000-000000000000::f:b" []
+        "f:a"
+        [ G.Node "f:b" []
         ]
     ]
 
@@ -79,10 +79,10 @@ tangleSpec = do
     "0100-dag-3-node-loop"
     "test/.orgids"
     [ G.Node
-        "id:00000000-0000-0000-0000-000000000000::f:a"
+        "f:a"
         [ G.Node
-            "id:00000000-0000-0000-0000-000000000000::f:b"
-            [ G.Node "id:00000000-0000-0000-0000-000000000000::f:c" []
+            "f:b"
+            [ G.Node "f:c" []
             ]
         ]
     ]
@@ -91,14 +91,14 @@ tangleSpec = do
     "0100-dag-complex-loops"
     "test/.orgids"
     [ G.Node
-        "id:00000000-0000-0000-0000-000000000000::f:a"
+        "f:a"
         [ G.Node
-            "id:00000000-0000-0000-0000-000000000000::f:b"
-            [ G.Node "id:00000000-0000-0000-0000-000000000000::f:c" [],
-              G.Node "id:00000000-0000-0000-0000-000000000000::f:d" []
+            "f:b"
+            [ G.Node "f:c" [],
+              G.Node "f:d" []
             ]
         ],
-      G.Node "id:00000000-0000-0000-0000-000000000000::f:e" []
+      G.Node "f:e" []
     ]
 
   checkCycles

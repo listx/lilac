@@ -6,7 +6,6 @@ module Lilac.Parse
     extractGOIDs,
     genHeadingSection,
     genOrgIdStack,
-    getOrgId,
     maskToStyles,
     orgDocParser,
     goidsParser,
@@ -44,7 +43,7 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText, nil)
+import Data.UUID.Types (UUID, fromText)
 import GHC.Generics (Generic)
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
@@ -148,7 +147,7 @@ type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { goids :: M.Map UUID P.OsPath,
-    orgId :: NonEmpty UUID,
+    orgId :: NonEmpty (Maybe UUID),
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
@@ -259,7 +258,7 @@ instance ToJSON LinkTarget
 
 type LinkNoweb :: Type
 data LinkNoweb = LinkNoweb
-  { uuid :: UUID,
+  { uuid :: Maybe UUID,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Show)
@@ -291,7 +290,8 @@ instance Show StyleMask where
 
 type Block :: Type
 data Block = Block
-  { meta :: M.Map T.Text T.Text,
+  { parentUuid :: Maybe UUID,
+    meta :: M.Map T.Text T.Text,
     body :: [BToken]
   }
   deriving stock (Eq, Generic, Show)
@@ -418,9 +418,7 @@ orgDocParser = do
         CMathFragment {}
         CFigure {}
         CTable {} -> True
-      maybeDocUuid
-        | last orgParserState.orgId == nil = Nothing
-        | otherwise = Just $ last orgParserState.orgId
+      maybeDocUuid = last orgParserState.orgId
   pure
     $ OrgDoc
       { uuid = maybeDocUuid,
@@ -440,7 +438,7 @@ defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
-      orgId = one nil,
+      orgId = one Nothing,
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
@@ -488,10 +486,10 @@ docMetaParser = do
     $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
     <> (show conflictingKeys)
   case M.lookup "ID" topLevelDrawerProps of
-    Nothing -> modify (\s -> s {orgId = one nil})
+    Nothing -> modify (\s -> s {orgId = one Nothing})
     Just uuidText -> do
       uuid <- validateUuidText uuidText
-      modify (\s -> s {orgId = one uuid})
+      modify (\s -> s {orgId = one $ Just uuid})
   pure $ M.union topLevelDrawerProps metaKVs
 
 lilacExtensionsParser :: OrgParser ()
@@ -633,13 +631,13 @@ genHeadingSection level prevSection
     bumpDeepestSection [] = []
     bumpDeepestSection (x : xs) = x + 1 : xs
 
-genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty UUID -> NonEmpty UUID
+genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty (Maybe UUID) -> NonEmpty (Maybe UUID)
 genOrgIdStack maybeId level prevOrgId
   | length prevOrgId == 1 = newId NE.<| prevOrgId
   | length prevOrgId == depth = newId :| tail prevOrgId
   | length prevOrgId < depth =
-      let nils = take (levelDiff - 1) $ repeat nil
-       in (newId :| nils) <> prevOrgId
+      let nothings = take (levelDiff - 1) $ repeat Nothing
+       in (newId :| nothings) <> prevOrgId
   | otherwise = newId :| (NE.drop (abs levelDiff + 1) prevOrgId)
   where
     depth = level + 1
@@ -647,8 +645,8 @@ genOrgIdStack maybeId level prevOrgId
     newId
       | Just uuidText <- maybeId,
         Just uuid <- fromText uuidText =
-          uuid
-      | otherwise = nil
+          Just uuid
+      | otherwise = Nothing
 
 propertiesDrawerParser :: OrgParser (Map T.Text T.Text)
 propertiesDrawerParser = propertiesParser <|> (pure $ M.fromList [])
@@ -1065,17 +1063,12 @@ blockParser = do
         Just _ -> Nothing
         Nothing -> Just ("__anon_block_number", T.show newAnonBlockNumber)
       blockMeta = ("__block_type", blockType)
-      closestUuidMeta =
-        ( "__closest_UUID",
-          T.show
-            . firstNonNilParent
-            $ NE.toList orgParserState.orgId
-        )
       block =
         Block
-          { meta =
+          { parentUuid = firstParent $ NE.toList orgParserState.orgId,
+            meta =
               M.fromList
-                $ (blockMeta : closestUuidMeta : metaKVs)
+                $ (blockMeta : metaKVs)
                 <> concatMap maybeToList [blockName, srcLang, anonBlockMeta],
             body =
               ignoreSpecialCommas
@@ -1088,9 +1081,10 @@ blockParser = do
       }
   pure $ CBlock block
   where
-    firstNonNilParent [] = nil
-    firstNonNilParent (oid : oids)
-      | oid == nil = firstNonNilParent oids
+    firstParent :: [Maybe UUID] -> Maybe UUID
+    firstParent [] = Nothing
+    firstParent (oid : oids)
+      | oid == Nothing = firstParent oids
       | otherwise = oid
 
 blockStartParser ::
@@ -1168,7 +1162,7 @@ nowebLinkParser = do
           ]
       }
 
-blockOriginSignatureParser :: OrgParser (UUID, T.Text)
+blockOriginSignatureParser :: OrgParser (Maybe UUID, T.Text)
 blockOriginSignatureParser = MP.choice [explicit, implicit]
   where
     blockNameOnly :: OrgParser T.Text
@@ -1194,7 +1188,7 @@ blockOriginSignatureParser = MP.choice [explicit, implicit]
         <> show uuidText
         <> " not found in global OrgIds"
       blockName <- blockNameOnly
-      pure (uuid, blockName)
+      pure (Just uuid, blockName)
     implicit = do
       orgParserState <- get
       blockName <- blockNameOnly
@@ -1692,13 +1686,6 @@ runGoidsParser orgIdLocationsFile = do
       die $ MP.errorBundlePretty errBundle
     Right (ids, _) -> pure ids
 
-getOrgId :: OrgDoc -> UUID
-getOrgId od
-  | Just uuidText <- EM.lookup "ID" od.meta,
-    Just uuid <- fromText uuidText =
-      uuid
-  | otherwise = nil
-
 extractGOIDs :: [(P.OsPath, T.Text)] -> T.Text
 extractGOIDs orgFilesAndContents =
   let goids = foldl' buildGOIDs M.empty orgFilesAndContents
@@ -1713,13 +1700,8 @@ extractGOIDs orgFilesAndContents =
           Left _err -> acc
           Right (orgDoc, _orgParserState) -> M.insert orgFile (getOrgIds orgDoc) acc
       | otherwise = acc
-    getOrgIds od =
-      let docOrgId = getOrgId od
-          acc =
-            if docOrgId == nil
-              then []
-              else [Just docOrgId]
-       in catMaybes $ foldl' f acc od.cells
+    getOrgIds :: OrgDoc -> [UUID]
+    getOrgIds od = catMaybes $ foldl' f [od.uuid] od.cells
     extractOrgId :: M.Map T.Text T.Text -> Maybe UUID
     extractOrgId meta
       | Just uuidText <- EM.lookup "ID" meta = fromText uuidText

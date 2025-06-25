@@ -13,7 +13,7 @@ import Data.Text.Lazy qualified as TL
 import Data.UUID.Types (UUID)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
-    Block (Block, body, meta),
+    Block (Block, body, meta, parentUuid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, section),
     Link (Link, name, target),
@@ -369,7 +369,8 @@ weaveLink link = do
         else "internal-link"
     linkTarget weaveConf = case link.target of
       LinkTargetNoweb linkNoweb
-        | Just orgFile <- EM.lookup linkNoweb.uuid weaveConf.goids,
+        | Just linkUuid <- linkNoweb.uuid,
+          Just orgFile <- EM.lookup linkUuid weaveConf.goids,
           Just docUuid <- weaveConf.orgDoc.uuid,
           Just currentOrgFile <- EM.lookup docUuid weaveConf.goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
@@ -383,7 +384,8 @@ weaveLink link = do
             getLinkAnchor
               $ CBlock
                 Block
-                  { meta = M.fromList [("name", linkNoweb.name)],
+                  { parentUuid = Nothing,
+                    meta = M.fromList [("name", linkNoweb.name)],
                     body = []
                   }
       LinkTargetOther targetText -> targetText
