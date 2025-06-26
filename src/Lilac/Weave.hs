@@ -18,7 +18,7 @@ import Lilac.Parse
     Heading (body, level, section),
     Link (Link, name, target),
     LinkNoweb (name, uuid),
-    LinkTarget (LinkTargetNoweb, LinkTargetOther),
+    LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
         LItemStart,
@@ -69,6 +69,7 @@ import Lucid
     type_,
   )
 import Lucid.Base (hoistHtmlT)
+import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Either (Right),
@@ -86,6 +87,7 @@ import Relude
     foldl',
     forM_,
     fst,
+    id,
     lift,
     map,
     otherwise,
@@ -252,6 +254,7 @@ weavePToken = \case
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
   LinkTargetNoweb _ -> False
+  LinkTargetURI {} -> True
   LinkTargetOther target
     | T.isPrefixOf "http" target -> True
     | otherwise -> False
@@ -388,6 +391,7 @@ weaveLink link = do
                     meta = M.fromList [("name", linkNoweb.name)],
                     body = []
                   }
+      LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
       LinkTargetOther targetText -> targetText
 
 weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> M.Map UUID P.OsPath -> IO ()

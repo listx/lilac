@@ -13,7 +13,7 @@ import Lilac.Parse
     Heading (body, meta),
     Link (target),
     LinkNoweb (name, uuid),
-    LinkTarget (LinkTargetNoweb, LinkTargetOther),
+    LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
     MathFragment (meta),
     OrgDoc (cells, uuid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
@@ -121,6 +121,7 @@ findExternalOrgLinkTargets orgDoc symbols =
         | or $ map (`T.isPrefixOf` raw) aliasedWebProtocols -> acc
         | M.member raw symbols -> acc
         | otherwise -> link.target : acc
+      LinkTargetURI {} -> acc
 
 webProtocols :: [T.Text]
 webProtocols =

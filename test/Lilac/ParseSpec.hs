@@ -8,6 +8,7 @@ import Data.UUID.Types (UUID, fromText, fromWords64, nil)
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Util qualified as LU
+import Network.URI qualified as N
 import Relude
   ( FilePath,
     Identity,
@@ -960,7 +961,21 @@ parseSpec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { target = L.LinkTargetOther "https://foo.org",
+                      { target =
+                          L.LinkTargetURI
+                            N.URI
+                              { N.uriScheme = "https:",
+                                N.uriAuthority =
+                                  Just
+                                    N.URIAuth
+                                      { N.uriUserInfo = "",
+                                        N.uriRegName = "foo.org",
+                                        N.uriPort = ""
+                                      },
+                                N.uriPath = "",
+                                N.uriQuery = "",
+                                N.uriFragment = ""
+                              },
                         name =
                           [ L.StyledText
                               { body = "https://foo.org",
@@ -977,7 +992,21 @@ parseSpec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { target = L.LinkTargetOther "https://bar.net",
+                      { target =
+                          L.LinkTargetURI
+                            N.URI
+                              { N.uriScheme = "https:",
+                                N.uriAuthority =
+                                  Just
+                                    N.URIAuth
+                                      { N.uriUserInfo = "",
+                                        N.uriRegName = "bar.net",
+                                        N.uriPort = ""
+                                      },
+                                N.uriPath = "",
+                                N.uriQuery = "",
+                                N.uriFragment = ""
+                              },
                         name =
                           [ L.StyledText
                               { body = "https://bar.net",
@@ -994,7 +1023,21 @@ parseSpec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { target = L.LinkTargetOther "http://localhost:3000",
+                      { target =
+                          L.LinkTargetURI
+                            N.URI
+                              { N.uriScheme = "http:",
+                                N.uriAuthority =
+                                  Just
+                                    N.URIAuth
+                                      { N.uriUserInfo = "",
+                                        N.uriRegName = "localhost",
+                                        N.uriPort = ":3000"
+                                      },
+                                N.uriPath = "",
+                                N.uriQuery = "",
+                                N.uriFragment = ""
+                              },
                         name =
                           [ L.StyledText
                               { body = "http://localhost:3000",
@@ -1011,7 +1054,21 @@ parseSpec = do
                   ),
                 L.PTokenLink
                   ( L.Link
-                      { target = L.LinkTargetOther "ftp://10.0.0.1",
+                      { target =
+                          L.LinkTargetURI
+                            N.URI
+                              { N.uriScheme = "ftp:",
+                                N.uriAuthority =
+                                  Just
+                                    N.URIAuth
+                                      { N.uriUserInfo = "",
+                                        N.uriRegName = "10.0.0.1",
+                                        N.uriPort = ""
+                                      },
+                                N.uriPath = "",
+                                N.uriQuery = "",
+                                N.uriFragment = ""
+                              },
                         name =
                           [ L.StyledText
                               { body = "ftp://10.0.0.1",

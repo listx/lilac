@@ -248,6 +248,7 @@ instance ToJSON Link
 type LinkTarget :: Type
 data LinkTarget
   = LinkTargetNoweb LinkNoweb
+  | LinkTargetURI N.URI
   | LinkTargetOther T.Text
   deriving stock (Eq, Generic, Ord, Show)
 
@@ -922,20 +923,20 @@ bracketedLinkParser = do
 
 rawLinkParser :: OrgParser Link
 rawLinkParser = do
-  protocol <- MP.takeWhile1P (Just "raw link protocol") isAsciiLower
-  separator <- string "://"
-  remainder <- T.pack <$> MP.some (MP.try remainderChar)
-  let url = protocol <> separator <> remainder
-  pure
-    Link
-      { target = LinkTargetOther url,
-        name =
-          [ StyledText
-              { body = url,
-                style = styleMaskFrom []
-              }
-          ]
-      }
+  candidate <- MP.some (MP.try remainderChar)
+  case N.parseURI candidate of
+    Nothing -> fail $ "not a valid URI: " <> candidate
+    Just uri ->
+      pure
+        Link
+          { target = LinkTargetURI uri,
+            name =
+              [ StyledText
+                  { body = T.pack candidate,
+                    style = styleMaskFrom []
+                  }
+              ]
+          }
   where
     remainderChar :: OrgParser Char
     remainderChar = do

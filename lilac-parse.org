@@ -2189,6 +2189,7 @@ the generic ~LinkTargetOther~ constructor.
 type LinkTarget :: Type
 data LinkTarget
   = LinkTargetNoweb LinkNoweb
+  | LinkTargetURI N.URI
   | LinkTargetOther T.Text
   deriving stock (Eq, Generic, Ord, Show)
 
@@ -2226,6 +2227,10 @@ In summary we support the following link types:
     in other files by UUID, where the syntax is ~<<id:...::foo>>~ where ~...~ is the
     UUID and ~<<foo>>~ is the name of the code block at that UUID. We have to use
     a UUID-to-file map data structure (which is parsed [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][here]]).
+
+  - ~LinkTargetURI~ :: a link that points to a traditional URI; these are the most
+    common types of links on the internet, the most famous example being
+    anything that looks like =https://...= or =http://...=.
 
   - ~LinkTargetOther~ :: all other links. Typical ways to define such links are
     with uses square brackets (e.g., ~[[target]]~ or ~[[target][name]]~) where
@@ -2504,26 +2509,26 @@ p
 
 *** Raw links
 
-The [[f:rawLinkParser]] parses text that look like URLs into ~LinkBracketed~.
+The [[f:rawLinkParser]] parses text that look like URLs into ~LinkTargetURI~.
 
 #+name: f:rawLinkParser
 #+begin_src haskell
 rawLinkParser :: OrgParser Link
 rawLinkParser = do
-  protocol <- MP.takeWhile1P (Just "raw link protocol") isAsciiLower
-  separator <- string "://"
-  remainder <- T.pack <$> MP.some (MP.try remainderChar)
-  let url = protocol <> separator <> remainder
-  pure
-    Link
-      { target = LinkTargetOther url,
-        name =
-          [ StyledText
-              { body = url,
-                style = styleMaskFrom []
-              }
-          ]
-      }
+  candidate <- MP.some (MP.try remainderChar)
+  case N.parseURI candidate of
+    Nothing -> fail $ "not a valid URI: " <> candidate
+    Just uri ->
+      pure
+        Link
+          { target = LinkTargetURI uri,
+            name =
+              [ StyledText
+                  { body = T.pack candidate,
+                    style = styleMaskFrom []
+                  }
+              ]
+          }
   where
     remainderChar :: OrgParser Char
     remainderChar = do
@@ -2573,7 +2578,21 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { target = L.LinkTargetOther "https://foo.org",
+                    { target =
+                        L.LinkTargetURI
+                          N.URI
+                            { N.uriScheme = "https:",
+                              N.uriAuthority =
+                                Just
+                                  N.URIAuth
+                                    { N.uriUserInfo = "",
+                                      N.uriRegName = "foo.org",
+                                      N.uriPort = ""
+                                    },
+                              N.uriPath = "",
+                              N.uriQuery = "",
+                              N.uriFragment = ""
+                            },
                       name =
                         [ L.StyledText
                             { body = "https://foo.org",
@@ -2590,7 +2609,21 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { target = L.LinkTargetOther "https://bar.net",
+                    { target =
+                        L.LinkTargetURI
+                          N.URI
+                            { N.uriScheme = "https:",
+                              N.uriAuthority =
+                                Just
+                                  N.URIAuth
+                                    { N.uriUserInfo = "",
+                                      N.uriRegName = "bar.net",
+                                      N.uriPort = ""
+                                    },
+                              N.uriPath = "",
+                              N.uriQuery = "",
+                              N.uriFragment = ""
+                            },
                       name =
                         [ L.StyledText
                             { body = "https://bar.net",
@@ -2607,7 +2640,21 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { target = L.LinkTargetOther "http://localhost:3000",
+                    { target =
+                        L.LinkTargetURI
+                          N.URI
+                            { N.uriScheme = "http:",
+                              N.uriAuthority =
+                                Just
+                                  N.URIAuth
+                                    { N.uriUserInfo = "",
+                                      N.uriRegName = "localhost",
+                                      N.uriPort = ":3000"
+                                    },
+                              N.uriPath = "",
+                              N.uriQuery = "",
+                              N.uriFragment = ""
+                            },
                       name =
                         [ L.StyledText
                             { body = "http://localhost:3000",
@@ -2624,7 +2671,21 @@ p
                 ),
               L.PTokenLink
                 ( L.Link
-                    { target = L.LinkTargetOther "ftp://10.0.0.1",
+                    { target =
+                        L.LinkTargetURI
+                          N.URI
+                            { N.uriScheme = "ftp:",
+                              N.uriAuthority =
+                                Just
+                                  N.URIAuth
+                                    { N.uriUserInfo = "",
+                                      N.uriRegName = "10.0.0.1",
+                                      N.uriPort = ""
+                                    },
+                              N.uriPath = "",
+                              N.uriQuery = "",
+                              N.uriFragment = ""
+                            },
                       name =
                         [ L.StyledText
                             { body = "ftp://10.0.0.1",
@@ -7261,6 +7322,7 @@ import Data.UUID.Types (UUID, fromText, fromWords64, nil)
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Util qualified as LU
+import Network.URI qualified as N
 import Relude
   ( FilePath,
     Identity,
