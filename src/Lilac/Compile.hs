@@ -2,6 +2,7 @@ module Lilac.Compile (mkObject) where
 
 import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
 import Data.Text qualified as T
 import GHC.Generics (Generic)
 import Lilac.Parse
@@ -27,11 +28,12 @@ import Relude
     catMaybes,
     concatMap,
     foldl',
-    hashNub,
     map,
     or,
     otherwise,
+    sort,
     ($),
+    (.),
     (<$>),
     (<>),
   )
@@ -86,7 +88,11 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
           | otherwise = []
 
 findExternalOrgLinkTargets :: OrgDoc -> M.Map T.Text Cell -> [LinkTarget]
-findExternalOrgLinkTargets orgDoc symbols = hashNub $ concatMap f orgDoc.cells
+findExternalOrgLinkTargets orgDoc symbols =
+  sort
+    . Set.toList
+    . Set.fromList
+    $ concatMap f orgDoc.cells
   where
     f cell = case cell of
       CBlock block -> foldl' g [] block.body

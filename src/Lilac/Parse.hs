@@ -54,7 +54,6 @@ import Relude
     Enum,
     Eq,
     FilePath,
-    Hashable,
     IO,
     Identity,
     Int,
@@ -250,9 +249,7 @@ type LinkTarget :: Type
 data LinkTarget
   = LinkTargetNoweb LinkNoweb
   | LinkTargetOther T.Text
-  deriving stock (Eq, Generic, Show)
-
-instance Hashable LinkTarget
+  deriving stock (Eq, Generic, Ord, Show)
 
 instance ToJSON LinkTarget
 
@@ -261,9 +258,7 @@ data LinkNoweb = LinkNoweb
   { uuid :: Maybe UUID,
     name :: T.Text
   }
-  deriving stock (Eq, Generic, Show)
-
-instance Hashable LinkNoweb
+  deriving stock (Eq, Generic, Ord, Show)
 
 instance ToJSON LinkNoweb
 
