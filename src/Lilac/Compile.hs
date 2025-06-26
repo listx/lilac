@@ -4,10 +4,11 @@ import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.UUID.Types (UUID)
 import GHC.Generics (Generic)
 import Lilac.Parse
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
-    Block (body, meta),
+    Block (body, meta, parentUuid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (meta),
     Heading (body, meta),
@@ -22,7 +23,7 @@ import Lilac.Parse
 import Lilac.Util qualified as LU
 import Relude
   ( Eq,
-    Maybe (Just),
+    Maybe (Just, Nothing),
     Show,
     Type,
     catMaybes,
@@ -34,7 +35,6 @@ import Relude
     sort,
     ($),
     (.),
-    (<$>),
     (<>),
   )
 import Relude.Extra.Map qualified as EM
@@ -64,25 +64,23 @@ mkSymbols :: OrgDoc -> M.Map T.Text Cell
 mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
   where
     f cell = case cell of
-      CBlock block -> getSymbols block.meta cell
+      CBlock block -> getSymbols block.parentUuid block.meta cell
       CHeading heading
         | Just uuidText <- EM.lookup "ID" heading.meta ->
             [("id:" <> uuidText, cell)]
         | otherwise -> []
-      CFigure figure -> getSymbols figure.meta cell
-      CMathFragment mathFragment -> getSymbols mathFragment.meta cell
-      CTable table -> getSymbols table.meta cell
+      CFigure figure -> getSymbols Nothing figure.meta cell
+      CMathFragment mathFragment -> getSymbols Nothing mathFragment.meta cell
+      CTable table -> getSymbols Nothing table.meta cell
       CListItem {}
       CParagraph {} -> []
-    getSymbols cellMeta cell =
-      let uuidClosest = EM.lookup "__closest_UUID" cellMeta
-          uuidDoc = T.show <$> orgDoc.uuid
-       in concatMap requireName
-            $ catMaybes [uuidClosest, uuidDoc]
+    getSymbols :: Maybe UUID -> M.Map T.Text T.Text -> Cell -> [(T.Text, Cell)]
+    getSymbols parentUuid cellMeta cell =
+      concatMap requireName $ catMaybes [parentUuid, orgDoc.uuid]
       where
-        requireName uuidText
+        requireName uuid
           | Just name <- EM.lookup "name" cellMeta =
-              [ ("id:" <> uuidText <> "::" <> name, cell),
+              [ (LU.prefixWithId (Just uuid) name, cell),
                 (name, cell)
               ]
           | otherwise = []
