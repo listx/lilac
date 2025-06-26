@@ -822,24 +822,29 @@ set -euo pipefail
 
 SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
 
-get_tangled_haskell_files()
+get_tangled_program_files()
 {
 	git -C "${SCRIPT_ROOT}" grep -P '^#\+header: :tangle' -- '*.org' \
 		| awk '{print $3}' \
-		| grep '\.\(cabal\|hs\)$'
+		| grep '\.\(cabal\|hs\|nix\|sh\)$'
 }
 
-reset_tangled_haskell_files()
+reset_tangled_program_files()
 {
 	echo >&2 "Error encountered; cleaning Haskell tangle paths."
-	>/dev/null git checkout -- "${tangled_haskell_files[@]}"
+	>/dev/null git checkout -- "${tangled_program_files[@]}" \
+		Makefile \
+		.gitignore \
+		.orgids \
+		test/.orgids \
+		nix
 }
 
 tangle()
 {
-	mapfile -t tangled_haskell_files < <(get_tangled_haskell_files)
+	mapfile -t tangled_program_files < <(get_tangled_program_files)
 	if ! time make -C "${SCRIPT_ROOT}" tangle; then
-		reset_tangled_haskell_files
+		reset_tangled_program_files
 		return 1
 	fi
 	return 0
@@ -850,10 +855,10 @@ tangle_and_test_and_check_and_weave()
 	tangle
 	if tangle; then
 		if ! make -C "${SCRIPT_ROOT}" test; then
-			reset_tangled_haskell_files
+			reset_tangled_program_files
 		fi
 		if ! (cd "${SCRIPT_ROOT}" && lilac check lilac.org); then
-			reset_tangled_haskell_files
+			reset_tangled_program_files
 		fi
 	fi
 	echo "----------------------------------------"
