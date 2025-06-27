@@ -6,7 +6,7 @@ import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.UUID.Types (UUID)
 import GHC.Generics (Generic)
-import Lilac.Parse
+import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta, parentUuid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),

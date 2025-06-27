@@ -738,7 +738,7 @@ too verbose to list all passing tests on each line (as is the default behavior).
 
 #+name: make:Run tests
 #+begin_src makefile
-test: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org
+test: lilac.org lilac-compile.org lilac-parse.org lilac-types.org lilac-weave.org
 	cabal test --test-show-details=direct --test-option=--format=progress
 	touch test
 #+end_src
@@ -750,7 +750,7 @@ we already have a folder named [[file:test]].
 
 #+name: make:Run linters
 #+begin_src makefile
-lint: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org
+lint: lilac.org lilac-compile.org lilac-parse.org lilac-types.org lilac-weave.org
 	pre-commit run --all-files
 	touch lint
 #+end_src
@@ -771,12 +771,13 @@ We can tangle Lilac with Lilac itself.
 
 #+name: make:Tangle sources
 #+begin_src makefile
-tangle: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org tangle-fe
+tangle: lilac.org lilac-compile.org lilac-parse.org lilac-types.org lilac-weave.org tangle-fe
 	git ls-files | grep '\.org$$' | xargs lilac write-goids
 	<<Generate GOIDs for tests>>
 	lilac tangle \
 		lilac-compile.org \
 		lilac-parse.org \
+		lilac-types.org \
 		lilac-weave.org \
 		lilac.org
 	touch tangle
@@ -890,6 +891,7 @@ main()
 		"${SCRIPT_ROOT}/lilac.org" \
 		"${SCRIPT_ROOT}/lilac-compile.org" \
 		"${SCRIPT_ROOT}/lilac-parse.org" \
+		"${SCRIPT_ROOT}/lilac-types.org" \
 		"${SCRIPT_ROOT}/lilac-weave.org" \
 		"${SCRIPT_ROOT}/fe.org"
 }
@@ -927,10 +929,11 @@ For weaving, use the =site= directory.
 
 #+name: make:Weave
 #+begin_src makefile
-weave: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org fe.org
+weave: lilac.org lilac-compile.org lilac-parse.org lilac-types.org lilac-weave.org fe.org
 	lilac weave --out-dir site --watch \
 		lilac-compile.org \
 		lilac-parse.org \
+		lilac-types.org \
 		lilac-weave.org \
 		lilac.org
 	touch weave
@@ -954,7 +957,7 @@ There are two ways to build =lilac=. The first option, =build=, builds with
 
 #+name: make:Build lilac with Cabal
 #+begin_src makefile
-build: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org lilac.cabal
+build: lilac.org lilac-compile.org lilac-parse.org lilac-types.org lilac-weave.org lilac.cabal
 	cabal build
 	touch build
 #+end_src
@@ -984,7 +987,7 @@ working order.
 #+name: make:Build lilac with Nix
 #+begin_src makefile
 LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
-build-release: lilac.org lilac-compile.org lilac-parse.org lilac-weave.org lilac.cabal
+build-release: lilac.org lilac-compile.org lilac-parse.org lilac-types.org lilac-weave.org lilac.cabal
 	nix-build ./nix/release.nix \
 	  --argstr lilacGitVersion $(LILAC_GIT_VERSION)
 	touch build-release
@@ -1717,6 +1720,7 @@ library
       Lilac.Compile
       Lilac.Parse
       Lilac.Tangle
+      Lilac.Types
       Lilac.Weave
       Lilac.Weave.Css
       Lilac.Util
@@ -2029,7 +2033,8 @@ import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.UUID.Types (UUID)
-import Lilac.Parse
+import Lilac.Parse (parseOrgDoc)
+import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta, parentUuid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
@@ -2037,7 +2042,6 @@ import Lilac.Parse
     LinkNoweb (LinkNoweb),
     LinkTarget (LinkTargetNoweb),
     OrgDoc (cells, uuid),
-    parseOrgDoc,
   )
 import Lilac.Util qualified as LU
 import Relude
@@ -3811,6 +3815,11 @@ import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
+import Lilac.Types
+  ( OrgParserState
+      ( goids
+      ),
+  )
 import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
 import Lilac.Weave qualified as LW
@@ -3937,7 +3946,7 @@ lilacCheck globalOpts checkOpts = do
   input <- LU.readFrom "" checkOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
           checkOpts.input
           input
   case parseResult of
@@ -4021,7 +4030,7 @@ lilacTangle globalOpts tangleOpts = do
       input <- LU.readFrom "" inputOrgFile
       let parseResult =
             MP.runParser
-              (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+              (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
               inputOrgFile
               input
       case parseResult of
@@ -4085,7 +4094,7 @@ lilacWeave globalOpts weaveOpts = do
       input <- LU.readFrom "" inputOrgFile
       let parseResult =
             MP.runParser
-              (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+              (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
               inputOrgFile
               input
       case parseResult of

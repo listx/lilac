@@ -5,6 +5,11 @@ import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
+import Lilac.Types
+  ( OrgParserState
+      ( goids
+      ),
+  )
 import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
 import Lilac.Weave qualified as LW
@@ -294,7 +299,7 @@ lilacCheck globalOpts checkOpts = do
   input <- LU.readFrom "" checkOpts.input
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
           checkOpts.input
           input
   case parseResult of
@@ -353,7 +358,7 @@ lilacTangle globalOpts tangleOpts = do
       input <- LU.readFrom "" inputOrgFile
       let parseResult =
             MP.runParser
-              (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+              (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
               inputOrgFile
               input
       case parseResult of
@@ -385,7 +390,7 @@ lilacWeave globalOpts weaveOpts = do
       input <- LU.readFrom "" inputOrgFile
       let parseResult =
             MP.runParser
-              (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+              (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
               inputOrgFile
               input
       case parseResult of

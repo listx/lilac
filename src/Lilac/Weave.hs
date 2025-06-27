@@ -11,7 +11,8 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.UUID.Types (UUID)
-import Lilac.Parse
+import Lilac.Parse (maskToStyles)
+import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentUuid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
@@ -32,7 +33,6 @@ import Lilac.Parse
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
-    maskToStyles,
   )
 import Lilac.Util qualified as LU
 import Lucid

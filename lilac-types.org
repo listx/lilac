@@ -1,0 +1,107 @@
+:PROPERTIES:
+:ID:       7ec06750-f75d-4722-870a-f6df0fd9c1fd
+:END:
+#+title: Lilac Types
+
+#+property: header-args+ :noweb no-export
+#+lilac_maxHeadingLevel: 3
+
+* Types
+
+We define the types we use in one place.
+
+** =Lilac.Types= module
+
+This module defines the core types and some helper functions (those named with a
+~default*~ prefix). Most of the discussions of the actual types themselves are
+done in [[id:bb5a9763-e8bf-4cb9-8e6c-8c5ac92975a6][Org parser]], because that module requires these types to perform the
+parsing (and it is in this capacity that most of these types first come into
+existence in the system). For this reason, many of the code blocks are defined
+(and discussed) there.
+
+#+name: module:Lilac.Types
+#+header: :tangle src/Lilac/Types.hs
+#+begin_src haskell
+module Lilac.Types
+  ( Block (..),
+    BToken (..),
+    Cell (..),
+    Figure (..),
+    Heading (..),
+    Level (..),
+    Link (..),
+    LinkNoweb (..),
+    LinkTarget (..),
+    ListMarker (..),
+    MathFragment (..),
+    OrgDoc (..),
+    OrgParser,
+    OrgParserConf (..),
+    OrgParserState (..),
+    PToken (..),
+    Prose,
+    Style (..),
+    StyleMask (..),
+    StyledText (..),
+    Table (..),
+    defaultOrgParserConf,
+  )
+where
+
+import Data.Aeson (ToJSON)
+import Data.Bits.Bitwise (toListLE)
+import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
+import Data.Text qualified as T
+import Data.UUID.Types (UUID)
+import GHC.Generics (Generic)
+import Network.URI qualified as N
+import Relude
+  ( Enum,
+    Eq,
+    Identity,
+    Int,
+    Maybe (Just, Nothing),
+    NonEmpty,
+    Ord,
+    Show,
+    StateT,
+    Type,
+    Void,
+    Word8,
+    catMaybes,
+    map,
+    toEnum,
+    zip,
+    ($),
+    (.),
+    (<>),
+  )
+import System.OsPath qualified as P
+import Text.Megaparsec qualified as MP
+import Prelude qualified (show)
+
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:BToken>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Block>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Cell>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Figure>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Heading>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Level>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Link>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:LinkNoweb>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:LinkTarget>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:ListMarker>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:MathFragment>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:OrgDoc>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:OrgParserConf>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::f:defaultOrgParserConf>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:OrgParserState>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:PToken>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Style>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:StyledText>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Table>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::instance:Show Stylemask>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::newtype:StyleMask>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:OrgParser>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:Prose>>
+#+end_src

@@ -12,29 +12,9 @@ module Lilac.Parse
     parseOrgDoc,
     runGoidsParser,
     styleMaskFrom,
-    OrgDoc (..),
-    OrgParserConf (..),
-    OrgParserState (..),
-    Cell (..),
-    Heading (..),
-    Link (..),
-    LinkNoweb (..),
-    LinkTarget (..),
-    MathFragment (..),
-    PToken (..),
-    Style (..),
-    StyledText (..),
-    StyleMask (..),
-    Block (..),
-    BToken (..),
-    Figure (..),
-    Table (..),
-    ListMarker (..),
-    Level (..),
   )
 where
 
-import Data.Aeson (ToJSON)
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
@@ -44,14 +24,58 @@ import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.UUID.Types (UUID, fromText)
-import GHC.Generics (Generic)
+import Lilac.Types
+  ( BToken (BTokenLink, BTokenPadding, BTokenString),
+    Block (Block, body, meta, parentUuid),
+    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Figure (Figure, link, meta),
+    Heading (Heading, body, level, meta, section),
+    Level (Level, indent, number),
+    Link (Link, name, target),
+    LinkNoweb (LinkNoweb, name, uuid),
+    LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
+    ListMarker
+      ( LItemEnd,
+        LItemStart,
+        LOrderedEnd,
+        LOrderedStart,
+        LUnorderedEnd,
+        LUnorderedStart
+      ),
+    MathFragment (MathFragment, body, meta),
+    OrgDoc (OrgDoc, cells, meta, uuid),
+    OrgParser,
+    OrgParserConf (maxHeadingLevel, maxListLevel),
+    OrgParserState
+      ( OrgParserState,
+        anonBlockNumber,
+        blockNames,
+        continuationIndent,
+        equationNumber,
+        goids,
+        headingLevel,
+        headingSection,
+        listLevels,
+        listMarkers,
+        orgId,
+        orgParserConf,
+        styleMask,
+        tanglePaths
+      ),
+    PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    Prose,
+    Style (Bold, Code, Italic, Underline, Verbatim),
+    StyleMask (StyleMask),
+    StyledText (StyledText, body, style),
+    Table (Table, grid, meta),
+    defaultOrgParserConf,
+  )
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Char,
     Either (Left, Right),
-    Enum,
     Eq,
     FilePath,
     IO,
@@ -61,7 +85,6 @@ import Relude
     Maybe (Just, Nothing),
     MonadFail,
     NonEmpty ((:|)),
-    Ord,
     Show,
     StateT,
     String,
@@ -138,216 +161,6 @@ import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
-import Prelude qualified (show)
-
-type OrgParser :: Type -> Type
-type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
-
-type OrgParserState :: Type
-data OrgParserState = OrgParserState
-  { goids :: M.Map UUID P.OsPath,
-    orgId :: NonEmpty (Maybe UUID),
-    headingLevel :: Int,
-    headingSection :: [Int],
-    styleMask :: StyleMask,
-    listLevels :: [Level],
-    listMarkers :: [ListMarker],
-    continuationIndent :: Int,
-    equationNumber :: Int,
-    blockNames :: Set.Set T.Text,
-    anonBlockNumber :: Int,
-    tanglePaths :: Set.Set T.Text,
-    orgParserConf :: OrgParserConf
-  }
-  deriving stock (Eq, Show)
-
-type OrgParserConf :: Type
-data OrgParserConf = OrgParserConf
-  { maxHeadingLevel :: Int,
-    maxListLevel :: Int
-  }
-  deriving stock (Eq, Show)
-
-defaultOrgParserConf :: OrgParserConf
-defaultOrgParserConf =
-  OrgParserConf
-    { maxHeadingLevel = 6,
-      maxListLevel = 6
-    }
-
-type OrgDoc :: Type
-data OrgDoc = OrgDoc
-  { uuid :: Maybe UUID,
-    cells :: [Cell],
-    meta :: M.Map T.Text T.Text
-  }
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON OrgDoc
-
-type Cell :: Type
-data Cell
-  = CHeading Heading
-  | CListItem [ListMarker]
-  | CParagraph Prose
-  | CBlock Block
-  | CMathFragment MathFragment
-  | CFigure Figure
-  | CTable Table
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON Cell
-
-type Heading :: Type
-data Heading = Heading
-  { level :: Int,
-    section :: [Int],
-    body :: Prose,
-    meta :: M.Map T.Text T.Text
-  }
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON Heading
-
-type Prose :: Type
-type Prose = [PToken]
-
-type PToken :: Type
-data PToken
-  = PTokenStyledText StyledText
-  | PTokenLink Link
-  | PTokenMathFragment MathFragment
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON PToken
-
-type StyledText :: Type
-data StyledText = StyledText
-  { body :: T.Text,
-    style :: StyleMask
-  }
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON StyledText
-
-type Style :: Type
-data Style = Bold | Italic | Underline | Verbatim | Code
-  deriving stock (Enum, Eq, Generic, Ord, Show)
-
-instance ToJSON Style
-
-type Link :: Type
-data Link = Link
-  { name :: [StyledText],
-    target :: LinkTarget
-  }
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON Link
-
-type LinkTarget :: Type
-data LinkTarget
-  = LinkTargetNoweb LinkNoweb
-  | LinkTargetURI N.URI
-  | LinkTargetOther T.Text
-  deriving stock (Eq, Generic, Ord, Show)
-
-instance ToJSON LinkTarget
-
-type LinkNoweb :: Type
-data LinkNoweb = LinkNoweb
-  { uuid :: Maybe UUID,
-    name :: T.Text
-  }
-  deriving stock (Eq, Generic, Ord, Show)
-
-instance ToJSON LinkNoweb
-
-type StyleMask :: Type
-newtype StyleMask = StyleMask Word8
-  deriving stock (Eq, Generic)
-
-instance ToJSON StyleMask
-
-instance Show StyleMask where
-  show (StyleMask a) = "styleMaskFrom " <> x
-    where
-      x =
-        Prelude.show
-          . catMaybes
-          . map
-            ( \(i, b) ->
-                if b
-                  then (Just $ (toEnum i :: Style))
-                  else Nothing
-            )
-          . zip [0 ..]
-          $ toListLE a
-
-type Block :: Type
-data Block = Block
-  { parentUuid :: Maybe UUID,
-    meta :: M.Map T.Text T.Text,
-    body :: [BToken]
-  }
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON Block
-
-type BToken :: Type
-data BToken
-  = BTokenString T.Text
-  | BTokenPadding
-  | BTokenLink Link
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON BToken
-
-type Level :: Type
-data Level = Level
-  { indent :: Int,
-    number :: Maybe Int
-  }
-  deriving stock (Eq, Show)
-
-type ListMarker :: Type
-data ListMarker
-  = LOrderedStart
-  | LOrderedEnd
-  | LUnorderedStart
-  | LUnorderedEnd
-  | LItemStart
-  | LItemEnd
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON ListMarker
-
-type MathFragment :: Type
-data MathFragment = MathFragment
-  { meta :: M.Map T.Text T.Text,
-    body :: T.Text
-  }
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON MathFragment
-
-type Figure :: Type
-data Figure = Figure
-  { meta :: M.Map T.Text T.Text,
-    link :: Link
-  }
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON Figure
-
-type Table :: Type
-data Table = Table
-  { meta :: M.Map T.Text T.Text,
-    grid :: M.Map (Int, Int) Prose
-  }
-  deriving stock (Eq, Generic, Show)
-
-instance ToJSON Table
 
 type GOIDsParserState :: Type
 data GOIDsParserState = GOIDsParserState

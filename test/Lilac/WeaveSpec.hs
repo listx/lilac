@@ -2,6 +2,7 @@ module Lilac.WeaveSpec (spec) where
 
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
+import Lilac.Types (OrgParserState (goids))
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
 import Relude
@@ -43,7 +44,7 @@ getWovenPrettyFromPath path orgIdLocationsFile = do
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {LP.goids = goids})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
           path
           inputOrgFile
   case parseResult of

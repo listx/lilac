@@ -7,6 +7,47 @@ import Data.Text qualified as T
 import Data.UUID.Types (UUID, fromText, fromWords64, nil)
 import Data.Void (Void)
 import Lilac.Parse qualified as L
+import Lilac.Types
+  ( BToken (BTokenLink, BTokenString),
+    Block (Block, body, meta, parentUuid),
+    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Figure (Figure, link, meta),
+    Heading (Heading, body, level, meta, section),
+    Link (Link, name, target),
+    LinkNoweb (LinkNoweb, name, uuid),
+    LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
+    ListMarker
+      ( LItemEnd,
+        LItemStart,
+        LOrderedEnd,
+        LOrderedStart,
+        LUnorderedEnd,
+        LUnorderedStart
+      ),
+    MathFragment (MathFragment, body, meta),
+    OrgDoc (OrgDoc, cells, meta, uuid),
+    OrgParserConf (maxHeadingLevel),
+    OrgParserState
+      ( OrgParserState,
+        anonBlockNumber,
+        blockNames,
+        continuationIndent,
+        equationNumber,
+        goids,
+        headingLevel,
+        headingSection,
+        listLevels,
+        listMarkers,
+        orgId,
+        orgParserConf,
+        styleMask,
+        tanglePaths
+      ),
+    PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    Style (Bold, Code, Italic, Underline, Verbatim),
+    StyledText (StyledText, body, style),
+    Table (Table, grid, meta),
+  )
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
@@ -51,7 +92,7 @@ spec = parseSpec
 type Parser :: Type -> Type
 type Parser = MP.ParsecT Void T.Text Identity
 
-p :: FilePath -> L.OrgDoc -> Spec
+p :: FilePath -> OrgDoc -> Spec
 p path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
@@ -61,7 +102,7 @@ p path expected = do
         input
         `shouldParse` (expected, L.defaultOrgParserState)
 
-ps :: FilePath -> L.OrgDoc -> L.OrgParserState -> Spec
+ps :: FilePath -> OrgDoc -> OrgParserState -> Spec
 ps path expected state = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
@@ -91,26 +132,26 @@ pfm path errorTrivial pos = do
         input
         `shouldFailWith` (err pos errorTrivial)
 
-plainParagraph :: T.Text -> L.Cell
+plainParagraph :: T.Text -> Cell
 plainParagraph body =
-  L.CParagraph
-    [ L.PTokenStyledText
-        ( L.StyledText
+  CParagraph
+    [ PTokenStyledText
+        ( StyledText
             { body = body,
               style = L.styleMaskFrom []
             }
         )
     ]
 
-plainHeading :: Int -> [Int] -> L.Cell
+plainHeading :: Int -> [Int] -> Cell
 plainHeading level section =
-  L.CHeading
-    ( L.Heading
+  CHeading
+    ( Heading
         { level = level,
           section = section,
           body =
-            [ L.PTokenStyledText
-                ( L.StyledText
+            [ PTokenStyledText
+                ( StyledText
                     { body = T.pack $ show level,
                       style = L.styleMaskFrom []
                     }
@@ -179,7 +220,7 @@ parseSpec = do
   ps
     "0001-blankline"
     (L.defaultOrgDoc Nothing [])
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = one Nothing,
         headingLevel = 0,
@@ -234,7 +275,7 @@ parseSpec = do
         [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
         ]
     )
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = one . Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
@@ -260,7 +301,7 @@ parseSpec = do
           ("title", "An Org Document")
         ]
     )
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = one . Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
@@ -288,7 +329,7 @@ parseSpec = do
 
   ps
     "0004-headings-20"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
           [ plainHeading 1 [1],
@@ -306,7 +347,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = NE.fromList . take 13 $ repeat Nothing,
         headingLevel = 12,
@@ -319,12 +360,12 @@ parseSpec = do
         blockNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 20}
+        orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 20}
       }
 
   ps
     "0004-headings-unlimited"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
           [ plainHeading 1 [1],
@@ -342,7 +383,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = NE.fromList . take 13 $ repeat Nothing,
         headingLevel = 12,
@@ -355,7 +396,7 @@ parseSpec = do
         blockNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf {L.maxHeadingLevel = 0}
+        orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 0}
       }
 
   pf
@@ -466,16 +507,16 @@ parseSpec = do
 
   ps
     "0004-properties-drawer-empty"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CHeading
-              ( L.Heading
+          [ CHeading
+              ( Heading
                   { level = 1,
                     section = [1],
                     body =
-                      [ L.PTokenStyledText
-                          (L.StyledText {body = "foo", style = L.styleMaskFrom []})
+                      [ PTokenStyledText
+                          (StyledText {body = "foo", style = L.styleMaskFrom []})
                       ],
                     meta = fromList []
                   }
@@ -483,7 +524,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = NE.fromList [Nothing, Nothing],
         headingLevel = 1,
@@ -501,16 +542,16 @@ parseSpec = do
 
   ps
     "0004-properties-drawer-not-empty"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CHeading
-              ( L.Heading
+          [ CHeading
+              ( Heading
                   { level = 1,
                     section = [1],
                     body =
-                      [ L.PTokenStyledText
-                          (L.StyledText {body = "foo", style = L.styleMaskFrom []})
+                      [ PTokenStyledText
+                          (StyledText {body = "foo", style = L.styleMaskFrom []})
                       ],
                     meta =
                       fromList
@@ -521,7 +562,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Nothing],
         headingLevel = 1,
@@ -539,16 +580,16 @@ parseSpec = do
 
   ps
     "0004-properties-drawer-not-empty-with-comments"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CHeading
-              ( L.Heading
+          [ CHeading
+              ( Heading
                   { level = 1,
                     section = [1],
                     body =
-                      [ L.PTokenStyledText
-                          (L.StyledText {body = "foo", style = L.styleMaskFrom []})
+                      [ PTokenStyledText
+                          (StyledText {body = "foo", style = L.styleMaskFrom []})
                       ],
                     meta =
                       fromList
@@ -559,7 +600,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Nothing],
         headingLevel = 1,
@@ -602,24 +643,24 @@ parseSpec = do
 
   p
     "0005-prose-paragraphs"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
+          [ CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "f g h i j", style = L.styleMaskFrom [Bold]})
               ],
-            L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "x y z foo bar", style = L.styleMaskFrom []})
+            CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "x y z foo bar", style = L.styleMaskFrom []})
               ],
-            L.CParagraph
-              [ L.PTokenStyledText
-                  ( L.StyledText
+            CParagraph
+              [ PTokenStyledText
+                  ( StyledText
                       { body = "multiple lines with underscore",
-                        style = L.styleMaskFrom [L.Underline]
+                        style = L.styleMaskFrom [Underline]
                       }
                   )
               ]
@@ -635,24 +676,24 @@ parseSpec = do
 
   p
     "0005-styled-strings-bold"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  ( L.StyledText
+          [ CParagraph
+              [ PTokenStyledText
+                  ( StyledText
                       { body = "foo ",
                         style = L.styleMaskFrom []
                       }
                   ),
-                L.PTokenStyledText
-                  ( L.StyledText
+                PTokenStyledText
+                  ( StyledText
                       { body = "bar",
-                        style = L.styleMaskFrom [L.Bold]
+                        style = L.styleMaskFrom [Bold]
                       }
                   ),
-                L.PTokenStyledText
-                  ( L.StyledText
+                PTokenStyledText
+                  ( StyledText
                       { body = " baz",
                         style = L.styleMaskFrom []
                       }
@@ -664,24 +705,24 @@ parseSpec = do
 
   p
     "0005-styled-strings-complex-punctuation"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "(foo ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "bar", style = L.styleMaskFrom [L.Verbatim]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "). What's up? and ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "that!", style = L.styleMaskFrom [L.Bold]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "(italic)", style = L.styleMaskFrom [L.Italic]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = ". It's #1!", style = L.styleMaskFrom []})
+          [ CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "(foo ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "bar", style = L.styleMaskFrom [Verbatim]}),
+                PTokenStyledText
+                  (StyledText {body = "). What's up? and ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "that!", style = L.styleMaskFrom [Bold]}),
+                PTokenStyledText
+                  (StyledText {body = " ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "(italic)", style = L.styleMaskFrom [Italic]}),
+                PTokenStyledText
+                  (StyledText {body = ". It's #1!", style = L.styleMaskFrom []})
               ]
           ],
         meta = fromList []
@@ -689,36 +730,36 @@ parseSpec = do
 
   p
     "0005-styled-strings-complex"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "bar ", style = L.styleMaskFrom [L.Bold, L.Italic]}),
-                L.PTokenStyledText
-                  ( L.StyledText
+          [ CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "foo ", style = L.styleMaskFrom [Bold]}),
+                PTokenStyledText
+                  (StyledText {body = "bar ", style = L.styleMaskFrom [Bold, Italic]}),
+                PTokenStyledText
+                  ( StyledText
                       { body = "underlined bold and italic",
-                        style = L.styleMaskFrom [L.Bold, L.Italic, L.Underline]
+                        style = L.styleMaskFrom [Bold, Italic, Underline]
                       }
                   ),
-                L.PTokenStyledText
-                  (L.StyledText {body = " baz", style = L.styleMaskFrom [L.Bold]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "verbatim  text", style = L.styleMaskFrom [L.Verbatim]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "x  y  z", style = L.styleMaskFrom [L.Code]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  ( L.StyledText
+                PTokenStyledText
+                  (StyledText {body = " baz", style = L.styleMaskFrom [Bold]}),
+                PTokenStyledText
+                  (StyledText {body = " ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "verbatim  text", style = L.styleMaskFrom [Verbatim]}),
+                PTokenStyledText
+                  (StyledText {body = " ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "x  y  z", style = L.styleMaskFrom [Code]}),
+                PTokenStyledText
+                  (StyledText {body = " ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  ( StyledText
                       { body = "bold",
-                        style = L.styleMaskFrom [L.Bold]
+                        style = L.styleMaskFrom [Bold]
                       }
                   )
               ]
@@ -728,14 +769,14 @@ parseSpec = do
 
   p
     "0005-styled-strings-compression"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "f g h i j", style = L.styleMaskFrom [L.Bold]})
+          [ CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "f g h i j", style = L.styleMaskFrom [Bold]})
               ]
           ],
         meta = fromList []
@@ -743,12 +784,12 @@ parseSpec = do
 
   p
     "0005-styled-strings-ignore-marker-inside-word"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = L.styleMaskFrom [L.Italic]})
+          [ CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = L.styleMaskFrom [Italic]})
               ]
           ],
         meta = fromList []
@@ -761,26 +802,26 @@ parseSpec = do
 
   ps
     "0005-styled-strings-messy-boundaries"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CHeading
-              ( L.Heading
+          [ CHeading
+              ( Heading
                   { level = 1,
                     section = [1],
                     body =
-                      [ L.PTokenStyledText
-                          (L.StyledText {body = "foo ", style = L.styleMaskFrom [L.Bold]}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = "bar baz a", style = L.styleMaskFrom []}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = "b", style = L.styleMaskFrom [L.Bold]}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = "c (", style = L.styleMaskFrom []}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = "ok", style = L.styleMaskFrom [L.Bold]}),
-                        L.PTokenStyledText
-                          (L.StyledText {body = ") yes", style = L.styleMaskFrom []})
+                      [ PTokenStyledText
+                          (StyledText {body = "foo ", style = L.styleMaskFrom [Bold]}),
+                        PTokenStyledText
+                          (StyledText {body = "bar baz a", style = L.styleMaskFrom []}),
+                        PTokenStyledText
+                          (StyledText {body = "b", style = L.styleMaskFrom [Bold]}),
+                        PTokenStyledText
+                          (StyledText {body = "c (", style = L.styleMaskFrom []}),
+                        PTokenStyledText
+                          (StyledText {body = "ok", style = L.styleMaskFrom [Bold]}),
+                        PTokenStyledText
+                          (StyledText {body = ") yes", style = L.styleMaskFrom []})
                       ],
                     meta = fromList []
                   }
@@ -788,7 +829,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = NE.fromList [Nothing, Nothing],
         headingLevel = 1,
@@ -806,7 +847,7 @@ parseSpec = do
 
   p
     "0005-styled-strings-no-style"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
           [ plainParagraph "foo"
@@ -816,24 +857,24 @@ parseSpec = do
 
   p
     "0005-styled-strings-verbatim-code-ignore-immediate-bold"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "*a", style = L.styleMaskFrom [L.Verbatim]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "b*", style = L.styleMaskFrom [L.Verbatim]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "*c", style = L.styleMaskFrom [L.Code]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "d*", style = L.styleMaskFrom [L.Code]})
+          [ CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "*a", style = L.styleMaskFrom [Verbatim]}),
+                PTokenStyledText
+                  (StyledText {body = " ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "b*", style = L.styleMaskFrom [Verbatim]}),
+                PTokenStyledText
+                  (StyledText {body = " ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "*c", style = L.styleMaskFrom [Code]}),
+                PTokenStyledText
+                  (StyledText {body = " ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "d*", style = L.styleMaskFrom [Code]})
               ]
           ],
         meta = fromList []
@@ -841,39 +882,39 @@ parseSpec = do
 
   p
     "0005-styled-strings-verbatim-precedence"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "[[foo", style = L.styleMaskFrom [L.Verbatim]})
+          [ CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "[[foo", style = L.styleMaskFrom [Verbatim]})
               ],
-            L.CParagraph
-              [ L.PTokenLink
-                  ( L.Link
-                      { target = L.LinkTargetOther "hello",
+            CParagraph
+              [ PTokenLink
+                  ( Link
+                      { target = LinkTargetOther "hello",
                         name =
-                          [ L.StyledText
+                          [ StyledText
                               { body = "hello",
                                 style = L.styleMaskFrom []
                               }
                           ]
                       }
                   ),
-                L.PTokenStyledText
-                  (L.StyledText {body = " there", style = L.styleMaskFrom []})
+                PTokenStyledText
+                  (StyledText {body = " there", style = L.styleMaskFrom []})
               ],
-            L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "\\(1 + 1 ", style = L.styleMaskFrom [L.Verbatim]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = " ", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "\\(2 * 2\\)", style = L.styleMaskFrom [L.Code]})
+            CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "\\(1 + 1 ", style = L.styleMaskFrom [Verbatim]}),
+                PTokenStyledText
+                  (StyledText {body = " ", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "\\(2 * 2\\)", style = L.styleMaskFrom [Code]})
               ],
-            L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "[[bar]]", style = L.styleMaskFrom [L.Code]})
+            CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "[[bar]]", style = L.styleMaskFrom [Code]})
               ]
           ],
         meta = fromList []
@@ -881,16 +922,16 @@ parseSpec = do
 
   p
     "0005-styled-strings-verbatim"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  (L.StyledText {body = "(", style = L.styleMaskFrom []}),
-                L.PTokenStyledText
-                  (L.StyledText {body = "import ./.", style = L.styleMaskFrom [L.Verbatim]}),
-                L.PTokenStyledText
-                  (L.StyledText {body = ") hello", style = L.styleMaskFrom []})
+          [ CParagraph
+              [ PTokenStyledText
+                  (StyledText {body = "(", style = L.styleMaskFrom []}),
+                PTokenStyledText
+                  (StyledText {body = "import ./.", style = L.styleMaskFrom [Verbatim]}),
+                PTokenStyledText
+                  (StyledText {body = ") hello", style = L.styleMaskFrom []})
               ]
           ],
         meta = fromList []
@@ -898,29 +939,29 @@ parseSpec = do
 
   p
     "0006-links-inside-parentheses"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  ( L.StyledText
+          [ CParagraph
+              [ PTokenStyledText
+                  ( StyledText
                       { body = "(",
                         style = L.styleMaskFrom []
                       }
                   ),
-                L.PTokenLink
-                  ( L.Link
-                      { target = L.LinkTargetOther "file:foo/bar",
+                PTokenLink
+                  ( Link
+                      { target = LinkTargetOther "file:foo/bar",
                         name =
-                          [ L.StyledText
+                          [ StyledText
                               { body = "file:foo/bar",
                                 style = L.styleMaskFrom []
                               }
                           ]
                       }
                   ),
-                L.PTokenStyledText
-                  ( L.StyledText
+                PTokenStyledText
+                  ( StyledText
                       { body = ")",
                         style = L.styleMaskFrom []
                       }
@@ -932,12 +973,12 @@ parseSpec = do
 
   p
     "0006-links-nonlink"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  ( L.StyledText
+          [ CParagraph
+              [ PTokenStyledText
+                  ( StyledText
                       { body = "[hi]",
                         style = L.styleMaskFrom []
                       }
@@ -949,20 +990,20 @@ parseSpec = do
 
   p
     "0006-links-raw"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  ( L.StyledText
+          [ CParagraph
+              [ PTokenStyledText
+                  ( StyledText
                       { body = "See ",
                         style = L.styleMaskFrom []
                       }
                   ),
-                L.PTokenLink
-                  ( L.Link
+                PTokenLink
+                  ( Link
                       { target =
-                          L.LinkTargetURI
+                          LinkTargetURI
                             N.URI
                               { N.uriScheme = "https:",
                                 N.uriAuthority =
@@ -977,23 +1018,23 @@ parseSpec = do
                                 N.uriFragment = ""
                               },
                         name =
-                          [ L.StyledText
+                          [ StyledText
                               { body = "https://foo.org",
                                 style = L.styleMaskFrom []
                               }
                           ]
                       }
                   ),
-                L.PTokenStyledText
-                  ( L.StyledText
+                PTokenStyledText
+                  ( StyledText
                       { body = ", or ",
                         style = L.styleMaskFrom []
                       }
                   ),
-                L.PTokenLink
-                  ( L.Link
+                PTokenLink
+                  ( Link
                       { target =
-                          L.LinkTargetURI
+                          LinkTargetURI
                             N.URI
                               { N.uriScheme = "https:",
                                 N.uriAuthority =
@@ -1008,23 +1049,23 @@ parseSpec = do
                                 N.uriFragment = ""
                               },
                         name =
-                          [ L.StyledText
+                          [ StyledText
                               { body = "https://bar.net",
                                 style = L.styleMaskFrom []
                               }
                           ]
                       }
                   ),
-                L.PTokenStyledText
-                  ( L.StyledText
+                PTokenStyledText
+                  ( StyledText
                       { body = ". Try ",
                         style = L.styleMaskFrom []
                       }
                   ),
-                L.PTokenLink
-                  ( L.Link
+                PTokenLink
+                  ( Link
                       { target =
-                          L.LinkTargetURI
+                          LinkTargetURI
                             N.URI
                               { N.uriScheme = "http:",
                                 N.uriAuthority =
@@ -1039,23 +1080,23 @@ parseSpec = do
                                 N.uriFragment = ""
                               },
                         name =
-                          [ L.StyledText
+                          [ StyledText
                               { body = "http://localhost:3000",
                                 style = L.styleMaskFrom []
                               }
                           ]
                       }
                   ),
-                L.PTokenStyledText
-                  ( L.StyledText
+                PTokenStyledText
+                  ( StyledText
                       { body = "? Go to ",
                         style = L.styleMaskFrom []
                       }
                   ),
-                L.PTokenLink
-                  ( L.Link
+                PTokenLink
+                  ( Link
                       { target =
-                          L.LinkTargetURI
+                          LinkTargetURI
                             N.URI
                               { N.uriScheme = "ftp:",
                                 N.uriAuthority =
@@ -1070,15 +1111,15 @@ parseSpec = do
                                 N.uriFragment = ""
                               },
                         name =
-                          [ L.StyledText
+                          [ StyledText
                               { body = "ftp://10.0.0.1",
                                 style = L.styleMaskFrom []
                               }
                           ]
                       }
                   ),
-                L.PTokenStyledText
-                  ( L.StyledText
+                PTokenStyledText
+                  ( StyledText
                       { body = "!",
                         style = L.styleMaskFrom []
                       }
@@ -1090,21 +1131,21 @@ parseSpec = do
 
   ps
     "0006-links"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CParagraph
-              [ L.PTokenStyledText
-                  ( L.StyledText
+          [ CParagraph
+              [ PTokenStyledText
+                  ( StyledText
                       { body = "foo ",
                         style = L.styleMaskFrom []
                       }
                   ),
-                L.PTokenLink
-                  ( L.Link
-                      { target = L.LinkTargetOther "link-target-only",
+                PTokenLink
+                  ( Link
+                      { target = LinkTargetOther "link-target-only",
                         name =
-                          [ L.StyledText
+                          [ StyledText
                               { body = "link-target-only",
                                 style = L.styleMaskFrom []
                               }
@@ -1112,16 +1153,16 @@ parseSpec = do
                       }
                   )
               ],
-            L.CHeading
-              ( L.Heading
+            CHeading
+              ( Heading
                   { level = 1,
                     section = [1],
                     body =
-                      [ L.PTokenLink
-                          ( L.Link
-                              { target = L.LinkTargetOther "link-target",
+                      [ PTokenLink
+                          ( Link
+                              { target = LinkTargetOther "link-target",
                                 name =
-                                  [ L.StyledText
+                                  [ StyledText
                                       { body = "link-name",
                                         style = L.styleMaskFrom []
                                       }
@@ -1132,20 +1173,20 @@ parseSpec = do
                     meta = fromList []
                   }
               ),
-            L.CParagraph
-              [ L.PTokenLink
-                  ( L.Link
-                      { target = L.LinkTargetOther "a",
+            CParagraph
+              [ PTokenLink
+                  ( Link
+                      { target = LinkTargetOther "a",
                         name =
-                          [ L.StyledText
+                          [ StyledText
                               { body = "a",
                                 style = L.styleMaskFrom []
                               }
                           ]
                       }
                   ),
-                L.PTokenStyledText
-                  ( L.StyledText
+                PTokenStyledText
+                  ( StyledText
                       { body = " b",
                         style = L.styleMaskFrom []
                       }
@@ -1154,7 +1195,7 @@ parseSpec = do
           ],
         meta = M.fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = NE.fromList [Nothing, Nothing],
         headingLevel = 1,
@@ -1177,11 +1218,11 @@ parseSpec = do
 
   ps
     "0007-blocks-empty"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CBlock
-              ( L.Block
+          [ CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1192,8 +1233,8 @@ parseSpec = do
                     body = []
                   }
               ),
-            L.CBlock
-              ( L.Block
+            CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1203,8 +1244,8 @@ parseSpec = do
                     body = []
                   }
               ),
-            L.CBlock
-              ( L.Block
+            CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1217,7 +1258,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = one Nothing,
         headingLevel = 0,
@@ -1235,11 +1276,11 @@ parseSpec = do
 
   ps
     "0007-blocks-ending"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CBlock
-              ( L.Block
+          [ CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1250,8 +1291,8 @@ parseSpec = do
                     body = []
                   }
               ),
-            L.CBlock
-              ( L.Block
+            CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1259,11 +1300,11 @@ parseSpec = do
                           ("__src_language", "sh"),
                           ("name", "end not in beginning of line")
                         ],
-                    body = [L.BTokenString " #+end_src"]
+                    body = [BTokenString " #+end_src"]
                   }
               ),
-            L.CBlock
-              ( L.Block
+            CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1271,11 +1312,11 @@ parseSpec = do
                           ("__src_language", "sh"),
                           ("name", "end has no preceding blank line")
                         ],
-                    body = [L.BTokenString "foo"]
+                    body = [BTokenString "foo"]
                   }
               ),
-            L.CBlock
-              ( L.Block
+            CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1283,11 +1324,11 @@ parseSpec = do
                           ("__src_language", "sh"),
                           ("name", "end has preceding blank line")
                         ],
-                    body = [L.BTokenString "foo\n"]
+                    body = [BTokenString "foo\n"]
                   }
               ),
-            L.CBlock
-              ( L.Block
+            CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1295,11 +1336,11 @@ parseSpec = do
                           ("__src_language", "sh"),
                           ("name", "end has preceding newline (multiple)")
                         ],
-                    body = [L.BTokenString "foo\n\n"]
+                    body = [BTokenString "foo\n\n"]
                   }
               ),
-            L.CBlock
-              ( L.Block
+            CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1307,13 +1348,13 @@ parseSpec = do
                           ("__src_language", "sh"),
                           ("name", "ignore #+end_example because this is a src block")
                         ],
-                    body = [L.BTokenString "#+end_example"]
+                    body = [BTokenString "#+end_example"]
                   }
               )
           ],
         meta = fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = one Nothing,
         headingLevel = 0,
@@ -1339,11 +1380,11 @@ parseSpec = do
 
   ps
     "0007-blocks-noweb-off"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CBlock
-              ( L.Block
+          [ CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1353,7 +1394,7 @@ parseSpec = do
                           ("noweb", "off")
                         ],
                     body =
-                      [ L.BTokenString "<<foo>>\n\n<<quux\n>>\necho <<bar>> x y z"
+                      [ BTokenString "<<foo>>\n\n<<quux\n>>\necho <<bar>> x y z"
                       ]
                   }
               )
@@ -1361,16 +1402,16 @@ parseSpec = do
         meta = fromList []
       }
     L.defaultOrgParserState
-      { L.anonBlockNumber = 1
+      { anonBlockNumber = 1
       }
 
   ps
     "0007-blocks-noweb"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CBlock
-              ( L.Block
+          [ CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1379,40 +1420,40 @@ parseSpec = do
                           ("__src_language", "sh")
                         ],
                     body =
-                      [ L.BTokenLink
-                          ( L.Link
+                      [ BTokenLink
+                          ( Link
                               { target =
-                                  L.LinkTargetNoweb
-                                    L.LinkNoweb
+                                  LinkTargetNoweb
+                                    LinkNoweb
                                       { uuid = Nothing,
                                         name = "foo"
                                       },
                                 name =
-                                  [ L.StyledText
+                                  [ StyledText
                                       { body = "foo",
                                         style = L.styleMaskFrom []
                                       }
                                   ]
                               }
                           ),
-                        L.BTokenString "\n\n<<quux\n>>\necho ",
-                        L.BTokenLink
-                          ( L.Link
+                        BTokenString "\n\n<<quux\n>>\necho ",
+                        BTokenLink
+                          ( Link
                               { target =
-                                  L.LinkTargetNoweb
-                                    L.LinkNoweb
+                                  LinkTargetNoweb
+                                    LinkNoweb
                                       { uuid = Nothing,
                                         name = "bar"
                                       },
                                 name =
-                                  [ L.StyledText
+                                  [ StyledText
                                       { body = "bar",
                                         style = L.styleMaskFrom []
                                       }
                                   ]
                               }
                           ),
-                        L.BTokenString " x y z"
+                        BTokenString " x y z"
                       ]
                   }
               )
@@ -1420,16 +1461,16 @@ parseSpec = do
         meta = fromList []
       }
     L.defaultOrgParserState
-      { L.anonBlockNumber = 1
+      { anonBlockNumber = 1
       }
 
   ps
     "0007-blocks-noweb-intraline"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CBlock
-              ( L.Block
+          [ CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1438,58 +1479,58 @@ parseSpec = do
                           ("__src_language", "sh")
                         ],
                     body =
-                      [ L.BTokenString "(",
-                        L.BTokenLink
-                          ( L.Link
+                      [ BTokenString "(",
+                        BTokenLink
+                          ( Link
                               { target =
-                                  L.LinkTargetNoweb
-                                    L.LinkNoweb
+                                  LinkTargetNoweb
+                                    LinkNoweb
                                       { uuid = Nothing,
                                         name = "foo"
                                       },
                                 name =
-                                  [ L.StyledText
+                                  [ StyledText
                                       { body = "foo",
                                         style = L.styleMaskFrom []
                                       }
                                   ]
                               }
                           ),
-                        L.BTokenString ") and \"",
-                        L.BTokenLink
-                          ( L.Link
+                        BTokenString ") and \"",
+                        BTokenLink
+                          ( Link
                               { target =
-                                  L.LinkTargetNoweb
-                                    L.LinkNoweb
+                                  LinkTargetNoweb
+                                    LinkNoweb
                                       { uuid = Nothing,
                                         name = "bar"
                                       },
                                 name =
-                                  [ L.StyledText
+                                  [ StyledText
                                       { body = "bar",
                                         style = L.styleMaskFrom []
                                       }
                                   ]
                               }
                           ),
-                        L.BTokenString "\" and <",
-                        L.BTokenLink
-                          ( L.Link
+                        BTokenString "\" and <",
+                        BTokenLink
+                          ( Link
                               { target =
-                                  L.LinkTargetNoweb
-                                    L.LinkNoweb
+                                  LinkTargetNoweb
+                                    LinkNoweb
                                       { uuid = Nothing,
                                         name = "ok"
                                       },
                                 name =
-                                  [ L.StyledText
+                                  [ StyledText
                                       { body = "ok",
                                         style = L.styleMaskFrom []
                                       }
                                   ]
                               }
                           ),
-                        L.BTokenString ">"
+                        BTokenString ">"
                       ]
                   }
               )
@@ -1497,7 +1538,7 @@ parseSpec = do
         meta = fromList []
       }
     L.defaultOrgParserState
-      { L.anonBlockNumber = 1
+      { anonBlockNumber = 1
       }
 
   pf
@@ -1512,11 +1553,11 @@ parseSpec = do
 
   ps
     "0007-blocks-special-commas"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CBlock
-              ( L.Block
+          [ CBlock
+              ( Block
                   { parentUuid = Nothing,
                     meta =
                       fromList
@@ -1525,7 +1566,7 @@ parseSpec = do
                           ("__src_language", "sh")
                         ],
                     body =
-                      [ L.BTokenString
+                      [ BTokenString
                           . T.stripEnd
                           $ T.unlines
                             [ "Special commas get removed:",
@@ -1547,7 +1588,7 @@ parseSpec = do
         meta = fromList []
       }
     L.defaultOrgParserState
-      { L.anonBlockNumber = 1
+      { anonBlockNumber = 1
       }
 
   pf
@@ -1567,23 +1608,23 @@ parseSpec = do
 
   p
     "0009-list-content-simple"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CListItem
-              [ L.LOrderedStart,
-                L.LItemStart
+          [ CListItem
+              [ LOrderedStart,
+                LItemStart
               ],
             plainParagraph "First paragraph.",
             plainParagraph "Second paragraph.",
-            L.CListItem
-              [ L.LItemEnd,
-                L.LItemStart
+            CListItem
+              [ LItemEnd,
+                LItemStart
               ],
             plainParagraph "Another paragraph.",
-            L.CListItem
-              [ L.LItemEnd,
-                L.LOrderedEnd
+            CListItem
+              [ LItemEnd,
+                LOrderedEnd
               ]
           ],
         meta = fromList []
@@ -1591,55 +1632,55 @@ parseSpec = do
 
   p
     "0009-list-indentation-nested-with-text"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
           [ plainParagraph "Foo.",
-            L.CListItem
-              [ L.LOrderedStart, ---- Start outer ordered list.
-                L.LItemStart -------- Start outer "1)".
+            CListItem
+              [ LOrderedStart, ---- Start outer ordered list.
+                LItemStart -------- Start outer "1)".
               ],
             plainParagraph "one",
-            L.CListItem
-              [ L.LUnorderedStart, -- Start inner bullets under "1)".
-                L.LItemStart -------- Inner bullet start.
+            CListItem
+              [ LUnorderedStart, -- Start inner bullets under "1)".
+                LItemStart -------- Inner bullet start.
               ],
             plainParagraph "a",
-            L.CListItem
-              [ L.LItemEnd, --------- Inner bullet end.
-                L.LItemStart -------- Inner bullet start.
+            CListItem
+              [ LItemEnd, --------- Inner bullet end.
+                LItemStart -------- Inner bullet start.
               ],
             plainParagraph "b",
-            L.CListItem
-              [ L.LItemEnd, --------- Inner bullet end.
-                L.LUnorderedEnd, ---- End of inner bullets under "1)".
-                L.LItemEnd, --------- End of outer "1)".
-                L.LItemStart -------- Start of outer "2)".
+            CListItem
+              [ LItemEnd, --------- Inner bullet end.
+                LUnorderedEnd, ---- End of inner bullets under "1)".
+                LItemEnd, --------- End of outer "1)".
+                LItemStart -------- Start of outer "2)".
               ],
             plainParagraph "two",
-            L.CListItem
-              [ L.LOrderedStart, ---- Start of nested ordered list.
-                L.LItemStart -------- Start of nested "1)".
+            CListItem
+              [ LOrderedStart, ---- Start of nested ordered list.
+                LItemStart -------- Start of nested "1)".
               ],
             plainParagraph "two-point-one",
             plainParagraph "hello",
-            L.CListItem
-              [ L.LUnorderedStart, -- Start deeply nested bullets.
-                L.LItemStart -------- Deeply nested bullet start.
+            CListItem
+              [ LUnorderedStart, -- Start deeply nested bullets.
+                LItemStart -------- Deeply nested bullet start.
               ],
             plainParagraph "X",
-            L.CListItem
-              [ L.LItemEnd, --------- Deeply nested bullet end.
-                L.LUnorderedEnd, ---- End of deeply nested bullets.
-                L.LItemEnd, --------- End of nested "1)".
-                L.LOrderedEnd, ------ End of nested ordered list.
-                L.LItemEnd, --------- End of outer "2)".
-                L.LItemStart -------- Start of outer "3)".
+            CListItem
+              [ LItemEnd, --------- Deeply nested bullet end.
+                LUnorderedEnd, ---- End of deeply nested bullets.
+                LItemEnd, --------- End of nested "1)".
+                LOrderedEnd, ------ End of nested ordered list.
+                LItemEnd, --------- End of outer "2)".
+                LItemStart -------- Start of outer "3)".
               ],
             plainParagraph "three",
-            L.CListItem
-              [ L.LItemEnd, --------- End of outer "3)".
-                L.LOrderedEnd ------- End outer ordered list.
+            CListItem
+              [ LItemEnd, --------- End of outer "3)".
+                LOrderedEnd ------- End outer ordered list.
               ],
             plainParagraph "Bar."
           ],
@@ -1648,46 +1689,46 @@ parseSpec = do
 
   p
     "0009-list-indentation-nested"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CListItem
-              [ L.LOrderedStart, ---- Start outer ordered list.
-                L.LItemStart -------- Start outer "1)".
+          [ CListItem
+              [ LOrderedStart, ---- Start outer ordered list.
+                LItemStart -------- Start outer "1)".
               ],
-            L.CListItem
-              [ L.LUnorderedStart, -- Start inner bullets under "1)".
-                L.LItemStart -------- Inner bullet start.
+            CListItem
+              [ LUnorderedStart, -- Start inner bullets under "1)".
+                LItemStart -------- Inner bullet start.
               ],
-            L.CListItem
-              [ L.LItemEnd, --------- Inner bullet end.
-                L.LItemStart -------- Inner bullet start.
+            CListItem
+              [ LItemEnd, --------- Inner bullet end.
+                LItemStart -------- Inner bullet start.
               ],
-            L.CListItem
-              [ L.LItemEnd, --------- Inner bullet end.
-                L.LUnorderedEnd, ---- End of inner bullets under "1)".
-                L.LItemEnd, --------- End of outer "1)".
-                L.LItemStart -------- Start of outer "2)".
+            CListItem
+              [ LItemEnd, --------- Inner bullet end.
+                LUnorderedEnd, ---- End of inner bullets under "1)".
+                LItemEnd, --------- End of outer "1)".
+                LItemStart -------- Start of outer "2)".
               ],
-            L.CListItem
-              [ L.LOrderedStart, ---- Start of nested ordered list.
-                L.LItemStart -------- Start of nested "1)".
+            CListItem
+              [ LOrderedStart, ---- Start of nested ordered list.
+                LItemStart -------- Start of nested "1)".
               ],
-            L.CListItem
-              [ L.LUnorderedStart, -- Start deeply nested bullets.
-                L.LItemStart -------- Deeply nested bullet start.
+            CListItem
+              [ LUnorderedStart, -- Start deeply nested bullets.
+                LItemStart -------- Deeply nested bullet start.
               ],
-            L.CListItem
-              [ L.LItemEnd, --------- Deeply nested bullet end.
-                L.LUnorderedEnd, ---- End of deeply nested bullets.
-                L.LItemEnd, --------- End of nested "1)".
-                L.LOrderedEnd, ------ End of nested ordered list.
-                L.LItemEnd, --------- End of outer "2)".
-                L.LItemStart -------- Start of outer "3)".
+            CListItem
+              [ LItemEnd, --------- Deeply nested bullet end.
+                LUnorderedEnd, ---- End of deeply nested bullets.
+                LItemEnd, --------- End of nested "1)".
+                LOrderedEnd, ------ End of nested ordered list.
+                LItemEnd, --------- End of outer "2)".
+                LItemStart -------- Start of outer "3)".
               ],
-            L.CListItem
-              [ L.LItemEnd, --------- End of outer "3)".
-                L.LOrderedEnd ------- End outer ordered list.
+            CListItem
+              [ LItemEnd, --------- End of outer "3)".
+                LOrderedEnd ------- End outer ordered list.
               ]
           ],
         meta = fromList []
@@ -1705,7 +1746,7 @@ parseSpec = do
 
   p
     "0009-list-indentation-no-indent"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
           [ plainParagraph "1)",
@@ -1716,20 +1757,20 @@ parseSpec = do
 
   p
     "0009-list-indentation-proper-indent"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CListItem
-              [ L.LOrderedStart,
-                L.LItemStart
+          [ CListItem
+              [ LOrderedStart,
+                LItemStart
               ],
-            L.CListItem
-              [ L.LItemEnd,
-                L.LItemStart
+            CListItem
+              [ LItemEnd,
+                LItemStart
               ],
-            L.CListItem
-              [ L.LItemEnd,
-                L.LOrderedEnd
+            CListItem
+              [ LItemEnd,
+                LOrderedEnd
               ]
           ],
         meta = fromList []
@@ -1737,17 +1778,17 @@ parseSpec = do
 
   p
     "0009-list-items-need-blank-line-separator"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CListItem
-              [ L.LOrderedStart,
-                L.LItemStart
+          [ CListItem
+              [ LOrderedStart,
+                LItemStart
               ],
             plainParagraph "a 1) b",
-            L.CListItem
-              [ L.LItemEnd,
-                L.LOrderedEnd
+            CListItem
+              [ LItemEnd,
+                LOrderedEnd
               ]
           ],
         meta = fromList []
@@ -1790,35 +1831,35 @@ parseSpec = do
 
   p
     "0009-paragraph-can-close-deeper-levels"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CListItem
-              [ L.LOrderedStart,
-                L.LItemStart
+          [ CListItem
+              [ LOrderedStart,
+                LItemStart
               ],
             plainParagraph "One",
             plainParagraph "Two x",
-            L.CListItem
-              [ L.LUnorderedStart,
-                L.LItemStart
+            CListItem
+              [ LUnorderedStart,
+                LItemStart
               ],
             plainParagraph "Bar",
-            L.CListItem
-              [ L.LUnorderedStart,
-                L.LItemStart
+            CListItem
+              [ LUnorderedStart,
+                LItemStart
               ],
             plainParagraph "Baz",
-            L.CListItem
-              [ L.LItemEnd,
-                L.LUnorderedEnd,
-                L.LItemEnd,
-                L.LUnorderedEnd
+            CListItem
+              [ LItemEnd,
+                LUnorderedEnd,
+                LItemEnd,
+                LUnorderedEnd
               ],
             plainParagraph "Three a b c",
-            L.CListItem
-              [ L.LItemEnd,
-                L.LOrderedEnd
+            CListItem
+              [ LItemEnd,
+                LOrderedEnd
               ],
             plainParagraph "Four"
           ],
@@ -1827,49 +1868,49 @@ parseSpec = do
 
   p
     "0009-paragraph-can-separate-mixed-lists"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CListItem
-              [ L.LOrderedStart,
-                L.LItemStart
+          [ CListItem
+              [ LOrderedStart,
+                LItemStart
               ],
             plainParagraph "One",
-            L.CListItem
-              [ L.LUnorderedStart,
-                L.LItemStart
+            CListItem
+              [ LUnorderedStart,
+                LItemStart
               ],
             plainParagraph "Bar",
-            L.CListItem
-              [ L.LUnorderedStart,
-                L.LItemStart
+            CListItem
+              [ LUnorderedStart,
+                LItemStart
               ],
             plainParagraph "Baz",
-            L.CListItem
-              [ L.LItemEnd,
-                L.LUnorderedEnd,
-                L.LItemEnd,
-                L.LUnorderedEnd
+            CListItem
+              [ LItemEnd,
+                LUnorderedEnd,
+                LItemEnd,
+                LUnorderedEnd
               ],
             plainParagraph "Two",
-            L.CListItem
-              [ L.LOrderedStart,
-                L.LItemStart
+            CListItem
+              [ LOrderedStart,
+                LItemStart
               ],
             plainParagraph "a",
-            L.CListItem
-              [ L.LItemEnd,
-                L.LItemStart
+            CListItem
+              [ LItemEnd,
+                LItemStart
               ],
             plainParagraph "b",
-            L.CListItem
-              [ L.LItemEnd,
-                L.LOrderedEnd
+            CListItem
+              [ LItemEnd,
+                LOrderedEnd
               ],
             plainParagraph "Three",
-            L.CListItem
-              [ L.LItemEnd,
-                L.LOrderedEnd
+            CListItem
+              [ LItemEnd,
+                LOrderedEnd
               ],
             plainParagraph "Four"
           ],
@@ -1878,40 +1919,40 @@ parseSpec = do
 
   ps
     "0010-standalone-math-fragments"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CMathFragment
-              L.MathFragment
+          [ CMathFragment
+              MathFragment
                 { meta =
                     fromList
                       [ ("__equation_number", "1")
                       ],
                   body = "1 + 1 = 2"
                 },
-            L.CMathFragment
-              L.MathFragment
+            CMathFragment
+              MathFragment
                 { meta =
                     fromList
                       [ ("__equation_number", "2")
                       ],
                   body = "1 + 1 = 2"
                 },
-            L.CMathFragment
-              L.MathFragment
+            CMathFragment
+              MathFragment
                 { meta = fromList [],
                   body = "2 + 2 = 4"
                 },
-            L.CMathFragment
-              L.MathFragment
+            CMathFragment
+              MathFragment
                 { meta =
                     fromList
                       [ ("name", "eq:x")
                       ],
                   body = "2 + 2 = 4"
                 },
-            L.CMathFragment
-              L.MathFragment
+            CMathFragment
+              MathFragment
                 { meta =
                     fromList
                       [ ("__equation_number", "3"),
@@ -1922,7 +1963,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = one Nothing,
         headingLevel = 0,
@@ -1940,31 +1981,31 @@ parseSpec = do
 
   ps
     "0010-standalone-math-inside-lists"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CListItem
-              [ L.LOrderedStart,
-                L.LItemStart
+          [ CListItem
+              [ LOrderedStart,
+                LItemStart
               ],
-            L.CParagraph
-              [ L.PTokenStyledText
-                  ( L.StyledText
+            CParagraph
+              [ PTokenStyledText
+                  ( StyledText
                       { body = "foo",
                         style = L.styleMaskFrom []
                       }
                   )
               ],
-            L.CMathFragment
-              L.MathFragment
+            CMathFragment
+              MathFragment
                 { meta =
                     fromList
                       [ ("name", "eq:x")
                       ],
                   body = "2 + 2 = 4"
                 },
-            L.CMathFragment
-              L.MathFragment
+            CMathFragment
+              MathFragment
                 { meta =
                     fromList
                       [ ("__equation_number", "1"),
@@ -1972,14 +2013,14 @@ parseSpec = do
                       ],
                   body = "1 + 1 = 2"
                 },
-            L.CListItem
-              [ L.LItemEnd,
-                L.LOrderedEnd
+            CListItem
+              [ LItemEnd,
+                LOrderedEnd
               ]
           ],
         meta = fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = one Nothing,
         headingLevel = 0,
@@ -1997,11 +2038,11 @@ parseSpec = do
 
   ps
     "0011-figures-and-blocks"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CBlock
-              L.Block
+          [ CBlock
+              Block
                 { parentUuid = Nothing,
                   meta =
                     fromList
@@ -2010,28 +2051,28 @@ parseSpec = do
                         ("name", "f:f"),
                         ("xxx", "bar")
                       ],
-                  body = [L.BTokenString "f = 1 + 1"]
+                  body = [BTokenString "f = 1 + 1"]
                 },
-            L.CFigure
-              L.Figure
+            CFigure
+              Figure
                 { meta =
                     fromList
                       [ ("attr_html", ":width 100%"),
                         ("name", "fig:hello")
                       ],
                   link =
-                    L.Link
-                      { target = L.LinkTargetOther "./image/hello.png",
+                    Link
+                      { target = LinkTargetOther "./image/hello.png",
                         name =
-                          [ L.StyledText
+                          [ StyledText
                               { body = "./image/hello.png",
                                 style = L.styleMaskFrom []
                               }
                           ]
                       }
                 },
-            L.CBlock
-              L.Block
+            CBlock
+              Block
                 { parentUuid = Nothing,
                   meta =
                     fromList
@@ -2040,16 +2081,16 @@ parseSpec = do
                         ("name", "f:g"),
                         ("yyy", "bar")
                       ],
-                  body = [L.BTokenString "g x = x + 1"]
+                  body = [BTokenString "g x = x + 1"]
                 },
-            L.CFigure
-              L.Figure
+            CFigure
+              Figure
                 { meta = fromList [],
                   link =
-                    L.Link
-                      { target = L.LinkTargetOther "./image/world.png",
+                    Link
+                      { target = LinkTargetOther "./image/world.png",
                         name =
-                          [ L.StyledText
+                          [ StyledText
                               { body = "./image/world.png",
                                 style = L.styleMaskFrom []
                               }
@@ -2059,7 +2100,7 @@ parseSpec = do
           ],
         meta = fromList []
       }
-    L.OrgParserState
+    OrgParserState
       { goids = fromList [],
         orgId = one Nothing,
         headingLevel = 0,
@@ -2081,11 +2122,11 @@ parseSpec = do
 
   p
     "0012-tables-and-prose"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CTable
-              L.Table
+          [ CTable
+              Table
                 { meta =
                     fromList
                       [ ("name", "tbl:famous-equations")
@@ -2093,8 +2134,8 @@ parseSpec = do
                   grid =
                     fromList
                       [ ( (1, 1),
-                          [ L.PTokenStyledText
-                              ( L.StyledText
+                          [ PTokenStyledText
+                              ( StyledText
                                   { body = "Name",
                                     style = L.styleMaskFrom []
                                   }
@@ -2102,8 +2143,8 @@ parseSpec = do
                           ]
                         ),
                         ( (1, 2),
-                          [ L.PTokenStyledText
-                              ( L.StyledText
+                          [ PTokenStyledText
+                              ( StyledText
                                   { body = "Equation",
                                     style = L.styleMaskFrom []
                                   }
@@ -2111,8 +2152,8 @@ parseSpec = do
                           ]
                         ),
                         ( (1, 3),
-                          [ L.PTokenStyledText
-                              ( L.StyledText
+                          [ PTokenStyledText
+                              ( StyledText
                                   { body = "Link",
                                     style = L.styleMaskFrom []
                                   }
@@ -2123,8 +2164,8 @@ parseSpec = do
                           []
                         ),
                         ( (3, 1),
-                          [ L.PTokenStyledText
-                              ( L.StyledText
+                          [ PTokenStyledText
+                              ( StyledText
                                   { body = "Pythagoras | Foo",
                                     style = L.styleMaskFrom []
                                   }
@@ -2132,8 +2173,8 @@ parseSpec = do
                           ]
                         ),
                         ( (3, 2),
-                          [ L.PTokenMathFragment
-                              ( L.MathFragment
+                          [ PTokenMathFragment
+                              ( MathFragment
                                   { meta = fromList [],
                                     body = "a^2 + b^2 = c^2"
                                   }
@@ -2141,11 +2182,11 @@ parseSpec = do
                           ]
                         ),
                         ( (3, 3),
-                          [ L.PTokenLink
-                              ( L.Link
-                                  { target = L.LinkTargetOther "https://wiki/x",
+                          [ PTokenLink
+                              ( Link
+                                  { target = LinkTargetOther "https://wiki/x",
                                     name =
-                                      [ L.StyledText
+                                      [ StyledText
                                           { body = "Wiki",
                                             style = L.styleMaskFrom []
                                           }
@@ -2155,23 +2196,23 @@ parseSpec = do
                           ]
                         ),
                         ( (4, 1),
-                          [ L.PTokenStyledText
-                              ( L.StyledText
+                          [ PTokenStyledText
+                              ( StyledText
                                   { body = "Albert ",
                                     style = L.styleMaskFrom []
                                   }
                               ),
-                            L.PTokenStyledText
-                              ( L.StyledText
+                            PTokenStyledText
+                              ( StyledText
                                   { body = "Einstein",
-                                    style = L.styleMaskFrom [L.Bold]
+                                    style = L.styleMaskFrom [Bold]
                                   }
                               )
                           ]
                         ),
                         ( (4, 2),
-                          [ L.PTokenMathFragment
-                              ( L.MathFragment
+                          [ PTokenMathFragment
+                              ( MathFragment
                                   { meta = fromList [],
                                     body = "E = mc^2"
                                   }
@@ -2179,11 +2220,11 @@ parseSpec = do
                           ]
                         ),
                         ( (4, 3),
-                          [ L.PTokenLink
-                              ( L.Link
-                                  { target = L.LinkTargetOther "https://wiki/y",
+                          [ PTokenLink
+                              ( Link
+                                  { target = LinkTargetOther "https://wiki/y",
                                     name =
-                                      [ L.StyledText
+                                      [ StyledText
                                           { body = "Wiki",
                                             style = L.styleMaskFrom []
                                           }
@@ -2200,23 +2241,23 @@ parseSpec = do
 
   p
     "0012-tables-inside-lists"
-    L.OrgDoc
+    OrgDoc
       { uuid = Nothing,
         cells =
-          [ L.CListItem
-              [ L.LOrderedStart,
-                L.LItemStart
+          [ CListItem
+              [ LOrderedStart,
+                LItemStart
               ],
-            L.CParagraph
-              [ L.PTokenStyledText
-                  ( L.StyledText
+            CParagraph
+              [ PTokenStyledText
+                  ( StyledText
                       { body = "foo",
                         style = L.styleMaskFrom []
                       }
                   )
               ],
-            L.CTable
-              L.Table
+            CTable
+              Table
                 { meta =
                     fromList
                       [ ("name", "tbl:famous-equations"),
@@ -2225,8 +2266,8 @@ parseSpec = do
                   grid =
                     fromList
                       [ ( (1, 1),
-                          [ L.PTokenStyledText
-                              ( L.StyledText
+                          [ PTokenStyledText
+                              ( StyledText
                                   { body = "Name",
                                     style = L.styleMaskFrom []
                                   }
@@ -2234,8 +2275,8 @@ parseSpec = do
                           ]
                         ),
                         ( (1, 2),
-                          [ L.PTokenStyledText
-                              ( L.StyledText
+                          [ PTokenStyledText
+                              ( StyledText
                                   { body = "Equation",
                                     style = L.styleMaskFrom []
                                   }
@@ -2243,8 +2284,8 @@ parseSpec = do
                           ]
                         ),
                         ( (1, 3),
-                          [ L.PTokenStyledText
-                              ( L.StyledText
+                          [ PTokenStyledText
+                              ( StyledText
                                   { body = "Link",
                                     style = L.styleMaskFrom []
                                   }
@@ -2255,8 +2296,8 @@ parseSpec = do
                           []
                         ),
                         ( (3, 1),
-                          [ L.PTokenStyledText
-                              ( L.StyledText
+                          [ PTokenStyledText
+                              ( StyledText
                                   { body = "Pythagoras | Foo",
                                     style = L.styleMaskFrom []
                                   }
@@ -2264,8 +2305,8 @@ parseSpec = do
                           ]
                         ),
                         ( (3, 2),
-                          [ L.PTokenMathFragment
-                              ( L.MathFragment
+                          [ PTokenMathFragment
+                              ( MathFragment
                                   { meta = fromList [],
                                     body = "a^2 + b^2 = c^2"
                                   }
@@ -2273,11 +2314,11 @@ parseSpec = do
                           ]
                         ),
                         ( (3, 3),
-                          [ L.PTokenLink
-                              ( L.Link
-                                  { target = L.LinkTargetOther "https://wiki/x",
+                          [ PTokenLink
+                              ( Link
+                                  { target = LinkTargetOther "https://wiki/x",
                                     name =
-                                      [ L.StyledText
+                                      [ StyledText
                                           { body = "Wiki",
                                             style = L.styleMaskFrom []
                                           }
@@ -2287,23 +2328,23 @@ parseSpec = do
                           ]
                         ),
                         ( (4, 1),
-                          [ L.PTokenStyledText
-                              ( L.StyledText
+                          [ PTokenStyledText
+                              ( StyledText
                                   { body = "Albert ",
                                     style = L.styleMaskFrom []
                                   }
                               ),
-                            L.PTokenStyledText
-                              ( L.StyledText
+                            PTokenStyledText
+                              ( StyledText
                                   { body = "Einstein",
-                                    style = L.styleMaskFrom [L.Bold]
+                                    style = L.styleMaskFrom [Bold]
                                   }
                               )
                           ]
                         ),
                         ( (4, 2),
-                          [ L.PTokenMathFragment
-                              ( L.MathFragment
+                          [ PTokenMathFragment
+                              ( MathFragment
                                   { meta = fromList [],
                                     body = "E = mc^2"
                                   }
@@ -2311,11 +2352,11 @@ parseSpec = do
                           ]
                         ),
                         ( (4, 3),
-                          [ L.PTokenLink
-                              ( L.Link
-                                  { target = L.LinkTargetOther "https://wiki/y",
+                          [ PTokenLink
+                              ( Link
+                                  { target = LinkTargetOther "https://wiki/y",
                                     name =
-                                      [ L.StyledText
+                                      [ StyledText
                                           { body = "Wiki",
                                             style = L.styleMaskFrom []
                                           }
@@ -2326,9 +2367,9 @@ parseSpec = do
                         )
                       ]
                 },
-            L.CListItem
-              [ L.LItemEnd,
-                L.LOrderedEnd
+            CListItem
+              [ LItemEnd,
+                LOrderedEnd
               ]
           ],
         meta = fromList []
