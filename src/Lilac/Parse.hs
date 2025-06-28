@@ -23,7 +23,7 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText)
+import Data.UUID.Types (UUID, fromText, nil)
 import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentUuid),
@@ -212,11 +212,10 @@ parseOrgDoc input = case MP.runParser
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
-  meta <- docMetaParser
+  (docUuid, meta) <- docMetaParser
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
-  orgParserState <- get
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -227,27 +226,31 @@ orgDocParser = do
         CMathFragment {}
         CFigure {}
         CTable {} -> True
-      maybeDocUuid = last orgParserState.orgId
   pure
     $ OrgDoc
-      { uuid = maybeDocUuid,
+      { uuid = docUuid,
         cells = filter meaningfulCell cells,
         meta = meta
       }
 
-defaultOrgDoc :: Maybe UUID -> [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDoc :: UUID -> [(T.Text, T.Text)] -> OrgDoc
 defaultOrgDoc uuid metas =
   OrgDoc
     { uuid = uuid,
       cells = [],
-      meta = M.fromList metas
+      meta = M.fromList metas'
     }
+  where
+    metas' =
+      if uuid == nil
+        then ("ID", "00000000-0000-0000-0000-000000000000") : metas
+        else metas
 
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
-      orgId = one Nothing,
+      orgId = one $ Just nil,
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
@@ -284,7 +287,7 @@ docMetaEntryParser = do
     avoidParsingLilacExtensions :: OrgParser ()
     avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
 
-docMetaParser :: OrgParser (M.Map T.Text T.Text)
+docMetaParser :: OrgParser (UUID, M.Map T.Text T.Text)
 docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
@@ -295,11 +298,11 @@ docMetaParser = do
     $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
     <> (show conflictingKeys)
   case M.lookup "ID" topLevelDrawerProps of
-    Nothing -> modify (\s -> s {orgId = one Nothing})
+    Nothing -> fail $ "required document ID property not found"
     Just uuidText -> do
       uuid <- validateUuidText uuidText
       modify (\s -> s {orgId = one $ Just uuid})
-  pure $ M.union topLevelDrawerProps metaKVs
+      pure (uuid, M.union topLevelDrawerProps metaKVs)
 
 lilacExtensionsParser :: OrgParser ()
 lilacExtensionsParser = do
@@ -1510,7 +1513,7 @@ extractGOIDs orgFilesAndContents =
           Right (orgDoc, _orgParserState) -> M.insert orgFile (getOrgIds orgDoc) acc
       | otherwise = acc
     getOrgIds :: OrgDoc -> [UUID]
-    getOrgIds od = catMaybes $ foldl' f [od.uuid] od.cells
+    getOrgIds od = catMaybes $ foldl' f [Just $ od.uuid] od.cells
     extractOrgId :: M.Map T.Text T.Text -> Maybe UUID
     extractOrgId meta
       | Just uuidText <- EM.lookup "ID" meta = fromText uuidText

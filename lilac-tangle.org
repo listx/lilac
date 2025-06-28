@@ -218,7 +218,7 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
       CTable {} -> sc
     getFqbn :: Block -> T.Text -> T.Text
     getFqbn b name = LU.prefixWithId b.parentUuid name
-    getFqbnByDocUUID name = LU.prefixWithId od.uuid name
+    getFqbnByDocUUID name = LU.prefixWithId (Just od.uuid) name
     injectFqbn fqbn block =
       block
         { meta = M.insert "__fqbn" fqbn block.meta
@@ -534,6 +534,10 @@ cd test && find Lilac/TangleSpec -type f \
 We use the [[f:checkCycles]] helper (powered by [[f:findCycles]] underneath) to detect
 cycles (or lack thereof).
 
+For tangling, because of the fact that we are testing things like using multiple
+Org files, we have to be a little more explicit about the Org ID of each Org
+file involved.
+
 First let's check for the happy path where there are no cycles. Note the use of
 ~:noweb off~ so as to preserve the Noweb link declaration (see
 [[f:nowebLinkParser]] and [[t:0007-blocks-noweb]] for more sample usage of ~:noweb off~).
@@ -541,6 +545,10 @@ First let's check for the happy path where there are no cycles. Note the use of
 #+header: :tangle test/Lilac/TangleSpec/0100-dag-no-loops
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e000
+:END:
+
 ,#+name: f:a
 ,#+begin_src haskell
 f = 1 + 1
@@ -566,6 +574,10 @@ Now check for the simplest case of a single self-loop.
 #+header: :tangle test/Lilac/TangleSpec/0100-dag-self-loop
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e001
+:END:
+
 ,#+name: f:a
 ,#+begin_src haskell
 f = 1 + 1
@@ -578,7 +590,7 @@ f = 1 + 1
 checkCycles
   "0100-dag-self-loop"
   "test/.orgids"
-  [G.Node "f:a" []]
+  [G.Node "id:00000000-0000-0000-0000-00000000e001::f:a" []]
 #+end_src
 
 Check whether we can detect two independent self-loops.
@@ -586,6 +598,10 @@ Check whether we can detect two independent self-loops.
 #+header: :tangle test/Lilac/TangleSpec/0100-dag-self-loops
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e003
+:END:
+
 ,#+name: f:a
 ,#+begin_src haskell
 f = 1 + 1
@@ -604,8 +620,8 @@ f = 1 + 1
 checkCycles
   "0100-dag-self-loops"
   "test/.orgids"
-  [ G.Node "f:a" [],
-    G.Node "f:b" []
+  [ G.Node "id:00000000-0000-0000-0000-00000000e003::f:a" [],
+    G.Node "id:00000000-0000-0000-0000-00000000e003::f:b" []
   ]
 #+end_src
 
@@ -615,6 +631,10 @@ Check whether we can detect a back edge to an ancestor. In
 #+header: :tangle test/Lilac/TangleSpec/0100-dag-2-node-loop
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e004
+:END:
+
 ,#+name: f:a
 ,#+begin_src haskell
 f = 1 + 1
@@ -634,8 +654,8 @@ checkCycles
   "0100-dag-2-node-loop"
   "test/.orgids"
   [ G.Node
-      "f:a"
-      [ G.Node "f:b" []
+      "id:00000000-0000-0000-0000-00000000e004::f:a"
+      [ G.Node "id:00000000-0000-0000-0000-00000000e004::f:b" []
       ]
   ]
 #+end_src
@@ -646,6 +666,10 @@ one node longer (involves 3 nodes instead of 2).
 #+header: :tangle test/Lilac/TangleSpec/0100-dag-3-node-loop
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e005
+:END:
+
 ,#+name: f:a
 ,#+begin_src haskell
 f = 1 + 1
@@ -671,10 +695,10 @@ checkCycles
   "0100-dag-3-node-loop"
   "test/.orgids"
   [ G.Node
-      "f:a"
+      "id:00000000-0000-0000-0000-00000000e005::f:a"
       [ G.Node
-          "f:b"
-          [ G.Node "f:c" []
+          "id:00000000-0000-0000-0000-00000000e005::f:b"
+          [ G.Node "id:00000000-0000-0000-0000-00000000e005::f:c" []
           ]
       ]
   ]
@@ -687,6 +711,10 @@ is still able to handle such pathological input.
 #+header: :tangle test/Lilac/TangleSpec/0100-dag-complex-loops
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e006
+:END:
+
 ,#+name: f:a
 ,#+begin_src haskell
 f = 1 + 1
@@ -726,14 +754,14 @@ checkCycles
   "0100-dag-complex-loops"
   "test/.orgids"
   [ G.Node
-      "f:a"
+      "id:00000000-0000-0000-0000-00000000e006::f:a"
       [ G.Node
-          "f:b"
-          [ G.Node "f:c" [],
-            G.Node "f:d" []
+          "id:00000000-0000-0000-0000-00000000e006::f:b"
+          [ G.Node "id:00000000-0000-0000-0000-00000000e006::f:c" [],
+            G.Node "id:00000000-0000-0000-0000-00000000e006::f:d" []
           ]
       ],
-    G.Node "f:e" []
+    G.Node "id:00000000-0000-0000-0000-00000000e006::f:e" []
   ]
 #+end_src
 
@@ -867,6 +895,10 @@ Expand a single code block.
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e007
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell
@@ -903,6 +935,10 @@ newline for the expanded content.
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-deeply-nested
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e008
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell
@@ -952,6 +988,10 @@ If the link name is indented, we have to indent the contents of that block.
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e009
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell
@@ -994,6 +1034,10 @@ of the indent found in the current and outer surrounding blocks.
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix-nested
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e00a
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell
@@ -1040,6 +1084,10 @@ have non-space characters in it as well.
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix-nonspace
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e00b
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell
@@ -1076,6 +1124,10 @@ Non-space prefixes can also be nested.
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix-nonspace-nested
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e00c
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell
@@ -1121,6 +1173,10 @@ Complex expansions.
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-complex
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e00d
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell
@@ -1207,6 +1263,10 @@ Noweb links.
 #+header: :tangle test/Lilac/TangleSpec/0102-pad-between-consecutive-links
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e00e
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell
@@ -1304,6 +1364,10 @@ Insert shebang lines if the user specifies them with the ~:shebang~ header.
 #+header: :tangle test/Lilac/TangleSpec/0103-shebang
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e00f
+:END:
+
 ,#+name: a
 ,#+header: :tangle a.sh
 ,#+header: :shebang #!/usr/bin/env bash
@@ -1332,6 +1396,10 @@ external file.
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-parent
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e010
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell
@@ -1374,6 +1442,10 @@ a heading's ID, not the ID that's set at the file level.
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-parent-headingchild
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e011
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell
@@ -1424,6 +1496,10 @@ the external child block from [[t:0101-block-expansion-external]].
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-2-hops-parent
 #+header: :noweb off
 #+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e012
+:END:
+
 ,#+name: a
 ,#+header: :tangle equations.txt
 ,#+begin_src haskell

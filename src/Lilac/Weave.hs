@@ -374,8 +374,7 @@ weaveLink link = do
       LinkTargetNoweb linkNoweb
         | Just linkUuid <- linkNoweb.uuid,
           Just orgFile <- EM.lookup linkUuid weaveConf.goids,
-          Just docUuid <- weaveConf.orgDoc.uuid,
-          Just currentOrgFile <- EM.lookup docUuid weaveConf.goids,
+          Just currentOrgFile <- EM.lookup weaveConf.orgDoc.uuid weaveConf.goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
             if orgFile == currentOrgFile
               then "#" <> linkAnchor

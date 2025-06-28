@@ -21,6 +21,7 @@ module Lilac.Types
     StyledText (..),
     Table (..),
     defaultOrgParserConf,
+    nilOrgDocUuid,
   )
 where
 
@@ -166,7 +167,7 @@ instance ToJSON MathFragment
 
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
-  { uuid :: Maybe UUID,
+  { uuid :: UUID,
     cells :: [Cell],
     meta :: M.Map T.Text T.Text
   }
@@ -265,3 +266,12 @@ type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
 
 type Prose :: Type
 type Prose = [PToken]
+
+nilOrgDocUuid :: T.Text
+nilOrgDocUuid =
+  """
+  :PROPERTIES:
+  :ID:       00000000-0000-0000-0000-000000000000
+  :END:
+
+  """

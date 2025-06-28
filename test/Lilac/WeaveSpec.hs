@@ -2,7 +2,7 @@ module Lilac.WeaveSpec (spec) where
 
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
-import Lilac.Types (OrgParserState (goids))
+import Lilac.Types (OrgParserState (goids), nilOrgDocUuid)
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
 import Relude
@@ -46,7 +46,7 @@ getWovenPrettyFromPath path orgIdLocationsFile = do
         MP.runParser
           (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
           path
-          inputOrgFile
+          (nilOrgDocUuid <> inputOrgFile)
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do

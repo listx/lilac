@@ -130,7 +130,7 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
       CParagraph {} -> []
     getSymbols :: Maybe UUID -> M.Map T.Text T.Text -> Cell -> [(T.Text, Cell)]
     getSymbols parentUuid cellMeta cell =
-      concatMap requireName $ catMaybes [parentUuid, orgDoc.uuid]
+      concatMap requireName $ catMaybes [parentUuid, Just $ orgDoc.uuid]
       where
         requireName uuid
           | Just name <- EM.lookup "name" cellMeta =

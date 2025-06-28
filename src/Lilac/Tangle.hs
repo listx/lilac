@@ -137,7 +137,7 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
       CTable {} -> sc
     getFqbn :: Block -> T.Text -> T.Text
     getFqbn b name = LU.prefixWithId b.parentUuid name
-    getFqbnByDocUUID name = LU.prefixWithId od.uuid name
+    getFqbnByDocUUID name = LU.prefixWithId (Just od.uuid) name
     injectFqbn fqbn block =
       block
         { meta = M.insert "__fqbn" fqbn block.meta

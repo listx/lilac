@@ -49,7 +49,7 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText)
+import Data.UUID.Types (UUID, fromText, nil)
 import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentUuid),
@@ -405,15 +405,14 @@ would-be-tangled file has its own code graph. These code graphs are discussed
 later in [[id:b449a097-d702-4fd6-98de-cb81f7e49177][Code graphs]].
 
 In summary an Org document is made up of cells and code graphs, as well as some
-metadata (the title, author name, etc). The doc also has an optional UUID, which
-will usually be populated to allow other Org files to link to its named cells
-(other files can also link to external headings by their UUID, if they exist).
+metadata (the title, author name, etc). The doc also has a UUID, which
+allows other Org files to refer to this Org file.
 
 #+name: data:OrgDoc
 #+begin_src haskell
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
-  { uuid :: Maybe UUID,
+  { uuid :: UUID,
     cells :: [Cell],
     meta :: M.Map T.Text T.Text
   }
@@ -507,7 +506,7 @@ defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
-      orgId = one Nothing,
+      orgId = one $ Just nil,
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
@@ -544,11 +543,10 @@ deal with it here separately.
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
-  meta <- docMetaParser
+  (docUuid, meta) <- docMetaParser
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
-  orgParserState <- get
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -559,10 +557,9 @@ orgDocParser = do
         CMathFragment {}
         CFigure {}
         CTable {} -> True
-      maybeDocUuid = last orgParserState.orgId
   pure
     $ OrgDoc
-      { uuid = maybeDocUuid,
+      { uuid = docUuid,
         cells = filter meaningfulCell cells,
         meta = meta
       }
@@ -584,8 +581,8 @@ it "empty input" $ do
   MP.runParser
     (runStateT L.orgDocParser L.defaultOrgParserState)
     "empty input"
-    ""
-    `shouldParse` (L.defaultOrgDoc Nothing [], L.defaultOrgParserState)
+    nilOrgDocUuid
+    `shouldParse` (L.defaultOrgDoc nil [], L.defaultOrgParserState)
 #+end_src
 
 The =defaultOrgDoc= is just a default (mostly blank) ~OrgDoc~. It's useful for
@@ -593,13 +590,18 @@ testing.
 
 #+name: f:defaultOrgDoc
 #+begin_src haskell
-defaultOrgDoc :: Maybe UUID -> [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDoc :: UUID -> [(T.Text, T.Text)] -> OrgDoc
 defaultOrgDoc uuid metas =
   OrgDoc
     { uuid = uuid,
       cells = [],
-      meta = M.fromList metas
+      meta = M.fromList metas'
     }
+  where
+    metas' =
+      if uuid == nil
+        then ("ID", "00000000-0000-0000-0000-000000000000") : metas
+        else metas
 #+end_src
 
 We should also be able to parse blank documents (not empty, but only has
@@ -620,7 +622,7 @@ This leaves us with just one newline in
 #+begin_src haskell
 p
   "0001-blankline"
-  (L.defaultOrgDoc Nothing [])
+  (L.defaultOrgDoc nil [])
 #+end_src
 
 Parsing comments should also result in a blank document.
@@ -639,7 +641,7 @@ a block comment.
 #+begin_src haskell
 p
   "0001-comments-only"
-  (L.defaultOrgDoc Nothing [])
+  (L.defaultOrgDoc nil [])
 #+end_src
 
 At the other end of the spectrum, Lilac should be able to parse itself
@@ -705,7 +707,7 @@ while consuming any trailing whitespace or comments with [[f:lexeme]].
 
 #+name: f:docMetaParser
 #+begin_src haskell
-docMetaParser :: OrgParser (M.Map T.Text T.Text)
+docMetaParser :: OrgParser (UUID, M.Map T.Text T.Text)
 docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
@@ -716,11 +718,11 @@ docMetaParser = do
     $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
     <> (show conflictingKeys)
   case M.lookup "ID" topLevelDrawerProps of
-    Nothing -> modify (\s -> s {orgId = one Nothing})
+    Nothing -> fail $ "required document ID property not found"
     Just uuidText -> do
       uuid <- validateUuidText uuidText
       modify (\s -> s {orgId = one $ Just uuid})
-  pure $ M.union topLevelDrawerProps metaKVs
+      pure (uuid, M.union topLevelDrawerProps metaKVs)
 #+end_src
 
 Note that using the properties drawer is the main way in which the ~ID~ field of a
@@ -854,7 +856,7 @@ Below are some unit test cases for parsing metadata.
 p
   "0002-doc-metadata"
   $ L.defaultOrgDoc
-    Nothing
+    nil
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
       ("property", "header-args+ :noweb no-export"),
@@ -898,7 +900,7 @@ Yet another comment.
 p
   "0003-doc-metadata-with-comments"
   $ L.defaultOrgDoc
-    Nothing
+    nil
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
       ("property", "header-args+ :noweb no-export"),
@@ -934,7 +936,7 @@ Metadata values can have leading whitespace. We ignore such whitespace.
 p
   "0002-doc-metadata-whitespace-before-value"
   $ L.defaultOrgDoc
-    Nothing
+    nil
     [ ("title", "Parse me without leading whitespace")
     ]
 #+end_src
@@ -968,7 +970,7 @@ Metadata can also come from top-level properties drawers.
 ps
   "0002-doc-metadata-properties-drawer"
   ( L.defaultOrgDoc
-      (Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
+      (fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
       [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
       ]
   )
@@ -996,10 +998,10 @@ test case file from [[t:0001-blankline]].
 #+begin_src haskell
 ps
   "0001-blankline"
-  (L.defaultOrgDoc Nothing [])
+  (L.defaultOrgDoc nil [])
   OrgParserState
     { goids = fromList [],
-      orgId = one Nothing,
+      orgId = one $ Just nil,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -1032,7 +1034,7 @@ key\/value metadata lines.
 ps
   "0002-doc-metadata-properties-drawer-combine"
   ( L.defaultOrgDoc
-      (Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
+      (fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
       [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
         ("author", "A. U. Thor"),
         ("property", "header-args+ :noweb no-export"),
@@ -1061,7 +1063,8 @@ If there is a clash, error out instead of silently choosing precedence.
 #+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer-clash
 #+begin_src org
 :PROPERTIES:
-:foo:       bar
+:ID:       00000000-0000-0000-0000-000000000000
+:foo:      bar
 :END:
 ,#+title: An Org Document
 ,#+author: A. U. Thor
@@ -1071,10 +1074,13 @@ If there is a clash, error out instead of silently choosing precedence.
 
 #+name: t:0002-doc-metadata-properties-drawer-clash
 #+begin_src haskell
-pf
-  "0002-doc-metadata-properties-drawer-clash"
-  "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: [\"foo\"]"
-  134
+before (LU.readFrom "test/Lilac/ParseSpec/" "0002-doc-metadata-properties-drawer-clash") $ do
+  it "0002-doc-metadata-properties-drawer-clash" $ \input -> do
+    MP.runParser
+      (runStateT L.orgDocParser L.defaultOrgParserState)
+      "0002-doc-metadata-properties-drawer-clash"
+      input
+      `shouldFailWith` (errFancy 181 . fancy $ MP.ErrorFail "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: [\"foo\"]")
 #+end_src
 
 ** Cells
@@ -1370,14 +1376,10 @@ This use of the backslash as an escape character deviates from Orgmode.
 #+begin_src haskell
 p
   "0005-styled-strings-ignore-marker-inside-word"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            <<Expected prose for 0005-styled-strings-ignore-marker-inside-word>>
-        ],
-      meta = fromList []
-    }
+  $ nilOrgDoc
+    [ CParagraph
+        <<Expected prose for 0005-styled-strings-ignore-marker-inside-word>>
+    ]
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-ignore-marker-inside-word
@@ -1437,24 +1439,21 @@ by the end of the cell (heading or paragraph), all styles must be turned off.
 #+begin_src haskell
 ps
   "0005-styled-strings-messy-boundaries"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CHeading
-            ( Heading
-                { level = 1,
-                  section = [1],
-                  body =
-                    <<Expected prose for 0005-styled-strings-messy-boundaries>>,
-                  meta = fromList []
-                }
-            )
-        ],
-      meta = fromList []
-    }
+  ( nilOrgDoc
+      [ CHeading
+          ( Heading
+              { level = 1,
+                section = [1],
+                body =
+                  <<Expected prose for 0005-styled-strings-messy-boundaries>>,
+                meta = fromList []
+              }
+          )
+      ]
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [Nothing, Nothing],
+      orgId = NE.fromList [Nothing, Just nil],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -1847,14 +1846,10 @@ a b  c   d    e      *f g  h   i    j*
 #+begin_src haskell
 p
   "0005-styled-strings-compression"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            <<Expected prose for 0005-styled-strings-compression>>
-        ],
-      meta = fromList []
-    }
+  $ nilOrgDoc
+    [ CParagraph
+        <<Expected prose for 0005-styled-strings-compression>>
+    ]
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-compression
@@ -1879,13 +1874,9 @@ foo
 #+begin_src haskell
 p
   "0005-styled-strings-no-style"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ plainParagraph "foo"
-        ],
-      meta = M.fromList []
-    }
+  $ nilOrgDoc
+    [ plainParagraph "foo"
+    ]
 #+end_src
 
 The next case tests a simple case where one word is in bold.
@@ -1899,32 +1890,28 @@ foo *bar* baz
 #+begin_src haskell
 p
   "0005-styled-strings-bold"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            [ PTokenStyledText
-                ( StyledText
-                    { body = "foo ",
-                      style = L.styleMaskFrom []
-                    }
-                ),
-              PTokenStyledText
-                ( StyledText
-                    { body = "bar",
-                      style = L.styleMaskFrom [Bold]
-                    }
-                ),
-              PTokenStyledText
-                ( StyledText
-                    { body = " baz",
-                      style = L.styleMaskFrom []
-                    }
-                )
-            ]
-        ],
-      meta = M.fromList []
-    }
+  $ nilOrgDoc
+    [ CParagraph
+        [ PTokenStyledText
+            ( StyledText
+                { body = "foo ",
+                  style = L.styleMaskFrom []
+                }
+            ),
+          PTokenStyledText
+            ( StyledText
+                { body = "bar",
+                  style = L.styleMaskFrom [Bold]
+                }
+            ),
+          PTokenStyledText
+            ( StyledText
+                { body = " baz",
+                  style = L.styleMaskFrom []
+                }
+            )
+        ]
+    ]
 #+end_src
 
 Below we mix things up a bit more, using more styles.
@@ -1938,14 +1925,10 @@ Below we mix things up a bit more, using more styles.
 #+begin_src haskell
 p
   "0005-styled-strings-complex"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            <<Expected prose for 0005-styled-strings-complex>>
-        ],
-      meta = fromList []
-    }
+  $ nilOrgDoc
+    [ CParagraph
+        <<Expected prose for 0005-styled-strings-complex>>
+    ]
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-complex
@@ -1992,14 +1975,10 @@ Here's another test, which checks some edge cases when dealing with punctuation.
 #+begin_src haskell
 p
   "0005-styled-strings-complex-punctuation"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            <<Expected prose for 0005-styled-strings-complex-punctuation>>
-        ],
-      meta = fromList []
-    }
+  $ nilOrgDoc
+    [ CParagraph
+        <<Expected prose for 0005-styled-strings-complex-punctuation>>
+    ]
 #+end_src
 
 Note how we preserve the information of having no space character between the
@@ -2036,14 +2015,10 @@ have a style marker inside a word (not at the usual beginning or end of a word).
 #+begin_src haskell
 p
   "0005-styled-strings-verbatim"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            <<Expected prose for 0005-styled-strings-verbatim>>
-        ],
-      meta = fromList []
-    }
+  $ nilOrgDoc
+    [ CParagraph
+        <<Expected prose for 0005-styled-strings-verbatim>>
+    ]
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-verbatim
@@ -2069,14 +2044,10 @@ if it immediately follows a verbatim or code marker.
 #+begin_src haskell
 p
   "0005-styled-strings-verbatim-code-ignore-immediate-bold"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            <<Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold>>
-        ],
-      meta = fromList []
-    }
+  $ nilOrgDoc
+    [ CParagraph
+        <<Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold>>
+    ]
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold
@@ -2118,12 +2089,8 @@ not apply if we're inside a verbatim (or code) region.
 #+begin_src haskell
 p
   "0005-styled-strings-verbatim-precedence"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        <<Expected prose for 0005-styled-strings-verbatim-precedence>>,
-      meta = fromList []
-    }
+  $ nilOrgDoc
+    <<Expected prose for 0005-styled-strings-verbatim-precedence>>
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-verbatim-precedence
@@ -2356,73 +2323,70 @@ foo [[link-target-only]]
 #+begin_src haskell
 ps
   "0006-links"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            [ PTokenStyledText
-                ( StyledText
-                    { body = "foo ",
-                      style = L.styleMaskFrom []
-                    }
-                ),
-              PTokenLink
-                ( Link
-                    { target = LinkTargetOther "link-target-only",
-                      name =
-                        [ StyledText
-                            { body = "link-target-only",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                )
-            ],
-          CHeading
-            ( Heading
-                { level = 1,
-                  section = [1],
-                  body =
-                    [ PTokenLink
-                        ( Link
-                            { target = LinkTargetOther "link-target",
-                              name =
-                                [ StyledText
-                                    { body = "link-name",
-                                      style = L.styleMaskFrom []
-                                    }
-                                ]
-                            }
-                        )
-                    ],
-                  meta = fromList []
-                }
-            ),
-          CParagraph
-            [ PTokenLink
-                ( Link
-                    { target = LinkTargetOther "a",
-                      name =
-                        [ StyledText
-                            { body = "a",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              PTokenStyledText
-                ( StyledText
-                    { body = " b",
-                      style = L.styleMaskFrom []
-                    }
-                )
-            ]
-        ],
-      meta = M.fromList []
-    }
+  ( nilOrgDoc
+      [ CParagraph
+          [ PTokenStyledText
+              ( StyledText
+                  { body = "foo ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { target = LinkTargetOther "link-target-only",
+                    name =
+                      [ StyledText
+                          { body = "link-target-only",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              )
+          ],
+        CHeading
+          ( Heading
+              { level = 1,
+                section = [1],
+                body =
+                  [ PTokenLink
+                      ( Link
+                          { target = LinkTargetOther "link-target",
+                            name =
+                              [ StyledText
+                                  { body = "link-name",
+                                    style = L.styleMaskFrom []
+                                  }
+                              ]
+                          }
+                      )
+                  ],
+                meta = fromList []
+              }
+          ),
+        CParagraph
+          [ PTokenLink
+              ( Link
+                  { target = LinkTargetOther "a",
+                    name =
+                      [ StyledText
+                          { body = "a",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              ),
+            PTokenStyledText
+              ( StyledText
+                  { body = " b",
+                    style = L.styleMaskFrom []
+                  }
+              )
+          ]
+      ]
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [Nothing, Nothing],
+      orgId = NE.fromList [Nothing, Just nil],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -2452,37 +2416,33 @@ This way, the input will look like ~[[...~ which will then allow
 #+begin_src haskell
 p
   "0006-links-inside-parentheses"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            [ PTokenStyledText
-                ( StyledText
-                    { body = "(",
-                      style = L.styleMaskFrom []
-                    }
-                ),
-              PTokenLink
-                ( Link
-                    { target = LinkTargetOther "file:foo/bar",
-                      name =
-                        [ StyledText
-                            { body = "file:foo/bar",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              PTokenStyledText
-                ( StyledText
-                    { body = ")",
-                      style = L.styleMaskFrom []
-                    }
-                )
-            ]
-        ],
-      meta = M.fromList []
-    }
+  $ nilOrgDoc
+    [ CParagraph
+        [ PTokenStyledText
+            ( StyledText
+                { body = "(",
+                  style = L.styleMaskFrom []
+                }
+            ),
+          PTokenLink
+            ( Link
+                { target = LinkTargetOther "file:foo/bar",
+                  name =
+                    [ StyledText
+                        { body = "file:foo/bar",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
+            ),
+          PTokenStyledText
+            ( StyledText
+                { body = ")",
+                  style = L.styleMaskFrom []
+                }
+            )
+        ]
+    ]
 #+end_src
 
 Sometimes we have text that look like links initially but turn out to be
@@ -2497,20 +2457,16 @@ non-links.
 #+begin_src haskell
 p
   "0006-links-nonlink"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            [ PTokenStyledText
-                ( StyledText
-                    { body = "[hi]",
-                      style = L.styleMaskFrom []
-                    }
-                )
-            ]
-        ],
-      meta = M.fromList []
-    }
+  $ nilOrgDoc
+    [ CParagraph
+        [ PTokenStyledText
+            ( StyledText
+                { body = "[hi]",
+                  style = L.styleMaskFrom []
+                }
+            )
+        ]
+    ]
 #+end_src
 
 *** Raw links
@@ -2572,144 +2528,140 @@ Go to ftp://10.0.0.1!
 #+begin_src haskell
 p
   "0006-links-raw"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CParagraph
-            [ PTokenStyledText
-                ( StyledText
-                    { body = "See ",
-                      style = L.styleMaskFrom []
-                    }
-                ),
-              PTokenLink
-                ( Link
-                    { target =
-                        LinkTargetURI
-                          N.URI
-                            { N.uriScheme = "https:",
-                              N.uriAuthority =
-                                Just
-                                  N.URIAuth
-                                    { N.uriUserInfo = "",
-                                      N.uriRegName = "foo.org",
-                                      N.uriPort = ""
-                                    },
-                              N.uriPath = "",
-                              N.uriQuery = "",
-                              N.uriFragment = ""
-                            },
-                      name =
-                        [ StyledText
-                            { body = "https://foo.org",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              PTokenStyledText
-                ( StyledText
-                    { body = ", or ",
-                      style = L.styleMaskFrom []
-                    }
-                ),
-              PTokenLink
-                ( Link
-                    { target =
-                        LinkTargetURI
-                          N.URI
-                            { N.uriScheme = "https:",
-                              N.uriAuthority =
-                                Just
-                                  N.URIAuth
-                                    { N.uriUserInfo = "",
-                                      N.uriRegName = "bar.net",
-                                      N.uriPort = ""
-                                    },
-                              N.uriPath = "",
-                              N.uriQuery = "",
-                              N.uriFragment = ""
-                            },
-                      name =
-                        [ StyledText
-                            { body = "https://bar.net",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              PTokenStyledText
-                ( StyledText
-                    { body = ". Try ",
-                      style = L.styleMaskFrom []
-                    }
-                ),
-              PTokenLink
-                ( Link
-                    { target =
-                        LinkTargetURI
-                          N.URI
-                            { N.uriScheme = "http:",
-                              N.uriAuthority =
-                                Just
-                                  N.URIAuth
-                                    { N.uriUserInfo = "",
-                                      N.uriRegName = "localhost",
-                                      N.uriPort = ":3000"
-                                    },
-                              N.uriPath = "",
-                              N.uriQuery = "",
-                              N.uriFragment = ""
-                            },
-                      name =
-                        [ StyledText
-                            { body = "http://localhost:3000",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              PTokenStyledText
-                ( StyledText
-                    { body = "? Go to ",
-                      style = L.styleMaskFrom []
-                    }
-                ),
-              PTokenLink
-                ( Link
-                    { target =
-                        LinkTargetURI
-                          N.URI
-                            { N.uriScheme = "ftp:",
-                              N.uriAuthority =
-                                Just
-                                  N.URIAuth
-                                    { N.uriUserInfo = "",
-                                      N.uriRegName = "10.0.0.1",
-                                      N.uriPort = ""
-                                    },
-                              N.uriPath = "",
-                              N.uriQuery = "",
-                              N.uriFragment = ""
-                            },
-                      name =
-                        [ StyledText
-                            { body = "ftp://10.0.0.1",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              PTokenStyledText
-                ( StyledText
-                    { body = "!",
-                      style = L.styleMaskFrom []
-                    }
-                )
-            ]
-        ],
-      meta = M.fromList []
-    }
+  $ nilOrgDoc
+    [ CParagraph
+        [ PTokenStyledText
+            ( StyledText
+                { body = "See ",
+                  style = L.styleMaskFrom []
+                }
+            ),
+          PTokenLink
+            ( Link
+                { target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "foo.org",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "https://foo.org",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
+            ),
+          PTokenStyledText
+            ( StyledText
+                { body = ", or ",
+                  style = L.styleMaskFrom []
+                }
+            ),
+          PTokenLink
+            ( Link
+                { target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "bar.net",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "https://bar.net",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
+            ),
+          PTokenStyledText
+            ( StyledText
+                { body = ". Try ",
+                  style = L.styleMaskFrom []
+                }
+            ),
+          PTokenLink
+            ( Link
+                { target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "http:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "localhost",
+                                  N.uriPort = ":3000"
+                                },
+                          N.uriPath = "",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "http://localhost:3000",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
+            ),
+          PTokenStyledText
+            ( StyledText
+                { body = "? Go to ",
+                  style = L.styleMaskFrom []
+                }
+            ),
+          PTokenLink
+            ( Link
+                { target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "ftp:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "10.0.0.1",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "ftp://10.0.0.1",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
+            ),
+          PTokenStyledText
+            ( StyledText
+                { body = "!",
+                  style = L.styleMaskFrom []
+                }
+            )
+        ]
+    ]
 #+end_src
 
 *** Noweb links
@@ -2874,12 +2826,8 @@ underscore_
 #+begin_src haskell
 p
   "0005-prose-paragraphs"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        <<Expected prose for 0005-prose-paragraphs>>,
-      meta = fromList []
-    }
+  $ nilOrgDoc
+    <<Expected prose for 0005-prose-paragraphs>>
 #+end_src
 
 #+name: Expected prose for 0005-prose-paragraphs
@@ -3268,27 +3216,24 @@ or set it to 0 (unlimited). First we demonstrate using a higher number, 20.
 #+begin_src haskell
 ps
   "0004-headings-20"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ plainHeading 1 [1],
-          plainHeading 2 [1, 1],
-          plainHeading 3 [1, 1, 1],
-          plainHeading 4 [1, 1, 1, 1],
-          plainHeading 5 [1, 1, 1, 1, 1],
-          plainHeading 6 [1, 1, 1, 1, 1, 1],
-          plainHeading 7 [1, 1, 1, 1, 1, 1, 1],
-          plainHeading 8 [1, 1, 1, 1, 1, 1, 1, 1],
-          plainHeading 9 [1, 1, 1, 1, 1, 1, 1, 1, 1],
-          plainHeading 10 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          plainHeading 11 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-        ],
-      meta = M.fromList []
-    }
+  ( nilOrgDoc
+      [ plainHeading 1 [1],
+        plainHeading 2 [1, 1],
+        plainHeading 3 [1, 1, 1],
+        plainHeading 4 [1, 1, 1, 1],
+        plainHeading 5 [1, 1, 1, 1, 1],
+        plainHeading 6 [1, 1, 1, 1, 1, 1],
+        plainHeading 7 [1, 1, 1, 1, 1, 1, 1],
+        plainHeading 8 [1, 1, 1, 1, 1, 1, 1, 1],
+        plainHeading 9 [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        plainHeading 10 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        plainHeading 11 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      ]
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList . take 13 $ repeat Nothing,
+      orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nil],
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
@@ -3326,27 +3271,24 @@ Now we check using ~0~ for unlimited nesting.
 #+begin_src haskell
 ps
   "0004-headings-unlimited"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ plainHeading 1 [1],
-          plainHeading 2 [1, 1],
-          plainHeading 3 [1, 1, 1],
-          plainHeading 4 [1, 1, 1, 1],
-          plainHeading 5 [1, 1, 1, 1, 1],
-          plainHeading 6 [1, 1, 1, 1, 1, 1],
-          plainHeading 7 [1, 1, 1, 1, 1, 1, 1],
-          plainHeading 8 [1, 1, 1, 1, 1, 1, 1, 1],
-          plainHeading 9 [1, 1, 1, 1, 1, 1, 1, 1, 1],
-          plainHeading 10 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          plainHeading 11 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-        ],
-      meta = M.fromList []
-    }
+  ( nilOrgDoc
+      [ plainHeading 1 [1],
+        plainHeading 2 [1, 1],
+        plainHeading 3 [1, 1, 1],
+        plainHeading 4 [1, 1, 1, 1],
+        plainHeading 5 [1, 1, 1, 1, 1],
+        plainHeading 6 [1, 1, 1, 1, 1, 1],
+        plainHeading 7 [1, 1, 1, 1, 1, 1, 1],
+        plainHeading 8 [1, 1, 1, 1, 1, 1, 1, 1],
+        plainHeading 9 [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        plainHeading 10 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        plainHeading 11 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      ]
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList . take 13 $ repeat Nothing,
+      orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nil],
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
@@ -3498,26 +3440,23 @@ The =:PROPERTIES:= drawer may be empty.
 #+begin_src haskell
 ps
   "0004-properties-drawer-empty"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CHeading
-            ( Heading
-                { level = 1,
-                  section = [1],
-                  body =
-                    [ PTokenStyledText
-                        (StyledText {body = "foo", style = L.styleMaskFrom []})
-                    ],
-                  meta = fromList []
-                }
-            )
-        ],
-      meta = M.fromList []
-    }
+  ( nilOrgDoc
+      [ CHeading
+          ( Heading
+              { level = 1,
+                section = [1],
+                body =
+                  [ PTokenStyledText
+                      (StyledText {body = "foo", style = L.styleMaskFrom []})
+                  ],
+                meta = fromList []
+              }
+          )
+      ]
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [Nothing, Nothing],
+      orgId = NE.fromList [Nothing, Just nil],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3546,29 +3485,26 @@ Check we can pick up keys and value from the =:PROPERTIES:= drawer.
 #+begin_src haskell
 ps
   "0004-properties-drawer-not-empty"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CHeading
-            ( Heading
-                { level = 1,
-                  section = [1],
-                  body =
-                    [ PTokenStyledText
-                        (StyledText {body = "foo", style = L.styleMaskFrom []})
-                    ],
-                  meta =
-                    fromList
-                      [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
-                      ]
-                }
-            )
-        ],
-      meta = M.fromList []
-    }
+  ( nilOrgDoc
+      [ CHeading
+          ( Heading
+              { level = 1,
+                section = [1],
+                body =
+                  [ PTokenStyledText
+                      (StyledText {body = "foo", style = L.styleMaskFrom []})
+                  ],
+                meta =
+                  fromList
+                    [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                    ]
+              }
+          )
+      ]
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Nothing],
+      orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nil],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3607,29 +3543,26 @@ This ":KEY:" ignored because it's inside a comment block.
 #+begin_src haskell
 ps
   "0004-properties-drawer-not-empty-with-comments"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CHeading
-            ( Heading
-                { level = 1,
-                  section = [1],
-                  body =
-                    [ PTokenStyledText
-                        (StyledText {body = "foo", style = L.styleMaskFrom []})
-                    ],
-                  meta =
-                    fromList
-                      [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
-                      ]
-                }
-            )
-        ],
-      meta = M.fromList []
-    }
+  ( nilOrgDoc
+      [ CHeading
+          ( Heading
+              { level = 1,
+                section = [1],
+                body =
+                  [ PTokenStyledText
+                      (StyledText {body = "foo", style = L.styleMaskFrom []})
+                  ],
+                meta =
+                  fromList
+                    [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                    ]
+              }
+          )
+      ]
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Nothing],
+      orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nil],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3689,15 +3622,12 @@ Below are some examples of valid (empty) code blocks.
 #+begin_src haskell
 ps
   "0007-blocks-empty"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        <<Expected blocks for 0007-blocks-empty>>,
-      meta = fromList []
-    }
+  ( nilOrgDoc
+      <<Expected blocks for 0007-blocks-empty>>
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = one Nothing,
+      orgId = one $ Just nil,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -3716,7 +3646,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -3728,7 +3658,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__block_type", "example"),
@@ -3739,7 +3669,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__anon_block_number", "2"),
@@ -4082,12 +4012,9 @@ Non-special commas stay put:
 #+begin_src haskell
 ps
   "0007-blocks-special-commas"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        <<Expected blocks for 0007-blocks-special-commas>>,
-      meta = fromList []
-    }
+  ( nilOrgDoc
+      <<Expected blocks for 0007-blocks-special-commas>>
+  )
   L.defaultOrgParserState
     { anonBlockNumber = 1
     }
@@ -4097,7 +4024,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4311,12 +4238,9 @@ with ~>>~ on the same line.
 #+begin_src haskell
 ps
   "0007-blocks-noweb"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        <<Expected blocks for 0007-blocks-noweb>>,
-      meta = fromList []
-    }
+  ( nilOrgDoc
+      <<Expected blocks for 0007-blocks-noweb>>
+  )
   L.defaultOrgParserState
     { anonBlockNumber = 1
     }
@@ -4327,7 +4251,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4340,7 +4264,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { uuid = Nothing,
+                            { uuid = Just nil,
                               name = "foo"
                             },
                       name =
@@ -4357,7 +4281,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { uuid = Nothing,
+                            { uuid = Just nil,
                               name = "bar"
                             },
                       name =
@@ -4400,12 +4324,9 @@ echo <<bar>> x y z
 #+begin_src haskell
 ps
   "0007-blocks-noweb-off"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        <<Expected blocks for 0007-blocks-noweb-off>>,
-      meta = fromList []
-    }
+  ( nilOrgDoc
+      <<Expected blocks for 0007-blocks-noweb-off>>
+  )
   L.defaultOrgParserState
     { anonBlockNumber = 1
     }
@@ -4416,7 +4337,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4453,12 +4374,9 @@ those contents into an existing line.
 #+begin_src haskell
 ps
   "0007-blocks-noweb-intraline"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        <<Expected blocks for 0007-blocks-noweb-intraline>>,
-      meta = fromList []
-    }
+  ( nilOrgDoc
+      <<Expected blocks for 0007-blocks-noweb-intraline>>
+  )
   L.defaultOrgParserState
     { anonBlockNumber = 1
     }
@@ -4469,7 +4387,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4483,7 +4401,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { uuid = Nothing,
+                            { uuid = Just nil,
                               name = "foo"
                             },
                       name =
@@ -4500,7 +4418,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { uuid = Nothing,
+                            { uuid = Just nil,
                               name = "bar"
                             },
                       name =
@@ -4517,7 +4435,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { uuid = Nothing,
+                            { uuid = Just nil,
                               name = "ok"
                             },
                       name =
@@ -4757,15 +4675,12 @@ foo
 #+begin_src haskell
 ps
   "0007-blocks-ending"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        <<Expected blocks for 0007-blocks-ending>>,
-      meta = fromList []
-    }
+  ( nilOrgDoc
+      <<Expected blocks for 0007-blocks-ending>>
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = one Nothing,
+      orgId = one $ Just nil,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -4792,7 +4707,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4804,7 +4719,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4816,7 +4731,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4828,7 +4743,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4840,7 +4755,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4852,7 +4767,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Nothing,
+        { parentUuid = Just nil,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -5612,14 +5527,10 @@ here.
 #+begin_src haskell
 p
   "0009-list-indentation-no-indent"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ plainParagraph "1)",
-          plainParagraph "2)"
-        ],
-      meta = fromList []
-    }
+  $ nilOrgDoc
+    [ plainParagraph "1)",
+      plainParagraph "2)"
+    ]
 #+end_src
 
 The list-like text is parsed as plain paragraphs in
@@ -5639,24 +5550,20 @@ Here's a list with the (proper) 2-space indent.
 #+begin_src haskell
 p
   "0009-list-indentation-proper-indent"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CListItem
-            [ LOrderedStart,
-              LItemStart
-            ],
-          CListItem
-            [ LItemEnd,
-              LItemStart
-            ],
-          CListItem
-            [ LItemEnd,
-              LOrderedEnd
-            ]
+  $ nilOrgDoc
+    [ CListItem
+        [ LOrderedStart,
+          LItemStart
         ],
-      meta = fromList []
-    }
+      CListItem
+        [ LItemEnd,
+          LItemStart
+        ],
+      CListItem
+        [ LItemEnd,
+          LOrderedEnd
+        ]
+    ]
 #+end_src
 
 Ordered lists require a closing parenthesis ~)~ after the number.
@@ -5714,50 +5621,46 @@ Here's a nested example.
 #+begin_src haskell
 p
   "0009-list-indentation-nested"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CListItem
-            [ LOrderedStart, ---- Start outer ordered list.
-              LItemStart -------- Start outer "1)".
-            ],
-          CListItem
-            [ LUnorderedStart, -- Start inner bullets under "1)".
-              LItemStart -------- Inner bullet start.
-            ],
-          CListItem
-            [ LItemEnd, --------- Inner bullet end.
-              LItemStart -------- Inner bullet start.
-            ],
-          CListItem
-            [ LItemEnd, --------- Inner bullet end.
-              LUnorderedEnd, ---- End of inner bullets under "1)".
-              LItemEnd, --------- End of outer "1)".
-              LItemStart -------- Start of outer "2)".
-            ],
-          CListItem
-            [ LOrderedStart, ---- Start of nested ordered list.
-              LItemStart -------- Start of nested "1)".
-            ],
-          CListItem
-            [ LUnorderedStart, -- Start deeply nested bullets.
-              LItemStart -------- Deeply nested bullet start.
-            ],
-          CListItem
-            [ LItemEnd, --------- Deeply nested bullet end.
-              LUnorderedEnd, ---- End of deeply nested bullets.
-              LItemEnd, --------- End of nested "1)".
-              LOrderedEnd, ------ End of nested ordered list.
-              LItemEnd, --------- End of outer "2)".
-              LItemStart -------- Start of outer "3)".
-            ],
-          CListItem
-            [ LItemEnd, --------- End of outer "3)".
-              LOrderedEnd ------- End outer ordered list.
-            ]
+  $ nilOrgDoc
+    [ CListItem
+        [ LOrderedStart, ---- Start outer ordered list.
+          LItemStart -------- Start outer "1)".
         ],
-      meta = fromList []
-    }
+      CListItem
+        [ LUnorderedStart, -- Start inner bullets under "1)".
+          LItemStart -------- Inner bullet start.
+        ],
+      CListItem
+        [ LItemEnd, --------- Inner bullet end.
+          LItemStart -------- Inner bullet start.
+        ],
+      CListItem
+        [ LItemEnd, --------- Inner bullet end.
+          LUnorderedEnd, ---- End of inner bullets under "1)".
+          LItemEnd, --------- End of outer "1)".
+          LItemStart -------- Start of outer "2)".
+        ],
+      CListItem
+        [ LOrderedStart, ---- Start of nested ordered list.
+          LItemStart -------- Start of nested "1)".
+        ],
+      CListItem
+        [ LUnorderedStart, -- Start deeply nested bullets.
+          LItemStart -------- Deeply nested bullet start.
+        ],
+      CListItem
+        [ LItemEnd, --------- Deeply nested bullet end.
+          LUnorderedEnd, ---- End of deeply nested bullets.
+          LItemEnd, --------- End of nested "1)".
+          LOrderedEnd, ------ End of nested ordered list.
+          LItemEnd, --------- End of outer "2)".
+          LItemStart -------- Start of outer "3)".
+        ],
+      CListItem
+        [ LItemEnd, --------- End of outer "3)".
+          LOrderedEnd ------- End outer ordered list.
+        ]
+    ]
 #+end_src
 
 Nesting is limited to 5 levels, for a total of 6 levels by default.
@@ -5853,27 +5756,23 @@ Now we test whether list items can also hold content (other cells) inside it.
 #+begin_src haskell
 p
   "0009-list-content-simple"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CListItem
-            [ LOrderedStart,
-              LItemStart
-            ],
-          plainParagraph "First paragraph.",
-          plainParagraph "Second paragraph.",
-          CListItem
-            [ LItemEnd,
-              LItemStart
-            ],
-          plainParagraph "Another paragraph.",
-          CListItem
-            [ LItemEnd,
-              LOrderedEnd
-            ]
+  $ nilOrgDoc
+    [ CListItem
+        [ LOrderedStart,
+          LItemStart
         ],
-      meta = fromList []
-    }
+      plainParagraph "First paragraph.",
+      plainParagraph "Second paragraph.",
+      CListItem
+        [ LItemEnd,
+          LItemStart
+        ],
+      plainParagraph "Another paragraph.",
+      CListItem
+        [ LItemEnd,
+          LOrderedEnd
+        ]
+    ]
 #+end_src
 
 Here's a more involved example using paragraph text for list items, following
@@ -5908,60 +5807,56 @@ Bar.
 #+begin_src haskell
 p
   "0009-list-indentation-nested-with-text"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ plainParagraph "Foo.",
-          CListItem
-            [ LOrderedStart, ---- Start outer ordered list.
-              LItemStart -------- Start outer "1)".
-            ],
-          plainParagraph "one",
-          CListItem
-            [ LUnorderedStart, -- Start inner bullets under "1)".
-              LItemStart -------- Inner bullet start.
-            ],
-          plainParagraph "a",
-          CListItem
-            [ LItemEnd, --------- Inner bullet end.
-              LItemStart -------- Inner bullet start.
-            ],
-          plainParagraph "b",
-          CListItem
-            [ LItemEnd, --------- Inner bullet end.
-              LUnorderedEnd, ---- End of inner bullets under "1)".
-              LItemEnd, --------- End of outer "1)".
-              LItemStart -------- Start of outer "2)".
-            ],
-          plainParagraph "two",
-          CListItem
-            [ LOrderedStart, ---- Start of nested ordered list.
-              LItemStart -------- Start of nested "1)".
-            ],
-          plainParagraph "two-point-one",
-          plainParagraph "hello",
-          CListItem
-            [ LUnorderedStart, -- Start deeply nested bullets.
-              LItemStart -------- Deeply nested bullet start.
-            ],
-          plainParagraph "X",
-          CListItem
-            [ LItemEnd, --------- Deeply nested bullet end.
-              LUnorderedEnd, ---- End of deeply nested bullets.
-              LItemEnd, --------- End of nested "1)".
-              LOrderedEnd, ------ End of nested ordered list.
-              LItemEnd, --------- End of outer "2)".
-              LItemStart -------- Start of outer "3)".
-            ],
-          plainParagraph "three",
-          CListItem
-            [ LItemEnd, --------- End of outer "3)".
-              LOrderedEnd ------- End outer ordered list.
-            ],
-          plainParagraph "Bar."
+  $ nilOrgDoc
+    [ plainParagraph "Foo.",
+      CListItem
+        [ LOrderedStart, ---- Start outer ordered list.
+          LItemStart -------- Start outer "1)".
         ],
-      meta = fromList []
-    }
+      plainParagraph "one",
+      CListItem
+        [ LUnorderedStart, -- Start inner bullets under "1)".
+          LItemStart -------- Inner bullet start.
+        ],
+      plainParagraph "a",
+      CListItem
+        [ LItemEnd, --------- Inner bullet end.
+          LItemStart -------- Inner bullet start.
+        ],
+      plainParagraph "b",
+      CListItem
+        [ LItemEnd, --------- Inner bullet end.
+          LUnorderedEnd, ---- End of inner bullets under "1)".
+          LItemEnd, --------- End of outer "1)".
+          LItemStart -------- Start of outer "2)".
+        ],
+      plainParagraph "two",
+      CListItem
+        [ LOrderedStart, ---- Start of nested ordered list.
+          LItemStart -------- Start of nested "1)".
+        ],
+      plainParagraph "two-point-one",
+      plainParagraph "hello",
+      CListItem
+        [ LUnorderedStart, -- Start deeply nested bullets.
+          LItemStart -------- Deeply nested bullet start.
+        ],
+      plainParagraph "X",
+      CListItem
+        [ LItemEnd, --------- Deeply nested bullet end.
+          LUnorderedEnd, ---- End of deeply nested bullets.
+          LItemEnd, --------- End of nested "1)".
+          LOrderedEnd, ------ End of nested ordered list.
+          LItemEnd, --------- End of outer "2)".
+          LItemStart -------- Start of outer "3)".
+        ],
+      plainParagraph "three",
+      CListItem
+        [ LItemEnd, --------- End of outer "3)".
+          LOrderedEnd ------- End outer ordered list.
+        ],
+      plainParagraph "Bar."
+    ]
 #+end_src
 
 Check whether we can detect invalid indentations for paragraphs that are
@@ -6083,40 +5978,36 @@ Four
 #+begin_src haskell
 p
   "0009-paragraph-can-close-deeper-levels"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CListItem
-            [ LOrderedStart,
-              LItemStart
-            ],
-          plainParagraph "One",
-          plainParagraph "Two x",
-          CListItem
-            [ LUnorderedStart,
-              LItemStart
-            ],
-          plainParagraph "Bar",
-          CListItem
-            [ LUnorderedStart,
-              LItemStart
-            ],
-          plainParagraph "Baz",
-          CListItem
-            [ LItemEnd,
-              LUnorderedEnd,
-              LItemEnd,
-              LUnorderedEnd
-            ],
-          plainParagraph "Three a b c",
-          CListItem
-            [ LItemEnd,
-              LOrderedEnd
-            ],
-          plainParagraph "Four"
+  $ nilOrgDoc
+    [ CListItem
+        [ LOrderedStart,
+          LItemStart
         ],
-      meta = fromList []
-    }
+      plainParagraph "One",
+      plainParagraph "Two x",
+      CListItem
+        [ LUnorderedStart,
+          LItemStart
+        ],
+      plainParagraph "Bar",
+      CListItem
+        [ LUnorderedStart,
+          LItemStart
+        ],
+      plainParagraph "Baz",
+      CListItem
+        [ LItemEnd,
+          LUnorderedEnd,
+          LItemEnd,
+          LUnorderedEnd
+        ],
+      plainParagraph "Three a b c",
+      CListItem
+        [ LItemEnd,
+          LOrderedEnd
+        ],
+      plainParagraph "Four"
+    ]
 #+end_src
 
 Paragraphs can close off list items, so we can mix ordered and unordered list
@@ -6147,54 +6038,50 @@ Four
 #+begin_src haskell
 p
   "0009-paragraph-can-separate-mixed-lists"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CListItem
-            [ LOrderedStart,
-              LItemStart
-            ],
-          plainParagraph "One",
-          CListItem
-            [ LUnorderedStart,
-              LItemStart
-            ],
-          plainParagraph "Bar",
-          CListItem
-            [ LUnorderedStart,
-              LItemStart
-            ],
-          plainParagraph "Baz",
-          CListItem
-            [ LItemEnd,
-              LUnorderedEnd,
-              LItemEnd,
-              LUnorderedEnd
-            ],
-          plainParagraph "Two",
-          CListItem
-            [ LOrderedStart,
-              LItemStart
-            ],
-          plainParagraph "a",
-          CListItem
-            [ LItemEnd,
-              LItemStart
-            ],
-          plainParagraph "b",
-          CListItem
-            [ LItemEnd,
-              LOrderedEnd
-            ],
-          plainParagraph "Three",
-          CListItem
-            [ LItemEnd,
-              LOrderedEnd
-            ],
-          plainParagraph "Four"
+  $ nilOrgDoc
+    [ CListItem
+        [ LOrderedStart,
+          LItemStart
         ],
-      meta = fromList []
-    }
+      plainParagraph "One",
+      CListItem
+        [ LUnorderedStart,
+          LItemStart
+        ],
+      plainParagraph "Bar",
+      CListItem
+        [ LUnorderedStart,
+          LItemStart
+        ],
+      plainParagraph "Baz",
+      CListItem
+        [ LItemEnd,
+          LUnorderedEnd,
+          LItemEnd,
+          LUnorderedEnd
+        ],
+      plainParagraph "Two",
+      CListItem
+        [ LOrderedStart,
+          LItemStart
+        ],
+      plainParagraph "a",
+      CListItem
+        [ LItemEnd,
+          LItemStart
+        ],
+      plainParagraph "b",
+      CListItem
+        [ LItemEnd,
+          LOrderedEnd
+        ],
+      plainParagraph "Three",
+      CListItem
+        [ LItemEnd,
+          LOrderedEnd
+        ],
+      plainParagraph "Four"
+    ]
 #+end_src
 
 It's an error if there is no separation between list types (if we suddenly try
@@ -6272,21 +6159,17 @@ text, as part of the "a" above it.
 #+begin_src haskell
 p
   "0009-list-items-need-blank-line-separator"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CListItem
-            [ LOrderedStart,
-              LItemStart
-            ],
-          plainParagraph "a 1) b",
-          CListItem
-            [ LItemEnd,
-              LOrderedEnd
-            ]
+  $ nilOrgDoc
+    [ CListItem
+        [ LOrderedStart,
+          LItemStart
         ],
-      meta = fromList []
-    }
+      plainParagraph "a 1) b",
+      CListItem
+        [ LItemEnd,
+          LOrderedEnd
+        ]
+    ]
 #+end_src
 
 Ordered list items at the same level must increment by one each time. In the
@@ -6499,53 +6382,50 @@ whitespace for the contents inside (just before the =\end{equation}= marker).
 #+begin_src haskell
 ps
   "0010-standalone-math-fragments"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CMathFragment
-            MathFragment
-              { meta =
-                  fromList
-                    [ ("__equation_number", "1")
-                    ],
-                body = "1 + 1 = 2"
-              },
-          CMathFragment
-            MathFragment
-              { meta =
-                  fromList
-                    [ ("__equation_number", "2")
-                    ],
-                body = "1 + 1 = 2"
-              },
-          CMathFragment
-            MathFragment
-              { meta = fromList [],
-                body = "2 + 2 = 4"
-              },
-          CMathFragment
-            MathFragment
-              { meta =
-                  fromList
-                    [ ("name", "eq:x")
-                    ],
-                body = "2 + 2 = 4"
-              },
-          CMathFragment
-            MathFragment
-              { meta =
-                  fromList
-                    [ ("__equation_number", "3"),
-                      ("name", "eq:y")
-                    ],
-                body = "1 + 1 = 2"
-              }
-        ],
-      meta = fromList []
-    }
+  ( nilOrgDoc
+      [ CMathFragment
+          MathFragment
+            { meta =
+                fromList
+                  [ ("__equation_number", "1")
+                  ],
+              body = "1 + 1 = 2"
+            },
+        CMathFragment
+          MathFragment
+            { meta =
+                fromList
+                  [ ("__equation_number", "2")
+                  ],
+              body = "1 + 1 = 2"
+            },
+        CMathFragment
+          MathFragment
+            { meta = fromList [],
+              body = "2 + 2 = 4"
+            },
+        CMathFragment
+          MathFragment
+            { meta =
+                fromList
+                  [ ("name", "eq:x")
+                  ],
+              body = "2 + 2 = 4"
+            },
+        CMathFragment
+          MathFragment
+            { meta =
+                fromList
+                  [ ("__equation_number", "3"),
+                    ("name", "eq:y")
+                  ],
+              body = "1 + 1 = 2"
+            }
+      ]
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = one Nothing,
+      orgId = one $ Just nil,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -6581,48 +6461,45 @@ Standalone math fragments may be included as part of a list item.
 #+begin_src haskell
 ps
   "0010-standalone-math-inside-lists"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CListItem
-            [ LOrderedStart,
-              LItemStart
-            ],
-          CParagraph
-            [ PTokenStyledText
-                ( StyledText
-                    { body = "foo",
-                      style = L.styleMaskFrom []
-                    }
-                )
-            ],
-          CMathFragment
-            MathFragment
-              { meta =
-                  fromList
-                    [ ("name", "eq:x")
-                    ],
-                body = "2 + 2 = 4"
-              },
-          CMathFragment
-            MathFragment
-              { meta =
-                  fromList
-                    [ ("__equation_number", "1"),
-                      ("name", "eq:y")
-                    ],
-                body = "1 + 1 = 2"
-              },
-          CListItem
-            [ LItemEnd,
-              LOrderedEnd
-            ]
-        ],
-      meta = fromList []
-    }
+  ( nilOrgDoc
+      [ CListItem
+          [ LOrderedStart,
+            LItemStart
+          ],
+        CParagraph
+          [ PTokenStyledText
+              ( StyledText
+                  { body = "foo",
+                    style = L.styleMaskFrom []
+                  }
+              )
+          ],
+        CMathFragment
+          MathFragment
+            { meta =
+                fromList
+                  [ ("name", "eq:x")
+                  ],
+              body = "2 + 2 = 4"
+            },
+        CMathFragment
+          MathFragment
+            { meta =
+                fromList
+                  [ ("__equation_number", "1"),
+                    ("name", "eq:y")
+                  ],
+              body = "1 + 1 = 2"
+            },
+        CListItem
+          [ LItemEnd,
+            LOrderedEnd
+          ]
+      ]
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = one Nothing,
+      orgId = one $ Just nil,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -6755,71 +6632,68 @@ g x = x + 1
 #+begin_src haskell
 ps
   "0011-figures-and-blocks"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CBlock
-            Block
-              { parentUuid = Nothing,
-                meta =
-                  fromList
-                    [ ("__block_type", "src"),
-                      ("__src_language", "haskell"),
-                      ("name", "f:f"),
-                      ("xxx", "bar")
-                    ],
-                body = [BTokenString "f = 1 + 1"]
-              },
-          CFigure
-            Figure
-              { meta =
-                  fromList
-                    [ ("attr_html", ":width 100%"),
-                      ("name", "fig:hello")
-                    ],
-                link =
-                  Link
-                    { target = LinkTargetOther "./image/hello.png",
-                      name =
-                        [ StyledText
-                            { body = "./image/hello.png",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-              },
-          CBlock
-            Block
-              { parentUuid = Nothing,
-                meta =
-                  fromList
-                    [ ("__block_type", "src"),
-                      ("__src_language", "haskell"),
-                      ("name", "f:g"),
-                      ("yyy", "bar")
-                    ],
-                body = [BTokenString "g x = x + 1"]
-              },
-          CFigure
-            Figure
-              { meta = fromList [],
-                link =
-                  Link
-                    { target = LinkTargetOther "./image/world.png",
-                      name =
-                        [ StyledText
-                            { body = "./image/world.png",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-              }
-        ],
-      meta = fromList []
-    }
+  ( nilOrgDoc
+      [ CBlock
+          Block
+            { parentUuid = Just nil,
+              meta =
+                fromList
+                  [ ("__block_type", "src"),
+                    ("__src_language", "haskell"),
+                    ("name", "f:f"),
+                    ("xxx", "bar")
+                  ],
+              body = [BTokenString "f = 1 + 1"]
+            },
+        CFigure
+          Figure
+            { meta =
+                fromList
+                  [ ("attr_html", ":width 100%"),
+                    ("name", "fig:hello")
+                  ],
+              link =
+                Link
+                  { target = LinkTargetOther "./image/hello.png",
+                    name =
+                      [ StyledText
+                          { body = "./image/hello.png",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+            },
+        CBlock
+          Block
+            { parentUuid = Just nil,
+              meta =
+                fromList
+                  [ ("__block_type", "src"),
+                    ("__src_language", "haskell"),
+                    ("name", "f:g"),
+                    ("yyy", "bar")
+                  ],
+              body = [BTokenString "g x = x + 1"]
+            },
+        CFigure
+          Figure
+            { meta = fromList [],
+              link =
+                Link
+                  { target = LinkTargetOther "./image/world.png",
+                    name =
+                      [ StyledText
+                          { body = "./image/world.png",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+            }
+      ]
+  )
   OrgParserState
     { goids = fromList [],
-      orgId = one Nothing,
+      orgId = one $ Just nil,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -7012,122 +6886,118 @@ The test below checks if we can parse a table with all 3 types of prose text
 #+begin_src haskell
 p
   "0012-tables-and-prose"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CTable
-            Table
-              { meta =
-                  fromList
-                    [ ("name", "tbl:famous-equations")
-                    ],
-                grid =
-                  fromList
-                    [ ( (1, 1),
-                        [ PTokenStyledText
-                            ( StyledText
-                                { body = "Name",
-                                  style = L.styleMaskFrom []
-                                }
-                            )
-                        ]
-                      ),
-                      ( (1, 2),
-                        [ PTokenStyledText
-                            ( StyledText
-                                { body = "Equation",
-                                  style = L.styleMaskFrom []
-                                }
-                            )
-                        ]
-                      ),
-                      ( (1, 3),
-                        [ PTokenStyledText
-                            ( StyledText
-                                { body = "Link",
-                                  style = L.styleMaskFrom []
-                                }
-                            )
-                        ]
-                      ),
-                      ( (2, 1),
-                        []
-                      ),
-                      ( (3, 1),
-                        [ PTokenStyledText
-                            ( StyledText
-                                { body = "Pythagoras | Foo",
-                                  style = L.styleMaskFrom []
-                                }
-                            )
-                        ]
-                      ),
-                      ( (3, 2),
-                        [ PTokenMathFragment
-                            ( MathFragment
-                                { meta = fromList [],
-                                  body = "a^2 + b^2 = c^2"
-                                }
-                            )
-                        ]
-                      ),
-                      ( (3, 3),
-                        [ PTokenLink
-                            ( Link
-                                { target = LinkTargetOther "https://wiki/x",
-                                  name =
-                                    [ StyledText
-                                        { body = "Wiki",
-                                          style = L.styleMaskFrom []
-                                        }
-                                    ]
-                                }
-                            )
-                        ]
-                      ),
-                      ( (4, 1),
-                        [ PTokenStyledText
-                            ( StyledText
-                                { body = "Albert ",
-                                  style = L.styleMaskFrom []
-                                }
-                            ),
-                          PTokenStyledText
-                            ( StyledText
-                                { body = "Einstein",
-                                  style = L.styleMaskFrom [Bold]
-                                }
-                            )
-                        ]
-                      ),
-                      ( (4, 2),
-                        [ PTokenMathFragment
-                            ( MathFragment
-                                { meta = fromList [],
-                                  body = "E = mc^2"
-                                }
-                            )
-                        ]
-                      ),
-                      ( (4, 3),
-                        [ PTokenLink
-                            ( Link
-                                { target = LinkTargetOther "https://wiki/y",
-                                  name =
-                                    [ StyledText
-                                        { body = "Wiki",
-                                          style = L.styleMaskFrom []
-                                        }
-                                    ]
-                                }
-                            )
-                        ]
-                      )
+  $ nilOrgDoc
+    [ CTable
+        Table
+          { meta =
+              fromList
+                [ ("name", "tbl:famous-equations")
+                ],
+            grid =
+              fromList
+                [ ( (1, 1),
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Name",
+                              style = L.styleMaskFrom []
+                            }
+                        )
                     ]
-              }
-        ],
-      meta = fromList []
-    }
+                  ),
+                  ( (1, 2),
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Equation",
+                              style = L.styleMaskFrom []
+                            }
+                        )
+                    ]
+                  ),
+                  ( (1, 3),
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Link",
+                              style = L.styleMaskFrom []
+                            }
+                        )
+                    ]
+                  ),
+                  ( (2, 1),
+                    []
+                  ),
+                  ( (3, 1),
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Pythagoras | Foo",
+                              style = L.styleMaskFrom []
+                            }
+                        )
+                    ]
+                  ),
+                  ( (3, 2),
+                    [ PTokenMathFragment
+                        ( MathFragment
+                            { meta = fromList [],
+                              body = "a^2 + b^2 = c^2"
+                            }
+                        )
+                    ]
+                  ),
+                  ( (3, 3),
+                    [ PTokenLink
+                        ( Link
+                            { target = LinkTargetOther "https://wiki/x",
+                              name =
+                                [ StyledText
+                                    { body = "Wiki",
+                                      style = L.styleMaskFrom []
+                                    }
+                                ]
+                            }
+                        )
+                    ]
+                  ),
+                  ( (4, 1),
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Albert ",
+                              style = L.styleMaskFrom []
+                            }
+                        ),
+                      PTokenStyledText
+                        ( StyledText
+                            { body = "Einstein",
+                              style = L.styleMaskFrom [Bold]
+                            }
+                        )
+                    ]
+                  ),
+                  ( (4, 2),
+                    [ PTokenMathFragment
+                        ( MathFragment
+                            { meta = fromList [],
+                              body = "E = mc^2"
+                            }
+                        )
+                    ]
+                  ),
+                  ( (4, 3),
+                    [ PTokenLink
+                        ( Link
+                            { target = LinkTargetOther "https://wiki/y",
+                              name =
+                                [ StyledText
+                                    { body = "Wiki",
+                                      style = L.styleMaskFrom []
+                                    }
+                                ]
+                            }
+                        )
+                    ]
+                  )
+                ]
+          }
+    ]
 #+end_src
 
 Below is the same as [[t:0012-tables-and-prose]], but for the case where we are
@@ -7150,139 +7020,135 @@ indented as a list item.
 #+begin_src haskell
 p
   "0012-tables-inside-lists"
-  OrgDoc
-    { uuid = Nothing,
-      cells =
-        [ CListItem
-            [ LOrderedStart,
-              LItemStart
-            ],
-          CParagraph
-            [ PTokenStyledText
-                ( StyledText
-                    { body = "foo",
-                      style = L.styleMaskFrom []
-                    }
-                )
-            ],
-          CTable
-            Table
-              { meta =
-                  fromList
-                    [ ("name", "tbl:famous-equations"),
-                      ("bar", "baz")
-                    ],
-                grid =
-                  fromList
-                    [ ( (1, 1),
-                        [ PTokenStyledText
-                            ( StyledText
-                                { body = "Name",
-                                  style = L.styleMaskFrom []
-                                }
-                            )
-                        ]
-                      ),
-                      ( (1, 2),
-                        [ PTokenStyledText
-                            ( StyledText
-                                { body = "Equation",
-                                  style = L.styleMaskFrom []
-                                }
-                            )
-                        ]
-                      ),
-                      ( (1, 3),
-                        [ PTokenStyledText
-                            ( StyledText
-                                { body = "Link",
-                                  style = L.styleMaskFrom []
-                                }
-                            )
-                        ]
-                      ),
-                      ( (2, 1),
-                        []
-                      ),
-                      ( (3, 1),
-                        [ PTokenStyledText
-                            ( StyledText
-                                { body = "Pythagoras | Foo",
-                                  style = L.styleMaskFrom []
-                                }
-                            )
-                        ]
-                      ),
-                      ( (3, 2),
-                        [ PTokenMathFragment
-                            ( MathFragment
-                                { meta = fromList [],
-                                  body = "a^2 + b^2 = c^2"
-                                }
-                            )
-                        ]
-                      ),
-                      ( (3, 3),
-                        [ PTokenLink
-                            ( Link
-                                { target = LinkTargetOther "https://wiki/x",
-                                  name =
-                                    [ StyledText
-                                        { body = "Wiki",
-                                          style = L.styleMaskFrom []
-                                        }
-                                    ]
-                                }
-                            )
-                        ]
-                      ),
-                      ( (4, 1),
-                        [ PTokenStyledText
-                            ( StyledText
-                                { body = "Albert ",
-                                  style = L.styleMaskFrom []
-                                }
-                            ),
-                          PTokenStyledText
-                            ( StyledText
-                                { body = "Einstein",
-                                  style = L.styleMaskFrom [Bold]
-                                }
-                            )
-                        ]
-                      ),
-                      ( (4, 2),
-                        [ PTokenMathFragment
-                            ( MathFragment
-                                { meta = fromList [],
-                                  body = "E = mc^2"
-                                }
-                            )
-                        ]
-                      ),
-                      ( (4, 3),
-                        [ PTokenLink
-                            ( Link
-                                { target = LinkTargetOther "https://wiki/y",
-                                  name =
-                                    [ StyledText
-                                        { body = "Wiki",
-                                          style = L.styleMaskFrom []
-                                        }
-                                    ]
-                                }
-                            )
-                        ]
-                      )
-                    ]
-              },
-          CListItem
-            [ LItemEnd,
-              LOrderedEnd
-            ]
+  $ nilOrgDoc
+    [ CListItem
+        [ LOrderedStart,
+          LItemStart
         ],
-      meta = fromList []
-    }
+      CParagraph
+        [ PTokenStyledText
+            ( StyledText
+                { body = "foo",
+                  style = L.styleMaskFrom []
+                }
+            )
+        ],
+      CTable
+        Table
+          { meta =
+              fromList
+                [ ("name", "tbl:famous-equations"),
+                  ("bar", "baz")
+                ],
+            grid =
+              fromList
+                [ ( (1, 1),
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Name",
+                              style = L.styleMaskFrom []
+                            }
+                        )
+                    ]
+                  ),
+                  ( (1, 2),
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Equation",
+                              style = L.styleMaskFrom []
+                            }
+                        )
+                    ]
+                  ),
+                  ( (1, 3),
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Link",
+                              style = L.styleMaskFrom []
+                            }
+                        )
+                    ]
+                  ),
+                  ( (2, 1),
+                    []
+                  ),
+                  ( (3, 1),
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Pythagoras | Foo",
+                              style = L.styleMaskFrom []
+                            }
+                        )
+                    ]
+                  ),
+                  ( (3, 2),
+                    [ PTokenMathFragment
+                        ( MathFragment
+                            { meta = fromList [],
+                              body = "a^2 + b^2 = c^2"
+                            }
+                        )
+                    ]
+                  ),
+                  ( (3, 3),
+                    [ PTokenLink
+                        ( Link
+                            { target = LinkTargetOther "https://wiki/x",
+                              name =
+                                [ StyledText
+                                    { body = "Wiki",
+                                      style = L.styleMaskFrom []
+                                    }
+                                ]
+                            }
+                        )
+                    ]
+                  ),
+                  ( (4, 1),
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Albert ",
+                              style = L.styleMaskFrom []
+                            }
+                        ),
+                      PTokenStyledText
+                        ( StyledText
+                            { body = "Einstein",
+                              style = L.styleMaskFrom [Bold]
+                            }
+                        )
+                    ]
+                  ),
+                  ( (4, 2),
+                    [ PTokenMathFragment
+                        ( MathFragment
+                            { meta = fromList [],
+                              body = "E = mc^2"
+                            }
+                        )
+                    ]
+                  ),
+                  ( (4, 3),
+                    [ PTokenLink
+                        ( Link
+                            { target = LinkTargetOther "https://wiki/y",
+                              name =
+                                [ StyledText
+                                    { body = "Wiki",
+                                      style = L.styleMaskFrom []
+                                    }
+                                ]
+                            }
+                        )
+                    ]
+                  )
+                ]
+          },
+      CListItem
+        [ LItemEnd,
+          LOrderedEnd
+        ]
+    ]
 #+end_src
 
 ** Testing framework
@@ -7367,6 +7233,7 @@ import Lilac.Types
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, grid, meta),
+    nilOrgDocUuid,
   )
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
@@ -7386,8 +7253,10 @@ import Relude
     show,
     take,
     ($),
+    (+),
     (.),
     (<>),
+    (==),
   )
 import System.OsPath qualified as P
 import Test.Hspec (Spec, before, describe, it, shouldBe)
@@ -7438,6 +7307,7 @@ type Parser = <<Concrete type for Megaparsec>>
 <<f:plainHeading>>
 <<f:pGOIDs>>
 <<f:pfGOIDs>>
+<<f:nilOrgDoc>>
 #+end_src
 
 The ~Parser~ type synonym uses the same [[Concrete type for Megaparsec][concrete types]] as we do for
@@ -7452,12 +7322,48 @@ given path (to feed to =parseOrgDoc=). We name this helper just =p=.
 p :: FilePath -> OrgDoc -> Spec
 p path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path $ \input -> do
+    it path check
+  where
+    check input
+      | expected.uuid == nil =
+          action nilOrgDocUuid input
+            $ L.defaultOrgParserState {orgId = one $ Just nil}
+      | otherwise = action "" input L.defaultOrgParserState
+    action inputPrefix input expectedState =
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        input
-        `shouldParse` (expected, L.defaultOrgParserState)
+        (inputPrefix <> input)
+        `shouldParse` (expected, expectedState)
+#+end_src
+
+For convenience though, [[f:p]] prefixes the file with a required Org ID, with the
+help of [[f:nilOrgDocUuid]]. This way the majority of test cases don't have to worry
+about this detail. The ones that do have to check the behavior of the top-level
+properties drawer have to do it manually, such as in
+[[t:0002-doc-metadata-properties-drawer-clash]].
+
+#+name: f:nilOrgDocUuid
+#+begin_src haskell
+nilOrgDocUuid :: T.Text
+nilOrgDocUuid =
+  """
+  :PROPERTIES:
+  :ID:       00000000-0000-0000-0000-000000000000
+  :END:
+
+  """
+#+end_src
+
+#+name: f:nilOrgDoc
+#+begin_src haskell
+nilOrgDoc :: [Cell] -> OrgDoc
+nilOrgDoc cells =
+  OrgDoc
+    { uuid = nil,
+      cells = cells,
+      meta = M.fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+    }
 #+end_src
 
 If we want to check the state (the parsing operation is stateful), we need to
@@ -7466,14 +7372,20 @@ check the expected end state as well. We do this with =ps= below.
 #+name: f:ps
 #+begin_src haskell
 ps :: FilePath -> OrgDoc -> OrgParserState -> Spec
-ps path expected state = do
+ps path expected expectedState = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path $ \input -> do
+    it path check
+  where
+    check input
+      | expected.uuid == nil =
+          action nilOrgDocUuid input expectedState
+      | otherwise = action "" input expectedState
+    action inputPrefix input expectedState' =
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        input
-        `shouldParse` (expected, state)
+        (inputPrefix <> input)
+        `shouldParse` (expected, expectedState')
 #+end_src
 
 Sometimes we want to test that a file will fail to parse. We do this with =pf=
@@ -7488,8 +7400,11 @@ pf path errMsg pos = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        input
-        `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
+        (inputPrefix <> input)
+        `shouldFailWith` (errFancy newPos . fancy $ MP.ErrorFail errMsg)
+  where
+    inputPrefix = nilOrgDocUuid
+    newPos = pos + T.length inputPrefix
 #+end_src
 
 Note that we use the =MP.ErrorFail= constructor because that's the only way we can
@@ -7512,8 +7427,11 @@ pfm path errorTrivial pos = do
       MP.runParser
         (runStateT L.orgDocParser L.defaultOrgParserState)
         path
-        input
-        `shouldFailWith` (err pos errorTrivial)
+        (inputPrefix <> input)
+        `shouldFailWith` (err newPos errorTrivial)
+  where
+    inputPrefix = nilOrgDocUuid
+    newPos = pos + T.length inputPrefix
 #+end_src
 
 The function =plainParagraph= helps to cut down on some of the repetition.
@@ -8071,7 +7989,7 @@ extractGOIDs orgFilesAndContents =
           Right (orgDoc, _orgParserState) -> M.insert orgFile (getOrgIds orgDoc) acc
       | otherwise = acc
     getOrgIds :: OrgDoc -> [UUID]
-    getOrgIds od = catMaybes $ foldl' f [od.uuid] od.cells
+    getOrgIds od = catMaybes $ foldl' f [Just $ od.uuid] od.cells
     extractOrgId :: M.Map T.Text T.Text -> Maybe UUID
     extractOrgId meta
       | Just uuidText <- EM.lookup "ID" meta = fromText uuidText

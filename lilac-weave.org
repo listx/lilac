@@ -734,8 +734,7 @@ weaveLink link = do
       LinkTargetNoweb linkNoweb
         | Just linkUuid <- linkNoweb.uuid,
           Just orgFile <- EM.lookup linkUuid weaveConf.goids,
-          Just docUuid <- weaveConf.orgDoc.uuid,
-          Just currentOrgFile <- EM.lookup docUuid weaveConf.goids,
+          Just currentOrgFile <- EM.lookup weaveConf.orgDoc.uuid weaveConf.goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
             if orgFile == currentOrgFile
               then "#" <> linkAnchor
@@ -844,7 +843,7 @@ module Lilac.WeaveSpec (spec) where
 
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
-import Lilac.Types (OrgParserState (goids))
+import Lilac.Types (OrgParserState (goids), nilOrgDocUuid)
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
 import Relude
@@ -921,7 +920,7 @@ getWovenPrettyFromPath path orgIdLocationsFile = do
         MP.runParser
           (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
           path
-          inputOrgFile
+          (nilOrgDocUuid <> inputOrgFile)
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
