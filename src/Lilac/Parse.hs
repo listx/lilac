@@ -893,10 +893,9 @@ blockParser = do
   pure $ CBlock block
   where
     firstParent :: OID -> [Maybe OID] -> OID
-    firstParent docOid [] = docOid
-    firstParent docOid (maybeOid : maybeOids) = case maybeOid of
-      Just oid -> oid
-      Nothing -> firstParent docOid maybeOids
+    firstParent docOid maybeOids = case catMaybes maybeOids of
+      (oid : _) -> oid
+      [] -> docOid
 
 blockStartParser ::
   OrgParser
