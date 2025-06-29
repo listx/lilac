@@ -4,17 +4,16 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText, fromWords64, nil)
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Types
   ( BToken (BTokenLink, BTokenString),
-    Block (Block, body, meta, parentUuid),
+    Block (Block, body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (Figure, link, meta),
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
-    LinkNoweb (LinkNoweb, name, uuid),
+    LinkNoweb (LinkNoweb, name, oid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
@@ -25,7 +24,8 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (MathFragment, body, meta),
-    OrgDoc (OrgDoc, cells, meta, uuid),
+    OID,
+    OrgDoc (OrgDoc, cells, meta, oid),
     OrgParserConf (maxHeadingLevel),
     OrgParserState
       ( OrgParserState,
@@ -47,7 +47,10 @@ import Lilac.Types
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, grid, meta),
-    nilOrgDocUuid,
+    fromText,
+    fromWords,
+    nilOid,
+    nilOidOrgDoc,
   )
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
@@ -101,9 +104,9 @@ p path expected = do
     it path check
   where
     check input
-      | expected.uuid == nil =
-          action nilOrgDocUuid input
-            $ L.defaultOrgParserState {orgId = one $ Just nil}
+      | expected.oid == nilOid =
+          action nilOidOrgDoc input
+            $ L.defaultOrgParserState {orgId = one $ Just nilOid}
       | otherwise = action "" input L.defaultOrgParserState
     action inputPrefix input expectedState =
       MP.runParser
@@ -118,8 +121,8 @@ ps path expected expectedState = do
     it path check
   where
     check input
-      | expected.uuid == nil =
-          action nilOrgDocUuid input expectedState
+      | expected.oid == nilOid =
+          action nilOidOrgDoc input expectedState
       | otherwise = action "" input expectedState
     action inputPrefix input expectedState' =
       MP.runParser
@@ -138,7 +141,7 @@ pf path errMsg pos = do
         (inputPrefix <> input)
         `shouldFailWith` (errFancy newPos . fancy $ MP.ErrorFail errMsg)
   where
-    inputPrefix = nilOrgDocUuid
+    inputPrefix = nilOidOrgDoc
     newPos = pos + T.length inputPrefix
 
 pfm :: FilePath -> ET T.Text -> Int -> Spec
@@ -151,7 +154,7 @@ pfm path errorTrivial pos = do
         (inputPrefix <> input)
         `shouldFailWith` (err newPos errorTrivial)
   where
-    inputPrefix = nilOrgDocUuid
+    inputPrefix = nilOidOrgDoc
     newPos = pos + T.length inputPrefix
 
 plainParagraph :: T.Text -> Cell
@@ -196,12 +199,12 @@ pGOIDs path expected = do
                       )
   where
     st = L.defaultGOIDsParserState
-    f :: (T.Text, FilePath) -> (UUID, P.OsPath)
-    f (uuidText, filePath)
-      | Just uuid <- fromText uuidText,
+    f :: (T.Text, FilePath) -> (OID, P.OsPath)
+    f (oidText, filePath)
+      | Just oid <- fromText oidText,
         Just osPath <- P.encodeUtf filePath =
-          (uuid, osPath)
-      | otherwise = (nil, P.pack [])
+          (oid, osPath)
+      | otherwise = (nilOid, P.pack [])
 
 pfGOIDs :: FilePath -> String -> Int -> Spec
 pfGOIDs path errMsg pos = do
@@ -218,7 +221,7 @@ pfGOIDs path errMsg pos = do
 nilOrgDoc :: [Cell] -> OrgDoc
 nilOrgDoc cells =
   OrgDoc
-    { uuid = nil,
+    { oid = nilOid,
       cells = cells,
       meta = M.fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
@@ -229,8 +232,8 @@ parseSpec = do
     MP.runParser
       (runStateT L.orgDocParser L.defaultOrgParserState)
       "empty input"
-      nilOrgDocUuid
-      `shouldParse` (L.defaultOrgDoc nil [], L.defaultOrgParserState)
+      nilOidOrgDoc
+      `shouldParse` (L.defaultOrgDoc nilOid [], L.defaultOrgParserState)
 
   before (LU.readFrom "" "lilac.org") $ do
     it "self-parse" $ \input -> do
@@ -241,18 +244,18 @@ parseSpec = do
 
   p
     "0001-blankline"
-    (L.defaultOrgDoc nil [])
+    (L.defaultOrgDoc nilOid [])
 
   p
     "0001-comments-only"
-    (L.defaultOrgDoc nil [])
+    (L.defaultOrgDoc nilOid [])
 
   ps
     "0001-blankline"
-    (L.defaultOrgDoc nil [])
+    (L.defaultOrgDoc nilOid [])
     OrgParserState
       { goids = fromList [],
-        orgId = one $ Just nil,
+        orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -274,14 +277,14 @@ parseSpec = do
   p
     "0002-doc-metadata-whitespace-before-value"
     $ L.defaultOrgDoc
-      nil
+      nilOid
       [ ("title", "Parse me without leading whitespace")
       ]
 
   p
     "0002-doc-metadata"
     $ L.defaultOrgDoc
-      nil
+      nilOid
       [ ("author", "A. U. Thor"),
         ("auto_tangle", "t"),
         ("property", "header-args+ :noweb no-export"),
@@ -291,7 +294,7 @@ parseSpec = do
   p
     "0003-doc-metadata-with-comments"
     $ L.defaultOrgDoc
-      nil
+      nilOid
       [ ("author", "A. U. Thor"),
         ("auto_tangle", "t"),
         ("property", "header-args+ :noweb no-export"),
@@ -301,13 +304,13 @@ parseSpec = do
   ps
     "0002-doc-metadata-properties-drawer"
     ( L.defaultOrgDoc
-        (fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
+        (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
         [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
         ]
     )
     OrgParserState
       { goids = fromList [],
-        orgId = one . Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+        orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -324,7 +327,7 @@ parseSpec = do
   ps
     "0002-doc-metadata-properties-drawer-combine"
     ( L.defaultOrgDoc
-        (fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
+        (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
         [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
           ("author", "A. U. Thor"),
           ("property", "header-args+ :noweb no-export"),
@@ -333,7 +336,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = one . Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+        orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -379,7 +382,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nil],
+        orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
@@ -412,7 +415,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nil],
+        orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
@@ -465,7 +468,7 @@ parseSpec = do
         1
         (NE.fromList [Nothing])
         `shouldBe` ( NE.fromList
-                       [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                       [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                          Nothing
                        ]
                    )
@@ -473,9 +476,9 @@ parseSpec = do
       L.genOrgIdStack
         (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         1
-        (NE.fromList [Just $ fromWords64 0x7777777777777777 0x7777777777777777, Nothing])
+        (NE.fromList [Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing])
         `shouldBe` ( NE.fromList
-                       [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                       [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                          Nothing
                        ]
                    )
@@ -485,7 +488,7 @@ parseSpec = do
         2
         (NE.fromList [Nothing, Nothing])
         `shouldBe` ( NE.fromList
-                       [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                       [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                          Nothing,
                          Nothing
                        ]
@@ -505,9 +508,9 @@ parseSpec = do
       L.genOrgIdStack
         (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         1
-        (NE.fromList [Just $ fromWords64 0x7777777777777777 0x7777777777777777, Nothing, Nothing])
+        (NE.fromList [Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing, Nothing])
         `shouldBe` ( NE.fromList
-                       [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                       [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                          Nothing
                        ]
                    )
@@ -515,7 +518,7 @@ parseSpec = do
       L.genOrgIdStack
         Nothing
         1
-        (NE.fromList [Nothing, Nothing, Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa, Nothing])
+        (NE.fromList [Nothing, Nothing, Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa, Nothing])
         `shouldBe` ( NE.fromList
                        [ Nothing,
                          Nothing
@@ -525,9 +528,9 @@ parseSpec = do
       L.genOrgIdStack
         (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         1
-        (NE.fromList [Nothing, Nothing, Just $ fromWords64 0x7777777777777777 0x7777777777777777, Nothing])
+        (NE.fromList [Nothing, Nothing, Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing])
         `shouldBe` ( NE.fromList
-                       [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                       [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                          Nothing
                        ]
                    )
@@ -550,7 +553,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = NE.fromList [Nothing, Just nil],
+        orgId = NE.fromList [Nothing, Just nilOid],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -585,7 +588,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nil],
+        orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -620,7 +623,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nil],
+        orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -822,7 +825,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = NE.fromList [Nothing, Just nil],
+        orgId = NE.fromList [Nothing, Just nilOid],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -1157,7 +1160,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = NE.fromList [Nothing, Just nil],
+        orgId = NE.fromList [Nothing, Just nilOid],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -1181,7 +1184,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "1"),
@@ -1193,7 +1196,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "example"),
@@ -1204,7 +1207,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "2"),
@@ -1217,7 +1220,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = one $ Just nil,
+        orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1236,7 +1239,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1248,7 +1251,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1260,7 +1263,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1272,7 +1275,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1284,7 +1287,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1296,7 +1299,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1310,7 +1313,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = one $ Just nil,
+        orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1337,7 +1340,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "1"),
@@ -1361,7 +1364,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "1"),
@@ -1374,7 +1377,7 @@ parseSpec = do
                             { target =
                                 LinkTargetNoweb
                                   LinkNoweb
-                                    { uuid = Just nil,
+                                    { oid = Just nilOid,
                                       name = "foo"
                                     },
                               name =
@@ -1391,7 +1394,7 @@ parseSpec = do
                             { target =
                                 LinkTargetNoweb
                                   LinkNoweb
-                                    { uuid = Just nil,
+                                    { oid = Just nilOid,
                                       name = "bar"
                                     },
                               name =
@@ -1417,7 +1420,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "1"),
@@ -1431,7 +1434,7 @@ parseSpec = do
                             { target =
                                 LinkTargetNoweb
                                   LinkNoweb
-                                    { uuid = Just nil,
+                                    { oid = Just nilOid,
                                       name = "foo"
                                     },
                               name =
@@ -1448,7 +1451,7 @@ parseSpec = do
                             { target =
                                 LinkTargetNoweb
                                   LinkNoweb
-                                    { uuid = Just nil,
+                                    { oid = Just nilOid,
                                       name = "bar"
                                     },
                               name =
@@ -1465,7 +1468,7 @@ parseSpec = do
                             { target =
                                 LinkTargetNoweb
                                   LinkNoweb
-                                    { uuid = Just nil,
+                                    { oid = Just nilOid,
                                       name = "ok"
                                     },
                               name =
@@ -1501,7 +1504,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentUuid = Just nil,
+                { parentOid = Just nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "1"),
@@ -1872,7 +1875,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = one $ Just nil,
+        orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1926,7 +1929,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = one $ Just nil,
+        orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1945,7 +1948,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             Block
-              { parentUuid = Just nil,
+              { parentOid = Just nilOid,
                 meta =
                   fromList
                     [ ("__block_type", "src"),
@@ -1975,7 +1978,7 @@ parseSpec = do
               },
           CBlock
             Block
-              { parentUuid = Just nil,
+              { parentOid = Just nilOid,
                 meta =
                   fromList
                     [ ("__block_type", "src"),
@@ -2003,7 +2006,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
-        orgId = one $ Just nil,
+        orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -2297,18 +2300,18 @@ parseSpec = do
     ]
 
   pfGOIDs
-    "0200-goids-file-non-uuid"
-    "\"b449a097-d702-4fd6-98de-cb81f7e49177e\" is not a valid UUID"
+    "0200-goids-file-non-oid"
+    "\"b449a097-d702-4fd6-98de-cb81f7e49177e\" is not a valid OID"
     336
 
   pfGOIDs
-    "0200-goids-file-non-uuid-x"
-    "\"a1e6d0d5-4540-423b-864e-b96ad06c56ex\" is not a valid UUID"
+    "0200-goids-file-non-oid-x"
+    "\"a1e6d0d5-4540-423b-864e-b96ad06c56ex\" is not a valid OID"
     66
 
   pfGOIDs
-    "0200-goids-file-duplicate-uuid"
-    "duplicate UUID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
+    "0200-goids-file-duplicate-oid"
+    "duplicate OID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
     335
 
   pGOIDs

@@ -10,15 +10,14 @@ import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
-import Data.UUID.Types (UUID)
 import Lilac.Parse (maskToStyles)
 import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
-    Block (Block, body, meta, parentUuid),
+    Block (Block, body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, section),
     Link (Link, name, target),
-    LinkNoweb (name, uuid),
+    LinkNoweb (name, oid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
@@ -29,7 +28,8 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (body),
-    OrgDoc (cells, meta, uuid),
+    OID,
+    OrgDoc (cells, meta, oid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
@@ -113,7 +113,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 type WeaveConf :: Type
 data WeaveConf = WeaveConf
   { orgDoc :: OrgDoc,
-    goids :: M.Map UUID P.OsPath,
+    goids :: M.Map OID P.OsPath,
     watch :: Bool
   }
 
@@ -372,9 +372,9 @@ weaveLink link = do
         else "internal-link"
     linkTarget weaveConf = case link.target of
       LinkTargetNoweb linkNoweb
-        | Just linkUuid <- linkNoweb.uuid,
-          Just orgFile <- EM.lookup linkUuid weaveConf.goids,
-          Just currentOrgFile <- EM.lookup weaveConf.orgDoc.uuid weaveConf.goids,
+        | Just linkOid <- linkNoweb.oid,
+          Just orgFile <- EM.lookup linkOid weaveConf.goids,
+          Just currentOrgFile <- EM.lookup weaveConf.orgDoc.oid weaveConf.goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
             if orgFile == currentOrgFile
               then "#" <> linkAnchor
@@ -386,14 +386,14 @@ weaveLink link = do
             getLinkAnchor
               $ CBlock
                 Block
-                  { parentUuid = Nothing,
+                  { parentOid = Nothing,
                     meta = M.fromList [("name", linkNoweb.name)],
                     body = []
                   }
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
       LinkTargetOther targetText -> targetText
 
-weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> M.Map UUID P.OsPath -> IO ()
+weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> M.Map OID P.OsPath -> IO ()
 weaveToDisk fp od watch goids = do
   let weaveConf =
         WeaveConf

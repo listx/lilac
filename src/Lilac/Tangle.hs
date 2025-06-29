@@ -13,16 +13,16 @@ import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID)
 import Lilac.Parse (parseOrgDoc)
 import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
-    Block (body, meta, parentUuid),
+    Block (body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Link (Link),
     LinkNoweb (LinkNoweb),
     LinkTarget (LinkTargetNoweb),
-    OrgDoc (cells, uuid),
+    OID,
+    OrgDoc (cells, oid),
   )
 import Lilac.Util qualified as LU
 import Relude
@@ -95,7 +95,7 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
         | Just name <- EM.lookup "name" b.meta,
           Just path <- EM.lookup "tangle" b.meta,
           Right filePath <- qualify path ->
-            let fqbn1 = getFqbnByDocUUID name
+            let fqbn1 = getFqbnByDocOID name
                 fqbn2 = getFqbn b name
                 newBlock1 = useQualifiedTanglePath filePath $ injectFqbn fqbn1 b
                 newBlock2 = useQualifiedTanglePath filePath $ injectFqbn fqbn2 b
@@ -108,7 +108,7 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
         | Just path <- EM.lookup "tangle" b.meta,
           Right filePath <- qualify path ->
             let name = (T.pack filePath) <> "\NUL"
-                fqbn1 = getFqbnByDocUUID name
+                fqbn1 = getFqbnByDocOID name
                 fqbn2 = getFqbn b name
                 newBlock1 = useQualifiedTanglePath filePath $ injectFqbn fqbn1 b
                 newBlock2 = useQualifiedTanglePath filePath $ injectFqbn fqbn2 b
@@ -119,7 +119,7 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
                         $ M.insert fqbn2 newBlock2 sc.fqbnToCodeBlock
                   }
         | Just name <- EM.lookup "name" b.meta ->
-            let fqbn1 = getFqbnByDocUUID name
+            let fqbn1 = getFqbnByDocOID name
                 fqbn2 = getFqbn b name
                 newBlock1 = injectFqbn fqbn1 b
                 newBlock2 = injectFqbn fqbn2 b
@@ -136,8 +136,8 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
       CFigure {}
       CTable {} -> sc
     getFqbn :: Block -> T.Text -> T.Text
-    getFqbn b name = LU.prefixWithId b.parentUuid name
-    getFqbnByDocUUID name = LU.prefixWithId (Just od.uuid) name
+    getFqbn b name = LU.prefixWithId b.parentOid name
+    getFqbnByDocOID name = LU.prefixWithId (Just od.oid) name
     injectFqbn fqbn block =
       block
         { meta = M.insert "__fqbn" fqbn block.meta
@@ -155,49 +155,49 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
         }
 
 growBlockUniverse ::
-  Set.Set (Maybe UUID) ->
+  Set.Set (Maybe OID) ->
   Set.Set FQBN ->
-  M.Map UUID P.OsPath ->
+  M.Map OID P.OsPath ->
   M.Map FQBN Block ->
   [FQBN] ->
   IO (M.Map FQBN Block)
 growBlockUniverse _ _ _ blockUniverse [] = pure blockUniverse
-growBlockUniverse parsedUuids seenFqbns goids blockUniverse (root : roots)
+growBlockUniverse parsedOids seenFqbns goids blockUniverse (root : roots)
   | Just block <- EM.lookup root blockUniverse = do
       let nowebLinks = catMaybes $ map getLinkTarget block.body
           fqbns =
             map
-              (\(LinkNoweb maybeUuid targetName) -> LU.prefixWithId maybeUuid targetName)
+              (\(LinkNoweb maybeOid targetName) -> LU.prefixWithId maybeOid targetName)
               nowebLinks
           newFqbns = filter (\fqbn -> not $ Set.member fqbn seenFqbns) fqbns
-      (newlyParsedUuids, grownBlockUniverse, toGrowFrom) <-
-        foldlM f (parsedUuids, blockUniverse, []) nowebLinks
+      (newlyParsedOids, grownBlockUniverse, toGrowFrom) <-
+        foldlM f (parsedOids, blockUniverse, []) nowebLinks
       growBlockUniverse
-        newlyParsedUuids
+        newlyParsedOids
         (Set.union seenFqbns $ Set.fromList newFqbns)
         goids
         grownBlockUniverse
         (roots <> newFqbns <> toGrowFrom)
-  | otherwise = growBlockUniverse parsedUuids seenFqbns goids blockUniverse roots
+  | otherwise = growBlockUniverse parsedOids seenFqbns goids blockUniverse roots
   where
     f ::
-      (Set.Set (Maybe UUID), M.Map FQBN Block, [FQBN]) ->
+      (Set.Set (Maybe OID), M.Map FQBN Block, [FQBN]) ->
       LinkNoweb ->
-      IO (Set.Set (Maybe UUID), M.Map FQBN Block, [FQBN])
-    f (pu, bu, tgf) (LinkNoweb maybeUuid targetName)
-      | Set.member (LU.prefixWithId maybeUuid targetName) seenFqbns = pure (pu, bu, tgf)
-      | Set.member maybeUuid pu = pure (pu, bu, (LU.prefixWithId maybeUuid targetName) : tgf)
-      | Just uuid <- maybeUuid,
-        Just uuidOsPath <- EM.lookup uuid goids = do
-          input <- LU.readFileRobustly uuidOsPath
+      IO (Set.Set (Maybe OID), M.Map FQBN Block, [FQBN])
+    f (pu, bu, tgf) (LinkNoweb maybeOid targetName)
+      | Set.member (LU.prefixWithId maybeOid targetName) seenFqbns = pure (pu, bu, tgf)
+      | Set.member maybeOid pu = pure (pu, bu, (LU.prefixWithId maybeOid targetName) : tgf)
+      | Just oid <- maybeOid,
+        Just oidOsPath <- EM.lookup oid goids = do
+          input <- LU.readFileRobustly oidOsPath
           case parseOrgDoc input of
             Right od -> do
-              uuidFilePath <- P.decodeUtf uuidOsPath
-              let sc = getSourceCode od uuidFilePath
+              oidFilePath <- P.decodeUtf oidOsPath
+              let sc = getSourceCode od oidFilePath
               pure
-                ( Set.insert maybeUuid pu,
+                ( Set.insert maybeOid pu,
                   M.union bu sc.fqbnToCodeBlock,
-                  (LU.prefixWithId maybeUuid targetName) : tgf
+                  (LU.prefixWithId maybeOid targetName) : tgf
                 )
             Left err -> do
               putStrLn $ show err
@@ -213,7 +213,7 @@ growBlockUniverse parsedUuids seenFqbns goids blockUniverse (root : roots)
 getSourceCodeMulti ::
   OrgDoc ->
   FilePath ->
-  M.Map UUID P.OsPath ->
+  M.Map OID P.OsPath ->
   IO SourceCode
 getSourceCodeMulti od odPath goids = do
   let sc = getSourceCode od odPath
@@ -244,8 +244,8 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
             $ map getLinkTarget block.body
       | otherwise = acc
     getLinkTarget = \case
-      BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb uuid targetName))) ->
-        Just $ LU.prefixWithId uuid targetName
+      BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb oid targetName))) ->
+        Just $ LU.prefixWithId oid targetName
       BTokenLink {}
       BTokenPadding {}
       BTokenString {} -> Nothing
@@ -302,10 +302,10 @@ expandBlock sc block existingPrefix =
       (acc <> "\n", "")
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb uuid target))))
+    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb oid target))))
       | Just targetBlock <-
           EM.lookup
-            (LU.prefixWithId uuid target)
+            (LU.prefixWithId oid target)
             sc.fqbnToCodeBlock =
           ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
             prefix

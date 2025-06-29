@@ -23,16 +23,15 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText, nil)
 import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
-    Block (Block, body, meta, parentUuid),
+    Block (Block, body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (Figure, link, meta),
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
     Link (Link, name, target),
-    LinkNoweb (LinkNoweb, name, uuid),
+    LinkNoweb (LinkNoweb, name, oid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
@@ -43,7 +42,8 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (MathFragment, body, meta),
-    OrgDoc (OrgDoc, cells, meta, uuid),
+    OID,
+    OrgDoc (OrgDoc, cells, meta, oid),
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
     OrgParserState
@@ -69,6 +69,8 @@ import Lilac.Types
     StyledText (StyledText, body, style),
     Table (Table, grid, meta),
     defaultOrgParserConf,
+    fromText,
+    nilOid,
   )
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
@@ -164,14 +166,14 @@ import Text.Megaparsec.Char.Lexer qualified as L
 
 type GOIDsParserState :: Type
 data GOIDsParserState = GOIDsParserState
-  { seenUuids :: M.Map UUID P.OsPath
+  { seenOids :: M.Map OID P.OsPath
   }
   deriving stock (Eq, Show)
 
 defaultGOIDsParserState :: GOIDsParserState
 defaultGOIDsParserState =
   GOIDsParserState
-    { seenUuids = M.fromList []
+    { seenOids = M.fromList []
     }
 
 type GOIDsParser :: Type -> Type
@@ -212,7 +214,7 @@ parseOrgDoc input = case MP.runParser
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
-  (docUuid, meta) <- docMetaParser
+  (docOid, meta) <- docMetaParser
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
@@ -228,21 +230,21 @@ orgDocParser = do
         CTable {} -> True
   pure
     $ OrgDoc
-      { uuid = docUuid,
+      { oid = docOid,
         cells = filter meaningfulCell cells,
         meta = meta
       }
 
-defaultOrgDoc :: UUID -> [(T.Text, T.Text)] -> OrgDoc
-defaultOrgDoc uuid metas =
+defaultOrgDoc :: OID -> [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDoc oid metas =
   OrgDoc
-    { uuid = uuid,
+    { oid = oid,
       cells = [],
       meta = M.fromList metas'
     }
   where
     metas' =
-      if uuid == nil
+      if oid == nilOid
         then ("ID", "00000000-0000-0000-0000-000000000000") : metas
         else metas
 
@@ -250,7 +252,7 @@ defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
-      orgId = one $ Just nil,
+      orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
@@ -287,7 +289,7 @@ docMetaEntryParser = do
     avoidParsingLilacExtensions :: OrgParser ()
     avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
 
-docMetaParser :: OrgParser (UUID, M.Map T.Text T.Text)
+docMetaParser :: OrgParser (OID, M.Map T.Text T.Text)
 docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
@@ -299,10 +301,10 @@ docMetaParser = do
     <> (show conflictingKeys)
   case M.lookup "ID" topLevelDrawerProps of
     Nothing -> fail $ "required document ID property not found"
-    Just uuidText -> do
-      uuid <- validateUuidText uuidText
-      modify (\s -> s {orgId = one $ Just uuid})
-      pure (uuid, M.union topLevelDrawerProps metaKVs)
+    Just oidText -> do
+      oid <- validateOidText oidText
+      modify (\s -> s {orgId = one $ Just oid})
+      pure (oid, M.union topLevelDrawerProps metaKVs)
 
 lilacExtensionsParser :: OrgParser ()
 lilacExtensionsParser = do
@@ -443,7 +445,7 @@ genHeadingSection level prevSection
     bumpDeepestSection [] = []
     bumpDeepestSection (x : xs) = x + 1 : xs
 
-genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty (Maybe UUID) -> NonEmpty (Maybe UUID)
+genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty (Maybe OID) -> NonEmpty (Maybe OID)
 genOrgIdStack maybeId level prevOrgId
   | length prevOrgId == 1 = newId NE.<| prevOrgId
   | length prevOrgId == depth = newId :| tail prevOrgId
@@ -455,9 +457,9 @@ genOrgIdStack maybeId level prevOrgId
     depth = level + 1
     levelDiff = depth - length prevOrgId
     newId
-      | Just uuidText <- maybeId,
-        Just uuid <- fromText uuidText =
-          Just uuid
+      | Just oidText <- maybeId,
+        Just oid <- Lilac.Types.fromText oidText =
+          Just oid
       | otherwise = Nothing
 
 propertiesDrawerParser :: OrgParser (Map T.Text T.Text)
@@ -877,7 +879,7 @@ blockParser = do
       blockMeta = ("__block_type", blockType)
       block =
         Block
-          { parentUuid = firstParent $ NE.toList orgParserState.orgId,
+          { parentOid = firstParent $ NE.toList orgParserState.orgId,
             meta =
               M.fromList
                 $ (blockMeta : metaKVs)
@@ -893,7 +895,7 @@ blockParser = do
       }
   pure $ CBlock block
   where
-    firstParent :: [Maybe UUID] -> Maybe UUID
+    firstParent :: [Maybe OID] -> Maybe OID
     firstParent [] = Nothing
     firstParent (oid : oids)
       | oid == Nothing = firstParent oids
@@ -956,14 +958,14 @@ someBTokensParser blockType nowebOn =
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
   _ <- string "<<"
-  (uuid, linkName) <- blockOriginSignatureParser
+  (oid, linkName) <- blockOriginSignatureParser
   _ <- string ">>"
   pure
     $ Link
       { target =
           LinkTargetNoweb
             LinkNoweb
-              { uuid = uuid,
+              { oid = oid,
                 name = linkName
               },
         name =
@@ -974,7 +976,7 @@ nowebLinkParser = do
           ]
       }
 
-blockOriginSignatureParser :: OrgParser (Maybe UUID, T.Text)
+blockOriginSignatureParser :: OrgParser (Maybe OID, T.Text)
 blockOriginSignatureParser = MP.choice [explicit, implicit]
   where
     blockNameOnly :: OrgParser T.Text
@@ -984,23 +986,23 @@ blockOriginSignatureParser = MP.choice [explicit, implicit]
         (`notElem` ['\n', '<', '>'])
     explicit = do
       _ <- string "id:"
-      uuidText <-
+      oidText <-
         MP.takeWhile1P
-          (Just "uuid char")
+          (Just "oid char")
           (`notElem` [':', '\n', '<', '>'])
       _ <- string "::"
-      uuid <- validateUuidText uuidText
+      oid <- validateOidText oidText
       orgParserState <- get
       when
         ( (M.size orgParserState.goids > 0)
-            && (not $ M.member uuid orgParserState.goids)
+            && (not $ M.member oid orgParserState.goids)
         )
         $ fail
-        $ "UUID "
-        <> show uuidText
+        $ "OID "
+        <> show oidText
         <> " not found in global OrgIds"
       blockName <- blockNameOnly
-      pure (Just uuid, blockName)
+      pure (Just oid, blockName)
     implicit = do
       orgParserState <- get
       blockName <- blockNameOnly
@@ -1081,8 +1083,8 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
-      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb uuid targetName))) ->
-        "\NUL_link" <> (LU.prefixWithId uuid targetName)
+      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb oid targetName))) ->
+        "\NUL_link" <> (LU.prefixWithId oid targetName)
       BTokenLink {} -> ""
 
 zeroIndent :: OrgParser (Int, Int)
@@ -1413,7 +1415,7 @@ rowToTuples (rowIndex, row)
         colIndex + 1
       )
 
-goidsParser :: P.OsPath -> GOIDsParser (M.Map UUID P.OsPath)
+goidsParser :: P.OsPath -> GOIDsParser (M.Map OID P.OsPath)
 goidsParser sourceFile = do
   _ <- ws
   _ <-
@@ -1427,12 +1429,12 @@ goidsParser sourceFile = do
         )
   goidsParserState <- get
   put defaultGOIDsParserState
-  pure goidsParserState.seenUuids
+  pure goidsParserState.seenOids
   where
     ws :: GOIDsParser ()
     ws = void . MP.many $ char ' ' <|> char '\n'
 
-goidsEntryParser :: P.OsPath -> GOIDsParser (P.OsPath, [UUID])
+goidsEntryParser :: P.OsPath -> GOIDsParser (P.OsPath, [OID])
 goidsEntryParser sourceFile = betweenParens $ do
   filepath <-
     P.unsafeEncodeUtf
@@ -1444,21 +1446,21 @@ goidsEntryParser sourceFile = betweenParens $ do
         if P.isAbsolute filepath
           then filepath
           else P.combine (P.takeDirectory sourceFile) filepath
-  uuids <- MP.some $ do
-    uuid <- uuidParser
+  oids <- MP.some $ do
+    oid <- oidParser
     _ <- ws
     goidsParserState <- get
-    when (M.member uuid goidsParserState.seenUuids)
+    when (M.member oid goidsParserState.seenOids)
       $ fail
-      $ "duplicate UUID: \""
-      <> show uuid
+      $ "duplicate OID: \""
+      <> show oid
       <> "\""
     put
       goidsParserState
-        { seenUuids = M.insert uuid fp goidsParserState.seenUuids
+        { seenOids = M.insert oid fp goidsParserState.seenOids
         }
-    pure uuid
-  pure (fp, uuids)
+    pure oid
+  pure (fp, oids)
   where
     betweenParens :: GOIDsParser a -> GOIDsParser a
     betweenParens =
@@ -1468,21 +1470,21 @@ goidsEntryParser sourceFile = betweenParens $ do
     ws :: GOIDsParser ()
     ws = void . MP.many $ char ' ' <|> char '\n'
 
-uuidParser :: GOIDsParser UUID
-uuidParser = do
-  uuidText <-
+oidParser :: GOIDsParser OID
+oidParser = do
+  oidText <-
     MP.between
       (string "\"")
       (string "\"")
-      (MP.takeWhile1P (Just "UUID character") (/= '"'))
-  validateUuidText uuidText
+      (MP.takeWhile1P (Just "OID character") (/= '"'))
+  validateOidText oidText
 
-validateUuidText :: (MonadFail m) => T.Text -> m UUID
-validateUuidText uuidText = case fromText uuidText of
-  Nothing -> fail $ show uuidText <> " is not a valid UUID"
-  Just uuid -> pure uuid
+validateOidText :: (MonadFail m) => T.Text -> m OID
+validateOidText oidText = case fromText oidText of
+  Nothing -> fail $ show oidText <> " is not a valid OID"
+  Just oid -> pure oid
 
-runGoidsParser :: FilePath -> IO (M.Map UUID P.OsPath)
+runGoidsParser :: FilePath -> IO (M.Map OID P.OsPath)
 runGoidsParser orgIdLocationsFile = do
   let path = case P.encodeUtf orgIdLocationsFile of
         Nothing -> P.pack []
@@ -1496,7 +1498,7 @@ runGoidsParser orgIdLocationsFile = do
   case parseResult of
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
-    Right (ids, _) -> pure ids
+    Right (oids, _) -> pure oids
 
 extractGOIDs :: [(P.OsPath, T.Text)] -> T.Text
 extractGOIDs orgFilesAndContents =
@@ -1512,11 +1514,11 @@ extractGOIDs orgFilesAndContents =
           Left _err -> acc
           Right (orgDoc, _orgParserState) -> M.insert orgFile (getOrgIds orgDoc) acc
       | otherwise = acc
-    getOrgIds :: OrgDoc -> [UUID]
-    getOrgIds od = catMaybes $ foldl' f [Just $ od.uuid] od.cells
-    extractOrgId :: M.Map T.Text T.Text -> Maybe UUID
+    getOrgIds :: OrgDoc -> [OID]
+    getOrgIds od = catMaybes $ foldl' f [Just $ od.oid] od.cells
+    extractOrgId :: M.Map T.Text T.Text -> Maybe OID
     extractOrgId meta
-      | Just uuidText <- EM.lookup "ID" meta = fromText uuidText
+      | Just oidText <- EM.lookup "ID" meta = Lilac.Types.fromText oidText
       | otherwise = Nothing
     f acc cell = case cell of
       CHeading heading -> extractOrgId heading.meta : acc
@@ -1526,7 +1528,7 @@ extractGOIDs orgFilesAndContents =
       CTable table -> extractOrgId table.meta : acc
       CListItem {}
       CParagraph {} -> acc
-    goidEntryToLines :: [T.Text] -> (P.OsPath, [UUID]) -> [T.Text]
+    goidEntryToLines :: [T.Text] -> (P.OsPath, [OID]) -> [T.Text]
     goidEntryToLines acc (orgFile, goids)
       | goids == [] = acc
       | Right str <- P.decodeWith utf8 utf8 orgFile,

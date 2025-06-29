@@ -1557,10 +1557,12 @@ Makefiles
 Megaparsec
 memoize
 memoizes
+namespace
 Niv
 Nixkell
 Nixpkgs
 Noweb
+OIDs
 Orgmode
 PDF
 PDFs
@@ -1579,7 +1581,6 @@ subcommands
 subgraph
 substrings
 toolchain
-UUIDs
 #+end_src
 
 *** Sort file contents
@@ -1819,7 +1820,6 @@ test-suite spec
     , megaparsec
     , network-uri
     , relude
-    , uuid-types
   default-language: <<Language edition>>
 #+end_src
 
@@ -2276,7 +2276,7 @@ file).
 
 #+name: f:runGoidsParser
 #+begin_src haskell
-runGoidsParser :: FilePath -> IO (M.Map UUID P.OsPath)
+runGoidsParser :: FilePath -> IO (M.Map OID P.OsPath)
 runGoidsParser orgIdLocationsFile = do
   let path = case P.encodeUtf orgIdLocationsFile of
         Nothing -> P.pack []
@@ -2290,7 +2290,7 @@ runGoidsParser orgIdLocationsFile = do
   case parseResult of
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
-    Right (ids, _) -> pure ids
+    Right (oids, _) -> pure oids
 #+end_src
 
 *** Weaving
@@ -2838,7 +2838,7 @@ where
 import Control.Exception (catch)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
-import Data.UUID.Types (UUID)
+import Lilac.Types (OID)
 import Relude
   ( Bool (True),
     FilePath,
@@ -2909,13 +2909,13 @@ writeFileRobustly path contentToWrite = do
 #+end_src
 
 The [[f:prefixWithId]] function fully qualifies the name of the code block with the
-given UUID, which will typically be the top-level ID for the Org document that
+given OID, which will typically be the top-level ID for the Org document that
 contains the code block.
 
 #+name: f:prefixWithId
 #+begin_src haskell
-prefixWithId :: Maybe UUID -> T.Text -> T.Text
-prefixWithId maybeUuid name = case maybeUuid of
-  Just uuid -> "id:" <> T.pack (show uuid) <> "::" <> name
+prefixWithId :: Maybe OID -> T.Text -> T.Text
+prefixWithId maybeOid name = case maybeOid of
+  Just oid -> "id:" <> T.pack (show oid) <> "::" <> name
   Nothing -> name
 #+end_src

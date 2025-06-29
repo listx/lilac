@@ -49,16 +49,15 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText, nil)
 import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
-    Block (Block, body, meta, parentUuid),
+    Block (Block, body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (Figure, link, meta),
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
     Link (Link, name, target),
-    LinkNoweb (LinkNoweb, name, uuid),
+    LinkNoweb (LinkNoweb, name, oid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
@@ -69,7 +68,8 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (MathFragment, body, meta),
-    OrgDoc (OrgDoc, cells, meta, uuid),
+    OID,
+    OrgDoc (OrgDoc, cells, meta, oid),
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
     OrgParserState
@@ -95,6 +95,8 @@ import Lilac.Types
     StyledText (StyledText, body, style),
     Table (Table, grid, meta),
     defaultOrgParserConf,
+    fromText,
+    nilOid,
   )
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
@@ -275,8 +277,8 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:rowToTuples>>
 <<f:goidsParser>>
 <<f:goidsEntryParser>>
-<<f:uuidParser>>
-<<f:validateUuidText>>
+<<f:oidParser>>
+<<f:validateOidText>>
 <<id:ef1e620c-357a-4350-b85a-ba813dabf8c7::f:runGoidsParser>>
 <<f:extractGOIDs>>
 #+end_src
@@ -405,14 +407,14 @@ would-be-tangled file has its own code graph. These code graphs are discussed
 later in [[id:b449a097-d702-4fd6-98de-cb81f7e49177][Code graphs]].
 
 In summary an Org document is made up of cells and code graphs, as well as some
-metadata (the title, author name, etc). The doc also has a UUID, which
+metadata (the title, author name, etc). The doc also has an OID, which
 allows other Org files to refer to this Org file.
 
 #+name: data:OrgDoc
 #+begin_src haskell
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
-  { uuid :: UUID,
+  { oid :: OID,
     cells :: [Cell],
     meta :: M.Map T.Text T.Text
   }
@@ -425,6 +427,20 @@ The ~instance ToJSON OrgDoc~ is needed to create the default implementation for
 JSON conversion automatically for us. All child types also require the same
 ~instance~ declaration for this to work. At the end of it though, we can use the
 ~encode~ and ~encodeFile~ functions from =Data.Aeson=.
+
+#+name: newtype:OID
+#+begin_src haskell
+type OID :: Type
+newtype OID = OID UUID
+  deriving stock (Eq, Ord, Generic)
+
+instance ToJSON OID
+#+end_src
+
+The OID wraps around a UUID. This way we can be agnostic about the concrete
+details of a UUID in the rest of the program. There are some helpers in [[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62][Org ID
+(OID)]] for this type, which plays a big role in Lilac because it is the building
+block of Org links to headings and other (external) Org documents.
 
 The top-level parsing function is =parseOrgDoc=, which takes some raw text input
 and parses it into a rich =OrgDoc= type.
@@ -483,8 +499,8 @@ inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { goids :: M.Map UUID P.OsPath,
-    orgId :: NonEmpty (Maybe UUID),
+  { goids :: M.Map OID P.OsPath,
+    orgId :: NonEmpty (Maybe OID),
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
@@ -506,7 +522,7 @@ defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
-      orgId = one $ Just nil,
+      orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
@@ -543,7 +559,7 @@ deal with it here separately.
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
-  (docUuid, meta) <- docMetaParser
+  (docOid, meta) <- docMetaParser
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
@@ -559,7 +575,7 @@ orgDocParser = do
         CTable {} -> True
   pure
     $ OrgDoc
-      { uuid = docUuid,
+      { oid = docOid,
         cells = filter meaningfulCell cells,
         meta = meta
       }
@@ -581,8 +597,8 @@ it "empty input" $ do
   MP.runParser
     (runStateT L.orgDocParser L.defaultOrgParserState)
     "empty input"
-    nilOrgDocUuid
-    `shouldParse` (L.defaultOrgDoc nil [], L.defaultOrgParserState)
+    nilOidOrgDoc
+    `shouldParse` (L.defaultOrgDoc nilOid [], L.defaultOrgParserState)
 #+end_src
 
 The =defaultOrgDoc= is just a default (mostly blank) ~OrgDoc~. It's useful for
@@ -590,16 +606,16 @@ testing.
 
 #+name: f:defaultOrgDoc
 #+begin_src haskell
-defaultOrgDoc :: UUID -> [(T.Text, T.Text)] -> OrgDoc
-defaultOrgDoc uuid metas =
+defaultOrgDoc :: OID -> [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDoc oid metas =
   OrgDoc
-    { uuid = uuid,
+    { oid = oid,
       cells = [],
       meta = M.fromList metas'
     }
   where
     metas' =
-      if uuid == nil
+      if oid == nilOid
         then ("ID", "00000000-0000-0000-0000-000000000000") : metas
         else metas
 #+end_src
@@ -622,7 +638,7 @@ This leaves us with just one newline in
 #+begin_src haskell
 p
   "0001-blankline"
-  (L.defaultOrgDoc nil [])
+  (L.defaultOrgDoc nilOid [])
 #+end_src
 
 Parsing comments should also result in a blank document.
@@ -641,7 +657,7 @@ a block comment.
 #+begin_src haskell
 p
   "0001-comments-only"
-  (L.defaultOrgDoc nil [])
+  (L.defaultOrgDoc nilOid [])
 #+end_src
 
 At the other end of the spectrum, Lilac should be able to parse itself
@@ -707,7 +723,7 @@ while consuming any trailing whitespace or comments with [[f:lexeme]].
 
 #+name: f:docMetaParser
 #+begin_src haskell
-docMetaParser :: OrgParser (UUID, M.Map T.Text T.Text)
+docMetaParser :: OrgParser (OID, M.Map T.Text T.Text)
 docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
@@ -719,10 +735,10 @@ docMetaParser = do
     <> (show conflictingKeys)
   case M.lookup "ID" topLevelDrawerProps of
     Nothing -> fail $ "required document ID property not found"
-    Just uuidText -> do
-      uuid <- validateUuidText uuidText
-      modify (\s -> s {orgId = one $ Just uuid})
-      pure (uuid, M.union topLevelDrawerProps metaKVs)
+    Just oidText -> do
+      oid <- validateOidText oidText
+      modify (\s -> s {orgId = one $ Just oid})
+      pure (oid, M.union topLevelDrawerProps metaKVs)
 #+end_src
 
 Note that using the properties drawer is the main way in which the ~ID~ field of a
@@ -856,7 +872,7 @@ Below are some unit test cases for parsing metadata.
 p
   "0002-doc-metadata"
   $ L.defaultOrgDoc
-    nil
+    nilOid
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
       ("property", "header-args+ :noweb no-export"),
@@ -900,7 +916,7 @@ Yet another comment.
 p
   "0003-doc-metadata-with-comments"
   $ L.defaultOrgDoc
-    nil
+    nilOid
     [ ("author", "A. U. Thor"),
       ("auto_tangle", "t"),
       ("property", "header-args+ :noweb no-export"),
@@ -936,7 +952,7 @@ Metadata values can have leading whitespace. We ignore such whitespace.
 p
   "0002-doc-metadata-whitespace-before-value"
   $ L.defaultOrgDoc
-    nil
+    nilOid
     [ ("title", "Parse me without leading whitespace")
     ]
 #+end_src
@@ -970,13 +986,13 @@ Metadata can also come from top-level properties drawers.
 ps
   "0002-doc-metadata-properties-drawer"
   ( L.defaultOrgDoc
-      (fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
+      (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
       [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
       ]
   )
   OrgParserState
     { goids = fromList [],
-      orgId = one . Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+      orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -991,17 +1007,17 @@ ps
     }
 #+end_src
 
-If the ~:ID:~ is missing, we assign a nil (all zero bits) UUID. We reuse the same
+If the ~:ID:~ is missing, we assign a nil (all zero bits) OID. We reuse the same
 test case file from [[t:0001-blankline]].
 
 #+name: t:0002-doc-metadata-properties-drawer-empty
 #+begin_src haskell
 ps
   "0001-blankline"
-  (L.defaultOrgDoc nil [])
+  (L.defaultOrgDoc nilOid [])
   OrgParserState
     { goids = fromList [],
-      orgId = one $ Just nil,
+      orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -1034,7 +1050,7 @@ key\/value metadata lines.
 ps
   "0002-doc-metadata-properties-drawer-combine"
   ( L.defaultOrgDoc
-      (fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
+      (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
       [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
         ("author", "A. U. Thor"),
         ("property", "header-args+ :noweb no-export"),
@@ -1043,7 +1059,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = one . Just $ fromWords64 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+      orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -1453,7 +1469,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [Nothing, Just nil],
+      orgId = NE.fromList [Nothing, Just nilOid],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -2170,12 +2186,12 @@ instance ToJSON LinkTarget
 #+end_src
 
 A Noweb link points to a code block with the given =name=, as well as the [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org ID
-or =uuid= of the file]] the code block comes from. The UUID acts as a /namespace/, so
-that each Org file is free to choose any name it wants for code blocks without
-fear of other Org files that might have a code block with the same name.
+of the file]] the code block comes from. The OID acts as a /namespace/, so that
+each Org file is free to choose any name it wants for code blocks without fear
+of other Org files that might have a code block with the same name.
 
-The UUID is wrapped in a =Maybe= because it is possible that an Org file has
-no UUID specified at the top level (see [[data:OrgDoc]]). However if this is the
+The OID is wrapped in a =Maybe= because it is possible that an Org file has
+no OID specified at the top level (see [[data:OrgDoc]]). However if this is the
 case, then none of the code blocks in that document will be able to be
 referenced by the outside world (in other Org files). See
 [[f:blockOriginSignatureParser]] for how we use this information.
@@ -2184,7 +2200,7 @@ referenced by the outside world (in other Org files). See
 #+begin_src haskell
 type LinkNoweb :: Type
 data LinkNoweb = LinkNoweb
-  { uuid :: Maybe UUID,
+  { oid :: Maybe OID,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Ord, Show)
@@ -2197,9 +2213,9 @@ In summary we support the following link types:
   - ~LinkTargetNoweb~ :: a link to a Noweb reference inside another code block.
     These use angle brackets (e.g., ~<<foo>>~), where the text inside the brackets
     refers to a code block in the current file. This can reference code blocks
-    in other files by UUID, where the syntax is ~<<id:...::foo>>~ where ~...~ is the
-    UUID and ~<<foo>>~ is the name of the code block at that UUID. We have to use
-    a UUID-to-file map data structure (which is parsed [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][here]]).
+    in other files by OID, where the syntax is ~<<id:...::foo>>~ where ~...~ is the
+    OID and ~<<foo>>~ is the name of the code block at that OID. We have to use
+    an OID-to-file map data structure (which is parsed [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][here]]).
 
   - ~LinkTargetURI~ :: a link that points to a traditional URI; these are the most
     common types of links on the internet, the most famous example being
@@ -2386,7 +2402,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [Nothing, Just nil],
+      orgId = NE.fromList [Nothing, Just nilOid],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3073,7 +3089,7 @@ in [[f:blockOriginSignatureParser]].
 
 #+name: f:genOrgIdStack
 #+begin_src haskell
-genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty (Maybe UUID) -> NonEmpty (Maybe UUID)
+genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty (Maybe OID) -> NonEmpty (Maybe OID)
 genOrgIdStack maybeId level prevOrgId
   | length prevOrgId == 1 = newId NE.<| prevOrgId
   | length prevOrgId == depth = newId :| tail prevOrgId
@@ -3085,9 +3101,9 @@ genOrgIdStack maybeId level prevOrgId
     depth = level + 1
     levelDiff = depth - length prevOrgId
     newId
-      | Just uuidText <- maybeId,
-        Just uuid <- fromText uuidText =
-          Just uuid
+      | Just oidText <- maybeId,
+        Just oid <- Lilac.Types.fromText oidText =
+          Just oid
       | otherwise = Nothing
 #+end_src
 
@@ -3100,7 +3116,7 @@ describe "genOrgIdStack" $ do
       1
       (NE.fromList [Nothing])
       `shouldBe` ( NE.fromList
-                     [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                     [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                        Nothing
                      ]
                  )
@@ -3108,9 +3124,9 @@ describe "genOrgIdStack" $ do
     L.genOrgIdStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [Just $ fromWords64 0x7777777777777777 0x7777777777777777, Nothing])
+      (NE.fromList [Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing])
       `shouldBe` ( NE.fromList
-                     [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                     [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                        Nothing
                      ]
                  )
@@ -3120,7 +3136,7 @@ describe "genOrgIdStack" $ do
       2
       (NE.fromList [Nothing, Nothing])
       `shouldBe` ( NE.fromList
-                     [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                     [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                        Nothing,
                        Nothing
                      ]
@@ -3140,9 +3156,9 @@ describe "genOrgIdStack" $ do
     L.genOrgIdStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [Just $ fromWords64 0x7777777777777777 0x7777777777777777, Nothing, Nothing])
+      (NE.fromList [Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing, Nothing])
       `shouldBe` ( NE.fromList
-                     [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                     [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                        Nothing
                      ]
                  )
@@ -3150,7 +3166,7 @@ describe "genOrgIdStack" $ do
     L.genOrgIdStack
       Nothing
       1
-      (NE.fromList [Nothing, Nothing, Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa, Nothing])
+      (NE.fromList [Nothing, Nothing, Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa, Nothing])
       `shouldBe` ( NE.fromList
                      [ Nothing,
                        Nothing
@@ -3160,9 +3176,9 @@ describe "genOrgIdStack" $ do
     L.genOrgIdStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [Nothing, Nothing, Just $ fromWords64 0x7777777777777777 0x7777777777777777, Nothing])
+      (NE.fromList [Nothing, Nothing, Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing])
       `shouldBe` ( NE.fromList
-                     [ Just $ fromWords64 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                     [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                        Nothing
                      ]
                  )
@@ -3233,7 +3249,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nil],
+      orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
@@ -3288,7 +3304,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nil],
+      orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
@@ -3373,7 +3389,7 @@ In vanilla Orgmode, drawers look like
 and the contents may be anything but another [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][heading]] or another (nested) drawer.
 In Lilac, we only parse the =:PROPERTIES:= drawer, which is a special drawer that
 can contain key\/value pairs that Org recognizes. One of these is the =:ID:= key,
-which can have a UUID as the value, and which can be used as a link target from
+which can have an OID as the value, and which can be used as a link target from
 elsewhere in the document (in Orgmode this can be done with ~org-id-store-link~).
 
 #+name: f:propertiesDrawerParser
@@ -3456,7 +3472,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [Nothing, Just nil],
+      orgId = NE.fromList [Nothing, Just nilOid],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3504,7 +3520,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nil],
+      orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3562,7 +3578,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = NE.fromList [Just $ fromWords64 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nil],
+      orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3594,7 +3610,7 @@ arbitrary keyword here.
 #+begin_src haskell
 type Block :: Type
 data Block = Block
-  { parentUuid :: Maybe UUID,
+  { parentOid :: Maybe OID,
     meta :: M.Map T.Text T.Text,
     body :: [BToken]
   }
@@ -3627,7 +3643,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = one $ Just nil,
+      orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -3646,7 +3662,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -3658,7 +3674,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__block_type", "example"),
@@ -3669,7 +3685,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "2"),
@@ -3850,7 +3866,7 @@ blockParser = do
       blockMeta = ("__block_type", blockType)
       block =
         Block
-          { parentUuid = firstParent $ NE.toList orgParserState.orgId,
+          { parentOid = firstParent $ NE.toList orgParserState.orgId,
             meta =
               M.fromList
                 $ (blockMeta : metaKVs)
@@ -3866,7 +3882,7 @@ blockParser = do
       }
   pure $ CBlock block
   where
-    firstParent :: [Maybe UUID] -> Maybe UUID
+    firstParent :: [Maybe OID] -> Maybe OID
     firstParent [] = Nothing
     firstParent (oid : oids)
       | oid == Nothing = firstParent oids
@@ -4024,7 +4040,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4149,14 +4165,14 @@ Noweb link.
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
   _ <- string "<<"
-  (uuid, linkName) <- blockOriginSignatureParser
+  (oid, linkName) <- blockOriginSignatureParser
   _ <- string ">>"
   pure
     $ Link
       { target =
           LinkTargetNoweb
             LinkNoweb
-              { uuid = uuid,
+              { oid = oid,
                 name = linkName
               },
         name =
@@ -4170,17 +4186,17 @@ nowebLinkParser = do
 
 The [[f:blockOriginSignatureParser]] parses information about the origin of the
 block being referenced, which we call the block origin signature. For now the
-origin can have an optional UUID, along with the name of the code block itself.
+origin can have an optional OID, along with the name of the code block itself.
 
-The UUID is prefixed with ~id:~. If it is there (explicitly), we use it after
-running some validation checks. Otherwise we assign the UUID that was parsed at
+The OID is prefixed with ~id:~. If it is there (explicitly), we use it after
+running some validation checks. Otherwise we assign the OID that was parsed at
 the beginning of the document in [[f:docMetaParser]], because although the link may
-refer to a block that has a parent heading which has its own UUID, we don't have
+refer to a block that has a parent heading which has its own OID, we don't have
 that information at hand.
 
 #+name: f:blockOriginSignatureParser
 #+begin_src haskell
-blockOriginSignatureParser :: OrgParser (Maybe UUID, T.Text)
+blockOriginSignatureParser :: OrgParser (Maybe OID, T.Text)
 blockOriginSignatureParser = MP.choice [explicit, implicit]
   where
     blockNameOnly :: OrgParser T.Text
@@ -4190,23 +4206,23 @@ blockOriginSignatureParser = MP.choice [explicit, implicit]
         (`notElem` ['\n', '<', '>'])
     explicit = do
       _ <- string "id:"
-      uuidText <-
+      oidText <-
         MP.takeWhile1P
-          (Just "uuid char")
+          (Just "oid char")
           (`notElem` [':', '\n', '<', '>'])
       _ <- string "::"
-      uuid <- validateUuidText uuidText
+      oid <- validateOidText oidText
       orgParserState <- get
       when
         ( (M.size orgParserState.goids > 0)
-            && (not $ M.member uuid orgParserState.goids)
+            && (not $ M.member oid orgParserState.goids)
         )
         $ fail
-        $ "UUID "
-        <> show uuidText
+        $ "OID "
+        <> show oidText
         <> " not found in global OrgIds"
       blockName <- blockNameOnly
-      pure (Just uuid, blockName)
+      pure (Just oid, blockName)
     implicit = do
       orgParserState <- get
       blockName <- blockNameOnly
@@ -4251,7 +4267,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4264,7 +4280,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { uuid = Just nil,
+                            { oid = Just nilOid,
                               name = "foo"
                             },
                       name =
@@ -4281,7 +4297,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { uuid = Just nil,
+                            { oid = Just nilOid,
                               name = "bar"
                             },
                       name =
@@ -4337,7 +4353,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4387,7 +4403,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4401,7 +4417,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { uuid = Just nil,
+                            { oid = Just nilOid,
                               name = "foo"
                             },
                       name =
@@ -4418,7 +4434,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { uuid = Just nil,
+                            { oid = Just nilOid,
                               name = "bar"
                             },
                       name =
@@ -4435,7 +4451,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { uuid = Just nil,
+                            { oid = Just nilOid,
                               name = "ok"
                             },
                       name =
@@ -4548,8 +4564,8 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
-      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb uuid targetName))) ->
-        <<link-marker>> <> (LU.prefixWithId uuid targetName)
+      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb oid targetName))) ->
+        <<link-marker>> <> (LU.prefixWithId oid targetName)
       BTokenLink {} -> ""
 #+end_src
 
@@ -4680,7 +4696,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = one $ Just nil,
+      orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -4707,7 +4723,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4719,7 +4735,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4731,7 +4747,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4743,7 +4759,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4755,7 +4771,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4767,7 +4783,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentUuid = Just nil,
+        { parentOid = Just nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -6425,7 +6441,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = one $ Just nil,
+      orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -6499,7 +6515,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = one $ Just nil,
+      orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -6635,7 +6651,7 @@ ps
   ( nilOrgDoc
       [ CBlock
           Block
-            { parentUuid = Just nil,
+            { parentOid = Just nilOid,
               meta =
                 fromList
                   [ ("__block_type", "src"),
@@ -6665,7 +6681,7 @@ ps
             },
         CBlock
           Block
-            { parentUuid = Just nil,
+            { parentOid = Just nilOid,
               meta =
                 fromList
                   [ ("__block_type", "src"),
@@ -6693,7 +6709,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
-      orgId = one $ Just nil,
+      orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -7190,17 +7206,16 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID, fromText, fromWords64, nil)
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Types
   ( BToken (BTokenLink, BTokenString),
-    Block (Block, body, meta, parentUuid),
+    Block (Block, body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (Figure, link, meta),
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
-    LinkNoweb (LinkNoweb, name, uuid),
+    LinkNoweb (LinkNoweb, name, oid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
@@ -7211,7 +7226,8 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (MathFragment, body, meta),
-    OrgDoc (OrgDoc, cells, meta, uuid),
+    OID,
+    OrgDoc (OrgDoc, cells, meta, oid),
     OrgParserConf (maxHeadingLevel),
     OrgParserState
       ( OrgParserState,
@@ -7233,7 +7249,10 @@ import Lilac.Types
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, grid, meta),
-    nilOrgDocUuid,
+    fromText,
+    fromWords,
+    nilOid,
+    nilOidOrgDoc,
   )
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
@@ -7325,9 +7344,9 @@ p path expected = do
     it path check
   where
     check input
-      | expected.uuid == nil =
-          action nilOrgDocUuid input
-            $ L.defaultOrgParserState {orgId = one $ Just nil}
+      | expected.oid == nilOid =
+          action nilOidOrgDoc input
+            $ L.defaultOrgParserState {orgId = one $ Just nilOid}
       | otherwise = action "" input L.defaultOrgParserState
     action inputPrefix input expectedState =
       MP.runParser
@@ -7338,15 +7357,15 @@ p path expected = do
 #+end_src
 
 For convenience though, [[f:p]] prefixes the file with a required Org ID, with the
-help of [[f:nilOrgDocUuid]]. This way the majority of test cases don't have to worry
+help of [[f:nilOidOrgDoc]]. This way the majority of test cases don't have to worry
 about this detail. The ones that do have to check the behavior of the top-level
 properties drawer have to do it manually, such as in
 [[t:0002-doc-metadata-properties-drawer-clash]].
 
-#+name: f:nilOrgDocUuid
+#+name: f:nilOidOrgDoc
 #+begin_src haskell
-nilOrgDocUuid :: T.Text
-nilOrgDocUuid =
+nilOidOrgDoc :: T.Text
+nilOidOrgDoc =
   """
   :PROPERTIES:
   :ID:       00000000-0000-0000-0000-000000000000
@@ -7360,7 +7379,7 @@ nilOrgDocUuid =
 nilOrgDoc :: [Cell] -> OrgDoc
 nilOrgDoc cells =
   OrgDoc
-    { uuid = nil,
+    { oid = nilOid,
       cells = cells,
       meta = M.fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
@@ -7377,8 +7396,8 @@ ps path expected expectedState = do
     it path check
   where
     check input
-      | expected.uuid == nil =
-          action nilOrgDocUuid input expectedState
+      | expected.oid == nilOid =
+          action nilOidOrgDoc input expectedState
       | otherwise = action "" input expectedState
     action inputPrefix input expectedState' =
       MP.runParser
@@ -7403,7 +7422,7 @@ pf path errMsg pos = do
         (inputPrefix <> input)
         `shouldFailWith` (errFancy newPos . fancy $ MP.ErrorFail errMsg)
   where
-    inputPrefix = nilOrgDocUuid
+    inputPrefix = nilOidOrgDoc
     newPos = pos + T.length inputPrefix
 #+end_src
 
@@ -7430,7 +7449,7 @@ pfm path errorTrivial pos = do
         (inputPrefix <> input)
         `shouldFailWith` (err newPos errorTrivial)
   where
-    inputPrefix = nilOrgDocUuid
+    inputPrefix = nilOidOrgDoc
     newPos = pos + T.length inputPrefix
 #+end_src
 
@@ -7490,12 +7509,12 @@ pGOIDs path expected = do
                       )
   where
     st = L.defaultGOIDsParserState
-    f :: (T.Text, FilePath) -> (UUID, P.OsPath)
-    f (uuidText, filePath)
-      | Just uuid <- fromText uuidText,
+    f :: (T.Text, FilePath) -> (OID, P.OsPath)
+    f (oidText, filePath)
+      | Just oid <- fromText oidText,
         Just osPath <- P.encodeUtf filePath =
-          (uuid, osPath)
-      | otherwise = (nil, P.pack [])
+          (oid, osPath)
+      | otherwise = (nilOid, P.pack [])
 #+end_src
 
 The [[f:pfGOIDs]] helper expects failures.
@@ -7607,9 +7626,9 @@ parseSpec = do
   <<t:0200-goids-file>>
   <<t:0200-goids-file-oneline>>
   <<t:0200-goids-file-caps>>
-  <<t:0200-goids-file-non-uuid>>
-  <<t:0200-goids-file-non-uuid-x>>
-  <<t:0200-goids-file-duplicate-uuid>>
+  <<t:0200-goids-file-non-oid>>
+  <<t:0200-goids-file-non-oid-x>>
+  <<t:0200-goids-file-duplicate-oid>>
   <<t:0200-goids-file-absolute>>
 #+end_src
 
@@ -7621,7 +7640,7 @@ parseSpec = do
 Lilac relies on Org files that are written in Emacs (Emacs is the best
 environment for writing Org files). When the ~org-id-locations-file~ and
 ~org-id-track-globally~ variables are set, Emacs remembers which files have which
-Org IDs (where the "ID" is the UUID generated by ~org-id-get-create~ and
+Org IDs (where the "ID" is the OID generated by ~org-id-get-create~ and
 ~org-id-store-link~).
 
 The information stored in this file is global, because Emacs will update it
@@ -7649,7 +7668,7 @@ in other places, across multiple Org files.
 
 The syntax is of a list of list of strings, in Emacs lisp. The inner lists have
 the relative file path of the Org file as the first element, followed by the
-UUIDs. The UUIDs are in reverse order (probably because Emacs grows the list
+OIDs. The OIDs are in reverse order (probably because Emacs grows the list
 right-to-left, just like Haskell's ~:~ (aka "cons") function).
 
 Below is an example, with newlines inserted for better presentation (Emacs does
@@ -7675,42 +7694,42 @@ type GOIDsParser :: Type -> Type
 type GOIDsParser = StateT GOIDsParserState (<<Concrete type for Megaparsec>>)
 #+end_src
 
-When we're parsing these UUIDs, we want to check that we're not parsing in
-duplicate UUIDs that have been seen elsewhere. Presumably Emacs performs this
+When we're parsing these OIDs, we want to check that we're not parsing in
+duplicate OIDs that have been seen elsewhere. Presumably Emacs performs this
 check, but it's easy enough to do it ourselves here, so design a stateful type
-we can use during the parser as we see each UUID.
+we can use during the parser as we see each OID.
 
 #+name: data:GOIDsParserState
 #+begin_src haskell
 type GOIDsParserState :: Type
 data GOIDsParserState = GOIDsParserState
-  { seenUuids :: M.Map UUID P.OsPath
+  { seenOids :: M.Map OID P.OsPath
   }
   deriving stock (Eq, Show)
 
 defaultGOIDsParserState :: GOIDsParserState
 defaultGOIDsParserState =
   GOIDsParserState
-    { seenUuids = M.fromList []
+    { seenOids = M.fromList []
     }
 #+end_src
 
-You may be wondering why ~seenUuids~ is a map, not a set of UUIDs. That's because
-we incrementally build up the final data structure (~M.Map UUID P.OsPath~) during
+You may be wondering why ~seenOids~ is a map, not a set of OIDs. That's because
+we incrementally build up the final data structure (~M.Map OID P.OsPath~) during
 the parsing stage, and because the map can also check for membership queries
 just like a set. This way we can simplify the data structures involved.
 
-The overall [[f:goidsParser]] returns a map of UUIDs to file paths. We reset the
+The overall [[f:goidsParser]] returns a map of OIDs to file paths. We reset the
 embedded state before returning, because we don't want to complicate tests by
-keeping around the seen UUIDs.
+keeping around the seen OIDs.
 
 We take care of optional whitespace because we want to be able to parse both the
-native Emacs-styled UUIDs that are all on a single line of text, as well as the
+native Emacs-styled OIDs that are all on a single line of text, as well as the
 output from [[f:extractGOIDs]] which adds newlines for human-friendliness.
 
 #+name: f:goidsParser
 #+begin_src haskell
-goidsParser :: P.OsPath -> GOIDsParser (M.Map UUID P.OsPath)
+goidsParser :: P.OsPath -> GOIDsParser (M.Map OID P.OsPath)
 goidsParser sourceFile = do
   _ <- ws
   _ <-
@@ -7724,17 +7743,17 @@ goidsParser sourceFile = do
         )
   goidsParserState <- get
   put defaultGOIDsParserState
-  pure goidsParserState.seenUuids
+  pure goidsParserState.seenOids
   where
     ws :: GOIDsParser ()
     ws = void . MP.many $ char ' ' <|> char '\n'
 #+end_src
 
-Within each "entry", we need to parse the file path, and any number of UUIDs.
+Within each "entry", we need to parse the file path, and any number of OIDs.
 
 #+name: f:goidsEntryParser
 #+begin_src haskell
-goidsEntryParser :: P.OsPath -> GOIDsParser (P.OsPath, [UUID])
+goidsEntryParser :: P.OsPath -> GOIDsParser (P.OsPath, [OID])
 goidsEntryParser sourceFile = betweenParens $ do
   filepath <-
     P.unsafeEncodeUtf
@@ -7746,21 +7765,21 @@ goidsEntryParser sourceFile = betweenParens $ do
         if P.isAbsolute filepath
           then filepath
           else P.combine (P.takeDirectory sourceFile) filepath
-  uuids <- MP.some $ do
-    uuid <- uuidParser
+  oids <- MP.some $ do
+    oid <- oidParser
     _ <- ws
     goidsParserState <- get
-    when (M.member uuid goidsParserState.seenUuids)
+    when (M.member oid goidsParserState.seenOids)
       $ fail
-      $ "duplicate UUID: \""
-      <> show uuid
+      $ "duplicate OID: \""
+      <> show oid
       <> "\""
     put
       goidsParserState
-        { seenUuids = M.insert uuid fp goidsParserState.seenUuids
+        { seenOids = M.insert oid fp goidsParserState.seenOids
         }
-    pure uuid
-  pure (fp, uuids)
+    pure oid
+  pure (fp, oids)
   where
     betweenParens :: GOIDsParser a -> GOIDsParser a
     betweenParens =
@@ -7771,29 +7790,29 @@ goidsEntryParser sourceFile = betweenParens $ do
     ws = void . MP.many $ char ' ' <|> char '\n'
 #+end_src
 
-When parsing a single UUID, we check whether the UUID has been seen already
+When parsing a single OID, we check whether the OID has been seen already
 before.
 
-#+name: f:uuidParser
+#+name: f:oidParser
 #+begin_src haskell
-uuidParser :: GOIDsParser UUID
-uuidParser = do
-  uuidText <-
+oidParser :: GOIDsParser OID
+oidParser = do
+  oidText <-
     MP.between
       (string "\"")
       (string "\"")
-      (MP.takeWhile1P (Just "UUID character") (/= '"'))
-  validateUuidText uuidText
+      (MP.takeWhile1P (Just "OID character") (/= '"'))
+  validateOidText oidText
 #+end_src
 
-UUID validation delegates to the ~Data.UUID.Types.fromText~ helper.
+OID validation delegates to the ~Lilac.Types.fromText~ helper.
 
-#+name: f:validateUuidText
+#+name: f:validateOidText
 #+begin_src haskell
-validateUuidText :: (MonadFail m) => T.Text -> m UUID
-validateUuidText uuidText = case fromText uuidText of
-  Nothing -> fail $ show uuidText <> " is not a valid UUID"
-  Just uuid -> pure uuid
+validateOidText :: (MonadFail m) => T.Text -> m OID
+validateOidText oidText = case fromText oidText of
+  Nothing -> fail $ show oidText <> " is not a valid OID"
+  Just oid -> pure oid
 #+end_src
 
 *** Tests
@@ -7880,10 +7899,10 @@ pGOIDs
   ]
 #+end_src
 
-We should run into an error if a UUID string is corrupted (is not a UUID). The
-last UUID here has an extra ~e~ character at the end and should fail.
+We should run into an error if an OID string is corrupted (is not an OID). The
+last OID here has an extra ~e~ character at the end and should fail.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-non-uuid
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-non-oid
 #+begin_src emacs-lisp
 (("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
  ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
@@ -7892,33 +7911,33 @@ last UUID here has an extra ~e~ character at the end and should fail.
                             "b449a097-d702-4fd6-98de-cb81f7e49177e"))
 #+end_src
 
-#+name: t:0200-goids-file-non-uuid
+#+name: t:0200-goids-file-non-oid
 #+begin_src haskell
 pfGOIDs
-  "0200-goids-file-non-uuid"
-  "\"b449a097-d702-4fd6-98de-cb81f7e49177e\" is not a valid UUID"
+  "0200-goids-file-non-oid"
+  "\"b449a097-d702-4fd6-98de-cb81f7e49177e\" is not a valid OID"
   336
 #+end_src
 
 Not having hex digits is also a problem. There is an ~x~ character at the end of
-the UUID below.
+the OID below.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-non-uuid-x
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-non-oid-x
 #+begin_src emacs-lisp
 (("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56ex"))
 #+end_src
 
-#+name: t:0200-goids-file-non-uuid-x
+#+name: t:0200-goids-file-non-oid-x
 #+begin_src haskell
 pfGOIDs
-  "0200-goids-file-non-uuid-x"
-  "\"a1e6d0d5-4540-423b-864e-b96ad06c56ex\" is not a valid UUID"
+  "0200-goids-file-non-oid-x"
+  "\"a1e6d0d5-4540-423b-864e-b96ad06c56ex\" is not a valid OID"
   66
 #+end_src
 
-If the UUID has a duplicate, that should also trigger a failure.
+If the OID has a duplicate, that should also trigger a failure.
 
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-duplicate-uuid
+#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-duplicate-oid
 #+begin_src emacs-lisp
 (("note/raw/recreation.org" "b449a097-d702-4fd6-98de-cb81f7e49177")
  ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
@@ -7927,11 +7946,11 @@ If the UUID has a duplicate, that should also trigger a failure.
                             "b449a097-d702-4fd6-98de-cb81f7e49177"))
 #+end_src
 
-#+name: t:0200-goids-file-duplicate-uuid
+#+name: t:0200-goids-file-duplicate-oid
 #+begin_src haskell
 pfGOIDs
-  "0200-goids-file-duplicate-uuid"
-  "duplicate UUID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
+  "0200-goids-file-duplicate-oid"
+  "duplicate OID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
   335
 #+end_src
 
@@ -7988,11 +8007,11 @@ extractGOIDs orgFilesAndContents =
           Left _err -> acc
           Right (orgDoc, _orgParserState) -> M.insert orgFile (getOrgIds orgDoc) acc
       | otherwise = acc
-    getOrgIds :: OrgDoc -> [UUID]
-    getOrgIds od = catMaybes $ foldl' f [Just $ od.uuid] od.cells
-    extractOrgId :: M.Map T.Text T.Text -> Maybe UUID
+    getOrgIds :: OrgDoc -> [OID]
+    getOrgIds od = catMaybes $ foldl' f [Just $ od.oid] od.cells
+    extractOrgId :: M.Map T.Text T.Text -> Maybe OID
     extractOrgId meta
-      | Just uuidText <- EM.lookup "ID" meta = fromText uuidText
+      | Just oidText <- EM.lookup "ID" meta = Lilac.Types.fromText oidText
       | otherwise = Nothing
     f acc cell = case cell of
       CHeading heading -> extractOrgId heading.meta : acc
@@ -8002,7 +8021,7 @@ extractGOIDs orgFilesAndContents =
       CTable table -> extractOrgId table.meta : acc
       CListItem {}
       CParagraph {} -> acc
-    goidEntryToLines :: [T.Text] -> (P.OsPath, [UUID]) -> [T.Text]
+    goidEntryToLines :: [T.Text] -> (P.OsPath, [OID]) -> [T.Text]
     goidEntryToLines acc (orgFile, goids)
       | goids == [] = acc
       | Right str <- P.decodeWith utf8 utf8 orgFile,

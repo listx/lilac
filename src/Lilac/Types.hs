@@ -10,6 +10,7 @@ module Lilac.Types
     LinkTarget (..),
     ListMarker (..),
     MathFragment (..),
+    OID (..),
     OrgDoc (..),
     OrgParser,
     OrgParserConf (..),
@@ -21,7 +22,10 @@ module Lilac.Types
     StyledText (..),
     Table (..),
     defaultOrgParserConf,
-    nilOrgDocUuid,
+    Lilac.Types.fromText,
+    fromWords,
+    nilOid,
+    nilOidOrgDoc,
   )
 where
 
@@ -30,7 +34,7 @@ import Data.Bits.Bitwise (toListLE)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID)
+import Data.UUID.Types (UUID, fromText, fromWords64)
 import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
@@ -45,6 +49,7 @@ import Relude
     StateT,
     Type,
     Void,
+    Word64,
     Word8,
     catMaybes,
     map,
@@ -69,7 +74,7 @@ instance ToJSON BToken
 
 type Block :: Type
 data Block = Block
-  { parentUuid :: Maybe UUID,
+  { parentOid :: Maybe OID,
     meta :: M.Map T.Text T.Text,
     body :: [BToken]
   }
@@ -128,7 +133,7 @@ instance ToJSON Link
 
 type LinkNoweb :: Type
 data LinkNoweb = LinkNoweb
-  { uuid :: Maybe UUID,
+  { oid :: Maybe OID,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Ord, Show)
@@ -167,7 +172,7 @@ instance ToJSON MathFragment
 
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
-  { uuid :: UUID,
+  { oid :: OID,
     cells :: [Cell],
     meta :: M.Map T.Text T.Text
   }
@@ -191,8 +196,8 @@ defaultOrgParserConf =
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { goids :: M.Map UUID P.OsPath,
-    orgId :: NonEmpty (Maybe UUID),
+  { goids :: M.Map OID P.OsPath,
+    orgId :: NonEmpty (Maybe OID),
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
@@ -261,17 +266,37 @@ newtype StyleMask = StyleMask Word8
 
 instance ToJSON StyleMask
 
-type OrgParser :: Type -> Type
-type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
+type OID :: Type
+newtype OID = OID UUID
+  deriving stock (Eq, Ord, Generic)
 
-type Prose :: Type
-type Prose = [PToken]
+instance ToJSON OID
 
-nilOrgDocUuid :: T.Text
-nilOrgDocUuid =
+instance Show OID where
+  show (OID uuid) = Prelude.show uuid
+
+nilOid :: OID
+nilOid = fromWords 0 0
+
+nilOidOrgDoc :: T.Text
+nilOidOrgDoc =
   """
   :PROPERTIES:
   :ID:       00000000-0000-0000-0000-000000000000
   :END:
 
   """
+
+fromWords :: Word64 -> Word64 -> OID
+fromWords w1 w2 = OID $ fromWords64 w1 w2
+
+fromText :: T.Text -> Maybe OID
+fromText t = case Data.UUID.Types.fromText t of
+  Just uuid -> Just $ OID uuid
+  Nothing -> Nothing
+
+type OrgParser :: Type -> Type
+type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
+
+type Prose :: Type
+type Prose = [PToken]

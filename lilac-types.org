@@ -37,6 +37,7 @@ module Lilac.Types
     LinkTarget (..),
     ListMarker (..),
     MathFragment (..),
+    OID (..),
     OrgDoc (..),
     OrgParser,
     OrgParserConf (..),
@@ -48,7 +49,10 @@ module Lilac.Types
     StyledText (..),
     Table (..),
     defaultOrgParserConf,
-    nilOrgDocUuid,
+    Lilac.Types.fromText,
+    fromWords,
+    nilOid,
+    nilOidOrgDoc,
   )
 where
 
@@ -57,7 +61,7 @@ import Data.Bits.Bitwise (toListLE)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID)
+import Data.UUID.Types (UUID, fromText, fromWords64)
 import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
@@ -72,6 +76,7 @@ import Relude
     StateT,
     Type,
     Void,
+    Word64,
     Word8,
     catMaybes,
     map,
@@ -106,8 +111,45 @@ import Prelude qualified (show)
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Table>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::instance:Show Stylemask>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::newtype:StyleMask>>
+
+<<id:e16dd5c7-0a63-4c52-afe9-744fdf853643::newtype:OID>>
+<<tc:Show OID>>
+<<f:nilOid>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::f:nilOidOrgDoc>>
+<<f:fromWords>>
+<<f:fromText>>
+
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:OrgParser>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:Prose>>
+#+end_src
 
-<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::f:nilOrgDocUuid>>
+** Org ID (OID)
+:PROPERTIES:
+:ID:       5908cefc-0e82-41a5-84ac-1c8c826f5e62
+:END:
+
+#+name: f:fromWords
+#+begin_src haskell
+fromWords :: Word64 -> Word64 -> OID
+fromWords w1 w2 = OID $ fromWords64 w1 w2
+#+end_src
+
+#+name: f:fromText
+#+begin_src haskell
+fromText :: T.Text -> Maybe OID
+fromText t = case Data.UUID.Types.fromText t of
+  Just uuid -> Just $ OID uuid
+  Nothing -> Nothing
+#+end_src
+
+#+name: tc:Show OID
+#+begin_src haskell
+instance Show OID where
+  show (OID uuid) = Prelude.show uuid
+#+end_src
+
+#+name: f:nilOid
+#+begin_src haskell
+nilOid :: OID
+nilOid = fromWords 0 0
 #+end_src

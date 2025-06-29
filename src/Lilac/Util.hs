@@ -9,7 +9,7 @@ where
 import Control.Exception (catch)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
-import Data.UUID.Types (UUID)
+import Lilac.Types (OID)
 import Relude
   ( Bool (True),
     FilePath,
@@ -53,7 +53,7 @@ writeFileRobustly path contentToWrite = do
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
 
-prefixWithId :: Maybe UUID -> T.Text -> T.Text
-prefixWithId maybeUuid name = case maybeUuid of
-  Just uuid -> "id:" <> T.pack (show uuid) <> "::" <> name
+prefixWithId :: Maybe OID -> T.Text -> T.Text
+prefixWithId maybeOid name = case maybeOid of
+  Just oid -> "id:" <> T.pack (show oid) <> "::" <> name
   Nothing -> name

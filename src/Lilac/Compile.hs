@@ -4,19 +4,19 @@ import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Data.UUID.Types (UUID)
 import GHC.Generics (Generic)
 import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
-    Block (body, meta, parentUuid),
+    Block (body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (meta),
     Heading (body, meta),
     Link (target),
-    LinkNoweb (name, uuid),
+    LinkNoweb (name, oid),
     LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
     MathFragment (meta),
-    OrgDoc (cells, uuid),
+    OID,
+    OrgDoc (cells, oid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
   )
@@ -64,23 +64,23 @@ mkSymbols :: OrgDoc -> M.Map T.Text Cell
 mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
   where
     f cell = case cell of
-      CBlock block -> getSymbols block.parentUuid block.meta cell
+      CBlock block -> getSymbols block.parentOid block.meta cell
       CHeading heading
-        | Just uuidText <- EM.lookup "ID" heading.meta ->
-            [("id:" <> uuidText, cell)]
+        | Just oidText <- EM.lookup "ID" heading.meta ->
+            [("id:" <> oidText, cell)]
         | otherwise -> []
       CFigure figure -> getSymbols Nothing figure.meta cell
       CMathFragment mathFragment -> getSymbols Nothing mathFragment.meta cell
       CTable table -> getSymbols Nothing table.meta cell
       CListItem {}
       CParagraph {} -> []
-    getSymbols :: Maybe UUID -> M.Map T.Text T.Text -> Cell -> [(T.Text, Cell)]
-    getSymbols parentUuid cellMeta cell =
-      concatMap requireName $ catMaybes [parentUuid, Just $ orgDoc.uuid]
+    getSymbols :: Maybe OID -> M.Map T.Text T.Text -> Cell -> [(T.Text, Cell)]
+    getSymbols parentOid cellMeta cell =
+      concatMap requireName $ catMaybes [parentOid, Just $ orgDoc.oid]
       where
-        requireName uuid
+        requireName oid
           | Just name <- EM.lookup "name" cellMeta =
-              [ (LU.prefixWithId (Just uuid) name, cell),
+              [ (LU.prefixWithId (Just oid) name, cell),
                 (name, cell)
               ]
           | otherwise = []
@@ -110,7 +110,7 @@ findExternalOrgLinkTargets orgDoc symbols =
       PTokenMathFragment {} -> acc
     getExternal acc link = case link.target of
       LinkTargetNoweb linkNoweb ->
-        let target = LU.prefixWithId linkNoweb.uuid linkNoweb.name
+        let target = LU.prefixWithId linkNoweb.oid linkNoweb.name
          in if M.member target symbols
               then acc
               else link.target : acc
