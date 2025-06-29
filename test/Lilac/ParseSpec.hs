@@ -32,6 +32,7 @@ import Lilac.Types
         anonBlockNumber,
         blockNames,
         continuationIndent,
+        docOid,
         equationNumber,
         goids,
         headingLevel,
@@ -255,6 +256,7 @@ parseSpec = do
     (L.defaultOrgDoc nilOid [])
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
@@ -310,6 +312,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
         headingSection = [],
@@ -336,6 +339,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingLevel = 0,
         headingSection = [],
@@ -382,6 +386,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -415,6 +420,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -553,6 +559,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = NE.fromList [Nothing, Just nilOid],
         headingLevel = 1,
         headingSection = [1],
@@ -588,6 +595,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
         headingLevel = 1,
         headingSection = [1],
@@ -623,6 +631,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
         headingLevel = 1,
         headingSection = [1],
@@ -825,6 +834,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = NE.fromList [Nothing, Just nilOid],
         headingLevel = 1,
         headingSection = [1],
@@ -1160,6 +1170,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = NE.fromList [Nothing, Just nilOid],
         headingLevel = 1,
         headingSection = [1],
@@ -1184,7 +1195,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "1"),
@@ -1196,7 +1207,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "example"),
@@ -1207,7 +1218,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "2"),
@@ -1220,6 +1231,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
@@ -1239,7 +1251,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1251,7 +1263,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1263,7 +1275,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1275,7 +1287,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1287,7 +1299,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1299,7 +1311,7 @@ parseSpec = do
             ),
           CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__block_type", "src"),
@@ -1313,6 +1325,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
@@ -1340,7 +1353,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "1"),
@@ -1364,7 +1377,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "1"),
@@ -1377,7 +1390,7 @@ parseSpec = do
                             { target =
                                 LinkTargetNoweb
                                   LinkNoweb
-                                    { oid = Just nilOid,
+                                    { oid = nilOid,
                                       name = "foo"
                                     },
                               name =
@@ -1394,7 +1407,7 @@ parseSpec = do
                             { target =
                                 LinkTargetNoweb
                                   LinkNoweb
-                                    { oid = Just nilOid,
+                                    { oid = nilOid,
                                       name = "bar"
                                     },
                               name =
@@ -1420,7 +1433,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "1"),
@@ -1434,7 +1447,7 @@ parseSpec = do
                             { target =
                                 LinkTargetNoweb
                                   LinkNoweb
-                                    { oid = Just nilOid,
+                                    { oid = nilOid,
                                       name = "foo"
                                     },
                               name =
@@ -1451,7 +1464,7 @@ parseSpec = do
                             { target =
                                 LinkTargetNoweb
                                   LinkNoweb
-                                    { oid = Just nilOid,
+                                    { oid = nilOid,
                                       name = "bar"
                                     },
                               name =
@@ -1468,7 +1481,7 @@ parseSpec = do
                             { target =
                                 LinkTargetNoweb
                                   LinkNoweb
-                                    { oid = Just nilOid,
+                                    { oid = nilOid,
                                       name = "ok"
                                     },
                               name =
@@ -1504,7 +1517,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             ( Block
-                { parentOid = Just nilOid,
+                { parentOid = nilOid,
                   meta =
                     fromList
                       [ ("__anon_block_number", "1"),
@@ -1875,6 +1888,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
@@ -1929,6 +1943,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],
@@ -1948,7 +1963,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CBlock
             Block
-              { parentOid = Just nilOid,
+              { parentOid = nilOid,
                 meta =
                   fromList
                     [ ("__block_type", "src"),
@@ -1978,7 +1993,7 @@ parseSpec = do
               },
           CBlock
             Block
-              { parentOid = Just nilOid,
+              { parentOid = nilOid,
                 meta =
                   fromList
                     [ ("__block_type", "src"),
@@ -2006,6 +2021,7 @@ parseSpec = do
     )
     OrgParserState
       { goids = fromList [],
+        docOid = nilOid,
         orgId = one $ Just nilOid,
         headingLevel = 0,
         headingSection = [],

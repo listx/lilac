@@ -74,7 +74,7 @@ instance ToJSON BToken
 
 type Block :: Type
 data Block = Block
-  { parentOid :: Maybe OID,
+  { parentOid :: OID,
     meta :: M.Map T.Text T.Text,
     body :: [BToken]
   }
@@ -133,7 +133,7 @@ instance ToJSON Link
 
 type LinkNoweb :: Type
 data LinkNoweb = LinkNoweb
-  { oid :: Maybe OID,
+  { oid :: OID,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Ord, Show)
@@ -197,6 +197,7 @@ defaultOrgParserConf =
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { goids :: M.Map OID P.OsPath,
+    docOid :: OID,
     orgId :: NonEmpty (Maybe OID),
     headingLevel :: Int,
     headingSection :: [Int],

@@ -51,6 +51,7 @@ import Lilac.Types
         anonBlockNumber,
         blockNames,
         continuationIndent,
+        docOid,
         equationNumber,
         goids,
         headingLevel,
@@ -108,7 +109,6 @@ import Relude
     get,
     isJust,
     isNothing,
-    last,
     length,
     many,
     map,
@@ -215,6 +215,7 @@ orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
   (docOid, meta) <- docMetaParser
+  modify (\s -> s {docOid = docOid})
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
@@ -252,6 +253,7 @@ defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
+      docOid = nilOid,
       orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
@@ -879,7 +881,8 @@ blockParser = do
       blockMeta = ("__block_type", blockType)
       block =
         Block
-          { parentOid = firstParent $ NE.toList orgParserState.orgId,
+          { parentOid =
+              firstParent orgParserState.docOid $ NE.toList orgParserState.orgId,
             meta =
               M.fromList
                 $ (blockMeta : metaKVs)
@@ -895,11 +898,11 @@ blockParser = do
       }
   pure $ CBlock block
   where
-    firstParent :: [Maybe OID] -> Maybe OID
-    firstParent [] = Nothing
-    firstParent (oid : oids)
-      | oid == Nothing = firstParent oids
-      | otherwise = oid
+    firstParent :: OID -> [Maybe OID] -> OID
+    firstParent docOid [] = docOid
+    firstParent docOid (maybeOid : maybeOids) = case maybeOid of
+      Just oid -> oid
+      Nothing -> firstParent docOid maybeOids
 
 blockStartParser ::
   OrgParser
@@ -976,7 +979,7 @@ nowebLinkParser = do
           ]
       }
 
-blockOriginSignatureParser :: OrgParser (Maybe OID, T.Text)
+blockOriginSignatureParser :: OrgParser (OID, T.Text)
 blockOriginSignatureParser = MP.choice [explicit, implicit]
   where
     blockNameOnly :: OrgParser T.Text
@@ -1002,11 +1005,11 @@ blockOriginSignatureParser = MP.choice [explicit, implicit]
         <> show oidText
         <> " not found in global OrgIds"
       blockName <- blockNameOnly
-      pure (Just oid, blockName)
+      pure (oid, blockName)
     implicit = do
       orgParserState <- get
       blockName <- blockNameOnly
-      pure (last orgParserState.orgId, blockName)
+      pure (orgParserState.docOid, blockName)
 
 ignoreSpecialCommas :: [BToken] -> [BToken]
 ignoreSpecialCommas = reverse . foldl' f []

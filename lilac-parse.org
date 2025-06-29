@@ -77,6 +77,7 @@ import Lilac.Types
         anonBlockNumber,
         blockNames,
         continuationIndent,
+        docOid,
         equationNumber,
         goids,
         headingLevel,
@@ -134,7 +135,6 @@ import Relude
     get,
     isJust,
     isNothing,
-    last,
     length,
     many,
     map,
@@ -500,6 +500,7 @@ inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { goids :: M.Map OID P.OsPath,
+    docOid :: OID,
     orgId :: NonEmpty (Maybe OID),
     headingLevel :: Int,
     headingSection :: [Int],
@@ -522,6 +523,7 @@ defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
+      docOid = nilOid,
       orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
@@ -560,6 +562,7 @@ orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
   (docOid, meta) <- docMetaParser
+  modify (\s -> s {docOid = docOid})
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
@@ -992,6 +995,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       headingLevel = 0,
       headingSection = [],
@@ -1017,6 +1021,7 @@ ps
   (L.defaultOrgDoc nilOid [])
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
@@ -1059,6 +1064,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       headingLevel = 0,
       headingSection = [],
@@ -1469,6 +1475,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = NE.fromList [Nothing, Just nilOid],
       headingLevel = 1,
       headingSection = [1],
@@ -2200,7 +2207,7 @@ referenced by the outside world (in other Org files). See
 #+begin_src haskell
 type LinkNoweb :: Type
 data LinkNoweb = LinkNoweb
-  { oid :: Maybe OID,
+  { oid :: OID,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Ord, Show)
@@ -2402,6 +2409,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = NE.fromList [Nothing, Just nilOid],
       headingLevel = 1,
       headingSection = [1],
@@ -3249,6 +3257,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -3304,6 +3313,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -3472,6 +3482,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = NE.fromList [Nothing, Just nilOid],
       headingLevel = 1,
       headingSection = [1],
@@ -3520,6 +3531,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
       headingLevel = 1,
       headingSection = [1],
@@ -3578,6 +3590,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
       headingLevel = 1,
       headingSection = [1],
@@ -3610,7 +3623,7 @@ arbitrary keyword here.
 #+begin_src haskell
 type Block :: Type
 data Block = Block
-  { parentOid :: Maybe OID,
+  { parentOid :: OID,
     meta :: M.Map T.Text T.Text,
     body :: [BToken]
   }
@@ -3643,6 +3656,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
@@ -3662,7 +3676,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -3674,7 +3688,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__block_type", "example"),
@@ -3685,7 +3699,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "2"),
@@ -3866,7 +3880,8 @@ blockParser = do
       blockMeta = ("__block_type", blockType)
       block =
         Block
-          { parentOid = firstParent $ NE.toList orgParserState.orgId,
+          { parentOid =
+              firstParent orgParserState.docOid $ NE.toList orgParserState.orgId,
             meta =
               M.fromList
                 $ (blockMeta : metaKVs)
@@ -3882,11 +3897,11 @@ blockParser = do
       }
   pure $ CBlock block
   where
-    firstParent :: [Maybe OID] -> Maybe OID
-    firstParent [] = Nothing
-    firstParent (oid : oids)
-      | oid == Nothing = firstParent oids
-      | otherwise = oid
+    firstParent :: OID -> [Maybe OID] -> OID
+    firstParent docOid [] = docOid
+    firstParent docOid (maybeOid : maybeOids) = case maybeOid of
+      Just oid -> oid
+      Nothing -> firstParent docOid maybeOids
 #+end_src
 
 The first thing is to get the start of the block with [[f:blockStartParser]].
@@ -4040,7 +4055,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4196,7 +4211,7 @@ that information at hand.
 
 #+name: f:blockOriginSignatureParser
 #+begin_src haskell
-blockOriginSignatureParser :: OrgParser (Maybe OID, T.Text)
+blockOriginSignatureParser :: OrgParser (OID, T.Text)
 blockOriginSignatureParser = MP.choice [explicit, implicit]
   where
     blockNameOnly :: OrgParser T.Text
@@ -4222,11 +4237,11 @@ blockOriginSignatureParser = MP.choice [explicit, implicit]
         <> show oidText
         <> " not found in global OrgIds"
       blockName <- blockNameOnly
-      pure (Just oid, blockName)
+      pure (oid, blockName)
     implicit = do
       orgParserState <- get
       blockName <- blockNameOnly
-      pure (last orgParserState.orgId, blockName)
+      pure (orgParserState.docOid, blockName)
 #+end_src
 
 Below we check a typical case with some Noweb references in it. Note that we
@@ -4267,7 +4282,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4280,7 +4295,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { oid = Just nilOid,
+                            { oid = nilOid,
                               name = "foo"
                             },
                       name =
@@ -4297,7 +4312,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { oid = Just nilOid,
+                            { oid = nilOid,
                               name = "bar"
                             },
                       name =
@@ -4353,7 +4368,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4403,7 +4418,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__anon_block_number", "1"),
@@ -4417,7 +4432,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { oid = Just nilOid,
+                            { oid = nilOid,
                               name = "foo"
                             },
                       name =
@@ -4434,7 +4449,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { oid = Just nilOid,
+                            { oid = nilOid,
                               name = "bar"
                             },
                       name =
@@ -4451,7 +4466,7 @@ ps
                     { target =
                         LinkTargetNoweb
                           LinkNoweb
-                            { oid = Just nilOid,
+                            { oid = nilOid,
                               name = "ok"
                             },
                       name =
@@ -4696,6 +4711,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
@@ -4723,7 +4739,7 @@ ps
 #+begin_src haskell
 [ CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4735,7 +4751,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4747,7 +4763,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4759,7 +4775,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4771,7 +4787,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -4783,7 +4799,7 @@ ps
     ),
   CBlock
     ( Block
-        { parentOid = Just nilOid,
+        { parentOid = nilOid,
           meta =
             fromList
               [ ("__block_type", "src"),
@@ -6441,6 +6457,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
@@ -6515,6 +6532,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
@@ -6651,7 +6669,7 @@ ps
   ( nilOrgDoc
       [ CBlock
           Block
-            { parentOid = Just nilOid,
+            { parentOid = nilOid,
               meta =
                 fromList
                   [ ("__block_type", "src"),
@@ -6681,7 +6699,7 @@ ps
             },
         CBlock
           Block
-            { parentOid = Just nilOid,
+            { parentOid = nilOid,
               meta =
                 fromList
                   [ ("__block_type", "src"),
@@ -6709,6 +6727,7 @@ ps
   )
   OrgParserState
     { goids = fromList [],
+      docOid = nilOid,
       orgId = one $ Just nilOid,
       headingLevel = 0,
       headingSection = [],
@@ -7234,6 +7253,7 @@ import Lilac.Types
         anonBlockNumber,
         blockNames,
         continuationIndent,
+        docOid,
         equationNumber,
         goids,
         headingLevel,

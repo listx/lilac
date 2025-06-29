@@ -137,7 +137,7 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
       CTable {} -> sc
     getFqbn :: Block -> T.Text -> T.Text
     getFqbn b name = LU.mkFqcn b.parentOid name
-    getFqbnByDocOID name = LU.mkFqcn (Just od.oid) name
+    getFqbnByDocOID name = LU.mkFqcn od.oid name
     injectFqbn fqbn block =
       block
         { meta = M.insert "__fqbn" fqbn block.meta
@@ -155,7 +155,7 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
         }
 
 growBlockUniverse ::
-  Set.Set (Maybe OID) ->
+  Set.Set OID ->
   Set.Set FQBN ->
   M.Map OID P.OsPath ->
   M.Map FQBN Block ->
@@ -167,7 +167,7 @@ growBlockUniverse parsedOids seenFqbns goids blockUniverse (root : roots)
       let nowebLinks = catMaybes $ map getLinkTarget block.body
           fqbns =
             map
-              (\(LinkNoweb maybeOid targetName) -> LU.mkFqcn maybeOid targetName)
+              (\(LinkNoweb oid targetName) -> LU.mkFqcn oid targetName)
               nowebLinks
           newFqbns = filter (\fqbn -> not $ Set.member fqbn seenFqbns) fqbns
       (newlyParsedOids, grownBlockUniverse, toGrowFrom) <-
@@ -181,23 +181,22 @@ growBlockUniverse parsedOids seenFqbns goids blockUniverse (root : roots)
   | otherwise = growBlockUniverse parsedOids seenFqbns goids blockUniverse roots
   where
     f ::
-      (Set.Set (Maybe OID), M.Map FQBN Block, [FQBN]) ->
+      (Set.Set OID, M.Map FQBN Block, [FQBN]) ->
       LinkNoweb ->
-      IO (Set.Set (Maybe OID), M.Map FQBN Block, [FQBN])
-    f (pu, bu, tgf) (LinkNoweb maybeOid targetName)
-      | Set.member (LU.mkFqcn maybeOid targetName) seenFqbns = pure (pu, bu, tgf)
-      | Set.member maybeOid pu = pure (pu, bu, (LU.mkFqcn maybeOid targetName) : tgf)
-      | Just oid <- maybeOid,
-        Just oidOsPath <- EM.lookup oid goids = do
+      IO (Set.Set OID, M.Map FQBN Block, [FQBN])
+    f (pu, bu, tgf) (LinkNoweb oid targetName)
+      | Set.member (LU.mkFqcn oid targetName) seenFqbns = pure (pu, bu, tgf)
+      | Set.member oid pu = pure (pu, bu, (LU.mkFqcn oid targetName) : tgf)
+      | Just oidOsPath <- EM.lookup oid goids = do
           input <- LU.readFileRobustly oidOsPath
           case parseOrgDoc input of
             Right od -> do
               oidFilePath <- P.decodeUtf oidOsPath
               let sc = getSourceCode od oidFilePath
               pure
-                ( Set.insert maybeOid pu,
+                ( Set.insert oid pu,
                   M.union bu sc.fqbnToCodeBlock,
-                  (LU.mkFqcn maybeOid targetName) : tgf
+                  (LU.mkFqcn oid targetName) : tgf
                 )
             Left err -> do
               putStrLn $ show err

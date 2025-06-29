@@ -2843,7 +2843,6 @@ import Relude
   ( Bool (True),
     FilePath,
     IO,
-    Maybe (Just, Nothing),
     otherwise,
     pure,
     putStrLn,
@@ -2914,8 +2913,6 @@ contains the cell.
 
 #+name: f:mkFqcn
 #+begin_src haskell
-mkFqcn :: Maybe OID -> T.Text -> T.Text
-mkFqcn maybeOid name = case maybeOid of
-  Just oid -> "id:" <> T.pack (show oid) <> "::" <> name
-  Nothing -> name
+mkFqcn :: OID -> T.Text -> T.Text
+mkFqcn oid name = "id:" <> T.pack (show oid) <> "::" <> name
 #+end_src

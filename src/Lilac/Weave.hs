@@ -372,8 +372,7 @@ weaveLink link = do
         else "internal-link"
     linkTarget weaveConf = case link.target of
       LinkTargetNoweb linkNoweb
-        | Just linkOid <- linkNoweb.oid,
-          Just orgFile <- EM.lookup linkOid weaveConf.goids,
+        | Just orgFile <- EM.lookup linkNoweb.oid weaveConf.goids,
           Just currentOrgFile <- EM.lookup weaveConf.orgDoc.oid weaveConf.goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
             if orgFile == currentOrgFile
@@ -386,7 +385,7 @@ weaveLink link = do
             getLinkAnchor
               $ CBlock
                 Block
-                  { parentOid = Nothing,
+                  { parentOid = weaveConf.orgDoc.oid,
                     meta = M.fromList [("name", linkNoweb.name)],
                     body = []
                   }

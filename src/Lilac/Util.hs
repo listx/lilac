@@ -14,7 +14,6 @@ import Relude
   ( Bool (True),
     FilePath,
     IO,
-    Maybe (Just, Nothing),
     otherwise,
     pure,
     putStrLn,
@@ -53,7 +52,5 @@ writeFileRobustly path contentToWrite = do
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
 
-mkFqcn :: Maybe OID -> T.Text -> T.Text
-mkFqcn maybeOid name = case maybeOid of
-  Just oid -> "id:" <> T.pack (show oid) <> "::" <> name
-  Nothing -> name
+mkFqcn :: OID -> T.Text -> T.Text
+mkFqcn oid name = "id:" <> T.pack (show oid) <> "::" <> name

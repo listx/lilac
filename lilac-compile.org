@@ -118,7 +118,7 @@ mkSymbols :: OrgDoc -> M.Map T.Text Cell
 mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
   where
     f cell = case cell of
-      CBlock block -> getSymbols block.parentOid block.meta cell
+      CBlock block -> getSymbols (Just block.parentOid) block.meta cell
       CHeading heading
         | Just oidText <- EM.lookup "ID" heading.meta ->
             [("id:" <> oidText, cell)]
@@ -134,7 +134,7 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
       where
         requireName oid
           | Just name <- EM.lookup "name" cellMeta =
-              [ (LU.mkFqcn (Just oid) name, cell),
+              [ (LU.mkFqcn oid name, cell),
                 (name, cell)
               ]
           | otherwise = []
