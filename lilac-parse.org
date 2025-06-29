@@ -4565,7 +4565,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
       BTokenString text -> text
       BTokenPadding -> ""
       BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb oid targetName))) ->
-        <<link-marker>> <> (LU.prefixWithId oid targetName)
+        <<link-marker>> <> (LU.mkFqcn oid targetName)
       BTokenLink {} -> ""
 #+end_src
 

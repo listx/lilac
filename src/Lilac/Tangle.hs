@@ -136,8 +136,8 @@ getSourceCode od odPath = foldl' f defaultSourceCode od.cells
       CFigure {}
       CTable {} -> sc
     getFqbn :: Block -> T.Text -> T.Text
-    getFqbn b name = LU.prefixWithId b.parentOid name
-    getFqbnByDocOID name = LU.prefixWithId (Just od.oid) name
+    getFqbn b name = LU.mkFqcn b.parentOid name
+    getFqbnByDocOID name = LU.mkFqcn (Just od.oid) name
     injectFqbn fqbn block =
       block
         { meta = M.insert "__fqbn" fqbn block.meta
@@ -167,7 +167,7 @@ growBlockUniverse parsedOids seenFqbns goids blockUniverse (root : roots)
       let nowebLinks = catMaybes $ map getLinkTarget block.body
           fqbns =
             map
-              (\(LinkNoweb maybeOid targetName) -> LU.prefixWithId maybeOid targetName)
+              (\(LinkNoweb maybeOid targetName) -> LU.mkFqcn maybeOid targetName)
               nowebLinks
           newFqbns = filter (\fqbn -> not $ Set.member fqbn seenFqbns) fqbns
       (newlyParsedOids, grownBlockUniverse, toGrowFrom) <-
@@ -185,8 +185,8 @@ growBlockUniverse parsedOids seenFqbns goids blockUniverse (root : roots)
       LinkNoweb ->
       IO (Set.Set (Maybe OID), M.Map FQBN Block, [FQBN])
     f (pu, bu, tgf) (LinkNoweb maybeOid targetName)
-      | Set.member (LU.prefixWithId maybeOid targetName) seenFqbns = pure (pu, bu, tgf)
-      | Set.member maybeOid pu = pure (pu, bu, (LU.prefixWithId maybeOid targetName) : tgf)
+      | Set.member (LU.mkFqcn maybeOid targetName) seenFqbns = pure (pu, bu, tgf)
+      | Set.member maybeOid pu = pure (pu, bu, (LU.mkFqcn maybeOid targetName) : tgf)
       | Just oid <- maybeOid,
         Just oidOsPath <- EM.lookup oid goids = do
           input <- LU.readFileRobustly oidOsPath
@@ -197,7 +197,7 @@ growBlockUniverse parsedOids seenFqbns goids blockUniverse (root : roots)
               pure
                 ( Set.insert maybeOid pu,
                   M.union bu sc.fqbnToCodeBlock,
-                  (LU.prefixWithId maybeOid targetName) : tgf
+                  (LU.mkFqcn maybeOid targetName) : tgf
                 )
             Left err -> do
               putStrLn $ show err
@@ -245,7 +245,7 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
       | otherwise = acc
     getLinkTarget = \case
       BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb oid targetName))) ->
-        Just $ LU.prefixWithId oid targetName
+        Just $ LU.mkFqcn oid targetName
       BTokenLink {}
       BTokenPadding {}
       BTokenString {} -> Nothing
@@ -305,7 +305,7 @@ expandBlock sc block existingPrefix =
     expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb oid target))))
       | Just targetBlock <-
           EM.lookup
-            (LU.prefixWithId oid target)
+            (LU.mkFqcn oid target)
             sc.fqbnToCodeBlock =
           ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
             prefix

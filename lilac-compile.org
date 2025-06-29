@@ -134,7 +134,7 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
       where
         requireName oid
           | Just name <- EM.lookup "name" cellMeta =
-              [ (LU.prefixWithId (Just oid) name, cell),
+              [ (LU.mkFqcn (Just oid) name, cell),
                 (name, cell)
               ]
           | otherwise = []
@@ -177,7 +177,7 @@ findExternalOrgLinkTargets orgDoc symbols =
       PTokenMathFragment {} -> acc
     getExternal acc link = case link.target of
       LinkTargetNoweb linkNoweb ->
-        let target = LU.prefixWithId linkNoweb.oid linkNoweb.name
+        let target = LU.mkFqcn linkNoweb.oid linkNoweb.name
          in if M.member target symbols
               then acc
               else link.target : acc

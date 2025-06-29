@@ -1,5 +1,5 @@
 module Lilac.Util
-  ( prefixWithId,
+  ( mkFqcn,
     readFrom,
     readFileRobustly,
     writeFileRobustly,
@@ -53,7 +53,7 @@ writeFileRobustly path contentToWrite = do
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
 
-prefixWithId :: Maybe OID -> T.Text -> T.Text
-prefixWithId maybeOid name = case maybeOid of
+mkFqcn :: Maybe OID -> T.Text -> T.Text
+mkFqcn maybeOid name = case maybeOid of
   Just oid -> "id:" <> T.pack (show oid) <> "::" <> name
   Nothing -> name

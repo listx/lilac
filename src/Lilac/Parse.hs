@@ -1084,7 +1084,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
       BTokenString text -> text
       BTokenPadding -> ""
       BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb oid targetName))) ->
-        "\NUL_link" <> (LU.prefixWithId oid targetName)
+        "\NUL_link" <> (LU.mkFqcn oid targetName)
       BTokenLink {} -> ""
 
 zeroIndent :: OrgParser (Int, Int)
