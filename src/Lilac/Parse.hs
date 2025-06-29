@@ -5,7 +5,7 @@ module Lilac.Parse
     defaultOrgParserState,
     extractGOIDs,
     genHeadingSection,
-    genOrgIdStack,
+    genHeadingOidStack,
     maskToStyles,
     orgDocParser,
     goidsParser,
@@ -19,7 +19,6 @@ import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
 import Data.List (groupBy)
-import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -55,10 +54,10 @@ import Lilac.Types
         equationNumber,
         goids,
         headingLevel,
+        headingOidStack,
         headingSection,
         listLevels,
         listMarkers,
-        orgId,
         orgParserConf,
         styleMask,
         tanglePaths
@@ -87,7 +86,6 @@ import Relude
     Map,
     Maybe (Just, Nothing),
     MonadFail,
-    NonEmpty ((:|)),
     Show,
     StateT,
     String,
@@ -117,7 +115,6 @@ import Relude
     not,
     notElem,
     null,
-    one,
     optional,
     or,
     otherwise,
@@ -129,7 +126,6 @@ import Relude
     reverse,
     runStateT,
     show,
-    tail,
     take,
     toEnum,
     void,
@@ -254,7 +250,7 @@ defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
       docOid = nilOid,
-      orgId = one $ Just nilOid,
+      headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
@@ -305,7 +301,6 @@ docMetaParser = do
     Nothing -> fail $ "required document ID property not found"
     Just oidText -> do
       oid <- validateOidText oidText
-      modify (\s -> s {orgId = one $ Just oid})
       pure (oid, M.union topLevelDrawerProps metaKVs)
 
 lilacExtensionsParser :: OrgParser ()
@@ -399,12 +394,16 @@ headingParser = do
   failIfLeftoverActiveStyles
   props <- propertiesDrawerParser
   let newHeadingSection = genHeadingSection lenStars orgParserState.headingSection
-      newOrgId = genOrgIdStack (EM.lookup "ID" props) lenStars orgParserState.orgId
+      newHeadingOidStack =
+        genHeadingOidStack
+          (EM.lookup "ID" props)
+          lenStars
+          orgParserState.headingOidStack
   put
     orgParserState
       { headingLevel = lenStars,
         headingSection = newHeadingSection,
-        orgId = newOrgId
+        headingOidStack = newHeadingOidStack
       }
   pure
     $ CHeading
@@ -447,22 +446,17 @@ genHeadingSection level prevSection
     bumpDeepestSection [] = []
     bumpDeepestSection (x : xs) = x + 1 : xs
 
-genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty (Maybe OID) -> NonEmpty (Maybe OID)
-genOrgIdStack maybeId level prevOrgId
-  | length prevOrgId == 1 = newId NE.<| prevOrgId
-  | length prevOrgId == depth = newId :| tail prevOrgId
-  | length prevOrgId < depth =
+genHeadingOidStack :: Maybe T.Text -> Int -> [Maybe OID] -> [Maybe OID]
+genHeadingOidStack maybeId level old
+  | length old == 0 = [newId]
+  | length old == level = newId : drop 1 old
+  | length old < level =
       let nothings = take (levelDiff - 1) $ repeat Nothing
-       in (newId :| nothings) <> prevOrgId
-  | otherwise = newId :| (NE.drop (abs levelDiff + 1) prevOrgId)
+       in (newId : nothings) <> old
+  | otherwise = newId : (drop (abs levelDiff + 1) old)
   where
-    depth = level + 1
-    levelDiff = depth - length prevOrgId
-    newId
-      | Just oidText <- maybeId,
-        Just oid <- Lilac.Types.fromText oidText =
-          Just oid
-      | otherwise = Nothing
+    levelDiff = level - length old
+    newId = fromText =<< maybeId
 
 propertiesDrawerParser :: OrgParser (Map T.Text T.Text)
 propertiesDrawerParser = propertiesParser <|> (pure $ M.fromList [])
@@ -882,7 +876,7 @@ blockParser = do
       block =
         Block
           { parentOid =
-              firstParent orgParserState.docOid $ NE.toList orgParserState.orgId,
+              firstParent orgParserState.docOid orgParserState.headingOidStack,
             meta =
               M.fromList
                 $ (blockMeta : metaKVs)

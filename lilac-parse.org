@@ -31,7 +31,7 @@ module Lilac.Parse
     defaultOrgParserState,
     extractGOIDs,
     genHeadingSection,
-    genOrgIdStack,
+    genHeadingOidStack,
     maskToStyles,
     orgDocParser,
     goidsParser,
@@ -45,7 +45,6 @@ import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char (isAsciiLower, isDigit, isSpace)
 import Data.List (groupBy)
-import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -81,10 +80,10 @@ import Lilac.Types
         equationNumber,
         goids,
         headingLevel,
+        headingOidStack,
         headingSection,
         listLevels,
         listMarkers,
-        orgId,
         orgParserConf,
         styleMask,
         tanglePaths
@@ -113,7 +112,6 @@ import Relude
     Map,
     Maybe (Just, Nothing),
     MonadFail,
-    NonEmpty ((:|)),
     Show,
     StateT,
     String,
@@ -143,7 +141,6 @@ import Relude
     not,
     notElem,
     null,
-    one,
     optional,
     or,
     otherwise,
@@ -155,7 +152,6 @@ import Relude
     reverse,
     runStateT,
     show,
-    tail,
     take,
     toEnum,
     void,
@@ -210,7 +206,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:headingParser>>
 <<f:failIfHeadingNestsWithoutDirectParent>>
 <<f:genHeadingSection>>
-<<f:genOrgIdStack>>
+<<f:genHeadingOidStack>>
 <<f:propertiesDrawerParser>>
 <<f:propertiesParser>>
 <<f:propertiesEntryParser>>
@@ -501,7 +497,7 @@ type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { goids :: M.Map OID P.OsPath,
     docOid :: OID,
-    orgId :: NonEmpty (Maybe OID),
+    headingOidStack :: [Maybe OID],
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
@@ -524,7 +520,7 @@ defaultOrgParserState =
   OrgParserState
     { goids = M.fromList [],
       docOid = nilOid,
-      orgId = one $ Just nilOid,
+      headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
@@ -740,7 +736,6 @@ docMetaParser = do
     Nothing -> fail $ "required document ID property not found"
     Just oidText -> do
       oid <- validateOidText oidText
-      modify (\s -> s {orgId = one $ Just oid})
       pure (oid, M.union topLevelDrawerProps metaKVs)
 #+end_src
 
@@ -996,7 +991,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
-      orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+      headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -1022,7 +1017,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = one $ Just nilOid,
+      headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -1065,7 +1060,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
-      orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+      headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -1476,7 +1471,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = NE.fromList [Nothing, Just nilOid],
+      headingOidStack = [Nothing],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -2410,7 +2405,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = NE.fromList [Nothing, Just nilOid],
+      headingOidStack = [Nothing],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -2982,12 +2977,16 @@ headingParser = do
   failIfLeftoverActiveStyles
   props <- propertiesDrawerParser
   let newHeadingSection = genHeadingSection lenStars orgParserState.headingSection
-      newOrgId = genOrgIdStack (EM.lookup "ID" props) lenStars orgParserState.orgId
+      newHeadingOidStack =
+        genHeadingOidStack
+          (EM.lookup "ID" props)
+          lenStars
+          orgParserState.headingOidStack
   put
     orgParserState
       { headingLevel = lenStars,
         headingSection = newHeadingSection,
-        orgId = newOrgId
+        headingOidStack = newHeadingOidStack
       }
   pure
     $ CHeading
@@ -3090,106 +3089,76 @@ describe "genHeadingSection" $ do
 
 *** Generating the current Org ID
 
-[[f:genOrgIdStack]] is quite similar to [[f:genHeadingSection]]. The point of it is to
-store the Org IDs up to the current point. This is ultimately used to assign the
-Org ID of the first non-nil parent heading for an implicitly-defined code block,
-in [[f:blockOriginSignatureParser]].
+[[f:genHeadingOidStack]] is quite similar to [[f:genHeadingSection]]. The point of it is
+to store the Org IDs up to the current point. This is ultimately used to assign
+the OID of the first parent heading (if any) for an implicitly-defined code
+block, in [[f:blockOriginSignatureParser]]. If there are no headings, then it
+defaults to the top-level OID found in the document.
 
-#+name: f:genOrgIdStack
+#+name: f:genHeadingOidStack
 #+begin_src haskell
-genOrgIdStack :: Maybe T.Text -> Int -> NonEmpty (Maybe OID) -> NonEmpty (Maybe OID)
-genOrgIdStack maybeId level prevOrgId
-  | length prevOrgId == 1 = newId NE.<| prevOrgId
-  | length prevOrgId == depth = newId :| tail prevOrgId
-  | length prevOrgId < depth =
+genHeadingOidStack :: Maybe T.Text -> Int -> [Maybe OID] -> [Maybe OID]
+genHeadingOidStack maybeId level old
+  | length old == 0 = [newId]
+  | length old == level = newId : drop 1 old
+  | length old < level =
       let nothings = take (levelDiff - 1) $ repeat Nothing
-       in (newId :| nothings) <> prevOrgId
-  | otherwise = newId :| (NE.drop (abs levelDiff + 1) prevOrgId)
+       in (newId : nothings) <> old
+  | otherwise = newId : (drop (abs levelDiff + 1) old)
   where
-    depth = level + 1
-    levelDiff = depth - length prevOrgId
-    newId
-      | Just oidText <- maybeId,
-        Just oid <- Lilac.Types.fromText oidText =
-          Just oid
-      | otherwise = Nothing
+    levelDiff = level - length old
+    newId = fromText =<< maybeId
 #+end_src
 
 #+name: t:Generate Org ID stack
 #+begin_src haskell
-describe "genOrgIdStack" $ do
+describe "genHeadingOidStack" $ do
   it "replaces the head if the nesting level matches (no heading yet)" $ do
-    L.genOrgIdStack
+    L.genHeadingOidStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [Nothing])
-      `shouldBe` ( NE.fromList
-                     [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                       Nothing
-                     ]
-                 )
+      [Nothing]
+      `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
   it "replaces the head if the nesting level matches (one heading exists)" $ do
-    L.genOrgIdStack
+    L.genHeadingOidStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing])
-      `shouldBe` ( NE.fromList
-                     [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                       Nothing
-                     ]
-                 )
+      [Just $ fromWords 0x7777777777777777 0x7777777777777777]
+      `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
   it "adds a new head if the heading nests (and this heading has an ID)" $ do
-    L.genOrgIdStack
+    L.genHeadingOidStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       2
-      (NE.fromList [Nothing, Nothing])
-      `shouldBe` ( NE.fromList
-                     [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                       Nothing,
-                       Nothing
-                     ]
-                 )
+      [Nothing]
+      `shouldBe` [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                   Nothing
+                 ]
   it "adds a new head if the heading nests (and this heading does not have an ID)" $ do
-    L.genOrgIdStack
+    L.genHeadingOidStack
       Nothing
       2
-      (NE.fromList [Nothing, Nothing])
-      `shouldBe` ( NE.fromList
-                     [ Nothing,
-                       Nothing,
-                       Nothing
-                     ]
-                 )
+      [Nothing]
+      `shouldBe` [ Nothing,
+                   Nothing
+                 ]
   it "truncates if we unnest (difference of 1 level)" $ do
-    L.genOrgIdStack
+    L.genHeadingOidStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing, Nothing])
-      `shouldBe` ( NE.fromList
-                     [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                       Nothing
-                     ]
-                 )
+      [Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing]
+      `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
   it "truncates if we unnest (multiple levels)" $ do
-    L.genOrgIdStack
+    L.genHeadingOidStack
       Nothing
       1
-      (NE.fromList [Nothing, Nothing, Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa, Nothing])
-      `shouldBe` ( NE.fromList
-                     [ Nothing,
-                       Nothing
-                     ]
-                 )
+      [Nothing, Nothing, Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
+      `shouldBe` [Nothing]
   it "truncates if we unnest (multiple levels, new heading has ID)" $ do
-    L.genOrgIdStack
+    L.genHeadingOidStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       1
-      (NE.fromList [Nothing, Nothing, Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing])
-      `shouldBe` ( NE.fromList
-                     [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                       Nothing
-                     ]
-                 )
+      [Nothing, Nothing, Just $ fromWords 0x7777777777777777 0x7777777777777777]
+      `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
 #+end_src
 
 *** Tests
@@ -3258,7 +3227,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
+      headingOidStack = take 12 $ repeat Nothing,
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
@@ -3314,7 +3283,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
+      headingOidStack = take 12 $ repeat Nothing,
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
@@ -3483,7 +3452,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = NE.fromList [Nothing, Just nilOid],
+      headingOidStack = [Nothing],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3532,7 +3501,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
+      headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3591,7 +3560,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
+      headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
@@ -3657,7 +3626,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = one $ Just nilOid,
+      headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -3881,7 +3850,7 @@ blockParser = do
       block =
         Block
           { parentOid =
-              firstParent orgParserState.docOid $ NE.toList orgParserState.orgId,
+              firstParent orgParserState.docOid orgParserState.headingOidStack,
             meta =
               M.fromList
                 $ (blockMeta : metaKVs)
@@ -4712,7 +4681,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = one $ Just nilOid,
+      headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -6458,7 +6427,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = one $ Just nilOid,
+      headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -6533,7 +6502,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = one $ Just nilOid,
+      headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -6728,7 +6697,7 @@ ps
   OrgParserState
     { goids = fromList [],
       docOid = nilOid,
-      orgId = one $ Just nilOid,
+      headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
@@ -7221,7 +7190,6 @@ spend far more time compiling the tests themselves).
 #+begin_src haskell
 module Lilac.ParseSpec (spec) where
 
-import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -7257,10 +7225,10 @@ import Lilac.Types
         equationNumber,
         goids,
         headingLevel,
+        headingOidStack,
         headingSection,
         listLevels,
         listMarkers,
-        orgId,
         orgParserConf,
         styleMask,
         tanglePaths
@@ -7285,7 +7253,6 @@ import Relude
     Type,
     fromList,
     map,
-    one,
     otherwise,
     repeat,
     runStateT,
@@ -7365,8 +7332,7 @@ p path expected = do
   where
     check input
       | expected.oid == nilOid =
-          action nilOidOrgDoc input
-            $ L.defaultOrgParserState {orgId = one $ Just nilOid}
+          action nilOidOrgDoc input L.defaultOrgParserState
       | otherwise = action "" input L.defaultOrgParserState
     action inputPrefix input expectedState =
       MP.runParser

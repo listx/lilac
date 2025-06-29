@@ -1,6 +1,5 @@
 module Lilac.ParseSpec (spec) where
 
-import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -36,10 +35,10 @@ import Lilac.Types
         equationNumber,
         goids,
         headingLevel,
+        headingOidStack,
         headingSection,
         listLevels,
         listMarkers,
-        orgId,
         orgParserConf,
         styleMask,
         tanglePaths
@@ -64,7 +63,6 @@ import Relude
     Type,
     fromList,
     map,
-    one,
     otherwise,
     repeat,
     runStateT,
@@ -106,8 +104,7 @@ p path expected = do
   where
     check input
       | expected.oid == nilOid =
-          action nilOidOrgDoc input
-            $ L.defaultOrgParserState {orgId = one $ Just nilOid}
+          action nilOidOrgDoc input L.defaultOrgParserState
       | otherwise = action "" input L.defaultOrgParserState
     action inputPrefix input expectedState =
       MP.runParser
@@ -257,7 +254,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = one $ Just nilOid,
+        headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -313,7 +310,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
-        orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+        headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -340,7 +337,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
-        orgId = one . Just $ fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+        headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -387,7 +384,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
+        headingOidStack = take 12 $ repeat Nothing,
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
@@ -421,7 +418,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = NE.fromList $ (take 12 $ repeat Nothing) <> [Just nilOid],
+        headingOidStack = take 12 $ repeat Nothing,
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
@@ -467,79 +464,53 @@ parseSpec = do
       L.genHeadingSection 3 [2, 2] `shouldBe` [1, 2, 2]
       L.genHeadingSection 5 [2, 2] `shouldBe` [1, 0, 0, 2, 2]
 
-  describe "genOrgIdStack" $ do
+  describe "genHeadingOidStack" $ do
     it "replaces the head if the nesting level matches (no heading yet)" $ do
-      L.genOrgIdStack
+      L.genHeadingOidStack
         (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         1
-        (NE.fromList [Nothing])
-        `shouldBe` ( NE.fromList
-                       [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                         Nothing
-                       ]
-                   )
+        [Nothing]
+        `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
     it "replaces the head if the nesting level matches (one heading exists)" $ do
-      L.genOrgIdStack
+      L.genHeadingOidStack
         (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         1
-        (NE.fromList [Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing])
-        `shouldBe` ( NE.fromList
-                       [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                         Nothing
-                       ]
-                   )
+        [Just $ fromWords 0x7777777777777777 0x7777777777777777]
+        `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
     it "adds a new head if the heading nests (and this heading has an ID)" $ do
-      L.genOrgIdStack
+      L.genHeadingOidStack
         (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         2
-        (NE.fromList [Nothing, Nothing])
-        `shouldBe` ( NE.fromList
-                       [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                         Nothing,
-                         Nothing
-                       ]
-                   )
+        [Nothing]
+        `shouldBe` [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
+                     Nothing
+                   ]
     it "adds a new head if the heading nests (and this heading does not have an ID)" $ do
-      L.genOrgIdStack
+      L.genHeadingOidStack
         Nothing
         2
-        (NE.fromList [Nothing, Nothing])
-        `shouldBe` ( NE.fromList
-                       [ Nothing,
-                         Nothing,
-                         Nothing
-                       ]
-                   )
+        [Nothing]
+        `shouldBe` [ Nothing,
+                     Nothing
+                   ]
     it "truncates if we unnest (difference of 1 level)" $ do
-      L.genOrgIdStack
+      L.genHeadingOidStack
         (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         1
-        (NE.fromList [Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing, Nothing])
-        `shouldBe` ( NE.fromList
-                       [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                         Nothing
-                       ]
-                   )
+        [Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing]
+        `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
     it "truncates if we unnest (multiple levels)" $ do
-      L.genOrgIdStack
+      L.genHeadingOidStack
         Nothing
         1
-        (NE.fromList [Nothing, Nothing, Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa, Nothing])
-        `shouldBe` ( NE.fromList
-                       [ Nothing,
-                         Nothing
-                       ]
-                   )
+        [Nothing, Nothing, Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
+        `shouldBe` [Nothing]
     it "truncates if we unnest (multiple levels, new heading has ID)" $ do
-      L.genOrgIdStack
+      L.genHeadingOidStack
         (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         1
-        (NE.fromList [Nothing, Nothing, Just $ fromWords 0x7777777777777777 0x7777777777777777, Nothing])
-        `shouldBe` ( NE.fromList
-                       [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
-                         Nothing
-                       ]
-                   )
+        [Nothing, Nothing, Just $ fromWords 0x7777777777777777 0x7777777777777777]
+        `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
 
   ps
     "0004-properties-drawer-empty"
@@ -560,7 +531,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = NE.fromList [Nothing, Just nilOid],
+        headingOidStack = [Nothing],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -596,7 +567,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
+        headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -632,7 +603,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = NE.fromList [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6, Just nilOid],
+        headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -835,7 +806,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = NE.fromList [Nothing, Just nilOid],
+        headingOidStack = [Nothing],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -1171,7 +1142,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = NE.fromList [Nothing, Just nilOid],
+        headingOidStack = [Nothing],
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
@@ -1232,7 +1203,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = one $ Just nilOid,
+        headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1326,7 +1297,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = one $ Just nilOid,
+        headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1889,7 +1860,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = one $ Just nilOid,
+        headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -1944,7 +1915,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = one $ Just nilOid,
+        headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
@@ -2022,7 +1993,7 @@ parseSpec = do
     OrgParserState
       { goids = fromList [],
         docOid = nilOid,
-        orgId = one $ Just nilOid,
+        headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],

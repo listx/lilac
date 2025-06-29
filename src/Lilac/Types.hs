@@ -43,7 +43,6 @@ import Relude
     Identity,
     Int,
     Maybe (Just, Nothing),
-    NonEmpty,
     Ord,
     Show,
     StateT,
@@ -198,7 +197,7 @@ type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { goids :: M.Map OID P.OsPath,
     docOid :: OID,
-    orgId :: NonEmpty (Maybe OID),
+    headingOidStack :: [Maybe OID],
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
