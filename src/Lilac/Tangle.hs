@@ -19,8 +19,8 @@ import Lilac.Types
     Block (body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Link (Link),
-    LinkNoweb (LinkNoweb),
-    LinkTarget (LinkTargetNoweb),
+    LinkOid (LinkOid),
+    LinkTarget (LinkTargetOid),
     OID,
     OrgDoc (cells, oid),
   )
@@ -167,7 +167,7 @@ growBlockUniverse parsedOids seenFqbns goids blockUniverse (root : roots)
       let nowebLinks = catMaybes $ map getLinkTarget block.body
           fqbns =
             map
-              (\(LinkNoweb oid targetName) -> LU.mkFqcn oid targetName)
+              (\(LinkOid oid targetName) -> LU.mkFqcn oid targetName)
               nowebLinks
           newFqbns = filter (\fqbn -> not $ Set.member fqbn seenFqbns) fqbns
       (newlyParsedOids, grownBlockUniverse, toGrowFrom) <-
@@ -182,9 +182,9 @@ growBlockUniverse parsedOids seenFqbns goids blockUniverse (root : roots)
   where
     f ::
       (Set.Set OID, M.Map FQBN Block, [FQBN]) ->
-      LinkNoweb ->
+      LinkOid ->
       IO (Set.Set OID, M.Map FQBN Block, [FQBN])
-    f (pu, bu, tgf) (LinkNoweb oid targetName)
+    f (pu, bu, tgf) (LinkOid oid targetName)
       | Set.member (LU.mkFqcn oid targetName) seenFqbns = pure (pu, bu, tgf)
       | Set.member oid pu = pure (pu, bu, (LU.mkFqcn oid targetName) : tgf)
       | Just oidOsPath <- EM.lookup oid goids = do
@@ -203,8 +203,8 @@ growBlockUniverse parsedOids seenFqbns goids blockUniverse (root : roots)
               pure (pu, bu, tgf)
       | otherwise = pure (pu, bu, tgf)
     getLinkTarget = \case
-      (BTokenLink (Link _ (LinkTargetNoweb linkNoweb))) ->
-        Just linkNoweb
+      (BTokenLink (Link _ (LinkTargetOid linkOid))) ->
+        Just linkOid
       BTokenLink {}
       BTokenPadding {}
       BTokenString {} -> Nothing
@@ -243,7 +243,7 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
             $ map getLinkTarget block.body
       | otherwise = acc
     getLinkTarget = \case
-      BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb oid targetName))) ->
+      BTokenLink (Link _ (LinkTargetOid (LinkOid oid targetName))) ->
         Just $ LU.mkFqcn oid targetName
       BTokenLink {}
       BTokenPadding {}
@@ -301,7 +301,7 @@ expandBlock sc block existingPrefix =
       (acc <> "\n", "")
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetNoweb (LinkNoweb oid target))))
+    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetOid (LinkOid oid target))))
       | Just targetBlock <-
           EM.lookup
             (LU.mkFqcn oid target)

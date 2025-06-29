@@ -12,8 +12,8 @@ import Lilac.Types
     Figure (Figure, link, meta),
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
-    LinkNoweb (LinkNoweb, name, oid),
-    LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
+    LinkOid (LinkOid, name, oid),
+    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
         LItemStart,
@@ -1359,8 +1359,8 @@ parseSpec = do
                     [ BTokenLink
                         ( Link
                             { target =
-                                LinkTargetNoweb
-                                  LinkNoweb
+                                LinkTargetOid
+                                  LinkOid
                                     { oid = nilOid,
                                       name = "foo"
                                     },
@@ -1376,8 +1376,8 @@ parseSpec = do
                       BTokenLink
                         ( Link
                             { target =
-                                LinkTargetNoweb
-                                  LinkNoweb
+                                LinkTargetOid
+                                  LinkOid
                                     { oid = nilOid,
                                       name = "bar"
                                     },
@@ -1416,8 +1416,8 @@ parseSpec = do
                       BTokenLink
                         ( Link
                             { target =
-                                LinkTargetNoweb
-                                  LinkNoweb
+                                LinkTargetOid
+                                  LinkOid
                                     { oid = nilOid,
                                       name = "foo"
                                     },
@@ -1433,8 +1433,8 @@ parseSpec = do
                       BTokenLink
                         ( Link
                             { target =
-                                LinkTargetNoweb
-                                  LinkNoweb
+                                LinkTargetOid
+                                  LinkOid
                                     { oid = nilOid,
                                       name = "bar"
                                     },
@@ -1450,8 +1450,8 @@ parseSpec = do
                       BTokenLink
                         ( Link
                             { target =
-                                LinkTargetNoweb
-                                  LinkNoweb
+                                LinkTargetOid
+                                  LinkOid
                                     { oid = nilOid,
                                       name = "ok"
                                     },

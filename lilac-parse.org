@@ -56,8 +56,8 @@ import Lilac.Types
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
     Link (Link, name, target),
-    LinkNoweb (LinkNoweb, name, oid),
-    LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
+    LinkOid (LinkOid, name, oid),
+    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
         LItemStart,
@@ -241,7 +241,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:zeroBTokensParser>>
 <<f:someBTokensParser>>
 <<f:nowebLinkParser>>
-<<f:blockOriginSignatureParser>>
+<<f:oidReferenceParser>>
 <<f:ignoreSpecialCommas>>
 <<f:compressBTokens>>
 <<f:padConsecutiveNowebLinks>>
@@ -2172,14 +2172,14 @@ instance ToJSON Link
 #+end_src
 
 The target is a rich definition of the kind of target we are linking to.
-Currently we only recognize [[data:LinkNoweb]]. All other links are just captured in
+Currently we only recognize [[data:LinkOid]]. All other links are just captured in
 the generic ~LinkTargetOther~ constructor.
 
 #+name: data:LinkTarget
 #+begin_src haskell
 type LinkTarget :: Type
 data LinkTarget
-  = LinkTargetNoweb LinkNoweb
+  = LinkTargetOid LinkOid
   | LinkTargetURI N.URI
   | LinkTargetOther T.Text
   deriving stock (Eq, Generic, Ord, Show)
@@ -2196,23 +2196,23 @@ The OID is wrapped in a =Maybe= because it is possible that an Org file has
 no OID specified at the top level (see [[data:OrgDoc]]). However if this is the
 case, then none of the code blocks in that document will be able to be
 referenced by the outside world (in other Org files). See
-[[f:blockOriginSignatureParser]] for how we use this information.
+[[f:oidReferenceParserParser]] for how we use this information.
 
-#+name: data:LinkNoweb
+#+name: data:LinkOid
 #+begin_src haskell
-type LinkNoweb :: Type
-data LinkNoweb = LinkNoweb
+type LinkOid :: Type
+data LinkOid = LinkOid
   { oid :: OID,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Ord, Show)
 
-instance ToJSON LinkNoweb
+instance ToJSON LinkOid
 #+end_src
 
 In summary we support the following link types:
 
-  - ~LinkTargetNoweb~ :: a link to a Noweb reference inside another code block.
+  - ~LinkTargetOid~ :: a link to a Noweb reference inside another code block.
     These use angle brackets (e.g., ~<<foo>>~), where the text inside the brackets
     refers to a code block in the current file. This can reference code blocks
     in other files by OID, where the syntax is ~<<id:...::foo>>~ where ~...~ is the
@@ -2685,17 +2685,17 @@ p
 
 *** Noweb links
 
-=LinkNoweb= links to Noweb references. We've been using Noweb references already
+=LinkOid= links to Noweb references. We've been using Noweb references already
 in this document, but here's an isolated example.
 
 #+begin_src sh
-echo <<LinkNoweb example>>
+echo <<LinkOid example>>
 #+end_src
 
-The block above refers to a Noweb reference named =LinkNoweb example=. We define
+The block above refers to a Noweb reference named =LinkOid example=. We define
 it below:
 
-#+name: LinkNoweb example
+#+name: LinkOid example
 #+begin_src sh
 hello world
 #+end_src
@@ -3092,7 +3092,7 @@ describe "genHeadingSection" $ do
 [[f:genHeadingOidStack]] is quite similar to [[f:genHeadingSection]]. The point of it is
 to store the Org IDs up to the current point. This is ultimately used to assign
 the OID of the first parent heading (if any) for an implicitly-defined code
-block, in [[f:blockOriginSignatureParser]]. If there are no headings, then it
+block, in [[f:oidReferenceParser]]. If there are no headings, then it
 defaults to the top-level OID found in the document.
 
 #+name: f:genHeadingOidStack
@@ -4148,13 +4148,13 @@ Noweb link.
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
   _ <- string "<<"
-  (oid, linkName) <- blockOriginSignatureParser
+  (oid, linkName) <- oidReferenceParser
   _ <- string ">>"
   pure
     $ Link
       { target =
-          LinkTargetNoweb
-            LinkNoweb
+          LinkTargetOid
+            LinkOid
               { oid = oid,
                 name = linkName
               },
@@ -4167,7 +4167,7 @@ nowebLinkParser = do
       }
 #+end_src
 
-The [[f:blockOriginSignatureParser]] parses information about the origin of the
+The [[f:oidReferenceParser]] parses information about the origin of the
 block being referenced, which we call the block origin signature. For now the
 origin can have an optional OID, along with the name of the code block itself.
 
@@ -4177,10 +4177,10 @@ the beginning of the document in [[f:docMetaParser]], because although the link 
 refer to a block that has a parent heading which has its own OID, we don't have
 that information at hand.
 
-#+name: f:blockOriginSignatureParser
+#+name: f:oidReferenceParser
 #+begin_src haskell
-blockOriginSignatureParser :: OrgParser (OID, T.Text)
-blockOriginSignatureParser = MP.choice [explicit, implicit]
+oidReferenceParser :: OrgParser (OID, T.Text)
+oidReferenceParser = MP.choice [explicit, implicit]
   where
     blockNameOnly :: OrgParser T.Text
     blockNameOnly =
@@ -4261,8 +4261,8 @@ ps
             [ BTokenLink
                 ( Link
                     { target =
-                        LinkTargetNoweb
-                          LinkNoweb
+                        LinkTargetOid
+                          LinkOid
                             { oid = nilOid,
                               name = "foo"
                             },
@@ -4278,8 +4278,8 @@ ps
               BTokenLink
                 ( Link
                     { target =
-                        LinkTargetNoweb
-                          LinkNoweb
+                        LinkTargetOid
+                          LinkOid
                             { oid = nilOid,
                               name = "bar"
                             },
@@ -4398,8 +4398,8 @@ ps
               BTokenLink
                 ( Link
                     { target =
-                        LinkTargetNoweb
-                          LinkNoweb
+                        LinkTargetOid
+                          LinkOid
                             { oid = nilOid,
                               name = "foo"
                             },
@@ -4415,8 +4415,8 @@ ps
               BTokenLink
                 ( Link
                     { target =
-                        LinkTargetNoweb
-                          LinkNoweb
+                        LinkTargetOid
+                          LinkOid
                             { oid = nilOid,
                               name = "bar"
                             },
@@ -4432,8 +4432,8 @@ ps
               BTokenLink
                 ( Link
                     { target =
-                        LinkTargetNoweb
-                          LinkNoweb
+                        LinkTargetOid
+                          LinkOid
                             { oid = nilOid,
                               name = "ok"
                             },
@@ -4547,7 +4547,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
-      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb oid targetName))) ->
+      BTokenLink (Link _name (LinkTargetOid (LinkOid oid targetName))) ->
         <<link-marker>> <> (LU.mkFqcn oid targetName)
       BTokenLink {} -> ""
 #+end_src
@@ -7201,8 +7201,8 @@ import Lilac.Types
     Figure (Figure, link, meta),
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
-    LinkNoweb (LinkNoweb, name, oid),
-    LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
+    LinkOid (LinkOid, name, oid),
+    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
         LItemStart,

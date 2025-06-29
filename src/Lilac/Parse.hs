@@ -30,8 +30,8 @@ import Lilac.Types
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
     Link (Link, name, target),
-    LinkNoweb (LinkNoweb, name, oid),
-    LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
+    LinkOid (LinkOid, name, oid),
+    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
         LItemStart,
@@ -954,13 +954,13 @@ someBTokensParser blockType nowebOn =
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
   _ <- string "<<"
-  (oid, linkName) <- blockOriginSignatureParser
+  (oid, linkName) <- oidReferenceParser
   _ <- string ">>"
   pure
     $ Link
       { target =
-          LinkTargetNoweb
-            LinkNoweb
+          LinkTargetOid
+            LinkOid
               { oid = oid,
                 name = linkName
               },
@@ -972,8 +972,8 @@ nowebLinkParser = do
           ]
       }
 
-blockOriginSignatureParser :: OrgParser (OID, T.Text)
-blockOriginSignatureParser = MP.choice [explicit, implicit]
+oidReferenceParser :: OrgParser (OID, T.Text)
+oidReferenceParser = MP.choice [explicit, implicit]
   where
     blockNameOnly :: OrgParser T.Text
     blockNameOnly =
@@ -1079,7 +1079,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
-      BTokenLink (Link _name (LinkTargetNoweb (LinkNoweb oid targetName))) ->
+      BTokenLink (Link _name (LinkTargetOid (LinkOid oid targetName))) ->
         "\NUL_link" <> (LU.mkFqcn oid targetName)
       BTokenLink {} -> ""
 

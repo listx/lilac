@@ -6,7 +6,7 @@ module Lilac.Types
     Heading (..),
     Level (..),
     Link (..),
-    LinkNoweb (..),
+    LinkOid (..),
     LinkTarget (..),
     ListMarker (..),
     MathFragment (..),
@@ -130,18 +130,18 @@ data Link = Link
 
 instance ToJSON Link
 
-type LinkNoweb :: Type
-data LinkNoweb = LinkNoweb
+type LinkOid :: Type
+data LinkOid = LinkOid
   { oid :: OID,
     name :: T.Text
   }
   deriving stock (Eq, Generic, Ord, Show)
 
-instance ToJSON LinkNoweb
+instance ToJSON LinkOid
 
 type LinkTarget :: Type
 data LinkTarget
-  = LinkTargetNoweb LinkNoweb
+  = LinkTargetOid LinkOid
   | LinkTargetURI N.URI
   | LinkTargetOther T.Text
   deriving stock (Eq, Generic, Ord, Show)

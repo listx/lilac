@@ -12,8 +12,8 @@ import Lilac.Types
     Figure (meta),
     Heading (body, meta),
     Link (target),
-    LinkNoweb (name, oid),
-    LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
+    LinkOid (name, oid),
+    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     MathFragment (meta),
     OID,
     OrgDoc (cells, oid),
@@ -109,8 +109,8 @@ findExternalOrgLinkTargets orgDoc symbols =
       PTokenStyledText {}
       PTokenMathFragment {} -> acc
     getExternal acc link = case link.target of
-      LinkTargetNoweb linkNoweb ->
-        let target = LU.mkFqcn linkNoweb.oid linkNoweb.name
+      LinkTargetOid linkOid ->
+        let target = LU.mkFqcn linkOid.oid linkOid.name
          in if M.member target symbols
               then acc
               else link.target : acc

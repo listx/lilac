@@ -17,8 +17,8 @@ import Lilac.Types
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, section),
     Link (Link, name, target),
-    LinkNoweb (name, oid),
-    LinkTarget (LinkTargetNoweb, LinkTargetOther, LinkTargetURI),
+    LinkOid (name, oid),
+    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
         LItemStart,
@@ -253,7 +253,7 @@ weavePToken = \case
 
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
-  LinkTargetNoweb _ -> False
+  LinkTargetOid _ -> False
   LinkTargetURI {} -> True
   LinkTargetOther target
     | T.isPrefixOf "http" target -> True
@@ -322,7 +322,7 @@ weaveBlock block = do
         bTokenToText = \case
           BTokenString text -> text
           BTokenPadding -> ""
-          BTokenLink (Link _name (LinkTargetNoweb _)) -> "\NUL"
+          BTokenLink (Link _name (LinkTargetOid _)) -> "\NUL"
           BTokenLink {} -> ""
     linkAnchor = getLinkAnchor $ CBlock block
 
@@ -371,8 +371,8 @@ weaveLink link = do
         then "external-link"
         else "internal-link"
     linkTarget weaveConf = case link.target of
-      LinkTargetNoweb linkNoweb
-        | Just orgFile <- EM.lookup linkNoweb.oid weaveConf.goids,
+      LinkTargetOid linkOid
+        | Just orgFile <- EM.lookup linkOid.oid weaveConf.goids,
           Just currentOrgFile <- EM.lookup weaveConf.orgDoc.oid weaveConf.goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
             if orgFile == currentOrgFile
@@ -386,7 +386,7 @@ weaveLink link = do
               $ CBlock
                 Block
                   { parentOid = weaveConf.orgDoc.oid,
-                    meta = M.fromList [("name", linkNoweb.name)],
+                    meta = M.fromList [("name", linkOid.name)],
                     body = []
                   }
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
