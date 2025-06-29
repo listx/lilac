@@ -376,6 +376,9 @@ In short the ~lilacSource~ is the source code needed to build Lilac, and
 configure the Lilac build process.
 
 *** =lilacSource=
+:PROPERTIES:
+:ID:       ae7b1a31-970d-41e4-b15a-8d7f383e1502
+:END:
 
 We want to tell Nix to use the local directory path of the project root as the
 starting point (this way, we can build Lilac without having to make a Git commit
@@ -1573,6 +1576,7 @@ Protobuf
 Protobufs
 quux
 Relude
+ripgrep
 sandbox
 sandboxing
 src
@@ -2016,6 +2020,30 @@ import Distribution.Simple
 
 main = defaultMain
 #+end_src
+
+** Searching with =ripgrep=
+The [[https://github.com/BurntSushi/ripgrep][ripgrep]] (=rg=) tool is a popular tool used for searching text. While =rg=
+respects the [[id:ae7b1a31-970d-41e4-b15a-8d7f383e1502::.gitignore][.gitignore]], we cannot solely rely on it because it will still
+search tangled source code. We want to tell =rg= to ignore those files because
+when we search for something we always want to look at the source of truth,
+which in most cases (except for generated code) is an Org file.
+
+To make =rg= behave as we want, we have to provide it a separate =.rgignore= file.
+
+#+name: .rgignore
+#+header: :tangle .rgignore
+#+begin_src rgignore
+,*.cabal
+,*.hs
+,*.nix
+,*.obj
+,*.sh
+test/*
+#+end_src
+
+We can't put these inside [[id:ae7b1a31-970d-41e4-b15a-8d7f383e1502::.gitignore][.gitignore]] because doing so will remove these files
+from bundling it into a Nix package in [[id:ae7b1a31-970d-41e4-b15a-8d7f383e1502::code:lilacSource][code:lilacSource]] (we actually want the
+tangled content because they are required for the build).
 
 * CLI
 
