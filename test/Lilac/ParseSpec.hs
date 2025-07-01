@@ -1271,6 +1271,96 @@ parseSpec = do
         ]
     )
 
+  p
+    "0006-links-oids"
+    ( nilOrgDoc
+        [ CParagraph
+            [ PTokenLink
+                ( Link
+                    { target =
+                        LinkTargetOid
+                          LinkOid
+                            { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                              name = ""
+                            },
+                      name =
+                        [ StyledText
+                            { body = "id:442c807f-c9d9-45a7-88bf-ffffffffffff",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              PTokenStyledText
+                ( StyledText
+                    { body = " ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { target =
+                        LinkTargetOid
+                          LinkOid
+                            { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                              name = ""
+                            },
+                      name =
+                        [ StyledText
+                            { body = "bar",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              PTokenStyledText
+                ( StyledText
+                    { body = " ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { target =
+                        LinkTargetOid
+                          LinkOid
+                            { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                              name = "foo"
+                            },
+                      name =
+                        [ StyledText
+                            { body = "abc",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              PTokenStyledText
+                ( StyledText
+                    { body = " ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { target =
+                        LinkTargetOid
+                          LinkOid
+                            { oid = nilOid,
+                              name = "foo"
+                            },
+                      name =
+                        [ StyledText
+                            { body = "abc",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                )
+            ]
+        ]
+    )
+
   pf
     "0007-block-src-without-lang"
     "block type src requires a language specifier"

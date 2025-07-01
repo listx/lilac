@@ -1021,11 +1021,14 @@ oidLinkParser = do
   _ <- string "[["
   avoidParsingKnownProtocols
   (oid, name) <- oidReferenceParser "[]"
+  let implicitName
+        | T.null name = "id:" <> T.show oid
+        | otherwise = name
 
   _ <- string "]"
   displayName <-
     MP.choice
-      [ MP.try $ string "]" >> pure name,
+      [ MP.try $ string "]" >> pure implicitName,
         MP.try linkDisplayNameParser
       ]
   pure
@@ -1053,30 +1056,30 @@ oidLinkParser = do
         <> protocolsEmacs
 
 oidReferenceParser :: [Char] -> OrgParser (OID, T.Text)
-oidReferenceParser disallowedChars = MP.choice [explicit, implicit]
+oidReferenceParser disallowedChars =
+  MP.choice
+    [ MP.try explicitFQCN,
+      MP.try explicitOID,
+      MP.try implicit
+    ]
   where
     nameOnly :: OrgParser T.Text
     nameOnly =
       MP.takeWhile1P
         (Just "name characters")
         (`notElem` ('\n' : disallowedChars))
-    explicit = do
+    explicitOID :: OrgParser (OID, T.Text)
+    explicitOID = do
       _ <- string "id:"
       oidText <-
         MP.takeWhile1P
           (Just "oid char")
-          (/= ':')
-      _ <- string "::"
+          (`notElem` (':' : disallowedChars))
       oid <- validateOidText oidText
-      orgParserState <- get
-      when
-        ( (M.size orgParserState.goids > 0)
-            && (not $ M.member oid orgParserState.goids)
-        )
-        $ fail
-        $ "OID "
-        <> show oidText
-        <> " not found in global OrgIds"
+      pure (oid, "")
+    explicitFQCN = do
+      (oid, _) <- explicitOID
+      _ <- string "::"
       name <- nameOnly
       pure (oid, name)
     implicit = do

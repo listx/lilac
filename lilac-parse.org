@@ -2308,11 +2308,14 @@ oidLinkParser = do
   _ <- string "[["
   avoidParsingKnownProtocols
   (oid, name) <- oidReferenceParser "[]"
+  let implicitName
+        | T.null name = "id:" <> T.show oid
+        | otherwise = name
 
   _ <- string "]"
   displayName <-
     MP.choice
-      [ MP.try $ string "]" >> pure name,
+      [ MP.try $ string "]" >> pure implicitName,
         MP.try linkDisplayNameParser
       ]
   pure
@@ -2351,6 +2354,107 @@ linkDisplayNameParser =
     (string "[")
     (string "]]")
     (MP.takeWhile1P (Just "name character") (/= ']'))
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0006-links-oids
+#+begin_src org
+[[id:442c807f-c9d9-45a7-88bf-ffffffffffff]]
+[[id:442c807f-c9d9-45a7-88bf-ffffffffffff][bar]]
+[[id:442c807f-c9d9-45a7-88bf-ffffffffffff::foo][abc]]
+[[foo][abc]]
+#+end_src
+
+#+name: t:0006-links-oids
+#+begin_src haskell
+p
+  "0006-links-oids"
+  ( nilOrgDoc
+      [ CParagraph
+          [ PTokenLink
+              ( Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                            name = ""
+                          },
+                    name =
+                      [ StyledText
+                          { body = "id:442c807f-c9d9-45a7-88bf-ffffffffffff",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              ),
+            PTokenStyledText
+              ( StyledText
+                  { body = " ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                            name = ""
+                          },
+                    name =
+                      [ StyledText
+                          { body = "bar",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              ),
+            PTokenStyledText
+              ( StyledText
+                  { body = " ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                            name = "foo"
+                          },
+                    name =
+                      [ StyledText
+                          { body = "abc",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              ),
+            PTokenStyledText
+              ( StyledText
+                  { body = " ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "foo"
+                          },
+                    name =
+                      [ StyledText
+                          { body = "abc",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              )
+          ]
+      ]
+  )
 #+end_src
 
 *** Links to recognized web protocols
@@ -4425,30 +4529,30 @@ that information at hand.
 #+name: f:oidReferenceParser
 #+begin_src haskell
 oidReferenceParser :: [Char] -> OrgParser (OID, T.Text)
-oidReferenceParser disallowedChars = MP.choice [explicit, implicit]
+oidReferenceParser disallowedChars =
+  MP.choice
+    [ MP.try explicitFQCN,
+      MP.try explicitOID,
+      MP.try implicit
+    ]
   where
     nameOnly :: OrgParser T.Text
     nameOnly =
       MP.takeWhile1P
         (Just "name characters")
         (`notElem` ('\n' : disallowedChars))
-    explicit = do
+    explicitOID :: OrgParser (OID, T.Text)
+    explicitOID = do
       _ <- string "id:"
       oidText <-
         MP.takeWhile1P
           (Just "oid char")
-          (/= ':')
-      _ <- string "::"
+          (`notElem` (':' : disallowedChars))
       oid <- validateOidText oidText
-      orgParserState <- get
-      when
-        ( (M.size orgParserState.goids > 0)
-            && (not $ M.member oid orgParserState.goids)
-        )
-        $ fail
-        $ "OID "
-        <> show oidText
-        <> " not found in global OrgIds"
+      pure (oid, "")
+    explicitFQCN = do
+      (oid, _) <- explicitOID
+      _ <- string "::"
       name <- nameOnly
       pure (oid, name)
     implicit = do
@@ -7874,6 +7978,7 @@ parseSpec = do
   <<t:0006-links-raw>>
   <<t:0006-links>>
   <<t:0006-links-web-protocols>>
+  <<t:0006-links-oids>>
   <<t:0007-block-src-without-lang>>
   <<t:0007-blocks-empty>>
   <<t:0007-blocks-ending>>
