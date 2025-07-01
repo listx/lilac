@@ -71,6 +71,8 @@ import Lilac.Types
     defaultOrgParserConf,
     fromText,
     nilOid,
+    protocolsEmacs,
+    protocolsWeb,
   )
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
@@ -692,7 +694,8 @@ linkParser = do
   failIfVerbatimOrCode
 
   MP.choice
-    [ MP.try bracketedLinkParser,
+    [ MP.try oidLinkParser,
+      MP.try otherLinkParser,
       MP.try rawLinkParser
     ]
 
@@ -703,8 +706,8 @@ failIfVerbatimOrCode = do
   when (isVerbatim mask || isCode mask)
     $ fail "aborting because verbatim or code style is active"
 
-bracketedLinkParser :: OrgParser Link
-bracketedLinkParser = do
+otherLinkParser :: OrgParser Link
+otherLinkParser = do
   _ <- string "["
   target <-
     MP.between
@@ -954,7 +957,7 @@ someBTokensParser blockType nowebOn =
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
   _ <- string "<<"
-  (oid, linkName) <- oidReferenceParser
+  (oid, linkName) <- oidReferenceParser "<>"
   _ <- string ">>"
   pure
     $ Link
@@ -972,20 +975,62 @@ nowebLinkParser = do
           ]
       }
 
-oidReferenceParser :: OrgParser (OID, T.Text)
-oidReferenceParser = MP.choice [explicit, implicit]
+oidLinkParser :: OrgParser Link
+oidLinkParser = do
+  _ <- string "[["
+  avoidParsingKnownProtocols
+  (oid, name) <- oidReferenceParser "[]"
+
+  _ <- string "]"
+  displayName <-
+    MP.choice
+      [ MP.try $ string "]" >> pure name,
+        MP.try nameParser
+      ]
+  pure
+    $ Link
+      { target =
+          LinkTargetOid
+            LinkOid
+              { oid = oid,
+                name = name
+              },
+        name =
+          [ StyledText
+              { body = displayName,
+                style = styleMaskFrom []
+              }
+          ]
+      }
   where
-    blockNameOnly :: OrgParser T.Text
-    blockNameOnly =
+    nameParser :: OrgParser T.Text
+    nameParser = do
+      _ <- string "["
+      name <- MP.takeWhile1P (Just "name character") (/= ']')
+      _ <- string "]]"
+      pure name
+    avoidParsingKnownProtocols :: OrgParser ()
+    avoidParsingKnownProtocols =
+      MP.notFollowedBy
+        . MP.choice
+        . map string
+        $ protocolsWeb
+        <> protocolsEmacs
+
+oidReferenceParser :: [Char] -> OrgParser (OID, T.Text)
+oidReferenceParser disallowedChars = MP.choice [explicit, implicit]
+  where
+    nameOnly :: OrgParser T.Text
+    nameOnly =
       MP.takeWhile1P
-        (Just "Noweb reference name")
-        (`notElem` ['\n', '<', '>'])
+        (Just "name characters")
+        (`notElem` ('\n' : disallowedChars))
     explicit = do
       _ <- string "id:"
       oidText <-
         MP.takeWhile1P
           (Just "oid char")
-          (`notElem` [':', '\n', '<', '>'])
+          (/= ':')
       _ <- string "::"
       oid <- validateOidText oidText
       orgParserState <- get
@@ -997,12 +1042,12 @@ oidReferenceParser = MP.choice [explicit, implicit]
         $ "OID "
         <> show oidText
         <> " not found in global OrgIds"
-      blockName <- blockNameOnly
-      pure (oid, blockName)
+      name <- nameOnly
+      pure (oid, name)
     implicit = do
       orgParserState <- get
-      blockName <- blockNameOnly
-      pure (orgParserState.docOid, blockName)
+      name <- nameOnly
+      pure (orgParserState.docOid, name)
 
 ignoreSpecialCommas :: [BToken] -> [BToken]
 ignoreSpecialCommas = reverse . foldl' f []
@@ -1308,9 +1353,9 @@ mathFragmentStandaloneParser =
 
 figureParser :: OrgParser Cell
 figureParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> bracketedLinkParser >> endOfCell)
+  _ <- MP.try $ MP.lookAhead (metaParser >> otherLinkParser >> endOfCell)
   metaKVs <- metaParser
-  link <- bracketedLinkParser
+  link <- otherLinkParser
   pure
     . CFigure
     $ Figure

@@ -53,6 +53,8 @@ module Lilac.Types
     fromWords,
     nilOid,
     nilOidOrgDoc,
+    protocolsEmacs,
+    protocolsWeb,
   )
 where
 
@@ -120,6 +122,9 @@ import Prelude qualified (show)
 
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:OrgParser>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:Prose>>
+
+<<f:protocolsEmacs>>
+<<f:protocolsWeb>>
 #+end_src
 
 ** Org ID (OID)
@@ -151,4 +156,37 @@ instance Show OID where
 #+begin_src haskell
 nilOid :: OID
 nilOid = fromWords 0 0
+#+end_src
+
+** Protocols
+
+The [[f:protocolsWeb]] are the typical protocols found in links on the
+internet.
+
+#+name: f:protocolsWeb
+#+begin_src haskell
+protocolsWeb :: [T.Text]
+protocolsWeb =
+  map
+    (<> "://")
+    [ "http",
+      "https",
+      "file",
+      "ftp",
+      "mailto",
+      "tel"
+    ]
+#+end_src
+
+The [[f:protocolsEmacs]] contains protocols that are used as aliases for their
+more traditional protocols in [[f:protocolsWeb]].
+
+#+name: f:protocolsEmacs
+#+begin_src haskell
+protocolsEmacs :: [T.Text]
+protocolsEmacs =
+  map
+    (<> ":")
+    [ "file"
+    ]
 #+end_src

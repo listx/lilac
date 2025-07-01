@@ -97,6 +97,8 @@ import Lilac.Types
     defaultOrgParserConf,
     fromText,
     nilOid,
+    protocolsEmacs,
+    protocolsWeb,
   )
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
@@ -228,7 +230,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:assertUniqueBlockName>>
 <<f:linkParser>>
 <<f:failIfVerbatimOrCode>>
-<<f:bracketedLinkParser>>
+<<f:otherLinkParser>>
 <<f:rawLinkParser>>
 <<f:mathFragmentInlineParser>>
 <<f:paragraphParser>>
@@ -241,6 +243,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:zeroBTokensParser>>
 <<f:someBTokensParser>>
 <<f:nowebLinkParser>>
+<<f:oidLinkParser>>
 <<f:oidReferenceParser>>
 <<f:ignoreSpecialCommas>>
 <<f:compressBTokens>>
@@ -2120,7 +2123,12 @@ p
   CParagraph
     [ PTokenLink
         ( Link
-            { target = LinkTargetOther "hello",
+            { target =
+                LinkTargetOid
+                  LinkOid
+                    { oid = nilOid,
+                      name = "hello"
+                    },
               name =
                 [ StyledText
                     { body = "hello",
@@ -2171,9 +2179,15 @@ data Link = Link
 instance ToJSON Link
 #+end_src
 
-The target is a rich definition of the kind of target we are linking to.
-Currently we only recognize [[data:LinkOid]]. All other links are just captured in
-the generic ~LinkTargetOther~ constructor.
+The [[data:LinkTarget]] is a rich definition of the kind of target we are linking
+to. For now, this data structure only supports the following two main cases:
+
+  1) [[data:LinkOid]] (links to either another part of the current Org document or
+     another (external) Org document)
+
+  2) URI (a typical web link, most common example being =https://...=)
+
+All other links are just captured in the generic ~LinkTargetOther~ constructor.
 
 #+name: data:LinkTarget
 #+begin_src haskell
@@ -2188,15 +2202,13 @@ instance ToJSON LinkTarget
 #+end_src
 
 A Noweb link points to a code block with the given =name=, as well as the [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org ID
-of the file]] the code block comes from. The OID acts as a /namespace/, so that
-each Org file is free to choose any name it wants for code blocks without fear
-of other Org files that might have a code block with the same name.
+of the file]] the code block comes from. The OID acts as a /namespace/, so that each
+Org file is free to choose any name it wants for code blocks without fear of
+other Org files that might have a code block with the same name.
 
-The OID is wrapped in a =Maybe= because it is possible that an Org file has
-no OID specified at the top level (see [[data:OrgDoc]]). However if this is the
-case, then none of the code blocks in that document will be able to be
-referenced by the outside world (in other Org files). See
-[[f:oidReferenceParserParser]] for how we use this information.
+We can use [[data:LinkOid]] to encode Noweb links when these links appear inside a
+code block. See [[f:oidReferenceParser]] for to see the expected format of these
+links.
 
 #+name: data:LinkOid
 #+begin_src haskell
@@ -2210,24 +2222,30 @@ data LinkOid = LinkOid
 instance ToJSON LinkOid
 #+end_src
 
-In summary we support the following link types:
+In summary we support the following link types in an Org document:
 
-  - ~LinkTargetOid~ :: a link to a Noweb reference inside another code block.
-    These use angle brackets (e.g., ~<<foo>>~), where the text inside the brackets
-    refers to a code block in the current file. This can reference code blocks
-    in other files by OID, where the syntax is ~<<id:...::foo>>~ where ~...~ is the
-    OID and ~<<foo>>~ is the name of the code block at that OID. We have to use
-    an OID-to-file map data structure (which is parsed [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][here]]).
+  - ~LinkTargetOid~ :: a link to another cell or Org document, also used for Noweb
+    reference inside another code block (because code blocks are just cells).
+
+    When inside code blocks, these use angle brackets (e.g., ~<<foo>>~). This can
+    reference code blocks in other files by OID, where the syntax is
+    ~<<id:...::foo>>~ where ~...~ is the OID and ~foo~ is the name of the code block
+    at that OID (either using the top-level OID of the document or the OID of
+    the closest enclosing heading). We have to use an OID-to-file map data
+    structure (which is parsed [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][here]]).
+
+    When used outside of code blocks, square brackets are used (e.g., ~[[target]]~
+    or ~[[target][name]]~) where ~target~ is just a plain text string (such as a URL
+    or some other entity in the document), and ~name~ is what is displayed to the
+    user when the link is rendered.
 
   - ~LinkTargetURI~ :: a link that points to a traditional URI; these are the most
     common types of links on the internet, the most famous example being
     anything that looks like =https://...= or =http://...=.
 
-  - ~LinkTargetOther~ :: all other links. Typical ways to define such links are
-    with uses square brackets (e.g., ~[[target]]~ or ~[[target][name]]~) where
-    ~target~ is just a plain text string (such as a URL or some other entity in
-    the document), and ~name~ is what is displayed to the user when the link is
-    rendered.
+  - ~LinkTargetOther~ :: all other links. This is basically a catch-all, and will
+    eventually be removed when we've enumerated all of the different
+    types of link targets.
 
 There are also [[Raw links]] which is prose text that looks like a URL. For example,
 https://www.haskell.org is an example of a raw link. This is a convenience
@@ -2246,7 +2264,8 @@ linkParser = do
   failIfVerbatimOrCode
 
   MP.choice
-    [ MP.try bracketedLinkParser,
+    [ MP.try oidLinkParser,
+      MP.try otherLinkParser,
       MP.try rawLinkParser
     ]
 #+end_src
@@ -2273,6 +2292,57 @@ interaction of this parser with these other parsers).
 Note that in [[f:linkParser]] we don't parse [[Noweb links]] here because they can only
 exist inside [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code blocks]].
 
+*** OID links
+
+The [[f:oidLinkParser]] closely resembles the [[f:nowebLinkParser]], because they both
+encode a [[data:LinkOid]], the only difference being where they are used (Noweb
+links are used exclusively inside code blocks to refer to other code blocks).
+
+#+name: f:oidLinkParser
+#+begin_src haskell
+oidLinkParser :: OrgParser Link
+oidLinkParser = do
+  _ <- string "[["
+  avoidParsingKnownProtocols
+  (oid, name) <- oidReferenceParser "[]"
+
+  _ <- string "]"
+  displayName <-
+    MP.choice
+      [ MP.try $ string "]" >> pure name,
+        MP.try nameParser
+      ]
+  pure
+    $ Link
+      { target =
+          LinkTargetOid
+            LinkOid
+              { oid = oid,
+                name = name
+              },
+        name =
+          [ StyledText
+              { body = displayName,
+                style = styleMaskFrom []
+              }
+          ]
+      }
+  where
+    nameParser :: OrgParser T.Text
+    nameParser = do
+      _ <- string "["
+      name <- MP.takeWhile1P (Just "name character") (/= ']')
+      _ <- string "]]"
+      pure name
+    avoidParsingKnownProtocols :: OrgParser ()
+    avoidParsingKnownProtocols =
+      MP.notFollowedBy
+        . MP.choice
+        . map string
+        $ protocolsWeb
+        <> protocolsEmacs
+#+end_src
+
 *** Other links
 
 All other links are simply called ~LinkTargetOther~. For now, these links are any
@@ -2293,10 +2363,10 @@ two links earlier in this paragraph are displayed as "like this". The format is
 where ~[name]~ is optional. If it is omitted, then the ~target~ part is used as the
 name.
 
-#+name: f:bracketedLinkParser
+#+name: f:otherLinkParser
 #+begin_src haskell
-bracketedLinkParser :: OrgParser Link
-bracketedLinkParser = do
+otherLinkParser :: OrgParser Link
+otherLinkParser = do
   _ <- string "["
   target <-
     MP.between
@@ -2351,7 +2421,12 @@ ps
               ),
             PTokenLink
               ( Link
-                  { target = LinkTargetOther "link-target-only",
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "link-target-only"
+                          },
                     name =
                       [ StyledText
                           { body = "link-target-only",
@@ -2368,7 +2443,12 @@ ps
                 body =
                   [ PTokenLink
                       ( Link
-                          { target = LinkTargetOther "link-target",
+                          { target =
+                              LinkTargetOid
+                                LinkOid
+                                  { oid = nilOid,
+                                    name = "link-target"
+                                  },
                             name =
                               [ StyledText
                                   { body = "link-name",
@@ -2384,7 +2464,12 @@ ps
         CParagraph
           [ PTokenLink
               ( Link
-                  { target = LinkTargetOther "a",
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "a"
+                          },
                     name =
                       [ StyledText
                           { body = "a",
@@ -2420,11 +2505,11 @@ ps
     }
 #+end_src
 
-Bracketed links can be preceded by ~(~ which means [[f:bracketedLinkParser]] won't be
+Bracketed links can be preceded by ~(~ which means [[f:otherLinkParser]] won't be
 able to parse it directly; however, in [[f:textParser]] (specifically ~normalChar~) we
 take care to ensure to stop consuming input if we see a double left bracket ~[[~.
 This way, the input will look like ~[[...~ which will then allow
-[[f:bracketedLinkParser]] to parse it.
+[[f:otherLinkParser]] to parse it.
 
 #+header: :tangle test/Lilac/ParseSpec/0006-links-inside-parentheses
 #+begin_src org
@@ -4148,7 +4233,7 @@ Noweb link.
 nowebLinkParser :: OrgParser Link
 nowebLinkParser = do
   _ <- string "<<"
-  (oid, linkName) <- oidReferenceParser
+  (oid, linkName) <- oidReferenceParser "<>"
   _ <- string ">>"
   pure
     $ Link
@@ -4179,20 +4264,20 @@ that information at hand.
 
 #+name: f:oidReferenceParser
 #+begin_src haskell
-oidReferenceParser :: OrgParser (OID, T.Text)
-oidReferenceParser = MP.choice [explicit, implicit]
+oidReferenceParser :: [Char] -> OrgParser (OID, T.Text)
+oidReferenceParser disallowedChars = MP.choice [explicit, implicit]
   where
-    blockNameOnly :: OrgParser T.Text
-    blockNameOnly =
+    nameOnly :: OrgParser T.Text
+    nameOnly =
       MP.takeWhile1P
-        (Just "Noweb reference name")
-        (`notElem` ['\n', '<', '>'])
+        (Just "name characters")
+        (`notElem` ('\n' : disallowedChars))
     explicit = do
       _ <- string "id:"
       oidText <-
         MP.takeWhile1P
           (Just "oid char")
-          (`notElem` [':', '\n', '<', '>'])
+          (/= ':')
       _ <- string "::"
       oid <- validateOidText oidText
       orgParserState <- get
@@ -4204,12 +4289,12 @@ oidReferenceParser = MP.choice [explicit, implicit]
         $ "OID "
         <> show oidText
         <> " not found in global OrgIds"
-      blockName <- blockNameOnly
-      pure (oid, blockName)
+      name <- nameOnly
+      pure (oid, name)
     implicit = do
       orgParserState <- get
-      blockName <- blockNameOnly
-      pure (orgParserState.docOid, blockName)
+      name <- nameOnly
+      pure (orgParserState.docOid, name)
 #+end_src
 
 Below we check a typical case with some Noweb references in it. Note that we
@@ -6547,9 +6632,9 @@ First we have parse for the metadata, and then the link.
 #+begin_src haskell
 figureParser :: OrgParser Cell
 figureParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> bracketedLinkParser >> endOfCell)
+  _ <- MP.try $ MP.lookAhead (metaParser >> otherLinkParser >> endOfCell)
   metaKVs <- metaParser
-  link <- bracketedLinkParser
+  link <- otherLinkParser
   pure
     . CFigure
     $ Figure

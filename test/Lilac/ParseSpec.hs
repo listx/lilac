@@ -857,7 +857,12 @@ parseSpec = do
         CParagraph
           [ PTokenLink
               ( Link
-                  { target = LinkTargetOther "hello",
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "hello"
+                          },
                     name =
                       [ StyledText
                           { body = "hello",
@@ -1088,7 +1093,12 @@ parseSpec = do
                 ),
               PTokenLink
                 ( Link
-                    { target = LinkTargetOther "link-target-only",
+                    { target =
+                        LinkTargetOid
+                          LinkOid
+                            { oid = nilOid,
+                              name = "link-target-only"
+                            },
                       name =
                         [ StyledText
                             { body = "link-target-only",
@@ -1105,7 +1115,12 @@ parseSpec = do
                   body =
                     [ PTokenLink
                         ( Link
-                            { target = LinkTargetOther "link-target",
+                            { target =
+                                LinkTargetOid
+                                  LinkOid
+                                    { oid = nilOid,
+                                      name = "link-target"
+                                    },
                               name =
                                 [ StyledText
                                     { body = "link-name",
@@ -1121,7 +1136,12 @@ parseSpec = do
           CParagraph
             [ PTokenLink
                 ( Link
-                    { target = LinkTargetOther "a",
+                    { target =
+                        LinkTargetOid
+                          LinkOid
+                            { oid = nilOid,
+                              name = "a"
+                            },
                       name =
                         [ StyledText
                             { body = "a",

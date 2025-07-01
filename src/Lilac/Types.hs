@@ -26,6 +26,8 @@ module Lilac.Types
     fromWords,
     nilOid,
     nilOidOrgDoc,
+    protocolsEmacs,
+    protocolsWeb,
   )
 where
 
@@ -300,3 +302,22 @@ type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
 
 type Prose :: Type
 type Prose = [PToken]
+
+protocolsEmacs :: [T.Text]
+protocolsEmacs =
+  map
+    (<> ":")
+    [ "file"
+    ]
+
+protocolsWeb :: [T.Text]
+protocolsWeb =
+  map
+    (<> "://")
+    [ "http",
+      "https",
+      "file",
+      "ftp",
+      "mailto",
+      "tel"
+    ]

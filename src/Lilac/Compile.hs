@@ -19,6 +19,8 @@ import Lilac.Types
     OrgDoc (cells, oid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
+    protocolsEmacs,
+    protocolsWeb,
   )
 import Lilac.Util qualified as LU
 import Relude
@@ -115,27 +117,8 @@ findExternalOrgLinkTargets orgDoc symbols =
               then acc
               else link.target : acc
       LinkTargetOther raw
-        | or $ map (`T.isPrefixOf` raw) webProtocols -> acc
-        | or $ map (`T.isPrefixOf` raw) aliasedWebProtocols -> acc
+        | or $ map (`T.isPrefixOf` raw) protocolsWeb -> acc
+        | or $ map (`T.isPrefixOf` raw) protocolsEmacs -> acc
         | M.member raw symbols -> acc
         | otherwise -> link.target : acc
       LinkTargetURI {} -> acc
-
-webProtocols :: [T.Text]
-webProtocols =
-  map
-    (<> "://")
-    [ "http",
-      "https",
-      "file",
-      "ftp",
-      "mailto",
-      "tel"
-    ]
-
-aliasedWebProtocols :: [T.Text]
-aliasedWebProtocols =
-  map
-    (<> ":")
-    [ "file"
-    ]
