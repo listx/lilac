@@ -229,7 +229,9 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:compressProse>>
 <<f:assertUniqueBlockName>>
 <<f:linkParser>>
+<<f:linkDisplayNameParser>>
 <<f:failIfVerbatimOrCode>>
+<<f:protocolWebLinkParser>>
 <<f:otherLinkParser>>
 <<f:rawLinkParser>>
 <<f:mathFragmentInlineParser>>
@@ -2265,6 +2267,7 @@ linkParser = do
 
   MP.choice
     [ MP.try oidLinkParser,
+      MP.try protocolWebLinkParser,
       MP.try otherLinkParser,
       MP.try rawLinkParser
     ]
@@ -2310,7 +2313,7 @@ oidLinkParser = do
   displayName <-
     MP.choice
       [ MP.try $ string "]" >> pure name,
-        MP.try nameParser
+        MP.try linkDisplayNameParser
       ]
   pure
     $ Link
@@ -2328,19 +2331,173 @@ oidLinkParser = do
           ]
       }
   where
-    nameParser :: OrgParser T.Text
-    nameParser = do
-      _ <- string "["
-      name <- MP.takeWhile1P (Just "name character") (/= ']')
-      _ <- string "]]"
-      pure name
     avoidParsingKnownProtocols :: OrgParser ()
     avoidParsingKnownProtocols =
       MP.notFollowedBy
         . MP.choice
-        . map string
+        . map (MP.try . string)
         $ protocolsWeb
         <> protocolsEmacs
+#+end_src
+
+[[f:linkDisplayNameParser]] just gets the name of the text to display. It is reused
+in [[f:protocolWebLinkParser]].
+
+#+name: f:linkDisplayNameParser
+#+begin_src haskell
+linkDisplayNameParser :: OrgParser T.Text
+linkDisplayNameParser =
+  MP.between
+    (string "[")
+    (string "]]")
+    (MP.takeWhile1P (Just "name character") (/= ']'))
+#+end_src
+
+*** Links to recognized web protocols
+
+Links to web protocols like ~https://~ should be parsed as a ~LinkTargetURI~, but
+not just for [[id:8fe81206-f50d-4200-a95e-99278e0ad410][Raw links]] but also those links found inside square brackets, like
+~[[http://abc.xyz]]~ and ~[[http://abc.xyz][foo]]~.
+
+#+name: f:protocolWebLinkParser
+#+begin_src haskell
+protocolWebLinkParser :: OrgParser Link
+protocolWebLinkParser = do
+  maybeUri <-
+    MP.between
+      (string "[[")
+      (string "]")
+      uriParser
+
+  displayName <-
+    MP.choice
+      [ MP.try $ string "]" >> pure maybeUri,
+        MP.try linkDisplayNameParser
+      ]
+  case N.parseURI (T.unpack maybeUri) of
+    Nothing -> fail $ "not a valid URI: " <> (T.unpack maybeUri)
+    Just uri ->
+      pure
+        $ Link
+          { target = LinkTargetURI uri,
+            name =
+              [ StyledText
+                  { body = displayName,
+                    style = styleMaskFrom []
+                  }
+              ]
+          }
+  where
+    uriParser :: OrgParser T.Text
+    uriParser = do
+      protocol <- MP.choice $ map (MP.try . string) protocolsWeb
+      rest <- MP.takeWhile1P (Just "name character") (/= ']')
+      pure $ protocol <> rest
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0006-links-web-protocols
+#+begin_src org
+[[http://foo.org]]
+[[https://foo.org]]
+[[https://foo.org][hello]]
+#+end_src
+
+#+name: t:0006-links-web-protocols
+#+begin_src haskell
+p
+  "0006-links-web-protocols"
+  ( nilOrgDoc
+      [ CParagraph
+          [ PTokenLink
+              ( Link
+                  { target =
+                      LinkTargetURI
+                        N.URI
+                          { N.uriScheme = "http:",
+                            N.uriAuthority =
+                              Just
+                                N.URIAuth
+                                  { N.uriUserInfo = "",
+                                    N.uriRegName = "foo.org",
+                                    N.uriPort = ""
+                                  },
+                            N.uriPath = "",
+                            N.uriQuery = "",
+                            N.uriFragment = ""
+                          },
+                    name =
+                      [ StyledText
+                          { body = "http://foo.org",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              ),
+            PTokenStyledText
+              ( StyledText
+                  { body = " ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { target =
+                      LinkTargetURI
+                        N.URI
+                          { N.uriScheme = "https:",
+                            N.uriAuthority =
+                              Just
+                                N.URIAuth
+                                  { N.uriUserInfo = "",
+                                    N.uriRegName = "foo.org",
+                                    N.uriPort = ""
+                                  },
+                            N.uriPath = "",
+                            N.uriQuery = "",
+                            N.uriFragment = ""
+                          },
+                    name =
+                      [ StyledText
+                          { body = "https://foo.org",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              ),
+            PTokenStyledText
+              ( StyledText
+                  { body = " ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { target =
+                      LinkTargetURI
+                        N.URI
+                          { N.uriScheme = "https:",
+                            N.uriAuthority =
+                              Just
+                                N.URIAuth
+                                  { N.uriUserInfo = "",
+                                    N.uriRegName = "foo.org",
+                                    N.uriPort = ""
+                                  },
+                            N.uriPath = "",
+                            N.uriQuery = "",
+                            N.uriFragment = ""
+                          },
+                    name =
+                      [ StyledText
+                          { body = "hello",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              )
+          ]
+      ]
+  )
 #+end_src
 
 *** Other links
@@ -2574,6 +2731,9 @@ p
 #+end_src
 
 *** Raw links
+:PROPERTIES:
+:ID:       8fe81206-f50d-4200-a95e-99278e0ad410
+:END:
 
 The [[f:rawLinkParser]] parses text that look like URLs into ~LinkTargetURI~.
 
@@ -7034,7 +7194,21 @@ p
                   ( (3, 3),
                     [ PTokenLink
                         ( Link
-                            { target = LinkTargetOther "https://wiki/x",
+                            { target =
+                                LinkTargetURI
+                                  N.URI
+                                    { N.uriScheme = "https:",
+                                      N.uriAuthority =
+                                        Just
+                                          N.URIAuth
+                                            { N.uriUserInfo = "",
+                                              N.uriRegName = "wiki",
+                                              N.uriPort = ""
+                                            },
+                                      N.uriPath = "/x",
+                                      N.uriQuery = "",
+                                      N.uriFragment = ""
+                                    },
                               name =
                                 [ StyledText
                                     { body = "Wiki",
@@ -7072,7 +7246,21 @@ p
                   ( (4, 3),
                     [ PTokenLink
                         ( Link
-                            { target = LinkTargetOther "https://wiki/y",
+                            { target =
+                                LinkTargetURI
+                                  N.URI
+                                    { N.uriScheme = "https:",
+                                      N.uriAuthority =
+                                        Just
+                                          N.URIAuth
+                                            { N.uriUserInfo = "",
+                                              N.uriRegName = "wiki",
+                                              N.uriPort = ""
+                                            },
+                                      N.uriPath = "/y",
+                                      N.uriQuery = "",
+                                      N.uriFragment = ""
+                                    },
                               name =
                                 [ StyledText
                                     { body = "Wiki",
@@ -7181,7 +7369,21 @@ p
                   ( (3, 3),
                     [ PTokenLink
                         ( Link
-                            { target = LinkTargetOther "https://wiki/x",
+                            { target =
+                                LinkTargetURI
+                                  N.URI
+                                    { N.uriScheme = "https:",
+                                      N.uriAuthority =
+                                        Just
+                                          N.URIAuth
+                                            { N.uriUserInfo = "",
+                                              N.uriRegName = "wiki",
+                                              N.uriPort = ""
+                                            },
+                                      N.uriPath = "/x",
+                                      N.uriQuery = "",
+                                      N.uriFragment = ""
+                                    },
                               name =
                                 [ StyledText
                                     { body = "Wiki",
@@ -7219,7 +7421,21 @@ p
                   ( (4, 3),
                     [ PTokenLink
                         ( Link
-                            { target = LinkTargetOther "https://wiki/y",
+                            { target =
+                                LinkTargetURI
+                                  N.URI
+                                    { N.uriScheme = "https:",
+                                      N.uriAuthority =
+                                        Just
+                                          N.URIAuth
+                                            { N.uriUserInfo = "",
+                                              N.uriRegName = "wiki",
+                                              N.uriPort = ""
+                                            },
+                                      N.uriPath = "/y",
+                                      N.uriQuery = "",
+                                      N.uriFragment = ""
+                                    },
                               name =
                                 [ StyledText
                                     { body = "Wiki",
@@ -7657,6 +7873,7 @@ parseSpec = do
   <<t:0006-links-nonlink>>
   <<t:0006-links-raw>>
   <<t:0006-links>>
+  <<t:0006-links-web-protocols>>
   <<t:0007-block-src-without-lang>>
   <<t:0007-blocks-empty>>
   <<t:0007-blocks-ending>>

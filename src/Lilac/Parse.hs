@@ -695,9 +695,17 @@ linkParser = do
 
   MP.choice
     [ MP.try oidLinkParser,
+      MP.try protocolWebLinkParser,
       MP.try otherLinkParser,
       MP.try rawLinkParser
     ]
+
+linkDisplayNameParser :: OrgParser T.Text
+linkDisplayNameParser =
+  MP.between
+    (string "[")
+    (string "]]")
+    (MP.takeWhile1P (Just "name character") (/= ']'))
 
 failIfVerbatimOrCode :: OrgParser ()
 failIfVerbatimOrCode = do
@@ -705,6 +713,39 @@ failIfVerbatimOrCode = do
   let mask = orgParserState.styleMask
   when (isVerbatim mask || isCode mask)
     $ fail "aborting because verbatim or code style is active"
+
+protocolWebLinkParser :: OrgParser Link
+protocolWebLinkParser = do
+  maybeUri <-
+    MP.between
+      (string "[[")
+      (string "]")
+      uriParser
+
+  displayName <-
+    MP.choice
+      [ MP.try $ string "]" >> pure maybeUri,
+        MP.try linkDisplayNameParser
+      ]
+  case N.parseURI (T.unpack maybeUri) of
+    Nothing -> fail $ "not a valid URI: " <> (T.unpack maybeUri)
+    Just uri ->
+      pure
+        $ Link
+          { target = LinkTargetURI uri,
+            name =
+              [ StyledText
+                  { body = displayName,
+                    style = styleMaskFrom []
+                  }
+              ]
+          }
+  where
+    uriParser :: OrgParser T.Text
+    uriParser = do
+      protocol <- MP.choice $ map (MP.try . string) protocolsWeb
+      rest <- MP.takeWhile1P (Just "name character") (/= ']')
+      pure $ protocol <> rest
 
 otherLinkParser :: OrgParser Link
 otherLinkParser = do
@@ -985,7 +1026,7 @@ oidLinkParser = do
   displayName <-
     MP.choice
       [ MP.try $ string "]" >> pure name,
-        MP.try nameParser
+        MP.try linkDisplayNameParser
       ]
   pure
     $ Link
@@ -1003,17 +1044,11 @@ oidLinkParser = do
           ]
       }
   where
-    nameParser :: OrgParser T.Text
-    nameParser = do
-      _ <- string "["
-      name <- MP.takeWhile1P (Just "name character") (/= ']')
-      _ <- string "]]"
-      pure name
     avoidParsingKnownProtocols :: OrgParser ()
     avoidParsingKnownProtocols =
       MP.notFollowedBy
         . MP.choice
-        . map string
+        . map (MP.try . string)
         $ protocolsWeb
         <> protocolsEmacs
 

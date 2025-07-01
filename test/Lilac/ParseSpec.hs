@@ -1176,6 +1176,101 @@ parseSpec = do
         orgParserConf = L.defaultOrgParserConf
       }
 
+  p
+    "0006-links-web-protocols"
+    ( nilOrgDoc
+        [ CParagraph
+            [ PTokenLink
+                ( Link
+                    { target =
+                        LinkTargetURI
+                          N.URI
+                            { N.uriScheme = "http:",
+                              N.uriAuthority =
+                                Just
+                                  N.URIAuth
+                                    { N.uriUserInfo = "",
+                                      N.uriRegName = "foo.org",
+                                      N.uriPort = ""
+                                    },
+                              N.uriPath = "",
+                              N.uriQuery = "",
+                              N.uriFragment = ""
+                            },
+                      name =
+                        [ StyledText
+                            { body = "http://foo.org",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              PTokenStyledText
+                ( StyledText
+                    { body = " ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { target =
+                        LinkTargetURI
+                          N.URI
+                            { N.uriScheme = "https:",
+                              N.uriAuthority =
+                                Just
+                                  N.URIAuth
+                                    { N.uriUserInfo = "",
+                                      N.uriRegName = "foo.org",
+                                      N.uriPort = ""
+                                    },
+                              N.uriPath = "",
+                              N.uriQuery = "",
+                              N.uriFragment = ""
+                            },
+                      name =
+                        [ StyledText
+                            { body = "https://foo.org",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              PTokenStyledText
+                ( StyledText
+                    { body = " ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { target =
+                        LinkTargetURI
+                          N.URI
+                            { N.uriScheme = "https:",
+                              N.uriAuthority =
+                                Just
+                                  N.URIAuth
+                                    { N.uriUserInfo = "",
+                                      N.uriRegName = "foo.org",
+                                      N.uriPort = ""
+                                    },
+                              N.uriPath = "",
+                              N.uriQuery = "",
+                              N.uriFragment = ""
+                            },
+                      name =
+                        [ StyledText
+                            { body = "hello",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                )
+            ]
+        ]
+    )
+
   pf
     "0007-block-src-without-lang"
     "block type src requires a language specifier"
@@ -2093,7 +2188,21 @@ parseSpec = do
                     ( (3, 3),
                       [ PTokenLink
                           ( Link
-                              { target = LinkTargetOther "https://wiki/x",
+                              { target =
+                                  LinkTargetURI
+                                    N.URI
+                                      { N.uriScheme = "https:",
+                                        N.uriAuthority =
+                                          Just
+                                            N.URIAuth
+                                              { N.uriUserInfo = "",
+                                                N.uriRegName = "wiki",
+                                                N.uriPort = ""
+                                              },
+                                        N.uriPath = "/x",
+                                        N.uriQuery = "",
+                                        N.uriFragment = ""
+                                      },
                                 name =
                                   [ StyledText
                                       { body = "Wiki",
@@ -2131,7 +2240,21 @@ parseSpec = do
                     ( (4, 3),
                       [ PTokenLink
                           ( Link
-                              { target = LinkTargetOther "https://wiki/y",
+                              { target =
+                                  LinkTargetURI
+                                    N.URI
+                                      { N.uriScheme = "https:",
+                                        N.uriAuthority =
+                                          Just
+                                            N.URIAuth
+                                              { N.uriUserInfo = "",
+                                                N.uriRegName = "wiki",
+                                                N.uriPort = ""
+                                              },
+                                        N.uriPath = "/y",
+                                        N.uriQuery = "",
+                                        N.uriFragment = ""
+                                      },
                                 name =
                                   [ StyledText
                                       { body = "Wiki",
@@ -2221,7 +2344,21 @@ parseSpec = do
                     ( (3, 3),
                       [ PTokenLink
                           ( Link
-                              { target = LinkTargetOther "https://wiki/x",
+                              { target =
+                                  LinkTargetURI
+                                    N.URI
+                                      { N.uriScheme = "https:",
+                                        N.uriAuthority =
+                                          Just
+                                            N.URIAuth
+                                              { N.uriUserInfo = "",
+                                                N.uriRegName = "wiki",
+                                                N.uriPort = ""
+                                              },
+                                        N.uriPath = "/x",
+                                        N.uriQuery = "",
+                                        N.uriFragment = ""
+                                      },
                                 name =
                                   [ StyledText
                                       { body = "Wiki",
@@ -2259,7 +2396,21 @@ parseSpec = do
                     ( (4, 3),
                       [ PTokenLink
                           ( Link
-                              { target = LinkTargetOther "https://wiki/y",
+                              { target =
+                                  LinkTargetURI
+                                    N.URI
+                                      { N.uriScheme = "https:",
+                                        N.uriAuthority =
+                                          Just
+                                            N.URIAuth
+                                              { N.uriUserInfo = "",
+                                                N.uriRegName = "wiki",
+                                                N.uriPort = ""
+                                              },
+                                        N.uriPath = "/y",
+                                        N.uriQuery = "",
+                                        N.uriFragment = ""
+                                      },
                                 name =
                                   [ StyledText
                                       { body = "Wiki",
