@@ -2388,10 +2388,10 @@ linkDisplayNameParser = do
     proseParser' :: OrgParser T.Text -> OrgParser [StyledText]
     proseParser' spaceConsumer = do
       a <- MP.choice baseParsers
-      b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
+      b <- MP.many $ MP.choice (spaceParser : baseParsers)
       pure . filter nonEmpty $ a : b
       where
-        spacePTokenParser = whitespaceCompressor spaceConsumer
+        spaceParser = whitespaceCompressor spaceConsumer
         baseParsers =
           [ styleMarkerParser,
             styledTextParser
