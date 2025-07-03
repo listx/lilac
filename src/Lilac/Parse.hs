@@ -56,6 +56,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
+        insideCodeBlock,
         insideLinkDisplayName,
         listLevels,
         listMarkers,
@@ -257,6 +258,7 @@ defaultOrgParserState =
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -928,17 +930,18 @@ assertUniqueTanglePath _ _ = pure ()
 
 blockParser :: OrgParser Cell
 blockParser = do
+  orgParserState <- get
   (blockName, metaKVs, blockType, srcLang) <- blockStartParser
   let nowebOff =
         (== Just "off")
           . EM.lookup "noweb"
           $ M.fromList metaKVs
+  modify (\s -> s {insideCodeBlock = True})
   bTokens <-
     MP.choice
       [ zeroBTokensParser blockType,
         someBTokensParser blockType (not nowebOff)
       ]
-  orgParserState <- get
   let newAnonBlockNumber = case blockName of
         Just _ -> orgParserState.anonBlockNumber
         Nothing -> orgParserState.anonBlockNumber + 1
@@ -959,10 +962,13 @@ blockParser = do
                 . compressBTokens
                 $ padConsecutiveNowebLinks bTokens
           }
-  put
-    orgParserState
-      { anonBlockNumber = newAnonBlockNumber
-      }
+  modify
+    ( \s ->
+        s
+          { anonBlockNumber = newAnonBlockNumber,
+            insideCodeBlock = False
+          }
+    )
   pure $ CBlock block
   where
     firstParent :: OID -> [Maybe OID] -> OID
@@ -1094,11 +1100,6 @@ oidReferenceParser disallowedChars =
       MP.try implicit
     ]
   where
-    nameOnly :: OrgParser T.Text
-    nameOnly =
-      MP.takeWhile1P
-        (Just "name characters")
-        (`notElem` ('\n' : disallowedChars))
     explicitOID :: OrgParser (OID, T.Text)
     explicitOID = do
       _ <- string "id:"
@@ -1111,12 +1112,60 @@ oidReferenceParser disallowedChars =
     explicitFQCN = do
       (oid, _) <- explicitOID
       _ <- string "::"
-      name <- nameOnly
+      name <- targetName
       pure (oid, name)
     implicit = do
       orgParserState <- get
-      name <- nameOnly
+      name <- targetName
       pure (orgParserState.docOid, name)
+    targetName :: OrgParser T.Text
+    targetName = do
+      orgParserState <- get
+      proseParser'
+        $ proseSpaceConsumer'
+          orgParserState.continuationIndent
+          orgParserState.insideCodeBlock
+    proseSpaceConsumer' :: Int -> Bool -> OrgParser T.Text
+    proseSpaceConsumer' expectedIndentLen insideCodeBlock
+      | insideCodeBlock = spaces
+      | otherwise =
+          MP.choice
+            [ newlineAndIndentParser expectedIndentLen,
+              spaces
+            ]
+      where
+        spaces :: OrgParser T.Text
+        spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
+    proseParser' :: OrgParser T.Text -> OrgParser T.Text
+    proseParser' spaceConsumer = do
+      a <- MP.choice baseParsers
+      b <- MP.many $ MP.choice (spaceParser : baseParsers)
+      pure . T.concat $ a : b
+      where
+        spaceParser = do
+          styledText <- whitespaceCompressor spaceConsumer
+          pure styledText.body
+        baseParsers =
+          [ textParser'
+          ]
+    textParser' :: OrgParser T.Text
+    textParser' = do
+      ws <-
+        MP.some
+          $ MP.choice
+            [ MP.label "normal characters" normalChars
+            ]
+      pure $ T.concat ws
+      where
+        normalChars :: OrgParser T.Text
+        normalChars = do
+          cs <- MP.some $ normalChar
+          pure $ T.pack cs
+        normalChar :: OrgParser Char
+        normalChar = MP.satisfy isNormalChar
+        isNormalChar c =
+          notElem c disallowedChars
+            && (not $ isSpace c)
 
 ignoreSpecialCommas :: [BToken] -> [BToken]
 ignoreSpecialCommas = reverse . foldl' f []

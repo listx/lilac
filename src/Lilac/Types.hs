@@ -204,6 +204,7 @@ data OrgParserState = OrgParserState
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
+    insideCodeBlock :: Bool,
     insideLinkDisplayName :: Bool,
     listLevels :: [Level],
     listMarkers :: [ListMarker],

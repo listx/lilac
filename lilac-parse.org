@@ -82,6 +82,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
+        insideCodeBlock,
         insideLinkDisplayName,
         listLevels,
         listMarkers,
@@ -508,6 +509,7 @@ data OrgParserState = OrgParserState
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
+    insideCodeBlock :: Bool,
     insideLinkDisplayName :: Bool,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
@@ -532,6 +534,7 @@ defaultOrgParserState =
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -1004,6 +1007,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -1031,6 +1035,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -1075,6 +1080,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -1487,6 +1493,7 @@ ps
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -2406,6 +2413,12 @@ ok]]
   - link name across list indentation [[foo][/italic/
     def ghi]
     !]]
+
+  - link target with spaces [[foo bar
+    baz]]
+
+  - oid with spaces [[id:442c807f-c9d9-45a7-88bf-ffffffffffff::a b
+    c]]
 #+end_src
 
 #+name: t:0006-links-oids
@@ -2605,6 +2618,64 @@ p
                         ( LinkOid
                             { oid = nilOid,
                               name = "foo"
+                            }
+                        )
+                  }
+              )
+          ],
+        CListItem
+          [ LItemEnd,
+            LItemStart
+          ],
+        CParagraph
+          [ PTokenStyledText
+              ( StyledText
+                  { body = "link target with spaces ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { name =
+                      [ StyledText
+                          { body = "foo bar baz",
+                            style = L.styleMaskFrom []
+                          }
+                      ],
+                    target =
+                      LinkTargetOid
+                        ( LinkOid
+                            { oid = nilOid,
+                              name = "foo bar baz"
+                            }
+                        )
+                  }
+              )
+          ],
+        CListItem
+          [ LItemEnd,
+            LItemStart
+          ],
+        CParagraph
+          [ PTokenStyledText
+              ( StyledText
+                  { body = "oid with spaces ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { name =
+                      [ StyledText
+                          { body = "a b c",
+                            style = L.styleMaskFrom []
+                          }
+                      ],
+                    target =
+                      LinkTargetOid
+                        ( LinkOid
+                            { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                              name = "a b c"
                             }
                         )
                   }
@@ -2919,6 +2990,7 @@ ps
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -3753,6 +3825,7 @@ ps
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -3810,6 +3883,7 @@ ps
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -3980,6 +4054,7 @@ ps
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -4030,6 +4105,7 @@ ps
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -4090,6 +4166,7 @@ ps
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -4157,6 +4234,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -4357,17 +4435,18 @@ Let's see how we parse the block itself with =blockParser=.
 #+begin_src haskell
 blockParser :: OrgParser Cell
 blockParser = do
+  orgParserState <- get
   (blockName, metaKVs, blockType, srcLang) <- blockStartParser
   let nowebOff =
         (== Just "off")
           . EM.lookup "noweb"
           $ M.fromList metaKVs
+  modify (\s -> s {insideCodeBlock = True})
   bTokens <-
     MP.choice
       [ zeroBTokensParser blockType,
         someBTokensParser blockType (not nowebOff)
       ]
-  orgParserState <- get
   let newAnonBlockNumber = case blockName of
         Just _ -> orgParserState.anonBlockNumber
         Nothing -> orgParserState.anonBlockNumber + 1
@@ -4388,10 +4467,13 @@ blockParser = do
                 . compressBTokens
                 $ padConsecutiveNowebLinks bTokens
           }
-  put
-    orgParserState
-      { anonBlockNumber = newAnonBlockNumber
-      }
+  modify
+    ( \s ->
+        s
+          { anonBlockNumber = newAnonBlockNumber,
+            insideCodeBlock = False
+          }
+    )
   pure $ CBlock block
   where
     firstParent :: OID -> [Maybe OID] -> OID
@@ -4715,11 +4797,6 @@ oidReferenceParser disallowedChars =
       MP.try implicit
     ]
   where
-    nameOnly :: OrgParser T.Text
-    nameOnly =
-      MP.takeWhile1P
-        (Just "name characters")
-        (`notElem` ('\n' : disallowedChars))
     explicitOID :: OrgParser (OID, T.Text)
     explicitOID = do
       _ <- string "id:"
@@ -4732,12 +4809,60 @@ oidReferenceParser disallowedChars =
     explicitFQCN = do
       (oid, _) <- explicitOID
       _ <- string "::"
-      name <- nameOnly
+      name <- targetName
       pure (oid, name)
     implicit = do
       orgParserState <- get
-      name <- nameOnly
+      name <- targetName
       pure (orgParserState.docOid, name)
+    targetName :: OrgParser T.Text
+    targetName = do
+      orgParserState <- get
+      proseParser'
+        $ proseSpaceConsumer'
+          orgParserState.continuationIndent
+          orgParserState.insideCodeBlock
+    proseSpaceConsumer' :: Int -> Bool -> OrgParser T.Text
+    proseSpaceConsumer' expectedIndentLen insideCodeBlock
+      | insideCodeBlock = spaces
+      | otherwise =
+          MP.choice
+            [ newlineAndIndentParser expectedIndentLen,
+              spaces
+            ]
+      where
+        spaces :: OrgParser T.Text
+        spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
+    proseParser' :: OrgParser T.Text -> OrgParser T.Text
+    proseParser' spaceConsumer = do
+      a <- MP.choice baseParsers
+      b <- MP.many $ MP.choice (spaceParser : baseParsers)
+      pure . T.concat $ a : b
+      where
+        spaceParser = do
+          styledText <- whitespaceCompressor spaceConsumer
+          pure styledText.body
+        baseParsers =
+          [ textParser'
+          ]
+    textParser' :: OrgParser T.Text
+    textParser' = do
+      ws <-
+        MP.some
+          $ MP.choice
+            [ MP.label "normal characters" normalChars
+            ]
+      pure $ T.concat ws
+      where
+        normalChars :: OrgParser T.Text
+        normalChars = do
+          cs <- MP.some $ normalChar
+          pure $ T.pack cs
+        normalChar :: OrgParser Char
+        normalChar = MP.satisfy isNormalChar
+        isNormalChar c =
+          notElem c disallowedChars
+            && (not $ isSpace c)
 #+end_src
 
 Below we check a typical case with some Noweb references in it. Note that we
@@ -5212,6 +5337,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -6959,6 +7085,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -7035,6 +7162,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -7231,6 +7359,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideCodeBlock = False,
       insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
@@ -7814,6 +7943,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
+        insideCodeBlock,
         insideLinkDisplayName,
         listLevels,
         listMarkers,

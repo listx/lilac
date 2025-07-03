@@ -37,6 +37,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
+        insideCodeBlock,
         insideLinkDisplayName,
         listLevels,
         listMarkers,
@@ -260,6 +261,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -317,6 +319,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -345,6 +348,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -393,6 +397,7 @@ parseSpec = do
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -428,6 +433,7 @@ parseSpec = do
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -542,6 +548,7 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -579,6 +586,7 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -616,6 +624,7 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -820,6 +829,7 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -1177,6 +1187,7 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -1485,6 +1496,64 @@ parseSpec = do
             ],
           CListItem
             [ LItemEnd,
+              LItemStart
+            ],
+          CParagraph
+            [ PTokenStyledText
+                ( StyledText
+                    { body = "link target with spaces ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { name =
+                        [ StyledText
+                            { body = "foo bar baz",
+                              style = L.styleMaskFrom []
+                            }
+                        ],
+                      target =
+                        LinkTargetOid
+                          ( LinkOid
+                              { oid = nilOid,
+                                name = "foo bar baz"
+                              }
+                          )
+                    }
+                )
+            ],
+          CListItem
+            [ LItemEnd,
+              LItemStart
+            ],
+          CParagraph
+            [ PTokenStyledText
+                ( StyledText
+                    { body = "oid with spaces ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { name =
+                        [ StyledText
+                            { body = "a b c",
+                              style = L.styleMaskFrom []
+                            }
+                        ],
+                      target =
+                        LinkTargetOid
+                          ( LinkOid
+                              { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                                name = "a b c"
+                              }
+                          )
+                    }
+                )
+            ],
+          CListItem
+            [ LItemEnd,
               LUnorderedEnd
             ]
         ]
@@ -1541,6 +1610,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -1636,6 +1706,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -2200,6 +2271,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -2256,6 +2328,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
@@ -2335,6 +2408,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
         insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
