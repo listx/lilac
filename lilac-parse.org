@@ -82,6 +82,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
+        insideLinkDisplayName,
         listLevels,
         listMarkers,
         orgParserConf,
@@ -213,6 +214,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:propertiesParser>>
 <<f:propertiesEntryParser>>
 <<f:proseParser>>
+<<f:proseSpaceConsumer>>
 <<f:whitespaceCompressor>>
 <<f:styleMarkers>>
 <<f:failIfLeftoverActiveStyles>>
@@ -506,6 +508,7 @@ data OrgParserState = OrgParserState
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
+    insideLinkDisplayName :: Bool,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
@@ -529,6 +532,7 @@ defaultOrgParserState =
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -1000,6 +1004,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -1026,6 +1031,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -1069,6 +1075,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -1480,6 +1487,7 @@ ps
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -1630,7 +1638,11 @@ textParser styleMask
       pure $ T.pack cs
     normalChar :: OrgParser Char
     normalChar = do
-      MP.notFollowedBy $ string "[["
+      orgParserState <- get
+      let toAvoid
+            | orgParserState.insideLinkDisplayName = "]]"
+            | otherwise = "[["
+      MP.notFollowedBy $ string toAvoid
       MP.satisfy isNormalChar
     isNormalChar c =
       M.notMember c styleMarkers
@@ -2308,14 +2320,21 @@ oidLinkParser = do
   _ <- string "[["
   avoidParsingKnownProtocols
   (oid, name) <- oidReferenceParser "[]"
-  let implicitName
+  orgParserState <- get
+  let mask = orgParserState.styleMask
+      implicitName
         | T.null name = "id:" <> T.show oid
         | otherwise = name
+      implicitNameStyledText =
+        StyledText
+          { body = implicitName,
+            style = mask
+          }
 
   _ <- string "]"
   displayName <-
     MP.choice
-      [ MP.try $ string "]" >> pure implicitName,
+      [ MP.try $ string "]" >> pure [implicitNameStyledText],
         MP.try linkDisplayNameParser
       ]
   pure
@@ -2326,12 +2345,7 @@ oidLinkParser = do
               { oid = oid,
                 name = name
               },
-        name =
-          [ StyledText
-              { body = displayName,
-                style = styleMaskFrom []
-              }
-          ]
+        name = displayName
       }
   where
     avoidParsingKnownProtocols :: OrgParser ()
@@ -2344,24 +2358,54 @@ oidLinkParser = do
 #+end_src
 
 [[f:linkDisplayNameParser]] just gets the name of the text to display. It is reused
-in [[f:protocolWebLinkParser]].
+in [[f:protocolWebLinkParser]]. It uses the ~proseParser'~ helper which is very
+similar to the [[f:proseParser]], except that instead of returning [[data:PToken]]
+values, it returns the finer-grained [[data:StyledText]]. We want to be careful
+about how we treat whitespace (especially across indentation levels), so we
+reuse the same [[f:proseSpaceConsumer]] that [[f:paragraphParser]] uses.
 
 #+name: f:linkDisplayNameParser
 #+begin_src haskell
-linkDisplayNameParser :: OrgParser T.Text
-linkDisplayNameParser =
-  MP.between
-    (string "[")
-    (string "]]")
-    (MP.takeWhile1P (Just "name character") (/= ']'))
+linkDisplayNameParser :: OrgParser [StyledText]
+linkDisplayNameParser = do
+  orgParserState <- get
+  modify (\s -> s {insideLinkDisplayName = True})
+  linkDisplayName <-
+    MP.between
+      (string "[")
+      (string "]]")
+      (proseParser' $ proseSpaceConsumer orgParserState.continuationIndent)
+  modify (\s -> s {insideLinkDisplayName = False})
+  pure linkDisplayName
+  where
+    proseParser' :: OrgParser T.Text -> OrgParser [StyledText]
+    proseParser' spaceConsumer = do
+      a <- MP.choice baseParsers
+      b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
+      pure . filter nonEmpty $ a : b
+      where
+        spacePTokenParser = whitespaceCompressor spaceConsumer
+        baseParsers =
+          [ styleMarkerParser,
+            styledTextParser
+          ]
+        nonEmpty :: StyledText -> Bool
+        nonEmpty styledText = not $ T.null styledText.body
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0006-links-oids
 #+begin_src org
 [[id:442c807f-c9d9-45a7-88bf-ffffffffffff]]
 [[id:442c807f-c9d9-45a7-88bf-ffffffffffff][bar]]
+[[id:442c807f-c9d9-45a7-88bf-ffffffffffff][bar =[]=]]
+[[id:442c807f-c9d9-45a7-88bf-ffffffffffff][bar
+ok]]
 [[id:442c807f-c9d9-45a7-88bf-ffffffffffff::foo][abc]]
 [[foo][abc]]
+
+  - link name across list indentation [[foo][/italic/
+    def ghi]
+    !]]
 #+end_src
 
 #+name: t:0006-links-oids
@@ -2420,6 +2464,66 @@ p
                       LinkTargetOid
                         LinkOid
                           { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                            name = ""
+                          },
+                    name =
+                      [ StyledText
+                          { body = "bar",
+                            style = L.styleMaskFrom []
+                          },
+                        StyledText
+                          { body = " ",
+                            style = L.styleMaskFrom []
+                          },
+                        StyledText
+                          { body = "[]",
+                            style = L.styleMaskFrom [Verbatim]
+                          }
+                      ]
+                  }
+              ),
+            PTokenStyledText
+              ( StyledText
+                  { body = " ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                            name = ""
+                          },
+                    name =
+                      [ StyledText
+                          { body = "bar",
+                            style = L.styleMaskFrom []
+                          },
+                        StyledText
+                          { body = " ",
+                            style = L.styleMaskFrom []
+                          },
+                        StyledText
+                          { body = "ok",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              ),
+            PTokenStyledText
+              ( StyledText
+                  { body = " ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
                             name = "foo"
                           },
                     name =
@@ -2452,6 +2556,63 @@ p
                       ]
                   }
               )
+          ],
+        CListItem
+          [ LUnorderedStart,
+            LItemStart
+          ],
+        CParagraph
+          [ PTokenStyledText
+              ( StyledText
+                  { body = "link name across list indentation ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { name =
+                      [ StyledText
+                          { body = "italic",
+                            style = L.styleMaskFrom [Italic]
+                          },
+                        StyledText
+                          { body = " ",
+                            style = L.styleMaskFrom []
+                          },
+                        StyledText
+                          { body = "def",
+                            style = L.styleMaskFrom []
+                          },
+                        StyledText
+                          { body = " ",
+                            style = L.styleMaskFrom []
+                          },
+                        StyledText
+                          { body = "ghi]",
+                            style = L.styleMaskFrom []
+                          },
+                        StyledText
+                          { body = " ",
+                            style = L.styleMaskFrom []
+                          },
+                        StyledText
+                          { body = "!",
+                            style = L.styleMaskFrom []
+                          }
+                      ],
+                    target =
+                      LinkTargetOid
+                        ( LinkOid
+                            { oid = nilOid,
+                              name = "foo"
+                            }
+                        )
+                  }
+              )
+          ],
+        CListItem
+          [ LItemEnd,
+            LUnorderedEnd
           ]
       ]
   )
@@ -2473,9 +2634,17 @@ protocolWebLinkParser = do
       (string "]")
       uriParser
 
+  orgParserState <- get
+  let mask = orgParserState.styleMask
+      implicitName = maybeUri
+      implicitNameStyledText =
+        StyledText
+          { body = implicitName,
+            style = mask
+          }
   displayName <-
     MP.choice
-      [ MP.try $ string "]" >> pure maybeUri,
+      [ MP.try $ string "]" >> pure [implicitNameStyledText],
         MP.try linkDisplayNameParser
       ]
   case N.parseURI (T.unpack maybeUri) of
@@ -2484,12 +2653,7 @@ protocolWebLinkParser = do
       pure
         $ Link
           { target = LinkTargetURI uri,
-            name =
-              [ StyledText
-                  { body = displayName,
-                    style = styleMaskFrom []
-                  }
-              ]
+            name = displayName
           }
   where
     uriParser :: OrgParser T.Text
@@ -2755,6 +2919,7 @@ ps
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -3105,16 +3270,24 @@ paragraph.
 paragraphParser :: OrgParser Cell
 paragraphParser = do
   orgParserState <- get
-  prose <- proseParser $ spaceConsumer orgParserState.continuationIndent
+  prose <- proseParser $ proseSpaceConsumer orgParserState.continuationIndent
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
+#+end_src
+
+The [[f:proseSpaceConsumer]] knows how to parse spaces across lines (while taking
+into account the existing level of indentation in the current line, if any).
+This is a top-level function because we reuse it in [[f:linkDisplayNameParser]].
+
+#+name: f:proseSpaceConsumer
+#+begin_src haskell
+proseSpaceConsumer :: Int -> OrgParser T.Text
+proseSpaceConsumer expectedIndentLen =
+  MP.choice
+    [ newlineAndIndentParser expectedIndentLen,
+      spaces
+    ]
   where
-    spaceConsumer :: Int -> OrgParser T.Text
-    spaceConsumer expectedIndentLen =
-      MP.choice
-        [ newlineAndIndentParser expectedIndentLen,
-          spaces
-        ]
     spaces :: OrgParser T.Text
     spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 #+end_src
@@ -3580,6 +3753,7 @@ ps
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -3636,6 +3810,7 @@ ps
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -3805,6 +3980,7 @@ ps
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -3854,6 +4030,7 @@ ps
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -3913,6 +4090,7 @@ ps
       headingLevel = 1,
       headingSection = [1],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -3979,6 +4157,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -5033,6 +5212,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -6779,6 +6959,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -6854,6 +7035,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -7049,6 +7231,7 @@ ps
       headingLevel = 0,
       headingSection = [],
       styleMask = L.styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -7631,6 +7814,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
+        insideLinkDisplayName,
         listLevels,
         listMarkers,
         orgParserConf,
@@ -7649,7 +7833,8 @@ import Lilac.Types
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
-  ( FilePath,
+  ( Bool (False),
+    FilePath,
     Identity,
     Int,
     Maybe (Just, Nothing),

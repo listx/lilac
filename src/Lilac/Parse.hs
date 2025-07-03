@@ -56,6 +56,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
+        insideLinkDisplayName,
         listLevels,
         listMarkers,
         orgParserConf,
@@ -256,6 +257,7 @@ defaultOrgParserState =
       headingLevel = 0,
       headingSection = [],
       styleMask = styleMaskFrom [],
+      insideLinkDisplayName = False,
       listLevels = [],
       listMarkers = [],
       continuationIndent = 0,
@@ -503,6 +505,16 @@ proseParser spaceConsumer = do
       PTokenLink {}
       PTokenMathFragment {} -> True
 
+proseSpaceConsumer :: Int -> OrgParser T.Text
+proseSpaceConsumer expectedIndentLen =
+  MP.choice
+    [ newlineAndIndentParser expectedIndentLen,
+      spaces
+    ]
+  where
+    spaces :: OrgParser T.Text
+    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
+
 whitespaceCompressor :: OrgParser T.Text -> OrgParser StyledText
 whitespaceCompressor spaceConsumer = do
   orgParserState <- get
@@ -603,7 +615,11 @@ textParser styleMask
       pure $ T.pack cs
     normalChar :: OrgParser Char
     normalChar = do
-      MP.notFollowedBy $ string "[["
+      orgParserState <- get
+      let toAvoid
+            | orgParserState.insideLinkDisplayName = "]]"
+            | otherwise = "[["
+      MP.notFollowedBy $ string toAvoid
       MP.satisfy isNormalChar
     isNormalChar c =
       M.notMember c styleMarkers
@@ -700,12 +716,31 @@ linkParser = do
       MP.try rawLinkParser
     ]
 
-linkDisplayNameParser :: OrgParser T.Text
-linkDisplayNameParser =
-  MP.between
-    (string "[")
-    (string "]]")
-    (MP.takeWhile1P (Just "name character") (/= ']'))
+linkDisplayNameParser :: OrgParser [StyledText]
+linkDisplayNameParser = do
+  orgParserState <- get
+  modify (\s -> s {insideLinkDisplayName = True})
+  linkDisplayName <-
+    MP.between
+      (string "[")
+      (string "]]")
+      (proseParser' $ proseSpaceConsumer orgParserState.continuationIndent)
+  modify (\s -> s {insideLinkDisplayName = False})
+  pure linkDisplayName
+  where
+    proseParser' :: OrgParser T.Text -> OrgParser [StyledText]
+    proseParser' spaceConsumer = do
+      a <- MP.choice baseParsers
+      b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
+      pure . filter nonEmpty $ a : b
+      where
+        spacePTokenParser = whitespaceCompressor spaceConsumer
+        baseParsers =
+          [ styleMarkerParser,
+            styledTextParser
+          ]
+        nonEmpty :: StyledText -> Bool
+        nonEmpty styledText = not $ T.null styledText.body
 
 failIfVerbatimOrCode :: OrgParser ()
 failIfVerbatimOrCode = do
@@ -722,9 +757,17 @@ protocolWebLinkParser = do
       (string "]")
       uriParser
 
+  orgParserState <- get
+  let mask = orgParserState.styleMask
+      implicitName = maybeUri
+      implicitNameStyledText =
+        StyledText
+          { body = implicitName,
+            style = mask
+          }
   displayName <-
     MP.choice
-      [ MP.try $ string "]" >> pure maybeUri,
+      [ MP.try $ string "]" >> pure [implicitNameStyledText],
         MP.try linkDisplayNameParser
       ]
   case N.parseURI (T.unpack maybeUri) of
@@ -733,12 +776,7 @@ protocolWebLinkParser = do
       pure
         $ Link
           { target = LinkTargetURI uri,
-            name =
-              [ StyledText
-                  { body = displayName,
-                    style = styleMaskFrom []
-                  }
-              ]
+            name = displayName
           }
   where
     uriParser :: OrgParser T.Text
@@ -827,18 +865,9 @@ mathFragmentInlineParser = do
 paragraphParser :: OrgParser Cell
 paragraphParser = do
   orgParserState <- get
-  prose <- proseParser $ spaceConsumer orgParserState.continuationIndent
+  prose <- proseParser $ proseSpaceConsumer orgParserState.continuationIndent
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
-  where
-    spaceConsumer :: Int -> OrgParser T.Text
-    spaceConsumer expectedIndentLen =
-      MP.choice
-        [ newlineAndIndentParser expectedIndentLen,
-          spaces
-        ]
-    spaces :: OrgParser T.Text
-    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 
 newlineAndIndentParser :: Int -> OrgParser T.Text
 newlineAndIndentParser expectedIndentLen = do
@@ -1021,14 +1050,21 @@ oidLinkParser = do
   _ <- string "[["
   avoidParsingKnownProtocols
   (oid, name) <- oidReferenceParser "[]"
-  let implicitName
+  orgParserState <- get
+  let mask = orgParserState.styleMask
+      implicitName
         | T.null name = "id:" <> T.show oid
         | otherwise = name
+      implicitNameStyledText =
+        StyledText
+          { body = implicitName,
+            style = mask
+          }
 
   _ <- string "]"
   displayName <-
     MP.choice
-      [ MP.try $ string "]" >> pure implicitName,
+      [ MP.try $ string "]" >> pure [implicitNameStyledText],
         MP.try linkDisplayNameParser
       ]
   pure
@@ -1039,12 +1075,7 @@ oidLinkParser = do
               { oid = oid,
                 name = name
               },
-        name =
-          [ StyledText
-              { body = displayName,
-                style = styleMaskFrom []
-              }
-          ]
+        name = displayName
       }
   where
     avoidParsingKnownProtocols :: OrgParser ()

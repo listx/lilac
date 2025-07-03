@@ -37,6 +37,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
+        insideLinkDisplayName,
         listLevels,
         listMarkers,
         orgParserConf,
@@ -55,7 +56,8 @@ import Lilac.Types
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
-  ( FilePath,
+  ( Bool (False),
+    FilePath,
     Identity,
     Int,
     Maybe (Just, Nothing),
@@ -258,6 +260,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -314,6 +317,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -341,6 +345,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -388,6 +393,7 @@ parseSpec = do
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -422,6 +428,7 @@ parseSpec = do
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -535,6 +542,7 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -571,6 +579,7 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -607,6 +616,7 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -810,6 +820,7 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -1166,6 +1177,7 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -1325,6 +1337,66 @@ parseSpec = do
                         LinkTargetOid
                           LinkOid
                             { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                              name = ""
+                            },
+                      name =
+                        [ StyledText
+                            { body = "bar",
+                              style = L.styleMaskFrom []
+                            },
+                          StyledText
+                            { body = " ",
+                              style = L.styleMaskFrom []
+                            },
+                          StyledText
+                            { body = "[]",
+                              style = L.styleMaskFrom [Verbatim]
+                            }
+                        ]
+                    }
+                ),
+              PTokenStyledText
+                ( StyledText
+                    { body = " ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { target =
+                        LinkTargetOid
+                          LinkOid
+                            { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                              name = ""
+                            },
+                      name =
+                        [ StyledText
+                            { body = "bar",
+                              style = L.styleMaskFrom []
+                            },
+                          StyledText
+                            { body = " ",
+                              style = L.styleMaskFrom []
+                            },
+                          StyledText
+                            { body = "ok",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                ),
+              PTokenStyledText
+                ( StyledText
+                    { body = " ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { target =
+                        LinkTargetOid
+                          LinkOid
+                            { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
                               name = "foo"
                             },
                       name =
@@ -1357,6 +1429,63 @@ parseSpec = do
                         ]
                     }
                 )
+            ],
+          CListItem
+            [ LUnorderedStart,
+              LItemStart
+            ],
+          CParagraph
+            [ PTokenStyledText
+                ( StyledText
+                    { body = "link name across list indentation ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { name =
+                        [ StyledText
+                            { body = "italic",
+                              style = L.styleMaskFrom [Italic]
+                            },
+                          StyledText
+                            { body = " ",
+                              style = L.styleMaskFrom []
+                            },
+                          StyledText
+                            { body = "def",
+                              style = L.styleMaskFrom []
+                            },
+                          StyledText
+                            { body = " ",
+                              style = L.styleMaskFrom []
+                            },
+                          StyledText
+                            { body = "ghi]",
+                              style = L.styleMaskFrom []
+                            },
+                          StyledText
+                            { body = " ",
+                              style = L.styleMaskFrom []
+                            },
+                          StyledText
+                            { body = "!",
+                              style = L.styleMaskFrom []
+                            }
+                        ],
+                      target =
+                        LinkTargetOid
+                          ( LinkOid
+                              { oid = nilOid,
+                                name = "foo"
+                              }
+                          )
+                    }
+                )
+            ],
+          CListItem
+            [ LItemEnd,
+              LUnorderedEnd
             ]
         ]
     )
@@ -1412,6 +1541,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -1506,6 +1636,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -2069,6 +2200,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -2124,6 +2256,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,
@@ -2202,6 +2335,7 @@ parseSpec = do
         headingLevel = 0,
         headingSection = [],
         styleMask = L.styleMaskFrom [],
+        insideLinkDisplayName = False,
         listLevels = [],
         listMarkers = [],
         continuationIndent = 0,

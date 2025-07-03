@@ -40,7 +40,8 @@ import Data.UUID.Types (UUID, fromText, fromWords64)
 import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
-  ( Enum,
+  ( Bool,
+    Enum,
     Eq,
     Identity,
     Int,
@@ -203,6 +204,7 @@ data OrgParserState = OrgParserState
     headingLevel :: Int,
     headingSection :: [Int],
     styleMask :: StyleMask,
+    insideLinkDisplayName :: Bool,
     listLevels :: [Level],
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
