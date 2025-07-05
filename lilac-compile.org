@@ -16,7 +16,14 @@ be tangled or weaved.
 #+name: module:Lilac.Compile
 #+header: :tangle src/Lilac/Compile.hs
 #+begin_src haskell
-module Lilac.Compile (findExternalOids, mkObject) where
+module Lilac.Compile
+  ( Archive,
+    Object,
+    findExternalOids,
+    mkObject,
+    mkArchive,
+  )
+where
 
 import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
@@ -39,25 +46,33 @@ import Lilac.Types
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
   )
+import Lilac.Util qualified as LU
 import Relude
-  ( Eq,
+  ( Either (Left, Right),
+    Eq,
+    FilePath,
     Maybe (Just, Nothing),
     Show,
     Type,
     catMaybes,
     concatMap,
     foldl',
+    map,
     otherwise,
     sort,
     ($),
     (.),
+    (/=),
+    (<>),
   )
 import Relude.Extra.Map qualified as EM
 
 <<data:Object>>
+<<data:Archive>>
 
 <<f:mkObject>>
 <<f:mkSymbols>>
+<<f:mkArchive>>
 <<f:findExternalOids>>
 #+end_src
 
@@ -301,6 +316,225 @@ checkExternalOids
   ]
 #+end_src
 
+** Archives
+
+When dealing with multiple [[data:Object]] files at a time, we have to answer the
+question, "is this collection of objects able to resolve all internal
+[[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] values"? Essentially this is the same question as asking if there
+are any broken links, as far as [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] targets are concerned.
+
+The above question also has two different "flavors", depending on what we want
+to do:
+
+  1) For tangling, we only care about broken Noweb links for those code blocks
+     that have the ~:tangle~ metadata key set (aka "root" blocks). That is, if a
+     code block depends on another block but is not itself something that a root
+     block depends on, we don't care because such blocks are ignored for
+     tangling purposes.
+
+  2) For weaving, we care about any broken link ([[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) to a cell,
+     because otherwise we will not be able to generate the correct HTML link tag
+     (~href=...~ attribute) for it.
+
+#+name: data:Archive
+#+begin_src haskell
+type Archive :: Type
+data Archive = Archive
+  { objects :: M.Map FilePath Object,
+    symbols :: M.Map LinkOid Cell
+  }
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Archive
+#+end_src
+
+A [[data:Archive]] is just a collection of [[data:Object]] values, which are each paired
+with the ~FilePath~ of where that object was found. In order to create a ~Archive~,
+it must not have any broken links.
+
+#+name: f:mkArchive
+#+begin_src haskell
+mkArchive :: [(FilePath, Object)] -> Either T.Text Archive
+mkArchive pathObjs
+  | brokenLinks /= [] =
+      Left
+        $ "broken links:\n"
+        <> T.intercalate
+          "\n"
+          (map (\l -> "  " <> LU.mkFqcn l.oid l.name) brokenLinks)
+  | otherwise = Right archive
+  where
+    archive =
+      Archive
+        { objects = objects,
+          symbols = symbols
+        }
+    (objects, symbols) = foldl' f (M.empty, M.empty) pathObjs
+    f ::
+      (M.Map FilePath Object, M.Map LinkOid Cell) ->
+      (FilePath, Object) ->
+      (M.Map FilePath Object, M.Map LinkOid Cell)
+    f (accObjs, accSyms) (path, obj) =
+      ( M.insert path obj accObjs,
+        M.union obj.symbols accSyms
+      )
+    brokenLinks = foldl' g [] allExternalOids
+    g acc linkOid = case EM.lookup linkOid archive.symbols of
+      Just _ -> acc
+      Nothing -> linkOid : acc
+    allExternalOids =
+      M.foldl (\acc obj -> obj.externalOids <> acc) [] archive.objects
+#+end_src
+
+*** Tests
+
+Detect broken Noweb links.
+
+#+header: :tangle test/Lilac/CompileSpec/0401-broken-links-noweb
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d003
+:END:
+
+,#+name: c
+,#+begin_src haskell
+c1
+,#+end_src
+
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+  <<b>>
+a1
+  <<x>>
+,#+end_src
+
+,#+name: b
+,#+begin_src haskell
+b1
+b2
+<<id:00000000-0000-0000-0000-00000000d000::c>>
+b3
+,#+end_src
+#+end_src
+
+#+name: t:0401-broken-links-noweb
+#+begin_src haskell
+expectArchiveError
+  ["0401-broken-links-noweb"]
+  """
+  broken links:
+    id:00000000-0000-0000-0000-00000000d003::x
+    id:00000000-0000-0000-0000-00000000d000::c
+  """
+#+end_src
+
+Detect broken links in paragraphs. In this case, ~[[foo]]~ is not a named cell
+anywhere.
+
+#+header: :tangle test/Lilac/CompileSpec/0401-broken-links-paragraph
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d004
+:END:
+
+[[foo]]
+#+end_src
+
+#+name: t:0401-broken-links-paragraph
+#+begin_src haskell
+expectArchiveError
+  ["0401-broken-links-paragraph"]
+  """
+  broken links:
+    id:00000000-0000-0000-0000-00000000d004::foo
+  """
+#+end_src
+
+If we define the cell, the error goes away.
+
+#+header: :tangle test/Lilac/CompileSpec/0401-broken-links-paragraph-ok
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d005
+:END:
+
+[[foo]]
+
+,#+name: foo
+,#+begin_src txt
+Hello
+,#+end_src
+#+end_src
+
+#+name: t:0401-broken-links-paragraph-ok
+#+begin_src haskell
+expectArchiveOk
+  ["0401-broken-links-paragraph-ok"]
+#+end_src
+
+Below is similar to [[t:0401-broken-links-noweb]], but the broken links have been
+fixed (we define the ~x~ cell and also the external document (dependency) that has
+cell ~c~).
+
+#+header: :tangle test/Lilac/CompileSpec/0401-broken-links-multi-ok
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d006
+:END:
+
+,#+name: c
+,#+begin_src haskell
+c1
+,#+end_src
+
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+  <<b>>
+a1
+  <<x>>
+,#+end_src
+
+,#+name: b
+,#+begin_src haskell
+b1
+b2
+<<id:00000000-0000-0000-0000-00000000d007::c>>
+b3
+,#+end_src
+
+,#+name: x
+,#+begin_src haskell
+xxx
+,#+end_src
+#+end_src
+
+#+header: :tangle test/Lilac/CompileSpec/0401-broken-links-multi-ok-dependency
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d007
+:END:
+
+,#+name: c
+,#+begin_src haskell
+This is c
+,#+end_src
+#+end_src
+
+#+name: t:0401-broken-links-multi-ok
+#+begin_src haskell
+expectArchiveOk
+  [ "0401-broken-links-multi-ok",
+    "0401-broken-links-multi-ok-dependency"
+  ]
+#+end_src
+
 ** Testing framework
 
 The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]].
@@ -312,6 +546,7 @@ The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941
 #+begin_src haskell
 module Lilac.CompileSpec (spec) where
 
+import Data.Text qualified as T
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
@@ -320,12 +555,16 @@ import Lilac.Types
   )
 import Lilac.Util qualified as LU
 import Relude
-  ( Either (Right),
+  ( Either (Left, Right),
     FilePath,
+    IO,
+    foldlM,
+    isRight,
     pure,
+    show,
     ($),
   )
-import Test.Hspec (Spec, it, shouldBe)
+import Test.Hspec (Spec, it, shouldBe, shouldSatisfy)
 
 <<compileSpec discovery>>
 
@@ -350,6 +589,9 @@ helpers.
 #+name: CompileSpec helpers
 #+begin_src haskell
 <<f:checkExternalOids>>
+<<f:expectArchiveError>>
+<<f:expectArchiveOk>>
+<<f:readObjectsFrom>>
 #+end_src
 
 There are two major areas of concern for the compilation process:
@@ -373,6 +615,47 @@ checkExternalOids path expectedExternalOids = do
       pure $ LP.parseOrgDoc input
 #+end_src
 
+We want to check broken links for [[data:Archive]] values as well. For this we
+have [[f:expectArchiveError]].
+
+#+name: f:expectArchiveError
+#+begin_src haskell
+expectArchiveError :: [FilePath] -> T.Text -> Spec
+expectArchiveError paths expected = do
+  it (show paths) $ do
+    pathObjs <- readObjectsFrom paths
+    LC.mkArchive pathObjs `shouldBe` (Left expected)
+#+end_src
+
+The [[f:readObjectsFrom]] helper reads files, parses them as [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] before
+converting them to [[data:Object]].
+
+#+name: f:readObjectsFrom
+#+begin_src haskell
+readObjectsFrom :: [FilePath] -> IO [(FilePath, LC.Object)]
+readObjectsFrom = foldlM f []
+  where
+    f :: [(FilePath, LC.Object)] -> FilePath -> IO [(FilePath, LC.Object)]
+    f acc path = do
+      (Right od) <- read path
+      pure $ (path, LC.mkObject od) : acc
+    read path = do
+      input <- LU.readFrom "test/Lilac/CompileSpec/" path
+      pure $ LP.parseOrgDoc input
+#+end_src
+
+The corollary is [[f:expectArchiveOk]] which expects the archive to be successfully
+created.
+
+#+name: f:expectArchiveOk
+#+begin_src haskell
+expectArchiveOk :: [FilePath] -> Spec
+expectArchiveOk paths = do
+  it (show paths) $ do
+    pathObjs <- readObjectsFrom paths
+    LC.mkArchive pathObjs `shouldSatisfy` isRight
+#+end_src
+
 *** All test cases
 
 Below are all of the individual test cases.
@@ -384,4 +667,8 @@ compileSpec = do
   <<t:0400-no-external-symbols-code-blocks>>
   <<t:0400-no-external-symbols-complex>>
   <<t:0400-external-symbols>>
+  <<t:0401-broken-links-noweb>>
+  <<t:0401-broken-links-paragraph>>
+  <<t:0401-broken-links-paragraph-ok>>
+  <<t:0401-broken-links-multi-ok>>
 #+end_src

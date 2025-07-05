@@ -1,4 +1,11 @@
-module Lilac.Compile (findExternalOids, mkObject) where
+module Lilac.Compile
+  ( Archive,
+    Object,
+    findExternalOids,
+    mkObject,
+    mkArchive,
+  )
+where
 
 import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
@@ -21,18 +28,24 @@ import Lilac.Types
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
   )
+import Lilac.Util qualified as LU
 import Relude
-  ( Eq,
+  ( Either (Left, Right),
+    Eq,
+    FilePath,
     Maybe (Just, Nothing),
     Show,
     Type,
     catMaybes,
     concatMap,
     foldl',
+    map,
     otherwise,
     sort,
     ($),
     (.),
+    (/=),
+    (<>),
   )
 import Relude.Extra.Map qualified as EM
 
@@ -45,6 +58,15 @@ data Object = Object
   deriving stock (Eq, Generic, Show)
 
 instance ToJSON Object
+
+type Archive :: Type
+data Archive = Archive
+  { objects :: M.Map FilePath Object,
+    symbols :: M.Map LinkOid Cell
+  }
+  deriving stock (Eq, Generic, Show)
+
+instance ToJSON Archive
 
 mkObject :: OrgDoc -> Object
 mkObject orgDoc =
@@ -89,6 +111,37 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
                 )
               ]
           | otherwise = []
+
+mkArchive :: [(FilePath, Object)] -> Either T.Text Archive
+mkArchive pathObjs
+  | brokenLinks /= [] =
+      Left
+        $ "broken links:\n"
+        <> T.intercalate
+          "\n"
+          (map (\l -> "  " <> LU.mkFqcn l.oid l.name) brokenLinks)
+  | otherwise = Right archive
+  where
+    archive =
+      Archive
+        { objects = objects,
+          symbols = symbols
+        }
+    (objects, symbols) = foldl' f (M.empty, M.empty) pathObjs
+    f ::
+      (M.Map FilePath Object, M.Map LinkOid Cell) ->
+      (FilePath, Object) ->
+      (M.Map FilePath Object, M.Map LinkOid Cell)
+    f (accObjs, accSyms) (path, obj) =
+      ( M.insert path obj accObjs,
+        M.union obj.symbols accSyms
+      )
+    brokenLinks = foldl' g [] allExternalOids
+    g acc linkOid = case EM.lookup linkOid archive.symbols of
+      Just _ -> acc
+      Nothing -> linkOid : acc
+    allExternalOids =
+      M.foldl (\acc obj -> obj.externalOids <> acc) [] archive.objects
 
 findExternalOids :: OrgDoc -> [LinkOid]
 findExternalOids orgDoc =
