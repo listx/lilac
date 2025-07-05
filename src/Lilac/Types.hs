@@ -146,7 +146,7 @@ type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
   | LinkTargetURI N.URI
-  | LinkTargetOther T.Text
+  | LinkTargetOther T.Text T.Text
   deriving stock (Eq, Generic, Ord, Show)
 
 instance ToJSON LinkTarget

@@ -253,11 +253,9 @@ weavePToken = \case
 
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
-  LinkTargetOid _ -> False
+  LinkTargetOid {} -> False
   LinkTargetURI {} -> True
-  LinkTargetOther target
-    | T.isPrefixOf "http" target -> True
-    | otherwise -> False
+  LinkTargetOther {} -> True
 
 weaveStyledText :: StyledText -> HtmlWeaver ()
 weaveStyledText styledText = do
@@ -390,7 +388,7 @@ weaveLink link = do
                     body = []
                   }
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
-      LinkTargetOther targetText -> targetText
+      LinkTargetOther protocol target -> protocol <> ":" <> target
 
 weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> M.Map OID P.OsPath -> IO ()
 weaveToDisk fp od watch goids = do

@@ -934,7 +934,7 @@ parseSpec = do
               ),
             PTokenLink
               ( Link
-                  { target = LinkTargetOther "file:foo/bar",
+                  { target = LinkTargetOther "file" "foo/bar",
                     name =
                       [ StyledText
                           { body = "file:foo/bar",
@@ -2364,10 +2364,10 @@ parseSpec = do
                     ],
                 link =
                   Link
-                    { target = LinkTargetOther "./image/hello.png",
+                    { target = LinkTargetOther "file" "image/hello.png",
                       name =
                         [ StyledText
-                            { body = "./image/hello.png",
+                            { body = "file:image/hello.png",
                               style = L.styleMaskFrom []
                             }
                         ]
@@ -2390,10 +2390,10 @@ parseSpec = do
               { meta = fromList [],
                 link =
                   Link
-                    { target = LinkTargetOther "./image/world.png",
+                    { target = LinkTargetOther "file" "image/world.png",
                       name =
                         [ StyledText
-                            { body = "./image/world.png",
+                            { body = "file:image/world.png",
                               style = L.styleMaskFrom []
                             }
                         ]

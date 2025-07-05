@@ -789,15 +789,12 @@ protocolWebLinkParser = do
 otherLinkParser :: OrgParser Link
 otherLinkParser = do
   _ <- string "[["
-  target <-
-    MP.label "external link target"
-      $ MP.some
-      $ MP.anySingleBut ']'
+  (protocol, target) <- otherTargetParser
   _ <- string "]"
   orgParserState <- get
   let implicitNameStyledText =
         StyledText
-          { body = T.pack target,
+          { body = protocol <> ":" <> target,
             style = orgParserState.styleMask
           }
   displayName <-
@@ -807,9 +804,16 @@ otherLinkParser = do
       ]
   pure
     Link
-      { target = LinkTargetOther $ T.pack target,
+      { target = LinkTargetOther protocol target,
         name = displayName
       }
+  where
+    otherTargetParser :: OrgParser (T.Text, T.Text)
+    otherTargetParser = do
+      protocol <- MP.takeWhile1P (Just "protocol") (`notElem` (":[]" :: String))
+      _ <- string ":"
+      target <- MP.takeWhile1P (Just "target") (/= ']')
+      pure (protocol, target)
 
 rawLinkParser :: OrgParser Link
 rawLinkParser = do

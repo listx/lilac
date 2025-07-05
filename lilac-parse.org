@@ -2215,7 +2215,7 @@ type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
   | LinkTargetURI N.URI
-  | LinkTargetOther T.Text
+  | LinkTargetOther T.Text T.Text
   deriving stock (Eq, Generic, Ord, Show)
 
 instance ToJSON LinkTarget
@@ -2863,15 +2863,12 @@ name.
 otherLinkParser :: OrgParser Link
 otherLinkParser = do
   _ <- string "[["
-  target <-
-    MP.label "external link target"
-      $ MP.some
-      $ MP.anySingleBut ']'
+  (protocol, target) <- otherTargetParser
   _ <- string "]"
   orgParserState <- get
   let implicitNameStyledText =
         StyledText
-          { body = T.pack target,
+          { body = protocol <> ":" <> target,
             style = orgParserState.styleMask
           }
   displayName <-
@@ -2881,9 +2878,16 @@ otherLinkParser = do
       ]
   pure
     Link
-      { target = LinkTargetOther $ T.pack target,
+      { target = LinkTargetOther protocol target,
         name = displayName
       }
+  where
+    otherTargetParser :: OrgParser (T.Text, T.Text)
+    otherTargetParser = do
+      protocol <- MP.takeWhile1P (Just "protocol") (`notElem` (":[]" :: String))
+      _ <- string ":"
+      target <- MP.takeWhile1P (Just "target") (/= ']')
+      pure (protocol, target)
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0006-links
@@ -3020,7 +3024,7 @@ p
             ),
           PTokenLink
             ( Link
-                { target = LinkTargetOther "file:foo/bar",
+                { target = LinkTargetOther "file" "foo/bar",
                   name =
                     [ StyledText
                         { body = "file:foo/bar",
@@ -7190,9 +7194,9 @@ Below is an example of a figure:
 
 #+name: fig:Portable Network Graphics sample image
 #+attr_html: :width 100%
-[[./image/PNG-Gradient.png]]
+[[file:image/PNG-Gradient.png]]
 
-First we have parse for the metadata, and then the link.
+First we have to parse for the metadata, and then the link.
 
 #+name: f:figureParser
 #+begin_src haskell
@@ -7270,7 +7274,7 @@ f = 1 + 1
 
 ,#+name: fig:hello
 ,#+attr_html: :width 100%
-[[./image/hello.png]]
+[[file:image/hello.png]]
 
 ,#+name: f:g
 ,#+header: :yyy bar
@@ -7278,7 +7282,7 @@ f = 1 + 1
 g x = x + 1
 ,#+end_src
 
-[[./image/world.png]]
+[[file:image/world.png]]
 #+end_src
 
 #+name: t:0011-figures-and-blocks
@@ -7307,10 +7311,10 @@ ps
                   ],
               link =
                 Link
-                  { target = LinkTargetOther "./image/hello.png",
+                  { target = LinkTargetOther "file" "image/hello.png",
                     name =
                       [ StyledText
-                          { body = "./image/hello.png",
+                          { body = "file:image/hello.png",
                             style = L.styleMaskFrom []
                           }
                       ]
@@ -7333,10 +7337,10 @@ ps
             { meta = fromList [],
               link =
                 Link
-                  { target = LinkTargetOther "./image/world.png",
+                  { target = LinkTargetOther "file" "image/world.png",
                     name =
                       [ StyledText
-                          { body = "./image/world.png",
+                          { body = "file:image/world.png",
                             style = L.styleMaskFrom []
                           }
                       ]

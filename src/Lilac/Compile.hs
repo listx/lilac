@@ -116,9 +116,5 @@ findExternalOrgLinkTargets orgDoc symbols =
          in if M.member target symbols
               then acc
               else link.target : acc
-      LinkTargetOther raw
-        | or $ map (`T.isPrefixOf` raw) protocolsWeb -> acc
-        | or $ map (`T.isPrefixOf` raw) protocolsEmacs -> acc
-        | M.member raw symbols -> acc
-        | otherwise -> link.target : acc
+      LinkTargetOther {} -> link.target : acc
       LinkTargetURI {} -> acc

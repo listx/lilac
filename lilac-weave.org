@@ -750,21 +750,18 @@ weaveLink link = do
                     body = []
                   }
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
-      LinkTargetOther targetText -> targetText
+      LinkTargetOther protocol target -> protocol <> ":" <> target
 #+end_src
 
-[[f:isExternalLink]] is not very smart and only checks whether the prefix has ~http~
-in it.
+[[f:isExternalLink]] checks if .
 
 #+name: f:isExternalLink
 #+begin_src haskell
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
-  LinkTargetOid _ -> False
+  LinkTargetOid {} -> False
   LinkTargetURI {} -> True
-  LinkTargetOther target
-    | T.isPrefixOf "http" target -> True
-    | otherwise -> False
+  LinkTargetOther {} -> True
 #+end_src
 
 *** Link anchor
