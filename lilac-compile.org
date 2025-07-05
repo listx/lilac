@@ -16,7 +16,7 @@ be tangled or weaved.
 #+name: module:Lilac.Compile
 #+header: :tangle src/Lilac/Compile.hs
 #+begin_src haskell
-module Lilac.Compile (mkObject) where
+module Lilac.Compile (findExternalOids, mkObject) where
 
 import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
@@ -37,8 +37,6 @@ import Lilac.Types
     OrgDoc (cells, oid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
-    protocolsEmacs,
-    protocolsWeb,
   )
 import Lilac.Util qualified as LU
 import Relude
@@ -49,8 +47,6 @@ import Relude
     catMaybes,
     concatMap,
     foldl',
-    map,
-    or,
     otherwise,
     sort,
     ($),
@@ -63,7 +59,7 @@ import Relude.Extra.Map qualified as EM
 
 <<f:mkObject>>
 <<f:mkSymbols>>
-<<f:findExternalOrgLinkTargets>>
+<<f:findExternalOids>>
 #+end_src
 
 ** Object generation
@@ -79,7 +75,7 @@ type Object :: Type
 data Object = Object
   { orgDoc :: OrgDoc,
     symbols :: M.Map T.Text Cell,
-    externalLinkTargets :: [LinkTarget]
+    externalOids :: [LinkOid]
   }
   deriving stock (Eq, Generic, Show)
 
@@ -90,7 +86,7 @@ The ~symbols~ is a map of either OIDs (as text strings), or OIDs plus a unique
 name, which form the basis of internal links (links to either other cells within
 the same Org file or inside other external Org files).
 
-The ~externalLinkTargets~ captures all links that point to some other cell in
+The ~externalOids~ captures all links that point to some other cell in
 another Org file. A consistent "cell universe" can be constructed when all
 external links are resolved, by getting all other =Object= values for other Org
 files we depend on.
@@ -101,12 +97,9 @@ mkObject :: OrgDoc -> Object
 mkObject orgDoc =
   Object
     { orgDoc = orgDoc,
-      symbols = symbols',
-      externalLinkTargets = targets
+      symbols = mkSymbols orgDoc,
+      externalOids = findExternalOids orgDoc
     }
-  where
-    symbols' = mkSymbols orgDoc
-    targets = findExternalOrgLinkTargets orgDoc symbols'
 #+end_src
 
 [[f:mkSymbols]] generates a mapping of all OIDs to their cells (headings), and also
@@ -141,19 +134,22 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
 #+end_src
 
 The ~(name, cell)~ tuple is important, because otherwise Org links that
-look like ~[[foo bar]]~ will be returned from [[f:findExternalOrgLinkTargets]]. Links
+look like ~[[foo bar]]~ will be returned from [[f:findExternalOids]]. Links
 like ~[[foo bar]]~ shouldn't be considered external, because they refer to cells
 that have been named like ~foo bar~ inside the current Org file, not an external
 Org file.
 
-[[f:findExternalOrgLinkTargets]] looks at all links, and checks if they are pointing
-to a target that exists inside the ~OrgDoc~. If they point somewhere else, then
-it's considered an external link target.
+** External symbol (OID) detection
 
-#+name: f:findExternalOrgLinkTargets
+[[f:findExternalOids]] looks for ~LinkTargetOid~ links that point to cells that are
+not inside the current Org file. We just look at all
+links and see if any of them point to an OID that is not accounted for in the
+=symbols= (symbols that are local to the current [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]]).
+
+#+name: f:findExternalOids
 #+begin_src haskell
-findExternalOrgLinkTargets :: OrgDoc -> M.Map T.Text Cell -> [LinkTarget]
-findExternalOrgLinkTargets orgDoc symbols =
+findExternalOids :: OrgDoc -> [LinkOid]
+findExternalOids orgDoc =
   sort
     . Set.toList
     . Set.fromList
@@ -180,7 +176,194 @@ findExternalOrgLinkTargets orgDoc symbols =
         let target = LU.mkFqcn linkOid.oid linkOid.name
          in if M.member target symbols
               then acc
-              else link.target : acc
-      LinkTargetOther {} -> link.target : acc
-      LinkTargetURI {} -> acc
+              else linkOid : acc
+      LinkTargetURI {}
+      LinkTargetOther {} -> acc
+    symbols = mkSymbols orgDoc
+#+end_src
+
+*** Tests
+
+Links to code blocks within the same document, whether explicitly defined with
+an OID or not, shouldn't result in external links.
+
+#+header: :tangle test/Lilac/CompileSpec/0400-no-external-symbols-code-blocks
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d000
+:END:
+
+,#+name: c
+,#+begin_src haskell
+c1
+,#+end_src
+
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+  <<b>>
+a1
+  <<b>>
+,#+end_src
+
+,#+name: b
+,#+begin_src haskell
+b1
+b2
+<<id:00000000-0000-0000-0000-00000000d000::c>>
+b3
+,#+end_src
+#+end_src
+
+#+name: t:0400-no-external-symbols-code-blocks
+#+begin_src haskell
+checkExternalOids
+  "0400-no-external-symbols-code-blocks"
+  []
+#+end_src
+
+Here is a more complex example, with internal links inside headings and
+paragraphs as well.
+
+#+header: :tangle test/Lilac/CompileSpec/0400-no-external-symbols-complex
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d001
+:END:
+
+,* h1 [[t:foo]]
+
+,#+name: t:foo
+,#+begin_src haskell
+foo
+,#+end_src
+
+Link to [[bar
+baz]] and [[bar baz][long
+description]]. Same link: [[id:00000000-0000-0000-0000-00000000d001::bar
+baz]]. Another link [[id:00000000-0000-0000-0000-00000000d001::t:foo][here]].
+
+,#+name: bar baz
+,#+begin_src haskell
+foo
+<<t:foo>>
+<<id:00000000-0000-0000-0000-00000000d001::t:foo>>
+,#+end_src
+#+end_src
+
+#+name: t:0400-no-external-symbols-complex
+#+begin_src haskell
+checkExternalOids
+  "0400-no-external-symbols-complex"
+  []
+#+end_src
+
+Check for external links.
+
+#+header: :tangle test/Lilac/CompileSpec/0400-external-symbols
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d002
+:END:
+
+Hello [[id:ffffffff-0000-0000-0000-00000000d001::a]]
+#+end_src
+
+#+name: t:0400-external-symbols
+#+begin_src haskell
+checkExternalOids
+  "0400-external-symbols"
+  [ LinkOid
+      { oid = fromWords 0xffffffff00000000 0x000000000000d001,
+        name = "a"
+      }
+  ]
+#+end_src
+
+** Testing framework
+
+The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]].
+
+*** Test module and helpers
+
+#+name: module:Lilac.CompileSpec
+#+header: :tangle test/Lilac/CompileSpec.hs
+#+begin_src haskell
+module Lilac.CompileSpec (spec) where
+
+import Lilac.Compile qualified as LC
+import Lilac.Parse qualified as LP
+import Lilac.Types
+  ( LinkOid (LinkOid, name, oid),
+    fromWords,
+  )
+import Lilac.Util qualified as LU
+import Relude
+  ( Either (Right),
+    FilePath,
+    pure,
+    ($),
+  )
+import Test.Hspec (Spec, it, shouldBe)
+
+<<compileSpec discovery>>
+
+<<CompileSpec helpers>>
+
+<<f:compileSpec>>
+#+end_src
+
+Just like [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]], we define a ~spec~ function for automatic
+discovery (and running) of the test cases here (in ~compileSpec~) in [[=compileSpec=
+discovery]].
+
+#+name: compileSpec discovery
+#+begin_src haskell
+spec :: Spec
+spec = compileSpec
+#+end_src
+
+On to the helpers. The test cases in [[f:compileSpec]] will be defined with these
+helpers.
+
+#+name: CompileSpec helpers
+#+begin_src haskell
+<<f:checkExternalOids>>
+#+end_src
+
+There are two major areas of concern for the compilation process:
+
+  1) generation of expected ~symbols~ and ~externalOids~ as specified in the
+     [[data:Object]], and
+
+  2) detection of cycles when resolving symbols that cannot be resolved within
+     the current object (when we require multiple objects).
+
+#+name: f:checkExternalOids
+#+begin_src haskell
+checkExternalOids :: FilePath -> [LinkOid] -> Spec
+checkExternalOids path expectedExternalOids = do
+  it path $ do
+    (Right od) <- read
+    LC.findExternalOids od `shouldBe` expectedExternalOids
+  where
+    read = do
+      input <- LU.readFrom "test/Lilac/CompileSpec/" path
+      pure $ LP.parseOrgDoc input
+#+end_src
+
+*** All test cases
+
+Below are all of the individual test cases.
+
+#+name: f:compileSpec
+#+begin_src haskell
+compileSpec :: Spec
+compileSpec = do
+  <<t:0400-no-external-symbols-code-blocks>>
+  <<t:0400-no-external-symbols-complex>>
+  <<t:0400-external-symbols>>
 #+end_src

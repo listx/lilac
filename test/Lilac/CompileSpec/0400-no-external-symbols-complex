@@ -1,0 +1,22 @@
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d001
+:END:
+
+* h1 [[t:foo]]
+
+#+name: t:foo
+#+begin_src haskell
+foo
+#+end_src
+
+Link to [[bar
+baz]] and [[bar baz][long
+description]]. Same link: [[id:00000000-0000-0000-0000-00000000d001::bar
+baz]]. Another link [[id:00000000-0000-0000-0000-00000000d001::t:foo][here]].
+
+#+name: bar baz
+#+begin_src haskell
+foo
+<<t:foo>>
+<<id:00000000-0000-0000-0000-00000000d001::t:foo>>
+#+end_src

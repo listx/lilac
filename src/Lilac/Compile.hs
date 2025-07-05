@@ -1,4 +1,4 @@
-module Lilac.Compile (mkObject) where
+module Lilac.Compile (findExternalOids, mkObject) where
 
 import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
@@ -19,8 +19,6 @@ import Lilac.Types
     OrgDoc (cells, oid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
-    protocolsEmacs,
-    protocolsWeb,
   )
 import Lilac.Util qualified as LU
 import Relude
@@ -31,8 +29,6 @@ import Relude
     catMaybes,
     concatMap,
     foldl',
-    map,
-    or,
     otherwise,
     sort,
     ($),
@@ -45,7 +41,7 @@ type Object :: Type
 data Object = Object
   { orgDoc :: OrgDoc,
     symbols :: M.Map T.Text Cell,
-    externalLinkTargets :: [LinkTarget]
+    externalOids :: [LinkOid]
   }
   deriving stock (Eq, Generic, Show)
 
@@ -55,12 +51,9 @@ mkObject :: OrgDoc -> Object
 mkObject orgDoc =
   Object
     { orgDoc = orgDoc,
-      symbols = symbols',
-      externalLinkTargets = targets
+      symbols = mkSymbols orgDoc,
+      externalOids = findExternalOids orgDoc
     }
-  where
-    symbols' = mkSymbols orgDoc
-    targets = findExternalOrgLinkTargets orgDoc symbols'
 
 mkSymbols :: OrgDoc -> M.Map T.Text Cell
 mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
@@ -87,8 +80,8 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
               ]
           | otherwise = []
 
-findExternalOrgLinkTargets :: OrgDoc -> M.Map T.Text Cell -> [LinkTarget]
-findExternalOrgLinkTargets orgDoc symbols =
+findExternalOids :: OrgDoc -> [LinkOid]
+findExternalOids orgDoc =
   sort
     . Set.toList
     . Set.fromList
@@ -115,6 +108,7 @@ findExternalOrgLinkTargets orgDoc symbols =
         let target = LU.mkFqcn linkOid.oid linkOid.name
          in if M.member target symbols
               then acc
-              else link.target : acc
-      LinkTargetOther {} -> link.target : acc
-      LinkTargetURI {} -> acc
+              else linkOid : acc
+      LinkTargetURI {}
+      LinkTargetOther {} -> acc
+    symbols = mkSymbols orgDoc
