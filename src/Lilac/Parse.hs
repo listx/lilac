@@ -48,7 +48,7 @@ import Lilac.Types
     OrgParserState
       ( OrgParserState,
         anonBlockNumber,
-        blockNames,
+        cellNames,
         continuationIndent,
         docOid,
         equationNumber,
@@ -263,7 +263,7 @@ defaultOrgParserState =
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
-      blockNames = Set.empty,
+      cellNames = Set.empty,
       anonBlockNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
@@ -693,17 +693,17 @@ compressProse = reverse . dropUnnecessary . foldl' f []
     dropUnnecessary (((PTokenStyledText (StyledText "" _))) : rest) = rest
     dropUnnecessary tokens = tokens
 
-assertUniqueBlockName :: T.Text -> OrgParser ()
-assertUniqueBlockName blockName = do
+assertUniqueCellName :: T.Text -> OrgParser ()
+assertUniqueCellName cellName = do
   orgParserState <- get
-  when (Set.member blockName orgParserState.blockNames)
+  when (Set.member cellName orgParserState.cellNames)
     . fail
-    $ "block name "
-    <> show blockName
+    $ "cell name "
+    <> show cellName
     <> " is not unique"
   put
     orgParserState
-      { blockNames = Set.insert blockName orgParserState.blockNames
+      { cellNames = Set.insert cellName orgParserState.cellNames
       }
 
 linkParser :: OrgParser Link
@@ -907,7 +907,7 @@ metaNameParser :: OrgParser (T.Text, T.Text)
 metaNameParser = do
   _ <- string "#+name: "
   name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
-  assertUniqueBlockName name
+  assertUniqueCellName name
   pure ("name", name)
 
 assertUniqueTanglePath :: T.Text -> T.Text -> OrgParser ()
@@ -1497,7 +1497,11 @@ figureParser = do
 metaParser :: OrgParser (M.Map T.Text T.Text)
 metaParser = do
   metaKVs <- many $ lexeme metaEntryParser
-  pure $ M.fromList metaKVs
+  let metaKVsMap = M.fromList metaKVs
+  case EM.lookup "name" metaKVsMap of
+    Just cellName -> assertUniqueCellName cellName
+    Nothing -> pure ()
+  pure metaKVsMap
 
 metaEntryParser :: OrgParser (T.Text, T.Text)
 metaEntryParser = do

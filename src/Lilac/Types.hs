@@ -210,7 +210,7 @@ data OrgParserState = OrgParserState
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
     equationNumber :: Int,
-    blockNames :: Set.Set T.Text,
+    cellNames :: Set.Set T.Text,
     anonBlockNumber :: Int,
     tanglePaths :: Set.Set T.Text,
     orgParserConf :: OrgParserConf

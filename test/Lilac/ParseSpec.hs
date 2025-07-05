@@ -29,7 +29,7 @@ import Lilac.Types
     OrgParserState
       ( OrgParserState,
         anonBlockNumber,
-        blockNames,
+        cellNames,
         continuationIndent,
         docOid,
         equationNumber,
@@ -267,7 +267,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.empty,
+        cellNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -325,7 +325,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.empty,
+        cellNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -354,7 +354,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.empty,
+        cellNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -403,7 +403,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.empty,
+        cellNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 20}
@@ -439,7 +439,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.empty,
+        cellNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 0}
@@ -554,7 +554,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.empty,
+        cellNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -592,7 +592,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.empty,
+        cellNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -630,7 +630,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.empty,
+        cellNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -835,7 +835,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.empty,
+        cellNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -1193,7 +1193,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.empty,
+        cellNames = Set.empty,
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -1616,7 +1616,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames = Set.fromList ["foo"],
+        cellNames = Set.fromList ["foo"],
         anonBlockNumber = 2,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -1712,7 +1712,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames =
+        cellNames =
           Set.fromList
             [ "empty",
               "end has no preceding blank line",
@@ -1882,7 +1882,7 @@ parseSpec = do
 
   pf
     "0007-blocks-duplicate-names"
-    "block name \"foo\" is not unique"
+    "cell name \"foo\" is not unique"
     52
 
   pf
@@ -2277,7 +2277,11 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 3,
-        blockNames = Set.empty,
+        cellNames =
+          Set.fromList
+            [ "eq:x",
+              "eq:y"
+            ],
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -2334,7 +2338,11 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 1,
-        blockNames = Set.empty,
+        cellNames =
+          Set.fromList
+            [ "eq:x",
+              "eq:y"
+            ],
         anonBlockNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
@@ -2434,318 +2442,363 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
-        blockNames =
+        cellNames =
           Set.fromList
             [ "f:f",
-              "f:g"
+              "f:g",
+              "fig:hello"
             ],
         anonBlockNumber = 0,
         tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
 
-  p
+  ps
     "0012-tables-and-prose"
-    $ nilOrgDoc
-      [ CTable
-          Table
-            { meta =
-                fromList
-                  [ ("name", "tbl:famous-equations")
-                  ],
-              grid =
-                fromList
-                  [ ( (1, 1),
-                      [ PTokenStyledText
-                          ( StyledText
-                              { body = "Name",
-                                style = L.styleMaskFrom []
-                              }
-                          )
-                      ]
-                    ),
-                    ( (1, 2),
-                      [ PTokenStyledText
-                          ( StyledText
-                              { body = "Equation",
-                                style = L.styleMaskFrom []
-                              }
-                          )
-                      ]
-                    ),
-                    ( (1, 3),
-                      [ PTokenStyledText
-                          ( StyledText
-                              { body = "Link",
-                                style = L.styleMaskFrom []
-                              }
-                          )
-                      ]
-                    ),
-                    ( (2, 1),
-                      []
-                    ),
-                    ( (3, 1),
-                      [ PTokenStyledText
-                          ( StyledText
-                              { body = "Pythagoras | Foo",
-                                style = L.styleMaskFrom []
-                              }
-                          )
-                      ]
-                    ),
-                    ( (3, 2),
-                      [ PTokenMathFragment
-                          ( MathFragment
-                              { meta = fromList [],
-                                body = "a^2 + b^2 = c^2"
-                              }
-                          )
-                      ]
-                    ),
-                    ( (3, 3),
-                      [ PTokenLink
-                          ( Link
-                              { target =
-                                  LinkTargetURI
-                                    N.URI
-                                      { N.uriScheme = "https:",
-                                        N.uriAuthority =
-                                          Just
-                                            N.URIAuth
-                                              { N.uriUserInfo = "",
-                                                N.uriRegName = "wiki",
-                                                N.uriPort = ""
-                                              },
-                                        N.uriPath = "/x",
-                                        N.uriQuery = "",
-                                        N.uriFragment = ""
-                                      },
-                                name =
-                                  [ StyledText
-                                      { body = "Wiki",
-                                        style = L.styleMaskFrom []
-                                      }
-                                  ]
-                              }
-                          )
-                      ]
-                    ),
-                    ( (4, 1),
-                      [ PTokenStyledText
-                          ( StyledText
-                              { body = "Albert ",
-                                style = L.styleMaskFrom []
-                              }
-                          ),
-                        PTokenStyledText
-                          ( StyledText
-                              { body = "Einstein",
-                                style = L.styleMaskFrom [Bold]
-                              }
-                          )
-                      ]
-                    ),
-                    ( (4, 2),
-                      [ PTokenMathFragment
-                          ( MathFragment
-                              { meta = fromList [],
-                                body = "E = mc^2"
-                              }
-                          )
-                      ]
-                    ),
-                    ( (4, 3),
-                      [ PTokenLink
-                          ( Link
-                              { target =
-                                  LinkTargetURI
-                                    N.URI
-                                      { N.uriScheme = "https:",
-                                        N.uriAuthority =
-                                          Just
-                                            N.URIAuth
-                                              { N.uriUserInfo = "",
-                                                N.uriRegName = "wiki",
-                                                N.uriPort = ""
-                                              },
-                                        N.uriPath = "/y",
-                                        N.uriQuery = "",
-                                        N.uriFragment = ""
-                                      },
-                                name =
-                                  [ StyledText
-                                      { body = "Wiki",
-                                        style = L.styleMaskFrom []
-                                      }
-                                  ]
-                              }
-                          )
-                      ]
-                    )
-                  ]
-            }
-      ]
+    ( nilOrgDoc
+        [ CTable
+            Table
+              { meta =
+                  fromList
+                    [ ("name", "tbl:famous-equations")
+                    ],
+                grid =
+                  fromList
+                    [ ( (1, 1),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Name",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (1, 2),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Equation",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (1, 3),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Link",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (2, 1),
+                        []
+                      ),
+                      ( (3, 1),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Pythagoras | Foo",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (3, 2),
+                        [ PTokenMathFragment
+                            ( MathFragment
+                                { meta = fromList [],
+                                  body = "a^2 + b^2 = c^2"
+                                }
+                            )
+                        ]
+                      ),
+                      ( (3, 3),
+                        [ PTokenLink
+                            ( Link
+                                { target =
+                                    LinkTargetURI
+                                      N.URI
+                                        { N.uriScheme = "https:",
+                                          N.uriAuthority =
+                                            Just
+                                              N.URIAuth
+                                                { N.uriUserInfo = "",
+                                                  N.uriRegName = "wiki",
+                                                  N.uriPort = ""
+                                                },
+                                          N.uriPath = "/x",
+                                          N.uriQuery = "",
+                                          N.uriFragment = ""
+                                        },
+                                  name =
+                                    [ StyledText
+                                        { body = "Wiki",
+                                          style = L.styleMaskFrom []
+                                        }
+                                    ]
+                                }
+                            )
+                        ]
+                      ),
+                      ( (4, 1),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Albert ",
+                                  style = L.styleMaskFrom []
+                                }
+                            ),
+                          PTokenStyledText
+                            ( StyledText
+                                { body = "Einstein",
+                                  style = L.styleMaskFrom [Bold]
+                                }
+                            )
+                        ]
+                      ),
+                      ( (4, 2),
+                        [ PTokenMathFragment
+                            ( MathFragment
+                                { meta = fromList [],
+                                  body = "E = mc^2"
+                                }
+                            )
+                        ]
+                      ),
+                      ( (4, 3),
+                        [ PTokenLink
+                            ( Link
+                                { target =
+                                    LinkTargetURI
+                                      N.URI
+                                        { N.uriScheme = "https:",
+                                          N.uriAuthority =
+                                            Just
+                                              N.URIAuth
+                                                { N.uriUserInfo = "",
+                                                  N.uriRegName = "wiki",
+                                                  N.uriPort = ""
+                                                },
+                                          N.uriPath = "/y",
+                                          N.uriQuery = "",
+                                          N.uriFragment = ""
+                                        },
+                                  name =
+                                    [ StyledText
+                                        { body = "Wiki",
+                                          style = L.styleMaskFrom []
+                                        }
+                                    ]
+                                }
+                            )
+                        ]
+                      )
+                    ]
+              }
+        ]
+    )
+    OrgParserState
+      { goids = fromList [],
+        docOid = nilOid,
+        headingOidStack = [],
+        headingLevel = 0,
+        headingSection = [],
+        styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
+        insideLinkDisplayName = False,
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0,
+        cellNames =
+          Set.fromList
+            [ "tbl:famous-equations"
+            ],
+        anonBlockNumber = 0,
+        tanglePaths = Set.fromList [],
+        orgParserConf = L.defaultOrgParserConf
+      }
 
-  p
+  ps
     "0012-tables-inside-lists"
-    $ nilOrgDoc
-      [ CListItem
-          [ LOrderedStart,
-            LItemStart
-          ],
-        CParagraph
-          [ PTokenStyledText
-              ( StyledText
-                  { body = "foo",
-                    style = L.styleMaskFrom []
-                  }
-              )
-          ],
-        CTable
-          Table
-            { meta =
-                fromList
-                  [ ("name", "tbl:famous-equations"),
-                    ("bar", "baz")
-                  ],
-              grid =
-                fromList
-                  [ ( (1, 1),
-                      [ PTokenStyledText
-                          ( StyledText
-                              { body = "Name",
-                                style = L.styleMaskFrom []
-                              }
-                          )
-                      ]
-                    ),
-                    ( (1, 2),
-                      [ PTokenStyledText
-                          ( StyledText
-                              { body = "Equation",
-                                style = L.styleMaskFrom []
-                              }
-                          )
-                      ]
-                    ),
-                    ( (1, 3),
-                      [ PTokenStyledText
-                          ( StyledText
-                              { body = "Link",
-                                style = L.styleMaskFrom []
-                              }
-                          )
-                      ]
-                    ),
-                    ( (2, 1),
-                      []
-                    ),
-                    ( (3, 1),
-                      [ PTokenStyledText
-                          ( StyledText
-                              { body = "Pythagoras | Foo",
-                                style = L.styleMaskFrom []
-                              }
-                          )
-                      ]
-                    ),
-                    ( (3, 2),
-                      [ PTokenMathFragment
-                          ( MathFragment
-                              { meta = fromList [],
-                                body = "a^2 + b^2 = c^2"
-                              }
-                          )
-                      ]
-                    ),
-                    ( (3, 3),
-                      [ PTokenLink
-                          ( Link
-                              { target =
-                                  LinkTargetURI
-                                    N.URI
-                                      { N.uriScheme = "https:",
-                                        N.uriAuthority =
-                                          Just
-                                            N.URIAuth
-                                              { N.uriUserInfo = "",
-                                                N.uriRegName = "wiki",
-                                                N.uriPort = ""
-                                              },
-                                        N.uriPath = "/x",
-                                        N.uriQuery = "",
-                                        N.uriFragment = ""
-                                      },
-                                name =
-                                  [ StyledText
-                                      { body = "Wiki",
-                                        style = L.styleMaskFrom []
-                                      }
-                                  ]
-                              }
-                          )
-                      ]
-                    ),
-                    ( (4, 1),
-                      [ PTokenStyledText
-                          ( StyledText
-                              { body = "Albert ",
-                                style = L.styleMaskFrom []
-                              }
-                          ),
-                        PTokenStyledText
-                          ( StyledText
-                              { body = "Einstein",
-                                style = L.styleMaskFrom [Bold]
-                              }
-                          )
-                      ]
-                    ),
-                    ( (4, 2),
-                      [ PTokenMathFragment
-                          ( MathFragment
-                              { meta = fromList [],
-                                body = "E = mc^2"
-                              }
-                          )
-                      ]
-                    ),
-                    ( (4, 3),
-                      [ PTokenLink
-                          ( Link
-                              { target =
-                                  LinkTargetURI
-                                    N.URI
-                                      { N.uriScheme = "https:",
-                                        N.uriAuthority =
-                                          Just
-                                            N.URIAuth
-                                              { N.uriUserInfo = "",
-                                                N.uriRegName = "wiki",
-                                                N.uriPort = ""
-                                              },
-                                        N.uriPath = "/y",
-                                        N.uriQuery = "",
-                                        N.uriFragment = ""
-                                      },
-                                name =
-                                  [ StyledText
-                                      { body = "Wiki",
-                                        style = L.styleMaskFrom []
-                                      }
-                                  ]
-                              }
-                          )
-                      ]
-                    )
-                  ]
-            },
-        CListItem
-          [ LItemEnd,
-            LOrderedEnd
-          ]
-      ]
+    ( nilOrgDoc
+        [ CListItem
+            [ LOrderedStart,
+              LItemStart
+            ],
+          CParagraph
+            [ PTokenStyledText
+                ( StyledText
+                    { body = "foo",
+                      style = L.styleMaskFrom []
+                    }
+                )
+            ],
+          CTable
+            Table
+              { meta =
+                  fromList
+                    [ ("name", "tbl:famous-equations"),
+                      ("bar", "baz")
+                    ],
+                grid =
+                  fromList
+                    [ ( (1, 1),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Name",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (1, 2),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Equation",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (1, 3),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Link",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (2, 1),
+                        []
+                      ),
+                      ( (3, 1),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Pythagoras | Foo",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (3, 2),
+                        [ PTokenMathFragment
+                            ( MathFragment
+                                { meta = fromList [],
+                                  body = "a^2 + b^2 = c^2"
+                                }
+                            )
+                        ]
+                      ),
+                      ( (3, 3),
+                        [ PTokenLink
+                            ( Link
+                                { target =
+                                    LinkTargetURI
+                                      N.URI
+                                        { N.uriScheme = "https:",
+                                          N.uriAuthority =
+                                            Just
+                                              N.URIAuth
+                                                { N.uriUserInfo = "",
+                                                  N.uriRegName = "wiki",
+                                                  N.uriPort = ""
+                                                },
+                                          N.uriPath = "/x",
+                                          N.uriQuery = "",
+                                          N.uriFragment = ""
+                                        },
+                                  name =
+                                    [ StyledText
+                                        { body = "Wiki",
+                                          style = L.styleMaskFrom []
+                                        }
+                                    ]
+                                }
+                            )
+                        ]
+                      ),
+                      ( (4, 1),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Albert ",
+                                  style = L.styleMaskFrom []
+                                }
+                            ),
+                          PTokenStyledText
+                            ( StyledText
+                                { body = "Einstein",
+                                  style = L.styleMaskFrom [Bold]
+                                }
+                            )
+                        ]
+                      ),
+                      ( (4, 2),
+                        [ PTokenMathFragment
+                            ( MathFragment
+                                { meta = fromList [],
+                                  body = "E = mc^2"
+                                }
+                            )
+                        ]
+                      ),
+                      ( (4, 3),
+                        [ PTokenLink
+                            ( Link
+                                { target =
+                                    LinkTargetURI
+                                      N.URI
+                                        { N.uriScheme = "https:",
+                                          N.uriAuthority =
+                                            Just
+                                              N.URIAuth
+                                                { N.uriUserInfo = "",
+                                                  N.uriRegName = "wiki",
+                                                  N.uriPort = ""
+                                                },
+                                          N.uriPath = "/y",
+                                          N.uriQuery = "",
+                                          N.uriFragment = ""
+                                        },
+                                  name =
+                                    [ StyledText
+                                        { body = "Wiki",
+                                          style = L.styleMaskFrom []
+                                        }
+                                    ]
+                                }
+                            )
+                        ]
+                      )
+                    ]
+              },
+          CListItem
+            [ LItemEnd,
+              LOrderedEnd
+            ]
+        ]
+    )
+    OrgParserState
+      { goids = fromList [],
+        docOid = nilOid,
+        headingOidStack = [],
+        headingLevel = 0,
+        headingSection = [],
+        styleMask = L.styleMaskFrom [],
+        insideCodeBlock = False,
+        insideLinkDisplayName = False,
+        listLevels = [],
+        listMarkers = [],
+        continuationIndent = 0,
+        equationNumber = 0,
+        cellNames =
+          Set.fromList
+            [ "tbl:famous-equations"
+            ],
+        anonBlockNumber = 0,
+        tanglePaths = Set.fromList [],
+        orgParserConf = L.defaultOrgParserConf
+      }
 
   pGOIDs
     "0200-goids-file-empty"
