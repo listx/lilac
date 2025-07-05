@@ -1472,20 +1472,20 @@ figureParser = do
     $ fail "figures are not allowed inside list items"
   _ <- MP.try $ MP.lookAhead (metaParser >> otherLinkParser >> endOfCell)
   metaKVs <- metaParser
+  when (EM.lookup "type" metaKVs /= Just "figure")
+    $ fail "type must be 'figure'"
   link <- otherLinkParser
   case link.target of
+    LinkTargetOther "file" _ ->
+      pure
+        . CFigure
+        $ Figure
+          { meta = EM.delete "type" metaKVs,
+            link = link
+          }
     LinkTargetOid {}
-    LinkTargetURI {} -> fail "'file:...' required for link to figures"
-    LinkTargetOther protocol _
-      | protocol /= "file" ->
-          fail $ "expected 'file' protocol, got '" <> (T.unpack protocol) <> "'"
-      | otherwise ->
-          pure
-            . CFigure
-            $ Figure
-              { meta = metaKVs,
-                link = link
-              }
+    LinkTargetURI {}
+    LinkTargetOther {} -> fail "'file:...' required for link to figures"
   where
     endOfCell :: OrgParser ()
     endOfCell =

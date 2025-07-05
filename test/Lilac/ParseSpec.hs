@@ -2426,7 +2426,55 @@ parseSpec = do
           CListItem
             [ LItemEnd,
               LUnorderedEnd
-            ]
+            ],
+          CParagraph
+            [ PTokenLink
+                Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "not a figure"
+                          },
+                    name =
+                      [ StyledText
+                          { body = "not a figure",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+            ],
+          CParagraph
+            [ PTokenLink
+                Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "not a figure"
+                          },
+                    name =
+                      [ StyledText
+                          { body = "not a figure",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+            ],
+          CFigure
+            Figure
+              { meta = fromList [],
+                link =
+                  Link
+                    { target = LinkTargetOther "file" "foo.png",
+                      name =
+                        [ StyledText
+                            { body = "file:foo.png",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+              }
         ]
     )
     OrgParserState

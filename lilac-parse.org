@@ -7201,6 +7201,7 @@ instance ToJSON Figure
 Below is an example of a figure:
 
 #+name: fig:Portable Network Graphics sample image
+#+type: figure
 #+attr_html: :width 100%
 [[file:image/PNG-Gradient.png]]
 
@@ -7220,20 +7221,20 @@ figureParser = do
     $ fail "figures are not allowed inside list items"
   _ <- MP.try $ MP.lookAhead (metaParser >> otherLinkParser >> endOfCell)
   metaKVs <- metaParser
+  when (EM.lookup "type" metaKVs /= Just "figure")
+    $ fail "type must be 'figure'"
   link <- otherLinkParser
   case link.target of
+    LinkTargetOther "file" _ ->
+      pure
+        . CFigure
+        $ Figure
+          { meta = EM.delete "type" metaKVs,
+            link = link
+          }
     LinkTargetOid {}
-    LinkTargetURI {} -> fail "'file:...' required for link to figures"
-    LinkTargetOther protocol _
-      | protocol /= "file" ->
-          fail $ "expected 'file' protocol, got '" <> (T.unpack protocol) <> "'"
-      | otherwise ->
-          pure
-            . CFigure
-            $ Figure
-              { meta = metaKVs,
-                link = link
-              }
+    LinkTargetURI {}
+    LinkTargetOther {} -> fail "'file:...' required for link to figures"
   where
     endOfCell :: OrgParser ()
     endOfCell =
@@ -7304,6 +7305,7 @@ f = 1 + 1
 ,#+end_src
 
 ,#+name: fig:hello
+,#+type: figure
 ,#+attr_html: :width 100%
 [[file:image/hello.png]]
 
@@ -7313,9 +7315,17 @@ f = 1 + 1
 g x = x + 1
 ,#+end_src
 
+,#+type: figure
 [[file:image/world.png]]
 
   - [[file:not-figure]]
+
+[[not a figure]]
+
+[[id:00000000-0000-0000-0000-000000000000::not a figure]]
+
+,#+type: figure
+[[file:foo.png]]
 #+end_src
 
 #+name: t:0011-figures-and-blocks
@@ -7398,7 +7408,55 @@ ps
         CListItem
           [ LItemEnd,
             LUnorderedEnd
-          ]
+          ],
+        CParagraph
+          [ PTokenLink
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "not a figure"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "not a figure",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
+          ],
+        CParagraph
+          [ PTokenLink
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "not a figure"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "not a figure",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
+          ],
+        CFigure
+          Figure
+            { meta = fromList [],
+              link =
+                Link
+                  { target = LinkTargetOther "file" "foo.png",
+                    name =
+                      [ StyledText
+                          { body = "file:foo.png",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+            }
       ]
   )
   OrgParserState
