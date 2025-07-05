@@ -106,7 +106,6 @@ import Relude
     fmap,
     foldl',
     fromEnum,
-    fromMaybe,
     fst,
     get,
     isJust,
@@ -789,34 +788,27 @@ protocolWebLinkParser = do
 
 otherLinkParser :: OrgParser Link
 otherLinkParser = do
-  _ <- string "["
+  _ <- string "[["
   target <-
-    MP.between
-      (string "[")
-      (string "]")
-      ( MP.label "external link target"
-          $ MP.some
-          $ MP.anySingleBut ']'
-      )
-  name <-
-    MP.optional
-      $ MP.between
-        (string "[")
-        (string "]")
-        ( MP.label "external link name"
-            $ MP.some
-            $ MP.anySingleBut ']'
-        )
+    MP.label "external link target"
+      $ MP.some
+      $ MP.anySingleBut ']'
   _ <- string "]"
+  orgParserState <- get
+  let implicitNameStyledText =
+        StyledText
+          { body = T.pack target,
+            style = orgParserState.styleMask
+          }
+  displayName <-
+    MP.choice
+      [ MP.try $ string "]" >> pure [implicitNameStyledText],
+        MP.try linkDisplayNameParser
+      ]
   pure
     Link
       { target = LinkTargetOther $ T.pack target,
-        name =
-          [ StyledText
-              { body = T.pack (fromMaybe target name),
-                style = styleMaskFrom []
-              }
-          ]
+        name = displayName
       }
 
 rawLinkParser :: OrgParser Link
