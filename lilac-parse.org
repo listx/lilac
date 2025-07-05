@@ -7196,21 +7196,36 @@ Below is an example of a figure:
 #+attr_html: :width 100%
 [[file:image/PNG-Gradient.png]]
 
-First we have to parse for the metadata, and then the link.
+First we have to parse for the metadata, and then the link. We don't allow
+figures inside list items, because that's just weird (how are you going to have
+metadata for that list item?).
+
+For the link target itself, just check that it's pointing to a file (instead of
+accepting any link).
 
 #+name: f:figureParser
 #+begin_src haskell
 figureParser :: OrgParser Cell
 figureParser = do
+  orgParserState <- get
+  when (orgParserState.listLevels /= [])
+    $ fail "figures are not allowed inside list items"
   _ <- MP.try $ MP.lookAhead (metaParser >> otherLinkParser >> endOfCell)
   metaKVs <- metaParser
   link <- otherLinkParser
-  pure
-    . CFigure
-    $ Figure
-      { meta = metaKVs,
-        link = link
-      }
+  case link.target of
+    LinkTargetOid {}
+    LinkTargetURI {} -> fail "'file:...' required for link to figures"
+    LinkTargetOther protocol _
+      | protocol /= "file" ->
+          fail $ "expected 'file' protocol, got '" <> (T.unpack protocol) <> "'"
+      | otherwise ->
+          pure
+            . CFigure
+            $ Figure
+              { meta = metaKVs,
+                link = link
+              }
   where
     endOfCell :: OrgParser ()
     endOfCell =
@@ -7283,6 +7298,8 @@ g x = x + 1
 ,#+end_src
 
 [[file:image/world.png]]
+
+  - [[file:not-figure]]
 #+end_src
 
 #+name: t:0011-figures-and-blocks
@@ -7345,7 +7362,27 @@ ps
                           }
                       ]
                   }
-            }
+            },
+        CListItem
+          [ LUnorderedStart,
+            LItemStart
+          ],
+        CParagraph
+          [ PTokenLink
+              Link
+                { target = LinkTargetOther "file" "not-figure",
+                  name =
+                    [ StyledText
+                        { body = "file:not-figure",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
+          ],
+        CListItem
+          [ LItemEnd,
+            LUnorderedEnd
+          ]
       ]
   )
   OrgParserState

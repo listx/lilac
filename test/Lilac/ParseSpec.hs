@@ -2398,7 +2398,27 @@ parseSpec = do
                             }
                         ]
                     }
-              }
+              },
+          CListItem
+            [ LUnorderedStart,
+              LItemStart
+            ],
+          CParagraph
+            [ PTokenLink
+                Link
+                  { target = LinkTargetOther "file" "not-figure",
+                    name =
+                      [ StyledText
+                          { body = "file:not-figure",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+            ],
+          CListItem
+            [ LItemEnd,
+              LUnorderedEnd
+            ]
         ]
     )
     OrgParserState

@@ -1467,15 +1467,25 @@ mathFragmentStandaloneParser =
 
 figureParser :: OrgParser Cell
 figureParser = do
+  orgParserState <- get
+  when (orgParserState.listLevels /= [])
+    $ fail "figures are not allowed inside list items"
   _ <- MP.try $ MP.lookAhead (metaParser >> otherLinkParser >> endOfCell)
   metaKVs <- metaParser
   link <- otherLinkParser
-  pure
-    . CFigure
-    $ Figure
-      { meta = metaKVs,
-        link = link
-      }
+  case link.target of
+    LinkTargetOid {}
+    LinkTargetURI {} -> fail "'file:...' required for link to figures"
+    LinkTargetOther protocol _
+      | protocol /= "file" ->
+          fail $ "expected 'file' protocol, got '" <> (T.unpack protocol) <> "'"
+      | otherwise ->
+          pure
+            . CFigure
+            $ Figure
+              { meta = metaKVs,
+                link = link
+              }
   where
     endOfCell :: OrgParser ()
     endOfCell =
