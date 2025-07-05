@@ -58,7 +58,8 @@ module Lilac.Types
   )
 where
 
-import Data.Aeson (ToJSON)
+import Data.Aeson (ToJSON, ToJSONKey, toJSONKey)
+import Data.Aeson.Types (toJSONKeyText)
 import Data.Bits.Bitwise (toListLE)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
@@ -100,6 +101,7 @@ import Prelude qualified (show)
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Level>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Link>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:LinkOid>>
+<<id:01da95fe-ba23-4481-9833-428423392f5f::tc:ToJSONKey LinkOid>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:LinkTarget>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:ListMarker>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:MathFragment>>

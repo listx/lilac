@@ -12,6 +12,7 @@ module Lilac.Parse
     parseOrgDoc,
     runGoidsParser,
     styleMaskFrom,
+    validateOidText,
   )
 where
 

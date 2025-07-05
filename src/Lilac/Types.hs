@@ -31,7 +31,8 @@ module Lilac.Types
   )
 where
 
-import Data.Aeson (ToJSON)
+import Data.Aeson (ToJSON, ToJSONKey, toJSONKey)
+import Data.Aeson.Types (toJSONKeyText)
 import Data.Bits.Bitwise (toListLE)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
@@ -141,6 +142,9 @@ data LinkOid = LinkOid
   deriving stock (Eq, Generic, Ord, Show)
 
 instance ToJSON LinkOid
+
+instance ToJSONKey LinkOid where
+  toJSONKey = toJSONKeyText T.show
 
 type LinkTarget :: Type
 data LinkTarget
