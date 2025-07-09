@@ -19,6 +19,7 @@ be tangled or weaved.
 module Lilac.Compile
   ( Archive,
     Object,
+    findCycles,
     findExternalOids,
     mkObject,
     mkArchive,
@@ -26,6 +27,7 @@ module Lilac.Compile
 where
 
 import Data.Aeson (ToJSON)
+import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -37,7 +39,7 @@ import Lilac.Types
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (meta),
     Heading (body, meta),
-    Link (target),
+    Link (Link, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     MathFragment (meta),
@@ -56,7 +58,10 @@ import Relude
     Type,
     catMaybes,
     concatMap,
+    elem,
+    fmap,
     foldl',
+    length,
     map,
     otherwise,
     sort,
@@ -64,6 +69,7 @@ import Relude
     (.),
     (/=),
     (<>),
+    (>),
   )
 import Relude.Extra.Map qualified as EM
 
@@ -73,6 +79,8 @@ import Relude.Extra.Map qualified as EM
 <<f:mkObject>>
 <<f:mkSymbols>>
 <<f:mkArchive>>
+<<f:buildGraph>>
+<<f:findCycles>>
 <<f:findExternalOids>>
 #+end_src
 
@@ -349,7 +357,7 @@ instance ToJSON Archive
 #+end_src
 
 A [[data:Archive]] is just a collection of [[data:Object]] values, which are each paired
-with the ~FilePath~ of where that object was found. In order to create a ~Archive~,
+with the ~FilePath~ of where that object was found. In order to create an ~Archive~,
 it must not have any broken links.
 
 #+name: f:mkArchive
@@ -535,6 +543,578 @@ expectArchiveOk
   ]
 #+end_src
 
+** Cycle detection for Noweb links
+
+All Noweb links (for code blocks) inside an [[data:Archive][Archive]] must be such that they do
+not form a cycle. This is because we have to expand (replace with the actual
+text) Noweb links during the tangling process, and we don't want to be in the
+position of expanding things forever.
+
+We want to build up a graph using the Noweb link information embedded in each
+block. Using a graph data structure allows us to easily detect cycles, which are
+not allowed for tangling because they cannot be resolved.
+
+You may think we could avoid using graphs entirely, and just use an algorithm
+like "keep expanding all Noweb links recursively; if we see a Noweb link being
+used more than once, error out" to detect cycles. However this won't work
+because you can technically reference the same block multiple times at different
+points in the tree.
+
+Specifically, we want to build a /directed/ graph where we treat all blocks as
+nodes (vertices) and the dependency of Noweb links as edges. So if a block =x=
+depends on a Noweb link =y=, then =x= would point to =y=.
+
+From CLRS 3rd, Ch 22 p. 614 we can find a more formal definition of cycles in a
+directed graph:
+
+#+begin_quote
+A directed graph G is acyclic if and only if a depth-first search of G yields no
+back edges.
+#+end_quote
+
+And a back edge is defined like this in CLRS p. 609:
+
+#+begin_quote
+Back edges are those edges (u, v) connecting a vertex u to an ancestor v in a
+depth-first tree. We consider self-loops, which may occur in directed graphs, to
+be back edges.
+#+end_quote
+
+Note that a back edge can be either an edge that points back to an ancestor, or
+a self-loop. Whether an edge points back to an ancestor can be determined by
+finding strongly connected components with more than one vertex. And we can
+check for self-loops by just seeing if a block links to itself.
+
+Checking for strongly connected components can be done with the =scc= function
+provided by the =Data.Graph= library. This library also lets us create a /single/
+graph with all of the blocks in it because the library doesn't care whether the
+edges we feed into it are connected.
+
+The [[f:buildGraph]] function looks at all code blocks and generates the necessary
+edges to build up a directed graph. It does this by constructing edges that have
+the [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] of the starting block as one vertex, and the Noweb links found
+inside the body as the other vertices.
+
+#+name: f:buildGraph
+#+begin_src haskell
+buildGraph ::
+  [Block] ->
+  ( G.Graph,
+    G.Vertex -> (Block, LinkOid, [LinkOid]),
+    LinkOid -> Maybe G.Vertex
+  )
+buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
+  where
+    f ::
+      [(Block, LinkOid, [LinkOid])] ->
+      Block ->
+      [(Block, LinkOid, [LinkOid])]
+    f acc block
+      | Just name <- EM.lookup "name" block.meta =
+          let selfLink = LinkOid block.parentOid name
+           in (\outLinks -> (block, selfLink, outLinks) : acc)
+                . catMaybes
+                $ map getOutLinks block.body
+      | otherwise = acc
+    getOutLinks = \case
+      BTokenLink (Link _ (LinkTargetOid linkOid)) -> Just linkOid
+      BTokenLink {}
+      BTokenPadding {}
+      BTokenString {} -> Nothing
+#+end_src
+
+The [[f:findCycles]] function takes the output of [[f:buildGraph]] and uses that to run
+the =scc= function to get the strongly connected components, which we filter to
+only keep the ones that have cycles in them.
+
+#+name: f:findCycles
+#+begin_src haskell
+findCycles :: Archive -> [G.Tree LinkOid]
+findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
+  where
+    blocks = foldl' getBlocksFromAllSymbols [] $ M.elems archive.symbols
+    getBlocksFromAllSymbols acc cell = case cell of
+      CBlock b -> b : acc
+      CHeading {}
+      CListItem {}
+      CParagraph {}
+      CMathFragment {}
+      CFigure {}
+      CTable {} -> acc
+    (graph, vertexToNode, _) = buildGraph blocks
+    toLinkOid vertex =
+      let (_, selfLink, _) = vertexToNode vertex
+       in selfLink
+    f acc tree@(G.Node vertex _)
+      | length tree > 1 = tree : acc
+      | (_, selfLink, outLinks) <- vertexToNode vertex,
+        elem selfLink outLinks =
+          tree : acc
+      | otherwise = acc
+#+end_src
+
+The line ~M.elems archive.symbols~ just gets all code blocks from the ~symbols~
+field of the [[data:Archive]] (perhaps ~M.elems~ is a poor name and should have been
+called ~M.values~ instead, but that's another matter).
+
+Checking for back edges means just seeing whether there is more than one vertex,
+or if there are any self-loops; these concerns are encoded in the ~f~ helper
+function.
+
+*** Tests
+
+We use the [[f:checkCycles]] helper (powered by [[f:findCycles]] underneath) to detect
+cycles (or lack thereof).
+
+# Sadly, vale gets confused for some reason and thinks we should be capitalizing
+# "noweb" even when they're inside verbatim text. So we have to turn it off
+# temporarily here.
+# vale off
+
+First let's check for the happy path where there are no cycles. Note the use of
+~:noweb off~ so as to preserve the Noweb link declaration (see [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::f:nowebLinkParser][f:nowebLinkParser]]
+and [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::t:0007-blocks-noweb][t:0007-blocks-noweb]] for more sample usage of ~:noweb off~).
+
+# vale on
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-no-loops
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e000
+:END:
+
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+
+,#+name: f:b
+,#+begin_src haskell
+g = 2 + 2
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-no-loops
+#+begin_src haskell
+checkCycles
+  ["0100-dag-no-loops"]
+  []
+#+end_src
+
+Now check for the simplest case of a single self-loop.
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-self-loop
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e001
+:END:
+
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-self-loop
+#+begin_src haskell
+checkCycles
+  ["0100-dag-self-loop"]
+  [ Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000e001,
+              name = "f:a"
+            },
+        subForest = []
+      }
+  ]
+#+end_src
+
+Check whether we can detect two independent self-loops.
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-self-loops
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e003
+:END:
+
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+
+,#+name: f:b
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-self-loops
+#+begin_src haskell
+checkCycles
+  ["0100-dag-self-loops"]
+  [ Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000e003,
+              name = "f:a"
+            },
+        subForest = []
+      },
+    Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000e003,
+              name = "f:b"
+            },
+        subForest = []
+      }
+  ]
+#+end_src
+
+Check whether we can detect a back edge to an ancestor. In
+[[t:0100-dag-2-node-loop]] we have a cycle involving 2 nodes.
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e004
+:END:
+
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+
+,#+name: f:b
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-2-node-loop
+#+begin_src haskell
+checkCycles
+  ["0100-dag-2-node-loop"]
+  [ Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000e004,
+              name = "f:a"
+            },
+        subForest =
+          [ Node
+              { rootLabel =
+                  LinkOid
+                    { oid = fromWords 0x0000000000000000 0x000000000000e004,
+                      name = "f:b"
+                    },
+                subForest = []
+              }
+          ]
+      }
+  ]
+#+end_src
+
+Test case [[t:0100-dag-3-node-loop]] is like the previous one, but where the loop is
+one node longer (involves 3 nodes instead of 2).
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-3-node-loop
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e005
+:END:
+
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+
+,#+name: f:b
+,#+begin_src haskell
+f = 1 + 1
+<<f:c>>
+,#+end_src
+
+,#+name: f:c
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-3-node-loop
+#+begin_src haskell
+checkCycles
+  ["0100-dag-3-node-loop"]
+  [ Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000e005,
+              name = "f:a"
+            },
+        subForest =
+          [ Node
+              { rootLabel =
+                  LinkOid
+                    { oid = fromWords 0x0000000000000000 0x000000000000e005,
+                      name = "f:b"
+                    },
+                subForest =
+                  [ Node
+                      { rootLabel =
+                          LinkOid
+                            { oid = fromWords 0x0000000000000000 0x000000000000e005,
+                              name = "f:c"
+                            },
+                        subForest = []
+                      }
+                  ]
+              }
+          ]
+      }
+  ]
+#+end_src
+
+Lastly, we have a test case involving complex loops. There are many back edges
+involved here; we just want to make sure that our algorithm for finding cycles
+is still able to handle such pathological input.
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-complex-loops
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e006
+:END:
+
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+
+,#+name: f:b
+,#+begin_src haskell
+f = 1 + 1
+<<f:c>>
+<<f:d>>
+,#+end_src
+
+,#+name: f:c
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+
+,#+name: f:d
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+<<f:d>>
+,#+end_src
+
+,#+name: f:e
+,#+begin_src haskell
+f = 1 + 1
+<<f:e>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-complex-loops
+#+begin_src haskell
+checkCycles
+  ["0100-dag-complex-loops"]
+  [ Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000e006,
+              name = "f:a"
+            },
+        subForest =
+          [ Node
+              { rootLabel =
+                  LinkOid
+                    { oid = fromWords 0x0000000000000000 0x000000000000e006,
+                      name = "f:b"
+                    },
+                subForest =
+                  [ Node
+                      { rootLabel =
+                          LinkOid
+                            { oid = fromWords 0x0000000000000000 0x000000000000e006,
+                              name = "f:c"
+                            },
+                        subForest = []
+                      },
+                    Node
+                      { rootLabel =
+                          LinkOid
+                            { oid = fromWords 0x0000000000000000 0x000000000000e006,
+                              name = "f:d"
+                            },
+                        subForest = []
+                      }
+                  ]
+              }
+          ]
+      },
+    Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000e006,
+              name = "f:e"
+            },
+        subForest = []
+      }
+  ]
+#+end_src
+
+Cycle detection should still work even for cycles that span across
+two files.
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-2-files-parent
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f004
+:END:
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+hello from a
+<<id:00000000-0000-0000-0000-00000000f005::b>>
+,#+end_src
+#+end_src
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-2-files-child
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f005
+:END:
+,#+name: b
+,#+begin_src haskell
+hello from b
+<<id:00000000-0000-0000-0000-00000000f004::a>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-2-node-loop-2-files
+#+begin_src haskell
+checkCycles
+  [ "0100-dag-2-node-loop-2-files-parent",
+    "0100-dag-2-node-loop-2-files-child"
+  ]
+  [ Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000f004,
+              name = "a"
+            },
+        subForest =
+          [ Node
+              { rootLabel =
+                  LinkOid
+                    { oid = fromWords 0x0000000000000000 0x000000000000f005,
+                      name = "b"
+                    },
+                subForest = []
+              }
+          ]
+      }
+  ]
+#+end_src
+
+If three files form a cycle, that should also be detected.
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-3-files-parent
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f006
+:END:
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+hello from a
+<<id:00000000-0000-0000-0000-00000000f007::b>>
+,#+end_src
+#+end_src
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-3-files-middleman
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f007
+:END:
+,#+name: b
+,#+begin_src haskell
+hello from b
+<<id:00000000-0000-0000-0000-00000000f008::c>>
+,#+end_src
+#+end_src
+
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-3-files-child
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f008
+:END:
+,#+name: c
+,#+begin_src haskell
+hello from c
+<<id:00000000-0000-0000-0000-00000000f006::a>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-2-node-loop-3-files
+#+begin_src haskell
+checkCycles
+  [ "0100-dag-2-node-loop-3-files-parent",
+    "0100-dag-2-node-loop-3-files-middleman",
+    "0100-dag-2-node-loop-3-files-child"
+  ]
+  [ Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000f006,
+              name = "a"
+            },
+        subForest =
+          [ Node
+              { rootLabel =
+                  LinkOid
+                    { oid = fromWords 0x0000000000000000 0x000000000000f007,
+                      name = "b"
+                    },
+                subForest =
+                  [ Node
+                      { rootLabel =
+                          LinkOid
+                            { oid = fromWords 0x0000000000000000 0x000000000000f008,
+                              name = "c"
+                            },
+                        subForest = []
+                      }
+                  ]
+              }
+          ]
+      }
+  ]
+#+end_src
+
 ** Testing framework
 
 The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]].
@@ -546,7 +1126,11 @@ The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941
 #+begin_src haskell
 module Lilac.CompileSpec (spec) where
 
+import Data.Graph qualified as G
 import Data.Text qualified as T
+import Data.Tree
+  ( Tree (Node, rootLabel, subForest),
+  )
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
@@ -564,7 +1148,14 @@ import Relude
     show,
     ($),
   )
-import Test.Hspec (Spec, it, shouldBe, shouldSatisfy)
+import Test.Hspec
+  ( Spec,
+    expectationFailure,
+    it,
+    runIO,
+    shouldBe,
+    shouldSatisfy,
+  )
 
 <<compileSpec discovery>>
 
@@ -592,6 +1183,7 @@ helpers.
 <<f:expectArchiveError>>
 <<f:expectArchiveOk>>
 <<f:readObjectsFrom>>
+<<f:checkCycles>>
 #+end_src
 
 There are two major areas of concern for the compilation process:
@@ -656,6 +1248,20 @@ expectArchiveOk paths = do
     LC.mkArchive pathObjs `shouldSatisfy` isRight
 #+end_src
 
+The [[f:checkCycles]] function uses [[f:findCycles]] to see if the archive that is
+constructed from the given Org documents has any cycles.
+
+#+name: f:checkCycles
+#+begin_src haskell
+checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
+checkCycles paths expectedCycles = do
+  pathObjs <- runIO $ readObjectsFrom paths
+  case LC.mkArchive pathObjs of
+    Left errMsg -> it "programmer error" $ expectationFailure $ T.unpack errMsg
+    Right archive -> it (show paths) $ do
+      (LC.findCycles archive) `shouldBe` expectedCycles
+#+end_src
+
 *** All test cases
 
 Below are all of the individual test cases.
@@ -671,4 +1277,12 @@ compileSpec = do
   <<t:0401-broken-links-paragraph>>
   <<t:0401-broken-links-paragraph-ok>>
   <<t:0401-broken-links-multi-ok>>
+  <<t:0100-dag-no-loops>>
+  <<t:0100-dag-self-loop>>
+  <<t:0100-dag-self-loops>>
+  <<t:0100-dag-2-node-loop>>
+  <<t:0100-dag-3-node-loop>>
+  <<t:0100-dag-complex-loops>>
+  <<t:0100-dag-2-node-loop-2-files>>
+  <<t:0100-dag-2-node-loop-3-files>>
 #+end_src

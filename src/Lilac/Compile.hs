@@ -1,6 +1,7 @@
 module Lilac.Compile
   ( Archive,
     Object,
+    findCycles,
     findExternalOids,
     mkObject,
     mkArchive,
@@ -8,6 +9,7 @@ module Lilac.Compile
 where
 
 import Data.Aeson (ToJSON)
+import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -19,7 +21,7 @@ import Lilac.Types
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (meta),
     Heading (body, meta),
-    Link (target),
+    Link (Link, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     MathFragment (meta),
@@ -38,7 +40,10 @@ import Relude
     Type,
     catMaybes,
     concatMap,
+    elem,
+    fmap,
     foldl',
+    length,
     map,
     otherwise,
     sort,
@@ -46,6 +51,7 @@ import Relude
     (.),
     (/=),
     (<>),
+    (>),
   )
 import Relude.Extra.Map qualified as EM
 
@@ -142,6 +148,54 @@ mkArchive pathObjs
       Nothing -> linkOid : acc
     allExternalOids =
       M.foldl (\acc obj -> obj.externalOids <> acc) [] archive.objects
+
+buildGraph ::
+  [Block] ->
+  ( G.Graph,
+    G.Vertex -> (Block, LinkOid, [LinkOid]),
+    LinkOid -> Maybe G.Vertex
+  )
+buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
+  where
+    f ::
+      [(Block, LinkOid, [LinkOid])] ->
+      Block ->
+      [(Block, LinkOid, [LinkOid])]
+    f acc block
+      | Just name <- EM.lookup "name" block.meta =
+          let selfLink = LinkOid block.parentOid name
+           in (\outLinks -> (block, selfLink, outLinks) : acc)
+                . catMaybes
+                $ map getOutLinks block.body
+      | otherwise = acc
+    getOutLinks = \case
+      BTokenLink (Link _ (LinkTargetOid linkOid)) -> Just linkOid
+      BTokenLink {}
+      BTokenPadding {}
+      BTokenString {} -> Nothing
+
+findCycles :: Archive -> [G.Tree LinkOid]
+findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
+  where
+    blocks = foldl' getBlocksFromAllSymbols [] $ M.elems archive.symbols
+    getBlocksFromAllSymbols acc cell = case cell of
+      CBlock b -> b : acc
+      CHeading {}
+      CListItem {}
+      CParagraph {}
+      CMathFragment {}
+      CFigure {}
+      CTable {} -> acc
+    (graph, vertexToNode, _) = buildGraph blocks
+    toLinkOid vertex =
+      let (_, selfLink, _) = vertexToNode vertex
+       in selfLink
+    f acc tree@(G.Node vertex _)
+      | length tree > 1 = tree : acc
+      | (_, selfLink, outLinks) <- vertexToNode vertex,
+        elem selfLink outLinks =
+          tree : acc
+      | otherwise = acc
 
 findExternalOids :: OrgDoc -> [LinkOid]
 findExternalOids orgDoc =
