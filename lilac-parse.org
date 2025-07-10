@@ -423,22 +423,35 @@ data OrgDoc = OrgDoc
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Generic, Show)
+  deriving anyclass (ToJSON)
+#+end_src
 
+The ~deriving anyclass (ToJSON)~ is needed to create the default implementation for
+JSON conversion automatically for us. It is the equivalent of writing a default
+instance like
+
+#+begin_src haskell
 instance ToJSON OrgDoc
 #+end_src
 
-The ~instance ToJSON OrgDoc~ is needed to create the default implementation for
-JSON conversion automatically for us. All child types also require the same
-~instance~ declaration for this to work. At the end of it though, we can use the
-~encode~ and ~encodeFile~ functions from =Data.Aeson=.
+but it's shorter because we don't have to put it on its own line, and it's even
+more closely coupled with the declaration of the ~OrgDoc~ type itself. If we try
+to use ~deriving stock (Eq, Generic, Show, ToJSON)~ we get an error like
+
+#+begin_quote
+‘ToJSON’ is not a stock derivable class (Eq, Show, etc.)
+#+end_quote
+
+which is why we use the ~deriving anyclass~ variant. All child types also require
+the same ~deriving anyclass (ToJSON)~ declaration for this to work. At the end of it
+though, we can use the ~encode~ and ~encodeFile~ functions from =Data.Aeson=.
 
 #+name: newtype:OID
 #+begin_src haskell
 type OID :: Type
 newtype OID = OID UUID
   deriving stock (Eq, Ord, Generic)
-
-instance ToJSON OID
+  deriving anyclass (ToJSON)
 #+end_src
 
 The OID wraps around a UUID. This way we can be agnostic about the concrete
@@ -1138,8 +1151,7 @@ data Cell
   | CFigure Figure
   | CTable Table
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON Cell
+  deriving anyclass (ToJSON)
 #+end_src
 
 All of the different cell types describe some sort of content, except for one,
@@ -1244,8 +1256,7 @@ data PToken
   | PTokenLink Link
   | PTokenMathFragment MathFragment
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON PToken
+  deriving anyclass (ToJSON)
 #+end_src
 
 The ~proseParser~ can parse a series of [[data:PToken]] values. It is used by both
@@ -1358,8 +1369,7 @@ data StyledText = StyledText
     style :: StyleMask
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON StyledText
+  deriving anyclass (ToJSON)
 #+end_src
 
 The [[newtype:StyleMask]] is a low-level bit mask that can store multiple boolean
@@ -1379,8 +1389,7 @@ should never be needed during exposition.
 type Style :: Type
 data Style = Bold | Italic | Underline | Verbatim | Code
   deriving stock (Enum, Eq, Generic, Ord, Show)
-
-instance ToJSON Style
+  deriving anyclass (ToJSON)
 #+end_src
 
 The =styleMarkers= keeps track of the characters that activate and deactivate each
@@ -1712,8 +1721,7 @@ use a =newtype= around a =Word8= (an 8-bit word) so as to keep it distinct from
 type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
   deriving stock (Eq, Generic)
-
-instance ToJSON StyleMask
+  deriving anyclass (ToJSON)
 #+end_src
 
 We have a custom =Show= instance because the default =Show= would just treat the
@@ -2199,8 +2207,7 @@ data Link = Link
     target :: LinkTarget
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON Link
+  deriving anyclass (ToJSON)
 #+end_src
 
 The [[data:LinkTarget]] is a rich definition of the kind of target we are linking
@@ -2221,8 +2228,7 @@ data LinkTarget
   | LinkTargetURI N.URI
   | LinkTargetOther T.Text T.Text
   deriving stock (Eq, Generic, Ord, Show)
-
-instance ToJSON LinkTarget
+  deriving anyclass (ToJSON)
 #+end_src
 
 A Noweb link points to a code block with the given =name=, as well as the [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org ID
@@ -2242,8 +2248,7 @@ data LinkOid = LinkOid
     name :: T.Text
   }
   deriving stock (Eq, Generic, Ord, Show)
-
-instance ToJSON LinkOid
+  deriving anyclass (ToJSON)
 #+end_src
 
 In summary we support the following link types in an Org document:
@@ -3532,8 +3537,7 @@ data Heading = Heading
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON Heading
+  deriving anyclass (ToJSON)
 #+end_src
 
 The ~section~ field is generated during the parse, and is the section number like
@@ -4201,8 +4205,7 @@ data Block = Block
     body :: [BToken]
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON Block
+  deriving anyclass (ToJSON)
 #+end_src
 
 Below are some examples of valid (empty) code blocks.
@@ -4423,8 +4426,7 @@ data BToken
   | BTokenPadding
   | BTokenLink Link
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON BToken
+  deriving anyclass (ToJSON)
 #+end_src
 
 *** Overall parser
@@ -5722,8 +5724,7 @@ data ListMarker
   | LItemStart
   | LItemEnd
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON ListMarker
+  deriving anyclass (ToJSON)
 #+end_src
 
 We take this model from HTML, which uses =<ol>= and =</ol>= to encode the start and
@@ -6890,8 +6891,7 @@ data MathFragment = MathFragment
     body :: T.Text
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON MathFragment
+  deriving anyclass (ToJSON)
 #+end_src
 
 There are three ways to write math fragments: using =\begin{equation}= and
@@ -7201,8 +7201,7 @@ data Figure = Figure
     link :: Link
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON Figure
+  deriving anyclass (ToJSON)
 #+end_src
 
 Below is an example of a figure:
@@ -7509,8 +7508,7 @@ data Table = Table
     grid :: M.Map (Int, Int) Prose
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON Table
+  deriving anyclass (ToJSON)
 #+end_src
 
 Below is an example of a table:

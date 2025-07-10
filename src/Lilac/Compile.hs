@@ -62,8 +62,7 @@ data Object = Object
     externalOids :: [LinkOid]
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON Object
+  deriving anyclass (ToJSON)
 
 type Archive :: Type
 data Archive = Archive
@@ -71,8 +70,7 @@ data Archive = Archive
     symbols :: M.Map LinkOid Cell
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON Archive
+  deriving anyclass (ToJSON)
 
 mkObject :: OrgDoc -> Object
 mkObject orgDoc =

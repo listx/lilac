@@ -103,8 +103,7 @@ data Object = Object
     externalOids :: [LinkOid]
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON Object
+  deriving anyclass (ToJSON)
 #+end_src
 
 The ~symbols~ houses all links that point to cells inside the current ~OrgDoc~. We
@@ -352,8 +351,7 @@ data Archive = Archive
     symbols :: M.Map LinkOid Cell
   }
   deriving stock (Eq, Generic, Show)
-
-instance ToJSON Archive
+  deriving anyclass (ToJSON)
 #+end_src
 
 A [[data:Archive]] is just a collection of [[data:Object]] values, which are each paired
