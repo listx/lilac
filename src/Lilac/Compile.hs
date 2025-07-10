@@ -1,6 +1,7 @@
 module Lilac.Compile
   ( Archive,
     Object,
+    expandRootBlocks,
     findCycles,
     findExternalOids,
     mkObject,
@@ -32,28 +33,34 @@ import Lilac.Types
   )
 import Lilac.Util qualified as LU
 import Relude
-  ( Either (Left, Right),
+  ( Bool (False, True),
+    Either (Left, Right),
     Eq,
     FilePath,
     Maybe (Just, Nothing),
     Show,
     Type,
     catMaybes,
+    concat,
     concatMap,
     elem,
     fmap,
     foldl',
+    fst,
     length,
     map,
     otherwise,
+    reverse,
     sort,
     ($),
     (.),
     (/=),
     (<>),
+    (==),
     (>),
   )
 import Relude.Extra.Map qualified as EM
+import System.OsPath qualified as P
 
 type Object :: Type
 data Object = Object
@@ -118,6 +125,12 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
 
 mkArchive :: [(FilePath, Object)] -> Either T.Text Archive
 mkArchive pathObjs
+  | brokenPaths /= [] =
+      Left
+        $ "broken paths:\n"
+        <> T.intercalate
+          "\n"
+          (map T.pack brokenPaths)
   | brokenLinks /= [] =
       Left
         $ "broken links:\n"
@@ -131,17 +144,24 @@ mkArchive pathObjs
         { objects = objects,
           symbols = symbols
         }
-    (objects, symbols) = foldl' f (M.empty, M.empty) pathObjs
-    f ::
+    (objects, symbols) = foldl' concatObjs (M.empty, M.empty) pathObjs
+    concatObjs ::
       (M.Map FilePath Object, M.Map LinkOid Cell) ->
       (FilePath, Object) ->
       (M.Map FilePath Object, M.Map LinkOid Cell)
-    f (accObjs, accSyms) (path, obj) =
+    concatObjs (accObjs, accSyms) (path, obj) =
       ( M.insert path obj accObjs,
         M.union obj.symbols accSyms
       )
-    brokenLinks = foldl' g [] allExternalOids
-    g acc linkOid = case EM.lookup linkOid archive.symbols of
+    brokenPaths :: [FilePath]
+    brokenPaths = foldl' getBrokenPath [] pathObjs
+    getBrokenPath :: [FilePath] -> (FilePath, Object) -> [FilePath]
+    getBrokenPath acc (path, _)
+      | Just _ <- P.encodeUtf path = acc
+      | otherwise = path : acc
+    brokenLinks :: [LinkOid]
+    brokenLinks = foldl' getBrokenLink [] allExternalOids
+    getBrokenLink acc linkOid = case EM.lookup linkOid archive.symbols of
       Just _ -> acc
       Nothing -> linkOid : acc
     allExternalOids =
@@ -226,3 +246,74 @@ findExternalOids orgDoc =
       LinkTargetURI {}
       LinkTargetOther {} -> acc
     symbols = mkSymbols orgDoc
+
+expandRootBlocks :: Archive -> [(P.OsPath, T.Text)]
+expandRootBlocks archive = map expandRootBlock rootBlocks
+  where
+    rootBlocks =
+      concat $ M.foldlWithKey getRootBlocksFromObject [] archive.objects
+    getRootBlocksFromObject ::
+      [[(P.OsPath, Block)]] ->
+      FilePath ->
+      Object ->
+      [[(P.OsPath, Block)]]
+    getRootBlocksFromObject acc objPath object =
+      M.foldl (getRootBlock objPath) [] object.symbols : acc
+    getRootBlock objPath acc cell = case cell of
+      CBlock b
+        | Just path <- EM.lookup "tangle" b.meta,
+          Just osPath <- P.encodeUtf $ T.unpack path,
+          Just osPathOfObject <- P.encodeUtf objPath ->
+            (P.combine (P.takeDirectory osPathOfObject) osPath, b) : acc
+        | otherwise -> acc
+      CHeading {}
+      CListItem {}
+      CParagraph {}
+      CMathFragment {}
+      CFigure {}
+      CTable {} -> acc
+    expandRootBlock :: (P.OsPath, Block) -> (P.OsPath, T.Text)
+    expandRootBlock (p, rootBlock) =
+      ( p,
+        maybeAddShebang rootBlock
+          . trimTrailingSpaces
+          $ expandBlock archive rootBlock ""
+      )
+    trimTrailingSpaces :: T.Text -> T.Text
+    trimTrailingSpaces text =
+      T.unlines
+        . map (T.dropWhileEnd (== ' '))
+        $ T.lines text
+    maybeAddShebang :: Block -> T.Text -> T.Text
+    maybeAddShebang rootBlock text
+      | Just shebang <- EM.lookup "shebang" rootBlock.meta =
+          shebang <> "\n" <> text
+      | otherwise = text
+
+expandBlock :: Archive -> Block -> T.Text -> T.Text
+expandBlock archive block existingPrefix =
+  let acc = "" :: T.Text
+      prefix = "" :: T.Text
+   in fst $ foldl' expand (acc, prefix) block.body
+  where
+    expand (acc, _) BTokenPadding =
+      (acc <> "\n", "")
+    expand (acc, _) (BTokenString text) =
+      (acc <> prependExistingPrefix text, getPrefix text)
+    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetOid linkOid)))
+      | Just (CBlock targetBlock) <- EM.lookup linkOid archive.symbols =
+          ( acc <> (expandBlock archive targetBlock $ existingPrefix <> prefix),
+            prefix
+          )
+      | otherwise = (acc, prefix)
+    expand (acc, prefix) _ = (acc, prefix)
+    getPrefix text = T.takeWhileEnd (/= '\n') text
+    prependExistingPrefix text =
+      T.intercalate "\n"
+        . reverse
+        . fst
+        . foldl' prefixTailLines ([], True)
+        $ T.split (== '\n') text
+    prefixTailLines (acc, isFirstLine) line
+      | isFirstLine = (line : acc, False)
+      | otherwise = (T.append existingPrefix line : acc, False)
