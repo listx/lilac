@@ -2080,6 +2080,7 @@ import Lilac.Weave qualified as LW
 import Lilac.Weave.Css qualified as LWC
 import Options.Applicative
   ( Parser,
+    ReadM,
     argument,
     command,
     customExecParser,
@@ -2111,13 +2112,17 @@ import Relude
     Either (Left, Right),
     FilePath,
     IO,
+    Maybe (Just),
+    MonadFail,
     Type,
     concat,
+    fail,
     foldlM,
     mapM,
     mapM_,
     not,
     null,
+    otherwise,
     pure,
     putStrLn,
     runStateT,
@@ -2126,6 +2131,7 @@ import Relude
     ($),
     (<$>),
     (<>),
+    (=<<),
   )
 import System.Exit (die)
 import System.OsPath qualified as P
@@ -2244,26 +2250,26 @@ They are essentially the machine equivalent of human-readable Org files.
 #+begin_src haskell
 lilacCompile :: GlobalOpts -> CompileOpts -> IO ()
 lilacCompile _globalOpts compileOpts = do
-  objsAndFilepaths <- mapM genObject compileOpts.inputs
-  mapM_ writeObjToFilepath objsAndFilepaths
+  objsAndPaths <- mapM genObject compileOpts.inputs
+  mapM_ writeObjToPath objsAndPaths
   where
-    genObject inputOrgFile = do
-      input <- LU.readFrom "" inputOrgFile
+    genObject inputPath = do
+      input <- LU.readFileRobustly inputPath
       let parseResult =
             MP.runParser
               (runStateT LP.orgDocParser LP.defaultOrgParserState)
-              inputOrgFile
+              (show inputPath)
               input
       case parseResult of
         Left errBundle -> do
           die $ MP.errorBundlePretty errBundle
         Right (orgDoc, _) -> do
-          pure (LC.mkObject orgDoc, inputOrgFile)
-    writeObjToFilepath :: (ToJSON a) => (a, FilePath) -> IO ()
-    writeObjToFilepath (obj, inputOrgFile) = do
+          pure (LC.mkObject orgDoc, inputPath)
+    writeObjToPath :: (ToJSON a) => (a, P.OsPath) -> IO ()
+    writeObjToPath (obj, inputPath) = do
       outPath <- do
-        base <- P.takeBaseName <$> P.encodeUtf inputOrgFile
-        let objExtension = P.unsafeEncodeUtf "obj"
+        let base = P.takeBaseName inputPath
+            objExtension = P.unsafeEncodeUtf "obj"
         P.decodeUtf $ P.addExtension base objExtension
       encodeFile outPath obj
 #+end_src
@@ -2392,6 +2398,7 @@ options, and the functions that operate on them.
 
 #+name: Option handling
 #+begin_src haskell
+<<f:readOsPath>>
 <<data:GlobalOpts>>
 <<data:Subcommand>>
 <<data:CheckOpts>>
@@ -2409,7 +2416,24 @@ options, and the functions that operate on them.
 <<f:writeGOIDsOptsHandler>>
 #+end_src
 
-The global options are encoded in [[data:GlobalOpts]].
+One useful helper we have to write ourselves is a parser that can understand how
+to parse ~P.OsPath~ from command line arguments. This is needed because
+~Options.Applicative~ does not know how to parse ~P.OsPath~ values (only ~FilePath~).
+
+#+name: f:readOsPath
+#+begin_src haskell
+readOsPath :: ReadM P.OsPath
+readOsPath = f =<< str
+  where
+    f :: (MonadFail m) => FilePath -> m P.OsPath
+    f maybeOsPath
+      | Just osPath <- P.encodeUtf maybeOsPath,
+        P.isValid osPath =
+          pure osPath
+      | otherwise = fail $ "invalid OsPath: " <> maybeOsPath
+#+end_src
+
+The global options for the Lilac CLI are encoded in [[data:GlobalOpts]].
 
 #+name: data:GlobalOpts
 #+begin_src haskell
@@ -2569,7 +2593,7 @@ same "architecture" here.
 #+begin_src haskell
 type CompileOpts :: Type
 data CompileOpts = CompileOpts
-  { inputs :: [FilePath]
+  { inputs :: [P.OsPath]
   }
 #+end_src
 
@@ -2578,7 +2602,7 @@ data CompileOpts = CompileOpts
 compileOptsHandler :: OptionHandler CompileOpts
 compileOptsHandler =
   CompileOpts
-    <$> (some $ argument str (metavar "FILES..."))
+    <$> (some $ argument readOsPath (metavar "FILES..."))
 #+end_src
 
 That's it for the data structures for option handling. The next concern is

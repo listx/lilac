@@ -16,6 +16,7 @@ import Lilac.Weave qualified as LW
 import Lilac.Weave.Css qualified as LWC
 import Options.Applicative
   ( Parser,
+    ReadM,
     argument,
     command,
     customExecParser,
@@ -47,13 +48,17 @@ import Relude
     Either (Left, Right),
     FilePath,
     IO,
+    Maybe (Just),
+    MonadFail,
     Type,
     concat,
+    fail,
     foldlM,
     mapM,
     mapM_,
     not,
     null,
+    otherwise,
     pure,
     putStrLn,
     runStateT,
@@ -62,11 +67,22 @@ import Relude
     ($),
     (<$>),
     (<>),
+    (=<<),
   )
 import System.Exit (die)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Pretty.Simple qualified as PP
+
+readOsPath :: ReadM P.OsPath
+readOsPath = f =<< str
+  where
+    f :: (MonadFail m) => FilePath -> m P.OsPath
+    f maybeOsPath
+      | Just osPath <- P.encodeUtf maybeOsPath,
+        P.isValid osPath =
+          pure osPath
+      | otherwise = fail $ "invalid OsPath: " <> maybeOsPath
 
 type GlobalOpts :: Type
 data GlobalOpts = GlobalOpts
@@ -110,7 +126,7 @@ data WriteGOIDsOpts = WriteGOIDsOpts
 
 type CompileOpts :: Type
 data CompileOpts = CompileOpts
-  { inputs :: [FilePath]
+  { inputs :: [P.OsPath]
   }
 
 type OptionHandler :: Type -> Type
@@ -244,7 +260,7 @@ weaveOptsHandler =
 compileOptsHandler :: OptionHandler CompileOpts
 compileOptsHandler =
   CompileOpts
-    <$> (some $ argument str (metavar "FILES..."))
+    <$> (some $ argument readOsPath (metavar "FILES..."))
 
 writeGOIDsOptsHandler :: OptionHandler WriteGOIDsOpts
 writeGOIDsOptsHandler =
@@ -326,26 +342,26 @@ lilacCheck globalOpts checkOpts = do
 
 lilacCompile :: GlobalOpts -> CompileOpts -> IO ()
 lilacCompile _globalOpts compileOpts = do
-  objsAndFilepaths <- mapM genObject compileOpts.inputs
-  mapM_ writeObjToFilepath objsAndFilepaths
+  objsAndPaths <- mapM genObject compileOpts.inputs
+  mapM_ writeObjToPath objsAndPaths
   where
-    genObject inputOrgFile = do
-      input <- LU.readFrom "" inputOrgFile
+    genObject inputPath = do
+      input <- LU.readFileRobustly inputPath
       let parseResult =
             MP.runParser
               (runStateT LP.orgDocParser LP.defaultOrgParserState)
-              inputOrgFile
+              (show inputPath)
               input
       case parseResult of
         Left errBundle -> do
           die $ MP.errorBundlePretty errBundle
         Right (orgDoc, _) -> do
-          pure (LC.mkObject orgDoc, inputOrgFile)
-    writeObjToFilepath :: (ToJSON a) => (a, FilePath) -> IO ()
-    writeObjToFilepath (obj, inputOrgFile) = do
+          pure (LC.mkObject orgDoc, inputPath)
+    writeObjToPath :: (ToJSON a) => (a, P.OsPath) -> IO ()
+    writeObjToPath (obj, inputPath) = do
       outPath <- do
-        base <- P.takeBaseName <$> P.encodeUtf inputOrgFile
-        let objExtension = P.unsafeEncodeUtf "obj"
+        let base = P.takeBaseName inputPath
+            objExtension = P.unsafeEncodeUtf "obj"
         P.decodeUtf $ P.addExtension base objExtension
       encodeFile outPath obj
 
