@@ -439,7 +439,7 @@ orgdoc.json
 result*
 site*
 ,*~
-,*.obj
+,*.lobj
 
 <<Makefile sentinels>>
 #+end_src
@@ -2040,7 +2040,7 @@ To make =rg= behave as we want, we have to provide it a separate =.rgignore= fil
 ,*.cabal
 ,*.hs
 ,*.nix
-,*.obj
+,*.lobj
 ,*.sh
 test/*
 #+end_src
@@ -2244,9 +2244,11 @@ useful for debugging.
 
 *** Compiling
 
-The [[f:lilacCompile]] function creates object files for all given Org files. Object
-files encode information about the Org file in a nice, machine-readable way.
-They are essentially the machine equivalent of human-readable Org files.
+The [[f:lilacCompile]] function creates "object" files for all given Org files.
+Object files encode information about the Org file in a nice, machine-readable
+way. They are essentially the machine equivalent of human-readable Org files.
+
+The created files have the ~.lobj~ extension to indicate "Lilac object".
 
 #+name: f:lilacCompile
 #+begin_src haskell
@@ -2271,7 +2273,7 @@ lilacCompile _globalOpts compileOpts = do
     writeObjToPath (obj, inputPath) = do
       outPath <- do
         let base = P.takeBaseName inputPath
-            objExtension = P.unsafeEncodeUtf "obj"
+            objExtension = P.unsafeEncodeUtf "lobj"
         P.decodeUtf $ P.addExtension base objExtension
       encodeFile outPath obj
 #+end_src
@@ -2593,7 +2595,7 @@ writeGOIDsOptsHandler =
     <*> (some $ argument str (metavar "FILES..."))
 #+end_src
 
-The =compile= subcommand writes an object (=*.obj=) file for the given Org file.
+The =compile= subcommand writes an object (=*.lobj=) file for the given Org file.
 This object file is used to perform some amount of "compilation" for the Org file,
 such that subsequent steps like tangling or weaving only need to use the object
 files. This is rather similar to how the C programming language toolchain uses

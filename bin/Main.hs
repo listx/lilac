@@ -366,7 +366,7 @@ lilacCompile _globalOpts compileOpts = do
     writeObjToPath (obj, inputPath) = do
       outPath <- do
         let base = P.takeBaseName inputPath
-            objExtension = P.unsafeEncodeUtf "obj"
+            objExtension = P.unsafeEncodeUtf "lobj"
         P.decodeUtf $ P.addExtension base objExtension
       encodeFile outPath obj
 
