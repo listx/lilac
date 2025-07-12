@@ -51,7 +51,6 @@ import Clay
     overflowY,
     p,
     padding,
-    paddingRight,
     position,
     pre,
     pretty,
