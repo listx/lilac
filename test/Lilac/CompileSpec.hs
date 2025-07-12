@@ -18,6 +18,7 @@ import Relude
   ( Either (Left, Right),
     FilePath,
     IO,
+    String,
     first,
     fmap,
     foldlM,
@@ -50,7 +51,7 @@ checkExternalOids path expectedExternalOids = do
       input <- LU.readFrom "test/Lilac/CompileSpec/" path
       pure $ LP.parseOrgDoc input
 
-expectArchiveError :: [FilePath] -> T.Text -> Spec
+expectArchiveError :: [FilePath] -> String -> Spec
 expectArchiveError paths expected = do
   it (show paths) $ do
     pathObjs <- readObjectsFrom paths
@@ -79,7 +80,7 @@ checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
 checkCycles paths expectedCycles = do
   pathObjs <- runIO $ readObjectsFrom paths
   case LC.mkArchive pathObjs of
-    Left errMsg -> it "programmer error" $ expectationFailure $ T.unpack errMsg
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do
       (LC.findCycles archive) `shouldBe` expectedCycles
 
@@ -87,7 +88,7 @@ checkExpansion :: [FilePath] -> [(FilePath, T.Text)] -> Spec
 checkExpansion paths expectedExpansions = do
   pathObjs <- runIO $ readObjectsFrom paths
   case LC.mkArchive pathObjs of
-    Left errMsg -> it "programmer error" $ expectationFailure $ T.unpack errMsg
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do
       (LC.expandRootBlocks archive)
         `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)

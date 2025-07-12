@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Data.Aeson (ToJSON, encodeFile)
+import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -10,6 +10,7 @@ import Lilac.Types
     OrgParserState
       ( goids
       ),
+    decodeGPath,
     encodeGPath,
   )
 import Lilac.Util qualified as LU
@@ -32,6 +33,7 @@ import Options.Applicative
     infoOption,
     long,
     metavar,
+    option,
     prefs,
     progDesc,
     short,
@@ -52,6 +54,7 @@ import Relude
     IO,
     Maybe (Just),
     MonadFail,
+    String,
     Type,
     concat,
     fail,
@@ -103,6 +106,7 @@ data Subcommand
   | Tangle TangleOpts
   | Weave WeaveOpts
   | Compile CompileOpts
+  | Archive ArchiveOpts
   | WriteGOIDs WriteGOIDsOpts
 
 type CheckOpts :: Type
@@ -132,6 +136,12 @@ data WriteGOIDsOpts = WriteGOIDsOpts
 type CompileOpts :: Type
 data CompileOpts = CompileOpts
   { inputs :: [P.OsPath]
+  }
+
+type ArchiveOpts :: Type
+data ArchiveOpts = ArchiveOpts
+  { inputs :: [GPath],
+    outFile :: P.OsPath
   }
 
 type OptionHandler :: Type -> Type
@@ -178,12 +188,19 @@ subcommandHandler :: OptionHandler Subcommand
 subcommandHandler =
   hsubparser
     $ metavar "SUBCOMMAND"
+    <> cmdArchive
     <> cmdCheck
     <> cmdCompile
     <> cmdTangle
     <> cmdWeave
     <> cmdWriteGOIDs
   where
+    cmdArchive =
+      command
+        "archive"
+        $ info
+          (Archive <$> archiveOptsHandler)
+          (progDesc "Create archive from object files.")
     cmdCheck =
       command
         "check"
@@ -267,6 +284,23 @@ compileOptsHandler =
   CompileOpts
     <$> (some $ argument readOsPath (metavar "FILES..."))
 
+archiveOptsHandler :: OptionHandler ArchiveOpts
+archiveOptsHandler =
+  ArchiveOpts
+    <$> (some $ argument readGPath (metavar "FILES..."))
+    <*> ( option
+            readOsPath
+            ( long "out-file"
+                <> metavar "FILE"
+                <> value (P.unsafeEncodeUtf "out.larc")
+                <> showDefault
+                <> help
+                  """
+                  Output file path for the archive.
+                  """
+            )
+        )
+
 writeGOIDsOptsHandler :: OptionHandler WriteGOIDsOpts
 writeGOIDsOptsHandler =
   WriteGOIDsOpts
@@ -308,6 +342,7 @@ main = do
 
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
+  Archive archiveOpts -> lilacArchive archiveOpts
   Check checkOpts -> lilacCheck globalOpts checkOpts
   Compile compileOpts -> lilacCompile globalOpts compileOpts
   Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
@@ -369,6 +404,27 @@ lilacCompile _globalOpts compileOpts = do
             objExtension = P.unsafeEncodeUtf "lobj"
         P.decodeUtf $ P.addExtension base objExtension
       encodeFile outPath obj
+
+lilacArchive :: ArchiveOpts -> IO ()
+lilacArchive archiveOpts = do
+  pathsObjects <- mapM readObjectDirectly archiveOpts.inputs
+  case LC.mkArchive pathsObjects of
+    Left errMsg -> die errMsg
+    Right archive -> do
+      outPath <- do
+        let base = P.takeBaseName archiveOpts.outFile
+            objExtension = P.unsafeEncodeUtf "larc"
+        P.decodeUtf $ P.addExtension base objExtension
+      encodeFile outPath archive
+  where
+    readObjectDirectly :: GPath -> IO (GPath, LC.Object)
+    readObjectDirectly gPath = do
+      let fp = decodeGPath gPath
+          inputPath = P.unsafeEncodeUtf fp
+      text <- LU.readFileRobustly inputPath
+      case eitherDecodeStrictText text :: Either String LC.Object of
+        Left errMsg -> die errMsg
+        Right obj -> pure (gPath, obj)
 
 lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
 lilacTangle globalOpts tangleOpts = do

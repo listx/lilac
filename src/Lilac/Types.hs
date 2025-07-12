@@ -34,7 +34,7 @@ module Lilac.Types
   )
 where
 
-import Data.Aeson (ToJSON, ToJSONKey, toJSONKey)
+import Data.Aeson (FromJSON, FromJSONKey, ToJSON, ToJSONKey, toJSONKey)
 import Data.Aeson.Types (toJSONKeyText)
 import Data.Bits.Bitwise (toListLE)
 import Data.Map.Strict qualified as M
@@ -81,7 +81,7 @@ data BToken
   | BTokenPadding
   | BTokenLink Link
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type Block :: Type
 data Block = Block
@@ -90,7 +90,7 @@ data Block = Block
     body :: [BToken]
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type Cell :: Type
 data Cell
@@ -102,7 +102,7 @@ data Cell
   | CFigure Figure
   | CTable Table
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type Figure :: Type
 data Figure = Figure
@@ -110,7 +110,7 @@ data Figure = Figure
     link :: Link
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type Heading :: Type
 data Heading = Heading
@@ -120,7 +120,7 @@ data Heading = Heading
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type Level :: Type
 data Level = Level
@@ -135,7 +135,7 @@ data Link = Link
     target :: LinkTarget
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type LinkOid :: Type
 data LinkOid = LinkOid
@@ -143,7 +143,7 @@ data LinkOid = LinkOid
     name :: T.Text
   }
   deriving stock (Eq, Generic, Ord, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
 
 instance ToJSONKey LinkOid where
   toJSONKey = toJSONKeyText T.show
@@ -154,7 +154,7 @@ data LinkTarget
   | LinkTargetURI N.URI
   | LinkTargetOther T.Text T.Text
   deriving stock (Eq, Generic, Ord, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type ListMarker :: Type
 data ListMarker
@@ -165,7 +165,7 @@ data ListMarker
   | LItemStart
   | LItemEnd
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type MathFragment :: Type
 data MathFragment = MathFragment
@@ -173,7 +173,7 @@ data MathFragment = MathFragment
     body :: T.Text
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
@@ -182,7 +182,7 @@ data OrgDoc = OrgDoc
     meta :: M.Map T.Text T.Text
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type OrgParserConf :: Type
 data OrgParserConf = OrgParserConf
@@ -225,12 +225,12 @@ data PToken
   | PTokenLink Link
   | PTokenMathFragment MathFragment
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type Style :: Type
 data Style = Bold | Italic | Underline | Verbatim | Code
   deriving stock (Enum, Eq, Generic, Ord, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type StyledText :: Type
 data StyledText = StyledText
@@ -238,7 +238,7 @@ data StyledText = StyledText
     style :: StyleMask
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type Table :: Type
 data Table = Table
@@ -246,7 +246,7 @@ data Table = Table
     grid :: M.Map (Int, Int) Prose
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 instance Show StyleMask where
   show (StyleMask a) = "styleMaskFrom " <> x
@@ -266,12 +266,12 @@ instance Show StyleMask where
 type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
   deriving stock (Eq, Generic)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type OID :: Type
 newtype OID = OID UUID
   deriving stock (Eq, Ord, Generic)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 instance Show OID where
   show (OID uuid) = Prelude.show uuid

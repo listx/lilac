@@ -9,7 +9,7 @@ module Lilac.Compile
   )
 where
 
-import Data.Aeson (ToJSON)
+import Data.Aeson (FromJSON, ToJSON)
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
@@ -40,6 +40,7 @@ import Relude
     Eq,
     Maybe (Just, Nothing),
     Show,
+    String,
     Type,
     catMaybes,
     concat,
@@ -49,6 +50,7 @@ import Relude
     foldl',
     foldlM,
     fst,
+    intercalate,
     length,
     map,
     otherwise,
@@ -72,7 +74,7 @@ data Object = Object
     externalOids :: [LinkOid]
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 
 type Archive :: Type
 data Archive = Archive
@@ -126,7 +128,7 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
               ]
           | otherwise = []
 
-mkArchive :: [(GPath, Object)] -> Either T.Text Archive
+mkArchive :: [(GPath, Object)] -> Either String Archive
 mkArchive pathObjs =
   case foldlM concatObjs (M.empty, M.empty) pathObjs of
     Left errMsg -> Left errMsg
@@ -136,9 +138,9 @@ mkArchive pathObjs =
             | brokenLinks /= [] ->
                 Left
                   $ "broken links:\n"
-                  <> T.intercalate
+                  <> intercalate
                     "\n"
-                    (map (\l -> "  " <> LU.mkFqcn l.oid l.name) brokenLinks)
+                    (map showBrokenLink brokenLinks)
             | otherwise ->
                 Right
                   Archive
@@ -149,7 +151,7 @@ mkArchive pathObjs =
     concatObjs ::
       (M.Map GPath Object, M.Map LinkOid Cell) ->
       (GPath, Object) ->
-      Either T.Text (M.Map GPath Object, M.Map LinkOid Cell)
+      Either String (M.Map GPath Object, M.Map LinkOid Cell)
     concatObjs (accObjs, accSyms) (path, obj) =
       pure
         ( M.insert path obj accObjs,
@@ -166,6 +168,9 @@ mkArchive pathObjs =
     allExternalOids :: M.Map GPath Object -> [LinkOid]
     allExternalOids objs =
       M.foldl (\acc obj -> obj.externalOids <> acc) [] objs
+    showBrokenLink :: LinkOid -> String
+    showBrokenLink link =
+      "  " <> (T.unpack $ LU.mkFqcn link.oid link.name)
 
 buildGraph ::
   [Block] ->

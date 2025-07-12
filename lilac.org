@@ -2064,7 +2064,7 @@ The boilerplate involves [[id:ce9af5ef-6559-4ffb-82c1-a439214eda6d][option handl
 #+begin_src haskell
 module Main (main) where
 
-import Data.Aeson (ToJSON, encodeFile)
+import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -2074,6 +2074,7 @@ import Lilac.Types
     OrgParserState
       ( goids
       ),
+    decodeGPath,
     encodeGPath,
   )
 import Lilac.Util qualified as LU
@@ -2096,6 +2097,7 @@ import Options.Applicative
     infoOption,
     long,
     metavar,
+    option,
     prefs,
     progDesc,
     short,
@@ -2116,6 +2118,7 @@ import Relude
     IO,
     Maybe (Just),
     MonadFail,
+    String,
     Type,
     concat,
     fail,
@@ -2146,6 +2149,7 @@ import Text.Pretty.Simple qualified as PP
 <<f:lilac>>
 <<f:lilacCheck>>
 <<f:lilacCompile>>
+<<f:lilacArchive>>
 <<f:lilacTangle>>
 <<f:lilacWeave>>
 <<f:lilacWriteGOIDs>>
@@ -2188,6 +2192,7 @@ out into the =check=, =tangle= and =weave= subcommands.
 #+begin_src haskell
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
+  Archive archiveOpts -> lilacArchive archiveOpts
   Check checkOpts -> lilacCheck globalOpts checkOpts
   Compile compileOpts -> lilacCompile globalOpts compileOpts
   Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
@@ -2276,6 +2281,32 @@ lilacCompile _globalOpts compileOpts = do
             objExtension = P.unsafeEncodeUtf "lobj"
         P.decodeUtf $ P.addExtension base objExtension
       encodeFile outPath obj
+#+end_src
+
+*** Archiving
+
+#+name: f:lilacArchive
+#+begin_src haskell
+lilacArchive :: ArchiveOpts -> IO ()
+lilacArchive archiveOpts = do
+  pathsObjects <- mapM readObjectDirectly archiveOpts.inputs
+  case LC.mkArchive pathsObjects of
+    Left errMsg -> die errMsg
+    Right archive -> do
+      outPath <- do
+        let base = P.takeBaseName archiveOpts.outFile
+            objExtension = P.unsafeEncodeUtf "larc"
+        P.decodeUtf $ P.addExtension base objExtension
+      encodeFile outPath archive
+  where
+    readObjectDirectly :: GPath -> IO (GPath, LC.Object)
+    readObjectDirectly gPath = do
+      let fp = decodeGPath gPath
+          inputPath = P.unsafeEncodeUtf fp
+      text <- LU.readFileRobustly inputPath
+      case eitherDecodeStrictText text :: Either String LC.Object of
+        Left errMsg -> die errMsg
+        Right obj -> pure (gPath, obj)
 #+end_src
 
 *** Tangling
@@ -2411,6 +2442,7 @@ options, and the functions that operate on them.
 <<data:WeaveOpts>>
 <<data:WriteGOIDsOpts>>
 <<data:CompileOpts>>
+<<data:ArchiveOpts>>
 <<data:OptionHandler>>
 <<f:globalOptionsHandler>>
 <<f:subcommandHandler>>
@@ -2418,6 +2450,7 @@ options, and the functions that operate on them.
 <<f:tangleOptsHandler>>
 <<f:weaveOptsHandler>>
 <<f:compileOptsHandler>>
+<<f:archiveOptsHandler>>
 <<f:writeGOIDsOptsHandler>>
 #+end_src
 
@@ -2470,6 +2503,7 @@ data Subcommand
   | Tangle TangleOpts
   | Weave WeaveOpts
   | Compile CompileOpts
+  | Archive ArchiveOpts
   | WriteGOIDs WriteGOIDsOpts
 #+end_src
 
@@ -2619,6 +2653,41 @@ compileOptsHandler =
     <$> (some $ argument readOsPath (metavar "FILES..."))
 #+end_src
 
+The ~archive~ subcommand writes an archive (=*.larc=) file for the given set of
+Lilac object files (generated with the =compile= subcommand). See [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] for
+details; essentially this is just a collection of multiple [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] files to
+allow for multi-Org-file tangling (where code blocks from one Org file can
+reference blocks from other files, as discussed in [[id:e6ffbd65-9dbf-4806-beab-65d8af82794e][Blocks from external files]]).
+
+#+name: data:ArchiveOpts
+#+begin_src haskell
+type ArchiveOpts :: Type
+data ArchiveOpts = ArchiveOpts
+  { inputs :: [GPath],
+    outFile :: P.OsPath
+  }
+#+end_src
+
+#+name: f:archiveOptsHandler
+#+begin_src haskell
+archiveOptsHandler :: OptionHandler ArchiveOpts
+archiveOptsHandler =
+  ArchiveOpts
+    <$> (some $ argument readGPath (metavar "FILES..."))
+    <*> ( option
+            readOsPath
+            ( long "out-file"
+                <> metavar "FILE"
+                <> value (P.unsafeEncodeUtf "out.larc")
+                <> showDefault
+                <> help
+                  """
+                  Output file path for the archive.
+                  """
+            )
+        )
+#+end_src
+
 That's it for the data structures for option handling. The next concern is
 understanding how to display and parse these options on the command line (that
 is, how we can perform option parsing on the CLI so that they end up as these
@@ -2687,12 +2756,19 @@ subcommandHandler :: OptionHandler Subcommand
 subcommandHandler =
   hsubparser
     $ metavar "SUBCOMMAND"
+    <> cmdArchive
     <> cmdCheck
     <> cmdCompile
     <> cmdTangle
     <> cmdWeave
     <> cmdWriteGOIDs
   where
+    cmdArchive =
+      command
+        "archive"
+        $ info
+          (Archive <$> archiveOptsHandler)
+          (progDesc "Create archive from object files.")
     cmdCheck =
       command
         "check"
