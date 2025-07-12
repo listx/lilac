@@ -3,6 +3,7 @@ module Lilac.Types
     BToken (..),
     Cell (..),
     Figure (..),
+    GPath,
     Heading (..),
     Level (..),
     Link (..),
@@ -21,7 +22,9 @@ module Lilac.Types
     StyleMask (..),
     StyledText (..),
     Table (..),
+    decodeGPath,
     defaultOrgParserConf,
+    encodeGPath,
     Lilac.Types.fromText,
     fromWords,
     nilOid,
@@ -44,9 +47,11 @@ import Relude
   ( Bool,
     Enum,
     Eq,
+    FilePath,
     Identity,
     Int,
     Maybe (Just, Nothing),
+    MonadFail,
     Ord,
     Show,
     StateT,
@@ -55,7 +60,11 @@ import Relude
     Word64,
     Word8,
     catMaybes,
+    fail,
     map,
+    otherwise,
+    pure,
+    show,
     toEnum,
     zip,
     ($),
@@ -292,6 +301,24 @@ type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
 
 type Prose :: Type
 type Prose = [PToken]
+
+type GPath :: Type
+newtype GPath = GPath FilePath
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (ToJSON)
+
+instance ToJSONKey GPath where
+  toJSONKey = toJSONKeyText T.show
+
+encodeGPath :: (MonadFail m) => FilePath -> m GPath
+encodeGPath fp
+  | Just osp <- P.encodeUtf fp,
+    P.isValid osp =
+      pure $ GPath fp
+  | otherwise = fail $ "invalid file path: " <> show fp
+
+decodeGPath :: GPath -> FilePath
+decodeGPath (GPath fp) = fp
 
 protocolsEmacs :: [T.Text]
 protocolsEmacs =

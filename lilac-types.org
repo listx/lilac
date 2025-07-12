@@ -30,6 +30,7 @@ module Lilac.Types
     BToken (..),
     Cell (..),
     Figure (..),
+    GPath,
     Heading (..),
     Level (..),
     Link (..),
@@ -48,7 +49,9 @@ module Lilac.Types
     StyleMask (..),
     StyledText (..),
     Table (..),
+    decodeGPath,
     defaultOrgParserConf,
+    encodeGPath,
     Lilac.Types.fromText,
     fromWords,
     nilOid,
@@ -71,9 +74,11 @@ import Relude
   ( Bool,
     Enum,
     Eq,
+    FilePath,
     Identity,
     Int,
     Maybe (Just, Nothing),
+    MonadFail,
     Ord,
     Show,
     StateT,
@@ -82,7 +87,11 @@ import Relude
     Word64,
     Word8,
     catMaybes,
+    fail,
     map,
+    otherwise,
+    pure,
+    show,
     toEnum,
     zip,
     ($),
@@ -126,6 +135,10 @@ import Prelude qualified (show)
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:OrgParser>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:Prose>>
 
+<<newtype:GPath>>
+<<f:encodeGPath>>
+<<f:decodeGPath>>
+
 <<f:protocolsEmacs>>
 <<f:protocolsWeb>>
 #+end_src
@@ -159,6 +172,52 @@ instance Show OID where
 #+begin_src haskell
 nilOid :: OID
 nilOid = fromWords 0 0
+#+end_src
+
+** ~GPath~, an ~OsPath~ wrapper
+:PROPERTIES:
+:ID:       2d98229c-e318-434b-916b-364c04021306
+:END:
+
+[[newtype:GPath]] is a custom type that *guarantees* that it can only contain a
+~FilePath~ which can be converted (without errors) into a valid ~OsPath~. It is
+named ~GPath~ to mean "guaranteed path".
+
+#+name: newtype:GPath
+#+begin_src haskell
+type GPath :: Type
+newtype GPath = GPath FilePath
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (ToJSON)
+
+<<instance:ToJSONKey GPath>>
+#+end_src
+
+#+name: instance:ToJSONKey GPath
+#+begin_src haskell
+instance ToJSONKey GPath where
+  toJSONKey = toJSONKeyText T.show
+#+end_src
+
+[[f:encodePath]] is the only way one is allowed to construct a [[newtype:GPath]].
+
+#+name: f:encodeGPath
+#+begin_src haskell
+encodeGPath :: (MonadFail m) => FilePath -> m GPath
+encodeGPath fp
+  | Just osp <- P.encodeUtf fp,
+    P.isValid osp =
+      pure $ GPath fp
+  | otherwise = fail $ "invalid file path: " <> show fp
+#+end_src
+
+[[f:decodeGPath]] takes a ~GPath~ and converts it back into the ~FilePath~ that it is
+based on.
+
+#+name: f:decodeGPath
+#+begin_src haskell
+decodeGPath :: GPath -> FilePath
+decodeGPath (GPath fp) = fp
 #+end_src
 
 ** Protocols

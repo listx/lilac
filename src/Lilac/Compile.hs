@@ -21,6 +21,7 @@ import Lilac.Types
     Block (body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (meta),
+    GPath,
     Heading (body, meta),
     Link (Link, target),
     LinkOid (LinkOid, name, oid),
@@ -30,13 +31,13 @@ import Lilac.Types
     OrgDoc (cells, oid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
+    decodeGPath,
   )
 import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
     Either (Left, Right),
     Eq,
-    FilePath,
     Maybe (Just, Nothing),
     Show,
     Type,
@@ -46,10 +47,12 @@ import Relude
     elem,
     fmap,
     foldl',
+    foldlM,
     fst,
     length,
     map,
     otherwise,
+    pure,
     reverse,
     sort,
     ($),
@@ -73,7 +76,7 @@ data Object = Object
 
 type Archive :: Type
 data Archive = Archive
-  { objects :: M.Map FilePath Object,
+  { objects :: M.Map GPath Object,
     symbols :: M.Map LinkOid Cell
   }
   deriving stock (Eq, Generic, Show)
@@ -123,49 +126,46 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
               ]
           | otherwise = []
 
-mkArchive :: [(FilePath, Object)] -> Either T.Text Archive
-mkArchive pathObjs
-  | brokenPaths /= [] =
-      Left
-        $ "broken paths:\n"
-        <> T.intercalate
-          "\n"
-          (map T.pack brokenPaths)
-  | brokenLinks /= [] =
-      Left
-        $ "broken links:\n"
-        <> T.intercalate
-          "\n"
-          (map (\l -> "  " <> LU.mkFqcn l.oid l.name) brokenLinks)
-  | otherwise = Right archive
+mkArchive :: [(GPath, Object)] -> Either T.Text Archive
+mkArchive pathObjs =
+  case foldlM concatObjs (M.empty, M.empty) pathObjs of
+    Left errMsg -> Left errMsg
+    Right (objects, symbols) ->
+      let brokenLinks = findBrokenLinks objects symbols
+       in if
+            | brokenLinks /= [] ->
+                Left
+                  $ "broken links:\n"
+                  <> T.intercalate
+                    "\n"
+                    (map (\l -> "  " <> LU.mkFqcn l.oid l.name) brokenLinks)
+            | otherwise ->
+                Right
+                  Archive
+                    { objects = objects,
+                      symbols = symbols
+                    }
   where
-    archive =
-      Archive
-        { objects = objects,
-          symbols = symbols
-        }
-    (objects, symbols) = foldl' concatObjs (M.empty, M.empty) pathObjs
     concatObjs ::
-      (M.Map FilePath Object, M.Map LinkOid Cell) ->
-      (FilePath, Object) ->
-      (M.Map FilePath Object, M.Map LinkOid Cell)
+      (M.Map GPath Object, M.Map LinkOid Cell) ->
+      (GPath, Object) ->
+      Either T.Text (M.Map GPath Object, M.Map LinkOid Cell)
     concatObjs (accObjs, accSyms) (path, obj) =
-      ( M.insert path obj accObjs,
-        M.union obj.symbols accSyms
-      )
-    brokenPaths :: [FilePath]
-    brokenPaths = foldl' getBrokenPath [] pathObjs
-    getBrokenPath :: [FilePath] -> (FilePath, Object) -> [FilePath]
-    getBrokenPath acc (path, _)
-      | Just _ <- P.encodeUtf path = acc
-      | otherwise = path : acc
-    brokenLinks :: [LinkOid]
-    brokenLinks = foldl' getBrokenLink [] allExternalOids
-    getBrokenLink acc linkOid = case EM.lookup linkOid archive.symbols of
+      pure
+        ( M.insert path obj accObjs,
+          M.union obj.symbols accSyms
+        )
+    findBrokenLinks :: M.Map GPath Object -> M.Map LinkOid Cell -> [LinkOid]
+    findBrokenLinks objs syms =
+      foldl' (getBrokenLink syms) []
+        $ allExternalOids objs
+    getBrokenLink :: M.Map LinkOid Cell -> [LinkOid] -> LinkOid -> [LinkOid]
+    getBrokenLink syms acc linkOid = case EM.lookup linkOid syms of
       Just _ -> acc
       Nothing -> linkOid : acc
-    allExternalOids =
-      M.foldl (\acc obj -> obj.externalOids <> acc) [] archive.objects
+    allExternalOids :: M.Map GPath Object -> [LinkOid]
+    allExternalOids objs =
+      M.foldl (\acc obj -> obj.externalOids <> acc) [] objs
 
 buildGraph ::
   [Block] ->
@@ -254,7 +254,7 @@ expandRootBlocks archive = map expandRootBlock rootBlocks
       concat $ M.foldlWithKey getRootBlocksFromObject [] archive.objects
     getRootBlocksFromObject ::
       [[(P.OsPath, Block)]] ->
-      FilePath ->
+      GPath ->
       Object ->
       [[(P.OsPath, Block)]]
     getRootBlocksFromObject acc objPath object =
@@ -263,7 +263,7 @@ expandRootBlocks archive = map expandRootBlock rootBlocks
       CBlock b
         | Just path <- EM.lookup "tangle" b.meta,
           Just osPath <- P.encodeUtf $ T.unpack path,
-          Just osPathOfObject <- P.encodeUtf objPath ->
+          Just osPathOfObject <- P.encodeUtf $ decodeGPath objPath ->
             (P.combine (P.takeDirectory osPathOfObject) osPath, b) : acc
         | otherwise -> acc
       CHeading {}

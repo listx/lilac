@@ -8,7 +8,9 @@ import Data.Tree
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( LinkOid (LinkOid, name, oid),
+  ( GPath,
+    LinkOid (LinkOid, name, oid),
+    encodeGPath,
     fromWords,
   )
 import Lilac.Util qualified as LU
@@ -23,7 +25,7 @@ import Relude
     pure,
     show,
     ($),
-    (<>),
+    (=<<),
   )
 import System.OsPath qualified as P
 import Test.Hspec
@@ -60,16 +62,18 @@ expectArchiveOk paths = do
     pathObjs <- readObjectsFrom paths
     LC.mkArchive pathObjs `shouldSatisfy` isRight
 
-readObjectsFrom :: [FilePath] -> IO [(FilePath, LC.Object)]
+readObjectsFrom :: [FilePath] -> IO [(GPath, LC.Object)]
 readObjectsFrom = foldlM f []
   where
-    f :: [(FilePath, LC.Object)] -> FilePath -> IO [(FilePath, LC.Object)]
+    f :: [(GPath, LC.Object)] -> FilePath -> IO [(GPath, LC.Object)]
     f acc path = do
-      (Right od) <- read path
-      pure $ ("test/Lilac/CompileSpec/" <> path, LC.mkObject od) : acc
-    read path = do
-      input <- LU.readFrom "test/Lilac/CompileSpec/" path
-      pure $ LP.parseOrgDoc input
+      compileSpecDir <- P.encodeUtf "test/Lilac/CompileSpec/"
+      p <- P.encodeUtf path
+      let relPath = P.combine compileSpecDir p
+      input <- LU.readFileRobustly relPath
+      (Right od) <- pure $ LP.parseOrgDoc input
+      relPath' <- encodeGPath =<< P.decodeUtf relPath
+      pure $ (relPath', LC.mkObject od) : acc
 
 checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
 checkCycles paths expectedCycles = do
