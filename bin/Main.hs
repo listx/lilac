@@ -6,9 +6,11 @@ import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Types
-  ( OrgParserState
+  ( GPath,
+    OrgParserState
       ( goids
       ),
+    encodeGPath,
   )
 import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
@@ -83,6 +85,9 @@ readOsPath = f =<< str
         P.isValid osPath =
           pure osPath
       | otherwise = fail $ "invalid OsPath: " <> maybeOsPath
+
+readGPath :: ReadM GPath
+readGPath = encodeGPath =<< str
 
 type GlobalOpts :: Type
 data GlobalOpts = GlobalOpts

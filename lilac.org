@@ -2070,9 +2070,11 @@ import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Types
-  ( OrgParserState
+  ( GPath,
+    OrgParserState
       ( goids
       ),
+    encodeGPath,
   )
 import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
@@ -2399,6 +2401,7 @@ options, and the functions that operate on them.
 #+name: Option handling
 #+begin_src haskell
 <<f:readOsPath>>
+<<f:readGPath>>
 <<data:GlobalOpts>>
 <<data:Subcommand>>
 <<data:CheckOpts>>
@@ -2431,6 +2434,15 @@ readOsPath = f =<< str
         P.isValid osPath =
           pure osPath
       | otherwise = fail $ "invalid OsPath: " <> maybeOsPath
+#+end_src
+
+Another helper is a parser for [[id:2d98229c-e318-434b-916b-364c04021306::newtype:GPath][newtype:GPath]], whose type we need for
+[[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]].
+
+#+name: f:readGPath
+#+begin_src haskell
+readGPath :: ReadM GPath
+readGPath = encodeGPath =<< str
 #+end_src
 
 The global options for the Lilac CLI are encoded in [[data:GlobalOpts]].
