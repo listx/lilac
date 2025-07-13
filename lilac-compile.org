@@ -121,13 +121,77 @@ data Object = Object
 #+end_src
 
 The ~symbols~ houses all links that point to cells inside the current ~OrgDoc~. We
-have to use [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] as a key, and for this we need to define a ~ToJSONKey~
-instance for it.
+have to use [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] as a key, and for this we need to define at least a
+~ToJSONKey~ instance and ~FromJSONKey~ instance. Otherwise, =Data.Aeson= can give an
+unrelated error message like
 
-#+name: tc:ToJSONKey LinkOid
+#+begin_quote
+Error in $.symbols: parsing Map failed, expected Array, but encountered Object
+#+end_quote
+
+when trying to parse the JSON for symbols (~"symbols":{}~), such that ~"symbols":[]~
+won't give an error (strange!).
+
+Marshaling to JSON is straightforward, because we can just reuse the [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::instance:Show
+ LinkOid][instance:Show LinkOid]], which already knows how to convert a ~LinkOid~ to a ~String~
+value.
+
+Unmarshaling is tricky because we have to inform =Data.Aeson= how to convert a
+~T.Text~ to ~LinkOid~. This is what we do in [[f:parseJSONLinkOid]].
+
+#+name: f:parseJSONLinkOid
+#+begin_src haskell
+parseJSONLinkOid :: T.Text -> Parser LinkOid
+parseJSONLinkOid t = do
+  oidAndNameText <- maybe (fail "invalid LinkOid") pure (T.stripPrefix "id:" t)
+  let oidText = T.take 36 oidAndNameText
+      maybeNameText = T.drop 36 oidAndNameText
+      name =
+        if T.length maybeNameText > 2
+          then T.drop 2 maybeNameText
+          else ""
+  case Lilac.Types.fromText oidText of
+    Nothing -> fail "invalid LinkOid"
+    Just oid -> pure $ LinkOid oid name
+#+end_src
+
+This function is not very strict (it only implicitly checks for the ~::~ separator
+between the UUID and the name (if any)), because it's good enough.
+
+Now we're ready to define the boilerplate for doing the round trip to and back
+from JSON. The [[instance:ToJSON LinkOid]] converts the ~LinkOid~ to a JSON ~Value~ type
+(one of the constructors being a JSON string, or ~Data.Aeson.Types.String~).
+
+#+name: instance:ToJSON LinkOid
+#+begin_src haskell
+instance ToJSON LinkOid where
+  toJSON linkOid = Data.Aeson.Types.String (T.pack $ show linkOid)
+#+end_src
+
+The [[instance:ToJSONKey LinkOid]] is simpler, because it just expects a type that
+can be a key. The use of ~toJSONKeyText~ is important because it results in
+encoding the surrounding map as a JSON object ~{...}~ instead of an array of
+key-value pairs ~[...]~ (see the [[https://hackage.haskell.org/package/aeson-2.2.3.0/docs/Data-Aeson-Types.html#t:ToJSONKeyFunction][upstream docs here]]).
+
+#+name: instance:ToJSONKey LinkOid
 #+begin_src haskell
 instance ToJSONKey LinkOid where
-  toJSONKey = toJSONKeyText T.show
+  toJSONKey = toJSONKeyText show
+#+end_src
+
+The instances for both ~FromJSON~ and ~FromJSONKey~ rely on the [[f:parseJSONLinkOid]]
+we defined above.
+
+#+name: instance:FromJSON LinkOid
+#+begin_src haskell
+instance FromJSON LinkOid where
+  parseJSON = withText "LinkOid" parseJSONLinkOid
+#+end_src
+
+#+name: instance:FromJSONKey LinkOid
+#+begin_src haskell
+instance FromJSONKey LinkOid where
+  fromJSONKey = FromJSONKeyTextParser parseJSONLinkOid
 #+end_src
 
 The ~externalOids~ captures all links that point to some other cell in

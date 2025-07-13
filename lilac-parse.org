@@ -451,7 +451,7 @@ though, we can use the ~encode~ and ~encodeFile~ functions from =Data.Aeson=.
 type OID :: Type
 newtype OID = OID UUID
   deriving stock (Eq, Ord, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
 #+end_src
 
 The OID wraps around a UUID. This way we can be agnostic about the concrete
@@ -2247,8 +2247,18 @@ data LinkOid = LinkOid
   { oid :: OID,
     name :: T.Text
   }
-  deriving stock (Eq, Generic, Ord, Show)
-  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
+  deriving stock (Eq, Generic, Ord)
+#+end_src
+
+We have a custom =Show= instance so that it's much more concise (especially when
+we're marshaling and unmarshaling from JSON).
+
+#+name: instance:Show LinkOid
+#+begin_src haskell
+instance Show LinkOid where
+  show (LinkOid (OID uuid) name)
+    | T.null name = "id:" <> show uuid
+    | otherwise = "id:" <> show uuid <> "::" <> T.unpack name
 #+end_src
 
 In summary we support the following link types in an Org document:

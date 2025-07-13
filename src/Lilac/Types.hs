@@ -34,8 +34,23 @@ module Lilac.Types
   )
 where
 
-import Data.Aeson (FromJSON, FromJSONKey, ToJSON, ToJSONKey, toJSONKey)
-import Data.Aeson.Types (toJSONKeyText)
+import Data.Aeson
+  ( FromJSON,
+    FromJSONKey,
+    FromJSONKeyFunction (FromJSONKeyTextParser),
+    ToJSON,
+    ToJSONKey,
+    fromJSONKey,
+    parseJSON,
+    toJSON,
+    toJSONKey,
+  )
+import Data.Aeson.Types
+  ( Parser,
+    Value (String),
+    toJSONKeyText,
+    withText,
+  )
 import Data.Bits.Bitwise (toListLE)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
@@ -62,6 +77,7 @@ import Relude
     catMaybes,
     fail,
     map,
+    maybe,
     otherwise,
     pure,
     show,
@@ -70,6 +86,7 @@ import Relude
     ($),
     (.),
     (<>),
+    (>),
   )
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -142,11 +159,37 @@ data LinkOid = LinkOid
   { oid :: OID,
     name :: T.Text
   }
-  deriving stock (Eq, Generic, Ord, Show)
-  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
+  deriving stock (Eq, Generic, Ord)
+
+instance ToJSON LinkOid where
+  toJSON linkOid = Data.Aeson.Types.String (T.pack $ show linkOid)
 
 instance ToJSONKey LinkOid where
-  toJSONKey = toJSONKeyText T.show
+  toJSONKey = toJSONKeyText show
+
+instance FromJSON LinkOid where
+  parseJSON = withText "LinkOid" parseJSONLinkOid
+
+instance FromJSONKey LinkOid where
+  fromJSONKey = FromJSONKeyTextParser parseJSONLinkOid
+
+instance Show LinkOid where
+  show (LinkOid (OID uuid) name)
+    | T.null name = "id:" <> show uuid
+    | otherwise = "id:" <> show uuid <> "::" <> T.unpack name
+
+parseJSONLinkOid :: T.Text -> Parser LinkOid
+parseJSONLinkOid t = do
+  oidAndNameText <- maybe (fail "invalid LinkOid") pure (T.stripPrefix "id:" t)
+  let oidText = T.take 36 oidAndNameText
+      maybeNameText = T.drop 36 oidAndNameText
+      name =
+        if T.length maybeNameText > 2
+          then T.drop 2 maybeNameText
+          else ""
+  case Lilac.Types.fromText oidText of
+    Nothing -> fail "invalid LinkOid"
+    Just oid -> pure $ LinkOid oid name
 
 type LinkTarget :: Type
 data LinkTarget
@@ -271,7 +314,7 @@ newtype StyleMask = StyleMask Word8
 type OID :: Type
 newtype OID = OID UUID
   deriving stock (Eq, Ord, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
 
 instance Show OID where
   show (OID uuid) = Prelude.show uuid

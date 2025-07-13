@@ -61,8 +61,23 @@ module Lilac.Types
   )
 where
 
-import Data.Aeson (FromJSON, FromJSONKey, ToJSON, ToJSONKey, toJSONKey)
-import Data.Aeson.Types (toJSONKeyText)
+import Data.Aeson
+  ( FromJSON,
+    FromJSONKey,
+    FromJSONKeyFunction (FromJSONKeyTextParser),
+    ToJSON,
+    ToJSONKey,
+    fromJSONKey,
+    parseJSON,
+    toJSON,
+    toJSONKey,
+  )
+import Data.Aeson.Types
+  ( Parser,
+    Value (String),
+    toJSONKeyText,
+    withText,
+  )
 import Data.Bits.Bitwise (toListLE)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
@@ -89,6 +104,7 @@ import Relude
     catMaybes,
     fail,
     map,
+    maybe,
     otherwise,
     pure,
     show,
@@ -97,6 +113,7 @@ import Relude
     ($),
     (.),
     (<>),
+    (>),
   )
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -110,7 +127,12 @@ import Prelude qualified (show)
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Level>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Link>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:LinkOid>>
-<<id:01da95fe-ba23-4481-9833-428423392f5f::tc:ToJSONKey LinkOid>>
+<<id:01da95fe-ba23-4481-9833-428423392f5f::instance:ToJSON LinkOid>>
+<<id:01da95fe-ba23-4481-9833-428423392f5f::instance:ToJSONKey LinkOid>>
+<<id:01da95fe-ba23-4481-9833-428423392f5f::instance:FromJSON LinkOid>>
+<<id:01da95fe-ba23-4481-9833-428423392f5f::instance:FromJSONKey LinkOid>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::instance:Show LinkOid>>
+<<id:01da95fe-ba23-4481-9833-428423392f5f::f:parseJSONLinkOid>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:LinkTarget>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:ListMarker>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:MathFragment>>
