@@ -10,7 +10,6 @@ module Lilac.Parse
     orgDocParser,
     goidsParser,
     parseOrgDoc,
-    runGoidsParser,
     styleMaskFrom,
     validateOidText,
   )
@@ -77,15 +76,12 @@ import Lilac.Types
     protocolsEmacs,
     protocolsWeb,
   )
-import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Char,
     Either (Left, Right),
     Eq,
-    FilePath,
-    IO,
     Identity,
     Int,
     Map,
@@ -157,7 +153,6 @@ import Relude
   )
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
-import System.Exit (die)
 import System.IO (utf8)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -1653,22 +1648,6 @@ validateOidText :: (MonadFail m) => T.Text -> m OID
 validateOidText oidText = case fromText oidText of
   Nothing -> fail $ show oidText <> " is not a valid OID"
   Just oid -> pure oid
-
-runGoidsParser :: FilePath -> IO (M.Map OID P.OsPath)
-runGoidsParser orgIdLocationsFile = do
-  let path = case P.encodeUtf orgIdLocationsFile of
-        Nothing -> P.pack []
-        Just p -> p
-  input <- LU.readFileRobustly path
-  let parseResult =
-        MP.runParser
-          (runStateT (goidsParser path) defaultGOIDsParserState)
-          orgIdLocationsFile
-          input
-  case parseResult of
-    Left errBundle -> do
-      die $ MP.errorBundlePretty errBundle
-    Right (oids, _) -> pure oids
 
 extractGOIDs :: [(P.OsPath, T.Text)] -> T.Text
 extractGOIDs orgFilesAndContents =

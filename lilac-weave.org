@@ -528,7 +528,6 @@ regular *bold* /italic/ _underline_ =verbatim= ~code~
 #+begin_src haskell
 weaveExpect
   "0300-weave-styled-text"
-  "test/.orgids"
   [ "<p>regular ",
     "<span class=\"bold\">bold</span> ",
     "<span class=\"italic\">italic</span> ",
@@ -582,7 +581,6 @@ doesn't hurt.
 #+begin_src haskell
 weaveExpect
   "0300-weave-lists"
-  "test/.orgids"
   $ map
     (T.intercalate "" . map T.strip . T.lines)
     [ """
@@ -808,12 +806,12 @@ just a thin wrapper around [[f:weave]] which does most of the work.
 
 #+name: f:weaveToDisk
 #+begin_src haskell
-weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> M.Map OID P.OsPath -> IO ()
-weaveToDisk fp od watch goids = do
+weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
+weaveToDisk fp od watch = do
   let weaveConf =
         WeaveConf
           { orgDoc = od,
-            goids = goids,
+            goids = M.empty,
             watch = watch
           }
   LU.writeFileRobustly fp
@@ -837,9 +835,10 @@ helpers]] to take care of some boilerplate.
 #+begin_src haskell
 module Lilac.WeaveSpec (spec) where
 
+import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
-import Lilac.Types (OrgParserState (goids), nilOidOrgDoc)
+import Lilac.Types (OID, OrgParserState (goids), nilOidOrgDoc)
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
 import Relude
@@ -861,6 +860,7 @@ import Relude
     (<>),
     (==),
   )
+import System.OsPath qualified as P
 import Test.Hspec
   ( Expectation,
     Spec,
@@ -908,9 +908,9 @@ prettified way (for readability).
 
 #+name: f:getWovenPrettyFromPath
 #+begin_src haskell
-getWovenPrettyFromPath :: FilePath -> FilePath -> IO (Either String T.Text)
-getWovenPrettyFromPath path orgIdLocationsFile = do
-  goids <- LP.runGoidsParser orgIdLocationsFile
+getWovenPrettyFromPath :: FilePath -> IO (Either String T.Text)
+getWovenPrettyFromPath path = do
+  let goids = M.empty :: M.Map OID P.OsPath
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
@@ -974,9 +974,9 @@ finally the list of expected substrings inside the woven result.
 
 #+name: f:weaveExpect
 #+begin_src haskell
-weaveExpect :: FilePath -> FilePath -> [T.Text] -> Spec
-weaveExpect path goidsFile needles = do
-  result <- runIO $ getWovenPrettyFromPath path goidsFile
+weaveExpect :: FilePath -> [T.Text] -> Spec
+weaveExpect path needles = do
+  result <- runIO $ getWovenPrettyFromPath path
   describe path $ do
     case result of
       Right haystack -> do

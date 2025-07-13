@@ -390,12 +390,12 @@ weaveLink link = do
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
       LinkTargetOther protocol target -> protocol <> ":" <> target
 
-weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> M.Map OID P.OsPath -> IO ()
-weaveToDisk fp od watch goids = do
+weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
+weaveToDisk fp od watch = do
   let weaveConf =
         WeaveConf
           { orgDoc = od,
-            goids = goids,
+            goids = M.empty,
             watch = watch
           }
   LU.writeFileRobustly fp

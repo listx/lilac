@@ -16,8 +16,6 @@ reset_tangled_program_files()
 	>/dev/null git checkout -- "${tangled_program_files[@]}" \
 		Makefile \
 		.gitignore \
-		.orgids \
-		test/.orgids \
 		nix
 }
 
@@ -31,14 +29,11 @@ tangle()
 	return 0
 }
 
-tangle_and_test_and_check_and_weave()
+tangle_and_test_and_weave()
 {
 	tangle
 	if tangle; then
 		if ! make -C "${SCRIPT_ROOT}" test; then
-			reset_tangled_program_files
-		fi
-		if ! (cd "${SCRIPT_ROOT}" && lilac check lilac.org); then
 			reset_tangled_program_files
 		fi
 	fi
@@ -54,12 +49,12 @@ watch()
 
 	s1="$(stat -c %Y "${files[@]}")"
 
-	tangle_and_test_and_check_and_weave
+	tangle_and_test_and_weave
 	while true; do
 		s2="$(stat -c %Y "${files[@]}")"
 		if [[ ! "${s1}" == "${s2}" ]]; then
 			s1="${s2}"
-			tangle_and_test_and_check_and_weave
+			tangle_and_test_and_weave
 		fi
 		sleep 1
 	done

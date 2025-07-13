@@ -1,8 +1,9 @@
 module Lilac.WeaveSpec (spec) where
 
+import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
-import Lilac.Types (OrgParserState (goids), nilOidOrgDoc)
+import Lilac.Types (OID, OrgParserState (goids), nilOidOrgDoc)
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
 import Relude
@@ -24,6 +25,7 @@ import Relude
     (<>),
     (==),
   )
+import System.OsPath qualified as P
 import Test.Hspec
   ( Expectation,
     Spec,
@@ -38,9 +40,9 @@ import Text.Megaparsec qualified as MP
 spec :: Spec
 spec = weaveSpec
 
-getWovenPrettyFromPath :: FilePath -> FilePath -> IO (Either String T.Text)
-getWovenPrettyFromPath path orgIdLocationsFile = do
-  goids <- LP.runGoidsParser orgIdLocationsFile
+getWovenPrettyFromPath :: FilePath -> IO (Either String T.Text)
+getWovenPrettyFromPath path = do
+  let goids = M.empty :: M.Map OID P.OsPath
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
@@ -88,9 +90,9 @@ searchOrderedNeedles haystackRaw needles =
             then (expectationF : testCases, remainingHaystack)
             else (expectation : testCases, remainingHaystack)
 
-weaveExpect :: FilePath -> FilePath -> [T.Text] -> Spec
-weaveExpect path goidsFile needles = do
-  result <- runIO $ getWovenPrettyFromPath path goidsFile
+weaveExpect :: FilePath -> [T.Text] -> Spec
+weaveExpect path needles = do
+  result <- runIO $ getWovenPrettyFromPath path
   describe path $ do
     case result of
       Right haystack -> do
@@ -102,7 +104,6 @@ weaveSpec :: Spec
 weaveSpec = do
   weaveExpect
     "0300-weave-styled-text"
-    "test/.orgids"
     [ "<p>regular ",
       "<span class=\"bold\">bold</span> ",
       "<span class=\"italic\">italic</span> ",
@@ -116,7 +117,6 @@ weaveSpec = do
 
   weaveExpect
     "0300-weave-lists"
-    "test/.orgids"
     $ map
       (T.intercalate "" . map T.strip . T.lines)
       [ """

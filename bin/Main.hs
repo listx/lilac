@@ -9,9 +9,6 @@ import Lilac.Types
   ( Archive,
     GPath,
     Object,
-    OrgParserState
-      ( goids
-      ),
     decodeGPath,
     encodeGPath,
   )
@@ -60,7 +57,6 @@ import Relude
     Type,
     concat,
     fail,
-    foldlM,
     mapM,
     mapM_,
     otherwise,
@@ -95,25 +91,16 @@ readGPath = encodeGPath =<< str
 type GlobalOpts :: Type
 data GlobalOpts = GlobalOpts
   { subcommand :: Subcommand,
-    orgIdLocationsFile :: FilePath,
     color :: Bool,
     verbose :: Bool
   }
 
 type Subcommand :: Type
 data Subcommand
-  = Check CheckOpts
-  | Tangle TangleOpts
+  = Tangle TangleOpts
   | Weave WeaveOpts
   | Compile CompileOpts
   | Archive ArchiveOpts
-  | WriteGOIDs WriteGOIDsOpts
-
-type CheckOpts :: Type
-data CheckOpts = CheckOpts
-  { input :: FilePath,
-    dumpJson :: Bool
-  }
 
 type TangleOpts :: Type
 data TangleOpts = TangleOpts
@@ -125,12 +112,6 @@ data WeaveOpts = WeaveOpts
   { inputs :: [FilePath],
     outDir :: FilePath,
     watch :: Bool
-  }
-
-type WriteGOIDsOpts :: Type
-data WriteGOIDsOpts = WriteGOIDsOpts
-  { outFile :: FilePath,
-    inputs :: [FilePath]
   }
 
 type CompileOpts :: Type
@@ -151,18 +132,6 @@ globalOptionsHandler :: OptionHandler GlobalOpts
 globalOptionsHandler =
   GlobalOpts
     <$> subcommandHandler
-    <*> ( strOption
-            ( long "org-id-locations-file"
-                <> metavar "FILE"
-                <> value ".orgids"
-                <> showDefault
-                <> help
-                  """
-                  File with Org ID locations. See 'org-id-locations-file' in
-                  Emacs documentation for more information.
-                  """
-            )
-        )
     <*> ( flag
             True
             False
@@ -189,11 +158,9 @@ subcommandHandler =
   hsubparser
     $ metavar "SUBCOMMAND"
     <> cmdArchive
-    <> cmdCheck
     <> cmdCompile
     <> cmdTangle
     <> cmdWeave
-    <> cmdWriteGOIDs
   where
     cmdArchive =
       command
@@ -201,12 +168,6 @@ subcommandHandler =
         $ info
           (Archive <$> archiveOptsHandler)
           (progDesc "Create archive from object files.")
-    cmdCheck =
-      command
-        "check"
-        $ info
-          (Check <$> checkOptsHandler)
-          (progDesc "Check input Org file for errors.")
     cmdCompile =
       command
         "compile"
@@ -225,27 +186,6 @@ subcommandHandler =
         $ info
           (Weave <$> weaveOptsHandler)
           (progDesc "Generate HTML representation.")
-    cmdWriteGOIDs =
-      command
-        "write-goids"
-        $ info
-          (WriteGOIDs <$> writeGOIDsOptsHandler)
-          (progDesc "Generate global Org IDs from a list of Org files.")
-
-checkOptsHandler :: OptionHandler CheckOpts
-checkOptsHandler =
-  CheckOpts
-    <$> (argument str (metavar "FILE"))
-    <*> ( flag
-            False
-            True
-            ( long "dump-json"
-                <> help
-                  """
-                  Dump Org file as JSON. This is useful for debugging.
-                  """
-            )
-        )
 
 tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
@@ -301,22 +241,6 @@ archiveOptsHandler =
             )
         )
 
-writeGOIDsOptsHandler :: OptionHandler WriteGOIDsOpts
-writeGOIDsOptsHandler =
-  WriteGOIDsOpts
-    <$> ( strOption
-            ( long "out-file"
-                <> metavar "FILE"
-                <> value ".orgids"
-                <> showDefault
-                <> help
-                  """
-                  File to save global Org IDs.
-                  """
-            )
-        )
-    <*> (some $ argument str (metavar "FILES..."))
-
 main :: IO ()
 main = do
   opts <- customExecParser (prefs showHelpOnEmpty) mainOptions
@@ -343,38 +267,9 @@ main = do
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
   Archive archiveOpts -> lilacArchive archiveOpts
-  Check checkOpts -> lilacCheck globalOpts checkOpts
   Compile compileOpts -> lilacCompile globalOpts compileOpts
-  Tangle tangleOpts -> lilacTangle tangleOpts
-  Weave weaveOpts -> lilacWeave globalOpts weaveOpts
-  WriteGOIDs writeGOIDsOpts -> lilacWriteGOIDs writeGOIDsOpts
-
-lilacCheck :: GlobalOpts -> CheckOpts -> IO ()
-lilacCheck globalOpts checkOpts = do
-  goids <- LP.runGoidsParser globalOpts.orgIdLocationsFile
-  input <- LU.readFrom "" checkOpts.input
-  let parseResult =
-        MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
-          checkOpts.input
-          input
-  case parseResult of
-    Left errBundle -> do
-      die $ MP.errorBundlePretty errBundle
-    Right (orgDoc, _) -> do
-      putStrLn $ checkOpts.input <> ": OK"
-      when (checkOpts.dumpJson) $ do
-        outPath <- do
-          base <- P.takeBaseName <$> P.encodeUtf checkOpts.input
-          let json = P.unsafeEncodeUtf "json"
-          P.decodeUtf $ P.addExtension base json
-        encodeFile outPath orgDoc
-      when (globalOpts.verbose) $ do
-        let prettyPrint =
-              if globalOpts.color
-                then PP.pPrintForceColor
-                else PP.pPrintNoColor
-        prettyPrint orgDoc
+  Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
+  Weave weaveOpts -> lilacWeave weaveOpts
 
 lilacCompile :: GlobalOpts -> CompileOpts -> IO ()
 lilacCompile _globalOpts compileOpts = do
@@ -422,8 +317,8 @@ lilacArchive archiveOpts = do
         Left errMsg -> die errMsg
         Right obj -> pure (gPath, obj)
 
-lilacTangle :: TangleOpts -> IO ()
-lilacTangle tangleOpts = do
+lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
+lilacTangle globalOpts tangleOpts = do
   mapM_ tangleArchiveFile tangleOpts.inputs
   where
     tangleArchiveFile gPath = do
@@ -433,15 +328,16 @@ lilacTangle tangleOpts = do
       case eitherDecodeStrictText text :: Either String Archive of
         Left errMsg -> die errMsg
         Right archive -> do
-          putStrLn $ "Tangling " <> fp
+          when (globalOpts.verbose) $ do
+            putStrLn $ "Tangling " <> fp
           LT.tangle archive
-          putStrLn "Finished tangling."
+          when (globalOpts.verbose)
+            $ putStrLn "Finished tangling."
 
-lilacWeave :: GlobalOpts -> WeaveOpts -> IO ()
-lilacWeave globalOpts weaveOpts = do
+lilacWeave :: WeaveOpts -> IO ()
+lilacWeave weaveOpts = do
   writeCssFile
-  goids <- LP.runGoidsParser globalOpts.orgIdLocationsFile
-  mapM_ (weaveOrgFile goids) $ weaveOpts.inputs
+  mapM_ weaveOrgFile $ weaveOpts.inputs
   where
     writeCssFile = do
       cssPath <- do
@@ -450,11 +346,11 @@ lilacWeave globalOpts weaveOpts = do
         css <- P.encodeUtf "default.css"
         pure $ P.joinPath [dir, cssDir, css]
       LU.writeFileRobustly cssPath $ LWC.genCss
-    weaveOrgFile goids inputOrgFile = do
+    weaveOrgFile inputOrgFile = do
       input <- LU.readFrom "" inputOrgFile
       let parseResult =
             MP.runParser
-              (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
+              (runStateT LP.orgDocParser LP.defaultOrgParserState)
               inputOrgFile
               input
       case parseResult of
@@ -468,16 +364,5 @@ lilacWeave globalOpts weaveOpts = do
             let withoutExtension = P.joinPath [dir, base]
                 html = P.unsafeEncodeUtf "html"
             pure $ P.addExtension withoutExtension html
-          LW.weaveToDisk outPath orgDoc weaveOpts.watch goids
+          LW.weaveToDisk outPath orgDoc weaveOpts.watch
           putStrLn "Finished weaving."
-
-lilacWriteGOIDs :: WriteGOIDsOpts -> IO ()
-lilacWriteGOIDs writeGOIDsOpts = do
-  outFile <- P.encodeUtf $ writeGOIDsOpts.outFile
-  inputs <- foldlM readInputs [] writeGOIDsOpts.inputs
-  LU.writeFileRobustly outFile $ LP.extractGOIDs inputs
-  where
-    readInputs acc orgFileStr = do
-      orgFileOsPath <- P.encodeUtf orgFileStr
-      orgFileContent <- LU.readFileRobustly orgFileOsPath
-      pure $ (orgFileOsPath, orgFileContent) : acc
