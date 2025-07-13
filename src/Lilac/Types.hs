@@ -351,7 +351,15 @@ newtype GPath = GPath FilePath
   deriving anyclass (ToJSON)
 
 instance ToJSONKey GPath where
-  toJSONKey = toJSONKeyText T.show
+  toJSONKey = toJSONKeyText $ \(GPath p) -> T.pack p
+
+instance FromJSON GPath where
+  parseJSON = withText "GPath" $ \t -> do
+    pure . GPath $ T.unpack t
+
+instance FromJSONKey GPath where
+  fromJSONKey = FromJSONKeyTextParser $ \t -> do
+    pure . GPath $ T.unpack t
 
 encodeGPath :: (MonadFail m) => FilePath -> m GPath
 encodeGPath fp

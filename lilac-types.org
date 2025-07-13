@@ -158,6 +158,9 @@ import Prelude qualified (show)
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:Prose>>
 
 <<newtype:GPath>>
+<<instance:ToJSONKey GPath>>
+<<instance:FromJSON GPath>>
+<<instance:FromJSONKey GPath>>
 <<f:encodeGPath>>
 <<f:decodeGPath>>
 
@@ -211,14 +214,38 @@ type GPath :: Type
 newtype GPath = GPath FilePath
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (ToJSON)
-
-<<instance:ToJSONKey GPath>>
 #+end_src
+
+Similar to [[id:01da95fe-ba23-4481-9833-428423392f5f::instance:ToJSONKey LinkOid][instance:ToJSONKey LinkOid]], we want to encode and decode ~GPath~ values
+in a succinct way. Because this is a ~newtype~ wrapper, by default =Data.Aeson= will
+try to write it as ~"GPath" \"...\""~ in JSON, which is ugly. To simplify this we
+have custom ~ToJSONKey~ and ~FromJSONKey~ instances.
+
+[[instance:ToJSONKey GPath]] tells ~Data.Aeson~ to only write the ~FilePath~ part of the
+~GPath~.
 
 #+name: instance:ToJSONKey GPath
 #+begin_src haskell
 instance ToJSONKey GPath where
-  toJSONKey = toJSONKeyText T.show
+  toJSONKey = toJSONKeyText $ \(GPath p) -> T.pack p
+#+end_src
+
+Both [[instance:FromJSON GPath]] and [[instance:FromJSONKey GPath]] understand how to
+parse a ~GPath~ from a ~Text~ value. The ~FromJSONKey~ instance also requires a
+~FromJSON~ instance, which is why we have both of them here.
+
+#+name: instance:FromJSONKey GPath
+#+begin_src haskell
+instance FromJSONKey GPath where
+  fromJSONKey = FromJSONKeyTextParser $ \t -> do
+    pure . GPath $ T.unpack t
+#+end_src
+
+#+name: instance:FromJSON GPath
+#+begin_src haskell
+instance FromJSON GPath where
+  parseJSON = withText "GPath" $ \t -> do
+    pure . GPath $ T.unpack t
 #+end_src
 
 [[f:encodePath]] is the only way one is allowed to construct a [[newtype:GPath]].
