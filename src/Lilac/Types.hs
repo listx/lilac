@@ -407,4 +407,4 @@ data Archive = Archive
     symbols :: M.Map LinkOid Cell
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)

@@ -17,8 +17,7 @@ be tangled or weaved.
 #+header: :tangle src/Lilac/Compile.hs
 #+begin_src haskell
 module Lilac.Compile
-  ( expandRootBlocks,
-    findCycles,
+  ( findCycles,
     findExternalOids,
     mkObject,
     mkArchive,
@@ -50,23 +49,19 @@ import Lilac.Types
     decodeGPath,
   )
 import Relude
-  ( Bool (False, True),
-    Either (Left, Right),
+  ( Either (Left, Right),
     Maybe (Just, Nothing),
     String,
     catMaybes,
-    concat,
     concatMap,
     elem,
     fmap,
     foldl',
-    fst,
     intercalate,
     length,
     map,
     otherwise,
     repeat,
-    reverse,
     show,
     sort,
     zip,
@@ -74,11 +69,9 @@ import Relude
     (.),
     (/=),
     (<>),
-    (==),
     (>),
   )
 import Relude.Extra.Map qualified as EM
-import System.OsPath qualified as P
 
 <<f:mkObject>>
 <<f:mkSymbols>>
@@ -86,8 +79,6 @@ import System.OsPath qualified as P
 <<f:buildGraph>>
 <<f:findCycles>>
 <<f:findExternalOids>>
-<<f:expandRootBlocks>>
-<<f:expandBlock>>
 #+end_src
 
 ** Object generation
@@ -424,7 +415,7 @@ data Archive = Archive
     symbols :: M.Map LinkOid Cell
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
 A [[data:Archive]] is just a collection of [[data:Object]] values, which are each paired
@@ -1248,844 +1239,14 @@ checkCycles
 #+end_src
 
 
-** Block expansion for tangling
-
-For tangling, we can't use the graph information from [[f:buildGraph]] directly
-because it doesn't handle the case where we have multiple links to the same code
-block. Instead we look at all of the root blocks (blocks which specify the
-~:tangle~ header, and thus require writing to the file system), and expand each
-one in turn in [[f:expandRootBlocks]]. The output is a list of tuples, where each
-tuple encodes the filesystem path where we want to write some text (as a result
-of tangling), and the contents of the text itself which we want to write there
---- hence the type is ~(P.OsPath, T.Text)~.
-
-The call to ~maybeAddShebang~ adds a special shebang line at the beginning of the
-file, if one was specified using the ~:shebang~ header. See [[id:caa38bf7-52ae-4246-8be0-8b2c9e58ccc2::unit-test.sh][unit-test.sh]] for an
-example.
-
-We also trim lines with only spaces in them (in ~trimTrailingSpaces~), because
-these can happen from the ~prependExistingPrefix~ function in [[f:expandBlock]].
-
-#+name: f:expandRootBlocks
-#+begin_src haskell
-expandRootBlocks :: Archive -> [(P.OsPath, T.Text)]
-expandRootBlocks archive = map expandRootBlock rootBlocks
-  where
-    rootBlocks =
-      concat $ M.foldlWithKey getRootBlocksFromObject [] archive.objects
-    getRootBlocksFromObject ::
-      [[(P.OsPath, Block)]] ->
-      GPath ->
-      Object ->
-      [[(P.OsPath, Block)]]
-    getRootBlocksFromObject acc objPath object =
-      M.foldl (getRootBlock objPath) [] object.symbols : acc
-    getRootBlock objPath acc cell = case cell of
-      CBlock b
-        | Just path <- EM.lookup "tangle" b.meta,
-          Just osPath <- P.encodeUtf $ T.unpack path,
-          Just osPathOfObject <- P.encodeUtf $ decodeGPath objPath ->
-            (P.combine (P.takeDirectory osPathOfObject) osPath, b) : acc
-        | otherwise -> acc
-      CHeading {}
-      CListItem {}
-      CParagraph {}
-      CMathFragment {}
-      CFigure {}
-      CTable {} -> acc
-    expandRootBlock :: (P.OsPath, Block) -> (P.OsPath, T.Text)
-    expandRootBlock (p, rootBlock) =
-      ( p,
-        maybeAddShebang rootBlock
-          . trimTrailingSpaces
-          $ expandBlock archive rootBlock ""
-      )
-    trimTrailingSpaces :: T.Text -> T.Text
-    trimTrailingSpaces text =
-      T.unlines
-        . map (T.dropWhileEnd (== ' '))
-        $ T.lines text
-    maybeAddShebang :: Block -> T.Text -> T.Text
-    maybeAddShebang rootBlock text
-      | Just shebang <- EM.lookup "shebang" rootBlock.meta =
-          shebang <> "\n" <> text
-      | otherwise = text
-#+end_src
-
-In [[f:expandBlock]], we recursively expand all Noweb links until there are none.
-
-#+name: f:expandBlock
-#+begin_src haskell
-expandBlock :: Archive -> Block -> T.Text -> T.Text
-expandBlock archive block existingPrefix =
-  let acc = "" :: T.Text
-      prefix = "" :: T.Text
-   in fst $ foldl' expand (acc, prefix) block.body
-  where
-    expand (acc, _) BTokenPadding =
-      (acc <> "\n", "")
-    expand (acc, _) (BTokenString text) =
-      (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetOid linkOid)))
-      | Just (CBlock targetBlock) <- EM.lookup linkOid archive.symbols =
-          ( acc <> (expandBlock archive targetBlock $ existingPrefix <> prefix),
-            prefix
-          )
-      | otherwise = (acc, prefix)
-    expand (acc, prefix) _ = (acc, prefix)
-    getPrefix text = T.takeWhileEnd (/= '\n') text
-    prependExistingPrefix text =
-      T.intercalate "\n"
-        . reverse
-        . fst
-        . foldl' prefixTailLines ([], True)
-        $ T.split (== '\n') text
-    prefixTailLines (acc, isFirstLine) line
-      | isFirstLine = (line : acc, False)
-      | otherwise = (T.append existingPrefix line : acc, False)
-#+end_src
-
-The ~expand~ function recursively calls ~expandBlock~ if it detects a ~LinkOid~ type
-link. Otherwise, for ~BTokenString~ tokens it searches for an indentation prefix
-with ~getPrefix~. We need the prefix because we want to indent entire blocks if
-the name of the link referring to it is indented. See
-[[t:0101-block-expansion-prefix]] and [[t:0101-block-expansion-prefix-nested]] for
-examples.
-
-The ~getPrefix~ function is simple and uses any characters it finds, not just
-spaces, looking backwards and stopping at a newline. See
-[[t:0101-block-expansion-prefix-nonspace]] and
-[[t:0101-block-expansion-prefix-nonspace-nested]] for examples.
-
-The ~prependExistingPrefix~ function splits up the given text, and injects the
-prefix on every line in the text except the very first line. This is because
-given the text
-
-#+header: :noweb off
-#+begin_src txt
-xx<<a>>
-#+end_src
-
-where ~xx~ is the prefix, we only want to give this prefix to the lines in ~<<a>>~
-except the first line (because the first line of ~<<a>>~ is already prefixed (from
-the outer block) with ~xx~); so only the lines after the first line in ~<<a>>~ need
-the ~xx~ prefix. This is what we do in ~prefixTailLines~, where we avoid adding the
-prefix to the "head", and instead only add it to the "tail."
-
-We use ~T.intercalate~ and ~T.split~ in ~prependExistingPrefix~ to avoid losing any
-information about the exact locations of newlines. If we used ~T.lines~ we would
-lose information about whether the last line actually had a trailing newline,
-because ~T.lines "a\nb"~ and ~T.lines "a\nb\n"~ both give ~["a", "b"]~.
-
-#+name: t:lines-unlines-info-loss
-#+begin_src haskell
-it "loses information" $ do
-  let withoutNewline = T.lines "a\nb"
-      withNewline = T.lines "a\nb\n"
-  T.unlines withoutNewline `shouldBe` T.unlines withNewline
-#+end_src
-
-*** Tests
-
-Expand a single code block.
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e007
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-a1
-<<b>>
-a2
-,#+end_src
-
-,#+name: b
-,#+begin_src haskell
-b
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion
-#+begin_src haskell
-checkExpansion
-  ["0101-block-expansion"]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "a1",
-          "b",
-          "a2"
-        ]
-    )
-  ]
-#+end_src
-
-Expand many code blocks in the same place, but the number of repeated expansions
-shouldn't result in a cumulative number of newlines; we should expect just one
-newline for the expanded content.
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-deeply-nested
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e008
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-a1
-<<b>>
-a2
-,#+end_src
-
-,#+name: b
-,#+begin_src haskell
-<<c>>
-,#+end_src
-
-,#+name: c
-,#+begin_src haskell
-<<d>>
-,#+end_src
-
-,#+name: d
-,#+begin_src haskell
-<<e>>
-,#+end_src
-
-,#+name: e
-,#+begin_src haskell
-e
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion-deeply-nested
-#+begin_src haskell
-checkExpansion
-  ["0101-block-expansion-deeply-nested"]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "a1",
-          "e",
-          "a2"
-        ]
-    )
-  ]
-#+end_src
-
-If the link name is indented, we have to indent the contents of that block.
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-prefix
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e009
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-  <<b>>
-a1
-  <<b>>
-,#+end_src
-
-,#+name: b
-,#+begin_src haskell
-b1
-b2
-b3
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion-prefix
-#+begin_src haskell
-checkExpansion
-  ["0101-block-expansion-prefix"]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "  b1",
-          "  b2",
-          "  b3",
-          "a1",
-          "  b1",
-          "  b2",
-          "  b3"
-        ]
-    )
-  ]
-#+end_src
-
-The indentation can be nested. For example if the named block itself links to
-other blocks with an indent, those inner blocks should be indented with the sum
-of the indent found in the current and outer surrounding blocks.
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-prefix-nested
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e00a
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-a1
-  <<b>>
-,#+end_src
-
-,#+name: b
-,#+begin_src haskell
-b1
-b2
-b3
-  <<c>>
-,#+end_src
-
-,#+name: c
-,#+begin_src haskell
-c1
-c2
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion-prefix-nested
-#+begin_src haskell
-checkExpansion
-  ["0101-block-expansion-prefix-nested"]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "a1",
-          "  b1",
-          "  b2",
-          "  b3",
-          "    c1",
-          "    c2"
-        ]
-    )
-  ]
-#+end_src
-
-The prefix is any string, up to the (preceding) newline. So this mean it can
-have non-space characters in it as well.
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-prefix-nonspace
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e00b
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-a1
-  -> <<b>>
-,#+end_src
-
-,#+name: b
-,#+begin_src haskell
-b1
-b2
-b3
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion-prefix-nonspace
-#+begin_src haskell
-checkExpansion
-  ["0101-block-expansion-prefix-nonspace"]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "a1",
-          "  -> b1",
-          "  -> b2",
-          "  -> b3"
-        ]
-    )
-  ]
-#+end_src
-
-Non-space prefixes can also be nested.
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-prefix-nonspace-nested
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e00c
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-a1
-  -> <<b>>
-,#+end_src
-
-,#+name: b
-,#+begin_src haskell
-b1
-b2
-b3
--- <<c>>
-,#+end_src
-
-,#+name: c
-,#+begin_src haskell
-c1
-c2
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion-prefix-nonspace-nested
-#+begin_src haskell
-checkExpansion
-  ["0101-block-expansion-prefix-nonspace-nested"]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "a1",
-          "  -> b1",
-          "  -> b2",
-          "  -> b3",
-          "  -> -- c1",
-          "  -> -- c2"
-        ]
-    )
-  ]
-#+end_src
-
-Complex expansions.
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-complex
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e00d
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-a1
-<<b>>
-a2
-  <<c>>
-a3
-<<g>>
-<<h>>
-,#+end_src
-
-,#+name: b
-,#+begin_src haskell
-b
-,#+end_src
-
-,#+name: c
-,#+begin_src haskell
-c
-c
-  <<d>>
-c
-,#+end_src
-
-,#+name: d
-,#+begin_src haskell
-d
-
-d
-<<e>>
-,#+end_src
-
-,#+name: e
-,#+begin_src haskell
-e <<f>>!
-,#+end_src
-
-,#+name: f
-,#+begin_src haskell
-hello
-,#+end_src
-
-,#+name: g
-,#+begin_src haskell
-g
-,#+end_src
-
-,#+name: h
-,#+begin_src haskell
-h
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion-complex
-#+begin_src haskell
-checkExpansion
-  ["0101-block-expansion-complex"]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "a1",
-          "b",
-          "a2",
-          "  c",
-          "  c",
-          "    d",
-          "",
-          "    d",
-          "    e hello!",
-          "  c",
-          "a3",
-          "g",
-          "",
-          "h"
-        ]
-    )
-  ]
-#+end_src
-
-Due to [[id:51f2edd8-5f8e-4c63-841f-da6c5c41680a::f:padConsecutiveNowebLinks][f:padConsecutiveNowebLinks]], insert extra newlines between consecutive
-Noweb links.
-
-#+header: :tangle test/Lilac/CompileSpec/0102-pad-between-consecutive-links
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e00e
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-a1
-<<b1>>
-<<b2>>
-a2
-  <<b1>>
-  <<b2>>
-  <<b3>>
-Even if indentation is different, still pad between them.
-  <<b1>>
-    <<b2>>
-      <<b3>>
-Even pad for the same block repeated multiple times.
-  <<b1>>
-  <<b1>>
-  <<b1>>
-Lines with multiple links still count as being consecutive.
-  <<b3>>
-  <<b3>>
-  <<b1>> <<b2>>
-  <<b3>>
-  <<b3>>
-No padding if only one link...
-  <<b1>>
-...is by itself.
-,#+end_src
-
-,#+name: b1
-,#+begin_src haskell
-b1
-,#+end_src
-
-,#+name: b2
-,#+begin_src haskell
-b2
-,#+end_src
-
-,#+name: b3
-,#+begin_src haskell
-b3
-,#+end_src
-#+end_src
-
-#+name: t:0102-pad-between-consecutive-links
-#+begin_src haskell
-checkExpansion
-  ["0102-pad-between-consecutive-links"]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "a1",
-          "b1",
-          "",
-          "b2",
-          "a2",
-          "  b1",
-          "",
-          "  b2",
-          "",
-          "  b3",
-          "Even if indentation is different, still pad between them.",
-          "  b1",
-          "",
-          "    b2",
-          "",
-          "      b3",
-          "Even pad for the same block repeated multiple times.",
-          "  b1",
-          "",
-          "  b1",
-          "",
-          "  b1",
-          "Lines with multiple links still count as being consecutive.",
-          "  b3",
-          "",
-          "  b3",
-          "",
-          "  b1 b2",
-          "",
-          "  b3",
-          "",
-          "  b3",
-          "No padding if only one link...",
-          "  b1",
-          "...is by itself."
-        ]
-    )
-  ]
-#+end_src
-
-Insert shebang lines if the user specifies them with the ~:shebang~ header.
-
-#+header: :tangle test/Lilac/CompileSpec/0103-shebang
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e00f
-:END:
-
-,#+name: a
-,#+header: :tangle a.sh
-,#+header: :shebang #!/usr/bin/env bash
-,#+begin_src sh
-a1
-,#+end_src
-#+end_src
-
-#+name: t:0103-shebang
-#+begin_src haskell
-checkExpansion
-  ["0103-shebang"]
-  [ ( "test/Lilac/CompileSpec/a.sh",
-      T.unlines
-        [ "#!/usr/bin/env bash",
-          "a1"
-        ]
-    )
-  ]
-#+end_src
-
-Expand blocks even if they have Noweb links that point to a block from an
-external file.
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-external-parent
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e010
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-a1
-<<id:00000000-0000-0000-0000-00000000f000::a>>
-a2
-,#+end_src
-#+end_src
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-external-child
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f000
-:END:
-,#+name: a
-,#+begin_src haskell
-hello from child
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion-external
-#+begin_src haskell
-checkExpansion
-  [ "0101-block-expansion-external-parent",
-    "0101-block-expansion-external-child"
-  ]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "a1",
-          "hello from child",
-          "a2"
-        ]
-    )
-  ]
-#+end_src
-
-The expansion should work for external Noweb links which refer to a block using
-a heading's ID, not the ID that's set at the file level.
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-external-parent-headingchild
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e011
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-a1
-<<id:00000000-0000-0000-0000-00000000f00a::a>>
-a2
-,#+end_src
-#+end_src
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-external-headingchild
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f009
-:END:
-
-,* A heading
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f00a
-:END:
-
-,#+name: a
-,#+begin_src haskell
-hello from child
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion-external-headingchild
-#+begin_src haskell
-checkExpansion
-  [ "0101-block-expansion-external-parent-headingchild",
-    "0101-block-expansion-external-headingchild"
-  ]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "a1",
-          "hello from child",
-          "a2"
-        ]
-    )
-  ]
-#+end_src
-
-
-An external block itself can refer to another external block. In
-[[t:0101-block-expansion-external-2-hops]] we use a middleman that itself refers to
-the external child block from [[t:0101-block-expansion-external]].
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-external-2-hops-parent
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e012
-:END:
-
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-a1
-<<id:00000000-0000-0000-0000-00000000f001::a>>
-a2
-,#+end_src
-#+end_src
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-external-2-hops-middleman
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f001
-:END:
-,#+name: a
-,#+begin_src haskell
-hello from middleman
-<<id:00000000-0000-0000-0000-00000000f000::a>>
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion-external-2-hops
-#+begin_src haskell
-checkExpansion
-  [ "0101-block-expansion-external-2-hops-parent",
-    "0101-block-expansion-external-2-hops-middleman",
-    "0101-block-expansion-external-child"
-  ]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "a1",
-          "hello from middleman",
-          "hello from child",
-          "a2"
-        ]
-    )
-  ]
-#+end_src
-
-We allow two files to refer to each other's code blocks as well, as long as
-there isn't a cycle.
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-external-mutual-a
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f002
-:END:
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-hello from a
-<<id:00000000-0000-0000-0000-00000000f003::b>>
-,#+end_src
-
-,#+name: c
-,#+begin_src haskell
-hello from c
-,#+end_src
-#+end_src
-
-#+header: :tangle test/Lilac/CompileSpec/0101-block-expansion-external-mutual-b
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f003
-:END:
-,#+name: b
-,#+begin_src haskell
-hello from b
-<<id:00000000-0000-0000-0000-00000000f002::c>>
-,#+end_src
-#+end_src
-
-#+name: t:0101-block-expansion-external-mutual
-#+begin_src haskell
-checkExpansion
-  [ "0101-block-expansion-external-mutual-a",
-    "0101-block-expansion-external-mutual-b"
-  ]
-  [ ( "test/Lilac/CompileSpec/equations.txt",
-      T.unlines
-        [ "hello from a",
-          "hello from b",
-          "hello from c"
-        ]
-    )
-  ]
-#+end_src
-
 ** Testing framework
 
 The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]].
 
 *** Test module and helpers
+:PROPERTIES:
+:ID:       ffb739b6-f38e-48bc-a260-7104802c69f4
+:END:
 
 #+name: module:Lilac.CompileSpec
 #+header: :tangle test/Lilac/CompileSpec.hs
@@ -2093,7 +1254,6 @@ The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941
 module Lilac.CompileSpec (spec) where
 
 import Data.Graph qualified as G
-import Data.Text qualified as T
 import Data.Tree
   ( Tree (Node, rootLabel, subForest),
   )
@@ -2112,8 +1272,6 @@ import Relude
     FilePath,
     IO,
     String,
-    first,
-    fmap,
     foldlM,
     isRight,
     pure,
@@ -2158,7 +1316,6 @@ helpers.
 <<f:expectArchiveOk>>
 <<f:readObjectsFrom>>
 <<f:checkCycles>>
-<<f:checkExpansion>>
 #+end_src
 
 There are two major areas of concern for the compilation process:
@@ -2243,22 +1400,6 @@ checkCycles paths expectedCycles = do
       (LC.findCycles archive) `shouldBe` expectedCycles
 #+end_src
 
-The [[f:checkExpansion]] function expands all source code blocks (found in the
-collection of Org documents, first converted into a [[data:Archive]]) and compares
-them with the expected output.
-
-#+name: f:checkExpansion
-#+begin_src haskell
-checkExpansion :: [FilePath] -> [(FilePath, T.Text)] -> Spec
-checkExpansion paths expectedExpansions = do
-  pathObjs <- runIO $ readObjectsFrom paths
-  case LC.mkArchive pathObjs of
-    Left errMsg -> it "programmer error" $ expectationFailure errMsg
-    Right archive -> it (show paths) $ do
-      (LC.expandRootBlocks archive)
-        `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
-#+end_src
-
 *** All test cases
 
 Below are all of the individual test cases.
@@ -2283,18 +1424,4 @@ compileSpec = do
   <<t:0100-dag-complex-loops>>
   <<t:0100-dag-2-node-loop-2-files>>
   <<t:0100-dag-2-node-loop-3-files>>
-  <<t:0101-block-expansion>>
-  <<t:0101-block-expansion-deeply-nested>>
-  <<t:0101-block-expansion-prefix>>
-  <<t:0101-block-expansion-prefix-nested>>
-  <<t:0101-block-expansion-prefix-nonspace>>
-  <<t:0101-block-expansion-prefix-nonspace-nested>>
-  <<t:0101-block-expansion-complex>>
-  <<t:0101-block-expansion-external>>
-  <<t:0101-block-expansion-external-headingchild>>
-  <<t:0101-block-expansion-external-2-hops>>
-  <<t:0101-block-expansion-external-mutual>>
-  <<t:0102-pad-between-consecutive-links>>
-  <<t:0103-shebang>>
-  <<t:lines-unlines-info-loss>>
 #+end_src

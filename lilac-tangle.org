@@ -24,41 +24,31 @@ Tangling concerns are captured in [[file:src/Lilac/Tangle.hs]].
 #+header: :tangle src/Lilac/Tangle.hs
 #+begin_src haskell
 module Lilac.Tangle
-  ( FQBN,
-    SourceCode (..),
-    expandRootBlocks,
-    getSourceCode,
-    getSourceCodeMulti,
+  ( expandRootBlocks,
     tangle,
   )
 where
 
 import Data.Map.Strict qualified as M
-import Data.Set qualified as Set
 import Data.Text qualified as T
-import Lilac.Parse (parseOrgDoc)
 import Lilac.Types
-  ( BToken (BTokenLink, BTokenPadding, BTokenString),
-    Block (body, meta, parentOid),
+  ( Archive (objects, symbols),
+    BToken (BTokenLink, BTokenPadding, BTokenString),
+    Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    GPath,
     Link (Link),
-    LinkOid (LinkOid),
     LinkTarget (LinkTargetOid),
-    OID,
-    OrgDoc (cells, oid),
+    Object (symbols),
+    decodeGPath,
   )
 import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
-    Either (Left, Right),
-    FilePath,
     IO,
     Int,
-    Maybe (Just, Nothing),
-    Type,
-    catMaybes,
-    error,
-    filter,
+    Maybe (Just),
+    concat,
     foldl',
     foldlM,
     fst,
@@ -85,15 +75,8 @@ import Relude
   )
 import Relude.Extra.Map qualified as EM
 import System.Directory.OsPath qualified as D
-import System.IO (utf8)
 import System.OsPath qualified as P
 
-<<data:SourceCode>>
-<<type:FQBN>>
-<<f:defaultSourceCode>>
-<<f:getSourceCode>>
-<<f:growBlockUniverse>>
-<<f:getSourceCodeMulti>>
 <<f:expandRootBlocks>>
 <<f:expandBlock>>
 <<f:tangle>>
@@ -117,300 +100,14 @@ to the computer for interpretation by it, while the third is a way to avoid
 unnecessarily busting the modification timestamp cache for Makefiles (because
 they use file modification timestamps to see whether we need to rerun a rule).
 
-The [[data:SourceCode]] data structure captures the information needed from the
-first two steps.
+** Block expansion for tangling
 
-#+name: data:SourceCode
-#+begin_src haskell
-type SourceCode :: Type
-data SourceCode = SourceCode
-  { roots :: [FQBN],
-    fqbnToCodeBlock :: M.Map FQBN Block
-  }
-#+end_src
-
-#+name: f:defaultSourceCode
-#+begin_src haskell
-defaultSourceCode :: SourceCode
-defaultSourceCode =
-  SourceCode
-    { roots = [],
-      fqbnToCodeBlock = M.fromList []
-    }
-#+end_src
-
-The ~roots~ field has a list of file paths that need to be tangled. The
-~fqbnToCodeBlock~ field is a simple mapping from the /fully qualified block name/
-(or "FQBN") of the block to the block itself. The FQBN is the combination of the
-OID and the human-friendly name of the block from the ~#+name:~ field of the
-block's metadata. The [[type:FQBN]] is just a convenience type to help readability.
-
-#+name: type:FQBN
-#+begin_src haskell
-type FQBN :: Type
-type FQBN = T.Text
-#+end_src
-
-** Find code blocks to tangle
-
-The function [[f:getSourceCode]] goes through the cells inside a [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] to
-populate [[data:SourceCode]].
-
-#+name: f:getSourceCode
-#+begin_src haskell
-getSourceCode :: OrgDoc -> FilePath -> SourceCode
-getSourceCode od odPath = foldl' f defaultSourceCode od.cells
-  where
-    f :: SourceCode -> Cell -> SourceCode
-    f sc cell = case cell of
-      CBlock b
-        | Just name <- EM.lookup "name" b.meta,
-          Just path <- EM.lookup "tangle" b.meta,
-          Right filePath <- qualify path ->
-            let fqbn1 = getFqbnByDocOID name
-                fqbn2 = getFqbn b name
-                newBlock1 = useQualifiedTanglePath filePath $ injectFqbn fqbn1 b
-                newBlock2 = useQualifiedTanglePath filePath $ injectFqbn fqbn2 b
-             in sc
-                  { roots = fqbn1 : sc.roots,
-                    fqbnToCodeBlock =
-                      M.insert fqbn1 newBlock1
-                        $ M.insert fqbn2 newBlock2 sc.fqbnToCodeBlock
-                  }
-        | Just path <- EM.lookup "tangle" b.meta,
-          Right filePath <- qualify path ->
-            let name = (T.pack filePath) <> "\NUL"
-                fqbn1 = getFqbnByDocOID name
-                fqbn2 = getFqbn b name
-                newBlock1 = useQualifiedTanglePath filePath $ injectFqbn fqbn1 b
-                newBlock2 = useQualifiedTanglePath filePath $ injectFqbn fqbn2 b
-             in sc
-                  { roots = fqbn1 : sc.roots,
-                    fqbnToCodeBlock =
-                      M.insert fqbn1 newBlock1
-                        $ M.insert fqbn2 newBlock2 sc.fqbnToCodeBlock
-                  }
-        | Just name <- EM.lookup "name" b.meta ->
-            let fqbn1 = getFqbnByDocOID name
-                fqbn2 = getFqbn b name
-                newBlock1 = injectFqbn fqbn1 b
-                newBlock2 = injectFqbn fqbn2 b
-             in sc
-                  { fqbnToCodeBlock =
-                      M.insert fqbn1 newBlock1
-                        $ M.insert fqbn2 newBlock2 sc.fqbnToCodeBlock
-                  }
-        | otherwise -> sc
-      CHeading {}
-      CListItem {}
-      CParagraph {}
-      CMathFragment {}
-      CFigure {}
-      CTable {} -> sc
-    getFqbn :: Block -> T.Text -> T.Text
-    getFqbn b name = LU.mkFqcn b.parentOid name
-    getFqbnByDocOID name = LU.mkFqcn od.oid name
-    injectFqbn fqbn block =
-      block
-        { meta = M.insert "__fqbn" fqbn block.meta
-        }
-    tanglePathPrefix = P.takeDirectory $ P.unsafeEncodeUtf odPath
-    qualify =
-      P.decodeWith utf8 utf8
-        . P.combine tanglePathPrefix
-        . P.unsafeEncodeUtf
-        . T.unpack
-    useQualifiedTanglePath qualifiedFilePath block =
-      block
-        { meta = M.insert "tangle" (T.pack qualifiedFilePath) block.meta,
-          body = block.body
-        }
-#+end_src
-
-Most of the work is done by the ~f~ helper. It's important to note that we give
-anonymous tangled blocks a default name with a ASCII NUL character. This is
-because our tangling machinery in [[f:expandRootBlocks]] requires looking up blocks
-(including root blocks) by their name. Anonymous blocks that are tangled are
-still considered root blocks, and so we use the tangle path as the name, plus a
-NUL character at the end to virtually guarantee that this does not conflict with
-the name of another block (because Org files should not have any NUL character
-in them).
-
-The business around using two =FQBN= values (~fqbn1~ and ~fqbn2~) when populating
-~fqbnToCodeBlock~ allows us to refer to blocks either by the OID of the Org file
-enclosing them (this is used for [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::f:oidReferenceParser][implicit Noweb links in
-f:oidReferenceParser]], which know about the OID of the Org file's
-metadata at the top-level but not about OIDs of other headings in the file), or
-by the OID of the closest parent.
-
-We need the latter case because the functions =org-store-link= and
-=org-insert-last-stored-link= always refer to the closest OID of the nearest
-parent heading; these Orgmode functions can be used to retrieve the OID easily,
-and with minor modification, the inserted link can be tweaked to turn it into a
-Noweb link inside a code block.
-
-The ~useQualifiedTanglePath~ helper prefixes all tangle paths with the directory
-that contains the Org file from which we generated the =OrgDoc=. Because the
-~odPath~ is itself canonicalized in [[f:getSourceCodeFromPath]], this basically
-results in a canonicalized path (because users aren't going to put in convoluted
-paths for the ~:tangle~ header). This is more intuitive, because the tangle paths
-should be relative to the location of the Org file, not the present working
-directory from where the =lilac= binary is invoked.
-
-The [[f:getSourceCode]] function can only extract code blocks from a single Org
-document. However, unlike vanilla Orgmode, we allow users to specify code
-blocks that refer to other code blocks in *other* (external) documents. So we need
-a way to get the full ~SourceCode~ we need, across /multiple files/ if necessary.
-The [[f:getSourceCodeMulti]] function calls ~getSourceCode~ first on the initial Org
-file, and then calls ~growBlockUniverse~ to augment it with all code blocks from
-external files as needed.
-
-#+name: f:getSourceCodeMulti
-#+begin_src haskell
-getSourceCodeMulti ::
-  OrgDoc ->
-  FilePath ->
-  M.Map OID P.OsPath ->
-  IO SourceCode
-getSourceCodeMulti od odPath goids = do
-  let sc = getSourceCode od odPath
-  bu <- growBlockUniverse Set.empty Set.empty goids sc.fqbnToCodeBlock sc.roots
-  pure
-    $ sc
-      { roots = sc.roots,
-        fqbnToCodeBlock = bu
-      }
-#+end_src
-
-Most of the heavy lifting here (of detecting external Org files, and then
-parsing them to grow the "block universe") is done inside [[f:growBlockUniverse]],
-which we examine in the next section.
-
-*** Blocks from external files
-:PROPERTIES:
-:ID:       e6ffbd65-9dbf-4806-beab-65d8af82794e
-:END:
-
-Code blocks themselves can reference other blocks. Most of the time, these other
-blocks are in the same file and can be "dereferenced" without any additional
-parsing.
-
-But what if a code block depends on a code block in /another file/, as we've seen
-in [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::f:oidReferenceParser][f:oidReferenceParser]]? We must bring those code blocks into our known
-universe of code blocks. In a sense we are building up a "super" Org file with
-all the code blocks we need for tangling.
-
-As long as we build up a ~SourceCode~ data structure with all of the code blocks
-we need (whether those code blocks come from a single Org file or multiple Org
-files), we can perform tangling without any problems.
-
-The tricky part here is parsing additional Org files, but also limiting the
-search so that we are only parsing those Org files that we need to resolve
-tangling the current file. That is, we only parse another Org file if a code
-block /needed by a root block/ refers to a code block in that other Org file.
-
-The [[f:growBlockUniverse]] function builds up the critical ~M.Map FQBN Block~ portion
-of a [[data:SourceCode]], teaching it all about the code blocks from relevant
-external files. It does this by doing a breadth-first search of the code blocks,
-starting from each root block in the [[data:SourceCode]] as a starting point (where
-a root block is a block that we want to tangle). We skip the search if the code
-block cannot be found in the block universe; this is the ~otherwise~ case in
-[[f:growBlockUniverse]] and can happen if we get a nonsensical Noweb link.
-
-Whenever we encounter a Noweb link that refers to another Org file, we parse
-that file if we haven't already and call [[f:getSourceCode]] to get the code blocks
-from that file. We have to use ~newFqbns~ to keep track of which code blocks have
-been visited; otherwise we'll end up in an infinite loop if there are any
-cycles.
-
-This last bit is done in the ~f~ helper function for [[f:growBlockUniverse]].
-
-#+name: f:growBlockUniverse
-#+begin_src haskell
-growBlockUniverse ::
-  Set.Set OID ->
-  Set.Set FQBN ->
-  M.Map OID P.OsPath ->
-  M.Map FQBN Block ->
-  [FQBN] ->
-  IO (M.Map FQBN Block)
-growBlockUniverse _ _ _ blockUniverse [] = pure blockUniverse
-growBlockUniverse parsedOids seenFqbns goids blockUniverse (root : roots)
-  | Just block <- EM.lookup root blockUniverse = do
-      let nowebLinks = catMaybes $ map getLinkTarget block.body
-          fqbns = map T.show nowebLinks
-          newFqbns = filter (\fqbn -> not $ Set.member fqbn seenFqbns) fqbns
-      (newlyParsedOids, grownBlockUniverse, toGrowFrom) <-
-        foldlM f (parsedOids, blockUniverse, []) nowebLinks
-      growBlockUniverse
-        newlyParsedOids
-        (Set.union seenFqbns $ Set.fromList newFqbns)
-        goids
-        grownBlockUniverse
-        (roots <> newFqbns <> toGrowFrom)
-  | otherwise = growBlockUniverse parsedOids seenFqbns goids blockUniverse roots
-  where
-    f ::
-      (Set.Set OID, M.Map FQBN Block, [FQBN]) ->
-      LinkOid ->
-      IO (Set.Set OID, M.Map FQBN Block, [FQBN])
-    f (pu, bu, tgf) linkOid@(LinkOid oid _)
-      | Set.member (T.show linkOid) seenFqbns = pure (pu, bu, tgf)
-      | Set.member oid pu = pure (pu, bu, (T.show linkOid) : tgf)
-      | Just oidOsPath <- EM.lookup oid goids = do
-          input <- LU.readFileRobustly oidOsPath
-          case parseOrgDoc input of
-            Right od -> do
-              oidFilePath <- P.decodeUtf oidOsPath
-              let sc = getSourceCode od oidFilePath
-              pure
-                ( Set.insert oid pu,
-                  M.union bu sc.fqbnToCodeBlock,
-                  (T.show linkOid) : tgf
-                )
-            Left err -> do
-              putStrLn $ show err
-              pure (pu, bu, tgf)
-      | otherwise = pure (pu, bu, tgf)
-    getLinkTarget = \case
-      (BTokenLink (Link _ (LinkTargetOid linkOid))) ->
-        Just linkOid
-      BTokenLink {}
-      BTokenPadding {}
-      BTokenString {} -> Nothing
-#+end_src
-
-The ~f~ helper does quite a lot. The main concern it has is to avoid performing
-the parse of the external Org file more than once:
-
-  - If we've seen this link before from a previous iteration, skip it (because
-    we must've already done everything we needed in the previous iteration).
-
-  - If we haven't seen this link before, but we've seen the Org doc containing
-    it before, record that the link needs to be explored further, but do not
-    parse the Org doc containing this link (because we're already parsed it
-    previously).
-
-  - If we haven't seen this link before, nor the Org doc containing it, only
-    then parse this new (external) Org doc to grow the block universe.
-
-  - If we cannot figure out how to locate the external Org doc, skip it.
-
-These four cases are encoded in the ~f~ helper above.
-
-Note that [[f:growBlockUniverse]] leaves out edge generation and does not build up a
-dependency graph like we do in our existing function [[f:findCycles]]. This is
-because we want to keep things simple.
-
-** Expand blocks for tangling
-
-For tangling, we can't use the graph information from [[f:buildGraph]] directly
-because it doesn't handle the case where we have multiple links to the same code
-block. Instead we look at all of the root blocks, and expand each one in turn in
-[[f:expandRootBlocks]]. The output is a list of tuples, where each tuple encodes the
-filesystem path where we want to write some text (as a result of tangling), and
-the contents of the text itself which we want to write there --- hence the type
-is ~(P.OsPath, T.Text)~.
+We examine the given [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] for all of the root blocks (blocks which
+specify the ~:tangle~ header, and thus require writing to the file system) in it,
+and expand each one in turn in [[f:expandRootBlocks]]. The output is a list of
+tuples, where each tuple encodes the filesystem path where we want to write some
+text (as a result of tangling), and the contents of the text itself which we
+want to write there --- hence the type is ~(P.OsPath, T.Text)~.
 
 The call to ~maybeAddShebang~ adds a special shebang line at the beginning of the
 file, if one was specified using the ~:shebang~ header. See [[id:caa38bf7-52ae-4246-8be0-8b2c9e58ccc2::unit-test.sh][unit-test.sh]] for an
@@ -421,28 +118,43 @@ these can happen from the ~prependExistingPrefix~ function in [[f:expandBlock]].
 
 #+name: f:expandRootBlocks
 #+begin_src haskell
-expandRootBlocks :: SourceCode -> [(P.OsPath, T.Text)]
-expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots
+expandRootBlocks :: Archive -> [(P.OsPath, T.Text)]
+expandRootBlocks archive = map expandRootBlock rootBlocks
   where
-    expandRootBlock :: T.Text -> Maybe (P.OsPath, T.Text)
-    expandRootBlock rootFqbn
-      | Just rootBlock <- EM.lookup rootFqbn sc.fqbnToCodeBlock =
-          Just
-            ( tanglePathOf rootBlock,
-              maybeAddShebang rootBlock
-                . trimTrailingSpaces
-                $ expandBlock sc rootBlock ""
-            )
-      | otherwise = Nothing
+    rootBlocks =
+      concat $ M.foldlWithKey getRootBlocksFromObject [] archive.objects
+    getRootBlocksFromObject ::
+      [[(P.OsPath, Block)]] ->
+      GPath ->
+      Object ->
+      [[(P.OsPath, Block)]]
+    getRootBlocksFromObject acc objPath object =
+      M.foldl (getRootBlock objPath) [] object.symbols : acc
+    getRootBlock objPath acc cell = case cell of
+      CBlock b
+        | Just path <- EM.lookup "tangle" b.meta,
+          Just osPath <- P.encodeUtf $ T.unpack path,
+          Just osPathOfObject <- P.encodeUtf $ decodeGPath objPath ->
+            (P.combine (P.takeDirectory osPathOfObject) osPath, b) : acc
+        | otherwise -> acc
+      CHeading {}
+      CListItem {}
+      CParagraph {}
+      CMathFragment {}
+      CFigure {}
+      CTable {} -> acc
+    expandRootBlock :: (P.OsPath, Block) -> (P.OsPath, T.Text)
+    expandRootBlock (p, rootBlock) =
+      ( p,
+        maybeAddShebang rootBlock
+          . trimTrailingSpaces
+          $ expandBlock archive rootBlock ""
+      )
     trimTrailingSpaces :: T.Text -> T.Text
     trimTrailingSpaces text =
       T.unlines
         . map (T.dropWhileEnd (== ' '))
         $ T.lines text
-    tanglePathOf :: Block -> P.OsPath
-    tanglePathOf block
-      | Just path <- EM.lookup "tangle" block.meta = P.unsafeEncodeUtf $ T.unpack path
-      | otherwise = error "programmer error"
     maybeAddShebang :: Block -> T.Text -> T.Text
     maybeAddShebang rootBlock text
       | Just shebang <- EM.lookup "shebang" rootBlock.meta =
@@ -454,8 +166,8 @@ In [[f:expandBlock]], we recursively expand all Noweb links until there are none
 
 #+name: f:expandBlock
 #+begin_src haskell
-expandBlock :: SourceCode -> Block -> T.Text -> T.Text
-expandBlock sc block existingPrefix =
+expandBlock :: Archive -> Block -> T.Text -> T.Text
+expandBlock archive block existingPrefix =
   let acc = "" :: T.Text
       prefix = "" :: T.Text
    in fst $ foldl' expand (acc, prefix) block.body
@@ -465,11 +177,8 @@ expandBlock sc block existingPrefix =
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
     expand (acc, prefix) (BTokenLink (Link _ (LinkTargetOid linkOid)))
-      | Just targetBlock <-
-          EM.lookup
-            (T.show linkOid)
-            sc.fqbnToCodeBlock =
-          ( acc <> (expandBlock sc targetBlock $ existingPrefix <> prefix),
+      | Just (CBlock targetBlock) <- EM.lookup linkOid archive.symbols =
+          ( acc <> (expandBlock archive targetBlock $ existingPrefix <> prefix),
             prefix
           )
       | otherwise = (acc, prefix)
@@ -487,10 +196,11 @@ expandBlock sc block existingPrefix =
 #+end_src
 
 The ~expand~ function recursively calls ~expandBlock~ if it detects a ~LinkOid~ type
-link. Otherwise, for ~BTokenString~ tokens it searches for a prefix with
-~getPrefix~. We need the prefix because we want to indent entire blocks if the
-name of the link referring to it is indented. See [[t:0101-block-expansion-prefix]]
-and [[t:0101-block-expansion-prefix-nested]] for examples.
+link. Otherwise, for ~BTokenString~ tokens it searches for an indentation prefix
+with ~getPrefix~. We need the prefix because we want to indent entire blocks if
+the name of the link referring to it is indented. See
+[[t:0101-block-expansion-prefix]] and [[t:0101-block-expansion-prefix-nested]] for
+examples.
 
 The ~getPrefix~ function is simple and uses any characters it finds, not just
 spaces, looking backwards and stopping at a newline. See
@@ -527,7 +237,7 @@ it "loses information" $ do
 
 *** Tests
 :PROPERTIES:
-:ID:       e35a4753-c2ec-4f2d-9f7e-d94a2ff05ec8
+:ID:       c78d3f21-b295-4f19-b720-ab50dedb3252
 :END:
 
 Expand a single code block.
@@ -556,8 +266,7 @@ b
 #+name: t:0101-block-expansion
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion"
-  "test/.orgids"
+  ["0101-block-expansion"]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
@@ -611,8 +320,7 @@ e
 #+name: t:0101-block-expansion-deeply-nested
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion-deeply-nested"
-  "test/.orgids"
+  ["0101-block-expansion-deeply-nested"]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
@@ -651,8 +359,7 @@ b3
 #+name: t:0101-block-expansion-prefix
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion-prefix"
-  "test/.orgids"
+  ["0101-block-expansion-prefix"]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "  b1",
@@ -703,8 +410,7 @@ c2
 #+name: t:0101-block-expansion-prefix-nested
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion-prefix-nested"
-  "test/.orgids"
+  ["0101-block-expansion-prefix-nested"]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
@@ -746,8 +452,7 @@ b3
 #+name: t:0101-block-expansion-prefix-nonspace
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion-prefix-nonspace"
-  "test/.orgids"
+  ["0101-block-expansion-prefix-nonspace"]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
@@ -793,8 +498,7 @@ c2
 #+name: t:0101-block-expansion-prefix-nonspace-nested
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion-prefix-nonspace-nested"
-  "test/.orgids"
+  ["0101-block-expansion-prefix-nonspace-nested"]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
@@ -874,8 +578,7 @@ h
 #+name: t:0101-block-expansion-complex
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion-complex"
-  "test/.orgids"
+  ["0101-block-expansion-complex"]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
@@ -955,8 +658,7 @@ b3
 #+name: t:0102-pad-between-consecutive-links
 #+begin_src haskell
 checkExpansion
-  "0102-pad-between-consecutive-links"
-  "test/.orgids"
+  ["0102-pad-between-consecutive-links"]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
@@ -1019,8 +721,7 @@ a1
 #+name: t:0103-shebang
 #+begin_src haskell
 checkExpansion
-  "0103-shebang"
-  "test/.orgids"
+  ["0103-shebang"]
   [ ( "test/Lilac/TangleSpec/a.sh",
       T.unlines
         [ "#!/usr/bin/env bash",
@@ -1064,8 +765,9 @@ hello from child
 #+name: t:0101-block-expansion-external
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion-external-parent"
-  "test/.orgids"
+  [ "0101-block-expansion-external-parent",
+    "0101-block-expansion-external-child"
+  ]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
@@ -1116,8 +818,9 @@ hello from child
 #+name: t:0101-block-expansion-external-headingchild
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion-external-parent-headingchild"
-  "test/.orgids"
+  [ "0101-block-expansion-external-parent-headingchild",
+    "0101-block-expansion-external-headingchild"
+  ]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
@@ -1165,8 +868,10 @@ hello from middleman
 #+name: t:0101-block-expansion-external-2-hops
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion-external-2-hops-parent"
-  "test/.orgids"
+  [ "0101-block-expansion-external-2-hops-parent",
+    "0101-block-expansion-external-2-hops-middleman",
+    "0101-block-expansion-external-child"
+  ]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "a1",
@@ -1216,8 +921,9 @@ hello from b
 #+name: t:0101-block-expansion-external-mutual
 #+begin_src haskell
 checkExpansion
-  "0101-block-expansion-external-mutual-a"
-  "test/.orgids"
+  [ "0101-block-expansion-external-mutual-a",
+    "0101-block-expansion-external-mutual-b"
+  ]
   [ ( "test/Lilac/TangleSpec/equations.txt",
       T.unlines
         [ "hello from a",
@@ -1238,9 +944,9 @@ updated. However, we always do write the file if it doesn't exist on disk.
 
 #+name: f:tangle
 #+begin_src haskell
-tangle :: SourceCode -> IO ()
-tangle sc = do
-  let blocks = sort $ expandRootBlocks sc
+tangle :: Archive -> IO ()
+tangle archive = do
+  let blocks = sort $ expandRootBlocks archive
   putStrLn $ "Blocks to process: " <> (show $ length blocks)
   (tangled, tangledPaths, skipped) <- foldlM f (0, [], 0) blocks
   putStrLn $ "Tangled: " <> (show tangled)
@@ -1287,8 +993,14 @@ The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941
 module Lilac.TangleSpec (spec) where
 
 import Data.Text qualified as T
+import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
+import Lilac.Types
+  ( GPath,
+    Object,
+    encodeGPath,
+  )
 import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
@@ -1296,12 +1008,14 @@ import Relude
     IO,
     first,
     fmap,
+    foldlM,
     pure,
+    show,
     ($),
-    (<>),
+    (=<<),
   )
 import System.OsPath qualified as P
-import Test.Hspec (Spec, it, shouldBe)
+import Test.Hspec (Spec, expectationFailure, it, runIO, shouldBe)
 
 <<tangleSpec discovery>>
 
@@ -1324,49 +1038,44 @@ helpers.
 
 #+name: TangleSpec helpers
 #+begin_src haskell
-<<f:getSourceCodeFromPath>>
 <<f:checkExpansion>>
+<<f:readObjectsFrom>>
 #+end_src
 
-The [[data:SourceCode]] data structure is critical for tangling. The function
-[[f:getSourceCodeFromPath]] reads a complete Org document from disk and converts it
-to a [[data:SourceCode]] type. It requires a map of global Org IDs (GOIDs), to mimic
-the behavior of tangling ([[id:27b05a30-83ff-4c47-b320-f53747424a68::f:lilacTangle][f:lilacTangle]]) which also requires it.
+The [[f:readObjectsFrom]] helper reads files, parses them as [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] before
+converting them to [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]]. It's based on [[id:ffb739b6-f38e-48bc-a260-7104802c69f4::f:readObjectsFrom][f:readObjectsFrom]] from
+[[id:ffb739b6-f38e-48bc-a260-7104802c69f4::CompileSpec helpers][CompileSpec helpers]].
 
-#+name: f:getSourceCodeFromPath
+#+name: f:readObjectsFrom
 #+begin_src haskell
-getSourceCodeFromPath ::
-  FilePath ->
-  FilePath ->
-  IO (Either T.Text LT.SourceCode)
-getSourceCodeFromPath path orgIdLocationsFile = do
-  goids <- LP.runGoidsParser orgIdLocationsFile
-  input <- LU.readFrom "test/Lilac/TangleSpec/" path
-  case LP.parseOrgDoc input of
-    Left errMsg -> pure $ Left errMsg
-    Right od -> do
-      sc <- LT.getSourceCodeMulti od ("test/Lilac/TangleSpec/" <> path) goids
-      pure $ Right sc
+readObjectsFrom :: [FilePath] -> IO [(GPath, Object)]
+readObjectsFrom = foldlM f []
+  where
+    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
+    f acc path = do
+      compileSpecDir <- P.encodeUtf "test/Lilac/TangleSpec/"
+      p <- P.encodeUtf path
+      let relPath = P.combine compileSpecDir p
+      input <- LU.readFileRobustly relPath
+      (Right od) <- pure $ LP.parseOrgDoc input
+      relPath' <- encodeGPath =<< P.decodeUtf relPath
+      pure $ (relPath', LC.mkObject od) : acc
 #+end_src
 
-We pass on ~"test/Lilac/TangleSpec/" <> path~ to [[f:getSourceCode][LT.getSourceCode]] because if we
-were to use the ~canonicalPath~ here, we would have to capture the absolute path
-in our test case expectations, which would break portability of the test cases
-(because the test case expectations would have to capture the absolute path,
-meaning all developers would have to clone the Lilac repository into the same
-path).
-
-The [[f:checkExpansion]] function expands all source code blocks and compares them
-with the expected output.
+The [[f:checkExpansion]] function expands all source code blocks (found in the
+collection of Org documents, first converted into a [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]) and compares
+them with the expected output.
 
 #+name: f:checkExpansion
 #+begin_src haskell
-checkExpansion :: FilePath -> FilePath -> [(FilePath, T.Text)] -> Spec
-checkExpansion path goidsFile expectedExpansions = do
-  it path $ do
-    (Right sc) <- getSourceCodeFromPath path goidsFile
-    (LT.expandRootBlocks sc)
-      `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
+checkExpansion :: [FilePath] -> [(FilePath, T.Text)] -> Spec
+checkExpansion paths expectedExpansions = do
+  pathObjs <- runIO $ readObjectsFrom paths
+  case LC.mkArchive pathObjs of
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    Right archive -> it (show paths) $ do
+      (LT.expandRootBlocks archive)
+        `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
 #+end_src
 
 *** All test cases

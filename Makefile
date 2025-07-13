@@ -21,13 +21,9 @@ lilac.larc: $(org_files:%.org=%.lobj)
 %.lobj: %.org
 	lilac compile $<
 
-tangle: $(backend_org_files) tangle-fe
-	git ls-files | grep '\.org$$' | xargs lilac write-goids
-	lilac tangle $(backend_org_files)
+tangle: lilac.larc
+	lilac tangle lilac.larc
 	touch tangle
-tangle-fe: fe.org
-	lilac tangle fe.org
-	touch tangle-fe
 
 weave: $(org_files)
 	lilac weave --out-dir site --watch $(org_files)

@@ -1,7 +1,6 @@
 module Lilac.CompileSpec (spec) where
 
 import Data.Graph qualified as G
-import Data.Text qualified as T
 import Data.Tree
   ( Tree (Node, rootLabel, subForest),
   )
@@ -20,8 +19,6 @@ import Relude
     FilePath,
     IO,
     String,
-    first,
-    fmap,
     foldlM,
     isRight,
     pure,
@@ -84,15 +81,6 @@ checkCycles paths expectedCycles = do
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do
       (LC.findCycles archive) `shouldBe` expectedCycles
-
-checkExpansion :: [FilePath] -> [(FilePath, T.Text)] -> Spec
-checkExpansion paths expectedExpansions = do
-  pathObjs <- runIO $ readObjectsFrom paths
-  case LC.mkArchive pathObjs of
-    Left errMsg -> it "programmer error" $ expectationFailure errMsg
-    Right archive -> it (show paths) $ do
-      (LC.expandRootBlocks archive)
-        `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
 
 compileSpec :: Spec
 compileSpec = do
@@ -328,214 +316,3 @@ compileSpec = do
             ]
         }
     ]
-
-  checkExpansion
-    ["0101-block-expansion"]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "a1",
-            "b",
-            "a2"
-          ]
-      )
-    ]
-
-  checkExpansion
-    ["0101-block-expansion-deeply-nested"]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "a1",
-            "e",
-            "a2"
-          ]
-      )
-    ]
-
-  checkExpansion
-    ["0101-block-expansion-prefix"]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "  b1",
-            "  b2",
-            "  b3",
-            "a1",
-            "  b1",
-            "  b2",
-            "  b3"
-          ]
-      )
-    ]
-
-  checkExpansion
-    ["0101-block-expansion-prefix-nested"]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "a1",
-            "  b1",
-            "  b2",
-            "  b3",
-            "    c1",
-            "    c2"
-          ]
-      )
-    ]
-
-  checkExpansion
-    ["0101-block-expansion-prefix-nonspace"]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "a1",
-            "  -> b1",
-            "  -> b2",
-            "  -> b3"
-          ]
-      )
-    ]
-
-  checkExpansion
-    ["0101-block-expansion-prefix-nonspace-nested"]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "a1",
-            "  -> b1",
-            "  -> b2",
-            "  -> b3",
-            "  -> -- c1",
-            "  -> -- c2"
-          ]
-      )
-    ]
-
-  checkExpansion
-    ["0101-block-expansion-complex"]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "a1",
-            "b",
-            "a2",
-            "  c",
-            "  c",
-            "    d",
-            "",
-            "    d",
-            "    e hello!",
-            "  c",
-            "a3",
-            "g",
-            "",
-            "h"
-          ]
-      )
-    ]
-
-  checkExpansion
-    [ "0101-block-expansion-external-parent",
-      "0101-block-expansion-external-child"
-    ]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "a1",
-            "hello from child",
-            "a2"
-          ]
-      )
-    ]
-
-  checkExpansion
-    [ "0101-block-expansion-external-parent-headingchild",
-      "0101-block-expansion-external-headingchild"
-    ]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "a1",
-            "hello from child",
-            "a2"
-          ]
-      )
-    ]
-
-  checkExpansion
-    [ "0101-block-expansion-external-2-hops-parent",
-      "0101-block-expansion-external-2-hops-middleman",
-      "0101-block-expansion-external-child"
-    ]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "a1",
-            "hello from middleman",
-            "hello from child",
-            "a2"
-          ]
-      )
-    ]
-
-  checkExpansion
-    [ "0101-block-expansion-external-mutual-a",
-      "0101-block-expansion-external-mutual-b"
-    ]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "hello from a",
-            "hello from b",
-            "hello from c"
-          ]
-      )
-    ]
-
-  checkExpansion
-    ["0102-pad-between-consecutive-links"]
-    [ ( "test/Lilac/CompileSpec/equations.txt",
-        T.unlines
-          [ "a1",
-            "b1",
-            "",
-            "b2",
-            "a2",
-            "  b1",
-            "",
-            "  b2",
-            "",
-            "  b3",
-            "Even if indentation is different, still pad between them.",
-            "  b1",
-            "",
-            "    b2",
-            "",
-            "      b3",
-            "Even pad for the same block repeated multiple times.",
-            "  b1",
-            "",
-            "  b1",
-            "",
-            "  b1",
-            "Lines with multiple links still count as being consecutive.",
-            "  b3",
-            "",
-            "  b3",
-            "",
-            "  b1 b2",
-            "",
-            "  b3",
-            "",
-            "  b3",
-            "No padding if only one link...",
-            "  b1",
-            "...is by itself."
-          ]
-      )
-    ]
-
-  checkExpansion
-    ["0103-shebang"]
-    [ ( "test/Lilac/CompileSpec/a.sh",
-        T.unlines
-          [ "#!/usr/bin/env bash",
-            "a1"
-          ]
-      )
-    ]
-
-  it "loses information" $ do
-    let withoutNewline = T.lines "a\nb"
-        withNewline = T.lines "a\nb\n"
-    T.unlines withoutNewline `shouldBe` T.unlines withNewline

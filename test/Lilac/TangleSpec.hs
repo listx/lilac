@@ -1,8 +1,14 @@
 module Lilac.TangleSpec (spec) where
 
 import Data.Text qualified as T
+import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
+import Lilac.Types
+  ( GPath,
+    Object,
+    encodeGPath,
+  )
 import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
@@ -10,41 +16,44 @@ import Relude
     IO,
     first,
     fmap,
+    foldlM,
     pure,
+    show,
     ($),
-    (<>),
+    (=<<),
   )
 import System.OsPath qualified as P
-import Test.Hspec (Spec, it, shouldBe)
+import Test.Hspec (Spec, expectationFailure, it, runIO, shouldBe)
 
 spec :: Spec
 spec = tangleSpec
 
-getSourceCodeFromPath ::
-  FilePath ->
-  FilePath ->
-  IO (Either T.Text LT.SourceCode)
-getSourceCodeFromPath path orgIdLocationsFile = do
-  goids <- LP.runGoidsParser orgIdLocationsFile
-  input <- LU.readFrom "test/Lilac/TangleSpec/" path
-  case LP.parseOrgDoc input of
-    Left errMsg -> pure $ Left errMsg
-    Right od -> do
-      sc <- LT.getSourceCodeMulti od ("test/Lilac/TangleSpec/" <> path) goids
-      pure $ Right sc
+checkExpansion :: [FilePath] -> [(FilePath, T.Text)] -> Spec
+checkExpansion paths expectedExpansions = do
+  pathObjs <- runIO $ readObjectsFrom paths
+  case LC.mkArchive pathObjs of
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    Right archive -> it (show paths) $ do
+      (LT.expandRootBlocks archive)
+        `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
 
-checkExpansion :: FilePath -> FilePath -> [(FilePath, T.Text)] -> Spec
-checkExpansion path goidsFile expectedExpansions = do
-  it path $ do
-    (Right sc) <- getSourceCodeFromPath path goidsFile
-    (LT.expandRootBlocks sc)
-      `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
+readObjectsFrom :: [FilePath] -> IO [(GPath, Object)]
+readObjectsFrom = foldlM f []
+  where
+    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
+    f acc path = do
+      compileSpecDir <- P.encodeUtf "test/Lilac/TangleSpec/"
+      p <- P.encodeUtf path
+      let relPath = P.combine compileSpecDir p
+      input <- LU.readFileRobustly relPath
+      (Right od) <- pure $ LP.parseOrgDoc input
+      relPath' <- encodeGPath =<< P.decodeUtf relPath
+      pure $ (relPath', LC.mkObject od) : acc
 
 tangleSpec :: Spec
 tangleSpec = do
   checkExpansion
-    "0101-block-expansion"
-    "test/.orgids"
+    ["0101-block-expansion"]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
@@ -55,8 +64,7 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0101-block-expansion-deeply-nested"
-    "test/.orgids"
+    ["0101-block-expansion-deeply-nested"]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
@@ -67,8 +75,7 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0101-block-expansion-prefix"
-    "test/.orgids"
+    ["0101-block-expansion-prefix"]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "  b1",
@@ -83,8 +90,7 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0101-block-expansion-prefix-nested"
-    "test/.orgids"
+    ["0101-block-expansion-prefix-nested"]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
@@ -98,8 +104,7 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0101-block-expansion-prefix-nonspace"
-    "test/.orgids"
+    ["0101-block-expansion-prefix-nonspace"]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
@@ -111,8 +116,7 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0101-block-expansion-prefix-nonspace-nested"
-    "test/.orgids"
+    ["0101-block-expansion-prefix-nonspace-nested"]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
@@ -126,8 +130,7 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0101-block-expansion-complex"
-    "test/.orgids"
+    ["0101-block-expansion-complex"]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
@@ -149,8 +152,9 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0101-block-expansion-external-parent"
-    "test/.orgids"
+    [ "0101-block-expansion-external-parent",
+      "0101-block-expansion-external-child"
+    ]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
@@ -161,8 +165,9 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0101-block-expansion-external-parent-headingchild"
-    "test/.orgids"
+    [ "0101-block-expansion-external-parent-headingchild",
+      "0101-block-expansion-external-headingchild"
+    ]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
@@ -173,8 +178,10 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0101-block-expansion-external-2-hops-parent"
-    "test/.orgids"
+    [ "0101-block-expansion-external-2-hops-parent",
+      "0101-block-expansion-external-2-hops-middleman",
+      "0101-block-expansion-external-child"
+    ]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
@@ -186,8 +193,9 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0101-block-expansion-external-mutual-a"
-    "test/.orgids"
+    [ "0101-block-expansion-external-mutual-a",
+      "0101-block-expansion-external-mutual-b"
+    ]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "hello from a",
@@ -203,8 +211,7 @@ tangleSpec = do
     T.unlines withoutNewline `shouldBe` T.unlines withNewline
 
   checkExpansion
-    "0102-pad-between-consecutive-links"
-    "test/.orgids"
+    ["0102-pad-between-consecutive-links"]
     [ ( "test/Lilac/TangleSpec/equations.txt",
         T.unlines
           [ "a1",
@@ -247,8 +254,7 @@ tangleSpec = do
     ]
 
   checkExpansion
-    "0103-shebang"
-    "test/.orgids"
+    ["0103-shebang"]
     [ ( "test/Lilac/TangleSpec/a.sh",
         T.unlines
           [ "#!/usr/bin/env bash",

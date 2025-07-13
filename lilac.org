@@ -825,13 +825,9 @@ We can tangle Lilac with Lilac itself.
 
 #+name: make:Tangle sources
 #+begin_src makefile
-tangle: $(backend_org_files) tangle-fe
-	git ls-files | grep '\.org$$' | xargs lilac write-goids
-	lilac tangle $(backend_org_files)
+tangle: lilac.larc
+	lilac tangle lilac.larc
 	touch tangle
-tangle-fe: fe.org
-	lilac tangle fe.org
-	touch tangle-fe
 #+end_src
 
 The call to =lilac write-goids= writes all global Org IDs ([[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][GOIDs]]) for all Org
@@ -2098,7 +2094,8 @@ import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Types
-  ( GPath,
+  ( Archive,
+    GPath,
     Object,
     OrgParserState
       ( goids
@@ -2222,7 +2219,7 @@ lilac globalOpts = case globalOpts.subcommand of
   Archive archiveOpts -> lilacArchive archiveOpts
   Check checkOpts -> lilacCheck globalOpts checkOpts
   Compile compileOpts -> lilacCompile globalOpts compileOpts
-  Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
+  Tangle tangleOpts -> lilacTangle tangleOpts
   Weave weaveOpts -> lilacWeave globalOpts weaveOpts
   WriteGOIDs writeGOIDsOpts -> lilacWriteGOIDs writeGOIDsOpts
 #+end_src
@@ -2343,25 +2340,19 @@ tangling) from a given list of Org files.
 
 #+name: f:lilacTangle
 #+begin_src haskell
-lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
-lilacTangle globalOpts tangleOpts = do
-  goids <- LP.runGoidsParser globalOpts.orgIdLocationsFile
-  mapM_ (tangleOrgFile goids) tangleOpts.inputs
+lilacTangle :: TangleOpts -> IO ()
+lilacTangle tangleOpts = do
+  mapM_ tangleArchiveFile tangleOpts.inputs
   where
-    tangleOrgFile goids inputOrgFile = do
-      input <- LU.readFrom "" inputOrgFile
-      let parseResult =
-            MP.runParser
-              (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
-              inputOrgFile
-              input
-      case parseResult of
-        Left errBundle -> do
-          die $ MP.errorBundlePretty errBundle
-        Right (orgDoc, _) -> do
-          sourceCode <- LT.getSourceCodeMulti orgDoc inputOrgFile goids
-          putStrLn $ "Tangling " <> inputOrgFile
-          LT.tangle sourceCode
+    tangleArchiveFile gPath = do
+      let fp = decodeGPath gPath
+          inputPath = P.unsafeEncodeUtf fp
+      text <- LU.readFileRobustly inputPath
+      case eitherDecodeStrictText text :: Either String Archive of
+        Left errMsg -> die errMsg
+        Right archive -> do
+          putStrLn $ "Tangling " <> fp
+          LT.tangle archive
           putStrLn "Finished tangling."
 #+end_src
 
@@ -2568,7 +2559,7 @@ Like =check=, the =tangle= subcommand runs [[f:lilacTangle]], and also requires 
 #+begin_src haskell
 type TangleOpts :: Type
 data TangleOpts = TangleOpts
-  { inputs :: [FilePath]
+  { inputs :: [GPath]
   }
 #+end_src
 
@@ -2577,7 +2568,7 @@ data TangleOpts = TangleOpts
 tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
   TangleOpts
-    <$> (some $ argument str (metavar "FILES..."))
+    <$> (some $ argument readGPath (metavar "FILES..."))
 #+end_src
 
 The =weave= subcommand requires an ~input~ option as well.
@@ -2681,7 +2672,7 @@ The ~archive~ subcommand writes an archive (=*.larc=) file for the given set of
 Lilac object files (generated with the =compile= subcommand). See [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] for
 details; essentially this is just a collection of multiple [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] files to
 allow for multi-Org-file tangling (where code blocks from one Org file can
-reference blocks from other files, as discussed in [[id:e6ffbd65-9dbf-4806-beab-65d8af82794e][Blocks from external files]]).
+reference blocks from other files).
 
 #+name: data:ArchiveOpts
 #+begin_src haskell

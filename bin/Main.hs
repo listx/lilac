@@ -6,7 +6,8 @@ import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Types
-  ( GPath,
+  ( Archive,
+    GPath,
     Object,
     OrgParserState
       ( goids
@@ -116,7 +117,7 @@ data CheckOpts = CheckOpts
 
 type TangleOpts :: Type
 data TangleOpts = TangleOpts
-  { inputs :: [FilePath]
+  { inputs :: [GPath]
   }
 
 type WeaveOpts :: Type
@@ -249,7 +250,7 @@ checkOptsHandler =
 tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
   TangleOpts
-    <$> (some $ argument str (metavar "FILES..."))
+    <$> (some $ argument readGPath (metavar "FILES..."))
 
 weaveOptsHandler :: OptionHandler WeaveOpts
 weaveOptsHandler =
@@ -344,7 +345,7 @@ lilac globalOpts = case globalOpts.subcommand of
   Archive archiveOpts -> lilacArchive archiveOpts
   Check checkOpts -> lilacCheck globalOpts checkOpts
   Compile compileOpts -> lilacCompile globalOpts compileOpts
-  Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
+  Tangle tangleOpts -> lilacTangle tangleOpts
   Weave weaveOpts -> lilacWeave globalOpts weaveOpts
   WriteGOIDs writeGOIDsOpts -> lilacWriteGOIDs writeGOIDsOpts
 
@@ -421,25 +422,19 @@ lilacArchive archiveOpts = do
         Left errMsg -> die errMsg
         Right obj -> pure (gPath, obj)
 
-lilacTangle :: GlobalOpts -> TangleOpts -> IO ()
-lilacTangle globalOpts tangleOpts = do
-  goids <- LP.runGoidsParser globalOpts.orgIdLocationsFile
-  mapM_ (tangleOrgFile goids) tangleOpts.inputs
+lilacTangle :: TangleOpts -> IO ()
+lilacTangle tangleOpts = do
+  mapM_ tangleArchiveFile tangleOpts.inputs
   where
-    tangleOrgFile goids inputOrgFile = do
-      input <- LU.readFrom "" inputOrgFile
-      let parseResult =
-            MP.runParser
-              (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
-              inputOrgFile
-              input
-      case parseResult of
-        Left errBundle -> do
-          die $ MP.errorBundlePretty errBundle
-        Right (orgDoc, _) -> do
-          sourceCode <- LT.getSourceCodeMulti orgDoc inputOrgFile goids
-          putStrLn $ "Tangling " <> inputOrgFile
-          LT.tangle sourceCode
+    tangleArchiveFile gPath = do
+      let fp = decodeGPath gPath
+          inputPath = P.unsafeEncodeUtf fp
+      text <- LU.readFileRobustly inputPath
+      case eitherDecodeStrictText text :: Either String Archive of
+        Left errMsg -> die errMsg
+        Right archive -> do
+          putStrLn $ "Tangling " <> fp
+          LT.tangle archive
           putStrLn "Finished tangling."
 
 lilacWeave :: GlobalOpts -> WeaveOpts -> IO ()
