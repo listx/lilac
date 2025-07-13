@@ -5215,8 +5215,8 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
-      BTokenLink (Link _name (LinkTargetOid (LinkOid oid targetName))) ->
-        <<link-marker>> <> (LU.mkFqcn oid targetName)
+      BTokenLink (Link _name (LinkTargetOid linkOid)) ->
+        <<link-marker>> <> (T.show linkOid)
       BTokenLink {} -> ""
 #+end_src
 

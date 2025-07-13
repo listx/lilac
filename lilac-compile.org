@@ -51,7 +51,6 @@ import Lilac.Types
     Table (grid, meta),
     decodeGPath,
   )
-import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
     Either (Left, Right),
@@ -74,6 +73,7 @@ import Relude
     otherwise,
     pure,
     reverse,
+    show,
     sort,
     ($),
     (.),
@@ -165,7 +165,7 @@ from JSON. The [[instance:ToJSON LinkOid]] converts the ~LinkOid~ to a JSON ~Val
 #+name: instance:ToJSON LinkOid
 #+begin_src haskell
 instance ToJSON LinkOid where
-  toJSON linkOid = Data.Aeson.Types.String (T.pack $ show linkOid)
+  toJSON linkOid = Data.Aeson.Types.String (T.show linkOid)
 #+end_src
 
 The [[instance:ToJSONKey LinkOid]] is simpler, because it just expects a type that
@@ -484,7 +484,7 @@ mkArchive pathObjs =
       M.foldl (\acc obj -> obj.externalOids <> acc) [] objs
     showBrokenLink :: LinkOid -> String
     showBrokenLink link =
-      "  " <> (T.unpack $ LU.mkFqcn link.oid link.name)
+      "  " <> (T.unpack $ show link)
 #+end_src
 
 *** Tests

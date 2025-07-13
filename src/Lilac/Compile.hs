@@ -33,7 +33,6 @@ import Lilac.Types
     Table (grid, meta),
     decodeGPath,
   )
-import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
     Either (Left, Right),
@@ -56,6 +55,7 @@ import Relude
     otherwise,
     pure,
     reverse,
+    show,
     sort,
     ($),
     (.),
@@ -170,7 +170,7 @@ mkArchive pathObjs =
       M.foldl (\acc obj -> obj.externalOids <> acc) [] objs
     showBrokenLink :: LinkOid -> String
     showBrokenLink link =
-      "  " <> (T.unpack $ LU.mkFqcn link.oid link.name)
+      "  " <> (T.unpack $ show link)
 
 buildGraph ::
   [Block] ->

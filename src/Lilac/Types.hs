@@ -162,7 +162,7 @@ data LinkOid = LinkOid
   deriving stock (Eq, Generic, Ord)
 
 instance ToJSON LinkOid where
-  toJSON linkOid = Data.Aeson.Types.String (T.pack $ show linkOid)
+  toJSON linkOid = Data.Aeson.Types.String (T.show linkOid)
 
 instance ToJSONKey LinkOid where
   toJSONKey = toJSONKeyText show

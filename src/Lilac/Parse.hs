@@ -1239,8 +1239,8 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
-      BTokenLink (Link _name (LinkTargetOid (LinkOid oid targetName))) ->
-        "\NUL_link" <> (LU.mkFqcn oid targetName)
+      BTokenLink (Link _name (LinkTargetOid linkOid)) ->
+        "\NUL_link" <> (T.show linkOid)
       BTokenLink {} -> ""
 
 zeroIndent :: OrgParser (Int, Int)
