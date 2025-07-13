@@ -671,6 +671,7 @@ we don't have to memorize exactly how to invoke certain commands.
 <<make:Org files>>
 <<make:Run tests>>
 <<make:Run linters>>
+<<make:Compile sources>>
 <<make:Tangle sources>>
 <<make:Weave>>
 <<id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa::make:Serve>>
@@ -791,6 +792,23 @@ See [[Linters via pre-commit]] for details on what the various linters do.
 
 Note that =pre-commit= isn't defined as a [[code:tools][tool]] in the [[devShellEnv]]. This is because
 we only define it in the =mkShell= wrapper in [[devShell definition]].
+
+*** Compile Lilac with Lilac
+
+Lilac can compile Org files into object files (=*.lobj=) and use those object
+files to create archive files (=*.larc=). Compilation helps us catch errors within
+object files, especially for finding broken links.
+
+#+name: make:Compile sources
+#+begin_src makefile
+lilac.larc: $(org_files:%.org=%.lobj)
+	lilac archive $^ --out-file lilac.larc
+%.lobj: %.org
+	lilac compile $<
+#+end_src
+
+In order to create the ~lilac.larc~ archive file of the entire Lilac project,
+do ~make lilac.larc~.
 
 *** Tangle Lilac with Lilac
 :PROPERTIES:

@@ -16,6 +16,11 @@ lint: $(org_files)
 	pre-commit run --all-files
 	touch lint
 
+lilac.larc: $(org_files:%.org=%.lobj)
+	lilac archive $^ --out-file lilac.larc
+%.lobj: %.org
+	lilac compile $<
+
 tangle: $(backend_org_files) tangle-fe
 	git ls-files | grep '\.org$$' | xargs lilac write-goids
 	cd test && find Lilac/TangleSpec -type f \
