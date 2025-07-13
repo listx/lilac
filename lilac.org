@@ -2100,6 +2100,7 @@ import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Types
   ( GPath,
+    Object,
     OrgParserState
       ( goids
       ),
@@ -2329,12 +2330,12 @@ lilacArchive archiveOpts = do
         P.decodeUtf $ P.addExtension base objExtension
       encodeFile outPath archive
   where
-    readObjectDirectly :: GPath -> IO (GPath, LC.Object)
+    readObjectDirectly :: GPath -> IO (GPath, Object)
     readObjectDirectly gPath = do
       let fp = decodeGPath gPath
           inputPath = P.unsafeEncodeUtf fp
       text <- LU.readFileRobustly inputPath
-      case eitherDecodeStrictText text :: Either String LC.Object of
+      case eitherDecodeStrictText text :: Either String Object of
         Left errMsg -> die errMsg
         Right obj -> pure (gPath, obj)
 #+end_src

@@ -1,7 +1,5 @@
 module Lilac.Compile
-  ( Archive,
-    Object,
-    expandRootBlocks,
+  ( expandRootBlocks,
     findCycles,
     findExternalOids,
     mkObject,
@@ -9,15 +7,14 @@ module Lilac.Compile
   )
 where
 
-import Data.Aeson (FromJSON, ToJSON)
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import GHC.Generics (Generic)
 import Lilac.Parse (validateOidText)
 import Lilac.Types
-  ( BToken (BTokenLink, BTokenPadding, BTokenString),
+  ( Archive (Archive, objects, symbols),
+    BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (meta),
@@ -28,6 +25,7 @@ import Lilac.Types
     LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     MathFragment (meta),
     OID,
+    Object (Object, externalOids, orgDoc, symbols),
     OrgDoc (cells, oid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
@@ -36,11 +34,8 @@ import Lilac.Types
 import Relude
   ( Bool (False, True),
     Either (Left, Right),
-    Eq,
     Maybe (Just, Nothing),
-    Show,
     String,
-    Type,
     catMaybes,
     concat,
     concatMap,
@@ -66,23 +61,6 @@ import Relude
   )
 import Relude.Extra.Map qualified as EM
 import System.OsPath qualified as P
-
-type Object :: Type
-data Object = Object
-  { orgDoc :: OrgDoc,
-    symbols :: M.Map LinkOid Cell,
-    externalOids :: [LinkOid]
-  }
-  deriving stock (Eq, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
-
-type Archive :: Type
-data Archive = Archive
-  { objects :: M.Map GPath Object,
-    symbols :: M.Map LinkOid Cell
-  }
-  deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
 
 mkObject :: OrgDoc -> Object
 mkObject orgDoc =

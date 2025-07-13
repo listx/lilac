@@ -10,6 +10,7 @@ import Lilac.Parse qualified as LP
 import Lilac.Types
   ( GPath,
     LinkOid (LinkOid, name, oid),
+    Object,
     encodeGPath,
     fromWords,
   )
@@ -63,10 +64,10 @@ expectArchiveOk paths = do
     pathObjs <- readObjectsFrom paths
     LC.mkArchive pathObjs `shouldSatisfy` isRight
 
-readObjectsFrom :: [FilePath] -> IO [(GPath, LC.Object)]
+readObjectsFrom :: [FilePath] -> IO [(GPath, Object)]
 readObjectsFrom = foldlM f []
   where
-    f :: [(GPath, LC.Object)] -> FilePath -> IO [(GPath, LC.Object)]
+    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
     f acc path = do
       compileSpecDir <- P.encodeUtf "test/Lilac/CompileSpec/"
       p <- P.encodeUtf path

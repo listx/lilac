@@ -1,5 +1,6 @@
 module Lilac.Types
-  ( Block (..),
+  ( Archive (..),
+    Block (..),
     BToken (..),
     Cell (..),
     Figure (..),
@@ -11,6 +12,7 @@ module Lilac.Types
     LinkTarget (..),
     ListMarker (..),
     MathFragment (..),
+    Object (..),
     OID (..),
     OrgDoc (..),
     OrgParser,
@@ -389,3 +391,20 @@ protocolsWeb =
       "mailto",
       "tel"
     ]
+
+type Object :: Type
+data Object = Object
+  { orgDoc :: OrgDoc,
+    symbols :: M.Map LinkOid Cell,
+    externalOids :: [LinkOid]
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
+type Archive :: Type
+data Archive = Archive
+  { objects :: M.Map GPath Object,
+    symbols :: M.Map LinkOid Cell
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (ToJSON)

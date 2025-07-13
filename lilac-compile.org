@@ -17,9 +17,7 @@ be tangled or weaved.
 #+header: :tangle src/Lilac/Compile.hs
 #+begin_src haskell
 module Lilac.Compile
-  ( Archive,
-    Object,
-    expandRootBlocks,
+  ( expandRootBlocks,
     findCycles,
     findExternalOids,
     mkObject,
@@ -27,15 +25,14 @@ module Lilac.Compile
   )
 where
 
-import Data.Aeson (FromJSON, ToJSON)
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import GHC.Generics (Generic)
 import Lilac.Parse (validateOidText)
 import Lilac.Types
-  ( BToken (BTokenLink, BTokenPadding, BTokenString),
+  ( Archive (Archive, objects, symbols),
+    BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Figure (meta),
@@ -46,6 +43,7 @@ import Lilac.Types
     LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     MathFragment (meta),
     OID,
+    Object (Object, externalOids, orgDoc, symbols),
     OrgDoc (cells, oid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
@@ -54,11 +52,8 @@ import Lilac.Types
 import Relude
   ( Bool (False, True),
     Either (Left, Right),
-    Eq,
     Maybe (Just, Nothing),
-    Show,
     String,
-    Type,
     catMaybes,
     concat,
     concatMap,
@@ -84,9 +79,6 @@ import Relude
   )
 import Relude.Extra.Map qualified as EM
 import System.OsPath qualified as P
-
-<<data:Object>>
-<<data:Archive>>
 
 <<f:mkObject>>
 <<f:mkSymbols>>
@@ -1414,6 +1406,7 @@ import Lilac.Parse qualified as LP
 import Lilac.Types
   ( GPath,
     LinkOid (LinkOid, name, oid),
+    Object,
     encodeGPath,
     fromWords,
   )
@@ -1514,10 +1507,10 @@ converting them to [[data:Object]].
 
 #+name: f:readObjectsFrom
 #+begin_src haskell
-readObjectsFrom :: [FilePath] -> IO [(GPath, LC.Object)]
+readObjectsFrom :: [FilePath] -> IO [(GPath, Object)]
 readObjectsFrom = foldlM f []
   where
-    f :: [(GPath, LC.Object)] -> FilePath -> IO [(GPath, LC.Object)]
+    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
     f acc path = do
       compileSpecDir <- P.encodeUtf "test/Lilac/CompileSpec/"
       p <- P.encodeUtf path
