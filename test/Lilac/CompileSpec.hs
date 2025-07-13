@@ -114,16 +114,16 @@ compileSpec = do
   expectArchiveError
     ["0401-broken-links-noweb"]
     """
-    broken links:
-      id:00000000-0000-0000-0000-00000000d003::x
-      id:00000000-0000-0000-0000-00000000d000::c
+    Found broken links:
+      id:00000000-0000-0000-0000-00000000d003::x (test/Lilac/CompileSpec/0401-broken-links-noweb)
+      id:00000000-0000-0000-0000-00000000d000::c (test/Lilac/CompileSpec/0401-broken-links-noweb)
     """
 
   expectArchiveError
     ["0401-broken-links-paragraph"]
     """
-    broken links:
-      id:00000000-0000-0000-0000-00000000d004::foo
+    Found broken links:
+      id:00000000-0000-0000-0000-00000000d004::foo (test/Lilac/CompileSpec/0401-broken-links-paragraph)
     """
 
   expectArchiveOk

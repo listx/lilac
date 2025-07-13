@@ -47,16 +47,16 @@ import Relude
     elem,
     fmap,
     foldl',
-    foldlM,
     fst,
     intercalate,
     length,
     map,
     otherwise,
-    pure,
+    repeat,
     reverse,
     show,
     sort,
+    zip,
     ($),
     (.),
     (/=),
@@ -130,47 +130,54 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
 
 mkArchive :: [(GPath, Object)] -> Either String Archive
 mkArchive pathObjs =
-  case foldlM concatObjs (M.empty, M.empty) pathObjs of
-    Left errMsg -> Left errMsg
-    Right (objects, symbols) ->
-      let brokenLinks = findBrokenLinks objects symbols
-       in if
-            | brokenLinks /= [] ->
-                Left
-                  $ "broken links:\n"
-                  <> intercalate
-                    "\n"
-                    (map showBrokenLink brokenLinks)
-            | otherwise ->
-                Right
-                  Archive
-                    { objects = objects,
-                      symbols = symbols
-                    }
+  let (objects, symbols) = foldl' concatObjs (M.empty, M.empty) pathObjs
+      brokenLinks = findBrokenLinks objects symbols
+   in if
+        | brokenLinks /= [] ->
+            Left
+              $ "Found broken links:\n"
+              <> intercalate
+                "\n"
+                (map showBrokenLink brokenLinks)
+        | otherwise ->
+            Right
+              Archive
+                { objects = objects,
+                  symbols = symbols
+                }
   where
     concatObjs ::
       (M.Map GPath Object, M.Map LinkOid Cell) ->
       (GPath, Object) ->
-      Either String (M.Map GPath Object, M.Map LinkOid Cell)
+      (M.Map GPath Object, M.Map LinkOid Cell)
     concatObjs (accObjs, accSyms) (path, obj) =
-      pure
-        ( M.insert path obj accObjs,
-          M.union obj.symbols accSyms
-        )
-    findBrokenLinks :: M.Map GPath Object -> M.Map LinkOid Cell -> [LinkOid]
+      ( M.insert path obj accObjs,
+        M.union obj.symbols accSyms
+      )
+    findBrokenLinks ::
+      M.Map GPath Object ->
+      M.Map LinkOid Cell ->
+      [(GPath, LinkOid)]
     findBrokenLinks objs syms =
       foldl' (getBrokenLink syms) []
         $ allExternalOids objs
-    getBrokenLink :: M.Map LinkOid Cell -> [LinkOid] -> LinkOid -> [LinkOid]
-    getBrokenLink syms acc linkOid = case EM.lookup linkOid syms of
+    getBrokenLink ::
+      M.Map LinkOid Cell ->
+      [(GPath, LinkOid)] ->
+      (GPath, LinkOid) ->
+      [(GPath, LinkOid)]
+    getBrokenLink syms acc (gPath, linkOid) = case EM.lookup linkOid syms of
       Just _ -> acc
-      Nothing -> linkOid : acc
-    allExternalOids :: M.Map GPath Object -> [LinkOid]
+      Nothing -> (gPath, linkOid) : acc
+    allExternalOids :: M.Map GPath Object -> [(GPath, LinkOid)]
     allExternalOids objs =
-      M.foldl (\acc obj -> obj.externalOids <> acc) [] objs
-    showBrokenLink :: LinkOid -> String
-    showBrokenLink link =
-      "  " <> (T.unpack $ show link)
+      M.foldlWithKey
+        (\acc gPath obj -> (zip (repeat gPath) obj.externalOids) <> acc)
+        []
+        objs
+    showBrokenLink :: (GPath, LinkOid) -> String
+    showBrokenLink (gPath, link) =
+      "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
 
 buildGraph ::
   [Block] ->
