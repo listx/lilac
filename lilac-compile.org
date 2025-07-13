@@ -1385,184 +1385,6 @@ it "loses information" $ do
   T.unlines withoutNewline `shouldBe` T.unlines withNewline
 #+end_src
 
-** Testing framework
-
-The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]].
-
-*** Test module and helpers
-
-#+name: module:Lilac.CompileSpec
-#+header: :tangle test/Lilac/CompileSpec.hs
-#+begin_src haskell
-module Lilac.CompileSpec (spec) where
-
-import Data.Graph qualified as G
-import Data.Text qualified as T
-import Data.Tree
-  ( Tree (Node, rootLabel, subForest),
-  )
-import Lilac.Compile qualified as LC
-import Lilac.Parse qualified as LP
-import Lilac.Types
-  ( GPath,
-    LinkOid (LinkOid, name, oid),
-    Object,
-    encodeGPath,
-    fromWords,
-  )
-import Lilac.Util qualified as LU
-import Relude
-  ( Either (Left, Right),
-    FilePath,
-    IO,
-    String,
-    first,
-    fmap,
-    foldlM,
-    isRight,
-    pure,
-    show,
-    ($),
-    (=<<),
-  )
-import System.OsPath qualified as P
-import Test.Hspec
-  ( Spec,
-    expectationFailure,
-    it,
-    runIO,
-    shouldBe,
-    shouldSatisfy,
-  )
-
-<<compileSpec discovery>>
-
-<<CompileSpec helpers>>
-
-<<f:compileSpec>>
-#+end_src
-
-Just like [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]], we define a ~spec~ function for automatic
-discovery (and running) of the test cases here (in ~compileSpec~) in
-[[compileSpec discovery]].
-
-#+name: compileSpec discovery
-#+begin_src haskell
-spec :: Spec
-spec = compileSpec
-#+end_src
-
-On to the helpers. The test cases in [[f:compileSpec]] will be defined with these
-helpers.
-
-#+name: CompileSpec helpers
-#+begin_src haskell
-<<f:checkExternalOids>>
-<<f:expectArchiveError>>
-<<f:expectArchiveOk>>
-<<f:readObjectsFrom>>
-<<f:checkCycles>>
-<<f:checkExpansion>>
-#+end_src
-
-There are two major areas of concern for the compilation process:
-
-  1) generation of expected ~symbols~ and ~externalOids~ as specified in the
-     [[data:Object]], and
-
-  2) detection of cycles when resolving symbols that cannot be resolved within
-     the current object (when we require multiple objects).
-
-Note that the helpers use the more convenient ~FilePath~ type instead of ~P.OsPath~,
-mainly because using the ~QuasiQuoter~ for ~P.OsPath~ slows down the compilation
-process and because [[data:Archive]] uses ~GPath~ anyway (and not ~P.OsPath~).
-
-#+name: f:checkExternalOids
-#+begin_src haskell
-checkExternalOids :: FilePath -> [LinkOid] -> Spec
-checkExternalOids path expectedExternalOids = do
-  it path $ do
-    (Right od) <- read
-    LC.findExternalOids od `shouldBe` expectedExternalOids
-  where
-    read = do
-      input <- LU.readFrom "test/Lilac/CompileSpec/" path
-      pure $ LP.parseOrgDoc input
-#+end_src
-
-We want to check broken links for [[data:Archive]] values as well. For this we
-have [[f:expectArchiveError]].
-
-#+name: f:expectArchiveError
-#+begin_src haskell
-expectArchiveError :: [FilePath] -> String -> Spec
-expectArchiveError paths expected = do
-  it (show paths) $ do
-    pathObjs <- readObjectsFrom paths
-    LC.mkArchive pathObjs `shouldBe` (Left expected)
-#+end_src
-
-The [[f:readObjectsFrom]] helper reads files, parses them as [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] before
-converting them to [[data:Object]].
-
-#+name: f:readObjectsFrom
-#+begin_src haskell
-readObjectsFrom :: [FilePath] -> IO [(GPath, Object)]
-readObjectsFrom = foldlM f []
-  where
-    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
-    f acc path = do
-      compileSpecDir <- P.encodeUtf "test/Lilac/CompileSpec/"
-      p <- P.encodeUtf path
-      let relPath = P.combine compileSpecDir p
-      input <- LU.readFileRobustly relPath
-      (Right od) <- pure $ LP.parseOrgDoc input
-      relPath' <- encodeGPath =<< P.decodeUtf relPath
-      pure $ (relPath', LC.mkObject od) : acc
-#+end_src
-
-The corollary is [[f:expectArchiveOk]] which expects the archive to be successfully
-created.
-
-#+name: f:expectArchiveOk
-#+begin_src haskell
-expectArchiveOk :: [FilePath] -> Spec
-expectArchiveOk paths = do
-  it (show paths) $ do
-    pathObjs <- readObjectsFrom paths
-    LC.mkArchive pathObjs `shouldSatisfy` isRight
-#+end_src
-
-The [[f:checkCycles]] function uses [[f:findCycles]] to see if the archive that is
-constructed from the given Org documents has any cycles.
-
-#+name: f:checkCycles
-#+begin_src haskell
-checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
-checkCycles paths expectedCycles = do
-  pathObjs <- runIO $ readObjectsFrom paths
-  case LC.mkArchive pathObjs of
-    Left errMsg -> it "programmer error" $ expectationFailure errMsg
-    Right archive -> it (show paths) $ do
-      (LC.findCycles archive) `shouldBe` expectedCycles
-#+end_src
-
-The [[f:checkExpansion]] function expands all source code blocks (found in the
-collection of Org documents, first converted into a [[data:Archive]]) and compares
-them with the expected output.
-
-#+name: f:checkExpansion
-#+begin_src haskell
-checkExpansion :: [FilePath] -> [(FilePath, T.Text)] -> Spec
-checkExpansion paths expectedExpansions = do
-  pathObjs <- runIO $ readObjectsFrom paths
-  case LC.mkArchive pathObjs of
-    Left errMsg -> it "programmer error" $ expectationFailure errMsg
-    Right archive -> it (show paths) $ do
-      (LC.expandRootBlocks archive)
-        `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
-#+end_src
-
 *** Tests
 
 Expand a single code block.
@@ -2257,6 +2079,184 @@ checkExpansion
         ]
     )
   ]
+#+end_src
+
+** Testing framework
+
+The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]].
+
+*** Test module and helpers
+
+#+name: module:Lilac.CompileSpec
+#+header: :tangle test/Lilac/CompileSpec.hs
+#+begin_src haskell
+module Lilac.CompileSpec (spec) where
+
+import Data.Graph qualified as G
+import Data.Text qualified as T
+import Data.Tree
+  ( Tree (Node, rootLabel, subForest),
+  )
+import Lilac.Compile qualified as LC
+import Lilac.Parse qualified as LP
+import Lilac.Types
+  ( GPath,
+    LinkOid (LinkOid, name, oid),
+    Object,
+    encodeGPath,
+    fromWords,
+  )
+import Lilac.Util qualified as LU
+import Relude
+  ( Either (Left, Right),
+    FilePath,
+    IO,
+    String,
+    first,
+    fmap,
+    foldlM,
+    isRight,
+    pure,
+    show,
+    ($),
+    (=<<),
+  )
+import System.OsPath qualified as P
+import Test.Hspec
+  ( Spec,
+    expectationFailure,
+    it,
+    runIO,
+    shouldBe,
+    shouldSatisfy,
+  )
+
+<<compileSpec discovery>>
+
+<<CompileSpec helpers>>
+
+<<f:compileSpec>>
+#+end_src
+
+Just like [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]], we define a ~spec~ function for automatic
+discovery (and running) of the test cases here (in ~compileSpec~) in
+[[compileSpec discovery]].
+
+#+name: compileSpec discovery
+#+begin_src haskell
+spec :: Spec
+spec = compileSpec
+#+end_src
+
+On to the helpers. The test cases in [[f:compileSpec]] will be defined with these
+helpers.
+
+#+name: CompileSpec helpers
+#+begin_src haskell
+<<f:checkExternalOids>>
+<<f:expectArchiveError>>
+<<f:expectArchiveOk>>
+<<f:readObjectsFrom>>
+<<f:checkCycles>>
+<<f:checkExpansion>>
+#+end_src
+
+There are two major areas of concern for the compilation process:
+
+  1) generation of expected ~symbols~ and ~externalOids~ as specified in the
+     [[data:Object]], and
+
+  2) detection of cycles when resolving symbols that cannot be resolved within
+     the current object (when we require multiple objects).
+
+Note that the helpers use the more convenient ~FilePath~ type instead of ~P.OsPath~,
+mainly because using the ~QuasiQuoter~ for ~P.OsPath~ slows down the compilation
+process and because [[data:Archive]] uses ~GPath~ anyway (and not ~P.OsPath~).
+
+#+name: f:checkExternalOids
+#+begin_src haskell
+checkExternalOids :: FilePath -> [LinkOid] -> Spec
+checkExternalOids path expectedExternalOids = do
+  it path $ do
+    (Right od) <- read
+    LC.findExternalOids od `shouldBe` expectedExternalOids
+  where
+    read = do
+      input <- LU.readFrom "test/Lilac/CompileSpec/" path
+      pure $ LP.parseOrgDoc input
+#+end_src
+
+We want to check broken links for [[data:Archive]] values as well. For this we
+have [[f:expectArchiveError]].
+
+#+name: f:expectArchiveError
+#+begin_src haskell
+expectArchiveError :: [FilePath] -> String -> Spec
+expectArchiveError paths expected = do
+  it (show paths) $ do
+    pathObjs <- readObjectsFrom paths
+    LC.mkArchive pathObjs `shouldBe` (Left expected)
+#+end_src
+
+The [[f:readObjectsFrom]] helper reads files, parses them as [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] before
+converting them to [[data:Object]].
+
+#+name: f:readObjectsFrom
+#+begin_src haskell
+readObjectsFrom :: [FilePath] -> IO [(GPath, Object)]
+readObjectsFrom = foldlM f []
+  where
+    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
+    f acc path = do
+      compileSpecDir <- P.encodeUtf "test/Lilac/CompileSpec/"
+      p <- P.encodeUtf path
+      let relPath = P.combine compileSpecDir p
+      input <- LU.readFileRobustly relPath
+      (Right od) <- pure $ LP.parseOrgDoc input
+      relPath' <- encodeGPath =<< P.decodeUtf relPath
+      pure $ (relPath', LC.mkObject od) : acc
+#+end_src
+
+The corollary is [[f:expectArchiveOk]] which expects the archive to be successfully
+created.
+
+#+name: f:expectArchiveOk
+#+begin_src haskell
+expectArchiveOk :: [FilePath] -> Spec
+expectArchiveOk paths = do
+  it (show paths) $ do
+    pathObjs <- readObjectsFrom paths
+    LC.mkArchive pathObjs `shouldSatisfy` isRight
+#+end_src
+
+The [[f:checkCycles]] function uses [[f:findCycles]] to see if the archive that is
+constructed from the given Org documents has any cycles.
+
+#+name: f:checkCycles
+#+begin_src haskell
+checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
+checkCycles paths expectedCycles = do
+  pathObjs <- runIO $ readObjectsFrom paths
+  case LC.mkArchive pathObjs of
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    Right archive -> it (show paths) $ do
+      (LC.findCycles archive) `shouldBe` expectedCycles
+#+end_src
+
+The [[f:checkExpansion]] function expands all source code blocks (found in the
+collection of Org documents, first converted into a [[data:Archive]]) and compares
+them with the expected output.
+
+#+name: f:checkExpansion
+#+begin_src haskell
+checkExpansion :: [FilePath] -> [(FilePath, T.Text)] -> Spec
+checkExpansion paths expectedExpansions = do
+  pathObjs <- runIO $ readObjectsFrom paths
+  case LC.mkArchive pathObjs of
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    Right archive -> it (show paths) $ do
+      (LC.expandRootBlocks archive)
+        `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
 #+end_src
 
 *** All test cases
