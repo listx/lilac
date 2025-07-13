@@ -33,7 +33,7 @@ document, but JS is necessary for making things dynamic.
 
 At this stage, the architecture we have in mind for weaving is the following:
 
-  1) Convert the [[data:OrgDoc]] into HTML.
+  1) Convert the [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] into HTML.
 
   2) Generate CSS separately.
 
@@ -193,11 +193,11 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 :ID:       3592f24a-dc14-4ae6-8c06-5680ee7eb9aa
 :END:
 
-Weaving mainly means converting the [[data:OrgDoc]] into HTML, as part of "Step 1"
+Weaving mainly means converting the [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] into HTML, as part of "Step 1"
 in [[id:8f5752c0-6162-4de6-9ceb-f78ba584722c][Architecture]].
 
 During the weaving process, we want to access various other settings that may
-not be apparent at the [[data:Cell]] level. To capture these values in one place, we
+not be apparent at the [[id:ed81c307-9172-4436-8672-583ea8ecb1f9::data:Cell][data:Cell]] level. To capture these values in one place, we
 use a [[data:WeaveConf]]. Instead of passing this around to all functions, we put it
 inside a ~ReaderT~ so that it is available for all weave-related functions that
 are using the [[type:HtmlWeaver]]. This is analogous to [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgParserState][data:OrgParserState]] which is

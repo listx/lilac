@@ -210,6 +210,9 @@ lifting is done. In the overlay, we inject a new Haskell package called
 known as an /attrset/ in Nix, which is just a key\/value map.
 
 ** =packages.nix=
+:PROPERTIES:
+:ID:       e7a371e9-b96f-402d-9ae3-d33ee6a6a48f
+:END:
 
 We call this file =packages.nix= because it is a function which returns two very
 important derivations, ~devShell~ and ~lilac~.
@@ -304,6 +307,9 @@ tools = [
 This leaves us with ~ghc~, which we cover in the next section.
 
 *** =ghc=
+:PROPERTIES:
+:ID:       65e5513b-2167-44d6-bd3a-50fdd9ee020e
+:END:
 
 In short we use ~ghc~ that Nixpkgs provides, but teach it
 about the Haskell dependencies (libraries) that Lilac uses. This means you can
@@ -497,7 +503,7 @@ configureHaskellPkg = haskellPkg:
 
 *** =lilac= attribute
 
-Recall that the [[Haskell overlays]] added the Lilac package to the top-level
+Recall that the [[code:Haskell overlays]] added the Lilac package to the top-level
 Nixpkgs set of packages, which we named ~ourHaskell~. We expose it now as just
 ~lilac~.
 
@@ -612,8 +618,8 @@ file.
 let pkgs = import ./nix/default.nix { }; in pkgs.lilacPkgs.devShell
 #+end_src
 
-See [[=packages.nix=]] for a deeper discussion of the underlying Nix infrastructure,
-including the [[devShell definition]], which shows how we declaratively define which
+See [[id:e7a371e9-b96f-402d-9ae3-d33ee6a6a48f][=packages.nix=]] for a deeper discussion of the underlying Nix infrastructure,
+including the [[devShell derivation]], which shows how we declaratively define which
 particular executables are made available to our development environment
 (including =scripts.nix=).
 
@@ -788,10 +794,10 @@ lint: $(org_files)
 lint
 #+end_src
 
-See [[Linters via pre-commit]] for details on what the various linters do.
+See [[id:b4d2ace9-2d11-4606-b7a3-ce9ad7763c1a][Linters via pre-commit]] for details on what the various linters do.
 
-Note that =pre-commit= isn't defined as a [[code:tools][tool]] in the [[devShellEnv]]. This is because
-we only define it in the =mkShell= wrapper in [[devShell definition]].
+Note that =pre-commit= isn't defined as a [[code:tools][tool]] in the [[code:devShellEnv]]. This is
+because we only define it in the =mkShell= wrapper in [[devShell derivation]].
 
 *** Compile Lilac with Lilac
 
@@ -821,7 +827,7 @@ We can tangle Lilac with Lilac itself.
 #+begin_src makefile
 tangle: $(backend_org_files) tangle-fe
 	git ls-files | grep '\.org$$' | xargs lilac write-goids
-	<<id:512acfd6-4360-40f6-a684-649d6d2fcfba::Generate GOIDs for tests>>
+	<<id:21fc34a2-ec00-45c4-ba28-91b67bc52809::Generate GOIDs for tests>>
 	lilac tangle $(backend_org_files)
 	touch tangle
 tangle-fe: fe.org
@@ -1041,6 +1047,9 @@ You can run the version of Lilac built by Nix with ~result/bin/lilac~, which we
 codify in ~lilac-nix~ in the [[nix/scripts.nix]] as well.
 
 ** Linters via pre-commit
+:PROPERTIES:
+:ID:       b4d2ace9-2d11-4606-b7a3-ce9ad7763c1a
+:END:
 
 Git has an elaborate system of hooks that it can run every time you do something
 important with Git. A common hook is a pre-commit hook, which will run just
@@ -1417,7 +1426,7 @@ This encourages a way of working where we can write something like ~FIXME: ...~ 
 start off how we want to fix something. Then we can delete it once we arrive at
 a solution and draft a non-WIP commit.
 
-We reuse [[shell-func-is-wip]] and [[shell-skip-if-wip]] here from [[f:unit-test.sh]].
+We reuse [[shell-func-is-wip]] and [[shell-skip-if-wip]] here from [[unit-test.sh]].
 
 #+name: hook-no-fixme
 #+begin_src nix
@@ -2259,10 +2268,11 @@ lilacCheck globalOpts checkOpts = do
         prettyPrint orgDoc
 #+end_src
 
-The [[f:lilacCheck]] function checks for any cycles and dies if it detects them. The [[f:lilacCheck]] function also pretty-prints the resulting [[data:OrgDoc]] if
-the global ~--verbose~ flag is given. This is useful for debugging. By default the
-data structure will be printed with colored braces, but you can suppress this
-with ~--no-color~.
+The [[f:lilacCheck]] function checks for any cycles and dies if it detects them. The
+[[f:lilacCheck]] function also pretty-prints the resulting [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] if the global
+~--verbose~ flag is given. This is useful for debugging. By default the data
+structure will be printed with colored braces, but you can suppress this with
+~--no-color~.
 
 If ~--dump-json~ is given, write out the parsed Org file as a JSON file. This is
 useful for debugging.
@@ -2330,6 +2340,9 @@ lilacArchive archiveOpts = do
 #+end_src
 
 *** Tangling
+:PROPERTIES:
+:ID:       27b05a30-83ff-4c47-b320-f53747424a68
+:END:
 
 The [[f:lilacTangle]] function tangles all blocks (which have been marked for
 tangling) from a given list of Org files.
@@ -2388,7 +2401,7 @@ runGoidsParser orgIdLocationsFile = do
 
 *** Weaving
 
-The [[f:lilacWeave]] function weaves the [[data:OrgDoc]] into HTML.
+The [[f:lilacWeave]] function weaves the [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] into HTML.
 
 #+name: f:lilacWeave
 #+begin_src haskell
@@ -2715,8 +2728,8 @@ data structures we've defined above).
 
 We use the type [[data:OptionHandler]] for option parsing on the CLI, because the
 alternative of calling it as =Parser= feels a bit confusing, given how we already
-use [[type:OrgParser]] (and the concept of a "parser" in general) to mean the Org
-parsing mechanism we have in [[module:Lilac.Parse]]).
+use [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::type:OrgParser][type:OrgParser]] (and the concept of a "parser" in general) to mean the Org
+parsing mechanism we have in [[id:5ce50c9a-5413-48d9-8bba-e465a4eb527c::module:Lilac.Parse][module:Lilac.Parse]]).
 
 #+name: data:OptionHandler
 #+begin_src haskell
@@ -2989,6 +3002,9 @@ versionFallback = pure "unknown-build-env"
 #+end_src
 
 * Common utility functions
+:PROPERTIES:
+:ID:       85a464eb-e220-40d7-ae49-5edc349ee6b4
+:END:
 
 #+name: module:Lilac.Util
 #+header: :tangle src/Lilac/Util.hs

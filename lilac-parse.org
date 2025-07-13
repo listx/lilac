@@ -15,11 +15,15 @@ We use [[https://github.com/mrkkrp/megaparsec][Megaparsec]] to parse an Org docu
 everything in a single Org file.
 
 ** =Lilac.Parse= module
+:PROPERTIES:
+:ID:       5ce50c9a-5413-48d9-8bba-e465a4eb527c
+:END:
 
 The parsing mechanism is in [[file:src/Lilac/Parse.hs]], which we describe below. We
 discuss each parser and interleave some tests for the smaller parsers. If you
 are curious about the overall testing framework itself (where and how these
-interleaved tests are executed), take a look at the [[Testing framework]].
+interleaved tests are executed), take a look at the [[id:ebf0d269-79d3-408a-a6e7-baf720d73837][Testing framework]].
+
 
 #+name: module:Lilac.Parse
 #+header: :tangle src/Lilac/Parse.hs
@@ -2286,7 +2290,7 @@ In summary we support the following link types in an Org document:
     eventually be removed when we've enumerated all of the different
     types of link targets.
 
-There are also [[Raw links]] which is prose text that looks like a URL. For example,
+There are also [[id:8fe81206-f50d-4200-a95e-99278e0ad410][Raw links]] which is prose text that looks like a URL. For example,
 https://www.haskell.org is an example of a raw link. This is a convenience
 facility because ~[[https://www.haskell.org]]~ behaves the same way as
 ~https://www.haskell.org~.
@@ -2329,7 +2333,7 @@ By conditionally failing [[f:linkParser]] with [[f:failIfVerbatimOrCode]], we al
 other parsers (such as [[f:styledTextParser]]) to succeed (see [[f:proseParser]] for the
 interaction of this parser with these other parsers).
 
-Note that in [[f:linkParser]] we don't parse [[Noweb links]] here because they can only
+Note that in [[f:linkParser]] we don't parse [[id:81e1c841-5de8-4111-9b18-f33bea904122][Noweb links]] here because they can only
 exist inside [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code blocks]].
 
 *** OID links
@@ -2866,7 +2870,7 @@ point in the Org document). In the future it is expected that we will enrich the
 different kinds of links in [[data:LinkTarget]], such that the percentage of
 ~LinkTargetOther~ is very low when we finish parsing an Org file.
 
-A URL link looks [[https://kernel.org][like this]]. A link to a file can look [[./README.org][like this]]. Note that their
+A URL link looks [[https://kernel.org][like this]]. A link to a file can look [[file:README.org][like this]]. Note that their
 format allows them to be named differently than the raw address. That's why the
 two links earlier in this paragraph are displayed as "like this". The format is
 
@@ -3285,6 +3289,9 @@ p
 #+end_src
 
 *** Noweb links
+:PROPERTIES:
+:ID:       81e1c841-5de8-4111-9b18-f33bea904122
+:END:
 
 =LinkOid= links to Noweb references. We've been using Noweb references already
 in this document, but here's an isolated example.
@@ -3302,7 +3309,7 @@ hello world
 #+end_src
 
 Note that if no such Noweb reference is defined, Lilac will error out. See
-[[f:nowebLinkParser]] for parsing details (it is discussed along with [[Blocks]] because
+[[f:nowebLinkParser]] for parsing details (it is discussed along with [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][Blocks]] because
 that's the only place where these links may be defined).
 
 ** Inline math fragments
@@ -4543,7 +4550,7 @@ Note that because we treat the trailing newline as a part of the =#+end_...=
 marker, we leave it out of the parsed contents. This actually helps us when we
 have to tangle blocks in [[id:b449a097-d702-4fd6-98de-cb81f7e49177::f:expandBlock][f:expandBlock]]. If we parsed in the trailing newlines,
 these newlines would build up every time we nested into a block (e.g.,
-[[t:0101-block-expansion-deeply-nested]]).
+[[id:e35a4753-c2ec-4f2d-9f7e-d94a2ff05ec8::t:0101-block-expansion-deeply-nested][t:0101-block-expansion-deeply-nested]]).
 
 Going back to [[f:blockParser]], there are three transformations we do for the
 parsed ~bTokens~ --- [[f:ignoreSpecialCommas]], [[f:compressBTokens]], and
@@ -5025,7 +5032,7 @@ by default. So the only way to disable them would be to set =#+header: :noweb of
 for each block where you'd want it disabled.
 
 Sometimes we'll have Noweb references surrounded by punctuation. For example,
-see how we use ~<<GHC version>>~ in [[code:ghcVersion]]. This is a typical use case
+see how we use ~<<GHC version>>~ in [[id:65e5513b-2167-44d6-bd3a-50fdd9ee020e::code:ghcVersion][code:ghcVersion]]. This is a typical use case
 when the referenced block only has 1 line of text in it and we want to inject
 those contents into an existing line.
 
@@ -5280,7 +5287,7 @@ padConsecutiveNowebLinks blockBody =
         [] -> (link : acc, [])
 #+end_src
 
-See [[id:b449a097-d702-4fd6-98de-cb81f7e49177::t:0102-pad-between-consecutive-links][t:0102-pad-between-consecutive-links]] for an example of this padding
+See [[id:e35a4753-c2ec-4f2d-9f7e-d94a2ff05ec8::t:0102-pad-between-consecutive-links][t:0102-pad-between-consecutive-links]] for an example of this padding
 behavior.
 
 *** Additional tests
@@ -6182,7 +6189,7 @@ the latter recognizes their (complete) end when there is no more indentation.
 
 *** Tests
 
-There are [[id:910d5a04-739c-4125-9a94-803ea0ebeaee][so many rules]] associated with lists; we try to check a few of them
+There are [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][so many rules]] associated with lists; we try to check a few of them
 here.
 
 #+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-no-indent
@@ -7505,7 +7512,7 @@ ps
 :ID:       d0f60631-8b30-4ae1-992d-49c7b0ea38fb
 :END:
 
-[[Tables][Tables]] are like [[data:Figure][figures]] in that they have some metadata. Unlike a figure which
+Tables are like [[data:Figure][figures]] in that they have some metadata. Unlike a figure which
 is just a link, a table has a two-dimensional grid with some information in each
 row\/column. The requirement is that the first non-whitespace character starts
 with a vertical bar (=|=), also known as the pipe character in UNIX.
@@ -8059,7 +8066,7 @@ some benefits of writing tests this way:
   1) The raw input file (on disk) for test cases can be looked at if necessary.
      This is especially useful if the input has any special Org characters in it
      we have to escape. See the inputs for [[t:0007-blocks-ending]] and
-     [[t:0004-drawers-empty]] where we need to escape some parts of the input with a
+     [[t:0004-properties-drawer-empty]] where we need to escape some parts of the input with a
      leading comma (so as to distinguish between the Org syntax of this document
      vs the nested Org syntax of the input file we are defining).
 
