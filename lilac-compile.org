@@ -643,6 +643,46 @@ expectArchiveOk
   ]
 #+end_src
 
+Ensure we allow links to an external cell, where the OID is either the top-level
+OID of the external Org doc, or the OID of the parent heading.
+
+#+header: :tangle test/Lilac/CompileSpec/0401-broken-links-multi-ok-alternates-parent
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d008
+:END:
+
+[[id:00000000-0000-0000-0000-00000000d009::foo]]
+[[id:00000000-0000-0000-0000-00000000c000::foo]]
+#+end_src
+
+#+header: :tangle test/Lilac/CompileSpec/0401-broken-links-multi-ok-alternates-child
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d009
+:END:
+
+,* heading
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000c000
+:END:
+
+,#+name: foo
+,#+begin_src haskell
+Hello from foo
+,#+end_src
+#+end_src
+
+#+name: t:0401-broken-links-multi-ok-alternates
+#+begin_src haskell
+expectArchiveOk
+  [ "0401-broken-links-multi-ok-alternates-parent",
+    "0401-broken-links-multi-ok-alternates-child"
+  ]
+#+end_src
+
 ** Cycle detection for Noweb links
 
 All Noweb links (for code blocks) inside an [[data:Archive][Archive]] must be such that they do
@@ -2241,6 +2281,7 @@ compileSpec = do
   <<t:0401-broken-links-paragraph>>
   <<t:0401-broken-links-paragraph-ok>>
   <<t:0401-broken-links-multi-ok>>
+  <<t:0401-broken-links-multi-ok-alternates>>
   <<t:0100-dag-no-loops>>
   <<t:0100-dag-self-loop>>
   <<t:0100-dag-self-loops>>

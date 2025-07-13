@@ -134,6 +134,11 @@ compileSpec = do
       "0401-broken-links-multi-ok-dependency"
     ]
 
+  expectArchiveOk
+    [ "0401-broken-links-multi-ok-alternates-parent",
+      "0401-broken-links-multi-ok-alternates-child"
+    ]
+
   checkCycles
     ["0100-dag-no-loops"]
     []
