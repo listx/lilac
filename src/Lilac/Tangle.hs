@@ -2,14 +2,12 @@ module Lilac.Tangle
   ( FQBN,
     SourceCode (..),
     expandRootBlocks,
-    findCycles,
     getSourceCode,
     getSourceCodeMulti,
     tangle,
   )
 where
 
-import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -34,10 +32,8 @@ import Relude
     Maybe (Just, Nothing),
     Type,
     catMaybes,
-    elem,
     error,
     filter,
-    fmap,
     foldl',
     foldlM,
     fst,
@@ -63,9 +59,6 @@ import Relude
     (||),
   )
 import Relude.Extra.Map qualified as EM
-import Relude.Nub
-  ( hashNub,
-  )
 import System.Directory.OsPath qualified as D
 import System.IO (utf8)
 import System.OsPath qualified as P
@@ -219,46 +212,6 @@ getSourceCodeMulti od odPath goids = do
       { roots = sc.roots,
         fqbnToCodeBlock = bu
       }
-
-buildGraph ::
-  [Block] ->
-  ( G.Graph,
-    G.Vertex -> (Block, FQBN, [FQBN]),
-    FQBN -> Maybe G.Vertex
-  )
-buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
-  where
-    f ::
-      [(Block, FQBN, [FQBN])] ->
-      Block ->
-      [(Block, FQBN, [FQBN])]
-    f acc block
-      | Just fqbn <- EM.lookup "__fqbn" block.meta =
-          (\targets -> (block, fqbn, targets) : acc)
-            . hashNub
-            . catMaybes
-            $ map getLinkTarget block.body
-      | otherwise = acc
-    getLinkTarget = \case
-      BTokenLink (Link _ (LinkTargetOid linkOid)) ->
-        Just $ T.show linkOid
-      BTokenLink {}
-      BTokenPadding {}
-      BTokenString {} -> Nothing
-
-findCycles :: SourceCode -> [G.Tree FQBN]
-findCycles sc = map (fmap toFqbn) . foldl' f [] $ G.scc graph
-  where
-    (graph, vertexToNode, _) = buildGraph $ M.elems sc.fqbnToCodeBlock
-    toFqbn vertex =
-      let (_, blockName, _) = vertexToNode vertex
-       in blockName
-    f acc tree@(G.Node vertex _)
-      | length tree > 1 = tree : acc
-      | (_, name, targets) <- vertexToNode vertex,
-        elem name targets =
-          tree : acc
-      | otherwise = acc
 
 expandRootBlocks :: SourceCode -> [(P.OsPath, T.Text)]
 expandRootBlocks sc = catMaybes $ map expandRootBlock sc.roots

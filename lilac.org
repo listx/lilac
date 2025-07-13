@@ -827,7 +827,6 @@ We can tangle Lilac with Lilac itself.
 #+begin_src makefile
 tangle: $(backend_org_files) tangle-fe
 	git ls-files | grep '\.org$$' | xargs lilac write-goids
-	<<id:21fc34a2-ec00-45c4-ba28-91b67bc52809::Generate GOIDs for tests>>
 	lilac tangle $(backend_org_files)
 	touch tangle
 tangle-fe: fe.org
@@ -2155,8 +2154,6 @@ import Relude
     foldlM,
     mapM,
     mapM_,
-    not,
-    null,
     otherwise,
     pure,
     putStrLn,
@@ -2250,10 +2247,6 @@ lilacCheck globalOpts checkOpts = do
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      sourceCode <- LT.getSourceCodeMulti orgDoc checkOpts.input goids
-      let cycles = LT.findCycles sourceCode
-      when (not $ null cycles) $ do
-        die $ "Found cycles: " <> show cycles
       putStrLn $ checkOpts.input <> ": OK"
       when (checkOpts.dumpJson) $ do
         outPath <- do
@@ -2367,9 +2360,6 @@ lilacTangle globalOpts tangleOpts = do
           die $ MP.errorBundlePretty errBundle
         Right (orgDoc, _) -> do
           sourceCode <- LT.getSourceCodeMulti orgDoc inputOrgFile goids
-          let cycles = LT.findCycles sourceCode
-          when (not $ null cycles) $ do
-            die $ "Found cycles: " <> show cycles
           putStrLn $ "Tangling " <> inputOrgFile
           LT.tangle sourceCode
           putStrLn "Finished tangling."

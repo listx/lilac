@@ -1,6 +1,5 @@
 module Lilac.TangleSpec (spec) where
 
-import Data.Graph qualified as G
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
@@ -34,12 +33,6 @@ getSourceCodeFromPath path orgIdLocationsFile = do
       sc <- LT.getSourceCodeMulti od ("test/Lilac/TangleSpec/" <> path) goids
       pure $ Right sc
 
-checkCycles :: FilePath -> FilePath -> [G.Tree LT.FQBN] -> Spec
-checkCycles path goidsFile expectedCycles = do
-  it path $ do
-    (Right sc) <- getSourceCodeFromPath path goidsFile
-    (LT.findCycles sc) `shouldBe` expectedCycles
-
 checkExpansion :: FilePath -> FilePath -> [(FilePath, T.Text)] -> Spec
 checkExpansion path goidsFile expectedExpansions = do
   it path $ do
@@ -49,81 +42,6 @@ checkExpansion path goidsFile expectedExpansions = do
 
 tangleSpec :: Spec
 tangleSpec = do
-  checkCycles
-    "0100-dag-no-loops"
-    "test/.orgids"
-    []
-
-  checkCycles
-    "0100-dag-self-loop"
-    "test/.orgids"
-    [G.Node "id:00000000-0000-0000-0000-00000000e001::f:a" []]
-
-  checkCycles
-    "0100-dag-self-loops"
-    "test/.orgids"
-    [ G.Node "id:00000000-0000-0000-0000-00000000e003::f:a" [],
-      G.Node "id:00000000-0000-0000-0000-00000000e003::f:b" []
-    ]
-
-  checkCycles
-    "0100-dag-2-node-loop"
-    "test/.orgids"
-    [ G.Node
-        "id:00000000-0000-0000-0000-00000000e004::f:a"
-        [ G.Node "id:00000000-0000-0000-0000-00000000e004::f:b" []
-        ]
-    ]
-
-  checkCycles
-    "0100-dag-3-node-loop"
-    "test/.orgids"
-    [ G.Node
-        "id:00000000-0000-0000-0000-00000000e005::f:a"
-        [ G.Node
-            "id:00000000-0000-0000-0000-00000000e005::f:b"
-            [ G.Node "id:00000000-0000-0000-0000-00000000e005::f:c" []
-            ]
-        ]
-    ]
-
-  checkCycles
-    "0100-dag-complex-loops"
-    "test/.orgids"
-    [ G.Node
-        "id:00000000-0000-0000-0000-00000000e006::f:a"
-        [ G.Node
-            "id:00000000-0000-0000-0000-00000000e006::f:b"
-            [ G.Node "id:00000000-0000-0000-0000-00000000e006::f:c" [],
-              G.Node "id:00000000-0000-0000-0000-00000000e006::f:d" []
-            ]
-        ],
-      G.Node "id:00000000-0000-0000-0000-00000000e006::f:e" []
-    ]
-
-  checkCycles
-    "0100-dag-2-node-loop-2-files-parent"
-    "test/.orgids"
-    [ G.Node
-        "id:00000000-0000-0000-0000-00000000f004::a"
-        [ G.Node "id:00000000-0000-0000-0000-00000000f005::b" []
-        ]
-    ]
-
-  checkCycles
-    "0100-dag-2-node-loop-3-files-parent"
-    "test/.orgids"
-    [ G.Node
-        "id:00000000-0000-0000-0000-00000000f006::a"
-        [ G.Node
-            "id:00000000-0000-0000-0000-00000000f007::b"
-            [ G.Node
-                "id:00000000-0000-0000-0000-00000000f008::c"
-                []
-            ]
-        ]
-    ]
-
   checkExpansion
     "0101-block-expansion"
     "test/.orgids"

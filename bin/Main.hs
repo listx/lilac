@@ -62,8 +62,6 @@ import Relude
     foldlM,
     mapM,
     mapM_,
-    not,
-    null,
     otherwise,
     pure,
     putStrLn,
@@ -363,10 +361,6 @@ lilacCheck globalOpts checkOpts = do
     Left errBundle -> do
       die $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      sourceCode <- LT.getSourceCodeMulti orgDoc checkOpts.input goids
-      let cycles = LT.findCycles sourceCode
-      when (not $ null cycles) $ do
-        die $ "Found cycles: " <> show cycles
       putStrLn $ checkOpts.input <> ": OK"
       when (checkOpts.dumpJson) $ do
         outPath <- do
@@ -444,9 +438,6 @@ lilacTangle globalOpts tangleOpts = do
           die $ MP.errorBundlePretty errBundle
         Right (orgDoc, _) -> do
           sourceCode <- LT.getSourceCodeMulti orgDoc inputOrgFile goids
-          let cycles = LT.findCycles sourceCode
-          when (not $ null cycles) $ do
-            die $ "Found cycles: " <> show cycles
           putStrLn $ "Tangling " <> inputOrgFile
           LT.tangle sourceCode
           putStrLn "Finished tangling."

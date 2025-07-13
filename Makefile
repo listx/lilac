@@ -23,9 +23,6 @@ lilac.larc: $(org_files:%.org=%.lobj)
 
 tangle: $(backend_org_files) tangle-fe
 	git ls-files | grep '\.org$$' | xargs lilac write-goids
-	cd test && find Lilac/TangleSpec -type f \
-		| sort \
-		| xargs lilac write-goids --out-file .orgids
 	lilac tangle $(backend_org_files)
 	touch tangle
 tangle-fe: fe.org

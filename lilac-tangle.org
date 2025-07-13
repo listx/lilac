@@ -27,14 +27,12 @@ module Lilac.Tangle
   ( FQBN,
     SourceCode (..),
     expandRootBlocks,
-    findCycles,
     getSourceCode,
     getSourceCodeMulti,
     tangle,
   )
 where
 
-import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -59,10 +57,8 @@ import Relude
     Maybe (Just, Nothing),
     Type,
     catMaybes,
-    elem,
     error,
     filter,
-    fmap,
     foldl',
     foldlM,
     fst,
@@ -88,9 +84,6 @@ import Relude
     (||),
   )
 import Relude.Extra.Map qualified as EM
-import Relude.Nub
-  ( hashNub,
-  )
 import System.Directory.OsPath qualified as D
 import System.IO (utf8)
 import System.OsPath qualified as P
@@ -101,8 +94,6 @@ import System.OsPath qualified as P
 <<f:getSourceCode>>
 <<f:growBlockUniverse>>
 <<f:getSourceCodeMulti>>
-<<f:buildGraph>>
-<<f:findCycles>>
 <<f:expandRootBlocks>>
 <<f:expandBlock>>
 <<f:tangle>>
@@ -410,364 +401,6 @@ These four cases are encoded in the ~f~ helper above.
 Note that [[f:growBlockUniverse]] leaves out edge generation and does not build up a
 dependency graph like we do in our existing function [[f:findCycles]]. This is
 because we want to keep things simple.
-
-** Detect cyclic Noweb links
-
-We want to build up a graph using the Noweb link information embedded in each
-block. Using a graph data structure allows us to easily detect cycles, which are
-not allowed for tangling because they cannot be resolved.
-
-You may think we could avoid using graphs entirely, and just use an algorithm
-like "keep expanding all Noweb links recursively; if we see a Noweb link being
-used more than once, error out" to detect cycles. However this won't work
-because you can technically reference the same block multiple times at different
-points in the tree.
-
-Specifically, we want to build a /directed/ graph where we treat all blocks as
-nodes (vertices) and the dependency of Noweb links as edges. So if a block =x=
-depends on a Noweb link =y=, then =x= would point to =y=.
-
-From CLRS 3rd, Ch 22 p. 614 we can find a more formal definition of cycles in a
-directed graph:
-
-#+begin_quote
-A directed graph G is acyclic if and only if a depth-first search of G yields no
-back edges.
-#+end_quote
-
-And a back edge is defined like this in CLRS p. 609:
-
-#+begin_quote
-Back edges are those edges (u, v) connecting a vertex u to an ancestor v in a
-depth-first tree. We consider self-loops, which may occur in directed graphs, to
-be back edges.
-#+end_quote
-
-Note that a back edge can be either an edge that points back to an ancestor, or
-a self-loop. Whether an edge points back to an ancestor can be determined by
-finding strongly connected components with more than one vertex. And we can
-check for self-loops by just seeing if a block links to itself.
-
-Checking for strongly connected components can be done with the =scc= function
-provided by the =Data.Graph= library. This library also lets us create a /single/
-graph with all of the blocks in it because the library doesn't care whether the
-edges we feed into it are connected.
-
-The [[f:buildGraph]] function looks at all code blocks and generates the necessary
-edges to build up a directed graph. It does this by constructing edges that have
-the FQBN of the starting block as one vertex, and the Noweb links found inside
-the body as the other vertices. Multiple links to the same code block are
-de-duplicated with ~hashNub~.
-
-#+name: f:buildGraph
-#+begin_src haskell
-buildGraph ::
-  [Block] ->
-  ( G.Graph,
-    G.Vertex -> (Block, FQBN, [FQBN]),
-    FQBN -> Maybe G.Vertex
-  )
-buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
-  where
-    f ::
-      [(Block, FQBN, [FQBN])] ->
-      Block ->
-      [(Block, FQBN, [FQBN])]
-    f acc block
-      | Just fqbn <- EM.lookup "__fqbn" block.meta =
-          (\targets -> (block, fqbn, targets) : acc)
-            . hashNub
-            . catMaybes
-            $ map getLinkTarget block.body
-      | otherwise = acc
-    getLinkTarget = \case
-      BTokenLink (Link _ (LinkTargetOid linkOid)) ->
-        Just $ T.show linkOid
-      BTokenLink {}
-      BTokenPadding {}
-      BTokenString {} -> Nothing
-#+end_src
-
-The [[f:findCycles]] function then takes the output of [[f:buildGraph]] and uses that to
-run the =scc= function to get the strongly connected components.
-
-#+name: f:findCycles
-#+begin_src haskell
-findCycles :: SourceCode -> [G.Tree FQBN]
-findCycles sc = map (fmap toFqbn) . foldl' f [] $ G.scc graph
-  where
-    (graph, vertexToNode, _) = buildGraph $ M.elems sc.fqbnToCodeBlock
-    toFqbn vertex =
-      let (_, blockName, _) = vertexToNode vertex
-       in blockName
-    f acc tree@(G.Node vertex _)
-      | length tree > 1 = tree : acc
-      | (_, name, targets) <- vertexToNode vertex,
-        elem name targets =
-          tree : acc
-      | otherwise = acc
-#+end_src
-
-The line ~M.elems sc.fqbnToCodeBlock~ just gets all code blocks from the
-~fqbnToCodeBlock~ field (perhaps ~M.elems~ is a poor name and should have been
-called ~M.values~ instead, but that's another matter).
-
-Checking for back edges means just seeing whether there is more than one vertex,
-or if there are any self-loops; these concerns are encoded in the ~f~ helper
-function.
-
-*** Tests
-:PROPERTIES:
-:ID:       21fc34a2-ec00-45c4-ba28-91b67bc52809
-:END:
-
-All tests related to tangling require the use of a global Org ID locations file
-([[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][GOIDs file parse]]), because this mimics the behavior of [[id:27b05a30-83ff-4c47-b320-f53747424a68::f:lilacTangle][f:lilacTangle]] which also
-requires it. For convenience, we define a single one to use for all test cases.
-This file is generated by Lilac itself.
-
-#+name: Generate GOIDs for tests
-#+begin_src sh
-cd test && find Lilac/TangleSpec -type f \
-	| sort \
-	| xargs lilac write-goids --out-file .orgids
-#+end_src
-
-We use the [[f:checkCycles]] helper (powered by [[f:findCycles]] underneath) to detect
-cycles (or lack thereof).
-
-For tangling, because of the fact that we are testing things like using multiple
-Org files, we have to be a little more explicit about the Org ID of each Org
-file involved.
-
-# vale off
-First let's check for the happy path where there are no cycles. Note the use of
-~:noweb off~ so as to preserve the Noweb link declaration (see
-[[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::f:nowebLinkParser][f:nowebLinkParser]] and [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::t:0007-blocks-noweb][t:0007-blocks-noweb]] for more sample usage of ~:noweb off~).
-# vale on
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-no-loops
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e000
-:END:
-
-,#+name: f:a
-,#+begin_src haskell
-f = 1 + 1
-<<f:b>>
-,#+end_src
-
-,#+name: f:b
-,#+begin_src haskell
-g = 2 + 2
-,#+end_src
-#+end_src
-
-#+name: t:0100-dag-no-loops
-#+begin_src haskell
-checkCycles
-  "0100-dag-no-loops"
-  "test/.orgids"
-  []
-#+end_src
-
-Now check for the simplest case of a single self-loop.
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-self-loop
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e001
-:END:
-
-,#+name: f:a
-,#+begin_src haskell
-f = 1 + 1
-<<f:a>>
-,#+end_src
-#+end_src
-
-#+name: t:0100-dag-self-loop
-#+begin_src haskell
-checkCycles
-  "0100-dag-self-loop"
-  "test/.orgids"
-  [G.Node "id:00000000-0000-0000-0000-00000000e001::f:a" []]
-#+end_src
-
-Check whether we can detect two independent self-loops.
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-self-loops
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e003
-:END:
-
-,#+name: f:a
-,#+begin_src haskell
-f = 1 + 1
-<<f:a>>
-,#+end_src
-
-,#+name: f:b
-,#+begin_src haskell
-f = 1 + 1
-<<f:b>>
-,#+end_src
-#+end_src
-
-#+name: t:0100-dag-self-loops
-#+begin_src haskell
-checkCycles
-  "0100-dag-self-loops"
-  "test/.orgids"
-  [ G.Node "id:00000000-0000-0000-0000-00000000e003::f:a" [],
-    G.Node "id:00000000-0000-0000-0000-00000000e003::f:b" []
-  ]
-#+end_src
-
-Check whether we can detect a back edge to an ancestor. In
-[[t:0100-dag-2-node-loop]] we have a cycle involving 2 nodes.
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-2-node-loop
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e004
-:END:
-
-,#+name: f:a
-,#+begin_src haskell
-f = 1 + 1
-<<f:b>>
-,#+end_src
-
-,#+name: f:b
-,#+begin_src haskell
-f = 1 + 1
-<<f:a>>
-,#+end_src
-#+end_src
-
-#+name: t:0100-dag-2-node-loop
-#+begin_src haskell
-checkCycles
-  "0100-dag-2-node-loop"
-  "test/.orgids"
-  [ G.Node
-      "id:00000000-0000-0000-0000-00000000e004::f:a"
-      [ G.Node "id:00000000-0000-0000-0000-00000000e004::f:b" []
-      ]
-  ]
-#+end_src
-
-Test case [[t:0100-dag-3-node-loop]] is like the previous one, but where the loop is
-one node longer (involves 3 nodes instead of 2).
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-3-node-loop
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e005
-:END:
-
-,#+name: f:a
-,#+begin_src haskell
-f = 1 + 1
-<<f:b>>
-,#+end_src
-
-,#+name: f:b
-,#+begin_src haskell
-f = 1 + 1
-<<f:c>>
-,#+end_src
-
-,#+name: f:c
-,#+begin_src haskell
-f = 1 + 1
-<<f:a>>
-,#+end_src
-#+end_src
-
-#+name: t:0100-dag-3-node-loop
-#+begin_src haskell
-checkCycles
-  "0100-dag-3-node-loop"
-  "test/.orgids"
-  [ G.Node
-      "id:00000000-0000-0000-0000-00000000e005::f:a"
-      [ G.Node
-          "id:00000000-0000-0000-0000-00000000e005::f:b"
-          [ G.Node "id:00000000-0000-0000-0000-00000000e005::f:c" []
-          ]
-      ]
-  ]
-#+end_src
-
-Lastly, we have a test case involving complex loops. There are many back edges
-involved here; we just want to make sure that our algorithm for finding cycles
-is still able to handle such pathological input.
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-complex-loops
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000e006
-:END:
-
-,#+name: f:a
-,#+begin_src haskell
-f = 1 + 1
-<<f:b>>
-,#+end_src
-
-,#+name: f:b
-,#+begin_src haskell
-f = 1 + 1
-<<f:c>>
-<<f:d>>
-,#+end_src
-
-,#+name: f:c
-,#+begin_src haskell
-f = 1 + 1
-<<f:a>>
-,#+end_src
-
-,#+name: f:d
-,#+begin_src haskell
-f = 1 + 1
-<<f:b>>
-<<f:d>>
-,#+end_src
-
-,#+name: f:e
-,#+begin_src haskell
-f = 1 + 1
-<<f:e>>
-,#+end_src
-#+end_src
-
-#+name: t:0100-dag-complex-loops
-#+begin_src haskell
-checkCycles
-  "0100-dag-complex-loops"
-  "test/.orgids"
-  [ G.Node
-      "id:00000000-0000-0000-0000-00000000e006::f:a"
-      [ G.Node
-          "id:00000000-0000-0000-0000-00000000e006::f:b"
-          [ G.Node "id:00000000-0000-0000-0000-00000000e006::f:c" [],
-            G.Node "id:00000000-0000-0000-0000-00000000e006::f:d" []
-          ]
-      ],
-    G.Node "id:00000000-0000-0000-0000-00000000e006::f:e" []
-  ]
-#+end_src
 
 ** Expand blocks for tangling
 
@@ -1595,108 +1228,6 @@ checkExpansion
   ]
 #+end_src
 
-If two files refer to each other in a cyclic manner, it should fail to tangle.
-That is, cycle detection should still work even for cycles that span across
-two files.
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-2-node-loop-2-files-parent
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f004
-:END:
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-hello from a
-<<id:00000000-0000-0000-0000-00000000f005::b>>
-,#+end_src
-#+end_src
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-2-node-loop-2-files-child
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f005
-:END:
-,#+name: b
-,#+begin_src haskell
-hello from b
-<<id:00000000-0000-0000-0000-00000000f004::a>>
-,#+end_src
-#+end_src
-
-#+name: t:0100-dag-2-node-loop-2-files
-#+begin_src haskell
-checkCycles
-  "0100-dag-2-node-loop-2-files-parent"
-  "test/.orgids"
-  [ G.Node
-      "id:00000000-0000-0000-0000-00000000f004::a"
-      [ G.Node "id:00000000-0000-0000-0000-00000000f005::b" []
-      ]
-  ]
-#+end_src
-
-If three files form a cycle, that should also be detected.
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-2-node-loop-3-files-parent
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f006
-:END:
-,#+name: a
-,#+header: :tangle equations.txt
-,#+begin_src haskell
-hello from a
-<<id:00000000-0000-0000-0000-00000000f007::b>>
-,#+end_src
-#+end_src
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-2-node-loop-3-files-middleman
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f007
-:END:
-,#+name: b
-,#+begin_src haskell
-hello from b
-<<id:00000000-0000-0000-0000-00000000f008::c>>
-,#+end_src
-#+end_src
-
-#+header: :tangle test/Lilac/TangleSpec/0100-dag-2-node-loop-3-files-child
-#+header: :noweb off
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-00000000f008
-:END:
-,#+name: c
-,#+begin_src haskell
-hello from c
-<<id:00000000-0000-0000-0000-00000000f006::a>>
-,#+end_src
-#+end_src
-
-#+name: t:0100-dag-2-node-loop-3-files
-#+begin_src haskell
-checkCycles
-  "0100-dag-2-node-loop-3-files-parent"
-  "test/.orgids"
-  [ G.Node
-      "id:00000000-0000-0000-0000-00000000f006::a"
-      [ G.Node
-          "id:00000000-0000-0000-0000-00000000f007::b"
-          [ G.Node
-              "id:00000000-0000-0000-0000-00000000f008::c"
-              []
-          ]
-      ]
-  ]
-#+end_src
-
 ** Tangle files
 
 In [[f:tangle]] we naively tangle each file, one at a time, in serial fashion. It
@@ -1755,7 +1286,6 @@ The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941
 #+begin_src haskell
 module Lilac.TangleSpec (spec) where
 
-import Data.Graph qualified as G
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
@@ -1795,7 +1325,6 @@ helpers.
 #+name: TangleSpec helpers
 #+begin_src haskell
 <<f:getSourceCodeFromPath>>
-<<f:checkCycles>>
 <<f:checkExpansion>>
 #+end_src
 
@@ -1827,18 +1356,6 @@ in our test case expectations, which would break portability of the test cases
 meaning all developers would have to clone the Lilac repository into the same
 path).
 
-The [[f:checkCycles]] function uses [[f:findCycles]] to see if the Org document at the
-given path has any cycles.
-
-#+name: f:checkCycles
-#+begin_src haskell
-checkCycles :: FilePath -> FilePath -> [G.Tree LT.FQBN] -> Spec
-checkCycles path goidsFile expectedCycles = do
-  it path $ do
-    (Right sc) <- getSourceCodeFromPath path goidsFile
-    (LT.findCycles sc) `shouldBe` expectedCycles
-#+end_src
-
 The [[f:checkExpansion]] function expands all source code blocks and compares them
 with the expected output.
 
@@ -1860,14 +1377,6 @@ Below are all of the individual test cases.
 #+begin_src haskell
 tangleSpec :: Spec
 tangleSpec = do
-  <<t:0100-dag-no-loops>>
-  <<t:0100-dag-self-loop>>
-  <<t:0100-dag-self-loops>>
-  <<t:0100-dag-2-node-loop>>
-  <<t:0100-dag-3-node-loop>>
-  <<t:0100-dag-complex-loops>>
-  <<t:0100-dag-2-node-loop-2-files>>
-  <<t:0100-dag-2-node-loop-3-files>>
   <<t:0101-block-expansion>>
   <<t:0101-block-expansion-deeply-nested>>
   <<t:0101-block-expansion-prefix>>
