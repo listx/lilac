@@ -104,6 +104,7 @@ import Relude
     fmap,
     foldl',
     fromEnum,
+    fromList,
     fst,
     get,
     isJust,
@@ -153,7 +154,7 @@ import Relude
     (>>),
     (||),
   )
-import Relude.Extra.Map (delete, lookup)
+import Relude.Extra.Map (delete, insert, lookup)
 import Relude.Unsafe (fromJust)
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -171,7 +172,7 @@ data GOIDsParserState = GOIDsParserState
 defaultGOIDsParserState :: GOIDsParserState
 defaultGOIDsParserState =
   GOIDsParserState
-    { seenOids = M.fromList []
+    { seenOids = fromList []
     }
 
 type GOIDsParser :: Type -> Type
@@ -239,7 +240,7 @@ defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
       cells = [],
-      meta = M.fromList metas'
+      meta = fromList metas'
     }
   where
     metas' =
@@ -250,7 +251,7 @@ defaultOrgDoc oid metas =
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { goids = M.fromList [],
+    { goids = fromList [],
       docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
@@ -295,7 +296,7 @@ docMetaParser :: OrgParser (OID, Map Text Text)
 docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
-  metaKVs <- M.fromList <$> (many $ lexeme docMetaEntryParser)
+  metaKVs <- fromList <$> (many $ lexeme docMetaEntryParser)
   let conflictingKeys = M.keys $ M.intersection topLevelDrawerProps metaKVs
   when (not $ null conflictingKeys)
     $ fail
@@ -463,11 +464,11 @@ genHeadingOidStack maybeId level old
     newId = fromText =<< maybeId
 
 propertiesDrawerParser :: OrgParser (Map Text Text)
-propertiesDrawerParser = propertiesParser <|> (pure $ M.fromList [])
+propertiesDrawerParser = propertiesParser <|> (pure $ fromList [])
 
 propertiesParser :: OrgParser (Map Text Text)
 propertiesParser =
-  M.fromList
+  fromList
     <$> MP.between
       (lexeme $ string ":PROPERTIES:\n")
       (string ":END:\n")
@@ -538,7 +539,7 @@ whitespaceCompressor spaceConsumer = do
 
 styleMarkers :: Map Char Style
 styleMarkers =
-  M.fromList
+  fromList
     [ ('*', Bold),
       ('/', Italic),
       ('_', Underline),
@@ -855,7 +856,7 @@ mathFragmentInlineParser = do
   latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
   pure
     MathFragment
-      { meta = M.fromList [],
+      { meta = fromList [],
         body = T.pack latex
       }
 
@@ -929,8 +930,7 @@ blockParser = do
   (blockName, metaKVs, blockType, srcLang) <- blockStartParser
   let nowebOff =
         (== Just "off")
-          . lookup "noweb"
-          $ M.fromList metaKVs
+          $ lookup "noweb" metaKVs
   modify (\s -> s {insideCodeBlock = True})
   bTokens <-
     MP.choice
@@ -943,15 +943,15 @@ blockParser = do
       anonBlockMeta = case blockName of
         Just _ -> Nothing
         Nothing -> Just ("__anon_block_number", T.show newAnonBlockNumber)
-      blockMeta = ("__block_type", blockType)
       block =
         Block
           { parentOid =
               firstParent orgParserState.docOid orgParserState.headingOidStack,
             meta =
-              M.fromList
-                $ (blockMeta : metaKVs)
-                <> concatMap maybeToList [blockName, srcLang, anonBlockMeta],
+              foldl'
+                (\acc (k, v) -> insert k v acc)
+                (insert "__block_type" blockType metaKVs)
+                $ concatMap maybeToList [blockName, srcLang, anonBlockMeta],
             body =
               ignoreSpecialCommas
                 . compressBTokens
@@ -974,14 +974,14 @@ blockParser = do
 blockStartParser ::
   OrgParser
     ( Maybe (Text, Text),
-      [(Text, Text)],
+      Map Text Text,
       Text,
       Maybe (Text, Text)
     )
 blockStartParser = do
   _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
   blockName <- MP.optional metaNameParser
-  metaKVs <- many $ lexeme blockMetaEntryParser
+  metaKVs <- fromList <$> (many $ lexeme blockMetaEntryParser)
   _ <- string "#+begin_"
   blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
   srcLang <- MP.optional $ do
@@ -1438,7 +1438,7 @@ mathFragmentNumberedParser = do
   pure
     MathFragment
       { meta =
-          M.insert "__equation_number" (T.pack $ show number) metaKVs,
+          insert "__equation_number" (T.pack $ show number) metaKVs,
         body = trimTrailingWhitespace $ T.pack latex
       }
 
@@ -1496,7 +1496,7 @@ figureParser = do
 metaParser :: OrgParser (Map Text Text)
 metaParser = do
   metaKVs <- many $ lexeme metaEntryParser
-  let metaKVsMap = M.fromList metaKVs
+  let metaKVsMap = fromList metaKVs
   case lookup "name" metaKVsMap of
     Just cellName -> assertUniqueCellName cellName
     Nothing -> pure ()
@@ -1523,7 +1523,7 @@ tableParser = do
     . CTable
     $ Table
       { meta = metaKVs,
-        grid = M.fromList $ rowsToTuples rows
+        grid = fromList $ rowsToTuples rows
       }
 
 tableLineParser :: OrgParser [Prose]
@@ -1625,7 +1625,7 @@ goidsEntryParser sourceFile = betweenParens $ do
       <> "\""
     put
       goidsParserState
-        { seenOids = M.insert oid fp goidsParserState.seenOids
+        { seenOids = insert oid fp goidsParserState.seenOids
         }
     pure oid
   pure (fp, oids)
@@ -1658,13 +1658,14 @@ extractGOIDs orgFilesAndContents =
       lines = foldl' goidEntryToLines [] $ M.toDescList goids
    in "(\n" <> (T.unlines $ map ("  " <>) lines) <> ")\n"
   where
+    buildGOIDs :: Map OsPath [OID] -> (OsPath, Text) -> Map OsPath [OID]
     buildGOIDs acc (orgFile, orgFileContents)
       | Right str <- P.decodeWith utf8 utf8 orgFile = case MP.runParser
           (runStateT orgDocParser defaultOrgParserState)
           str
           orgFileContents of
           Left _err -> acc
-          Right (orgDoc, _orgParserState) -> M.insert orgFile (getOrgIds orgDoc) acc
+          Right (orgDoc, _orgParserState) -> insert orgFile (getOrgIds orgDoc) acc
       | otherwise = acc
     getOrgIds :: OrgDoc -> [OID]
     getOrgIds od = catMaybes $ foldl' f [Just $ od.oid] od.cells

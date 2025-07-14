@@ -197,7 +197,7 @@ pGOIDs path expected = do
         (runStateT (L.goidsParser $ P.unsafeEncodeUtf path) st)
         path
         input
-        `shouldParse` ( M.fromList $ map f expected,
+        `shouldParse` ( fromList $ map f expected,
                         L.defaultGOIDsParserState
                       )
   where
@@ -226,7 +226,7 @@ nilOrgDoc cells =
   OrgDoc
     { oid = nilOid,
       cells = cells,
-      meta = M.fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+      meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
 
 parseSpec :: Spec

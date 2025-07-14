@@ -41,6 +41,7 @@ import Relude
     elem,
     fmap,
     foldl',
+    fromList,
     intercalate,
     length,
     map,
@@ -67,7 +68,7 @@ mkObject orgDoc =
     }
 
 mkSymbols :: OrgDoc -> Map LinkOid Cell
-mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
+mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
   where
     f cell = case cell of
       CBlock block -> getSymbols (Just block.parentOid) block.meta cell
@@ -205,7 +206,7 @@ findExternalOids :: OrgDoc -> [LinkOid]
 findExternalOids orgDoc =
   sort
     . Set.toList
-    . Set.fromList
+    . fromList
     $ concatMap f orgDoc.cells
   where
     f cell = case cell of

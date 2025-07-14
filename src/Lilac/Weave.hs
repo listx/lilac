@@ -6,7 +6,6 @@ module Lilac.Weave
 where
 
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
-import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Lilac.Parse (maskToStyles)
@@ -85,6 +84,7 @@ import Relude
     foldMap',
     foldl',
     forM_,
+    fromList,
     fst,
     id,
     lift,
@@ -384,7 +384,7 @@ weaveLink link = do
               $ CBlock
                 Block
                   { parentOid = weaveConf.orgDoc.oid,
-                    meta = M.fromList [("name", linkOid.name)],
+                    meta = fromList [("name", linkOid.name)],
                     body = []
                   }
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
