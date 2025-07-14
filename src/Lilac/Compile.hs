@@ -44,6 +44,7 @@ import Relude
     intercalate,
     length,
     map,
+    mempty,
     otherwise,
     repeat,
     show,
@@ -103,7 +104,7 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
 
 mkArchive :: [(GPath, Object)] -> Either String Archive
 mkArchive pathObjs =
-  let (objects, symbols) = foldl' concatObjs (M.empty, M.empty) pathObjs
+  let (objects, symbols) = foldl' concatObjs (mempty, mempty) pathObjs
       brokenLinks = findBrokenLinks objects symbols
    in if
         | brokenLinks /= [] ->

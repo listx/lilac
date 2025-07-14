@@ -2151,7 +2151,6 @@ module Main (main) where
 
 import Data.Aeson (ToJSON, eitherDecodeStrictText)
 import Data.Aeson.Encode.Pretty qualified as EP
-import Data.Map.Strict qualified as M
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -2513,7 +2512,7 @@ weaveToDisk fp od watch = do
   let weaveConf =
         LW.WeaveConf
           { LW.orgDoc = od,
-            LW.goids = M.empty,
+            LW.goids = mempty,
             LW.watch = watch
           }
   LU.writeFileRobustly fp

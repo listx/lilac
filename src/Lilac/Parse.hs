@@ -112,6 +112,7 @@ import Relude
     many,
     map,
     maybeToList,
+    mempty,
     modify,
     not,
     notElem,
@@ -1653,7 +1654,7 @@ validateOidText oidText = case fromText oidText of
 
 extractGOIDs :: [(OsPath, Text)] -> Text
 extractGOIDs orgFilesAndContents =
-  let goids = foldl' buildGOIDs M.empty orgFilesAndContents
+  let goids = foldl' buildGOIDs mempty orgFilesAndContents
       lines = foldl' goidEntryToLines [] $ M.toDescList goids
    in "(\n" <> (T.unlines $ map ("  " <>) lines) <> ")\n"
   where

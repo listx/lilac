@@ -1,6 +1,5 @@
 module Lilac.WeaveSpec (spec) where
 
-import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Types (OID, OrgParserState (goids), nilOidOrgDoc)
@@ -17,6 +16,7 @@ import Relude
     foldl',
     fst,
     map,
+    mempty,
     pure,
     reverse,
     runStateT,
@@ -44,7 +44,7 @@ spec = weaveSpec
 
 getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
 getWovenPrettyFromPath path = do
-  let goids = M.empty :: Map OID OsPath
+  let goids = mempty :: Map OID OsPath
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
