@@ -1,6 +1,7 @@
 module Main (main) where
 
-import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
+import Data.Aeson (ToJSON, eitherDecodeStrictText)
+import Data.Aeson.Encode.Pretty qualified as EP
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -59,12 +60,14 @@ import Relude
     fail,
     mapM,
     mapM_,
+    mempty,
     otherwise,
     pure,
     putStrLn,
     runStateT,
     show,
     when,
+    writeFileLBS,
     ($),
     (<$>),
     (<>),
@@ -73,7 +76,6 @@ import Relude
 import System.Exit (die)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
-import Text.Pretty.Simple qualified as PP
 
 readOsPath :: ReadM P.OsPath
 readOsPath = f =<< str
@@ -294,7 +296,7 @@ lilacCompile _globalOpts compileOpts = do
         let base = P.takeBaseName inputPath
             objExtension = P.unsafeEncodeUtf "lobj"
         P.decodeUtf $ P.addExtension base objExtension
-      encodeFile outPath obj
+      writeJSONPretty outPath obj
 
 lilacArchive :: ArchiveOpts -> IO ()
 lilacArchive archiveOpts = do
@@ -306,7 +308,7 @@ lilacArchive archiveOpts = do
         let base = P.takeBaseName archiveOpts.outFile
             objExtension = P.unsafeEncodeUtf "larc"
         P.decodeUtf $ P.addExtension base objExtension
-      encodeFile outPath archive
+      writeJSONPretty outPath archive
   where
     readObjectDirectly :: GPath -> IO (GPath, Object)
     readObjectDirectly gPath = do
@@ -366,3 +368,16 @@ lilacWeave weaveOpts = do
             pure $ P.addExtension withoutExtension html
           LW.weaveToDisk outPath orgDoc weaveOpts.watch
           putStrLn "Finished weaving."
+
+writeJSONPretty :: (ToJSON a) => FilePath -> a -> IO ()
+writeJSONPretty path marshalMe =
+  writeFileLBS
+    path
+    $ EP.encodePretty'
+      EP.Config
+        { EP.confIndent = EP.Spaces 2,
+          EP.confCompare = mempty,
+          EP.confNumFormat = EP.Generic,
+          EP.confTrailingNewline = True
+        }
+      marshalMe

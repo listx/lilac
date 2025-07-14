@@ -1803,12 +1803,12 @@ executable lilac
       <<GHC threaded flags>>
   build-depends:
       aeson
+    , aeson-pretty
     , base >=4.7 && <5
     , filepath
     , lilac
     , optparse-applicative
     , megaparsec
-    , pretty-simple
     , relude
   default-language: <<Language edition>>
 
@@ -2075,7 +2075,8 @@ The boilerplate involves [[id:ce9af5ef-6559-4ffb-82c1-a439214eda6d][option handl
 #+begin_src haskell
 module Main (main) where
 
-import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
+import Data.Aeson (ToJSON, eitherDecodeStrictText)
+import Data.Aeson.Encode.Pretty qualified as EP
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -2134,12 +2135,14 @@ import Relude
     fail,
     mapM,
     mapM_,
+    mempty,
     otherwise,
     pure,
     putStrLn,
     runStateT,
     show,
     when,
+    writeFileLBS,
     ($),
     (<$>),
     (<>),
@@ -2148,7 +2151,6 @@ import Relude
 import System.Exit (die)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
-import Text.Pretty.Simple qualified as PP
 
 <<Option handling>>
 
@@ -2158,6 +2160,7 @@ import Text.Pretty.Simple qualified as PP
 <<f:lilacArchive>>
 <<f:lilacTangle>>
 <<f:lilacWeave>>
+<<f:writeJSONPretty>>
 #+end_src
 
 ** =main= entrypoint
@@ -2236,7 +2239,27 @@ lilacCompile _globalOpts compileOpts = do
         let base = P.takeBaseName inputPath
             objExtension = P.unsafeEncodeUtf "lobj"
         P.decodeUtf $ P.addExtension base objExtension
-      encodeFile outPath obj
+      writeJSONPretty outPath obj
+#+end_src
+
+The [[f:writeJSONPretty]] helper relies on ~Data.Aeson.Encode.Pretty~ to make the JSON
+we write even more human-friendly (which is useful for debugging if we need to
+modify the JSON, for example).
+
+#+name: f:writeJSONPretty
+#+begin_src haskell
+writeJSONPretty :: (ToJSON a) => FilePath -> a -> IO ()
+writeJSONPretty path marshalMe =
+  writeFileLBS
+    path
+    $ EP.encodePretty'
+      EP.Config
+        { EP.confIndent = EP.Spaces 2,
+          EP.confCompare = mempty,
+          EP.confNumFormat = EP.Generic,
+          EP.confTrailingNewline = True
+        }
+      marshalMe
 #+end_src
 
 *** Archiving
@@ -2253,7 +2276,7 @@ lilacArchive archiveOpts = do
         let base = P.takeBaseName archiveOpts.outFile
             objExtension = P.unsafeEncodeUtf "larc"
         P.decodeUtf $ P.addExtension base objExtension
-      encodeFile outPath archive
+      writeJSONPretty outPath archive
   where
     readObjectDirectly :: GPath -> IO (GPath, Object)
     readObjectDirectly gPath = do
