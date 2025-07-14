@@ -2,7 +2,6 @@ module Lilac.Weave
   ( WeaveConf (..),
     renderAsText,
     weave,
-    weaveToDisk,
   )
 where
 
@@ -34,7 +33,6 @@ import Lilac.Types
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
   )
-import Lilac.Util qualified as LU
 import Lucid
   ( HtmlT,
     a_,
@@ -73,7 +71,6 @@ import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Either (Right),
-    IO,
     Identity,
     Maybe (Just, Nothing),
     ReaderT,
@@ -389,17 +386,6 @@ weaveLink link = do
                   }
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
       LinkTargetOther protocol target -> protocol <> ":" <> target
-
-weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
-weaveToDisk fp od watch = do
-  let weaveConf =
-        WeaveConf
-          { orgDoc = od,
-            goids = M.empty,
-            watch = watch
-          }
-  LU.writeFileRobustly fp
-    $ renderAsText weaveConf weave
 
 renderAsText :: WeaveConf -> HtmlWeaver a -> T.Text
 renderAsText weaveConf weaver =

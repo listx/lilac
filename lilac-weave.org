@@ -58,7 +58,6 @@ module Lilac.Weave
   ( WeaveConf (..),
     renderAsText,
     weave,
-    weaveToDisk,
   )
 where
 
@@ -90,7 +89,6 @@ import Lilac.Types
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
   )
-import Lilac.Util qualified as LU
 import Lucid
   ( HtmlT,
     a_,
@@ -129,7 +127,6 @@ import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Either (Right),
-    IO,
     Identity,
     Maybe (Just, Nothing),
     ReaderT,
@@ -184,7 +181,6 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:colorizeText>>
 <<f:spliceLinks>>
 <<f:weaveLink>>
-<<f:weaveToDisk>>
 <<f:renderAsText>>
 #+end_src
 
@@ -798,25 +794,6 @@ Initially the ~.side-popup~ is not displayed at all (invisible), and it shows up
 only when the containing ~.code-block-container~ is hovered. This keeps the page
 free of clutter (otherwise we'd have these link anchors showing up for all
 blocks at all times, which is noisy).
-
-** Write to disk
-
-Weaving to disk is used when we want to choose where to write the HTML. It's
-just a thin wrapper around [[f:weave]] which does most of the work.
-
-#+name: f:weaveToDisk
-#+begin_src haskell
-weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
-weaveToDisk fp od watch = do
-  let weaveConf =
-        WeaveConf
-          { orgDoc = od,
-            goids = M.empty,
-            watch = watch
-          }
-  LU.writeFileRobustly fp
-    $ renderAsText weaveConf weave
-#+end_src
 
 ** Testing framework
 

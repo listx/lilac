@@ -2,6 +2,7 @@ module Main (main) where
 
 import Data.Aeson (ToJSON, eitherDecodeStrictText)
 import Data.Aeson.Encode.Pretty qualified as EP
+import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
@@ -11,6 +12,7 @@ import Lilac.Types
   ( Archive,
     GPath,
     Object,
+    OrgDoc,
     decodeGPath,
     encodeGPath,
   )
@@ -418,8 +420,19 @@ lilacWeave weaveOpts = do
             let withoutExtension = P.joinPath [dir, base]
                 html = P.unsafeEncodeUtf "html"
             pure $ P.addExtension withoutExtension html
-          LW.weaveToDisk outPath orgDoc weaveOpts.watch
+          weaveToDisk outPath orgDoc weaveOpts.watch
           putStrLn "Finished weaving."
+
+weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
+weaveToDisk fp od watch = do
+  let weaveConf =
+        LW.WeaveConf
+          { LW.orgDoc = od,
+            LW.goids = M.empty,
+            LW.watch = watch
+          }
+  LU.writeFileRobustly fp
+    $ LW.renderAsText weaveConf LW.weave
 
 writeJSONPretty :: (ToJSON a) => FilePath -> a -> IO ()
 writeJSONPretty path marshalMe =

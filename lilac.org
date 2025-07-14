@@ -2151,6 +2151,7 @@ module Main (main) where
 
 import Data.Aeson (ToJSON, eitherDecodeStrictText)
 import Data.Aeson.Encode.Pretty qualified as EP
+import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
@@ -2160,6 +2161,7 @@ import Lilac.Types
   ( Archive,
     GPath,
     Object,
+    OrgDoc,
     decodeGPath,
     encodeGPath,
   )
@@ -2251,6 +2253,7 @@ import Text.Megaparsec qualified as MP
 <<f:lilacTangle>>
 <<f:tangle>>
 <<f:lilacWeave>>
+<<f:weaveToDisk>>
 <<f:writeJSONPretty>>
 <<f:putStrColor>>
 <<f:putStrLnColor>>
@@ -2495,8 +2498,25 @@ lilacWeave weaveOpts = do
             let withoutExtension = P.joinPath [dir, base]
                 html = P.unsafeEncodeUtf "html"
             pure $ P.addExtension withoutExtension html
-          LW.weaveToDisk outPath orgDoc weaveOpts.watch
+          weaveToDisk outPath orgDoc weaveOpts.watch
           putStrLn "Finished weaving."
+#+end_src
+
+Weaving to disk is used when we want to choose where to write the HTML. It's
+just a thin wrapper around [[id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa::f:weave][f:weave]] which does most of the work.
+
+#+name: f:weaveToDisk
+#+begin_src haskell
+weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
+weaveToDisk fp od watch = do
+  let weaveConf =
+        LW.WeaveConf
+          { LW.orgDoc = od,
+            LW.goids = M.empty,
+            LW.watch = watch
+          }
+  LU.writeFileRobustly fp
+    $ LW.renderAsText weaveConf LW.weave
 #+end_src
 
 ** Option handling boilerplate
