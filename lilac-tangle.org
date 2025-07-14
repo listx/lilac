@@ -23,11 +23,7 @@ Tangling concerns are captured in [[file:src/Lilac/Tangle.hs]].
 #+name: module:Lilac.Tangle
 #+header: :tangle src/Lilac/Tangle.hs
 #+begin_src haskell
-module Lilac.Tangle
-  ( expandRootBlocks,
-    tangle,
-  )
-where
+module Lilac.Tangle (expandRootBlocks) where
 
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
@@ -42,44 +38,26 @@ import Lilac.Types
     Object (symbols),
     decodeGPath,
   )
-import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
-    IO,
-    Int,
     Maybe (Just),
     concat,
     foldl',
-    foldlM,
     fst,
-    length,
     map,
-    mapM_,
-    not,
     otherwise,
-    pure,
-    putStrLn,
     reverse,
-    show,
-    sort,
-    when,
     ($),
-    (&&),
-    (+),
     (.),
     (/=),
     (<>),
     (==),
-    (>),
-    (||),
   )
 import Relude.Extra.Map qualified as EM
-import System.Directory.OsPath qualified as D
 import System.OsPath qualified as P
 
 <<f:expandRootBlocks>>
 <<f:expandBlock>>
-<<f:tangle>>
 #+end_src
 
 ** Tangling overview
@@ -933,50 +911,6 @@ checkExpansion
     )
   ]
 #+end_src
-
-** Tangle files
-
-In [[f:tangle]] we naively tangle each file, one at a time, in serial fashion. It
-does not write to the file if what would be written is the same as what's
-already there. This way, file modification timestamps can remain the same and
-tools like GNU Make won't get confused by timestamps that have been needlessly
-updated. However, we always do write the file if it doesn't exist on disk.
-
-#+name: f:tangle
-#+begin_src haskell
-tangle :: Archive -> IO ()
-tangle archive = do
-  let blocks = sort $ expandRootBlocks archive
-  putStrLn $ "Blocks to process: " <> (show $ length blocks)
-  (tangled, tangledPaths, skipped) <- foldlM f (0, [], 0) blocks
-  putStrLn $ "Tangled: " <> (show tangled)
-  when (tangled > 0) $ mapM_ printTangled $ reverse tangledPaths
-  putStrLn $ "Skipped: " <> (show skipped)
-  where
-    f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
-    f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
-      alreadyExists <- D.doesPathExist path
-      existingContent <- LU.readFileRobustly path
-      let g
-            | (alreadyExists && existingContent /= contentToWrite)
-                || not alreadyExists = do
-                LU.writeFileRobustly path contentToWrite
-                pure (tangled + 1, path : tangledPaths, skipped)
-            | otherwise = pure (tangled, tangledPaths, skipped + 1)
-       in g
-    printTangled :: P.OsPath -> IO ()
-    printTangled path = putStrLn $ "  " <> show path
-#+end_src
-
-We sort the paths first so that the output is less confusing. Only tangled paths
-are printed, because otherwise the output can be overly verbose.
-
-The function [[id:85a464eb-e220-40d7-ae49-5edc349ee6b4::f:readFileRobustly][f:readFileRobustly]] will return the empty string if there was any
-error encountered while reading the file. One common scenario is if the file
-does not exist yet. Returning the empty string in this (or other error-raising
-scenarios) is fine because it will most likely result in the comparison
-~existingContent /= contentToWrite~ in [[f:tangle]] failing (assuming the
-~contentToWrite~ is not empty), resulting in the file being marked for tangling.
 
 ** Testing framework
 

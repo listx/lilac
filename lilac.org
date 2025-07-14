@@ -1876,7 +1876,9 @@ executable lilac
   build-depends:
       aeson
     , aeson-pretty
+    , ansi-terminal
     , base >=4.7 && <5
+    , directory
     , filepath
     , lilac
     , optparse-applicative
@@ -2149,6 +2151,7 @@ module Main (main) where
 
 import Data.Aeson (ToJSON, eitherDecodeStrictText)
 import Data.Aeson.Encode.Pretty qualified as EP
+import Data.Text qualified as T
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -2199,40 +2202,58 @@ import Relude
     Either (Left, Right),
     FilePath,
     IO,
+    Int,
     Maybe (Just),
     MonadFail,
     String,
     Type,
     concat,
     fail,
+    foldlM,
+    length,
     mapM,
     mapM_,
     mempty,
+    not,
     otherwise,
     pure,
+    putStr,
     putStrLn,
+    reverse,
     runStateT,
     show,
+    sort,
     when,
     writeFileLBS,
     ($),
+    (&&),
+    (+),
+    (/=),
     (<$>),
     (<>),
     (=<<),
+    (>),
+    (||),
   )
+import System.Console.ANSI qualified as C
+import System.Directory.OsPath qualified as D
 import System.Exit (die)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 
 <<Option handling>>
+<<Basic colors>>
 
 <<f:lilac-main>>
 <<f:lilac>>
 <<f:lilacCompile>>
 <<f:lilacArchive>>
 <<f:lilacTangle>>
+<<f:tangle>>
 <<f:lilacWeave>>
 <<f:writeJSONPretty>>
+<<f:putStrColor>>
+<<f:putStrLnColor>>
 #+end_src
 
 ** =main= entrypoint
@@ -2382,11 +2403,61 @@ lilacTangle globalOpts tangleOpts = do
         Left errMsg -> die errMsg
         Right archive -> do
           when (globalOpts.verbose) $ do
-            putStrLn $ "Tangling " <> fp
-          LT.tangle archive
+            putStrLn' $ "Tangling " <> fp
+          tangle globalOpts archive
           when (globalOpts.verbose)
-            $ putStrLn "Finished tangling."
+            $ putStrLn' "Finished tangling."
+    putStrLn' =
+      if globalOpts.color
+        then putStrLnColor boldWhite
+        else putStrLn
 #+end_src
+
+In [[f:tangle]] we naively tangle each file, one at a time, in serial fashion. It
+does not write to the file if what would be written is the same as what's
+already there. This way, file modification timestamps can remain the same and
+tools like GNU Make won't get confused by timestamps that have been needlessly
+updated. However, we always do write the file if it doesn't exist on disk.
+
+#+name: f:tangle
+#+begin_src haskell
+tangle :: GlobalOpts -> Archive -> IO ()
+tangle globalOpts archive = do
+  let blocks = sort $ LT.expandRootBlocks archive
+  putStrLn' $ "Blocks to process: " <> (show $ length blocks)
+  (tangled, tangledPaths, skipped) <- foldlM f (0, [], 0) blocks
+  putStrLn' $ "Tangled: " <> (show tangled)
+  when (tangled > 0) $ mapM_ printTangled $ reverse tangledPaths
+  putStrLn' $ "Skipped: " <> (show skipped)
+  where
+    f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
+    f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
+      alreadyExists <- D.doesPathExist path
+      existingContent <- LU.readFileRobustly path
+      let g
+            | (alreadyExists && existingContent /= contentToWrite)
+                || not alreadyExists = do
+                LU.writeFileRobustly path contentToWrite
+                pure (tangled + 1, path : tangledPaths, skipped)
+            | otherwise = pure (tangled, tangledPaths, skipped + 1)
+       in g
+    printTangled :: P.OsPath -> IO ()
+    printTangled path = putStrLn $ "  " <> show path
+    putStrLn' =
+      if globalOpts.color
+        then putStrLnColor boldWhite
+        else putStrLn
+#+end_src
+
+We sort the paths first so that the output is less confusing. Only tangled paths
+are printed, because otherwise the output can be overly verbose.
+
+The function [[id:85a464eb-e220-40d7-ae49-5edc349ee6b4::f:readFileRobustly][f:readFileRobustly]] will return the empty string if there was any
+error encountered while reading the file. One common scenario is if the file
+does not exist yet. Returning the empty string in this (or other error-raising
+scenarios) is fine because it will most likely result in the comparison
+~existingContent /= contentToWrite~ in [[f:tangle]] failing (assuming the
+~contentToWrite~ is not empty), resulting in the file being marked for tangling.
 
 *** Weaving
 
@@ -2876,6 +2947,43 @@ how this version information came to be.
 #+begin_src haskell
 versionFallback :: ContT String IO String
 versionFallback = pure "unknown-build-env"
+#+end_src
+
+** Colored terminal output
+
+These two functions help us print text to standard output using colors.
+
+#+name: f:putStrColor
+#+begin_src haskell
+putStrColor :: [C.SGR] -> String -> IO ()
+putStrColor sgrs s = do
+  C.setSGR sgrs
+  putStr s
+  C.setSGR [C.Reset]
+#+end_src
+
+#+name: f:putStrLnColor
+#+begin_src haskell
+putStrLnColor :: [C.SGR] -> String -> IO ()
+putStrLnColor sgrs s = do
+  putStrColor sgrs s
+  putStrLn ""
+#+end_src
+
+Below are some basic colors.
+
+#+name: Basic colors
+#+begin_src haskell
+<<f:boldWhite>>
+#+end_src
+
+#+name: f:boldWhite
+#+begin_src haskell
+boldWhite :: [C.SGR]
+boldWhite =
+  [ C.SetColor C.Foreground C.Vivid C.White,
+    C.SetConsoleIntensity C.BoldIntensity
+  ]
 #+end_src
 
 * Common utility functions

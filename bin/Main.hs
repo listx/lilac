@@ -2,6 +2,7 @@ module Main (main) where
 
 import Data.Aeson (ToJSON, eitherDecodeStrictText)
 import Data.Aeson.Encode.Pretty qualified as EP
+import Data.Text qualified as T
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -52,27 +53,41 @@ import Relude
     Either (Left, Right),
     FilePath,
     IO,
+    Int,
     Maybe (Just),
     MonadFail,
     String,
     Type,
     concat,
     fail,
+    foldlM,
+    length,
     mapM,
     mapM_,
     mempty,
+    not,
     otherwise,
     pure,
+    putStr,
     putStrLn,
+    reverse,
     runStateT,
     show,
+    sort,
     when,
     writeFileLBS,
     ($),
+    (&&),
+    (+),
+    (/=),
     (<$>),
     (<>),
     (=<<),
+    (>),
+    (||),
   )
+import System.Console.ANSI qualified as C
+import System.Directory.OsPath qualified as D
 import System.Exit (die)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
@@ -243,6 +258,12 @@ archiveOptsHandler =
             )
         )
 
+boldWhite :: [C.SGR]
+boldWhite =
+  [ C.SetColor C.Foreground C.Vivid C.White,
+    C.SetConsoleIntensity C.BoldIntensity
+  ]
+
 main :: IO ()
 main = do
   opts <- customExecParser (prefs showHelpOnEmpty) mainOptions
@@ -331,10 +352,41 @@ lilacTangle globalOpts tangleOpts = do
         Left errMsg -> die errMsg
         Right archive -> do
           when (globalOpts.verbose) $ do
-            putStrLn $ "Tangling " <> fp
-          LT.tangle archive
+            putStrLn' $ "Tangling " <> fp
+          tangle globalOpts archive
           when (globalOpts.verbose)
-            $ putStrLn "Finished tangling."
+            $ putStrLn' "Finished tangling."
+    putStrLn' =
+      if globalOpts.color
+        then putStrLnColor boldWhite
+        else putStrLn
+
+tangle :: GlobalOpts -> Archive -> IO ()
+tangle globalOpts archive = do
+  let blocks = sort $ LT.expandRootBlocks archive
+  putStrLn' $ "Blocks to process: " <> (show $ length blocks)
+  (tangled, tangledPaths, skipped) <- foldlM f (0, [], 0) blocks
+  putStrLn' $ "Tangled: " <> (show tangled)
+  when (tangled > 0) $ mapM_ printTangled $ reverse tangledPaths
+  putStrLn' $ "Skipped: " <> (show skipped)
+  where
+    f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
+    f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
+      alreadyExists <- D.doesPathExist path
+      existingContent <- LU.readFileRobustly path
+      let g
+            | (alreadyExists && existingContent /= contentToWrite)
+                || not alreadyExists = do
+                LU.writeFileRobustly path contentToWrite
+                pure (tangled + 1, path : tangledPaths, skipped)
+            | otherwise = pure (tangled, tangledPaths, skipped + 1)
+       in g
+    printTangled :: P.OsPath -> IO ()
+    printTangled path = putStrLn $ "  " <> show path
+    putStrLn' =
+      if globalOpts.color
+        then putStrLnColor boldWhite
+        else putStrLn
 
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
@@ -381,3 +433,14 @@ writeJSONPretty path marshalMe =
           EP.confTrailingNewline = True
         }
       marshalMe
+
+putStrColor :: [C.SGR] -> String -> IO ()
+putStrColor sgrs s = do
+  C.setSGR sgrs
+  putStr s
+  C.setSGR [C.Reset]
+
+putStrLnColor :: [C.SGR] -> String -> IO ()
+putStrLnColor sgrs s = do
+  putStrColor sgrs s
+  putStrLn ""

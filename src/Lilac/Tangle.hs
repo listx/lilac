@@ -1,8 +1,4 @@
-module Lilac.Tangle
-  ( expandRootBlocks,
-    tangle,
-  )
-where
+module Lilac.Tangle (expandRootBlocks) where
 
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
@@ -17,39 +13,22 @@ import Lilac.Types
     Object (symbols),
     decodeGPath,
   )
-import Lilac.Util qualified as LU
 import Relude
   ( Bool (False, True),
-    IO,
-    Int,
     Maybe (Just),
     concat,
     foldl',
-    foldlM,
     fst,
-    length,
     map,
-    mapM_,
-    not,
     otherwise,
-    pure,
-    putStrLn,
     reverse,
-    show,
-    sort,
-    when,
     ($),
-    (&&),
-    (+),
     (.),
     (/=),
     (<>),
     (==),
-    (>),
-    (||),
   )
 import Relude.Extra.Map qualified as EM
-import System.Directory.OsPath qualified as D
 import System.OsPath qualified as P
 
 expandRootBlocks :: Archive -> [(P.OsPath, T.Text)]
@@ -122,26 +101,3 @@ expandBlock archive block existingPrefix =
     prefixTailLines (acc, isFirstLine) line
       | isFirstLine = (line : acc, False)
       | otherwise = (T.append existingPrefix line : acc, False)
-
-tangle :: Archive -> IO ()
-tangle archive = do
-  let blocks = sort $ expandRootBlocks archive
-  putStrLn $ "Blocks to process: " <> (show $ length blocks)
-  (tangled, tangledPaths, skipped) <- foldlM f (0, [], 0) blocks
-  putStrLn $ "Tangled: " <> (show tangled)
-  when (tangled > 0) $ mapM_ printTangled $ reverse tangledPaths
-  putStrLn $ "Skipped: " <> (show skipped)
-  where
-    f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
-    f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
-      alreadyExists <- D.doesPathExist path
-      existingContent <- LU.readFileRobustly path
-      let g
-            | (alreadyExists && existingContent /= contentToWrite)
-                || not alreadyExists = do
-                LU.writeFileRobustly path contentToWrite
-                pure (tangled + 1, path : tangledPaths, skipped)
-            | otherwise = pure (tangled, tangledPaths, skipped + 1)
-       in g
-    printTangled :: P.OsPath -> IO ()
-    printTangled path = putStrLn $ "  " <> show path
