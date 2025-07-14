@@ -73,7 +73,7 @@ import Relude
     (<>),
     (>),
   )
-import Relude.Extra.Map qualified as EM
+import Relude.Extra.Map (lookup)
 
 <<f:mkObject>>
 <<f:mkSymbols>>
@@ -206,7 +206,7 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
     f cell = case cell of
       CBlock block -> getSymbols (Just block.parentOid) block.meta cell
       CHeading heading
-        | Just oidText <- EM.lookup "ID" heading.meta,
+        | Just oidText <- lookup "ID" heading.meta,
           Just oid <- validateOidText oidText ->
             [ ( LinkOid
                   { oid = oid,
@@ -226,7 +226,7 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
       concatMap requireName $ catMaybes [parentOid, Just $ orgDoc.oid]
       where
         requireName oid
-          | Just name <- EM.lookup "name" cellMeta =
+          | Just name <- lookup "name" cellMeta =
               [ ( LinkOid
                     { oid = oid,
                       name = name
@@ -465,7 +465,7 @@ mkArchive pathObjs =
       [(GPath, LinkOid)] ->
       (GPath, LinkOid) ->
       [(GPath, LinkOid)]
-    getBrokenLink syms acc (gPath, linkOid) = case EM.lookup linkOid syms of
+    getBrokenLink syms acc (gPath, linkOid) = case lookup linkOid syms of
       Just _ -> acc
       Nothing -> (gPath, linkOid) : acc
     allExternalOids :: Map GPath Object -> [(GPath, LinkOid)]
@@ -735,7 +735,7 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
       Block ->
       [(Block, LinkOid, [LinkOid])]
     f acc block
-      | Just name <- EM.lookup "name" block.meta =
+      | Just name <- lookup "name" block.meta =
           let selfLink = LinkOid block.parentOid name
            in (\outLinks -> (block, selfLink, outLinks) : acc)
                 . catMaybes

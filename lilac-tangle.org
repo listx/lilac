@@ -54,7 +54,7 @@ import Relude
     (<>),
     (==),
   )
-import Relude.Extra.Map qualified as EM
+import Relude.Extra.Map (lookup)
 import System.OsPath (OsPath)
 import System.OsPath qualified as P
 
@@ -112,7 +112,7 @@ expandRootBlocks archive = map expandRootBlock rootBlocks
       M.foldl (getRootBlock objPath) [] object.symbols : acc
     getRootBlock objPath acc cell = case cell of
       CBlock b
-        | Just path <- EM.lookup "tangle" b.meta,
+        | Just path <- lookup "tangle" b.meta,
           Just osPath <- P.encodeUtf $ T.unpack path,
           Just osPathOfObject <- P.encodeUtf $ decodeGPath objPath ->
             (P.combine (P.takeDirectory osPathOfObject) osPath, b) : acc
@@ -137,7 +137,7 @@ expandRootBlocks archive = map expandRootBlock rootBlocks
         $ T.lines text
     maybeAddShebang :: Block -> Text -> Text
     maybeAddShebang rootBlock text
-      | Just shebang <- EM.lookup "shebang" rootBlock.meta =
+      | Just shebang <- lookup "shebang" rootBlock.meta =
           shebang <> "\n" <> text
       | otherwise = text
 #+end_src
@@ -157,7 +157,7 @@ expandBlock archive block existingPrefix =
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
     expand (acc, prefix) (BTokenLink (Link _ (LinkTargetOid linkOid)))
-      | Just (CBlock targetBlock) <- EM.lookup linkOid archive.symbols =
+      | Just (CBlock targetBlock) <- lookup linkOid archive.symbols =
           ( acc <> (expandBlock archive targetBlock $ existingPrefix <> prefix),
             prefix
           )

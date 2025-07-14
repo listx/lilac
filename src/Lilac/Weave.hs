@@ -103,7 +103,7 @@ import Relude
     (==),
     (||),
   )
-import Relude.Extra.Map qualified as EM
+import Relude.Extra.Map (lookup)
 import Skylighting qualified as Sky
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -123,7 +123,7 @@ type HtmlWeaver a = HtmlT (ReaderT WeaveConf Identity) a
 weave :: HtmlWeaver ()
 weave = do
   weaveConf <- ask
-  let title' = toHtml $ case EM.lookup "title" weaveConf.orgDoc.meta of
+  let title' = toHtml $ case lookup "title" weaveConf.orgDoc.meta of
         Just title -> title
         Nothing -> "Untitled"
   doctypehtml_ $ do
@@ -231,9 +231,9 @@ getLinkAnchor = \case
   CParagraph {} -> ""
   CBlock block ->
     let ref
-          | Just name <- EM.lookup "name" block.meta =
+          | Just name <- lookup "name" block.meta =
               name
-          | Just anonBlockNum <- EM.lookup "__anon_block_number" block.meta =
+          | Just anonBlockNum <- lookup "__anon_block_number" block.meta =
               anonBlockNum
           | otherwise = "anon-block-error"
      in T.intercalate
@@ -291,12 +291,12 @@ weaveBlock block = do
       a_ [href_ $ "#" <> linkAnchor] $ do
         toHtmlRaw ("&#x1F517;" :: String)
     maybeAssignName
-    let bodyBorder = case EM.lookup "name" block.meta of
+    let bodyBorder = case lookup "name" block.meta of
           Just _ -> ""
           Nothing -> " fully-rounded"
     pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
       let bodyText = getBlockContentsWithoutLinks block.body
-      case EM.lookup "__src_language" block.meta of
+      case lookup "__src_language" block.meta of
         Just lang -> do
           let colorized = renderAsText weaveConf $ colorizeText lang bodyText
               getLink = \case
@@ -308,7 +308,7 @@ weaveBlock block = do
         Nothing -> code_ $ toHtml bodyText
   where
     maybeAssignName =
-      case EM.lookup "name" block.meta of
+      case lookup "name" block.meta of
         Just name ->
           div_ [class_ "code-block-name"] $ do
             code_ $ toHtml name
@@ -370,8 +370,8 @@ weaveLink link = do
         else "internal-link"
     linkTarget weaveConf = case link.target of
       LinkTargetOid linkOid
-        | Just orgFile <- EM.lookup linkOid.oid weaveConf.goids,
-          Just currentOrgFile <- EM.lookup weaveConf.orgDoc.oid weaveConf.goids,
+        | Just orgFile <- lookup linkOid.oid weaveConf.goids,
+          Just currentOrgFile <- lookup weaveConf.orgDoc.oid weaveConf.goids,
           Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
             if orgFile == currentOrgFile
               then "#" <> linkAnchor

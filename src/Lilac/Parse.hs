@@ -152,7 +152,7 @@ import Relude
     (>>),
     (||),
   )
-import Relude.Extra.Map qualified as EM
+import Relude.Extra.Map (delete, lookup)
 import Relude.Unsafe (fromJust)
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -399,7 +399,7 @@ headingParser = do
   let newHeadingSection = genHeadingSection lenStars orgParserState.headingSection
       newHeadingOidStack =
         genHeadingOidStack
-          (EM.lookup "ID" props)
+          (lookup "ID" props)
           lenStars
           orgParserState.headingOidStack
   put
@@ -658,7 +658,7 @@ toStyleMask :: (MonadFail m) => Char -> m StyleMask
 toStyleMask cs = pure =<< styleToStyleMask =<< charToStyle cs
 
 charToStyle :: (MonadFail m) => Char -> m Style
-charToStyle c = case EM.lookup c styleMarkers of
+charToStyle c = case lookup c styleMarkers of
   Just style -> pure style
   Nothing -> fail $ "programmer error: unrecognized style marker " <> (show c)
 
@@ -928,7 +928,7 @@ blockParser = do
   (blockName, metaKVs, blockType, srcLang) <- blockStartParser
   let nowebOff =
         (== Just "off")
-          . EM.lookup "noweb"
+          . lookup "noweb"
           $ M.fromList metaKVs
   modify (\s -> s {insideCodeBlock = True})
   bTokens <-
@@ -1470,7 +1470,7 @@ figureParser = do
     $ fail "figures are not allowed inside list items"
   _ <- MP.try $ MP.lookAhead (metaParser >> otherLinkParser >> endOfCell)
   metaKVs <- metaParser
-  when (EM.lookup "type" metaKVs /= Just "figure")
+  when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
   link <- otherLinkParser
   case link.target of
@@ -1478,7 +1478,7 @@ figureParser = do
       pure
         . CFigure
         $ Figure
-          { meta = EM.delete "type" metaKVs,
+          { meta = delete "type" metaKVs,
             link = link
           }
     LinkTargetOid {}
@@ -1496,7 +1496,7 @@ metaParser :: OrgParser (Map Text Text)
 metaParser = do
   metaKVs <- many $ lexeme metaEntryParser
   let metaKVsMap = M.fromList metaKVs
-  case EM.lookup "name" metaKVsMap of
+  case lookup "name" metaKVsMap of
     Just cellName -> assertUniqueCellName cellName
     Nothing -> pure ()
   pure metaKVsMap
@@ -1669,7 +1669,7 @@ extractGOIDs orgFilesAndContents =
     getOrgIds od = catMaybes $ foldl' f [Just $ od.oid] od.cells
     extractOrgId :: Map Text Text -> Maybe OID
     extractOrgId meta
-      | Just oidText <- EM.lookup "ID" meta = Lilac.Types.fromText oidText
+      | Just oidText <- lookup "ID" meta = Lilac.Types.fromText oidText
       | otherwise = Nothing
     f acc cell = case cell of
       CHeading heading -> extractOrgId heading.meta : acc
