@@ -2152,7 +2152,6 @@ module Main (main) where
 import Data.Aeson (ToJSON, eitherDecodeStrictText)
 import Data.Aeson.Encode.Pretty qualified as EP
 import Data.Map.Strict qualified as M
-import Data.Text qualified as T
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -2208,6 +2207,7 @@ import Relude
     Maybe (Just),
     MonadFail,
     String,
+    Text,
     Type,
     concat,
     fail,
@@ -2240,6 +2240,7 @@ import Relude
 import System.Console.ANSI qualified as C
 import System.Directory.OsPath qualified as D
 import System.Exit (die)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 
@@ -2329,7 +2330,7 @@ lilacCompile _globalOpts compileOpts = do
           die $ MP.errorBundlePretty errBundle
         Right (orgDoc, _) -> do
           pure (LC.mkObject orgDoc, inputPath)
-    writeObjToPath :: (ToJSON a) => (a, P.OsPath) -> IO ()
+    writeObjToPath :: (ToJSON a) => (a, OsPath) -> IO ()
     writeObjToPath (obj, inputPath) = do
       outPath <- do
         let base = P.takeBaseName inputPath
@@ -2433,7 +2434,7 @@ tangle globalOpts archive = do
   when (tangled > 0) $ mapM_ printTangled $ reverse tangledPaths
   putStrLn' $ "Skipped: " <> (show skipped)
   where
-    f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
+    f :: (Int, [OsPath], Int) -> (OsPath, Text) -> IO (Int, [OsPath], Int)
     f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
       alreadyExists <- D.doesPathExist path
       existingContent <- LU.readFileRobustly path
@@ -2444,7 +2445,7 @@ tangle globalOpts archive = do
                 pure (tangled + 1, path : tangledPaths, skipped)
             | otherwise = pure (tangled, tangledPaths, skipped + 1)
        in g
-    printTangled :: P.OsPath -> IO ()
+    printTangled :: OsPath -> IO ()
     printTangled path = putStrLn $ "  " <> show path
     putStrLn' =
       if globalOpts.color
@@ -2507,7 +2508,7 @@ just a thin wrapper around [[id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa::f:weave][f
 
 #+name: f:weaveToDisk
 #+begin_src haskell
-weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
+weaveToDisk :: OsPath -> OrgDoc -> Bool -> IO ()
 weaveToDisk fp od watch = do
   let weaveConf =
         LW.WeaveConf
@@ -2547,15 +2548,15 @@ options, and the functions that operate on them.
 #+end_src
 
 One useful helper we have to write ourselves is a parser that can understand how
-to parse ~P.OsPath~ from command line arguments. This is needed because
-~Options.Applicative~ does not know how to parse ~P.OsPath~ values (only ~FilePath~).
+to parse ~OsPath~ from command line arguments. This is needed because
+~Options.Applicative~ does not know how to parse ~OsPath~ values (only ~FilePath~).
 
 #+name: f:readOsPath
 #+begin_src haskell
-readOsPath :: ReadM P.OsPath
+readOsPath :: ReadM OsPath
 readOsPath = f =<< str
   where
-    f :: (MonadFail m) => FilePath -> m P.OsPath
+    f :: (MonadFail m) => FilePath -> m OsPath
     f maybeOsPath
       | Just osPath <- P.encodeUtf maybeOsPath,
         P.isValid osPath =
@@ -2668,7 +2669,7 @@ same "architecture" here.
 #+begin_src haskell
 type CompileOpts :: Type
 data CompileOpts = CompileOpts
-  { inputs :: [P.OsPath]
+  { inputs :: [OsPath]
   }
 #+end_src
 
@@ -2691,7 +2692,7 @@ reference blocks from other files).
 type ArchiveOpts :: Type
 data ArchiveOpts = ArchiveOpts
   { inputs :: [GPath],
-    outFile :: P.OsPath
+    outFile :: OsPath
   }
 #+end_src
 
@@ -3030,6 +3031,7 @@ import Relude
   ( Bool (True),
     FilePath,
     IO,
+    Text,
     otherwise,
     pure,
     putStrLn,
@@ -3042,6 +3044,7 @@ import Relude
 import System.Directory.OsPath qualified as D
 import System.File.OsPath qualified as P.IO
 import System.IO.Error (IOError)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 
 <<f:readFrom>>
@@ -3050,13 +3053,13 @@ import System.OsPath qualified as P
 <<f:mkFqcn>>
 #+end_src
 
-[[f:readFrom]] reads a path from the given prefix, and returns a =T.Text=. We'll
+[[f:readFrom]] reads a path from the given prefix, and returns a =Text=. We'll
 be using this a lot because most of the tests here are based on parsing some
 input file path.
 
 #+name: f:readFrom
 #+begin_src haskell
-readFrom :: FilePath -> FilePath -> IO T.Text
+readFrom :: FilePath -> FilePath -> IO Text
 readFrom prefix path = do
   let fullPath = P.unsafeEncodeUtf $ prefix <> path
   TE.decodeUtf8 <$> P.IO.readFile' fullPath
@@ -3067,7 +3070,7 @@ errors. This helps us to avoid crashing the program in an embarrassing fashion.
 
 #+name: f:readFileRobustly
 #+begin_src haskell
-readFileRobustly :: P.OsPath -> IO T.Text
+readFileRobustly :: OsPath -> IO Text
 readFileRobustly path
   | P.unpack path == [] = pure ""
   | otherwise = do
@@ -3075,7 +3078,7 @@ readFileRobustly path
         (TE.decodeUtf8 <$> P.IO.readFile' path)
         readHandler
   where
-    readHandler :: IOError -> IO T.Text
+    readHandler :: IOError -> IO Text
     readHandler _ = pure ""
 #+end_src
 
@@ -3085,7 +3088,7 @@ fails, we print an error message but otherwise do nothing.
 
 #+name: f:writeFileRobustly
 #+begin_src haskell
-writeFileRobustly :: P.OsPath -> T.Text -> IO ()
+writeFileRobustly :: OsPath -> Text -> IO ()
 writeFileRobustly path contentToWrite = do
   D.createDirectoryIfMissing True $ P.takeDirectory path
   catch (P.IO.writeFile' path $ TE.encodeUtf8 contentToWrite) writeHandler
@@ -3100,6 +3103,6 @@ contains the cell.
 
 #+name: f:mkFqcn
 #+begin_src haskell
-mkFqcn :: OID -> T.Text -> T.Text
+mkFqcn :: OID -> Text -> Text
 mkFqcn oid name = "id:" <> T.pack (show oid) <> "::" <> name
 #+end_src

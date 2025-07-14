@@ -11,7 +11,9 @@ import Relude
     Either (Left, Right),
     FilePath,
     IO,
+    Map,
     String,
+    Text,
     foldl',
     fst,
     map,
@@ -25,7 +27,7 @@ import Relude
     (<>),
     (==),
   )
-import System.OsPath qualified as P
+import System.OsPath (OsPath)
 import Test.Hspec
   ( Expectation,
     Spec,
@@ -40,9 +42,9 @@ import Text.Megaparsec qualified as MP
 spec :: Spec
 spec = weaveSpec
 
-getWovenPrettyFromPath :: FilePath -> IO (Either String T.Text)
+getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
 getWovenPrettyFromPath path = do
-  let goids = M.empty :: M.Map OID P.OsPath
+  let goids = M.empty :: Map OID OsPath
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
@@ -62,7 +64,7 @@ getWovenPrettyFromPath path = do
         . Right
         $ LW.renderAsText weaveConf LW.weave
 
-searchOrderedNeedles :: T.Text -> [T.Text] -> (String, [Expectation])
+searchOrderedNeedles :: Text -> [Text] -> (String, [Expectation])
 searchOrderedNeedles haystackRaw needles =
   (\expectations -> ("sees needles", expectations))
     . reverse
@@ -70,9 +72,9 @@ searchOrderedNeedles haystackRaw needles =
     $ foldl' f ([], haystackRaw) needles
   where
     f ::
-      ([Expectation], T.Text) ->
-      T.Text ->
-      ([Expectation], T.Text)
+      ([Expectation], Text) ->
+      Text ->
+      ([Expectation], Text)
     f (testCases, haystack) needle =
       let (discardMe, foundAndRest) = T.breakOn needle haystack
           discardLen = T.length discardMe
@@ -90,7 +92,7 @@ searchOrderedNeedles haystackRaw needles =
             then (expectationF : testCases, remainingHaystack)
             else (expectation : testCases, remainingHaystack)
 
-weaveExpect :: FilePath -> [T.Text] -> Spec
+weaveExpect :: FilePath -> [Text] -> Spec
 weaveExpect path needles = do
   result <- runIO $ getWovenPrettyFromPath path
   describe path $ do

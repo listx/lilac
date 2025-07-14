@@ -81,8 +81,6 @@ import Data.Aeson.Types
     withText,
   )
 import Data.Bits.Bitwise (toListLE)
-import Data.Map.Strict qualified as M
-import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.UUID.Types (UUID, fromText, fromWords64)
 import GHC.Generics (Generic)
@@ -94,11 +92,14 @@ import Relude
     FilePath,
     Identity,
     Int,
+    Map,
     Maybe (Just, Nothing),
     MonadFail,
     Ord,
+    Set,
     Show,
     StateT,
+    Text,
     Type,
     Void,
     Word64,
@@ -117,6 +118,7 @@ import Relude
     (<>),
     (>),
   )
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Prelude qualified (show)
@@ -186,7 +188,7 @@ fromWords w1 w2 = OID $ fromWords64 w1 w2
 
 #+name: f:fromText
 #+begin_src haskell
-fromText :: T.Text -> Maybe OID
+fromText :: Text -> Maybe OID
 fromText t = case Data.UUID.Types.fromText t of
   Just uuid -> Just $ OID uuid
   Nothing -> Nothing
@@ -281,7 +283,7 @@ internet.
 
 #+name: f:protocolsWeb
 #+begin_src haskell
-protocolsWeb :: [T.Text]
+protocolsWeb :: [Text]
 protocolsWeb =
   map
     (<> "://")
@@ -299,7 +301,7 @@ more traditional protocols in [[f:protocolsWeb]].
 
 #+name: f:protocolsEmacs
 #+begin_src haskell
-protocolsEmacs :: [T.Text]
+protocolsEmacs :: [Text]
 protocolsEmacs =
   map
     (<> ":")

@@ -90,6 +90,7 @@ import Relude
     Show,
     StateT,
     String,
+    Text,
     Type,
     Void,
     Word8,
@@ -154,6 +155,7 @@ import Relude
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
 import System.IO (utf8)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, string)
@@ -161,7 +163,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 
 type GOIDsParserState :: Type
 data GOIDsParserState = GOIDsParserState
-  { seenOids :: M.Map OID P.OsPath
+  { seenOids :: Map OID OsPath
   }
   deriving stock (Eq, Show)
 
@@ -172,7 +174,7 @@ defaultGOIDsParserState =
     }
 
 type GOIDsParser :: Type -> Type
-type GOIDsParser = StateT GOIDsParserState (MP.ParsecT Void T.Text Identity)
+type GOIDsParser = StateT GOIDsParserState (MP.ParsecT Void Text Identity)
 
 skipNewlinesAndComments :: OrgParser ()
 skipNewlinesAndComments =
@@ -198,7 +200,7 @@ skipNewlinesAndComments =
 lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme skipNewlinesAndComments
 
-parseOrgDoc :: T.Text -> Either T.Text OrgDoc
+parseOrgDoc :: Text -> Either Text OrgDoc
 parseOrgDoc input = case MP.runParser
   (runStateT orgDocParser defaultOrgParserState)
   ""
@@ -231,7 +233,7 @@ orgDocParser = do
         meta = meta
       }
 
-defaultOrgDoc :: OID -> [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDoc :: OID -> [(Text, Text)] -> OrgDoc
 defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
@@ -265,7 +267,7 @@ defaultOrgParserState =
       orgParserConf = defaultOrgParserConf
     }
 
-docMetaEntryParser :: OrgParser (T.Text, T.Text)
+docMetaEntryParser :: OrgParser (Text, Text)
 docMetaEntryParser = do
   avoidParsingBlockMetadata
   avoidParsingLilacExtensions
@@ -288,7 +290,7 @@ docMetaEntryParser = do
     avoidParsingLilacExtensions :: OrgParser ()
     avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
 
-docMetaParser :: OrgParser (OID, M.Map T.Text T.Text)
+docMetaParser :: OrgParser (OID, Map Text Text)
 docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
@@ -415,9 +417,9 @@ headingParser = do
           meta = props
         }
   where
-    spaceConsumer :: OrgParser T.Text
+    spaceConsumer :: OrgParser Text
     spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
-    starsParser :: OrgParser T.Text
+    starsParser :: OrgParser Text
     starsParser = MP.takeWhile1P (Just "heading star") (\c -> c == '*')
 
 failIfHeadingNestsWithoutDirectParent :: Int -> Int -> OrgParser ()
@@ -447,7 +449,7 @@ genHeadingSection level prevSection
     bumpDeepestSection [] = []
     bumpDeepestSection (x : xs) = x + 1 : xs
 
-genHeadingOidStack :: Maybe T.Text -> Int -> [Maybe OID] -> [Maybe OID]
+genHeadingOidStack :: Maybe Text -> Int -> [Maybe OID] -> [Maybe OID]
 genHeadingOidStack maybeId level old
   | length old == 0 = [newId]
   | length old == level = newId : drop 1 old
@@ -459,10 +461,10 @@ genHeadingOidStack maybeId level old
     levelDiff = level - length old
     newId = fromText =<< maybeId
 
-propertiesDrawerParser :: OrgParser (Map T.Text T.Text)
+propertiesDrawerParser :: OrgParser (Map Text Text)
 propertiesDrawerParser = propertiesParser <|> (pure $ M.fromList [])
 
-propertiesParser :: OrgParser (Map T.Text T.Text)
+propertiesParser :: OrgParser (Map Text Text)
 propertiesParser =
   M.fromList
     <$> MP.between
@@ -470,7 +472,7 @@ propertiesParser =
       (string ":END:\n")
       (many $ lexeme propertiesEntryParser)
 
-propertiesEntryParser :: OrgParser (T.Text, T.Text)
+propertiesEntryParser :: OrgParser (Text, Text)
 propertiesEntryParser = do
   MP.notFollowedBy $ string ":END:"
   _ <- char ':'
@@ -483,7 +485,7 @@ propertiesEntryParser = do
       (char '\n')
   pure (T.pack key, T.pack value)
 
-proseParser :: OrgParser T.Text -> OrgParser [PToken]
+proseParser :: OrgParser Text -> OrgParser [PToken]
 proseParser spaceConsumer = do
   a <- MP.choice baseParsers
   b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
@@ -502,17 +504,17 @@ proseParser spaceConsumer = do
       PTokenLink {}
       PTokenMathFragment {} -> True
 
-proseSpaceConsumer :: Int -> OrgParser T.Text
+proseSpaceConsumer :: Int -> OrgParser Text
 proseSpaceConsumer expectedIndentLen =
   MP.choice
     [ newlineAndIndentParser expectedIndentLen,
       spaces
     ]
   where
-    spaces :: OrgParser T.Text
+    spaces :: OrgParser Text
     spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 
-whitespaceCompressor :: OrgParser T.Text -> OrgParser StyledText
+whitespaceCompressor :: OrgParser Text -> OrgParser StyledText
 whitespaceCompressor spaceConsumer = do
   orgParserState <- get
 
@@ -533,7 +535,7 @@ whitespaceCompressor spaceConsumer = do
         style = mask
       }
 
-styleMarkers :: M.Map Char Style
+styleMarkers :: Map Char Style
 styleMarkers =
   M.fromList
     [ ('*', Bold),
@@ -589,7 +591,7 @@ styledTextParser = do
         style = mask
       }
 
-textParser :: StyleMask -> OrgParser T.Text
+textParser :: StyleMask -> OrgParser Text
 textParser styleMask
   | isVerbatim styleMask =
       MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
@@ -606,7 +608,7 @@ textParser styleMask
   where
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
-    normalChars :: OrgParser T.Text
+    normalChars :: OrgParser Text
     normalChars = do
       cs <- MP.some $ normalChar
       pure $ T.pack cs
@@ -623,7 +625,7 @@ textParser styleMask
         && (not $ isSpace c)
         && (not $ c == '\\')
 
-escapedSymbolParser :: StyleMask -> OrgParser T.Text
+escapedSymbolParser :: StyleMask -> OrgParser Text
 escapedSymbolParser styleMask = do
   _ <- char '\\'
   s <-
@@ -689,7 +691,7 @@ compressProse = reverse . dropUnnecessary . foldl' f []
     dropUnnecessary (((PTokenStyledText (StyledText "" _))) : rest) = rest
     dropUnnecessary tokens = tokens
 
-assertUniqueCellName :: T.Text -> OrgParser ()
+assertUniqueCellName :: Text -> OrgParser ()
 assertUniqueCellName cellName = do
   orgParserState <- get
   when (Set.member cellName orgParserState.cellNames)
@@ -725,7 +727,7 @@ linkDisplayNameParser = do
   modify (\s -> s {insideLinkDisplayName = False})
   pure linkDisplayName
   where
-    proseParser' :: OrgParser T.Text -> OrgParser [StyledText]
+    proseParser' :: OrgParser Text -> OrgParser [StyledText]
     proseParser' spaceConsumer = do
       a <- MP.choice baseParsers
       b <- MP.many $ MP.choice (spaceParser : baseParsers)
@@ -776,7 +778,7 @@ protocolWebLinkParser = do
             name = displayName
           }
   where
-    uriParser :: OrgParser T.Text
+    uriParser :: OrgParser Text
     uriParser = do
       protocol <- MP.choice $ map (MP.try . string) protocolsWeb
       rest <- MP.takeWhile1P (Just "name character") (/= ']')
@@ -804,7 +806,7 @@ otherLinkParser = do
         name = displayName
       }
   where
-    otherTargetParser :: OrgParser (T.Text, T.Text)
+    otherTargetParser :: OrgParser (Text, Text)
     otherTargetParser = do
       protocol <- MP.takeWhile1P (Just "protocol") (`notElem` (":[]" :: String))
       _ <- string ":"
@@ -863,14 +865,14 @@ paragraphParser = do
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
 
-newlineAndIndentParser :: Int -> OrgParser T.Text
+newlineAndIndentParser :: Int -> OrgParser Text
 newlineAndIndentParser expectedIndentLen = do
   MP.notFollowedBy cellBoundary
   _ <- string "\n"
   maybeIndent
   pure " "
   where
-    cellBoundary :: OrgParser T.Text
+    cellBoundary :: OrgParser Text
     cellBoundary = string "\n\n"
     maybeIndent =
       if (expectedIndentLen == 0)
@@ -887,7 +889,7 @@ newlineAndIndentParser expectedIndentLen = do
       MP.notFollowedBy (char '\n')
       pure ()
 
-blockMetaEntryParser :: OrgParser (T.Text, T.Text)
+blockMetaEntryParser :: OrgParser (Text, Text)
 blockMetaEntryParser = do
   _ <- string "#+header: :"
   key <- MP.takeWhile1P (Just "(block meta) keyword letter") isKeywordLetter
@@ -899,14 +901,14 @@ blockMetaEntryParser = do
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')]
 
-metaNameParser :: OrgParser (T.Text, T.Text)
+metaNameParser :: OrgParser (Text, Text)
 metaNameParser = do
   _ <- string "#+name: "
   name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
   assertUniqueCellName name
   pure ("name", name)
 
-assertUniqueTanglePath :: T.Text -> T.Text -> OrgParser ()
+assertUniqueTanglePath :: Text -> Text -> OrgParser ()
 assertUniqueTanglePath "tangle" path = do
   orgParserState <- get
   when (Set.member path orgParserState.tanglePaths)
@@ -970,10 +972,10 @@ blockParser = do
 
 blockStartParser ::
   OrgParser
-    ( Maybe (T.Text, T.Text),
-      [(T.Text, T.Text)],
-      T.Text,
-      Maybe (T.Text, T.Text)
+    ( Maybe (Text, Text),
+      [(Text, Text)],
+      Text,
+      Maybe (Text, Text)
     )
 blockStartParser = do
   _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
@@ -1011,12 +1013,12 @@ bTokenParser isSrcBlock nowebOn = MP.choice parsers
         then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
         else baseParsers
 
-zeroBTokensParser :: T.Text -> OrgParser [BToken]
+zeroBTokensParser :: Text -> OrgParser [BToken]
 zeroBTokensParser blockType = do
   _ <- string $ T.concat ["#+end_", blockType, "\n"]
   pure []
 
-someBTokensParser :: T.Text -> Bool -> OrgParser [BToken]
+someBTokensParser :: Text -> Bool -> OrgParser [BToken]
 someBTokensParser blockType nowebOn =
   MP.someTill
     (bTokenParser (blockType == "src") nowebOn)
@@ -1084,7 +1086,7 @@ oidLinkParser = do
         $ protocolsWeb
         <> protocolsEmacs
 
-oidReferenceParser :: [Char] -> OrgParser (OID, T.Text)
+oidReferenceParser :: [Char] -> OrgParser (OID, Text)
 oidReferenceParser disallowedChars =
   MP.choice
     [ MP.try explicitFQCN,
@@ -1092,7 +1094,7 @@ oidReferenceParser disallowedChars =
       MP.try implicit
     ]
   where
-    explicitOID :: OrgParser (OID, T.Text)
+    explicitOID :: OrgParser (OID, Text)
     explicitOID = do
       _ <- string "id:"
       oidText <-
@@ -1110,14 +1112,14 @@ oidReferenceParser disallowedChars =
       orgParserState <- get
       name <- targetName
       pure (orgParserState.docOid, name)
-    targetName :: OrgParser T.Text
+    targetName :: OrgParser Text
     targetName = do
       orgParserState <- get
       proseParser'
         $ proseSpaceConsumer'
           orgParserState.continuationIndent
           orgParserState.insideCodeBlock
-    proseSpaceConsumer' :: Int -> Bool -> OrgParser T.Text
+    proseSpaceConsumer' :: Int -> Bool -> OrgParser Text
     proseSpaceConsumer' expectedIndentLen insideCodeBlock
       | insideCodeBlock = spaces
       | otherwise =
@@ -1126,9 +1128,9 @@ oidReferenceParser disallowedChars =
               spaces
             ]
       where
-        spaces :: OrgParser T.Text
+        spaces :: OrgParser Text
         spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
-    proseParser' :: OrgParser T.Text -> OrgParser T.Text
+    proseParser' :: OrgParser Text -> OrgParser Text
     proseParser' spaceConsumer = do
       a <- MP.choice baseParsers
       b <- MP.many $ MP.choice (spaceParser : baseParsers)
@@ -1140,7 +1142,7 @@ oidReferenceParser disallowedChars =
         baseParsers =
           [ textParser'
           ]
-    textParser' :: OrgParser T.Text
+    textParser' :: OrgParser Text
     textParser' = do
       ws <-
         MP.some
@@ -1149,7 +1151,7 @@ oidReferenceParser disallowedChars =
             ]
       pure $ T.concat ws
       where
-        normalChars :: OrgParser T.Text
+        normalChars :: OrgParser Text
         normalChars = do
           cs <- MP.some $ normalChar
           pure $ T.pack cs
@@ -1217,7 +1219,7 @@ getLinkPaddingBools blockBody =
     . T.lines
     $ getBlockContents blockBody
   where
-    consecutiveNowebLines :: T.Text -> T.Text -> Bool
+    consecutiveNowebLines :: Text -> Text -> Bool
     consecutiveNowebLines a b = (countLinks a > 0) && (countLinks b > 0)
     distributeBools (False, line) =
       replicate (countLinks line) False
@@ -1227,10 +1229,10 @@ getLinkPaddingBools blockBody =
         n -> reverse $ True : replicate (n - 1) False
     countLinks = T.count "\NUL_link"
 
-getBlockContents :: [BToken] -> T.Text
+getBlockContents :: [BToken] -> Text
 getBlockContents blockBody = T.concat $ map bTokenToText blockBody
   where
-    bTokenToText :: BToken -> T.Text
+    bTokenToText :: BToken -> Text
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
@@ -1439,7 +1441,7 @@ mathFragmentNumberedParser = do
         body = trimTrailingWhitespace $ T.pack latex
       }
 
-trimTrailingWhitespace :: T.Text -> T.Text
+trimTrailingWhitespace :: Text -> Text
 trimTrailingWhitespace = T.dropWhileEnd (\c -> T.elem c " \n\r\t")
 
 mathFragmentUnnumberedParser :: OrgParser MathFragment
@@ -1490,7 +1492,7 @@ figureParser = do
           char '\n' >> MP.eof
         ]
 
-metaParser :: OrgParser (M.Map T.Text T.Text)
+metaParser :: OrgParser (Map Text Text)
 metaParser = do
   metaKVs <- many $ lexeme metaEntryParser
   let metaKVsMap = M.fromList metaKVs
@@ -1499,7 +1501,7 @@ metaParser = do
     Nothing -> pure ()
   pure metaKVsMap
 
-metaEntryParser :: OrgParser (T.Text, T.Text)
+metaEntryParser :: OrgParser (Text, Text)
 metaEntryParser = do
   _ <- MP.notFollowedBy $ string "#+begin_"
   _ <- string "#+"
@@ -1557,9 +1559,9 @@ tableCellParser = do
   _ <- MP.optional spaces
   pure $ compressProse prose
   where
-    spaces :: OrgParser T.Text
+    spaces :: OrgParser Text
     spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
-    spacesInsideProse :: OrgParser T.Text
+    spacesInsideProse :: OrgParser Text
     spacesInsideProse = do
       _ <- MP.try $ MP.lookAhead (spaces >> tableCellContent)
       spaces
@@ -1580,7 +1582,7 @@ rowToTuples (rowIndex, row)
         colIndex + 1
       )
 
-goidsParser :: P.OsPath -> GOIDsParser (M.Map OID P.OsPath)
+goidsParser :: OsPath -> GOIDsParser (Map OID OsPath)
 goidsParser sourceFile = do
   _ <- ws
   _ <-
@@ -1599,7 +1601,7 @@ goidsParser sourceFile = do
     ws :: GOIDsParser ()
     ws = void . MP.many $ char ' ' <|> char '\n'
 
-goidsEntryParser :: P.OsPath -> GOIDsParser (P.OsPath, [OID])
+goidsEntryParser :: OsPath -> GOIDsParser (OsPath, [OID])
 goidsEntryParser sourceFile = betweenParens $ do
   filepath <-
     P.unsafeEncodeUtf
@@ -1644,12 +1646,12 @@ oidParser = do
       (MP.takeWhile1P (Just "OID character") (/= '"'))
   validateOidText oidText
 
-validateOidText :: (MonadFail m) => T.Text -> m OID
+validateOidText :: (MonadFail m) => Text -> m OID
 validateOidText oidText = case fromText oidText of
   Nothing -> fail $ show oidText <> " is not a valid OID"
   Just oid -> pure oid
 
-extractGOIDs :: [(P.OsPath, T.Text)] -> T.Text
+extractGOIDs :: [(OsPath, Text)] -> Text
 extractGOIDs orgFilesAndContents =
   let goids = foldl' buildGOIDs M.empty orgFilesAndContents
       lines = foldl' goidEntryToLines [] $ M.toDescList goids
@@ -1665,7 +1667,7 @@ extractGOIDs orgFilesAndContents =
       | otherwise = acc
     getOrgIds :: OrgDoc -> [OID]
     getOrgIds od = catMaybes $ foldl' f [Just $ od.oid] od.cells
-    extractOrgId :: M.Map T.Text T.Text -> Maybe OID
+    extractOrgId :: Map Text Text -> Maybe OID
     extractOrgId meta
       | Just oidText <- EM.lookup "ID" meta = Lilac.Types.fromText oidText
       | otherwise = Nothing
@@ -1677,7 +1679,7 @@ extractGOIDs orgFilesAndContents =
       CTable table -> extractOrgId table.meta : acc
       CListItem {}
       CParagraph {} -> acc
-    goidEntryToLines :: [T.Text] -> (P.OsPath, [OID]) -> [T.Text]
+    goidEntryToLines :: [Text] -> (OsPath, [OID]) -> [Text]
     goidEntryToLines acc (orgFile, goids)
       | goids == [] = acc
       | Right str <- P.decodeWith utf8 utf8 orgFile,

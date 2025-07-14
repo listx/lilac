@@ -128,9 +128,11 @@ import Relude
   ( Bool (False, True),
     Either (Right),
     Identity,
+    Map,
     Maybe (Just, Nothing),
     ReaderT,
     String,
+    Text,
     Type,
     ask,
     catMaybes,
@@ -160,6 +162,7 @@ import Relude
 import Relude.Extra.Map qualified as EM
 import Skylighting qualified as Sky
 import System.IO (utf8)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 
@@ -204,7 +207,7 @@ available to all parsing functions in [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643:
 type WeaveConf :: Type
 data WeaveConf = WeaveConf
   { orgDoc :: OrgDoc,
-    goids :: M.Map OID P.OsPath,
+    goids :: Map OID OsPath,
     watch :: Bool
   }
 #+end_src
@@ -228,13 +231,13 @@ run inside a monad. This means we can use that to generate ~Text~ from
 [[type:HtmlWeaver]]; this is what [[f:renderAsText]] does.
 
 [[f:renderAsText]] takes a ~WeaveConf~ and an ~HtmlWeaver a~ action, and converts it to
-a ~T.Text~ type. It's there because we cannot use any of the default rendering
+a ~Text~ type. It's there because we cannot use any of the default rendering
 functions that Lucid gives us (because they operate on Lucid's ~HtmlT~, not the
 ~HtmlWeaver~ we use).
 
 #+name: f:renderAsText
 #+begin_src haskell
-renderAsText :: WeaveConf -> HtmlWeaver a -> T.Text
+renderAsText :: WeaveConf -> HtmlWeaver a -> Text
 renderAsText weaveConf weaver =
   TL.toStrict
     . renderText
@@ -288,7 +291,7 @@ when weaveConf.watch
     [ type_ "text/javascript",
       src_ "https://livejs.com/live.js"
     ]
-    ("" :: T.Text)
+    ("" :: Text)
 #+end_src
 
 The ~live.js~ script only works with a web server, so we declare Python as a
@@ -373,7 +376,7 @@ any number of letters, digits ([0-9]), hyphens ("-"), underscores ("_"), colons
 
 #+name: f:toSafeHtmlId
 #+begin_src haskell
-toSafeHtmlId :: T.Text -> T.Text
+toSafeHtmlId :: Text -> Text
 toSafeHtmlId = T.map onlyKeepSomeChars
   where
     onlyKeepSomeChars c
@@ -388,7 +391,7 @@ The [[f:getLinkAnchor]] function generates the unique, human-friendly ID of a
 
 #+name: f:getLinkAnchor
 #+begin_src haskell
-getLinkAnchor :: Cell -> T.Text
+getLinkAnchor :: Cell -> Text
 getLinkAnchor = \case
   CHeading heading ->
     T.intercalate
@@ -417,11 +420,11 @@ getLinkAnchor = \case
 #+end_src
 
 The [[f:getSectionText]] function just retrieves the numeric heading section number,
-as a ~T.Text~ value.
+as a ~Text~ value.
 
 #+name: f:getSectionText
 #+begin_src haskell
-getSectionText :: Heading -> T.Text
+getSectionText :: Heading -> Text
 getSectionText heading =
   T.intercalate "."
     . map T.show
@@ -461,7 +464,7 @@ Org file, but for human-friendliness we also extract the textual part of it with
 
 #+name: f:getProseContents
 #+begin_src haskell
-getProseContents :: [PToken] -> T.Text
+getProseContents :: [PToken] -> Text
 getProseContents = join . foldl' f []
   where
     join = T.intercalate "" . reverse
@@ -501,7 +504,7 @@ weaveStyledText styledText = do
     else span_ [class_ $ T.unwords styles] b
   where
     styles = foldl' styleToClasses [] $ maskToStyles styledText.style
-    styleToClasses :: [T.Text] -> Style -> [T.Text]
+    styleToClasses :: [Text] -> Style -> [Text]
     styleToClasses acc = \case
       Bold -> "bold" : acc
       Italic -> "italic" : acc
@@ -553,7 +556,7 @@ so it's actually very easy to insert the tags manually. This is what we do in
 weaveListMarker :: ListMarker -> HtmlWeaver ()
 weaveListMarker =
   toHtmlRaw . \case
-    LOrderedStart -> "<ol>" :: T.Text
+    LOrderedStart -> "<ol>" :: Text
     LOrderedEnd -> "</ol>"
     LUnorderedStart -> "<ul>"
     LUnorderedEnd -> "</ul>"
@@ -641,10 +644,10 @@ weaveBlock block = do
           div_ [class_ "code-block-name"] $ do
             code_ $ toHtml name
         Nothing -> pure ()
-    getBlockContentsWithoutLinks :: [BToken] -> T.Text
+    getBlockContentsWithoutLinks :: [BToken] -> Text
     getBlockContentsWithoutLinks = T.concat . map bTokenToText
       where
-        bTokenToText :: BToken -> T.Text
+        bTokenToText :: BToken -> Text
         bTokenToText = \case
           BTokenString text -> text
           BTokenPadding -> ""
@@ -664,7 +667,7 @@ tangling.
 
 #+name: f:colorizeText
 #+begin_src haskell
-colorizeText :: T.Text -> T.Text -> HtmlWeaver ()
+colorizeText :: Text -> Text -> HtmlWeaver ()
 colorizeText lang txt
   | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
     Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
@@ -685,11 +688,11 @@ the woven link HTML fragments.
 
 #+name: f:spliceLinks
 #+begin_src haskell
-spliceLinks :: T.Text -> [Link] -> HtmlWeaver T.Text
+spliceLinks :: Text -> [Link] -> HtmlWeaver Text
 spliceLinks colorized links = do
   weaveConf <- ask
   let colorizedStrs = T.splitOn "\NUL" colorized
-      f :: ([T.Text], [Link]) -> T.Text -> ([T.Text], [Link])
+      f :: ([Text], [Link]) -> Text -> ([Text], [Link])
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
@@ -823,7 +826,9 @@ import Relude
     Either (Left, Right),
     FilePath,
     IO,
+    Map,
     String,
+    Text,
     foldl',
     fst,
     map,
@@ -837,7 +842,7 @@ import Relude
     (<>),
     (==),
   )
-import System.OsPath qualified as P
+import System.OsPath (OsPath)
 import Test.Hspec
   ( Expectation,
     Spec,
@@ -877,7 +882,7 @@ These helpers let us be a bit more concise when writing individual test cases.
 <<f:weaveExpect>>
 #+end_src
 
-[[f:getWovenPrettyFromPath]] weaves the given Org file to a =T.Text=. Then in our test
+[[f:getWovenPrettyFromPath]] weaves the given Org file to a =Text=. Then in our test
 cases we can check for expected substrings inside it. Note how it uses
 =renderHtml= from the =Text.Blaze.Html.Renderer.Pretty= module, because we want to
 be able to write test cases where we write expected HTML substrings in a
@@ -885,9 +890,9 @@ prettified way (for readability).
 
 #+name: f:getWovenPrettyFromPath
 #+begin_src haskell
-getWovenPrettyFromPath :: FilePath -> IO (Either String T.Text)
+getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
 getWovenPrettyFromPath path = do
-  let goids = M.empty :: M.Map OID P.OsPath
+  let goids = M.empty :: Map OID OsPath
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
@@ -913,7 +918,7 @@ needles to be in the haystack, in order.
 
 #+name: f:searchOrderedNeedles
 #+begin_src haskell
-searchOrderedNeedles :: T.Text -> [T.Text] -> (String, [Expectation])
+searchOrderedNeedles :: Text -> [Text] -> (String, [Expectation])
 searchOrderedNeedles haystackRaw needles =
   (\expectations -> ("sees needles", expectations))
     . reverse
@@ -921,9 +926,9 @@ searchOrderedNeedles haystackRaw needles =
     $ foldl' f ([], haystackRaw) needles
   where
     f ::
-      ([Expectation], T.Text) ->
-      T.Text ->
-      ([Expectation], T.Text)
+      ([Expectation], Text) ->
+      Text ->
+      ([Expectation], Text)
     f (testCases, haystack) needle =
       let (discardMe, foundAndRest) = T.breakOn needle haystack
           discardLen = T.length discardMe
@@ -951,7 +956,7 @@ finally the list of expected substrings inside the woven result.
 
 #+name: f:weaveExpect
 #+begin_src haskell
-weaveExpect :: FilePath -> [T.Text] -> Spec
+weaveExpect :: FilePath -> [Text] -> Spec
 weaveExpect path needles = do
   result <- runIO $ getWovenPrettyFromPath path
   describe path $ do
@@ -1078,6 +1083,7 @@ import Relude
     Int,
     Maybe (Just),
     String,
+    Text,
     concatMap,
     forM_,
     fromIntegral,
@@ -1105,7 +1111,7 @@ overall CSS for the rest of Lilac ([[f:defaultCss]]).
 
 #+name: f:genCss
 #+begin_src haskell
-genCss :: T.Text
+genCss :: Text
 genCss =
   T.unlines
     [ T.pack $ Sky.styleToCss kateLilac,
@@ -1370,7 +1376,7 @@ hexCodeFg = 0x1f1c1b :: Int
 hexCodeBg = 0xf7f7f7 :: Int
 hexCodeBorder = 0xcccccc :: Int
 hexNowebLinkFg = 0x2161ac :: Int
-hexNowebLinkFgTxt = "#2161ac" :: T.Text
+hexNowebLinkFgTxt = "#2161ac" :: Text
 hexNowebLinkBg = 0xd8f6ff :: Int
 hexNowebLinkVisitedFg = 0x7d3c98 :: Int
 hexNowebLinkVisitedBg = 0xf8e9ff :: Int

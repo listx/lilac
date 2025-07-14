@@ -32,8 +32,10 @@ import Lilac.Types
   )
 import Relude
   ( Either (Left, Right),
+    Map,
     Maybe (Just, Nothing),
     String,
+    Text,
     catMaybes,
     concatMap,
     elem,
@@ -63,7 +65,7 @@ mkObject orgDoc =
       externalOids = findExternalOids orgDoc
     }
 
-mkSymbols :: OrgDoc -> M.Map LinkOid Cell
+mkSymbols :: OrgDoc -> Map LinkOid Cell
 mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
   where
     f cell = case cell of
@@ -84,7 +86,7 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
       CTable table -> getSymbols Nothing table.meta cell
       CListItem {}
       CParagraph {} -> []
-    getSymbols :: Maybe OID -> M.Map T.Text T.Text -> Cell -> [(LinkOid, Cell)]
+    getSymbols :: Maybe OID -> Map Text Text -> Cell -> [(LinkOid, Cell)]
     getSymbols parentOid cellMeta cell =
       concatMap requireName $ catMaybes [parentOid, Just $ orgDoc.oid]
       where
@@ -118,29 +120,29 @@ mkArchive pathObjs =
                 }
   where
     concatObjs ::
-      (M.Map GPath Object, M.Map LinkOid Cell) ->
+      (Map GPath Object, Map LinkOid Cell) ->
       (GPath, Object) ->
-      (M.Map GPath Object, M.Map LinkOid Cell)
+      (Map GPath Object, Map LinkOid Cell)
     concatObjs (accObjs, accSyms) (path, obj) =
       ( M.insert path obj accObjs,
         M.union obj.symbols accSyms
       )
     findBrokenLinks ::
-      M.Map GPath Object ->
-      M.Map LinkOid Cell ->
+      Map GPath Object ->
+      Map LinkOid Cell ->
       [(GPath, LinkOid)]
     findBrokenLinks objs syms =
       foldl' (getBrokenLink syms) []
         $ allExternalOids objs
     getBrokenLink ::
-      M.Map LinkOid Cell ->
+      Map LinkOid Cell ->
       [(GPath, LinkOid)] ->
       (GPath, LinkOid) ->
       [(GPath, LinkOid)]
     getBrokenLink syms acc (gPath, linkOid) = case EM.lookup linkOid syms of
       Just _ -> acc
       Nothing -> (gPath, linkOid) : acc
-    allExternalOids :: M.Map GPath Object -> [(GPath, LinkOid)]
+    allExternalOids :: Map GPath Object -> [(GPath, LinkOid)]
     allExternalOids objs =
       M.foldlWithKey
         (\acc gPath obj -> (zip (repeat gPath) obj.externalOids) <> acc)

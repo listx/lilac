@@ -88,6 +88,7 @@ import Relude
     Int,
     Maybe (Just),
     String,
+    Text,
     concatMap,
     forM_,
     fromIntegral,
@@ -100,7 +101,7 @@ import Relude
   )
 import Skylighting qualified as Sky
 
-genCss :: T.Text
+genCss :: Text
 genCss =
   T.unlines
     [ T.pack $ Sky.styleToCss kateLilac,
@@ -264,7 +265,7 @@ defaultCss = do
     hexCodeBg = 0xf7f7f7 :: Int
     hexCodeBorder = 0xcccccc :: Int
     hexNowebLinkFg = 0x2161ac :: Int
-    hexNowebLinkFgTxt = "#2161ac" :: T.Text
+    hexNowebLinkFgTxt = "#2161ac" :: Text
     hexNowebLinkBg = 0xd8f6ff :: Int
     hexNowebLinkVisitedFg = 0x7d3c98 :: Int
     hexNowebLinkVisitedBg = 0xf8e9ff :: Int

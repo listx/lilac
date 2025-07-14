@@ -16,6 +16,7 @@ import Lilac.Types
 import Relude
   ( Bool (False, True),
     Maybe (Just),
+    Text,
     concat,
     foldl',
     fst,
@@ -29,18 +30,19 @@ import Relude
     (==),
   )
 import Relude.Extra.Map qualified as EM
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 
-expandRootBlocks :: Archive -> [(P.OsPath, T.Text)]
+expandRootBlocks :: Archive -> [(OsPath, Text)]
 expandRootBlocks archive = map expandRootBlock rootBlocks
   where
     rootBlocks =
       concat $ M.foldlWithKey getRootBlocksFromObject [] archive.objects
     getRootBlocksFromObject ::
-      [[(P.OsPath, Block)]] ->
+      [[(OsPath, Block)]] ->
       GPath ->
       Object ->
-      [[(P.OsPath, Block)]]
+      [[(OsPath, Block)]]
     getRootBlocksFromObject acc objPath object =
       M.foldl (getRootBlock objPath) [] object.symbols : acc
     getRootBlock objPath acc cell = case cell of
@@ -56,28 +58,28 @@ expandRootBlocks archive = map expandRootBlock rootBlocks
       CMathFragment {}
       CFigure {}
       CTable {} -> acc
-    expandRootBlock :: (P.OsPath, Block) -> (P.OsPath, T.Text)
+    expandRootBlock :: (OsPath, Block) -> (OsPath, Text)
     expandRootBlock (p, rootBlock) =
       ( p,
         maybeAddShebang rootBlock
           . trimTrailingSpaces
           $ expandBlock archive rootBlock ""
       )
-    trimTrailingSpaces :: T.Text -> T.Text
+    trimTrailingSpaces :: Text -> Text
     trimTrailingSpaces text =
       T.unlines
         . map (T.dropWhileEnd (== ' '))
         $ T.lines text
-    maybeAddShebang :: Block -> T.Text -> T.Text
+    maybeAddShebang :: Block -> Text -> Text
     maybeAddShebang rootBlock text
       | Just shebang <- EM.lookup "shebang" rootBlock.meta =
           shebang <> "\n" <> text
       | otherwise = text
 
-expandBlock :: Archive -> Block -> T.Text -> T.Text
+expandBlock :: Archive -> Block -> Text -> Text
 expandBlock archive block existingPrefix =
-  let acc = "" :: T.Text
-      prefix = "" :: T.Text
+  let acc = "" :: Text
+      prefix = "" :: Text
    in fst $ foldl' expand (acc, prefix) block.body
   where
     expand (acc, _) BTokenPadding =

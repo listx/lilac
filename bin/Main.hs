@@ -3,7 +3,6 @@ module Main (main) where
 import Data.Aeson (ToJSON, eitherDecodeStrictText)
 import Data.Aeson.Encode.Pretty qualified as EP
 import Data.Map.Strict qualified as M
-import Data.Text qualified as T
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -59,6 +58,7 @@ import Relude
     Maybe (Just),
     MonadFail,
     String,
+    Text,
     Type,
     concat,
     fail,
@@ -91,13 +91,14 @@ import Relude
 import System.Console.ANSI qualified as C
 import System.Directory.OsPath qualified as D
 import System.Exit (die)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 
-readOsPath :: ReadM P.OsPath
+readOsPath :: ReadM OsPath
 readOsPath = f =<< str
   where
-    f :: (MonadFail m) => FilePath -> m P.OsPath
+    f :: (MonadFail m) => FilePath -> m OsPath
     f maybeOsPath
       | Just osPath <- P.encodeUtf maybeOsPath,
         P.isValid osPath =
@@ -135,13 +136,13 @@ data WeaveOpts = WeaveOpts
 
 type CompileOpts :: Type
 data CompileOpts = CompileOpts
-  { inputs :: [P.OsPath]
+  { inputs :: [OsPath]
   }
 
 type ArchiveOpts :: Type
 data ArchiveOpts = ArchiveOpts
   { inputs :: [GPath],
-    outFile :: P.OsPath
+    outFile :: OsPath
   }
 
 type OptionHandler :: Type -> Type
@@ -313,7 +314,7 @@ lilacCompile _globalOpts compileOpts = do
           die $ MP.errorBundlePretty errBundle
         Right (orgDoc, _) -> do
           pure (LC.mkObject orgDoc, inputPath)
-    writeObjToPath :: (ToJSON a) => (a, P.OsPath) -> IO ()
+    writeObjToPath :: (ToJSON a) => (a, OsPath) -> IO ()
     writeObjToPath (obj, inputPath) = do
       outPath <- do
         let base = P.takeBaseName inputPath
@@ -372,7 +373,7 @@ tangle globalOpts archive = do
   when (tangled > 0) $ mapM_ printTangled $ reverse tangledPaths
   putStrLn' $ "Skipped: " <> (show skipped)
   where
-    f :: (Int, [P.OsPath], Int) -> (P.OsPath, T.Text) -> IO (Int, [P.OsPath], Int)
+    f :: (Int, [OsPath], Int) -> (OsPath, Text) -> IO (Int, [OsPath], Int)
     f (tangled, tangledPaths, skipped) (path, contentToWrite) = do
       alreadyExists <- D.doesPathExist path
       existingContent <- LU.readFileRobustly path
@@ -383,7 +384,7 @@ tangle globalOpts archive = do
                 pure (tangled + 1, path : tangledPaths, skipped)
             | otherwise = pure (tangled, tangledPaths, skipped + 1)
        in g
-    printTangled :: P.OsPath -> IO ()
+    printTangled :: OsPath -> IO ()
     printTangled path = putStrLn $ "  " <> show path
     putStrLn' =
       if globalOpts.color
@@ -423,7 +424,7 @@ lilacWeave weaveOpts = do
           weaveToDisk outPath orgDoc weaveOpts.watch
           putStrLn "Finished weaving."
 
-weaveToDisk :: P.OsPath -> OrgDoc -> Bool -> IO ()
+weaveToDisk :: OsPath -> OrgDoc -> Bool -> IO ()
 weaveToDisk fp od watch = do
   let weaveConf =
         LW.WeaveConf

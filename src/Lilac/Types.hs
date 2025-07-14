@@ -54,8 +54,6 @@ import Data.Aeson.Types
     withText,
   )
 import Data.Bits.Bitwise (toListLE)
-import Data.Map.Strict qualified as M
-import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.UUID.Types (UUID, fromText, fromWords64)
 import GHC.Generics (Generic)
@@ -67,11 +65,14 @@ import Relude
     FilePath,
     Identity,
     Int,
+    Map,
     Maybe (Just, Nothing),
     MonadFail,
     Ord,
+    Set,
     Show,
     StateT,
+    Text,
     Type,
     Void,
     Word64,
@@ -90,13 +91,14 @@ import Relude
     (<>),
     (>),
   )
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Prelude qualified (show)
 
 type BToken :: Type
 data BToken
-  = BTokenString T.Text
+  = BTokenString Text
   | BTokenPadding
   | BTokenLink Link
   deriving stock (Eq, Generic, Show)
@@ -105,7 +107,7 @@ data BToken
 type Block :: Type
 data Block = Block
   { parentOid :: OID,
-    meta :: M.Map T.Text T.Text,
+    meta :: Map Text Text,
     body :: [BToken]
   }
   deriving stock (Eq, Generic, Show)
@@ -125,7 +127,7 @@ data Cell
 
 type Figure :: Type
 data Figure = Figure
-  { meta :: M.Map T.Text T.Text,
+  { meta :: Map Text Text,
     link :: Link
   }
   deriving stock (Eq, Generic, Show)
@@ -136,7 +138,7 @@ data Heading = Heading
   { level :: Int,
     section :: [Int],
     body :: Prose,
-    meta :: M.Map T.Text T.Text
+    meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -159,7 +161,7 @@ data Link = Link
 type LinkOid :: Type
 data LinkOid = LinkOid
   { oid :: OID,
-    name :: T.Text
+    name :: Text
   }
   deriving stock (Eq, Generic, Ord)
 
@@ -180,7 +182,7 @@ instance Show LinkOid where
     | T.null name = "id:" <> show uuid
     | otherwise = "id:" <> show uuid <> "::" <> T.unpack name
 
-parseJSONLinkOid :: T.Text -> Parser LinkOid
+parseJSONLinkOid :: Text -> Parser LinkOid
 parseJSONLinkOid t = do
   oidAndNameText <- maybe (fail "invalid LinkOid") pure (T.stripPrefix "id:" t)
   let oidText = T.take 36 oidAndNameText
@@ -197,7 +199,7 @@ type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
   | LinkTargetURI N.URI
-  | LinkTargetOther T.Text T.Text
+  | LinkTargetOther Text Text
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 
@@ -214,8 +216,8 @@ data ListMarker
 
 type MathFragment :: Type
 data MathFragment = MathFragment
-  { meta :: M.Map T.Text T.Text,
-    body :: T.Text
+  { meta :: Map Text Text,
+    body :: Text
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -224,7 +226,7 @@ type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
-    meta :: M.Map T.Text T.Text
+    meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -245,7 +247,7 @@ defaultOrgParserConf =
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { goids :: M.Map OID P.OsPath,
+  { goids :: Map OID OsPath,
     docOid :: OID,
     headingOidStack :: [Maybe OID],
     headingLevel :: Int,
@@ -257,9 +259,9 @@ data OrgParserState = OrgParserState
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
     equationNumber :: Int,
-    cellNames :: Set.Set T.Text,
+    cellNames :: Set Text,
     anonBlockNumber :: Int,
-    tanglePaths :: Set.Set T.Text,
+    tanglePaths :: Set Text,
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
@@ -279,7 +281,7 @@ data Style = Bold | Italic | Underline | Verbatim | Code
 
 type StyledText :: Type
 data StyledText = StyledText
-  { body :: T.Text,
+  { body :: Text,
     style :: StyleMask
   }
   deriving stock (Eq, Generic, Show)
@@ -287,8 +289,8 @@ data StyledText = StyledText
 
 type Table :: Type
 data Table = Table
-  { meta :: M.Map T.Text T.Text,
-    grid :: M.Map (Int, Int) Prose
+  { meta :: Map Text Text,
+    grid :: Map (Int, Int) Prose
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -324,7 +326,7 @@ instance Show OID where
 nilOid :: OID
 nilOid = fromWords 0 0
 
-nilOidOrgDoc :: T.Text
+nilOidOrgDoc :: Text
 nilOidOrgDoc =
   """
   :PROPERTIES:
@@ -336,13 +338,13 @@ nilOidOrgDoc =
 fromWords :: Word64 -> Word64 -> OID
 fromWords w1 w2 = OID $ fromWords64 w1 w2
 
-fromText :: T.Text -> Maybe OID
+fromText :: Text -> Maybe OID
 fromText t = case Data.UUID.Types.fromText t of
   Just uuid -> Just $ OID uuid
   Nothing -> Nothing
 
 type OrgParser :: Type -> Type
-type OrgParser = StateT OrgParserState (MP.ParsecT Void T.Text Identity)
+type OrgParser = StateT OrgParserState (MP.ParsecT Void Text Identity)
 
 type Prose :: Type
 type Prose = [PToken]
@@ -373,14 +375,14 @@ encodeGPath fp
 decodeGPath :: GPath -> FilePath
 decodeGPath (GPath fp) = fp
 
-protocolsEmacs :: [T.Text]
+protocolsEmacs :: [Text]
 protocolsEmacs =
   map
     (<> ":")
     [ "file"
     ]
 
-protocolsWeb :: [T.Text]
+protocolsWeb :: [Text]
 protocolsWeb =
   map
     (<> "://")
@@ -395,7 +397,7 @@ protocolsWeb =
 type Object :: Type
 data Object = Object
   { orgDoc :: OrgDoc,
-    symbols :: M.Map LinkOid Cell,
+    symbols :: Map LinkOid Cell,
     externalOids :: [LinkOid]
   }
   deriving stock (Eq, Generic, Show)
@@ -403,8 +405,8 @@ data Object = Object
 
 type Archive :: Type
 data Archive = Archive
-  { objects :: M.Map GPath Object,
-    symbols :: M.Map LinkOid Cell
+  { objects :: Map GPath Object,
+    symbols :: Map LinkOid Cell
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

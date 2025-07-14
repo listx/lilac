@@ -120,6 +120,7 @@ import Relude
     Show,
     StateT,
     String,
+    Text,
     Type,
     Void,
     Word8,
@@ -184,6 +185,7 @@ import Relude
 import Relude.Extra.Map qualified as EM
 import Relude.Unsafe (fromJust)
 import System.IO (utf8)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, string)
@@ -418,7 +420,7 @@ type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
-    meta :: M.Map T.Text T.Text
+    meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -462,7 +464,7 @@ and parses it into a rich =OrgDoc= type.
 
 #+name: f:parseOrgDoc
 #+begin_src haskell
-parseOrgDoc :: T.Text -> Either T.Text OrgDoc
+parseOrgDoc :: Text -> Either Text OrgDoc
 parseOrgDoc input = case MP.runParser
   (runStateT orgDocParser defaultOrgParserState)
   ""
@@ -474,8 +476,8 @@ parseOrgDoc input = case MP.runParser
 The [[f:orgDocParser]] is the main parser combinator; it is itself composed of other
 parser combinators. All of these parsers live inside the =OrgParser= monadic type,
 which is defined as a state monad transformer (=StateT=) with =OrgParserState=,
-which wraps around the inner =Parsec Void T.Text= monad, where =Void= is the custom
-error component and =T.Text= is the type of the text being parsed. Using =Void= for
+which wraps around the inner =Parsec Void Text= monad, where =Void= is the custom
+error component and =Text= is the type of the text being parsed. Using =Void= for
 the custom error component means that we'll be defaulting to the default error
 handling mechanism that ships with Megaparsec.
 
@@ -485,13 +487,13 @@ type OrgParser :: Type -> Type
 type OrgParser = StateT OrgParserState (<<Concrete type for Megaparsec>>)
 #+end_src
 
-The [[Concrete type for Megaparsec]] feeds the concrete ~T.Text~ type to use as the
+The [[Concrete type for Megaparsec]] feeds the concrete ~Text~ type to use as the
 stream for Megaparsec. Megaparsec defines a polymorphic API and expects users to
 use concrete types like this for speed optimizations.
 
 #+name: Concrete type for Megaparsec
 #+begin_src haskell
-MP.ParsecT Void T.Text Identity
+MP.ParsecT Void Text Identity
 #+end_src
 
 The =OrgParserState= is the custom state we want to use while parsing. You can
@@ -514,7 +516,7 @@ inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { goids :: M.Map OID P.OsPath,
+  { goids :: Map OID OsPath,
     docOid :: OID,
     headingOidStack :: [Maybe OID],
     headingLevel :: Int,
@@ -526,9 +528,9 @@ data OrgParserState = OrgParserState
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
     equationNumber :: Int,
-    cellNames :: Set.Set T.Text,
+    cellNames :: Set Text,
     anonBlockNumber :: Int,
-    tanglePaths :: Set.Set T.Text,
+    tanglePaths :: Set Text,
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
@@ -628,7 +630,7 @@ testing.
 
 #+name: f:defaultOrgDoc
 #+begin_src haskell
-defaultOrgDoc :: OID -> [(T.Text, T.Text)] -> OrgDoc
+defaultOrgDoc :: OID -> [(Text, Text)] -> OrgDoc
 defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
@@ -705,7 +707,7 @@ that first with =docMetaEntryParser= below.
 
 #+name: f:docMetaEntryParser
 #+begin_src haskell
-docMetaEntryParser :: OrgParser (T.Text, T.Text)
+docMetaEntryParser :: OrgParser (Text, Text)
 docMetaEntryParser = do
   avoidParsingBlockMetadata
   avoidParsingLilacExtensions
@@ -745,7 +747,7 @@ while consuming any trailing whitespace or comments with [[f:lexeme]].
 
 #+name: f:docMetaParser
 #+begin_src haskell
-docMetaParser :: OrgParser (OID, M.Map T.Text T.Text)
+docMetaParser :: OrgParser (OID, Map Text Text)
 docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
@@ -1263,7 +1265,7 @@ them.
 
 #+name: f:proseParser
 #+begin_src haskell
-proseParser :: OrgParser T.Text -> OrgParser [PToken]
+proseParser :: OrgParser Text -> OrgParser [PToken]
 proseParser spaceConsumer = do
   a <- MP.choice baseParsers
   b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
@@ -1322,7 +1324,7 @@ space characters in the =StyledText= object.
 
 #+name: f:whitespaceCompressor
 #+begin_src haskell
-whitespaceCompressor :: OrgParser T.Text -> OrgParser StyledText
+whitespaceCompressor :: OrgParser Text -> OrgParser StyledText
 whitespaceCompressor spaceConsumer = do
   orgParserState <- get
 
@@ -1363,7 +1365,7 @@ are some examples: *bold*, /italic/, _underline_, =verbatim=, and ~code~.
 #+begin_src haskell
 type StyledText :: Type
 data StyledText = StyledText
-  { body :: T.Text,
+  { body :: Text,
     style :: StyleMask
   }
   deriving stock (Eq, Generic, Show)
@@ -1396,7 +1398,7 @@ style. It has the syntactic characters we use to /mark/ text with the a supporte
 
 #+name: f:styleMarkers
 #+begin_src haskell
-styleMarkers :: M.Map Char Style
+styleMarkers :: Map Char Style
 styleMarkers =
   M.fromList
     [ ('*', Bold),
@@ -1632,7 +1634,7 @@ input.
 
 #+name: f:textParser
 #+begin_src haskell
-textParser :: StyleMask -> OrgParser T.Text
+textParser :: StyleMask -> OrgParser Text
 textParser styleMask
   | isVerbatim styleMask =
       MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
@@ -1649,7 +1651,7 @@ textParser styleMask
   where
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
-    normalChars :: OrgParser T.Text
+    normalChars :: OrgParser Text
     normalChars = do
       cs <- MP.some $ normalChar
       pure $ T.pack cs
@@ -1676,7 +1678,7 @@ and code markers as discussed in [[f:isStyleMarker]]).
 
 #+name: f:escapedSymbolParser
 #+begin_src haskell
-escapedSymbolParser :: StyleMask -> OrgParser T.Text
+escapedSymbolParser :: StyleMask -> OrgParser Text
 escapedSymbolParser styleMask = do
   _ <- char '\\'
   s <-
@@ -2224,7 +2226,7 @@ type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
   | LinkTargetURI N.URI
-  | LinkTargetOther T.Text T.Text
+  | LinkTargetOther Text Text
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
@@ -2243,7 +2245,7 @@ links.
 type LinkOid :: Type
 data LinkOid = LinkOid
   { oid :: OID,
-    name :: T.Text
+    name :: Text
   }
   deriving stock (Eq, Generic, Ord)
 #+end_src
@@ -2401,7 +2403,7 @@ linkDisplayNameParser = do
   modify (\s -> s {insideLinkDisplayName = False})
   pure linkDisplayName
   where
-    proseParser' :: OrgParser T.Text -> OrgParser [StyledText]
+    proseParser' :: OrgParser Text -> OrgParser [StyledText]
     proseParser' spaceConsumer = do
       a <- MP.choice baseParsers
       b <- MP.many $ MP.choice (spaceParser : baseParsers)
@@ -2743,7 +2745,7 @@ protocolWebLinkParser = do
             name = displayName
           }
   where
-    uriParser :: OrgParser T.Text
+    uriParser :: OrgParser Text
     uriParser = do
       protocol <- MP.choice $ map (MP.try . string) protocolsWeb
       rest <- MP.takeWhile1P (Just "name character") (/= ']')
@@ -2899,7 +2901,7 @@ otherLinkParser = do
         name = displayName
       }
   where
-    otherTargetParser :: OrgParser (T.Text, T.Text)
+    otherTargetParser :: OrgParser (Text, Text)
     otherTargetParser = do
       protocol <- MP.takeWhile1P (Just "protocol") (`notElem` (":[]" :: String))
       _ <- string ":"
@@ -3369,14 +3371,14 @@ This is a top-level function because we reuse it in [[f:linkDisplayNameParser]].
 
 #+name: f:proseSpaceConsumer
 #+begin_src haskell
-proseSpaceConsumer :: Int -> OrgParser T.Text
+proseSpaceConsumer :: Int -> OrgParser Text
 proseSpaceConsumer expectedIndentLen =
   MP.choice
     [ newlineAndIndentParser expectedIndentLen,
       spaces
     ]
   where
-    spaces :: OrgParser T.Text
+    spaces :: OrgParser Text
     spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 #+end_src
 
@@ -3386,14 +3388,14 @@ or just ~spaces~ which we define to be one or more space characters.
 
 #+name: f:newlineAndIndentParser
 #+begin_src haskell
-newlineAndIndentParser :: Int -> OrgParser T.Text
+newlineAndIndentParser :: Int -> OrgParser Text
 newlineAndIndentParser expectedIndentLen = do
   MP.notFollowedBy cellBoundary
   _ <- string "\n"
   maybeIndent
   pure " "
   where
-    cellBoundary :: OrgParser T.Text
+    cellBoundary :: OrgParser Text
     cellBoundary = string "\n\n"
     maybeIndent =
       if (expectedIndentLen == 0)
@@ -3545,7 +3547,7 @@ data Heading = Heading
   { level :: Int,
     section :: [Int],
     body :: Prose,
-    meta :: M.Map T.Text T.Text
+    meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -3606,9 +3608,9 @@ headingParser = do
           meta = props
         }
   where
-    spaceConsumer :: OrgParser T.Text
+    spaceConsumer :: OrgParser Text
     spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
-    starsParser :: OrgParser T.Text
+    starsParser :: OrgParser Text
     starsParser = MP.takeWhile1P (Just "heading star") (\c -> c == '*')
 #+end_src
 
@@ -3706,7 +3708,7 @@ defaults to the top-level OID found in the document.
 
 #+name: f:genHeadingOidStack
 #+begin_src haskell
-genHeadingOidStack :: Maybe T.Text -> Int -> [Maybe OID] -> [Maybe OID]
+genHeadingOidStack :: Maybe Text -> Int -> [Maybe OID] -> [Maybe OID]
 genHeadingOidStack maybeId level old
   | length old == 0 = [newId]
   | length old == level = newId : drop 1 old
@@ -3986,7 +3988,7 @@ elsewhere in the document (in Orgmode this can be done with ~org-id-store-link~)
 
 #+name: f:propertiesDrawerParser
 #+begin_src haskell
-propertiesDrawerParser :: OrgParser (Map T.Text T.Text)
+propertiesDrawerParser :: OrgParser (Map Text Text)
 propertiesDrawerParser = propertiesParser <|> (pure $ M.fromList [])
 #+end_src
 
@@ -3995,7 +3997,7 @@ The [[f:propertiesDrawerParser]] tries to parse a =:PROPERTIES:= drawer with
 
 #+name: f:propertiesParser
 #+begin_src haskell
-propertiesParser :: OrgParser (Map T.Text T.Text)
+propertiesParser :: OrgParser (Map Text Text)
 propertiesParser =
   M.fromList
     <$> MP.between
@@ -4016,7 +4018,7 @@ with [[f:lexeme]] as well).
 
 #+name: f:propertiesEntryParser
 #+begin_src haskell
-propertiesEntryParser :: OrgParser (T.Text, T.Text)
+propertiesEntryParser :: OrgParser (Text, Text)
 propertiesEntryParser = do
   MP.notFollowedBy $ string ":END:"
   _ <- char ':'
@@ -4212,7 +4214,7 @@ arbitrary keyword here.
 type Block :: Type
 data Block = Block
   { parentOid :: OID,
-    meta :: M.Map T.Text T.Text,
+    meta :: Map Text Text,
     body :: [BToken]
   }
   deriving stock (Eq, Generic, Show)
@@ -4314,7 +4316,7 @@ also simplifies the parser.
 
 #+name: f:blockMetaEntryParser
 #+begin_src haskell
-blockMetaEntryParser :: OrgParser (T.Text, T.Text)
+blockMetaEntryParser :: OrgParser (Text, Text)
 blockMetaEntryParser = do
   _ <- string "#+header: :"
   key <- MP.takeWhile1P (Just "(block meta) keyword letter") isKeywordLetter
@@ -4326,7 +4328,7 @@ blockMetaEntryParser = do
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')]
 
-metaNameParser :: OrgParser (T.Text, T.Text)
+metaNameParser :: OrgParser (Text, Text)
 metaNameParser = do
   _ <- string "#+name: "
   name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
@@ -4339,7 +4341,7 @@ that is, no two code blocks may share the same tangle path.
 
 #+name: f:assertUniqueTanglePath
 #+begin_src haskell
-assertUniqueTanglePath :: T.Text -> T.Text -> OrgParser ()
+assertUniqueTanglePath :: Text -> Text -> OrgParser ()
 assertUniqueTanglePath "tangle" path = do
   orgParserState <- get
   when (Set.member path orgParserState.tanglePaths)
@@ -4384,7 +4386,7 @@ once, which is not allowed.
 
 #+name: f:assertUniqueCellName
 #+begin_src haskell
-assertUniqueCellName :: T.Text -> OrgParser ()
+assertUniqueCellName :: Text -> OrgParser ()
 assertUniqueCellName cellName = do
   orgParserState <- get
   when (Set.member cellName orgParserState.cellNames)
@@ -4433,7 +4435,7 @@ source of the referenced code block during tangling.
 #+begin_src haskell
 type BToken :: Type
 data BToken
-  = BTokenString T.Text
+  = BTokenString Text
   | BTokenPadding
   | BTokenLink Link
   deriving stock (Eq, Generic, Show)
@@ -4519,7 +4521,7 @@ empty with =zeroBTokensParser=.
 
 #+name: f:zeroBTokensParser
 #+begin_src haskell
-zeroBTokensParser :: T.Text -> OrgParser [BToken]
+zeroBTokensParser :: Text -> OrgParser [BToken]
 zeroBTokensParser blockType = do
   _ <- string $ T.concat ["#+end_", blockType, "\n"]
   pure []
@@ -4530,7 +4532,7 @@ of ~MP.choice~ in [[f:blockParser]]).
 
 #+name: f:someBTokensParser
 #+begin_src haskell
-someBTokensParser :: T.Text -> Bool -> OrgParser [BToken]
+someBTokensParser :: Text -> Bool -> OrgParser [BToken]
 someBTokensParser blockType nowebOn =
   MP.someTill
     (bTokenParser (blockType == "src") nowebOn)
@@ -4552,7 +4554,7 @@ parsed ~bTokens~ --- [[f:ignoreSpecialCommas]], [[f:compressBTokens]], and
 
 The [[f:compressBTokens]] function is similar to [[f:compressProse]], but it's simpler
 because it doesn't have to deal with styled text. Instead it only deals with raw
-=T.Text= values directly. We need to use =compressBTokens= because otherwise we'll
+=Text= values directly. We need to use =compressBTokens= because otherwise we'll
 end up with many separate =BToken= values (because [[f:bTokenParser]] uses multiple
 separate parsers that all use the same =BTokenString= constructor for parsing text
 tokens).
@@ -4683,10 +4685,10 @@ Now let's look at how [[f:blockStartParser]] works in detail.
 #+begin_src haskell
 blockStartParser ::
   OrgParser
-    ( Maybe (T.Text, T.Text),
-      [(T.Text, T.Text)],
-      T.Text,
-      Maybe (T.Text, T.Text)
+    ( Maybe (Text, Text),
+      [(Text, Text)],
+      Text,
+      Maybe (Text, Text)
     )
 blockStartParser = do
   _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
@@ -4805,7 +4807,7 @@ that information at hand.
 
 #+name: f:oidReferenceParser
 #+begin_src haskell
-oidReferenceParser :: [Char] -> OrgParser (OID, T.Text)
+oidReferenceParser :: [Char] -> OrgParser (OID, Text)
 oidReferenceParser disallowedChars =
   MP.choice
     [ MP.try explicitFQCN,
@@ -4813,7 +4815,7 @@ oidReferenceParser disallowedChars =
       MP.try implicit
     ]
   where
-    explicitOID :: OrgParser (OID, T.Text)
+    explicitOID :: OrgParser (OID, Text)
     explicitOID = do
       _ <- string "id:"
       oidText <-
@@ -4831,14 +4833,14 @@ oidReferenceParser disallowedChars =
       orgParserState <- get
       name <- targetName
       pure (orgParserState.docOid, name)
-    targetName :: OrgParser T.Text
+    targetName :: OrgParser Text
     targetName = do
       orgParserState <- get
       proseParser'
         $ proseSpaceConsumer'
           orgParserState.continuationIndent
           orgParserState.insideCodeBlock
-    proseSpaceConsumer' :: Int -> Bool -> OrgParser T.Text
+    proseSpaceConsumer' :: Int -> Bool -> OrgParser Text
     proseSpaceConsumer' expectedIndentLen insideCodeBlock
       | insideCodeBlock = spaces
       | otherwise =
@@ -4847,9 +4849,9 @@ oidReferenceParser disallowedChars =
               spaces
             ]
       where
-        spaces :: OrgParser T.Text
+        spaces :: OrgParser Text
         spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
-    proseParser' :: OrgParser T.Text -> OrgParser T.Text
+    proseParser' :: OrgParser Text -> OrgParser Text
     proseParser' spaceConsumer = do
       a <- MP.choice baseParsers
       b <- MP.many $ MP.choice (spaceParser : baseParsers)
@@ -4861,7 +4863,7 @@ oidReferenceParser disallowedChars =
         baseParsers =
           [ textParser'
           ]
-    textParser' :: OrgParser T.Text
+    textParser' :: OrgParser Text
     textParser' = do
       ws <-
         MP.some
@@ -4870,7 +4872,7 @@ oidReferenceParser disallowedChars =
             ]
       pure $ T.concat ws
       where
-        normalChars :: OrgParser T.Text
+        normalChars :: OrgParser Text
         normalChars = do
           cs <- MP.some $ normalChar
           pure $ T.pack cs
@@ -5178,7 +5180,7 @@ block's body ~BToken~ values, as ~BTokenString "\n"~. This is what we do by call
 
 The high-level algorithm is as follows:
 
-  1) Concatenate the ~BToken~ values together (using the ~T.Text~ representation).
+  1) Concatenate the ~BToken~ values together (using the ~Text~ representation).
      For ~BTokenString~ values we use the inner text information as is. For
      ~BTokenLink~ we use the target, but also inject a special [[link-marker]] which
      uses an ASCII ~NUL~ character.
@@ -5209,10 +5211,10 @@ Now let's look at the implementation in detail. Step 1 is done in
 
 #+name: f:getBlockContents
 #+begin_src haskell
-getBlockContents :: [BToken] -> T.Text
+getBlockContents :: [BToken] -> Text
 getBlockContents blockBody = T.concat $ map bTokenToText blockBody
   where
-    bTokenToText :: BToken -> T.Text
+    bTokenToText :: BToken -> Text
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
@@ -5222,7 +5224,7 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
 #+end_src
 
 The ~<<link-marker>>~ is just a special marker we use to keep track of where the
-links are inside the concatenated (single) ~T.Text~ value representing all of the
+links are inside the concatenated (single) ~Text~ value representing all of the
 block contents.
 
 #+name: link-marker
@@ -5248,7 +5250,7 @@ getLinkPaddingBools blockBody =
     . T.lines
     $ getBlockContents blockBody
   where
-    consecutiveNowebLines :: T.Text -> T.Text -> Bool
+    consecutiveNowebLines :: Text -> Text -> Bool
     consecutiveNowebLines a b = (countLinks a > 0) && (countLinks b > 0)
     distributeBools (False, line) =
       replicate (countLinks line) False
@@ -6898,8 +6900,8 @@ only support math, we call them /math/ fragments.
 #+begin_src haskell
 type MathFragment :: Type
 data MathFragment = MathFragment
-  { meta :: M.Map T.Text T.Text,
-    body :: T.Text
+  { meta :: Map Text Text,
+    body :: Text
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -6969,7 +6971,7 @@ into ~latex~.
 
 #+name: f:trimTrailingWhitespace
 #+begin_src haskell
-trimTrailingWhitespace :: T.Text -> T.Text
+trimTrailingWhitespace :: Text -> Text
 trimTrailingWhitespace = T.dropWhileEnd (\c -> T.elem c " \n\r\t")
 #+end_src
 
@@ -7208,7 +7210,7 @@ A [[data:Figure][Figure]] is just a link to an image file, with some metadata.
 #+begin_src haskell
 type Figure :: Type
 data Figure = Figure
-  { meta :: M.Map T.Text T.Text,
+  { meta :: Map Text Text,
     link :: Link
   }
   deriving stock (Eq, Generic, Show)
@@ -7275,7 +7277,7 @@ name if one exists because they are usually much more human-friendly).
 
 #+name: f:metaParser
 #+begin_src haskell
-metaParser :: OrgParser (M.Map T.Text T.Text)
+metaParser :: OrgParser (Map Text Text)
 metaParser = do
   metaKVs <- many $ lexeme metaEntryParser
   let metaKVsMap = M.fromList metaKVs
@@ -7298,7 +7300,7 @@ in [[f:figureParser]]).
 
 #+name: f:metaEntryParser
 #+begin_src haskell
-metaEntryParser :: OrgParser (T.Text, T.Text)
+metaEntryParser :: OrgParser (Text, Text)
 metaEntryParser = do
   _ <- MP.notFollowedBy $ string "#+begin_"
   _ <- string "#+"
@@ -7515,8 +7517,8 @@ with a vertical bar (=|=), also known as the pipe character in UNIX.
 #+begin_src haskell
 type Table :: Type
 data Table = Table
-  { meta :: M.Map T.Text T.Text,
-    grid :: M.Map (Int, Int) Prose
+  { meta :: Map Text Text,
+    grid :: Map (Int, Int) Prose
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -7613,9 +7615,9 @@ tableCellParser = do
   _ <- MP.optional spaces
   pure $ compressProse prose
   where
-    spaces :: OrgParser T.Text
+    spaces :: OrgParser Text
     spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
-    spacesInsideProse :: OrgParser T.Text
+    spacesInsideProse :: OrgParser Text
     spacesInsideProse = do
       _ <- MP.try $ MP.lookAhead (spaces >> tableCellContent)
       spaces
@@ -7642,7 +7644,7 @@ We assign each row its row index with ~zip [1 ..]~, then delegate most of the wo
 to [[f:rowToTuples]] where each row's table cells are given its column index to form
 a completed table cell. These are simply accumulated and returned as a list. The
 order of accumulation (consing) does not matter because this is ultimately fed
-into a =M.Map= type, an unordered container.
+into a =Map= type, an unordered container.
 
 #+name: f:rowToTuples
 #+begin_src haskell
@@ -8147,6 +8149,7 @@ import Relude
     Int,
     Maybe (Just, Nothing),
     String,
+    Text,
     Type,
     fromList,
     map,
@@ -8161,6 +8164,7 @@ import Relude
     (<>),
     (==),
   )
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Test.Hspec (Spec, before, describe, it, shouldBe)
 import Test.Hspec.Megaparsec
@@ -8247,7 +8251,7 @@ properties drawer have to do it manually, such as in
 
 #+name: f:nilOidOrgDoc
 #+begin_src haskell
-nilOidOrgDoc :: T.Text
+nilOidOrgDoc :: Text
 nilOidOrgDoc =
   """
   :PROPERTIES:
@@ -8322,7 +8326,7 @@ trivial parse errors.".
 
 #+name: f:pfm
 #+begin_src haskell
-pfm :: FilePath -> ET T.Text -> Int -> Spec
+pfm :: FilePath -> ET Text -> Int -> Spec
 pfm path errorTrivial pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
@@ -8340,7 +8344,7 @@ The function =plainParagraph= helps to cut down on some of the repetition.
 
 #+name: f:plainParagraph
 #+begin_src haskell
-plainParagraph :: T.Text -> Cell
+plainParagraph :: Text -> Cell
 plainParagraph body =
   CParagraph
     [ PTokenStyledText
@@ -8379,7 +8383,7 @@ This [[f:pGOIDs]] helper parses [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org I
 
 #+name: f:pGOIDs
 #+begin_src haskell
-pGOIDs :: FilePath -> [(T.Text, FilePath)] -> Spec
+pGOIDs :: FilePath -> [(Text, FilePath)] -> Spec
 pGOIDs path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
@@ -8392,7 +8396,7 @@ pGOIDs path expected = do
                       )
   where
     st = L.defaultGOIDsParserState
-    f :: (T.Text, FilePath) -> (OID, P.OsPath)
+    f :: (Text, FilePath) -> (OID, OsPath)
     f (oidText, filePath)
       | Just oid <- fromText oidText,
         Just osPath <- P.encodeUtf filePath =
@@ -8588,7 +8592,7 @@ we can use during the parser as we see each OID.
 #+begin_src haskell
 type GOIDsParserState :: Type
 data GOIDsParserState = GOIDsParserState
-  { seenOids :: M.Map OID P.OsPath
+  { seenOids :: Map OID OsPath
   }
   deriving stock (Eq, Show)
 
@@ -8600,7 +8604,7 @@ defaultGOIDsParserState =
 #+end_src
 
 You may be wondering why ~seenOids~ is a map, not a set of OIDs. That's because
-we incrementally build up the final data structure (~M.Map OID P.OsPath~) during
+we incrementally build up the final data structure (~Map OID OsPath~) during
 the parsing stage, and because the map can also check for membership queries
 just like a set. This way we can simplify the data structures involved.
 
@@ -8614,7 +8618,7 @@ output from [[f:extractGOIDs]] which adds newlines for human-friendliness.
 
 #+name: f:goidsParser
 #+begin_src haskell
-goidsParser :: P.OsPath -> GOIDsParser (M.Map OID P.OsPath)
+goidsParser :: OsPath -> GOIDsParser (Map OID OsPath)
 goidsParser sourceFile = do
   _ <- ws
   _ <-
@@ -8638,7 +8642,7 @@ Within each "entry", we need to parse the file path, and any number of OIDs.
 
 #+name: f:goidsEntryParser
 #+begin_src haskell
-goidsEntryParser :: P.OsPath -> GOIDsParser (P.OsPath, [OID])
+goidsEntryParser :: OsPath -> GOIDsParser (OsPath, [OID])
 goidsEntryParser sourceFile = betweenParens $ do
   filepath <-
     P.unsafeEncodeUtf
@@ -8694,7 +8698,7 @@ OID validation delegates to the ~Lilac.Types.fromText~ helper.
 
 #+name: f:validateOidText
 #+begin_src haskell
-validateOidText :: (MonadFail m) => T.Text -> m OID
+validateOidText :: (MonadFail m) => Text -> m OID
 validateOidText oidText = case fromText oidText of
   Nothing -> fail $ show oidText <> " is not a valid OID"
   Just oid -> pure oid
@@ -8878,7 +8882,7 @@ disk is done in the CLI layer.
 
 #+name: f:extractGOIDs
 #+begin_src haskell
-extractGOIDs :: [(P.OsPath, T.Text)] -> T.Text
+extractGOIDs :: [(OsPath, Text)] -> Text
 extractGOIDs orgFilesAndContents =
   let goids = foldl' buildGOIDs M.empty orgFilesAndContents
       lines = foldl' goidEntryToLines [] $ M.toDescList goids
@@ -8894,7 +8898,7 @@ extractGOIDs orgFilesAndContents =
       | otherwise = acc
     getOrgIds :: OrgDoc -> [OID]
     getOrgIds od = catMaybes $ foldl' f [Just $ od.oid] od.cells
-    extractOrgId :: M.Map T.Text T.Text -> Maybe OID
+    extractOrgId :: Map Text Text -> Maybe OID
     extractOrgId meta
       | Just oidText <- EM.lookup "ID" meta = Lilac.Types.fromText oidText
       | otherwise = Nothing
@@ -8906,7 +8910,7 @@ extractGOIDs orgFilesAndContents =
       CTable table -> extractOrgId table.meta : acc
       CListItem {}
       CParagraph {} -> acc
-    goidEntryToLines :: [T.Text] -> (P.OsPath, [OID]) -> [T.Text]
+    goidEntryToLines :: [Text] -> (OsPath, [OID]) -> [Text]
     goidEntryToLines acc (orgFile, goids)
       | goids == [] = acc
       | Right str <- P.decodeWith utf8 utf8 orgFile,

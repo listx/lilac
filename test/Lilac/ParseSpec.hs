@@ -63,6 +63,7 @@ import Relude
     Int,
     Maybe (Just, Nothing),
     String,
+    Text,
     Type,
     fromList,
     map,
@@ -77,6 +78,7 @@ import Relude
     (<>),
     (==),
   )
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Test.Hspec (Spec, before, describe, it, shouldBe)
 import Test.Hspec.Megaparsec
@@ -98,7 +100,7 @@ spec :: Spec
 spec = parseSpec
 
 type Parser :: Type -> Type
-type Parser = MP.ParsecT Void T.Text Identity
+type Parser = MP.ParsecT Void Text Identity
 
 p :: FilePath -> OrgDoc -> Spec
 p path expected = do
@@ -145,7 +147,7 @@ pf path errMsg pos = do
     inputPrefix = nilOidOrgDoc
     newPos = pos + T.length inputPrefix
 
-pfm :: FilePath -> ET T.Text -> Int -> Spec
+pfm :: FilePath -> ET Text -> Int -> Spec
 pfm path errorTrivial pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
@@ -158,7 +160,7 @@ pfm path errorTrivial pos = do
     inputPrefix = nilOidOrgDoc
     newPos = pos + T.length inputPrefix
 
-plainParagraph :: T.Text -> Cell
+plainParagraph :: Text -> Cell
 plainParagraph body =
   CParagraph
     [ PTokenStyledText
@@ -187,7 +189,7 @@ plainHeading level section =
         }
     )
 
-pGOIDs :: FilePath -> [(T.Text, FilePath)] -> Spec
+pGOIDs :: FilePath -> [(Text, FilePath)] -> Spec
 pGOIDs path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
@@ -200,7 +202,7 @@ pGOIDs path expected = do
                       )
   where
     st = L.defaultGOIDsParserState
-    f :: (T.Text, FilePath) -> (OID, P.OsPath)
+    f :: (Text, FilePath) -> (OID, OsPath)
     f (oidText, filePath)
       | Just oid <- fromText oidText,
         Just osPath <- P.encodeUtf filePath =

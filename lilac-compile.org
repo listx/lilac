@@ -50,8 +50,10 @@ import Lilac.Types
   )
 import Relude
   ( Either (Left, Right),
+    Map,
     Maybe (Just, Nothing),
     String,
+    Text,
     catMaybes,
     concatMap,
     elem,
@@ -96,7 +98,7 @@ special case of the "cell universe", such that all cells are code blocks).
 type Object :: Type
 data Object = Object
   { orgDoc :: OrgDoc,
-    symbols :: M.Map LinkOid Cell,
+    symbols :: Map LinkOid Cell,
     externalOids :: [LinkOid]
   }
   deriving stock (Eq, Generic, Show)
@@ -120,11 +122,11 @@ Marshaling to JSON is straightforward, because we can just reuse the [[id:f8254d
 value.
 
 Unmarshaling is tricky because we have to inform =Data.Aeson= how to convert a
-~T.Text~ to ~LinkOid~. This is what we do in [[f:parseJSONLinkOid]].
+~Text~ to ~LinkOid~. This is what we do in [[f:parseJSONLinkOid]].
 
 #+name: f:parseJSONLinkOid
 #+begin_src haskell
-parseJSONLinkOid :: T.Text -> Parser LinkOid
+parseJSONLinkOid :: Text -> Parser LinkOid
 parseJSONLinkOid t = do
   oidAndNameText <- maybe (fail "invalid LinkOid") pure (T.stripPrefix "id:" t)
   let oidText = T.take 36 oidAndNameText
@@ -198,7 +200,7 @@ any OID and name combinations to their cells.
 
 #+name: f:mkSymbols
 #+begin_src haskell
-mkSymbols :: OrgDoc -> M.Map LinkOid Cell
+mkSymbols :: OrgDoc -> Map LinkOid Cell
 mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
   where
     f cell = case cell of
@@ -219,7 +221,7 @@ mkSymbols orgDoc = M.fromList $ concatMap f orgDoc.cells
       CTable table -> getSymbols Nothing table.meta cell
       CListItem {}
       CParagraph {} -> []
-    getSymbols :: Maybe OID -> M.Map T.Text T.Text -> Cell -> [(LinkOid, Cell)]
+    getSymbols :: Maybe OID -> Map Text Text -> Cell -> [(LinkOid, Cell)]
     getSymbols parentOid cellMeta cell =
       concatMap requireName $ catMaybes [parentOid, Just $ orgDoc.oid]
       where
@@ -411,8 +413,8 @@ to do:
 #+begin_src haskell
 type Archive :: Type
 data Archive = Archive
-  { objects :: M.Map GPath Object,
-    symbols :: M.Map LinkOid Cell
+  { objects :: Map GPath Object,
+    symbols :: Map LinkOid Cell
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -444,29 +446,29 @@ mkArchive pathObjs =
                 }
   where
     concatObjs ::
-      (M.Map GPath Object, M.Map LinkOid Cell) ->
+      (Map GPath Object, Map LinkOid Cell) ->
       (GPath, Object) ->
-      (M.Map GPath Object, M.Map LinkOid Cell)
+      (Map GPath Object, Map LinkOid Cell)
     concatObjs (accObjs, accSyms) (path, obj) =
       ( M.insert path obj accObjs,
         M.union obj.symbols accSyms
       )
     findBrokenLinks ::
-      M.Map GPath Object ->
-      M.Map LinkOid Cell ->
+      Map GPath Object ->
+      Map LinkOid Cell ->
       [(GPath, LinkOid)]
     findBrokenLinks objs syms =
       foldl' (getBrokenLink syms) []
         $ allExternalOids objs
     getBrokenLink ::
-      M.Map LinkOid Cell ->
+      Map LinkOid Cell ->
       [(GPath, LinkOid)] ->
       (GPath, LinkOid) ->
       [(GPath, LinkOid)]
     getBrokenLink syms acc (gPath, linkOid) = case EM.lookup linkOid syms of
       Just _ -> acc
       Nothing -> (gPath, linkOid) : acc
-    allExternalOids :: M.Map GPath Object -> [(GPath, LinkOid)]
+    allExternalOids :: Map GPath Object -> [(GPath, LinkOid)]
     allExternalOids objs =
       M.foldlWithKey
         (\acc gPath obj -> (zip (repeat gPath) obj.externalOids) <> acc)

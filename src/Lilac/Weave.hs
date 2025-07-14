@@ -72,9 +72,11 @@ import Relude
   ( Bool (False, True),
     Either (Right),
     Identity,
+    Map,
     Maybe (Just, Nothing),
     ReaderT,
     String,
+    Text,
     Type,
     ask,
     catMaybes,
@@ -104,13 +106,14 @@ import Relude
 import Relude.Extra.Map qualified as EM
 import Skylighting qualified as Sky
 import System.IO (utf8)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 
 type WeaveConf :: Type
 data WeaveConf = WeaveConf
   { orgDoc :: OrgDoc,
-    goids :: M.Map OID P.OsPath,
+    goids :: Map OID OsPath,
     watch :: Bool
   }
 
@@ -132,7 +135,7 @@ weave = do
           [ type_ "text/javascript",
             src_ "https://livejs.com/live.js"
           ]
-          ("" :: T.Text)
+          ("" :: Text)
 
       link_ [rel_ "stylesheet", href_ "./css/default.css"]
       link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
@@ -166,7 +169,7 @@ weaveCell = \case
   CTable _ -> do
     p_ "TABLE"
 
-toSafeHtmlId :: T.Text -> T.Text
+toSafeHtmlId :: Text -> Text
 toSafeHtmlId = T.map onlyKeepSomeChars
   where
     onlyKeepSomeChars c
@@ -175,7 +178,7 @@ toSafeHtmlId = T.map onlyKeepSomeChars
       | T.elem c "-_:." = c
       | otherwise = '-'
 
-getProseContents :: [PToken] -> T.Text
+getProseContents :: [PToken] -> Text
 getProseContents = join . foldl' f []
   where
     join = T.intercalate "" . reverse
@@ -208,14 +211,14 @@ weaveHeading heading =
     sectionText = getSectionText heading
     linkAnchor = getLinkAnchor $ CHeading heading
 
-getSectionText :: Heading -> T.Text
+getSectionText :: Heading -> Text
 getSectionText heading =
   T.intercalate "."
     . map T.show
     . reverse
     $ heading.section
 
-getLinkAnchor :: Cell -> T.Text
+getLinkAnchor :: Cell -> Text
 getLinkAnchor = \case
   CHeading heading ->
     T.intercalate
@@ -262,7 +265,7 @@ weaveStyledText styledText = do
     else span_ [class_ $ T.unwords styles] b
   where
     styles = foldl' styleToClasses [] $ maskToStyles styledText.style
-    styleToClasses :: [T.Text] -> Style -> [T.Text]
+    styleToClasses :: [Text] -> Style -> [Text]
     styleToClasses acc = \case
       Bold -> "bold" : acc
       Italic -> "italic" : acc
@@ -273,7 +276,7 @@ weaveStyledText styledText = do
 weaveListMarker :: ListMarker -> HtmlWeaver ()
 weaveListMarker =
   toHtmlRaw . \case
-    LOrderedStart -> "<ol>" :: T.Text
+    LOrderedStart -> "<ol>" :: Text
     LOrderedEnd -> "</ol>"
     LUnorderedStart -> "<ul>"
     LUnorderedEnd -> "</ul>"
@@ -310,10 +313,10 @@ weaveBlock block = do
           div_ [class_ "code-block-name"] $ do
             code_ $ toHtml name
         Nothing -> pure ()
-    getBlockContentsWithoutLinks :: [BToken] -> T.Text
+    getBlockContentsWithoutLinks :: [BToken] -> Text
     getBlockContentsWithoutLinks = T.concat . map bTokenToText
       where
-        bTokenToText :: BToken -> T.Text
+        bTokenToText :: BToken -> Text
         bTokenToText = \case
           BTokenString text -> text
           BTokenPadding -> ""
@@ -321,7 +324,7 @@ weaveBlock block = do
           BTokenLink {} -> ""
     linkAnchor = getLinkAnchor $ CBlock block
 
-colorizeText :: T.Text -> T.Text -> HtmlWeaver ()
+colorizeText :: Text -> Text -> HtmlWeaver ()
 colorizeText lang txt
   | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
     Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
@@ -332,11 +335,11 @@ colorizeText lang txt
   where
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 
-spliceLinks :: T.Text -> [Link] -> HtmlWeaver T.Text
+spliceLinks :: Text -> [Link] -> HtmlWeaver Text
 spliceLinks colorized links = do
   weaveConf <- ask
   let colorizedStrs = T.splitOn "\NUL" colorized
-      f :: ([T.Text], [Link]) -> T.Text -> ([T.Text], [Link])
+      f :: ([Text], [Link]) -> Text -> ([Text], [Link])
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
@@ -387,7 +390,7 @@ weaveLink link = do
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
       LinkTargetOther protocol target -> protocol <> ":" <> target
 
-renderAsText :: WeaveConf -> HtmlWeaver a -> T.Text
+renderAsText :: WeaveConf -> HtmlWeaver a -> Text
 renderAsText weaveConf weaver =
   TL.toStrict
     . renderText

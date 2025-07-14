@@ -14,6 +14,7 @@ import Relude
   ( Either (Left, Right),
     FilePath,
     IO,
+    Text,
     first,
     fmap,
     foldlM,
@@ -28,7 +29,7 @@ import Test.Hspec (Spec, expectationFailure, it, runIO, shouldBe)
 spec :: Spec
 spec = tangleSpec
 
-checkExpansion :: [FilePath] -> [(FilePath, T.Text)] -> Spec
+checkExpansion :: [FilePath] -> [(FilePath, Text)] -> Spec
 checkExpansion paths expectedExpansions = do
   pathObjs <- runIO $ readObjectsFrom paths
   case LC.mkArchive pathObjs of
