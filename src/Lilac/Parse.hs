@@ -154,7 +154,14 @@ import Relude
     (>>),
     (||),
   )
-import Relude.Extra.Map (delete, insert, lookup)
+import Relude.Extra.Map
+  ( delete,
+    insert,
+    keys,
+    lookup,
+    member,
+    notMember,
+  )
 import Relude.Unsafe (fromJust)
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -297,16 +304,16 @@ docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
   metaKVs <- fromList <$> (many $ lexeme docMetaEntryParser)
-  let conflictingKeys = M.keys $ M.intersection topLevelDrawerProps metaKVs
+  let conflictingKeys = keys $ M.intersection topLevelDrawerProps metaKVs
   when (not $ null conflictingKeys)
     $ fail
     $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
     <> (show conflictingKeys)
-  case M.lookup "ID" topLevelDrawerProps of
+  case lookup "ID" topLevelDrawerProps of
     Nothing -> fail $ "required document ID property not found"
     Just oidText -> do
       oid <- validateOidText oidText
-      pure (oid, M.union topLevelDrawerProps metaKVs)
+      pure (oid, topLevelDrawerProps <> metaKVs)
 
 lilacExtensionsParser :: OrgParser ()
 lilacExtensionsParser = do
@@ -577,7 +584,7 @@ isStyleMarker :: StyleMask -> Char -> Bool
 isStyleMarker styleMask c
   | isVerbatim styleMask = c == '='
   | isCode styleMask = c == '~'
-  | otherwise = M.member c styleMarkers
+  | otherwise = member c styleMarkers
 
 styledTextParser :: OrgParser StyledText
 styledTextParser = do
@@ -623,7 +630,7 @@ textParser styleMask
       MP.notFollowedBy $ string toAvoid
       MP.satisfy isNormalChar
     isNormalChar c =
-      M.notMember c styleMarkers
+      notMember c styleMarkers
         && (not $ isSpace c)
         && (not $ c == '\\')
 
@@ -1618,7 +1625,7 @@ goidsEntryParser sourceFile = betweenParens $ do
     oid <- oidParser
     _ <- ws
     goidsParserState <- get
-    when (M.member oid goidsParserState.seenOids)
+    when (member oid goidsParserState.seenOids)
       $ fail
       $ "duplicate OID: \""
       <> show oid

@@ -57,7 +57,7 @@ import Relude
     (<>),
     (>),
   )
-import Relude.Extra.Map (lookup)
+import Relude.Extra.Map (elems, insert, lookup, member)
 
 mkObject :: OrgDoc -> Object
 mkObject orgDoc =
@@ -126,8 +126,8 @@ mkArchive pathObjs =
       (GPath, Object) ->
       (Map GPath Object, Map LinkOid Cell)
     concatObjs (accObjs, accSyms) (path, obj) =
-      ( M.insert path obj accObjs,
-        M.union obj.symbols accSyms
+      ( insert path obj accObjs,
+        obj.symbols <> accSyms
       )
     findBrokenLinks ::
       Map GPath Object ->
@@ -182,7 +182,7 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
 findCycles :: Archive -> [G.Tree LinkOid]
 findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
   where
-    blocks = foldl' getBlocksFromAllSymbols [] $ M.elems archive.symbols
+    blocks = foldl' getBlocksFromAllSymbols [] $ elems archive.symbols
     getBlocksFromAllSymbols acc cell = case cell of
       CBlock b -> b : acc
       CHeading {}
@@ -227,7 +227,7 @@ findExternalOids orgDoc =
       PTokenMathFragment {} -> acc
     getExternal acc link = case link.target of
       LinkTargetOid linkOid ->
-        if M.member linkOid symbols
+        if member linkOid symbols
           then acc
           else linkOid : acc
       LinkTargetURI {}

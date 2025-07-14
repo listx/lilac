@@ -80,7 +80,6 @@ import Data.Bits
   ( shiftR,
     (.&.),
   )
-import Data.Map qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Relude
@@ -99,6 +98,7 @@ import Relude
     (<>),
     (>),
   )
+import Relude.Extra.Map (insert)
 import Skylighting qualified as Sky
 
 genCss :: Text
@@ -112,7 +112,7 @@ kateLilac :: Sky.Style
 kateLilac =
   Sky.kate
     { Sky.tokenStyles =
-        M.insert
+        insert
           Sky.ExtensionTok
           ( Sky.defStyle
               { Sky.tokenColor = Just (Sky.RGB 0 0x60 0xa4),
