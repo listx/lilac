@@ -146,7 +146,7 @@ mkArchive pathObjs =
       Nothing -> (gPath, linkOid) : acc
     allExternalOids :: Map GPath Object -> [(GPath, LinkOid)]
     allExternalOids objs =
-      M.foldlWithKey
+      M.foldlWithKey'
         (\acc gPath obj -> (zip (repeat gPath) obj.externalOids) <> acc)
         []
         objs
@@ -213,7 +213,7 @@ findExternalOids orgDoc =
       CBlock block -> foldl' g [] block.body
       CHeading heading -> foldl' h [] heading.body
       CParagraph prose -> foldl' h [] prose
-      CTable table -> M.foldl (foldl' h) [] table.grid
+      CTable table -> foldl' (foldl' h) [] table.grid
       CFigure {}
       CListItem {}
       CMathFragment {} -> []

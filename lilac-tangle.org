@@ -102,14 +102,14 @@ expandRootBlocks :: Archive -> [(OsPath, Text)]
 expandRootBlocks archive = map expandRootBlock rootBlocks
   where
     rootBlocks =
-      concat $ M.foldlWithKey getRootBlocksFromObject [] archive.objects
+      concat $ M.foldlWithKey' getRootBlocksFromObject [] archive.objects
     getRootBlocksFromObject ::
       [[(OsPath, Block)]] ->
       GPath ->
       Object ->
       [[(OsPath, Block)]]
     getRootBlocksFromObject acc objPath object =
-      M.foldl (getRootBlock objPath) [] object.symbols : acc
+      foldl' (getRootBlock objPath) [] object.symbols : acc
     getRootBlock objPath acc cell = case cell of
       CBlock b
         | Just path <- lookup "tangle" b.meta,
