@@ -16,10 +16,14 @@ lint: $(org_files)
 	pre-commit run --all-files
 	touch lint
 
-lilac.larc: $(org_files:%.org=%.lobj)
-	lilac archive $^ --out-file lilac.larc
-%.lobj: %.org
-	lilac compile $<
+obj_files = $(org_files:%.org=%.lobj)
+
+$(obj_files) &: $(org_files)
+	lilac compile $?
+	touch $(obj_files)
+
+lilac.larc: $(obj_files)
+	lilac archive $^ --out-file $@
 
 tangle: lilac.larc
 	lilac tangle lilac.larc

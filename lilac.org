@@ -807,10 +807,82 @@ object files, especially for finding broken links.
 
 #+name: make:Compile sources
 #+begin_src makefile
-lilac.larc: $(org_files:%.org=%.lobj)
-	lilac archive $^ --out-file lilac.larc
+obj_files = $(org_files:%.org=%.lobj)
+
+<<make:Batch compile Org files>>
+<<make:Build archive>>
+#+end_src
+
+The naive way of building object files involves a rule like this:
+
+#+begin_src makefile
 %.lobj: %.org
 	lilac compile $<
+#+end_src
+
+But this doesn't work well, because we'll invoke the ~lilac~ CLI multiple times,
+once for each Org file that needs to be compiled because the ~:~ creates
+individual targets. So [[make:Batch compile Org files]] fixes this issue.
+
+#+name: make:Batch compile Org files
+#+begin_src makefile
+$(obj_files) &: $(org_files)
+	lilac compile $?
+	touch $(obj_files)
+#+end_src
+
+This batch compilation works by specifying the ~&:~ ([[https://www.gnu.org/software/make/manual/html_node/Multiple-Targets.html][grouped targets]]). This way,
+if any object file is outdated (older than the ~org_files~), we can invoke ~lilac
+compile ...~ just once on all needing-to-be-compiled Org files (specified with
+the ~$?~ [[https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html][automatic variable]]). This doesn't matter too much when running the
+[[id:77786b08-6211-47b8-940d-6aaefc17ec47::tangle-loop.sh][tangle-loop.sh]] because that reacts as soon as one of the Org files is saved, but
+it does matter more when we compile everything from scratch (such as when we
+wipe the object files as a sanity check).
+
+We have to run ~touch $(obj_files)~ at the end of the batch compilation. To see
+why this is needed, consider the following. Suppose the timestamps could be like
+this for the Org files:
+
+| File   | Time |
+|--------+------|
+| a.org  |    0 |
+| a.lobj |    0 |
+| b.org  |    1 |
+| b.lobj |    0 |
+
+If we now see that ~b.org~ is newer, and then run ~lilac compile b.org~, we'll only
+update the ~b.lobj~ timestamp (say, to 2).
+
+| File   | Time |
+|--------+------|
+| a.org  |    0 |
+| a.lobj |    0 |
+| b.org  |    1 |
+| b.lobj |    2 |
+
+However, now ~a.lobj~ has an older timestamp of 0, compared to ~b.org~ which still
+has a timestamp of 1. And so Make will think it will need to run the batch
+compilation again. To avoid this scenario from happening, we run ~touch
+$(obj_files)~ so that now all objects get the timestamp update. So in this new
+scenario, the timestamps will look like
+
+| File   | Time |
+|--------+------|
+| a.org  |    0 |
+| a.lobj |    2 |
+| b.org  |    1 |
+| b.lobj |    2 |
+
+and all of the object files will be newer than the Org files, which will
+correctly inform Make that it won't need to run batch compilation again.
+
+The [[make:Build archive]] rule says we should rebuild ~lilac.larc~ if any of the
+object files are missing or newer than ~lilac.larc~.
+
+#+name: make:Build archive
+#+begin_src makefile
+lilac.larc: $(obj_files)
+	lilac archive $^ --out-file $@
 #+end_src
 
 In order to create the ~lilac.larc~ archive file of the entire Lilac project,
