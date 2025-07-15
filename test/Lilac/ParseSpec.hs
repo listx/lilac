@@ -1,6 +1,5 @@
 module Lilac.ParseSpec (spec) where
 
-import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.Void (Void)
