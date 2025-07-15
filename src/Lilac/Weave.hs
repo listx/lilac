@@ -1,6 +1,5 @@
 module Lilac.Weave
-  ( WeaveConf (..),
-    renderAsText,
+  ( renderAsText,
     weave,
   )
 where
@@ -26,11 +25,11 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (body),
-    OID,
     OrgDoc (cells, meta, oid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
+    WeaveConf (goids, orgDoc, watch),
   )
 import Lucid
   ( HtmlT,
@@ -71,7 +70,6 @@ import Relude
   ( Bool (False, True),
     Either (Right),
     Identity,
-    Map,
     Maybe (Just, Nothing),
     ReaderT,
     String,
@@ -106,16 +104,8 @@ import Relude
 import Relude.Extra.Map (lookup)
 import Skylighting qualified as Sky
 import System.IO (utf8)
-import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Blaze.Html.Renderer.Text (renderHtml)
-
-type WeaveConf :: Type
-data WeaveConf = WeaveConf
-  { orgDoc :: OrgDoc,
-    goids :: Map OID OsPath,
-    watch :: Bool
-  }
 
 type HtmlWeaver :: Type -> Type
 type HtmlWeaver a = HtmlT (ReaderT WeaveConf Identity) a

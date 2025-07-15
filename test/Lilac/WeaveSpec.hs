@@ -2,7 +2,11 @@ module Lilac.WeaveSpec (spec) where
 
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
-import Lilac.Types (OID, OrgParserState (goids), nilOidOrgDoc)
+import Lilac.Types
+  ( OID,
+    WeaveConf (WeaveConf, goids, orgDoc, watch),
+    nilOidOrgDoc,
+  )
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
 import Relude
@@ -48,14 +52,14 @@ getWovenPrettyFromPath path = do
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState)
           path
           (nilOidOrgDoc <> inputOrgFile)
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
       let weaveConf =
-            LW.WeaveConf
+            WeaveConf
               { orgDoc = orgDoc,
                 goids = goids,
                 watch = True

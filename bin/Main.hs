@@ -11,6 +11,7 @@ import Lilac.Types
     GPath,
     Object,
     OrgDoc,
+    WeaveConf (WeaveConf, goids, orgDoc, watch),
     decodeGPath,
     encodeGPath,
   )
@@ -425,10 +426,10 @@ lilacWeave weaveOpts = do
 weaveToDisk :: OsPath -> OrgDoc -> Bool -> IO ()
 weaveToDisk fp od watch = do
   let weaveConf =
-        LW.WeaveConf
-          { LW.orgDoc = od,
-            LW.goids = mempty,
-            LW.watch = watch
+        WeaveConf
+          { orgDoc = od,
+            goids = mempty,
+            watch = watch
           }
   LU.writeFileRobustly fp
     $ LW.renderAsText weaveConf LW.weave

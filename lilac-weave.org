@@ -55,8 +55,7 @@ Weaving concerns are captured in [[file:src/Lilac/Weave.hs]].
 #+header: :tangle src/Lilac/Weave.hs
 #+begin_src haskell
 module Lilac.Weave
-  ( WeaveConf (..),
-    renderAsText,
+  ( renderAsText,
     weave,
   )
 where
@@ -82,11 +81,11 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (body),
-    OID,
     OrgDoc (cells, meta, oid),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
+    WeaveConf (goids, orgDoc, watch),
   )
 import Lucid
   ( HtmlT,
@@ -127,7 +126,6 @@ import Relude
   ( Bool (False, True),
     Either (Right),
     Identity,
-    Map,
     Maybe (Just, Nothing),
     ReaderT,
     String,
@@ -162,11 +160,9 @@ import Relude
 import Relude.Extra.Map (lookup)
 import Skylighting qualified as Sky
 import System.IO (utf8)
-import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 
-<<data:WeaveConf>>
 <<type:HtmlWeaver>>
 
 <<f:weave>>
@@ -817,7 +813,11 @@ module Lilac.WeaveSpec (spec) where
 
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
-import Lilac.Types (OID, OrgParserState (goids), nilOidOrgDoc)
+import Lilac.Types
+  ( OID,
+    WeaveConf (WeaveConf, goids, orgDoc, watch),
+    nilOidOrgDoc,
+  )
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
 import Relude
@@ -896,14 +896,14 @@ getWovenPrettyFromPath path = do
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState {goids = goids})
+          (runStateT LP.orgDocParser LP.defaultOrgParserState)
           path
           (nilOidOrgDoc <> inputOrgFile)
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
       let weaveConf =
-            LW.WeaveConf
+            WeaveConf
               { orgDoc = orgDoc,
                 goids = goids,
                 watch = True

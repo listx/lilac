@@ -24,6 +24,7 @@ module Lilac.Types
     StyleMask (..),
     StyledText (..),
     Table (..),
+    WeaveConf (..),
     decodeGPath,
     defaultOrgParserConf,
     encodeGPath,
@@ -393,6 +394,13 @@ protocolsWeb =
       "mailto",
       "tel"
     ]
+
+type WeaveConf :: Type
+data WeaveConf = WeaveConf
+  { orgDoc :: OrgDoc,
+    goids :: Map OID OsPath,
+    watch :: Bool
+  }
 
 type Object :: Type
 data Object = Object
