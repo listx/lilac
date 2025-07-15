@@ -970,7 +970,9 @@ tangle_and_test_and_weave()
 		fi
 	fi
 	echo "----------------------------------------"
-	time make -C "${SCRIPT_ROOT}" weave
+	if ! time make -C "${SCRIPT_ROOT}" weave; then
+		reset_tangled_program_files
+	fi
 }
 
 watch()
