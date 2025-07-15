@@ -42,7 +42,6 @@ import Options.Applicative
     showHelpOnEmpty,
     some,
     str,
-    strOption,
     value,
     (<*>),
   )
@@ -128,8 +127,8 @@ data TangleOpts = TangleOpts
 
 type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
-  { inputs :: [FilePath],
-    outDir :: FilePath,
+  { inputs :: [OsPath],
+    outDir :: OsPath,
     watch :: Bool
   }
 
@@ -214,11 +213,12 @@ tangleOptsHandler =
 weaveOptsHandler :: OptionHandler WeaveOpts
 weaveOptsHandler =
   WeaveOpts
-    <$> (some $ argument str (metavar "FILES..."))
-    <*> ( strOption
+    <$> (some $ argument readOsPath (metavar "FILES..."))
+    <*> ( option
+            readOsPath
             ( long "out-dir"
                 <> metavar "DIR"
-                <> value "."
+                <> value (P.unsafeEncodeUtf ".")
                 <> showDefault
                 <> help
                   """
@@ -397,27 +397,26 @@ lilacWeave weaveOpts = do
   where
     writeCssFile = do
       cssPath <- do
-        dir <- P.encodeUtf weaveOpts.outDir
         cssDir <- P.encodeUtf "css"
         css <- P.encodeUtf "default.css"
-        pure $ P.joinPath [dir, cssDir, css]
+        pure $ P.joinPath [weaveOpts.outDir, cssDir, css]
       LU.writeFileRobustly cssPath $ LWC.genCss
-    weaveOrgFile inputOrgFile = do
-      input <- LU.readFrom "" inputOrgFile
+    weaveOrgFile inputPath = do
+      input <- LU.readFileRobustly inputPath
+      inputFile <- P.decodeUtf inputPath
       let parseResult =
             MP.runParser
               (runStateT LP.orgDocParser LP.defaultOrgParserState)
-              inputOrgFile
+              inputFile
               input
       case parseResult of
         Left errBundle -> do
           die $ MP.errorBundlePretty errBundle
         Right (orgDoc, _) -> do
-          putStrLn $ "Weaving " <> inputOrgFile
+          putStrLn $ "Weaving " <> inputFile
           outPath <- do
-            dir <- P.encodeUtf weaveOpts.outDir
-            base <- P.takeBaseName <$> P.encodeUtf inputOrgFile
-            let withoutExtension = P.joinPath [dir, base]
+            let base = P.takeBaseName inputPath
+                withoutExtension = P.joinPath [weaveOpts.outDir, base]
                 html = P.unsafeEncodeUtf "html"
             pure $ P.addExtension withoutExtension html
           weaveToDisk outPath orgDoc weaveOpts.watch
