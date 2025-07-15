@@ -2,16 +2,16 @@ module Main (main) where
 
 import Data.Aeson (ToJSON, eitherDecodeStrictText)
 import Data.Aeson.Encode.Pretty qualified as EP
+import Data.Map.Strict qualified as M
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Types
-  ( Archive,
+  ( Archive (objects),
     GPath,
     Object,
-    OrgDoc,
-    WeaveConf (WeaveConf, goids, orgDoc, watch),
+    WeaveConf (WeaveConf, archive, originObjectPath, watch),
     decodeGPath,
     encodeGPath,
   )
@@ -73,6 +73,7 @@ import Relude
     putStrLn,
     reverse,
     runStateT,
+    sequence_,
     show,
     sort,
     when,
@@ -80,6 +81,7 @@ import Relude
     ($),
     (&&),
     (+),
+    (.),
     (/=),
     (<$>),
     (<>),
@@ -394,7 +396,7 @@ tangle globalOpts archive = do
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
   writeCssFile
-  mapM_ weaveOrgFile $ weaveOpts.inputs
+  mapM_ weaveArchiveFile $ weaveOpts.inputs
   where
     writeCssFile = do
       cssPath <- do
@@ -402,37 +404,35 @@ lilacWeave weaveOpts = do
         css <- P.encodeUtf "default.css"
         pure $ P.joinPath [weaveOpts.outDir, cssDir, css]
       LU.writeFileRobustly cssPath $ LWC.genCss
-    weaveOrgFile inputPath = do
-      input <- LU.readFileRobustly inputPath
-      inputFile <- P.decodeUtf inputPath
-      let parseResult =
-            MP.runParser
-              (runStateT LP.orgDocParser LP.defaultOrgParserState)
-              inputFile
-              input
-      case parseResult of
-        Left errBundle -> do
-          die $ MP.errorBundlePretty errBundle
-        Right (orgDoc, _) -> do
-          putStrLn $ "Weaving " <> inputFile
-          outPath <- do
-            let base = P.takeBaseName inputPath
-                withoutExtension = P.joinPath [weaveOpts.outDir, base]
-                html = P.unsafeEncodeUtf "html"
-            pure $ P.addExtension withoutExtension html
-          weaveToDisk outPath orgDoc weaveOpts.watch
+    weaveArchiveFile inputPath = do
+      text <- LU.readFileRobustly inputPath
+      case eitherDecodeStrictText text :: Either String Archive of
+        Left errMsg -> die errMsg
+        Right archive -> do
+          fp <- P.decodeUtf inputPath
+          putStrLn $ "Weaving " <> fp
+          sequence_
+            $ M.foldlWithKey' (weaveToDisk weaveOpts archive) [] archive.objects
           putStrLn "Finished weaving."
 
-weaveToDisk :: OsPath -> OrgDoc -> Bool -> IO ()
-weaveToDisk fp od watch = do
+weaveToDisk :: WeaveOpts -> Archive -> [IO ()] -> GPath -> Object -> [IO ()]
+weaveToDisk weaveOpts archive acc objPath obj =
   let weaveConf =
         WeaveConf
-          { orgDoc = od,
-            goids = mempty,
-            watch = watch
+          { archive = archive,
+            originObjectPath = objPath,
+            watch = weaveOpts.watch
           }
-  LU.writeFileRobustly fp
-    $ LW.renderAsText weaveConf LW.weave
+      fp = decodeGPath objPath
+      base = P.takeBaseName $ P.unsafeEncodeUtf fp
+      withoutExtension = P.joinPath [weaveOpts.outDir, base]
+      html = P.unsafeEncodeUtf "html"
+      outPath = P.addExtension withoutExtension html
+      action =
+        LU.writeFileRobustly outPath
+          . LW.renderAsText weaveConf
+          $ LW.weaveObject obj
+   in action : acc
 
 writeJSONPretty :: (ToJSON a) => FilePath -> a -> IO ()
 writeJSONPretty path marshalMe =

@@ -1,6 +1,6 @@
 module Lilac.Weave
   ( renderAsText,
-    weave,
+    weaveObject,
   )
 where
 
@@ -9,12 +9,12 @@ import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Lilac.Parse (maskToStyles)
 import Lilac.Types
-  ( BToken (BTokenLink, BTokenPadding, BTokenString),
-    Block (Block, body, meta, parentOid),
+  ( Archive (objects, symbolPath, symbols),
+    BToken (BTokenLink, BTokenPadding, BTokenString),
+    Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, section),
     Link (Link, name, target),
-    LinkOid (name, oid),
     LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
@@ -25,11 +25,13 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (body),
-    OrgDoc (cells, meta, oid),
+    Object (orgDoc, symbols),
+    OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
-    WeaveConf (goids, orgDoc, watch),
+    WeaveConf (archive, originObjectPath, watch),
+    decodeGPath,
   )
 import Lucid
   ( HtmlT,
@@ -82,7 +84,6 @@ import Relude
     foldMap',
     foldl',
     forM_,
-    fromList,
     fst,
     id,
     lift,
@@ -92,6 +93,7 @@ import Relude
     reverse,
     runReaderT,
     sequence_,
+    show,
     take,
     when,
     ($),
@@ -110,10 +112,10 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 type HtmlWeaver :: Type -> Type
 type HtmlWeaver a = HtmlT (ReaderT WeaveConf Identity) a
 
-weave :: HtmlWeaver ()
-weave = do
+weaveObject :: Object -> HtmlWeaver ()
+weaveObject object = do
   weaveConf <- ask
-  let title' = toHtml $ case lookup "title" weaveConf.orgDoc.meta of
+  let title' = toHtml $ case lookup "title" object.orgDoc.meta of
         Just title -> title
         Nothing -> "Untitled"
   doctypehtml_ $ do
@@ -144,7 +146,7 @@ weave = do
               ]
       link_ [rel_ "stylesheet", href_ fontsLink]
     body_ $ do
-      forM_ weaveConf.orgDoc.cells weaveCell
+      forM_ object.orgDoc.cells weaveCell
 
 weaveCell :: Cell -> HtmlWeaver ()
 weaveCell = \case
@@ -360,23 +362,17 @@ weaveLink link = do
         else "internal-link"
     linkTarget weaveConf = case link.target of
       LinkTargetOid linkOid
-        | Just orgFile <- lookup linkOid.oid weaveConf.goids,
-          Just currentOrgFile <- lookup weaveConf.orgDoc.oid weaveConf.goids,
-          Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
-            if orgFile == currentOrgFile
-              then "#" <> linkAnchor
-              else (T.pack str) <> "#" <> linkAnchor
-        | otherwise -> "#" <> linkAnchor
+        | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+          Just internalCell <- lookup linkOid originObj.symbols ->
+            "#" <> getLinkAnchor internalCell
+        | Just externalCell <- lookup linkOid weaveConf.archive.symbols,
+          Just externalObjGPath <- lookup linkOid weaveConf.archive.symbolPath,
+          fp <- decodeGPath externalObjGPath,
+          Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension (P.unsafeEncodeUtf fp) htmlExt ->
+            (T.pack str) <> "#" <> getLinkAnchor externalCell
+        | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
         where
           htmlExt = P.unsafeEncodeUtf "html"
-          linkAnchor =
-            getLinkAnchor
-              $ CBlock
-                Block
-                  { parentOid = weaveConf.orgDoc.oid,
-                    meta = fromList [("name", linkOid.name)],
-                    body = []
-                  }
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
       LinkTargetOther protocol target -> protocol <> ":" <> target
 

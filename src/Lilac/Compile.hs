@@ -12,7 +12,7 @@ import Data.Set qualified as Set
 import Data.Text qualified as T
 import Lilac.Parse (validateOidText)
 import Lilac.Types
-  ( Archive (Archive, objects, symbols),
+  ( Archive (Archive, objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
@@ -57,7 +57,7 @@ import Relude
     (<>),
     (>),
   )
-import Relude.Extra.Map (elems, insert, lookup, member)
+import Relude.Extra.Map (elems, insert, keys, lookup, member)
 
 mkObject :: OrgDoc -> Object
 mkObject orgDoc =
@@ -105,7 +105,8 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
 
 mkArchive :: [(GPath, Object)] -> Either String Archive
 mkArchive pathObjs =
-  let (objects, symbols) = foldl' concatObjs (mempty, mempty) pathObjs
+  let (objects, symbols, symbolPath) =
+        foldl' concatObjs (mempty, mempty, mempty) pathObjs
       brokenLinks = findBrokenLinks objects symbols
    in if
         | brokenLinks /= [] ->
@@ -118,16 +119,18 @@ mkArchive pathObjs =
             Right
               Archive
                 { objects = objects,
-                  symbols = symbols
+                  symbols = symbols,
+                  symbolPath = symbolPath
                 }
   where
     concatObjs ::
-      (Map GPath Object, Map LinkOid Cell) ->
+      (Map GPath Object, Map LinkOid Cell, Map LinkOid GPath) ->
       (GPath, Object) ->
-      (Map GPath Object, Map LinkOid Cell)
-    concatObjs (accObjs, accSyms) (path, obj) =
+      (Map GPath Object, Map LinkOid Cell, Map LinkOid GPath)
+    concatObjs (accObjs, accSyms, accSymPaths) (path, obj) =
       ( insert path obj accObjs,
-        obj.symbols <> accSyms
+        obj.symbols <> accSyms,
+        (fromList $ zip (keys obj.symbols) (repeat path)) <> accSymPaths
       )
     findBrokenLinks ::
       Map GPath Object ->

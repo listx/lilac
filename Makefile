@@ -29,8 +29,8 @@ tangle: lilac.larc
 	lilac tangle lilac.larc
 	touch tangle
 
-weave: $(org_files)
-	lilac weave --out-dir site --watch $(org_files)
+weave: lilac.larc
+	lilac weave --out-dir site --watch $<
 	touch weave
 
 serve:

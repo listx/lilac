@@ -397,8 +397,8 @@ protocolsWeb =
 
 type WeaveConf :: Type
 data WeaveConf = WeaveConf
-  { orgDoc :: OrgDoc,
-    goids :: Map OID OsPath,
+  { archive :: Archive,
+    originObjectPath :: GPath,
     watch :: Bool
   }
 
@@ -414,7 +414,8 @@ data Object = Object
 type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object,
-    symbols :: Map LinkOid Cell
+    symbols :: Map LinkOid Cell,
+    symbolPath :: Map LinkOid GPath
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

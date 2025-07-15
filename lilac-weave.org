@@ -56,7 +56,7 @@ Weaving concerns are captured in [[file:src/Lilac/Weave.hs]].
 #+begin_src haskell
 module Lilac.Weave
   ( renderAsText,
-    weave,
+    weaveObject,
   )
 where
 
@@ -65,12 +65,12 @@ import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Lilac.Parse (maskToStyles)
 import Lilac.Types
-  ( BToken (BTokenLink, BTokenPadding, BTokenString),
-    Block (Block, body, meta, parentOid),
+  ( Archive (objects, symbolPath, symbols),
+    BToken (BTokenLink, BTokenPadding, BTokenString),
+    Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, section),
     Link (Link, name, target),
-    LinkOid (name, oid),
     LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
     ListMarker
       ( LItemEnd,
@@ -81,11 +81,13 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (body),
-    OrgDoc (cells, meta, oid),
+    Object (orgDoc, symbols),
+    OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
-    WeaveConf (goids, orgDoc, watch),
+    WeaveConf (archive, originObjectPath, watch),
+    decodeGPath,
   )
 import Lucid
   ( HtmlT,
@@ -138,7 +140,6 @@ import Relude
     foldMap',
     foldl',
     forM_,
-    fromList,
     fst,
     id,
     lift,
@@ -148,6 +149,7 @@ import Relude
     reverse,
     runReaderT,
     sequence_,
+    show,
     take,
     when,
     ($),
@@ -165,7 +167,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 
 <<type:HtmlWeaver>>
 
-<<f:weave>>
+<<f:weaveObject>>
 <<f:weaveCell>>
 <<f:toSafeHtmlId>>
 <<f:getProseContents>>
@@ -202,8 +204,8 @@ available to all parsing functions in [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643:
 #+begin_src haskell
 type WeaveConf :: Type
 data WeaveConf = WeaveConf
-  { orgDoc :: OrgDoc,
-    goids :: Map OID OsPath,
+  { archive :: Archive,
+    originObjectPath :: GPath,
     watch :: Bool
   }
 #+end_src
@@ -248,16 +250,19 @@ Identity~, and running ~runReaderT~ will result in ~Identity ()~ (where ~()~ is 
 in the type signature for [[f:renderAsText]]). So then the call to ~hoistHtmlT~ gives
 us ~HtmlT Identity a~, which is what Lucid's ~renderText~ expects.
 
-The top-level weaving function is [[f:weave]], which sets up the main HTML bits
-(like the title, head, style sheets, etc), before finally delegating to
-[[f:weaveCell]] for the bulk of the work.
+The top-level weaving function is [[f:weaveObject]], which weaves a [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]]
+value.
 
-#+name: f:weave
+The [[f:weaveObject]] function sets up the main HTML bits (like the title, head,
+style sheets, etc), before finally delegating to [[f:weaveCell]] for the bulk of the
+work.
+
+#+name: f:weaveObject
 #+begin_src haskell
-weave :: HtmlWeaver ()
-weave = do
+weaveObject :: Object -> HtmlWeaver ()
+weaveObject object = do
   weaveConf <- ask
-  let title' = toHtml $ case lookup "title" weaveConf.orgDoc.meta of
+  let title' = toHtml $ case lookup "title" object.orgDoc.meta of
         Just title -> title
         Nothing -> "Untitled"
   doctypehtml_ $ do
@@ -267,7 +272,7 @@ weave = do
       <<Hot reload script>>
       <<Styles and fonts>>
     body_ $ do
-      forM_ weaveConf.orgDoc.cells weaveCell
+      forM_ object.orgDoc.cells weaveCell
 #+end_src
 
 The use of ~toHtml~ is to help Haskell infer the correct type. This is because
@@ -725,23 +730,17 @@ weaveLink link = do
         else "internal-link"
     linkTarget weaveConf = case link.target of
       LinkTargetOid linkOid
-        | Just orgFile <- lookup linkOid.oid weaveConf.goids,
-          Just currentOrgFile <- lookup weaveConf.orgDoc.oid weaveConf.goids,
-          Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension orgFile htmlExt ->
-            if orgFile == currentOrgFile
-              then "#" <> linkAnchor
-              else (T.pack str) <> "#" <> linkAnchor
-        | otherwise -> "#" <> linkAnchor
+        | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+          Just internalCell <- lookup linkOid originObj.symbols ->
+            "#" <> getLinkAnchor internalCell
+        | Just externalCell <- lookup linkOid weaveConf.archive.symbols,
+          Just externalObjGPath <- lookup linkOid weaveConf.archive.symbolPath,
+          fp <- decodeGPath externalObjGPath,
+          Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension (P.unsafeEncodeUtf fp) htmlExt ->
+            (T.pack str) <> "#" <> getLinkAnchor externalCell
+        | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
         where
           htmlExt = P.unsafeEncodeUtf "html"
-          linkAnchor =
-            getLinkAnchor
-              $ CBlock
-                Block
-                  { parentOid = weaveConf.orgDoc.oid,
-                    meta = fromList [("name", linkOid.name)],
-                    body = []
-                  }
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
       LinkTargetOther protocol target -> protocol <> ":" <> target
 #+end_src
@@ -812,10 +811,12 @@ helpers]] to take care of some boilerplate.
 module Lilac.WeaveSpec (spec) where
 
 import Data.Text qualified as T
+import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
   ( OID,
-    WeaveConf (WeaveConf, goids, orgDoc, watch),
+    WeaveConf (WeaveConf, archive, originObjectPath, watch),
+    encodeGPath,
     nilOidOrgDoc,
   )
 import Lilac.Util qualified as LU
@@ -882,17 +883,17 @@ These helpers let us be a bit more concise when writing individual test cases.
 <<f:weaveExpect>>
 #+end_src
 
-[[f:getWovenPrettyFromPath]] weaves the given Org file to a =Text=. Then in our test
-cases we can check for expected substrings inside it. Note how it uses
-=renderHtml= from the =Text.Blaze.Html.Renderer.Pretty= module, because we want to
-be able to write test cases where we write expected HTML substrings in a
-prettified way (for readability).
+[[f:getWovenPrettyFromPath]] weaves the given Org file to a =Text=, by first compiling
+it to an object. Then in our test cases we can check for expected substrings
+inside it. Note how it uses =renderHtml= from the =Text.Blaze.Html.Renderer.Pretty=
+module, because we want to be able to write test cases where we write expected
+HTML substrings in a prettified way (for readability).
 
 #+name: f:getWovenPrettyFromPath
 #+begin_src haskell
 getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
 getWovenPrettyFromPath path = do
-  let goids = mempty :: Map OID OsPath
+  inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
@@ -902,15 +903,20 @@ getWovenPrettyFromPath path = do
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      let weaveConf =
-            WeaveConf
-              { orgDoc = orgDoc,
-                goids = goids,
-                watch = True
-              }
-      pure
-        . Right
-        $ LW.renderAsText weaveConf LW.weave
+      let object = LC.mkObject orgDoc
+      case LC.mkArchive [(inputOrgFileGPath, object)] of
+        Left errMsg -> pure $ Left errMsg
+        Right archive -> do
+          let weaveConf =
+                WeaveConf
+                  { archive = archive,
+                    originObjectPath = inputOrgFileGPath,
+                    watch = True
+                  }
+          pure
+            . Right
+            . LW.renderAsText weaveConf
+            $ LW.weaveObject object
 #+end_src
 
 [[f:searchOrderedNeedles]] looks through a haystack and searches for all given

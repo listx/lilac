@@ -1,10 +1,12 @@
 module Lilac.WeaveSpec (spec) where
 
 import Data.Text qualified as T
+import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
   ( OID,
-    WeaveConf (WeaveConf, goids, orgDoc, watch),
+    WeaveConf (WeaveConf, archive, originObjectPath, watch),
+    encodeGPath,
     nilOidOrgDoc,
   )
 import Lilac.Util qualified as LU
@@ -48,7 +50,7 @@ spec = weaveSpec
 
 getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
 getWovenPrettyFromPath path = do
-  let goids = mempty :: Map OID OsPath
+  inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
@@ -58,15 +60,20 @@ getWovenPrettyFromPath path = do
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      let weaveConf =
-            WeaveConf
-              { orgDoc = orgDoc,
-                goids = goids,
-                watch = True
-              }
-      pure
-        . Right
-        $ LW.renderAsText weaveConf LW.weave
+      let object = LC.mkObject orgDoc
+      case LC.mkArchive [(inputOrgFileGPath, object)] of
+        Left errMsg -> pure $ Left errMsg
+        Right archive -> do
+          let weaveConf =
+                WeaveConf
+                  { archive = archive,
+                    originObjectPath = inputOrgFileGPath,
+                    watch = True
+                  }
+          pure
+            . Right
+            . LW.renderAsText weaveConf
+            $ LW.weaveObject object
 
 searchOrderedNeedles :: Text -> [Text] -> (String, [Expectation])
 searchOrderedNeedles haystackRaw needles =
