@@ -49,3 +49,10 @@ build-release: $(org_files) lilac.cabal
 update-nix:
 	niv init
 	niv update nixpkgs --branch nixos-25.05
+
+clean:
+	rm -rf \
+		lilac.larc \
+		$(obj_files) \
+		site/*
+.PHONY: clean

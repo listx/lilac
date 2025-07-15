@@ -684,6 +684,7 @@ we don't have to memorize exactly how to invoke certain commands.
 <<make:Build lilac with Cabal>>
 <<make:Build lilac with Nix>>
 <<make:Update Nix dependencies>>
+<<make:Clean>>
 #+end_src
 
 *** Org files
@@ -887,6 +888,18 @@ lilac.larc: $(obj_files)
 
 In order to create the ~lilac.larc~ archive file of the entire Lilac project,
 do ~make lilac.larc~.
+
+Finally, add a rule to clean up compilation artifacts, for debugging.
+
+#+name: make:Clean
+#+begin_src makefile
+clean:
+	rm -rf \
+		lilac.larc \
+		$(obj_files) \
+		site/*
+.PHONY: clean
+#+end_src
 
 *** Tangle Lilac with Lilac
 :PROPERTIES:
