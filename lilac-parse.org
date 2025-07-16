@@ -61,7 +61,11 @@ import Lilac.Types
     Level (Level, indent, number),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
-    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
+    LinkTarget
+      ( LinkTargetFilePath,
+        LinkTargetOid,
+        LinkTargetURI
+      ),
     ListMarker
       ( LItemEnd,
         LItemStart,
@@ -245,7 +249,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:linkDisplayNameParser>>
 <<f:failIfVerbatimOrCode>>
 <<f:protocolWebLinkParser>>
-<<f:otherLinkParser>>
+<<f:fileLinkParser>>
 <<f:rawLinkParser>>
 <<f:mathFragmentInlineParser>>
 <<f:paragraphParser>>
@@ -2220,14 +2224,24 @@ data Link = Link
 #+end_src
 
 The [[data:LinkTarget]] is a rich definition of the kind of target we are linking
-to. For now, this data structure only supports the following two main cases:
+to. For now, this data structure only supports the following cases:
 
   1) [[data:LinkOid]] (links to either another part of the current Org document or
-     another (external) Org document)
+     another (external) Org document).
 
-  2) URI (a typical web link, most common example being =https://...=)
+  2) URI (a typical web link, most common example being =https://...=).
 
-All other links are just captured in the generic ~LinkTargetOther~ constructor.
+  3) File path. These links are only useful because they let you go open that
+     file on disk locally in Emacs. On weaving these links are checked if they
+     refer to a path inside the current Git repo. If they are inside, then we
+     calculate what the link /should/ target (based on weaving configuration),
+     assuming that the entire Git repo is also being served somewhere on the
+     internet.
+
+     If the file path is pointing to a place outside the Git repo, then on
+     weaving we display it as a path description (and not as a link), because
+     the link will be broken anyway (again, assuming that only the content
+     inside the Git repo is accessible by a link).
 
 #+name: data:LinkTarget
 #+begin_src haskell
@@ -2235,7 +2249,7 @@ type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
   | LinkTargetURI N.URI
-  | LinkTargetOther Text Text
+  | LinkTargetFilePath FilePath
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
@@ -2291,9 +2305,10 @@ In summary we support the following link types in an Org document:
     common types of links on the internet, the most famous example being
     anything that looks like =https://...= or =http://...=.
 
-  - ~LinkTargetOther~ :: all other links. This is basically a catch-all, and will
-    eventually be removed when we've enumerated all of the different
-    types of link targets.
+  - LinkTargetFilePath :: a link to a file. Although this is arbitrary when
+    using Emacs, it has a limitation on weaving --- only those files that are
+    also being served by the web server that is serving that page will be linked
+    (otherwise the link will be broken).
 
 There are also [[id:8fe81206-f50d-4200-a95e-99278e0ad410][Raw links]] which is prose text that looks like a URL. For example,
 https://www.haskell.org is an example of a raw link. This is a convenience
@@ -2314,7 +2329,7 @@ linkParser = do
   MP.choice
     [ MP.try oidLinkParser,
       MP.try protocolWebLinkParser,
-      MP.try otherLinkParser,
+      MP.try fileLinkParser,
       MP.try rawLinkParser
     ]
 #+end_src
@@ -2915,57 +2930,63 @@ p
   )
 #+end_src
 
-*** Other links
+*** Filesystem links
 
-All other links are simply called ~LinkTargetOther~. For now, these links are any
-links found in double brackets. They can target both external resources, such as
-a web page on the internet or a file on disk, or internal ones (to some other
-point in the Org document). In the future it is expected that we will enrich the
-different kinds of links in [[data:LinkTarget]], such that the percentage of
-~LinkTargetOther~ is very low when we finish parsing an Org file.
-
-A URL link looks [[https://kernel.org][like this]]. A link to a file can look [[file:README.org][like this]]. Note that their
-format allows them to be named differently than the raw address. That's why the
-two links earlier in this paragraph are displayed as "like this". The format is
+Orgmode lets you create links like
 
 #+begin_src org
-[[target][name]]
+[[file:foo]]
 #+end_src
 
-where ~[name]~ is optional. If it is omitted, then the ~target~ part is used as the
-name.
+where ~foo~ is a path on the local filesystem (you can select the path using
+completion from Emacs). These links are useful for linking out to a file which
+you can open up using Emacs.
 
-#+name: f:otherLinkParser
+On weaving, these links only get converted to a real HTML link if the target is
+something that is also already tracked by the Git repo that we're in.
+
+#+name: f:fileLinkParser
 #+begin_src haskell
-otherLinkParser :: OrgParser Link
-otherLinkParser = do
-  _ <- string "[["
-  (protocol, target) <- otherTargetParser
-  _ <- string "]"
+fileLinkParser :: OrgParser Link
+fileLinkParser = do
+  maybeFilePath <-
+    MP.between
+      (string "[[")
+      (string "]")
+      filePathParser
+
   orgParserState <- get
-  let implicitNameStyledText =
+  let mask = orgParserState.styleMask
+      implicitName = maybeFilePath
+      implicitNameStyledText =
         StyledText
-          { body = protocol <> ":" <> target,
-            style = orgParserState.styleMask
+          { body = implicitName,
+            style = mask
           }
+      filePath = T.unpack maybeFilePath
   displayName <-
     MP.choice
       [ MP.try $ string "]" >> pure [implicitNameStyledText],
         MP.try linkDisplayNameParser
       ]
-  pure
-    Link
-      { target = LinkTargetOther protocol target,
-        name = displayName
-      }
+  if
+    | Just osPath <- P.encodeUtf filePath,
+      P.isValid osPath ->
+        pure
+          $ Link
+            { target = LinkTargetFilePath filePath,
+              name = displayName
+            }
+    | otherwise -> fail $ "not a valid file path: " <> filePath
   where
-    otherTargetParser :: OrgParser (Text, Text)
-    otherTargetParser = do
-      protocol <- MP.takeWhile1P (Just "protocol") (`notElem` (":[]" :: String))
-      _ <- string ":"
-      target <- MP.takeWhile1P (Just "target") (/= ']')
-      pure (protocol, target)
+    filePathParser :: OrgParser Text
+    filePathParser = do
+      _ <- string "file:"
+      fp <- MP.takeWhile1P (Just "name character") (/= ']')
+      pure fp
 #+end_src
+
+Here are some basic links.
 
 #+header: :tangle test/Lilac/ParseSpec/0006-links
 #+begin_src org
@@ -3076,11 +3097,11 @@ ps
     }
 #+end_src
 
-Bracketed links can be preceded by ~(~ which means [[f:otherLinkParser]] won't be
+Bracketed links can be preceded by ~(~ which means [[f:linkParser]] won't be
 able to parse it directly; however, in [[f:textParser]] (specifically ~normalChar~) we
 take care to ensure to stop consuming input if we see a double left bracket ~[[~.
 This way, the input will look like ~[[...~ which will then allow
-[[f:otherLinkParser]] to parse it.
+[[f:linkParser]] to parse it.
 
 #+header: :tangle test/Lilac/ParseSpec/0006-links-inside-parentheses
 #+begin_src org
@@ -3101,10 +3122,10 @@ p
             ),
           PTokenLink
             ( Link
-                { target = LinkTargetOther "file" "foo/bar",
+                { target = LinkTargetFilePath "foo/bar",
                   name =
                     [ StyledText
-                        { body = "file:foo/bar",
+                        { body = "foo/bar",
                           style = L.styleMaskFrom []
                         }
                     ]
@@ -4948,8 +4969,7 @@ correctness of the indentation following a newline (it does not take an
 the case where OID links are found in prose, because sometimes indentation can
 get silently added when using =fill-paragraph= in Emacs (if the OID link target
 gets unlucky and ends up getting hard wrapped by =fill-paragraph=). Otherwise,
-this parser will fail and the catch-all [[f:otherLinkParser]] will succeed, which
-would then make the OID link become wrongly parsed.
+this parser will fail, which would then make the OID link become wrongly parsed.
 
 Now we could punish the user for having erroneous indentation, but because
 =org-toggle-link-display= can hide this error caused by =fill-paragraph= (and
@@ -7313,13 +7333,13 @@ figureParser = do
   orgParserState <- get
   when (orgParserState.listLevels /= [])
     $ fail "figures are not allowed inside list items"
-  _ <- MP.try $ MP.lookAhead (metaParser >> otherLinkParser >> endOfCell)
+  _ <- MP.try $ MP.lookAhead (metaParser >> fileLinkParser >> endOfCell)
   metaKVs <- metaParser
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
-  link <- otherLinkParser
+  link <- fileLinkParser
   case link.target of
-    LinkTargetOther "file" _ ->
+    LinkTargetFilePath _ ->
       pure
         . CFigure
         $ Figure
@@ -7327,8 +7347,7 @@ figureParser = do
             link = link
           }
     LinkTargetOid {}
-    LinkTargetURI {}
-    LinkTargetOther {} -> fail "'file:...' required for link to figures"
+    LinkTargetURI {} -> fail "'file:...' required for link to figures"
   where
     endOfCell :: OrgParser ()
     endOfCell =
@@ -7448,10 +7467,10 @@ ps
                   ],
               link =
                 Link
-                  { target = LinkTargetOther "file" "image/hello.png",
+                  { target = LinkTargetFilePath "image/hello.png",
                     name =
                       [ StyledText
-                          { body = "file:image/hello.png",
+                          { body = "image/hello.png",
                             style = L.styleMaskFrom []
                           }
                       ]
@@ -7474,10 +7493,10 @@ ps
             { meta = fromList [],
               link =
                 Link
-                  { target = LinkTargetOther "file" "image/world.png",
+                  { target = LinkTargetFilePath "image/world.png",
                     name =
                       [ StyledText
-                          { body = "file:image/world.png",
+                          { body = "image/world.png",
                             style = L.styleMaskFrom []
                           }
                       ]
@@ -7490,10 +7509,10 @@ ps
         CParagraph
           [ PTokenLink
               Link
-                { target = LinkTargetOther "file" "not-figure",
+                { target = LinkTargetFilePath "not-figure",
                   name =
                     [ StyledText
-                        { body = "file:not-figure",
+                        { body = "not-figure",
                           style = L.styleMaskFrom []
                         }
                     ]
@@ -7542,10 +7561,10 @@ ps
             { meta = fromList [],
               link =
                 Link
-                  { target = LinkTargetOther "file" "foo.png",
+                  { target = LinkTargetFilePath "foo.png",
                     name =
                       [ StyledText
-                          { body = "file:foo.png",
+                          { body = "foo.png",
                             style = L.styleMaskFrom []
                           }
                       ]
@@ -8173,7 +8192,11 @@ import Lilac.Types
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
-    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
+    LinkTarget
+      ( LinkTargetFilePath,
+        LinkTargetOid,
+        LinkTargetURI
+      ),
     ListMarker
       ( LItemEnd,
         LItemStart,

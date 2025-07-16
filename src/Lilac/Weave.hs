@@ -15,7 +15,11 @@ import Lilac.Types
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, section),
     Link (Link, name, target),
-    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
+    LinkTarget
+      ( LinkTargetFilePath,
+        LinkTargetOid,
+        LinkTargetURI
+      ),
     ListMarker
       ( LItemEnd,
         LItemStart,
@@ -246,8 +250,8 @@ weavePToken = \case
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
   LinkTargetOid {} -> False
+  LinkTargetFilePath {} -> True
   LinkTargetURI {} -> True
-  LinkTargetOther {} -> True
 
 weaveStyledText :: StyledText -> HtmlWeaver ()
 weaveStyledText styledText = do
@@ -373,8 +377,8 @@ weaveLink link = do
         | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
         where
           htmlExt = P.unsafeEncodeUtf "html"
+      LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
-      LinkTargetOther protocol target -> protocol <> ":" <> target
 
 renderAsText :: WeaveConf -> HtmlWeaver a -> Text
 renderAsText weaveConf weaver =

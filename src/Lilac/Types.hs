@@ -200,7 +200,7 @@ type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
   | LinkTargetURI N.URI
-  | LinkTargetOther Text Text
+  | LinkTargetFilePath FilePath
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 

@@ -21,7 +21,11 @@ import Lilac.Types
     Heading (body, meta),
     Link (Link, target),
     LinkOid (LinkOid, name, oid),
-    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
+    LinkTarget
+      ( LinkTargetFilePath,
+        LinkTargetOid,
+        LinkTargetURI
+      ),
     MathFragment (meta),
     OID,
     Object (Object, externalOids, orgDoc, symbols),
@@ -241,6 +245,6 @@ findExternalOids orgDoc =
         if member linkOid symbols
           then acc
           else linkOid : acc
-      LinkTargetURI {}
-      LinkTargetOther {} -> acc
+      LinkTargetFilePath {}
+      LinkTargetURI {} -> acc
     symbols = mkSymbols orgDoc

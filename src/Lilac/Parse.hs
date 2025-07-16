@@ -31,7 +31,11 @@ import Lilac.Types
     Level (Level, indent, number),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
-    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
+    LinkTarget
+      ( LinkTargetFilePath,
+        LinkTargetOid,
+        LinkTargetURI
+      ),
     ListMarker
       ( LItemEnd,
         LItemStart,
@@ -720,7 +724,7 @@ linkParser = do
   MP.choice
     [ MP.try oidLinkParser,
       MP.try protocolWebLinkParser,
-      MP.try otherLinkParser,
+      MP.try fileLinkParser,
       MP.try rawLinkParser
     ]
 
@@ -793,34 +797,43 @@ protocolWebLinkParser = do
       rest <- MP.takeWhile1P (Just "name character") (/= ']')
       pure $ protocol <> rest
 
-otherLinkParser :: OrgParser Link
-otherLinkParser = do
-  _ <- string "[["
-  (protocol, target) <- otherTargetParser
-  _ <- string "]"
+fileLinkParser :: OrgParser Link
+fileLinkParser = do
+  maybeFilePath <-
+    MP.between
+      (string "[[")
+      (string "]")
+      filePathParser
+
   orgParserState <- get
-  let implicitNameStyledText =
+  let mask = orgParserState.styleMask
+      implicitName = maybeFilePath
+      implicitNameStyledText =
         StyledText
-          { body = protocol <> ":" <> target,
-            style = orgParserState.styleMask
+          { body = implicitName,
+            style = mask
           }
+      filePath = T.unpack maybeFilePath
   displayName <-
     MP.choice
       [ MP.try $ string "]" >> pure [implicitNameStyledText],
         MP.try linkDisplayNameParser
       ]
-  pure
-    Link
-      { target = LinkTargetOther protocol target,
-        name = displayName
-      }
+  if
+    | Just osPath <- P.encodeUtf filePath,
+      P.isValid osPath ->
+        pure
+          $ Link
+            { target = LinkTargetFilePath filePath,
+              name = displayName
+            }
+    | otherwise -> fail $ "not a valid file path: " <> filePath
   where
-    otherTargetParser :: OrgParser (Text, Text)
-    otherTargetParser = do
-      protocol <- MP.takeWhile1P (Just "protocol") (`notElem` (":[]" :: String))
-      _ <- string ":"
-      target <- MP.takeWhile1P (Just "target") (/= ']')
-      pure (protocol, target)
+    filePathParser :: OrgParser Text
+    filePathParser = do
+      _ <- string "file:"
+      fp <- MP.takeWhile1P (Just "name character") (/= ']')
+      pure fp
 
 rawLinkParser :: OrgParser Link
 rawLinkParser = do
@@ -1478,13 +1491,13 @@ figureParser = do
   orgParserState <- get
   when (orgParserState.listLevels /= [])
     $ fail "figures are not allowed inside list items"
-  _ <- MP.try $ MP.lookAhead (metaParser >> otherLinkParser >> endOfCell)
+  _ <- MP.try $ MP.lookAhead (metaParser >> fileLinkParser >> endOfCell)
   metaKVs <- metaParser
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
-  link <- otherLinkParser
+  link <- fileLinkParser
   case link.target of
-    LinkTargetOther "file" _ ->
+    LinkTargetFilePath _ ->
       pure
         . CFigure
         $ Figure
@@ -1492,8 +1505,7 @@ figureParser = do
             link = link
           }
     LinkTargetOid {}
-    LinkTargetURI {}
-    LinkTargetOther {} -> fail "'file:...' required for link to figures"
+    LinkTargetURI {} -> fail "'file:...' required for link to figures"
   where
     endOfCell :: OrgParser ()
     endOfCell =

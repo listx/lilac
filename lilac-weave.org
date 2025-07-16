@@ -71,7 +71,11 @@ import Lilac.Types
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
     Heading (body, level, section),
     Link (Link, name, target),
-    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
+    LinkTarget
+      ( LinkTargetFilePath,
+        LinkTargetOid,
+        LinkTargetURI
+      ),
     ListMarker
       ( LItemEnd,
         LItemStart,
@@ -709,8 +713,7 @@ spliceLinks colorized links = do
     $ drop 1 colorizedStrs
 #+end_src
 
-Weaving links is not yet fully supported (in particular ~LinkTargetOther~ is
-broken for non-external links).
+Weaving links is fairly straightforward.
 
 #+name: f:weaveLink
 #+begin_src haskell
@@ -741,8 +744,8 @@ weaveLink link = do
         | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
         where
           htmlExt = P.unsafeEncodeUtf "html"
+      LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
-      LinkTargetOther protocol target -> protocol <> ":" <> target
 #+end_src
 
 [[f:isExternalLink]] checks if .
@@ -752,8 +755,8 @@ weaveLink link = do
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
   LinkTargetOid {} -> False
+  LinkTargetFilePath {} -> True
   LinkTargetURI {} -> True
-  LinkTargetOther {} -> True
 #+end_src
 
 *** Link anchor

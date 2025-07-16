@@ -12,7 +12,11 @@ import Lilac.Types
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
-    LinkTarget (LinkTargetOid, LinkTargetOther, LinkTargetURI),
+    LinkTarget
+      ( LinkTargetFilePath,
+        LinkTargetOid,
+        LinkTargetURI
+      ),
     ListMarker
       ( LItemEnd,
         LItemStart,
@@ -935,10 +939,10 @@ parseSpec = do
               ),
             PTokenLink
               ( Link
-                  { target = LinkTargetOther "file" "foo/bar",
+                  { target = LinkTargetFilePath "foo/bar",
                     name =
                       [ StyledText
-                          { body = "file:foo/bar",
+                          { body = "foo/bar",
                             style = L.styleMaskFrom []
                           }
                       ]
@@ -2403,10 +2407,10 @@ parseSpec = do
                     ],
                 link =
                   Link
-                    { target = LinkTargetOther "file" "image/hello.png",
+                    { target = LinkTargetFilePath "image/hello.png",
                       name =
                         [ StyledText
-                            { body = "file:image/hello.png",
+                            { body = "image/hello.png",
                               style = L.styleMaskFrom []
                             }
                         ]
@@ -2429,10 +2433,10 @@ parseSpec = do
               { meta = fromList [],
                 link =
                   Link
-                    { target = LinkTargetOther "file" "image/world.png",
+                    { target = LinkTargetFilePath "image/world.png",
                       name =
                         [ StyledText
-                            { body = "file:image/world.png",
+                            { body = "image/world.png",
                               style = L.styleMaskFrom []
                             }
                         ]
@@ -2445,10 +2449,10 @@ parseSpec = do
           CParagraph
             [ PTokenLink
                 Link
-                  { target = LinkTargetOther "file" "not-figure",
+                  { target = LinkTargetFilePath "not-figure",
                     name =
                       [ StyledText
-                          { body = "file:not-figure",
+                          { body = "not-figure",
                             style = L.styleMaskFrom []
                           }
                       ]
@@ -2497,10 +2501,10 @@ parseSpec = do
               { meta = fromList [],
                 link =
                   Link
-                    { target = LinkTargetOther "file" "foo.png",
+                    { target = LinkTargetFilePath "foo.png",
                       name =
                         [ StyledText
-                            { body = "file:foo.png",
+                            { body = "foo.png",
                               style = L.styleMaskFrom []
                             }
                         ]
