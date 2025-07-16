@@ -396,6 +396,35 @@ checkExternalOids
   ]
 #+end_src
 
+Here's a more complicated external link.
+
+#+header: :tangle test/Lilac/CompileSpec/0400-external-symbols-newlines
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d002
+:END:
+
+Hello [[id:ffffffff-0000-0000-0000-00000000d001::Hello
+World]]. Another one: [[id:ffffffff-0000-0000-0000-00000000d001::a b c
+d e][a b c d e]].
+#+end_src
+
+#+name: t:0400-external-symbols-newlines
+#+begin_src haskell
+checkExternalOids
+  "0400-external-symbols-newlines"
+  [ LinkOid
+      { oid = fromWords 0xffffffff00000000 0x000000000000d001,
+        name = "Hello World"
+      },
+    LinkOid
+      { oid = fromWords 0xffffffff00000000 0x000000000000d001,
+        name = "a b c d e"
+      }
+  ]
+#+end_src
+
 ** Archives
 :PROPERTIES:
 :ID:       25827c17-2015-434b-b686-db3d72b2ee4d
@@ -1427,6 +1456,7 @@ compileSpec = do
   <<t:0400-no-external-symbols-code-blocks>>
   <<t:0400-no-external-symbols-complex>>
   <<t:0400-external-symbols>>
+  <<t:0400-external-symbols-newlines>>
   <<t:0401-broken-links-noweb>>
   <<t:0401-broken-links-paragraph>>
   <<t:0401-broken-links-paragraph-ok>>

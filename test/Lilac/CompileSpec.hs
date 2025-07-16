@@ -100,6 +100,18 @@ compileSpec = do
         }
     ]
 
+  checkExternalOids
+    "0400-external-symbols-newlines"
+    [ LinkOid
+        { oid = fromWords 0xffffffff00000000 0x000000000000d001,
+          name = "Hello World"
+        },
+      LinkOid
+        { oid = fromWords 0xffffffff00000000 0x000000000000d001,
+          name = "a b c d e"
+        }
+    ]
+
   expectArchiveError
     ["0401-broken-links-noweb"]
     """
