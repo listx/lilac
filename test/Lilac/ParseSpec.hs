@@ -1560,6 +1560,36 @@ parseSpec = do
         ]
     )
 
+  p
+    "0006-links-oids-lenient-whitespace"
+    ( nilOrgDoc
+        [ CParagraph
+            [ PTokenStyledText
+                ( StyledText
+                    { body = "Hello ",
+                      style = L.styleMaskFrom []
+                    }
+                ),
+              PTokenLink
+                ( Link
+                    { target =
+                        LinkTargetOid
+                          LinkOid
+                            { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                              name = "target name with newline and space is still treated as space"
+                            },
+                      name =
+                        [ StyledText
+                            { body = "foo",
+                              style = L.styleMaskFrom []
+                            }
+                        ]
+                    }
+                )
+            ]
+        ]
+    )
+
   pf
     "0007-block-src-without-lang"
     "block type src requires a language specifier"

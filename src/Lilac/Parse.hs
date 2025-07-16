@@ -1123,16 +1123,18 @@ oidReferenceParser disallowedChars =
     targetName :: OrgParser Text
     targetName = do
       orgParserState <- get
-      proseParser'
-        $ proseSpaceConsumer'
-          orgParserState.continuationIndent
-          orgParserState.insideCodeBlock
-    proseSpaceConsumer' :: Int -> Bool -> OrgParser Text
-    proseSpaceConsumer' expectedIndentLen insideCodeBlock
+      tn <-
+        proseParser'
+          $ proseSpaceConsumer'
+            orgParserState.insideCodeBlock
+      pure $ compressWhitespace tn
+    compressWhitespace = T.unwords . T.words
+    proseSpaceConsumer' :: Bool -> OrgParser Text
+    proseSpaceConsumer' insideCodeBlock
       | insideCodeBlock = spaces
       | otherwise =
           MP.choice
-            [ newlineAndIndentParser expectedIndentLen,
+            [ string "\n",
               spaces
             ]
       where

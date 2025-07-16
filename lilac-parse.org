@@ -2716,6 +2716,55 @@ p
   )
 #+end_src
 
+If we encounter a link in the middle of a paragraph (where the ~OID~ portion is
+broken up incorrectly such that there is additional white space at the beginning
+of a line), we should still be able to parse the ~\n ~ as a single space
+character because that's almost always the intent. This situation can happen
+when invoking =fill-paragraph= in Emacs with =org-toggle-link-display=.
+
+So in [[t:0006-links-oids-lenient-whitespace]], even though the string (if we parse
+it naively) should look like ~with\n newline~, that ~\n ~ will get compressed so
+that we just get ~with newline~ instead.
+
+#+header: :tangle test/Lilac/ParseSpec/0006-links-oids-lenient-whitespace
+#+begin_src org
+Hello [[id:442c807f-c9d9-45a7-88bf-ffffffffffff::target name with
+ newline and space is still treated as space][foo]]
+#+end_src
+
+#+name: t:0006-links-oids-lenient-whitespace
+#+begin_src haskell
+p
+  "0006-links-oids-lenient-whitespace"
+  ( nilOrgDoc
+      [ CParagraph
+          [ PTokenStyledText
+              ( StyledText
+                  { body = "Hello ",
+                    style = L.styleMaskFrom []
+                  }
+              ),
+            PTokenLink
+              ( Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                            name = "target name with newline and space is still treated as space"
+                          },
+                    name =
+                      [ StyledText
+                          { body = "foo",
+                            style = L.styleMaskFrom []
+                          }
+                      ]
+                  }
+              )
+          ]
+      ]
+  )
+#+end_src
+
 *** Links to recognized web protocols
 
 Links to web protocols like ~https://~ should be parsed as a ~LinkTargetURI~, but
@@ -4844,16 +4893,18 @@ oidReferenceParser disallowedChars =
     targetName :: OrgParser Text
     targetName = do
       orgParserState <- get
-      proseParser'
-        $ proseSpaceConsumer'
-          orgParserState.continuationIndent
-          orgParserState.insideCodeBlock
-    proseSpaceConsumer' :: Int -> Bool -> OrgParser Text
-    proseSpaceConsumer' expectedIndentLen insideCodeBlock
+      tn <-
+        proseParser'
+          $ proseSpaceConsumer'
+            orgParserState.insideCodeBlock
+      pure $ compressWhitespace tn
+    compressWhitespace = T.unwords . T.words
+    proseSpaceConsumer' :: Bool -> OrgParser Text
+    proseSpaceConsumer' insideCodeBlock
       | insideCodeBlock = spaces
       | otherwise =
           MP.choice
-            [ newlineAndIndentParser expectedIndentLen,
+            [ string "\n",
               spaces
             ]
       where
@@ -4890,6 +4941,22 @@ oidReferenceParser disallowedChars =
           notElem c disallowedChars
             && (not $ isSpace c)
 #+end_src
+
+Unlike [[f:proseSpaceConsumer]], the ~proseSpaceConsumer'~ does *not* check for the
+correctness of the indentation following a newline (it does not take an
+~expectedIndentLen~ parameter). This is because we want to be more generous for
+the case where OID links are found in prose, because sometimes indentation can
+get silently added when using =fill-paragraph= in Emacs (if the OID link target
+gets unlucky and ends up getting hard wrapped by =fill-paragraph=). Otherwise,
+this parser will fail and the catch-all [[f:otherLinkParser]] will succeed, which
+would then make the OID link become wrongly parsed.
+
+Now we could punish the user for having erroneous indentation, but because
+=org-toggle-link-display= can hide this error caused by =fill-paragraph= (and
+because the link target contents will be hidden), we take the approach of being
+a bit lenient here. We still disallow newlines inside the link target inside
+code blocks, which is why ~insideCodeBlock~ is still a parameter for
+~proseSpaceConsumer'~. See [[t:0006-links-oids-lenient-whitespace]] for a test case.
 
 Below we check a typical case with some Noweb references in it. Note that we
 have to set =#+header: :noweb off= here because otherwise Orgmode will think
@@ -8483,6 +8550,7 @@ parseSpec = do
   <<t:0006-links>>
   <<t:0006-links-web-protocols>>
   <<t:0006-links-oids>>
+  <<t:0006-links-oids-lenient-whitespace>>
   <<t:0007-block-src-without-lang>>
   <<t:0007-blocks-empty>>
   <<t:0007-blocks-ending>>
