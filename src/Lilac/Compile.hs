@@ -101,6 +101,14 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
                   cell
                 )
               ]
+          | Just tanglePath <- lookup "tangle" cellMeta =
+              [ ( LinkOid
+                    { oid = oid,
+                      name = tanglePath <> "\NUL"
+                    },
+                  cell
+                )
+              ]
           | otherwise = []
 
 mkArchive :: [(GPath, Object)] -> Either String Archive
