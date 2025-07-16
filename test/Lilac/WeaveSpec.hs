@@ -4,8 +4,7 @@ import Data.Text qualified as T
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( OID,
-    WeaveConf (WeaveConf, archive, originObjectPath, watch),
+  ( WeaveConf (WeaveConf, archive, originObjectPath, watch),
     encodeGPath,
     nilOidOrgDoc,
   )
@@ -16,13 +15,11 @@ import Relude
     Either (Left, Right),
     FilePath,
     IO,
-    Map,
     String,
     Text,
     foldl',
     fst,
     map,
-    mempty,
     pure,
     reverse,
     runStateT,
@@ -33,7 +30,6 @@ import Relude
     (<>),
     (==),
   )
-import System.OsPath (OsPath)
 import Test.Hspec
   ( Expectation,
     Spec,
