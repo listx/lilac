@@ -65,13 +65,13 @@ watch()
 main()
 {
 	watch \
-		"${SCRIPT_ROOT}/lilac.org" \
-		"${SCRIPT_ROOT}/lilac-compile.org" \
-		"${SCRIPT_ROOT}/lilac-parse.org" \
-		"${SCRIPT_ROOT}/lilac-tangle.org" \
-		"${SCRIPT_ROOT}/lilac-types.org" \
-		"${SCRIPT_ROOT}/lilac-weave.org" \
-		"${SCRIPT_ROOT}/fe.org"
+		"${SCRIPT_ROOT}/base/lilac.org" \
+		"${SCRIPT_ROOT}/base/lilac-compile.org" \
+		"${SCRIPT_ROOT}/base/lilac-parse.org" \
+		"${SCRIPT_ROOT}/base/lilac-tangle.org" \
+		"${SCRIPT_ROOT}/base/lilac-types.org" \
+		"${SCRIPT_ROOT}/base/lilac-weave.org" \
+		"${SCRIPT_ROOT}/base/fe.org"
 }
 
 main "$@"

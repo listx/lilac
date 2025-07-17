@@ -14,7 +14,7 @@ known_not_tangled=(
 	nix/sources.nix
 
 	# Images.
-	image/PNG-Gradient.png
+	base/image/PNG-Gradient.png
 
 	.vale/styles/.gitkeep
 )

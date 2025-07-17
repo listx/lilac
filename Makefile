@@ -1,12 +1,12 @@
 org_files = \
-	lilac.org \
-	lilac-compile.org \
-	lilac-parse.org \
-	lilac-tangle.org \
-	lilac-types.org \
-	lilac-weave.org \
-	fe.org
-backend_org_files = $(filter-out fe.org,$(org_files))
+	base/lilac.org \
+	base/lilac-compile.org \
+	base/lilac-parse.org \
+	base/lilac-tangle.org \
+	base/lilac-types.org \
+	base/lilac-weave.org \
+	base/fe.org
+backend_org_files = $(filter-out base/fe.org,$(org_files))
 
 test: $(org_files)
 	cabal test --test-show-details=direct --test-option=--format=progress
@@ -22,19 +22,19 @@ $(obj_files) &: $(org_files)
 	lilac compile $?
 	touch $(obj_files)
 
-lilac.larc: $(obj_files)
+base/lilac.larc: $(obj_files)
 	lilac archive $^ --out-file $@
 
-tangle: lilac.larc
-	lilac tangle lilac.larc
+tangle: base/lilac.larc
+	lilac tangle base/lilac.larc --out-dir .
 	touch tangle
 
-weave: lilac.larc
-	lilac weave --out-dir site --watch $<
+weave: base/lilac.larc
+	lilac weave --watch $<
 	touch weave
 
 serve:
-	python3 -m http.server 8080 -d site
+	python3 -m http.server 8080 -d .
 
 build: $(org_files) lilac.cabal
 	cabal build
@@ -52,7 +52,7 @@ update-nix:
 
 clean:
 	rm -rf \
-		lilac.larc \
+		base/lilac.larc \
 		$(obj_files) \
 		site/*
 .PHONY: clean

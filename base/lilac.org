@@ -443,8 +443,9 @@ cabal.project.local
 dist-newstyle
 orgdoc.json
 result*
-site*
 ,*~
+,*.css
+,*.html
 ,*.larc
 ,*.lobj
 
@@ -694,14 +695,14 @@ The Org files are all of the files that make up this project.
 #+name: make:Org files
 #+begin_src makefile
 org_files = \
-	lilac.org \
-	lilac-compile.org \
-	lilac-parse.org \
-	lilac-tangle.org \
-	lilac-types.org \
-	lilac-weave.org \
-	fe.org
-backend_org_files = $(filter-out fe.org,$(org_files))
+	base/lilac.org \
+	base/lilac-compile.org \
+	base/lilac-parse.org \
+	base/lilac-tangle.org \
+	base/lilac-types.org \
+	base/lilac-weave.org \
+	base/fe.org
+backend_org_files = $(filter-out base/fe.org,$(org_files))
 #+end_src
 
 Because we tangle Lilac with itself, we want to separate out just the tangling
@@ -882,7 +883,7 @@ object files are missing or newer than ~lilac.larc~.
 
 #+name: make:Build archive
 #+begin_src makefile
-lilac.larc: $(obj_files)
+base/lilac.larc: $(obj_files)
 	lilac archive $^ --out-file $@
 #+end_src
 
@@ -895,7 +896,7 @@ Finally, add a rule to clean up compilation artifacts, for debugging.
 #+begin_src makefile
 clean:
 	rm -rf \
-		lilac.larc \
+		base/lilac.larc \
 		$(obj_files) \
 		site/*
 .PHONY: clean
@@ -910,8 +911,8 @@ We can tangle Lilac with Lilac itself.
 
 #+name: make:Tangle sources
 #+begin_src makefile
-tangle: lilac.larc
-	lilac tangle lilac.larc
+tangle: base/lilac.larc
+	lilac tangle base/lilac.larc --out-dir .
 	touch tangle
 #+end_src
 
@@ -1010,13 +1011,13 @@ watch()
 main()
 {
 	watch \
-		"${SCRIPT_ROOT}/lilac.org" \
-		"${SCRIPT_ROOT}/lilac-compile.org" \
-		"${SCRIPT_ROOT}/lilac-parse.org" \
-		"${SCRIPT_ROOT}/lilac-tangle.org" \
-		"${SCRIPT_ROOT}/lilac-types.org" \
-		"${SCRIPT_ROOT}/lilac-weave.org" \
-		"${SCRIPT_ROOT}/fe.org"
+		"${SCRIPT_ROOT}/base/lilac.org" \
+		"${SCRIPT_ROOT}/base/lilac-compile.org" \
+		"${SCRIPT_ROOT}/base/lilac-parse.org" \
+		"${SCRIPT_ROOT}/base/lilac-tangle.org" \
+		"${SCRIPT_ROOT}/base/lilac-types.org" \
+		"${SCRIPT_ROOT}/base/lilac-weave.org" \
+		"${SCRIPT_ROOT}/base/fe.org"
 }
 
 main "$@"
@@ -1052,8 +1053,8 @@ For weaving, use the =site= directory.
 
 #+name: make:Weave
 #+begin_src makefile
-weave: lilac.larc
-	lilac weave --out-dir site --watch $<
+weave: base/lilac.larc
+	lilac weave --watch $<
 	touch weave
 #+end_src
 
@@ -1340,7 +1341,7 @@ known_not_tangled=(
 	nix/sources.nix
 
 	# Images.
-	image/PNG-Gradient.png
+	base/image/PNG-Gradient.png
 
 	.vale/styles/.gitkeep
 )
