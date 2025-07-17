@@ -346,9 +346,8 @@ lilacCompile _globalOpts compileOpts = do
     writeObjToPath :: (ToJSON a) => (a, OsPath) -> IO ()
     writeObjToPath (obj, inputPath) = do
       outPath <- do
-        let base = P.takeBaseName inputPath
-            objExtension = P.unsafeEncodeUtf "lobj"
-        P.decodeUtf $ P.addExtension base objExtension
+        let base = P.replaceExtension inputPath $ P.unsafeEncodeUtf "lobj"
+        P.decodeUtf base
       writeJSONPretty outPath obj
 
 lilacArchive :: ArchiveOpts -> IO ()
@@ -358,9 +357,8 @@ lilacArchive archiveOpts = do
     Left errMsg -> die errMsg
     Right archive -> do
       outPath <- do
-        let base = P.takeBaseName archiveOpts.outFile
-            objExtension = P.unsafeEncodeUtf "larc"
-        P.decodeUtf $ P.addExtension base objExtension
+        let base = P.replaceExtension archiveOpts.outFile $ P.unsafeEncodeUtf "larc"
+        P.decodeUtf base
       writeJSONPretty outPath archive
   where
     readObjectDirectly :: GPath -> IO (GPath, Object)
@@ -451,10 +449,9 @@ weaveToDisk weaveOpts archive acc objPath obj =
             watch = weaveOpts.watch
           }
       fp = decodeGPath objPath
-      base = P.takeBaseName $ P.unsafeEncodeUtf fp
-      withoutExtension = P.joinPath [weaveOpts.outDir, base]
-      html = P.unsafeEncodeUtf "html"
-      outPath = P.addExtension withoutExtension html
+      ext = P.unsafeEncodeUtf "html"
+      base = P.replaceExtension (P.unsafeEncodeUtf fp) ext
+      outPath = P.joinPath [weaveOpts.outDir, base]
       action =
         LU.writeFileRobustly outPath
           . LW.renderAsText weaveConf
