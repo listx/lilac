@@ -56,7 +56,7 @@ tangleSpec :: Spec
 tangleSpec = do
   checkExpansion
     ["0101-block-expansion"]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "a1",
             "b",
@@ -67,7 +67,7 @@ tangleSpec = do
 
   checkExpansion
     ["0101-block-expansion-deeply-nested"]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "a1",
             "e",
@@ -78,7 +78,7 @@ tangleSpec = do
 
   checkExpansion
     ["0101-block-expansion-prefix"]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "  b1",
             "  b2",
@@ -93,7 +93,7 @@ tangleSpec = do
 
   checkExpansion
     ["0101-block-expansion-prefix-nested"]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "a1",
             "  b1",
@@ -107,7 +107,7 @@ tangleSpec = do
 
   checkExpansion
     ["0101-block-expansion-prefix-nonspace"]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "a1",
             "  -> b1",
@@ -119,7 +119,7 @@ tangleSpec = do
 
   checkExpansion
     ["0101-block-expansion-prefix-nonspace-nested"]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "a1",
             "  -> b1",
@@ -133,7 +133,7 @@ tangleSpec = do
 
   checkExpansion
     ["0101-block-expansion-complex"]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "a1",
             "b",
@@ -157,7 +157,7 @@ tangleSpec = do
     [ "0101-block-expansion-external-parent",
       "0101-block-expansion-external-child"
     ]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "a1",
             "hello from child",
@@ -170,7 +170,7 @@ tangleSpec = do
     [ "0101-block-expansion-external-parent-headingchild",
       "0101-block-expansion-external-headingchild"
     ]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "a1",
             "hello from child",
@@ -184,7 +184,7 @@ tangleSpec = do
       "0101-block-expansion-external-2-hops-middleman",
       "0101-block-expansion-external-child"
     ]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "a1",
             "hello from middleman",
@@ -198,7 +198,7 @@ tangleSpec = do
     [ "0101-block-expansion-external-mutual-a",
       "0101-block-expansion-external-mutual-b"
     ]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "hello from a",
             "hello from b",
@@ -214,7 +214,7 @@ tangleSpec = do
 
   checkExpansion
     ["0102-pad-between-consecutive-links"]
-    [ ( "test/Lilac/TangleSpec/equations.txt",
+    [ ( "equations.txt",
         T.unlines
           [ "a1",
             "b1",
@@ -257,7 +257,7 @@ tangleSpec = do
 
   checkExpansion
     ["0103-shebang"]
-    [ ( "test/Lilac/TangleSpec/a.sh",
+    [ ( "a.sh",
         T.unlines
           [ "#!/usr/bin/env bash",
             "a1"

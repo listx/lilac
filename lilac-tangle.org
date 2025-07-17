@@ -25,18 +25,15 @@ Tangling concerns are captured in [[file:src/Lilac/Tangle.hs]].
 #+begin_src haskell
 module Lilac.Tangle (expandRootBlocks) where
 
-import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Types
   ( Archive (objects, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
-    GPath,
     Link (Link),
     LinkTarget (LinkTargetOid),
     Object (symbols),
-    decodeGPath,
   )
 import Relude
   ( Bool (False, True),
@@ -102,20 +99,18 @@ expandRootBlocks :: Archive -> OsPath -> [(OsPath, Text)]
 expandRootBlocks archive outDir = map expandRootBlock rootBlocks
   where
     rootBlocks =
-      concat $ M.foldlWithKey' getRootBlocksFromObject [] archive.objects
+      concat $ foldl' getRootBlocksFromObject [] archive.objects
     getRootBlocksFromObject ::
       [[(OsPath, Block)]] ->
-      GPath ->
       Object ->
       [[(OsPath, Block)]]
-    getRootBlocksFromObject acc objPath object =
-      foldl' (getRootBlock objPath) [] object.symbols : acc
-    getRootBlock objPath acc cell = case cell of
+    getRootBlocksFromObject acc object =
+      foldl' getRootBlock [] object.symbols : acc
+    getRootBlock acc cell = case cell of
       CBlock b
-        | Just path <- lookup "tangle" b.meta,
-          Just osPath <- P.encodeUtf $ T.unpack path,
-          Just osPathOfObject <- P.encodeUtf $ decodeGPath objPath ->
-            (P.combine (P.takeDirectory osPathOfObject) osPath, b) : acc
+        | Just tPath <- lookup "tangle" b.meta,
+          Just tOsPath <- P.encodeUtf $ T.unpack tPath ->
+            (P.combine outDir tOsPath, b) : acc
         | otherwise -> acc
       CHeading {}
       CListItem {}
@@ -247,7 +242,7 @@ b
 #+begin_src haskell
 checkExpansion
   ["0101-block-expansion"]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "a1",
           "b",
@@ -301,7 +296,7 @@ e
 #+begin_src haskell
 checkExpansion
   ["0101-block-expansion-deeply-nested"]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "a1",
           "e",
@@ -340,7 +335,7 @@ b3
 #+begin_src haskell
 checkExpansion
   ["0101-block-expansion-prefix"]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "  b1",
           "  b2",
@@ -391,7 +386,7 @@ c2
 #+begin_src haskell
 checkExpansion
   ["0101-block-expansion-prefix-nested"]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "a1",
           "  b1",
@@ -433,7 +428,7 @@ b3
 #+begin_src haskell
 checkExpansion
   ["0101-block-expansion-prefix-nonspace"]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "a1",
           "  -> b1",
@@ -479,7 +474,7 @@ c2
 #+begin_src haskell
 checkExpansion
   ["0101-block-expansion-prefix-nonspace-nested"]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "a1",
           "  -> b1",
@@ -559,7 +554,7 @@ h
 #+begin_src haskell
 checkExpansion
   ["0101-block-expansion-complex"]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "a1",
           "b",
@@ -639,7 +634,7 @@ b3
 #+begin_src haskell
 checkExpansion
   ["0102-pad-between-consecutive-links"]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "a1",
           "b1",
@@ -702,7 +697,7 @@ a1
 #+begin_src haskell
 checkExpansion
   ["0103-shebang"]
-  [ ( "test/Lilac/TangleSpec/a.sh",
+  [ ( "a.sh",
       T.unlines
         [ "#!/usr/bin/env bash",
           "a1"
@@ -748,7 +743,7 @@ checkExpansion
   [ "0101-block-expansion-external-parent",
     "0101-block-expansion-external-child"
   ]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "a1",
           "hello from child",
@@ -801,7 +796,7 @@ checkExpansion
   [ "0101-block-expansion-external-parent-headingchild",
     "0101-block-expansion-external-headingchild"
   ]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "a1",
           "hello from child",
@@ -852,7 +847,7 @@ checkExpansion
     "0101-block-expansion-external-2-hops-middleman",
     "0101-block-expansion-external-child"
   ]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "a1",
           "hello from middleman",
@@ -904,7 +899,7 @@ checkExpansion
   [ "0101-block-expansion-external-mutual-a",
     "0101-block-expansion-external-mutual-b"
   ]
-  [ ( "test/Lilac/TangleSpec/equations.txt",
+  [ ( "equations.txt",
       T.unlines
         [ "hello from a",
           "hello from b",

@@ -412,7 +412,9 @@ tangle globalOpts tangleOpts archive = do
             | otherwise = pure (tangled, tangledPaths, skipped + 1)
        in g
     printTangled :: OsPath -> IO ()
-    printTangled path = putStrLn $ "  " <> show path
+    printTangled path = do
+      fp <- P.decodeUtf path
+      putStrLn $ "  " <> fp
     putStrLn' =
       if globalOpts.color
         then putStrLnColor boldWhite

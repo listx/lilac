@@ -1,17 +1,14 @@
 module Lilac.Tangle (expandRootBlocks) where
 
-import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Lilac.Types
   ( Archive (objects, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
-    GPath,
     Link (Link),
     LinkTarget (LinkTargetOid),
     Object (symbols),
-    decodeGPath,
   )
 import Relude
   ( Bool (False, True),
@@ -37,20 +34,18 @@ expandRootBlocks :: Archive -> OsPath -> [(OsPath, Text)]
 expandRootBlocks archive outDir = map expandRootBlock rootBlocks
   where
     rootBlocks =
-      concat $ M.foldlWithKey' getRootBlocksFromObject [] archive.objects
+      concat $ foldl' getRootBlocksFromObject [] archive.objects
     getRootBlocksFromObject ::
       [[(OsPath, Block)]] ->
-      GPath ->
       Object ->
       [[(OsPath, Block)]]
-    getRootBlocksFromObject acc objPath object =
-      foldl' (getRootBlock objPath) [] object.symbols : acc
-    getRootBlock objPath acc cell = case cell of
+    getRootBlocksFromObject acc object =
+      foldl' getRootBlock [] object.symbols : acc
+    getRootBlock acc cell = case cell of
       CBlock b
-        | Just path <- lookup "tangle" b.meta,
-          Just osPath <- P.encodeUtf $ T.unpack path,
-          Just osPathOfObject <- P.encodeUtf $ decodeGPath objPath ->
-            (P.combine (P.takeDirectory osPathOfObject) osPath, b) : acc
+        | Just tPath <- lookup "tangle" b.meta,
+          Just tOsPath <- P.encodeUtf $ T.unpack tPath ->
+            (P.combine outDir tOsPath, b) : acc
         | otherwise -> acc
       CHeading {}
       CListItem {}
