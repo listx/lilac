@@ -464,10 +464,25 @@ data Archive = Archive
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-A [[data:Archive]] is just a collection of [[data:Object]] values, which are each paired
-with the [[id:2d98229c-e318-434b-916b-364c04021306::newtype:GPath][newtype:GPath]] of where that object was found. We have to use ~GPath~
-because there is no ~ToJSONKey~ instance for ~P.OsPath~ (which would otherwise have
-been our first choice). We also check for any broken links.
+A [[data:Archive]] is just a collection of [[data:Object]] values. The ~objects~ field
+holds this collection, where the [[id:2d98229c-e318-434b-916b-364c04021306::newtype:GPath][newtype:GPath]] is the key of where that object
+was found. We have to use ~GPath~ because there is no ~ToJSONKey~ instance for
+~P.OsPath~ (which would otherwise have been our first choice).
+
+The other fields in [[data:Archive]] are based on the ~objects~:
+
+  - The ~symbols~ is a table for finding the cell (in one of the objects found in
+    the archive) that corresponds to a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]].
+
+  - The ~symbolPath~ is used for determining which [[data:Object]] contains the given
+    [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]], by returning the unique [[id:2d98229c-e318-434b-916b-364c04021306::newtype:GPath][newtype:GPath]] key of the object (which
+    can be then looked up in the ~objects~ field).
+
+To construct the archive, [[f:mkArchive]] reads a list of paths and the objects that
+are found on those paths. The main check that is performed is to see that there
+are no broken links within this collection of objects. The term "broken" here
+mainly means any internal link (to a cell) that cannot be resolved; we do not go
+over the network to check for broken HTTP links.
 
 #+name: f:mkArchive
 #+begin_src haskell

@@ -55,7 +55,9 @@ Weaving concerns are captured in [[file:src/Lilac/Weave.hs]].
 #+header: :tangle src/Lilac/Weave.hs
 #+begin_src haskell
 module Lilac.Weave
-  ( renderAsText,
+  ( commonPrefix,
+    getRelativePathWithoutSymlinks,
+    renderAsText,
     weaveObject,
   )
 where
@@ -131,6 +133,7 @@ import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Either (Right),
+    Eq,
     Identity,
     Maybe (Just, Nothing),
     ReaderT,
@@ -146,26 +149,34 @@ import Relude
     forM_,
     fst,
     id,
+    length,
     lift,
     map,
+    null,
     otherwise,
     pure,
+    replicate,
     reverse,
     runReaderT,
     sequence_,
     show,
     take,
+    takeWhile,
     when,
+    zip,
     ($),
+    (-),
     (.),
     (<>),
     (=<<),
     (==),
+    (>),
     (||),
   )
 import Relude.Extra.Map (lookup)
 import Skylighting qualified as Sky
 import System.IO (utf8)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 
@@ -186,6 +197,8 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:colorizeText>>
 <<f:spliceLinks>>
 <<f:weaveLink>>
+<<f:getRelativePathWithoutSymlinks>>
+<<f:commonPrefix>>
 <<f:renderAsText>>
 #+end_src
 
@@ -213,6 +226,11 @@ data WeaveConf = WeaveConf
     watch :: Bool
   }
 #+end_src
+
+The ~originObjectPath~ is used to check whether a given [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] refers to a
+cell that exists in the current object being woven in [[id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa::f:weaveObject][f:weaveObject]] (so we know
+whether to refer to the cell with just ~#...~ as the HTML =id= attribute, or whether
+as ~path/to/external/object.html#...~ because the cell belongs to another object).
 
 The [[type:HtmlWeaver]] is a monad that can compute any ~a~ value. We stack ~ReaderT~ on
 top of Lucid's ~HtmlT~ to create the monadic environment where we can read from
@@ -738,14 +756,121 @@ weaveLink link = do
             "#" <> getLinkAnchor internalCell
         | Just externalCell <- lookup linkOid weaveConf.archive.symbols,
           Just externalObjGPath <- lookup linkOid weaveConf.archive.symbolPath,
-          fp <- decodeGPath externalObjGPath,
-          Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension (P.unsafeEncodeUtf fp) htmlExt ->
+          Just toObjPath <- P.encodeUtf $ decodeGPath externalObjGPath,
+          Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+          Right str <-
+            P.decodeWith utf8 utf8
+              $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt ->
             (T.pack str) <> "#" <> getLinkAnchor externalCell
         | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
         where
           htmlExt = P.unsafeEncodeUtf "html"
       LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
+#+end_src
+
+[[f:getRelativePathWithoutSymlinks]] takes two file paths. It tries to answer the
+question "assuming I am in the directory in the first file, how can I go to the
+directory containing the second file?" This assumes that the given paths have no
+symlinks (to avoid the pitfall described at [[https://hackage.haskell.org/package/filepath-1.5.4.0/docs/System-OsPath.html#v:makeRelative][System.OsPath.makeRelative]] and [[https://neilmitchell.blogspot.com/2015/10/filepaths-are-subtle-symlinks-are-hard.html][this
+blog post]]).
+
+We use the following algorithm:
+
+  1) If we're in the same directory, or if the destination is a child of the
+     source directory, then drop the common prefix of the
+     destination. ~a/b/c/src~ to ~a/b/c/dest~ is ~dest~. ~a/b/c/src~ to ~a/b/c/d/e/dest~
+     is ~d/e/dest~.
+
+  2) If we're not in the same directory, we have to go up N directories up until
+     we get to the common prefix.
+
+     - No common prefix: go up all the way to the root, then go to the
+       destination. ~a/b/c/src~ to ~d/dest~ is ~../../../d/dest~.
+
+     - Some common prefix: go up to the common prefix. ~a/b/c/dest~ to ~a/x/y/dest~
+       is ~../../x/y/dest~ because ~a~ is the common prefix. ~a/b/c/d/e/src~ to ~a/dest~
+       is ~../../../../dest~.
+
+#+name: f:getRelativePathWithoutSymlinks
+#+begin_src haskell
+getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
+getRelativePathWithoutSymlinks src dest
+  | dirsSrc == dirsDest || isDestChildOfSrc =
+      P.joinPath $ remainingDest <> destFile
+  | null commonPathPrefix =
+      P.joinPath $ replicate (length dirsSrc) goUp <> destFile
+  | otherwise =
+      P.joinPath
+        $ replicate (length dirsSrc - length commonPathPrefix) goUp
+        <> drop (length commonPathPrefix) dirsDest
+        <> destFile
+  where
+    goUp = P.unsafeEncodeUtf ".."
+    destFile = [P.takeFileName dest]
+    dirSrc = P.takeDirectory src
+    dirDest = P.takeDirectory dest
+    dirsSrc = P.splitDirectories dirSrc
+    dirsDest = P.splitDirectories dirDest
+    commonPathPrefix = commonPrefix dirsSrc dirsDest
+    isDestChildOfSrc = dirsSrc == commonPathPrefix
+    remainingDest = drop (length commonPathPrefix) dirsDest
+#+end_src
+
+The [[f:commonPrefix]] helper returns the common prefix found in two lists.
+
+#+name: f:commonPrefix
+#+begin_src haskell
+commonPrefix :: (Eq a) => [a] -> [a] -> [a]
+commonPrefix xs ys = map fst . takeWhile (\(x, y) -> (x == y)) $ zip xs ys
+#+end_src
+
+#+name: t:0301-weave-external-links-common-prefix
+#+begin_src haskell
+it "0301-weave-external-links-common-prefix" $ do
+  mapM_
+    ( \(a, b, c) ->
+        ( P.joinPath
+            $ LW.commonPrefix
+              (P.splitDirectories $ P.unsafeEncodeUtf a)
+              (P.splitDirectories $ P.unsafeEncodeUtf b)
+        )
+          `shouldBe` (P.unsafeEncodeUtf c)
+    )
+    [ ("from.html", "to.html1", ""),
+      ("base/from.html", "base/to.html2", "base"),
+      ("1base/a/b/from.html", "1base/a/b/to.html3", "1base/a/b"),
+      ("2base/a/b/from.html", "2base/a/b/c/to.html4", "2base/a/b"),
+      ("3base/a/b/from.html", "3base/a/b/c/d/to.html5", "3base/a/b"),
+      ("a/b/c", "x/y/z", "")
+    ]
+#+end_src
+
+We use HTML file path examples in [[t:0301-weave-external-links-common-prefix]] to
+reflect the use case of [[f:getRelativePathWithoutSymlinks]] (to find the relative
+path to the external object's woven HTML file). The test cases in
+[[t:0301-weave-external-links]] check for some typical situations of such relative
+paths.
+
+#+name: t:0301-weave-external-links
+#+begin_src haskell
+it "0301-weave-external-links" $ do
+  mapM_
+    ( \(a, b, c) ->
+        LW.getRelativePathWithoutSymlinks
+          (P.unsafeEncodeUtf a)
+          (P.unsafeEncodeUtf b)
+          `shouldBe` (P.unsafeEncodeUtf c)
+    )
+    [ ("from.html", "to.html1", "to.html1"),
+      ("base/from.html", "base/to.html2", "to.html2"),
+      ("base/a/b/from.html", "base/a/b/to.html3", "to.html3"),
+      ("base/a/b/from.html", "base/a/b/c/to.html4", "c/to.html4"),
+      ("base/a/b/from.html", "base/a/b/c/d/to.html5", "c/d/to.html5"),
+      ("base/a/b/from.html", "to.html6", "../../../to.html6"),
+      ("base/a/b/from.html", "base/a/c/to.html7", "../c/to.html7"),
+      ("base/a/b/c/d/from.html", "base/a/x/y/to.html8", "../../../x/y/to.html8")
+    ]
 #+end_src
 
 [[f:isExternalLink]] checks if .
@@ -834,6 +959,7 @@ import Relude
     foldl',
     fst,
     map,
+    mapM_,
     pure,
     reverse,
     runStateT,
@@ -844,6 +970,7 @@ import Relude
     (<>),
     (==),
   )
+import System.OsPath qualified as P
 import Test.Hspec
   ( Expectation,
     Spec,
@@ -851,6 +978,7 @@ import Test.Hspec
     expectationFailure,
     it,
     runIO,
+    shouldBe,
     shouldStartWith,
   )
 import Text.Megaparsec qualified as MP
@@ -981,6 +1109,8 @@ weaveSpec :: Spec
 weaveSpec = do
   <<t:0300-weave-styled-text>>
   <<t:0300-weave-lists>>
+  <<t:0301-weave-external-links-common-prefix>>
+  <<t:0301-weave-external-links>>
 #+end_src
 
 * Generate CSS

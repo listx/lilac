@@ -1,5 +1,7 @@
 module Lilac.Weave
-  ( renderAsText,
+  ( commonPrefix,
+    getRelativePathWithoutSymlinks,
+    renderAsText,
     weaveObject,
   )
 where
@@ -75,6 +77,7 @@ import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Either (Right),
+    Eq,
     Identity,
     Maybe (Just, Nothing),
     ReaderT,
@@ -90,26 +93,34 @@ import Relude
     forM_,
     fst,
     id,
+    length,
     lift,
     map,
+    null,
     otherwise,
     pure,
+    replicate,
     reverse,
     runReaderT,
     sequence_,
     show,
     take,
+    takeWhile,
     when,
+    zip,
     ($),
+    (-),
     (.),
     (<>),
     (=<<),
     (==),
+    (>),
     (||),
   )
 import Relude.Extra.Map (lookup)
 import Skylighting qualified as Sky
 import System.IO (utf8)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 
@@ -371,14 +382,42 @@ weaveLink link = do
             "#" <> getLinkAnchor internalCell
         | Just externalCell <- lookup linkOid weaveConf.archive.symbols,
           Just externalObjGPath <- lookup linkOid weaveConf.archive.symbolPath,
-          fp <- decodeGPath externalObjGPath,
-          Right str <- P.decodeWith utf8 utf8 $ P.replaceExtension (P.unsafeEncodeUtf fp) htmlExt ->
+          Just toObjPath <- P.encodeUtf $ decodeGPath externalObjGPath,
+          Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+          Right str <-
+            P.decodeWith utf8 utf8
+              $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt ->
             (T.pack str) <> "#" <> getLinkAnchor externalCell
         | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
         where
           htmlExt = P.unsafeEncodeUtf "html"
       LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
       LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
+
+getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
+getRelativePathWithoutSymlinks src dest
+  | dirsSrc == dirsDest || isDestChildOfSrc =
+      P.joinPath $ remainingDest <> destFile
+  | null commonPathPrefix =
+      P.joinPath $ replicate (length dirsSrc) goUp <> destFile
+  | otherwise =
+      P.joinPath
+        $ replicate (length dirsSrc - length commonPathPrefix) goUp
+        <> drop (length commonPathPrefix) dirsDest
+        <> destFile
+  where
+    goUp = P.unsafeEncodeUtf ".."
+    destFile = [P.takeFileName dest]
+    dirSrc = P.takeDirectory src
+    dirDest = P.takeDirectory dest
+    dirsSrc = P.splitDirectories dirSrc
+    dirsDest = P.splitDirectories dirDest
+    commonPathPrefix = commonPrefix dirsSrc dirsDest
+    isDestChildOfSrc = dirsSrc == commonPathPrefix
+    remainingDest = drop (length commonPathPrefix) dirsDest
+
+commonPrefix :: (Eq a) => [a] -> [a] -> [a]
+commonPrefix xs ys = map fst . takeWhile (\(x, y) -> (x == y)) $ zip xs ys
 
 renderAsText :: WeaveConf -> HtmlWeaver a -> Text
 renderAsText weaveConf weaver =
