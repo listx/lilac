@@ -188,35 +188,35 @@ subcommandHandler =
         "archive"
         $ info
           (Archive <$> archiveOptsHandler)
-          (progDesc "Create archive from object files.")
+          (progDesc "Combine objects into a single archive.")
     cmdCompile =
       command
         "compile"
         $ info
           (Compile <$> compileOptsHandler)
-          (progDesc "Compile Org file into object file.")
+          (progDesc "Compile Org files into objects.")
     cmdTangle =
       command
         "tangle"
         $ info
           (Tangle <$> tangleOptsHandler)
-          (progDesc "Extract source code from files.")
+          (progDesc "Extract source code from archives.")
     cmdWeave =
       command
         "weave"
         $ info
           (Weave <$> weaveOptsHandler)
-          (progDesc "Generate HTML representation.")
+          (progDesc "Generate HTML documentation from archives.")
 
 tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
   TangleOpts
-    <$> (some $ argument readGPath (metavar "FILES..."))
+    <$> (some $ argument readGPath (metavar "ARCHIVES..."))
 
 weaveOptsHandler :: OptionHandler WeaveOpts
 weaveOptsHandler =
   WeaveOpts
-    <$> (some $ argument readOsPath (metavar "FILES..."))
+    <$> (some $ argument readOsPath (metavar "ARCHIVES..."))
     <*> ( option
             readOsPath
             ( long "out-dir"
@@ -225,7 +225,7 @@ weaveOptsHandler =
                 <> showDefault
                 <> help
                   """
-                  Directory for saving the HTML file.
+                  Directory for saving the HTML files.
                   """
             )
         )
@@ -244,12 +244,21 @@ weaveOptsHandler =
 compileOptsHandler :: OptionHandler CompileOpts
 compileOptsHandler =
   CompileOpts
-    <$> (some $ argument readOsPath (metavar "FILES..."))
+    <$> (some $ argument readOsPath (metavar "ORG_FILES..."))
 
 archiveOptsHandler :: OptionHandler ArchiveOpts
 archiveOptsHandler =
   ArchiveOpts
-    <$> (some $ argument readGPath (metavar "FILES..."))
+    <$> ( some
+            $ argument
+              readGPath
+              ( metavar "OBJECTS..."
+                  <> help
+                    """
+                    Objects to combine into an archive.
+                    """
+              )
+        )
     <*> ( option
             readOsPath
             ( long "out-file"
@@ -290,7 +299,7 @@ main = do
       let cabalVersion = version
        in infoOption
             (concat [showVersion cabalVersion, "-", $(lilacVersion)])
-            (long "version" <> short 'v' <> help "Show version")
+            (long "version" <> short 'v' <> help "Show version.")
 
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
