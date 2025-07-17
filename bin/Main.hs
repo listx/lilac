@@ -125,7 +125,8 @@ data Subcommand
 
 type TangleOpts :: Type
 data TangleOpts = TangleOpts
-  { inputs :: [GPath]
+  { inputs :: [GPath],
+    outDir :: OsPath
   }
 
 type WeaveOpts :: Type
@@ -212,6 +213,23 @@ tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
   TangleOpts
     <$> (some $ argument readGPath (metavar "ARCHIVES..."))
+    <*> ( option
+            readOsPath
+            ( long "out-dir"
+                <> metavar "DIR"
+                <> value mempty
+                <> showDefault
+                <> help
+                  """
+                  Directory used for tangling. It's the starting point from
+                  which all of the code blocks' ":tangle" header will be a
+                  child of. Typically you'd want this to point to your repo's
+                  root directory, so you can tangle a file in any location in
+                  the repo root, regardless of where your Org files are authored
+                  and checked into version control.
+                  """
+            )
+        )
 
 weaveOptsHandler :: OptionHandler WeaveOpts
 weaveOptsHandler =
@@ -367,7 +385,7 @@ lilacTangle globalOpts tangleOpts = do
         Right archive -> do
           when (globalOpts.verbose) $ do
             putStrLn' $ "Tangling " <> fp
-          tangle globalOpts archive
+          tangle globalOpts tangleOpts archive
           when (globalOpts.verbose)
             $ putStrLn' "Finished tangling."
     putStrLn' =
@@ -375,9 +393,9 @@ lilacTangle globalOpts tangleOpts = do
         then putStrLnColor boldWhite
         else putStrLn
 
-tangle :: GlobalOpts -> Archive -> IO ()
-tangle globalOpts archive = do
-  let blocks = sort $ LT.expandRootBlocks archive
+tangle :: GlobalOpts -> TangleOpts -> Archive -> IO ()
+tangle globalOpts tangleOpts archive = do
+  let blocks = sort $ LT.expandRootBlocks archive tangleOpts.outDir
   putStrLn' $ "Blocks to process: " <> (show $ length blocks)
   (tangled, tangledPaths, skipped) <- foldlM f (0, [], 0) blocks
   putStrLn' $ "Tangled: " <> (show tangled)

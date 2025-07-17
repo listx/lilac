@@ -18,6 +18,7 @@ import Relude
     first,
     fmap,
     foldlM,
+    mempty,
     pure,
     show,
     ($),
@@ -35,7 +36,7 @@ checkExpansion paths expectedExpansions = do
   case LC.mkArchive pathObjs of
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do
-      (LT.expandRootBlocks archive)
+      (LT.expandRootBlocks archive mempty)
         `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
 
 readObjectsFrom :: [FilePath] -> IO [(GPath, Object)]

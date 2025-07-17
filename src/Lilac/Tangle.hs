@@ -33,8 +33,8 @@ import Relude.Extra.Map (lookup)
 import System.OsPath (OsPath)
 import System.OsPath qualified as P
 
-expandRootBlocks :: Archive -> [(OsPath, Text)]
-expandRootBlocks archive = map expandRootBlock rootBlocks
+expandRootBlocks :: Archive -> OsPath -> [(OsPath, Text)]
+expandRootBlocks archive outDir = map expandRootBlock rootBlocks
   where
     rootBlocks =
       concat $ M.foldlWithKey' getRootBlocksFromObject [] archive.objects
@@ -60,7 +60,7 @@ expandRootBlocks archive = map expandRootBlock rootBlocks
       CTable {} -> acc
     expandRootBlock :: (OsPath, Block) -> (OsPath, Text)
     expandRootBlock (p, rootBlock) =
-      ( p,
+      ( P.combine outDir p,
         maybeAddShebang rootBlock
           . trimTrailingSpaces
           $ expandBlock archive rootBlock ""
