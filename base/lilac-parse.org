@@ -2288,6 +2288,7 @@ In summary we support the following link types in an Org document:
 
   - ~LinkTargetOid~ :: a link to another cell or Org document, also used for Noweb
     reference inside another code block (because code blocks are just cells).
+    They can be used to also link to figures, which are also cells. [[fig:PNG image][Example]].
 
     When inside code blocks, these use angle brackets (e.g., ~<<foo>>~). This can
     reference code blocks in other files by OID, where the syntax is
@@ -7299,7 +7300,7 @@ ps
 :ID:       a090bf9c-0e52-422b-b0f0-51e3b1bf1698
 :END:
 
-A [[data:Figure][Figure]] is just a link to an image file, with some metadata.
+A [[data:Figure][Figure]] is just a link to an image file, preceded by some metadata.
 
 #+name: data:Figure
 #+begin_src haskell
@@ -7312,11 +7313,32 @@ data Figure = Figure
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
+The metadata recognizes certain reserved keys:
+
+  - type :: (Required) Used to force there to be at least 1 key\/value pair in
+    the metadata. Otherwise when the parser comes across a link to an image on
+    its own without metadata, it is ambiguous whether the link is part of a
+    1-link paragraph cell, or as part of a figure cell.
+
+  - name :: (Optional) Used to name the cell uniquely in the surrounding Org
+    file. Other cells can refer to this figure by this name (or as part of a
+    global [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]).
+
+  - caption :: (Optional) Displayed as the caption for the image.
+
+  - width :: (Optional) Width of the image (as a percentage of page width or
+    pixel count), for HTML weaving.
+
+  - height :: (Optional) Height of the image (as a percentage of page width or
+    pixel count), for HTML weaving.
+
 Below is an example of a figure:
 
-#+name: fig:Portable Network Graphics sample image
+#+name: fig:PNG image
+#+caption: Portable Network Graphics sample image.
 #+type: figure
-#+attr_html: :width 100%
+#+width: 50%
+#+height: 40
 [[file:image/PNG-Gradient.png]]
 
 First we have to parse for the metadata, and then the link. We don't allow
@@ -7419,7 +7441,7 @@ f = 1 + 1
 
 ,#+name: fig:hello
 ,#+type: figure
-,#+attr_html: :width 100%
+,#+width: 100%
 [[file:image/hello.png]]
 
 ,#+name: f:g
@@ -7433,7 +7455,7 @@ g x = x + 1
 
   - [[file:not-figure]]
 
-[[not a figure]]
+[[file:not-a-figure-2]]
 
 [[id:00000000-0000-0000-0000-000000000000::not a figure]]
 
@@ -7462,7 +7484,7 @@ ps
           Figure
             { meta =
                 fromList
-                  [ ("attr_html", ":width 100%"),
+                  [ ("width", "100%"),
                     ("name", "fig:hello")
                   ],
               link =
@@ -7525,15 +7547,10 @@ ps
         CParagraph
           [ PTokenLink
               Link
-                { target =
-                    LinkTargetOid
-                      LinkOid
-                        { oid = nilOid,
-                          name = "not a figure"
-                        },
+                { target = LinkTargetFilePath "not-a-figure-2",
                   name =
                     [ StyledText
-                        { body = "not a figure",
+                        { body = "not-a-figure-2",
                           style = L.styleMaskFrom []
                         }
                     ]

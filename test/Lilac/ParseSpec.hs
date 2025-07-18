@@ -2402,7 +2402,7 @@ parseSpec = do
             Figure
               { meta =
                   fromList
-                    [ ("attr_html", ":width 100%"),
+                    [ ("width", "100%"),
                       ("name", "fig:hello")
                     ],
                 link =
@@ -2465,15 +2465,10 @@ parseSpec = do
           CParagraph
             [ PTokenLink
                 Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = nilOid,
-                            name = "not a figure"
-                          },
+                  { target = LinkTargetFilePath "not-a-figure-2",
                     name =
                       [ StyledText
-                          { body = "not a figure",
+                          { body = "not-a-figure-2",
                             style = L.styleMaskFrom []
                           }
                       ]

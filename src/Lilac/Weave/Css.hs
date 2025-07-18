@@ -22,6 +22,7 @@ import Clay
     borderTopRightRadius,
     bottom,
     boxSizing,
+    center,
     code,
     color,
     display,
@@ -258,6 +259,12 @@ defaultCss = do
     fontSans
   ".fully-rounded" & do
     ev borderRadius (px 5)
+  ".figure-image" & do
+    display block
+    vh margin (px 0) auto
+  ".figure-caption" & do
+    textAlign center
+    fontStyle italic
   where
     hexBg = 0xffffff :: Int
     hexText = 0x000000 :: Int

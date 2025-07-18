@@ -1054,7 +1054,7 @@ For weaving, use the =site= directory.
 #+name: make:Weave
 #+begin_src makefile
 weave: base/lilac.larc
-	lilac weave --watch $<
+	lilac weave --watch $< --out-dir base
 	touch weave
 #+end_src
 
@@ -2525,8 +2525,7 @@ weaveToDisk weaveOpts archive acc objPath obj =
           }
       fp = decodeGPath objPath
       ext = P.unsafeEncodeUtf "html"
-      base = P.replaceExtension (P.unsafeEncodeUtf fp) ext
-      outPath = P.joinPath [weaveOpts.outDir, base]
+      outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
       action =
         LU.writeFileRobustly outPath
           . LW.renderAsText weaveConf

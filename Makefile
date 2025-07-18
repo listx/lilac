@@ -30,7 +30,7 @@ tangle: base/lilac.larc
 	touch tangle
 
 weave: base/lilac.larc
-	lilac weave --watch $<
+	lilac weave --watch $< --out-dir base
 	touch weave
 
 serve:

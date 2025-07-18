@@ -452,8 +452,7 @@ weaveToDisk weaveOpts archive acc objPath obj =
           }
       fp = decodeGPath objPath
       ext = P.unsafeEncodeUtf "html"
-      base = P.replaceExtension (P.unsafeEncodeUtf fp) ext
-      outPath = P.joinPath [weaveOpts.outDir, base]
+      outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
       action =
         LU.writeFileRobustly outPath
           . LW.renderAsText weaveConf

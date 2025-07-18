@@ -15,6 +15,7 @@ import Lilac.Types
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Figure (link, meta),
     Heading (body, level, section),
     Link (Link, name, target),
     LinkTarget
@@ -42,6 +43,7 @@ import Lilac.Types
 import Lucid
   ( HtmlT,
     a_,
+    alt_,
     body_,
     charset_,
     class_,
@@ -56,8 +58,10 @@ import Lucid
     h5_,
     h6_,
     head_,
+    height_,
     href_,
     id_,
+    img_,
     link_,
     meta_,
     p_,
@@ -71,6 +75,7 @@ import Lucid
     toHtml,
     toHtmlRaw,
     type_,
+    width_,
   )
 import Lucid.Base (hoistHtmlT)
 import Network.URI qualified as N
@@ -94,7 +99,6 @@ import Relude
     fst,
     id,
     length,
-    lift,
     map,
     null,
     otherwise,
@@ -111,10 +115,10 @@ import Relude
     ($),
     (-),
     (.),
+    (<$>),
     (<>),
     (=<<),
     (==),
-    (>),
     (||),
   )
 import Relude.Extra.Map (lookup)
@@ -171,8 +175,7 @@ weaveCell = \case
   CBlock block -> weaveBlock block
   CMathFragment _ -> do
     p_ "FRAGMENT"
-  CFigure _ -> do
-    p_ "FIGURE"
+  CFigure figure -> weaveFigure figure
   CTable _ -> do
     p_ "TABLE"
 
@@ -249,7 +252,14 @@ getLinkAnchor = \case
             toSafeHtmlId ref
           ]
   CMathFragment {} -> ""
-  CFigure {} -> ""
+  CFigure figure ->
+    let ref
+          | Just name <- lookup "name" figure.meta =
+              name
+          | Just anonFigureNum <- lookup "__anon_figure_number" figure.meta =
+              anonFigureNum
+          | otherwise = "anon-figure-error"
+     in toSafeHtmlId ref
   CTable {} -> ""
 
 weavePToken :: PToken -> HtmlWeaver ()
@@ -363,9 +373,9 @@ spliceLinks colorized links = do
 
 weaveLink :: Link -> HtmlWeaver ()
 weaveLink link = do
-  weaveConf <- lift ask
+  wovenLinkTarget <- weaveLinkTarget link.target
   a_
-    [ href_ $ linkTarget weaveConf,
+    [ href_ wovenLinkTarget,
       class_ linkCategory
     ]
     $ sequence_
@@ -375,24 +385,49 @@ weaveLink link = do
       if isExternalLink link.target
         then "external-link"
         else "internal-link"
-    linkTarget weaveConf = case link.target of
-      LinkTargetOid linkOid
-        | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-          Just internalCell <- lookup linkOid originObj.symbols ->
-            "#" <> getLinkAnchor internalCell
-        | Just externalCell <- lookup linkOid weaveConf.archive.symbols,
-          Just externalObjGPath <- lookup linkOid weaveConf.archive.symbolPath,
-          Just toObjPath <- P.encodeUtf $ decodeGPath externalObjGPath,
-          Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
-          Right str <-
-            P.decodeWith utf8 utf8
-              $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt ->
-            (T.pack str) <> "#" <> getLinkAnchor externalCell
-        | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
-        where
-          htmlExt = P.unsafeEncodeUtf "html"
-      LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
-      LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
+
+weaveLinkTarget :: LinkTarget -> HtmlWeaver T.Text
+weaveLinkTarget linkTarget = do
+  weaveConf <- ask
+  pure $ case linkTarget of
+    LinkTargetOid linkOid
+      | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+        Just internalCell <- lookup linkOid originObj.symbols ->
+          "#" <> getLinkAnchor internalCell
+      | Just externalCell <- lookup linkOid weaveConf.archive.symbols,
+        Just externalObjGPath <- lookup linkOid weaveConf.archive.symbolPath,
+        Just toObjPath <- P.encodeUtf $ decodeGPath externalObjGPath,
+        Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+        Right str <-
+          P.decodeWith utf8 utf8
+            $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt ->
+          (T.pack str) <> "#" <> getLinkAnchor externalCell
+      | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
+      where
+        htmlExt = P.unsafeEncodeUtf "html"
+    LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
+    LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
+
+weaveFigure :: Figure -> HtmlWeaver ()
+weaveFigure figure = do
+  wovenLinkTarget <- weaveLinkTarget figure.link.target
+  img_
+    $ [ id_ . getLinkAnchor $ CFigure figure,
+        src_ wovenLinkTarget,
+        class_ "figure-image"
+      ]
+    <> ( catMaybes
+           $ map
+             (\(attr, metaKey) -> attr <$> lookup metaKey figure.meta)
+             [ (width_, "width"),
+               (height_, "height"),
+               (alt_, "name"),
+               (title_, "name")
+             ]
+       )
+  case lookup "caption" figure.meta of
+    Nothing -> pure ()
+    Just caption -> p_ [class_ "figure-caption"] $ toHtml caption
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest
