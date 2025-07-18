@@ -873,7 +873,10 @@ it "0301-weave-external-links" $ do
     ]
 #+end_src
 
-[[f:isExternalLink]] checks if .
+[[f:isExternalLink]] checks if a given link target is external to the
+would-be-generated HTML file (of the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] being woven). It considers any
+non-OID link to be external. This encourages users to always use the
+[[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]], which is a good thing.
 
 #+name: f:isExternalLink
 #+begin_src haskell
