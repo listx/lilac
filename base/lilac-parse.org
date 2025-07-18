@@ -19,8 +19,8 @@ everything in a single Org file.
 :ID:       5ce50c9a-5413-48d9-8bba-e465a4eb527c
 :END:
 
-The parsing mechanism is in [[file:src/Lilac/Parse.hs]], which we describe below. We
-discuss each parser and interleave some tests for the smaller parsers. If you
+The parsing mechanism is in [[file:../src/Lilac/Parse.hs]], which we describe below.
+We discuss each parser and interleave some tests for the smaller parsers. If you
 are curious about the overall testing framework itself (where and how these
 interleaved tests are executed), take a look at the [[id:ebf0d269-79d3-408a-a6e7-baf720d73837][Testing framework]].
 
@@ -669,7 +669,7 @@ whitespace).
 We have to put in two newlines above because during parsing we will lose one
 newline (it is used to parse the ~"\n#+end_src"~ string; see [[f:someBTokensParser]]).
 This leaves us with just one newline in
-[[file:test/Lilac/ParseSpec/0001-blankline]].
+[[file:../test/Lilac/ParseSpec/0001-blankline]].
 
 #+name: t:0001-blankline
 #+begin_src haskell
@@ -4688,7 +4688,7 @@ ignoreSpecialCommas = reverse . foldl' f []
        in indent <> T.drop 1 commas
 #+end_src
 
-See [[file:test/Lilac/ParseSpec/0007-blocks-special-commas]] for the raw text;
+See [[file:../test/Lilac/ParseSpec/0007-blocks-special-commas]] for the raw text;
 seeing the escaped version here (where we have to put an extra comma ourselves
 so that we can tangle the right number of leading commas) may make things a bit
 confusing.
@@ -4982,7 +4982,7 @@ Below we check a typical case with some Noweb references in it. Note that we
 have to set =#+header: :noweb off= here because otherwise Orgmode will think
 =<<foo>>= and =<<bar>>= are Noweb references that exist in this doc (=lilac.org=), and
 because they don't exist, will just result in those strings not being inserted
-into [[file:test/Lilac/ParseSpec/0007-blocks-noweb]].
+into [[file:../test/Lilac/ParseSpec/0007-blocks-noweb]].
 
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-noweb
 #+header: :noweb off
@@ -8162,7 +8162,7 @@ some benefits of writing tests this way:
 
   2) We can organize the input files in a systematic way. We use a
      ~NNNN-<description>~ naming scheme for the inputs, which all live under
-     [[file:test/Lilac/ParseSpec]]. Each unique ~NNNN~ number groups together files
+     [[file:../test/Lilac/ParseSpec]]. Each unique ~NNNN~ number groups together files
      meant to test similar functionality. This makes it easy to see at a glance
      what sorts of things we test.
 
