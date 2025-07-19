@@ -92,7 +92,6 @@ import Relude
     (<>),
     (>),
   )
-import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Prelude qualified (show)
@@ -248,8 +247,7 @@ defaultOrgParserConf =
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { goids :: Map OID OsPath,
-    docOid :: OID,
+  { docOid :: OID,
     headingOidStack :: [Maybe OID],
     headingLevel :: Int,
     headingSection :: [Int],

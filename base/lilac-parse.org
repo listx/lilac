@@ -30,15 +30,12 @@ interleaved tests are executed), take a look at the [[id:ebf0d269-79d3-408a-a6e7
 #+begin_src haskell
 module Lilac.Parse
   ( defaultOrgDoc,
-    defaultGOIDsParserState,
     defaultOrgParserConf,
     defaultOrgParserState,
-    extractGOIDs,
     genHeadingSection,
     genHeadingOidStack,
     maskToStyles,
     orgDocParser,
-    goidsParser,
     parseOrgDoc,
     styleMaskFrom,
     validateOidText,
@@ -86,7 +83,6 @@ import Lilac.Types
         continuationIndent,
         docOid,
         equationNumber,
-        goids,
         headingLevel,
         headingOidStack,
         headingSection,
@@ -115,18 +111,12 @@ import Relude
   ( Bool (False, True),
     Char,
     Either (Left, Right),
-    Eq,
-    Identity,
     Int,
     Map,
     Maybe (Just, Nothing),
     MonadFail,
-    Show,
-    StateT,
     String,
     Text,
-    Type,
-    Void,
     Word8,
     abs,
     catMaybes,
@@ -147,7 +137,6 @@ import Relude
     many,
     map,
     maybeToList,
-    mempty,
     modify,
     not,
     notElem,
@@ -197,15 +186,10 @@ import Relude.Extra.Map
     notMember,
   )
 import Relude.Unsafe (fromJust)
-import System.IO (utf8)
-import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
-
-<<data:GOIDsParserState>>
-<<type:GOIDsParser>>
 
 <<f:skipNewlinesAndComments>>
 <<f:lexeme>>
@@ -293,11 +277,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:tableCellParser>>
 <<f:rowsToTuples>>
 <<f:rowToTuples>>
-<<f:goidsParser>>
-<<f:goidsEntryParser>>
-<<f:oidParser>>
 <<f:validateOidText>>
-<<f:extractGOIDs>>
 #+end_src
 
 ** Whitespace and comments
@@ -529,8 +509,7 @@ inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { goids :: Map OID OsPath,
-    docOid :: OID,
+  { docOid :: OID,
     headingOidStack :: [Maybe OID],
     headingLevel :: Int,
     headingSection :: [Int],
@@ -554,8 +533,7 @@ data OrgParserState = OrgParserState
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -572,9 +550,6 @@ defaultOrgParserState =
       orgParserConf = defaultOrgParserConf
     }
 #+end_src
-
-The ~goids~ is the global map of all known Org IDs. This information is the same
-one encoded by Emacs as discussed in [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][ID locations file parser]].
 
 The ~anonBlockNumber~ is used to give some unique name (in lieu of actual names)
 for anonymous blocks. This is needed for generating link anchors for it during
@@ -775,6 +750,17 @@ docMetaParser = do
     Just oidText -> do
       oid <- validateOidText oidText
       pure (oid, topLevelDrawerProps <> metaKVs)
+#+end_src
+
+OID validation in [[f:validateOidText]] delegates to the ~Lilac.Types.fromText~
+helper.
+
+#+name: f:validateOidText
+#+begin_src haskell
+validateOidText :: (MonadFail m) => Text -> m OID
+validateOidText oidText = case fromText oidText of
+  Nothing -> fail $ show oidText <> " is not a valid OID"
+  Just oid -> pure oid
 #+end_src
 
 Note that using the properties drawer is the main way in which the ~ID~ field of a
@@ -1027,8 +1013,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+    { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -1055,8 +1040,7 @@ ps
   "0001-blankline"
   (L.defaultOrgDoc nilOid [])
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -1100,8 +1084,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+    { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -1512,8 +1495,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [Nothing],
       headingLevel = 1,
       headingSection = [1],
@@ -2316,6 +2298,45 @@ https://www.haskell.org is an example of a raw link. This is a convenience
 facility because ~[[https://www.haskell.org]]~ behaves the same way as
 ~https://www.haskell.org~.
 
+*** OIDs and Emacs
+:PROPERTIES:
+:ID:       96f8cbda-abca-48bd-bb89-512aaac61ca8
+:END:
+
+Lilac relies on Org files that are written in Emacs (Emacs is the best
+environment for writing Org files). When the ~org-id-locations-file~ and
+~org-id-track-globally~ variables are set, Emacs remembers which files have which
+Org IDs (where the "ID" is the OID generated by ~org-id-get-create~ and
+~org-id-store-link~). Emacs then saves this information to the value of
+~org-id-locations-file~.
+
+Historically Lilac used to parse these files generated by Emacs, but it has
+moved on to a compilation pipeline that doesn't need to rely on these files
+coming from Emacs. If Lilac wants to bring back tangling and weaving based
+purely on Org files without the compilation process, it will be forced to read
+these OID location files again. Below is a brief discussion of the format of
+these files to serve as a historical reference.
+
+The syntax is of a list of list of strings, in Emacs lisp. The inner lists have
+the relative file path of the Org file as the first element, followed by the
+OIDs. Each Org ID is just a UUIDv4 string. The OIDs are in reverse order
+(probably because Emacs grows the list right-to-left, just like Haskell's ~:~ (aka
+"cons") function).
+
+Below is an example, with newlines inserted for better presentation (Emacs does
+not use newlines here, and so in the wild everything is in one line):
+
+#+begin_src emacs-lisp
+(("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
+ ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
+                            "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
+                            "8f5752c0-6162-4de6-9ceb-f78ba584722c"
+                            "b449a097-d702-4fd6-98de-cb81f7e49177"))
+#+end_src
+
+The information stored in this file is global, because Emacs will update it
+whenever it encounters Org files.
+
 *** Standalone link parser
 
 The standalone link parser [[f:linkParser]] can parse links that can be embedded
@@ -3079,8 +3100,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [Nothing],
       headingLevel = 1,
       headingSection = [1],
@@ -3387,6 +3407,16 @@ hello world
 Note that if no such Noweb reference is defined, Lilac will error out. See
 [[f:nowebLinkParser]] for parsing details (it is discussed along with [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][Blocks]] because
 that's the only place where these links may be defined).
+
+Noweb links are powered by [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] which can reference blocks in the
+current Org file or any other Org file (as long as those other Org files are
+[[id:c80fd6a6-7eb2-4672-99cc-a5a10c1fda69][compiled]] and [[id:75173d6f-c210-46a0-8acf-689deeacd250][archived]] together).
+
+The ability for Noweb links to reference other files is not part of Orgmode and
+is Lilac's own extension. This allows source code blocks to be defined across
+multiple Org files if needed. One simple example is version information that
+we might want to define only in a single place, but which might be referenced
+in other places, across multiple Org files.
 
 ** Inline math fragments
 :PROPERTIES:
@@ -3916,8 +3946,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = take 12 $ repeat Nothing,
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -3974,8 +4003,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = take 12 $ repeat Nothing,
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -4145,8 +4173,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [Nothing],
       headingLevel = 1,
       headingSection = [1],
@@ -4196,8 +4223,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
       headingLevel = 1,
       headingSection = [1],
@@ -4257,8 +4283,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
       headingLevel = 1,
       headingSection = [1],
@@ -4324,8 +4349,7 @@ ps
       <<Expected blocks for 0007-blocks-empty>>
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -5445,8 +5469,7 @@ ps
       <<Expected blocks for 0007-blocks-ending>>
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -7191,8 +7214,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -7272,8 +7294,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -7590,8 +7611,7 @@ ps
       ]
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -7791,8 +7811,7 @@ ps
       <<Expected cells for 0012-tables-and-prose>>
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -7980,8 +7999,7 @@ ps
       <<Expected cells for 0012-tables-inside-lists>>
   )
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -8223,7 +8241,6 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (MathFragment, body, meta),
-    OID,
     OrgDoc (OrgDoc, cells, meta, oid),
     OrgParserConf (maxHeadingLevel),
     OrgParserState
@@ -8233,7 +8250,6 @@ import Lilac.Types
         continuationIndent,
         docOid,
         equationNumber,
-        goids,
         headingLevel,
         headingOidStack,
         headingSection,
@@ -8249,7 +8265,6 @@ import Lilac.Types
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, grid, meta),
-    fromText,
     fromWords,
     nilOid,
     nilOidOrgDoc,
@@ -8266,7 +8281,6 @@ import Relude
     Text,
     Type,
     fromList,
-    map,
     otherwise,
     repeat,
     runStateT,
@@ -8278,8 +8292,6 @@ import Relude
     (<>),
     (==),
   )
-import System.OsPath (OsPath)
-import System.OsPath qualified as P
 import Test.Hspec (Spec, before, describe, it, shouldBe)
 import Test.Hspec.Megaparsec
   ( ET,
@@ -8326,8 +8338,6 @@ type Parser = <<Concrete type for Megaparsec>>
 <<f:pfm>>
 <<f:plainParagraph>>
 <<f:plainHeading>>
-<<f:pGOIDs>>
-<<f:pfGOIDs>>
 <<f:nilOrgDoc>>
 #+end_src
 
@@ -8493,48 +8503,6 @@ plainHeading level section =
     )
 #+end_src
 
-This [[f:pGOIDs]] helper parses [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org ID locations files]].
-
-#+name: f:pGOIDs
-#+begin_src haskell
-pGOIDs :: FilePath -> [(Text, FilePath)] -> Spec
-pGOIDs path expected = do
-  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path $ \input -> do
-      MP.runParser
-        (runStateT (L.goidsParser $ P.unsafeEncodeUtf path) st)
-        path
-        input
-        `shouldParse` ( fromList $ map f expected,
-                        L.defaultGOIDsParserState
-                      )
-  where
-    st = L.defaultGOIDsParserState
-    f :: (Text, FilePath) -> (OID, OsPath)
-    f (oidText, filePath)
-      | Just oid <- fromText oidText,
-        Just osPath <- P.encodeUtf filePath =
-          (oid, osPath)
-      | otherwise = (nilOid, P.pack [])
-#+end_src
-
-The [[f:pfGOIDs]] helper expects failures.
-
-#+name: f:pfGOIDs
-#+begin_src haskell
-pfGOIDs :: FilePath -> String -> Int -> Spec
-pfGOIDs path errMsg pos = do
-  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path $ \input -> do
-      MP.runParser
-        (runStateT (L.goidsParser $ P.unsafeEncodeUtf path) st)
-        path
-        input
-        `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
-  where
-    st = L.defaultGOIDsParserState
-#+end_src
-
 *** All test cases
 
 Below are all of the individual test cases.
@@ -8625,415 +8593,6 @@ parseSpec = do
   <<t:0011-figures-and-blocks>>
   <<t:0012-tables-and-prose>>
   <<t:0012-tables-inside-lists>>
-  <<t:0200-goids-file-empty>>
-  <<t:0200-goids-file-empty-list>>
-  <<t:0200-goids-file>>
-  <<t:0200-goids-file-oneline>>
-  <<t:0200-goids-file-caps>>
-  <<t:0200-goids-file-non-oid>>
-  <<t:0200-goids-file-non-oid-x>>
-  <<t:0200-goids-file-duplicate-oid>>
-  <<t:0200-goids-file-absolute>>
-#+end_src
-
-* GOIDs file parse
-:PROPERTIES:
-:ID:       96f8cbda-abca-48bd-bb89-512aaac61ca8
-:END:
-
-Lilac relies on Org files that are written in Emacs (Emacs is the best
-environment for writing Org files). When the ~org-id-locations-file~ and
-~org-id-track-globally~ variables are set, Emacs remembers which files have which
-Org IDs (where the "ID" is the OID generated by ~org-id-get-create~ and
-~org-id-store-link~).
-
-The information stored in this file is global, because Emacs will update it
-whenever it encounters Org files. For this reason we call the information
-contained within this file as the "global Org IDs" or =GOIDs= for short.
-
-We want to be able to read this file because it is automatically updated by
-Emacs for us. Then we can have a good idea of where each ID comes from, so that
-we know how to dereference ID links when we come across them later. Some
-examples of this are:
-
-  - Whenever we see a link with the ~id:~ as the "protocol". This can happen for
-    regular links to headings or anything else.
-
-  - When we come across a Noweb link that uses an ID to reference a code block
-    located in another file.
-
-The ability for Noweb links to reference other files is not part of Orgmode and
-is Lilac's own extension. This allows source code blocks to be defined across
-multiple Org files if needed. One simple example is version information that
-we might want to define only in a single place, but which might be referenced
-in other places, across multiple Org files.
-
-** GOIDs parser
-
-The syntax is of a list of list of strings, in Emacs lisp. The inner lists have
-the relative file path of the Org file as the first element, followed by the
-OIDs. The OIDs are in reverse order (probably because Emacs grows the list
-right-to-left, just like Haskell's ~:~ (aka "cons") function).
-
-Below is an example, with newlines inserted for better presentation (Emacs does
-not use newlines here, and so in the wild everything is in one line):
-
-#+name: ex:GOIDsFile
-#+begin_src emacs-lisp
-(("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
- ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
-                            "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
-                            "8f5752c0-6162-4de6-9ceb-f78ba584722c"
-                            "b449a097-d702-4fd6-98de-cb81f7e49177"))
-#+end_src
-
-Each Org ID is just a UUIDv4 string.
-
-For the monad transformer stack, we don't use the [[type:OrgParser]] because we're
-not parsing an Org file. Instead we use a separate ~GOIDsParser~ type.
-
-#+name: type:GOIDsParser
-#+begin_src haskell
-type GOIDsParser :: Type -> Type
-type GOIDsParser = StateT GOIDsParserState (<<Concrete type for Megaparsec>>)
-#+end_src
-
-When we're parsing these OIDs, we want to check that we're not parsing in
-duplicate OIDs that have been seen elsewhere. Presumably Emacs performs this
-check, but it's easy enough to do it ourselves here, so design a stateful type
-we can use during the parser as we see each OID.
-
-#+name: data:GOIDsParserState
-#+begin_src haskell
-type GOIDsParserState :: Type
-data GOIDsParserState = GOIDsParserState
-  { seenOids :: Map OID OsPath
-  }
-  deriving stock (Eq, Show)
-
-defaultGOIDsParserState :: GOIDsParserState
-defaultGOIDsParserState =
-  GOIDsParserState
-    { seenOids = fromList []
-    }
-#+end_src
-
-You may be wondering why ~seenOids~ is a map, not a set of OIDs. That's because
-we incrementally build up the final data structure (~Map OID OsPath~) during
-the parsing stage, and because the map can also check for membership queries
-just like a set. This way we can simplify the data structures involved.
-
-The overall [[f:goidsParser]] returns a map of OIDs to file paths. We reset the
-embedded state before returning, because we don't want to complicate tests by
-keeping around the seen OIDs.
-
-We take care of optional whitespace because we want to be able to parse both the
-native Emacs-styled OIDs that are all on a single line of text, as well as the
-output from [[f:extractGOIDs]] which adds newlines for human-friendliness.
-
-#+name: f:goidsParser
-#+begin_src haskell
-goidsParser :: OsPath -> GOIDsParser (Map OID OsPath)
-goidsParser sourceFile = do
-  _ <- ws
-  _ <-
-    MP.optional
-      $ MP.between
-        (string "(" >> ws)
-        (string ")" >> ws)
-        ( MP.label "Org Ids entries"
-            $ MP.many
-            $ goidsEntryParser sourceFile
-        )
-  goidsParserState <- get
-  put defaultGOIDsParserState
-  pure goidsParserState.seenOids
-  where
-    ws :: GOIDsParser ()
-    ws = void . MP.many $ char ' ' <|> char '\n'
-#+end_src
-
-Within each "entry", we need to parse the file path, and any number of OIDs.
-
-#+name: f:goidsEntryParser
-#+begin_src haskell
-goidsEntryParser :: OsPath -> GOIDsParser (OsPath, [OID])
-goidsEntryParser sourceFile = betweenParens $ do
-  filepath <-
-    P.unsafeEncodeUtf
-      <$> MP.between
-        (string "\"")
-        (string "\"" >> ws)
-        (MP.label "filepath" $ MP.some $ MP.anySingleBut '"')
-  let fp =
-        if P.isAbsolute filepath
-          then filepath
-          else P.combine (P.takeDirectory sourceFile) filepath
-  oids <- MP.some $ do
-    oid <- oidParser
-    _ <- ws
-    goidsParserState <- get
-    when (member oid goidsParserState.seenOids)
-      $ fail
-      $ "duplicate OID: \""
-      <> show oid
-      <> "\""
-    put
-      goidsParserState
-        { seenOids = insert oid fp goidsParserState.seenOids
-        }
-    pure oid
-  pure (fp, oids)
-  where
-    betweenParens :: GOIDsParser a -> GOIDsParser a
-    betweenParens =
-      MP.between
-        (string "(" >> ws)
-        (string ")" >> ws)
-    ws :: GOIDsParser ()
-    ws = void . MP.many $ char ' ' <|> char '\n'
-#+end_src
-
-When parsing a single OID, we check whether the OID has been seen already
-before.
-
-#+name: f:oidParser
-#+begin_src haskell
-oidParser :: GOIDsParser OID
-oidParser = do
-  oidText <-
-    MP.between
-      (string "\"")
-      (string "\"")
-      (MP.takeWhile1P (Just "OID character") (/= '"'))
-  validateOidText oidText
-#+end_src
-
-OID validation delegates to the ~Lilac.Types.fromText~ helper.
-
-#+name: f:validateOidText
-#+begin_src haskell
-validateOidText :: (MonadFail m) => Text -> m OID
-validateOidText oidText = case fromText oidText of
-  Nothing -> fail $ show oidText <> " is not a valid OID"
-  Just oid -> pure oid
-#+end_src
-
-*** Tests
-
-Parsing an empty file shouldn't result in failure.
-
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-empty
-#+begin_src emacs-lisp
-#+end_src
-
-#+name: t:0200-goids-file-empty
-#+begin_src haskell
-pGOIDs
-  "0200-goids-file-empty"
-  []
-#+end_src
-
-Parsing an empty list should result in an empty result as well.
-
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-empty-list
-#+begin_src emacs-lisp
-()
-#+end_src
-
-#+name: t:0200-goids-file-empty-list
-#+begin_src haskell
-pGOIDs
-  "0200-goids-file-empty-list"
-  []
-#+end_src
-
-Example from [[ex:GOIDsFile]].
-
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file
-#+begin_src emacs-lisp
-(("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
- ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
-                            "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
-                            "8f5752c0-6162-4de6-9ceb-f78ba584722c"
-                            "b449a097-d702-4fd6-98de-cb81f7e49177"))
-#+end_src
-
-#+name: t:0200-goids-file
-#+begin_src haskell
-pGOIDs
-  "0200-goids-file"
-  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
-    ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
-    ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
-    ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "./../prog/lilac/lilac.org"),
-    ("b449a097-d702-4fd6-98de-cb81f7e49177", "./../prog/lilac/lilac.org")
-  ]
-#+end_src
-
-Parsing single-line content should also work.
-
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-oneline
-#+begin_src emacs-lisp
-(("a" "a1e6d0d5-4540-423b-864e-b96ad06c56eb") ("b" "3c576a02-418b-431b-ab96-e4936e977fb7"))
-#+end_src
-
-#+name: t:0200-goids-file-oneline
-#+begin_src haskell
-pGOIDs
-  "0200-goids-file-oneline"
-  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./a"),
-    ("3c576a02-418b-431b-ab96-e4936e977fb7", "./b")
-  ]
-#+end_src
-
-Though Emacs does not use capital letters for the hex digits, we should still
-support them just in case.
-
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-caps
-#+begin_src emacs-lisp
-(("note/raw/recreation.org" "A1E6D0D5-4540-423B-864E-B96AD06C56EB"))
-#+end_src
-
-#+name: t:0200-goids-file-caps
-#+begin_src haskell
-pGOIDs
-  "0200-goids-file-caps"
-  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org")
-  ]
-#+end_src
-
-We should run into an error if an OID string is corrupted (is not an OID). The
-last OID here has an extra ~e~ character at the end and should fail.
-
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-non-oid
-#+begin_src emacs-lisp
-(("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
- ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
-                            "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
-                            "8f5752c0-6162-4de6-9ceb-f78ba584722c"
-                            "b449a097-d702-4fd6-98de-cb81f7e49177e"))
-#+end_src
-
-#+name: t:0200-goids-file-non-oid
-#+begin_src haskell
-pfGOIDs
-  "0200-goids-file-non-oid"
-  "\"b449a097-d702-4fd6-98de-cb81f7e49177e\" is not a valid OID"
-  336
-#+end_src
-
-Not having hex digits is also a problem. There is an ~x~ character at the end of
-the OID below.
-
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-non-oid-x
-#+begin_src emacs-lisp
-(("note/raw/recreation.org" "a1e6d0d5-4540-423b-864e-b96ad06c56ex"))
-#+end_src
-
-#+name: t:0200-goids-file-non-oid-x
-#+begin_src haskell
-pfGOIDs
-  "0200-goids-file-non-oid-x"
-  "\"a1e6d0d5-4540-423b-864e-b96ad06c56ex\" is not a valid OID"
-  66
-#+end_src
-
-If the OID has a duplicate, that should also trigger a failure.
-
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-duplicate-oid
-#+begin_src emacs-lisp
-(("note/raw/recreation.org" "b449a097-d702-4fd6-98de-cb81f7e49177")
- ("../prog/lilac/lilac.org" "3c576a02-418b-431b-ab96-e4936e977fb7"
-                            "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
-                            "8f5752c0-6162-4de6-9ceb-f78ba584722c"
-                            "b449a097-d702-4fd6-98de-cb81f7e49177"))
-#+end_src
-
-#+name: t:0200-goids-file-duplicate-oid
-#+begin_src haskell
-pfGOIDs
-  "0200-goids-file-duplicate-oid"
-  "duplicate OID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
-  335
-#+end_src
-
-If the path is absolute, we should leave it as is.
-
-#+header: :tangle test/Lilac/ParseSpec/0200-goids-file-absolute
-#+begin_src emacs-lisp
-(("/foo/bar" "a1e6d0d5-4540-423b-864e-b96ad06c56eb")
- ("/baz"     "3c576a02-418b-431b-ab96-e4936e977fb7"
-             "ce9af5ef-6559-4ffb-82c1-a439214eda6d"
-             "8f5752c0-6162-4de6-9ceb-f78ba584722c"
-             "b449a097-d702-4fd6-98de-cb81f7e49177"))
-#+end_src
-
-#+name: t:0200-goids-file-absolute
-#+begin_src haskell
-pGOIDs
-  "0200-goids-file-absolute"
-  [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "/foo/bar"),
-    ("3c576a02-418b-431b-ab96-e4936e977fb7", "/baz"),
-    ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "/baz"),
-    ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "/baz"),
-    ("b449a097-d702-4fd6-98de-cb81f7e49177", "/baz")
-  ]
-#+end_src
-
-** GOIDs writer
-
-Normally, Lilac users can just reuse the existing Org ID locations file that
-Emacs updates directly. However, for purposes of developing Lilac itself, we
-want to have this file inside the Lilac code repository's root directory. This
-way, we don't have to pollute the Lilac repository with knowledge about
-developer-specific settings of the value of the ~org-id-locations-file~.
-
-So for internal, Lilac development purposes, we want to be able to write out the
-~org-id-locations-file~ ourselves. The [[f:extractGOIDs]] function extracts all given
-Org IDs from a list of Org files and their contents, generating a single text
-string that can be written to disk. The actual reading and writing of files from
-disk is done in the CLI layer.
-
-#+name: f:extractGOIDs
-#+begin_src haskell
-extractGOIDs :: [(OsPath, Text)] -> Text
-extractGOIDs orgFilesAndContents =
-  let goids = foldl' buildGOIDs mempty orgFilesAndContents
-      lines = foldl' goidEntryToLines [] $ M.toDescList goids
-   in "(\n" <> (T.unlines $ map ("  " <>) lines) <> ")\n"
-  where
-    buildGOIDs :: Map OsPath [OID] -> (OsPath, Text) -> Map OsPath [OID]
-    buildGOIDs acc (orgFile, orgFileContents)
-      | Right str <- P.decodeWith utf8 utf8 orgFile = case MP.runParser
-          (runStateT orgDocParser defaultOrgParserState)
-          str
-          orgFileContents of
-          Left _err -> acc
-          Right (orgDoc, _orgParserState) -> insert orgFile (getOrgIds orgDoc) acc
-      | otherwise = acc
-    getOrgIds :: OrgDoc -> [OID]
-    getOrgIds od = catMaybes $ foldl' f [Just $ od.oid] od.cells
-    extractOrgId :: Map Text Text -> Maybe OID
-    extractOrgId meta
-      | Just oidText <- lookup "ID" meta = Lilac.Types.fromText oidText
-      | otherwise = Nothing
-    f acc cell = case cell of
-      CHeading heading -> extractOrgId heading.meta : acc
-      CBlock block -> extractOrgId block.meta : acc
-      CMathFragment mathFragment -> extractOrgId mathFragment.meta : acc
-      CFigure figure -> extractOrgId figure.meta : acc
-      CTable table -> extractOrgId table.meta : acc
-      CListItem {}
-      CParagraph {} -> acc
-    goidEntryToLines :: [Text] -> (OsPath, [OID]) -> [Text]
-    goidEntryToLines acc (orgFile, goids)
-      | goids == [] = acc
-      | Right str <- P.decodeWith utf8 utf8 orgFile,
-        orgFileText <- T.pack $ show str,
-        goidsLines <- map (\goid -> "    \"" <> (T.pack $ show goid) <> "\"") goids =
-          ("(\n    " <> orgFileText <> "\n" <> (T.unlines goidsLines) <> "  )") : acc
-      | otherwise = acc
 #+end_src
 
 * Footnotes

@@ -1,14 +1,11 @@
 module Lilac.Parse
   ( defaultOrgDoc,
-    defaultGOIDsParserState,
     defaultOrgParserConf,
     defaultOrgParserState,
-    extractGOIDs,
     genHeadingSection,
     genHeadingOidStack,
     maskToStyles,
     orgDocParser,
-    goidsParser,
     parseOrgDoc,
     styleMaskFrom,
     validateOidText,
@@ -56,7 +53,6 @@ import Lilac.Types
         continuationIndent,
         docOid,
         equationNumber,
-        goids,
         headingLevel,
         headingOidStack,
         headingSection,
@@ -85,18 +81,12 @@ import Relude
   ( Bool (False, True),
     Char,
     Either (Left, Right),
-    Eq,
-    Identity,
     Int,
     Map,
     Maybe (Just, Nothing),
     MonadFail,
-    Show,
-    StateT,
     String,
     Text,
-    Type,
-    Void,
     Word8,
     abs,
     catMaybes,
@@ -117,7 +107,6 @@ import Relude
     many,
     map,
     maybeToList,
-    mempty,
     modify,
     not,
     notElem,
@@ -167,27 +156,10 @@ import Relude.Extra.Map
     notMember,
   )
 import Relude.Unsafe (fromJust)
-import System.IO (utf8)
-import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec.Char.Lexer qualified as L
-
-type GOIDsParserState :: Type
-data GOIDsParserState = GOIDsParserState
-  { seenOids :: Map OID OsPath
-  }
-  deriving stock (Eq, Show)
-
-defaultGOIDsParserState :: GOIDsParserState
-defaultGOIDsParserState =
-  GOIDsParserState
-    { seenOids = fromList []
-    }
-
-type GOIDsParser :: Type -> Type
-type GOIDsParser = StateT GOIDsParserState (MP.ParsecT Void Text Identity)
 
 skipNewlinesAndComments :: OrgParser ()
 skipNewlinesAndComments =
@@ -262,8 +234,7 @@ defaultOrgDoc oid metas =
 defaultOrgParserState :: OrgParserState
 defaultOrgParserState =
   OrgParserState
-    { goids = fromList [],
-      docOid = nilOid,
+    { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
@@ -1604,109 +1575,7 @@ rowToTuples (rowIndex, row)
         colIndex + 1
       )
 
-goidsParser :: OsPath -> GOIDsParser (Map OID OsPath)
-goidsParser sourceFile = do
-  _ <- ws
-  _ <-
-    MP.optional
-      $ MP.between
-        (string "(" >> ws)
-        (string ")" >> ws)
-        ( MP.label "Org Ids entries"
-            $ MP.many
-            $ goidsEntryParser sourceFile
-        )
-  goidsParserState <- get
-  put defaultGOIDsParserState
-  pure goidsParserState.seenOids
-  where
-    ws :: GOIDsParser ()
-    ws = void . MP.many $ char ' ' <|> char '\n'
-
-goidsEntryParser :: OsPath -> GOIDsParser (OsPath, [OID])
-goidsEntryParser sourceFile = betweenParens $ do
-  filepath <-
-    P.unsafeEncodeUtf
-      <$> MP.between
-        (string "\"")
-        (string "\"" >> ws)
-        (MP.label "filepath" $ MP.some $ MP.anySingleBut '"')
-  let fp =
-        if P.isAbsolute filepath
-          then filepath
-          else P.combine (P.takeDirectory sourceFile) filepath
-  oids <- MP.some $ do
-    oid <- oidParser
-    _ <- ws
-    goidsParserState <- get
-    when (member oid goidsParserState.seenOids)
-      $ fail
-      $ "duplicate OID: \""
-      <> show oid
-      <> "\""
-    put
-      goidsParserState
-        { seenOids = insert oid fp goidsParserState.seenOids
-        }
-    pure oid
-  pure (fp, oids)
-  where
-    betweenParens :: GOIDsParser a -> GOIDsParser a
-    betweenParens =
-      MP.between
-        (string "(" >> ws)
-        (string ")" >> ws)
-    ws :: GOIDsParser ()
-    ws = void . MP.many $ char ' ' <|> char '\n'
-
-oidParser :: GOIDsParser OID
-oidParser = do
-  oidText <-
-    MP.between
-      (string "\"")
-      (string "\"")
-      (MP.takeWhile1P (Just "OID character") (/= '"'))
-  validateOidText oidText
-
 validateOidText :: (MonadFail m) => Text -> m OID
 validateOidText oidText = case fromText oidText of
   Nothing -> fail $ show oidText <> " is not a valid OID"
   Just oid -> pure oid
-
-extractGOIDs :: [(OsPath, Text)] -> Text
-extractGOIDs orgFilesAndContents =
-  let goids = foldl' buildGOIDs mempty orgFilesAndContents
-      lines = foldl' goidEntryToLines [] $ M.toDescList goids
-   in "(\n" <> (T.unlines $ map ("  " <>) lines) <> ")\n"
-  where
-    buildGOIDs :: Map OsPath [OID] -> (OsPath, Text) -> Map OsPath [OID]
-    buildGOIDs acc (orgFile, orgFileContents)
-      | Right str <- P.decodeWith utf8 utf8 orgFile = case MP.runParser
-          (runStateT orgDocParser defaultOrgParserState)
-          str
-          orgFileContents of
-          Left _err -> acc
-          Right (orgDoc, _orgParserState) -> insert orgFile (getOrgIds orgDoc) acc
-      | otherwise = acc
-    getOrgIds :: OrgDoc -> [OID]
-    getOrgIds od = catMaybes $ foldl' f [Just $ od.oid] od.cells
-    extractOrgId :: Map Text Text -> Maybe OID
-    extractOrgId meta
-      | Just oidText <- lookup "ID" meta = Lilac.Types.fromText oidText
-      | otherwise = Nothing
-    f acc cell = case cell of
-      CHeading heading -> extractOrgId heading.meta : acc
-      CBlock block -> extractOrgId block.meta : acc
-      CMathFragment mathFragment -> extractOrgId mathFragment.meta : acc
-      CFigure figure -> extractOrgId figure.meta : acc
-      CTable table -> extractOrgId table.meta : acc
-      CListItem {}
-      CParagraph {} -> acc
-    goidEntryToLines :: [Text] -> (OsPath, [OID]) -> [Text]
-    goidEntryToLines acc (orgFile, goids)
-      | goids == [] = acc
-      | Right str <- P.decodeWith utf8 utf8 orgFile,
-        orgFileText <- T.pack $ show str,
-        goidsLines <- map (\goid -> "    \"" <> (T.pack $ show goid) <> "\"") goids =
-          ("(\n    " <> orgFileText <> "\n" <> (T.unlines goidsLines) <> "  )") : acc
-      | otherwise = acc

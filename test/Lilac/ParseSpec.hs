@@ -26,7 +26,6 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (MathFragment, body, meta),
-    OID,
     OrgDoc (OrgDoc, cells, meta, oid),
     OrgParserConf (maxHeadingLevel),
     OrgParserState
@@ -36,7 +35,6 @@ import Lilac.Types
         continuationIndent,
         docOid,
         equationNumber,
-        goids,
         headingLevel,
         headingOidStack,
         headingSection,
@@ -52,7 +50,6 @@ import Lilac.Types
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, grid, meta),
-    fromText,
     fromWords,
     nilOid,
     nilOidOrgDoc,
@@ -69,7 +66,6 @@ import Relude
     Text,
     Type,
     fromList,
-    map,
     otherwise,
     repeat,
     runStateT,
@@ -81,8 +77,6 @@ import Relude
     (<>),
     (==),
   )
-import System.OsPath (OsPath)
-import System.OsPath qualified as P
 import Test.Hspec (Spec, before, describe, it, shouldBe)
 import Test.Hspec.Megaparsec
   ( ET,
@@ -192,38 +186,6 @@ plainHeading level section =
         }
     )
 
-pGOIDs :: FilePath -> [(Text, FilePath)] -> Spec
-pGOIDs path expected = do
-  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path $ \input -> do
-      MP.runParser
-        (runStateT (L.goidsParser $ P.unsafeEncodeUtf path) st)
-        path
-        input
-        `shouldParse` ( fromList $ map f expected,
-                        L.defaultGOIDsParserState
-                      )
-  where
-    st = L.defaultGOIDsParserState
-    f :: (Text, FilePath) -> (OID, OsPath)
-    f (oidText, filePath)
-      | Just oid <- fromText oidText,
-        Just osPath <- P.encodeUtf filePath =
-          (oid, osPath)
-      | otherwise = (nilOid, P.pack [])
-
-pfGOIDs :: FilePath -> String -> Int -> Spec
-pfGOIDs path errMsg pos = do
-  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path $ \input -> do
-      MP.runParser
-        (runStateT (L.goidsParser $ P.unsafeEncodeUtf path) st)
-        path
-        input
-        `shouldFailWith` (errFancy pos . fancy $ MP.ErrorFail errMsg)
-  where
-    st = L.defaultGOIDsParserState
-
 nilOrgDoc :: [Cell] -> OrgDoc
 nilOrgDoc cells =
   OrgDoc
@@ -260,8 +222,7 @@ parseSpec = do
     "0001-blankline"
     (L.defaultOrgDoc nilOid [])
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
@@ -318,8 +279,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+      { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
@@ -347,8 +307,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
+      { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
         headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
@@ -396,8 +355,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = take 12 $ repeat Nothing,
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -432,8 +390,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = take 12 $ repeat Nothing,
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -547,8 +504,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [Nothing],
         headingLevel = 1,
         headingSection = [1],
@@ -585,8 +541,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
         headingLevel = 1,
         headingSection = [1],
@@ -623,8 +578,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
         headingLevel = 1,
         headingSection = [1],
@@ -828,8 +782,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [Nothing],
         headingLevel = 1,
         headingSection = [1],
@@ -1186,8 +1139,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [Nothing],
         headingLevel = 1,
         headingSection = [1],
@@ -1639,8 +1591,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
@@ -1735,8 +1686,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
@@ -2300,8 +2250,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
@@ -2361,8 +2310,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
@@ -2508,8 +2456,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
@@ -2675,8 +2622,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
@@ -2857,8 +2803,7 @@ parseSpec = do
         ]
     )
     OrgParserState
-      { goids = fromList [],
-        docOid = nilOid,
+      { docOid = nilOid,
         headingOidStack = [],
         headingLevel = 0,
         headingSection = [],
@@ -2877,55 +2822,3 @@ parseSpec = do
         tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
-
-  pGOIDs
-    "0200-goids-file-empty"
-    []
-
-  pGOIDs
-    "0200-goids-file-empty-list"
-    []
-
-  pGOIDs
-    "0200-goids-file"
-    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org"),
-      ("3c576a02-418b-431b-ab96-e4936e977fb7", "./../prog/lilac/lilac.org"),
-      ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "./../prog/lilac/lilac.org"),
-      ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "./../prog/lilac/lilac.org"),
-      ("b449a097-d702-4fd6-98de-cb81f7e49177", "./../prog/lilac/lilac.org")
-    ]
-
-  pGOIDs
-    "0200-goids-file-oneline"
-    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./a"),
-      ("3c576a02-418b-431b-ab96-e4936e977fb7", "./b")
-    ]
-
-  pGOIDs
-    "0200-goids-file-caps"
-    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "./note/raw/recreation.org")
-    ]
-
-  pfGOIDs
-    "0200-goids-file-non-oid"
-    "\"b449a097-d702-4fd6-98de-cb81f7e49177e\" is not a valid OID"
-    336
-
-  pfGOIDs
-    "0200-goids-file-non-oid-x"
-    "\"a1e6d0d5-4540-423b-864e-b96ad06c56ex\" is not a valid OID"
-    66
-
-  pfGOIDs
-    "0200-goids-file-duplicate-oid"
-    "duplicate OID: \"b449a097-d702-4fd6-98de-cb81f7e49177\""
-    335
-
-  pGOIDs
-    "0200-goids-file-absolute"
-    [ ("a1e6d0d5-4540-423b-864e-b96ad06c56eb", "/foo/bar"),
-      ("3c576a02-418b-431b-ab96-e4936e977fb7", "/baz"),
-      ("ce9af5ef-6559-4ffb-82c1-a439214eda6d", "/baz"),
-      ("8f5752c0-6162-4de6-9ceb-f78ba584722c", "/baz"),
-      ("b449a097-d702-4fd6-98de-cb81f7e49177", "/baz")
-    ]
