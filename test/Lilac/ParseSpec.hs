@@ -31,6 +31,7 @@ import Lilac.Types
     OrgParserState
       ( OrgParserState,
         anonBlockNumber,
+        anonEquationNumber,
         cellNames,
         continuationIndent,
         docOid,
@@ -234,6 +235,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
         figureNumber = 0,
@@ -292,6 +294,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
         figureNumber = 0,
@@ -321,6 +324,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
         figureNumber = 0,
@@ -370,6 +374,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
         figureNumber = 0,
@@ -406,6 +411,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
         figureNumber = 0,
@@ -521,6 +527,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
         figureNumber = 0,
@@ -559,6 +566,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
         figureNumber = 0,
@@ -597,6 +605,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
         figureNumber = 0,
@@ -802,6 +811,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
         figureNumber = 0,
@@ -1160,6 +1170,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
         figureNumber = 0,
@@ -1613,6 +1624,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames = Set.fromList ["foo"],
         anonBlockNumber = 2,
         figureNumber = 0,
@@ -1709,6 +1721,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames =
           Set.fromList
             [ "empty",
@@ -2240,7 +2253,10 @@ parseSpec = do
               },
           CMathFragment
             MathFragment
-              { meta = fromList [],
+              { meta =
+                  fromList
+                    [ ("__equation_anon_number", "1")
+                    ],
                 body = "2 + 2 = 4"
               },
           CMathFragment
@@ -2274,6 +2290,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 3,
+        anonEquationNumber = 1,
         cellNames =
           Set.fromList
             [ "eq:x",
@@ -2335,6 +2352,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 1,
+        anonEquationNumber = 0,
         cellNames =
           Set.fromList
             [ "eq:x",
@@ -2489,6 +2507,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames =
           Set.fromList
             [ "f:f",
@@ -2656,6 +2675,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames =
           Set.fromList
             [ "tbl:famous-equations"
@@ -2838,6 +2858,7 @@ parseSpec = do
         listMarkers = [],
         continuationIndent = 0,
         equationNumber = 0,
+        anonEquationNumber = 0,
         cellNames =
           Set.fromList
             [ "tbl:famous-equations"

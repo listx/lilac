@@ -258,6 +258,7 @@ data OrgParserState = OrgParserState
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
     equationNumber :: Int,
+    anonEquationNumber :: Int,
     cellNames :: Set Text,
     anonBlockNumber :: Int,
     figureNumber :: Int,

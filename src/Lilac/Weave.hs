@@ -31,7 +31,7 @@ import Lilac.Types
         LUnorderedEnd,
         LUnorderedStart
       ),
-    MathFragment (body),
+    MathFragment (body, meta),
     Object (orgDoc, symbols),
     OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
@@ -44,6 +44,7 @@ import Lucid
   ( HtmlT,
     a_,
     alt_,
+    async_,
     body_,
     charset_,
     class_,
@@ -164,6 +165,28 @@ weaveObject object = do
                 "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
               ]
       link_ [rel_ "stylesheet", href_ fontsLink]
+
+      let s :: Text
+          s =
+            """
+            window.MathJax = {
+              tex: {
+                  tags: 'ams'
+              },
+
+              options: {
+                  ignoreHtmlClass: 'verbatim|code'
+              }
+            };
+            """
+      script_ [] s
+
+      script_
+        [ id_ "MathJax-script",
+          async_ "",
+          src_ "https://cdn.jsdelivr.net/npm/mathjax@3.0.1/es5/tex-mml-chtml.js"
+        ]
+        ("" :: Text)
     body_ $ do
       forM_ object.orgDoc.cells weaveCell
 
@@ -173,8 +196,7 @@ weaveCell = \case
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> p_ $ sequence_ $ map weavePToken prose
   CBlock block -> weaveBlock block
-  CMathFragment _ -> do
-    p_ "FRAGMENT"
+  CMathFragment mathFragment -> weaveMathFragmentStandalone mathFragment
   CFigure figure -> weaveFigure figure
   CTable _ -> do
     p_ "TABLE"
@@ -251,7 +273,17 @@ getLinkAnchor = \case
           [ "b",
             toSafeHtmlId ref
           ]
-  CMathFragment {} -> ""
+  CMathFragment mathFragment ->
+    let ref
+          | Just name <- lookup "name" mathFragment.meta,
+            Just eqNum <- lookup "__equation_number" mathFragment.meta =
+              "eq-" <> eqNum <> "-" <> name
+          | Just eqNum <- lookup "__equation_number" mathFragment.meta =
+              "eq-" <> eqNum
+          | Just eqNum <- lookup "__equation_anon_number" mathFragment.meta =
+              "eq-anon-" <> eqNum
+          | otherwise = "eq-num-error"
+     in toSafeHtmlId ref
   CFigure figure ->
     let ref
           | Just name <- lookup "name" figure.meta,
@@ -267,7 +299,7 @@ weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
   PTokenLink link -> weaveLink link
-  PTokenMathFragment _ -> p_ ""
+  PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
 
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
@@ -436,6 +468,21 @@ weaveFigure figure = do
   p_ [class_ "figure-caption"] $ toHtml fullCaption
   where
     linkAnchor = getLinkAnchor $ CFigure figure
+
+weaveMathFragmentStandalone :: MathFragment -> HtmlWeaver ()
+weaveMathFragmentStandalone mathFragment = do
+  let (begMarker, endMarker)
+        | Just _ <- lookup "__equation_number" mathFragment.meta =
+            ("\\begin{equation}", "\\end{equation}")
+        | otherwise = ("\\[", "\\]")
+  p_ [id_ linkAnchor] $ do
+    a_ [href_ $ "#" <> linkAnchor, class_ "equation"] $ do
+      begMarker <> toHtml mathFragment.body <> endMarker
+  where
+    linkAnchor = getLinkAnchor $ CMathFragment mathFragment
+
+weaveMathFragmentInline :: MathFragment -> HtmlWeaver ()
+weaveMathFragmentInline mathFragment = "\\(" <> toHtml mathFragment.body <> "\\)"
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest

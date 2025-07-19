@@ -155,6 +155,11 @@ defaultCss = do
       ".code" & do
         fontSize (pt 10)
   a ? do
+    ".equation" & do
+      color $ rgbHex hexText
+      ":visited" & do
+        color $ rgbHex hexText
+  a ? do
     color $ rgbHex hexNowebLinkFg
     textDecoration none
     ":hover" & do

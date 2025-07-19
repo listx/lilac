@@ -87,7 +87,7 @@ import Lilac.Types
         LUnorderedEnd,
         LUnorderedStart
       ),
-    MathFragment (body),
+    MathFragment (body, meta),
     Object (orgDoc, symbols),
     OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
@@ -100,6 +100,7 @@ import Lucid
   ( HtmlT,
     a_,
     alt_,
+    async_,
     body_,
     charset_,
     class_,
@@ -203,6 +204,8 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveLink>>
 <<f:weaveLinkTarget>>
 <<f:weaveFigure>>
+<<f:weaveMathFragmentStandalone>>
+<<f:weaveMathFragmentInline>>
 <<f:getRelativePathWithoutSymlinks>>
 <<f:commonPrefix>>
 <<f:renderAsText>>
@@ -320,8 +323,7 @@ weaveCell = \case
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> p_ $ sequence_ $ map weavePToken prose
   CBlock block -> weaveBlock block
-  CMathFragment _ -> do
-    p_ "FRAGMENT"
+  CMathFragment mathFragment -> weaveMathFragmentStandalone mathFragment
   CFigure figure -> weaveFigure figure
   CTable _ -> do
     p_ "TABLE"
@@ -336,6 +338,8 @@ head_ $ do
   title_ title'
   <<Hot reload script>>
   <<Styles and fonts>>
+  <<MathJax customization>>
+  <<MathJax script>>
 #+end_src
 
 *** Hot reload
@@ -403,6 +407,67 @@ let fontsLink =
 link_ [rel_ "stylesheet", href_ fontsLink]
 #+end_src
 
+*** MathJax
+
+We use [[https://www.mathjax.org][MathJax]] to render mathematical expressions (what we encode as the
+[[id:d1064535-5c98-4c80-a901-5cdc1fd5297f::data:MathFragment][data:MathFragment]]). The MathJax JS import is a Lucid port of the [[https://www.mathjax.org/#gettingstarted][official
+instructions]].
+
+#+name: MathJax script
+#+begin_src haskell
+script_
+  [ id_ "MathJax-script",
+    async_ "",
+    src_ "https://cdn.jsdelivr.net/npm/mathjax@3.0.1/es5/tex-mml-chtml.js"
+  ]
+  ("" :: Text)
+#+end_src
+
+MathJax is configurable.
+
+#+name: MathJax customization
+#+begin_src haskell
+let s :: Text
+    s =
+      """
+      window.MathJax = {
+        <<Automatic equation numbering>>
+        <<Ignore certain HTML element classes>>
+      };
+      """
+script_ [] s
+#+end_src
+
+To turn on numbering, we have to run a script with a special ~'ams'~ parameter.
+
+#+name: Automatic equation numbering
+#+begin_src javascript
+tex: {
+    tags: 'ams'
+},
+#+end_src
+
+It may sound a bit surprising to let MathJax perform the numbering when we
+already have this numbering information on hand from the
+[[id:d1064535-5c98-4c80-a901-5cdc1fd5297f::f:mathFragmentNumberedParser][f:mathFragmentNumberedParser]]. The thing that MathJax solves for us is the
+automatic placement of the numbers themselves on the pages, so that we don't
+have to do that part. The parsers we use already conform to the behavior that
+MathJax expects when numbering equations (namely, that ~\begin{equation}~ and ~\[~
+start numbered and unnumbered equations), so the way we number equations and the
+way MathJax numbers equations is the same. In other words, we can let MathJax
+number equations for us and those automatically generated equation numbers
+should line up with what we have.
+
+We can prohibit MathJax from acting on certain HTML element classes. This is
+necessary for making it ignore verbatim and code styles from [[id:d6abea81-d620-4ede-9c2c-68f7ea07f847::f:weaveStyledText][f:weaveStyledText]].
+
+#+name: Ignore certain HTML element classes
+#+begin_src javascript
+options: {
+    ignoreHtmlClass: 'verbatim|code'
+}
+#+end_src
+
 ** Unique names
 
 Generating a unique name suitable for being used as the ~id~ attribute value
@@ -457,7 +522,17 @@ getLinkAnchor = \case
           [ "b",
             toSafeHtmlId ref
           ]
-  CMathFragment {} -> ""
+  CMathFragment mathFragment ->
+    let ref
+          | Just name <- lookup "name" mathFragment.meta,
+            Just eqNum <- lookup "__equation_number" mathFragment.meta =
+              "eq-" <> eqNum <> "-" <> name
+          | Just eqNum <- lookup "__equation_number" mathFragment.meta =
+              "eq-" <> eqNum
+          | Just eqNum <- lookup "__equation_anon_number" mathFragment.meta =
+              "eq-anon-" <> eqNum
+          | otherwise = "eq-num-error"
+     in toSafeHtmlId ref
   CFigure figure ->
     let ref
           | Just name <- lookup "name" figure.meta,
@@ -484,6 +559,9 @@ getSectionText heading =
 #+end_src
 
 ** Headings
+:PROPERTIES:
+:ID:       c036cf17-0f61-4f07-bf76-bbe8b4eeb12e
+:END:
 
 Headings might sound simple, but because they are made up of arbitrary text,
 it's fairly involved. The body of a heading is made up of a list of [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]]
@@ -540,10 +618,13 @@ weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
   PTokenLink link -> weaveLink link
-  PTokenMathFragment _ -> p_ ""
+  PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
 #+end_src
 
 ** Styled text
+:PROPERTIES:
+:ID:       d6abea81-d620-4ede-9c2c-68f7ea07f847
+:END:
 
 #+name: f:weaveStyledText
 #+begin_src haskell
@@ -998,6 +1079,35 @@ weaveFigure figure = do
     linkAnchor = getLinkAnchor $ CFigure figure
 #+end_src
 
+** Math fragments
+
+Math fragments come in two types, standalone and inline. Standalone fragments
+get linked to themselves, much like how we weave headings in [[id:c036cf17-0f61-4f07-bf76-bbe8b4eeb12e::f:weaveHeading][f:weaveHeading]].
+
+#+name: f:weaveMathFragmentStandalone
+#+begin_src haskell
+weaveMathFragmentStandalone :: MathFragment -> HtmlWeaver ()
+weaveMathFragmentStandalone mathFragment = do
+  let (begMarker, endMarker)
+        | Just _ <- lookup "__equation_number" mathFragment.meta =
+            ("\\begin{equation}", "\\end{equation}")
+        | otherwise = ("\\[", "\\]")
+  p_ [id_ linkAnchor] $ do
+    a_ [href_ $ "#" <> linkAnchor, class_ "equation"] $ do
+      begMarker <> toHtml mathFragment.body <> endMarker
+  where
+    linkAnchor = getLinkAnchor $ CMathFragment mathFragment
+#+end_src
+
+The inline one is much simpler because it doesn't have to worry about being
+identified (and hence linkable) by an ~id~ HTML attribute.
+
+#+name: f:weaveMathFragmentInline
+#+begin_src haskell
+weaveMathFragmentInline :: MathFragment -> HtmlWeaver ()
+weaveMathFragmentInline mathFragment = "\\(" <> toHtml mathFragment.body <> "\\)"
+#+end_src
+
 ** Testing framework
 
 The tests here use Org files as input. The output are HTML documents. For the
@@ -1386,6 +1496,11 @@ defaultCss = do
     span ? do
       ".code" & do
         fontSize (pt 10)
+  a ? do
+    ".equation" & do
+      color $ rgbHex hexText
+      ":visited" & do
+        color $ rgbHex hexText
   <<css:Links>>
   ".sourceCode" & do
     noMargin

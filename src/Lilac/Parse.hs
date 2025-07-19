@@ -49,6 +49,7 @@ import Lilac.Types
     OrgParserState
       ( OrgParserState,
         anonBlockNumber,
+        anonEquationNumber,
         cellNames,
         continuationIndent,
         docOid,
@@ -246,6 +247,7 @@ defaultOrgParserState =
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -1442,15 +1444,25 @@ trimTrailingWhitespace = T.dropWhileEnd (\c -> T.elem c " \n\r\t")
 
 mathFragmentUnnumberedParser :: OrgParser MathFragment
 mathFragmentUnnumberedParser = do
+  orgParserState <- get
   metaKVs <- metaParser
   _ <- lexeme $ string "\\["
   latex <-
     MP.someTill
       (MP.label "LaTeX standalone unnumbered math input" MP.anySingle)
       (string "\\]")
+  anonNumber <- case lookup "name" metaKVs of
+    Just _ -> pure Nothing
+    Nothing -> do
+      let n = orgParserState.anonEquationNumber + 1
+      modify (\s -> s {anonEquationNumber = n})
+      pure $ Just n
   pure
     MathFragment
-      { meta = metaKVs,
+      { meta = case anonNumber of
+          Just n ->
+            insert "__equation_anon_number" (T.pack $ show n) metaKVs
+          Nothing -> metaKVs,
         body = trimTrailingWhitespace $ T.pack latex
       }
 

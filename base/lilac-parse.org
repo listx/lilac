@@ -79,6 +79,7 @@ import Lilac.Types
     OrgParserState
       ( OrgParserState,
         anonBlockNumber,
+        anonEquationNumber,
         cellNames,
         continuationIndent,
         docOid,
@@ -521,6 +522,7 @@ data OrgParserState = OrgParserState
     listMarkers :: [ListMarker],
     continuationIndent :: Int,
     equationNumber :: Int,
+    anonEquationNumber :: Int,
     cellNames :: Set Text,
     anonBlockNumber :: Int,
     figureNumber :: Int,
@@ -546,6 +548,7 @@ defaultOrgParserState =
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -1027,6 +1030,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -1055,6 +1059,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -1100,6 +1105,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -1512,6 +1518,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -3118,6 +3125,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -3965,6 +3973,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -4023,6 +4032,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -4194,6 +4204,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -4245,6 +4256,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -4306,6 +4318,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
@@ -4373,6 +4386,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames = Set.fromList ["foo"],
       anonBlockNumber = 2,
       figureNumber = 0,
@@ -5494,6 +5508,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames =
         Set.fromList
           [ "empty",
@@ -7053,11 +7068,30 @@ need to be part of another cell.
 
 Use the first form for a standalone equation like this
 
+# Note: these code blocks for the math bits are needed for HTML audiences,
+# because otherwise the markers like "\begin{equation}" and "\[" get removed by
+# MathJax. That is, without these code blocks, HTML audiences will only see the
+# rendered 2 + 2 = 4 output and not what goes into the inputs to generate them.
+
+#+begin_src latex
 \begin{equation}
-2 + 2 = 4.
+2 + 2 = 4
+\end{equation}
+#+end_src
+
+to get
+
+\begin{equation}
+2 + 2 = 4
 \end{equation}
 
 where the equation will get numbered and centered on its own. Use
+
+#+begin_src latex
+\[2 + 2 = 4\]
+#+end_src
+
+to get
 
 \[2 + 2 = 4\]
 
@@ -7067,6 +7101,15 @@ displayed inside the paragraph).
 
 When using the standalone form, you can assign a =#+name= keyword to it to refer
 to the equation using a human-friendly name, like this:
+
+#+begin_src org
+,#+name: eq:Pythagorean Theorem
+\begin{equation}
+a^2 + b^2 = c^2
+\end{equation}
+#+end_src
+
+which becomes
 
 #+name: eq:Pythagorean Theorem
 \begin{equation}
@@ -7115,15 +7158,25 @@ Parsing unnumbered equations is almost the same.
 #+begin_src haskell
 mathFragmentUnnumberedParser :: OrgParser MathFragment
 mathFragmentUnnumberedParser = do
+  orgParserState <- get
   metaKVs <- metaParser
   _ <- lexeme $ string "\\["
   latex <-
     MP.someTill
       (MP.label "LaTeX standalone unnumbered math input" MP.anySingle)
       (string "\\]")
+  anonNumber <- case lookup "name" metaKVs of
+    Just _ -> pure Nothing
+    Nothing -> do
+      let n = orgParserState.anonEquationNumber + 1
+      modify (\s -> s {anonEquationNumber = n})
+      pure $ Just n
   pure
     MathFragment
-      { meta = metaKVs,
+      { meta = case anonNumber of
+          Just n ->
+            insert "__equation_anon_number" (T.pack $ show n) metaKVs
+          Nothing -> metaKVs,
         body = trimTrailingWhitespace $ T.pack latex
       }
 #+end_src
@@ -7206,7 +7259,10 @@ ps
             },
         CMathFragment
           MathFragment
-            { meta = fromList [],
+            { meta =
+                fromList
+                  [ ("__equation_anon_number", "1")
+                  ],
               body = "2 + 2 = 4"
             },
         CMathFragment
@@ -7240,6 +7296,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 3,
+      anonEquationNumber = 1,
       cellNames =
         Set.fromList
           [ "eq:x",
@@ -7321,6 +7378,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 1,
+      anonEquationNumber = 0,
       cellNames =
         Set.fromList
           [ "eq:x",
@@ -7670,6 +7728,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames =
         Set.fromList
           [ "f:f",
@@ -7871,6 +7930,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames =
         Set.fromList
           [ "tbl:famous-equations"
@@ -8060,6 +8120,7 @@ ps
       listMarkers = [],
       continuationIndent = 0,
       equationNumber = 0,
+      anonEquationNumber = 0,
       cellNames =
         Set.fromList
           [ "tbl:famous-equations"
@@ -8297,6 +8358,7 @@ import Lilac.Types
     OrgParserState
       ( OrgParserState,
         anonBlockNumber,
+        anonEquationNumber,
         cellNames,
         continuationIndent,
         docOid,
