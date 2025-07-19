@@ -33,7 +33,7 @@ document, but JS is necessary for making things dynamic.
 
 At this stage, the architecture we have in mind for weaving is the following:
 
-  1) Convert the [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] into HTML.
+  1) Convert the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] into HTML.
 
   2) Generate CSS separately.
 
@@ -213,8 +213,10 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 :ID:       3592f24a-dc14-4ae6-8c06-5680ee7eb9aa
 :END:
 
-Weaving mainly means converting the [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] into HTML, as part of "Step 1"
+Weaving mainly means converting the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] into HTML, as part of "Step 1"
 in [[id:8f5752c0-6162-4de6-9ceb-f78ba584722c][Architecture]].
+
+** =HtmlWeaver= monad
 
 During the weaving process, we want to access various other settings that may
 not be apparent at the [[id:ed81c307-9172-4436-8672-583ea8ecb1f9::data:Cell][data:Cell]] level. To capture these values in one place, we
@@ -278,6 +280,8 @@ Identity~, and running ~runReaderT~ will result in ~Identity ()~ (where ~()~ is 
 in the type signature for [[f:renderAsText]]). So then the call to ~hoistHtmlT~ gives
 us ~HtmlT Identity a~, which is what Lucid's ~renderText~ expects.
 
+** Top-level (Object) weaver
+
 The top-level weaving function is [[f:weaveObject]], which weaves a [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]]
 value.
 
@@ -294,11 +298,7 @@ weaveObject object = do
         Just title -> title
         Nothing -> "Untitled"
   doctypehtml_ $ do
-    head_ $ do
-      meta_ [charset_ "utf-8"]
-      title_ title'
-      <<Hot reload script>>
-      <<Styles and fonts>>
+    <<HTML head>>
     body_ $ do
       forM_ object.orgDoc.cells weaveCell
 #+end_src
@@ -308,6 +308,37 @@ Lucid will think that regular strings are of type ~Html ()~ (this is how Lucid
 automatically escapes strings to be HTML-safe). The ~title_~ function expects a
 ~Html ()~ type, so we have to manually convert the ~Text~ we get out of ~lookup~
 with ~toHtml~.
+
+Weaving cells just means delegating to each of the weavers that know how to
+handle each cell type.
+
+#+name: f:weaveCell
+#+begin_src haskell
+weaveCell :: Cell -> HtmlWeaver ()
+weaveCell = \case
+  CHeading heading -> weaveHeading heading
+  CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
+  CParagraph prose -> p_ $ sequence_ $ map weavePToken prose
+  CBlock block -> weaveBlock block
+  CMathFragment _ -> do
+    p_ "FRAGMENT"
+  CFigure figure -> weaveFigure figure
+  CTable _ -> do
+    p_ "TABLE"
+#+end_src
+
+The [[HTML head]] has some "imports" for the HTML page, including CSS and JS.
+
+#+name: HTML head
+#+begin_src haskell
+head_ $ do
+  meta_ [charset_ "utf-8"]
+  title_ title'
+  <<Hot reload script>>
+  <<Styles and fonts>>
+#+end_src
+
+*** Hot reload
 
 The [[Hot reload script]] is a simple third-party development tool which reloads the
 page if there is a change in the HTML, CSS, or JS. It requires a web server, so
@@ -346,6 +377,8 @@ in [[id:73b60692-f369-4707-a7ee-434cc7a4549f::code:tools][code:tools]].
 pkgs.python3
 #+end_src
 
+*** CSS styles and fonts
+
 The [[Styles and fonts]] are just some top-level CSS we need for the document,
 including the default CSS we [[id:8017befd-7628-46cf-a090-72fdbb00fb5a][generate]] and some default fonts we want to load
 from Google Fonts.
@@ -368,24 +401,6 @@ let fontsLink =
           "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
         ]
 link_ [rel_ "stylesheet", href_ fontsLink]
-#+end_src
-
-Weaving cells just means delegating to each of the weavers that know how to
-handle each cell type.
-
-#+name: f:weaveCell
-#+begin_src haskell
-weaveCell :: Cell -> HtmlWeaver ()
-weaveCell = \case
-  CHeading heading -> weaveHeading heading
-  CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
-  CParagraph prose -> p_ $ sequence_ $ map weavePToken prose
-  CBlock block -> weaveBlock block
-  CMathFragment _ -> do
-    p_ "FRAGMENT"
-  CFigure figure -> weaveFigure figure
-  CTable _ -> do
-    p_ "TABLE"
 #+end_src
 
 ** Unique names
@@ -468,7 +483,7 @@ getSectionText heading =
     $ heading.section
 #+end_src
 
-** Weave headings
+** Headings
 
 Headings might sound simple, but because they are made up of arbitrary text,
 it's fairly involved. The body of a heading is made up of a list of [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]]
@@ -528,7 +543,7 @@ weavePToken = \case
   PTokenMathFragment _ -> p_ ""
 #+end_src
 
-** Weave styled text
+** Styled text
 
 #+name: f:weaveStyledText
 #+begin_src haskell
@@ -575,7 +590,7 @@ weaveExpect
   ]
 #+end_src
 
-** Weave list markers
+** List markers
 
 The =blaze-html= library we use expects to take care of the starting and closing
 tags for us automatically when we use its HTML tag functions. However, for
@@ -642,7 +657,7 @@ weaveExpect
     ]
 #+end_src
 
-** Weave code blocks
+** Code blocks
 
 Weaving code blocks requires us to be able to handle both regular text
 (~BTokenString~) and also links (~BTokenLink~). There is some additional work for
@@ -947,7 +962,7 @@ only when the containing ~.code-block-container~ is hovered. This keeps the page
 free of clutter (otherwise we'd have these link anchors showing up for all
 blocks at all times, which is noisy).
 
-** Weave figures
+** Figures
 
 [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][Figures]] need to link to the target image file they are trying to display. We
 also display any associated metadata.
