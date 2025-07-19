@@ -7362,7 +7362,9 @@ The metadata recognizes certain reserved keys:
     file. Other cells can refer to this figure by this name (or as part of a
     global [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]).
 
-  - caption :: (Optional) Displayed as the caption for the image.
+  - caption :: (Optional) Displayed as the caption for the image. If there is no
+    caption, on weaving the only name of the figure will be just the figure
+    number, like "Figure 1" or "Figure 12".
 
   - width :: (Optional) Width of the image (as a percentage of page width or
     pixel count), for HTML weaving.
@@ -7379,16 +7381,16 @@ Below is an example of a figure:
 #+height: 40
 [[file:image/PNG-Gradient.png]]
 
-Below is the same, but the figure does not have a ~name~ in the metadata.
+Below is the same, but the figure does not have a ~name~ in the metadata, nor a
+~caption~. This is still valid.
 
-#+caption: (Anonymous) Portable Network Graphics sample image.
 #+type: figure
 #+width: 50%
 #+height: 40
 [[file:image/PNG-Gradient.png]]
 
-The only difference is that the unnamed figure is not able to be referenced
-using a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] by this or other Org files.
+The only practical difference is that the unnamed figure is not able to be
+referenced using a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] by this or other Org files.
 
 *** Figure parser
 

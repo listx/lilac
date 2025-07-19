@@ -968,19 +968,17 @@ weaveFigure figure = do
                (\(attr, metaKey) -> attr <$> lookup metaKey figure.meta)
                [ (width_, "width"),
                  (height_, "height"),
-                 (alt_, "name"),
+                 (alt_, "caption"),
                  (title_, "name")
                ]
          )
-  case lookup "caption" figure.meta of
-    Nothing -> pure ()
-    Just caption ->
-      let captionPrefix =
-            "Figure "
-              <> lookupDefault "figure-number-error" "__figure_number" figure.meta
-              <> ": "
-          fullCaption = captionPrefix <> caption
-       in p_ [class_ "figure-caption"] $ toHtml fullCaption
+  let captionPrefix =
+        "Figure "
+          <> lookupDefault "figure-number-error" "__figure_number" figure.meta
+      fullCaption = case lookup "caption" figure.meta of
+        Nothing -> captionPrefix <> "."
+        Just caption -> captionPrefix <> ": " <> caption
+  p_ [class_ "figure-caption"] $ toHtml fullCaption
   where
     linkAnchor = getLinkAnchor $ CFigure figure
 #+end_src
