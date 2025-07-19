@@ -121,7 +121,7 @@ import Relude
     (==),
     (||),
   )
-import Relude.Extra.Map (lookup)
+import Relude.Extra.Map (lookup, lookupDefault)
 import Skylighting qualified as Sky
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -412,23 +412,32 @@ weaveLinkTarget linkTarget = do
 weaveFigure :: Figure -> HtmlWeaver ()
 weaveFigure figure = do
   wovenLinkTarget <- weaveLinkTarget figure.link.target
-  img_
-    $ [ id_ . getLinkAnchor $ CFigure figure,
-        src_ wovenLinkTarget,
-        class_ "figure-image"
-      ]
-    <> ( catMaybes
-           $ map
-             (\(attr, metaKey) -> attr <$> lookup metaKey figure.meta)
-             [ (width_, "width"),
-               (height_, "height"),
-               (alt_, "name"),
-               (title_, "name")
-             ]
-       )
+  a_ [href_ $ "#" <> linkAnchor] $ do
+    img_
+      $ [ id_ linkAnchor,
+          src_ wovenLinkTarget,
+          class_ "figure-image"
+        ]
+      <> ( catMaybes
+             $ map
+               (\(attr, metaKey) -> attr <$> lookup metaKey figure.meta)
+               [ (width_, "width"),
+                 (height_, "height"),
+                 (alt_, "name"),
+                 (title_, "name")
+               ]
+         )
   case lookup "caption" figure.meta of
     Nothing -> pure ()
-    Just caption -> p_ [class_ "figure-caption"] $ toHtml caption
+    Just caption ->
+      let captionPrefix =
+            "Figure "
+              <> lookupDefault "figure-number-error" "__figure_number" figure.meta
+              <> ": "
+          fullCaption = captionPrefix <> caption
+       in p_ [class_ "figure-caption"] $ toHtml fullCaption
+  where
+    linkAnchor = getLinkAnchor $ CFigure figure
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest

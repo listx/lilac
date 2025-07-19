@@ -7379,11 +7379,18 @@ Below is an example of a figure:
 #+height: 40
 [[file:image/PNG-Gradient.png]]
 
+Below is the same, but the figure does not have a ~name~ in the metadata.
+
 #+caption: (Anonymous) Portable Network Graphics sample image.
 #+type: figure
 #+width: 50%
 #+height: 40
 [[file:image/PNG-Gradient.png]]
+
+The only difference is that the unnamed figure is not able to be referenced
+using a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] by this or other Org files.
+
+*** Figure parser
 
 First we have to parse for the metadata, and then the link. We don't allow
 figures inside list items, because that's just weird (how are you going to have
@@ -7479,6 +7486,8 @@ metaEntryParser = do
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
 #+end_src
+
+*** Tests
 
 Below we parse a doc that has figures and blocks, both with metadata.
 
