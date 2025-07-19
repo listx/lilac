@@ -83,6 +83,7 @@ import Lilac.Types
         continuationIndent,
         docOid,
         equationNumber,
+        figureNumber,
         headingLevel,
         headingOidStack,
         headingSection,
@@ -522,6 +523,7 @@ data OrgParserState = OrgParserState
     equationNumber :: Int,
     cellNames :: Set Text,
     anonBlockNumber :: Int,
+    figureNumber :: Int,
     tanglePaths :: Set Text,
     orgParserConf :: OrgParserConf
   }
@@ -546,6 +548,7 @@ defaultOrgParserState =
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
@@ -1026,6 +1029,7 @@ ps
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -1053,6 +1057,7 @@ ps
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -1097,6 +1102,7 @@ ps
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -1508,6 +1514,7 @@ ps
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -3113,6 +3120,7 @@ ps
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -3959,6 +3967,7 @@ ps
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 20}
     }
@@ -4016,6 +4025,7 @@ ps
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 0}
     }
@@ -4186,6 +4196,7 @@ ps
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -4236,6 +4247,7 @@ ps
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -4296,6 +4308,7 @@ ps
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -4362,6 +4375,7 @@ ps
       equationNumber = 0,
       cellNames = Set.fromList ["foo"],
       anonBlockNumber = 2,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -5490,6 +5504,7 @@ ps
             "ignore #+end_example because this is a src block"
           ],
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.fromList [],
       orgParserConf = L.defaultOrgParserConf
     }
@@ -7231,6 +7246,7 @@ ps
             "eq:y"
           ],
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -7311,6 +7327,7 @@ ps
             "eq:y"
           ],
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = L.defaultOrgParserConf
     }
@@ -7362,6 +7379,12 @@ Below is an example of a figure:
 #+height: 40
 [[file:image/PNG-Gradient.png]]
 
+#+caption: (Anonymous) Portable Network Graphics sample image.
+#+type: figure
+#+width: 50%
+#+height: 40
+[[file:image/PNG-Gradient.png]]
+
 First we have to parse for the metadata, and then the link. We don't allow
 figures inside list items, because that's just weird (how are you going to have
 metadata for that list item?).
@@ -7381,16 +7404,23 @@ figureParser = do
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
   link <- fileLinkParser
+  let newFigureNumber = orgParserState.figureNumber + 1
+      figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
-    LinkTargetFilePath _ ->
+    LinkTargetOid {}
+    LinkTargetURI {} -> fail "'file:...' required for link to figures"
+    LinkTargetFilePath _ -> do
+      modify (\s -> s {figureNumber = newFigureNumber})
       pure
         . CFigure
         $ Figure
-          { meta = delete "type" metaKVs,
+          { meta =
+              foldl'
+                (\acc (k, v) -> insert k v acc)
+                (delete "type" metaKVs)
+                [figureNumberMeta],
             link = link
           }
-    LinkTargetOid {}
-    LinkTargetURI {} -> fail "'file:...' required for link to figures"
   where
     endOfCell :: OrgParser ()
     endOfCell =
@@ -7505,7 +7535,8 @@ ps
           Figure
             { meta =
                 fromList
-                  [ ("width", "100%"),
+                  [ ("__figure_number", "1"),
+                    ("width", "100%"),
                     ("name", "fig:hello")
                   ],
               link =
@@ -7533,7 +7564,10 @@ ps
             },
         CFigure
           Figure
-            { meta = fromList [],
+            { meta =
+                fromList
+                  [ ("__figure_number", "2")
+                  ],
               link =
                 Link
                   { target = LinkTargetFilePath "image/world.png",
@@ -7596,7 +7630,10 @@ ps
           ],
         CFigure
           Figure
-            { meta = fromList [],
+            { meta =
+                fromList
+                  [ ("__figure_number", "3")
+                  ],
               link =
                 Link
                   { target = LinkTargetFilePath "foo.png",
@@ -7629,6 +7666,7 @@ ps
             "fig:hello"
           ],
       anonBlockNumber = 0,
+      figureNumber = 3,
       tanglePaths = Set.fromList [],
       orgParserConf = L.defaultOrgParserConf
     }
@@ -7827,6 +7865,7 @@ ps
           [ "tbl:famous-equations"
           ],
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.fromList [],
       orgParserConf = L.defaultOrgParserConf
     }
@@ -8015,6 +8054,7 @@ ps
           [ "tbl:famous-equations"
           ],
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.fromList [],
       orgParserConf = L.defaultOrgParserConf
     }
@@ -8250,6 +8290,7 @@ import Lilac.Types
         continuationIndent,
         docOid,
         equationNumber,
+        figureNumber,
         headingLevel,
         headingOidStack,
         headingSection,

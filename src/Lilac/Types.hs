@@ -260,6 +260,7 @@ data OrgParserState = OrgParserState
     equationNumber :: Int,
     cellNames :: Set Text,
     anonBlockNumber :: Int,
+    figureNumber :: Int,
     tanglePaths :: Set Text,
     orgParserConf :: OrgParserConf
   }

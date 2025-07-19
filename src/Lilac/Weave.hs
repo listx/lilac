@@ -254,11 +254,12 @@ getLinkAnchor = \case
   CMathFragment {} -> ""
   CFigure figure ->
     let ref
-          | Just name <- lookup "name" figure.meta =
-              name
-          | Just anonFigureNum <- lookup "__anon_figure_number" figure.meta =
-              anonFigureNum
-          | otherwise = "anon-figure-error"
+          | Just name <- lookup "name" figure.meta,
+            Just figureNum <- lookup "__figure_number" figure.meta =
+              "fig-" <> figureNum <> "-" <> name
+          | Just figureNum <- lookup "__figure_number" figure.meta =
+              "fig-" <> figureNum
+          | otherwise = "figure-num-error"
      in toSafeHtmlId ref
   CTable {} -> ""
 

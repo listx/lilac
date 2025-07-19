@@ -53,6 +53,7 @@ import Lilac.Types
         continuationIndent,
         docOid,
         equationNumber,
+        figureNumber,
         headingLevel,
         headingOidStack,
         headingSection,
@@ -247,6 +248,7 @@ defaultOrgParserState =
       equationNumber = 0,
       cellNames = Set.empty,
       anonBlockNumber = 0,
+      figureNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
@@ -1467,16 +1469,23 @@ figureParser = do
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
   link <- fileLinkParser
+  let newFigureNumber = orgParserState.figureNumber + 1
+      figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
-    LinkTargetFilePath _ ->
+    LinkTargetOid {}
+    LinkTargetURI {} -> fail "'file:...' required for link to figures"
+    LinkTargetFilePath _ -> do
+      modify (\s -> s {figureNumber = newFigureNumber})
       pure
         . CFigure
         $ Figure
-          { meta = delete "type" metaKVs,
+          { meta =
+              foldl'
+                (\acc (k, v) -> insert k v acc)
+                (delete "type" metaKVs)
+                [figureNumberMeta],
             link = link
           }
-    LinkTargetOid {}
-    LinkTargetURI {} -> fail "'file:...' required for link to figures"
   where
     endOfCell :: OrgParser ()
     endOfCell =

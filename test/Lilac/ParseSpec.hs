@@ -35,6 +35,7 @@ import Lilac.Types
         continuationIndent,
         docOid,
         equationNumber,
+        figureNumber,
         headingLevel,
         headingOidStack,
         headingSection,
@@ -235,6 +236,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -292,6 +294,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -320,6 +323,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -368,6 +372,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 20}
       }
@@ -403,6 +408,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 0}
       }
@@ -517,6 +523,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -554,6 +561,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -591,6 +599,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -795,6 +804,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -1152,6 +1162,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.empty,
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -1604,6 +1615,7 @@ parseSpec = do
         equationNumber = 0,
         cellNames = Set.fromList ["foo"],
         anonBlockNumber = 2,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -1707,6 +1719,7 @@ parseSpec = do
               "ignore #+end_example because this is a src block"
             ],
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
@@ -2267,6 +2280,7 @@ parseSpec = do
               "eq:y"
             ],
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -2327,6 +2341,7 @@ parseSpec = do
               "eq:y"
             ],
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf
       }
@@ -2350,7 +2365,8 @@ parseSpec = do
             Figure
               { meta =
                   fromList
-                    [ ("width", "100%"),
+                    [ ("__figure_number", "1"),
+                      ("width", "100%"),
                       ("name", "fig:hello")
                     ],
                 link =
@@ -2378,7 +2394,10 @@ parseSpec = do
               },
           CFigure
             Figure
-              { meta = fromList [],
+              { meta =
+                  fromList
+                    [ ("__figure_number", "2")
+                    ],
                 link =
                   Link
                     { target = LinkTargetFilePath "image/world.png",
@@ -2441,7 +2460,10 @@ parseSpec = do
             ],
           CFigure
             Figure
-              { meta = fromList [],
+              { meta =
+                  fromList
+                    [ ("__figure_number", "3")
+                    ],
                 link =
                   Link
                     { target = LinkTargetFilePath "foo.png",
@@ -2474,6 +2496,7 @@ parseSpec = do
               "fig:hello"
             ],
         anonBlockNumber = 0,
+        figureNumber = 3,
         tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
@@ -2638,6 +2661,7 @@ parseSpec = do
             [ "tbl:famous-equations"
             ],
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
@@ -2819,6 +2843,7 @@ parseSpec = do
             [ "tbl:famous-equations"
             ],
         anonBlockNumber = 0,
+        figureNumber = 0,
         tanglePaths = Set.fromList [],
         orgParserConf = L.defaultOrgParserConf
       }
