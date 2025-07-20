@@ -494,7 +494,7 @@ weaveMathFragmentStandalone mathFragment = do
             ("\\begin{equation}", "\\end{equation}")
         | otherwise = ("\\[", "\\]")
   p_ [id_ linkAnchor] $ do
-    a_ [href_ $ "#" <> linkAnchor, class_ "equation"] $ do
+    a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ do
       begMarker <> toHtml mathFragment.body <> endMarker
   where
     linkAnchor = getLinkAnchor $ CMathFragment mathFragment
