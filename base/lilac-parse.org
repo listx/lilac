@@ -102,7 +102,7 @@ import Lilac.Types
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyleMask (StyleMask),
     StyledText (StyledText, body, style),
-    Table (Table, grid, meta),
+    Table (Table, caption, grid, meta),
     defaultOrgParserConf,
     fromText,
     nilOid,
@@ -275,6 +275,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:metaParser>>
 <<f:metaEntryParser>>
 <<f:tableParser>>
+<<f:captionParser>>
 <<f:tableLineParser>>
 <<f:tableRowParser>>
 <<f:tableCellParser>>
@@ -5720,7 +5721,7 @@ end of ordered lists (=<ul>= and =</ul>= for unordered lists), and =<li>= and =<
 mark the start and en of a single list item.
 
 #+name: tbl:List markers
-#+caption: ListMarker values and their HTML equivalents.
+#+caption: ~ListMarker~ values and their HTML equivalents.
 | ListMarker      | HTML equivalent |
 |-----------------+-----------------|
 | ~LOrderedStart~   | ~<ol>~            |
@@ -7543,6 +7544,7 @@ All tables are numbered. A table can also have a caption (just like a
 type Table :: Type
 data Table = Table
   { meta :: Map Text Text,
+    caption :: Prose,
     grid :: Map (Int, Int) Prose
   }
   deriving stock (Eq, Generic, Show)
@@ -7573,6 +7575,11 @@ tableParser = do
   orgParserState <- get
   _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
   metaKVs <- metaParser
+  caption <- case lookup "caption" metaKVs of
+    Nothing -> pure []
+    Just s -> case MP.runParser (runStateT captionParser orgParserState) "" s of
+      Left err -> fail $ MP.errorBundlePretty err
+      Right (prose, _orgParserState) -> pure prose
   rows <- MP.some $ tableLineParser <|> tableRowParser
   let newTableNumber = orgParserState.tableNumber + 1
   modify (\s -> s {tableNumber = newTableNumber})
@@ -7580,8 +7587,27 @@ tableParser = do
     . CTable
     $ Table
       { meta = insert "__table_number" (T.show newTableNumber) metaKVs,
+        caption = caption,
         grid = fromList $ rowsToTuples rows
       }
+#+end_src
+
+The caption parser parses the caption text from a ~#+caption: ...~ into prose.
+This way the caption can support other text styles, links, and even math
+fragments. We parse twice (by invoking ~MP.runParser~), because it's easy to
+implement; if we wanted a smoother experience for the user, we would have to
+enrich the [[f:metaParser]] to hold values that can be either raw text or prose.
+
+#+name: f:captionParser
+#+begin_src haskell
+captionParser :: OrgParser [PToken]
+captionParser = do
+  caption <- proseParser spaceConsumer
+  failIfLeftoverActiveStyles
+  pure caption
+  where
+    spaceConsumer :: OrgParser Text
+    spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
 #+end_src
 
 The [[f:tableLineParser]] skips over horizontal rules that typically separate the
@@ -7695,6 +7721,7 @@ The test below checks if we can parse a table with all 3 types of prose text
 #+header: :tangle test/Lilac/ParseSpec/0012-tables-and-prose
 #+begin_src org
 ,#+name: tbl:famous-equations
+,#+caption: *Bold*. [[tbl:famous-equations][A self-link]]. \(E = mc^2\)
 | Name            | Equation            | Link |
 |-----------------+---------------------+------|
 | Pythagoras \vert{} Foo | \(a^2 + b^2 = c^2\) | [[https://wiki/x][Wiki]] |
@@ -7724,8 +7751,35 @@ ps
       { meta =
           fromList
             [ ("name", "tbl:famous-equations"),
+              ("caption", "*Bold*. [[tbl:famous-equations][A self-link]]. \\(E = mc^2\\)"),
               ("__table_number", "1")
             ],
+        caption =
+          [ PTokenStyledText
+              (StyledText {body = "Bold", style = L.styleMaskFrom [Bold]}),
+            PTokenStyledText
+              (StyledText {body = ".", style = L.styleMaskFrom []}),
+            PTokenStyledText
+              (StyledText {body = " ", style = L.styleMaskFrom []}),
+            PTokenLink
+              ( Link
+                  { name =
+                      [ StyledText {body = "A", style = L.styleMaskFrom []},
+                        StyledText {body = " ", style = L.styleMaskFrom []},
+                        StyledText {body = "self-link", style = L.styleMaskFrom []}
+                      ],
+                    target =
+                      LinkTargetOid
+                        LinkOid {oid = nilOid, name = "tbl:famous-equations"}
+                  }
+              ),
+            PTokenStyledText
+              (StyledText {body = ".", style = L.styleMaskFrom []}),
+            PTokenStyledText
+              (StyledText {body = " ", style = L.styleMaskFrom []}),
+            PTokenMathFragment
+              (MathFragment {meta = fromList [], body = "E = mc^2"})
+          ],
         grid =
           fromList
             [ ( (1, 1),
@@ -7915,6 +7969,7 @@ ps
               ("bar", "baz"),
               ("__table_number", "1")
             ],
+        caption = [],
         grid =
           fromList
             [ ( (1, 1),
@@ -8133,7 +8188,7 @@ import Lilac.Types
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
-    Table (Table, grid, meta),
+    Table (Table, caption, grid, meta),
     fromWords,
     nilOid,
     nilOidOrgDoc,

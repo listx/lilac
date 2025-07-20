@@ -72,7 +72,7 @@ import Lilac.Types
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyleMask (StyleMask),
     StyledText (StyledText, body, style),
-    Table (Table, grid, meta),
+    Table (Table, caption, grid, meta),
     defaultOrgParserConf,
     fromText,
     nilOid,
@@ -1534,6 +1534,11 @@ tableParser = do
   orgParserState <- get
   _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
   metaKVs <- metaParser
+  caption <- case lookup "caption" metaKVs of
+    Nothing -> pure []
+    Just s -> case MP.runParser (runStateT captionParser orgParserState) "" s of
+      Left err -> fail $ MP.errorBundlePretty err
+      Right (prose, _orgParserState) -> pure prose
   rows <- MP.some $ tableLineParser <|> tableRowParser
   let newTableNumber = orgParserState.tableNumber + 1
   modify (\s -> s {tableNumber = newTableNumber})
@@ -1541,8 +1546,18 @@ tableParser = do
     . CTable
     $ Table
       { meta = insert "__table_number" (T.show newTableNumber) metaKVs,
+        caption = caption,
         grid = fromList $ rowsToTuples rows
       }
+
+captionParser :: OrgParser [PToken]
+captionParser = do
+  caption <- proseParser spaceConsumer
+  failIfLeftoverActiveStyles
+  pure caption
+  where
+    spaceConsumer :: OrgParser Text
+    spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
 
 tableLineParser :: OrgParser [Prose]
 tableLineParser = do

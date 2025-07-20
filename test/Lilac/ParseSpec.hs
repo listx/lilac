@@ -44,7 +44,7 @@ import Lilac.Types
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
-    Table (Table, grid, meta),
+    Table (Table, caption, grid, meta),
     fromWords,
     nilOid,
     nilOidOrgDoc,
@@ -2299,8 +2299,35 @@ parseSpec = do
               { meta =
                   fromList
                     [ ("name", "tbl:famous-equations"),
+                      ("caption", "*Bold*. [[tbl:famous-equations][A self-link]]. \\(E = mc^2\\)"),
                       ("__table_number", "1")
                     ],
+                caption =
+                  [ PTokenStyledText
+                      (StyledText {body = "Bold", style = L.styleMaskFrom [Bold]}),
+                    PTokenStyledText
+                      (StyledText {body = ".", style = L.styleMaskFrom []}),
+                    PTokenStyledText
+                      (StyledText {body = " ", style = L.styleMaskFrom []}),
+                    PTokenLink
+                      ( Link
+                          { name =
+                              [ StyledText {body = "A", style = L.styleMaskFrom []},
+                                StyledText {body = " ", style = L.styleMaskFrom []},
+                                StyledText {body = "self-link", style = L.styleMaskFrom []}
+                              ],
+                            target =
+                              LinkTargetOid
+                                LinkOid {oid = nilOid, name = "tbl:famous-equations"}
+                          }
+                      ),
+                    PTokenStyledText
+                      (StyledText {body = ".", style = L.styleMaskFrom []}),
+                    PTokenStyledText
+                      (StyledText {body = " ", style = L.styleMaskFrom []}),
+                    PTokenMathFragment
+                      (MathFragment {meta = fromList [], body = "E = mc^2"})
+                  ],
                 grid =
                   fromList
                     [ ( (1, 1),
@@ -2466,6 +2493,7 @@ parseSpec = do
                       ("bar", "baz"),
                       ("__table_number", "1")
                     ],
+                caption = [],
                 grid =
                   fromList
                     [ ( (1, 1),

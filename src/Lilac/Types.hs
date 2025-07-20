@@ -292,6 +292,7 @@ data StyledText = StyledText
 type Table :: Type
 data Table = Table
   { meta :: Map Text Text,
+    caption :: Prose,
     grid :: Map (Int, Int) Prose
   }
   deriving stock (Eq, Generic, Show)

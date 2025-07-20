@@ -38,7 +38,7 @@ import Lilac.Types
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
-    Table (grid, meta),
+    Table (caption, grid, meta),
     WeaveConf (archive, originObjectPath, watch),
     decodeGPath,
   )
@@ -507,12 +507,14 @@ weaveTable table = do
   let captionPrefix =
         "Table "
           <> lookupDefault "table-number-error" "__table_number" table.meta
-      fullCaption = case lookup "caption" table.meta of
-        Nothing -> captionPrefix <> "."
-        Just caption -> captionPrefix <> ": " <> caption
   figure_ [id_ linkAnchor] $ do
     figcaption_ [] $ do
-      a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ toHtml fullCaption
+      a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ do
+        toHtml captionPrefix
+      toHtml $ case table.caption of
+        [] -> "." :: Text
+        _ -> ": " :: Text
+      sequence_ $ map weavePToken table.caption
     table_ [] $ do
       thead_ [] $ do
         tr_ [] $ do
