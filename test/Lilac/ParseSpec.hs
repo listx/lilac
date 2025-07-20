@@ -29,24 +29,16 @@ import Lilac.Types
     OrgDoc (OrgDoc, cells, meta, oid),
     OrgParserConf (maxHeadingLevel),
     OrgParserState
-      ( OrgParserState,
-        anonBlockNumber,
+      ( anonBlockNumber,
         anonEquationNumber,
         cellNames,
-        continuationIndent,
         docOid,
         equationNumber,
         figureNumber,
         headingLevel,
         headingOidStack,
         headingSection,
-        insideCodeBlock,
-        insideLinkDisplayName,
-        listLevels,
-        listMarkers,
-        orgParserConf,
-        styleMask,
-        tanglePaths
+        orgParserConf
       ),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
@@ -59,8 +51,7 @@ import Lilac.Types
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
-  ( Bool (False),
-    FilePath,
+  ( FilePath,
     Identity,
     Int,
     Maybe (Just, Nothing),
@@ -223,25 +214,7 @@ parseSpec = do
   ps
     "0001-blankline"
     (L.defaultOrgDoc nilOid [])
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [],
-        headingLevel = 0,
-        headingSection = [],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.empty,
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
-      }
+    L.defaultOrgParserState
 
   pfm
     "0002-doc-metadata-missing-value"
@@ -282,24 +255,8 @@ parseSpec = do
         [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
         ]
     )
-    OrgParserState
-      { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
-        headingOidStack = [],
-        headingLevel = 0,
-        headingSection = [],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.empty,
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
+    L.defaultOrgParserState
+      { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f
       }
 
   ps
@@ -312,24 +269,8 @@ parseSpec = do
           ("title", "An Org Document")
         ]
     )
-    OrgParserState
-      { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f,
-        headingOidStack = [],
-        headingLevel = 0,
-        headingSection = [],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.empty,
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
+    L.defaultOrgParserState
+      { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f
       }
 
   before (LU.readFrom "test/Lilac/ParseSpec/" "0002-doc-metadata-properties-drawer-clash") $ do
@@ -362,23 +303,10 @@ parseSpec = do
           plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = take 12 $ repeat Nothing,
+    L.defaultOrgParserState
+      { headingOidStack = take 12 $ repeat Nothing,
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.empty,
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 20}
       }
 
@@ -399,23 +327,10 @@ parseSpec = do
           plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = take 12 $ repeat Nothing,
+    L.defaultOrgParserState
+      { headingOidStack = take 12 $ repeat Nothing,
         headingLevel = 12,
         headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.empty,
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
         orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 0}
       }
 
@@ -515,24 +430,10 @@ parseSpec = do
             )
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [Nothing],
+    L.defaultOrgParserState
+      { headingOidStack = [Nothing],
         headingLevel = 1,
-        headingSection = [1],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.empty,
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
+        headingSection = [1]
       }
 
   ps
@@ -554,24 +455,10 @@ parseSpec = do
             )
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
+    L.defaultOrgParserState
+      { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
         headingLevel = 1,
-        headingSection = [1],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.empty,
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
+        headingSection = [1]
       }
 
   ps
@@ -593,24 +480,10 @@ parseSpec = do
             )
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
+    L.defaultOrgParserState
+      { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
         headingLevel = 1,
-        headingSection = [1],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.empty,
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
+        headingSection = [1]
       }
 
   pf
@@ -799,24 +672,10 @@ parseSpec = do
             )
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [Nothing],
+    L.defaultOrgParserState
+      { headingOidStack = [Nothing],
         headingLevel = 1,
-        headingSection = [1],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.empty,
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
+        headingSection = [1]
       }
 
   p
@@ -1158,24 +1017,10 @@ parseSpec = do
             ]
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [Nothing],
+    L.defaultOrgParserState
+      { headingOidStack = [Nothing],
         headingLevel = 1,
-        headingSection = [1],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.empty,
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
+        headingSection = [1]
       }
 
   p
@@ -1612,24 +1457,9 @@ parseSpec = do
             )
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [],
-        headingLevel = 0,
-        headingSection = [],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames = Set.fromList ["foo"],
-        anonBlockNumber = 2,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
+    L.defaultOrgParserState
+      { cellNames = Set.fromList ["foo"],
+        anonBlockNumber = 2
       }
 
   ps
@@ -1709,20 +1539,8 @@ parseSpec = do
             )
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [],
-        headingLevel = 0,
-        headingSection = [],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames =
+    L.defaultOrgParserState
+      { cellNames =
           Set.fromList
             [ "empty",
               "end has no preceding blank line",
@@ -1730,11 +1548,7 @@ parseSpec = do
               "end has preceding newline (multiple)",
               "end not in beginning of line",
               "ignore #+end_example because this is a src block"
-            ],
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.fromList [],
-        orgParserConf = L.defaultOrgParserConf
+            ]
       }
 
   ps
@@ -2278,28 +2092,14 @@ parseSpec = do
               }
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [],
-        headingLevel = 0,
-        headingSection = [],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 3,
+    L.defaultOrgParserState
+      { equationNumber = 3,
         anonEquationNumber = 1,
         cellNames =
           Set.fromList
             [ "eq:x",
               "eq:y"
-            ],
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
+            ]
       }
 
   ps
@@ -2340,28 +2140,13 @@ parseSpec = do
             ]
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [],
-        headingLevel = 0,
-        headingSection = [],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 1,
-        anonEquationNumber = 0,
+    L.defaultOrgParserState
+      { equationNumber = 1,
         cellNames =
           Set.fromList
             [ "eq:x",
               "eq:y"
-            ],
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.empty,
-        orgParserConf = L.defaultOrgParserConf
+            ]
       }
 
   ps
@@ -2495,29 +2280,14 @@ parseSpec = do
               }
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [],
-        headingLevel = 0,
-        headingSection = [],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames =
+    L.defaultOrgParserState
+      { cellNames =
           Set.fromList
             [ "f:f",
               "f:g",
               "fig:hello"
             ],
-        anonBlockNumber = 0,
-        figureNumber = 3,
-        tanglePaths = Set.fromList [],
-        orgParserConf = L.defaultOrgParserConf
+        figureNumber = 3
       }
 
   ps
@@ -2663,27 +2433,11 @@ parseSpec = do
               }
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [],
-        headingLevel = 0,
-        headingSection = [],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames =
+    L.defaultOrgParserState
+      { cellNames =
           Set.fromList
             [ "tbl:famous-equations"
-            ],
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.fromList [],
-        orgParserConf = L.defaultOrgParserConf
+            ]
       }
 
   ps
@@ -2846,25 +2600,9 @@ parseSpec = do
             ]
         ]
     )
-    OrgParserState
-      { docOid = nilOid,
-        headingOidStack = [],
-        headingLevel = 0,
-        headingSection = [],
-        styleMask = L.styleMaskFrom [],
-        insideCodeBlock = False,
-        insideLinkDisplayName = False,
-        listLevels = [],
-        listMarkers = [],
-        continuationIndent = 0,
-        equationNumber = 0,
-        anonEquationNumber = 0,
-        cellNames =
+    L.defaultOrgParserState
+      { cellNames =
           Set.fromList
             [ "tbl:famous-equations"
-            ],
-        anonBlockNumber = 0,
-        figureNumber = 0,
-        tanglePaths = Set.fromList [],
-        orgParserConf = L.defaultOrgParserConf
+            ]
       }
