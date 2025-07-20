@@ -16,7 +16,7 @@ import Lilac.Types
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
-    Figure (link, meta),
+    Figure (caption, link, meta),
     Heading (body, level, section),
     Link (Link, name, target),
     LinkTarget
@@ -462,7 +462,17 @@ weaveLinkTarget linkTarget = do
 weaveFigure :: Figure -> HtmlWeaver ()
 weaveFigure figure = do
   wovenLinkTarget <- weaveLinkTarget figure.link.target
-  a_ [href_ $ "#" <> linkAnchor] $ do
+  let captionPrefix =
+        "Figure "
+          <> lookupDefault "figure-number-error" "__figure_number" figure.meta
+  figure_ [id_ linkAnchor] $ do
+    figcaption_ [] $ do
+      a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ do
+        toHtml captionPrefix
+      toHtml $ case figure.caption of
+        [] -> "." :: Text
+        _ -> ": " :: Text
+      sequence_ $ map weavePToken figure.caption
     img_
       $ [ id_ linkAnchor,
           src_ wovenLinkTarget,
@@ -477,13 +487,6 @@ weaveFigure figure = do
                  (title_, "name")
                ]
          )
-  let captionPrefix =
-        "Figure "
-          <> lookupDefault "figure-number-error" "__figure_number" figure.meta
-      fullCaption = case lookup "caption" figure.meta of
-        Nothing -> captionPrefix <> "."
-        Just caption -> captionPrefix <> ": " <> caption
-  p_ [class_ "figure-caption"] $ toHtml fullCaption
   where
     linkAnchor = getLinkAnchor $ CFigure figure
 

@@ -128,6 +128,7 @@ data Cell
 type Figure :: Type
 data Figure = Figure
   { meta :: Map Text Text,
+    caption :: Prose,
     link :: Link
   }
   deriving stock (Eq, Generic, Show)

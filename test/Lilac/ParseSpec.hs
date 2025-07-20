@@ -8,7 +8,7 @@ import Lilac.Types
   ( BToken (BTokenLink, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
-    Figure (Figure, link, meta),
+    Figure (Figure, caption, link, meta),
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
@@ -2171,8 +2171,13 @@ parseSpec = do
                   fromList
                     [ ("__figure_number", "1"),
                       ("width", "100%"),
-                      ("name", "fig:hello")
+                      ("name", "fig:hello"),
+                      ("caption", "=hello=")
                     ],
+                caption =
+                  [ PTokenStyledText
+                      (StyledText {body = "hello", style = L.styleMaskFrom [Verbatim]})
+                  ],
                 link =
                   Link
                     { target = LinkTargetFilePath "image/hello.png",
@@ -2202,6 +2207,7 @@ parseSpec = do
                   fromList
                     [ ("__figure_number", "2")
                     ],
+                caption = [],
                 link =
                   Link
                     { target = LinkTargetFilePath "image/world.png",
@@ -2268,6 +2274,7 @@ parseSpec = do
                   fromList
                     [ ("__figure_number", "3")
                     ],
+                caption = [],
                 link =
                   Link
                     { target = LinkTargetFilePath "foo.png",

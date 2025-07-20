@@ -162,6 +162,7 @@ defaultCss = do
       ":visited" & do
         color $ rgbHex hexText
   figcaption ? do
+    vh margin (px 10) auto
     textAlign center
     fontStyle italic
   table ? do
@@ -277,9 +278,6 @@ defaultCss = do
   ".figure-image" & do
     display block
     vh margin (px 0) auto
-  ".figure-caption" & do
-    textAlign center
-    fontStyle italic
   where
     hexBg = 0xffffff :: Int
     hexText = 0x000000 :: Int

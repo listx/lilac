@@ -23,7 +23,7 @@ import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
-    Figure (Figure, link, meta),
+    Figure (Figure, caption, link, meta),
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
     Link (Link, name, target),
@@ -1482,6 +1482,11 @@ figureParser = do
   metaKVs <- metaParser
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
+  caption <- case lookup "caption" metaKVs of
+    Nothing -> pure []
+    Just s -> case MP.runParser (runStateT captionParser orgParserState) "" s of
+      Left err -> fail $ MP.errorBundlePretty err
+      Right (prose, _orgParserState) -> pure prose
   link <- fileLinkParser
   let newFigureNumber = orgParserState.figureNumber + 1
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
@@ -1498,6 +1503,7 @@ figureParser = do
                 (\acc (k, v) -> insert k v acc)
                 (delete "type" metaKVs)
                 [figureNumberMeta],
+            caption = caption,
             link = link
           }
   where

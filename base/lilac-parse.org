@@ -52,7 +52,7 @@ import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
-    Figure (Figure, link, meta),
+    Figure (Figure, caption, link, meta),
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
     Link (Link, name, target),
@@ -7201,6 +7201,7 @@ A [[data:Figure][Figure]] is just a link to an image file, preceded by some meta
 type Figure :: Type
 data Figure = Figure
   { meta :: Map Text Text,
+    caption :: Prose,
     link :: Link
   }
   deriving stock (Eq, Generic, Show)
@@ -7220,7 +7221,9 @@ The metadata recognizes certain reserved keys:
 
   - caption :: (Optional) Displayed as the caption for the image. If there is no
     caption, on weaving the only name of the figure will be just the figure
-    number, like "Figure 1" or "Figure 12".
+    number, like "Figure 1" or "Figure 12". You can use styled text (*bold*, etc),
+    links, and inline math, just like regular paragraphs (the only caveat is
+    that you are not allowed to have newlines).
 
   - width :: (Optional) Width of the image (as a percentage of page width or
     pixel count), for HTML weaving.
@@ -7231,7 +7234,7 @@ The metadata recognizes certain reserved keys:
 Below is an example of a figure:
 
 #+name: fig:PNG image
-#+caption: Portable Network Graphics sample image.
+#+caption: [[https://en.wikipedia.org/wiki/PNG][Portable Network Graphics]] sample image.
 #+type: figure
 #+width: 50%
 #+height: 40
@@ -7268,6 +7271,11 @@ figureParser = do
   metaKVs <- metaParser
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
+  caption <- case lookup "caption" metaKVs of
+    Nothing -> pure []
+    Just s -> case MP.runParser (runStateT captionParser orgParserState) "" s of
+      Left err -> fail $ MP.errorBundlePretty err
+      Right (prose, _orgParserState) -> pure prose
   link <- fileLinkParser
   let newFigureNumber = orgParserState.figureNumber + 1
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
@@ -7284,6 +7292,7 @@ figureParser = do
                 (\acc (k, v) -> insert k v acc)
                 (delete "type" metaKVs)
                 [figureNumberMeta],
+            caption = caption,
             link = link
           }
   where
@@ -7358,6 +7367,7 @@ f = 1 + 1
 ,#+end_src
 
 ,#+name: fig:hello
+,#+caption: =hello=
 ,#+type: figure
 ,#+width: 100%
 [[file:image/hello.png]]
@@ -7404,8 +7414,13 @@ ps
                 fromList
                   [ ("__figure_number", "1"),
                     ("width", "100%"),
-                    ("name", "fig:hello")
+                    ("name", "fig:hello"),
+                    ("caption", "=hello=")
                   ],
+              caption =
+                [ PTokenStyledText
+                    (StyledText {body = "hello", style = L.styleMaskFrom [Verbatim]})
+                ],
               link =
                 Link
                   { target = LinkTargetFilePath "image/hello.png",
@@ -7435,6 +7450,7 @@ ps
                 fromList
                   [ ("__figure_number", "2")
                   ],
+              caption = [],
               link =
                 Link
                   { target = LinkTargetFilePath "image/world.png",
@@ -7501,6 +7517,7 @@ ps
                 fromList
                   [ ("__figure_number", "3")
                   ],
+              caption = [],
               link =
                 Link
                   { target = LinkTargetFilePath "foo.png",
@@ -8151,7 +8168,7 @@ import Lilac.Types
   ( BToken (BTokenLink, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
-    Figure (Figure, link, meta),
+    Figure (Figure, caption, link, meta),
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
