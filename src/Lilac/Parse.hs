@@ -64,6 +64,7 @@ import Lilac.Types
         listMarkers,
         orgParserConf,
         styleMask,
+        tableNumber,
         tanglePaths
       ),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
@@ -251,6 +252,7 @@ defaultOrgParserState =
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
+      tableNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
@@ -1529,13 +1531,16 @@ metaEntryParser = do
 
 tableParser :: OrgParser Cell
 tableParser = do
+  orgParserState <- get
   _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
   metaKVs <- metaParser
   rows <- MP.some $ tableLineParser <|> tableRowParser
+  let newTableNumber = orgParserState.tableNumber + 1
+  modify (\s -> s {tableNumber = newTableNumber})
   pure
     . CTable
     $ Table
-      { meta = metaKVs,
+      { meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         grid = fromList $ rowsToTuples rows
       }
 

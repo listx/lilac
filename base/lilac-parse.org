@@ -94,6 +94,7 @@ import Lilac.Types
         listMarkers,
         orgParserConf,
         styleMask,
+        tableNumber,
         tanglePaths
       ),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
@@ -526,6 +527,7 @@ data OrgParserState = OrgParserState
     cellNames :: Set Text,
     anonBlockNumber :: Int,
     figureNumber :: Int,
+    tableNumber :: Int,
     tanglePaths :: Set Text,
     orgParserConf :: OrgParserConf
   }
@@ -552,6 +554,7 @@ defaultOrgParserState =
       cellNames = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
+      tableNumber = 0,
       tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
@@ -7531,6 +7534,8 @@ is just a link, a table has a two-dimensional grid with some information in each
 row\/column. The requirement is that the first non-whitespace character starts
 with a vertical bar (=|=), also known as the pipe character in UNIX.
 
+All tables are numbered.
+
 #+name: data:Table
 #+begin_src haskell
 type Table :: Type
@@ -7562,13 +7567,16 @@ are ignored.
 #+begin_src haskell
 tableParser :: OrgParser Cell
 tableParser = do
+  orgParserState <- get
   _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
   metaKVs <- metaParser
   rows <- MP.some $ tableLineParser <|> tableRowParser
+  let newTableNumber = orgParserState.tableNumber + 1
+  modify (\s -> s {tableNumber = newTableNumber})
   pure
     . CTable
     $ Table
-      { meta = metaKVs,
+      { meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         grid = fromList $ rowsToTuples rows
       }
 #+end_src
@@ -7701,7 +7709,8 @@ ps
     { cellNames =
         Set.fromList
           [ "tbl:famous-equations"
-          ]
+          ],
+      tableNumber = 1
     }
 #+end_src
 
@@ -7711,7 +7720,8 @@ ps
     Table
       { meta =
           fromList
-            [ ("name", "tbl:famous-equations")
+            [ ("name", "tbl:famous-equations"),
+              ("__table_number", "1")
             ],
         grid =
           fromList
@@ -7875,7 +7885,8 @@ ps
     { cellNames =
         Set.fromList
           [ "tbl:famous-equations"
-          ]
+          ],
+      tableNumber = 1
     }
 #+end_src
 
@@ -7898,7 +7909,8 @@ ps
       { meta =
           fromList
             [ ("name", "tbl:famous-equations"),
-              ("bar", "baz")
+              ("bar", "baz"),
+              ("__table_number", "1")
             ],
         grid =
           fromList
@@ -8112,7 +8124,8 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
-        orgParserConf
+        orgParserConf,
+        tableNumber
       ),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),

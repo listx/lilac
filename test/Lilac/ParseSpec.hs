@@ -38,7 +38,8 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
-        orgParserConf
+        orgParserConf,
+        tableNumber
       ),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
@@ -2297,7 +2298,8 @@ parseSpec = do
             Table
               { meta =
                   fromList
-                    [ ("name", "tbl:famous-equations")
+                    [ ("name", "tbl:famous-equations"),
+                      ("__table_number", "1")
                     ],
                 grid =
                   fromList
@@ -2437,7 +2439,8 @@ parseSpec = do
       { cellNames =
           Set.fromList
             [ "tbl:famous-equations"
-            ]
+            ],
+        tableNumber = 1
       }
 
   ps
@@ -2460,7 +2463,8 @@ parseSpec = do
               { meta =
                   fromList
                     [ ("name", "tbl:famous-equations"),
-                      ("bar", "baz")
+                      ("bar", "baz"),
+                      ("__table_number", "1")
                     ],
                 grid =
                   fromList
@@ -2604,5 +2608,6 @@ parseSpec = do
       { cellNames =
           Set.fromList
             [ "tbl:famous-equations"
-            ]
+            ],
+        tableNumber = 1
       }
