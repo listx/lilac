@@ -7,6 +7,7 @@ module Lilac.Weave
 where
 
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
+import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Lilac.Parse (maskToStyles)
@@ -37,6 +38,7 @@ import Lilac.Types
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
+    Table (grid, meta),
     WeaveConf (archive, originObjectPath, watch),
     decodeGPath,
   )
@@ -52,6 +54,8 @@ import Lucid
     crossorigin_,
     div_,
     doctypehtml_,
+    figcaption_,
+    figure_,
     h1_,
     h2_,
     h3_,
@@ -72,9 +76,15 @@ import Lucid
     script_,
     span_,
     src_,
+    table_,
+    tbody_,
+    td_,
+    th_,
+    thead_,
     title_,
     toHtml,
     toHtmlRaw,
+    tr_,
     type_,
     width_,
   )
@@ -101,6 +111,7 @@ import Relude
     id,
     length,
     map,
+    max,
     null,
     otherwise,
     pure,
@@ -122,7 +133,7 @@ import Relude
     (==),
     (||),
   )
-import Relude.Extra.Map (lookup, lookupDefault)
+import Relude.Extra.Map (elems, keys, lookup, lookupDefault)
 import Skylighting qualified as Sky
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -198,8 +209,7 @@ weaveCell = \case
   CBlock block -> weaveBlock block
   CMathFragment mathFragment -> weaveMathFragmentStandalone mathFragment
   CFigure figure -> weaveFigure figure
-  CTable _ -> do
-    p_ "TABLE"
+  CTable table -> weaveTable table
 
 toSafeHtmlId :: Text -> Text
 toSafeHtmlId = T.map onlyKeepSomeChars
@@ -293,7 +303,15 @@ getLinkAnchor = \case
               "fig-" <> figureNum
           | otherwise = "figure-num-error"
      in toSafeHtmlId ref
-  CTable {} -> ""
+  CTable table ->
+    let ref
+          | Just name <- lookup "name" table.meta,
+            Just tableNum <- lookup "__table_number" table.meta =
+              "tbl-" <> tableNum <> "-" <> name
+          | Just tableNum <- lookup "__table_number" table.meta =
+              "tbl-" <> tableNum
+          | otherwise = "table-num-error"
+     in toSafeHtmlId ref
 
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
@@ -483,6 +501,35 @@ weaveMathFragmentStandalone mathFragment = do
 
 weaveMathFragmentInline :: MathFragment -> HtmlWeaver ()
 weaveMathFragmentInline mathFragment = "\\(" <> toHtml mathFragment.body <> "\\)"
+
+weaveTable :: Table -> HtmlWeaver ()
+weaveTable table = do
+  let captionPrefix =
+        "Table "
+          <> lookupDefault "table-number-error" "__table_number" table.meta
+      fullCaption = case lookup "caption" table.meta of
+        Nothing -> captionPrefix <> "."
+        Just caption -> captionPrefix <> ": " <> caption
+  figure_ [id_ linkAnchor] $ do
+    figcaption_ [] $ do
+      a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ toHtml fullCaption
+    table_ [] $ do
+      thead_ [] $ do
+        tr_ [] $ do
+          forM_ columnNames $ \prose -> do
+            th_ [] $ sequence_ $ map weavePToken prose
+      tbody_ [] $ do
+        forM_ (rows [2 .. rowMax]) $ \row -> do
+          tr_ [] $ do
+            forM_ row $ \prose -> do
+              td_ [] $ sequence_ $ map weavePToken prose
+  where
+    linkAnchor = getLinkAnchor $ CTable table
+    tableCellsFromRow n =
+      elems $ M.filterWithKey (\(row, _col) _ -> row == n) table.grid
+    rowMax = foldl' max 0 . map fst $ keys table.grid
+    rows rowNums = map tableCellsFromRow rowNums
+    columnNames = tableCellsFromRow 1
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest

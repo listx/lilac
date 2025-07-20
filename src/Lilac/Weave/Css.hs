@@ -28,6 +28,7 @@ import Clay
     display,
     div,
     em,
+    figcaption,
     fitContent,
     fontFamily,
     fontSize,
@@ -66,6 +67,7 @@ import Clay
     sideRight,
     solid,
     span,
+    table,
     textAlign,
     textDecoration,
     top,
@@ -159,6 +161,18 @@ defaultCss = do
       color $ rgbHex hexText
       ":visited" & do
         color $ rgbHex hexText
+    ".self-link" & do
+      color $ rgbHex hexText
+      ":visited" & do
+        color $ rgbHex hexText
+  figcaption ? do
+    textAlign center
+    fontStyle italic
+  table ? do
+    margin (px 10) auto (px 0) auto
+    ev padding (px 10)
+    ev borderRadius (px 5)
+    border (px 1) solid $ rgbHex hexCodeBorder
   a ? do
     color $ rgbHex hexNowebLinkFg
     textDecoration none

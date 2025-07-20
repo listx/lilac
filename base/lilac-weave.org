@@ -63,6 +63,7 @@ module Lilac.Weave
 where
 
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
+import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Lilac.Parse (maskToStyles)
@@ -93,6 +94,7 @@ import Lilac.Types
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
+    Table (grid, meta),
     WeaveConf (archive, originObjectPath, watch),
     decodeGPath,
   )
@@ -108,6 +110,8 @@ import Lucid
     crossorigin_,
     div_,
     doctypehtml_,
+    figcaption_,
+    figure_,
     h1_,
     h2_,
     h3_,
@@ -128,9 +132,15 @@ import Lucid
     script_,
     span_,
     src_,
+    table_,
+    tbody_,
+    td_,
+    th_,
+    thead_,
     title_,
     toHtml,
     toHtmlRaw,
+    tr_,
     type_,
     width_,
   )
@@ -157,6 +167,7 @@ import Relude
     id,
     length,
     map,
+    max,
     null,
     otherwise,
     pure,
@@ -178,7 +189,7 @@ import Relude
     (==),
     (||),
   )
-import Relude.Extra.Map (lookup, lookupDefault)
+import Relude.Extra.Map (elems, keys, lookup, lookupDefault)
 import Skylighting qualified as Sky
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -206,6 +217,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveFigure>>
 <<f:weaveMathFragmentStandalone>>
 <<f:weaveMathFragmentInline>>
+<<f:weaveTable>>
 <<f:getRelativePathWithoutSymlinks>>
 <<f:commonPrefix>>
 <<f:renderAsText>>
@@ -325,8 +337,7 @@ weaveCell = \case
   CBlock block -> weaveBlock block
   CMathFragment mathFragment -> weaveMathFragmentStandalone mathFragment
   CFigure figure -> weaveFigure figure
-  CTable _ -> do
-    p_ "TABLE"
+  CTable table -> weaveTable table
 #+end_src
 
 The [[HTML head]] has some "imports" for the HTML page, including CSS and JS.
@@ -542,7 +553,15 @@ getLinkAnchor = \case
               "fig-" <> figureNum
           | otherwise = "figure-num-error"
      in toSafeHtmlId ref
-  CTable {} -> ""
+  CTable table ->
+    let ref
+          | Just name <- lookup "name" table.meta,
+            Just tableNum <- lookup "__table_number" table.meta =
+              "tbl-" <> tableNum <> "-" <> name
+          | Just tableNum <- lookup "__table_number" table.meta =
+              "tbl-" <> tableNum
+          | otherwise = "table-num-error"
+     in toSafeHtmlId ref
 #+end_src
 
 The [[f:getSectionText]] function just retrieves the numeric heading section number,
@@ -1044,6 +1063,9 @@ free of clutter (otherwise we'd have these link anchors showing up for all
 blocks at all times, which is noisy).
 
 ** Figures
+:PROPERTIES:
+:ID:       4eea4449-2418-42c5-86e4-af63c3b742e3
+:END:
 
 [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][Figures]] need to link to the target image file they are trying to display. We
 also display any associated metadata.
@@ -1106,6 +1128,43 @@ identified (and hence linkable) by an ~id~ HTML attribute.
 #+begin_src haskell
 weaveMathFragmentInline :: MathFragment -> HtmlWeaver ()
 weaveMathFragmentInline mathFragment = "\\(" <> toHtml mathFragment.body <> "\\)"
+#+end_src
+
+** Tables
+
+[[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][Tables]] are similar to figures, because they have some content (a table instead
+of an image), and also have a caption.
+
+#+name: f:weaveTable
+#+begin_src haskell
+weaveTable :: Table -> HtmlWeaver ()
+weaveTable table = do
+  let captionPrefix =
+        "Table "
+          <> lookupDefault "table-number-error" "__table_number" table.meta
+      fullCaption = case lookup "caption" table.meta of
+        Nothing -> captionPrefix <> "."
+        Just caption -> captionPrefix <> ": " <> caption
+  figure_ [id_ linkAnchor] $ do
+    figcaption_ [] $ do
+      a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ toHtml fullCaption
+    table_ [] $ do
+      thead_ [] $ do
+        tr_ [] $ do
+          forM_ columnNames $ \prose -> do
+            th_ [] $ sequence_ $ map weavePToken prose
+      tbody_ [] $ do
+        forM_ (rows [2 .. rowMax]) $ \row -> do
+          tr_ [] $ do
+            forM_ row $ \prose -> do
+              td_ [] $ sequence_ $ map weavePToken prose
+  where
+    linkAnchor = getLinkAnchor $ CTable table
+    tableCellsFromRow n =
+      elems $ M.filterWithKey (\(row, _col) _ -> row == n) table.grid
+    rowMax = foldl' max 0 . map fst $ keys table.grid
+    rows rowNums = map tableCellsFromRow rowNums
+    columnNames = tableCellsFromRow 1
 #+end_src
 
 ** Testing framework
@@ -1346,6 +1405,7 @@ import Clay
     display,
     div,
     em,
+    figcaption,
     fitContent,
     fontFamily,
     fontSize,
@@ -1384,6 +1444,7 @@ import Clay
     sideRight,
     solid,
     span,
+    table,
     textAlign,
     textDecoration,
     top,
@@ -1501,6 +1562,18 @@ defaultCss = do
       color $ rgbHex hexText
       ":visited" & do
         color $ rgbHex hexText
+    ".self-link" & do
+      color $ rgbHex hexText
+      ":visited" & do
+        color $ rgbHex hexText
+  figcaption ? do
+    textAlign center
+    fontStyle italic
+  table ? do
+    margin (px 10) auto (px 0) auto
+    ev padding (px 10)
+    ev borderRadius (px 5)
+    border (px 1) solid $ rgbHex hexCodeBorder
   <<css:Links>>
   ".sourceCode" & do
     noMargin

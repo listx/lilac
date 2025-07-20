@@ -5720,14 +5720,15 @@ end of ordered lists (=<ul>= and =</ul>= for unordered lists), and =<li>= and =<
 mark the start and en of a single list item.
 
 #+name: tbl:List markers
+#+caption: ListMarker values and their HTML equivalents.
 | ListMarker      | HTML equivalent |
 |-----------------+-----------------|
-| LOrderedStart   | ~<ol>~            |
-| LOrderedEnd     | ~</ol>~           |
-| LUnorderedStart | ~<ul>~            |
-| LUnorderedEnd   | ~</ul>~           |
-| LItemStart      | ~<li>~            |
-| LItemEnd        | ~</li>~           |
+| ~LOrderedStart~   | ~<ol>~            |
+| ~LOrderedEnd~     | ~</ol>~           |
+| ~LUnorderedStart~ | ~<ul>~            |
+| ~LUnorderedEnd~   | ~</ul>~           |
+| ~LItemStart~      | ~<li>~            |
+| ~LItemEnd~        | ~</li>~           |
 
 In summary when we parse a list item, we parse it as a combination of =CListItem=
 and other cell types for the list structure and content, respectively. This lets
@@ -7534,7 +7535,8 @@ is just a link, a table has a two-dimensional grid with some information in each
 row\/column. The requirement is that the first non-whitespace character starts
 with a vertical bar (=|=), also known as the pipe character in UNIX.
 
-All tables are numbered.
+All tables are numbered. A table can also have a caption (just like a
+[[data:Figure]]) using metadata.
 
 #+name: data:Table
 #+begin_src haskell
@@ -7550,6 +7552,7 @@ data Table = Table
 Below is an example of a table:
 
 #+name: tbl:Programming languages
+#+caption: Programming languages and typing disciplines.
 | Language | Typing          |
 |----------+-----------------|
 | LISP     | dynamic, strong |
