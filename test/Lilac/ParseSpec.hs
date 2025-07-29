@@ -2464,7 +2464,18 @@ parseSpec = do
                                 }
                             )
                         ]
-                      )
+                      ),
+                      ( (5, 1),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "Unknown",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ((5, 2), []),
+                      ((5, 3), [])
                     ]
               }
         ]

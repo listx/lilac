@@ -7659,8 +7659,8 @@ which is never expected to be the last line of a table.
 tableRowParser :: OrgParser [Prose]
 tableRowParser = do
   _ <- char '|'
-  _ <- MP.takeWhile1P (Just "table whitespace") (== ' ')
-  tableCells <- MP.some tableCellParser
+  _ <- spaces
+  tableCells <- MP.some $ emptyTableCellParser <|> tableCellParser
   _ <- char '\n'
   orgParserState <- get
   _ <-
@@ -7668,7 +7668,20 @@ tableRowParser = do
       . MP.label "indentation for next table line"
       $ MP.count orgParserState.continuationIndent (char ' ')
   pure tableCells
+  where
+    emptyTableCellParser :: OrgParser [PToken]
+    emptyTableCellParser = do
+      _ <- char '|'
+      _ <- MP.optional spaces
+      pure []
+    spaces :: OrgParser Text
+    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
 #+end_src
+
+The ~emptyTableCellParser~ parses an empty table cell (because [[f:proseParser]]
+requires non-empty text). We need this in order to parse (essentially skip over)
+empty table cells, while still recording their existence. See how empty table
+cells are parsed in [[t:0012-tables-and-prose]].
 
 The [[f:tableCellParser]] just parses text inside a single row and column
 combination --- which we call a "table cell". The main idea is that we parse
@@ -7742,6 +7755,7 @@ The test below checks if we can parse a table with all 3 types of prose text
 |-----------------+---------------------+------|
 | Pythagoras \vert{} Foo | \(a^2 + b^2 = c^2\) | [[https://wiki/x][Wiki]] |
 | Albert *Einstein* | \(E = mc^2\) | [[https://wiki/y][Wiki]] |
+| Unknown           |  |  |
 #+end_src
 
 #+name: t:0012-tables-and-prose
@@ -7925,7 +7939,18 @@ ps
                         }
                     )
                 ]
-              )
+              ),
+              ( (5, 1),
+                [ PTokenStyledText
+                    ( StyledText
+                        { body = "Unknown",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+              ),
+              ((5, 2), []),
+              ((5, 3), [])
             ]
       }
 ]

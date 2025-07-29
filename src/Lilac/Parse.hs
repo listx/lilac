@@ -1581,8 +1581,8 @@ tableLineParser = do
 tableRowParser :: OrgParser [Prose]
 tableRowParser = do
   _ <- char '|'
-  _ <- MP.takeWhile1P (Just "table whitespace") (== ' ')
-  tableCells <- MP.some tableCellParser
+  _ <- spaces
+  tableCells <- MP.some $ emptyTableCellParser <|> tableCellParser
   _ <- char '\n'
   orgParserState <- get
   _ <-
@@ -1590,6 +1590,14 @@ tableRowParser = do
       . MP.label "indentation for next table line"
       $ MP.count orgParserState.continuationIndent (char ' ')
   pure tableCells
+  where
+    emptyTableCellParser :: OrgParser [PToken]
+    emptyTableCellParser = do
+      _ <- char '|'
+      _ <- MP.optional spaces
+      pure []
+    spaces :: OrgParser Text
+    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
 
 tableCellParser :: OrgParser Prose
 tableCellParser = do
