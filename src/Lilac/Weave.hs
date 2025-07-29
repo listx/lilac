@@ -36,6 +36,7 @@ import Lilac.Types
     Object (orgDoc, symbols),
     OrgDoc (cells, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    Prose,
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
     Table (caption, grid, meta),
@@ -92,9 +93,11 @@ import Lucid.Base (hoistHtmlT)
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
+    Char,
     Either (Right),
     Eq,
     Identity,
+    Int,
     Maybe (Just, Nothing),
     ReaderT,
     String,
@@ -107,11 +110,13 @@ import Relude
     foldMap',
     foldl',
     forM_,
+    fromMaybe,
     fst,
     id,
     length,
     map,
     max,
+    notElem,
     null,
     otherwise,
     pure,
@@ -125,6 +130,7 @@ import Relude
     when,
     zip,
     ($),
+    (+),
     (-),
     (.),
     (<$>),
@@ -524,7 +530,7 @@ weaveTable table = do
           forM_ columnNames $ \prose -> do
             th_ [] $ sequence_ $ map weavePToken prose
       tbody_ [] $ do
-        forM_ (rows [2 .. rowMax]) $ \row -> do
+        forM_ (rows [(headerRowIndex + 1) .. rowMax]) $ \row -> do
           tr_ [] $ do
             forM_ row $ \prose -> do
               td_ [] $ sequence_ $ map weavePToken prose
@@ -534,7 +540,22 @@ weaveTable table = do
       elems $ M.filterWithKey (\(row, _col) _ -> row == n) table.grid
     rowMax = foldl' max 0 . map fst $ keys table.grid
     rows rowNums = map tableCellsFromRow rowNums
-    columnNames = tableCellsFromRow 1
+    columnNames = tableCellsFromRow headerRowIndex
+    firstColumnCells =
+      M.toList
+        $ M.filterWithKey (\(_row, col) _ -> col == 1) table.grid
+    headerRowIndex = fromMaybe 1 $ foldl' f Nothing firstColumnCells
+    f acc@(Just _) _ = acc
+    f acc cell@((row, _col), _)
+      | visible cell = Just row
+      | otherwise = acc
+    visible :: ((Int, Int), Prose) -> Bool
+    visible (_, []) = True
+    visible (_, prose) = case prose of
+      [PTokenStyledText styledText] ->
+        notElem styledText.body $ map T.singleton markingCharacters
+      _ -> True
+    markingCharacters = "!^_$#*/" :: [Char]
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest
