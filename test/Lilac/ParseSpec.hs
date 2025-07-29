@@ -2475,7 +2475,34 @@ parseSpec = do
                         ]
                       ),
                       ((5, 2), []),
-                      ((5, 3), [])
+                      ((5, 3), []),
+                      ( (6, 1),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "_",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (6, 2),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "*",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      ),
+                      ( (6, 3),
+                        [ PTokenStyledText
+                            ( StyledText
+                                { body = "/",
+                                  style = L.styleMaskFrom []
+                                }
+                            )
+                        ]
+                      )
                     ]
               }
         ]

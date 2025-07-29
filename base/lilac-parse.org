@@ -104,6 +104,7 @@ import Lilac.Types
     Table (Table, caption, grid, meta),
     defaultOrgParserConf,
     fromText,
+    markingChars,
     nilOid,
     protocolsEmacs,
     protocolsWeb,
@@ -124,6 +125,7 @@ import Relude
     catMaybes,
     concatMap,
     drop,
+    elem,
     fail,
     filter,
     find,
@@ -7693,7 +7695,7 @@ extra columns that we don't want).
 #+begin_src haskell
 tableCellParser :: OrgParser Prose
 tableCellParser = do
-  prose <- proseParser spacesInsideProse
+  prose <- onlyMarkingCharacterParser <|> proseParser spacesInsideProse
   _ <- MP.optional spaces
   _ <- char '|'
   _ <- MP.optional spaces
@@ -7707,6 +7709,17 @@ tableCellParser = do
       spaces
     tableCellContent :: OrgParser ()
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
+    onlyMarkingCharacterParser :: OrgParser Prose
+    onlyMarkingCharacterParser = do
+      c <- MP.satisfy (`elem` markingChars)
+      _ <- MP.try . MP.lookAhead $ do
+        _ <- MP.takeWhile1P (Just "table whitespace (marking char)") (== ' ')
+        _ <- char '|'
+        pure ()
+      pure
+        [ PTokenStyledText
+            StyledText {body = T.singleton c, style = styleMaskFrom []}
+        ]
 #+end_src
 
 The ~spacesInsideProse~ is a special space consumer inside table cells, where
@@ -7714,6 +7727,13 @@ newlines and pipe characters are prohibited. This way, when [[f:proseParser]] us
 it to find some contiguous amount of text, it will know to stop when it sees the
 pipe character (as that function does not treat pipe characters differently than
 any other non-space character).
+
+The ~onlyMarkingCharacterParser~ is there to parse [[id:3b072b1b-c63e-4fca-ab56-9388d11aa3c0::f:markingChars][f:markingChars]] which share the
+same syntax as the characters used for styling prose, especially ~_~, ~*~, and ~/~.
+These characters will break things if we let [[f:proseParser]] naively look at it,
+because that parser has no concept of table cell boundaries. The
+~onlyMarkingCharacterParser~ parses one of these marking characters, and creates
+the corresponding [[id:c8616126-215d-49be-8874-c2aca7d93a54::type:Prose][type:Prose]] value.
 
 After the rows are parsed, we need to convert them to a =grid= (as part of
 [[data:Table]]. We do this with [[f:rowsToTuples]].
@@ -7756,6 +7776,7 @@ The test below checks if we can parse a table with all 3 types of prose text
 | Pythagoras \vert{} Foo | \(a^2 + b^2 = c^2\) | [[https://wiki/x][Wiki]] |
 | Albert *Einstein* | \(E = mc^2\) | [[https://wiki/y][Wiki]] |
 | Unknown           |  |  |
+| _ | * | / |
 #+end_src
 
 #+name: t:0012-tables-and-prose
@@ -7950,7 +7971,34 @@ ps
                 ]
               ),
               ((5, 2), []),
-              ((5, 3), [])
+              ((5, 3), []),
+              ( (6, 1),
+                [ PTokenStyledText
+                    ( StyledText
+                        { body = "_",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+              ),
+              ( (6, 2),
+                [ PTokenStyledText
+                    ( StyledText
+                        { body = "*",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+              ),
+              ( (6, 3),
+                [ PTokenStyledText
+                    ( StyledText
+                        { body = "/",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+              )
             ]
       }
 ]

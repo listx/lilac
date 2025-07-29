@@ -42,6 +42,8 @@ import Lilac.Types
     Table (caption, grid, meta),
     WeaveConf (archive, originObjectPath, watch),
     decodeGPath,
+    markingChars,
+    markingCharsInvisible,
   )
 import Lucid
   ( HtmlT,
@@ -93,7 +95,6 @@ import Lucid.Base (hoistHtmlT)
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
-    Char,
     Either (Right),
     Eq,
     Identity,
@@ -106,6 +107,7 @@ import Relude
     ask,
     catMaybes,
     drop,
+    filter,
     flip,
     foldMap',
     foldl',
@@ -125,11 +127,13 @@ import Relude
     runReaderT,
     sequence_,
     show,
+    snd,
     take,
     takeWhile,
     when,
     zip,
     ($),
+    (&&),
     (+),
     (-),
     (.),
@@ -139,7 +143,7 @@ import Relude
     (==),
     (||),
   )
-import Relude.Extra.Map (elems, keys, lookup, lookupDefault)
+import Relude.Extra.Map (keys, lookup, lookupDefault)
 import Skylighting qualified as Sky
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -530,14 +534,20 @@ weaveTable table = do
           forM_ columnNames $ \prose -> do
             th_ [] $ sequence_ $ map weavePToken prose
       tbody_ [] $ do
-        forM_ (rows [(headerRowIndex + 1) .. rowMax]) $ \row -> do
+        forM_ (rows visibleRows) $ \row -> do
           tr_ [] $ do
             forM_ row $ \prose -> do
               td_ [] $ sequence_ $ map weavePToken prose
   where
     linkAnchor = getLinkAnchor $ CTable table
+    hideMarkingCharInFirstColumn [] = []
+    hideMarkingCharInFirstColumn (cell@((_row, col), prose) : cells)
+      | col == 1 && visibleColumn cell = prose : map snd cells
+      | otherwise = [] : map snd cells
     tableCellsFromRow n =
-      elems $ M.filterWithKey (\(row, _col) _ -> row == n) table.grid
+      hideMarkingCharInFirstColumn
+        . M.toList
+        $ M.filterWithKey (\(row, _col) _ -> row == n) table.grid
     rowMax = foldl' max 0 . map fst $ keys table.grid
     rows rowNums = map tableCellsFromRow rowNums
     columnNames = tableCellsFromRow headerRowIndex
@@ -547,15 +557,25 @@ weaveTable table = do
     headerRowIndex = fromMaybe 1 $ foldl' f Nothing firstColumnCells
     f acc@(Just _) _ = acc
     f acc cell@((row, _col), _)
-      | visible cell = Just row
+      | visibleColumn cell = Just row
       | otherwise = acc
-    visible :: ((Int, Int), Prose) -> Bool
-    visible (_, []) = True
-    visible (_, prose) = case prose of
+    visibleColumn :: ((Int, Int), Prose) -> Bool
+    visibleColumn (_, []) = True
+    visibleColumn (_, prose) = case prose of
       [PTokenStyledText styledText] ->
-        notElem styledText.body $ map T.singleton markingCharacters
+        notElem styledText.body $ map T.singleton markingChars
       _ -> True
-    markingCharacters = "!^_$#*/" :: [Char]
+    visibleRow :: ((Int, Int), Prose) -> Bool
+    visibleRow (_, []) = True
+    visibleRow (_, prose) = case prose of
+      [PTokenStyledText styledText] ->
+        notElem styledText.body $ map T.singleton markingCharsInvisible
+      _ -> True
+    visibleRows = filter (`notElem` invisibleRows) [(headerRowIndex + 1) .. rowMax]
+    invisibleRows = foldl' g [] firstColumnCells
+    g acc cell@((row, _col), _)
+      | visibleRow cell = acc
+      | otherwise = row : acc
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest

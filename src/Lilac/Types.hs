@@ -30,6 +30,8 @@ module Lilac.Types
     encodeGPath,
     Lilac.Types.fromText,
     fromWords,
+    markingChars,
+    markingCharsInvisible,
     nilOid,
     nilOidOrgDoc,
     protocolsEmacs,
@@ -61,6 +63,7 @@ import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
   ( Bool,
+    Char,
     Enum,
     Eq,
     FilePath,
@@ -422,3 +425,9 @@ data Archive = Archive
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
+
+markingChars :: [Char]
+markingChars = "#*" <> markingCharsInvisible
+
+markingCharsInvisible :: [Char]
+markingCharsInvisible = "!^_$/"

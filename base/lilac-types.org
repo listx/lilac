@@ -56,6 +56,8 @@ module Lilac.Types
     encodeGPath,
     Lilac.Types.fromText,
     fromWords,
+    markingChars,
+    markingCharsInvisible,
     nilOid,
     nilOidOrgDoc,
     protocolsEmacs,
@@ -87,6 +89,7 @@ import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
   ( Bool,
+    Char,
     Enum,
     Eq,
     FilePath,
@@ -174,6 +177,9 @@ import Prelude qualified (show)
 
 <<id:01da95fe-ba23-4481-9833-428423392f5f::data:Object>>
 <<id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive>>
+
+<<f:markingChars>>
+<<f:markingCharsInvisible>>
 #+end_src
 
 ** Org ID (OID)
@@ -308,4 +314,26 @@ protocolsEmacs =
     (<> ":")
     [ "file"
     ]
+#+end_src
+
+** Marking characters
+:PROPERTIES:
+:ID:       3b072b1b-c63e-4fca-ab56-9388d11aa3c0
+:END:
+
+These come from [[https://orgmode.org/manual/Advanced-features.html][here]].
+
+#+name: f:markingChars
+#+begin_src haskell
+markingChars :: [Char]
+markingChars = "#*" <> markingCharsInvisible
+#+end_src
+
+Some marking characters are purely for metadata and signal entire rows that are
+not meant to be displayed to the user directly. These are defined separately.
+
+#+name: f:markingCharsInvisible
+#+begin_src haskell
+markingCharsInvisible :: [Char]
+markingCharsInvisible = "!^_$/"
 #+end_src

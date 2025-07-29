@@ -75,6 +75,7 @@ import Lilac.Types
     Table (Table, caption, grid, meta),
     defaultOrgParserConf,
     fromText,
+    markingChars,
     nilOid,
     protocolsEmacs,
     protocolsWeb,
@@ -95,6 +96,7 @@ import Relude
     catMaybes,
     concatMap,
     drop,
+    elem,
     fail,
     filter,
     find,
@@ -1601,7 +1603,7 @@ tableRowParser = do
 
 tableCellParser :: OrgParser Prose
 tableCellParser = do
-  prose <- proseParser spacesInsideProse
+  prose <- onlyMarkingCharacterParser <|> proseParser spacesInsideProse
   _ <- MP.optional spaces
   _ <- char '|'
   _ <- MP.optional spaces
@@ -1615,6 +1617,17 @@ tableCellParser = do
       spaces
     tableCellContent :: OrgParser ()
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
+    onlyMarkingCharacterParser :: OrgParser Prose
+    onlyMarkingCharacterParser = do
+      c <- MP.satisfy (`elem` markingChars)
+      _ <- MP.try . MP.lookAhead $ do
+        _ <- MP.takeWhile1P (Just "table whitespace (marking char)") (== ' ')
+        _ <- char '|'
+        pure ()
+      pure
+        [ PTokenStyledText
+            StyledText {body = T.singleton c, style = styleMaskFrom []}
+        ]
 
 rowsToTuples :: [[Prose]] -> [((Int, Int), Prose)]
 rowsToTuples rows = concatMap rowToTuples $ zip [1 ..] rows
