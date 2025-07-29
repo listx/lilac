@@ -18,6 +18,8 @@ import Clay
     borderBottomWidth,
     borderBox,
     borderRadius,
+    borderSpacing,
+    borderTop,
     borderTopLeftRadius,
     borderTopRightRadius,
     bottom,
@@ -68,9 +70,13 @@ import Clay
     solid,
     span,
     table,
+    tbody,
+    td,
     textAlign,
     textDecoration,
+    th,
     top,
+    tr,
     underline,
     width,
     (#),
@@ -170,6 +176,17 @@ defaultCss = do
     ev padding (px 10)
     ev borderRadius (px 5)
     border (px 1) solid $ rgbHex hexCodeBorder
+    borderSpacing (px 0)
+    th ? do
+      padding (px 4) (px 4) (px 0) (px 4)
+    td ? do
+      ev padding (px 4)
+    tbody ? do
+      tr ? do
+        ".table-horizontal-line" & do
+          td ? do
+            borderTop (px 1) solid $ rgbHex 0
+            padding (px 0) (px 0) (px 4) (px 0)
   a ? do
     color $ rgbHex hexNowebLinkFg
     textDecoration none

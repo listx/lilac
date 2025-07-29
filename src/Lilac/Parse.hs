@@ -8,6 +8,7 @@ module Lilac.Parse
     orgDocParser,
     parseOrgDoc,
     styleMaskFrom,
+    tableHorizontalLine,
     validateOidText,
   )
 where
@@ -1576,9 +1577,15 @@ tableLineParser = do
   _ <-
     MP.label "indentation for next table line"
       $ MP.count orgParserState.continuationIndent (char ' ')
-  pure []
+  pure [tableHorizontalLine]
   where
     isTableLineChar c = c == '-' || c == '+' || c == '|'
+
+tableHorizontalLine :: [PToken]
+tableHorizontalLine =
+  [ PTokenStyledText
+      StyledText {body = "horizontal-line\NUL", style = styleMaskFrom []}
+  ]
 
 tableRowParser :: OrgParser [Prose]
 tableRowParser = do

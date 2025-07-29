@@ -10,7 +10,7 @@ import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
-import Lilac.Parse (maskToStyles)
+import Lilac.Parse (maskToStyles, tableHorizontalLine)
 import Lilac.Types
   ( Archive (objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -54,6 +54,7 @@ import Lucid
     charset_,
     class_,
     code_,
+    colspan_,
     crossorigin_,
     div_,
     doctypehtml_,
@@ -104,6 +105,7 @@ import Relude
     String,
     Text,
     Type,
+    any,
     ask,
     catMaybes,
     drop,
@@ -118,6 +120,7 @@ import Relude
     length,
     map,
     max,
+    not,
     notElem,
     null,
     otherwise,
@@ -133,7 +136,6 @@ import Relude
     when,
     zip,
     ($),
-    (&&),
     (+),
     (-),
     (.),
@@ -534,16 +536,23 @@ weaveTable table = do
           forM_ columnNames $ \prose -> do
             th_ [] $ sequence_ $ map weavePToken prose
       tbody_ [] $ do
-        forM_ (rows visibleRows) $ \row -> do
-          tr_ [] $ do
-            forM_ row $ \prose -> do
-              td_ [] $ sequence_ $ map weavePToken prose
+        forM_ (rows visibleRows) $ \row ->
+          if row == [[]]
+            then do
+              tr_ [class_ "table-horizontal-line"] $ do
+                td_ [colspan_ "100%"] ""
+            else do
+              tr_ [] $ do
+                forM_ row $ \prose -> do
+                  td_ [] $ sequence_ $ map weavePToken prose
   where
     linkAnchor = getLinkAnchor $ CTable table
     hideMarkingCharInFirstColumn [] = []
-    hideMarkingCharInFirstColumn (cell@((_row, col), prose) : cells)
-      | col == 1 && visibleColumn cell = prose : map snd cells
-      | otherwise = [] : map snd cells
+    hideMarkingCharInFirstColumn (((_row, _col), prose) : cells)
+      | prose == tableHorizontalLine = [[]]
+      | markingCharExistsInFirstColumn = map snd cells
+      | otherwise = prose : map snd cells
+    markingCharExistsInFirstColumn = any (not . visibleColumn) firstColumnCells
     tableCellsFromRow n =
       hideMarkingCharInFirstColumn
         . M.toList

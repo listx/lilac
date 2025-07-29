@@ -2365,7 +2365,7 @@ parseSpec = do
                         ]
                       ),
                       ( (2, 1),
-                        []
+                        L.tableHorizontalLine
                       ),
                       ( (3, 1),
                         [ PTokenStyledText
@@ -2569,7 +2569,7 @@ parseSpec = do
                         ]
                       ),
                       ( (2, 1),
-                        []
+                        L.tableHorizontalLine
                       ),
                       ( (3, 1),
                         [ PTokenStyledText

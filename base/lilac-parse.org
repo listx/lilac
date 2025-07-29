@@ -37,6 +37,7 @@ module Lilac.Parse
     orgDocParser,
     parseOrgDoc,
     styleMaskFrom,
+    tableHorizontalLine,
     validateOidText,
   )
 where
@@ -278,6 +279,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:tableParser>>
 <<f:captionParser>>
 <<f:tableLineParser>>
+<<f:tableHorizontalLine>>
 <<f:tableRowParser>>
 <<f:tableCellParser>>
 <<f:rowsToTuples>>
@@ -7645,9 +7647,21 @@ tableLineParser = do
   _ <-
     MP.label "indentation for next table line"
       $ MP.count orgParserState.continuationIndent (char ' ')
-  pure []
+  pure [tableHorizontalLine]
   where
     isTableLineChar c = c == '-' || c == '+' || c == '|'
+#+end_src
+
+The [[f:tableHorizontalLine]] is a special value to signify a horizontal line, which
+can basically only be generated internally because of the trailing NULL byte.
+
+#+name: f:tableHorizontalLine
+#+begin_src haskell
+tableHorizontalLine :: [PToken]
+tableHorizontalLine =
+  [ PTokenStyledText
+      StyledText {body = "horizontal-line\NUL", style = styleMaskFrom []}
+  ]
 #+end_src
 
 The [[f:tableRowParser]] parses rows with data in them. It also skips over
@@ -7861,7 +7875,7 @@ ps
                 ]
               ),
               ( (2, 1),
-                []
+                L.tableHorizontalLine
               ),
               ( (3, 1),
                 [ PTokenStyledText
@@ -8089,7 +8103,7 @@ ps
                 ]
               ),
               ( (2, 1),
-                []
+                L.tableHorizontalLine
               ),
               ( (3, 1),
                 [ PTokenStyledText
