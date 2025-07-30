@@ -1556,6 +1556,7 @@ tableParser = do
       Left err -> fail $ MP.errorBundlePretty err
       Right (prose, _orgParserState) -> pure prose
   rows <- MP.some $ tableLineParser <|> tableRowParser
+  _ <- MP.optional tableFormulaParser
   let newTableNumber = orgParserState.tableNumber + 1
   modify (\s -> s {tableNumber = newTableNumber})
   pure
@@ -1565,6 +1566,14 @@ tableParser = do
         caption = caption,
         grid = fromList $ rowsToTuples rows
       }
+
+tableFormulaParser :: OrgParser ()
+tableFormulaParser = do
+  _ <- string "#+"
+  _ <- string "tblfm: " <|> string "TBLFM: "
+  _ <- MP.takeWhile1P (Just "table formula") (/= '\n')
+  _ <- char '\n'
+  pure ()
 
 captionParser :: OrgParser [PToken]
 captionParser = do

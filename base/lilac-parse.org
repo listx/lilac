@@ -284,6 +284,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:metaParser>>
 <<f:metaEntryParser>>
 <<f:tableParser>>
+<<f:tableFormulaParser>>
 <<f:captionParser>>
 <<f:tableLineParser>>
 <<f:tableHorizontalLine>>
@@ -7610,6 +7611,7 @@ tableParser = do
       Left err -> fail $ MP.errorBundlePretty err
       Right (prose, _orgParserState) -> pure prose
   rows <- MP.some $ tableLineParser <|> tableRowParser
+  _ <- MP.optional tableFormulaParser
   let newTableNumber = orgParserState.tableNumber + 1
   modify (\s -> s {tableNumber = newTableNumber})
   pure
@@ -7637,6 +7639,22 @@ captionParser = do
   where
     spaceConsumer :: OrgParser Text
     spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
+#+end_src
+
+The [[f:tableFormulaParser]] checks for a table formula line, which is neither
+useful for tangling or weaving. These table formulas always come *after* a table,
+not before it. We need to be able to parse it in order to ignore it (otherwise
+we will think that the ~#+tblfm: ...~ is part of another Org cell's metadata).
+
+#+name: f:tableFormulaParser
+#+begin_src haskell
+tableFormulaParser :: OrgParser ()
+tableFormulaParser = do
+  _ <- string "#+"
+  _ <- string "tblfm: " <|> string "TBLFM: "
+  _ <- MP.takeWhile1P (Just "table formula") (/= '\n')
+  _ <- char '\n'
+  pure ()
 #+end_src
 
 The [[f:tableLineParser]] skips over horizontal rules that typically separate the
@@ -7843,6 +7861,7 @@ The test below checks if we can parse a table with all 3 types of prose text
 | Albert *Einstein* | \(E = mc^2\) | [[https://wiki/y][Wiki]] |
 | Unknown           |  |  |
 | _ | * | / |
+,#+tblfm: $x
 #+end_src
 
 #+name: t:0012-tables-and-prose
