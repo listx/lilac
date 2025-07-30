@@ -65,7 +65,7 @@ import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
-import Lilac.Parse (maskToStyles, tableHorizontalLine)
+import Lilac.Parse (isNumericText, maskToStyles, tableHorizontalLine)
 import Lilac.Types
   ( Archive (objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -1150,6 +1150,9 @@ weaveMathFragmentInline mathFragment = "\\(" <> toHtml mathFragment.body <> "\\)
 #+end_src
 
 ** Tables
+:PROPERTIES:
+:ID:       6c10afe2-2714-4e85-9121-e96a36d27ba4
+:END:
 
 [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][Tables]] are similar to figures, because they have some content (a table instead
 of an image), and also have a caption.
@@ -1192,7 +1195,11 @@ weaveTable table = do
             else do
               tr_ [] $ do
                 forM_ row $ \prose -> do
-                  td_ [] $ sequence_ $ map weavePToken prose
+                  let tdAttrs =
+                        if mostlyNumeric prose
+                          then [class_ "table-cell-numeric"]
+                          else []
+                  td_ tdAttrs $ sequence_ $ map weavePToken prose
   where
     linkAnchor = getLinkAnchor $ CTable table
     hideMarkingCharInFirstColumn [] = []
@@ -1260,6 +1267,13 @@ weaveTable table = do
       PTokenMathFragment {} -> False
     proseHasColgroupStartMarker = proseHas "<"
     proseHasNonExportMarker = proseHas "/"
+    mostlyNumeric prose =
+      let rawText = T.concat $ map extractText prose
+       in isNumericText rawText
+    extractText pToken = case pToken of
+      PTokenStyledText styledText -> styledText.body
+      PTokenLink {}
+      PTokenMathFragment {} -> ""
 #+end_src
 
 The ~headerRowIndex~ is calculated by examining the table cells in the first
@@ -1701,6 +1715,8 @@ defaultCss = do
       vh padding (px 4) (px 8)
     td ? do
       vh padding (px 4) (px 8)
+      ".table-cell-numeric" & do
+        textAlign $ alignSide sideRight
     thead ? do
       backgroundColor $ rgbHex hexCodeBg
     tbody ? do

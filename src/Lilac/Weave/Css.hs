@@ -185,6 +185,8 @@ defaultCss = do
       vh padding (px 4) (px 8)
     td ? do
       vh padding (px 4) (px 8)
+      ".table-cell-numeric" & do
+        textAlign $ alignSide sideRight
     thead ? do
       backgroundColor $ rgbHex hexCodeBg
     tbody ? do

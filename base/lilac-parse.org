@@ -33,6 +33,7 @@ module Lilac.Parse
     defaultOrgParserState,
     genHeadingSection,
     genHeadingOidStack,
+    isNumericText,
     maskToStyles,
     orgDocParser,
     parseOrgDoc,
@@ -44,7 +45,13 @@ where
 
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
-import Data.Char (isAsciiLower, isDigit, isSpace)
+import Data.Char
+  ( GeneralCategory (CurrencySymbol),
+    generalCategory,
+    isAsciiLower,
+    isDigit,
+    isSpace,
+  )
 import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
@@ -285,6 +292,8 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:rowsToTuples>>
 <<f:rowToTuples>>
 <<f:validateOidText>>
+<<f:isNumericText>>
+<<f:isNumericTextParser>>
 #+end_src
 
 ** Whitespace and comments
@@ -7777,6 +7786,49 @@ rowToTuples (rowIndex, row)
         colIndex + 1
       )
 #+end_src
+
+*** Check for numeric table cell
+
+It's useful to know if a table cell contains mostly numeric content, at the time
+of weaving (see [[id:6c10afe2-2714-4e85-9121-e96a36d27ba4::f:weaveTable][f:weaveTable]]). This way, we can right-align the contents of that
+table cell, just like popular spreadsheet programs.
+
+[[f:isNumericText]] parses the input through [[f:isNumericTextParser]].
+
+#+name: f:isNumericText
+#+begin_src haskell
+isNumericText :: Text -> Bool
+isNumericText input = case MP.runParser
+  (runStateT isNumericTextParser defaultOrgParserState)
+  ""
+  input of
+  Left _ -> False
+  Right (b, _) -> b
+#+end_src
+
+[[f:isNumericTextParser]] allows for a currency symbol, which can be either after or
+before a ~-~ or ~+~ sign. Then any combination of digits, periods, commas, and
+spaces are allowed. We check that there is at least 1 numeric digit in the
+string.
+
+#+name: f:isNumericTextParser
+#+begin_src haskell
+isNumericTextParser :: OrgParser Bool
+isNumericTextParser = do
+  _ <- MP.optional sign
+  _ <- MP.optional $ MP.satisfy isCurrencySymbol
+  _ <- MP.optional sign
+  s <- MP.some $ MP.satisfy isDigit <|> MP.satisfy (`elem` ['.', ',', ' '])
+  MP.eof
+  let numberFound = (> 0) . length $ filter isDigit s
+  pure numberFound
+  where
+    isCurrencySymbol c = generalCategory c == CurrencySymbol
+    sign :: OrgParser Char
+    sign = MP.satisfy (`elem` ['-', '+'])
+#+end_src
+
+*** Tests
 
 The test below checks if we can parse a table with all 3 types of prose text
 (styled text, links, and math fragments).

@@ -10,7 +10,7 @@ import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
-import Lilac.Parse (maskToStyles, tableHorizontalLine)
+import Lilac.Parse (isNumericText, maskToStyles, tableHorizontalLine)
 import Lilac.Types
   ( Archive (objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -558,7 +558,11 @@ weaveTable table = do
             else do
               tr_ [] $ do
                 forM_ row $ \prose -> do
-                  td_ [] $ sequence_ $ map weavePToken prose
+                  let tdAttrs =
+                        if mostlyNumeric prose
+                          then [class_ "table-cell-numeric"]
+                          else []
+                  td_ tdAttrs $ sequence_ $ map weavePToken prose
   where
     linkAnchor = getLinkAnchor $ CTable table
     hideMarkingCharInFirstColumn [] = []
@@ -626,6 +630,13 @@ weaveTable table = do
       PTokenMathFragment {} -> False
     proseHasColgroupStartMarker = proseHas "<"
     proseHasNonExportMarker = proseHas "/"
+    mostlyNumeric prose =
+      let rawText = T.concat $ map extractText prose
+       in isNumericText rawText
+    extractText pToken = case pToken of
+      PTokenStyledText styledText -> styledText.body
+      PTokenLink {}
+      PTokenMathFragment {} -> ""
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest

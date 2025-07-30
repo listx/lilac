@@ -4,6 +4,7 @@ module Lilac.Parse
     defaultOrgParserState,
     genHeadingSection,
     genHeadingOidStack,
+    isNumericText,
     maskToStyles,
     orgDocParser,
     parseOrgDoc,
@@ -15,7 +16,13 @@ where
 
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
-import Data.Char (isAsciiLower, isDigit, isSpace)
+import Data.Char
+  ( GeneralCategory (CurrencySymbol),
+    generalCategory,
+    isAsciiLower,
+    isDigit,
+    isSpace,
+  )
 import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
@@ -1654,3 +1661,25 @@ validateOidText :: (MonadFail m) => Text -> m OID
 validateOidText oidText = case fromText oidText of
   Nothing -> fail $ show oidText <> " is not a valid OID"
   Just oid -> pure oid
+
+isNumericText :: Text -> Bool
+isNumericText input = case MP.runParser
+  (runStateT isNumericTextParser defaultOrgParserState)
+  ""
+  input of
+  Left _ -> False
+  Right (b, _) -> b
+
+isNumericTextParser :: OrgParser Bool
+isNumericTextParser = do
+  _ <- MP.optional sign
+  _ <- MP.optional $ MP.satisfy isCurrencySymbol
+  _ <- MP.optional sign
+  s <- MP.some $ MP.satisfy isDigit <|> MP.satisfy (`elem` ['.', ',', ' '])
+  MP.eof
+  let numberFound = (> 0) . length $ filter isDigit s
+  pure numberFound
+  where
+    isCurrencySymbol c = generalCategory c == CurrencySymbol
+    sign :: OrgParser Char
+    sign = MP.satisfy (`elem` ['-', '+'])
