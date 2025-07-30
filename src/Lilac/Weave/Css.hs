@@ -50,6 +50,7 @@ import Clay
     inlineBlock,
     italic,
     margin,
+    marginBottom,
     marginLeft,
     minWidth,
     monospace,
@@ -147,6 +148,19 @@ defaultCss = do
     fontSerif
     width $ px 800
     vh margin (px 0) auto
+  h1 ? do
+    fontSize (pt 36)
+    marginBottom (pt $ -16)
+  h2 ? do
+    fontSize (pt 26)
+  h3 ? do
+    fontSize (pt 22)
+  h4 ? do
+    fontSize (pt 18)
+  h5 ? do
+    fontSize (pt 16)
+  h6 ? do
+    fontSize (pt 14)
   forM_ [h1, h2, h3, h4, h5, h6] $ \hN -> do
     hN ? do
       fontSans
@@ -166,6 +180,12 @@ defaultCss = do
     span ? do
       ".code" & do
         fontSize (pt 10)
+  ".doc-meta-author" & do
+    fontStyle italic
+    ev margin (px 2)
+  ".doc-meta-date" & do
+    fontStyle italic
+    ev margin (px 2)
   a ? do
     ".self-link" & do
       color $ rgbHex hexText

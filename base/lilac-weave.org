@@ -124,6 +124,7 @@ import Lucid
     h6_,
     head_,
     height_,
+    hr_,
     href_,
     id_,
     img_,
@@ -218,6 +219,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveCell>>
 <<f:toSafeHtmlId>>
 <<f:getProseContents>>
+<<f:weaveDocMeta>>
 <<f:weaveHeading>>
 <<f:getSectionText>>
 <<f:getLinkAnchor>>
@@ -331,6 +333,7 @@ weaveObject object = do
   doctypehtml_ $ do
     <<HTML head>>
     body_ $ do
+      weaveDocMeta object.orgDoc.meta
       forM_ object.orgDoc.cells weaveCell
 #+end_src
 
@@ -593,6 +596,27 @@ getSectionText heading =
     $ heading.section
 #+end_src
 
+** Document metadata
+
+Weave document metadata such as the title, author, and date.
+
+#+name: f:weaveDocMeta
+#+begin_src haskell
+weaveDocMeta :: M.Map Text Text -> HtmlWeaver ()
+weaveDocMeta m = do
+  case lookup "title" m of
+    Nothing -> pure ()
+    Just title -> do
+      h1_ [] $ toHtml title
+      hr_ []
+  f "author" $ p_ [class_ "doc-meta-author"]
+  f "date" $ p_ [class_ "doc-meta-date"]
+  where
+    f k element = case lookup k m of
+      Nothing -> pure ()
+      Just x -> element $ toHtml x
+#+end_src
+
 ** Headings
 :PROPERTIES:
 :ID:       c036cf17-0f61-4f07-bf76-bbe8b4eeb12e
@@ -612,15 +636,18 @@ weaveHeading heading =
       sequence_ $ map weavePToken heading.body
   where
     hN = case heading.level of
-      1 -> h1_
-      2 -> h2_
-      3 -> h3_
-      4 -> h4_
-      5 -> h5_
+      1 -> h2_
+      2 -> h3_
+      3 -> h4_
+      4 -> h5_
       _ -> h6_
     sectionText = getSectionText heading
     linkAnchor = getLinkAnchor $ CHeading heading
 #+end_src
+
+A well-formed document should only have one ~<h1>~ HTML element (for the title of
+the document). We use ~h1_~ when weaving the title of the document (if any). This
+is why we start from ~h2_~ for headings.
 
 The ~sectionText~ already makes the heading unique amongst the other ones in the
 Org file, but for human-friendliness we also extract the textual part of it with
@@ -1556,6 +1583,7 @@ import Clay
     inlineBlock,
     italic,
     margin,
+    marginBottom,
     marginLeft,
     minWidth,
     monospace,
@@ -1677,6 +1705,19 @@ defaultCss = do
     fontSerif
     width $ px 800
     vh margin (px 0) auto
+  h1 ? do
+    fontSize (pt 36)
+    marginBottom (pt $ -16)
+  h2 ? do
+    fontSize (pt 26)
+  h3 ? do
+    fontSize (pt 22)
+  h4 ? do
+    fontSize (pt 18)
+  h5 ? do
+    fontSize (pt 16)
+  h6 ? do
+    fontSize (pt 14)
   forM_ [h1, h2, h3, h4, h5, h6] $ \hN -> do
     hN ? do
       fontSans
@@ -1696,6 +1737,12 @@ defaultCss = do
     span ? do
       ".code" & do
         fontSize (pt 10)
+  ".doc-meta-author" & do
+    fontStyle italic
+    ev margin (px 2)
+  ".doc-meta-date" & do
+    fontStyle italic
+    ev margin (px 2)
   a ? do
     ".self-link" & do
       color $ rgbHex hexText

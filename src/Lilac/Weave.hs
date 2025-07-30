@@ -69,6 +69,7 @@ import Lucid
     h6_,
     head_,
     height_,
+    hr_,
     href_,
     id_,
     img_,
@@ -216,6 +217,7 @@ weaveObject object = do
         ]
         ("" :: Text)
     body_ $ do
+      weaveDocMeta object.orgDoc.meta
       forM_ object.orgDoc.cells weaveCell
 
 weaveCell :: Cell -> HtmlWeaver ()
@@ -253,6 +255,20 @@ getProseContents = join . foldl' f []
          in linkText : acc
       PTokenMathFragment mathFragment -> mathFragment.body : acc
 
+weaveDocMeta :: M.Map Text Text -> HtmlWeaver ()
+weaveDocMeta m = do
+  case lookup "title" m of
+    Nothing -> pure ()
+    Just title -> do
+      h1_ [] $ toHtml title
+      hr_ []
+  f "author" $ p_ [class_ "doc-meta-author"]
+  f "date" $ p_ [class_ "doc-meta-date"]
+  where
+    f k element = case lookup k m of
+      Nothing -> pure ()
+      Just x -> element $ toHtml x
+
 weaveHeading :: Heading -> HtmlWeaver ()
 weaveHeading heading =
   hN [id_ linkAnchor] $ do
@@ -261,11 +277,10 @@ weaveHeading heading =
       sequence_ $ map weavePToken heading.body
   where
     hN = case heading.level of
-      1 -> h1_
-      2 -> h2_
-      3 -> h3_
-      4 -> h4_
-      5 -> h5_
+      1 -> h2_
+      2 -> h3_
+      3 -> h4_
+      4 -> h5_
       _ -> h6_
     sectionText = getSectionText heading
     linkAnchor = getLinkAnchor $ CHeading heading
