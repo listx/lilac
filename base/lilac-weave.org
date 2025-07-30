@@ -109,7 +109,8 @@ import Lucid
     charset_,
     class_,
     code_,
-    colspan_,
+    col_,
+    colgroup_,
     crossorigin_,
     div_,
     doctypehtml_,
@@ -172,9 +173,11 @@ import Relude
     fromMaybe,
     fst,
     id,
+    isJust,
     length,
     map,
     max,
+    maybe,
     not,
     notElem,
     null,
@@ -191,6 +194,7 @@ import Relude
     when,
     zip,
     ($),
+    (&&),
     (+),
     (-),
     (.),
@@ -198,6 +202,7 @@ import Relude
     (<>),
     (=<<),
     (==),
+    (>),
     (||),
   )
 import Relude.Extra.Map (keys, lookup, lookupDefault)
@@ -1165,6 +1170,16 @@ weaveTable table = do
         _ -> ": " :: Text
       sequence_ $ map weavePToken table.caption
     table_ [] $ do
+      forM_ (zip [1 :: Int ..] getColgroups) $ \(groupIdx, numCols) -> do
+        let colgroupAttrs =
+              if groupIdx > 1
+                then [class_ "table-vertical-line-colgroup"]
+                else []
+        colgroup_ colgroupAttrs $ do
+          forM_ [1 .. numCols] $ \colNum -> do
+            if (colNum > 1)
+              then col_ [class_ "table-vertical-line-col"]
+              else col_ []
       thead_ [] $ do
         tr_ [] $ do
           forM_ columnNames $ \prose -> do
@@ -1173,8 +1188,7 @@ weaveTable table = do
         forM_ (rows visibleRows) $ \row ->
           if row == [[]]
             then do
-              tr_ [class_ "table-horizontal-line"] $ do
-                td_ [colspan_ "100%"] ""
+              tr_ [class_ "table-horizontal-line"] ""
             else do
               tr_ [] $ do
                 forM_ row $ \prose -> do
@@ -1219,10 +1233,54 @@ weaveTable table = do
     g acc cell@((row, _col), _)
       | visibleRow cell = acc
       | otherwise = row : acc
+    getColgroups :: [Int]
+    getColgroups =
+      maybe
+        [rowMax]
+        (reverse . foldl' getColgroupStarts [0] . tableCellsFromRow)
+        getColgroupsRow
+    getColgroupStarts :: [Int] -> Prose -> [Int]
+    getColgroupStarts [] _prose = []
+    getColgroupStarts [0] _prose = [1]
+    getColgroupStarts acc@(latest : rest) prose
+      | proseHasColgroupStartMarker prose = 1 : acc
+      | otherwise = latest + 1 : rest
+    getColgroupsRow = foldl' h Nothing firstColumnCells
+    h :: Maybe Int -> ((Int, Int), Prose) -> Maybe Int
+    h acc ((row, _col), prose)
+      | isJust acc = acc
+      | proseHasNonExportMarker prose = Just row
+      | otherwise = acc
+    proseHas _ [] = False
+    proseHas prefix (firstPToken : _) = case firstPToken of
+      PTokenStyledText styledText ->
+        (maskToStyles styledText.style == [])
+          && T.isPrefixOf prefix styledText.body
+      PTokenLink {}
+      PTokenMathFragment {} -> False
+    proseHasColgroupStartMarker = proseHas "<"
+    proseHasNonExportMarker = proseHas "/"
 #+end_src
 
 The ~headerRowIndex~ is calculated by examining the table cells in the first
 column, to avoid any cells that look like the special ~markingCharacters~.
+
+Below is a table with some special marking characters on the very first column.
+This demonstrates some of the complexities around ~markingCharacters~.
+
+#+name: tbl:Marking characters
+#+caption: Marking characters should be absent if you're reading this from HTML.
+| ! | A        | B        | C        |
+|   | Header A | Header B | Header C |
+|---+----------+----------+----------|
+| ^ | a        | b        | c        |
+| _ | a        | b        | c        |
+| $ | a        | b        | c        |
+| # | a        | b        | c        |
+| * | a        | b        | c        |
+| / | <        | <        |          |
+|---+----------+----------+----------|
+|   |          |          | foo      |
 
 ** Testing framework
 
@@ -1451,8 +1509,9 @@ import Clay
     borderBottomRightRadius,
     borderBottomWidth,
     borderBox,
+    borderCollapse,
+    borderLeft,
     borderRadius,
-    borderSpacing,
     borderTop,
     borderTopLeftRadius,
     borderTopRightRadius,
@@ -1460,6 +1519,7 @@ import Clay
     boxSizing,
     center,
     code,
+    collapse,
     color,
     display,
     div,
@@ -1489,6 +1549,7 @@ import Clay
     overflowY,
     p,
     padding,
+    pct,
     position,
     pre,
     pretty,
@@ -1509,6 +1570,7 @@ import Clay
     textAlign,
     textDecoration,
     th,
+    thead,
     top,
     tr,
     underline,
@@ -1629,22 +1691,27 @@ defaultCss = do
     vh margin (px 10) auto
     textAlign center
     fontStyle italic
+    width (pct 80)
   table ? do
-    margin (px 10) auto (px 0) auto
-    ev padding (px 10)
-    ev borderRadius (px 5)
+    fontSans
+    borderCollapse collapse
     border (px 1) solid $ rgbHex hexCodeBorder
-    borderSpacing (px 0)
+    vh margin (px 0) auto
     th ? do
-      padding (px 4) (px 4) (px 0) (px 4)
+      vh padding (px 4) (px 8)
     td ? do
-      ev padding (px 4)
+      vh padding (px 4) (px 8)
+    thead ? do
+      backgroundColor $ rgbHex hexCodeBg
     tbody ? do
       tr ? do
         ".table-horizontal-line" & do
-          td ? do
-            borderTop (px 1) solid $ rgbHex 0
-            padding (px 0) (px 0) (px 4) (px 0)
+          borderTop (px 1) solid $ rgbHex hexCodeBorder
+          ev padding (px 0)
+  ".table-vertical-line-colgroup" & do
+    borderLeft (px 3) solid $ rgbHex hexCodeBorder
+  ".table-vertical-line-col" & do
+    borderLeft (px 1) solid $ rgbHex hexCodeBorder
   <<css:Links>>
   ".sourceCode" & do
     noMargin

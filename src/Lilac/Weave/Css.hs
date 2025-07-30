@@ -17,8 +17,9 @@ import Clay
     borderBottomRightRadius,
     borderBottomWidth,
     borderBox,
+    borderCollapse,
+    borderLeft,
     borderRadius,
-    borderSpacing,
     borderTop,
     borderTopLeftRadius,
     borderTopRightRadius,
@@ -26,6 +27,7 @@ import Clay
     boxSizing,
     center,
     code,
+    collapse,
     color,
     display,
     div,
@@ -55,6 +57,7 @@ import Clay
     overflowY,
     p,
     padding,
+    pct,
     position,
     pre,
     pretty,
@@ -75,6 +78,7 @@ import Clay
     textAlign,
     textDecoration,
     th,
+    thead,
     top,
     tr,
     underline,
@@ -171,22 +175,27 @@ defaultCss = do
     vh margin (px 10) auto
     textAlign center
     fontStyle italic
+    width (pct 80)
   table ? do
-    margin (px 10) auto (px 0) auto
-    ev padding (px 10)
-    ev borderRadius (px 5)
+    fontSans
+    borderCollapse collapse
     border (px 1) solid $ rgbHex hexCodeBorder
-    borderSpacing (px 0)
+    vh margin (px 0) auto
     th ? do
-      padding (px 4) (px 4) (px 0) (px 4)
+      vh padding (px 4) (px 8)
     td ? do
-      ev padding (px 4)
+      vh padding (px 4) (px 8)
+    thead ? do
+      backgroundColor $ rgbHex hexCodeBg
     tbody ? do
       tr ? do
         ".table-horizontal-line" & do
-          td ? do
-            borderTop (px 1) solid $ rgbHex 0
-            padding (px 0) (px 0) (px 4) (px 0)
+          borderTop (px 1) solid $ rgbHex hexCodeBorder
+          ev padding (px 0)
+  ".table-vertical-line-colgroup" & do
+    borderLeft (px 3) solid $ rgbHex hexCodeBorder
+  ".table-vertical-line-col" & do
+    borderLeft (px 1) solid $ rgbHex hexCodeBorder
   a ? do
     color $ rgbHex hexNowebLinkFg
     textDecoration none

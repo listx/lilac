@@ -54,7 +54,8 @@ import Lucid
     charset_,
     class_,
     code_,
-    colspan_,
+    col_,
+    colgroup_,
     crossorigin_,
     div_,
     doctypehtml_,
@@ -117,9 +118,11 @@ import Relude
     fromMaybe,
     fst,
     id,
+    isJust,
     length,
     map,
     max,
+    maybe,
     not,
     notElem,
     null,
@@ -136,6 +139,7 @@ import Relude
     when,
     zip,
     ($),
+    (&&),
     (+),
     (-),
     (.),
@@ -143,6 +147,7 @@ import Relude
     (<>),
     (=<<),
     (==),
+    (>),
     (||),
   )
 import Relude.Extra.Map (keys, lookup, lookupDefault)
@@ -531,6 +536,16 @@ weaveTable table = do
         _ -> ": " :: Text
       sequence_ $ map weavePToken table.caption
     table_ [] $ do
+      forM_ (zip [1 :: Int ..] getColgroups) $ \(groupIdx, numCols) -> do
+        let colgroupAttrs =
+              if groupIdx > 1
+                then [class_ "table-vertical-line-colgroup"]
+                else []
+        colgroup_ colgroupAttrs $ do
+          forM_ [1 .. numCols] $ \colNum -> do
+            if (colNum > 1)
+              then col_ [class_ "table-vertical-line-col"]
+              else col_ []
       thead_ [] $ do
         tr_ [] $ do
           forM_ columnNames $ \prose -> do
@@ -539,8 +554,7 @@ weaveTable table = do
         forM_ (rows visibleRows) $ \row ->
           if row == [[]]
             then do
-              tr_ [class_ "table-horizontal-line"] $ do
-                td_ [colspan_ "100%"] ""
+              tr_ [class_ "table-horizontal-line"] ""
             else do
               tr_ [] $ do
                 forM_ row $ \prose -> do
@@ -585,6 +599,33 @@ weaveTable table = do
     g acc cell@((row, _col), _)
       | visibleRow cell = acc
       | otherwise = row : acc
+    getColgroups :: [Int]
+    getColgroups =
+      maybe
+        [rowMax]
+        (reverse . foldl' getColgroupStarts [0] . tableCellsFromRow)
+        getColgroupsRow
+    getColgroupStarts :: [Int] -> Prose -> [Int]
+    getColgroupStarts [] _prose = []
+    getColgroupStarts [0] _prose = [1]
+    getColgroupStarts acc@(latest : rest) prose
+      | proseHasColgroupStartMarker prose = 1 : acc
+      | otherwise = latest + 1 : rest
+    getColgroupsRow = foldl' h Nothing firstColumnCells
+    h :: Maybe Int -> ((Int, Int), Prose) -> Maybe Int
+    h acc ((row, _col), prose)
+      | isJust acc = acc
+      | proseHasNonExportMarker prose = Just row
+      | otherwise = acc
+    proseHas _ [] = False
+    proseHas prefix (firstPToken : _) = case firstPToken of
+      PTokenStyledText styledText ->
+        (maskToStyles styledText.style == [])
+          && T.isPrefixOf prefix styledText.body
+      PTokenLink {}
+      PTokenMathFragment {} -> False
+    proseHasColgroupStartMarker = proseHas "<"
+    proseHasNonExportMarker = proseHas "/"
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest
