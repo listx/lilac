@@ -29,7 +29,16 @@ import Lilac.Types
   ( Archive (objects, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
-    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Cell
+      ( CBlock,
+        CFigure,
+        CFootnote,
+        CHeading,
+        CListItem,
+        CMathFragment,
+        CParagraph,
+        CTable
+      ),
     Link (Link),
     LinkTarget (LinkTargetOid),
     Object (symbols),
@@ -116,7 +125,8 @@ expandRootBlocks archive outDir = map expandRootBlock rootBlocks
       CParagraph {}
       CMathFragment {}
       CFigure {}
-      CTable {} -> acc
+      CTable {}
+      CFootnote {} -> acc
     expandRootBlock :: (OsPath, Block) -> (OsPath, Text)
     expandRootBlock (p, rootBlock) =
       ( P.combine outDir p,

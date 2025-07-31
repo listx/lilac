@@ -15,12 +15,23 @@ import Lilac.Types
   ( Archive (objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
-    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Cell
+      ( CBlock,
+        CFigure,
+        CFootnote,
+        CHeading,
+        CListItem,
+        CMathFragment,
+        CParagraph,
+        CTable
+      ),
     Figure (caption, link, meta),
+    Footnote (body, name),
     Heading (body, level, section),
     Link (Link, name, target),
     LinkTarget
       ( LinkTargetFilePath,
+        LinkTargetFootnote,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -34,7 +45,7 @@ import Lilac.Types
       ),
     MathFragment (body, meta),
     Object (orgDoc, symbols),
-    OrgDoc (cells, meta),
+    OrgDoc (cells, footnotes, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose,
     Style (Bold, Code, Italic, Underline, Verbatim),
@@ -82,6 +93,7 @@ import Lucid
     script_,
     span_,
     src_,
+    sup_,
     table_,
     tbody_,
     td_,
@@ -111,6 +123,7 @@ import Relude
     ask,
     catMaybes,
     drop,
+    dropWhile,
     filter,
     flip,
     foldMap',
@@ -123,6 +136,7 @@ import Relude
     length,
     map,
     max,
+    maxBound,
     maybe,
     not,
     notElem,
@@ -135,6 +149,7 @@ import Relude
     sequence_,
     show,
     snd,
+    sortOn,
     take,
     takeWhile,
     when,
@@ -218,7 +233,31 @@ weaveObject object = do
         ("" :: Text)
     body_ $ do
       weaveDocMeta object.orgDoc.meta
-      forM_ object.orgDoc.cells weaveCell
+      forM_ rearrangedCells weaveCell
+  where
+    rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
+    beforeFootnotes = takeWhile (not . isFootnote) object.orgDoc.cells
+    afterFootnotes =
+      dropWhile isFootnote
+        $ dropWhile (not . isFootnote) object.orgDoc.cells
+    sortedFootnotes =
+      sortOn getSortingKey
+        $ takeWhile isFootnote
+        $ dropWhile (not . isFootnote) object.orgDoc.cells
+    getSortingKey cell
+      | (CFootnote footnote) <- cell,
+        Just (n, _) <- lookup footnote.name object.orgDoc.footnotes =
+          n
+      | otherwise = maxBound :: Int
+    isFootnote = \case
+      CFootnote {} -> True
+      CBlock {}
+      CFigure {}
+      CHeading {}
+      CListItem {}
+      CMathFragment {}
+      CParagraph {}
+      CTable {} -> False
 
 weaveCell :: Cell -> HtmlWeaver ()
 weaveCell = \case
@@ -229,6 +268,7 @@ weaveCell = \case
   CMathFragment mathFragment -> weaveMathFragmentStandalone mathFragment
   CFigure figure -> weaveFigure figure
   CTable table -> weaveTable table
+  CFootnote footnote -> weaveFootnote footnote
 
 toSafeHtmlId :: Text -> Text
 toSafeHtmlId = T.map onlyKeepSomeChars
@@ -344,16 +384,24 @@ getLinkAnchor = \case
               "tbl-" <> tableNum
           | otherwise = "table-num-error"
      in toSafeHtmlId ref
+  CFootnote {} -> ""
 
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink link -> weaveLink link
+  PTokenLink link -> case link.target of
+    LinkTargetFootnote {} -> do
+      sup_ [class_ "footnote-link"] $ do
+        weaveLink link
+    LinkTargetOid {}
+    LinkTargetFilePath {}
+    LinkTargetURI {} -> weaveLink link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
 
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
   LinkTargetOid {} -> False
+  LinkTargetFootnote {} -> False
   LinkTargetFilePath {} -> True
   LinkTargetURI {} -> True
 
@@ -488,6 +536,11 @@ weaveLinkTarget linkTarget = do
       | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
       where
         htmlExt = P.unsafeEncodeUtf "html"
+    LinkTargetFootnote name
+      | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+        Just (footnoteNumber, _) <- lookup name originObj.orgDoc.footnotes ->
+          (T.pack "#footnote-") <> (T.show footnoteNumber)
+      | otherwise -> "#LILAC_BROKEN_LINK"
     LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
     LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
 
@@ -674,6 +727,17 @@ getRelativePathWithoutSymlinks src dest
     commonPathPrefix = commonPrefix dirsSrc dirsDest
     isDestChildOfSrc = dirsSrc == commonPathPrefix
     remainingDest = drop (length commonPathPrefix) dirsDest
+
+weaveFootnote :: Footnote -> HtmlWeaver ()
+weaveFootnote footnote = do
+  weaveConf <- ask
+  if
+    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+      Just (footnoteNumber, _) <- lookup footnote.name originObj.orgDoc.footnotes -> do
+        p_ [class_ "footnote-definition", id_ ("footnote-" <> T.show footnoteNumber)] $ do
+          span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
+          sequence_ $ map weavePToken footnote.body
+    | otherwise -> pure ()
 
 commonPrefix :: (Eq a) => [a] -> [a] -> [a]
 commonPrefix xs ys = map fst . takeWhile (\(x, y) -> (x == y)) $ zip xs ys

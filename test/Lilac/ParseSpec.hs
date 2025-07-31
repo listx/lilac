@@ -1,5 +1,6 @@
 module Lilac.ParseSpec (spec) where
 
+import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.Void (Void)
@@ -7,13 +8,24 @@ import Lilac.Parse qualified as L
 import Lilac.Types
   ( BToken (BTokenLink, BTokenString),
     Block (Block, body, meta, parentOid),
-    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Cell
+      ( CBlock,
+        CFigure,
+        CFootnote,
+        CHeading,
+        CListItem,
+        CMathFragment,
+        CParagraph,
+        CTable
+      ),
     Figure (Figure, caption, link, meta),
+    Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
+        LinkTargetFootnote,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -26,7 +38,13 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (MathFragment, body, meta),
-    OrgDoc (OrgDoc, cells, meta, oid),
+    OrgDoc
+      ( OrgDoc,
+        cells,
+        footnotes,
+        meta,
+        oid
+      ),
     OrgParserConf (maxHeadingLevel),
     OrgParserState
       ( anonBlockNumber,
@@ -35,10 +53,14 @@ import Lilac.Types
         docOid,
         equationNumber,
         figureNumber,
+        footnoteDefinitions,
+        footnoteNumber,
+        footnoteNumbers,
         headingLevel,
         headingOidStack,
         headingSection,
         orgParserConf,
+        prevCellIsFootnote,
         tableNumber
       ),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
@@ -52,7 +74,8 @@ import Lilac.Types
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
-  ( FilePath,
+  ( Bool (True),
+    FilePath,
     Identity,
     Int,
     Maybe (Just, Nothing),
@@ -185,6 +208,7 @@ nilOrgDoc cells =
   OrgDoc
     { oid = nilOid,
       cells = cells,
+      footnotes = M.empty,
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
 
@@ -2684,3 +2708,209 @@ parseSpec = do
             ],
         tableNumber = 1
       }
+
+  pf
+    "0013-footnotes-broken-link"
+    "broken footnote links: hello"
+    24
+
+  pf
+    "0013-footnotes-unused-def"
+    "unused footnote definitions: hello"
+    30
+
+  ps
+    "0013-footnotes-simple"
+    ( OrgDoc
+        { oid = nilOid,
+          cells =
+            [ CParagraph
+                [ PTokenStyledText
+                    ( StyledText
+                        { body = "Hello",
+                          style = L.styleMaskFrom []
+                        }
+                    ),
+                  PTokenLink
+                    Link
+                      { target = LinkTargetFootnote "hello",
+                        name =
+                          [ StyledText
+                              { body = "1",
+                                style = L.styleMaskFrom []
+                              }
+                          ]
+                      },
+                  PTokenStyledText
+                    ( StyledText
+                        { body = " world.",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ],
+              CFootnote
+                Footnote
+                  { name = "hello",
+                    body =
+                      [ PTokenStyledText
+                          (StyledText {body = "Foo.", style = L.styleMaskFrom []})
+                      ]
+                  }
+            ],
+          footnotes =
+            fromList
+              [ ( "hello",
+                  ( 1,
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Foo.",
+                              style = L.styleMaskFrom []
+                            }
+                        )
+                    ]
+                  )
+                )
+              ],
+          meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+        }
+    )
+    L.defaultOrgParserState
+      { footnoteNumber = 1,
+        footnoteNumbers =
+          fromList
+            [ ("hello", 1)
+            ],
+        footnoteDefinitions =
+          fromList
+            [ ( "hello",
+                [ PTokenStyledText
+                    ( StyledText
+                        { body = "Foo.",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+              )
+            ],
+        prevCellIsFootnote = True
+      }
+
+  ps
+    "0013-footnotes-complex"
+    ( OrgDoc
+        { oid = nilOid,
+          cells =
+            [ CParagraph
+                [ PTokenStyledText
+                    ( StyledText
+                        { body = "Hello",
+                          style = L.styleMaskFrom []
+                        }
+                    ),
+                  PTokenLink
+                    Link
+                      { target = LinkTargetFootnote "a",
+                        name =
+                          [ StyledText
+                              { body = "1",
+                                style = L.styleMaskFrom []
+                              }
+                          ]
+                      },
+                  PTokenStyledText
+                    ( StyledText
+                        { body = " world.",
+                          style = L.styleMaskFrom []
+                        }
+                    ),
+                  PTokenLink
+                    Link
+                      { target = LinkTargetFootnote "b",
+                        name =
+                          [ StyledText
+                              { body = "2",
+                                style = L.styleMaskFrom []
+                              }
+                          ]
+                      }
+                ],
+              CFootnote
+                Footnote
+                  { name = "b",
+                    body =
+                      [ PTokenStyledText
+                          (StyledText {body = "Definition of b.", style = L.styleMaskFrom []})
+                      ]
+                  },
+              CFootnote
+                Footnote
+                  { name = "a",
+                    body =
+                      [ PTokenStyledText
+                          (StyledText {body = "Definition of a.", style = L.styleMaskFrom []})
+                      ]
+                  }
+            ],
+          footnotes =
+            fromList
+              [ ( "a",
+                  ( 1,
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Definition of a.",
+                              style = L.styleMaskFrom []
+                            }
+                        )
+                    ]
+                  )
+                ),
+                ( "b",
+                  ( 2,
+                    [ PTokenStyledText
+                        ( StyledText
+                            { body = "Definition of b.",
+                              style = L.styleMaskFrom []
+                            }
+                        )
+                    ]
+                  )
+                )
+              ],
+          meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+        }
+    )
+    L.defaultOrgParserState
+      { footnoteNumber = 2,
+        footnoteNumbers =
+          fromList
+            [ ("a", 1),
+              ("b", 2)
+            ],
+        footnoteDefinitions =
+          fromList
+            [ ( "a",
+                [ PTokenStyledText
+                    ( StyledText
+                        { body = "Definition of a.",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+              ),
+              ( "b",
+                [ PTokenStyledText
+                    ( StyledText
+                        { body = "Definition of b.",
+                          style = L.styleMaskFrom []
+                        }
+                    )
+                ]
+              )
+            ],
+        prevCellIsFootnote = True
+      }
+
+  pf
+    "0013-footnotes-multiple-groups"
+    "cannot have more than one group of footnote definitions"
+    95

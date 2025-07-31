@@ -4,6 +4,7 @@ module Lilac.Types
     BToken (..),
     Cell (..),
     Figure (..),
+    Footnote (..),
     GPath,
     Heading (..),
     Level (..),
@@ -125,6 +126,7 @@ data Cell
   | CMathFragment MathFragment
   | CFigure Figure
   | CTable Table
+  | CFootnote Footnote
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
@@ -202,6 +204,7 @@ parseJSONLinkOid t = do
 type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
+  | LinkTargetFootnote Text
   | LinkTargetURI N.URI
   | LinkTargetFilePath FilePath
   deriving stock (Eq, Generic, Ord, Show)
@@ -230,6 +233,7 @@ type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
+    footnotes :: Map Text (Int, Prose),
     meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
@@ -267,6 +271,10 @@ data OrgParserState = OrgParserState
     anonBlockNumber :: Int,
     figureNumber :: Int,
     tableNumber :: Int,
+    footnoteNumber :: Int,
+    footnoteNumbers :: Map Text Int,
+    footnoteDefinitions :: Map Text Prose,
+    prevCellIsFootnote :: Bool,
     tanglePaths :: Set Text,
     orgParserConf :: OrgParserConf
   }
@@ -320,6 +328,14 @@ instance Show StyleMask where
 type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
   deriving stock (Eq, Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
+type Footnote :: Type
+data Footnote = Footnote
+  { name :: Text,
+    body :: Prose
+  }
+  deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type OID :: Type

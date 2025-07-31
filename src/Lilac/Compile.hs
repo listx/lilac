@@ -15,7 +15,16 @@ import Lilac.Types
   ( Archive (Archive, objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
-    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Cell
+      ( CBlock,
+        CFigure,
+        CFootnote,
+        CHeading,
+        CListItem,
+        CMathFragment,
+        CParagraph,
+        CTable
+      ),
     Figure (meta),
     GPath,
     Heading (body, meta),
@@ -23,6 +32,7 @@ import Lilac.Types
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
+        LinkTargetFootnote,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -90,6 +100,7 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
       CFigure figure -> getSymbols Nothing figure.meta cell
       CMathFragment mathFragment -> getSymbols Nothing mathFragment.meta cell
       CTable table -> getSymbols Nothing table.meta cell
+      CFootnote {}
       CListItem {}
       CParagraph {} -> []
     getSymbols :: Maybe OID -> Map Text Text -> Cell -> [(LinkOid, Cell)]
@@ -205,7 +216,8 @@ findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
       CParagraph {}
       CMathFragment {}
       CFigure {}
-      CTable {} -> acc
+      CTable {}
+      CFootnote {} -> acc
     (graph, vertexToNode, _) = buildGraph blocks
     toLinkOid vertex =
       let (_, selfLink, _) = vertexToNode vertex
@@ -230,6 +242,7 @@ findExternalOids orgDoc =
       CParagraph prose -> foldl' h [] prose
       CTable table -> foldl' (foldl' h) [] table.grid
       CFigure {}
+      CFootnote {}
       CListItem {}
       CMathFragment {} -> []
     g acc = \case
@@ -245,6 +258,7 @@ findExternalOids orgDoc =
         if member linkOid symbols
           then acc
           else linkOid : acc
+      LinkTargetFootnote {}
       LinkTargetFilePath {}
       LinkTargetURI {} -> acc
     symbols = mkSymbols orgDoc

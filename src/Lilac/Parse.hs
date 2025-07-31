@@ -30,14 +30,25 @@ import Data.Text qualified as T
 import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentOid),
-    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Cell
+      ( CBlock,
+        CFigure,
+        CFootnote,
+        CHeading,
+        CListItem,
+        CMathFragment,
+        CParagraph,
+        CTable
+      ),
     Figure (Figure, caption, link, meta),
+    Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
+        LinkTargetFootnote,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -51,7 +62,13 @@ import Lilac.Types
       ),
     MathFragment (MathFragment, body, meta),
     OID,
-    OrgDoc (OrgDoc, cells, meta, oid),
+    OrgDoc
+      ( OrgDoc,
+        cells,
+        footnotes,
+        meta,
+        oid
+      ),
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
     OrgParserState
@@ -63,6 +80,9 @@ import Lilac.Types
         docOid,
         equationNumber,
         figureNumber,
+        footnoteDefinitions,
+        footnoteNumber,
+        footnoteNumbers,
         headingLevel,
         headingOidStack,
         headingSection,
@@ -71,6 +91,7 @@ import Lilac.Types
         listLevels,
         listMarkers,
         orgParserConf,
+        prevCellIsFootnote,
         styleMask,
         tableNumber,
         tanglePaths
@@ -137,6 +158,8 @@ import Relude
     show,
     take,
     toEnum,
+    toList,
+    unwords,
     void,
     when,
     zip,
@@ -214,6 +237,7 @@ orgDocParser = do
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
+  footnotes <- reconcileFootnotes
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -223,11 +247,13 @@ orgDocParser = do
         CBlock {}
         CMathFragment {}
         CFigure {}
-        CTable {} -> True
+        CTable {}
+        CFootnote {} -> True
   pure
     $ OrgDoc
       { oid = docOid,
         cells = filter meaningfulCell cells,
+        footnotes = footnotes,
         meta = meta
       }
 
@@ -236,6 +262,7 @@ defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
       cells = [],
+      footnotes = M.empty,
       meta = fromList metas'
     }
   where
@@ -263,6 +290,10 @@ defaultOrgParserState =
       anonBlockNumber = 0,
       figureNumber = 0,
       tableNumber = 0,
+      footnoteNumber = 0,
+      footnoteNumbers = M.empty,
+      footnoteDefinitions = M.empty,
+      prevCellIsFootnote = False,
       tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
@@ -345,14 +376,15 @@ cellParser :: OrgParser Cell
 cellParser =
   lexeme
     $ MP.choice
-      [ listItemStartParser,
-        listItemsEndParser,
-        resetContinuationIndent headingParser,
-        resetContinuationIndent blockParser,
-        resetContinuationIndent figureParser,
-        resetContinuationIndent tableParser,
-        resetContinuationIndent mathFragmentStandaloneParser,
-        resetContinuationIndent paragraphParser,
+      [ toggleFootnote False $ listItemStartParser,
+        toggleFootnote False $ listItemsEndParser,
+        toggleFootnote False $ resetContinuationIndent headingParser,
+        toggleFootnote False $ resetContinuationIndent blockParser,
+        toggleFootnote False $ resetContinuationIndent figureParser,
+        toggleFootnote False $ resetContinuationIndent tableParser,
+        toggleFootnote False $ resetContinuationIndent mathFragmentStandaloneParser,
+        toggleFootnote True $ resetContinuationIndent footnoteDefinitionParser,
+        toggleFootnote False $ resetContinuationIndent paragraphParser,
         detectInvalidIndentation
       ]
   where
@@ -360,6 +392,11 @@ cellParser =
     resetContinuationIndent p = do
       a <- p
       modify (\s -> s {continuationIndent = 0})
+      pure a
+    toggleFootnote :: Bool -> OrgParser a -> OrgParser a
+    toggleFootnote b p = do
+      a <- p
+      modify (\s -> s {prevCellIsFootnote = b})
       pure a
 
 detectInvalidIndentation :: OrgParser Cell
@@ -526,6 +563,7 @@ whitespaceCompressor spaceConsumer = do
     MP.lookAhead
       $ MP.choice
         [ MP.eof >> pure "",
+          footnoteReferenceParser >> pure "",
           MP.anySingle >> pure " "
         ]
 
@@ -712,6 +750,7 @@ linkParser = do
     [ MP.try oidLinkParser,
       MP.try protocolWebLinkParser,
       MP.try fileLinkParser,
+      MP.try footnoteLinkParser,
       MP.try rawLinkParser
     ]
 
@@ -1502,7 +1541,8 @@ figureParser = do
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetOid {}
-    LinkTargetURI {} -> fail "'file:...' required for link to figures"
+    LinkTargetURI {}
+    LinkTargetFootnote {} -> fail "'file:...' required for link to figures"
     LinkTargetFilePath _ -> do
       modify (\s -> s {figureNumber = newFigureNumber})
       pure
@@ -1665,6 +1705,85 @@ rowToTuples (rowIndex, row)
       ( ((rowIndex, colIndex), tableCell) : acc,
         colIndex + 1
       )
+
+footnoteLinkParser :: OrgParser Link
+footnoteLinkParser = do
+  name <- footnoteReferenceParser
+  orgParserState <- get
+  displayName <- case lookup name orgParserState.footnoteNumbers of
+    Nothing -> do
+      let newFootnoteNumber = orgParserState.footnoteNumber + 1
+          newFootnoteNumbers =
+            insert name newFootnoteNumber orgParserState.footnoteNumbers
+      modify
+        ( \s ->
+            s
+              { footnoteNumber = newFootnoteNumber,
+                footnoteNumbers = newFootnoteNumbers
+              }
+        )
+      pure $ T.show newFootnoteNumber
+    Just n -> do
+      pure $ T.show n
+  pure
+    $ Link
+      { target = LinkTargetFootnote name,
+        name = [StyledText {body = displayName, style = styleMaskFrom []}]
+      }
+
+footnoteReferenceParser :: OrgParser Text
+footnoteReferenceParser = do
+  _ <- string "[fn:"
+  name <- MP.takeWhile1P (Just "footnote name character") (/= ']')
+  _ <- string "]"
+  pure name
+
+footnoteDefinitionParser :: OrgParser Cell
+footnoteDefinitionParser = do
+  name <- footnoteReferenceParser
+  _ <- spaces
+  (CParagraph prose) <- paragraphParser
+  orgParserState <- get
+  o <- MP.getOffset
+  when
+    ( (not orgParserState.prevCellIsFootnote)
+        && (orgParserState.footnoteDefinitions /= M.empty)
+    )
+    $ do
+      MP.setOffset o
+      fail "cannot have more than one group of footnote definitions"
+  modify
+    ( \s ->
+        s
+          { footnoteDefinitions =
+              insert name prose orgParserState.footnoteDefinitions
+          }
+    )
+  pure $ CFootnote Footnote {name = name, body = prose}
+  where
+    spaces :: OrgParser Text
+    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
+
+reconcileFootnotes :: OrgParser (Map Text (Int, Prose))
+reconcileFootnotes = do
+  orgParserState <- get
+  let referenced = M.keysSet orgParserState.footnoteNumbers
+      defined = M.keysSet orgParserState.footnoteDefinitions
+      brokenLinks = Set.difference referenced defined
+      unusedDefs = Set.difference defined referenced
+      hasBrokenLinks = length brokenLinks /= 0
+      hasUnusedDefs = length unusedDefs /= 0
+      brokenLinksMsg = T.unpack . unwords $ toList brokenLinks
+      unusedDefsMsg = T.unpack . unwords $ toList unusedDefs
+  if
+    | hasBrokenLinks -> fail $ "broken footnote links: " <> brokenLinksMsg
+    | hasUnusedDefs -> fail $ "unused footnote definitions: " <> unusedDefsMsg
+    | otherwise ->
+        pure
+          $ M.intersectionWith
+            (,)
+            orgParserState.footnoteNumbers
+            orgParserState.footnoteDefinitions
 
 validateOidText :: (MonadFail m) => Text -> m OID
 validateOidText oidText = case fromText oidText of

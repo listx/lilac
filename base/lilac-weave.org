@@ -70,12 +70,23 @@ import Lilac.Types
   ( Archive (objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
-    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Cell
+      ( CBlock,
+        CFigure,
+        CFootnote,
+        CHeading,
+        CListItem,
+        CMathFragment,
+        CParagraph,
+        CTable
+      ),
     Figure (caption, link, meta),
+    Footnote (body, name),
     Heading (body, level, section),
     Link (Link, name, target),
     LinkTarget
       ( LinkTargetFilePath,
+        LinkTargetFootnote,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -89,7 +100,7 @@ import Lilac.Types
       ),
     MathFragment (body, meta),
     Object (orgDoc, symbols),
-    OrgDoc (cells, meta),
+    OrgDoc (cells, footnotes, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose,
     Style (Bold, Code, Italic, Underline, Verbatim),
@@ -137,6 +148,7 @@ import Lucid
     script_,
     span_,
     src_,
+    sup_,
     table_,
     tbody_,
     td_,
@@ -166,6 +178,7 @@ import Relude
     ask,
     catMaybes,
     drop,
+    dropWhile,
     filter,
     flip,
     foldMap',
@@ -178,6 +191,7 @@ import Relude
     length,
     map,
     max,
+    maxBound,
     maybe,
     not,
     notElem,
@@ -190,6 +204,7 @@ import Relude
     sequence_,
     show,
     snd,
+    sortOn,
     take,
     takeWhile,
     when,
@@ -237,6 +252,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveMathFragmentInline>>
 <<f:weaveTable>>
 <<f:getRelativePathWithoutSymlinks>>
+<<f:weaveFootnote>>
 <<f:commonPrefix>>
 <<f:renderAsText>>
 #+end_src
@@ -334,7 +350,31 @@ weaveObject object = do
     <<HTML head>>
     body_ $ do
       weaveDocMeta object.orgDoc.meta
-      forM_ object.orgDoc.cells weaveCell
+      forM_ rearrangedCells weaveCell
+  where
+    rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
+    beforeFootnotes = takeWhile (not . isFootnote) object.orgDoc.cells
+    afterFootnotes =
+      dropWhile isFootnote
+        $ dropWhile (not . isFootnote) object.orgDoc.cells
+    sortedFootnotes =
+      sortOn getSortingKey
+        $ takeWhile isFootnote
+        $ dropWhile (not . isFootnote) object.orgDoc.cells
+    getSortingKey cell
+      | (CFootnote footnote) <- cell,
+        Just (n, _) <- lookup footnote.name object.orgDoc.footnotes =
+          n
+      | otherwise = maxBound :: Int
+    isFootnote = \case
+      CFootnote {} -> True
+      CBlock {}
+      CFigure {}
+      CHeading {}
+      CListItem {}
+      CMathFragment {}
+      CParagraph {}
+      CTable {} -> False
 #+end_src
 
 The use of ~toHtml~ is to help Haskell infer the correct type. This is because
@@ -342,6 +382,13 @@ Lucid will think that regular strings are of type ~Html ()~ (this is how Lucid
 automatically escapes strings to be HTML-safe). The ~title_~ function expects a
 ~Html ()~ type, so we have to manually convert the ~Text~ we get out of ~lookup~
 with ~toHtml~.
+
+The cells are rearranged (for footnotes) in ~rearrangedCells~. This way, users
+don't have to keep them in order in the doc (users can freely change which ones
+are referenced first, without having to manually reorder the footnote
+definitions). In Orgmode users can already press ENTER on a footnote reference
+and Orgmode will jump to the definition, so manual ordering doesn't matter much
+even in that case.
 
 Weaving cells just means delegating to each of the weavers that know how to
 handle each cell type.
@@ -357,6 +404,7 @@ weaveCell = \case
   CMathFragment mathFragment -> weaveMathFragmentStandalone mathFragment
   CFigure figure -> weaveFigure figure
   CTable table -> weaveTable table
+  CFootnote footnote -> weaveFootnote footnote
 #+end_src
 
 The [[HTML head]] has some "imports" for the HTML page, including CSS and JS.
@@ -581,7 +629,15 @@ getLinkAnchor = \case
               "tbl-" <> tableNum
           | otherwise = "table-num-error"
      in toSafeHtmlId ref
+  CFootnote {} -> ""
 #+end_src
+
+We don't generate link anchors for footnote cells (~CFootnote~) because the cell
+does not have information about its number. This is because unlike things like
+figures or tables, the order of appearance (of this footnote definition) may not
+be the same as the order of usage (when the footnote definition is referenced).
+This discrepancy makes automatic numbering slightly more difficult, and we
+choose to not go through that exercise for the [[id:4127feee-755d-430e-8fef-192e95143790::data:Footnote][data:Footnote]] type, for ease of parsing.
 
 The [[f:getSectionText]] function just retrieves the numeric heading section number,
 as a ~Text~ value.
@@ -679,7 +735,13 @@ Each [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] value
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink link -> weaveLink link
+  PTokenLink link -> case link.target of
+    LinkTargetFootnote {} -> do
+      sup_ [class_ "footnote-link"] $ do
+        weaveLink link
+    LinkTargetOid {}
+    LinkTargetFilePath {}
+    LinkTargetURI {} -> weaveLink link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
 #+end_src
 
@@ -946,6 +1008,11 @@ weaveLinkTarget linkTarget = do
       | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
       where
         htmlExt = P.unsafeEncodeUtf "html"
+    LinkTargetFootnote name
+      | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+        Just (footnoteNumber, _) <- lookup name originObj.orgDoc.footnotes ->
+          (T.pack "#footnote-") <> (T.show footnoteNumber)
+      | otherwise -> "#LILAC_BROKEN_LINK"
     LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
     LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
 #+end_src
@@ -1064,6 +1131,7 @@ non-OID link to be external. This encourages users to always use the
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
   LinkTargetOid {} -> False
+  LinkTargetFootnote {} -> False
   LinkTargetFilePath {} -> True
   LinkTargetURI {} -> True
 #+end_src
@@ -1515,6 +1583,24 @@ weaveSpec = do
   <<t:0301-weave-external-links>>
 #+end_src
 
+** Footnotes
+
+Footnote definitions are just paragraphs, with a leading number.
+
+#+name: f:weaveFootnote
+#+begin_src haskell
+weaveFootnote :: Footnote -> HtmlWeaver ()
+weaveFootnote footnote = do
+  weaveConf <- ask
+  if
+    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+      Just (footnoteNumber, _) <- lookup footnote.name originObj.orgDoc.footnotes -> do
+        p_ [class_ "footnote-definition", id_ ("footnote-" <> T.show footnoteNumber)] $ do
+          span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
+          sequence_ $ map weavePToken footnote.body
+    | otherwise -> pure ()
+#+end_src
+
 * Generate CSS
 :PROPERTIES:
 :ID:       8017befd-7628-46cf-a090-72fdbb00fb5a
@@ -1553,6 +1639,7 @@ import Clay
     borderCollapse,
     borderLeft,
     borderRadius,
+    borderStyle,
     borderTop,
     borderTopLeftRadius,
     borderTopRightRadius,
@@ -1588,6 +1675,7 @@ import Clay
     minWidth,
     monospace,
     none,
+    normal,
     overflowY,
     p,
     padding,
@@ -1606,6 +1694,7 @@ import Clay
     sideRight,
     solid,
     span,
+    sup,
     table,
     tbody,
     td,
@@ -1818,6 +1907,23 @@ defaultCss = do
   ".figure-image" & do
     display block
     vh margin (px 0) auto
+  sup ? do
+    ".footnote-link" & do
+      a ? do
+        borderStyle none
+        ev borderRadius (px 0)
+        vh padding 0 (px 0)
+        vh margin (px 0) 0
+        fontStyle normal
+        ".internal-link" & do
+          backgroundColor $ rgbHex 0xffffff
+          ":hover" & do
+            borderStyle none
+            textDecoration underline
+          ":visited" & do
+            ":hover" & do
+              borderStyle none
+              textDecoration underline
   where
     <<Default CSS colors>>
     fontSerif = do

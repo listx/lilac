@@ -20,6 +20,7 @@ import Clay
     borderCollapse,
     borderLeft,
     borderRadius,
+    borderStyle,
     borderTop,
     borderTopLeftRadius,
     borderTopRightRadius,
@@ -55,6 +56,7 @@ import Clay
     minWidth,
     monospace,
     none,
+    normal,
     overflowY,
     p,
     padding,
@@ -73,6 +75,7 @@ import Clay
     sideRight,
     solid,
     span,
+    sup,
     table,
     tbody,
     td,
@@ -326,6 +329,23 @@ defaultCss = do
   ".figure-image" & do
     display block
     vh margin (px 0) auto
+  sup ? do
+    ".footnote-link" & do
+      a ? do
+        borderStyle none
+        ev borderRadius (px 0)
+        vh padding 0 (px 0)
+        vh margin (px 0) 0
+        fontStyle normal
+        ".internal-link" & do
+          backgroundColor $ rgbHex 0xffffff
+          ":hover" & do
+            borderStyle none
+            textDecoration underline
+          ":visited" & do
+            ":hover" & do
+              borderStyle none
+              textDecoration underline
   where
     hexBg = 0xffffff :: Int
     hexText = 0x000000 :: Int

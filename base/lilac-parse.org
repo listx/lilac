@@ -59,14 +59,25 @@ import Data.Text qualified as T
 import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentOid),
-    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Cell
+      ( CBlock,
+        CFigure,
+        CFootnote,
+        CHeading,
+        CListItem,
+        CMathFragment,
+        CParagraph,
+        CTable
+      ),
     Figure (Figure, caption, link, meta),
+    Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
+        LinkTargetFootnote,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -80,7 +91,13 @@ import Lilac.Types
       ),
     MathFragment (MathFragment, body, meta),
     OID,
-    OrgDoc (OrgDoc, cells, meta, oid),
+    OrgDoc
+      ( OrgDoc,
+        cells,
+        footnotes,
+        meta,
+        oid
+      ),
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
     OrgParserState
@@ -92,6 +109,9 @@ import Lilac.Types
         docOid,
         equationNumber,
         figureNumber,
+        footnoteDefinitions,
+        footnoteNumber,
+        footnoteNumbers,
         headingLevel,
         headingOidStack,
         headingSection,
@@ -100,6 +120,7 @@ import Lilac.Types
         listLevels,
         listMarkers,
         orgParserConf,
+        prevCellIsFootnote,
         styleMask,
         tableNumber,
         tanglePaths
@@ -166,6 +187,8 @@ import Relude
     show,
     take,
     toEnum,
+    toList,
+    unwords,
     void,
     when,
     zip,
@@ -292,6 +315,10 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:tableCellParser>>
 <<f:rowsToTuples>>
 <<f:rowToTuples>>
+<<f:footnoteLinkParser>>
+<<f:footnoteReferenceParser>>
+<<f:footnoteDefinitionParser>>
+<<f:reconcileFootnotes>>
 <<f:validateOidText>>
 <<f:isNumericText>>
 <<f:isNumericTextParser>>
@@ -430,6 +457,7 @@ type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
+    footnotes :: Map Text (Int, Prose),
     meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
@@ -542,6 +570,10 @@ data OrgParserState = OrgParserState
     anonBlockNumber :: Int,
     figureNumber :: Int,
     tableNumber :: Int,
+    footnoteNumber :: Int,
+    footnoteNumbers :: Map Text Int,
+    footnoteDefinitions :: Map Text Prose,
+    prevCellIsFootnote :: Bool,
     tanglePaths :: Set Text,
     orgParserConf :: OrgParserConf
   }
@@ -569,6 +601,10 @@ defaultOrgParserState =
       anonBlockNumber = 0,
       figureNumber = 0,
       tableNumber = 0,
+      footnoteNumber = 0,
+      footnoteNumbers = M.empty,
+      footnoteDefinitions = M.empty,
+      prevCellIsFootnote = False,
       tanglePaths = Set.empty,
       orgParserConf = defaultOrgParserConf
     }
@@ -598,6 +634,7 @@ orgDocParser = do
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
+  footnotes <- reconcileFootnotes
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -607,11 +644,13 @@ orgDocParser = do
         CBlock {}
         CMathFragment {}
         CFigure {}
-        CTable {} -> True
+        CTable {}
+        CFootnote {} -> True
   pure
     $ OrgDoc
       { oid = docOid,
         cells = filter meaningfulCell cells,
+        footnotes = footnotes,
         meta = meta
       }
 #+end_src
@@ -646,6 +685,7 @@ defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
       cells = [],
+      footnotes = M.empty,
       meta = fromList metas'
     }
   where
@@ -1125,6 +1165,7 @@ data Cell
   | CMathFragment MathFragment
   | CFigure Figure
   | CTable Table
+  | CFootnote Footnote
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
@@ -1143,14 +1184,15 @@ cellParser :: OrgParser Cell
 cellParser =
   lexeme
     $ MP.choice
-      [ listItemStartParser,
-        listItemsEndParser,
-        resetContinuationIndent headingParser,
-        resetContinuationIndent blockParser,
-        resetContinuationIndent figureParser,
-        resetContinuationIndent tableParser,
-        resetContinuationIndent mathFragmentStandaloneParser,
-        resetContinuationIndent paragraphParser,
+      [ toggleFootnote False $ listItemStartParser,
+        toggleFootnote False $ listItemsEndParser,
+        toggleFootnote False $ resetContinuationIndent headingParser,
+        toggleFootnote False $ resetContinuationIndent blockParser,
+        toggleFootnote False $ resetContinuationIndent figureParser,
+        toggleFootnote False $ resetContinuationIndent tableParser,
+        toggleFootnote False $ resetContinuationIndent mathFragmentStandaloneParser,
+        toggleFootnote True $ resetContinuationIndent footnoteDefinitionParser,
+        toggleFootnote False $ resetContinuationIndent paragraphParser,
         detectInvalidIndentation
       ]
   where
@@ -1158,6 +1200,11 @@ cellParser =
     resetContinuationIndent p = do
       a <- p
       modify (\s -> s {continuationIndent = 0})
+      pure a
+    toggleFootnote :: Bool -> OrgParser a -> OrgParser a
+    toggleFootnote b p = do
+      a <- p
+      modify (\s -> s {prevCellIsFootnote = b})
       pure a
 #+end_src
 
@@ -1311,6 +1358,7 @@ whitespaceCompressor spaceConsumer = do
     MP.lookAhead
       $ MP.choice
         [ MP.eof >> pure "",
+          footnoteReferenceParser >> pure "",
           MP.anySingle >> pure " "
         ]
 
@@ -1327,6 +1375,10 @@ space character --- unless it sees that the input stream ends, in which case we
 use an empty string instead (0 space characters). Note that we also do a second
 level of "compression" in [[f:compressProse]], where we will drop =StyledText= objects
 with an empty string as the body.
+
+Whitespace compression also happens when we detect [[id:4127feee-755d-430e-8fef-192e95143790][footnote]] references. This
+way, at weaving time it can ignore any whitespace between non-whitespace text
+and the footnote reference.
 
 ** Styled strings
 :PROPERTIES:
@@ -2178,9 +2230,12 @@ to. For now, this data structure only supports the following cases:
   1) [[data:LinkOid]] (links to either another part of the current Org document or
      another (external) Org document).
 
-  2) URI (a typical web link, most common example being =https://...=).
+  2) A link to a [[id:4127feee-755d-430e-8fef-192e95143790][footnote definition]]. These also use [[data:LinkOid]] internally,
+     and always refer to footnote definitions within the same Org document.
 
-  3) File path. These links are only useful because they let you go open that
+  3) URI (a typical web link, most common example being =https://...=).
+
+  4) File path. These links are only useful because they let you go open that
      file on disk locally in Emacs. On weaving these links are checked if they
      refer to a path inside the current Git repo. If they are inside, then we
      calculate what the link /should/ target (based on weaving configuration),
@@ -2197,6 +2252,7 @@ to. For now, this data structure only supports the following cases:
 type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
+  | LinkTargetFootnote Text
   | LinkTargetURI N.URI
   | LinkTargetFilePath FilePath
   deriving stock (Eq, Generic, Ord, Show)
@@ -2319,6 +2375,7 @@ linkParser = do
     [ MP.try oidLinkParser,
       MP.try protocolWebLinkParser,
       MP.try fileLinkParser,
+      MP.try footnoteLinkParser,
       MP.try rawLinkParser
     ]
 #+end_src
@@ -3372,6 +3429,458 @@ is Lilac's own extension. This allows source code blocks to be defined across
 multiple Org files if needed. One simple example is version information that
 we might want to define only in a single place, but which might be referenced
 in other places, across multiple Org files.
+
+*** Footnotes
+:PROPERTIES:
+:ID:       4127feee-755d-430e-8fef-192e95143790
+:END:
+
+Footnotes are essentially named paragraphs. They look like this in practice:
+
+#+begin_src org
+Hello world [fn:foo].
+
+...
+
+,* Footnotes
+
+[fn:foo] A paragraph that defines this footnote.
+#+end_src
+
+So a footnote is made up of both the link to the footnote from the main text,
+and a definition of the footnote at the bottom. Both the link and the definition
+share the same footnote reference, which is parsed with the
+[[f:footnoteReferenceParser]].
+
+#+name: f:footnoteReferenceParser
+#+begin_src haskell
+footnoteReferenceParser :: OrgParser Text
+footnoteReferenceParser = do
+  _ <- string "[fn:"
+  name <- MP.takeWhile1P (Just "footnote name character") (/= ']')
+  _ <- string "]"
+  pure name
+#+end_src
+
+When parsing the link to a footnote, we parse it as a [[data:LinkOid]], but use the
+~LinkTargetFootnote~ constructor to distinguish it from ~LinkTargetOid~ which are
+generic links to any other named cell. Then at weaving time, we know how to
+style it (with a numeric superscript).
+
+#+name: f:footnoteLinkParser
+#+begin_src haskell
+footnoteLinkParser :: OrgParser Link
+footnoteLinkParser = do
+  name <- footnoteReferenceParser
+  orgParserState <- get
+  displayName <- case lookup name orgParserState.footnoteNumbers of
+    Nothing -> do
+      let newFootnoteNumber = orgParserState.footnoteNumber + 1
+          newFootnoteNumbers =
+            insert name newFootnoteNumber orgParserState.footnoteNumbers
+      modify
+        ( \s ->
+            s
+              { footnoteNumber = newFootnoteNumber,
+                footnoteNumbers = newFootnoteNumbers
+              }
+        )
+      pure $ T.show newFootnoteNumber
+    Just n -> do
+      pure $ T.show n
+  pure
+    $ Link
+      { target = LinkTargetFootnote name,
+        name = [StyledText {body = displayName, style = styleMaskFrom []}]
+      }
+#+end_src
+
+As for the footnote definitions, they are expected to be placed on their own, as
+separate paragraphs. The definition may only be made up of 1 paragraph, because
+good footnotes are short and to the point. For purposes of parsing, it doesn't
+actually matter where these definitions are placed, because the order of when
+they are defined does not affect how they are presented when woven.
+
+#+name: data:Footnote
+#+begin_src haskell
+type Footnote :: Type
+data Footnote = Footnote
+  { name :: Text,
+    body :: Prose
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+Parsing footnote definitions is a little different than other cells, because the
+order in which the footnotes are defined may not necessarily be the order in
+which the footnotes are referenced from the rest of the document (this can
+happen, for example, if you move around the footnote definitions).
+
+For simplicity, Lilac doesn't care about the order in which footnote definitions
+appear. However, it does expect two conditions:
+
+  1) Footnote definitions must appear together, just once, in the entire
+     document. That is, you may not define footnotes in multiple places.
+
+  2) Inline footnotes (where footnotes are defined in the same area where they
+     are referenced) are not allowed.
+
+During weaving, the footnote definitions are sorted according to the order in
+which they are referenced (via footnote links).
+
+The footnotes are not turned into cells; instead they are used to build up the
+~footnoteDefinitions~ map in [[data:OrgParserState]], which are then dumped into
+[[data:OrgDoc]]. This is because there is no point in preserving information about
+the order in which these footnote definitions are defined; in other words, it's
+useless to store footnote definitions as individual cells in the order they're
+defined, if during weave time we are going to sort them anyway in a (possibly)
+different order.
+
+#+name: f:footnoteDefinitionParser
+#+begin_src haskell
+footnoteDefinitionParser :: OrgParser Cell
+footnoteDefinitionParser = do
+  name <- footnoteReferenceParser
+  _ <- spaces
+  (CParagraph prose) <- paragraphParser
+  orgParserState <- get
+  o <- MP.getOffset
+  when
+    ( (not orgParserState.prevCellIsFootnote)
+        && (orgParserState.footnoteDefinitions /= M.empty)
+    )
+    $ do
+      MP.setOffset o
+      fail "cannot have more than one group of footnote definitions"
+  modify
+    ( \s ->
+        s
+          { footnoteDefinitions =
+              insert name prose orgParserState.footnoteDefinitions
+          }
+    )
+  pure $ CFootnote Footnote {name = name, body = prose}
+  where
+    spaces :: OrgParser Text
+    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
+#+end_src
+
+The document is expected to have only one contiguous group of footnote
+definitions; if footnote definitions have anything substantive in-between,
+that's a parse error.
+
+When we have finished parsing the document, it's expected that all footnote
+links and definitions line up with each other (that there is an exact 1:1
+match). If there are either links that don't have an associated reference or a
+definition without an associated link, it's considered an error.
+
+#+name: f:reconcileFootnotes
+#+begin_src haskell
+reconcileFootnotes :: OrgParser (Map Text (Int, Prose))
+reconcileFootnotes = do
+  orgParserState <- get
+  let referenced = M.keysSet orgParserState.footnoteNumbers
+      defined = M.keysSet orgParserState.footnoteDefinitions
+      brokenLinks = Set.difference referenced defined
+      unusedDefs = Set.difference defined referenced
+      hasBrokenLinks = length brokenLinks /= 0
+      hasUnusedDefs = length unusedDefs /= 0
+      brokenLinksMsg = T.unpack . unwords $ toList brokenLinks
+      unusedDefsMsg = T.unpack . unwords $ toList unusedDefs
+  if
+    | hasBrokenLinks -> fail $ "broken footnote links: " <> brokenLinksMsg
+    | hasUnusedDefs -> fail $ "unused footnote definitions: " <> unusedDefsMsg
+    | otherwise ->
+        pure
+          $ M.intersectionWith
+            (,)
+            orgParserState.footnoteNumbers
+            orgParserState.footnoteDefinitions
+#+end_src
+
+*** Tests
+
+Check for broken links.
+
+#+header: :tangle test/Lilac/ParseSpec/0013-footnotes-broken-link
+#+begin_src org
+Hello [fn:hello] world.
+#+end_src
+
+#+name: t:0013-footnotes-broken-link
+#+begin_src haskell
+pf
+  "0013-footnotes-broken-link"
+  "broken footnote links: hello"
+  24
+#+end_src
+
+Check for unused definitions.
+
+#+header: :tangle test/Lilac/ParseSpec/0013-footnotes-unused-def
+#+begin_src org
+Hello world.
+
+[fn:hello] Foo.
+#+end_src
+
+#+name: t:0013-footnotes-unused-def
+#+begin_src haskell
+pf
+  "0013-footnotes-unused-def"
+  "unused footnote definitions: hello"
+  30
+#+end_src
+
+Basic happy path.
+
+#+header: :tangle test/Lilac/ParseSpec/0013-footnotes-simple
+#+begin_src org
+Hello [fn:hello] world.
+
+[fn:hello] Foo.
+#+end_src
+
+#+name: Expected cells for 0013-footnotes-simple
+#+begin_src haskell
+[ CParagraph
+    [ PTokenStyledText
+        ( StyledText
+            { body = "Hello",
+              style = L.styleMaskFrom []
+            }
+        ),
+      PTokenLink
+        Link
+          { target = LinkTargetFootnote "hello",
+            name =
+              [ StyledText
+                  { body = "1",
+                    style = L.styleMaskFrom []
+                  }
+              ]
+          },
+      PTokenStyledText
+        ( StyledText
+            { body = " world.",
+              style = L.styleMaskFrom []
+            }
+        )
+    ],
+  CFootnote
+    Footnote
+      { name = "hello",
+        body =
+          [ PTokenStyledText
+              (StyledText {body = "Foo.", style = L.styleMaskFrom []})
+          ]
+      }
+]
+#+end_src
+
+#+name: t:0013-footnotes-simple
+#+begin_src haskell
+ps
+  "0013-footnotes-simple"
+  ( OrgDoc
+      { oid = nilOid,
+        cells =
+          <<Expected cells for 0013-footnotes-simple>>,
+        footnotes =
+          fromList
+            [ ( "hello",
+                ( 1,
+                  [ PTokenStyledText
+                      ( StyledText
+                          { body = "Foo.",
+                            style = L.styleMaskFrom []
+                          }
+                      )
+                  ]
+                )
+              )
+            ],
+        meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+      }
+  )
+  L.defaultOrgParserState
+    { footnoteNumber = 1,
+      footnoteNumbers =
+        fromList
+          [ ("hello", 1)
+          ],
+      footnoteDefinitions =
+        fromList
+          [ ( "hello",
+              [ PTokenStyledText
+                  ( StyledText
+                      { body = "Foo.",
+                        style = L.styleMaskFrom []
+                      }
+                  )
+              ]
+            )
+          ],
+      prevCellIsFootnote = True
+    }
+#+end_src
+
+Complex example.
+
+#+header: :tangle test/Lilac/ParseSpec/0013-footnotes-complex
+#+begin_src org
+Hello [fn:a] world. [fn:b]
+
+[fn:b] Definition of b.
+
+[fn:a] Definition of a.
+#+end_src
+
+#+name: Expected cells for 0013-footnotes-complex
+#+begin_src haskell
+[ CParagraph
+    [ PTokenStyledText
+        ( StyledText
+            { body = "Hello",
+              style = L.styleMaskFrom []
+            }
+        ),
+      PTokenLink
+        Link
+          { target = LinkTargetFootnote "a",
+            name =
+              [ StyledText
+                  { body = "1",
+                    style = L.styleMaskFrom []
+                  }
+              ]
+          },
+      PTokenStyledText
+        ( StyledText
+            { body = " world.",
+              style = L.styleMaskFrom []
+            }
+        ),
+      PTokenLink
+        Link
+          { target = LinkTargetFootnote "b",
+            name =
+              [ StyledText
+                  { body = "2",
+                    style = L.styleMaskFrom []
+                  }
+              ]
+          }
+    ],
+  CFootnote
+    Footnote
+      { name = "b",
+        body =
+          [ PTokenStyledText
+              (StyledText {body = "Definition of b.", style = L.styleMaskFrom []})
+          ]
+      },
+  CFootnote
+    Footnote
+      { name = "a",
+        body =
+          [ PTokenStyledText
+              (StyledText {body = "Definition of a.", style = L.styleMaskFrom []})
+          ]
+      }
+]
+#+end_src
+
+#+name: t:0013-footnotes-complex
+#+begin_src haskell
+ps
+  "0013-footnotes-complex"
+  ( OrgDoc
+      { oid = nilOid,
+        cells =
+          <<Expected cells for 0013-footnotes-complex>>,
+        footnotes =
+          fromList
+            [ ( "a",
+                ( 1,
+                  [ PTokenStyledText
+                      ( StyledText
+                          { body = "Definition of a.",
+                            style = L.styleMaskFrom []
+                          }
+                      )
+                  ]
+                )
+              ),
+              ( "b",
+                ( 2,
+                  [ PTokenStyledText
+                      ( StyledText
+                          { body = "Definition of b.",
+                            style = L.styleMaskFrom []
+                          }
+                      )
+                  ]
+                )
+              )
+            ],
+        meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+      }
+  )
+  L.defaultOrgParserState
+    { footnoteNumber = 2,
+      footnoteNumbers =
+        fromList
+          [ ("a", 1),
+            ("b", 2)
+          ],
+      footnoteDefinitions =
+        fromList
+          [ ( "a",
+              [ PTokenStyledText
+                  ( StyledText
+                      { body = "Definition of a.",
+                        style = L.styleMaskFrom []
+                      }
+                  )
+              ]
+            ),
+            ( "b",
+              [ PTokenStyledText
+                  ( StyledText
+                      { body = "Definition of b.",
+                        style = L.styleMaskFrom []
+                      }
+                  )
+              ]
+            )
+          ],
+      prevCellIsFootnote = True
+    }
+#+end_src
+
+Like [[t:0013-footnotes-complex]], but we have a non-footnote cell that separates
+the two footnote definitions. This is not allowed.
+
+#+header: :tangle test/Lilac/ParseSpec/0013-footnotes-multiple-groups
+#+begin_src org
+Hello [fn:a] world. [fn:b]
+
+[fn:b] Definition of b.
+
+Some other text.
+
+[fn:a] Definition of a.
+#+end_src
+
+#+name: t:0013-footnotes-multiple-groups
+#+begin_src haskell
+pf
+  "0013-footnotes-multiple-groups"
+  "cannot have more than one group of footnote definitions"
+  95
+#+end_src
 
 ** Inline math fragments
 :PROPERTIES:
@@ -7295,7 +7804,8 @@ figureParser = do
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetOid {}
-    LinkTargetURI {} -> fail "'file:...' required for link to figures"
+    LinkTargetURI {}
+    LinkTargetFootnote {} -> fail "'file:...' required for link to figures"
     LinkTargetFilePath _ -> do
       modify (\s -> s {figureNumber = newFigureNumber})
       pure
@@ -8318,6 +8828,7 @@ spend far more time compiling the tests themselves).
 #+begin_src haskell
 module Lilac.ParseSpec (spec) where
 
+import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.Void (Void)
@@ -8325,13 +8836,24 @@ import Lilac.Parse qualified as L
 import Lilac.Types
   ( BToken (BTokenLink, BTokenString),
     Block (Block, body, meta, parentOid),
-    Cell (CBlock, CFigure, CHeading, CListItem, CMathFragment, CParagraph, CTable),
+    Cell
+      ( CBlock,
+        CFigure,
+        CFootnote,
+        CHeading,
+        CListItem,
+        CMathFragment,
+        CParagraph,
+        CTable
+      ),
     Figure (Figure, caption, link, meta),
+    Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
+        LinkTargetFootnote,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -8344,7 +8866,13 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (MathFragment, body, meta),
-    OrgDoc (OrgDoc, cells, meta, oid),
+    OrgDoc
+      ( OrgDoc,
+        cells,
+        footnotes,
+        meta,
+        oid
+      ),
     OrgParserConf (maxHeadingLevel),
     OrgParserState
       ( anonBlockNumber,
@@ -8353,10 +8881,14 @@ import Lilac.Types
         docOid,
         equationNumber,
         figureNumber,
+        footnoteDefinitions,
+        footnoteNumber,
+        footnoteNumbers,
         headingLevel,
         headingOidStack,
         headingSection,
         orgParserConf,
+        prevCellIsFootnote,
         tableNumber
       ),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
@@ -8370,7 +8902,8 @@ import Lilac.Types
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
-  ( FilePath,
+  ( Bool (True),
+    FilePath,
     Identity,
     Int,
     Maybe (Just, Nothing),
@@ -8489,6 +9022,7 @@ nilOrgDoc cells =
   OrgDoc
     { oid = nilOid,
       cells = cells,
+      footnotes = M.empty,
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
 #+end_src
@@ -8690,6 +9224,11 @@ parseSpec = do
   <<t:0011-figures-and-blocks>>
   <<t:0012-tables-and-prose>>
   <<t:0012-tables-inside-lists>>
+  <<t:0013-footnotes-broken-link>>
+  <<t:0013-footnotes-unused-def>>
+  <<t:0013-footnotes-simple>>
+  <<t:0013-footnotes-complex>>
+  <<t:0013-footnotes-multiple-groups>>
 #+end_src
 
 * Footnotes
