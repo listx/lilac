@@ -31,7 +31,7 @@ tangle()
 
 tangle_and_test_and_weave()
 {
-	tangle
+	tangle || true
 	if tangle; then
 		if ! make -C "${SCRIPT_ROOT}" test; then
 			reset_tangled_program_files
