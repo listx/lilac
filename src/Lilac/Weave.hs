@@ -45,7 +45,7 @@ import Lilac.Types
       ),
     MathFragment (body, meta),
     Object (orgDoc, symbols),
-    OrgDoc (cells, footnotes, meta),
+    OrgDoc (cells, footnoteNumbers, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose,
     Style (Bold, Code, Italic, Underline, Verbatim),
@@ -246,7 +246,7 @@ weaveObject object = do
         $ dropWhile (not . isFootnote) object.orgDoc.cells
     getSortingKey cell
       | (CFootnote footnote) <- cell,
-        Just (n, _) <- lookup footnote.name object.orgDoc.footnotes =
+        Just n <- lookup footnote.name object.orgDoc.footnoteNumbers =
           n
       | otherwise = maxBound :: Int
     isFootnote = \case
@@ -538,7 +538,7 @@ weaveLinkTarget linkTarget = do
         htmlExt = P.unsafeEncodeUtf "html"
     LinkTargetFootnote name
       | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-        Just (footnoteNumber, _) <- lookup name originObj.orgDoc.footnotes ->
+        Just footnoteNumber <- lookup name originObj.orgDoc.footnoteNumbers ->
           (T.pack "#footnote-") <> (T.show footnoteNumber)
       | otherwise -> "#LILAC_BROKEN_LINK"
     LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
@@ -733,7 +733,7 @@ weaveFootnote footnote = do
   weaveConf <- ask
   if
     | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just (footnoteNumber, _) <- lookup footnote.name originObj.orgDoc.footnotes -> do
+      Just footnoteNumber <- lookup footnote.name originObj.orgDoc.footnoteNumbers -> do
         p_ [class_ "footnote-definition", id_ ("footnote-" <> T.show footnoteNumber)] $ do
           span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
           sequence_ $ map weavePToken footnote.body

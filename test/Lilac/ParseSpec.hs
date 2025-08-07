@@ -41,7 +41,7 @@ import Lilac.Types
     OrgDoc
       ( OrgDoc,
         cells,
-        footnotes,
+        footnoteNumbers,
         meta,
         oid
       ),
@@ -208,7 +208,7 @@ nilOrgDoc cells =
   OrgDoc
     { oid = nilOid,
       cells = cells,
-      footnotes = M.empty,
+      footnoteNumbers = M.empty,
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
 
@@ -2757,19 +2757,9 @@ parseSpec = do
                       ]
                   }
             ],
-          footnotes =
+          footnoteNumbers =
             fromList
-              [ ( "hello",
-                  ( 1,
-                    [ PTokenStyledText
-                        ( StyledText
-                            { body = "Foo.",
-                              style = L.styleMaskFrom []
-                            }
-                        )
-                    ]
-                  )
-                )
+              [ ("hello", 1)
               ],
           meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
         }
@@ -2851,30 +2841,10 @@ parseSpec = do
                       ]
                   }
             ],
-          footnotes =
+          footnoteNumbers =
             fromList
-              [ ( "a",
-                  ( 1,
-                    [ PTokenStyledText
-                        ( StyledText
-                            { body = "Definition of a.",
-                              style = L.styleMaskFrom []
-                            }
-                        )
-                    ]
-                  )
-                ),
-                ( "b",
-                  ( 2,
-                    [ PTokenStyledText
-                        ( StyledText
-                            { body = "Definition of b.",
-                              style = L.styleMaskFrom []
-                            }
-                        )
-                    ]
-                  )
-                )
+              [ ("a", 1),
+                ("b", 2)
               ],
           meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
         }

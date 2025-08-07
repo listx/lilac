@@ -100,7 +100,7 @@ import Lilac.Types
       ),
     MathFragment (body, meta),
     Object (orgDoc, symbols),
-    OrgDoc (cells, footnotes, meta),
+    OrgDoc (cells, footnoteNumbers, meta),
     PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose,
     Style (Bold, Code, Italic, Underline, Verbatim),
@@ -285,7 +285,7 @@ data WeaveConf = WeaveConf
 #+end_src
 
 The ~originObjectPath~ is used to check whether a given [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] refers to a
-cell that exists in the current object being woven in [[id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa::f:weaveObject][f:weaveObject]] (so we know
+cell that exists in the current object being woven in [[f:weaveObject]] (so we know
 whether to refer to the cell with just ~#...~ as the HTML =id= attribute, or whether
 as ~path/to/external/object.html#...~ because the cell belongs to another object).
 
@@ -366,7 +366,7 @@ weaveObject object = do
         $ dropWhile (not . isFootnote) object.orgDoc.cells
     getSortingKey cell
       | (CFootnote footnote) <- cell,
-        Just (n, _) <- lookup footnote.name object.orgDoc.footnotes =
+        Just n <- lookup footnote.name object.orgDoc.footnoteNumbers =
           n
       | otherwise = maxBound :: Int
     isFootnote = \case
@@ -424,6 +424,9 @@ head_ $ do
 #+end_src
 
 *** Hot reload
+:PROPERTIES:
+:ID:       4c96f0c2-7ee5-4be3-ba73-e7c0f5ddc658
+:END:
 
 The [[Hot reload script]] is a simple third-party development tool which reloads the
 page if there is a change in the HTML, CSS, or JS. It requires a web server, so
@@ -1013,7 +1016,7 @@ weaveLinkTarget linkTarget = do
         htmlExt = P.unsafeEncodeUtf "html"
     LinkTargetFootnote name
       | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-        Just (footnoteNumber, _) <- lookup name originObj.orgDoc.footnotes ->
+        Just footnoteNumber <- lookup name originObj.orgDoc.footnoteNumbers ->
           (T.pack "#footnote-") <> (T.show footnoteNumber)
       | otherwise -> "#LILAC_BROKEN_LINK"
     LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
@@ -1597,7 +1600,7 @@ weaveFootnote footnote = do
   weaveConf <- ask
   if
     | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just (footnoteNumber, _) <- lookup footnote.name originObj.orgDoc.footnotes -> do
+      Just footnoteNumber <- lookup footnote.name originObj.orgDoc.footnoteNumbers -> do
         p_ [class_ "footnote-definition", id_ ("footnote-" <> T.show footnoteNumber)] $ do
           span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
           sequence_ $ map weavePToken footnote.body

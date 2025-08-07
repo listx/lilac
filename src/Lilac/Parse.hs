@@ -65,7 +65,7 @@ import Lilac.Types
     OrgDoc
       ( OrgDoc,
         cells,
-        footnotes,
+        footnoteNumbers,
         meta,
         oid
       ),
@@ -237,7 +237,7 @@ orgDocParser = do
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
-  footnotes <- reconcileFootnotes
+  footnoteNumbers <- reconcileFootnotes
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -253,7 +253,7 @@ orgDocParser = do
     $ OrgDoc
       { oid = docOid,
         cells = filter meaningfulCell cells,
-        footnotes = footnotes,
+        footnoteNumbers = footnoteNumbers,
         meta = meta
       }
 
@@ -262,7 +262,7 @@ defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
       cells = [],
-      footnotes = M.empty,
+      footnoteNumbers = M.empty,
       meta = fromList metas'
     }
   where
@@ -1764,7 +1764,7 @@ footnoteDefinitionParser = do
     spaces :: OrgParser Text
     spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 
-reconcileFootnotes :: OrgParser (Map Text (Int, Prose))
+reconcileFootnotes :: OrgParser (Map Text Int)
 reconcileFootnotes = do
   orgParserState <- get
   let referenced = M.keysSet orgParserState.footnoteNumbers
@@ -1778,12 +1778,7 @@ reconcileFootnotes = do
   if
     | hasBrokenLinks -> fail $ "broken footnote links: " <> brokenLinksMsg
     | hasUnusedDefs -> fail $ "unused footnote definitions: " <> unusedDefsMsg
-    | otherwise ->
-        pure
-          $ M.intersectionWith
-            (,)
-            orgParserState.footnoteNumbers
-            orgParserState.footnoteDefinitions
+    | otherwise -> pure orgParserState.footnoteNumbers
 
 validateOidText :: (MonadFail m) => Text -> m OID
 validateOidText oidText = case fromText oidText of

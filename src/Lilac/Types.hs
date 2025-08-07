@@ -233,7 +233,7 @@ type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
-    footnotes :: Map Text (Int, Prose),
+    footnoteNumbers :: Map Text Int,
     meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)

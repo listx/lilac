@@ -94,7 +94,7 @@ import Lilac.Types
     OrgDoc
       ( OrgDoc,
         cells,
-        footnotes,
+        footnoteNumbers,
         meta,
         oid
       ),
@@ -450,17 +450,23 @@ type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
-    footnotes :: Map Text (Int, Prose),
+    footnoteNumbers :: Map Text Int,
     meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-Footnotes get their own separate data structure, because the order of how they
-are written may not align with the order of how they are woven. This is unlike
+Footnotes get their own separate data structure called ~footnoteNumbers~ (on top
+of the footnote cells in ~cells~), because we have to remember the order of when
+these footnotes are referenced from other cells (anywhere we could have prose,
+such as paragraphs, headings, etc). This ordering is needed to determine which
+number to display as a superscript when creating the link to the footnote
+definition. This same ordering information is used in [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] which
+rearranges the footnote definitions so that they are woven in the order they are
+referenced, not the order in which they are defined (parsed). This is unlike
 every other cell where the order of writing them (cell-by-cell) is preserved
-during weaving. See [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] which rearranges the footnote cells.
+during weaving.
 
 The ~deriving anyclass (ToJSON)~ is needed to create the default implementation for
 JSON conversion automatically for us. It is the equivalent of writing a default
@@ -632,7 +638,7 @@ orgDocParser = do
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
-  footnotes <- reconcileFootnotes
+  footnoteNumbers <- reconcileFootnotes
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -648,7 +654,7 @@ orgDocParser = do
     $ OrgDoc
       { oid = docOid,
         cells = filter meaningfulCell cells,
-        footnotes = footnotes,
+        footnoteNumbers = footnoteNumbers,
         meta = meta
       }
 #+end_src
@@ -683,7 +689,7 @@ defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
       cells = [],
-      footnotes = M.empty,
+      footnoteNumbers = M.empty,
       meta = fromList metas'
     }
   where
@@ -3575,7 +3581,7 @@ definition without an associated link, it's considered an error.
 
 #+name: f:reconcileFootnotes
 #+begin_src haskell
-reconcileFootnotes :: OrgParser (Map Text (Int, Prose))
+reconcileFootnotes :: OrgParser (Map Text Int)
 reconcileFootnotes = do
   orgParserState <- get
   let referenced = M.keysSet orgParserState.footnoteNumbers
@@ -3589,12 +3595,7 @@ reconcileFootnotes = do
   if
     | hasBrokenLinks -> fail $ "broken footnote links: " <> brokenLinksMsg
     | hasUnusedDefs -> fail $ "unused footnote definitions: " <> unusedDefsMsg
-    | otherwise ->
-        pure
-          $ M.intersectionWith
-            (,)
-            orgParserState.footnoteNumbers
-            orgParserState.footnoteDefinitions
+    | otherwise -> pure orgParserState.footnoteNumbers
 #+end_src
 
 *** Tests
@@ -3685,19 +3686,9 @@ ps
       { oid = nilOid,
         cells =
           <<Expected cells for 0013-footnotes-simple>>,
-        footnotes =
+        footnoteNumbers =
           fromList
-            [ ( "hello",
-                ( 1,
-                  [ PTokenStyledText
-                      ( StyledText
-                          { body = "Foo.",
-                            style = L.styleMaskFrom []
-                          }
-                      )
-                  ]
-                )
-              )
+            [ ("hello", 1)
             ],
         meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
       }
@@ -3798,30 +3789,10 @@ ps
       { oid = nilOid,
         cells =
           <<Expected cells for 0013-footnotes-complex>>,
-        footnotes =
+        footnoteNumbers =
           fromList
-            [ ( "a",
-                ( 1,
-                  [ PTokenStyledText
-                      ( StyledText
-                          { body = "Definition of a.",
-                            style = L.styleMaskFrom []
-                          }
-                      )
-                  ]
-                )
-              ),
-              ( "b",
-                ( 2,
-                  [ PTokenStyledText
-                      ( StyledText
-                          { body = "Definition of b.",
-                            style = L.styleMaskFrom []
-                          }
-                      )
-                  ]
-                )
-              )
+            [ ("a", 1),
+              ("b", 2)
             ],
         meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
       }
@@ -8867,7 +8838,7 @@ import Lilac.Types
     OrgDoc
       ( OrgDoc,
         cells,
-        footnotes,
+        footnoteNumbers,
         meta,
         oid
       ),
@@ -9020,7 +8991,7 @@ nilOrgDoc cells =
   OrgDoc
     { oid = nilOid,
       cells = cells,
-      footnotes = M.empty,
+      footnoteNumbers = M.empty,
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
 #+end_src
