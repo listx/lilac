@@ -414,40 +414,33 @@ lexeme = L.lexeme skipNewlinesAndComments
 :ID:       e16dd5c7-0a63-4c52-afe9-744fdf853643
 :END:
 
-We use two major data structures for parsing. The first is a *list of
-/cells/* [fn:cell], where each cell can be things like
+We use a *list of /cells/* [fn:cell] for parsing, where each cell can be a
 
-  - [[https://orgmode.org/worg/org-syntax.html#Headings][headings]] (aka [[https://orgmode.org/manual/Headlines.html][headlines]]),
+  - [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][heading]] (aka [[https://orgmode.org/manual/Headlines.html][headlines]]),
 
-  - [[id:272567ab-4077-4a47-ae78-dfe77243ccc0][paragraphs]] ([[id:c8616126-215d-49be-8874-c2aca7d93a54][prose]] text),
+  - [[id:272567ab-4077-4a47-ae78-dfe77243ccc0][paragraph]] ([[id:c8616126-215d-49be-8874-c2aca7d93a54][prose]] text),
 
-  - ordered and unordered [[id:58f69993-599d-4389-ba47-3056b1bb2350][list items]] (can be nested),
+  - ordered or unordered [[id:58f69993-599d-4389-ba47-3056b1bb2350][list item]] (can be nested),
 
-  - [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][blocks]] (code blocks, quotations, examples, etc),
+  - [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][block]] (code block, quotation, example, etc),
 
-  - [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][tables]],
+  - [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][table]],
 
-  - [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][figures]] (images), and
+  - [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][figure]] (image),
 
-  - LaTeX math fragments ([[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][inline]] and [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][standalone]]).
+  - LaTeX math fragment ([[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][inline]] or [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][standalone]]), or
+
+  - [[id:4127feee-755d-430e-8fef-192e95143790][footnote]].
 
 This scheme is good for quickly making sense of the overall document structure
 in linear fashion, start to finish. It also simplifies the parsing data
-structure --- we just parse one cell after the other. It's worth mentioning that
-using a tree data structure for the headings could be useful for situations
-where tree-based manipulations are desirable; however we will never need to do
-such manipulations for purposes of weaving the Org input into HTML (or any other
-format). Hence our preference for arranging the cells as a list instead of a
-tree.
+structure --- we just parse one cell after the other. Though using a tree data
+structure for the headings could be useful for situations where tree-based
+manipulations are desirable, we will never need to do such manipulations for
+purposes of weaving the Org input into HTML (or any other format). Hence our
+preference for arranging the cells as a list instead of a tree.
 
-The second major data structure is a *directed acyclic graph (DAG) for tangled
-code blocks*, which we call a *code graph*, for handling Noweb references. Noweb
-code blocks can reference other Noweb code blocks, so we create a dependency
-graph for each code block which will get tangled to a file. That is, each
-would-be-tangled file has its own code graph. These code graphs are discussed
-later in [[id:b449a097-d702-4fd6-98de-cb81f7e49177][Code graphs]].
-
-In summary an Org document is made up of cells and code graphs, as well as some
+In summary an Org document is made up of cells, as well as some
 metadata (the title, author name, etc). The doc also has an OID, which
 allows other Org files to refer to this Org file.
 
@@ -463,6 +456,11 @@ data OrgDoc = OrgDoc
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
+
+Footnotes get their own separate data structure, because the order of how they
+are written may not align with the order of how they are woven. This is unlike
+every other cell where the order of writing them (cell-by-cell) is preserved
+during weaving. See [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] which rearranges the footnote cells.
 
 The ~deriving anyclass (ToJSON)~ is needed to create the default implementation for
 JSON conversion automatically for us. It is the equivalent of writing a default
