@@ -71,7 +71,8 @@ import Lilac.Types
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell
-      ( CBlock,
+      ( CBibliography,
+        CBlock,
         CFigure,
         CFootnote,
         CHeading,
@@ -101,7 +102,7 @@ import Lilac.Types
     MathFragment (body, meta),
     Object (orgDoc, symbols),
     OrgDoc (cells, footnoteNumbers, meta),
-    PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose,
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
@@ -377,7 +378,8 @@ weaveObject object = do
       CListItem {}
       CMathFragment {}
       CParagraph {}
-      CTable {} -> False
+      CTable {}
+      CBibliography {} -> False
 #+end_src
 
 The use of ~toHtml~ is to help Haskell infer the correct type. This is because
@@ -408,6 +410,7 @@ weaveCell = \case
   CFigure figure -> weaveFigure figure
   CTable table -> weaveTable table
   CFootnote footnote -> weaveFootnote footnote
+  CBibliography _ -> "PRINT BIBLIOGRAPHY HERE"
 #+end_src
 
 The [[HTML head]] has some "imports" for the HTML page, including CSS and JS.
@@ -636,6 +639,7 @@ getLinkAnchor = \case
           | otherwise = "table-num-error"
      in toSafeHtmlId ref
   CFootnote {} -> ""
+  CBibliography {} -> ""
 #+end_src
 
 We don't generate link anchors for footnote cells (~CFootnote~) because the cell
@@ -732,6 +736,7 @@ getProseContents = join . foldl' f []
                   link.name
          in linkText : acc
       PTokenMathFragment mathFragment -> mathFragment.body : acc
+      PTokenCitation {} -> acc
 #+end_src
 
 Each [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] value has its own weaver.
@@ -749,6 +754,7 @@ weavePToken = \case
     LinkTargetFilePath {}
     LinkTargetURI {} -> weaveLink link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
+  PTokenCitation {} -> "CITATION"
 #+end_src
 
 ** Styled text
@@ -1365,7 +1371,8 @@ weaveTable table = do
         (maskToStyles styledText.style == [])
           && T.isPrefixOf prefix styledText.body
       PTokenLink {}
-      PTokenMathFragment {} -> False
+      PTokenMathFragment {}
+      PTokenCitation {} -> False
     proseHasColgroupStartMarker = proseHas "<"
     proseHasNonExportMarker = proseHas "/"
     mostlyNumeric prose =
@@ -1374,7 +1381,8 @@ weaveTable table = do
     extractText pToken = case pToken of
       PTokenStyledText styledText -> styledText.body
       PTokenLink {}
-      PTokenMathFragment {} -> ""
+      PTokenMathFragment {}
+      PTokenCitation {} -> ""
 #+end_src
 
 The ~headerRowIndex~ is calculated by examining the table cells in the first

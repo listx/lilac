@@ -27,9 +27,11 @@ We use a *list of /cells/* [fn:cell] for parsing, where each cell can be a
 
   - [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][figure]] (image),
 
-  - LaTeX math fragment ([[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][inline]] or [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][standalone]]), or
+  - LaTeX math fragment ([[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][inline]] or [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][standalone]]),
 
-  - [[id:4127feee-755d-430e-8fef-192e95143790][footnote]].
+  - [[id:4127feee-755d-430e-8fef-192e95143790][footnote]], or
+
+  - [[id:a54a7762-a861-42b1-b2c8-2b760281052c][citation]].
 
 This scheme is good for quickly making sense of the overall document structure
 in linear fashion, start to finish. It also simplifies the parsing data
@@ -50,6 +52,8 @@ data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
     footnoteNumbers :: Map Text Int,
+    cslPath :: Maybe FilePath,
+    bibPaths :: [FilePath],
     meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
@@ -161,6 +165,7 @@ data OrgParserState = OrgParserState
     headingOidStack :: [Maybe OID],
     headingLevel :: Int,
     headingSection :: [Int],
+    insideHeading :: Bool,
     styleMask :: StyleMask,
     insideCodeBlock :: Bool,
     insideLinkDisplayName :: Bool,
@@ -178,6 +183,9 @@ data OrgParserState = OrgParserState
     footnoteDefinitions :: Map Text Prose,
     prevCellIsFootnote :: Bool,
     tanglePaths :: Set Text,
+    insideCitation :: Bool,
+    bracketBalance :: Int,
+    insideCitePrefix :: Bool,
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
@@ -192,6 +200,7 @@ defaultOrgParserState =
       headingOidStack = [],
       headingLevel = 0,
       headingSection = [],
+      insideHeading = False,
       styleMask = styleMaskFrom [],
       insideCodeBlock = False,
       insideLinkDisplayName = False,
@@ -209,6 +218,9 @@ defaultOrgParserState =
       footnoteDefinitions = M.empty,
       prevCellIsFootnote = False,
       tanglePaths = Set.empty,
+      insideCitation = False,
+      bracketBalance = 0,
+      insideCitePrefix = False,
       orgParserConf = defaultOrgParserConf
     }
 #+end_src
@@ -264,7 +276,8 @@ import Lilac.Types
   ( BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell
-      ( CBlock,
+      ( CBibliography,
+        CBlock,
         CFigure,
         CFootnote,
         CHeading,
@@ -273,6 +286,8 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
+    Citation (Citation, cites, prefix, styleVariation, suffix),
+    Cite (Cite, id, locator, prefix, suffix),
     Figure (Figure, caption, link, meta),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
@@ -297,7 +312,9 @@ import Lilac.Types
     OID,
     OrgDoc
       ( OrgDoc,
+        bibPaths,
         cells,
+        cslPath,
         footnoteNumbers,
         meta,
         oid
@@ -308,6 +325,7 @@ import Lilac.Types
       ( OrgParserState,
         anonBlockNumber,
         anonEquationNumber,
+        bracketBalance,
         cellNames,
         continuationIndent,
         docOid,
@@ -319,7 +337,10 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSection,
+        insideCitation,
+        insideCitePrefix,
         insideCodeBlock,
+        insideHeading,
         insideLinkDisplayName,
         listLevels,
         listMarkers,
@@ -329,7 +350,7 @@ import Lilac.Types
         tableNumber,
         tanglePaths
       ),
-    PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose,
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyleMask (StyleMask),
@@ -347,6 +368,7 @@ import Relude
   ( Bool (False, True),
     Char,
     Either (Left, Right),
+    FilePath,
     Int,
     Map,
     Maybe (Just, Nothing),
@@ -364,8 +386,10 @@ import Relude
     find,
     fmap,
     foldl',
+    forM_,
     fromEnum,
     fromList,
+    fromMaybe,
     fst,
     get,
     isJust,
@@ -373,6 +397,7 @@ import Relude
     length,
     many,
     map,
+    mapM_,
     maybeToList,
     modify,
     not,
@@ -476,6 +501,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:mathFragmentInlineParser>>
 <<f:paragraphParser>>
 <<f:newlineAndIndentParser>>
+<<f:cellBoundary>>
 <<f:blockMetaEntryParser>>
 <<f:assertUniqueTanglePath>>
 <<f:blockParser>>
@@ -523,8 +549,26 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:footnoteDefinitionParser>>
 <<f:reconcileFootnotes>>
 <<f:validateOidText>>
+<<f:validateCslPath>>
+<<f:collectValsFor>>
+<<f:bibliographyLocationParser>>
+<<f:citationParser>>
+<<f:failIfUnbalancedBrackets>>
+<<f:citeParser>>
+<<f:citeIdParser>>
+<<f:citeLocatorParser>>
+<<f:citeLocatorTermParser>>
+<<f:citeLocatorCoordsParser>>
+<<f:citeLocatorCoordParser>>
+<<f:citeLocatorCoordRangeParser>>
+<<f:citeAffixParser>>
 <<f:isNumericText>>
 <<f:isNumericTextParser>>
+<<f:isPunctuation>>
+<<f:isAlphaNumChar>>
+<<f:isAlphaChar>>
+<<f:isDigitChar>>
+<<f:intraCellWhitespaceParser>>
 #+end_src
 
 * Whitespace and comments
@@ -612,8 +656,6 @@ lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme skipNewlinesAndComments
 #+end_src
 
-* =orgDocParser=
-
 The =orgDocParser= first needs to parse any metadata associated with the document,
 such as the document ID, title and author. It starts by skipping any leading
 whitespace\/comments. We have to do this first because all of the other parsers
@@ -627,7 +669,7 @@ deal with it here separately.
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
-  (docOid, meta) <- docMetaParser
+  (docOid, cslPath, bibPaths, meta) <- docMetaParser
   modify (\s -> s {docOid = docOid})
   _ <- lilacExtensionsParser
   cells <- many cellParser
@@ -643,12 +685,15 @@ orgDocParser = do
         CMathFragment {}
         CFigure {}
         CTable {}
-        CFootnote {} -> True
+        CFootnote {}
+        CBibliography {} -> True
   pure
     $ OrgDoc
       { oid = docOid,
         cells = filter meaningfulCell cells,
         footnoteNumbers = footnoteNumbers,
+        cslPath = cslPath,
+        bibPaths = bibPaths,
         meta = meta
       }
 #+end_src
@@ -684,6 +729,8 @@ defaultOrgDoc oid metas =
     { oid = oid,
       cells = [],
       footnoteNumbers = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
       meta = fromList metas'
     }
   where
@@ -770,11 +817,14 @@ docMetaEntryParser = do
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
     avoidParsingBlockMetadata :: OrgParser ()
     avoidParsingBlockMetadata =
-      MP.notFollowedBy
-        $ MP.choice
-          [ string "#+begin_",
-            string "#+name: ",
-            string "#+header: "
+      mapM_
+        MP.notFollowedBy
+        $ map
+          string
+          [ "#+begin_",
+            "#+name: ",
+            "#+header: ",
+            "#+print_bibliography:"
           ]
     avoidParsingLilacExtensions :: OrgParser ()
     avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
@@ -796,11 +846,13 @@ while consuming any trailing whitespace or comments with [[f:lexeme]].
 
 #+name: f:docMetaParser
 #+begin_src haskell
-docMetaParser :: OrgParser (OID, Map Text Text)
+docMetaParser :: OrgParser (OID, Maybe FilePath, [FilePath], Map Text Text)
 docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
-  metaKVs <- fromList <$> (many $ lexeme docMetaEntryParser)
+  metaKVsList <- many $ lexeme docMetaEntryParser
+  let (bibPaths, remainingKVs) = collectValsFor "bibliography" metaKVsList
+      metaKVs = fromList remainingKVs
   let conflictingKeys = keys $ M.intersection topLevelDrawerProps metaKVs
   when (not $ null conflictingKeys)
     $ fail
@@ -810,7 +862,10 @@ docMetaParser = do
     Nothing -> fail $ "required document ID property not found"
     Just oidText -> do
       oid <- validateOidText oidText
-      pure (oid, topLevelDrawerProps <> metaKVs)
+      cslPath <- case lookup "cite_export" metaKVs of
+        Just maybeCslPath -> validateCslPath maybeCslPath
+        Nothing -> pure Nothing
+      pure (oid, cslPath, map T.unpack bibPaths, topLevelDrawerProps <> metaKVs)
 #+end_src
 
 OID validation in [[f:validateOidText]] delegates to the ~Lilac.Types.fromText~
@@ -831,6 +886,9 @@ document is created, which is then used by Orgmode (see
 us to create links that are more resilient against file name changes (or
 directory changes). See [[id:ca12051e-cd17-4d8d-996a-767695441d48][Drawers]] for more discussion about properties drawers and
 [[t:0002-doc-metadata-properties-drawer]].
+
+The special key ~#+cite_export: ...~ is parsed separately as the ~cslPath~, using
+the [[f:validateCslPath]] helper. This is needed for supporting [[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]].
 
 ** Lilac extensions
 :PROPERTIES:
@@ -1164,6 +1222,7 @@ data Cell
   | CFigure Figure
   | CTable Table
   | CFootnote Footnote
+  | CBibliography ()
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
@@ -1179,20 +1238,24 @@ The =cellParser= is responsible for parsing these different recognized values of
 #+name: f:cellParser
 #+begin_src haskell
 cellParser :: OrgParser Cell
-cellParser =
-  lexeme
-    $ MP.choice
-      [ toggleFootnote False $ listItemStartParser,
-        toggleFootnote False $ listItemsEndParser,
-        toggleFootnote False $ resetContinuationIndent headingParser,
-        toggleFootnote False $ resetContinuationIndent blockParser,
-        toggleFootnote False $ resetContinuationIndent figureParser,
-        toggleFootnote False $ resetContinuationIndent tableParser,
-        toggleFootnote False $ resetContinuationIndent mathFragmentStandaloneParser,
-        toggleFootnote True $ resetContinuationIndent footnoteDefinitionParser,
-        toggleFootnote False $ resetContinuationIndent paragraphParser,
-        detectInvalidIndentation
-      ]
+cellParser = do
+  cell <-
+    lexeme
+      $ MP.choice
+        [ toggleFootnote False $ listItemStartParser,
+          toggleFootnote False $ listItemsEndParser,
+          toggleFootnote False $ resetContinuationIndent headingParser,
+          toggleFootnote False $ resetContinuationIndent blockParser,
+          toggleFootnote False $ resetContinuationIndent figureParser,
+          toggleFootnote False $ resetContinuationIndent tableParser,
+          toggleFootnote False $ resetContinuationIndent mathFragmentStandaloneParser,
+          toggleFootnote True $ resetContinuationIndent footnoteDefinitionParser,
+          toggleFootnote False $ resetContinuationIndent bibliographyLocationParser,
+          toggleFootnote False $ resetContinuationIndent paragraphParser,
+          detectInvalidIndentation
+        ]
+  modify (\s -> s {bracketBalance = 0})
+  pure cell
   where
     resetContinuationIndent :: OrgParser a -> OrgParser a
     resetContinuationIndent p = do
@@ -1249,6 +1312,10 @@ line in the function above (~pure $ CListItem []~) is only there to satisfy the
 type checker --- we will always fail if the =takeWhile1P= succeeds (the
 =MP.fancyFailure= will not be executed if =takeWhile1P= fails).
 
+The ~bracketBalance~ is set to 0 in [[f:cellParser]] after a cell is parsed, because
+we're not interested in cross-cell issues about unbalanced brackets. See
+[[f:failIfUnbalancedBrackets]].
+
 * Prose
 :PROPERTIES:
 :ID:       c8616126-215d-49be-8874-c2aca7d93a54
@@ -1264,9 +1331,7 @@ type Prose :: Type
 type Prose = [PToken]
 #+end_src
 
-A =PToken= can be a string (styled or otherwise), a link of some sort, or a Latex
-fragment. See [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][Styled strings]], [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][Links]], and [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][Math fragments]] for details on how these
-lower-level bits are parsed.
+A =PToken= can be a [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][styled string]], [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][link]], [[id:a54a7762-a861-42b1-b2c8-2b760281052c][citation]], or [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][math fragment]].
 
 #+name: data:PToken
 #+begin_src haskell
@@ -1274,6 +1339,7 @@ type PToken :: Type
 data PToken
   = PTokenStyledText StyledText
   | PTokenLink Link
+  | PTokenCitation Citation
   | PTokenMathFragment MathFragment
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -1281,28 +1347,43 @@ data PToken
 
 The ~proseParser~ can parse a series of [[data:PToken]] values. It is used by both
 [[f:headingParser]] and [[f:paragraphParser]], because they both allow prose text in
-them.
+them. In particular, it avoids parsing [[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]] inside headings and also if
+we're already inside another citation (no nesting allowed).
 
 #+name: f:proseParser
 #+begin_src haskell
 proseParser :: OrgParser Text -> OrgParser [PToken]
 proseParser spaceConsumer = do
-  a <- MP.choice baseParsers
-  b <- MP.many $ MP.choice (spacePTokenParser : baseParsers)
+  orgParserState <- get
+  let avoidCitations =
+        orgParserState.insideHeading || orgParserState.insideCitation
+  a <- MP.choice $ baseParsers avoidCitations
+  b <-
+    MP.many
+      $ MP.choice (spacePTokenParser : baseParsers avoidCitations)
   pure . filter nonEmpty $ a : b
   where
     spacePTokenParser = PTokenStyledText <$> whitespaceCompressor spaceConsumer
-    baseParsers =
-      [ PTokenLink <$> linkParser,
-        PTokenMathFragment <$> mathFragmentInlineParser,
-        PTokenStyledText <$> styleMarkerParser,
-        PTokenStyledText <$> styledTextParser
-      ]
+    baseParsers avoidCitations
+      | avoidCitations =
+          [ PTokenLink <$> linkParser,
+            PTokenMathFragment <$> mathFragmentInlineParser,
+            PTokenStyledText <$> styleMarkerParser,
+            PTokenStyledText <$> styledTextParser
+          ]
+      | otherwise =
+          [ PTokenLink <$> linkParser,
+            PTokenCitation <$> citationParser,
+            PTokenMathFragment <$> mathFragmentInlineParser,
+            PTokenStyledText <$> styleMarkerParser,
+            PTokenStyledText <$> styledTextParser
+          ]
     nonEmpty :: PToken -> Bool
     nonEmpty = \case
       PTokenStyledText styledText -> not $ T.null styledText.body
       PTokenLink {}
-      PTokenMathFragment {} -> True
+      PTokenMathFragment {}
+      PTokenCitation {} -> True
 #+end_src
 
 In [[f:proseParser]], we parse whitespace explicitly with =whitespaceCompressor= which
@@ -1670,11 +1751,30 @@ textParser styleMask
     normalChar :: OrgParser Char
     normalChar = do
       orgParserState <- get
-      let toAvoid
-            | orgParserState.insideLinkDisplayName = "]]"
-            | otherwise = "[["
-      MP.notFollowedBy $ string toAvoid
-      MP.satisfy isNormalChar
+      let toAvoid =
+            [ (orgParserState.insideCitation, string ";"),
+              (orgParserState.insideCitePrefix, citeIdParser),
+              ( orgParserState.insideCitation
+                  && (orgParserState.bracketBalance == 0),
+                string "]"
+              ),
+              (orgParserState.insideLinkDisplayName, string "]]"),
+              ( not orgParserState.insideCitation
+                  && not orgParserState.insideCitePrefix
+                  && not orgParserState.insideLinkDisplayName,
+                string "[["
+              )
+            ]
+      forM_
+        toAvoid
+        $ \(condition, p) -> when condition $ MP.notFollowedBy p
+      c <- MP.satisfy isNormalChar
+      let bracketBalanceDiff
+            | c == '[' = 1
+            | c == ']' = -1
+            | otherwise = 0
+      modify (\s -> s {bracketBalance = s.bracketBalance + bracketBalanceDiff})
+      pure c
     isNormalChar c =
       notMember c styleMarkers
         && (not $ isSpace c)
@@ -3229,14 +3329,6 @@ rawLinkParser = do
         MP.notFollowedBy (char ' ')
         MP.notFollowedBy (char '\n')
       pure c
-    isPunctuation :: Char -> Bool
-    isPunctuation = not . isAlphaNumChar
-    isAlphaNumChar :: Char -> Bool
-    isAlphaNumChar c = isAlphaChar c || isDigitChar c
-    isAlphaChar :: Char -> Bool
-    isAlphaChar c = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-    isDigitChar :: Char -> Bool
-    isDigitChar c = c >= '0' && c <= '9'
 #+end_src
 
 The tricky part is in the =remainderChar=. Essentially, if we see a raw link
@@ -3244,8 +3336,35 @@ followed by some punctuation, like https://funloop.org, then we want the
 punctuation plus the whitespace immediately after it to be excluded from the
 link. The punctuation may or may not be part of the allowed characters in
 =N.isAllowedInURI=. We fix this problem by running some additional checks if we
-ever encounter punctuation, with =isPunctuation=. The =isAlphaNumChar= helper is
+ever encounter punctuation, with [[f:isPunctuation]]. The [[f:isAlphaNumChar]] helper is
 taken from [[https://hackage.haskell.org/package/network-uri][network-uri]].
+
+The [[f:isPunctuation]] parser (and its parts) are generic and useful enough that we
+expose them as top-level functions.
+
+#+name: f:isPunctuation
+#+begin_src haskell
+isPunctuation :: Char -> Bool
+isPunctuation = not . isAlphaNumChar
+#+end_src
+
+#+name: f:isAlphaNumChar
+#+begin_src haskell
+isAlphaNumChar :: Char -> Bool
+isAlphaNumChar c = isAlphaChar c || isDigitChar c
+#+end_src
+
+#+name: f:isAlphaChar
+#+begin_src haskell
+isAlphaChar :: Char -> Bool
+isAlphaChar c = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+#+end_src
+
+#+name: f:isDigitChar
+#+begin_src haskell
+isDigitChar :: Char -> Bool
+isDigitChar c = c >= '0' && c <= '9'
+#+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0006-links-raw
 #+begin_src org
@@ -3684,6 +3803,8 @@ ps
           fromList
             [ ("hello", 1)
             ],
+        cslPath = Nothing,
+        bibPaths = [],
         meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
       }
   )
@@ -3788,6 +3909,8 @@ ps
             [ ("a", 1),
               ("b", 2)
             ],
+        cslPath = Nothing,
+        bibPaths = [],
         meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
       }
   )
@@ -3843,6 +3966,1370 @@ pf
   "0013-footnotes-multiple-groups"
   "cannot have more than one group of footnote definitions"
   95
+#+end_src
+
+* Citations
+:PROPERTIES:
+:ID:       a54a7762-a861-42b1-b2c8-2b760281052c
+:END:
+
+The [[https://docs.citationstyles.org/en/stable/specification.html#terminology][CSL specification]] says "citations consist of one or more cites to individual
+items". A /cite/ is a single (unique) pointer to a bibliographical work. The
+description of the bibliographical work itself is defined separately from a
+cite, and the collection of all bibliographical works cited in a document is
+called the /bibliography/.
+
+Citations are similar to footnotes, but there are some major differences:
+
+  1) A special Citation Style Language (CSL) file is needed to be able to weave
+     both the bibliography and citations. These CSL files are just XML files.
+     See [[https://github.com/citation-style-language/styles][this repository]] for an example.
+
+  2) The equivalent of a "footnote definition" is the global description of the
+     bibliographical work, which can be a book, journal, article, web page, etc.
+     In a sense, these descriptions are a subset of the universe of possible
+     footnote definitions.
+
+     These descriptions are expected to be stored in CSL JSON format, separate
+     from the Org file itself.
+
+  3) For weaving the bibliography, we have to say ~#+print_bibliography:~ in the
+     place where we want to have them woven. From the reader's point of view,
+     this is the equivalent of footnote definitions for footnotes.
+
+  4) A single cite may also use a /locator/, which refers to a more specific
+     section in the work (such as via page numbers). It can also be flanked by
+     /affixes/ (a prefix or suffix), which just means text that can come before or
+     after the cite to describe it more in natural language (such as styled text
+     or even inline math fragments).
+
+     So whereas a footnote link may only need a numerical superscript for
+     presentation when woven, citations need much more work. This translates to
+     additional work required during the parsing stage.
+
+The following sections take a closer look at each of these areas.
+
+** CSL file
+:PROPERTIES:
+:ID:       15706715-c648-4866-b757-ea4a1aad0570
+:END:
+
+The CSL file (an XML file specifying various styling properties for rendering
+citations) can be specified as part of the top-level document metadata in
+[[f:docMetaParser]], which uses [[f:validateCslPath]].
+
+#+name: f:validateCslPath
+#+begin_src haskell
+validateCslPath :: (MonadFail m) => Text -> m (Maybe FilePath)
+validateCslPath maybeCslPath
+  | T.isPrefixOf cslPrefix maybeCslPath =
+      pure $ T.unpack <$> T.stripPrefix cslPrefix maybeCslPath
+  | otherwise = fail $ show cslPrefix <> " prefix required for specifying CSL file"
+  where
+    cslPrefix :: Text
+    cslPrefix = "csl "
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-csl-path
+#+begin_src org
+,#+cite_export: csl foo.csl
+#+end_src
+
+#+name: t:0014-citations-csl-path
+#+begin_src haskell
+ps
+  "0014-citations-csl-path"
+  ( OrgDoc
+      { oid = nilOid,
+        cells = [],
+        footnoteNumbers = M.empty,
+        cslPath = Just "foo.csl",
+        bibPaths = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000"),
+              ("cite_export", "csl foo.csl")
+            ]
+      }
+  )
+  L.defaultOrgParserState
+#+end_src
+
+** CSL JSON (bibliographical entries)
+:PROPERTIES:
+:ID:       909c5265-065a-412c-9305-2cff398ad233
+:END:
+
+A document may refer to multiple CSL JSON files. All are consulted during
+weaving in order to generate bibliographies. The tricky part here is that you
+can define them more than once. However, they all use the same ~#+bibliography:~
+key. So we cannot simply combine them into a ~Map~ because the similar keys will
+override each other.
+
+Instead, we can collect all the values that share the same ~bibliography~ key with
+[[f:collectValsFor]]. See how this is used in [[f:docMetaParser]].
+
+#+name: f:collectValsFor
+#+begin_src haskell
+collectValsFor :: Text -> [(Text, Text)] -> ([Text], [(Text, Text)])
+collectValsFor key kvs =
+  let otherKVs = filter (\(k, _) -> k /= key) kvs
+      vals = reverse $ foldl' f [] kvs
+   in (vals, otherKVs)
+  where
+    f :: [Text] -> (Text, Text) -> [Text]
+    f acc (k, v)
+      | k == key = v : acc
+      | otherwise = acc
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-csl-json-paths
+#+begin_src org
+,#+bibliography: a.json
+,#+bibliography: b.json
+#+end_src
+
+#+name: t:0014-citations-csl-json-paths
+#+begin_src haskell
+ps
+  "0014-citations-csl-json-paths"
+  ( OrgDoc
+      { oid = nilOid,
+        cells = [],
+        footnoteNumbers = M.empty,
+        cslPath = Nothing,
+        bibPaths =
+          [ "a.json",
+            "b.json"
+          ],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+  )
+  L.defaultOrgParserState
+#+end_src
+
+** Printing bibliographies
+
+The document must specify where to print the list of bibliographical references
+that have been cited (otherwise, if we were to omit this, the citations become
+somewhat meaningless). This is done by having a line that just says
+~#+print_bibliography:~ (note the trailing colon ~:~).
+
+Orgmode supports passing in additional options here to the CSL citation export
+processor, but we do not, for simplicity.
+
+#+name: f:bibliographyLocationParser
+#+begin_src haskell
+bibliographyLocationParser :: OrgParser Cell
+bibliographyLocationParser = do
+  _ <- string "#+print_bibliography:"
+  pure $ CBibliography ()
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-bibliography-location
+#+begin_src org
+,#+print_bibliography:
+#+end_src
+
+#+name: t:0014-citations-bibliography-location
+#+begin_src haskell
+ps
+  "0014-citations-bibliography-location"
+  ( OrgDoc
+      { oid = nilOid,
+        cells = [CBibliography ()],
+        footnoteNumbers = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+  )
+  L.defaultOrgParserState
+#+end_src
+
+** Citation data structures
+
+With the boilerplate in the preceding sections out of the way, we can focus on
+encoding all of the various parts of citations.
+
+A [[data:Citation]] is a collection of one or more cites. The idea is that you can
+have multiple cites in a single span of text.
+
+#+name: data:Citation
+#+begin_src haskell
+type Citation :: Type
+data Citation = Citation
+  { styleVariation :: (Maybe Text, Maybe Text),
+    cites :: [Cite],
+    prefix :: Prose,
+    suffix :: Prose
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+The [[data:Citation]] also specifies the style to be used for rendering the key in
+[[data:Cite]], via the ~styleVariation~. This is just an additional way of tweaking
+the style to use on top of the overall CSL style in [[id:15706715-c648-4866-b757-ea4a1aad0570][CSL file]].
+
+#+name: data:Cite
+#+begin_src haskell
+type Cite :: Type
+data Cite = Cite
+  { id :: Text,
+    locator :: Maybe (Text, Text),
+    prefix :: Prose,
+    suffix :: Prose
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+Each [[data:Cite]] also has its own ~prefix~ and ~suffix~ for describing things using
+regular prose.
+
+The most important field for [[data:Cite]] is the ~id~, which refers to a unique
+bibliographical work. It's expected that this ID is found in one of the [[id:909c5265-065a-412c-9305-2cff398ad233][CSL JSON]]
+files. Orgmode calls this the [[https://orgmode.org/manual/Citations.html][key]], but we prefer ~id~ because "key" conflicts with
+the notion of keys and values of map (aka dictionary, or hashmap) data
+structures.
+
+#+name: f:citationParser
+#+begin_src haskell
+citationParser :: OrgParser Citation
+citationParser = do
+  orgParserState <- get
+  when (isVerbatim orgParserState.styleMask || isCode orgParserState.styleMask)
+    $ fail "cannot parse citations inside verbatim or code styles"
+  _ <- string "[cite"
+  modify (\s -> s {insideCitation = True})
+  sv1 <- MP.optional $ char '/' >> MP.label "style variation 1" svParser
+  sv2 <- MP.optional $ char '/' >> MP.label "style variation 2" svParser
+  _ <- char ':'
+  _ <- MP.optional intraCellWhitespaceParser
+  citationPrefix <-
+    MP.optional $ do
+      _ <- MP.notFollowedBy pseudoCiteParser
+      p <- citeAffixParser True
+      _ <- MP.optional intraCellWhitespaceParser
+      _ <- char ';'
+      pure p
+  cites <-
+    MP.sepEndBy1
+      citeParser
+      (char ';' >> MP.optional intraCellWhitespaceParser)
+  citationSuffix <-
+    MP.optional $ do
+      _ <- MP.notFollowedBy pseudoCiteParser
+      p <- citeAffixParser True
+      _ <- MP.optional intraCellWhitespaceParser
+      pure p
+  _ <- MP.optional intraCellWhitespaceParser
+  _ <- char ']'
+  modify (\s -> s {insideCitation = False})
+  pure
+    Citation
+      { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
+        cites = cites,
+        prefix = fromMaybe [] citationPrefix,
+        suffix = fromMaybe [] citationSuffix
+      }
+  where
+    svParser :: OrgParser [Char]
+    svParser =
+      MP.some
+        $ MP.satisfy (\c -> isAlphaNumChar c || c == '_' || c == '-')
+    pseudoCiteParser = do
+      prefix <-
+        MP.optional $ do
+          p <- citeAffixParser True
+          _ <- intraCellWhitespaceParser
+          pure p
+      citeId <- citeIdParser
+      pure (prefix, citeId)
+#+end_src
+
+The [[f:intraCellWhitespaceParser]] parses spaces and newlines, but does not cross
+cell boundaries (no double newlines).
+
+#+name: f:intraCellWhitespaceParser
+#+begin_src haskell
+intraCellWhitespaceParser :: OrgParser [Char]
+intraCellWhitespaceParser =
+  MP.label "intra-cell whitespace"
+    $ MP.some
+    $ MP.choice
+      [ MP.satisfy (\c -> c == ' '),
+        do
+          MP.notFollowedBy cellBoundary
+          char '\n'
+      ]
+#+end_src
+
+The [[f:citeParser]] parses a single [[data:Cite]]. A cite is composed of four pieces:
+
+  1) (Optional) The /prefix/, which is some explanatory prose just before the /id/.
+
+  2) The /id/ (Orgmode calls this the /key/), which refers to a unique
+     bibliographical entry.
+
+  3) (Optional) The /locator/, which identifies some subsection of the cited
+     bibliographical entry, such as page or chapter numbers.
+
+  4) (Optional) The /suffix/, which is some explanatory prose that follows the
+     cite /id/ and optional /locator/.
+
+#+name: f:citeParser
+#+begin_src haskell
+citeParser :: OrgParser Cite
+citeParser = do
+  _ <- MP.try . MP.lookAhead $ MP.optional citePrefixParser >> citeIdParser
+  citePrefix <- MP.optional citePrefixParser
+  citeId <- citeIdParser
+  citeLocator <-
+    MP.optional . MP.try $ do
+      _ <- intraCellWhitespaceParser
+      citeLocatorParser
+  citeSuffix <-
+    MP.optional $ do
+      _ <- intraCellWhitespaceParser
+      citeAffixParser False
+  pure
+    Cite
+      { id = citeId,
+        locator = citeLocator,
+        prefix = fromMaybe [] citePrefix,
+        suffix = fromMaybe [] citeSuffix
+      }
+  where
+    citePrefixParser = do
+      p <- citeAffixParser True
+      _ <- intraCellWhitespaceParser
+      pure p
+#+end_src
+
+We have to use ~MP.lookAhead~ in [[f:citeParser]] because otherwise there is no way to
+tell apart a cite prefix (which precedes a cite id like "@foo") from a citation
+prefix.
+
+The [[https://orgmode.org/worg/org-syntax.html#Citation_References][Orgmode syntax description]] says this about the allowed characters for a cite
+key (what we call an ~id~):
+
+#+begin_quote
+A string made of any word-constituent character, -, ., :, ?, !, `, ', /, *, @,
++, |, (, ), {, }, <, >, &, _, ^, $, #, %, or ~.
+#+end_quote
+
+And so that's why we allow such a broad range of characters in [[f:citeIdParser]].
+
+#+name: f:citeIdParser
+#+begin_src haskell
+citeIdParser :: OrgParser Text
+citeIdParser = do
+  _ <- char '@'
+  citeId <-
+    MP.takeWhile1P
+      (Just "citeId")
+      (\c -> isAlphaNumChar c || c `T.elem` "-.:?!`'/*@+|(){}<>&_^$#%~")
+  pure citeId
+#+end_src
+
+The [[f:citeLocatorParser]] parses the locator, which is made up of two parts. The
+first part is the /term/, which describes the location inside the work, such as
+"chapter" or "page". See [[f:citeLocatorTermParser]] for all supported terms. If
+omitted, this defaults to "page".
+
+The second part is a CSV of /coordinates/, which can be a number (e.g., 35), a
+section (e.g., 1.2.3), or a range of numbers (e.g., 35-50) or sections (e.g.,
+1.2-4). We don't bother with roman numerals, balanced parentheses, etc. See
+[[t:0014-citations-locators]] for more examples.
+
+#+name: f:citeLocatorParser
+#+begin_src haskell
+citeLocatorParser :: OrgParser (Text, Text)
+citeLocatorParser =
+  MP.choice
+    [ explicitLocator,
+      implicitLocator
+    ]
+  where
+    explicitLocator :: OrgParser (Text, Text)
+    explicitLocator = do
+      term <- citeLocatorTermParser
+      _ <- intraCellWhitespaceParser
+      coords <- citeLocatorCoordsParser
+      pure (term, coords)
+    implicitLocator :: OrgParser (Text, Text)
+    implicitLocator = do
+      coords <- citeLocatorCoordsParser
+      pure ("page", coords)
+#+end_src
+
+These terms are mostly lifted from ~org-cite-csl--label-alist~ from [[https://github.com/bzg/org-mode/blob/c356e1c9b750740a9066ebddb53be055531fa076/lisp/oc-csl.el#L370][Orgmode]].
+Unlike Orgmode, we do not allow special characters like ~¶~ or ~§~.
+
+#+name: f:citeLocatorTermParser
+#+begin_src haskell
+citeLocatorTermParser :: OrgParser Text
+citeLocatorTermParser =
+  MP.choice $ map (MP.try . locatorTermParser) locatorTerms
+  where
+    locatorTermParser :: (Text, Text) -> OrgParser Text
+    locatorTermParser (humanFriendlyTerm, term) = do
+      _ <- string humanFriendlyTerm
+      pure term
+    locatorTerms :: [(Text, Text)]
+    locatorTerms =
+      [ ("books", "book"),
+        ("book", "book"),
+        ("bks.", "book"),
+        ("bk.", "book"),
+        ("chapters", "chapter"),
+        ("chapter", "chapter"),
+        ("chaps.", "chapter"),
+        ("chap.", "chapter"),
+        ("ch.", "chapter"),
+        ("columns", "column"),
+        ("column", "column"),
+        ("cols.", "column"),
+        ("col.", "column"),
+        ("figures", "figure"),
+        ("figure", "figure"),
+        ("figs.", "figure"),
+        ("fig.", "figure"),
+        ("folios", "folio"),
+        ("folio", "folio"),
+        ("fols.", "folio"),
+        ("fol.", "folio"),
+        ("numbers", "number"),
+        ("number", "number"),
+        ("nos.", "number"),
+        ("no.", "number"),
+        ("lines", "line"),
+        ("line", "line"),
+        ("ll.", "line"),
+        ("l.", "line"),
+        ("notes", "note"),
+        ("note", "note"),
+        ("nn.", "note"),
+        ("n.", "note"),
+        ("opus", "opus"),
+        ("opp.", "opus"),
+        ("op.", "opus"),
+        ("pages", "page"),
+        ("page", "page"),
+        ("pp.", "page"),
+        ("p.", "page"),
+        ("paragraphs", "paragraph"),
+        ("paragraph", "paragraph"),
+        ("paras.", "paragraph"),
+        ("para.", "paragraph"),
+        ("parts", "part"),
+        ("part", "part"),
+        ("pts.", "part"),
+        ("pt.", "part"),
+        ("sections", "section"),
+        ("section", "section"),
+        ("secs.", "section"),
+        ("sec.", "section"),
+        ("sub verbo", "sub verbo"),
+        ("s.vv.", "sub verbo"),
+        ("s.v.", "sub verbo"),
+        ("verses", "verse"),
+        ("verse", "verse"),
+        ("vv.", "verse"),
+        ("v.", "verse"),
+        ("volumes", "volume"),
+        ("volume", "volume"),
+        ("vols.", "volume"),
+        ("vol.", "volume")
+      ]
+#+end_src
+
+The [[f:citeLocatorCoordsParser]] parses the coordinates, which is a comma-separated
+value.
+
+#+name: f:citeLocatorCoordsParser
+#+begin_src haskell
+citeLocatorCoordsParser :: OrgParser Text
+citeLocatorCoordsParser = do
+  coords <-
+    MP.sepBy1
+      ( MP.choice
+          [ MP.try citeLocatorCoordRangeParser,
+            citeLocatorCoordParser
+          ]
+      )
+      (char ',' >> intraCellWhitespaceParser)
+  pure $ T.intercalate ", " coords
+#+end_src
+
+The [[f:citeLocatorCoordParser]] can parse a single number or a section (numbers
+separated by periods). The use of ~MP.sepBy1~ guarantees that we don't get
+multiple periods in a row.
+
+#+name: f:citeLocatorCoordParser
+#+begin_src haskell
+citeLocatorCoordParser :: OrgParser Text
+citeLocatorCoordParser = do
+  numCoord <- MP.sepBy1 numParser $ char '.'
+  pure $ T.intercalate "." numCoord
+  where
+    numParser :: OrgParser Text
+    numParser = MP.takeWhile1P (Just "locatorCoordNum") isDigitChar
+#+end_src
+
+The [[f:citeLocatorCoordRangeParser]] just parses a range of numbers or sections.
+
+#+name: f:citeLocatorCoordRangeParser
+#+begin_src haskell
+citeLocatorCoordRangeParser :: OrgParser Text
+citeLocatorCoordRangeParser = do
+  n1 <- citeLocatorCoordParser
+  _ <- char '-'
+  n2 <- citeLocatorCoordParser
+  pure $ T.concat [n1, "-", n2]
+#+end_src
+
+The [[f:citeAffixParser]] can parse anything, except for semicolons and the ~@~
+symbol if parsing the prefix (because otherwise this will end up swallowing the
+cite /id/ such as ~@foo~).
+
+#+name: f:citeAffixParser
+#+begin_src haskell
+citeAffixParser :: Bool -> OrgParser Prose
+citeAffixParser isPrefix = do
+  modify (\s -> s {insideCitePrefix = isPrefix})
+  orgParserState <- get
+  prose <- proseParser $ proseSpaceConsumer orgParserState.continuationIndent
+  modify (\s -> s {insideCitePrefix = False})
+  failIfLeftoverActiveStyles
+  failIfUnbalancedBrackets
+  pure $ compressProse prose
+#+end_src
+
+The [[f:failIfUnbalancedBrackets]] helper fails if it detects if square brackets
+have not been balanced by the end of the citation.
+
+#+name: f:failIfUnbalancedBrackets
+#+begin_src haskell
+failIfUnbalancedBrackets :: OrgParser ()
+failIfUnbalancedBrackets = do
+  orgParserState <- get
+  when (orgParserState.bracketBalance /= 0) $ do
+    fail "unbalanced brackets"
+#+end_src
+
+*** Tests
+
+Simple citation, without any locators or affixes.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-single-cite
+#+begin_src org
+[cite/v1/v2: @foo123-.:?!`'/*@+|(){}<>&_^$#%~]
+#+end_src
+
+#+name: t:0014-citations-single-cite
+#+begin_src haskell
+ps
+  "0014-citations-single-cite"
+  ( OrgDoc
+      { oid = nilOid,
+        cells =
+          <<Expected prose for 0014-citations-single-cite>>,
+        footnoteNumbers = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+  )
+  L.defaultOrgParserState
+#+end_src
+
+#+name: Expected prose for 0014-citations-single-cite
+#+begin_src haskell
+[ CParagraph
+    [ PTokenCitation
+        ( Citation
+            { styleVariation = (Just "v1", Just "v2"),
+              cites =
+                [ Cite
+                    { id = "foo123-.:?!`'/*@+|(){}<>&_^$#%~",
+                      locator = Nothing,
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            }
+        )
+    ]
+]
+#+end_src
+
+Cite with various (typical) locators.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-locators
+#+begin_src org
+[cite: @a 15]
+[cite: @b 15-30]
+[cite: @c chapters 15-30, 35]
+[cite: @d secs. 1.5-10]
+[cite: @e sec. 1.22.3]
+[cite:@f]
+#+end_src
+
+#+name: t:0014-citations-locators
+#+begin_src haskell
+ps
+  "0014-citations-locators"
+  ( OrgDoc
+      { oid = nilOid,
+        cells =
+          <<Expected prose for 0014-citations-locators>>,
+        footnoteNumbers = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+  )
+  L.defaultOrgParserState
+#+end_src
+
+#+name: Expected prose for 0014-citations-locators
+#+begin_src haskell
+[ CParagraph
+    [ PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "a",
+                    locator = Just ("page", "15"),
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "b",
+                    locator = Just ("page", "15-30"),
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "c",
+                    locator = Just ("chapter", "15-30, 35"),
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "d",
+                    locator = Just ("section", "1.5-10"),
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "e",
+                    locator = Just ("section", "1.22.3"),
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "f",
+                    locator = Nothing,
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          }
+    ]
+]
+#+end_src
+
+Citations with locators and affixes.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-locators-affixes
+#+begin_src org
+[cite:prefix @a1 15 suffix]
+[cite: @b1 15-30; a really long prefix, maybe? @b2 chap. 4 more suffix]
+[cite: @c1 chapters 15-30, 35 suffix with balanced [[brackets] and @sign]]
+[cite: @d1 secs. 1.5-10; prefix @d2;@d3]
+[cite:@ /see also/ @e1 sec. 1.22.3]
+[cite:@f1;*foo* =@fake1= ~@fake2~ @f2 vols. 3-4]
+#+end_src
+
+#+name: t:0014-citations-locators-affixes
+#+begin_src haskell
+ps
+  "0014-citations-locators-affixes"
+  ( OrgDoc
+      { oid = nilOid,
+        cells =
+          <<Expected prose for 0014-citations-locators-affixes>>,
+        footnoteNumbers = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+  )
+  L.defaultOrgParserState
+#+end_src
+
+#+name: Expected prose for 0014-citations-locators-affixes
+#+begin_src haskell
+[ CParagraph
+    [ PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "a1",
+                    locator = Just ("page", "15"),
+                    prefix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "prefix",
+                                style = L.styleMaskFrom []
+                              }
+                          )
+                      ],
+                    suffix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "suffix",
+                                style = L.styleMaskFrom []
+                              }
+                          )
+                      ]
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "b1",
+                    locator = Just ("page", "15-30"),
+                    prefix = [],
+                    suffix = []
+                  },
+                Cite
+                  { id = "b2",
+                    locator = Just ("chapter", "4"),
+                    prefix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "a really long prefix, maybe?",
+                                style = L.styleMaskFrom []
+                              }
+                          )
+                      ],
+                    suffix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "more suffix",
+                                style = L.styleMaskFrom []
+                              }
+                          )
+                      ]
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "c1",
+                    locator = Just ("chapter", "15-30, 35"),
+                    prefix = [],
+                    suffix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "suffix with balanced [[brackets] and @sign]",
+                                style = L.styleMaskFrom []
+                              }
+                          )
+                      ]
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "d1",
+                    locator = Just ("section", "1.5-10"),
+                    prefix = [],
+                    suffix = []
+                  },
+                Cite
+                  { id = "d2",
+                    locator = Nothing,
+                    prefix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "prefix",
+                                style = L.styleMaskFrom []
+                              }
+                          )
+                      ],
+                    suffix = []
+                  },
+                Cite
+                  { id = "d3",
+                    locator = Nothing,
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "e1",
+                    locator = Just ("section", "1.22.3"),
+                    prefix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "@ ",
+                                style = L.styleMaskFrom []
+                              }
+                          ),
+                        PTokenStyledText
+                          ( StyledText
+                              { body = "see also",
+                                style = L.styleMaskFrom [Italic]
+                              }
+                          )
+                      ],
+                    suffix = []
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "f1",
+                    locator = Nothing,
+                    prefix = [],
+                    suffix = []
+                  },
+                Cite
+                  { id = "f2",
+                    locator = Just ("volume", "3-4"),
+                    prefix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "foo",
+                                style = L.styleMaskFrom [Bold]
+                              }
+                          ),
+                        PTokenStyledText
+                          ( StyledText
+                              { body = " ",
+                                style = L.styleMaskFrom []
+                              }
+                          ),
+                        PTokenStyledText
+                          ( StyledText
+                              { body = "@fake1",
+                                style = L.styleMaskFrom [Verbatim]
+                              }
+                          ),
+                        PTokenStyledText
+                          ( StyledText
+                              { body = " ",
+                                style = L.styleMaskFrom []
+                              }
+                          ),
+                        PTokenStyledText
+                          ( StyledText
+                              { body = "@fake2",
+                                style = L.styleMaskFrom [Code]
+                              }
+                          )
+                      ],
+                    suffix = []
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          }
+    ]
+]
+#+end_src
+
+Check for citation-level (aka /common/ or /global/) affixes, with some examples
+taken from [[https://orgmode.org/worg/org-syntax.html#Citation_References][the Org community]]. These citation-level affixes are useful because it
+may be the case that the CSL processor decides to [[https://github.com/jgm/pandoc/issues/7329#issuecomment-984815328][reorder the cites]].
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-worg
+#+begin_src org
+[cite:*global* prefix;@a1;global =suffix=]
+[cite/t: see;@source1;@source2;by Smith /et al./]
+[cite/t:see;@foo p. 7;@bar pp. 4;by foo]
+[cite/a/f:c.f.;the very important @@atkey @ once;the crucial @baz vol. 3]
+#+end_src
+
+#+name: t:0014-citations-worg
+#+begin_src haskell
+ps
+  "0014-citations-worg"
+  ( OrgDoc
+      { oid = nilOid,
+        cells =
+          <<Expected prose for 0014-citations-worg>>,
+        footnoteNumbers = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+  )
+  L.defaultOrgParserState
+#+end_src
+
+#+name: Expected prose for 0014-citations-worg
+#+begin_src haskell
+[ CParagraph
+    [ PTokenCitation
+        Citation
+          { styleVariation = (Nothing, Nothing),
+            cites =
+              [ Cite
+                  { id = "a1",
+                    locator = Nothing,
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix =
+              [ PTokenStyledText
+                  ( StyledText
+                      { body = "global",
+                        style = L.styleMaskFrom [Bold]
+                      }
+                  ),
+                PTokenStyledText
+                  ( StyledText
+                      { body = " prefix",
+                        style = L.styleMaskFrom []
+                      }
+                  )
+              ],
+            suffix =
+              [ PTokenStyledText
+                  ( StyledText
+                      { body = "global ",
+                        style = L.styleMaskFrom []
+                      }
+                  ),
+                PTokenStyledText
+                  ( StyledText
+                      { body = "suffix",
+                        style = L.styleMaskFrom [Verbatim]
+                      }
+                  )
+              ]
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Just "t", Nothing),
+            cites =
+              [ Cite
+                  { id = "source1",
+                    locator = Nothing,
+                    prefix = [],
+                    suffix = []
+                  },
+                Cite
+                  { id = "source2",
+                    locator = Nothing,
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix =
+              [ PTokenStyledText
+                  ( StyledText
+                      { body = "see",
+                        style = L.styleMaskFrom []
+                      }
+                  )
+              ],
+            suffix =
+              [ PTokenStyledText
+                  ( StyledText
+                      { body = "by Smith ",
+                        style = L.styleMaskFrom []
+                      }
+                  ),
+                PTokenStyledText
+                  ( StyledText
+                      { body = "et al.",
+                        style = L.styleMaskFrom [Italic]
+                      }
+                  )
+              ]
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Just "t", Nothing),
+            cites =
+              [ Cite
+                  { id = "foo",
+                    locator = Just ("page", "7"),
+                    prefix = [],
+                    suffix = []
+                  },
+                Cite
+                  { id = "bar",
+                    locator = Just ("page", "4"),
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix =
+              [ PTokenStyledText
+                  ( StyledText
+                      { body = "see",
+                        style = L.styleMaskFrom []
+                      }
+                  )
+              ],
+            suffix =
+              [ PTokenStyledText
+                  ( StyledText
+                      { body = "by foo",
+                        style = L.styleMaskFrom []
+                      }
+                  )
+              ]
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenCitation
+        Citation
+          { styleVariation = (Just "a", Just "f"),
+            cites =
+              [ Cite
+                  { id = "@atkey",
+                    locator = Nothing,
+                    prefix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "the very important",
+                                style = L.styleMaskFrom []
+                              }
+                          )
+                      ],
+                    suffix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "@ once",
+                                style = L.styleMaskFrom []
+                              }
+                          )
+                      ]
+                  },
+                Cite
+                  { id = "baz",
+                    locator = Just ("volume", "3"),
+                    prefix =
+                      [ PTokenStyledText
+                          ( StyledText
+                              { body = "the crucial",
+                                style = L.styleMaskFrom []
+                              }
+                          )
+                      ],
+                    suffix = []
+                  }
+              ],
+            prefix =
+              [ PTokenStyledText
+                  ( StyledText
+                      { body = "c.f.",
+                        style = L.styleMaskFrom []
+                      }
+                  )
+              ],
+            suffix = []
+          }
+    ]
+]
+#+end_src
+
+Unbalanced brackets are rejected from the cite prefix.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-unbalanced-brackets-prefix-opening
+#+begin_src org
+[cite: [ @foo]
+#+end_src
+
+#+name: t:0014-citations-unbalanced-brackets-prefix-opening
+#+begin_src haskell
+pf
+  "0014-citations-unbalanced-brackets-prefix-opening"
+  "unbalanced brackets"
+  8
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-unbalanced-brackets-prefix-closing
+#+begin_src org
+[cite: ] @foo]
+#+end_src
+
+#+name: t:0014-citations-unbalanced-brackets-prefix-closing
+#+begin_src haskell
+pfm
+  "0014-citations-unbalanced-brackets-prefix-closing"
+  (utoks "]" <> etoks "@" <> etoks "\n")
+  7
+#+end_src
+
+Similarly, unbalanced brackets should fail for the cite suffix.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-unbalanced-brackets-suffix-opening
+#+begin_src org
+[cite: @foo []
+#+end_src
+
+#+name: t:0014-citations-unbalanced-brackets-suffix-opening
+#+begin_src haskell
+pfSimple "0014-citations-unbalanced-brackets-suffix-opening"
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-unbalanced-brackets-suffix-closing
+#+begin_src org
+[cite: @foo ]]
+#+end_src
+
+#+name: t:0014-citations-unbalanced-brackets-suffix-closing
+#+begin_src haskell
+pfSimple "0014-citations-unbalanced-brackets-suffix-closing"
+#+end_src
+
+Semicolons must be meaningful; extraneous semicolons are not allowed.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-extra-semicolons-basic
+#+begin_src org
+[cite:;@foo]
+#+end_src
+
+#+name: t:0014-citations-extra-semicolons-basic
+#+begin_src haskell
+pfSimple "0014-citations-extra-semicolons-basic"
+#+end_src
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-extra-semicolons-consecutive
+#+begin_src org
+[cite:@foo;;]
+#+end_src
+
+#+name: t:0014-citations-extra-semicolons-consecutive
+#+begin_src haskell
+pfSimple "0014-citations-extra-semicolons-consecutive"
+#+end_src
+
+Citations cannot be nested. Because we don't parse for nested citations in
+[[f:proseParser]], in [[t:0014-citations-nested]] we end up parsing the magic string
+~[cite:~ as prose text. So then this triggers the balanced brackets checker.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-nested
+#+begin_src org
+[cite:@foo;[cite: @bar]]
+#+end_src
+
+#+name: t:0014-citations-nested
+#+begin_src haskell
+pf
+  "0014-citations-nested"
+  "unbalanced brackets"
+  17
+#+end_src
+
+Citations inside verbatim or code style markers are ignored.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-forbidden-in-verbatim-code
+#+begin_src org
+~[cite:@foo]~
+=[cite:@bar]=
+#+end_src
+
+#+name: t:0014-citations-forbidden-in-verbatim-code
+#+begin_src haskell
+ps
+  "0014-citations-forbidden-in-verbatim-code"
+  ( OrgDoc
+      { oid = nilOid,
+        cells =
+          <<Expected prose for 0014-citations-forbidden-in-verbatim-code>>,
+        footnoteNumbers = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+  )
+  L.defaultOrgParserState
+#+end_src
+
+#+name: Expected prose for 0014-citations-forbidden-in-verbatim-code
+#+begin_src haskell
+[ CParagraph
+    [ PTokenStyledText
+        StyledText
+          { body = "[cite:@foo]",
+            style = L.styleMaskFrom [Code]
+          },
+      PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+      PTokenStyledText
+        StyledText
+          { body = "[cite:@bar]",
+            style = L.styleMaskFrom [Verbatim]
+          }
+    ]
+]
+#+end_src
+
+For simplicity, citations are not allowed in headings. This is controlled by the
+~insideHeading~ boolean in [[f:headingParser]], and respected by [[f:proseParser]].
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-forbidden-in-headings
+#+begin_src org
+,* heading [cite:@foo]
+#+end_src
+
+#+name: t:0014-citations-forbidden-in-headings
+#+begin_src haskell
+ps
+  "0014-citations-forbidden-in-headings"
+  ( OrgDoc
+      { oid = nilOid,
+        cells =
+          [ CHeading
+              Heading
+                { level = 1,
+                  section = [1],
+                  body =
+                    <<Expected prose for 0014-citations-forbidden-in-headings>>,
+                  meta = fromList []
+                }
+          ],
+        footnoteNumbers = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+  )
+  L.defaultOrgParserState
+    { headingOidStack = [Nothing],
+      headingLevel = 1,
+      headingSection = [1]
+    }
+#+end_src
+
+#+name: Expected prose for 0014-citations-forbidden-in-headings
+#+begin_src haskell
+[ PTokenStyledText
+    StyledText
+      { body = "heading [cite:@foo]",
+        style = L.styleMaskFrom []
+      }
+]
 #+end_src
 
 * Inline math fragments
@@ -3909,14 +5396,24 @@ This is a top-level function because we reuse it in [[f:linkDisplayNameParser]].
 #+name: f:proseSpaceConsumer
 #+begin_src haskell
 proseSpaceConsumer :: Int -> OrgParser Text
-proseSpaceConsumer expectedIndentLen =
+proseSpaceConsumer expectedIndentLen = do
+  _ <- beLessGreedy
   MP.choice
     [ newlineAndIndentParser expectedIndentLen,
       spaces
     ]
   where
     spaces :: OrgParser Text
-    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
+    spaces = MP.takeWhile1P (Just "prose space") (\c -> c == ' ')
+    beLessGreedy :: OrgParser ()
+    beLessGreedy = do
+      orgParserState <- get
+      let toAvoid =
+            [ (orgParserState.insideCitePrefix, string " " >> citeIdParser)
+            ]
+      forM_
+        toAvoid
+        $ \(condition, p) -> when condition $ MP.notFollowedBy p
 #+end_src
 
 The tricky bit is with ~spaceConsumer~ here. It chooses between either a newline
@@ -3932,8 +5429,6 @@ newlineAndIndentParser expectedIndentLen = do
   maybeIndent
   pure " "
   where
-    cellBoundary :: OrgParser Text
-    cellBoundary = string "\n\n"
     maybeIndent =
       if (expectedIndentLen == 0)
         then nonSpace
@@ -3956,6 +5451,12 @@ other words a sequence of two consecutive newlines). If we don't do this, our
 parser will see a newline and immediately think that there should follow some
 spaces for the indent portion, which may not be true if the newline was part of
 a cell boundary.
+
+#+name: f:cellBoundary
+#+begin_src haskell
+cellBoundary :: OrgParser Text
+cellBoundary = string "\n\n"
+#+end_src
 
 The ~maybeIndent~ handles the case where there is no indentation (with ~nonSpace~),
 or where there is indentation (with ~MP.eof <|> exactIndent~). The first case does
@@ -4120,6 +5621,7 @@ headingParser = do
       <> show opc.maxHeadingLevel
   failIfHeadingNestsWithoutDirectParent currentHeadingLevel lenStars
   _ <- char ' '
+  modify (\s -> s {insideHeading = True})
   prose <- proseParser spaceConsumer
   _ <- char '\n'
   failIfLeftoverActiveStyles
@@ -4134,7 +5636,8 @@ headingParser = do
     orgParserState
       { headingLevel = lenStars,
         headingSection = newHeadingSection,
-        headingOidStack = newHeadingOidStack
+        headingOidStack = newHeadingOidStack,
+        insideHeading = False
       }
   pure
     $ CHeading
@@ -7830,7 +9333,13 @@ in [[f:figureParser]]).
 #+begin_src haskell
 metaEntryParser :: OrgParser (Text, Text)
 metaEntryParser = do
-  _ <- MP.notFollowedBy $ string "#+begin_"
+  mapM_
+    MP.notFollowedBy
+    $ map
+      string
+      [ "#+begin_",
+        "#+print_bibliography:"
+      ]
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
   _ <- MP.label "(meta) separator" $ string ": "
@@ -8800,7 +10309,8 @@ import Lilac.Types
   ( BToken (BTokenLink, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell
-      ( CBlock,
+      ( CBibliography,
+        CBlock,
         CFigure,
         CFootnote,
         CHeading,
@@ -8809,6 +10319,8 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
+    Citation (Citation, cites, prefix, styleVariation, suffix),
+    Cite (Cite, id, locator, prefix, suffix),
     Figure (Figure, caption, link, meta),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
@@ -8831,7 +10343,9 @@ import Lilac.Types
     MathFragment (MathFragment, body, meta),
     OrgDoc
       ( OrgDoc,
+        bibPaths,
         cells,
+        cslPath,
         footnoteNumbers,
         meta,
         oid
@@ -8854,7 +10368,7 @@ import Lilac.Types
         prevCellIsFootnote,
         tableNumber
       ),
-    PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, caption, grid, meta),
@@ -8893,6 +10407,7 @@ import Test.Hspec.Megaparsec
     errFancy,
     etoks,
     fancy,
+    shouldFailOn,
     shouldFailWith,
     shouldParse,
     shouldSucceedOn,
@@ -8929,6 +10444,7 @@ type Parser = <<Concrete type for Megaparsec>>
 <<f:ps>>
 <<f:pf>>
 <<f:pfm>>
+<<f:pfSimple>>
 <<f:plainParagraph>>
 <<f:plainHeading>>
 <<f:nilOrgDoc>>
@@ -8986,6 +10502,8 @@ nilOrgDoc cells =
     { oid = nilOid,
       cells = cells,
       footnoteNumbers = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
 #+end_src
@@ -9056,6 +10574,23 @@ pfm path errorTrivial pos = do
   where
     inputPrefix = nilOidOrgDoc
     newPos = pos + T.length inputPrefix
+#+end_src
+
+The [[f:pfSimple]] helper simply asserts that the parse should fail, without regard
+to the exact failure message.
+
+#+name: f:pfSimple
+#+begin_src haskell
+pfSimple :: FilePath -> Spec
+pfSimple path = do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser L.defaultOrgParserState)
+        path
+        `shouldFailOn` (inputPrefix <> input)
+  where
+    inputPrefix = nilOidOrgDoc
 #+end_src
 
 The function =plainParagraph= helps to cut down on some of the repetition.
@@ -9192,6 +10727,22 @@ parseSpec = do
   <<t:0013-footnotes-simple>>
   <<t:0013-footnotes-complex>>
   <<t:0013-footnotes-multiple-groups>>
+  <<t:0014-citations-csl-path>>
+  <<t:0014-citations-csl-json-paths>>
+  <<t:0014-citations-bibliography-location>>
+  <<t:0014-citations-single-cite>>
+  <<t:0014-citations-locators>>
+  <<t:0014-citations-locators-affixes>>
+  <<t:0014-citations-worg>>
+  <<t:0014-citations-unbalanced-brackets-prefix-opening>>
+  <<t:0014-citations-unbalanced-brackets-prefix-closing>>
+  <<t:0014-citations-unbalanced-brackets-suffix-opening>>
+  <<t:0014-citations-unbalanced-brackets-suffix-closing>>
+  <<t:0014-citations-extra-semicolons-basic>>
+  <<t:0014-citations-extra-semicolons-consecutive>>
+  <<t:0014-citations-nested>>
+  <<t:0014-citations-forbidden-in-verbatim-code>>
+  <<t:0014-citations-forbidden-in-headings>>
 #+end_src
 
 * Footnotes

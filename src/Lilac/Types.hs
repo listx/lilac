@@ -3,6 +3,8 @@ module Lilac.Types
     Block (..),
     BToken (..),
     Cell (..),
+    Citation (..),
+    Cite (..),
     Figure (..),
     Footnote (..),
     GPath,
@@ -127,6 +129,7 @@ data Cell
   | CFigure Figure
   | CTable Table
   | CFootnote Footnote
+  | CBibliography ()
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
@@ -234,6 +237,8 @@ data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
     footnoteNumbers :: Map Text Int,
+    cslPath :: Maybe FilePath,
+    bibPaths :: [FilePath],
     meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
@@ -259,6 +264,7 @@ data OrgParserState = OrgParserState
     headingOidStack :: [Maybe OID],
     headingLevel :: Int,
     headingSection :: [Int],
+    insideHeading :: Bool,
     styleMask :: StyleMask,
     insideCodeBlock :: Bool,
     insideLinkDisplayName :: Bool,
@@ -276,6 +282,9 @@ data OrgParserState = OrgParserState
     footnoteDefinitions :: Map Text Prose,
     prevCellIsFootnote :: Bool,
     tanglePaths :: Set Text,
+    insideCitation :: Bool,
+    bracketBalance :: Int,
+    insideCitePrefix :: Bool,
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
@@ -284,6 +293,7 @@ type PToken :: Type
 data PToken
   = PTokenStyledText StyledText
   | PTokenLink Link
+  | PTokenCitation Citation
   | PTokenMathFragment MathFragment
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -334,6 +344,26 @@ type Footnote :: Type
 data Footnote = Footnote
   { name :: Text,
     body :: Prose
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
+type Citation :: Type
+data Citation = Citation
+  { styleVariation :: (Maybe Text, Maybe Text),
+    cites :: [Cite],
+    prefix :: Prose,
+    suffix :: Prose
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
+type Cite :: Type
+data Cite = Cite
+  { id :: Text,
+    locator :: Maybe (Text, Text),
+    prefix :: Prose,
+    suffix :: Prose
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

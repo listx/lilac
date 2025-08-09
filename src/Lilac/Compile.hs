@@ -16,7 +16,8 @@ import Lilac.Types
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
     Cell
-      ( CBlock,
+      ( CBibliography,
+        CBlock,
         CFigure,
         CFootnote,
         CHeading,
@@ -40,7 +41,7 @@ import Lilac.Types
     OID,
     Object (Object, externalOids, orgDoc, symbols),
     OrgDoc (cells, oid),
-    PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
     decodeGPath,
   )
@@ -102,7 +103,8 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
       CTable table -> getSymbols Nothing table.meta cell
       CFootnote {}
       CListItem {}
-      CParagraph {} -> []
+      CParagraph {}
+      CBibliography {} -> []
     getSymbols :: Maybe OID -> Map Text Text -> Cell -> [(LinkOid, Cell)]
     getSymbols parentOid cellMeta cell =
       concatMap requireName $ catMaybes [parentOid, Just $ orgDoc.oid]
@@ -217,7 +219,8 @@ findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
       CMathFragment {}
       CFigure {}
       CTable {}
-      CFootnote {} -> acc
+      CFootnote {}
+      CBibliography {} -> acc
     (graph, vertexToNode, _) = buildGraph blocks
     toLinkOid vertex =
       let (_, selfLink, _) = vertexToNode vertex
@@ -244,7 +247,8 @@ findExternalOids orgDoc =
       CFigure {}
       CFootnote {}
       CListItem {}
-      CMathFragment {} -> []
+      CMathFragment {}
+      CBibliography {} -> []
     g acc = \case
       BTokenLink link -> getExternal acc link
       BTokenString {}
@@ -252,6 +256,7 @@ findExternalOids orgDoc =
     h acc = \case
       PTokenLink link -> getExternal acc link
       PTokenStyledText {}
+      PTokenCitation {}
       PTokenMathFragment {} -> acc
     getExternal acc link = case link.target of
       LinkTargetOid linkOid ->

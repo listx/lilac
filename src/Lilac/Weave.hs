@@ -16,7 +16,8 @@ import Lilac.Types
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell
-      ( CBlock,
+      ( CBibliography,
+        CBlock,
         CFigure,
         CFootnote,
         CHeading,
@@ -46,7 +47,7 @@ import Lilac.Types
     MathFragment (body, meta),
     Object (orgDoc, symbols),
     OrgDoc (cells, footnoteNumbers, meta),
-    PToken (PTokenLink, PTokenMathFragment, PTokenStyledText),
+    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose,
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
@@ -257,7 +258,8 @@ weaveObject object = do
       CListItem {}
       CMathFragment {}
       CParagraph {}
-      CTable {} -> False
+      CTable {}
+      CBibliography {} -> False
 
 weaveCell :: Cell -> HtmlWeaver ()
 weaveCell = \case
@@ -269,6 +271,7 @@ weaveCell = \case
   CFigure figure -> weaveFigure figure
   CTable table -> weaveTable table
   CFootnote footnote -> weaveFootnote footnote
+  CBibliography _ -> "PRINT BIBLIOGRAPHY HERE"
 
 toSafeHtmlId :: Text -> Text
 toSafeHtmlId = T.map onlyKeepSomeChars
@@ -294,6 +297,7 @@ getProseContents = join . foldl' f []
                   link.name
          in linkText : acc
       PTokenMathFragment mathFragment -> mathFragment.body : acc
+      PTokenCitation {} -> acc
 
 weaveDocMeta :: M.Map Text Text -> HtmlWeaver ()
 weaveDocMeta m = do
@@ -385,6 +389,7 @@ getLinkAnchor = \case
           | otherwise = "table-num-error"
      in toSafeHtmlId ref
   CFootnote {} -> ""
+  CBibliography {} -> ""
 
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
@@ -397,6 +402,7 @@ weavePToken = \case
     LinkTargetFilePath {}
     LinkTargetURI {} -> weaveLink link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
+  PTokenCitation {} -> "CITATION"
 
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
@@ -695,7 +701,8 @@ weaveTable table = do
         (maskToStyles styledText.style == [])
           && T.isPrefixOf prefix styledText.body
       PTokenLink {}
-      PTokenMathFragment {} -> False
+      PTokenMathFragment {}
+      PTokenCitation {} -> False
     proseHasColgroupStartMarker = proseHas "<"
     proseHasNonExportMarker = proseHas "/"
     mostlyNumeric prose =
@@ -704,7 +711,8 @@ weaveTable table = do
     extractText pToken = case pToken of
       PTokenStyledText styledText -> styledText.body
       PTokenLink {}
-      PTokenMathFragment {} -> ""
+      PTokenMathFragment {}
+      PTokenCitation {} -> ""
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest
