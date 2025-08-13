@@ -5,15 +5,219 @@
 
 #+lilac_maxHeadingLevel: 3
 
-* Org parser
+* Overview
 :PROPERTIES:
-:ID:       bb5a9763-e8bf-4cb9-8e6c-8c5ac92975a6
+:ID:       e16dd5c7-0a63-4c52-afe9-744fdf853643
 :END:
 
 We use [[https://github.com/mrkkrp/megaparsec][Megaparsec]] to parse an Org document. The parsing requires us to read in
 everything in a single Org file.
 
-** =Lilac.Parse= module
+We use a *list of /cells/* [fn:cell] for parsing, where each cell can be a
+
+  - [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][heading]] (aka [[https://orgmode.org/manual/Headlines.html][headlines]]),
+
+  - [[id:272567ab-4077-4a47-ae78-dfe77243ccc0][paragraph]] ([[id:c8616126-215d-49be-8874-c2aca7d93a54][prose]] text),
+
+  - ordered or unordered [[id:58f69993-599d-4389-ba47-3056b1bb2350][list item]] (can be nested),
+
+  - [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][block]] (code block, quotation, example, etc),
+
+  - [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][table]],
+
+  - [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][figure]] (image),
+
+  - LaTeX math fragment ([[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][inline]] or [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][standalone]]), or
+
+  - [[id:4127feee-755d-430e-8fef-192e95143790][footnote]].
+
+This scheme is good for quickly making sense of the overall document structure
+in linear fashion, start to finish. It also simplifies the parsing data
+structure --- we just parse one cell after the other. Though using a tree data
+structure for the headings could be useful for situations where tree-based
+manipulations are desirable, we will never need to do such manipulations for
+purposes of weaving the Org input into HTML (or any other format). Hence our
+preference for arranging the cells as a list instead of a tree.
+
+In summary an Org document is made up of cells, as well as some
+metadata (the title, author name, etc). The doc also has an OID, which
+allows other Org files to refer to this Org file.
+
+#+name: data:OrgDoc
+#+begin_src haskell
+type OrgDoc :: Type
+data OrgDoc = OrgDoc
+  { oid :: OID,
+    cells :: [Cell],
+    footnoteNumbers :: Map Text Int,
+    meta :: Map Text Text
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+Footnotes get their own separate data structure called ~footnoteNumbers~ (on top
+of the footnote cells in ~cells~), because we have to remember the order of when
+these footnotes are referenced from other cells (anywhere we could have prose,
+such as paragraphs, headings, etc). This ordering is needed to determine which
+number to display as a superscript when creating the link to the footnote
+definition. This same ordering information is used in [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] which
+rearranges the footnote definitions so that they are woven in the order they are
+referenced, not the order in which they are defined (parsed). This is unlike
+every other cell where the order of writing them (cell-by-cell) is preserved
+during weaving.
+
+The ~deriving anyclass (ToJSON)~ is needed to create the default implementation for
+JSON conversion automatically for us. It is the equivalent of writing a default
+instance like
+
+#+begin_src haskell
+instance ToJSON OrgDoc
+#+end_src
+
+but it's shorter because we don't have to put it on its own line, and it's even
+more closely coupled with the declaration of the ~OrgDoc~ type itself. If we try
+to use ~deriving stock (Eq, Generic, Show, ToJSON)~ we get an error like
+
+#+begin_quote
+‘ToJSON’ is not a stock derivable class (Eq, Show, etc.)
+#+end_quote
+
+which is why we use the ~deriving anyclass~ variant. All child types also require
+the same ~deriving anyclass (ToJSON)~ declaration for this to work. At the end of it
+though, we can use the ~encode~ and ~encodeFile~ functions from =Data.Aeson=.
+
+#+name: newtype:OID
+#+begin_src haskell
+type OID :: Type
+newtype OID = OID UUID
+  deriving stock (Eq, Ord, Generic)
+  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
+#+end_src
+
+The OID wraps around a UUID. This way we can be agnostic about the concrete
+details of a UUID in the rest of the program. There are some helpers in [[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62][Org ID
+(OID)]] for this type, which plays a big role in Lilac because it is the building
+block of Org links to headings and other (external) Org documents.
+
+The top-level parsing function is =parseOrgDoc=, which takes some raw text input
+and parses it into a rich =OrgDoc= type.
+
+#+name: f:parseOrgDoc
+#+begin_src haskell
+parseOrgDoc :: Text -> Either Text OrgDoc
+parseOrgDoc input = case MP.runParser
+  (runStateT orgDocParser defaultOrgParserState)
+  ""
+  input of
+  Left err -> Left . T.pack $ MP.errorBundlePretty err
+  Right (orgDoc, _orgParserState) -> Right orgDoc
+#+end_src
+
+The [[f:orgDocParser]] is the main parser combinator; it is itself composed of other
+parser combinators. All of these parsers live inside the =OrgParser= monadic type,
+which is defined as a state monad transformer (=StateT=) with =OrgParserState=,
+which wraps around the inner =Parsec Void Text= monad, where =Void= is the custom
+error component and =Text= is the type of the text being parsed. Using =Void= for
+the custom error component means that we'll be defaulting to the default error
+handling mechanism that ships with Megaparsec.
+
+#+name: type:OrgParser
+#+begin_src haskell
+type OrgParser :: Type -> Type
+type OrgParser = StateT OrgParserState (<<Concrete type for Megaparsec>>)
+#+end_src
+
+The [[Concrete type for Megaparsec]] feeds the concrete ~Text~ type to use as the
+stream for Megaparsec. Megaparsec defines a polymorphic API and expects users to
+use concrete types like this for speed optimizations.
+
+#+name: Concrete type for Megaparsec
+#+begin_src haskell
+MP.ParsecT Void Text Identity
+#+end_src
+
+The =OrgParserState= is the custom state we want to use while parsing. You can
+think of it as a mutable variable we keep modifying as we make progress during
+parsing.
+
+The ~headingLevel~ is the last-seen heading level we parsed. See
+[[t:0004-headings-cannot-skip-level]] for how we use it.
+
+The ~headingSection~ is the last-generated heading section number. This is what we
+use to assign each heading its section number.
+
+The =styleMask= is discussed in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][the section on parsing styled strings]].
+The =listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The
+=continuationIndent= is used to keep track of how much indentation to expect
+inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
+[[f:listHeadIndentLevelParser]] for a usage example.
+
+#+name: data:OrgParserState
+#+begin_src haskell
+type OrgParserState :: Type
+data OrgParserState = OrgParserState
+  { docOid :: OID,
+    headingOidStack :: [Maybe OID],
+    headingLevel :: Int,
+    headingSection :: [Int],
+    styleMask :: StyleMask,
+    insideCodeBlock :: Bool,
+    insideLinkDisplayName :: Bool,
+    listLevels :: [Level],
+    listMarkers :: [ListMarker],
+    continuationIndent :: Int,
+    equationNumber :: Int,
+    anonEquationNumber :: Int,
+    cellNames :: Set Text,
+    anonBlockNumber :: Int,
+    figureNumber :: Int,
+    tableNumber :: Int,
+    footnoteNumber :: Int,
+    footnoteNumbers :: Map Text Int,
+    footnoteDefinitions :: Map Text Prose,
+    prevCellIsFootnote :: Bool,
+    tanglePaths :: Set Text,
+    orgParserConf :: OrgParserConf
+  }
+  deriving stock (Eq, Show)
+#+end_src
+
+#+name: f:defaultOrgParserState
+#+begin_src haskell
+defaultOrgParserState :: OrgParserState
+defaultOrgParserState =
+  OrgParserState
+    { docOid = nilOid,
+      headingOidStack = [],
+      headingLevel = 0,
+      headingSection = [],
+      styleMask = styleMaskFrom [],
+      insideCodeBlock = False,
+      insideLinkDisplayName = False,
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      anonEquationNumber = 0,
+      cellNames = Set.empty,
+      anonBlockNumber = 0,
+      figureNumber = 0,
+      tableNumber = 0,
+      footnoteNumber = 0,
+      footnoteNumbers = M.empty,
+      footnoteDefinitions = M.empty,
+      prevCellIsFootnote = False,
+      tanglePaths = Set.empty,
+      orgParserConf = defaultOrgParserConf
+    }
+#+end_src
+
+The ~anonBlockNumber~ is used to give some unique name (in lieu of actual names)
+for anonymous blocks. This is needed for generating link anchors for it during
+weaving.
+
+* =Lilac.Parse= module
 :PROPERTIES:
 :ID:       5ce50c9a-5413-48d9-8bba-e465a4eb527c
 :END:
@@ -324,7 +528,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:isNumericTextParser>>
 #+end_src
 
-** Whitespace and comments
+* Whitespace and comments
 
 Before writing our first parsers, we have to consider the problem of whitespace
 and comments.
@@ -409,216 +613,7 @@ lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme skipNewlinesAndComments
 #+end_src
 
-** Parsing overview
-:PROPERTIES:
-:ID:       e16dd5c7-0a63-4c52-afe9-744fdf853643
-:END:
-
-We use a *list of /cells/* [fn:cell] for parsing, where each cell can be a
-
-  - [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][heading]] (aka [[https://orgmode.org/manual/Headlines.html][headlines]]),
-
-  - [[id:272567ab-4077-4a47-ae78-dfe77243ccc0][paragraph]] ([[id:c8616126-215d-49be-8874-c2aca7d93a54][prose]] text),
-
-  - ordered or unordered [[id:58f69993-599d-4389-ba47-3056b1bb2350][list item]] (can be nested),
-
-  - [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][block]] (code block, quotation, example, etc),
-
-  - [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][table]],
-
-  - [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][figure]] (image),
-
-  - LaTeX math fragment ([[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][inline]] or [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][standalone]]), or
-
-  - [[id:4127feee-755d-430e-8fef-192e95143790][footnote]].
-
-This scheme is good for quickly making sense of the overall document structure
-in linear fashion, start to finish. It also simplifies the parsing data
-structure --- we just parse one cell after the other. Though using a tree data
-structure for the headings could be useful for situations where tree-based
-manipulations are desirable, we will never need to do such manipulations for
-purposes of weaving the Org input into HTML (or any other format). Hence our
-preference for arranging the cells as a list instead of a tree.
-
-In summary an Org document is made up of cells, as well as some
-metadata (the title, author name, etc). The doc also has an OID, which
-allows other Org files to refer to this Org file.
-
-#+name: data:OrgDoc
-#+begin_src haskell
-type OrgDoc :: Type
-data OrgDoc = OrgDoc
-  { oid :: OID,
-    cells :: [Cell],
-    footnoteNumbers :: Map Text Int,
-    meta :: Map Text Text
-  }
-  deriving stock (Eq, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
-#+end_src
-
-Footnotes get their own separate data structure called ~footnoteNumbers~ (on top
-of the footnote cells in ~cells~), because we have to remember the order of when
-these footnotes are referenced from other cells (anywhere we could have prose,
-such as paragraphs, headings, etc). This ordering is needed to determine which
-number to display as a superscript when creating the link to the footnote
-definition. This same ordering information is used in [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] which
-rearranges the footnote definitions so that they are woven in the order they are
-referenced, not the order in which they are defined (parsed). This is unlike
-every other cell where the order of writing them (cell-by-cell) is preserved
-during weaving.
-
-The ~deriving anyclass (ToJSON)~ is needed to create the default implementation for
-JSON conversion automatically for us. It is the equivalent of writing a default
-instance like
-
-#+begin_src haskell
-instance ToJSON OrgDoc
-#+end_src
-
-but it's shorter because we don't have to put it on its own line, and it's even
-more closely coupled with the declaration of the ~OrgDoc~ type itself. If we try
-to use ~deriving stock (Eq, Generic, Show, ToJSON)~ we get an error like
-
-#+begin_quote
-‘ToJSON’ is not a stock derivable class (Eq, Show, etc.)
-#+end_quote
-
-which is why we use the ~deriving anyclass~ variant. All child types also require
-the same ~deriving anyclass (ToJSON)~ declaration for this to work. At the end of it
-though, we can use the ~encode~ and ~encodeFile~ functions from =Data.Aeson=.
-
-#+name: newtype:OID
-#+begin_src haskell
-type OID :: Type
-newtype OID = OID UUID
-  deriving stock (Eq, Ord, Generic)
-  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
-#+end_src
-
-The OID wraps around a UUID. This way we can be agnostic about the concrete
-details of a UUID in the rest of the program. There are some helpers in [[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62][Org ID
-(OID)]] for this type, which plays a big role in Lilac because it is the building
-block of Org links to headings and other (external) Org documents.
-
-The top-level parsing function is =parseOrgDoc=, which takes some raw text input
-and parses it into a rich =OrgDoc= type.
-
-#+name: f:parseOrgDoc
-#+begin_src haskell
-parseOrgDoc :: Text -> Either Text OrgDoc
-parseOrgDoc input = case MP.runParser
-  (runStateT orgDocParser defaultOrgParserState)
-  ""
-  input of
-  Left err -> Left . T.pack $ MP.errorBundlePretty err
-  Right (orgDoc, _orgParserState) -> Right orgDoc
-#+end_src
-
-The [[f:orgDocParser]] is the main parser combinator; it is itself composed of other
-parser combinators. All of these parsers live inside the =OrgParser= monadic type,
-which is defined as a state monad transformer (=StateT=) with =OrgParserState=,
-which wraps around the inner =Parsec Void Text= monad, where =Void= is the custom
-error component and =Text= is the type of the text being parsed. Using =Void= for
-the custom error component means that we'll be defaulting to the default error
-handling mechanism that ships with Megaparsec.
-
-#+name: type:OrgParser
-#+begin_src haskell
-type OrgParser :: Type -> Type
-type OrgParser = StateT OrgParserState (<<Concrete type for Megaparsec>>)
-#+end_src
-
-The [[Concrete type for Megaparsec]] feeds the concrete ~Text~ type to use as the
-stream for Megaparsec. Megaparsec defines a polymorphic API and expects users to
-use concrete types like this for speed optimizations.
-
-#+name: Concrete type for Megaparsec
-#+begin_src haskell
-MP.ParsecT Void Text Identity
-#+end_src
-
-The =OrgParserState= is the custom state we want to use while parsing. You can
-think of it as a mutable variable we keep modifying as we make progress during
-parsing.
-
-The ~headingLevel~ is the last-seen heading level we parsed. See
-[[t:0004-headings-cannot-skip-level]] for how we use it.
-
-The ~headingSection~ is the last-generated heading section number. This is what we
-use to assign each heading its section number.
-
-The =styleMask= is discussed in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][the section on parsing styled strings]].
-The =listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The
-=continuationIndent= is used to keep track of how much indentation to expect
-inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
-[[f:listHeadIndentLevelParser]] for a usage example.
-
-#+name: data:OrgParserState
-#+begin_src haskell
-type OrgParserState :: Type
-data OrgParserState = OrgParserState
-  { docOid :: OID,
-    headingOidStack :: [Maybe OID],
-    headingLevel :: Int,
-    headingSection :: [Int],
-    styleMask :: StyleMask,
-    insideCodeBlock :: Bool,
-    insideLinkDisplayName :: Bool,
-    listLevels :: [Level],
-    listMarkers :: [ListMarker],
-    continuationIndent :: Int,
-    equationNumber :: Int,
-    anonEquationNumber :: Int,
-    cellNames :: Set Text,
-    anonBlockNumber :: Int,
-    figureNumber :: Int,
-    tableNumber :: Int,
-    footnoteNumber :: Int,
-    footnoteNumbers :: Map Text Int,
-    footnoteDefinitions :: Map Text Prose,
-    prevCellIsFootnote :: Bool,
-    tanglePaths :: Set Text,
-    orgParserConf :: OrgParserConf
-  }
-  deriving stock (Eq, Show)
-#+end_src
-
-#+name: f:defaultOrgParserState
-#+begin_src haskell
-defaultOrgParserState :: OrgParserState
-defaultOrgParserState =
-  OrgParserState
-    { docOid = nilOid,
-      headingOidStack = [],
-      headingLevel = 0,
-      headingSection = [],
-      styleMask = styleMaskFrom [],
-      insideCodeBlock = False,
-      insideLinkDisplayName = False,
-      listLevels = [],
-      listMarkers = [],
-      continuationIndent = 0,
-      equationNumber = 0,
-      anonEquationNumber = 0,
-      cellNames = Set.empty,
-      anonBlockNumber = 0,
-      figureNumber = 0,
-      tableNumber = 0,
-      footnoteNumber = 0,
-      footnoteNumbers = M.empty,
-      footnoteDefinitions = M.empty,
-      prevCellIsFootnote = False,
-      tanglePaths = Set.empty,
-      orgParserConf = defaultOrgParserConf
-    }
-#+end_src
-
-The ~anonBlockNumber~ is used to give some unique name (in lieu of actual names)
-for anonymous blocks. This is needed for generating link anchors for it during
-weaving.
-
-** =orgDocParser=
+* =orgDocParser=
 
 The =orgDocParser= first needs to parse any metadata associated with the document,
 such as the document ID, title and author. It starts by skipping any leading
@@ -752,7 +747,7 @@ before (LU.readFrom "" "base/lilac.org") $ do
       `shouldSucceedOn` input
 #+end_src
 
-** =docMetaParser=
+* =docMetaParser=
 
 An Org document's metadata is the first meaningful thing that could be parsed.
 Metadata can be created with a ~:PROPERTIES:~ drawer, or with a line that looks
@@ -838,7 +833,7 @@ us to create links that are more resilient against file name changes (or
 directory changes). See [[id:ca12051e-cd17-4d8d-996a-767695441d48][Drawers]] for more discussion about properties drawers and
 [[t:0002-doc-metadata-properties-drawer]].
 
-*** Lilac extensions
+** Lilac extensions
 :PROPERTIES:
 :ID:       84edd33a-a146-4a46-ac0a-cd1c3d0926d3
 :END:
@@ -944,7 +939,7 @@ maxListLevelParser = do
 
 Unsurprisingly, [[f:maxListLevelParser]] closely resembles [[f:maxHeadingLevelParser]].
 
-*** Tests
+** Tests
 
 Below are some unit test cases for parsing metadata.
 
@@ -1150,7 +1145,7 @@ before (LU.readFrom "test/Lilac/ParseSpec/" "0002-doc-metadata-properties-drawer
       `shouldFailWith` (errFancy 181 . fancy $ MP.ErrorFail "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: [\"foo\"]")
 #+end_src
 
-** Cells
+* Cells
 :PROPERTIES:
 :ID:       ed81c307-9172-4436-8672-583ea8ecb1f9
 :END:
@@ -1255,7 +1250,7 @@ line in the function above (~pure $ CListItem []~) is only there to satisfy the
 type checker --- we will always fail if the =takeWhile1P= succeeds (the
 =MP.fancyFailure= will not be executed if =takeWhile1P= fails).
 
-** Prose
+* Prose
 :PROPERTIES:
 :ID:       c8616126-215d-49be-8874-c2aca7d93a54
 :END:
@@ -1384,7 +1379,7 @@ Whitespace compression also happens when we detect [[id:4127feee-755d-430e-8fef-
 way, at weaving time it can ignore any whitespace between non-whitespace text
 and the footnote reference.
 
-** Styled strings
+* Styled strings
 :PROPERTIES:
 :ID:       b616c1e2-6b42-41cf-8e5d-c1832f95b59b
 :END:
@@ -1467,7 +1462,7 @@ p
 ]
 #+end_src
 
-*** Parsing
+** Parsing
 
 Parsing styled strings is somewhat tricky, because of two main problems:
 
@@ -1719,7 +1714,7 @@ will mess up the alignment of table cells). For this reason, we use =\vert{}=
 instead. Of course, outside of tables the pipe character can be written raw like
 this "|" without issue.
 
-*** =StyleMask= details
+** =StyleMask= details
 :PROPERTIES:
 :ID:       87cd7d62-1f5c-4442-87ff-e1f2a68a8e56
 :END:
@@ -1932,7 +1927,7 @@ p
 ]
 #+end_src
 
-*** Additional tests
+** Additional tests
 
 The simple case with no style markers.
 
@@ -2205,7 +2200,7 @@ p
 ]
 #+end_src
 
-** Links
+* Links
 :PROPERTIES:
 :ID:       f8254d58-7a3d-4595-a265-e0d6255e6ab5
 :END:
@@ -2325,7 +2320,7 @@ https://www.haskell.org is an example of a raw link. This is a convenience
 facility because ~[[https://www.haskell.org]]~ behaves the same way as
 ~https://www.haskell.org~.
 
-*** OIDs and Emacs
+** OIDs and Emacs
 :PROPERTIES:
 :ID:       96f8cbda-abca-48bd-bb89-512aaac61ca8
 :END:
@@ -2364,7 +2359,7 @@ not use newlines here, and so in the wild everything is in one line):
 The information stored in this file is global, because Emacs will update it
 whenever it encounters Org files.
 
-*** Standalone link parser
+** Standalone link parser
 
 The standalone link parser [[f:linkParser]] can parse links that can be embedded
 inside prose text.
@@ -2406,7 +2401,7 @@ interaction of this parser with these other parsers).
 Note that in [[f:linkParser]] we don't parse [[id:81e1c841-5de8-4111-9b18-f33bea904122][Noweb links]] here because they can only
 exist inside [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code blocks]].
 
-*** OID links
+** OID links
 
 The [[f:oidLinkParser]] closely resembles the [[f:nowebLinkParser]], because they both
 encode a [[data:LinkOid]], the only difference being where they are used (Noweb
@@ -2830,7 +2825,7 @@ p
   )
 #+end_src
 
-*** Links to recognized web protocols
+** Links to recognized web protocols
 
 Links to web protocols like ~https://~ should be parsed as a ~LinkTargetURI~, but
 not just for [[id:8fe81206-f50d-4200-a95e-99278e0ad410][Raw links]] but also those links found inside square brackets, like
@@ -2980,7 +2975,7 @@ p
   )
 #+end_src
 
-*** Filesystem links
+** Filesystem links
 
 Orgmode lets you create links like
 
@@ -3202,7 +3197,7 @@ p
     ]
 #+end_src
 
-*** Raw links
+** Raw links
 :PROPERTIES:
 :ID:       8fe81206-f50d-4200-a95e-99278e0ad410
 :END:
@@ -3400,7 +3395,7 @@ p
     ]
 #+end_src
 
-*** Noweb links
+** Noweb links
 :PROPERTIES:
 :ID:       81e1c841-5de8-4111-9b18-f33bea904122
 :END:
@@ -3434,7 +3429,7 @@ multiple Org files if needed. One simple example is version information that
 we might want to define only in a single place, but which might be referenced
 in other places, across multiple Org files.
 
-*** Footnotes
+** Footnotes
 :PROPERTIES:
 :ID:       4127feee-755d-430e-8fef-192e95143790
 :END:
@@ -3598,7 +3593,7 @@ reconcileFootnotes = do
     | otherwise -> pure orgParserState.footnoteNumbers
 #+end_src
 
-*** Tests
+** Tests
 
 Check for broken links.
 
@@ -3851,7 +3846,7 @@ pf
   95
 #+end_src
 
-** Inline math fragments
+* Inline math fragments
 :PROPERTIES:
 :ID:       216e94b7-e037-4f3e-856a-2040d0d0a75a
 :END:
@@ -3874,7 +3869,7 @@ mathFragmentInlineParser = do
       }
 #+end_src
 
-** Paragraphs
+* Paragraphs
 :PROPERTIES:
 :ID:       272567ab-4077-4a47-ae78-dfe77243ccc0
 :END:
@@ -3978,7 +3973,7 @@ it "accepts empty input for \"notFollowedBy (char ' ')\"" $ do
     `shouldSucceedOn` ""
 #+end_src
 
-*** Tests
+** Tests
 
 Below we check several types of paragraphs without regard to indentation.
 
@@ -4048,7 +4043,7 @@ For tests involving paragraphs and lists, see those prefixed with
 =0005-paragraph-indentation-*=, such as
 [[t:0005-paragraph-indentation-mismatch-over]].
 
-** Headings
+* Headings
 :PROPERTIES:
 :ID:       16a68a74-d4cc-41a4-ac77-cbca77de2a31
 :END:
@@ -4187,7 +4182,7 @@ We consider prose in detail in [[id:c8616126-215d-49be-8874-c2aca7d93a54][Prose]
 [[f:failIfLeftoverActiveStyles]] and also [[f:compressProse]]. Drawers are discussed
 separately [[id:ca12051e-cd17-4d8d-996a-767695441d48][here]].
 
-*** Section number generation
+** Section number generation
 
 Generating the section number relies on the previous section, and the current
 level of the heading for which we want to generate the section number.
@@ -4241,7 +4236,7 @@ describe "genHeadingSection" $ do
     L.genHeadingSection 5 [2, 2] `shouldBe` [1, 0, 0, 2, 2]
 #+end_src
 
-*** Generating the current Org ID
+** Generating the current Org ID
 
 [[f:genHeadingOidStack]] is quite similar to [[f:genHeadingSection]]. The point of it is
 to store the Org IDs up to the current point. This is ultimately used to assign
@@ -4315,7 +4310,7 @@ describe "genHeadingOidStack" $ do
       `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
 #+end_src
 
-*** Tests
+** Tests
 
 By default we only allow 6 levels of headings.
 
@@ -4486,7 +4481,7 @@ pf
   8
 #+end_src
 
-** Drawers
+* Drawers
 :PROPERTIES:
 :ID:       ca12051e-cd17-4d8d-996a-767695441d48
 :END:
@@ -4554,7 +4549,7 @@ propertiesEntryParser = do
 The main tricky bit is ~MP.notFollowedBy $ string ":END:"~; we need this because
 otherwise we will think that the string ~:END:~ is just another key.
 
-*** Tests
+** Tests
 
 The =:PROPERTIES:= drawer may be empty.
 
@@ -4676,7 +4671,7 @@ ps
     }
 #+end_src
 
-** Blocks
+* Blocks
 :PROPERTIES:
 :ID:       cae993e5-02bd-4f89-a6d3-20b41adaff8f
 :END:
@@ -4687,7 +4682,7 @@ references), examples, quotes, and others. Some examples are =src= or =example= 
 in =#+begin_src= and =#+begin_example=), although technically Org allows for any
 arbitrary keyword here.
 
-*** =Block= type
+** =Block= type
 
 #+name: data:Block
 #+begin_src haskell
@@ -4768,7 +4763,7 @@ ps
 ]
 #+end_src
 
-*** Metadata
+** Metadata
 
 Blocks can have associated metadata, as we can see from the test case above. The
 metadata is made up of any number of special key\/value pairs that are written
@@ -4888,7 +4883,7 @@ pf
   52
 #+end_src
 
-*** Body
+** Body
 
 The contents or ~body~ of a [[data:Block]] is list of =BToken= values, which are quite
 similar to =Prose= (a list of =PToken= types). A =BToken= can be either some raw piece
@@ -4908,7 +4903,7 @@ data BToken
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-*** Overall parser
+** Overall parser
 
 Let's see how we parse the block itself with =blockParser=.
 
@@ -5181,7 +5176,7 @@ figures) can have a =#+name= associated with them.
 We fail the parse if we detect a ~#+begin_src~ block without an accompanying
 language; see [[t:0007-block-src-without-lang]].
 
-*** =bTokenParser= (code block contents)
+** =bTokenParser= (code block contents)
 
 Now let's dig into the actual block tokens (~[BToken]~) which form the contents of
 the code block. These ~BToken~ values can be either text (~BTokenString~) or a Noweb
@@ -5223,7 +5218,7 @@ parser for the ~left angle bracket~ is there to take care of an edge case where 
 Noweb reference is immediately preceded by another left angle bracket ~<~; see
 [[t:0007-blocks-noweb-intraline]] for details.
 
-*** =nowebLinkParser=
+** =nowebLinkParser=
 :PROPERTIES:
 :ID:       d9b8b9d6-0334-4d9a-9146-d6bd158f0d77
 :END:
@@ -5605,7 +5600,7 @@ ps
 ]
 #+end_src
 
-*** Add padding between consecutive Noweb links
+** Add padding between consecutive Noweb links
 :PROPERTIES:
 :ID:       51f2edd8-5f8e-4c63-841f-da6c5c41680a
 :END:
@@ -5768,7 +5763,7 @@ padConsecutiveNowebLinks blockBody =
 See [[id:c78d3f21-b295-4f19-b720-ab50dedb3252::t:0102-pad-between-consecutive-links][t:0102-pad-between-consecutive-links]] for an example of this padding
 behavior.
 
-*** Additional tests
+** Additional tests
 
 A =#+begin_src= without an accompanying language should trigger an error.
 
@@ -5920,7 +5915,7 @@ ps
 ]
 #+end_src
 
-** List items
+* List items
 :PROPERTIES:
 :ID:       58f69993-599d-4389-ba47-3056b1bb2350
 :END:
@@ -5966,7 +5961,7 @@ to make it belong to ~* a~ (any such content must be placed /before/ ~** b~).
 Below we have a look at some more detailed rules around how lists may be written
 in an Org file.
 
-*** Detailed rules
+** Detailed rules
 :PROPERTIES:
 :ID:       32d34523-2148-4f2f-b2f3-2a2543a7d57c
 :END:
@@ -6163,7 +6158,7 @@ paragraph below):
 
     - b
 
-*** Indentation and =ListMarker=
+** Indentation and =ListMarker=
 
 Parsing list items is tricky because of meaningful indentation (whitespace).
 Keeping track of the current level of indentation requires additional state
@@ -6228,7 +6223,7 @@ us parse things into a single global list of cells in [[f:cellParser]], without 
 need to nest them inside a recursive data structure (as shown in
 https://markkarpov.com/tutorial/megaparsec.html#nested-indented-list).
 
-*** Parsing initial indentation to close list items
+** Parsing initial indentation to close list items
 :PROPERTIES:
 :ID:       5990dd7f-2f37-4a9e-96ea-6cc6b2e20dc0
 :END:
@@ -6404,7 +6399,7 @@ getEndingListMarkers levelsToDrop = concatMap f . take levelsToDrop
       Just _ -> [LItemEnd, LOrderedEnd]
 #+end_src
 
-*** Parsing list heads
+** Parsing list heads
 
 In the [[id:5990dd7f-2f37-4a9e-96ea-6cc6b2e20dc0][previous section]] we considered how to close off list items based purely
 on indentation. Parsing list heads is similar (because list heads can also close
@@ -6542,7 +6537,7 @@ than the current level. If this is the case, we delegate to [[f:listItemNester]]
 Otherwise the list item is merely continuing some existing list, for which we
 delegate to [[f:listItemFitter]].
 
-*** Nesting the list item beyond the current level
+** Nesting the list item beyond the current level
 
 =listItemNester= appends starting markers to =listMarkers=. We use this information
 in other places when we want to know how to un-nest an item (close it off),
@@ -6582,7 +6577,7 @@ rest of the function just updates the ~orgParserState~ to have the additional
 ~level~ as the new most-deeply-nested level, and also grows the ~listMarkers~
 accordingly.
 
-*** Fitting the list item into an existing level
+** Fitting the list item into an existing level
 
 The goal of [[f:listItemFitter]] is twofold:
 
@@ -6651,7 +6646,7 @@ We use [[f:listItemStartParser]] and [[f:listItemsEndParser]] inside
 [[f:cellParser]]; the former identifies and the beginnings of list items, while
 the latter recognizes their (complete) end when there is no more indentation.
 
-*** Tests
+** Tests
 
 There are [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][so many rules]] associated with lists; we try to check a few of them
 here.
@@ -7350,7 +7345,7 @@ pf
   25
 #+end_src
 
-** Standalone math fragments
+* Standalone math fragments
 :PROPERTIES:
 :ID:       d1064535-5c98-4c80-a901-5cdc1fd5297f
 :END:
@@ -7681,7 +7676,7 @@ ps
     }
 #+end_src
 
-** Figures
+* Figures
 :PROPERTIES:
 :ID:       a090bf9c-0e52-422b-b0f0-51e3b1bf1698
 :END:
@@ -7743,7 +7738,7 @@ Below is the same, but the figure does not have a ~name~ in the metadata, nor a
 The only practical difference is that the unnamed figure is not able to be
 referenced using a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] by this or other Org files.
 
-*** Figure parser
+** Figure parser
 
 First we have to parse for the metadata, and then the link. We don't allow
 figures inside list items, because that's just weird (how are you going to have
@@ -7847,7 +7842,7 @@ metaEntryParser = do
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
 #+end_src
 
-*** Tests
+** Tests
 
 Below we parse a doc that has figures and blocks, both with metadata.
 
@@ -8035,7 +8030,7 @@ ps
     }
 #+end_src
 
-** Tables
+* Tables
 :PROPERTIES:
 :ID:       d0f60631-8b30-4ae1-992d-49c7b0ea38fb
 :END:
@@ -8284,7 +8279,7 @@ rowToTuples (rowIndex, row)
       )
 #+end_src
 
-*** Check for numeric table cell
+** Check for numeric table cell
 
 It's useful to know if a table cell contains mostly numeric content, at the time
 of weaving (see [[id:6c10afe2-2714-4e85-9121-e96a36d27ba4::f:weaveTable][f:weaveTable]]). This way, we can right-align the contents of that
@@ -8325,7 +8320,7 @@ isNumericTextParser = do
     sign = MP.satisfy (`elem` ['-', '+'])
 #+end_src
 
-*** Tests
+** Tests
 
 The test below checks if we can parse a table with all 3 types of prose text
 (styled text, links, and math fragments).
@@ -8762,7 +8757,7 @@ ps
 ]
 #+end_src
 
-** Testing framework
+* Testing framework
 :PROPERTIES:
 :ID:       ebf0d269-79d3-408a-a6e7-baf720d73837
 :END:
@@ -8787,7 +8782,7 @@ The downside is that we have to perform lots of small read operations (IO) to
 run the unit tests. But this cost is small enough that we can ignore it (we
 spend far more time compiling the tests themselves).
 
-*** Test module and helpers
+** Test module and helpers
 :PROPERTIES:
 :ID:       906bcb25-4380-4e41-a941-e57cbcf7d2a1
 :END:
@@ -9103,7 +9098,7 @@ plainHeading level section =
     )
 #+end_src
 
-*** All test cases
+** All test cases
 
 Below are all of the individual test cases.
 
