@@ -942,9 +942,10 @@ blockMetaEntryParser = do
   _ <- string "#+header: :"
   key <- MP.takeWhile1P (Just "(block meta) keyword letter") isKeywordLetter
   _ <- char ' '
+  o <- MP.getOffset
   value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
   _ <- char '\n'
-  assertUniqueTanglePath key value
+  assertUniqueTanglePath key value o
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')]
@@ -956,19 +957,18 @@ metaNameParser = do
   assertUniqueCellName name
   pure ("name", name)
 
-assertUniqueTanglePath :: Text -> Text -> OrgParser ()
-assertUniqueTanglePath "tangle" path = do
+assertUniqueTanglePath :: Text -> Text -> Int -> OrgParser ()
+assertUniqueTanglePath "tangle" path offset = do
   orgParserState <- get
   when (Set.member path orgParserState.tanglePaths)
-    . fail
-    $ "tangle path "
-    <> show path
-    <> " is not unique"
+    $ do
+      MP.setOffset $ offset
+      fail $ "tangle path " <> show path <> " is not unique"
   put
     orgParserState
       { tanglePaths = Set.insert path orgParserState.tanglePaths
       }
-assertUniqueTanglePath _ _ = pure ()
+assertUniqueTanglePath _ _ _ = pure ()
 
 blockParser :: OrgParser Cell
 blockParser = do

@@ -1738,7 +1738,7 @@ parseSpec = do
   pf
     "0007-blocks-duplicate-tangle-paths"
     "tangle path \"some/path.sh\" is not unique"
-    114
+    101
 
   ps
     "0007-blocks-special-commas"
