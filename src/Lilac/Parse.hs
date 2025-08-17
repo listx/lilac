@@ -809,7 +809,7 @@ protocolWebLinkParser = do
         MP.try linkDisplayNameParser
       ]
   case N.parseURI (T.unpack maybeUri) of
-    Nothing -> fail $ "not a valid URI: " <> (T.unpack maybeUri)
+    Nothing -> fail $ "(protocol web link) not a valid URI: " <> (T.unpack maybeUri)
     Just uri ->
       pure
         $ Link
@@ -865,7 +865,7 @@ rawLinkParser :: OrgParser Link
 rawLinkParser = do
   candidate <- MP.some (MP.try remainderChar)
   case N.parseURI candidate of
-    Nothing -> fail $ "not a valid URI: " <> candidate
+    Nothing -> fail $ "(raw link) not a valid URI: " <> candidate
     Just uri ->
       pure
         Link
