@@ -61,6 +61,7 @@ module Lilac.Weave
   )
 where
 
+import Citeproc (citeproc)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
@@ -1614,6 +1615,12 @@ weaveFootnote footnote = do
           sequence_ $ map weavePToken footnote.body
     | otherwise -> pure ()
 #+end_src
+
+** Citations
+
+For weaving citations, we use a 2-step process. First, we weave the prose
+contents of [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Citation][data:Citation]] into HTML, while preserving the structure. Then we
+call into =Citeproc.citeproc= to get the new HTML strings we want.
 
 * Generate CSS
 :PROPERTIES:

@@ -6,6 +6,7 @@ module Lilac.Weave
   )
 where
 
+import Citeproc (citeproc)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T

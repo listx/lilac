@@ -43,6 +43,8 @@ let
 
   jailbreaks = final: prev: {
     skylighting-core = pkgs.haskell.lib.doJailbreak (prev.skylighting-core);
+
+    unicode-data = pkgs.haskell.lib.dontCheck prev.unicode-data;
   };
 
   injectExternalPackages = final: prev: {
@@ -56,6 +58,15 @@ let
           sparseCheckout = [ "xml-conduit" ];
         };
       in "${repo}/xml-conduit") { });
+
+    citeproc = pkgs.haskell.lib.dontCheck (prev.callCabal2nix "citeproc" (let
+      repo = fetchFromGitHub {
+        owner = "jgm";
+        repo = "citeproc";
+        rev = "8078d4c25380a37e497c7d3dc4384691be8a2b8a";
+        sha256 = "sha256-TSLRuH/veHB+MipeSK7JqIAZ7QSG+7vrX+UvBu9ippc=";
+      };
+    in "${repo}") { });
   };
 
   injectLilac = final: prev: {
