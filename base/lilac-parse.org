@@ -400,7 +400,6 @@ import Relude
     (&&),
     (*),
     (+),
-    (++),
     (-),
     (.),
     (/=),
@@ -1495,7 +1494,7 @@ failIfLeftoverActiveStyles = do
   when (mask /= 0) $ do
     fail
       $ "leftover active styles: "
-      ++ (show $ maskToStyles $ StyleMask mask)
+      <> (show $ maskToStyles $ StyleMask mask)
 #+end_src
 
 We don't really care which styles are turned on or off at which point (the style

@@ -167,7 +167,6 @@ import Relude
     (&&),
     (*),
     (+),
-    (++),
     (-),
     (.),
     (/=),
@@ -590,7 +589,7 @@ failIfLeftoverActiveStyles = do
   when (mask /= 0) $ do
     fail
       $ "leftover active styles: "
-      ++ (show $ maskToStyles $ StyleMask mask)
+      <> (show $ maskToStyles $ StyleMask mask)
 
 styleMarkerParser :: OrgParser StyledText
 styleMarkerParser = do
