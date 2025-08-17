@@ -274,6 +274,7 @@ defaultCss = do
         display inlineBlock
         width (em 1)
         height (em 1)
+        margin 0 (em (-0.2)) 0 0
   ".sourceCode" & do
     noMargin
   ".code-block-container" & do
