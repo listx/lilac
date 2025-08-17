@@ -1538,7 +1538,7 @@ p
 #+name: Expected prose for 0005-styled-strings-ignore-marker-inside-word
 #+begin_src haskell
 [ PTokenStyledText
-    (StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = L.styleMaskFrom [Italic]})
+    StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = L.styleMaskFrom [Italic]}
 ]
 #+end_src
 
@@ -1594,14 +1594,13 @@ ps
   "0005-styled-strings-messy-boundaries"
   ( nilOrgDoc
       [ CHeading
-          ( Heading
-              { level = 1,
-                section = [1],
-                body =
-                  <<Expected prose for 0005-styled-strings-messy-boundaries>>,
-                meta = fromList []
-              }
-          )
+          Heading
+            { level = 1,
+              section = [1],
+              body =
+                <<Expected prose for 0005-styled-strings-messy-boundaries>>,
+              meta = fromList []
+            }
       ]
   )
   L.defaultOrgParserState
@@ -1614,17 +1613,17 @@ ps
 #+name: Expected prose for 0005-styled-strings-messy-boundaries
 #+begin_src haskell
 [ PTokenStyledText
-    (StyledText {body = "foo ", style = L.styleMaskFrom [Bold]}),
+    StyledText {body = "foo ", style = L.styleMaskFrom [Bold]},
   PTokenStyledText
-    (StyledText {body = "bar baz a", style = L.styleMaskFrom []}),
+    StyledText {body = "bar baz a", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "b", style = L.styleMaskFrom [Bold]}),
+    StyledText {body = "b", style = L.styleMaskFrom [Bold]},
   PTokenStyledText
-    (StyledText {body = "c (", style = L.styleMaskFrom []}),
+    StyledText {body = "c (", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "ok", style = L.styleMaskFrom [Bold]}),
+    StyledText {body = "ok", style = L.styleMaskFrom [Bold]},
   PTokenStyledText
-    (StyledText {body = ") yes", style = L.styleMaskFrom []})
+    StyledText {body = ") yes", style = L.styleMaskFrom []}
 ]
 #+end_src
 
@@ -2020,9 +2019,9 @@ p
 #+name: Expected prose for 0005-styled-strings-compression
 #+begin_src haskell
 [ PTokenStyledText
-    (StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
+    StyledText {body = "a b c d e ", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "f g h i j", style = L.styleMaskFrom [Bold]})
+    StyledText {body = "f g h i j", style = L.styleMaskFrom [Bold]}
 ]
 #+end_src
 
@@ -2058,23 +2057,20 @@ p
   $ nilOrgDoc
     [ CParagraph
         [ PTokenStyledText
-            ( StyledText
-                { body = "foo ",
-                  style = L.styleMaskFrom []
-                }
-            ),
+            StyledText
+              { body = "foo ",
+                style = L.styleMaskFrom []
+              },
           PTokenStyledText
-            ( StyledText
-                { body = "bar",
-                  style = L.styleMaskFrom [Bold]
-                }
-            ),
+            StyledText
+              { body = "bar",
+                style = L.styleMaskFrom [Bold]
+              },
           PTokenStyledText
-            ( StyledText
-                { body = " baz",
-                  style = L.styleMaskFrom []
-                }
-            )
+            StyledText
+              { body = " baz",
+                style = L.styleMaskFrom []
+              }
         ]
     ]
 #+end_src
@@ -2099,33 +2095,31 @@ p
 #+name: Expected prose for 0005-styled-strings-complex
 #+begin_src haskell
 [ PTokenStyledText
-    (StyledText {body = "foo ", style = L.styleMaskFrom [Bold]}),
+    StyledText {body = "foo ", style = L.styleMaskFrom [Bold]},
   PTokenStyledText
-    (StyledText {body = "bar ", style = L.styleMaskFrom [Bold, Italic]}),
+    StyledText {body = "bar ", style = L.styleMaskFrom [Bold, Italic]},
   PTokenStyledText
-    ( StyledText
-        { body = "underlined bold and italic",
-          style = L.styleMaskFrom [Bold, Italic, Underline]
-        }
-    ),
+    StyledText
+      { body = "underlined bold and italic",
+        style = L.styleMaskFrom [Bold, Italic, Underline]
+      },
   PTokenStyledText
-    (StyledText {body = " baz", style = L.styleMaskFrom [Bold]}),
+    StyledText {body = " baz", style = L.styleMaskFrom [Bold]},
   PTokenStyledText
-    (StyledText {body = " ", style = L.styleMaskFrom []}),
+    StyledText {body = " ", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "verbatim  text", style = L.styleMaskFrom [Verbatim]}),
+    StyledText {body = "verbatim  text", style = L.styleMaskFrom [Verbatim]},
   PTokenStyledText
-    (StyledText {body = " ", style = L.styleMaskFrom []}),
+    StyledText {body = " ", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "x  y  z", style = L.styleMaskFrom [Code]}),
+    StyledText {body = "x  y  z", style = L.styleMaskFrom [Code]},
   PTokenStyledText
-    (StyledText {body = " ", style = L.styleMaskFrom []}),
+    StyledText {body = " ", style = L.styleMaskFrom []},
   PTokenStyledText
-    ( StyledText
-        { body = "bold",
-          style = L.styleMaskFrom [Bold]
-        }
-    )
+    StyledText
+      { body = "bold",
+        style = L.styleMaskFrom [Bold]
+      }
 ]
 #+end_src
 
@@ -2152,19 +2146,19 @@ Note how we preserve the information of having no space character between the
 #+name: Expected prose for 0005-styled-strings-complex-punctuation
 #+begin_src haskell
 [ PTokenStyledText
-    (StyledText {body = "(foo ", style = L.styleMaskFrom []}),
+    StyledText {body = "(foo ", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "bar", style = L.styleMaskFrom [Verbatim]}),
+    StyledText {body = "bar", style = L.styleMaskFrom [Verbatim]},
   PTokenStyledText
-    (StyledText {body = "). What's up? and ", style = L.styleMaskFrom []}),
+    StyledText {body = "). What's up? and ", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "that!", style = L.styleMaskFrom [Bold]}),
+    StyledText {body = "that!", style = L.styleMaskFrom [Bold]},
   PTokenStyledText
-    (StyledText {body = " ", style = L.styleMaskFrom []}),
+    StyledText {body = " ", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "(italic)", style = L.styleMaskFrom [Italic]}),
+    StyledText {body = "(italic)", style = L.styleMaskFrom [Italic]},
   PTokenStyledText
-    (StyledText {body = ". It's #1!", style = L.styleMaskFrom []})
+    StyledText {body = ". It's #1!", style = L.styleMaskFrom []}
 ]
 #+end_src
 
@@ -2189,11 +2183,11 @@ p
 #+name: Expected prose for 0005-styled-strings-verbatim
 #+begin_src haskell
 [ PTokenStyledText
-    (StyledText {body = "(", style = L.styleMaskFrom []}),
+    StyledText {body = "(", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "import ./.", style = L.styleMaskFrom [Verbatim]}),
+    StyledText {body = "import ./.", style = L.styleMaskFrom [Verbatim]},
   PTokenStyledText
-    (StyledText {body = ") hello", style = L.styleMaskFrom []})
+    StyledText {body = ") hello", style = L.styleMaskFrom []}
 ]
 #+end_src
 
@@ -2218,19 +2212,19 @@ p
 #+name: Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold
 #+begin_src haskell
 [ PTokenStyledText
-    (StyledText {body = "*a", style = L.styleMaskFrom [Verbatim]}),
+    StyledText {body = "*a", style = L.styleMaskFrom [Verbatim]},
   PTokenStyledText
-    (StyledText {body = " ", style = L.styleMaskFrom []}),
+    StyledText {body = " ", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "b*", style = L.styleMaskFrom [Verbatim]}),
+    StyledText {body = "b*", style = L.styleMaskFrom [Verbatim]},
   PTokenStyledText
-    (StyledText {body = " ", style = L.styleMaskFrom []}),
+    StyledText {body = " ", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "*c", style = L.styleMaskFrom [Code]}),
+    StyledText {body = "*c", style = L.styleMaskFrom [Code]},
   PTokenStyledText
-    (StyledText {body = " ", style = L.styleMaskFrom []}),
+    StyledText {body = " ", style = L.styleMaskFrom []},
   PTokenStyledText
-    (StyledText {body = "d*", style = L.styleMaskFrom [Code]})
+    StyledText {body = "d*", style = L.styleMaskFrom [Code]}
 ]
 #+end_src
 
@@ -2262,39 +2256,38 @@ p
 #+begin_src haskell
 [ CParagraph
     [ PTokenStyledText
-        (StyledText {body = "[[foo", style = L.styleMaskFrom [Verbatim]})
+        StyledText {body = "[[foo", style = L.styleMaskFrom [Verbatim]}
     ],
   CParagraph
     [ PTokenLink
-        ( Link
-            { target =
-                LinkTargetOid
-                  LinkOid
-                    { oid = nilOid,
-                      name = "hello"
-                    },
-              name =
-                [ StyledText
-                    { body = "hello",
-                      style = L.styleMaskFrom []
-                    }
-                ]
-            }
-        ),
+        Link
+          { target =
+              LinkTargetOid
+                LinkOid
+                  { oid = nilOid,
+                    name = "hello"
+                  },
+            name =
+              [ StyledText
+                  { body = "hello",
+                    style = L.styleMaskFrom []
+                  }
+              ]
+          },
       PTokenStyledText
-        (StyledText {body = " there", style = L.styleMaskFrom []})
+        StyledText {body = " there", style = L.styleMaskFrom []}
     ],
   CParagraph
     [ PTokenStyledText
-        (StyledText {body = "\\(1 + 1 ", style = L.styleMaskFrom [Verbatim]}),
+        StyledText {body = "\\(1 + 1 ", style = L.styleMaskFrom [Verbatim]},
       PTokenStyledText
-        (StyledText {body = " ", style = L.styleMaskFrom []}),
+        StyledText {body = " ", style = L.styleMaskFrom []},
       PTokenStyledText
-        (StyledText {body = "\\(2 * 2\\)", style = L.styleMaskFrom [Code]})
+        StyledText {body = "\\(2 * 2\\)", style = L.styleMaskFrom [Code]}
     ],
   CParagraph
     [ PTokenStyledText
-        (StyledText {body = "[[bar]]", style = L.styleMaskFrom [Code]})
+        StyledText {body = "[[bar]]", style = L.styleMaskFrom [Code]}
     ]
 ]
 #+end_src
@@ -2614,147 +2607,136 @@ p
   ( nilOrgDoc
       [ CParagraph
           [ PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
-                            name = ""
-                          },
-                    name =
-                      [ StyledText
-                          { body = "id:442c807f-c9d9-45a7-88bf-ffffffffffff",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              ),
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                          name = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "id:442c807f-c9d9-45a7-88bf-ffffffffffff",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
             PTokenStyledText
-              ( StyledText
-                  { body = " ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = " ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
-                            name = ""
-                          },
-                    name =
-                      [ StyledText
-                          { body = "bar",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              ),
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                          name = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "bar",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
             PTokenStyledText
-              ( StyledText
-                  { body = " ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = " ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
-                            name = ""
-                          },
-                    name =
-                      [ StyledText
-                          { body = "bar",
-                            style = L.styleMaskFrom []
-                          },
-                        StyledText
-                          { body = " ",
-                            style = L.styleMaskFrom []
-                          },
-                        StyledText
-                          { body = "[]",
-                            style = L.styleMaskFrom [Verbatim]
-                          }
-                      ]
-                  }
-              ),
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                          name = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "bar",
+                          style = L.styleMaskFrom []
+                        },
+                      StyledText
+                        { body = " ",
+                          style = L.styleMaskFrom []
+                        },
+                      StyledText
+                        { body = "[]",
+                          style = L.styleMaskFrom [Verbatim]
+                        }
+                    ]
+                },
             PTokenStyledText
-              ( StyledText
-                  { body = " ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = " ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
-                            name = ""
-                          },
-                    name =
-                      [ StyledText
-                          { body = "bar",
-                            style = L.styleMaskFrom []
-                          },
-                        StyledText
-                          { body = " ",
-                            style = L.styleMaskFrom []
-                          },
-                        StyledText
-                          { body = "ok",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              ),
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                          name = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "bar",
+                          style = L.styleMaskFrom []
+                        },
+                      StyledText
+                        { body = " ",
+                          style = L.styleMaskFrom []
+                        },
+                      StyledText
+                        { body = "ok",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
             PTokenStyledText
-              ( StyledText
-                  { body = " ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = " ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
-                            name = "foo"
-                          },
-                    name =
-                      [ StyledText
-                          { body = "abc",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              ),
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                          name = "foo"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "abc",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
             PTokenStyledText
-              ( StyledText
-                  { body = " ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = " ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = nilOid,
-                            name = "foo"
-                          },
-                    name =
-                      [ StyledText
-                          { body = "abc",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              )
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "foo"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "abc",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
           ],
         CListItem
           [ LUnorderedStart,
@@ -2762,52 +2744,49 @@ p
           ],
         CParagraph
           [ PTokenStyledText
-              ( StyledText
-                  { body = "link name across list indentation ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = "link name across list indentation ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { name =
-                      [ StyledText
-                          { body = "italic",
-                            style = L.styleMaskFrom [Italic]
-                          },
-                        StyledText
-                          { body = " ",
-                            style = L.styleMaskFrom []
-                          },
-                        StyledText
-                          { body = "def",
-                            style = L.styleMaskFrom []
-                          },
-                        StyledText
-                          { body = " ",
-                            style = L.styleMaskFrom []
-                          },
-                        StyledText
-                          { body = "ghi]",
-                            style = L.styleMaskFrom []
-                          },
-                        StyledText
-                          { body = " ",
-                            style = L.styleMaskFrom []
-                          },
-                        StyledText
-                          { body = "!",
-                            style = L.styleMaskFrom []
-                          }
-                      ],
-                    target =
-                      LinkTargetOid
-                        ( LinkOid
-                            { oid = nilOid,
-                              name = "foo"
-                            }
-                        )
-                  }
-              )
+              Link
+                { name =
+                    [ StyledText
+                        { body = "italic",
+                          style = L.styleMaskFrom [Italic]
+                        },
+                      StyledText
+                        { body = " ",
+                          style = L.styleMaskFrom []
+                        },
+                      StyledText
+                        { body = "def",
+                          style = L.styleMaskFrom []
+                        },
+                      StyledText
+                        { body = " ",
+                          style = L.styleMaskFrom []
+                        },
+                      StyledText
+                        { body = "ghi]",
+                          style = L.styleMaskFrom []
+                        },
+                      StyledText
+                        { body = " ",
+                          style = L.styleMaskFrom []
+                        },
+                      StyledText
+                        { body = "!",
+                          style = L.styleMaskFrom []
+                        }
+                    ],
+                  target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "foo"
+                        }
+                }
           ],
         CListItem
           [ LItemEnd,
@@ -2815,28 +2794,25 @@ p
           ],
         CParagraph
           [ PTokenStyledText
-              ( StyledText
-                  { body = "link target with spaces ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = "link target with spaces ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { name =
-                      [ StyledText
-                          { body = "foo bar baz",
-                            style = L.styleMaskFrom []
-                          }
-                      ],
-                    target =
-                      LinkTargetOid
-                        ( LinkOid
-                            { oid = nilOid,
-                              name = "foo bar baz"
-                            }
-                        )
-                  }
-              )
+              Link
+                { name =
+                    [ StyledText
+                        { body = "foo bar baz",
+                          style = L.styleMaskFrom []
+                        }
+                    ],
+                  target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "foo bar baz"
+                        }
+                }
           ],
         CListItem
           [ LItemEnd,
@@ -2844,28 +2820,25 @@ p
           ],
         CParagraph
           [ PTokenStyledText
-              ( StyledText
-                  { body = "oid with spaces ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = "oid with spaces ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { name =
-                      [ StyledText
-                          { body = "a b c",
-                            style = L.styleMaskFrom []
-                          }
-                      ],
-                    target =
-                      LinkTargetOid
-                        ( LinkOid
-                            { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
-                              name = "a b c"
-                            }
-                        )
-                  }
-              )
+              Link
+                { name =
+                    [ StyledText
+                        { body = "a b c",
+                          style = L.styleMaskFrom []
+                        }
+                    ],
+                  target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                          name = "a b c"
+                        }
+                }
           ],
         CListItem
           [ LItemEnd,
@@ -2898,27 +2871,25 @@ p
   ( nilOrgDoc
       [ CParagraph
           [ PTokenStyledText
-              ( StyledText
-                  { body = "Hello ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = "Hello ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
-                            name = "target name with newline and space is still treated as space"
-                          },
-                    name =
-                      [ StyledText
-                          { body = "foo",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              )
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
+                          name = "target name with newline and space is still treated as space"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "foo",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
           ]
       ]
   )
@@ -2983,92 +2954,87 @@ p
   ( nilOrgDoc
       [ CParagraph
           [ PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetURI
-                        N.URI
-                          { N.uriScheme = "http:",
-                            N.uriAuthority =
-                              Just
-                                N.URIAuth
-                                  { N.uriUserInfo = "",
-                                    N.uriRegName = "foo.org",
-                                    N.uriPort = ""
-                                  },
-                            N.uriPath = "",
-                            N.uriQuery = "",
-                            N.uriFragment = ""
-                          },
-                    name =
-                      [ StyledText
-                          { body = "http://foo.org",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              ),
+              Link
+                { target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "http:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "foo.org",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "http://foo.org",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
             PTokenStyledText
-              ( StyledText
-                  { body = " ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = " ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetURI
-                        N.URI
-                          { N.uriScheme = "https:",
-                            N.uriAuthority =
-                              Just
-                                N.URIAuth
-                                  { N.uriUserInfo = "",
-                                    N.uriRegName = "foo.org",
-                                    N.uriPort = ""
-                                  },
-                            N.uriPath = "",
-                            N.uriQuery = "",
-                            N.uriFragment = ""
-                          },
-                    name =
-                      [ StyledText
-                          { body = "https://foo.org",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              ),
+              Link
+                { target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "foo.org",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "https://foo.org",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
             PTokenStyledText
-              ( StyledText
-                  { body = " ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = " ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetURI
-                        N.URI
-                          { N.uriScheme = "https:",
-                            N.uriAuthority =
-                              Just
-                                N.URIAuth
-                                  { N.uriUserInfo = "",
-                                    N.uriRegName = "foo.org",
-                                    N.uriPort = ""
-                                  },
-                            N.uriPath = "",
-                            N.uriQuery = "",
-                            N.uriFragment = ""
-                          },
-                    name =
-                      [ StyledText
-                          { body = "hello",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              )
+              Link
+                { target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "foo.org",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        },
+                  name =
+                    [ StyledText
+                        { body = "hello",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
           ]
       ]
   )
@@ -3148,76 +3114,70 @@ ps
   ( nilOrgDoc
       [ CParagraph
           [ PTokenStyledText
-              ( StyledText
-                  { body = "foo ",
-                    style = L.styleMaskFrom []
-                  }
-              ),
+              StyledText
+                { body = "foo ",
+                  style = L.styleMaskFrom []
+                },
             PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = nilOid,
-                            name = "link-target-only"
-                          },
-                    name =
-                      [ StyledText
-                          { body = "link-target-only",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              )
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "link-target-only"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "link-target-only",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                }
           ],
         CHeading
-          ( Heading
-              { level = 1,
-                section = [1],
-                body =
-                  [ PTokenLink
-                      ( Link
-                          { target =
-                              LinkTargetOid
-                                LinkOid
-                                  { oid = nilOid,
-                                    name = "link-target"
-                                  },
-                            name =
-                              [ StyledText
-                                  { body = "link-name",
-                                    style = L.styleMaskFrom []
-                                  }
-                              ]
-                          }
-                      )
-                  ],
-                meta = fromList []
-              }
-          ),
+          Heading
+            { level = 1,
+              section = [1],
+              body =
+                [ PTokenLink
+                    Link
+                      { target =
+                          LinkTargetOid
+                            LinkOid
+                              { oid = nilOid,
+                                name = "link-target"
+                              },
+                        name =
+                          [ StyledText
+                              { body = "link-name",
+                                style = L.styleMaskFrom []
+                              }
+                          ]
+                      }
+                ],
+              meta = fromList []
+            },
         CParagraph
           [ PTokenLink
-              ( Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = nilOid,
-                            name = "a"
-                          },
-                    name =
-                      [ StyledText
-                          { body = "a",
-                            style = L.styleMaskFrom []
-                          }
-                      ]
-                  }
-              ),
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "a"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "a",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
             PTokenStyledText
-              ( StyledText
-                  { body = " b",
-                    style = L.styleMaskFrom []
-                  }
-              )
+              StyledText
+                { body = " b",
+                  style = L.styleMaskFrom []
+                }
           ]
       ]
   )
@@ -3246,28 +3206,25 @@ p
   $ nilOrgDoc
     [ CParagraph
         [ PTokenStyledText
-            ( StyledText
-                { body = "(",
-                  style = L.styleMaskFrom []
-                }
-            ),
+            StyledText
+              { body = "(",
+                style = L.styleMaskFrom []
+              },
           PTokenLink
-            ( Link
-                { target = LinkTargetFilePath "foo/bar",
-                  name =
-                    [ StyledText
-                        { body = "foo/bar",
-                          style = L.styleMaskFrom []
-                        }
-                    ]
-                }
-            ),
+            Link
+              { target = LinkTargetFilePath "foo/bar",
+                name =
+                  [ StyledText
+                      { body = "foo/bar",
+                        style = L.styleMaskFrom []
+                      }
+                  ]
+              },
           PTokenStyledText
-            ( StyledText
-                { body = ")",
-                  style = L.styleMaskFrom []
-                }
-            )
+            StyledText
+              { body = ")",
+                style = L.styleMaskFrom []
+              }
         ]
     ]
 #+end_src
@@ -3287,11 +3244,10 @@ p
   $ nilOrgDoc
     [ CParagraph
         [ PTokenStyledText
-            ( StyledText
-                { body = "[hi]",
-                  style = L.styleMaskFrom []
-                }
-            )
+            StyledText
+              { body = "[hi]",
+                style = L.styleMaskFrom []
+              }
         ]
     ]
 #+end_src
@@ -3380,135 +3336,126 @@ p
   $ nilOrgDoc
     [ CParagraph
         [ PTokenStyledText
-            ( StyledText
-                { body = "See ",
-                  style = L.styleMaskFrom []
-                }
-            ),
+            StyledText
+              { body = "See ",
+                style = L.styleMaskFrom []
+              },
           PTokenLink
-            ( Link
-                { target =
-                    LinkTargetURI
-                      N.URI
-                        { N.uriScheme = "https:",
-                          N.uriAuthority =
-                            Just
-                              N.URIAuth
-                                { N.uriUserInfo = "",
-                                  N.uriRegName = "foo.org",
-                                  N.uriPort = ""
-                                },
-                          N.uriPath = "",
-                          N.uriQuery = "",
-                          N.uriFragment = ""
-                        },
-                  name =
-                    [ StyledText
-                        { body = "https://foo.org",
-                          style = L.styleMaskFrom []
-                        }
-                    ]
-                }
-            ),
+            Link
+              { target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "https:",
+                        N.uriAuthority =
+                          Just
+                            N.URIAuth
+                              { N.uriUserInfo = "",
+                                N.uriRegName = "foo.org",
+                                N.uriPort = ""
+                              },
+                        N.uriPath = "",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      },
+                name =
+                  [ StyledText
+                      { body = "https://foo.org",
+                        style = L.styleMaskFrom []
+                      }
+                  ]
+              },
           PTokenStyledText
-            ( StyledText
-                { body = ", or ",
-                  style = L.styleMaskFrom []
-                }
-            ),
+            StyledText
+              { body = ", or ",
+                style = L.styleMaskFrom []
+              },
           PTokenLink
-            ( Link
-                { target =
-                    LinkTargetURI
-                      N.URI
-                        { N.uriScheme = "https:",
-                          N.uriAuthority =
-                            Just
-                              N.URIAuth
-                                { N.uriUserInfo = "",
-                                  N.uriRegName = "bar.net",
-                                  N.uriPort = ""
-                                },
-                          N.uriPath = "",
-                          N.uriQuery = "",
-                          N.uriFragment = ""
-                        },
-                  name =
-                    [ StyledText
-                        { body = "https://bar.net",
-                          style = L.styleMaskFrom []
-                        }
-                    ]
-                }
-            ),
+            Link
+              { target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "https:",
+                        N.uriAuthority =
+                          Just
+                            N.URIAuth
+                              { N.uriUserInfo = "",
+                                N.uriRegName = "bar.net",
+                                N.uriPort = ""
+                              },
+                        N.uriPath = "",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      },
+                name =
+                  [ StyledText
+                      { body = "https://bar.net",
+                        style = L.styleMaskFrom []
+                      }
+                  ]
+              },
           PTokenStyledText
-            ( StyledText
-                { body = ". Try ",
-                  style = L.styleMaskFrom []
-                }
-            ),
+            StyledText
+              { body = ". Try ",
+                style = L.styleMaskFrom []
+              },
           PTokenLink
-            ( Link
-                { target =
-                    LinkTargetURI
-                      N.URI
-                        { N.uriScheme = "http:",
-                          N.uriAuthority =
-                            Just
-                              N.URIAuth
-                                { N.uriUserInfo = "",
-                                  N.uriRegName = "localhost",
-                                  N.uriPort = ":3000"
-                                },
-                          N.uriPath = "",
-                          N.uriQuery = "",
-                          N.uriFragment = ""
-                        },
-                  name =
-                    [ StyledText
-                        { body = "http://localhost:3000",
-                          style = L.styleMaskFrom []
-                        }
-                    ]
-                }
-            ),
+            Link
+              { target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "http:",
+                        N.uriAuthority =
+                          Just
+                            N.URIAuth
+                              { N.uriUserInfo = "",
+                                N.uriRegName = "localhost",
+                                N.uriPort = ":3000"
+                              },
+                        N.uriPath = "",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      },
+                name =
+                  [ StyledText
+                      { body = "http://localhost:3000",
+                        style = L.styleMaskFrom []
+                      }
+                  ]
+              },
           PTokenStyledText
-            ( StyledText
-                { body = "? Go to ",
-                  style = L.styleMaskFrom []
-                }
-            ),
+            StyledText
+              { body = "? Go to ",
+                style = L.styleMaskFrom []
+              },
           PTokenLink
-            ( Link
-                { target =
-                    LinkTargetURI
-                      N.URI
-                        { N.uriScheme = "ftp:",
-                          N.uriAuthority =
-                            Just
-                              N.URIAuth
-                                { N.uriUserInfo = "",
-                                  N.uriRegName = "10.0.0.1",
-                                  N.uriPort = ""
-                                },
-                          N.uriPath = "",
-                          N.uriQuery = "",
-                          N.uriFragment = ""
-                        },
-                  name =
-                    [ StyledText
-                        { body = "ftp://10.0.0.1",
-                          style = L.styleMaskFrom []
-                        }
-                    ]
-                }
-            ),
+            Link
+              { target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "ftp:",
+                        N.uriAuthority =
+                          Just
+                            N.URIAuth
+                              { N.uriUserInfo = "",
+                                N.uriRegName = "10.0.0.1",
+                                N.uriPort = ""
+                              },
+                        N.uriPath = "",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      },
+                name =
+                  [ StyledText
+                      { body = "ftp://10.0.0.1",
+                        style = L.styleMaskFrom []
+                      }
+                  ]
+              },
           PTokenStyledText
-            ( StyledText
-                { body = "!",
-                  style = L.styleMaskFrom []
-                }
-            )
+            StyledText
+              { body = "!",
+                style = L.styleMaskFrom []
+              }
         ]
     ]
 #+end_src
@@ -3758,11 +3705,10 @@ Hello [fn:hello] world.
 #+begin_src haskell
 [ CParagraph
     [ PTokenStyledText
-        ( StyledText
-            { body = "Hello",
-              style = L.styleMaskFrom []
-            }
-        ),
+        StyledText
+          { body = "Hello",
+            style = L.styleMaskFrom []
+          },
       PTokenLink
         Link
           { target = LinkTargetFootnote "hello",
@@ -3774,18 +3720,17 @@ Hello [fn:hello] world.
               ]
           },
       PTokenStyledText
-        ( StyledText
-            { body = " world.",
-              style = L.styleMaskFrom []
-            }
-        )
+        StyledText
+          { body = " world.",
+            style = L.styleMaskFrom []
+          }
     ],
   CFootnote
     Footnote
       { name = "hello",
         body =
           [ PTokenStyledText
-              (StyledText {body = "Foo.", style = L.styleMaskFrom []})
+              StyledText {body = "Foo.", style = L.styleMaskFrom []}
           ]
       }
 ]
@@ -3795,19 +3740,18 @@ Hello [fn:hello] world.
 #+begin_src haskell
 ps
   "0013-footnotes-simple"
-  ( OrgDoc
-      { oid = nilOid,
-        cells =
-          <<Expected cells for 0013-footnotes-simple>>,
-        footnoteNumbers =
-          fromList
-            [ ("hello", 1)
-            ],
-        cslPath = Nothing,
-        bibPaths = [],
-        meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        <<Expected cells for 0013-footnotes-simple>>,
+      footnoteNumbers =
+        fromList
+          [ ("hello", 1)
+          ],
+      cslPath = Nothing,
+      bibPaths = [],
+      meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+    }
   L.defaultOrgParserState
     { footnoteNumber = 1,
       footnoteNumbers =
@@ -3818,11 +3762,10 @@ ps
         fromList
           [ ( "hello",
               [ PTokenStyledText
-                  ( StyledText
-                      { body = "Foo.",
-                        style = L.styleMaskFrom []
-                      }
-                  )
+                  StyledText
+                    { body = "Foo.",
+                      style = L.styleMaskFrom []
+                    }
               ]
             )
           ],
@@ -3845,11 +3788,10 @@ Hello [fn:a] world. [fn:b]
 #+begin_src haskell
 [ CParagraph
     [ PTokenStyledText
-        ( StyledText
-            { body = "Hello",
-              style = L.styleMaskFrom []
-            }
-        ),
+        StyledText
+          { body = "Hello",
+            style = L.styleMaskFrom []
+          },
       PTokenLink
         Link
           { target = LinkTargetFootnote "a",
@@ -3861,11 +3803,10 @@ Hello [fn:a] world. [fn:b]
               ]
           },
       PTokenStyledText
-        ( StyledText
-            { body = " world.",
-              style = L.styleMaskFrom []
-            }
-        ),
+        StyledText
+          { body = " world.",
+            style = L.styleMaskFrom []
+          },
       PTokenLink
         Link
           { target = LinkTargetFootnote "b",
@@ -3882,7 +3823,7 @@ Hello [fn:a] world. [fn:b]
       { name = "b",
         body =
           [ PTokenStyledText
-              (StyledText {body = "Definition of b.", style = L.styleMaskFrom []})
+              StyledText {body = "Definition of b.", style = L.styleMaskFrom []}
           ]
       },
   CFootnote
@@ -3890,7 +3831,7 @@ Hello [fn:a] world. [fn:b]
       { name = "a",
         body =
           [ PTokenStyledText
-              (StyledText {body = "Definition of a.", style = L.styleMaskFrom []})
+              StyledText {body = "Definition of a.", style = L.styleMaskFrom []}
           ]
       }
 ]
@@ -3900,20 +3841,19 @@ Hello [fn:a] world. [fn:b]
 #+begin_src haskell
 ps
   "0013-footnotes-complex"
-  ( OrgDoc
-      { oid = nilOid,
-        cells =
-          <<Expected cells for 0013-footnotes-complex>>,
-        footnoteNumbers =
-          fromList
-            [ ("a", 1),
-              ("b", 2)
-            ],
-        cslPath = Nothing,
-        bibPaths = [],
-        meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        <<Expected cells for 0013-footnotes-complex>>,
+      footnoteNumbers =
+        fromList
+          [ ("a", 1),
+            ("b", 2)
+          ],
+      cslPath = Nothing,
+      bibPaths = [],
+      meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+    }
   L.defaultOrgParserState
     { footnoteNumber = 2,
       footnoteNumbers =
@@ -3925,20 +3865,18 @@ ps
         fromList
           [ ( "a",
               [ PTokenStyledText
-                  ( StyledText
-                      { body = "Definition of a.",
-                        style = L.styleMaskFrom []
-                      }
-                  )
+                  StyledText
+                    { body = "Definition of a.",
+                      style = L.styleMaskFrom []
+                    }
               ]
             ),
             ( "b",
               [ PTokenStyledText
-                  ( StyledText
-                      { body = "Definition of b.",
-                        style = L.styleMaskFrom []
-                      }
-                  )
+                  StyledText
+                    { body = "Definition of b.",
+                      style = L.styleMaskFrom []
+                    }
               ]
             )
           ],
@@ -4039,19 +3977,18 @@ validateCslPath maybeCslPath
 #+begin_src haskell
 ps
   "0014-citations-csl-path"
-  ( OrgDoc
-      { oid = nilOid,
-        cells = [],
-        footnoteNumbers = M.empty,
-        cslPath = Just "foo.csl",
-        bibPaths = [],
-        meta =
-          fromList
-            [ ("ID", "00000000-0000-0000-0000-000000000000"),
-              ("cite_export", "csl foo.csl")
-            ]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells = [],
+      footnoteNumbers = M.empty,
+      cslPath = Just "foo.csl",
+      bibPaths = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000"),
+            ("cite_export", "csl foo.csl")
+          ]
+    }
   L.defaultOrgParserState
 #+end_src
 
@@ -4093,21 +4030,20 @@ collectValsFor key kvs =
 #+begin_src haskell
 ps
   "0014-citations-csl-json-paths"
-  ( OrgDoc
-      { oid = nilOid,
-        cells = [],
-        footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths =
-          [ "a.json",
-            "b.json"
-          ],
-        meta =
-          fromList
-            [ ("ID", "00000000-0000-0000-0000-000000000000")
-            ]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells = [],
+      footnoteNumbers = M.empty,
+      cslPath = Nothing,
+      bibPaths =
+        [ "a.json",
+          "b.json"
+        ],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
   L.defaultOrgParserState
 #+end_src
 
@@ -4138,18 +4074,17 @@ bibliographyLocationParser = do
 #+begin_src haskell
 ps
   "0014-citations-bibliography-location"
-  ( OrgDoc
-      { oid = nilOid,
-        cells = [CBibliography ()],
-        footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
-        meta =
-          fromList
-            [ ("ID", "00000000-0000-0000-0000-000000000000")
-            ]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells = [CBibliography ()],
+      footnoteNumbers = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
   L.defaultOrgParserState
 #+end_src
 
@@ -4539,19 +4474,18 @@ Simple citation, without any locators or affixes.
 #+begin_src haskell
 ps
   "0014-citations-single-cite"
-  ( OrgDoc
-      { oid = nilOid,
-        cells =
-          <<Expected prose for 0014-citations-single-cite>>,
-        footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
-        meta =
-          fromList
-            [ ("ID", "00000000-0000-0000-0000-000000000000")
-            ]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        <<Expected prose for 0014-citations-single-cite>>,
+      footnoteNumbers = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
   L.defaultOrgParserState
 #+end_src
 
@@ -4559,20 +4493,19 @@ ps
 #+begin_src haskell
 [ CParagraph
     [ PTokenCitation
-        ( Citation
-            { styleVariation = (Just "v1", Just "v2"),
-              cites =
-                [ Cite
-                    { id = "foo123-.:?!`'/*@+|(){}<>&_^$#%~",
-                      locator = Nothing,
-                      prefix = [],
-                      suffix = []
-                    }
-                ],
-              prefix = [],
-              suffix = []
-            }
-        )
+        Citation
+          { styleVariation = (Just "v1", Just "v2"),
+            cites =
+              [ Cite
+                  { id = "foo123-.:?!`'/*@+|(){}<>&_^$#%~",
+                    locator = Nothing,
+                    prefix = [],
+                    suffix = []
+                  }
+              ],
+            prefix = [],
+            suffix = []
+          }
     ]
 ]
 #+end_src
@@ -4593,19 +4526,18 @@ Cite with various (typical) locators.
 #+begin_src haskell
 ps
   "0014-citations-locators"
-  ( OrgDoc
-      { oid = nilOid,
-        cells =
-          <<Expected prose for 0014-citations-locators>>,
-        footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
-        meta =
-          fromList
-            [ ("ID", "00000000-0000-0000-0000-000000000000")
-            ]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        <<Expected prose for 0014-citations-locators>>,
+      footnoteNumbers = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
   L.defaultOrgParserState
 #+end_src
 
@@ -4721,19 +4653,18 @@ Citations with locators and affixes.
 #+begin_src haskell
 ps
   "0014-citations-locators-affixes"
-  ( OrgDoc
-      { oid = nilOid,
-        cells =
-          <<Expected prose for 0014-citations-locators-affixes>>,
-        footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
-        meta =
-          fromList
-            [ ("ID", "00000000-0000-0000-0000-000000000000")
-            ]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        <<Expected prose for 0014-citations-locators-affixes>>,
+      footnoteNumbers = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
   L.defaultOrgParserState
 #+end_src
 
@@ -4749,19 +4680,17 @@ ps
                     locator = Just ("page", "15"),
                     prefix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "prefix",
-                                style = L.styleMaskFrom []
-                              }
-                          )
+                          StyledText
+                            { body = "prefix",
+                              style = L.styleMaskFrom []
+                            }
                       ],
                     suffix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "suffix",
-                                style = L.styleMaskFrom []
-                              }
-                          )
+                          StyledText
+                            { body = "suffix",
+                              style = L.styleMaskFrom []
+                            }
                       ]
                   }
               ],
@@ -4784,19 +4713,17 @@ ps
                     locator = Just ("chapter", "4"),
                     prefix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "a really long prefix, maybe?",
-                                style = L.styleMaskFrom []
-                              }
-                          )
+                          StyledText
+                            { body = "a really long prefix, maybe?",
+                              style = L.styleMaskFrom []
+                            }
                       ],
                     suffix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "more suffix",
-                                style = L.styleMaskFrom []
-                              }
-                          )
+                          StyledText
+                            { body = "more suffix",
+                              style = L.styleMaskFrom []
+                            }
                       ]
                   }
               ],
@@ -4814,11 +4741,10 @@ ps
                     prefix = [],
                     suffix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "suffix with balanced [[brackets] and @sign]",
-                                style = L.styleMaskFrom []
-                              }
-                          )
+                          StyledText
+                            { body = "suffix with balanced [[brackets] and @sign]",
+                              style = L.styleMaskFrom []
+                            }
                       ]
                   }
               ],
@@ -4841,11 +4767,10 @@ ps
                     locator = Nothing,
                     prefix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "prefix",
-                                style = L.styleMaskFrom []
-                              }
-                          )
+                          StyledText
+                            { body = "prefix",
+                              style = L.styleMaskFrom []
+                            }
                       ],
                     suffix = []
                   },
@@ -4869,17 +4794,15 @@ ps
                     locator = Just ("section", "1.22.3"),
                     prefix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "@ ",
-                                style = L.styleMaskFrom []
-                              }
-                          ),
+                          StyledText
+                            { body = "@ ",
+                              style = L.styleMaskFrom []
+                            },
                         PTokenStyledText
-                          ( StyledText
-                              { body = "see also",
-                                style = L.styleMaskFrom [Italic]
-                              }
-                          )
+                          StyledText
+                            { body = "see also",
+                              style = L.styleMaskFrom [Italic]
+                            }
                       ],
                     suffix = []
                   }
@@ -4903,35 +4826,30 @@ ps
                     locator = Just ("volume", "3-4"),
                     prefix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "foo",
-                                style = L.styleMaskFrom [Bold]
-                              }
-                          ),
+                          StyledText
+                            { body = "foo",
+                              style = L.styleMaskFrom [Bold]
+                            },
                         PTokenStyledText
-                          ( StyledText
-                              { body = " ",
-                                style = L.styleMaskFrom []
-                              }
-                          ),
+                          StyledText
+                            { body = " ",
+                              style = L.styleMaskFrom []
+                            },
                         PTokenStyledText
-                          ( StyledText
-                              { body = "@fake1",
-                                style = L.styleMaskFrom [Verbatim]
-                              }
-                          ),
+                          StyledText
+                            { body = "@fake1",
+                              style = L.styleMaskFrom [Verbatim]
+                            },
                         PTokenStyledText
-                          ( StyledText
-                              { body = " ",
-                                style = L.styleMaskFrom []
-                              }
-                          ),
+                          StyledText
+                            { body = " ",
+                              style = L.styleMaskFrom []
+                            },
                         PTokenStyledText
-                          ( StyledText
-                              { body = "@fake2",
-                                style = L.styleMaskFrom [Code]
-                              }
-                          )
+                          StyledText
+                            { body = "@fake2",
+                              style = L.styleMaskFrom [Code]
+                            }
                       ],
                     suffix = []
                   }
@@ -4959,19 +4877,18 @@ may be the case that the CSL processor decides to [[https://github.com/jgm/pando
 #+begin_src haskell
 ps
   "0014-citations-worg"
-  ( OrgDoc
-      { oid = nilOid,
-        cells =
-          <<Expected prose for 0014-citations-worg>>,
-        footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
-        meta =
-          fromList
-            [ ("ID", "00000000-0000-0000-0000-000000000000")
-            ]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        <<Expected prose for 0014-citations-worg>>,
+      footnoteNumbers = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
   L.defaultOrgParserState
 #+end_src
 
@@ -4991,31 +4908,27 @@ ps
               ],
             prefix =
               [ PTokenStyledText
-                  ( StyledText
-                      { body = "global",
-                        style = L.styleMaskFrom [Bold]
-                      }
-                  ),
+                  StyledText
+                    { body = "global",
+                      style = L.styleMaskFrom [Bold]
+                    },
                 PTokenStyledText
-                  ( StyledText
-                      { body = " prefix",
-                        style = L.styleMaskFrom []
-                      }
-                  )
+                  StyledText
+                    { body = " prefix",
+                      style = L.styleMaskFrom []
+                    }
               ],
             suffix =
               [ PTokenStyledText
-                  ( StyledText
-                      { body = "global ",
-                        style = L.styleMaskFrom []
-                      }
-                  ),
+                  StyledText
+                    { body = "global ",
+                      style = L.styleMaskFrom []
+                    },
                 PTokenStyledText
-                  ( StyledText
-                      { body = "suffix",
-                        style = L.styleMaskFrom [Verbatim]
-                      }
-                  )
+                  StyledText
+                    { body = "suffix",
+                      style = L.styleMaskFrom [Verbatim]
+                    }
               ]
           },
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
@@ -5038,25 +4951,22 @@ ps
               ],
             prefix =
               [ PTokenStyledText
-                  ( StyledText
-                      { body = "see",
-                        style = L.styleMaskFrom []
-                      }
-                  )
+                  StyledText
+                    { body = "see",
+                      style = L.styleMaskFrom []
+                    }
               ],
             suffix =
               [ PTokenStyledText
-                  ( StyledText
-                      { body = "by Smith ",
-                        style = L.styleMaskFrom []
-                      }
-                  ),
+                  StyledText
+                    { body = "by Smith ",
+                      style = L.styleMaskFrom []
+                    },
                 PTokenStyledText
-                  ( StyledText
-                      { body = "et al.",
-                        style = L.styleMaskFrom [Italic]
-                      }
-                  )
+                  StyledText
+                    { body = "et al.",
+                      style = L.styleMaskFrom [Italic]
+                    }
               ]
           },
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
@@ -5079,19 +4989,17 @@ ps
               ],
             prefix =
               [ PTokenStyledText
-                  ( StyledText
-                      { body = "see",
-                        style = L.styleMaskFrom []
-                      }
-                  )
+                  StyledText
+                    { body = "see",
+                      style = L.styleMaskFrom []
+                    }
               ],
             suffix =
               [ PTokenStyledText
-                  ( StyledText
-                      { body = "by foo",
-                        style = L.styleMaskFrom []
-                      }
-                  )
+                  StyledText
+                    { body = "by foo",
+                      style = L.styleMaskFrom []
+                    }
               ]
           },
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
@@ -5104,19 +5012,17 @@ ps
                     locator = Nothing,
                     prefix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "the very important",
-                                style = L.styleMaskFrom []
-                              }
-                          )
+                          StyledText
+                            { body = "the very important",
+                              style = L.styleMaskFrom []
+                            }
                       ],
                     suffix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "@ once",
-                                style = L.styleMaskFrom []
-                              }
-                          )
+                          StyledText
+                            { body = "@ once",
+                              style = L.styleMaskFrom []
+                            }
                       ]
                   },
                 Cite
@@ -5124,22 +5030,20 @@ ps
                     locator = Just ("volume", "3"),
                     prefix =
                       [ PTokenStyledText
-                          ( StyledText
-                              { body = "the crucial",
-                                style = L.styleMaskFrom []
-                              }
-                          )
+                          StyledText
+                            { body = "the crucial",
+                              style = L.styleMaskFrom []
+                            }
                       ],
                     suffix = []
                   }
               ],
             prefix =
               [ PTokenStyledText
-                  ( StyledText
-                      { body = "c.f.",
-                        style = L.styleMaskFrom []
-                      }
-                  )
+                  StyledText
+                    { body = "c.f.",
+                      style = L.styleMaskFrom []
+                    }
               ],
             suffix = []
           }
@@ -5248,19 +5152,18 @@ Citations inside verbatim or code style markers are ignored.
 #+begin_src haskell
 ps
   "0014-citations-forbidden-in-verbatim-code"
-  ( OrgDoc
-      { oid = nilOid,
-        cells =
-          <<Expected prose for 0014-citations-forbidden-in-verbatim-code>>,
-        footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
-        meta =
-          fromList
-            [ ("ID", "00000000-0000-0000-0000-000000000000")
-            ]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        <<Expected prose for 0014-citations-forbidden-in-verbatim-code>>,
+      footnoteNumbers = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
   L.defaultOrgParserState
 #+end_src
 
@@ -5294,27 +5197,26 @@ For simplicity, citations are not allowed in headings. This is controlled by the
 #+begin_src haskell
 ps
   "0014-citations-forbidden-in-headings"
-  ( OrgDoc
-      { oid = nilOid,
-        cells =
-          [ CHeading
-              Heading
-                { level = 1,
-                  section = [1],
-                  body =
-                    <<Expected prose for 0014-citations-forbidden-in-headings>>,
-                  meta = fromList []
-                }
-          ],
-        footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
-        meta =
-          fromList
-            [ ("ID", "00000000-0000-0000-0000-000000000000")
-            ]
-      }
-  )
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        [ CHeading
+            Heading
+              { level = 1,
+                section = [1],
+                body =
+                  <<Expected prose for 0014-citations-forbidden-in-headings>>,
+                meta = fromList []
+              }
+        ],
+      footnoteNumbers = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
   L.defaultOrgParserState
     { headingOidStack = [Nothing],
       headingLevel = 1,
@@ -5503,21 +5405,20 @@ p
 #+begin_src haskell
 [ CParagraph
     [ PTokenStyledText
-        (StyledText {body = "a b c d e ", style = L.styleMaskFrom []}),
+        StyledText {body = "a b c d e ", style = L.styleMaskFrom []},
       PTokenStyledText
-        (StyledText {body = "f g h i j", style = L.styleMaskFrom [Bold]})
+        StyledText {body = "f g h i j", style = L.styleMaskFrom [Bold]}
     ],
   CParagraph
     [ PTokenStyledText
-        (StyledText {body = "x y z foo bar", style = L.styleMaskFrom []})
+        StyledText {body = "x y z foo bar", style = L.styleMaskFrom []}
     ],
   CParagraph
     [ PTokenStyledText
-        ( StyledText
-            { body = "multiple lines with underscore",
-              style = L.styleMaskFrom [Underline]
-            }
-        )
+        StyledText
+          { body = "multiple lines with underscore",
+            style = L.styleMaskFrom [Underline]
+          }
     ]
 ]
 #+end_src
@@ -6068,16 +5969,15 @@ ps
   "0004-properties-drawer-empty"
   ( nilOrgDoc
       [ CHeading
-          ( Heading
-              { level = 1,
-                section = [1],
-                body =
-                  [ PTokenStyledText
-                      (StyledText {body = "foo", style = L.styleMaskFrom []})
-                  ],
-                meta = fromList []
-              }
-          )
+          Heading
+            { level = 1,
+              section = [1],
+              body =
+                [ PTokenStyledText
+                    StyledText {body = "foo", style = L.styleMaskFrom []}
+                ],
+              meta = fromList []
+            }
       ]
   )
   L.defaultOrgParserState
@@ -6103,19 +6003,18 @@ ps
   "0004-properties-drawer-not-empty"
   ( nilOrgDoc
       [ CHeading
-          ( Heading
-              { level = 1,
-                section = [1],
-                body =
-                  [ PTokenStyledText
-                      (StyledText {body = "foo", style = L.styleMaskFrom []})
-                  ],
-                meta =
-                  fromList
-                    [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
-                    ]
-              }
-          )
+          Heading
+            { level = 1,
+              section = [1],
+              body =
+                [ PTokenStyledText
+                    StyledText {body = "foo", style = L.styleMaskFrom []}
+                ],
+              meta =
+                fromList
+                  [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                  ]
+            }
       ]
   )
   L.defaultOrgParserState
@@ -6151,19 +6050,18 @@ ps
   "0004-properties-drawer-not-empty-with-comments"
   ( nilOrgDoc
       [ CHeading
-          ( Heading
-              { level = 1,
-                section = [1],
-                body =
-                  [ PTokenStyledText
-                      (StyledText {body = "foo", style = L.styleMaskFrom []})
-                  ],
-                meta =
-                  fromList
-                    [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
-                    ]
-              }
-          )
+          Heading
+            { level = 1,
+              section = [1],
+              body =
+                [ PTokenStyledText
+                    StyledText {body = "foo", style = L.styleMaskFrom []}
+                ],
+              meta =
+                fromList
+                  [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                  ]
+            }
       ]
   )
   L.defaultOrgParserState
@@ -6229,39 +6127,36 @@ ps
 #+name: Expected blocks for 0007-blocks-empty
 #+begin_src haskell
 [ CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__anon_block_number", "1"),
-                ("__block_type", "src"),
-                ("__src_language", "haskell")
-              ],
-          body = []
-        }
-    ),
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__anon_block_number", "1"),
+              ("__block_type", "src"),
+              ("__src_language", "haskell")
+            ],
+        body = []
+      },
   CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__block_type", "example"),
-                ("name", "foo")
-              ],
-          body = []
-        }
-    ),
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "example"),
+              ("name", "foo")
+            ],
+        body = []
+      },
   CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__anon_block_number", "2"),
-                ("__block_type", "quote")
-              ],
-          body = []
-        }
-    )
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__anon_block_number", "2"),
+              ("__block_type", "quote")
+            ],
+        body = []
+      }
 ]
 #+end_src
 
@@ -6609,33 +6504,32 @@ ps
 #+name: Expected blocks for 0007-blocks-special-commas
 #+begin_src haskell
 [ CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__anon_block_number", "1"),
-                ("__block_type", "src"),
-                ("__src_language", "sh")
-              ],
-          body =
-            [ BTokenString
-                . T.stripEnd
-                $ T.unlines
-                  [ "Special commas get removed:",
-                    "*",
-                    "#+",
-                    ",*",
-                    ",#+",
-                    "Special commas may have leading whitespace:",
-                    " *",
-                    "Non-special commas stay put:",
-                    ",",
-                    ",.",
-                    ", x"
-                  ]
-            ]
-        }
-    )
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__anon_block_number", "1"),
+              ("__block_type", "src"),
+              ("__src_language", "sh")
+            ],
+        body =
+          [ BTokenString
+              . T.stripEnd
+              $ T.unlines
+                [ "Special commas get removed:",
+                  "*",
+                  "#+",
+                  ",*",
+                  ",#+",
+                  "Special commas may have leading whitespace:",
+                  " *",
+                  "Non-special commas stay put:",
+                  ",",
+                  ",.",
+                  ", x"
+                ]
+          ]
+      }
 ]
 #+end_src
 
@@ -6899,52 +6793,49 @@ ps
 #+header: :noweb off
 #+begin_src haskell
 [ CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__anon_block_number", "1"),
-                ("__block_type", "src"),
-                ("__src_language", "sh")
-              ],
-          body =
-            [ BTokenLink
-                ( Link
-                    { target =
-                        LinkTargetOid
-                          LinkOid
-                            { oid = nilOid,
-                              name = "foo"
-                            },
-                      name =
-                        [ StyledText
-                            { body = "foo",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              BTokenString "\n\n<<quux\n>>\necho ",
-              BTokenLink
-                ( Link
-                    { target =
-                        LinkTargetOid
-                          LinkOid
-                            { oid = nilOid,
-                              name = "bar"
-                            },
-                      name =
-                        [ StyledText
-                            { body = "bar",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              BTokenString " x y z"
-            ]
-        }
-    )
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__anon_block_number", "1"),
+              ("__block_type", "src"),
+              ("__src_language", "sh")
+            ],
+        body =
+          [ BTokenLink
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "foo"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "foo",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
+            BTokenString "\n\n<<quux\n>>\necho ",
+            BTokenLink
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "bar"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "bar",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
+            BTokenString " x y z"
+          ]
+      }
 ]
 #+end_src
 
@@ -6985,20 +6876,19 @@ ps
 #+header: :noweb off
 #+begin_src haskell
 [ CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__anon_block_number", "1"),
-                ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("noweb", "off")
-              ],
-          body =
-            [ BTokenString "<<foo>>\n\n<<quux\n>>\necho <<bar>> x y z"
-            ]
-        }
-    )
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__anon_block_number", "1"),
+              ("__block_type", "src"),
+              ("__src_language", "sh"),
+              ("noweb", "off")
+            ],
+        body =
+          [ BTokenString "<<foo>>\n\n<<quux\n>>\necho <<bar>> x y z"
+          ]
+      }
 ]
 #+end_src
 
@@ -7035,70 +6925,66 @@ ps
 #+header: :noweb off
 #+begin_src haskell
 [ CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__anon_block_number", "1"),
-                ("__block_type", "src"),
-                ("__src_language", "sh")
-              ],
-          body =
-            [ BTokenString "(",
-              BTokenLink
-                ( Link
-                    { target =
-                        LinkTargetOid
-                          LinkOid
-                            { oid = nilOid,
-                              name = "foo"
-                            },
-                      name =
-                        [ StyledText
-                            { body = "foo",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              BTokenString ") and \"",
-              BTokenLink
-                ( Link
-                    { target =
-                        LinkTargetOid
-                          LinkOid
-                            { oid = nilOid,
-                              name = "bar"
-                            },
-                      name =
-                        [ StyledText
-                            { body = "bar",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              BTokenString "\" and <",
-              BTokenLink
-                ( Link
-                    { target =
-                        LinkTargetOid
-                          LinkOid
-                            { oid = nilOid,
-                              name = "ok"
-                            },
-                      name =
-                        [ StyledText
-                            { body = "ok",
-                              style = L.styleMaskFrom []
-                            }
-                        ]
-                    }
-                ),
-              BTokenString ">"
-            ]
-        }
-    )
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__anon_block_number", "1"),
+              ("__block_type", "src"),
+              ("__src_language", "sh")
+            ],
+        body =
+          [ BTokenString "(",
+            BTokenLink
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "foo"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "foo",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
+            BTokenString ") and \"",
+            BTokenLink
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "bar"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "bar",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
+            BTokenString "\" and <",
+            BTokenLink
+              Link
+                { target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = nilOid,
+                          name = "ok"
+                        },
+                  name =
+                    [ StyledText
+                        { body = "ok",
+                          style = L.styleMaskFrom []
+                        }
+                    ]
+                },
+            BTokenString ">"
+          ]
+      }
 ]
 #+end_src
 
@@ -7343,77 +7229,71 @@ ps
 #+name: Expected blocks for 0007-blocks-ending
 #+begin_src haskell
 [ CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "empty")
-              ],
-          body = []
-        }
-    ),
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "src"),
+              ("__src_language", "sh"),
+              ("name", "empty")
+            ],
+        body = []
+      },
   CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "end not in beginning of line")
-              ],
-          body = [BTokenString " #+end_src"]
-        }
-    ),
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "src"),
+              ("__src_language", "sh"),
+              ("name", "end not in beginning of line")
+            ],
+        body = [BTokenString " #+end_src"]
+      },
   CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "end has no preceding blank line")
-              ],
-          body = [BTokenString "foo"]
-        }
-    ),
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "src"),
+              ("__src_language", "sh"),
+              ("name", "end has no preceding blank line")
+            ],
+        body = [BTokenString "foo"]
+      },
   CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "end has preceding blank line")
-              ],
-          body = [BTokenString "foo\n"]
-        }
-    ),
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "src"),
+              ("__src_language", "sh"),
+              ("name", "end has preceding blank line")
+            ],
+        body = [BTokenString "foo\n"]
+      },
   CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "end has preceding newline (multiple)")
-              ],
-          body = [BTokenString "foo\n\n"]
-        }
-    ),
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "src"),
+              ("__src_language", "sh"),
+              ("name", "end has preceding newline (multiple)")
+            ],
+        body = [BTokenString "foo\n\n"]
+      },
   CBlock
-    ( Block
-        { parentOid = nilOid,
-          meta =
-            fromList
-              [ ("__block_type", "src"),
-                ("__src_language", "sh"),
-                ("name", "ignore #+end_example because this is a src block")
-              ],
-          body = [BTokenString "#+end_example"]
-        }
-    )
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "src"),
+              ("__src_language", "sh"),
+              ("name", "ignore #+end_example because this is a src block")
+            ],
+        body = [BTokenString "#+end_example"]
+      }
 ]
 #+end_src
 
@@ -9139,11 +9019,10 @@ ps
           ],
         CParagraph
           [ PTokenStyledText
-              ( StyledText
-                  { body = "foo",
-                    style = L.styleMaskFrom []
-                  }
-              )
+              StyledText
+                { body = "foo",
+                  style = L.styleMaskFrom []
+                }
           ],
         CMathFragment
           MathFragment
@@ -9415,7 +9294,7 @@ ps
                   ],
               caption =
                 [ PTokenStyledText
-                    (StyledText {body = "hello", style = L.styleMaskFrom [Verbatim]})
+                    StyledText {body = "hello", style = L.styleMaskFrom [Verbatim]}
                 ],
               link =
                 Link
@@ -9874,57 +9753,53 @@ ps
             ],
         caption =
           [ PTokenStyledText
-              (StyledText {body = "Bold", style = L.styleMaskFrom [Bold]}),
+              StyledText {body = "Bold", style = L.styleMaskFrom [Bold]},
             PTokenStyledText
-              (StyledText {body = ".", style = L.styleMaskFrom []}),
+              StyledText {body = ".", style = L.styleMaskFrom []},
             PTokenStyledText
-              (StyledText {body = " ", style = L.styleMaskFrom []}),
+              StyledText {body = " ", style = L.styleMaskFrom []},
             PTokenLink
-              ( Link
-                  { name =
-                      [ StyledText {body = "A", style = L.styleMaskFrom []},
-                        StyledText {body = " ", style = L.styleMaskFrom []},
-                        StyledText {body = "self-link", style = L.styleMaskFrom []}
-                      ],
-                    target =
-                      LinkTargetOid
-                        LinkOid {oid = nilOid, name = "tbl:famous-equations"}
-                  }
-              ),
+              Link
+                { name =
+                    [ StyledText {body = "A", style = L.styleMaskFrom []},
+                      StyledText {body = " ", style = L.styleMaskFrom []},
+                      StyledText {body = "self-link", style = L.styleMaskFrom []}
+                    ],
+                  target =
+                    LinkTargetOid
+                      LinkOid {oid = nilOid, name = "tbl:famous-equations"}
+                },
             PTokenStyledText
-              (StyledText {body = ".", style = L.styleMaskFrom []}),
+              StyledText {body = ".", style = L.styleMaskFrom []},
             PTokenStyledText
-              (StyledText {body = " ", style = L.styleMaskFrom []}),
+              StyledText {body = " ", style = L.styleMaskFrom []},
             PTokenMathFragment
-              (MathFragment {meta = fromList [], body = "E = mc^2"})
+              MathFragment {meta = fromList [], body = "E = mc^2"}
           ],
         grid =
           fromList
             [ ( (1, 1),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Name",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "Name",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ( (1, 2),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Equation",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "Equation",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ( (1, 3),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Link",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "Link",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ( (2, 1),
@@ -9932,138 +9807,127 @@ ps
               ),
               ( (3, 1),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Pythagoras | Foo",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "Pythagoras | Foo",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ( (3, 2),
                 [ PTokenMathFragment
-                    ( MathFragment
-                        { meta = fromList [],
-                          body = "a^2 + b^2 = c^2"
-                        }
-                    )
+                    MathFragment
+                      { meta = fromList [],
+                        body = "a^2 + b^2 = c^2"
+                      }
                 ]
               ),
               ( (3, 3),
                 [ PTokenLink
-                    ( Link
-                        { target =
-                            LinkTargetURI
-                              N.URI
-                                { N.uriScheme = "https:",
-                                  N.uriAuthority =
-                                    Just
-                                      N.URIAuth
-                                        { N.uriUserInfo = "",
-                                          N.uriRegName = "wiki",
-                                          N.uriPort = ""
-                                        },
-                                  N.uriPath = "/x",
-                                  N.uriQuery = "",
-                                  N.uriFragment = ""
-                                },
-                          name =
-                            [ StyledText
-                                { body = "Wiki",
-                                  style = L.styleMaskFrom []
-                                }
-                            ]
-                        }
-                    )
+                    Link
+                      { target =
+                          LinkTargetURI
+                            N.URI
+                              { N.uriScheme = "https:",
+                                N.uriAuthority =
+                                  Just
+                                    N.URIAuth
+                                      { N.uriUserInfo = "",
+                                        N.uriRegName = "wiki",
+                                        N.uriPort = ""
+                                      },
+                                N.uriPath = "/x",
+                                N.uriQuery = "",
+                                N.uriFragment = ""
+                              },
+                        name =
+                          [ StyledText
+                              { body = "Wiki",
+                                style = L.styleMaskFrom []
+                              }
+                          ]
+                      }
                 ]
               ),
               ( (4, 1),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Albert ",
-                          style = L.styleMaskFrom []
-                        }
-                    ),
+                    StyledText
+                      { body = "Albert ",
+                        style = L.styleMaskFrom []
+                      },
                   PTokenStyledText
-                    ( StyledText
-                        { body = "Einstein",
-                          style = L.styleMaskFrom [Bold]
-                        }
-                    )
+                    StyledText
+                      { body = "Einstein",
+                        style = L.styleMaskFrom [Bold]
+                      }
                 ]
               ),
               ( (4, 2),
                 [ PTokenMathFragment
-                    ( MathFragment
-                        { meta = fromList [],
-                          body = "E = mc^2"
-                        }
-                    )
+                    MathFragment
+                      { meta = fromList [],
+                        body = "E = mc^2"
+                      }
                 ]
               ),
               ( (4, 3),
                 [ PTokenLink
-                    ( Link
-                        { target =
-                            LinkTargetURI
-                              N.URI
-                                { N.uriScheme = "https:",
-                                  N.uriAuthority =
-                                    Just
-                                      N.URIAuth
-                                        { N.uriUserInfo = "",
-                                          N.uriRegName = "wiki",
-                                          N.uriPort = ""
-                                        },
-                                  N.uriPath = "/y",
-                                  N.uriQuery = "",
-                                  N.uriFragment = ""
-                                },
-                          name =
-                            [ StyledText
-                                { body = "Wiki",
-                                  style = L.styleMaskFrom []
-                                }
-                            ]
-                        }
-                    )
+                    Link
+                      { target =
+                          LinkTargetURI
+                            N.URI
+                              { N.uriScheme = "https:",
+                                N.uriAuthority =
+                                  Just
+                                    N.URIAuth
+                                      { N.uriUserInfo = "",
+                                        N.uriRegName = "wiki",
+                                        N.uriPort = ""
+                                      },
+                                N.uriPath = "/y",
+                                N.uriQuery = "",
+                                N.uriFragment = ""
+                              },
+                        name =
+                          [ StyledText
+                              { body = "Wiki",
+                                style = L.styleMaskFrom []
+                              }
+                          ]
+                      }
                 ]
               ),
               ( (5, 1),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Unknown",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "Unknown",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ((5, 2), []),
               ((5, 3), []),
               ( (6, 1),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "_",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "_",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ( (6, 2),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "*",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "*",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ( (6, 3),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "/",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "/",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               )
             ]
@@ -10111,11 +9975,10 @@ ps
     ],
   CParagraph
     [ PTokenStyledText
-        ( StyledText
-            { body = "foo",
-              style = L.styleMaskFrom []
-            }
-        )
+        StyledText
+          { body = "foo",
+            style = L.styleMaskFrom []
+          }
     ],
   CTable
     Table
@@ -10130,29 +9993,26 @@ ps
           fromList
             [ ( (1, 1),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Name",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "Name",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ( (1, 2),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Equation",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "Equation",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ( (1, 3),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Link",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "Link",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ( (2, 1),
@@ -10160,100 +10020,93 @@ ps
               ),
               ( (3, 1),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Pythagoras | Foo",
-                          style = L.styleMaskFrom []
-                        }
-                    )
+                    StyledText
+                      { body = "Pythagoras | Foo",
+                        style = L.styleMaskFrom []
+                      }
                 ]
               ),
               ( (3, 2),
                 [ PTokenMathFragment
-                    ( MathFragment
-                        { meta = fromList [],
-                          body = "a^2 + b^2 = c^2"
-                        }
-                    )
+                    MathFragment
+                      { meta = fromList [],
+                        body = "a^2 + b^2 = c^2"
+                      }
                 ]
               ),
               ( (3, 3),
                 [ PTokenLink
-                    ( Link
-                        { target =
-                            LinkTargetURI
-                              N.URI
-                                { N.uriScheme = "https:",
-                                  N.uriAuthority =
-                                    Just
-                                      N.URIAuth
-                                        { N.uriUserInfo = "",
-                                          N.uriRegName = "wiki",
-                                          N.uriPort = ""
-                                        },
-                                  N.uriPath = "/x",
-                                  N.uriQuery = "",
-                                  N.uriFragment = ""
-                                },
-                          name =
-                            [ StyledText
-                                { body = "Wiki",
-                                  style = L.styleMaskFrom []
-                                }
-                            ]
-                        }
-                    )
+                    Link
+                      { target =
+                          LinkTargetURI
+                            N.URI
+                              { N.uriScheme = "https:",
+                                N.uriAuthority =
+                                  Just
+                                    N.URIAuth
+                                      { N.uriUserInfo = "",
+                                        N.uriRegName = "wiki",
+                                        N.uriPort = ""
+                                      },
+                                N.uriPath = "/x",
+                                N.uriQuery = "",
+                                N.uriFragment = ""
+                              },
+                        name =
+                          [ StyledText
+                              { body = "Wiki",
+                                style = L.styleMaskFrom []
+                              }
+                          ]
+                      }
                 ]
               ),
               ( (4, 1),
                 [ PTokenStyledText
-                    ( StyledText
-                        { body = "Albert ",
-                          style = L.styleMaskFrom []
-                        }
-                    ),
+                    StyledText
+                      { body = "Albert ",
+                        style = L.styleMaskFrom []
+                      },
                   PTokenStyledText
-                    ( StyledText
-                        { body = "Einstein",
-                          style = L.styleMaskFrom [Bold]
-                        }
-                    )
+                    StyledText
+                      { body = "Einstein",
+                        style = L.styleMaskFrom [Bold]
+                      }
                 ]
               ),
               ( (4, 2),
                 [ PTokenMathFragment
-                    ( MathFragment
-                        { meta = fromList [],
-                          body = "E = mc^2"
-                        }
-                    )
+                    MathFragment
+                      { meta = fromList [],
+                        body = "E = mc^2"
+                      }
                 ]
               ),
               ( (4, 3),
                 [ PTokenLink
-                    ( Link
-                        { target =
-                            LinkTargetURI
-                              N.URI
-                                { N.uriScheme = "https:",
-                                  N.uriAuthority =
-                                    Just
-                                      N.URIAuth
-                                        { N.uriUserInfo = "",
-                                          N.uriRegName = "wiki",
-                                          N.uriPort = ""
-                                        },
-                                  N.uriPath = "/y",
-                                  N.uriQuery = "",
-                                  N.uriFragment = ""
-                                },
-                          name =
-                            [ StyledText
-                                { body = "Wiki",
-                                  style = L.styleMaskFrom []
-                                }
-                            ]
-                        }
-                    )
+                    Link
+                      { target =
+                          LinkTargetURI
+                            N.URI
+                              { N.uriScheme = "https:",
+                                N.uriAuthority =
+                                  Just
+                                    N.URIAuth
+                                      { N.uriUserInfo = "",
+                                        N.uriRegName = "wiki",
+                                        N.uriPort = ""
+                                      },
+                                N.uriPath = "/y",
+                                N.uriQuery = "",
+                                N.uriFragment = ""
+                              },
+                        name =
+                          [ StyledText
+                              { body = "Wiki",
+                                style = L.styleMaskFrom []
+                              }
+                          ]
+                      }
                 ]
               )
             ]
@@ -10601,11 +10454,10 @@ plainParagraph :: Text -> Cell
 plainParagraph body =
   CParagraph
     [ PTokenStyledText
-        ( StyledText
-            { body = body,
-              style = L.styleMaskFrom []
-            }
-        )
+        StyledText
+          { body = body,
+            style = L.styleMaskFrom []
+          }
     ]
 #+end_src
 
@@ -10616,20 +10468,18 @@ The same goes for function ~plainHeading~.
 plainHeading :: Int -> [Int] -> Cell
 plainHeading level section =
   CHeading
-    ( Heading
-        { level = level,
-          section = section,
-          body =
-            [ PTokenStyledText
-                ( StyledText
-                    { body = T.pack $ show level,
-                      style = L.styleMaskFrom []
-                    }
-                )
-            ],
-          meta = fromList []
-        }
-    )
+    Heading
+      { level = level,
+        section = section,
+        body =
+          [ PTokenStyledText
+              StyledText
+                { body = T.pack $ show level,
+                  style = L.styleMaskFrom []
+                }
+          ],
+        meta = fromList []
+      }
 #+end_src
 
 ** All test cases
