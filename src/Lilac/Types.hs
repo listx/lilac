@@ -239,6 +239,7 @@ data OrgDoc = OrgDoc
     footnoteNumbers :: Map Text Int,
     cslPath :: Maybe FilePath,
     bibPaths :: [FilePath],
+    citations :: [Citation],
     meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
@@ -285,6 +286,7 @@ data OrgParserState = OrgParserState
     insideCitation :: Bool,
     bracketBalance :: Int,
     insideCitePrefix :: Bool,
+    citations :: [Citation],
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
@@ -293,7 +295,7 @@ type PToken :: Type
 data PToken
   = PTokenStyledText StyledText
   | PTokenLink Link
-  | PTokenCitation Citation
+  | PTokenCitation Int
   | PTokenMathFragment MathFragment
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

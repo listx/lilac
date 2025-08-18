@@ -69,6 +69,7 @@ import Lilac.Types
       ( OrgDoc,
         bibPaths,
         cells,
+        citations,
         cslPath,
         footnoteNumbers,
         meta,
@@ -76,12 +77,27 @@ import Lilac.Types
       ),
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
-    OrgParserState
+    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
+    Prose,
+    Style (Bold, Code, Italic, Underline, Verbatim),
+    StyleMask (StyleMask),
+    StyledText (StyledText, body, style),
+    Table (Table, caption, grid, meta),
+    defaultOrgParserConf,
+    fromText,
+    markingChars,
+    nilOid,
+    protocolsEmacs,
+    protocolsWeb,
+  )
+import Lilac.Types as OrgParserState
+  ( OrgParserState
       ( OrgParserState,
         anonBlockNumber,
         anonEquationNumber,
         bracketBalance,
         cellNames,
+        citations,
         continuationIndent,
         docOid,
         equationNumber,
@@ -105,18 +121,6 @@ import Lilac.Types
         tableNumber,
         tanglePaths
       ),
-    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
-    Prose,
-    Style (Bold, Code, Italic, Underline, Verbatim),
-    StyleMask (StyleMask),
-    StyledText (StyledText, body, style),
-    Table (Table, caption, grid, meta),
-    defaultOrgParserConf,
-    fromText,
-    markingChars,
-    nilOid,
-    protocolsEmacs,
-    protocolsWeb,
   )
 import Network.URI qualified as N
 import Relude
@@ -250,6 +254,7 @@ orgDocParser = do
   cells <- many cellParser
   MP.eof
   footnoteNumbers <- reconcileFootnotes
+  citations <- collectCitations
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -269,6 +274,7 @@ orgDocParser = do
         footnoteNumbers = footnoteNumbers,
         cslPath = cslPath,
         bibPaths = bibPaths,
+        citations = citations,
         meta = meta
       }
 
@@ -280,6 +286,7 @@ defaultOrgDoc oid metas =
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
+      citations = [],
       meta = fromList metas'
     }
   where
@@ -316,6 +323,7 @@ defaultOrgParserState =
       insideCitation = False,
       bracketBalance = 0,
       insideCitePrefix = False,
+      citations = [],
       orgParserConf = defaultOrgParserConf
     }
 
@@ -1887,7 +1895,7 @@ bibliographyLocationParser = do
   _ <- string "#+print_bibliography:"
   pure $ CBibliography ()
 
-citationParser :: OrgParser Citation
+citationParser :: OrgParser Int
 citationParser = do
   orgParserState <- get
   when (isVerbatim orgParserState.styleMask || isCode orgParserState.styleMask)
@@ -1917,14 +1925,21 @@ citationParser = do
       pure p
   _ <- MP.optional intraCellWhitespaceParser
   _ <- char ']'
-  modify (\s -> s {insideCitation = False})
-  pure
-    Citation
-      { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
-        cites = cites,
-        prefix = fromMaybe [] citationPrefix,
-        suffix = fromMaybe [] citationSuffix
-      }
+  let c =
+        Citation
+          { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
+            cites = cites,
+            prefix = fromMaybe [] citationPrefix,
+            suffix = fromMaybe [] citationSuffix
+          }
+  modify
+    ( \s ->
+        s
+          { insideCitation = False,
+            citations = c : s.citations
+          }
+    )
+  pure $ length orgParserState.citations
   where
     svParser :: OrgParser [Char]
     svParser =
@@ -1938,6 +1953,12 @@ citationParser = do
           pure p
       citeId <- citeIdParser
       pure (prefix, citeId)
+
+collectCitations :: OrgParser [Citation]
+collectCitations = do
+  orgParserState <- get
+  modify (\s -> s {OrgParserState.citations = []})
+  pure $ reverse orgParserState.citations
 
 failIfUnbalancedBrackets :: OrgParser ()
 failIfUnbalancedBrackets = do

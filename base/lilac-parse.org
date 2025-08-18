@@ -54,6 +54,7 @@ data OrgDoc = OrgDoc
     footnoteNumbers :: Map Text Int,
     cslPath :: Maybe FilePath,
     bibPaths :: [FilePath],
+    citations :: [Citation],
     meta :: Map Text Text
   }
   deriving stock (Eq, Generic, Show)
@@ -186,6 +187,7 @@ data OrgParserState = OrgParserState
     insideCitation :: Bool,
     bracketBalance :: Int,
     insideCitePrefix :: Bool,
+    citations :: [Citation],
     orgParserConf :: OrgParserConf
   }
   deriving stock (Eq, Show)
@@ -221,6 +223,7 @@ defaultOrgParserState =
       insideCitation = False,
       bracketBalance = 0,
       insideCitePrefix = False,
+      citations = [],
       orgParserConf = defaultOrgParserConf
     }
 #+end_src
@@ -314,6 +317,7 @@ import Lilac.Types
       ( OrgDoc,
         bibPaths,
         cells,
+        citations,
         cslPath,
         footnoteNumbers,
         meta,
@@ -321,12 +325,27 @@ import Lilac.Types
       ),
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
-    OrgParserState
+    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
+    Prose,
+    Style (Bold, Code, Italic, Underline, Verbatim),
+    StyleMask (StyleMask),
+    StyledText (StyledText, body, style),
+    Table (Table, caption, grid, meta),
+    defaultOrgParserConf,
+    fromText,
+    markingChars,
+    nilOid,
+    protocolsEmacs,
+    protocolsWeb,
+  )
+import Lilac.Types as OrgParserState
+  ( OrgParserState
       ( OrgParserState,
         anonBlockNumber,
         anonEquationNumber,
         bracketBalance,
         cellNames,
+        citations,
         continuationIndent,
         docOid,
         equationNumber,
@@ -350,18 +369,6 @@ import Lilac.Types
         tableNumber,
         tanglePaths
       ),
-    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
-    Prose,
-    Style (Bold, Code, Italic, Underline, Verbatim),
-    StyleMask (StyleMask),
-    StyledText (StyledText, body, style),
-    Table (Table, caption, grid, meta),
-    defaultOrgParserConf,
-    fromText,
-    markingChars,
-    nilOid,
-    protocolsEmacs,
-    protocolsWeb,
   )
 import Network.URI qualified as N
 import Relude
@@ -553,6 +560,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:collectValsFor>>
 <<f:bibliographyLocationParser>>
 <<f:citationParser>>
+<<f:collectCitations>>
 <<f:failIfUnbalancedBrackets>>
 <<f:citeParser>>
 <<f:citeIdParser>>
@@ -675,6 +683,7 @@ orgDocParser = do
   cells <- many cellParser
   MP.eof
   footnoteNumbers <- reconcileFootnotes
+  citations <- collectCitations
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -694,6 +703,7 @@ orgDocParser = do
         footnoteNumbers = footnoteNumbers,
         cslPath = cslPath,
         bibPaths = bibPaths,
+        citations = citations,
         meta = meta
       }
 #+end_src
@@ -731,6 +741,7 @@ defaultOrgDoc oid metas =
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
+      citations = [],
       meta = fromList metas'
     }
   where
@@ -1331,7 +1342,10 @@ type Prose :: Type
 type Prose = [PToken]
 #+end_src
 
-A =PToken= can be a [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][styled string]], [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][link]], [[id:a54a7762-a861-42b1-b2c8-2b760281052c][citation]], or [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][math fragment]].
+A =PToken= can be a [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][styled string]], [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][link]], [[id:a54a7762-a861-42b1-b2c8-2b760281052c][citation]], or [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][math fragment]]. For the
+citation, we only store the index of it (starting from 0), to act as a "pointer"
+to the list of all citations in the entire document, collected in
+[[f:collectCitations]].
 
 #+name: data:PToken
 #+begin_src haskell
@@ -1339,7 +1353,7 @@ type PToken :: Type
 data PToken
   = PTokenStyledText StyledText
   | PTokenLink Link
-  | PTokenCitation Citation
+  | PTokenCitation Int
   | PTokenMathFragment MathFragment
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -3750,6 +3764,7 @@ ps
           ],
       cslPath = Nothing,
       bibPaths = [],
+      citations = [],
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
   L.defaultOrgParserState
@@ -3852,6 +3867,7 @@ ps
           ],
       cslPath = Nothing,
       bibPaths = [],
+      citations = [],
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
   L.defaultOrgParserState
@@ -3983,6 +3999,7 @@ ps
       footnoteNumbers = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = [],
+      citations = [],
       meta =
         fromList
           [ ("ID", "00000000-0000-0000-0000-000000000000"),
@@ -4039,6 +4056,7 @@ ps
         [ "a.json",
           "b.json"
         ],
+      citations = [],
       meta =
         fromList
           [ ("ID", "00000000-0000-0000-0000-000000000000")
@@ -4080,6 +4098,7 @@ ps
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
+      citations = [],
       meta =
         fromList
           [ ("ID", "00000000-0000-0000-0000-000000000000")
@@ -4140,7 +4159,7 @@ structures.
 
 #+name: f:citationParser
 #+begin_src haskell
-citationParser :: OrgParser Citation
+citationParser :: OrgParser Int
 citationParser = do
   orgParserState <- get
   when (isVerbatim orgParserState.styleMask || isCode orgParserState.styleMask)
@@ -4170,14 +4189,21 @@ citationParser = do
       pure p
   _ <- MP.optional intraCellWhitespaceParser
   _ <- char ']'
-  modify (\s -> s {insideCitation = False})
-  pure
-    Citation
-      { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
-        cites = cites,
-        prefix = fromMaybe [] citationPrefix,
-        suffix = fromMaybe [] citationSuffix
-      }
+  let c =
+        Citation
+          { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
+            cites = cites,
+            prefix = fromMaybe [] citationPrefix,
+            suffix = fromMaybe [] citationSuffix
+          }
+  modify
+    ( \s ->
+        s
+          { insideCitation = False,
+            citations = c : s.citations
+          }
+    )
+  pure $ length orgParserState.citations
   where
     svParser :: OrgParser [Char]
     svParser =
@@ -4209,6 +4235,39 @@ intraCellWhitespaceParser =
           char '\n'
       ]
 #+end_src
+
+We collect all citations into a list in [[f:collectCitations]]. This is used in
+[[f:orgDocParser]] to get the list of all citations used in the document. We have to
+reverse the order because during parsing we just prepend to it. We clear the
+list of citations because otherwise it pollutes the [[data:OrgParserState]] too much
+during testing.
+
+We have to get a single list of all citations, because when we call
+~Citeproc.citeproc~, we have to provide all citations used in the document; this
+is the only way to get numbering correct with a style like IEEE. For example, if
+we were to call ~Citeproc.citeproc~ once for every citation on its own, those
+citations would all get numbered as ~[1]~ because ~Citeproc~ will only see a single
+citation at a time.
+
+#+name: f:collectCitations
+#+begin_src haskell
+collectCitations :: OrgParser [Citation]
+collectCitations = do
+  orgParserState <- get
+  modify (\s -> s {OrgParserState.citations = []})
+  pure $ reverse orgParserState.citations
+#+end_src
+
+In [[f:collectCitations]] we cannot do
+
+#+begin_src haskell
+  modify (\s -> s {citations = []})
+#+end_src
+
+because it will result in an [[https://errors.haskell.org/messages/GHC-02256/]["Ambiguous record update" error]], because both
+[[data:OrgDoc]] and [[data:OrgParserState]] have a field named ~citations~. So we work
+around this by importing the latter through ~import Lilac.Types as OrgParserState~
+in [[module:Lilac.Parse]]. See [[https://discourse.haskell.org/t/what-are-you-supposed-to-do-about-wambiguous-fields/9545][this discussion from 2024]] for more information.
 
 The [[f:citeParser]] parses a single [[data:Cite]]. A cite is composed of four pieces:
 
@@ -4484,6 +4543,21 @@ ps
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
+      citations =
+        [ Citation
+            { styleVariation = (Just "v1", Just "v2"),
+              cites =
+                [ Cite
+                    { id = "foo123-.:?!`'/*@+|(){}<>&_^$#%~",
+                      locator = Nothing,
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            }
+        ],
       meta =
         fromList
           [ ("ID", "00000000-0000-0000-0000-000000000000")
@@ -4495,20 +4569,7 @@ ps
 #+name: Expected prose for 0014-citations-single-cite
 #+begin_src haskell
 [ CParagraph
-    [ PTokenCitation
-        Citation
-          { styleVariation = (Just "v1", Just "v2"),
-            cites =
-              [ Cite
-                  { id = "foo123-.:?!`'/*@+|(){}<>&_^$#%~",
-                    locator = Nothing,
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          }
+    [ PTokenCitation 0
     ]
 ]
 #+end_src
@@ -4536,6 +4597,86 @@ ps
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
+      citations =
+        [ Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "a",
+                      locator = Just ("page", "15"),
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            },
+          Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "b",
+                      locator = Just ("page", "15-30"),
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            },
+          Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "c",
+                      locator = Just ("chapter", "15-30, 35"),
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            },
+          Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "d",
+                      locator = Just ("section", "1.5-10"),
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            },
+          Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "e",
+                      locator = Just ("section", "1.22.3"),
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            },
+          Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "f",
+                      locator = Nothing,
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            }
+        ],
       meta =
         fromList
           [ ("ID", "00000000-0000-0000-0000-000000000000")
@@ -4547,95 +4688,17 @@ ps
 #+name: Expected prose for 0014-citations-locators
 #+begin_src haskell
 [ CParagraph
-    [ PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "a",
-                    locator = Just ("page", "15"),
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          },
+    [ PTokenCitation 0,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "b",
-                    locator = Just ("page", "15-30"),
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          },
+      PTokenCitation 1,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "c",
-                    locator = Just ("chapter", "15-30, 35"),
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          },
+      PTokenCitation 2,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "d",
-                    locator = Just ("section", "1.5-10"),
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          },
+      PTokenCitation 3,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "e",
-                    locator = Just ("section", "1.22.3"),
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          },
+      PTokenCitation 4,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "f",
-                    locator = Nothing,
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          }
+      PTokenCitation 5
     ]
 ]
 #+end_src
@@ -4663,6 +4726,183 @@ ps
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
+      citations =
+        [ Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "a1",
+                      locator = Just ("page", "15"),
+                      prefix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "prefix",
+                                style = L.styleMaskFrom []
+                              }
+                        ],
+                      suffix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "suffix",
+                                style = L.styleMaskFrom []
+                              }
+                        ]
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            },
+          Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "b1",
+                      locator = Just ("page", "15-30"),
+                      prefix = [],
+                      suffix = []
+                    },
+                  Cite
+                    { id = "b2",
+                      locator = Just ("chapter", "4"),
+                      prefix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "a really long prefix, maybe?",
+                                style = L.styleMaskFrom []
+                              }
+                        ],
+                      suffix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "more suffix",
+                                style = L.styleMaskFrom []
+                              }
+                        ]
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            },
+          Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "c1",
+                      locator = Just ("chapter", "15-30, 35"),
+                      prefix = [],
+                      suffix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "suffix with balanced [[brackets] and @sign]",
+                                style = L.styleMaskFrom []
+                              }
+                        ]
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            },
+          Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "d1",
+                      locator = Just ("section", "1.5-10"),
+                      prefix = [],
+                      suffix = []
+                    },
+                  Cite
+                    { id = "d2",
+                      locator = Nothing,
+                      prefix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "prefix",
+                                style = L.styleMaskFrom []
+                              }
+                        ],
+                      suffix = []
+                    },
+                  Cite
+                    { id = "d3",
+                      locator = Nothing,
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            },
+          Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "e1",
+                      locator = Just ("section", "1.22.3"),
+                      prefix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "@ ",
+                                style = L.styleMaskFrom []
+                              },
+                          PTokenStyledText
+                            StyledText
+                              { body = "see also",
+                                style = L.styleMaskFrom [Italic]
+                              }
+                        ],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            },
+          Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "f1",
+                      locator = Nothing,
+                      prefix = [],
+                      suffix = []
+                    },
+                  Cite
+                    { id = "f2",
+                      locator = Just ("volume", "3-4"),
+                      prefix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "foo",
+                                style = L.styleMaskFrom [Bold]
+                              },
+                          PTokenStyledText
+                            StyledText
+                              { body = " ",
+                                style = L.styleMaskFrom []
+                              },
+                          PTokenStyledText
+                            StyledText
+                              { body = "@fake1",
+                                style = L.styleMaskFrom [Verbatim]
+                              },
+                          PTokenStyledText
+                            StyledText
+                              { body = " ",
+                                style = L.styleMaskFrom []
+                              },
+                          PTokenStyledText
+                            StyledText
+                              { body = "@fake2",
+                                style = L.styleMaskFrom [Code]
+                              }
+                        ],
+                      suffix = []
+                    }
+                ],
+              prefix = [],
+              suffix = []
+            }
+        ],
       meta =
         fromList
           [ ("ID", "00000000-0000-0000-0000-000000000000")
@@ -4674,192 +4914,17 @@ ps
 #+name: Expected prose for 0014-citations-locators-affixes
 #+begin_src haskell
 [ CParagraph
-    [ PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "a1",
-                    locator = Just ("page", "15"),
-                    prefix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "prefix",
-                              style = L.styleMaskFrom []
-                            }
-                      ],
-                    suffix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "suffix",
-                              style = L.styleMaskFrom []
-                            }
-                      ]
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          },
+    [ PTokenCitation 0,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "b1",
-                    locator = Just ("page", "15-30"),
-                    prefix = [],
-                    suffix = []
-                  },
-                Cite
-                  { id = "b2",
-                    locator = Just ("chapter", "4"),
-                    prefix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "a really long prefix, maybe?",
-                              style = L.styleMaskFrom []
-                            }
-                      ],
-                    suffix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "more suffix",
-                              style = L.styleMaskFrom []
-                            }
-                      ]
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          },
+      PTokenCitation 1,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "c1",
-                    locator = Just ("chapter", "15-30, 35"),
-                    prefix = [],
-                    suffix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "suffix with balanced [[brackets] and @sign]",
-                              style = L.styleMaskFrom []
-                            }
-                      ]
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          },
+      PTokenCitation 2,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "d1",
-                    locator = Just ("section", "1.5-10"),
-                    prefix = [],
-                    suffix = []
-                  },
-                Cite
-                  { id = "d2",
-                    locator = Nothing,
-                    prefix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "prefix",
-                              style = L.styleMaskFrom []
-                            }
-                      ],
-                    suffix = []
-                  },
-                Cite
-                  { id = "d3",
-                    locator = Nothing,
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          },
+      PTokenCitation 3,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "e1",
-                    locator = Just ("section", "1.22.3"),
-                    prefix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "@ ",
-                              style = L.styleMaskFrom []
-                            },
-                        PTokenStyledText
-                          StyledText
-                            { body = "see also",
-                              style = L.styleMaskFrom [Italic]
-                            }
-                      ],
-                    suffix = []
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          },
+      PTokenCitation 4,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "f1",
-                    locator = Nothing,
-                    prefix = [],
-                    suffix = []
-                  },
-                Cite
-                  { id = "f2",
-                    locator = Just ("volume", "3-4"),
-                    prefix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "foo",
-                              style = L.styleMaskFrom [Bold]
-                            },
-                        PTokenStyledText
-                          StyledText
-                            { body = " ",
-                              style = L.styleMaskFrom []
-                            },
-                        PTokenStyledText
-                          StyledText
-                            { body = "@fake1",
-                              style = L.styleMaskFrom [Verbatim]
-                            },
-                        PTokenStyledText
-                          StyledText
-                            { body = " ",
-                              style = L.styleMaskFrom []
-                            },
-                        PTokenStyledText
-                          StyledText
-                            { body = "@fake2",
-                              style = L.styleMaskFrom [Code]
-                            }
-                      ],
-                    suffix = []
-                  }
-              ],
-            prefix = [],
-            suffix = []
-          }
+      PTokenCitation 5
     ]
 ]
 #+end_src
@@ -4887,6 +4952,153 @@ ps
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
+      citations =
+        [ Citation
+            { styleVariation = (Nothing, Nothing),
+              cites =
+                [ Cite
+                    { id = "a1",
+                      locator = Nothing,
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix =
+                [ PTokenStyledText
+                    StyledText
+                      { body = "global",
+                        style = L.styleMaskFrom [Bold]
+                      },
+                  PTokenStyledText
+                    StyledText
+                      { body = " prefix",
+                        style = L.styleMaskFrom []
+                      }
+                ],
+              suffix =
+                [ PTokenStyledText
+                    StyledText
+                      { body = "global ",
+                        style = L.styleMaskFrom []
+                      },
+                  PTokenStyledText
+                    StyledText
+                      { body = "suffix",
+                        style = L.styleMaskFrom [Verbatim]
+                      }
+                ]
+            },
+          Citation
+            { styleVariation = (Just "t", Nothing),
+              cites =
+                [ Cite
+                    { id = "source1",
+                      locator = Nothing,
+                      prefix = [],
+                      suffix = []
+                    },
+                  Cite
+                    { id = "source2",
+                      locator = Nothing,
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix =
+                [ PTokenStyledText
+                    StyledText
+                      { body = "see",
+                        style = L.styleMaskFrom []
+                      }
+                ],
+              suffix =
+                [ PTokenStyledText
+                    StyledText
+                      { body = "by Smith ",
+                        style = L.styleMaskFrom []
+                      },
+                  PTokenStyledText
+                    StyledText
+                      { body = "et al.",
+                        style = L.styleMaskFrom [Italic]
+                      }
+                ]
+            },
+          Citation
+            { styleVariation = (Just "t", Nothing),
+              cites =
+                [ Cite
+                    { id = "foo",
+                      locator = Just ("page", "7"),
+                      prefix = [],
+                      suffix = []
+                    },
+                  Cite
+                    { id = "bar",
+                      locator = Just ("page", "4"),
+                      prefix = [],
+                      suffix = []
+                    }
+                ],
+              prefix =
+                [ PTokenStyledText
+                    StyledText
+                      { body = "see",
+                        style = L.styleMaskFrom []
+                      }
+                ],
+              suffix =
+                [ PTokenStyledText
+                    StyledText
+                      { body = "by foo",
+                        style = L.styleMaskFrom []
+                      }
+                ]
+            },
+          Citation
+            { styleVariation = (Just "a", Just "f"),
+              cites =
+                [ Cite
+                    { id = "@atkey",
+                      locator = Nothing,
+                      prefix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "the very important",
+                                style = L.styleMaskFrom []
+                              }
+                        ],
+                      suffix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "@ once",
+                                style = L.styleMaskFrom []
+                              }
+                        ]
+                    },
+                  Cite
+                    { id = "baz",
+                      locator = Just ("volume", "3"),
+                      prefix =
+                        [ PTokenStyledText
+                            StyledText
+                              { body = "the crucial",
+                                style = L.styleMaskFrom []
+                              }
+                        ],
+                      suffix = []
+                    }
+                ],
+              prefix =
+                [ PTokenStyledText
+                    StyledText
+                      { body = "c.f.",
+                        style = L.styleMaskFrom []
+                      }
+                ],
+              suffix = []
+            }
+        ],
       meta =
         fromList
           [ ("ID", "00000000-0000-0000-0000-000000000000")
@@ -4898,158 +5110,13 @@ ps
 #+name: Expected prose for 0014-citations-worg
 #+begin_src haskell
 [ CParagraph
-    [ PTokenCitation
-        Citation
-          { styleVariation = (Nothing, Nothing),
-            cites =
-              [ Cite
-                  { id = "a1",
-                    locator = Nothing,
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix =
-              [ PTokenStyledText
-                  StyledText
-                    { body = "global",
-                      style = L.styleMaskFrom [Bold]
-                    },
-                PTokenStyledText
-                  StyledText
-                    { body = " prefix",
-                      style = L.styleMaskFrom []
-                    }
-              ],
-            suffix =
-              [ PTokenStyledText
-                  StyledText
-                    { body = "global ",
-                      style = L.styleMaskFrom []
-                    },
-                PTokenStyledText
-                  StyledText
-                    { body = "suffix",
-                      style = L.styleMaskFrom [Verbatim]
-                    }
-              ]
-          },
+    [ PTokenCitation 0,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Just "t", Nothing),
-            cites =
-              [ Cite
-                  { id = "source1",
-                    locator = Nothing,
-                    prefix = [],
-                    suffix = []
-                  },
-                Cite
-                  { id = "source2",
-                    locator = Nothing,
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix =
-              [ PTokenStyledText
-                  StyledText
-                    { body = "see",
-                      style = L.styleMaskFrom []
-                    }
-              ],
-            suffix =
-              [ PTokenStyledText
-                  StyledText
-                    { body = "by Smith ",
-                      style = L.styleMaskFrom []
-                    },
-                PTokenStyledText
-                  StyledText
-                    { body = "et al.",
-                      style = L.styleMaskFrom [Italic]
-                    }
-              ]
-          },
+      PTokenCitation 1,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Just "t", Nothing),
-            cites =
-              [ Cite
-                  { id = "foo",
-                    locator = Just ("page", "7"),
-                    prefix = [],
-                    suffix = []
-                  },
-                Cite
-                  { id = "bar",
-                    locator = Just ("page", "4"),
-                    prefix = [],
-                    suffix = []
-                  }
-              ],
-            prefix =
-              [ PTokenStyledText
-                  StyledText
-                    { body = "see",
-                      style = L.styleMaskFrom []
-                    }
-              ],
-            suffix =
-              [ PTokenStyledText
-                  StyledText
-                    { body = "by foo",
-                      style = L.styleMaskFrom []
-                    }
-              ]
-          },
+      PTokenCitation 2,
       PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
-      PTokenCitation
-        Citation
-          { styleVariation = (Just "a", Just "f"),
-            cites =
-              [ Cite
-                  { id = "@atkey",
-                    locator = Nothing,
-                    prefix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "the very important",
-                              style = L.styleMaskFrom []
-                            }
-                      ],
-                    suffix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "@ once",
-                              style = L.styleMaskFrom []
-                            }
-                      ]
-                  },
-                Cite
-                  { id = "baz",
-                    locator = Just ("volume", "3"),
-                    prefix =
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "the crucial",
-                              style = L.styleMaskFrom []
-                            }
-                      ],
-                    suffix = []
-                  }
-              ],
-            prefix =
-              [ PTokenStyledText
-                  StyledText
-                    { body = "c.f.",
-                      style = L.styleMaskFrom []
-                    }
-              ],
-            suffix = []
-          }
+      PTokenCitation 3
     ]
 ]
 #+end_src
@@ -5162,6 +5229,7 @@ ps
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
+      citations = [],
       meta =
         fromList
           [ ("ID", "00000000-0000-0000-0000-000000000000")
@@ -5215,6 +5283,7 @@ ps
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
+      citations = [],
       meta =
         fromList
           [ ("ID", "00000000-0000-0000-0000-000000000000")
@@ -10201,6 +10270,7 @@ import Lilac.Types
       ( OrgDoc,
         bibPaths,
         cells,
+        citations,
         cslPath,
         footnoteNumbers,
         meta,
@@ -10360,6 +10430,7 @@ nilOrgDoc cells =
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
+      citations = [],
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
 #+end_src
