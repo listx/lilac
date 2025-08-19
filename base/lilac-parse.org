@@ -5185,7 +5185,16 @@ pfSimple "0014-citations-extra-semicolons-basic"
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-extra-semicolons-consecutive
 #+begin_src org
-[cite:@foo;;]
+[<<orgmode-citation-breakage-workaround>>@foo;;]
+#+end_src
+
+Aside: sadly, using ~[cite:...~ directly above seems to break Orgmode's parsing,
+such that opening this file in Emacs results in an error. So "hide" it from
+Orgmode with [[orgmode-citation-breakage-workaround]].
+
+#+name: orgmode-citation-breakage-workaround
+#+begin_src txt
+cite:
 #+end_src
 
 #+name: t:0014-citations-extra-semicolons-consecutive
