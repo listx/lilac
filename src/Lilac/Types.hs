@@ -283,6 +283,8 @@ data OrgParserState = OrgParserState
     footnoteDefinitions :: Map Text Prose,
     prevCellIsFootnote :: Bool,
     tanglePaths :: Set Text,
+    cslPath :: Maybe FilePath,
+    bibPaths :: [FilePath],
     insideCitation :: Bool,
     bracketBalance :: Int,
     insideCitePrefix :: Bool,

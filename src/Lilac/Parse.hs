@@ -95,10 +95,12 @@ import Lilac.Types as OrgParserState
       ( OrgParserState,
         anonBlockNumber,
         anonEquationNumber,
+        bibPaths,
         bracketBalance,
         cellNames,
         citations,
         continuationIndent,
+        cslPath,
         docOid,
         equationNumber,
         figureNumber,
@@ -132,6 +134,7 @@ import Relude
     Map,
     Maybe (Just, Nothing),
     MonadFail,
+    Ord,
     String,
     Text,
     Word8,
@@ -143,6 +146,7 @@ import Relude
     fail,
     filter,
     find,
+    flip,
     fmap,
     foldl',
     forM_,
@@ -249,12 +253,12 @@ orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
   (docOid, cslPath, bibPaths, meta) <- docMetaParser
-  modify (\s -> s {docOid = docOid})
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
   footnoteNumbers <- reconcileFootnotes
   citations <- collectCitations
+  resetState
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -275,7 +279,7 @@ orgDocParser = do
         cslPath = cslPath,
         bibPaths = bibPaths,
         citations = citations,
-        meta = meta
+        meta = deleteRedundantKeys meta ["cite_export"]
       }
 
 defaultOrgDoc :: OID -> [(Text, Text)] -> OrgDoc
@@ -320,6 +324,8 @@ defaultOrgParserState =
       footnoteDefinitions = M.empty,
       prevCellIsFootnote = False,
       tanglePaths = Set.empty,
+      cslPath = Nothing,
+      bibPaths = [],
       insideCitation = False,
       bracketBalance = 0,
       insideCitePrefix = False,
@@ -358,8 +364,9 @@ docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
   metaKVsList <- many $ lexeme docMetaEntryParser
-  let (bibPaths, remainingKVs) = collectValsFor "bibliography" metaKVsList
+  let (bibPathsText, remainingKVs) = collectValsFor "bibliography" metaKVsList
       metaKVs = fromList remainingKVs
+      bibPaths = map T.unpack bibPathsText
   let conflictingKeys = keys $ M.intersection topLevelDrawerProps metaKVs
   when (not $ null conflictingKeys)
     $ fail
@@ -372,7 +379,13 @@ docMetaParser = do
       cslPath <- case lookup "cite_export" metaKVs of
         Just maybeCslPath -> validateCslPath maybeCslPath
         Nothing -> pure Nothing
-      pure (oid, cslPath, map T.unpack bibPaths, topLevelDrawerProps <> metaKVs)
+      modify $ \s ->
+        s
+          { OrgParserState.bibPaths = bibPaths,
+            OrgParserState.cslPath = cslPath,
+            docOid = oid
+          }
+      pure (oid, cslPath, bibPaths, topLevelDrawerProps <> metaKVs)
 
 lilacExtensionsParser :: OrgParser ()
 lilacExtensionsParser = do
@@ -585,8 +598,8 @@ proseParser spaceConsumer = do
             PTokenStyledText <$> styledTextParser
           ]
       | otherwise =
-          [ PTokenLink <$> linkParser,
-            PTokenCitation <$> citationParser,
+          [ PTokenCitation <$> citationParser,
+            PTokenLink <$> linkParser,
             PTokenMathFragment <$> mathFragmentInlineParser,
             PTokenStyledText <$> styleMarkerParser,
             PTokenStyledText <$> styledTextParser
@@ -949,7 +962,11 @@ fileLinkParser = do
 
 rawLinkParser :: OrgParser Link
 rawLinkParser = do
-  candidate <- MP.some (MP.try remainderChar)
+  _ <- MP.try . MP.lookAhead $ do
+    _ <- MP.takeWhile1P (Just "(raw link) protocol") isAlphaChar
+    _ <- char ':'
+    pure ()
+  candidate <- MP.some $ MP.try remainderChar
   case N.parseURI candidate of
     Nothing -> fail $ "(raw link) not a valid URI: " <> candidate
     Just uri ->
@@ -1893,14 +1910,22 @@ collectValsFor key kvs =
 bibliographyLocationParser :: OrgParser Cell
 bibliographyLocationParser = do
   _ <- string "#+print_bibliography:"
+  orgParserState <- get
+  when (orgParserState.cslPath == Nothing)
+    $ fail "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
+  when (orgParserState.bibPaths == [])
+    $ fail "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   pure $ CBibliography ()
 
 citationParser :: OrgParser Int
 citationParser = do
+  failIfVerbatimOrCode
   orgParserState <- get
-  when (isVerbatim orgParserState.styleMask || isCode orgParserState.styleMask)
-    $ fail "cannot parse citations inside verbatim or code styles"
   _ <- string "[cite"
+  when (orgParserState.cslPath == Nothing)
+    $ fail "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
+  when (orgParserState.bibPaths == [])
+    $ fail "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   modify (\s -> s {insideCitation = True})
   sv1 <- MP.optional $ char '/' >> MP.label "style variation 1" svParser
   sv2 <- MP.optional $ char '/' >> MP.label "style variation 2" svParser
@@ -1957,8 +1982,19 @@ citationParser = do
 collectCitations :: OrgParser [Citation]
 collectCitations = do
   orgParserState <- get
-  modify (\s -> s {OrgParserState.citations = []})
   pure $ reverse orgParserState.citations
+
+resetState :: OrgParser ()
+resetState =
+  modify $ \s ->
+    s
+      { OrgParserState.bibPaths = [],
+        OrgParserState.citations = [],
+        OrgParserState.cslPath = Nothing
+      }
+
+deleteRedundantKeys :: (Ord k) => Map k v -> [k] -> Map k v
+deleteRedundantKeys = foldl' (flip M.delete)
 
 failIfUnbalancedBrackets :: OrgParser ()
 failIfUnbalancedBrackets = do

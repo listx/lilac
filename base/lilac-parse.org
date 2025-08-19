@@ -184,6 +184,8 @@ data OrgParserState = OrgParserState
     footnoteDefinitions :: Map Text Prose,
     prevCellIsFootnote :: Bool,
     tanglePaths :: Set Text,
+    cslPath :: Maybe FilePath,
+    bibPaths :: [FilePath],
     insideCitation :: Bool,
     bracketBalance :: Int,
     insideCitePrefix :: Bool,
@@ -220,6 +222,8 @@ defaultOrgParserState =
       footnoteDefinitions = M.empty,
       prevCellIsFootnote = False,
       tanglePaths = Set.empty,
+      cslPath = Nothing,
+      bibPaths = [],
       insideCitation = False,
       bracketBalance = 0,
       insideCitePrefix = False,
@@ -343,10 +347,12 @@ import Lilac.Types as OrgParserState
       ( OrgParserState,
         anonBlockNumber,
         anonEquationNumber,
+        bibPaths,
         bracketBalance,
         cellNames,
         citations,
         continuationIndent,
+        cslPath,
         docOid,
         equationNumber,
         figureNumber,
@@ -380,6 +386,7 @@ import Relude
     Map,
     Maybe (Just, Nothing),
     MonadFail,
+    Ord,
     String,
     Text,
     Word8,
@@ -391,6 +398,7 @@ import Relude
     fail,
     filter,
     find,
+    flip,
     fmap,
     foldl',
     forM_,
@@ -561,6 +569,8 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:bibliographyLocationParser>>
 <<f:citationParser>>
 <<f:collectCitations>>
+<<f:resetState>>
+<<f:deleteRedundantKeys>>
 <<f:failIfUnbalancedBrackets>>
 <<f:citeParser>>
 <<f:citeIdParser>>
@@ -678,12 +688,12 @@ orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
   _ <- optional skipNewlinesAndComments
   (docOid, cslPath, bibPaths, meta) <- docMetaParser
-  modify (\s -> s {docOid = docOid})
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
   footnoteNumbers <- reconcileFootnotes
   citations <- collectCitations
+  resetState
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
@@ -704,7 +714,7 @@ orgDocParser = do
         cslPath = cslPath,
         bibPaths = bibPaths,
         citations = citations,
-        meta = meta
+        meta = deleteRedundantKeys meta ["cite_export"]
       }
 #+end_src
 
@@ -715,6 +725,47 @@ because that can happen when [[f:listItemsEndParser]] detects maximum indentatio
 that matches the most-deeply-nested item (in which case no list items end).
 
 See [[f:docMetaParser]] to see how ~docMetaParser~ works.
+
+We call [[f:resetState]] to clear some state from [[data:OrgParserState]], because
+otherwise it gets too polluted during testing. Also, it's not like we're
+throwing away information because everything we need is still captured elsewhere
+(just check the fields that have the same name in both [[data:OrgParserState]] and
+[[data:OrgDoc]]).
+
+#+name: f:resetState
+#+begin_src haskell
+resetState :: OrgParser ()
+resetState =
+  modify $ \s ->
+    s
+      { OrgParserState.bibPaths = [],
+        OrgParserState.citations = [],
+        OrgParserState.cslPath = Nothing
+      }
+#+end_src
+
+In [[f:resetState]] we cannot simply refer to the field alone in the record update,
+like this
+
+#+begin_src haskell
+  modify (\s -> s {citations = []})
+#+end_src
+
+because it will result in an [[https://errors.haskell.org/messages/GHC-02256/]["Ambiguous record update" error]], because both
+[[data:OrgDoc]] and [[data:OrgParserState]] have a field named ~citations~. So we work
+around this by importing the latter through ~import Lilac.Types as OrgParserState~
+in [[module:Lilac.Parse]]. See [[https://discourse.haskell.org/t/what-are-you-supposed-to-do-about-wambiguous-fields/9545][this discussion from 2024]] for more information.
+
+In a similar vein to [[f:resetState]], [[f:deleteRedundantKeys]] removes certain entries
+from the given map data structure. In the case of [[f:orgDocParser]], it removes
+keys that won't be used because the information in those keys have already been
+parsed and saved elsewhere.
+
+#+name: f:deleteRedundantKeys
+#+begin_src haskell
+deleteRedundantKeys :: (Ord k) => Map k v -> [k] -> Map k v
+deleteRedundantKeys = foldl' (flip M.delete)
+#+end_src
 
 We should be able to parse empty input.
 
@@ -862,8 +913,9 @@ docMetaParser = do
   topLevelDrawerProps <- propertiesDrawerParser
   _ <- optional skipNewlinesAndComments
   metaKVsList <- many $ lexeme docMetaEntryParser
-  let (bibPaths, remainingKVs) = collectValsFor "bibliography" metaKVsList
+  let (bibPathsText, remainingKVs) = collectValsFor "bibliography" metaKVsList
       metaKVs = fromList remainingKVs
+      bibPaths = map T.unpack bibPathsText
   let conflictingKeys = keys $ M.intersection topLevelDrawerProps metaKVs
   when (not $ null conflictingKeys)
     $ fail
@@ -876,7 +928,13 @@ docMetaParser = do
       cslPath <- case lookup "cite_export" metaKVs of
         Just maybeCslPath -> validateCslPath maybeCslPath
         Nothing -> pure Nothing
-      pure (oid, cslPath, map T.unpack bibPaths, topLevelDrawerProps <> metaKVs)
+      modify $ \s ->
+        s
+          { OrgParserState.bibPaths = bibPaths,
+            OrgParserState.cslPath = cslPath,
+            docOid = oid
+          }
+      pure (oid, cslPath, bibPaths, topLevelDrawerProps <> metaKVs)
 #+end_src
 
 OID validation in [[f:validateOidText]] delegates to the ~Lilac.Types.fromText~
@@ -1386,8 +1444,8 @@ proseParser spaceConsumer = do
             PTokenStyledText <$> styledTextParser
           ]
       | otherwise =
-          [ PTokenLink <$> linkParser,
-            PTokenCitation <$> citationParser,
+          [ PTokenCitation <$> citationParser,
+            PTokenLink <$> linkParser,
             PTokenMathFragment <$> mathFragmentInlineParser,
             PTokenStyledText <$> styleMarkerParser,
             PTokenStyledText <$> styledTextParser
@@ -3277,7 +3335,11 @@ The [[f:rawLinkParser]] parses text that look like URLs into ~LinkTargetURI~.
 #+begin_src haskell
 rawLinkParser :: OrgParser Link
 rawLinkParser = do
-  candidate <- MP.some (MP.try remainderChar)
+  _ <- MP.try . MP.lookAhead $ do
+    _ <- MP.takeWhile1P (Just "(raw link) protocol") isAlphaChar
+    _ <- char ':'
+    pure ()
+  candidate <- MP.some $ MP.try remainderChar
   case N.parseURI candidate of
     Nothing -> fail $ "(raw link) not a valid URI: " <> candidate
     Just uri ->
@@ -4002,8 +4064,7 @@ ps
       citations = [],
       meta =
         fromList
-          [ ("ID", "00000000-0000-0000-0000-000000000000"),
-            ("cite_export", "csl foo.csl")
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
           ]
     }
   L.defaultOrgParserState
@@ -4080,11 +4141,18 @@ processor, but we do not, for simplicity.
 bibliographyLocationParser :: OrgParser Cell
 bibliographyLocationParser = do
   _ <- string "#+print_bibliography:"
+  orgParserState <- get
+  when (orgParserState.cslPath == Nothing)
+    $ fail "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
+  when (orgParserState.bibPaths == [])
+    $ fail "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   pure $ CBibliography ()
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-bibliography-location
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 ,#+print_bibliography:
 #+end_src
 
@@ -4096,8 +4164,8 @@ ps
     { oid = nilOid,
       cells = [CBibliography ()],
       footnoteNumbers = M.empty,
-      cslPath = Nothing,
-      bibPaths = [],
+      cslPath = Just "foo.csl",
+      bibPaths = ["a.json"],
       citations = [],
       meta =
         fromList
@@ -4105,6 +4173,40 @@ ps
           ]
     }
   L.defaultOrgParserState
+#+end_src
+
+Trying to print the bibliography without a style specified should result in an
+error.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-print-biblio-missing-csl-style
+#+begin_src org
+,#+bibliography: a.json
+,#+print_bibliography:
+#+end_src
+
+#+name: t:0014-citations-print-biblio-missing-csl-style
+#+begin_src haskell
+pf
+  "0014-citations-print-biblio-missing-csl-style"
+  "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
+  44
+#+end_src
+
+Trying to print the bibliography without [[id:909c5265-065a-412c-9305-2cff398ad233][CSL JSON (bibliographical entries)]]
+should also result in an error.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-print-biblio-missing-bib-entries
+#+begin_src org
+,#+cite_export: csl foo.csl
+,#+print_bibliography:
+#+end_src
+
+#+name: t:0014-citations-print-biblio-missing-bib-entries
+#+begin_src haskell
+pf
+  "0014-citations-print-biblio-missing-bib-entries"
+  "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
+  48
 #+end_src
 
 ** Citation data structures
@@ -4161,10 +4263,13 @@ structures.
 #+begin_src haskell
 citationParser :: OrgParser Int
 citationParser = do
+  failIfVerbatimOrCode
   orgParserState <- get
-  when (isVerbatim orgParserState.styleMask || isCode orgParserState.styleMask)
-    $ fail "cannot parse citations inside verbatim or code styles"
   _ <- string "[cite"
+  when (orgParserState.cslPath == Nothing)
+    $ fail "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
+  when (orgParserState.bibPaths == [])
+    $ fail "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   modify (\s -> s {insideCitation = True})
   sv1 <- MP.optional $ char '/' >> MP.label "style variation 1" svParser
   sv2 <- MP.optional $ char '/' >> MP.label "style variation 2" svParser
@@ -4238,9 +4343,7 @@ intraCellWhitespaceParser =
 
 We collect all citations into a list in [[f:collectCitations]]. This is used in
 [[f:orgDocParser]] to get the list of all citations used in the document. We have to
-reverse the order because during parsing we just prepend to it. We clear the
-list of citations because otherwise it pollutes the [[data:OrgParserState]] too much
-during testing.
+reverse the order because during parsing we just prepend to it.
 
 We have to get a single list of all citations, because when we call
 ~Citeproc.citeproc~, we have to provide all citations used in the document; this
@@ -4254,20 +4357,8 @@ citation at a time.
 collectCitations :: OrgParser [Citation]
 collectCitations = do
   orgParserState <- get
-  modify (\s -> s {OrgParserState.citations = []})
   pure $ reverse orgParserState.citations
 #+end_src
-
-In [[f:collectCitations]] we cannot do
-
-#+begin_src haskell
-  modify (\s -> s {citations = []})
-#+end_src
-
-because it will result in an [[https://errors.haskell.org/messages/GHC-02256/]["Ambiguous record update" error]], because both
-[[data:OrgDoc]] and [[data:OrgParserState]] have a field named ~citations~. So we work
-around this by importing the latter through ~import Lilac.Types as OrgParserState~
-in [[module:Lilac.Parse]]. See [[https://discourse.haskell.org/t/what-are-you-supposed-to-do-about-wambiguous-fields/9545][this discussion from 2024]] for more information.
 
 The [[f:citeParser]] parses a single [[data:Cite]]. A cite is composed of four pieces:
 
@@ -4529,6 +4620,8 @@ Simple citation, without any locators or affixes.
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-single-cite
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [cite/v1/v2: @foo123-.:?!`'/*@+|(){}<>&_^$#%~]
 #+end_src
 
@@ -4541,8 +4634,8 @@ ps
       cells =
         <<Expected prose for 0014-citations-single-cite>>,
       footnoteNumbers = M.empty,
-      cslPath = Nothing,
-      bibPaths = [],
+      cslPath = Just "foo.csl",
+      bibPaths = ["a.json"],
       citations =
         [ Citation
             { styleVariation = (Just "v1", Just "v2"),
@@ -4578,6 +4671,8 @@ Cite with various (typical) locators.
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-locators
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [cite: @a 15]
 [cite: @b 15-30]
 [cite: @c chapters 15-30, 35]
@@ -4595,8 +4690,8 @@ ps
       cells =
         <<Expected prose for 0014-citations-locators>>,
       footnoteNumbers = M.empty,
-      cslPath = Nothing,
-      bibPaths = [],
+      cslPath = Just "foo.csl",
+      bibPaths = ["a.json"],
       citations =
         [ Citation
             { styleVariation = (Nothing, Nothing),
@@ -4707,6 +4802,8 @@ Citations with locators and affixes.
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-locators-affixes
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [cite:prefix @a1 15 suffix]
 [cite: @b1 15-30; a really long prefix, maybe? @b2 chap. 4 more suffix]
 [cite: @c1 chapters 15-30, 35 suffix with balanced [[brackets] and @sign]]
@@ -4724,8 +4821,8 @@ ps
       cells =
         <<Expected prose for 0014-citations-locators-affixes>>,
       footnoteNumbers = M.empty,
-      cslPath = Nothing,
-      bibPaths = [],
+      cslPath = Just "foo.csl",
+      bibPaths = ["a.json"],
       citations =
         [ Citation
             { styleVariation = (Nothing, Nothing),
@@ -4935,6 +5032,8 @@ may be the case that the CSL processor decides to [[https://github.com/jgm/pando
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-worg
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [cite:*global* prefix;@a1;global =suffix=]
 [cite/t: see;@source1;@source2;by Smith /et al./]
 [cite/t:see;@foo p. 7;@bar pp. 4;by foo]
@@ -4950,8 +5049,8 @@ ps
       cells =
         <<Expected prose for 0014-citations-worg>>,
       footnoteNumbers = M.empty,
-      cslPath = Nothing,
-      bibPaths = [],
+      cslPath = Just "foo.csl",
+      bibPaths = ["a.json"],
       citations =
         [ Citation
             { styleVariation = (Nothing, Nothing),
@@ -5125,6 +5224,8 @@ Unbalanced brackets are rejected from the cite prefix.
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-unbalanced-brackets-prefix-opening
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [cite: [ @foo]
 #+end_src
 
@@ -5133,11 +5234,13 @@ Unbalanced brackets are rejected from the cite prefix.
 pf
   "0014-citations-unbalanced-brackets-prefix-opening"
   "unbalanced brackets"
-  8
+  58
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-unbalanced-brackets-prefix-closing
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [cite: ] @foo]
 #+end_src
 
@@ -5145,14 +5248,25 @@ pf
 #+begin_src haskell
 pfm
   "0014-citations-unbalanced-brackets-prefix-closing"
-  (utoks "]" <> etoks "@" <> etoks "\n")
-  7
+  ( utoks "]"
+      <> etoks "[["
+      <> etoks "[fn:"
+      <> etoks "\\("
+      <> etoks "@"
+      <> etoks "\\"
+      <> elabel "(raw link) protocol"
+      <> etoks "\n"
+      <> elabel "normal characters"
+  )
+  57
 #+end_src
 
 Similarly, unbalanced brackets should fail for the cite suffix.
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-unbalanced-brackets-suffix-opening
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [cite: @foo []
 #+end_src
 
@@ -5163,28 +5277,57 @@ pfSimple "0014-citations-unbalanced-brackets-suffix-opening"
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-unbalanced-brackets-suffix-closing
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [cite: @foo ]]
 #+end_src
 
 #+name: t:0014-citations-unbalanced-brackets-suffix-closing
 #+begin_src haskell
-pfSimple "0014-citations-unbalanced-brackets-suffix-closing"
+pfm
+  "0014-citations-unbalanced-brackets-suffix-closing"
+  ( utoks "]]\n"
+      <> etoks "[["
+      <> etoks "[fn:"
+      <> etoks "\\("
+      <> etoks "\\"
+      <> elabel "(raw link) protocol"
+      <> etoks "\n"
+      <> elabel "normal characters"
+  )
+  62
 #+end_src
 
 Semicolons must be meaningful; extraneous semicolons are not allowed.
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-extra-semicolons-basic
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [cite:;@foo]
 #+end_src
 
 #+name: t:0014-citations-extra-semicolons-basic
 #+begin_src haskell
-pfSimple "0014-citations-extra-semicolons-basic"
+pfm
+  "0014-citations-extra-semicolons-basic"
+  ( utoks ";"
+      <> etoks "[["
+      <> etoks "[fn:"
+      <> etoks "\\("
+      <> etoks "@"
+      <> etoks "\\"
+      <> elabel "(raw link) protocol"
+      <> elabel "intra-cell whitespace"
+      <> elabel "normal characters"
+  )
+  56
 #+end_src
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-extra-semicolons-consecutive
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [<<orgmode-citation-breakage-workaround>>@foo;;]
 #+end_src
 
@@ -5199,7 +5342,20 @@ cite:
 
 #+name: t:0014-citations-extra-semicolons-consecutive
 #+begin_src haskell
-pfSimple "0014-citations-extra-semicolons-consecutive"
+pfm
+  "0014-citations-extra-semicolons-consecutive"
+  ( utoks ";"
+      <> etoks "[["
+      <> etoks "[fn:"
+      <> etoks "\\("
+      <> etoks "@"
+      <> etoks "\\"
+      <> etoks "]"
+      <> elabel "(raw link) protocol"
+      <> elabel "intra-cell whitespace"
+      <> elabel "normal characters"
+  )
+  61
 #+end_src
 
 Citations cannot be nested. Because we don't parse for nested citations in
@@ -5208,6 +5364,8 @@ Citations cannot be nested. Because we don't parse for nested citations in
 
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-nested
 #+begin_src org
+,#+cite_export: csl foo.csl
+,#+bibliography: a.json
 [cite:@foo;[cite: @bar]]
 #+end_src
 
@@ -5216,7 +5374,7 @@ Citations cannot be nested. Because we don't parse for nested citations in
 pf
   "0014-citations-nested"
   "unbalanced brackets"
-  17
+  67
 #+end_src
 
 Citations inside verbatim or code style markers are ignored.
@@ -5313,6 +5471,39 @@ ps
         style = L.styleMaskFrom []
       }
 ]
+#+end_src
+
+Trying to use citations when no export style or bibliography sources have been
+defined is an error.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-missing-csl-style
+#+begin_src org
+,#+bibliography: a.json
+[cite:@foo]
+#+end_src
+
+#+name: t:0014-citations-missing-csl-style
+#+begin_src haskell
+pf
+  "0014-citations-missing-csl-style"
+  "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
+  28
+#+end_src
+
+Trying to use citations without a CSL style file is an error.
+
+#+header: :tangle test/Lilac/ParseSpec/0014-citations-missing-bib-entries
+#+begin_src org
+,#+cite_export: csl foo.csl
+[cite:@foo]
+#+end_src
+
+#+name: t:0014-citations-missing-bib-entries
+#+begin_src haskell
+pf
+  "0014-citations-missing-bib-entries"
+  "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
+  32
 #+end_src
 
 * Inline math fragments
@@ -10663,6 +10854,8 @@ parseSpec = do
   <<t:0014-citations-csl-path>>
   <<t:0014-citations-csl-json-paths>>
   <<t:0014-citations-bibliography-location>>
+  <<t:0014-citations-print-biblio-missing-csl-style>>
+  <<t:0014-citations-print-biblio-missing-bib-entries>>
   <<t:0014-citations-single-cite>>
   <<t:0014-citations-locators>>
   <<t:0014-citations-locators-affixes>>
@@ -10676,6 +10869,8 @@ parseSpec = do
   <<t:0014-citations-nested>>
   <<t:0014-citations-forbidden-in-verbatim-code>>
   <<t:0014-citations-forbidden-in-headings>>
+  <<t:0014-citations-missing-csl-style>>
+  <<t:0014-citations-missing-bib-entries>>
 #+end_src
 
 * Footnotes

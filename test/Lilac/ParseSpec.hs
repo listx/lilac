@@ -2809,8 +2809,7 @@ parseSpec = do
         citations = [],
         meta =
           fromList
-            [ ("ID", "00000000-0000-0000-0000-000000000000"),
-              ("cite_export", "csl foo.csl")
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
             ]
       }
     L.defaultOrgParserState
@@ -2840,8 +2839,8 @@ parseSpec = do
       { oid = nilOid,
         cells = [CBibliography ()],
         footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
+        cslPath = Just "foo.csl",
+        bibPaths = ["a.json"],
         citations = [],
         meta =
           fromList
@@ -2849,6 +2848,16 @@ parseSpec = do
             ]
       }
     L.defaultOrgParserState
+
+  pf
+    "0014-citations-print-biblio-missing-csl-style"
+    "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
+    44
+
+  pf
+    "0014-citations-print-biblio-missing-bib-entries"
+    "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
+    48
 
   ps
     "0014-citations-single-cite"
@@ -2860,8 +2869,8 @@ parseSpec = do
               ]
           ],
         footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
+        cslPath = Just "foo.csl",
+        bibPaths = ["a.json"],
         citations =
           [ Citation
               { styleVariation = (Just "v1", Just "v2"),
@@ -2904,8 +2913,8 @@ parseSpec = do
               ]
           ],
         footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
+        cslPath = Just "foo.csl",
+        bibPaths = ["a.json"],
         citations =
           [ Citation
               { styleVariation = (Nothing, Nothing),
@@ -3013,8 +3022,8 @@ parseSpec = do
               ]
           ],
         footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
+        cslPath = Just "foo.csl",
+        bibPaths = ["a.json"],
         citations =
           [ Citation
               { styleVariation = (Nothing, Nothing),
@@ -3215,8 +3224,8 @@ parseSpec = do
               ]
           ],
         footnoteNumbers = M.empty,
-        cslPath = Nothing,
-        bibPaths = [],
+        cslPath = Just "foo.csl",
+        bibPaths = ["a.json"],
         citations =
           [ Citation
               { styleVariation = (Nothing, Nothing),
@@ -3374,25 +3383,70 @@ parseSpec = do
   pf
     "0014-citations-unbalanced-brackets-prefix-opening"
     "unbalanced brackets"
-    8
+    58
 
   pfm
     "0014-citations-unbalanced-brackets-prefix-closing"
-    (utoks "]" <> etoks "@" <> etoks "\n")
-    7
+    ( utoks "]"
+        <> etoks "[["
+        <> etoks "[fn:"
+        <> etoks "\\("
+        <> etoks "@"
+        <> etoks "\\"
+        <> elabel "(raw link) protocol"
+        <> etoks "\n"
+        <> elabel "normal characters"
+    )
+    57
 
   pfSimple "0014-citations-unbalanced-brackets-suffix-opening"
 
-  pfSimple "0014-citations-unbalanced-brackets-suffix-closing"
+  pfm
+    "0014-citations-unbalanced-brackets-suffix-closing"
+    ( utoks "]]\n"
+        <> etoks "[["
+        <> etoks "[fn:"
+        <> etoks "\\("
+        <> etoks "\\"
+        <> elabel "(raw link) protocol"
+        <> etoks "\n"
+        <> elabel "normal characters"
+    )
+    62
 
-  pfSimple "0014-citations-extra-semicolons-basic"
+  pfm
+    "0014-citations-extra-semicolons-basic"
+    ( utoks ";"
+        <> etoks "[["
+        <> etoks "[fn:"
+        <> etoks "\\("
+        <> etoks "@"
+        <> etoks "\\"
+        <> elabel "(raw link) protocol"
+        <> elabel "intra-cell whitespace"
+        <> elabel "normal characters"
+    )
+    56
 
-  pfSimple "0014-citations-extra-semicolons-consecutive"
+  pfm
+    "0014-citations-extra-semicolons-consecutive"
+    ( utoks ";"
+        <> etoks "[["
+        <> etoks "[fn:"
+        <> etoks "\\("
+        <> etoks "@"
+        <> etoks "\\"
+        <> etoks "]"
+        <> elabel "(raw link) protocol"
+        <> elabel "intra-cell whitespace"
+        <> elabel "normal characters"
+    )
+    61
 
   pf
     "0014-citations-nested"
     "unbalanced brackets"
-    17
+    67
 
   ps
     "0014-citations-forbidden-in-verbatim-code"
@@ -3457,3 +3511,13 @@ parseSpec = do
         headingLevel = 1,
         headingSection = [1]
       }
+
+  pf
+    "0014-citations-missing-csl-style"
+    "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
+    28
+
+  pf
+    "0014-citations-missing-bib-entries"
+    "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
+    32
