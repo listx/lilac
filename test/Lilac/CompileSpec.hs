@@ -7,26 +7,19 @@ import Data.Tree
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( GPath,
-    LinkOid (LinkOid, name, oid),
-    Object,
-    encodeGPath,
+  ( LinkOid (LinkOid, name, oid),
     fromWords,
   )
 import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
     FilePath,
-    IO,
     String,
-    foldlM,
     isRight,
     pure,
     show,
     ($),
-    (=<<),
   )
-import System.OsPath qualified as P
 import Test.Hspec
   ( Spec,
     expectationFailure,
@@ -52,31 +45,18 @@ checkExternalOids path expectedExternalOids = do
 expectArchiveError :: [FilePath] -> String -> Spec
 expectArchiveError paths expected = do
   it (show paths) $ do
-    pathObjs <- readObjectsFrom paths
+    pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
     LC.mkArchive pathObjs `shouldBe` (Left expected)
 
 expectArchiveOk :: [FilePath] -> Spec
 expectArchiveOk paths = do
   it (show paths) $ do
-    pathObjs <- readObjectsFrom paths
+    pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
     LC.mkArchive pathObjs `shouldSatisfy` isRight
-
-readObjectsFrom :: [FilePath] -> IO [(GPath, Object)]
-readObjectsFrom = foldlM f []
-  where
-    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
-    f acc path = do
-      compileSpecDir <- P.encodeUtf "test/Lilac/CompileSpec/"
-      p <- P.encodeUtf path
-      let relPath = P.combine compileSpecDir p
-      input <- LU.readFileRobustly relPath
-      (Right od) <- pure $ LP.parseOrgDoc input
-      relPath' <- encodeGPath =<< P.decodeUtf relPath
-      pure $ (relPath', LC.mkObject od) : acc
 
 checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
 checkCycles paths expectedCycles = do
-  pathObjs <- runIO $ readObjectsFrom paths
+  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
   case LC.mkArchive pathObjs of
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do

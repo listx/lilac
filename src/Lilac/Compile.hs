@@ -3,6 +3,7 @@ module Lilac.Compile
     findExternalOids,
     mkObject,
     mkArchive,
+    readObjectsFrom,
   )
 where
 
@@ -10,7 +11,7 @@ import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Lilac.Parse (validateOidText)
+import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Archive (Archive, objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -44,9 +45,13 @@ import Lilac.Types
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
     decodeGPath,
+    encodeGPath,
   )
+import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
+    FilePath,
+    IO,
     Map,
     Maybe (Just, Nothing),
     String,
@@ -56,12 +61,14 @@ import Relude
     elem,
     fmap,
     foldl',
+    foldlM,
     fromList,
     intercalate,
     length,
     map,
     mempty,
     otherwise,
+    pure,
     repeat,
     show,
     sort,
@@ -70,17 +77,21 @@ import Relude
     (.),
     (/=),
     (<>),
+    (=<<),
     (>),
   )
 import Relude.Extra.Map (elems, insert, keys, lookup, member)
+import System.Exit (die)
+import System.OsPath qualified as P
 
-mkObject :: OrgDoc -> Object
-mkObject orgDoc =
-  Object
-    { orgDoc = orgDoc,
-      symbols = mkSymbols orgDoc,
-      externalOids = findExternalOids orgDoc
-    }
+mkObject :: OrgDoc -> IO Object
+mkObject orgDoc = do
+  pure
+    Object
+      { orgDoc = orgDoc,
+        symbols = mkSymbols orgDoc,
+        externalOids = findExternalOids orgDoc
+      }
 
 mkSymbols :: OrgDoc -> Map LinkOid Cell
 mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
@@ -89,7 +100,7 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
       CBlock block -> getSymbols (Just block.parentOid) block.meta cell
       CHeading heading
         | Just oidText <- lookup "ID" heading.meta,
-          Just oid <- validateOidText oidText ->
+          Just oid <- LP.validateOidText oidText ->
             [ ( LinkOid
                   { oid = oid,
                     name = T.empty
@@ -181,6 +192,22 @@ mkArchive pathObjs =
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
+
+readObjectsFrom :: FilePath -> [FilePath] -> IO [(GPath, Object)]
+readObjectsFrom parentDir = foldlM f []
+  where
+    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
+    f acc path = do
+      parentDirEncoded <- P.encodeUtf parentDir
+      p <- P.encodeUtf path
+      let relPath = P.combine parentDirEncoded p
+      input <- LU.readFileRobustly relPath
+      case LP.parseOrgDoc input of
+        Left errTxt -> die $ T.unpack errTxt
+        Right od -> do
+          obj <- mkObject od
+          relPath' <- encodeGPath =<< P.decodeUtf relPath
+          pure $ (relPath', obj) : acc
 
 buildGraph ::
   [Block] ->

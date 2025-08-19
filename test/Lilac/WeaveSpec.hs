@@ -59,7 +59,7 @@ getWovenPrettyFromPath path = do
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      let object = LC.mkObject orgDoc
+      object <- LC.mkObject orgDoc
       case LC.mkArchive [(inputOrgFileGPath, object)] of
         Left errMsg -> pure $ Left errMsg
         Right archive -> do

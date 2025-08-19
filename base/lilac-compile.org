@@ -23,6 +23,7 @@ module Lilac.Compile
     findExternalOids,
     mkObject,
     mkArchive,
+    readObjectsFrom,
   )
 where
 
@@ -30,7 +31,7 @@ import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
-import Lilac.Parse (validateOidText)
+import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Archive (Archive, objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -64,9 +65,13 @@ import Lilac.Types
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Table (grid, meta),
     decodeGPath,
+    encodeGPath,
   )
+import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
+    FilePath,
+    IO,
     Map,
     Maybe (Just, Nothing),
     String,
@@ -76,12 +81,14 @@ import Relude
     elem,
     fmap,
     foldl',
+    foldlM,
     fromList,
     intercalate,
     length,
     map,
     mempty,
     otherwise,
+    pure,
     repeat,
     show,
     sort,
@@ -90,13 +97,17 @@ import Relude
     (.),
     (/=),
     (<>),
+    (=<<),
     (>),
   )
 import Relude.Extra.Map (elems, insert, keys, lookup, member)
+import System.Exit (die)
+import System.OsPath qualified as P
 
 <<f:mkObject>>
 <<f:mkSymbols>>
 <<f:mkArchive>>
+<<f:readObjectsFrom>>
 <<f:buildGraph>>
 <<f:findCycles>>
 <<f:findExternalOids>>
@@ -205,13 +216,14 @@ files we depend on.
 
 #+name: f:mkObject
 #+begin_src haskell
-mkObject :: OrgDoc -> Object
-mkObject orgDoc =
-  Object
-    { orgDoc = orgDoc,
-      symbols = mkSymbols orgDoc,
-      externalOids = findExternalOids orgDoc
-    }
+mkObject :: OrgDoc -> IO Object
+mkObject orgDoc = do
+  pure
+    Object
+      { orgDoc = orgDoc,
+        symbols = mkSymbols orgDoc,
+        externalOids = findExternalOids orgDoc
+      }
 #+end_src
 
 [[f:mkSymbols]] generates a mapping of all OIDs to their cells (headings), and also
@@ -226,7 +238,7 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
       CBlock block -> getSymbols (Just block.parentOid) block.meta cell
       CHeading heading
         | Just oidText <- lookup "ID" heading.meta,
-          Just oid <- validateOidText oidText ->
+          Just oid <- LP.validateOidText oidText ->
             [ ( LinkOid
                   { oid = oid,
                     name = T.empty
@@ -558,6 +570,28 @@ mkArchive pathObjs =
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
+#+end_src
+
+[[f:readObjectsFrom]] reads files from a given parent directory, and converts them
+into [[data:Object]] values. This is used in tests where we want to read multiple objects for a test case.
+
+#+name: f:readObjectsFrom
+#+begin_src haskell
+readObjectsFrom :: FilePath -> [FilePath] -> IO [(GPath, Object)]
+readObjectsFrom parentDir = foldlM f []
+  where
+    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
+    f acc path = do
+      parentDirEncoded <- P.encodeUtf parentDir
+      p <- P.encodeUtf path
+      let relPath = P.combine parentDirEncoded p
+      input <- LU.readFileRobustly relPath
+      case LP.parseOrgDoc input of
+        Left errTxt -> die $ T.unpack errTxt
+        Right od -> do
+          obj <- mkObject od
+          relPath' <- encodeGPath =<< P.decodeUtf relPath
+          pure $ (relPath', obj) : acc
 #+end_src
 
 *** Tests
@@ -1348,26 +1382,19 @@ import Data.Tree
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( GPath,
-    LinkOid (LinkOid, name, oid),
-    Object,
-    encodeGPath,
+  ( LinkOid (LinkOid, name, oid),
     fromWords,
   )
 import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
     FilePath,
-    IO,
     String,
-    foldlM,
     isRight,
     pure,
     show,
     ($),
-    (=<<),
   )
-import System.OsPath qualified as P
 import Test.Hspec
   ( Spec,
     expectationFailure,
@@ -1402,7 +1429,6 @@ helpers.
 <<f:checkExternalOids>>
 <<f:expectArchiveError>>
 <<f:expectArchiveOk>>
-<<f:readObjectsFrom>>
 <<f:checkCycles>>
 #+end_src
 
@@ -1439,27 +1465,8 @@ have [[f:expectArchiveError]].
 expectArchiveError :: [FilePath] -> String -> Spec
 expectArchiveError paths expected = do
   it (show paths) $ do
-    pathObjs <- readObjectsFrom paths
+    pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
     LC.mkArchive pathObjs `shouldBe` (Left expected)
-#+end_src
-
-The [[f:readObjectsFrom]] helper reads files, parses them as [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] before
-converting them to [[data:Object]].
-
-#+name: f:readObjectsFrom
-#+begin_src haskell
-readObjectsFrom :: [FilePath] -> IO [(GPath, Object)]
-readObjectsFrom = foldlM f []
-  where
-    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
-    f acc path = do
-      compileSpecDir <- P.encodeUtf "test/Lilac/CompileSpec/"
-      p <- P.encodeUtf path
-      let relPath = P.combine compileSpecDir p
-      input <- LU.readFileRobustly relPath
-      (Right od) <- pure $ LP.parseOrgDoc input
-      relPath' <- encodeGPath =<< P.decodeUtf relPath
-      pure $ (relPath', LC.mkObject od) : acc
 #+end_src
 
 The corollary is [[f:expectArchiveOk]] which expects the archive to be successfully
@@ -1470,7 +1477,7 @@ created.
 expectArchiveOk :: [FilePath] -> Spec
 expectArchiveOk paths = do
   it (show paths) $ do
-    pathObjs <- readObjectsFrom paths
+    pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
     LC.mkArchive pathObjs `shouldSatisfy` isRight
 #+end_src
 
@@ -1481,7 +1488,7 @@ constructed from the given Org documents has any cycles.
 #+begin_src haskell
 checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
 checkCycles paths expectedCycles = do
-  pathObjs <- runIO $ readObjectsFrom paths
+  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
   case LC.mkArchive pathObjs of
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do

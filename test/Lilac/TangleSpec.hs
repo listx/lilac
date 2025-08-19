@@ -2,27 +2,16 @@ module Lilac.TangleSpec (spec) where
 
 import Data.Text qualified as T
 import Lilac.Compile qualified as LC
-import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
-import Lilac.Types
-  ( GPath,
-    Object,
-    encodeGPath,
-  )
-import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
     FilePath,
-    IO,
     Text,
     first,
     fmap,
-    foldlM,
     mempty,
-    pure,
     show,
     ($),
-    (=<<),
   )
 import System.OsPath qualified as P
 import Test.Hspec (Spec, expectationFailure, it, runIO, shouldBe)
@@ -32,25 +21,12 @@ spec = tangleSpec
 
 checkExpansion :: [FilePath] -> [(FilePath, Text)] -> Spec
 checkExpansion paths expectedExpansions = do
-  pathObjs <- runIO $ readObjectsFrom paths
+  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/TangleSpec/" paths
   case LC.mkArchive pathObjs of
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do
       (LT.expandRootBlocks archive mempty)
         `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
-
-readObjectsFrom :: [FilePath] -> IO [(GPath, Object)]
-readObjectsFrom = foldlM f []
-  where
-    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
-    f acc path = do
-      compileSpecDir <- P.encodeUtf "test/Lilac/TangleSpec/"
-      p <- P.encodeUtf path
-      let relPath = P.combine compileSpecDir p
-      input <- LU.readFileRobustly relPath
-      (Right od) <- pure $ LP.parseOrgDoc input
-      relPath' <- encodeGPath =<< P.decodeUtf relPath
-      pure $ (relPath', LC.mkObject od) : acc
 
 tangleSpec :: Spec
 tangleSpec = do
