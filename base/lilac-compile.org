@@ -63,6 +63,7 @@ import Lilac.Types
     Object (Object, externalOids, orgDoc, symbols),
     OrgDoc (cells, oid),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
+    Prose (unProse),
     Table (grid, meta),
     decodeGPath,
     encodeGPath,
@@ -302,9 +303,9 @@ findExternalOids orgDoc =
   where
     f cell = case cell of
       CBlock block -> foldl' g [] block.body
-      CHeading heading -> foldl' h [] heading.body
-      CParagraph prose -> foldl' h [] prose
-      CTable table -> foldl' (foldl' h) [] table.grid
+      CHeading heading -> foldl' h [] heading.body.unProse
+      CParagraph prose -> foldl' h [] prose.unProse
+      CTable table -> foldl' (\acc prose -> foldl' h acc prose.unProse) [] table.grid
       CFigure {}
       CFootnote {}
       CListItem {}

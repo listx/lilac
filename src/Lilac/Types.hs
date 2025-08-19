@@ -22,7 +22,7 @@ module Lilac.Types
     OrgParserConf (..),
     OrgParserState (..),
     PToken (..),
-    Prose,
+    Prose (..),
     Style (..),
     StyleMask (..),
     StyledText (..),
@@ -293,6 +293,13 @@ data OrgParserState = OrgParserState
   }
   deriving stock (Eq, Show)
 
+type Prose :: Type
+newtype Prose = Prose
+  { unProse :: [PToken]
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
 type PToken :: Type
 data PToken
   = PTokenStyledText StyledText
@@ -402,9 +409,6 @@ fromText t = case Data.UUID.Types.fromText t of
 
 type OrgParser :: Type -> Type
 type OrgParser = StateT OrgParserState (MP.ParsecT Void Text Identity)
-
-type Prose :: Type
-type Prose = [PToken]
 
 type GPath :: Type
 newtype GPath = GPath FilePath

@@ -78,7 +78,7 @@ import Lilac.Types
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
-    Prose,
+    Prose (Prose, unProse),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyleMask (StyleMask),
     StyledText (StyledText, body, style),
@@ -578,7 +578,7 @@ propertiesEntryParser = do
       (char '\n')
   pure (T.pack key, T.pack value)
 
-proseParser :: OrgParser Text -> OrgParser [PToken]
+proseParser :: OrgParser Text -> OrgParser Prose
 proseParser spaceConsumer = do
   orgParserState <- get
   let avoidCitations =
@@ -587,7 +587,7 @@ proseParser spaceConsumer = do
   b <-
     MP.many
       $ MP.choice (spacePTokenParser : baseParsers avoidCitations)
-  pure . filter nonEmpty $ a : b
+  pure . Prose . filter nonEmpty $ a : b
   where
     spacePTokenParser = PTokenStyledText <$> whitespaceCompressor spaceConsumer
     baseParsers avoidCitations
@@ -811,8 +811,12 @@ isVerbatim (StyleMask a) = testBit a (fromEnum Verbatim)
 isCode :: StyleMask -> Bool
 isCode (StyleMask a) = testBit a (fromEnum Code)
 
-compressProse :: [PToken] -> [PToken]
-compressProse = reverse . dropUnnecessary . foldl' f []
+compressProse :: Prose -> Prose
+compressProse prose =
+  Prose
+    . reverse
+    . dropUnnecessary
+    $ foldl' f [] prose.unProse
   where
     f :: [PToken] -> PToken -> [PToken]
     f [] token = token : []
@@ -1628,7 +1632,7 @@ figureParser = do
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
   caption <- case lookup "caption" metaKVs of
-    Nothing -> pure []
+    Nothing -> pure $ Prose []
     Just s -> case MP.runParser (runStateT captionParser orgParserState) "" s of
       Left err -> fail $ MP.errorBundlePretty err
       Right (prose, _orgParserState) -> pure prose
@@ -1693,7 +1697,7 @@ tableParser = do
   _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
   metaKVs <- metaParser
   caption <- case lookup "caption" metaKVs of
-    Nothing -> pure []
+    Nothing -> pure $ Prose []
     Just s -> case MP.runParser (runStateT captionParser orgParserState) "" s of
       Left err -> fail $ MP.errorBundlePretty err
       Right (prose, _orgParserState) -> pure prose
@@ -1717,7 +1721,7 @@ tableFormulaParser = do
   _ <- char '\n'
   pure ()
 
-captionParser :: OrgParser [PToken]
+captionParser :: OrgParser Prose
 captionParser = do
   caption <- proseParser spaceConsumer
   failIfLeftoverActiveStyles
@@ -1739,11 +1743,12 @@ tableLineParser = do
   where
     isTableLineChar c = c == '-' || c == '+' || c == '|'
 
-tableHorizontalLine :: [PToken]
+tableHorizontalLine :: Prose
 tableHorizontalLine =
-  [ PTokenStyledText
-      StyledText {body = "horizontal-line\NUL", style = styleMaskFrom []}
-  ]
+  Prose
+    [ PTokenStyledText
+        StyledText {body = "horizontal-line\NUL", style = styleMaskFrom []}
+    ]
 
 tableRowParser :: OrgParser [Prose]
 tableRowParser = do
@@ -1758,11 +1763,11 @@ tableRowParser = do
       $ MP.count orgParserState.continuationIndent (char ' ')
   pure tableCells
   where
-    emptyTableCellParser :: OrgParser [PToken]
+    emptyTableCellParser :: OrgParser Prose
     emptyTableCellParser = do
       _ <- char '|'
       _ <- MP.optional spaces
-      pure []
+      pure $ Prose []
     spaces :: OrgParser Text
     spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
 
@@ -1790,16 +1795,17 @@ tableCellParser = do
         _ <- char '|'
         pure ()
       pure
-        [ PTokenStyledText
-            StyledText {body = T.singleton c, style = styleMaskFrom []}
-        ]
+        $ Prose
+          [ PTokenStyledText
+              StyledText {body = T.singleton c, style = styleMaskFrom []}
+          ]
 
 rowsToTuples :: [[Prose]] -> [((Int, Int), Prose)]
 rowsToTuples rows = concatMap rowToTuples $ zip [1 ..] rows
 
 rowToTuples :: (Int, [Prose]) -> [((Int, Int), Prose)]
 rowToTuples (rowIndex, row)
-  | null row = [((rowIndex, 1), [])]
+  | null row = [((rowIndex, 1), Prose [])]
   | otherwise = fst $ foldl' f ([], 1) row
   where
     f :: ([((Int, Int), Prose)], Int) -> Prose -> ([((Int, Int), Prose)], Int)
@@ -1954,8 +1960,8 @@ citationParser = do
         Citation
           { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
             cites = cites,
-            prefix = fromMaybe [] citationPrefix,
-            suffix = fromMaybe [] citationSuffix
+            prefix = fromMaybe (Prose []) citationPrefix,
+            suffix = fromMaybe (Prose []) citationSuffix
           }
   modify
     ( \s ->
@@ -2019,8 +2025,8 @@ citeParser = do
     Cite
       { id = citeId,
         locator = citeLocator,
-        prefix = fromMaybe [] citePrefix,
-        suffix = fromMaybe [] citeSuffix
+        prefix = fromMaybe (Prose []) citePrefix,
+        suffix = fromMaybe (Prose []) citeSuffix
       }
   where
     citePrefixParser = do

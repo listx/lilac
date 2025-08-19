@@ -49,7 +49,7 @@ import Lilac.Types
     Object (orgDoc, symbols),
     OrgDoc (cells, footnoteNumbers, meta),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
-    Prose,
+    Prose (Prose, unProse),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (body, style),
     Table (caption, grid, meta),
@@ -266,7 +266,7 @@ weaveCell :: Cell -> HtmlWeaver ()
 weaveCell = \case
   CHeading heading -> weaveHeading heading
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
-  CParagraph prose -> p_ $ sequence_ $ map weavePToken prose
+  CParagraph prose -> p_ $ weaveProse prose
   CBlock block -> weaveBlock block
   CMathFragment mathFragment -> weaveMathFragmentStandalone mathFragment
   CFigure figure -> weaveFigure figure
@@ -283,8 +283,8 @@ toSafeHtmlId = T.map onlyKeepSomeChars
       | T.elem c "-_:." = c
       | otherwise = '-'
 
-getProseContents :: [PToken] -> Text
-getProseContents = join . foldl' f []
+getProseContents :: Prose -> Text
+getProseContents prose = join $ foldl' f [] prose.unProse
   where
     join = T.intercalate "" . reverse
     f acc = \case
@@ -319,7 +319,7 @@ weaveHeading heading =
   hN [id_ linkAnchor] $ do
     a_ [href_ $ "#" <> linkAnchor] $ do
       toHtml $ sectionText <> " "
-      sequence_ $ map weavePToken heading.body
+      weaveProse heading.body
   where
     hN = case heading.level of
       1 -> h2_
@@ -391,6 +391,9 @@ getLinkAnchor = \case
      in toSafeHtmlId ref
   CFootnote {} -> ""
   CBibliography {} -> ""
+
+weaveProse :: Prose -> HtmlWeaver ()
+weaveProse prose = sequence_ $ map weavePToken prose.unProse
 
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
@@ -561,10 +564,10 @@ weaveFigure figure = do
     figcaption_ [] $ do
       a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ do
         toHtml captionPrefix
-      toHtml $ case figure.caption of
+      toHtml $ case figure.caption.unProse of
         [] -> "." :: Text
         _ -> ": " :: Text
-      sequence_ $ map weavePToken figure.caption
+      weaveProse figure.caption
     img_
       $ [ id_ linkAnchor,
           src_ wovenLinkTarget,
@@ -606,10 +609,10 @@ weaveTable table = do
     figcaption_ [] $ do
       a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ do
         toHtml captionPrefix
-      toHtml $ case table.caption of
+      toHtml $ case table.caption.unProse of
         [] -> "." :: Text
         _ -> ": " :: Text
-      sequence_ $ map weavePToken table.caption
+      weaveProse table.caption
     table_ [] $ do
       forM_ (zip [1 :: Int ..] getColgroups) $ \(groupIdx, numCols) -> do
         let colgroupAttrs =
@@ -624,10 +627,10 @@ weaveTable table = do
       thead_ [] $ do
         tr_ [] $ do
           forM_ columnNames $ \prose -> do
-            th_ [] $ sequence_ $ map weavePToken prose
+            th_ [] $ weaveProse prose
       tbody_ [] $ do
         forM_ (rows visibleRows) $ \row ->
-          if row == [[]]
+          if row == [Prose []]
             then do
               tr_ [class_ "table-horizontal-line"] ""
             else do
@@ -637,15 +640,18 @@ weaveTable table = do
                         if mostlyNumeric prose
                           then [class_ "table-cell-numeric"]
                           else []
-                  td_ tdAttrs $ sequence_ $ map weavePToken prose
+                  td_ tdAttrs $ weaveProse prose
   where
     linkAnchor = getLinkAnchor $ CTable table
-    hideMarkingCharInFirstColumn [] = []
-    hideMarkingCharInFirstColumn (((_row, _col), prose) : cells)
-      | prose == tableHorizontalLine = [[]]
-      | markingCharExistsInFirstColumn = map snd cells
-      | otherwise = prose : map snd cells
+    hideMarkingCharInFirstColumn :: [((Int, Int), Prose)] -> [Prose]
+    hideMarkingCharInFirstColumn = \case
+      [] -> []
+      (((_row, _col), prose) : cells)
+        | prose == tableHorizontalLine -> [Prose []]
+        | markingCharExistsInFirstColumn -> map snd cells
+        | otherwise -> prose : map snd cells
     markingCharExistsInFirstColumn = any (not . visibleColumn) firstColumnCells
+    tableCellsFromRow :: Int -> [Prose]
     tableCellsFromRow n =
       hideMarkingCharInFirstColumn
         . M.toList
@@ -662,14 +668,14 @@ weaveTable table = do
       | visibleColumn cell = Just row
       | otherwise = acc
     visibleColumn :: ((Int, Int), Prose) -> Bool
-    visibleColumn (_, []) = True
-    visibleColumn (_, prose) = case prose of
+    visibleColumn (_, prose) = case prose.unProse of
+      [] -> True
       [PTokenStyledText styledText] ->
         notElem styledText.body $ map T.singleton markingChars
       _ -> True
     visibleRow :: ((Int, Int), Prose) -> Bool
-    visibleRow (_, []) = True
-    visibleRow (_, prose) = case prose of
+    visibleRow (_, prose) = case prose.unProse of
+      [] -> True
       [PTokenStyledText styledText] ->
         notElem styledText.body $ map T.singleton markingCharsInvisible
       _ -> True
@@ -685,31 +691,37 @@ weaveTable table = do
         (reverse . foldl' getColgroupStarts [0] . tableCellsFromRow)
         getColgroupsRow
     getColgroupStarts :: [Int] -> Prose -> [Int]
-    getColgroupStarts [] _prose = []
-    getColgroupStarts [0] _prose = [1]
-    getColgroupStarts acc@(latest : rest) prose
-      | proseHasColgroupStartMarker prose = 1 : acc
-      | otherwise = latest + 1 : rest
+    getColgroupStarts ns prose = case ns of
+      [] -> []
+      [0] -> [1]
+      acc@(latest : rest)
+        | proseHasColgroupStartMarker prose -> 1 : acc
+        | otherwise -> latest + 1 : rest
     getColgroupsRow = foldl' h Nothing firstColumnCells
     h :: Maybe Int -> ((Int, Int), Prose) -> Maybe Int
     h acc ((row, _col), prose)
       | isJust acc = acc
       | proseHasNonExportMarker prose = Just row
       | otherwise = acc
-    proseHas _ [] = False
-    proseHas prefix (firstPToken : _) = case firstPToken of
-      PTokenStyledText styledText ->
-        (maskToStyles styledText.style == [])
-          && T.isPrefixOf prefix styledText.body
-      PTokenLink {}
-      PTokenMathFragment {}
-      PTokenCitation {} -> False
+    proseHas :: Text -> Prose -> Bool
+    proseHas prefix prose = case prose.unProse of
+      [] -> False
+      (firstPToken : _) -> case firstPToken of
+        PTokenStyledText styledText ->
+          (maskToStyles styledText.style == [])
+            && T.isPrefixOf prefix styledText.body
+        PTokenLink {}
+        PTokenMathFragment {}
+        PTokenCitation {} -> False
+    proseHasColgroupStartMarker :: Prose -> Bool
     proseHasColgroupStartMarker = proseHas "<"
+    proseHasNonExportMarker :: Prose -> Bool
     proseHasNonExportMarker = proseHas "/"
+    mostlyNumeric :: Prose -> Bool
     mostlyNumeric prose =
-      let rawText = T.concat $ map extractText prose
+      let rawText = T.concat $ map extractText prose.unProse
        in isNumericText rawText
-    extractText pToken = case pToken of
+    extractText = \case
       PTokenStyledText styledText -> styledText.body
       PTokenLink {}
       PTokenMathFragment {}
@@ -745,7 +757,7 @@ weaveFootnote footnote = do
       Just footnoteNumber <- lookup footnote.name originObj.orgDoc.footnoteNumbers -> do
         p_ [class_ "footnote-definition", id_ ("footnote-" <> T.show footnoteNumber)] $ do
           span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
-          sequence_ $ map weavePToken footnote.body
+          weaveProse footnote.body
     | otherwise -> pure ()
 
 commonPrefix :: (Eq a) => [a] -> [a] -> [a]
