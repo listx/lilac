@@ -3631,7 +3631,7 @@ footnoteReferenceParser = do
   pure name
 #+end_src
 
-When parsing the link to a footnote, we parse it as a [[data:LinkOid]], but use the
+When parsing the link to a footnote, we parse it with the
 ~LinkTargetFootnote~ constructor to distinguish it from ~LinkTargetOid~ which are
 generic links to any other named cell. Then at weaving time, we know how to
 style it (with a numeric superscript).
