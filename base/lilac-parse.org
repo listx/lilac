@@ -3147,8 +3147,10 @@ where ~foo~ is a path on the local filesystem (you can select the path using
 completion from Emacs). These links are useful for linking out to a file which
 you can open up using Emacs.
 
-On weaving, these links only get converted to a real HTML link if the target is
-something that is also already tracked by the Git repo that we're in.
+Practically speaking, in only makes sense to use these links to point to files
+that are already tracked by the Git repo that we're in (if we're using Lilac as
+a static site generator), because otherwise we might risk creating a broken link
+(assuming that the published site only includes files that are tracked in Git).
 
 #+name: f:fileLinkParser
 #+begin_src haskell
