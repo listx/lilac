@@ -80,7 +80,9 @@ import Relude
     Map,
     Maybe (Just, Nothing),
     MonadFail,
+    Monoid,
     Ord,
+    Semigroup,
     Set,
     Show,
     StateT,
@@ -95,6 +97,7 @@ import Relude
     fromEnum,
     map,
     maybe,
+    mempty,
     otherwise,
     pure,
     show,
@@ -171,7 +174,7 @@ data Link = Link
   { name :: [StyledText],
     target :: LinkTarget
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type LinkOid :: Type
@@ -236,7 +239,7 @@ data MathFragment = MathFragment
   { meta :: Map Text Text,
     body :: Text
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type OrgDoc :: Type
@@ -338,8 +341,14 @@ type Prose :: Type
 newtype Prose = Prose
   { unProse :: [PToken]
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
+
+instance Semigroup Prose where
+  x <> y = Prose $ x.unProse <> y.unProse
+
+instance Monoid Prose where
+  mempty = Prose []
 
 type PToken :: Type
 data PToken
@@ -347,7 +356,7 @@ data PToken
   | PTokenLink Link
   | PTokenCitation Int
   | PTokenMathFragment MathFragment
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Style :: Type
@@ -360,7 +369,7 @@ data StyledText = StyledText
   { body :: Text,
     style :: StyleMask
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Table :: Type
@@ -389,7 +398,7 @@ instance Show StyleMask where
 
 type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
-  deriving stock (Eq, Generic)
+  deriving stock (Eq, Generic, Ord)
   deriving anyclass (FromJSON, ToJSON)
 
 styleMaskFrom :: [Style] -> StyleMask

@@ -1,5 +1,25 @@
 module Lilac.ParseSpec (spec) where
 
+import Citeproc
+  ( CiteprocOutput,
+    addDisplay,
+    addFontStyle,
+    addFontVariant,
+    addFontWeight,
+    addHyperlink,
+    addQuotes,
+    addTextCase,
+    addTextDecoration,
+    addVerticalAlign,
+    dropTextWhile,
+    dropTextWhileEnd,
+    fromText,
+    inNote,
+    localizeQuotes,
+    mapText,
+    movePunctuationInsideQuotes,
+    toText,
+  )
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -91,6 +111,7 @@ import Relude
     String,
     Text,
     Type,
+    forM_,
     fromList,
     otherwise,
     repeat,
@@ -234,6 +255,13 @@ nilOrgDoc cells =
       citations = [],
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
+
+checkTextToProseRoundTrip :: String -> [(Text, Prose)] -> Spec
+checkTextToProseRoundTrip msg testCases = do
+  it msg $ do
+    forM_ testCases $ \(text, prose) -> do
+      fromText text `shouldBe` prose
+      toText prose `shouldBe` text
 
 parseSpec :: Spec
 parseSpec = do
@@ -3617,3 +3645,285 @@ parseSpec = do
     "0014-citations-missing-bib-entries"
     "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
     32
+
+  describe "Text to Prose round trip" $ do
+    checkTextToProseRoundTrip
+      "can handle StyledText"
+      [ ( "no style",
+          Prose
+            [ PTokenStyledText
+                StyledText
+                  { body = "no",
+                    style = styleMaskFrom []
+                  },
+              PTokenStyledText
+                StyledText
+                  { body = " ",
+                    style = styleMaskFrom []
+                  },
+              PTokenStyledText
+                StyledText
+                  { body = "style",
+                    style = styleMaskFrom []
+                  }
+            ]
+        ),
+        ( "*bold*",
+          Prose
+            [ PTokenStyledText
+                StyledText
+                  { body = "bold",
+                    style = styleMaskFrom [Bold]
+                  }
+            ]
+        ),
+        ( "/italic/",
+          Prose
+            [ PTokenStyledText
+                StyledText
+                  { body = "italic",
+                    style = styleMaskFrom [Italic]
+                  }
+            ]
+        ),
+        ( "_underline_",
+          Prose
+            [ PTokenStyledText
+                StyledText
+                  { body = "underline",
+                    style = styleMaskFrom [Underline]
+                  }
+            ]
+        ),
+        ( "=*/_~verbatim=",
+          Prose
+            [ PTokenStyledText
+                StyledText
+                  { body = "*/_~verbatim",
+                    style = styleMaskFrom [Verbatim]
+                  }
+            ]
+        ),
+        ( "~*/_=code~",
+          Prose
+            [ PTokenStyledText
+                StyledText
+                  { body = "*/_=code",
+                    style = styleMaskFrom [Code]
+                  }
+            ]
+        )
+      ]
+    checkTextToProseRoundTrip
+      "can handle OID links"
+      [ ( "[[id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1]]",
+          Prose
+            [ PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+                            style = styleMaskFrom []
+                          }
+                      ],
+                    target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaa1,
+                            name = ""
+                          }
+                  }
+            ]
+        ),
+        ( "[[id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2][*foo*]]",
+          Prose
+            [ PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "foo",
+                            style = styleMaskFrom [Bold]
+                          }
+                      ],
+                    target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaa2,
+                            name = ""
+                          }
+                  }
+            ]
+        ),
+        ( "[[id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3::abc][/bar/]]",
+          Prose
+            [ PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "bar",
+                            style = styleMaskFrom [Italic]
+                          }
+                      ],
+                    target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaa3,
+                            name = "abc"
+                          }
+                  }
+            ]
+        )
+      ]
+    checkTextToProseRoundTrip
+      "can handle footnote links"
+      [ ( "[fn:abc]",
+          Prose
+            [ PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "1",
+                            style = styleMaskFrom []
+                          }
+                      ],
+                    target = LinkTargetFootnote "abc"
+                  }
+            ]
+        ),
+        ( "[fn:abc][fn:xyz][fn:abc]",
+          Prose
+            [ PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "1",
+                            style = styleMaskFrom []
+                          }
+                      ],
+                    target = LinkTargetFootnote "abc"
+                  },
+              PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "2",
+                            style = styleMaskFrom []
+                          }
+                      ],
+                    target = LinkTargetFootnote "xyz"
+                  },
+              PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "1",
+                            style = styleMaskFrom []
+                          }
+                      ],
+                    target = LinkTargetFootnote "abc"
+                  }
+            ]
+        )
+      ]
+    checkTextToProseRoundTrip
+      "can handle web links"
+      [ ( "[[https://foo.org][bar]]",
+          Prose
+            [ PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "bar",
+                            style = styleMaskFrom []
+                          }
+                      ],
+                    target =
+                      LinkTargetURI
+                        N.URI
+                          { N.uriScheme = "https:",
+                            N.uriAuthority =
+                              Just
+                                N.URIAuth
+                                  { N.uriUserInfo = "",
+                                    N.uriRegName = "foo.org",
+                                    N.uriPort = ""
+                                  },
+                            N.uriPath = "",
+                            N.uriQuery = "",
+                            N.uriFragment = ""
+                          }
+                  }
+            ]
+        ),
+        ( "https://foo2.org",
+          Prose
+            [ PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "https://foo2.org",
+                            style = styleMaskFrom []
+                          }
+                      ],
+                    target =
+                      LinkTargetURI
+                        N.URI
+                          { N.uriScheme = "https:",
+                            N.uriAuthority =
+                              Just
+                                N.URIAuth
+                                  { N.uriUserInfo = "",
+                                    N.uriRegName = "foo2.org",
+                                    N.uriPort = ""
+                                  },
+                            N.uriPath = "",
+                            N.uriQuery = "",
+                            N.uriFragment = ""
+                          }
+                  }
+            ]
+        )
+      ]
+    checkTextToProseRoundTrip
+      "can handle file links"
+      [ ( "[[file:foo/bar]]",
+          Prose
+            [ PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "foo/bar",
+                            style = styleMaskFrom []
+                          }
+                      ],
+                    target = LinkTargetFilePath "foo/bar"
+                  }
+            ]
+        ),
+        ( "[[file:foo/bar][baz]]",
+          Prose
+            [ PTokenLink
+                Link
+                  { name =
+                      [ StyledText
+                          { body = "baz",
+                            style = styleMaskFrom []
+                          }
+                      ],
+                    target = LinkTargetFilePath "foo/bar"
+                  }
+            ]
+        )
+      ]
+    checkTextToProseRoundTrip
+      "can handle inline math fragments"
+      [ ( "\\(4 = 2 * 2\\)",
+          Prose
+            [ PTokenMathFragment
+                MathFragment
+                  { body = "4 = 2 * 2",
+                    meta = fromList []
+                  }
+            ]
+        )
+      ]

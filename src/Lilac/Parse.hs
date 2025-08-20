@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Lilac.Parse
   ( defaultOrgDoc,
     defaultOrgParserConf,
@@ -12,6 +14,26 @@ module Lilac.Parse
   )
 where
 
+import Citeproc
+  ( CiteprocOutput,
+    addDisplay,
+    addFontStyle,
+    addFontVariant,
+    addFontWeight,
+    addHyperlink,
+    addQuotes,
+    addTextCase,
+    addTextDecoration,
+    addVerticalAlign,
+    dropTextWhile,
+    dropTextWhileEnd,
+    fromText,
+    inNote,
+    localizeQuotes,
+    mapText,
+    movePunctuationInsideQuotes,
+    toText,
+  )
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char
@@ -92,8 +114,7 @@ import Lilac.Types
   )
 import Lilac.Types as OrgParserState
   ( OrgParserState
-      ( OrgParserState,
-        anonBlockNumber,
+      ( anonBlockNumber,
         anonEquationNumber,
         bibPaths,
         bracketBalance,
@@ -142,6 +163,7 @@ import Relude
     concatMap,
     drop,
     elem,
+    error,
     fail,
     filter,
     find,
@@ -154,6 +176,7 @@ import Relude
     fromMaybe,
     fst,
     get,
+    id,
     isJust,
     isNothing,
     length,
@@ -176,9 +199,11 @@ import Relude
     reverse,
     runStateT,
     show,
+    sort,
     take,
     toEnum,
     toList,
+    undefined,
     unwords,
     void,
     when,
@@ -517,7 +542,7 @@ genHeadingOidStack maybeId level old
   | otherwise = newId : (drop (abs levelDiff + 1) old)
   where
     levelDiff = level - length old
-    newId = fromText =<< maybeId
+    newId = Lilac.Types.fromText =<< maybeId
 
 propertiesDrawerParser :: OrgParser (Map Text Text)
 propertiesDrawerParser = propertiesParser <|> (pure $ fromList [])
@@ -1848,7 +1873,7 @@ reconcileFootnotes = do
     | otherwise -> pure orgParserState.footnoteNumbers
 
 validateOidText :: (MonadFail m) => Text -> m OID
-validateOidText oidText = case fromText oidText of
+validateOidText oidText = case Lilac.Types.fromText oidText of
   Nothing -> fail $ show oidText <> " is not a valid OID"
   Just oid -> pure oid
 
@@ -1881,6 +1906,88 @@ bibliographyLocationParser = do
   when (orgParserState.bibPaths == [])
     $ fail "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   pure $ CBibliography ()
+
+instance CiteprocOutput Prose where
+  toText prose = foldl' f T.empty prose.unProse
+    where
+      f :: Text -> PToken -> Text
+      f acc = \case
+        PTokenCitation {} -> acc
+        PTokenStyledText styledText -> acc <> unparseStyledText styledText
+        PTokenLink link -> acc <> unparseLink link
+        PTokenMathFragment mathFragment -> acc <> unparseMathFragment mathFragment
+
+  fromText input = case MP.runParser
+    (runStateT (proseParser spaceConsumer) defaultOrgParserState)
+    ""
+    input of
+    Left err -> error . T.pack $ MP.errorBundlePretty err
+    Right (prose, _) -> prose
+    where
+      spaceConsumer :: OrgParser Text
+      spaceConsumer = T.pack <$> intraCellWhitespaceParser
+  dropTextWhile = undefined
+  dropTextWhileEnd = undefined
+  addFontVariant = undefined
+  addFontStyle = undefined
+  addFontWeight = undefined
+  addTextDecoration = undefined
+  addVerticalAlign = undefined
+  addTextCase = undefined
+  addDisplay = undefined
+  addQuotes = undefined
+  movePunctuationInsideQuotes = undefined
+  inNote = undefined
+  mapText = undefined
+  addHyperlink = undefined
+  localizeQuotes = undefined
+
+unparseStyledText :: StyledText -> Text
+unparseStyledText styledText =
+  getStyleMarkers styledText.style
+    <> styledText.body
+    <> getStyleMarkers styledText.style
+  where
+    getStyleMarkers styleMask =
+      foldl' accumulateStyle T.empty . sort $ maskToStyles styleMask
+    accumulateStyle :: Text -> Style -> Text
+    accumulateStyle acc = \case
+      Bold -> acc <> "*"
+      Italic -> acc <> "/"
+      Underline -> acc <> "_"
+      Verbatim -> acc <> "="
+      Code -> acc <> "~"
+
+unparseLink :: Link -> Text
+unparseLink link = case link.target of
+  LinkTargetOid linkOid ->
+    let linkTargetText = show linkOid
+     in if linkTargetText == displayName
+          then "[[" <> linkTargetText <> "]]"
+          else "[[" <> linkTargetText <> "][" <> displayName <> "]]"
+  LinkTargetFootnote name -> "[fn:" <> name <> "]"
+  LinkTargetURI uri ->
+    let linkTargetText = T.pack $ N.uriToString id uri ""
+     in if linkTargetText == displayName
+          then linkTargetText
+          else "[[" <> linkTargetText <> "][" <> displayName <> "]]"
+  LinkTargetFilePath filePath ->
+    let linkTargetText = T.pack filePath
+     in if linkTargetText == displayName
+          then "[[file:" <> linkTargetText <> "]]"
+          else "[[file:" <> linkTargetText <> "][" <> displayName <> "]]"
+  where
+    displayName = T.concat $ map unparseStyledText link.name
+
+unparseMathFragment :: MathFragment -> Text
+unparseMathFragment mathFragment = mathStart <> mathFragment.body <> mathEnd
+  where
+    (mathStart, mathEnd)
+      | Just _ <- lookup "__equation_number" mathFragment.meta =
+          ("\\begin{equation}", "\\end{equation}")
+      | Just _ <- lookup "__equation_anon_number" mathFragment.meta =
+          ("\\[", "\\]")
+      | otherwise = ("\\(", "\\)")
 
 citationParser :: OrgParser Int
 citationParser = do

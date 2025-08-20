@@ -106,7 +106,9 @@ import Relude
     Map,
     Maybe (Just, Nothing),
     MonadFail,
+    Monoid,
     Ord,
+    Semigroup,
     Set,
     Show,
     StateT,
@@ -121,6 +123,7 @@ import Relude
     fromEnum,
     map,
     maybe,
+    mempty,
     otherwise,
     pure,
     show,
@@ -158,6 +161,8 @@ import Prelude qualified (show)
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:OrgParserState>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::f:defaultOrgParserState>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::newtype:Prose>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::instance:Semigroup Prose>>
+<<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::instance:Monoid Prose>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:PToken>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Style>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:StyledText>>

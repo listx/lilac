@@ -250,6 +250,8 @@ interleaved tests are executed), take a look at the [[id:ebf0d269-79d3-408a-a6e7
 #+name: module:Lilac.Parse
 #+header: :tangle src/Lilac/Parse.hs
 #+begin_src haskell
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Lilac.Parse
   ( defaultOrgDoc,
     defaultOrgParserConf,
@@ -264,6 +266,26 @@ module Lilac.Parse
   )
 where
 
+import Citeproc
+  ( CiteprocOutput,
+    addDisplay,
+    addFontStyle,
+    addFontVariant,
+    addFontWeight,
+    addHyperlink,
+    addQuotes,
+    addTextCase,
+    addTextDecoration,
+    addVerticalAlign,
+    dropTextWhile,
+    dropTextWhileEnd,
+    fromText,
+    inNote,
+    localizeQuotes,
+    mapText,
+    movePunctuationInsideQuotes,
+    toText,
+  )
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char
@@ -344,8 +366,7 @@ import Lilac.Types
   )
 import Lilac.Types as OrgParserState
   ( OrgParserState
-      ( OrgParserState,
-        anonBlockNumber,
+      ( anonBlockNumber,
         anonEquationNumber,
         bibPaths,
         bracketBalance,
@@ -394,6 +415,7 @@ import Relude
     concatMap,
     drop,
     elem,
+    error,
     fail,
     filter,
     find,
@@ -406,6 +428,7 @@ import Relude
     fromMaybe,
     fst,
     get,
+    id,
     isJust,
     isNothing,
     length,
@@ -428,9 +451,11 @@ import Relude
     reverse,
     runStateT,
     show,
+    sort,
     take,
     toEnum,
     toList,
+    undefined,
     unwords,
     void,
     when,
@@ -564,6 +589,10 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:validateCslPath>>
 <<f:collectValsFor>>
 <<f:bibliographyLocationParser>>
+<<instance:CiteprocOutput Prose>>
+<<f:unparseStyledText>>
+<<f:unparseLink>>
+<<f:unparseMathFragment>>
 <<f:citationParser>>
 <<f:collectCitations>>
 <<f:resetState>>
@@ -940,7 +969,7 @@ helper.
 #+name: f:validateOidText
 #+begin_src haskell
 validateOidText :: (MonadFail m) => Text -> m OID
-validateOidText oidText = case fromText oidText of
+validateOidText oidText = case Lilac.Types.fromText oidText of
   Nothing -> fail $ show oidText <> " is not a valid OID"
   Just oid -> pure oid
 #+end_src
@@ -1397,7 +1426,7 @@ type Prose :: Type
 newtype Prose = Prose
   { unProse :: [PToken]
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -1414,7 +1443,7 @@ data PToken
   | PTokenLink Link
   | PTokenCitation Int
   | PTokenMathFragment MathFragment
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -1532,6 +1561,503 @@ Whitespace compression also happens when we detect [[id:4127feee-755d-430e-8fef-
 way, at weaving time it can ignore any whitespace between non-whitespace text
 and the footnote reference.
 
+** Compatibility with ~CiteprocOutput~
+
+[[https://hackage.haskell.org/package/citeproc][Citeproc]] will read the [[id:15706715-c648-4866-b757-ea4a1aad0570][CSL style file (XML)]] to understand how to make formatting
+transformations (adding emphasis, changing cases, etc). The ~CiteprocOutput~
+typeclass instance describes all of these [[https://github.com/jgm/citeproc/blob/8078d4c25380a37e497c7d3dc4384691be8a2b8a/src/Citeproc/Types.hs#L186-L209][these transformations]]:
+
+#+begin_src haskell
+-- | CSL styles require certain formatting transformations to
+-- be defined.  These are defined in the 'CiteprocOutput' class.
+-- The library may be used with any structured format that defines
+-- these operations.  See the 'Citeproc.CslJson' module for an instance
+-- that corresponds to the markup allowed in CSL JSON. See
+-- the 'Citeproc.Pandoc' module for an instance for Pandoc 'Inlines'.
+class (Semigroup a, Monoid a, Show a, Eq a, Ord a) => CiteprocOutput a where
+  toText                      :: a -> Text
+  fromText                    :: Text -> a
+  dropTextWhile               :: (Char -> Bool) -> a -> a
+  dropTextWhileEnd            :: (Char -> Bool) -> a -> a
+  addFontVariant              :: FontVariant -> a -> a
+  addFontStyle                :: FontStyle -> a -> a
+  addFontWeight               :: FontWeight -> a -> a
+  addTextDecoration           :: TextDecoration -> a -> a
+  addVerticalAlign            :: VerticalAlign -> a -> a
+  addTextCase                 :: Maybe Lang -> TextCase -> a -> a
+  addDisplay                  :: DisplayStyle -> a -> a
+  addQuotes                   :: a -> a
+  movePunctuationInsideQuotes :: a -> a
+  inNote                      :: a -> a
+  mapText                     :: (Text -> Text) -> a -> a
+  addHyperlink                :: Text -> a -> a
+  localizeQuotes              :: Locale -> a -> a
+#+end_src
+
+Any type that has an instance of the ~CiteprocOutput~ typeclass will be able to be
+transformed by Citeproc according to the CSL style file. For us, this type is
+[[newtype:Prose]], which we'll use to format both the [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Citation][data:Citation]] values as well
+as the [[id:909c5265-065a-412c-9305-2cff398ad233][CSL JSON (bibliographical entries)]].
+
+But first things first. ~CiteprocOutput~ requires the type variable to also be an
+instance of ~Semigroup~ and ~Monoid~. Because a [[newtype:Prose]] is just a wrapper
+around a list of [[data:PToken]] values, we don't have to actually define anything
+ourselves here (as the operations have already been defined for the list (~[]~)
+type) [fn:semigroup-monoid-for-list].
+
+#+name: instance:Semigroup Prose
+#+begin_src haskell
+instance Semigroup Prose where
+  x <> y = Prose $ x.unProse <> y.unProse
+#+end_src
+
+#+name: instance:Monoid Prose
+#+begin_src haskell
+instance Monoid Prose where
+  mempty = Prose []
+#+end_src
+
+We define the ~CiteprocOutput~ instance for [[newtype:Prose]] in
+[[instance:CiteprocOutput Prose]] below.
+
+#+name: instance:CiteprocOutput Prose
+#+begin_src haskell
+instance CiteprocOutput Prose where
+  <<instance:CiteprocOutput Prose:toText>>
+  <<instance:CiteprocOutput Prose:fromText>>
+  dropTextWhile = undefined
+  dropTextWhileEnd = undefined
+  addFontVariant = undefined
+  addFontStyle = undefined
+  addFontWeight = undefined
+  addTextDecoration = undefined
+  addVerticalAlign = undefined
+  addTextCase = undefined
+  addDisplay = undefined
+  addQuotes = undefined
+  movePunctuationInsideQuotes = undefined
+  inNote = undefined
+  mapText = undefined
+  addHyperlink = undefined
+  localizeQuotes = undefined
+#+end_src
+
+The functions ~toText~ and ~fromText~ are for converting the value (in this case
+[[newtype:Prose]]) to and from a textual representation. For us this means,
+converting [[newtype:Prose]] from text (parsing) and back to text again. Let's look
+at the parsing first.
+
+#+name: instance:CiteprocOutput Prose:fromText
+#+begin_src haskell
+fromText input = case MP.runParser
+  (runStateT (proseParser spaceConsumer) defaultOrgParserState)
+  ""
+  input of
+  Left err -> error . T.pack $ MP.errorBundlePretty err
+  Right (prose, _) -> prose
+  where
+    spaceConsumer :: OrgParser Text
+    spaceConsumer = T.pack <$> intraCellWhitespaceParser
+#+end_src
+
+This definition is rather simple; we just wrap around [[f:proseParser]].
+
+The definition of ~toText~ is a bit more involved, though perhaps mechanical. The
+key is to convert the [[data:PToken]] values back into the Orgmode syntax. That way
+we can guarantee no loss of information going from ~Text~ to ~Prose~ and back again
+to ~Text~.
+
+#+name: instance:CiteprocOutput Prose:toText
+#+begin_src haskell
+toText prose = foldl' f T.empty prose.unProse
+  where
+    f :: Text -> PToken -> Text
+    f acc = \case
+      PTokenCitation {} -> acc
+      PTokenStyledText styledText -> acc <> unparseStyledText styledText
+      PTokenLink link -> acc <> unparseLink link
+      PTokenMathFragment mathFragment -> acc <> unparseMathFragment mathFragment
+#+end_src
+
+We don't support converting [[data:Citation]] back into ~Text~, because that would
+suggest a nested citation (where a citation has another citation inside it),
+which is strictly forbidden, as seen in [[t:0014-citations-nested]].
+
+Converting a [[data:StyledText]] back into a ~Text~ is straightforward. We simply
+surround the bold text with the appropriate style markers.
+
+#+name: f:unparseStyledText
+#+begin_src haskell
+unparseStyledText :: StyledText -> Text
+unparseStyledText styledText =
+  getStyleMarkers styledText.style
+    <> styledText.body
+    <> getStyleMarkers styledText.style
+  where
+    getStyleMarkers styleMask =
+      foldl' accumulateStyle T.empty . sort $ maskToStyles styleMask
+    accumulateStyle :: Text -> Style -> Text
+    accumulateStyle acc = \case
+      Bold -> acc <> "*"
+      Italic -> acc <> "/"
+      Underline -> acc <> "_"
+      Verbatim -> acc <> "="
+      Code -> acc <> "~"
+#+end_src
+
+Converting a [[data:Link]] to ~Text~ is straightforward. We try to avoid duplicating
+information (e.g., if the display name is the same as the link itself, we avoid
+spelling it out).
+
+#+name: f:unparseLink
+#+begin_src haskell
+unparseLink :: Link -> Text
+unparseLink link = case link.target of
+  LinkTargetOid linkOid ->
+    let linkTargetText = show linkOid
+     in if linkTargetText == displayName
+          then "[[" <> linkTargetText <> "]]"
+          else "[[" <> linkTargetText <> "][" <> displayName <> "]]"
+  LinkTargetFootnote name -> "[fn:" <> name <> "]"
+  LinkTargetURI uri ->
+    let linkTargetText = T.pack $ N.uriToString id uri ""
+     in if linkTargetText == displayName
+          then linkTargetText
+          else "[[" <> linkTargetText <> "][" <> displayName <> "]]"
+  LinkTargetFilePath filePath ->
+    let linkTargetText = T.pack filePath
+     in if linkTargetText == displayName
+          then "[[file:" <> linkTargetText <> "]]"
+          else "[[file:" <> linkTargetText <> "][" <> displayName <> "]]"
+  where
+    displayName = T.concat $ map unparseStyledText link.name
+#+end_src
+
+For [[data:MathFragment]], we have to disambiguate the three different kinds of
+declarations of math fragments --- numbered standalone
+([[f:mathFragmentNumberedParser]]), unnumbered standalone
+([[f:mathFragmentUnnumberedParser]]), and inline math ([[f:mathFragmentInlineParser]]).
+In terms of conversion to and out of [[data:PToken]] values, however, we will only
+ever use inline math, because the other ones require the math to be in its own
+cell as a ~CMathFragment~ at the [[data:Cell]] level, outside of a [[newtype:Prose]].
+Still, we check for all three types of math fragments for completeness.
+
+#+name: f:unparseMathFragment
+#+begin_src haskell
+unparseMathFragment :: MathFragment -> Text
+unparseMathFragment mathFragment = mathStart <> mathFragment.body <> mathEnd
+  where
+    (mathStart, mathEnd)
+      | Just _ <- lookup "__equation_number" mathFragment.meta =
+          ("\\begin{equation}", "\\end{equation}")
+      | Just _ <- lookup "__equation_anon_number" mathFragment.meta =
+          ("\\[", "\\]")
+      | otherwise = ("\\(", "\\)")
+#+end_src
+
+** Tests
+
+We need to check that there is no information loss going the full round trip
+from ~Text~ to ~Prose~ and back to ~Text~ again.
+
+#+name: f:checkTextToProseRoundTrip
+#+begin_src haskell
+checkTextToProseRoundTrip :: String -> [(Text, Prose)] -> Spec
+checkTextToProseRoundTrip msg testCases = do
+  it msg $ do
+    forM_ testCases $ \(text, prose) -> do
+      fromText text `shouldBe` prose
+      toText prose `shouldBe` text
+#+end_src
+
+#+name: Text to Prose round trip
+#+begin_src haskell
+describe "Text to Prose round trip" $ do
+  checkTextToProseRoundTrip
+    "can handle StyledText"
+    [ ( "no style",
+        Prose
+          [ PTokenStyledText
+              StyledText
+                { body = "no",
+                  style = styleMaskFrom []
+                },
+            PTokenStyledText
+              StyledText
+                { body = " ",
+                  style = styleMaskFrom []
+                },
+            PTokenStyledText
+              StyledText
+                { body = "style",
+                  style = styleMaskFrom []
+                }
+          ]
+      ),
+      ( "*bold*",
+        Prose
+          [ PTokenStyledText
+              StyledText
+                { body = "bold",
+                  style = styleMaskFrom [Bold]
+                }
+          ]
+      ),
+      ( "/italic/",
+        Prose
+          [ PTokenStyledText
+              StyledText
+                { body = "italic",
+                  style = styleMaskFrom [Italic]
+                }
+          ]
+      ),
+      ( "_underline_",
+        Prose
+          [ PTokenStyledText
+              StyledText
+                { body = "underline",
+                  style = styleMaskFrom [Underline]
+                }
+          ]
+      ),
+      ( "=*/_~verbatim=",
+        Prose
+          [ PTokenStyledText
+              StyledText
+                { body = "*/_~verbatim",
+                  style = styleMaskFrom [Verbatim]
+                }
+          ]
+      ),
+      ( "~*/_=code~",
+        Prose
+          [ PTokenStyledText
+              StyledText
+                { body = "*/_=code",
+                  style = styleMaskFrom [Code]
+                }
+          ]
+      )
+    ]
+  checkTextToProseRoundTrip
+    "can handle OID links"
+    [ ( "[[id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1]]",
+        Prose
+          [ PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+                          style = styleMaskFrom []
+                        }
+                    ],
+                  target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaa1,
+                          name = ""
+                        }
+                }
+          ]
+      ),
+      ( "[[id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2][*foo*]]",
+        Prose
+          [ PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "foo",
+                          style = styleMaskFrom [Bold]
+                        }
+                    ],
+                  target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaa2,
+                          name = ""
+                        }
+                }
+          ]
+      ),
+      ( "[[id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3::abc][/bar/]]",
+        Prose
+          [ PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "bar",
+                          style = styleMaskFrom [Italic]
+                        }
+                    ],
+                  target =
+                    LinkTargetOid
+                      LinkOid
+                        { oid = fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaa3,
+                          name = "abc"
+                        }
+                }
+          ]
+      )
+    ]
+  checkTextToProseRoundTrip
+    "can handle footnote links"
+    [ ( "[fn:abc]",
+        Prose
+          [ PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "1",
+                          style = styleMaskFrom []
+                        }
+                    ],
+                  target = LinkTargetFootnote "abc"
+                }
+          ]
+      ),
+      ( "[fn:abc][fn:xyz][fn:abc]",
+        Prose
+          [ PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "1",
+                          style = styleMaskFrom []
+                        }
+                    ],
+                  target = LinkTargetFootnote "abc"
+                },
+            PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "2",
+                          style = styleMaskFrom []
+                        }
+                    ],
+                  target = LinkTargetFootnote "xyz"
+                },
+            PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "1",
+                          style = styleMaskFrom []
+                        }
+                    ],
+                  target = LinkTargetFootnote "abc"
+                }
+          ]
+      )
+    ]
+  checkTextToProseRoundTrip
+    "can handle web links"
+    [ ( "[[https://foo.org][bar]]",
+        Prose
+          [ PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "bar",
+                          style = styleMaskFrom []
+                        }
+                    ],
+                  target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "foo.org",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        }
+                }
+          ]
+      ),
+      ( "https://foo2.org",
+        Prose
+          [ PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "https://foo2.org",
+                          style = styleMaskFrom []
+                        }
+                    ],
+                  target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "foo2.org",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        }
+                }
+          ]
+      )
+    ]
+  checkTextToProseRoundTrip
+    "can handle file links"
+    [ ( "[[file:foo/bar]]",
+        Prose
+          [ PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "foo/bar",
+                          style = styleMaskFrom []
+                        }
+                    ],
+                  target = LinkTargetFilePath "foo/bar"
+                }
+          ]
+      ),
+      ( "[[file:foo/bar][baz]]",
+        Prose
+          [ PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = "baz",
+                          style = styleMaskFrom []
+                        }
+                    ],
+                  target = LinkTargetFilePath "foo/bar"
+                }
+          ]
+      )
+    ]
+  checkTextToProseRoundTrip
+    "can handle inline math fragments"
+    [ ( "\\(4 = 2 * 2\\)",
+        Prose
+          [ PTokenMathFragment
+              MathFragment
+                { body = "4 = 2 * 2",
+                  meta = fromList []
+                }
+          ]
+      )
+    ]
+#+end_src
+
+We can't check for non-inline math fragments in the test above, because
+[[f:proseParser]] only allows for inline math fragments.
+
 * Styled strings
 :PROPERTIES:
 :ID:       b616c1e2-6b42-41cf-8e5d-c1832f95b59b
@@ -1547,7 +2073,7 @@ data StyledText = StyledText
   { body :: Text,
     style :: StyleMask
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -1906,7 +2432,7 @@ use a =newtype= around a =Word8= (an 8-bit word) so as to keep it distinct from
 #+begin_src haskell
 type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
-  deriving stock (Eq, Generic)
+  deriving stock (Eq, Generic, Ord)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -2400,7 +2926,7 @@ data Link = Link
   { name :: [StyledText],
     target :: LinkTarget
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -5997,7 +6523,7 @@ genHeadingOidStack maybeId level old
   | otherwise = newId : (drop (abs levelDiff + 1) old)
   where
     levelDiff = level - length old
-    newId = fromText =<< maybeId
+    newId = Lilac.Types.fromText =<< maybeId
 #+end_src
 
 #+name: t:Generate Org ID stack
@@ -9089,7 +9615,7 @@ data MathFragment = MathFragment
   { meta :: Map Text Text,
     body :: Text
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -10525,6 +11051,26 @@ spend far more time compiling the tests themselves).
 #+begin_src haskell
 module Lilac.ParseSpec (spec) where
 
+import Citeproc
+  ( CiteprocOutput,
+    addDisplay,
+    addFontStyle,
+    addFontVariant,
+    addFontWeight,
+    addHyperlink,
+    addQuotes,
+    addTextCase,
+    addTextDecoration,
+    addVerticalAlign,
+    dropTextWhile,
+    dropTextWhileEnd,
+    fromText,
+    inNote,
+    localizeQuotes,
+    mapText,
+    movePunctuationInsideQuotes,
+    toText,
+  )
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -10616,6 +11162,7 @@ import Relude
     String,
     Text,
     Type,
+    forM_,
     fromList,
     otherwise,
     repeat,
@@ -10677,6 +11224,7 @@ type Parser = <<Concrete type for Megaparsec>>
 <<f:plainParagraph>>
 <<f:plainHeading>>
 <<f:nilOrgDoc>>
+<<f:checkTextToProseRoundTrip>>
 #+end_src
 
 The ~Parser~ type synonym uses the same [[Concrete type for Megaparsec][concrete types]] as we do for
@@ -10976,6 +11524,7 @@ parseSpec = do
   <<t:0014-citations-forbidden-in-headings>>
   <<t:0014-citations-missing-csl-style>>
   <<t:0014-citations-missing-bib-entries>>
+  <<Text to Prose round trip>>
 #+end_src
 
 * Footnotes
@@ -10983,3 +11532,6 @@ parseSpec = do
 [fn:cell] We deviate from the terminology used in the [[https://orgmode.org/worg/org-syntax.html][Org syntax description]],
 where the terms /element/ and /object/ are used for what we call a /cell/. This is to
 avoid any unintentional overlap of meaning.
+
+[fn:semigroup-monoid-for-list] For example, see [[https://hackage.haskell.org/package/ghc-internal-9.1201.0/docs/src/GHC.Internal.Base.html#line-713][the implementation for GHC
+9.12]] (found via [[https://hackage.haskell.org/package/base-4.21.0.0/docs/Data-Semigroup.html#t:Semigroup][base-4.21.0.0]]).
