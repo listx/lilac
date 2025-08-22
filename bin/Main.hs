@@ -13,6 +13,7 @@ import Lilac.Types
     Object,
     WeaveConf (WeaveConf, archive, originObjectPath, watch),
     decodeGPath,
+    defaultOrgParserState,
     encodeGPath,
   )
 import Lilac.Util qualified as LU
@@ -335,7 +336,7 @@ lilacCompile _globalOpts compileOpts = do
       input <- LU.readFileRobustly inputPath
       let parseResult =
             MP.runParser
-              (runStateT LP.orgDocParser LP.defaultOrgParserState)
+              (runStateT LP.orgDocParser defaultOrgParserState)
               (show inputPath)
               input
       case parseResult of

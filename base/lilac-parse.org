@@ -253,14 +253,12 @@ interleaved tests are executed), take a look at the [[id:ebf0d269-79d3-408a-a6e7
 module Lilac.Parse
   ( defaultOrgDoc,
     defaultOrgParserConf,
-    defaultOrgParserState,
     genHeadingSection,
     genHeadingOidStack,
     isNumericText,
     maskToStyles,
     orgDocParser,
     parseOrgDoc,
-    styleMaskFrom,
     tableHorizontalLine,
     validateOidText,
   )
@@ -336,11 +334,13 @@ import Lilac.Types
     StyledText (StyledText, body, style),
     Table (Table, caption, grid, meta),
     defaultOrgParserConf,
+    defaultOrgParserState,
     fromText,
     markingChars,
     nilOid,
     protocolsEmacs,
     protocolsWeb,
+    styleMaskFrom,
   )
 import Lilac.Types as OrgParserState
   ( OrgParserState
@@ -389,7 +389,6 @@ import Relude
     Ord,
     String,
     Text,
-    Word8,
     abs,
     catMaybes,
     concatMap,
@@ -474,7 +473,6 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:parseOrgDoc>>
 <<f:orgDocParser>>
 <<f:defaultOrgDoc>>
-<<f:defaultOrgParserState>>
 <<f:docMetaEntryParser>>
 <<f:docMetaParser>>
 <<f:lilacExtensionsParser>>
@@ -500,7 +498,6 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:styledTextParser>>
 <<f:textParser>>
 <<f:escapedSymbolParser>>
-<<f:styleMaskFrom>>
 <<f:maskToStyles>>
 <<f:toStyleMask>>
 <<f:styleMaskFlip>>
@@ -773,10 +770,10 @@ We should be able to parse empty input.
 #+begin_src haskell
 it "empty input" $ do
   MP.runParser
-    (runStateT L.orgDocParser L.defaultOrgParserState)
+    (runStateT L.orgDocParser defaultOrgParserState)
     "empty input"
     nilOidOrgDoc
-    `shouldParse` (L.defaultOrgDoc nilOid [], L.defaultOrgParserState)
+    `shouldParse` (L.defaultOrgDoc nilOid [], defaultOrgParserState)
 #+end_src
 
 The =defaultOrgDoc= is just a default (mostly blank) ~OrgDoc~. It's useful for
@@ -850,7 +847,7 @@ At the other end of the spectrum, Lilac should be able to parse itself
 before (LU.readFrom "" "base/lilac.org") $ do
   it "self-parse" $ \input -> do
     MP.runParser
-      (runStateT L.orgDocParser L.defaultOrgParserState)
+      (runStateT L.orgDocParser defaultOrgParserState)
       "base/lilac.org"
       `shouldSucceedOn` input
 #+end_src
@@ -1200,7 +1197,7 @@ ps
       [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f
     }
 #+end_src
@@ -1213,7 +1210,7 @@ test case file from [[t:0001-blankline]].
 ps
   "0001-blankline"
   (L.defaultOrgDoc nilOid [])
-  L.defaultOrgParserState
+  defaultOrgParserState
 #+end_src
 
 Combine metadata together, from the top-level properties drawer and also the
@@ -1241,7 +1238,7 @@ ps
         ("title", "An Org Document")
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f
     }
 #+end_src
@@ -1265,7 +1262,7 @@ If there is a clash, error out instead of silently choosing precedence.
 before (LU.readFrom "test/Lilac/ParseSpec/" "0002-doc-metadata-properties-drawer-clash") $ do
   it "0002-doc-metadata-properties-drawer-clash" $ \input -> do
     MP.runParser
-      (runStateT L.orgDocParser L.defaultOrgParserState)
+      (runStateT L.orgDocParser defaultOrgParserState)
       "0002-doc-metadata-properties-drawer-clash"
       input
       `shouldFailWith` (errFancy 181 . fancy $ MP.ErrorFail "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: [\"foo\"]")
@@ -1615,7 +1612,7 @@ p
 #+name: Expected prose for 0005-styled-strings-ignore-marker-inside-word
 #+begin_src haskell
 [ PTokenStyledText
-    StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = L.styleMaskFrom [Italic]}
+    StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = styleMaskFrom [Italic]}
 ]
 #+end_src
 
@@ -1681,7 +1678,7 @@ ps
             }
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { headingOidStack = [Nothing],
       headingLevel = 1,
       headingSection = [1]
@@ -1691,17 +1688,17 @@ ps
 #+name: Expected prose for 0005-styled-strings-messy-boundaries
 #+begin_src haskell
 [ PTokenStyledText
-    StyledText {body = "foo ", style = L.styleMaskFrom [Bold]},
+    StyledText {body = "foo ", style = styleMaskFrom [Bold]},
   PTokenStyledText
-    StyledText {body = "bar baz a", style = L.styleMaskFrom []},
+    StyledText {body = "bar baz a", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "b", style = L.styleMaskFrom [Bold]},
+    StyledText {body = "b", style = styleMaskFrom [Bold]},
   PTokenStyledText
-    StyledText {body = "c (", style = L.styleMaskFrom []},
+    StyledText {body = "c (", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "ok", style = L.styleMaskFrom [Bold]},
+    StyledText {body = "ok", style = styleMaskFrom [Bold]},
   PTokenStyledText
-    StyledText {body = ") yes", style = L.styleMaskFrom []}
+    StyledText {body = ") yes", style = styleMaskFrom []}
 ]
 #+end_src
 
@@ -2102,9 +2099,9 @@ p
 #+name: Expected prose for 0005-styled-strings-compression
 #+begin_src haskell
 [ PTokenStyledText
-    StyledText {body = "a b c d e ", style = L.styleMaskFrom []},
+    StyledText {body = "a b c d e ", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "f g h i j", style = L.styleMaskFrom [Bold]}
+    StyledText {body = "f g h i j", style = styleMaskFrom [Bold]}
 ]
 #+end_src
 
@@ -2143,17 +2140,17 @@ p
           [ PTokenStyledText
               StyledText
                 { body = "foo ",
-                  style = L.styleMaskFrom []
+                  style = styleMaskFrom []
                 },
             PTokenStyledText
               StyledText
                 { body = "bar",
-                  style = L.styleMaskFrom [Bold]
+                  style = styleMaskFrom [Bold]
                 },
             PTokenStyledText
               StyledText
                 { body = " baz",
-                  style = L.styleMaskFrom []
+                  style = styleMaskFrom []
                 }
           ]
     ]
@@ -2180,30 +2177,30 @@ p
 #+name: Expected prose for 0005-styled-strings-complex
 #+begin_src haskell
 [ PTokenStyledText
-    StyledText {body = "foo ", style = L.styleMaskFrom [Bold]},
+    StyledText {body = "foo ", style = styleMaskFrom [Bold]},
   PTokenStyledText
-    StyledText {body = "bar ", style = L.styleMaskFrom [Bold, Italic]},
+    StyledText {body = "bar ", style = styleMaskFrom [Bold, Italic]},
   PTokenStyledText
     StyledText
       { body = "underlined bold and italic",
-        style = L.styleMaskFrom [Bold, Italic, Underline]
+        style = styleMaskFrom [Bold, Italic, Underline]
       },
   PTokenStyledText
-    StyledText {body = " baz", style = L.styleMaskFrom [Bold]},
+    StyledText {body = " baz", style = styleMaskFrom [Bold]},
   PTokenStyledText
-    StyledText {body = " ", style = L.styleMaskFrom []},
+    StyledText {body = " ", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "verbatim  text", style = L.styleMaskFrom [Verbatim]},
+    StyledText {body = "verbatim  text", style = styleMaskFrom [Verbatim]},
   PTokenStyledText
-    StyledText {body = " ", style = L.styleMaskFrom []},
+    StyledText {body = " ", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "x  y  z", style = L.styleMaskFrom [Code]},
+    StyledText {body = "x  y  z", style = styleMaskFrom [Code]},
   PTokenStyledText
-    StyledText {body = " ", style = L.styleMaskFrom []},
+    StyledText {body = " ", style = styleMaskFrom []},
   PTokenStyledText
     StyledText
       { body = "bold",
-        style = L.styleMaskFrom [Bold]
+        style = styleMaskFrom [Bold]
       }
 ]
 #+end_src
@@ -2232,19 +2229,19 @@ Note how we preserve the information of having no space character between the
 #+name: Expected prose for 0005-styled-strings-complex-punctuation
 #+begin_src haskell
 [ PTokenStyledText
-    StyledText {body = "(foo ", style = L.styleMaskFrom []},
+    StyledText {body = "(foo ", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "bar", style = L.styleMaskFrom [Verbatim]},
+    StyledText {body = "bar", style = styleMaskFrom [Verbatim]},
   PTokenStyledText
-    StyledText {body = "). What's up? and ", style = L.styleMaskFrom []},
+    StyledText {body = "). What's up? and ", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "that!", style = L.styleMaskFrom [Bold]},
+    StyledText {body = "that!", style = styleMaskFrom [Bold]},
   PTokenStyledText
-    StyledText {body = " ", style = L.styleMaskFrom []},
+    StyledText {body = " ", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "(italic)", style = L.styleMaskFrom [Italic]},
+    StyledText {body = "(italic)", style = styleMaskFrom [Italic]},
   PTokenStyledText
-    StyledText {body = ". It's #1!", style = L.styleMaskFrom []}
+    StyledText {body = ". It's #1!", style = styleMaskFrom []}
 ]
 #+end_src
 
@@ -2270,11 +2267,11 @@ p
 #+name: Expected prose for 0005-styled-strings-verbatim
 #+begin_src haskell
 [ PTokenStyledText
-    StyledText {body = "(", style = L.styleMaskFrom []},
+    StyledText {body = "(", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "import ./.", style = L.styleMaskFrom [Verbatim]},
+    StyledText {body = "import ./.", style = styleMaskFrom [Verbatim]},
   PTokenStyledText
-    StyledText {body = ") hello", style = L.styleMaskFrom []}
+    StyledText {body = ") hello", style = styleMaskFrom []}
 ]
 #+end_src
 
@@ -2300,19 +2297,19 @@ p
 #+name: Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold
 #+begin_src haskell
 [ PTokenStyledText
-    StyledText {body = "*a", style = L.styleMaskFrom [Verbatim]},
+    StyledText {body = "*a", style = styleMaskFrom [Verbatim]},
   PTokenStyledText
-    StyledText {body = " ", style = L.styleMaskFrom []},
+    StyledText {body = " ", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "b*", style = L.styleMaskFrom [Verbatim]},
+    StyledText {body = "b*", style = styleMaskFrom [Verbatim]},
   PTokenStyledText
-    StyledText {body = " ", style = L.styleMaskFrom []},
+    StyledText {body = " ", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "*c", style = L.styleMaskFrom [Code]},
+    StyledText {body = "*c", style = styleMaskFrom [Code]},
   PTokenStyledText
-    StyledText {body = " ", style = L.styleMaskFrom []},
+    StyledText {body = " ", style = styleMaskFrom []},
   PTokenStyledText
-    StyledText {body = "d*", style = L.styleMaskFrom [Code]}
+    StyledText {body = "d*", style = styleMaskFrom [Code]}
 ]
 #+end_src
 
@@ -2345,7 +2342,7 @@ p
 [ CParagraph
     $ Prose
       [ PTokenStyledText
-          StyledText {body = "[[foo", style = L.styleMaskFrom [Verbatim]}
+          StyledText {body = "[[foo", style = styleMaskFrom [Verbatim]}
       ],
   CParagraph
     $ Prose
@@ -2360,26 +2357,26 @@ p
               name =
                 [ StyledText
                     { body = "hello",
-                      style = L.styleMaskFrom []
+                      style = styleMaskFrom []
                     }
                 ]
             },
         PTokenStyledText
-          StyledText {body = " there", style = L.styleMaskFrom []}
+          StyledText {body = " there", style = styleMaskFrom []}
       ],
   CParagraph
     $ Prose
       [ PTokenStyledText
-          StyledText {body = "\\(1 + 1 ", style = L.styleMaskFrom [Verbatim]},
+          StyledText {body = "\\(1 + 1 ", style = styleMaskFrom [Verbatim]},
         PTokenStyledText
-          StyledText {body = " ", style = L.styleMaskFrom []},
+          StyledText {body = " ", style = styleMaskFrom []},
         PTokenStyledText
-          StyledText {body = "\\(2 * 2\\)", style = L.styleMaskFrom [Code]}
+          StyledText {body = "\\(2 * 2\\)", style = styleMaskFrom [Code]}
       ],
   CParagraph
     $ Prose
       [ PTokenStyledText
-          StyledText {body = "[[bar]]", style = L.styleMaskFrom [Code]}
+          StyledText {body = "[[bar]]", style = styleMaskFrom [Code]}
       ]
 ]
 #+end_src
@@ -2710,14 +2707,14 @@ p
                     name =
                       [ StyledText
                           { body = "id:442c807f-c9d9-45a7-88bf-ffffffffffff",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   },
               PTokenStyledText
                 StyledText
                   { body = " ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
@@ -2730,14 +2727,14 @@ p
                     name =
                       [ StyledText
                           { body = "bar",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   },
               PTokenStyledText
                 StyledText
                   { body = " ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
@@ -2750,22 +2747,22 @@ p
                     name =
                       [ StyledText
                           { body = "bar",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           },
                         StyledText
                           { body = " ",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           },
                         StyledText
                           { body = "[]",
-                            style = L.styleMaskFrom [Verbatim]
+                            style = styleMaskFrom [Verbatim]
                           }
                       ]
                   },
               PTokenStyledText
                 StyledText
                   { body = " ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
@@ -2778,22 +2775,22 @@ p
                     name =
                       [ StyledText
                           { body = "bar",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           },
                         StyledText
                           { body = " ",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           },
                         StyledText
                           { body = "ok",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   },
               PTokenStyledText
                 StyledText
                   { body = " ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
@@ -2806,14 +2803,14 @@ p
                     name =
                       [ StyledText
                           { body = "abc",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   },
               PTokenStyledText
                 StyledText
                   { body = " ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
@@ -2826,7 +2823,7 @@ p
                     name =
                       [ StyledText
                           { body = "abc",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   }
@@ -2840,38 +2837,38 @@ p
             [ PTokenStyledText
                 StyledText
                   { body = "link name across list indentation ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
                   { name =
                       [ StyledText
                           { body = "italic",
-                            style = L.styleMaskFrom [Italic]
+                            style = styleMaskFrom [Italic]
                           },
                         StyledText
                           { body = " ",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           },
                         StyledText
                           { body = "def",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           },
                         StyledText
                           { body = " ",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           },
                         StyledText
                           { body = "ghi]",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           },
                         StyledText
                           { body = " ",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           },
                         StyledText
                           { body = "!",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ],
                     target =
@@ -2891,14 +2888,14 @@ p
             [ PTokenStyledText
                 StyledText
                   { body = "link target with spaces ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
                   { name =
                       [ StyledText
                           { body = "foo bar baz",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ],
                     target =
@@ -2918,14 +2915,14 @@ p
             [ PTokenStyledText
                 StyledText
                   { body = "oid with spaces ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
                   { name =
                       [ StyledText
                           { body = "a b c",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ],
                     target =
@@ -2970,7 +2967,7 @@ p
             [ PTokenStyledText
                 StyledText
                   { body = "Hello ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
@@ -2983,7 +2980,7 @@ p
                     name =
                       [ StyledText
                           { body = "foo",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   }
@@ -3071,14 +3068,14 @@ p
                     name =
                       [ StyledText
                           { body = "http://foo.org",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   },
               PTokenStyledText
                 StyledText
                   { body = " ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
@@ -3100,14 +3097,14 @@ p
                     name =
                       [ StyledText
                           { body = "https://foo.org",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   },
               PTokenStyledText
                 StyledText
                   { body = " ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
@@ -3129,7 +3126,7 @@ p
                     name =
                       [ StyledText
                           { body = "hello",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   }
@@ -3215,7 +3212,7 @@ ps
             [ PTokenStyledText
                 StyledText
                   { body = "foo ",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   },
               PTokenLink
                 Link
@@ -3228,7 +3225,7 @@ ps
                     name =
                       [ StyledText
                           { body = "link-target-only",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   }
@@ -3250,7 +3247,7 @@ ps
                           name =
                             [ StyledText
                                 { body = "link-name",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                             ]
                         }
@@ -3270,19 +3267,19 @@ ps
                     name =
                       [ StyledText
                           { body = "a",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   },
               PTokenStyledText
                 StyledText
                   { body = " b",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   }
             ]
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { headingOidStack = [Nothing],
       headingLevel = 1,
       headingSection = [1]
@@ -3310,7 +3307,7 @@ p
           [ PTokenStyledText
               StyledText
                 { body = "(",
-                  style = L.styleMaskFrom []
+                  style = styleMaskFrom []
                 },
             PTokenLink
               Link
@@ -3318,14 +3315,14 @@ p
                   name =
                     [ StyledText
                         { body = "foo/bar",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                     ]
                 },
             PTokenStyledText
               StyledText
                 { body = ")",
-                  style = L.styleMaskFrom []
+                  style = styleMaskFrom []
                 }
           ]
     ]
@@ -3349,7 +3346,7 @@ p
           [ PTokenStyledText
               StyledText
                 { body = "[hi]",
-                  style = L.styleMaskFrom []
+                  style = styleMaskFrom []
                 }
           ]
     ]
@@ -3446,7 +3443,7 @@ p
           [ PTokenStyledText
               StyledText
                 { body = "See ",
-                  style = L.styleMaskFrom []
+                  style = styleMaskFrom []
                 },
             PTokenLink
               Link
@@ -3468,14 +3465,14 @@ p
                   name =
                     [ StyledText
                         { body = "https://foo.org",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                     ]
                 },
             PTokenStyledText
               StyledText
                 { body = ", or ",
-                  style = L.styleMaskFrom []
+                  style = styleMaskFrom []
                 },
             PTokenLink
               Link
@@ -3497,14 +3494,14 @@ p
                   name =
                     [ StyledText
                         { body = "https://bar.net",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                     ]
                 },
             PTokenStyledText
               StyledText
                 { body = ". Try ",
-                  style = L.styleMaskFrom []
+                  style = styleMaskFrom []
                 },
             PTokenLink
               Link
@@ -3526,14 +3523,14 @@ p
                   name =
                     [ StyledText
                         { body = "http://localhost:3000",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                     ]
                 },
             PTokenStyledText
               StyledText
                 { body = "? Go to ",
-                  style = L.styleMaskFrom []
+                  style = styleMaskFrom []
                 },
             PTokenLink
               Link
@@ -3555,14 +3552,14 @@ p
                   name =
                     [ StyledText
                         { body = "ftp://10.0.0.1",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                     ]
                 },
             PTokenStyledText
               StyledText
                 { body = "!",
-                  style = L.styleMaskFrom []
+                  style = styleMaskFrom []
                 }
           ]
     ]
@@ -3816,7 +3813,7 @@ Hello [fn:hello] world.
       [ PTokenStyledText
           StyledText
             { body = "Hello",
-              style = L.styleMaskFrom []
+              style = styleMaskFrom []
             },
         PTokenLink
           Link
@@ -3824,14 +3821,14 @@ Hello [fn:hello] world.
               name =
                 [ StyledText
                     { body = "1",
-                      style = L.styleMaskFrom []
+                      style = styleMaskFrom []
                     }
                 ]
             },
         PTokenStyledText
           StyledText
             { body = " world.",
-              style = L.styleMaskFrom []
+              style = styleMaskFrom []
             }
       ],
   CFootnote
@@ -3840,7 +3837,7 @@ Hello [fn:hello] world.
         body =
           Prose
             [ PTokenStyledText
-                StyledText {body = "Foo.", style = L.styleMaskFrom []}
+                StyledText {body = "Foo.", style = styleMaskFrom []}
             ]
       }
 ]
@@ -3863,7 +3860,7 @@ ps
       citations = [],
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
     { footnoteNumber = 1,
       footnoteNumbers =
         fromList
@@ -3876,7 +3873,7 @@ ps
                 [ PTokenStyledText
                     StyledText
                       { body = "Foo.",
-                        style = L.styleMaskFrom []
+                        style = styleMaskFrom []
                       }
                 ]
             )
@@ -3903,7 +3900,7 @@ Hello [fn:a] world. [fn:b]
       [ PTokenStyledText
           StyledText
             { body = "Hello",
-              style = L.styleMaskFrom []
+              style = styleMaskFrom []
             },
         PTokenLink
           Link
@@ -3911,14 +3908,14 @@ Hello [fn:a] world. [fn:b]
               name =
                 [ StyledText
                     { body = "1",
-                      style = L.styleMaskFrom []
+                      style = styleMaskFrom []
                     }
                 ]
             },
         PTokenStyledText
           StyledText
             { body = " world.",
-              style = L.styleMaskFrom []
+              style = styleMaskFrom []
             },
         PTokenLink
           Link
@@ -3926,7 +3923,7 @@ Hello [fn:a] world. [fn:b]
               name =
                 [ StyledText
                     { body = "2",
-                      style = L.styleMaskFrom []
+                      style = styleMaskFrom []
                     }
                 ]
             }
@@ -3937,7 +3934,7 @@ Hello [fn:a] world. [fn:b]
         body =
           Prose
             [ PTokenStyledText
-                StyledText {body = "Definition of b.", style = L.styleMaskFrom []}
+                StyledText {body = "Definition of b.", style = styleMaskFrom []}
             ]
       },
   CFootnote
@@ -3946,7 +3943,7 @@ Hello [fn:a] world. [fn:b]
         body =
           Prose
             [ PTokenStyledText
-                StyledText {body = "Definition of a.", style = L.styleMaskFrom []}
+                StyledText {body = "Definition of a.", style = styleMaskFrom []}
             ]
       }
 ]
@@ -3970,7 +3967,7 @@ ps
       citations = [],
       meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
     { footnoteNumber = 2,
       footnoteNumbers =
         fromList
@@ -3984,7 +3981,7 @@ ps
                 [ PTokenStyledText
                     StyledText
                       { body = "Definition of a.",
-                        style = L.styleMaskFrom []
+                        style = styleMaskFrom []
                       }
                 ]
             ),
@@ -3993,7 +3990,7 @@ ps
                 [ PTokenStyledText
                     StyledText
                       { body = "Definition of b.",
-                        style = L.styleMaskFrom []
+                        style = styleMaskFrom []
                       }
                 ]
             )
@@ -4065,7 +4062,7 @@ Citations are similar to footnotes, but there are some major differences:
 
 The following sections take a closer look at each of these areas.
 
-** CSL file
+** CSL style file (XML)
 :PROPERTIES:
 :ID:       15706715-c648-4866-b757-ea4a1aad0570
 :END:
@@ -4107,7 +4104,7 @@ ps
           [ ("ID", "00000000-0000-0000-0000-000000000000")
           ]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
 #+end_src
 
 ** CSL JSON (bibliographical entries)
@@ -4163,7 +4160,7 @@ ps
           [ ("ID", "00000000-0000-0000-0000-000000000000")
           ]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
 #+end_src
 
 ** Printing bibliographies
@@ -4212,7 +4209,7 @@ ps
           [ ("ID", "00000000-0000-0000-0000-000000000000")
           ]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
 #+end_src
 
 Trying to print the bibliography without a style specified should result in an
@@ -4696,7 +4693,7 @@ ps
           [ ("ID", "00000000-0000-0000-0000-000000000000")
           ]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
 #+end_src
 
 #+name: Expected prose for 0014-citations-single-cite
@@ -4818,7 +4815,7 @@ ps
           [ ("ID", "00000000-0000-0000-0000-000000000000")
           ]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
 #+end_src
 
 #+name: Expected prose for 0014-citations-locators
@@ -4826,15 +4823,15 @@ ps
 [ CParagraph
     $ Prose
       [ PTokenCitation 0,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 1,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 2,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 3,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 4,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 5
       ]
 ]
@@ -4877,7 +4874,7 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "prefix",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                           ],
                       suffix =
@@ -4885,7 +4882,7 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "suffix",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                           ]
                     }
@@ -4910,7 +4907,7 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "a really long prefix, maybe?",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                           ],
                       suffix =
@@ -4918,7 +4915,7 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "more suffix",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                           ]
                     }
@@ -4938,7 +4935,7 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "suffix with balanced [[brackets] and @sign]",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                           ]
                     }
@@ -4963,7 +4960,7 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "prefix",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                           ],
                       suffix = Prose []
@@ -4989,12 +4986,12 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "@ ",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 },
                             PTokenStyledText
                               StyledText
                                 { body = "see also",
-                                  style = L.styleMaskFrom [Italic]
+                                  style = styleMaskFrom [Italic]
                                 }
                           ],
                       suffix = Prose []
@@ -5020,27 +5017,27 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "foo",
-                                  style = L.styleMaskFrom [Bold]
+                                  style = styleMaskFrom [Bold]
                                 },
                             PTokenStyledText
                               StyledText
                                 { body = " ",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 },
                             PTokenStyledText
                               StyledText
                                 { body = "@fake1",
-                                  style = L.styleMaskFrom [Verbatim]
+                                  style = styleMaskFrom [Verbatim]
                                 },
                             PTokenStyledText
                               StyledText
                                 { body = " ",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 },
                             PTokenStyledText
                               StyledText
                                 { body = "@fake2",
-                                  style = L.styleMaskFrom [Code]
+                                  style = styleMaskFrom [Code]
                                 }
                           ],
                       suffix = Prose []
@@ -5055,7 +5052,7 @@ ps
           [ ("ID", "00000000-0000-0000-0000-000000000000")
           ]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
 #+end_src
 
 #+name: Expected prose for 0014-citations-locators-affixes
@@ -5063,15 +5060,15 @@ ps
 [ CParagraph
     $ Prose
       [ PTokenCitation 0,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 1,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 2,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 3,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 4,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 5
       ]
 ]
@@ -5118,12 +5115,12 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "global",
-                          style = L.styleMaskFrom [Bold]
+                          style = styleMaskFrom [Bold]
                         },
                     PTokenStyledText
                       StyledText
                         { body = " prefix",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ],
               suffix =
@@ -5131,12 +5128,12 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "global ",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         },
                     PTokenStyledText
                       StyledText
                         { body = "suffix",
-                          style = L.styleMaskFrom [Verbatim]
+                          style = styleMaskFrom [Verbatim]
                         }
                   ]
             },
@@ -5161,7 +5158,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "see",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ],
               suffix =
@@ -5169,12 +5166,12 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "by Smith ",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         },
                     PTokenStyledText
                       StyledText
                         { body = "et al.",
-                          style = L.styleMaskFrom [Italic]
+                          style = styleMaskFrom [Italic]
                         }
                   ]
             },
@@ -5199,7 +5196,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "see",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ],
               suffix =
@@ -5207,7 +5204,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "by foo",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
             },
@@ -5222,7 +5219,7 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "the very important",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                           ],
                       suffix =
@@ -5230,7 +5227,7 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "@ once",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                           ]
                     },
@@ -5242,7 +5239,7 @@ ps
                           [ PTokenStyledText
                               StyledText
                                 { body = "the crucial",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                           ],
                       suffix = Prose []
@@ -5253,7 +5250,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "c.f.",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ],
               suffix = Prose []
@@ -5264,7 +5261,7 @@ ps
           [ ("ID", "00000000-0000-0000-0000-000000000000")
           ]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
 #+end_src
 
 #+name: Expected prose for 0014-citations-worg
@@ -5272,11 +5269,11 @@ ps
 [ CParagraph
     $ Prose
       [ PTokenCitation 0,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 1,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 2,
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenCitation 3
       ]
 ]
@@ -5464,7 +5461,7 @@ ps
           [ ("ID", "00000000-0000-0000-0000-000000000000")
           ]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
 #+end_src
 
 #+name: Expected prose for 0014-citations-forbidden-in-verbatim-code
@@ -5474,13 +5471,13 @@ ps
       [ PTokenStyledText
           StyledText
             { body = "[cite:@foo]",
-              style = L.styleMaskFrom [Code]
+              style = styleMaskFrom [Code]
             },
-        PTokenStyledText StyledText {body = " ", style = L.styleMaskFrom []},
+        PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
         PTokenStyledText
           StyledText
             { body = "[cite:@bar]",
-              style = L.styleMaskFrom [Verbatim]
+              style = styleMaskFrom [Verbatim]
             }
       ]
 ]
@@ -5520,7 +5517,7 @@ ps
           [ ("ID", "00000000-0000-0000-0000-000000000000")
           ]
     }
-  L.defaultOrgParserState
+  defaultOrgParserState
     { headingOidStack = [Nothing],
       headingLevel = 1,
       headingSection = [1]
@@ -5532,7 +5529,7 @@ ps
 [ PTokenStyledText
     StyledText
       { body = "heading [cite:@foo]",
-        style = L.styleMaskFrom []
+        style = styleMaskFrom []
       }
 ]
 #+end_src
@@ -5742,21 +5739,21 @@ p
 [ CParagraph
     $ Prose
       [ PTokenStyledText
-          StyledText {body = "a b c d e ", style = L.styleMaskFrom []},
+          StyledText {body = "a b c d e ", style = styleMaskFrom []},
         PTokenStyledText
-          StyledText {body = "f g h i j", style = L.styleMaskFrom [Bold]}
+          StyledText {body = "f g h i j", style = styleMaskFrom [Bold]}
       ],
   CParagraph
     $ Prose
       [ PTokenStyledText
-          StyledText {body = "x y z foo bar", style = L.styleMaskFrom []}
+          StyledText {body = "x y z foo bar", style = styleMaskFrom []}
       ],
   CParagraph
     $ Prose
       [ PTokenStyledText
           StyledText
             { body = "multiple lines with underscore",
-              style = L.styleMaskFrom [Underline]
+              style = styleMaskFrom [Underline]
             }
       ]
 ]
@@ -6115,7 +6112,7 @@ ps
         plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { headingOidStack = take 12 $ repeat Nothing,
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -6161,7 +6158,7 @@ ps
         plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { headingOidStack = take 12 $ repeat Nothing,
       headingLevel = 12,
       headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -6314,13 +6311,13 @@ ps
               body =
                 Prose
                   [ PTokenStyledText
-                      StyledText {body = "foo", style = L.styleMaskFrom []}
+                      StyledText {body = "foo", style = styleMaskFrom []}
                   ],
               meta = fromList []
             }
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { headingOidStack = [Nothing],
       headingLevel = 1,
       headingSection = [1]
@@ -6349,7 +6346,7 @@ ps
               body =
                 Prose
                   [ PTokenStyledText
-                      StyledText {body = "foo", style = L.styleMaskFrom []}
+                      StyledText {body = "foo", style = styleMaskFrom []}
                   ],
               meta =
                 fromList
@@ -6358,7 +6355,7 @@ ps
             }
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
       headingLevel = 1,
       headingSection = [1]
@@ -6397,7 +6394,7 @@ ps
               body =
                 Prose
                   [ PTokenStyledText
-                      StyledText {body = "foo", style = L.styleMaskFrom []}
+                      StyledText {body = "foo", style = styleMaskFrom []}
                   ],
               meta =
                 fromList
@@ -6406,7 +6403,7 @@ ps
             }
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
       headingLevel = 1,
       headingSection = [1]
@@ -6460,7 +6457,7 @@ ps
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-empty>>
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { cellNames = Set.fromList ["foo"],
       anonBlockNumber = 2
     }
@@ -6838,7 +6835,7 @@ ps
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-special-commas>>
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { anonBlockNumber = 1
     }
 #+end_src
@@ -7126,7 +7123,7 @@ ps
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-noweb>>
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { anonBlockNumber = 1
     }
 #+end_src
@@ -7155,7 +7152,7 @@ ps
                   name =
                     [ StyledText
                         { body = "foo",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                     ]
                 },
@@ -7171,7 +7168,7 @@ ps
                   name =
                     [ StyledText
                         { body = "bar",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                     ]
                 },
@@ -7209,7 +7206,7 @@ ps
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-noweb-off>>
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { anonBlockNumber = 1
     }
 #+end_src
@@ -7258,7 +7255,7 @@ ps
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-noweb-intraline>>
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { anonBlockNumber = 1
     }
 #+end_src
@@ -7288,7 +7285,7 @@ ps
                   name =
                     [ StyledText
                         { body = "foo",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                     ]
                 },
@@ -7304,7 +7301,7 @@ ps
                   name =
                     [ StyledText
                         { body = "bar",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                     ]
                 },
@@ -7320,7 +7317,7 @@ ps
                   name =
                     [ StyledText
                         { body = "ok",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                     ]
                 },
@@ -7555,7 +7552,7 @@ ps
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-ending>>
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { cellNames =
         Set.fromList
           [ "empty",
@@ -9322,7 +9319,7 @@ ps
             }
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { equationNumber = 3,
       anonEquationNumber = 1,
       cellNames =
@@ -9364,7 +9361,7 @@ ps
             [ PTokenStyledText
                 StyledText
                   { body = "foo",
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   }
             ],
         CMathFragment
@@ -9390,7 +9387,7 @@ ps
           ]
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { equationNumber = 1,
       cellNames =
         Set.fromList
@@ -9638,7 +9635,7 @@ ps
               caption =
                 Prose
                   [ PTokenStyledText
-                      StyledText {body = "hello", style = L.styleMaskFrom [Verbatim]}
+                      StyledText {body = "hello", style = styleMaskFrom [Verbatim]}
                   ],
               link =
                 Link
@@ -9646,7 +9643,7 @@ ps
                     name =
                       [ StyledText
                           { body = "image/hello.png",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   }
@@ -9676,7 +9673,7 @@ ps
                     name =
                       [ StyledText
                           { body = "image/world.png",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   }
@@ -9693,7 +9690,7 @@ ps
                     name =
                       [ StyledText
                           { body = "not-figure",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   }
@@ -9710,7 +9707,7 @@ ps
                     name =
                       [ StyledText
                           { body = "not-a-figure-2",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   }
@@ -9728,7 +9725,7 @@ ps
                     name =
                       [ StyledText
                           { body = "not a figure",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   }
@@ -9746,14 +9743,14 @@ ps
                     name =
                       [ StyledText
                           { body = "foo.png",
-                            style = L.styleMaskFrom []
+                            style = styleMaskFrom []
                           }
                       ]
                   }
             }
       ]
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { cellNames =
         Set.fromList
           [ "f:f",
@@ -10081,7 +10078,7 @@ ps
   ( nilOrgDoc
       <<Expected cells for 0012-tables-and-prose>>
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { cellNames =
         Set.fromList
           [ "tbl:famous-equations"
@@ -10103,26 +10100,26 @@ ps
         caption =
           Prose
             [ PTokenStyledText
-                StyledText {body = "Bold", style = L.styleMaskFrom [Bold]},
+                StyledText {body = "Bold", style = styleMaskFrom [Bold]},
               PTokenStyledText
-                StyledText {body = ".", style = L.styleMaskFrom []},
+                StyledText {body = ".", style = styleMaskFrom []},
               PTokenStyledText
-                StyledText {body = " ", style = L.styleMaskFrom []},
+                StyledText {body = " ", style = styleMaskFrom []},
               PTokenLink
                 Link
                   { name =
-                      [ StyledText {body = "A", style = L.styleMaskFrom []},
-                        StyledText {body = " ", style = L.styleMaskFrom []},
-                        StyledText {body = "self-link", style = L.styleMaskFrom []}
+                      [ StyledText {body = "A", style = styleMaskFrom []},
+                        StyledText {body = " ", style = styleMaskFrom []},
+                        StyledText {body = "self-link", style = styleMaskFrom []}
                       ],
                     target =
                       LinkTargetOid
                         LinkOid {oid = nilOid, name = "tbl:famous-equations"}
                   },
               PTokenStyledText
-                StyledText {body = ".", style = L.styleMaskFrom []},
+                StyledText {body = ".", style = styleMaskFrom []},
               PTokenStyledText
-                StyledText {body = " ", style = L.styleMaskFrom []},
+                StyledText {body = " ", style = styleMaskFrom []},
               PTokenMathFragment
                 MathFragment {meta = fromList [], body = "E = mc^2"}
             ],
@@ -10133,7 +10130,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Name",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10142,7 +10139,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Equation",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10151,7 +10148,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Link",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10163,7 +10160,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Pythagoras | Foo",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10198,7 +10195,7 @@ ps
                           name =
                             [ StyledText
                                 { body = "Wiki",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                             ]
                         }
@@ -10209,12 +10206,12 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Albert ",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         },
                     PTokenStyledText
                       StyledText
                         { body = "Einstein",
-                          style = L.styleMaskFrom [Bold]
+                          style = styleMaskFrom [Bold]
                         }
                   ]
               ),
@@ -10249,7 +10246,7 @@ ps
                           name =
                             [ StyledText
                                 { body = "Wiki",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                             ]
                         }
@@ -10260,7 +10257,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Unknown",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10271,7 +10268,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "_",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10280,7 +10277,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "*",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10289,7 +10286,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "/",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               )
@@ -10321,7 +10318,7 @@ ps
   ( nilOrgDoc
       <<Expected cells for 0012-tables-inside-lists>>
   )
-  L.defaultOrgParserState
+  defaultOrgParserState
     { cellNames =
         Set.fromList
           [ "tbl:famous-equations"
@@ -10341,7 +10338,7 @@ ps
       [ PTokenStyledText
           StyledText
             { body = "foo",
-              style = L.styleMaskFrom []
+              style = styleMaskFrom []
             }
       ],
   CTable
@@ -10360,7 +10357,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Name",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10369,7 +10366,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Equation",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10378,7 +10375,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Link",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10390,7 +10387,7 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Pythagoras | Foo",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         }
                   ]
               ),
@@ -10425,7 +10422,7 @@ ps
                           name =
                             [ StyledText
                                 { body = "Wiki",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                             ]
                         }
@@ -10436,12 +10433,12 @@ ps
                   [ PTokenStyledText
                       StyledText
                         { body = "Albert ",
-                          style = L.styleMaskFrom []
+                          style = styleMaskFrom []
                         },
                     PTokenStyledText
                       StyledText
                         { body = "Einstein",
-                          style = L.styleMaskFrom [Bold]
+                          style = styleMaskFrom [Bold]
                         }
                   ]
               ),
@@ -10476,7 +10473,7 @@ ps
                           name =
                             [ StyledText
                                 { body = "Wiki",
-                                  style = L.styleMaskFrom []
+                                  style = styleMaskFrom []
                                 }
                             ]
                         }
@@ -10600,9 +10597,11 @@ import Lilac.Types
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, caption, grid, meta),
+    defaultOrgParserState,
     fromWords,
     nilOid,
     nilOidOrgDoc,
+    styleMaskFrom,
   )
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
@@ -10694,11 +10693,11 @@ p path expected = do
   where
     check input
       | expected.oid == nilOid =
-          action nilOidOrgDoc input L.defaultOrgParserState
-      | otherwise = action "" input L.defaultOrgParserState
+          action nilOidOrgDoc input defaultOrgParserState
+      | otherwise = action "" input defaultOrgParserState
     action inputPrefix input expectedState =
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser defaultOrgParserState)
         path
         (inputPrefix <> input)
         `shouldParse` (expected, expectedState)
@@ -10753,7 +10752,7 @@ ps path expected expectedState = do
       | otherwise = action "" input expectedState
     action inputPrefix input expectedState' =
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser defaultOrgParserState)
         path
         (inputPrefix <> input)
         `shouldParse` (expected, expectedState')
@@ -10769,7 +10768,7 @@ pf path errMsg pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser defaultOrgParserState)
         path
         (inputPrefix <> input)
         `shouldFailWith` (errFancy newPos . fancy $ MP.ErrorFail errMsg)
@@ -10796,7 +10795,7 @@ pfm path errorTrivial pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser defaultOrgParserState)
         path
         (inputPrefix <> input)
         `shouldFailWith` (err newPos errorTrivial)
@@ -10815,7 +10814,7 @@ pfSimple path = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
-        (runStateT L.orgDocParser L.defaultOrgParserState)
+        (runStateT L.orgDocParser defaultOrgParserState)
         path
         `shouldFailOn` (inputPrefix <> input)
   where
@@ -10833,7 +10832,7 @@ plainParagraph body =
       [ PTokenStyledText
           StyledText
             { body = body,
-              style = L.styleMaskFrom []
+              style = styleMaskFrom []
             }
       ]
 #+end_src
@@ -10853,7 +10852,7 @@ plainHeading level section =
             [ PTokenStyledText
                 StyledText
                   { body = T.pack $ show level,
-                    style = L.styleMaskFrom []
+                    style = styleMaskFrom []
                   }
             ],
         meta = fromList []

@@ -30,6 +30,7 @@ module Lilac.Types
     WeaveConf (..),
     decodeGPath,
     defaultOrgParserConf,
+    defaultOrgParserState,
     encodeGPath,
     Lilac.Types.fromText,
     fromWords,
@@ -39,6 +40,7 @@ module Lilac.Types
     nilOidOrgDoc,
     protocolsEmacs,
     protocolsWeb,
+    styleMaskFrom,
   )
 where
 
@@ -59,13 +61,16 @@ import Data.Aeson.Types
     toJSONKeyText,
     withText,
   )
+import Data.Bits (setBit)
 import Data.Bits.Bitwise (toListLE)
+import Data.Map.Strict qualified as M
+import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.UUID.Types (UUID, fromText, fromWords64)
 import GHC.Generics (Generic)
 import Network.URI qualified as N
 import Relude
-  ( Bool,
+  ( Bool (False),
     Char,
     Enum,
     Eq,
@@ -86,6 +91,8 @@ import Relude
     Word8,
     catMaybes,
     fail,
+    foldl',
+    fromEnum,
     map,
     maybe,
     otherwise,
@@ -293,6 +300,40 @@ data OrgParserState = OrgParserState
   }
   deriving stock (Eq, Show)
 
+defaultOrgParserState :: OrgParserState
+defaultOrgParserState =
+  OrgParserState
+    { docOid = nilOid,
+      headingOidStack = [],
+      headingLevel = 0,
+      headingSection = [],
+      insideHeading = False,
+      styleMask = styleMaskFrom [],
+      insideCodeBlock = False,
+      insideLinkDisplayName = False,
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
+      equationNumber = 0,
+      anonEquationNumber = 0,
+      cellNames = Set.empty,
+      anonBlockNumber = 0,
+      figureNumber = 0,
+      tableNumber = 0,
+      footnoteNumber = 0,
+      footnoteNumbers = M.empty,
+      footnoteDefinitions = M.empty,
+      prevCellIsFootnote = False,
+      tanglePaths = Set.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      insideCitation = False,
+      bracketBalance = 0,
+      insideCitePrefix = False,
+      citations = [],
+      orgParserConf = defaultOrgParserConf
+    }
+
 type Prose :: Type
 newtype Prose = Prose
   { unProse :: [PToken]
@@ -350,6 +391,12 @@ type StyleMask :: Type
 newtype StyleMask = StyleMask Word8
   deriving stock (Eq, Generic)
   deriving anyclass (FromJSON, ToJSON)
+
+styleMaskFrom :: [Style] -> StyleMask
+styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
+  where
+    f :: Word8 -> Style -> Word8
+    f acc s = setBit acc (fromEnum s)
 
 type Footnote :: Type
 data Footnote = Footnote

@@ -1,14 +1,12 @@
 module Lilac.Parse
   ( defaultOrgDoc,
     defaultOrgParserConf,
-    defaultOrgParserState,
     genHeadingSection,
     genHeadingOidStack,
     isNumericText,
     maskToStyles,
     orgDocParser,
     parseOrgDoc,
-    styleMaskFrom,
     tableHorizontalLine,
     validateOidText,
   )
@@ -84,11 +82,13 @@ import Lilac.Types
     StyledText (StyledText, body, style),
     Table (Table, caption, grid, meta),
     defaultOrgParserConf,
+    defaultOrgParserState,
     fromText,
     markingChars,
     nilOid,
     protocolsEmacs,
     protocolsWeb,
+    styleMaskFrom,
   )
 import Lilac.Types as OrgParserState
   ( OrgParserState
@@ -137,7 +137,6 @@ import Relude
     Ord,
     String,
     Text,
-    Word8,
     abs,
     catMaybes,
     concatMap,
@@ -298,40 +297,6 @@ defaultOrgDoc oid metas =
       if oid == nilOid
         then ("ID", "00000000-0000-0000-0000-000000000000") : metas
         else metas
-
-defaultOrgParserState :: OrgParserState
-defaultOrgParserState =
-  OrgParserState
-    { docOid = nilOid,
-      headingOidStack = [],
-      headingLevel = 0,
-      headingSection = [],
-      insideHeading = False,
-      styleMask = styleMaskFrom [],
-      insideCodeBlock = False,
-      insideLinkDisplayName = False,
-      listLevels = [],
-      listMarkers = [],
-      continuationIndent = 0,
-      equationNumber = 0,
-      anonEquationNumber = 0,
-      cellNames = Set.empty,
-      anonBlockNumber = 0,
-      figureNumber = 0,
-      tableNumber = 0,
-      footnoteNumber = 0,
-      footnoteNumbers = M.empty,
-      footnoteDefinitions = M.empty,
-      prevCellIsFootnote = False,
-      tanglePaths = Set.empty,
-      cslPath = Nothing,
-      bibPaths = [],
-      insideCitation = False,
-      bracketBalance = 0,
-      insideCitePrefix = False,
-      citations = [],
-      orgParserConf = defaultOrgParserConf
-    }
 
 docMetaEntryParser :: OrgParser (Text, Text)
 docMetaEntryParser = do
@@ -775,12 +740,6 @@ escapedSymbolParser styleMask = do
   if s == "vert{}"
     then pure "|"
     else pure s
-
-styleMaskFrom :: [Style] -> StyleMask
-styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
-  where
-    f :: Word8 -> Style -> Word8
-    f acc s = setBit acc (fromEnum s)
 
 maskToStyles :: StyleMask -> [Style]
 maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask

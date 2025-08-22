@@ -5,6 +5,7 @@ import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
   ( WeaveConf (WeaveConf, archive, originObjectPath, watch),
+    defaultOrgParserState,
     encodeGPath,
     nilOidOrgDoc,
   )
@@ -53,7 +54,7 @@ getWovenPrettyFromPath path = do
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
         MP.runParser
-          (runStateT LP.orgDocParser LP.defaultOrgParserState)
+          (runStateT LP.orgDocParser defaultOrgParserState)
           path
           (nilOidOrgDoc <> inputOrgFile)
   case parseResult of
