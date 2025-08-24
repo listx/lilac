@@ -3927,3 +3927,23 @@ parseSpec = do
             ]
         )
       ]
+
+  describe "Drop text chars from Prose" $ do
+    it "can handle plain text from the front" $ do
+      dropTextWhile (== 'a') (fromText "aa b *cc*" :: Prose)
+        `shouldBe` (fromText " b *cc*")
+    it "can handle plain text from the back" $ do
+      dropTextWhileEnd (== 'c') (fromText "aa b *cc*" :: Prose)
+        `shouldBe` (fromText "aa b ")
+    it "can handle styled (italic) text from the front" $ do
+      dropTextWhile (== 'a') (fromText "/aa/ b *cc*" :: Prose)
+        `shouldBe` (fromText " b *cc*")
+    it "can handle styled (italic) text from the back" $ do
+      dropTextWhileEnd (== 'c') (fromText "/aa/ b *cc*" :: Prose)
+        `shouldBe` (fromText "/aa/ b ")
+    it "skips over non-text elements from the front" $ do
+      dropTextWhile (== 'a') (fromText "[[foo]]/aa/ b *cc*" :: Prose)
+        `shouldBe` (fromText "[[foo]] b *cc*")
+    it "skips over non-text elements from the back" $ do
+      dropTextWhileEnd (== 'c') (fromText "/aa/ b *cc*[[foo]]" :: Prose)
+        `shouldBe` (fromText "/aa/ b [[foo]]")

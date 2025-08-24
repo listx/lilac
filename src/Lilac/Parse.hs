@@ -474,7 +474,7 @@ headingParser = do
   failIfHeadingNestsWithoutDirectParent currentHeadingLevel lenStars
   _ <- char ' '
   modify (\s -> s {insideHeading = True})
-  prose <- proseParser spaceConsumer
+  prose <- proseParser $ whitespaceCompressor spaceConsumer
   _ <- char '\n'
   failIfLeftoverActiveStyles
   props <- propertiesDrawerParser
@@ -579,7 +579,12 @@ proseParser spaceConsumer = do
       $ MP.choice (spacePTokenParser : baseParsers avoidCitations)
   pure . Prose . filter nonEmpty $ a : b
   where
-    spacePTokenParser = PTokenStyledText <$> whitespaceCompressor spaceConsumer
+    spacePTokenParser = do
+      s <- spaceConsumer
+      st <- get
+      pure
+        $ PTokenStyledText
+          StyledText {body = s, style = st.styleMask}
     baseParsers avoidCitations
       | avoidCitations =
           [ PTokenLink <$> linkParser,
@@ -621,27 +626,16 @@ proseSpaceConsumer expectedIndentLen = do
         toAvoid
         $ \(condition, p) -> when condition $ MP.notFollowedBy p
 
-whitespaceCompressor :: OrgParser Text -> OrgParser StyledText
+whitespaceCompressor :: OrgParser Text -> OrgParser Text
 whitespaceCompressor spaceConsumer = do
-  orgParserState <- get
-
-  let mask = orgParserState.styleMask
-
   _ <- spaceConsumer
 
-  ws <-
-    MP.lookAhead
-      $ MP.choice
-        [ MP.eof >> pure "",
-          footnoteReferenceParser >> pure "",
-          MP.anySingle >> pure " "
-        ]
-
-  pure
-    StyledText
-      { body = ws,
-        style = mask
-      }
+  MP.lookAhead
+    $ MP.choice
+      [ MP.eof >> pure "",
+        footnoteReferenceParser >> pure "",
+        MP.anySingle >> pure " "
+      ]
 
 styleMarkers :: Map Char Style
 styleMarkers =
@@ -859,7 +853,9 @@ linkDisplayNameParser = do
       b <- MP.many $ MP.choice (spaceParser : baseParsers)
       pure . filter nonEmpty $ a : b
       where
-        spaceParser = whitespaceCompressor spaceConsumer
+        spaceParser = do
+          s <- whitespaceCompressor spaceConsumer
+          pure StyledText {body = s, style = styleMaskFrom []}
         baseParsers =
           [ styleMarkerParser,
             styledTextParser
@@ -992,7 +988,7 @@ mathFragmentInlineParser = do
 paragraphParser :: OrgParser Cell
 paragraphParser = do
   orgParserState <- get
-  prose <- proseParser $ proseSpaceConsumer orgParserState.continuationIndent
+  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer orgParserState.continuationIndent
   failIfLeftoverActiveStyles
   pure . CParagraph $ compressProse prose
 
@@ -1269,9 +1265,7 @@ oidReferenceParser disallowedChars =
       b <- MP.many $ MP.choice (spaceParser : baseParsers)
       pure . T.concat $ a : b
       where
-        spaceParser = do
-          styledText <- whitespaceCompressor spaceConsumer
-          pure styledText.body
+        spaceParser = whitespaceCompressor spaceConsumer
         baseParsers =
           [ textParser'
           ]
@@ -1707,7 +1701,7 @@ tableFormulaParser = do
 
 captionParser :: OrgParser Prose
 captionParser = do
-  caption <- proseParser spaceConsumer
+  caption <- proseParser $ whitespaceCompressor spaceConsumer
   failIfLeftoverActiveStyles
   pure caption
   where
@@ -1757,7 +1751,7 @@ tableRowParser = do
 
 tableCellParser :: OrgParser Prose
 tableCellParser = do
-  prose <- onlyMarkingCharacterParser <|> proseParser spacesInsideProse
+  prose <- onlyMarkingCharacterParser <|> (proseParser $ whitespaceCompressor spacesInsideProse)
   _ <- MP.optional spaces
   _ <- char '|'
   _ <- MP.optional spaces
@@ -1913,21 +1907,31 @@ instance CiteprocOutput Prose where
       f :: Text -> PToken -> Text
       f acc = \case
         PTokenCitation {} -> acc
-        PTokenStyledText styledText -> acc <> unparseStyledText styledText
+        PTokenStyledText styledText
+          | T.null styledText.body -> acc
+          | otherwise -> acc <> unparseStyledText styledText
         PTokenLink link -> acc <> unparseLink link
         PTokenMathFragment mathFragment -> acc <> unparseMathFragment mathFragment
 
   fromText input = case MP.runParser
-    (runStateT (proseParser spaceConsumer) defaultOrgParserState)
+    (runStateT customProseParser defaultOrgParserState)
     ""
     input of
     Left err -> error . T.pack $ MP.errorBundlePretty err
     Right (prose, _) -> prose
     where
+      customProseParser = do
+        leadingWhitespace <- MP.optional spaceConsumer
+        rest <- proseParser spaceConsumer
+        case leadingWhitespace of
+          Nothing -> pure rest
+          Just s ->
+            let w = PTokenStyledText StyledText {body = s, style = styleMaskFrom []}
+             in pure . Prose $ w : rest.unProse
       spaceConsumer :: OrgParser Text
       spaceConsumer = T.pack <$> intraCellWhitespaceParser
-  dropTextWhile = undefined
-  dropTextWhileEnd = undefined
+  dropTextWhile = dropTextFromStyledText True
+  dropTextWhileEnd = dropTextFromStyledText False
   addFontVariant = undefined
   addFontStyle = undefined
   addFontWeight = undefined
@@ -1988,6 +1992,36 @@ unparseMathFragment mathFragment = mathStart <> mathFragment.body <> mathEnd
       | Just _ <- lookup "__equation_anon_number" mathFragment.meta =
           ("\\[", "\\]")
       | otherwise = ("\\(", "\\)")
+
+dropTextFromStyledText :: Bool -> (Char -> Bool) -> Prose -> Prose
+dropTextFromStyledText dropFromStart f prose =
+  Prose
+    . (if dropFromStart then reverse else id)
+    . fst
+    . foldl' g ([], False)
+    $ if dropFromStart then prose.unProse else reverse prose.unProse
+  where
+    g :: ([PToken], Bool) -> PToken -> ([PToken], Bool)
+    g (acc, pastFirst) pToken
+      | pastFirst = (pToken : acc, pastFirst)
+      | otherwise = case pToken of
+          PTokenStyledText styledText
+            | T.null styledText.body -> (pToken : acc, pastFirst)
+            | otherwise ->
+                let modifiedBody = dropper f styledText.body
+                    modified =
+                      PTokenStyledText
+                        StyledText
+                          { body = modifiedBody,
+                            style = styledText.style
+                          }
+                 in if T.null modifiedBody
+                      then (acc, True)
+                      else (modified : acc, True)
+          PTokenLink {}
+          PTokenMathFragment {}
+          PTokenCitation {} -> (pToken : acc, pastFirst)
+    dropper = if dropFromStart then T.dropWhile else T.dropWhileEnd
 
 citationParser :: OrgParser Int
 citationParser = do
@@ -2233,7 +2267,7 @@ citeAffixParser :: Bool -> OrgParser Prose
 citeAffixParser isPrefix = do
   modify (\s -> s {insideCitePrefix = isPrefix})
   orgParserState <- get
-  prose <- proseParser $ proseSpaceConsumer orgParserState.continuationIndent
+  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer orgParserState.continuationIndent
   modify (\s -> s {insideCitePrefix = False})
   failIfLeftoverActiveStyles
   failIfUnbalancedBrackets
