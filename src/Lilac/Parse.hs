@@ -34,6 +34,46 @@ import Citeproc
     movePunctuationInsideQuotes,
     toText,
   )
+import Citeproc.Types
+  ( DisplayStyle
+      ( DisplayBlock,
+        DisplayIndent,
+        DisplayLeftMargin,
+        DisplayRightInline
+      ),
+    FontStyle
+      ( ItalicFont,
+        NormalFont,
+        ObliqueFont
+      ),
+    FontVariant
+      ( NormalVariant,
+        SmallCapsVariant
+      ),
+    FontWeight
+      ( BoldWeight,
+        LightWeight,
+        NormalWeight
+      ),
+    TextCase
+      ( CapitalizeAll,
+        CapitalizeFirst,
+        Lowercase,
+        PreserveCase,
+        SentenceCase,
+        TitleCase,
+        Uppercase
+      ),
+    TextDecoration
+      ( NoDecoration,
+        UnderlineDecoration
+      ),
+    VerticalAlign
+      ( BaselineAlign,
+        SubAlign,
+        SupAlign
+      ),
+  )
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char
@@ -203,7 +243,6 @@ import Relude
     take,
     toEnum,
     toList,
-    undefined,
     unwords,
     void,
     when,
@@ -1932,19 +1971,187 @@ instance CiteprocOutput Prose where
       spaceConsumer = T.pack <$> intraCellWhitespaceParser
   dropTextWhile = dropTextFromStyledText True
   dropTextWhileEnd = dropTextFromStyledText False
-  addFontVariant = undefined
-  addFontStyle = undefined
-  addFontWeight = undefined
-  addTextDecoration = undefined
-  addVerticalAlign = undefined
-  addTextCase = undefined
-  addDisplay = undefined
-  addQuotes = undefined
-  movePunctuationInsideQuotes = undefined
-  inNote = undefined
-  mapText = undefined
-  addHyperlink = undefined
-  localizeQuotes = undefined
+  addFontVariant fontVariant prose = case fontVariant of
+    NormalVariant -> prose
+    SmallCapsVariant -> prose
+
+  addFontStyle fontStyle prose = case fontStyle of
+    NormalFont -> Prose $ map noStyle prose.unProse
+    ItalicFont -> Prose $ map italicize prose.unProse
+    ObliqueFont -> Prose $ map italicize prose.unProse
+    where
+      noStyle pToken = case pToken of
+        PTokenStyledText styledText ->
+          PTokenStyledText
+            StyledText
+              { body = styledText.body,
+                style = styleMaskFrom []
+              }
+        PTokenLink {}
+        PTokenCitation {}
+        PTokenMathFragment {} -> pToken
+      italicize pToken = case pToken of
+        PTokenStyledText styledText ->
+          PTokenStyledText
+            StyledText
+              { body = styledText.body,
+                style = styleMaskFrom $ Italic : maskToStyles styledText.style
+              }
+        PTokenLink {}
+        PTokenCitation {}
+        PTokenMathFragment {} -> pToken
+
+  addFontWeight fontWeight prose = case fontWeight of
+    NormalWeight -> Prose $ map unBold prose.unProse
+    BoldWeight -> Prose $ map bold prose.unProse
+    LightWeight -> Prose $ map unBold prose.unProse
+    where
+      bold pToken = case pToken of
+        PTokenStyledText styledText ->
+          PTokenStyledText
+            StyledText
+              { body = styledText.body,
+                style = styleMaskFrom $ Bold : maskToStyles styledText.style
+              }
+        PTokenLink {}
+        PTokenCitation {}
+        PTokenMathFragment {} -> pToken
+      unBold pToken = case pToken of
+        PTokenStyledText styledText ->
+          PTokenStyledText
+            StyledText
+              { body = styledText.body,
+                style =
+                  styleMaskFrom
+                    . filter (/= Bold)
+                    $ maskToStyles styledText.style
+              }
+        PTokenLink {}
+        PTokenCitation {}
+        PTokenMathFragment {} -> pToken
+
+  addTextDecoration textDecoration prose = case textDecoration of
+    NoDecoration -> Prose $ map noUnderline prose.unProse
+    UnderlineDecoration -> Prose $ map underline prose.unProse
+    where
+      underline pToken = case pToken of
+        PTokenStyledText styledText ->
+          PTokenStyledText
+            StyledText
+              { body = styledText.body,
+                style = styleMaskFrom $ Underline : maskToStyles styledText.style
+              }
+        PTokenLink {}
+        PTokenCitation {}
+        PTokenMathFragment {} -> pToken
+      noUnderline pToken = case pToken of
+        PTokenStyledText styledText ->
+          PTokenStyledText
+            StyledText
+              { body = styledText.body,
+                style =
+                  styleMaskFrom
+                    . filter (/= Underline)
+                    $ maskToStyles styledText.style
+              }
+        PTokenLink {}
+        PTokenCitation {}
+        PTokenMathFragment {} -> pToken
+
+  addVerticalAlign verticalAlign prose = case verticalAlign of
+    BaselineAlign
+    SupAlign
+    SubAlign -> prose
+
+  addTextCase _ textCase prose = case textCase of
+    Lowercase
+    Uppercase
+    CapitalizeFirst
+    CapitalizeAll
+    SentenceCase
+    TitleCase
+    PreserveCase -> prose
+
+  addDisplay displayStyle prose = case displayStyle of
+    DisplayBlock
+    DisplayLeftMargin
+    DisplayRightInline
+    DisplayIndent -> prose
+
+  addQuotes prose = Prose $ [quote] <> prose.unProse <> [quote]
+    where
+      quote =
+        PTokenStyledText
+          StyledText
+            { body = "\"",
+              style = styleMaskFrom []
+            }
+
+  movePunctuationInsideQuotes prose =
+    Prose $ map f prose.unProse
+    where
+      f pToken = case pToken of
+        PTokenStyledText styledText ->
+          PTokenStyledText
+            StyledText
+              { body = g styledText.body,
+                style = styledText.style
+              }
+        PTokenLink {}
+        PTokenCitation {}
+        PTokenMathFragment {} -> pToken
+      g s =
+        let attempts = map (tryRearrange s) punctCombos
+         in case find (\(mightHaveMore, _) -> mightHaveMore) attempts of
+              Just (_, s') -> g s'
+              Nothing -> s
+      tryRearrange s punctCombo
+        | (prefix, remainder) <- T.breakOn punctCombo s,
+          not (T.null remainder) =
+            (True, prefix <> T.reverse punctCombo <> T.drop (T.length punctCombo) remainder)
+        | otherwise = (False, s)
+      punctCombos :: [Text]
+      punctCombos =
+        [ "\".",
+          "\",",
+          "'.",
+          "',"
+        ]
+
+  inNote = id
+
+  mapText f prose = Prose $ map g prose.unProse
+    where
+      g :: PToken -> PToken
+      g pToken = case pToken of
+        PTokenStyledText styledText ->
+          PTokenStyledText
+            StyledText
+              { body = f styledText.body,
+                style = styledText.style
+              }
+        PTokenLink {}
+        PTokenCitation {}
+        PTokenMathFragment {} -> pToken
+
+  addHyperlink url prose = Prose $ maybeToList link <> prose.unProse
+    where
+      link = case N.parseURI $ T.unpack url of
+        Nothing -> Nothing
+        Just uri ->
+          Just
+            $ PTokenLink
+              Link
+                { name =
+                    [ StyledText
+                        { body = url,
+                          style = styleMaskFrom []
+                        }
+                    ],
+                  target = LinkTargetURI uri
+                }
+
+  localizeQuotes _ prose = prose
 
 unparseStyledText :: StyledText -> Text
 unparseStyledText styledText =

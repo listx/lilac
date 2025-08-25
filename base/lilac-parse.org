@@ -286,6 +286,46 @@ import Citeproc
     movePunctuationInsideQuotes,
     toText,
   )
+import Citeproc.Types
+  ( DisplayStyle
+      ( DisplayBlock,
+        DisplayIndent,
+        DisplayLeftMargin,
+        DisplayRightInline
+      ),
+    FontStyle
+      ( ItalicFont,
+        NormalFont,
+        ObliqueFont
+      ),
+    FontVariant
+      ( NormalVariant,
+        SmallCapsVariant
+      ),
+    FontWeight
+      ( BoldWeight,
+        LightWeight,
+        NormalWeight
+      ),
+    TextCase
+      ( CapitalizeAll,
+        CapitalizeFirst,
+        Lowercase,
+        PreserveCase,
+        SentenceCase,
+        TitleCase,
+        Uppercase
+      ),
+    TextDecoration
+      ( NoDecoration,
+        UnderlineDecoration
+      ),
+    VerticalAlign
+      ( BaselineAlign,
+        SubAlign,
+        SupAlign
+      ),
+  )
 import Data.Bits (setBit, testBit, (.^.))
 import Data.Bits.Bitwise (toListLE)
 import Data.Char
@@ -455,7 +495,6 @@ import Relude
     take,
     toEnum,
     toList,
-    undefined,
     unwords,
     void,
     when,
@@ -1622,19 +1661,19 @@ instance CiteprocOutput Prose where
   <<instance:CiteprocOutput Prose:fromText>>
   dropTextWhile = dropTextFromStyledText True
   dropTextWhileEnd = dropTextFromStyledText False
-  addFontVariant = undefined
-  addFontStyle = undefined
-  addFontWeight = undefined
-  addTextDecoration = undefined
-  addVerticalAlign = undefined
-  addTextCase = undefined
-  addDisplay = undefined
-  addQuotes = undefined
-  movePunctuationInsideQuotes = undefined
-  inNote = undefined
-  mapText = undefined
-  addHyperlink = undefined
-  localizeQuotes = undefined
+  <<instance:CiteprocOutput Prose:addFontVariant>>
+  <<instance:CiteprocOutput Prose:addFontStyle>>
+  <<instance:CiteprocOutput Prose:addFontWeight>>
+  <<instance:CiteprocOutput Prose:addTextDecoration>>
+  <<instance:CiteprocOutput Prose:addVerticalAlign>>
+  <<instance:CiteprocOutput Prose:addTextCase>>
+  <<instance:CiteprocOutput Prose:addDisplay>>
+  <<instance:CiteprocOutput Prose:addQuotes>>
+  <<instance:CiteprocOutput Prose:movePunctuationInsideQuotes>>
+  <<instance:CiteprocOutput Prose:inNote>>
+  <<instance:CiteprocOutput Prose:mapText>>
+  <<instance:CiteprocOutput Prose:addHyperlink>>
+  <<instance:CiteprocOutput Prose:localizeQuotes>>
 #+end_src
 
 The functions ~toText~ and ~fromText~ are for converting the value (in this case
@@ -1818,6 +1857,269 @@ dropTextFromStyledText dropFromStart f prose =
           PTokenMathFragment {}
           PTokenCitation {} -> (pToken : acc, pastFirst)
     dropper = if dropFromStart then T.dropWhile else T.dropWhileEnd
+#+end_src
+
+Adding font variations is not supported, because we have no notion of small caps
+as a stylistic option.
+
+#+name: instance:CiteprocOutput Prose:addFontVariant
+#+begin_src haskell
+addFontVariant fontVariant prose = case fontVariant of
+  NormalVariant -> prose
+  SmallCapsVariant -> prose
+#+end_src
+
+For font styles, we treat ~ObliqueFont~ the same as ~ItalicFont~. For ~NormalFont~
+though, we simply strip all styling.
+
+#+name: instance:CiteprocOutput Prose:addFontStyle
+#+begin_src haskell
+addFontStyle fontStyle prose = case fontStyle of
+  NormalFont -> Prose $ map noStyle prose.unProse
+  ItalicFont -> Prose $ map italicize prose.unProse
+  ObliqueFont -> Prose $ map italicize prose.unProse
+  where
+    noStyle pToken = case pToken of
+      PTokenStyledText styledText ->
+        PTokenStyledText
+          StyledText
+            { body = styledText.body,
+              style = styleMaskFrom []
+            }
+      PTokenLink {}
+      PTokenCitation {}
+      PTokenMathFragment {} -> pToken
+    italicize pToken = case pToken of
+      PTokenStyledText styledText ->
+        PTokenStyledText
+          StyledText
+            { body = styledText.body,
+              style = styleMaskFrom $ Italic : maskToStyles styledText.style
+            }
+      PTokenLink {}
+      PTokenCitation {}
+      PTokenMathFragment {} -> pToken
+#+end_src
+
+For the font weight, we only have one weight, which is ~Bold~.
+
+#+name: instance:CiteprocOutput Prose:addFontWeight
+#+begin_src haskell
+addFontWeight fontWeight prose = case fontWeight of
+  NormalWeight -> Prose $ map unBold prose.unProse
+  BoldWeight -> Prose $ map bold prose.unProse
+  LightWeight -> Prose $ map unBold prose.unProse
+  where
+    bold pToken = case pToken of
+      PTokenStyledText styledText ->
+        PTokenStyledText
+          StyledText
+            { body = styledText.body,
+              style = styleMaskFrom $ Bold : maskToStyles styledText.style
+            }
+      PTokenLink {}
+      PTokenCitation {}
+      PTokenMathFragment {} -> pToken
+    unBold pToken = case pToken of
+      PTokenStyledText styledText ->
+        PTokenStyledText
+          StyledText
+            { body = styledText.body,
+              style =
+                styleMaskFrom
+                  . filter (/= Bold)
+                  $ maskToStyles styledText.style
+            }
+      PTokenLink {}
+      PTokenCitation {}
+      PTokenMathFragment {} -> pToken
+#+end_src
+
+The ~addTextDecoration~ definition is straightforward enough, because there is no
+information loss (it's either having an underline or not having one).
+
+#+name: instance:CiteprocOutput Prose:addTextDecoration
+#+begin_src haskell
+addTextDecoration textDecoration prose = case textDecoration of
+  NoDecoration -> Prose $ map noUnderline prose.unProse
+  UnderlineDecoration -> Prose $ map underline prose.unProse
+  where
+    underline pToken = case pToken of
+      PTokenStyledText styledText ->
+        PTokenStyledText
+          StyledText
+            { body = styledText.body,
+              style = styleMaskFrom $ Underline : maskToStyles styledText.style
+            }
+      PTokenLink {}
+      PTokenCitation {}
+      PTokenMathFragment {} -> pToken
+    noUnderline pToken = case pToken of
+      PTokenStyledText styledText ->
+        PTokenStyledText
+          StyledText
+            { body = styledText.body,
+              style =
+                styleMaskFrom
+                  . filter (/= Underline)
+                  $ maskToStyles styledText.style
+            }
+      PTokenLink {}
+      PTokenCitation {}
+      PTokenMathFragment {} -> pToken
+#+end_src
+
+We don't support adding vertical alignment, so we don't do anything here.
+
+#+name: instance:CiteprocOutput Prose:addVerticalAlign
+#+begin_src haskell
+addVerticalAlign verticalAlign prose = case verticalAlign of
+  BaselineAlign
+  SupAlign
+  SubAlign -> prose
+#+end_src
+
+We don't support case transformations (converting to uppercase, lowercase, etc).
+The =Citeproc= library has a =Citeproc.CaseTransform= module which provides much of
+the work for this. However, we don't bother with this for now to avoid
+additional complexity.
+
+#+name: instance:CiteprocOutput Prose:addTextCase
+#+begin_src haskell
+addTextCase _ textCase prose = case textCase of
+  Lowercase
+  Uppercase
+  CapitalizeFirst
+  CapitalizeAll
+  SentenceCase
+  TitleCase
+  PreserveCase -> prose
+#+end_src
+
+We don't support display transformations (whether to display as a block,
+indented, etc). This is presumably for the bibliography list only.
+
+#+name: instance:CiteprocOutput Prose:addDisplay
+#+begin_src haskell
+addDisplay displayStyle prose = case displayStyle of
+  DisplayBlock
+  DisplayLeftMargin
+  DisplayRightInline
+  DisplayIndent -> prose
+#+end_src
+
+Adding quotes means just surrounding the prose with quote characters.
+
+#+name: instance:CiteprocOutput Prose:addQuotes
+#+begin_src haskell
+addQuotes prose = Prose $ [quote] <> prose.unProse <> [quote]
+  where
+    quote =
+      PTokenStyledText
+        StyledText
+          { body = "\"",
+            style = styleMaskFrom []
+          }
+#+end_src
+
+The ~movePunctuationInsideQuotes~ function moves all commas and periods to come
+just /before/ the quote, instead of after it. For example, ~"a".~ would be converted
+into ~"b."~. Because of the way styles are handled though, a [[data:PToken]] can only
+see text that have the same style; if there are two of them, and they each have
+a piece of the punctuation combination we are concerned about, this won't work.
+However, such cases should be rare, and even if we did support that case, it
+wouldn't make sense to move a bold period inside of a non-bold quote character,
+for example. So working inside of a single [[data:PToken]] should be reasonable
+enough.
+
+#+name: instance:CiteprocOutput Prose:movePunctuationInsideQuotes
+#+begin_src haskell
+movePunctuationInsideQuotes prose =
+  Prose $ map f prose.unProse
+  where
+    f pToken = case pToken of
+      PTokenStyledText styledText ->
+        PTokenStyledText
+          StyledText
+            { body = g styledText.body,
+              style = styledText.style
+            }
+      PTokenLink {}
+      PTokenCitation {}
+      PTokenMathFragment {} -> pToken
+    g s =
+      let attempts = map (tryRearrange s) punctCombos
+       in case find (\(mightHaveMore, _) -> mightHaveMore) attempts of
+            Just (_, s') -> g s'
+            Nothing -> s
+    tryRearrange s punctCombo
+      | (prefix, remainder) <- T.breakOn punctCombo s,
+        not (T.null remainder) =
+          (True, prefix <> T.reverse punctCombo <> T.drop (T.length punctCombo) remainder)
+      | otherwise = (False, s)
+    punctCombos :: [Text]
+    punctCombos =
+      [ "\".",
+        "\",",
+        "'.",
+        "',"
+      ]
+#+end_src
+
+We don't support ~inNote~. [[https://github.com/jgm/citeproc/blob/f0b55e2a8363f5c80d5d63638696e475e524b340/src/Citeproc/CslJson.hs#L148][CslJson]] doesn't support it either.
+
+#+name: instance:CiteprocOutput Prose:inNote
+#+begin_src haskell
+inNote = id
+#+end_src
+
+~mapText~ just applies an arbitrary function to all ~Text~ values.
+
+#+name: instance:CiteprocOutput Prose:mapText
+#+begin_src haskell
+mapText f prose = Prose $ map g prose.unProse
+  where
+    g :: PToken -> PToken
+    g pToken = case pToken of
+      PTokenStyledText styledText ->
+        PTokenStyledText
+          StyledText
+            { body = f styledText.body,
+              style = styledText.style
+            }
+      PTokenLink {}
+      PTokenCitation {}
+      PTokenMathFragment {} -> pToken
+#+end_src
+
+~addHyperlink~ just adds a URL; we have a rich [[data:Link]] type for this, so that's
+what we use.
+
+#+name: instance:CiteprocOutput Prose:addHyperlink
+#+begin_src haskell
+addHyperlink url prose = Prose $ maybeToList link <> prose.unProse
+  where
+    link = case N.parseURI $ T.unpack url of
+      Nothing -> Nothing
+      Just uri ->
+        Just
+          $ PTokenLink
+            Link
+              { name =
+                  [ StyledText
+                      { body = url,
+                        style = styleMaskFrom []
+                      }
+                  ],
+                target = LinkTargetURI uri
+              }
+#+end_src
+
+We don't support localization of quotes.
+
+#+name: instance:CiteprocOutput Prose:localizeQuotes
+#+begin_src haskell
+localizeQuotes _ prose = prose
 #+end_src
 
 ** Tests
