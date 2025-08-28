@@ -1063,6 +1063,7 @@ watch()
 		if [[ ! "${s1}" == "${s2}" ]]; then
 			s1="${s2}"
 			tangle_and_test_and_weave
+			make -C "${SCRIPT_ROOT}" lint || true
 		fi
 		sleep 1
 	done
