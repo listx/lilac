@@ -130,6 +130,8 @@ let
         enable = true;
         package = devShellEnv;
         excludes = [ "nix/sources.nix" ];
+        entry = let opts = [ "--check" ];
+        in "${devShellEnv}/bin/nixfmt ${toolOpts opts}";
       };
 
       ormolu = {
@@ -143,13 +145,8 @@ let
         enable = true;
         package = devShellEnv;
         entry = let
-          opts = [
-            "--indent"
-            "0"
-            "--binary-next-line"
-            "--func-next-line"
-            "--write"
-          ];
+          opts =
+            [ "--indent" "0" "--binary-next-line" "--func-next-line" "--diff" ];
         in "${devShellEnv}/bin/shfmt ${toolOpts opts}";
       };
 
