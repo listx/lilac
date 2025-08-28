@@ -27,13 +27,19 @@ module Lilac.Compile
   )
 where
 
+import Citeproc.CslJson (CslJson)
+import Citeproc.Style
+  ( parseStyle,
+  )
+import Citeproc.Types qualified as CP
+import Data.Aeson (eitherDecodeStrictText)
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( Archive (Archive, objects, symbolPath, symbols),
+  ( Archive (Archive, bibs, csls, objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
     Cell
@@ -61,7 +67,7 @@ import Lilac.Types
     MathFragment (meta),
     OID,
     Object (Object, externalOids, orgDoc, symbols),
-    OrgDoc (cells, oid),
+    OrgDoc (bibPaths, cells, cslPath, oid),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose (unProse),
     Table (grid, meta),
@@ -78,15 +84,19 @@ import Relude
     String,
     Text,
     catMaybes,
+    concat,
     concatMap,
     elem,
     fmap,
     foldl',
     foldlM,
     fromList,
+    fst,
     intercalate,
     length,
     map,
+    mapM,
+    maybeToList,
     mempty,
     otherwise,
     pure,
@@ -97,6 +107,7 @@ import Relude
     ($),
     (.),
     (/=),
+    (<$>),
     (<>),
     (=<<),
     (>),
@@ -112,6 +123,13 @@ import System.OsPath qualified as P
 <<f:buildGraph>>
 <<f:findCycles>>
 <<f:findExternalOids>>
+<<f:getCitationStyles>>
+<<f:getCitationStyle>>
+<<f:citationStyleParser>>
+<<f:getBibliographies>>
+<<f:getBibliography>>
+<<f:bibliographyParser>>
+<<f:makeRelativeToObjectPath>>
 #+end_src
 
 ** Object generation
@@ -210,8 +228,8 @@ instance FromJSONKey LinkOid where
   fromJSONKey = FromJSONKeyTextParser parseJSONLinkOid
 #+end_src
 
-The ~externalOids~ captures all links that point to some other cell in
-another Org file. A consistent "cell universe" can be constructed when all
+In [[f:mkObject]], the ~externalOids~ captures all links that point to some other cell
+in another Org file. A consistent "cell universe" can be constructed when all
 external links are resolved, by getting all other =Object= values for other Org
 files we depend on.
 
@@ -284,6 +302,82 @@ look like ~[[foo bar]]~ will be returned from [[f:findExternalOids]]. Links
 like ~[[foo bar]]~ shouldn't be considered external, because they refer to cells
 that have been named like ~foo bar~ inside the current Org file, not an external
 Org file.
+
+*** Citation dependencies
+:PROPERTIES:
+:ID:       4194fc81-a28d-451f-b4bd-f2f522b5a750
+:END:
+
+[[f:getCitationStyles]] returns both the raw XML content as well as the parsed
+content. We need the raw XML because we want to store it in [[f:mkArchive]], because
+there is no ~ToJSON~ instance for the ~CP.Style~ type.
+
+#+name: f:getCitationStyles
+#+begin_src haskell
+getCitationStyles :: [FilePath] -> IO [(Text, CP.Style (CslJson Text))]
+getCitationStyles filePaths = mapM getCitationStyle filePaths
+#+end_src
+
+For parsing the CSL style file (XML), we read a given path, then defer to [[f:citationStyleParser]].
+
+#+name: f:getCitationStyle
+#+begin_src haskell
+getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))
+getCitationStyle filePath = do
+  p <- P.encodeUtf filePath
+  input <- LU.readFileRobustly p
+  case citationStyleParser input of
+    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
+    Right style -> pure (input, style)
+#+end_src
+
+[[f:citationStyleParser]] just delegates most of the work to ~parseStyle~ from
+~Citeproc.Style~. We expect the contents to be in ~CslJson Text~ format.
+
+#+name: f:citationStyleParser
+#+begin_src haskell
+citationStyleParser :: Text -> Either String (CP.Style (CslJson Text))
+citationStyleParser input = do
+  result <- parseStyle (\_ -> pure mempty) input
+  case result of
+    Left citeprocError -> Left $ show citeprocError
+    Right style -> Right style
+#+end_src
+
+The [[f:getBibliographies]] reads multiple JSON files that have bibliographical
+entries in them.
+
+#+name: f:getBibliographies
+#+begin_src haskell
+getBibliographies :: [FilePath] -> IO [CP.Reference (CslJson Text)]
+getBibliographies filePaths = do
+  bibs <- mapM getBibliography filePaths
+  pure $ concat bibs
+#+end_src
+
+The [[f:getBibliography]] parses a single JSON file which has a list of references
+inside it.
+
+#+name: f:getBibliography
+#+begin_src haskell
+getBibliography :: FilePath -> IO [CP.Reference (CslJson Text)]
+getBibliography filePath = do
+  p <- P.encodeUtf filePath
+  input <- LU.readFileRobustly p
+  case bibliographyParser input of
+    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
+    Right references -> pure references
+#+end_src
+
+[[f:bibliographyParser]] just delegates to ~eitherDecodeStrictText~ from ~Data.Aeson~.
+This is possible because the ~Reference~ type (from ~Citeproc.Types~) has a ~FromJSON~
+instance.
+
+#+name: f:bibliographyParser
+#+begin_src haskell
+bibliographyParser :: Text -> Either String [CP.Reference (CslJson Text)]
+bibliographyParser = eitherDecodeStrictText
+#+end_src
 
 ** External symbol (OID) detection
 
@@ -490,7 +584,9 @@ type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object,
     symbols :: Map LinkOid Cell,
-    symbolPath :: Map LinkOid GPath
+    symbolPath :: Map LinkOid GPath,
+    csls :: Map FilePath Text,
+    bibs :: Map FilePath (CP.Reference (CslJson Text))
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -516,27 +612,49 @@ are no broken links within this collection of objects. The term "broken" here
 mainly means any internal link (to a cell) that cannot be resolved; we do not go
 over the network to check for broken HTTP links.
 
+[[f:mkArchive]] also reads in any [[id:15706715-c648-4866-b757-ea4a1aad0570][CSL style file (XML)]] and also corresponding [[id:909c5265-065a-412c-9305-2cff398ad233][CSL
+JSON (bibliographical entries)]] files, as these are needed for processing
+citations and [[id:e24de101-bf1d-418b-a18f-b1a98fea9696][printing bibliographies]]. If there is any problem with parsing
+these inputs, we return an error. This area around citations is discussed
+separately in [[id:4194fc81-a28d-451f-b4bd-f2f522b5a750][Citation dependencies]]. For the CSL style file, we have to store
+the information as a ~Text~ value, because there is no ~ToJSON~ instance for the
+~Citeproc.Types.Style~ type.
+
 #+name: f:mkArchive
 #+begin_src haskell
-mkArchive :: [(GPath, Object)] -> Either String Archive
-mkArchive pathObjs =
+mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
+mkArchive pathObjs = do
   let (objects, symbols, symbolPath) =
         foldl' concatObjs (mempty, mempty, mempty) pathObjs
       brokenLinks = findBrokenLinks objects symbols
-   in if
-        | brokenLinks /= [] ->
-            Left
-              $ "Found broken links:\n"
-              <> intercalate
-                "\n"
-                (map showBrokenLink brokenLinks)
-        | otherwise ->
-            Right
-              Archive
-                { objects = objects,
-                  symbols = symbols,
-                  symbolPath = symbolPath
-                }
+  allBibPaths <-
+    concat
+      <$> mapM (\(gp, o) -> makeRelativeToObjectPath gp o.orgDoc.bibPaths) pathObjs
+  allCslPaths <-
+    concat
+      <$> mapM (\(gp, o) -> makeRelativeToObjectPath gp $ maybeToList o.orgDoc.cslPath) pathObjs
+  bibContents <- getBibliographies allBibPaths
+  let bibs = zip allBibPaths bibContents
+  cslRawXMLs <- map fst <$> getCitationStyles allCslPaths
+  let csls = zip allCslPaths cslRawXMLs
+  if
+    | brokenLinks /= [] ->
+        pure
+          . Left
+          $ "Found broken links:\n"
+          <> intercalate
+            "\n"
+            (map showBrokenLink brokenLinks)
+    | otherwise ->
+        pure
+          $ Right
+            Archive
+              { objects = objects,
+                symbols = symbols,
+                symbolPath = symbolPath,
+                csls = fromList csls,
+                bibs = fromList bibs
+              }
   where
     concatObjs ::
       (Map GPath Object, Map LinkOid Cell, Map LinkOid GPath) ->
@@ -593,6 +711,27 @@ readObjectsFrom parentDir = foldlM f []
           obj <- mkObject od
           relPath' <- encodeGPath =<< P.decodeUtf relPath
           pure $ (relPath', obj) : acc
+#+end_src
+
+[[f:makeRelativeToObjectPath]] gets a ~[FilePath]~ and makes them relative to the
+given ~GPath~. This is useful for getting paths defined inside an Org doc (such as
+the path to a CSL style or bibliography JSON) to be relative to where the Org
+doc is located.
+
+#+name: f:makeRelativeToObjectPath
+#+begin_src haskell
+makeRelativeToObjectPath :: GPath -> [FilePath] -> IO [FilePath]
+makeRelativeToObjectPath objGPath fps = do
+  let objPath = decodeGPath objGPath
+  objOsp <- P.encodeUtf objPath
+  let objDir = P.takeDirectory objOsp
+  mapM (f objDir) fps
+  where
+    f :: P.OsPath -> FilePath -> IO FilePath
+    f objDir fp = do
+      p <- P.encodeUtf fp
+      let relPath = P.combine objDir p
+      P.decodeUtf relPath
 #+end_src
 
 *** Tests
@@ -1467,7 +1606,8 @@ expectArchiveError :: [FilePath] -> String -> Spec
 expectArchiveError paths expected = do
   it (show paths) $ do
     pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-    LC.mkArchive pathObjs `shouldBe` (Left expected)
+    maybeArchive <- LC.mkArchive pathObjs
+    maybeArchive `shouldBe` (Left expected)
 #+end_src
 
 The corollary is [[f:expectArchiveOk]] which expects the archive to be successfully
@@ -1479,7 +1619,8 @@ expectArchiveOk :: [FilePath] -> Spec
 expectArchiveOk paths = do
   it (show paths) $ do
     pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-    LC.mkArchive pathObjs `shouldSatisfy` isRight
+    maybeArchive <- LC.mkArchive pathObjs
+    maybeArchive `shouldSatisfy` isRight
 #+end_src
 
 The [[f:checkCycles]] function uses [[f:findCycles]] to see if the archive that is
@@ -1490,7 +1631,8 @@ constructed from the given Org documents has any cycles.
 checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
 checkCycles paths expectedCycles = do
   pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-  case LC.mkArchive pathObjs of
+  maybeArchive <- runIO $ LC.mkArchive pathObjs
+  case maybeArchive of
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do
       (LC.findCycles archive) `shouldBe` expectedCycles

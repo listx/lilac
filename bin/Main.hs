@@ -355,7 +355,8 @@ lilacCompile _globalOpts compileOpts = do
 lilacArchive :: ArchiveOpts -> IO ()
 lilacArchive archiveOpts = do
   pathsObjects <- mapM readObjectDirectly archiveOpts.inputs
-  case LC.mkArchive pathsObjects of
+  maybeArchive <- LC.mkArchive pathsObjects
+  case maybeArchive of
     Left errMsg -> die errMsg
     Right archive -> do
       outPath <- do

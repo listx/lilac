@@ -7,13 +7,19 @@ module Lilac.Compile
   )
 where
 
+import Citeproc.CslJson (CslJson)
+import Citeproc.Style
+  ( parseStyle,
+  )
+import Citeproc.Types qualified as CP
+import Data.Aeson (eitherDecodeStrictText)
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( Archive (Archive, objects, symbolPath, symbols),
+  ( Archive (Archive, bibs, csls, objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
     Cell
@@ -41,7 +47,7 @@ import Lilac.Types
     MathFragment (meta),
     OID,
     Object (Object, externalOids, orgDoc, symbols),
-    OrgDoc (cells, oid),
+    OrgDoc (bibPaths, cells, cslPath, oid),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose (unProse),
     Table (grid, meta),
@@ -58,15 +64,19 @@ import Relude
     String,
     Text,
     catMaybes,
+    concat,
     concatMap,
     elem,
     fmap,
     foldl',
     foldlM,
     fromList,
+    fst,
     intercalate,
     length,
     map,
+    mapM,
+    maybeToList,
     mempty,
     otherwise,
     pure,
@@ -77,6 +87,7 @@ import Relude
     ($),
     (.),
     (/=),
+    (<$>),
     (<>),
     (=<<),
     (>),
@@ -140,25 +151,39 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
               ]
           | otherwise = []
 
-mkArchive :: [(GPath, Object)] -> Either String Archive
-mkArchive pathObjs =
+mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
+mkArchive pathObjs = do
   let (objects, symbols, symbolPath) =
         foldl' concatObjs (mempty, mempty, mempty) pathObjs
       brokenLinks = findBrokenLinks objects symbols
-   in if
-        | brokenLinks /= [] ->
-            Left
-              $ "Found broken links:\n"
-              <> intercalate
-                "\n"
-                (map showBrokenLink brokenLinks)
-        | otherwise ->
-            Right
-              Archive
-                { objects = objects,
-                  symbols = symbols,
-                  symbolPath = symbolPath
-                }
+  allBibPaths <-
+    concat
+      <$> mapM (\(gp, o) -> makeRelativeToObjectPath gp o.orgDoc.bibPaths) pathObjs
+  allCslPaths <-
+    concat
+      <$> mapM (\(gp, o) -> makeRelativeToObjectPath gp $ maybeToList o.orgDoc.cslPath) pathObjs
+  bibContents <- getBibliographies allBibPaths
+  let bibs = zip allBibPaths bibContents
+  cslRawXMLs <- map fst <$> getCitationStyles allCslPaths
+  let csls = zip allCslPaths cslRawXMLs
+  if
+    | brokenLinks /= [] ->
+        pure
+          . Left
+          $ "Found broken links:\n"
+          <> intercalate
+            "\n"
+            (map showBrokenLink brokenLinks)
+    | otherwise ->
+        pure
+          $ Right
+            Archive
+              { objects = objects,
+                symbols = symbols,
+                symbolPath = symbolPath,
+                csls = fromList csls,
+                bibs = fromList bibs
+              }
   where
     concatObjs ::
       (Map GPath Object, Map LinkOid Cell, Map LinkOid GPath) ->
@@ -295,3 +320,50 @@ findExternalOids orgDoc =
       LinkTargetFilePath {}
       LinkTargetURI {} -> acc
     symbols = mkSymbols orgDoc
+
+getCitationStyles :: [FilePath] -> IO [(Text, CP.Style (CslJson Text))]
+getCitationStyles filePaths = mapM getCitationStyle filePaths
+
+getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))
+getCitationStyle filePath = do
+  p <- P.encodeUtf filePath
+  input <- LU.readFileRobustly p
+  case citationStyleParser input of
+    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
+    Right style -> pure (input, style)
+
+citationStyleParser :: Text -> Either String (CP.Style (CslJson Text))
+citationStyleParser input = do
+  result <- parseStyle (\_ -> pure mempty) input
+  case result of
+    Left citeprocError -> Left $ show citeprocError
+    Right style -> Right style
+
+getBibliographies :: [FilePath] -> IO [CP.Reference (CslJson Text)]
+getBibliographies filePaths = do
+  bibs <- mapM getBibliography filePaths
+  pure $ concat bibs
+
+getBibliography :: FilePath -> IO [CP.Reference (CslJson Text)]
+getBibliography filePath = do
+  p <- P.encodeUtf filePath
+  input <- LU.readFileRobustly p
+  case bibliographyParser input of
+    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
+    Right references -> pure references
+
+bibliographyParser :: Text -> Either String [CP.Reference (CslJson Text)]
+bibliographyParser = eitherDecodeStrictText
+
+makeRelativeToObjectPath :: GPath -> [FilePath] -> IO [FilePath]
+makeRelativeToObjectPath objGPath fps = do
+  let objPath = decodeGPath objGPath
+  objOsp <- P.encodeUtf objPath
+  let objDir = P.takeDirectory objOsp
+  mapM (f objDir) fps
+  where
+    f :: P.OsPath -> FilePath -> IO FilePath
+    f objDir fp = do
+      p <- P.encodeUtf fp
+      let relPath = P.combine objDir p
+      P.decodeUtf relPath

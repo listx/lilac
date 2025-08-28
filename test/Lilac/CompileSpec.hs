@@ -46,18 +46,21 @@ expectArchiveError :: [FilePath] -> String -> Spec
 expectArchiveError paths expected = do
   it (show paths) $ do
     pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-    LC.mkArchive pathObjs `shouldBe` (Left expected)
+    maybeArchive <- LC.mkArchive pathObjs
+    maybeArchive `shouldBe` (Left expected)
 
 expectArchiveOk :: [FilePath] -> Spec
 expectArchiveOk paths = do
   it (show paths) $ do
     pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-    LC.mkArchive pathObjs `shouldSatisfy` isRight
+    maybeArchive <- LC.mkArchive pathObjs
+    maybeArchive `shouldSatisfy` isRight
 
 checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
 checkCycles paths expectedCycles = do
   pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-  case LC.mkArchive pathObjs of
+  maybeArchive <- runIO $ LC.mkArchive pathObjs
+  case maybeArchive of
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do
       (LC.findCycles archive) `shouldBe` expectedCycles

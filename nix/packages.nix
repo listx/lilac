@@ -137,7 +137,7 @@ let
       ormolu = {
         enable = true;
         package = devShellEnv;
-        entry = let opts = [ "--mode" "inplace" "--check-idempotence" ];
+        entry = let opts = [ "--mode" "check" "--check-idempotence" ];
         in "${devShellEnv}/bin/ormolu ${toolOpts opts}";
       };
 

@@ -22,7 +22,8 @@ spec = tangleSpec
 checkExpansion :: [FilePath] -> [(FilePath, Text)] -> Spec
 checkExpansion paths expectedExpansions = do
   pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/TangleSpec/" paths
-  case LC.mkArchive pathObjs of
+  maybeArchive <- runIO $ LC.mkArchive pathObjs
+  case maybeArchive of
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do
       (LT.expandRootBlocks archive mempty)

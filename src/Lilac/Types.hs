@@ -44,6 +44,8 @@ module Lilac.Types
   )
 where
 
+import Citeproc.CslJson (CslJson)
+import Citeproc.Types qualified as CP
 import Data.Aeson
   ( FromJSON,
     FromJSONKey,
@@ -531,7 +533,9 @@ type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object,
     symbols :: Map LinkOid Cell,
-    symbolPath :: Map LinkOid GPath
+    symbolPath :: Map LinkOid GPath,
+    csls :: Map FilePath Text,
+    bibs :: Map FilePath (CP.Reference (CslJson Text))
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
