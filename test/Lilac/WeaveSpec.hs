@@ -1,21 +1,34 @@
 module Lilac.WeaveSpec (spec) where
 
+import Citeproc
+  ( Result (resultBibliography, resultCitations, resultWarnings),
+  )
+import Citeproc qualified as CP
 import Data.Text qualified as T
 import Lilac.Compile qualified as LC
+import Lilac.Parse (styleMaskFrom)
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( WeaveConf (WeaveConf, archive, originObjectPath, watch),
+  ( Link (Link, name, target),
+    LinkTarget (LinkTargetURI),
+    PToken (PTokenLink, PTokenStyledText),
+    Prose (Prose, unProse),
+    Style (Italic),
+    StyledText (StyledText, body, style),
+    WeaveConf (WeaveConf, archive, citeprocResult, originObjectPath, watch),
     defaultOrgParserState,
     encodeGPath,
     nilOidOrgDoc,
   )
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
+import Network.URI qualified as N
 import Relude
   ( Bool (True),
     Either (Left, Right),
     FilePath,
     IO,
+    Maybe (Just, Nothing),
     String,
     Text,
     foldl',
@@ -29,6 +42,7 @@ import Relude
     show,
     ($),
     (.),
+    (<$>),
     (<>),
     (==),
   )
@@ -65,10 +79,12 @@ getWovenPrettyFromPath path = do
       case maybeArchive of
         Left errMsg -> pure $ Left errMsg
         Right archive -> do
+          result <- LW.prepareCitations inputOrgFileGPath object archive
           let weaveConf =
                 WeaveConf
                   { archive = archive,
                     originObjectPath = inputOrgFileGPath,
+                    citeprocResult = result,
                     watch = True
                   }
           pure
@@ -112,6 +128,39 @@ weaveExpect path needles = do
       Right haystack -> do
         let (name, expectations) = searchOrderedNeedles haystack needles
         it name $ sequence_ expectations
+      Left errMsg -> it "programmer error" $ expectationFailure errMsg
+
+getCiteprocResultFromPath :: FilePath -> IO (Either String (CP.Result Prose))
+getCiteprocResultFromPath path = do
+  inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
+  inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser defaultOrgParserState)
+          path
+          (nilOidOrgDoc <> inputOrgFile)
+  case parseResult of
+    Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) -> do
+      object <- LC.mkObject orgDoc
+      maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
+      case maybeArchive of
+        Left errMsg -> pure $ Left errMsg
+        Right archive ->
+          Right <$> LW.prepareCitations inputOrgFileGPath object archive
+
+expectCiteprocResult :: FilePath -> CP.Result Prose -> Spec
+expectCiteprocResult path expected = do
+  result <- runIO $ getCiteprocResultFromPath path
+  describe path $ do
+    case result of
+      Right got -> do
+        it "citations" $ do
+          got.resultCitations `shouldBe` expected.resultCitations
+        it "bibliography" $ do
+          got.resultBibliography `shouldBe` expected.resultBibliography
+        it "warnings" $ do
+          got.resultWarnings `shouldBe` expected.resultWarnings
       Left errMsg -> it "programmer error" $ expectationFailure errMsg
 
 weaveSpec :: Spec
@@ -191,3 +240,226 @@ weaveSpec = do
         ("base/a/b/from.html", "base/a/c/to.html7", "../c/to.html7"),
         ("base/a/b/c/d/from.html", "base/a/x/y/to.html8", "../../../x/y/to.html8")
       ]
+
+  expectCiteprocResult
+    "0400-citeproc-basic"
+    CP.Result
+      { resultCitations =
+          [ Prose
+              { unProse =
+                  [ PTokenLink
+                      Link
+                        { name =
+                            [ StyledText {body = "[", style = styleMaskFrom []},
+                              StyledText {body = "1", style = styleMaskFrom []},
+                              StyledText {body = "]", style = styleMaskFrom []}
+                            ],
+                          target =
+                            LinkTargetURI
+                              N.URI
+                                { N.uriScheme = "",
+                                  N.uriAuthority = Nothing,
+                                  N.uriPath = "#ref-a",
+                                  N.uriQuery = "",
+                                  N.uriFragment = ""
+                                }
+                        },
+                    PTokenStyledText
+                      StyledText
+                        { body = ", ",
+                          style = styleMaskFrom []
+                        },
+                    PTokenLink
+                      Link
+                        { name =
+                            [ StyledText {body = "[", style = styleMaskFrom []},
+                              StyledText {body = "2", style = styleMaskFrom []},
+                              StyledText {body = "]", style = styleMaskFrom []}
+                            ],
+                          target =
+                            LinkTargetURI
+                              N.URI
+                                { N.uriScheme = "",
+                                  N.uriAuthority = Nothing,
+                                  N.uriPath = "#ref-b",
+                                  N.uriQuery = "",
+                                  N.uriFragment = ""
+                                }
+                        },
+                    PTokenStyledText StyledText {body = ", ", style = styleMaskFrom []},
+                    PTokenLink
+                      Link
+                        { name =
+                            [ StyledText {body = "[", style = styleMaskFrom []},
+                              StyledText {body = "3", style = styleMaskFrom []},
+                              StyledText {body = "]", style = styleMaskFrom []}
+                            ],
+                          target =
+                            LinkTargetURI
+                              N.URI
+                                { N.uriScheme = "",
+                                  N.uriAuthority = Nothing,
+                                  N.uriPath = "#ref-c",
+                                  N.uriQuery = "",
+                                  N.uriFragment = ""
+                                }
+                        },
+                    PTokenStyledText StyledText {body = ", ", style = styleMaskFrom []},
+                    PTokenLink
+                      Link
+                        { name =
+                            [ StyledText {body = "[", style = styleMaskFrom []},
+                              StyledText {body = "4", style = styleMaskFrom []},
+                              StyledText {body = "]", style = styleMaskFrom []}
+                            ],
+                          target =
+                            LinkTargetURI
+                              N.URI
+                                { N.uriScheme = "",
+                                  N.uriAuthority = Nothing,
+                                  N.uriPath = "#ref-d",
+                                  N.uriQuery = "",
+                                  N.uriFragment = ""
+                                }
+                        }
+                  ]
+              }
+          ],
+        resultBibliography =
+          [ ( "a",
+              Prose
+                { unProse =
+                    [ PTokenStyledText StyledText {body = "[1]D. E. Knuth, ", style = styleMaskFrom []},
+                      PTokenStyledText StyledText {body = "Literate programming", style = styleMaskFrom [Italic]},
+                      PTokenStyledText StyledText {body = ". in CSLI lecture notes, no. no. 27. Stanford, Calif.: Center for the Study of Language; Information, 1992.", style = styleMaskFrom []}
+                    ]
+                }
+            ),
+            ( "b",
+              Prose
+                { unProse =
+                    [ PTokenStyledText (StyledText {body = "[2]E. W. Dijkstra, \8220Letters to the editor: Go to statement considered harmful,\8221 ", style = styleMaskFrom []}),
+                      PTokenStyledText (StyledText {body = "Communications of the ACM", style = styleMaskFrom [Italic]}),
+                      PTokenStyledText (StyledText {body = ", vol. 11, no. 3, pp. 147\8211\&148, Mar. 1968, doi: ", style = styleMaskFrom []}),
+                      PTokenLink
+                        Link
+                          { name =
+                              [ StyledText {body = "10", style = styleMaskFrom []},
+                                StyledText {body = ".", style = styleMaskFrom []},
+                                StyledText {body = "1145", style = styleMaskFrom []},
+                                StyledText {body = "/", style = styleMaskFrom []},
+                                StyledText {body = "362929", style = styleMaskFrom []},
+                                StyledText {body = ".", style = styleMaskFrom []},
+                                StyledText {body = "362947", style = styleMaskFrom []}
+                              ],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "https:",
+                                    N.uriAuthority =
+                                      Just
+                                        N.URIAuth
+                                          { N.uriUserInfo = "",
+                                            N.uriRegName = "doi.org",
+                                            N.uriPort = ""
+                                          },
+                                    N.uriPath = "/10.1145/362929.362947",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          },
+                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+                    ]
+                }
+            ),
+            ( "c",
+              Prose
+                { unProse =
+                    [ PTokenStyledText StyledText {body = "[3]A. M. Turing, \8220On Computable Numbers, with an Application to the Entscheidungsproblem,\8221 ", style = styleMaskFrom []},
+                      PTokenStyledText StyledText {body = "Proceedings of the London Mathematical Society", style = styleMaskFrom [Italic]},
+                      PTokenStyledText StyledText {body = ", vol. s2\8211\&42, no. 1, pp. 230\8211\&265, 1937, doi: ", style = styleMaskFrom []},
+                      PTokenLink
+                        Link
+                          { name =
+                              [ StyledText {body = "10", style = styleMaskFrom []},
+                                StyledText {body = ".", style = styleMaskFrom []},
+                                StyledText {body = "1112", style = styleMaskFrom []},
+                                StyledText {body = "/", style = styleMaskFrom []},
+                                StyledText {body = "plms", style = styleMaskFrom []},
+                                StyledText {body = "/", style = styleMaskFrom []},
+                                StyledText {body = "s2", style = styleMaskFrom []},
+                                StyledText {body = "-", style = styleMaskFrom []},
+                                StyledText {body = "42", style = styleMaskFrom []},
+                                StyledText {body = ".", style = styleMaskFrom []},
+                                StyledText {body = "1", style = styleMaskFrom []},
+                                StyledText {body = ".", style = styleMaskFrom []},
+                                StyledText {body = "230", style = styleMaskFrom []}
+                              ],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "https:",
+                                    N.uriAuthority =
+                                      Just
+                                        N.URIAuth
+                                          { N.uriUserInfo = "",
+                                            N.uriRegName = "doi.org",
+                                            N.uriPort = ""
+                                          },
+                                    N.uriPath = "/10.1112/plms/s2-42.1.230",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          },
+                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+                    ]
+                }
+            ),
+            ( "d",
+              Prose
+                { unProse =
+                    [ PTokenStyledText StyledText {body = "[4]C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 ", style = styleMaskFrom []},
+                      PTokenStyledText StyledText {body = "Bell System Technical Journal", style = styleMaskFrom [Italic]},
+                      PTokenStyledText StyledText {body = ", vol. 27, no. 3, pp. 379\8211\&423, July 1948, doi: ", style = styleMaskFrom []},
+                      PTokenLink
+                        Link
+                          { name =
+                              [ StyledText {body = "10", style = styleMaskFrom []},
+                                StyledText {body = ".", style = styleMaskFrom []},
+                                StyledText {body = "1002", style = styleMaskFrom []},
+                                StyledText {body = "/", style = styleMaskFrom []},
+                                StyledText {body = "j", style = styleMaskFrom []},
+                                StyledText {body = ".", style = styleMaskFrom []},
+                                StyledText {body = "1538", style = styleMaskFrom []},
+                                StyledText {body = "-", style = styleMaskFrom []},
+                                StyledText {body = "7305", style = styleMaskFrom []},
+                                StyledText {body = ".", style = styleMaskFrom []},
+                                StyledText {body = "1948", style = styleMaskFrom []},
+                                StyledText {body = ".", style = styleMaskFrom []},
+                                StyledText {body = "tb01338", style = styleMaskFrom []},
+                                StyledText {body = ".", style = styleMaskFrom []},
+                                StyledText {body = "x", style = styleMaskFrom []}
+                              ],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "https:",
+                                    N.uriAuthority =
+                                      Just
+                                        N.URIAuth
+                                          { N.uriUserInfo = "",
+                                            N.uriRegName = "doi.org",
+                                            N.uriPort = ""
+                                          },
+                                    N.uriPath = "/10.1002/j.1538-7305.1948.tb01338.x",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          },
+                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+                    ]
+                }
+            )
+          ],
+        resultWarnings = []
+      }

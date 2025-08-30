@@ -1,19 +1,53 @@
 module Lilac.Weave
   ( commonPrefix,
     getRelativePathWithoutSymlinks,
+    prepareCitations,
     renderAsText,
     weaveObject,
   )
 where
 
-import Citeproc (citeproc)
+import Citeproc
+  ( Result (resultBibliography, resultCitations),
+  )
+import Citeproc qualified as CP
+import Citeproc.CslJson
+  ( CslJson
+      ( CslBaseline,
+        CslBold,
+        CslConcat,
+        CslDiv,
+        CslEmpty,
+        CslItalic,
+        CslLink,
+        CslNoCase,
+        CslNoDecoration,
+        CslNormal,
+        CslQuoted,
+        CslSmallCaps,
+        CslSub,
+        CslSup,
+        CslText,
+        CslUnderline
+      ),
+    parseCslJson,
+  )
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
-import Lilac.Parse (isNumericText, maskToStyles, tableHorizontalLine)
+import Lilac.Compile (makeRelativeToObjectPath, parseCitationStyle)
+import Lilac.Parse
+  ( compressProse,
+    isNumericText,
+    maskToStyles,
+    styleMaskFrom,
+    tableHorizontalLine,
+    unparseLink,
+    unparseMathFragment,
+  )
 import Lilac.Types
-  ( Archive (objects, symbolPath, symbols),
+  ( Archive (bibs, csls, objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell
@@ -27,8 +61,11 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
+    Citation (cites, noteNumber, prefix, styleVariation, suffix),
+    Cite (id, locator, prefix, suffix),
     Figure (caption, link, meta),
     Footnote (body, name),
+    GPath,
     Heading (body, level, section),
     Link (Link, name, target),
     LinkTarget
@@ -47,13 +84,13 @@ import Lilac.Types
       ),
     MathFragment (body, meta),
     Object (orgDoc, symbols),
-    OrgDoc (cells, footnoteNumbers, meta),
+    OrgDoc (bibPaths, cells, citations, cslPath, footnoteNumbers, meta),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose (Prose, unProse),
     Style (Bold, Code, Italic, Underline, Verbatim),
-    StyledText (body, style),
+    StyledText (StyledText, body, style),
     Table (caption, grid, meta),
-    WeaveConf (archive, originObjectPath, watch),
+    WeaveConf (archive, citeprocResult, originObjectPath, watch),
     decodeGPath,
     markingChars,
     markingCharsInvisible,
@@ -109,11 +146,17 @@ import Lucid
     width_,
   )
 import Lucid.Base (hoistHtmlT)
+import Network.URI
+  ( uriAuthority,
+    uriPath,
+    uriScheme,
+  )
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Either (Right),
     Eq,
+    IO,
     Identity,
     Int,
     Maybe (Just, Nothing),
@@ -124,6 +167,8 @@ import Relude
     any,
     ask,
     catMaybes,
+    concat,
+    concatMap,
     drop,
     dropWhile,
     filter,
@@ -135,11 +180,16 @@ import Relude
     fst,
     id,
     isJust,
+    isPrefixOf,
     length,
+    listToMaybe,
     map,
     max,
     maxBound,
     maybe,
+    maybeAt,
+    maybeToList,
+    mempty,
     not,
     notElem,
     null,
@@ -161,6 +211,7 @@ import Relude
     (+),
     (-),
     (.),
+    (/=),
     (<$>),
     (<>),
     (=<<),
@@ -272,7 +323,7 @@ weaveCell = \case
   CFigure figure -> weaveFigure figure
   CTable table -> weaveTable table
   CFootnote footnote -> weaveFootnote footnote
-  CBibliography _ -> "PRINT BIBLIOGRAPHY HERE"
+  CBibliography _ -> weaveBibliography
 
 toSafeHtmlId :: Text -> Text
 toSafeHtmlId = T.map onlyKeepSomeChars
@@ -406,14 +457,19 @@ weavePToken = \case
     LinkTargetFilePath {}
     LinkTargetURI {} -> weaveLink link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
-  PTokenCitation {} -> "CITATION"
+  PTokenCitation n -> weaveCitation n
 
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
   LinkTargetOid {} -> False
   LinkTargetFootnote {} -> False
   LinkTargetFilePath {} -> True
-  LinkTargetURI {} -> True
+  LinkTargetURI uri
+    | "" <- uri.uriScheme,
+      Nothing <- uri.uriAuthority,
+      "#ref-" `isPrefixOf` uri.uriPath ->
+        False
+    | otherwise -> True
 
 weaveStyledText :: StyledText -> HtmlWeaver ()
 weaveStyledText styledText = do
@@ -768,3 +824,195 @@ renderAsText weaveConf weaver =
   TL.toStrict
     . renderText
     $ hoistHtmlT (flip runReaderT weaveConf) weaver
+
+proseToCslJsonText :: Prose -> CslJson Text
+proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
+  where
+    f :: CslJson Text -> PToken -> CslJson Text
+    f acc pToken = case pToken of
+      PTokenStyledText styledText ->
+        let styles = maskToStyles styledText.style
+            body = parseCslJson mempty styledText.body
+         in acc <> applyStyles body styles
+      PTokenLink link ->
+        let encoded = CslLink ("LILAC_LINK\NUL" <> unparseLink link) CslEmpty
+         in acc <> encoded
+      PTokenMathFragment mathFragment ->
+        let encoded = CslDiv ("LILAC_MATH_FRAGMENT\NUL" <> unparseMathFragment mathFragment) CslEmpty
+         in acc <> encoded
+      PTokenCitation {} -> acc
+    applyStyles :: CslJson Text -> [Style] -> CslJson Text
+    applyStyles cslBody styles = foldl' applyStyle cslBody styles
+    applyStyle :: CslJson Text -> Style -> CslJson Text
+    applyStyle acc = \case
+      Bold -> CslBold acc
+      Italic -> CslItalic acc
+      Underline -> CslUnderline acc
+      Verbatim -> CslDiv "LILAC_STYLE_VERBATIM\NUL" acc
+      Code -> CslDiv "LILAC_STYLE_CODE\NUL" acc
+
+proseToMaybeCslJsonText :: Prose -> Maybe (CslJson Text)
+proseToMaybeCslJsonText prose =
+  case proseToCslJsonText prose of
+    CslEmpty -> Nothing
+    cslJson -> Just cslJson
+
+citationToCiteprocCitation :: Citation -> CP.Citation (CslJson Text)
+citationToCiteprocCitation citation =
+  CP.Citation
+    { CP.citationId = Nothing,
+      CP.citationNoteNumber = citation.noteNumber,
+      CP.citationPrefix = proseToMaybeCslJsonText citation.prefix,
+      CP.citationSuffix = proseToMaybeCslJsonText citation.suffix,
+      CP.citationItems = concatMap (citeToCiteprocCitationItems sv) citation.cites
+    }
+  where
+    (sv, _) = citation.styleVariation
+
+citeToCiteprocCitationItems :: Maybe Text -> Cite -> [CP.CitationItem (CslJson Text)]
+citeToCiteprocCitationItems sv cite =
+  let citationItem =
+        CP.CitationItem
+          { CP.citationItemId = CP.ItemId cite.id,
+            CP.citationItemLabel = term,
+            CP.citationItemLocator = coord,
+            CP.citationItemType = CP.NormalCite,
+            CP.citationItemPrefix = proseToMaybeCslJsonText cite.prefix,
+            CP.citationItemSuffix = proseToMaybeCslJsonText cite.suffix,
+            CP.citationItemData = Nothing
+          }
+   in if
+        | Just "t" <- sv ->
+            [ citationItem
+                { CP.citationItemType = CP.AuthorOnly,
+                  CP.citationItemSuffix = Nothing
+                },
+              citationItem
+                { CP.citationItemType = CP.SuppressAuthor,
+                  CP.citationItemPrefix = Nothing
+                }
+            ]
+        | Just "na" <- sv ->
+            [citationItem {CP.citationItemType = CP.SuppressAuthor}]
+        | otherwise -> [citationItem]
+  where
+    (term, coord) = case cite.locator of
+      Just (t, c) -> (Just t, Just c)
+      Nothing -> (Nothing, Nothing)
+
+cslJsonTextToProse :: CslJson Text -> Prose
+cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
+  where
+    f :: [Style] -> CslJson Text -> [PToken]
+    f s = \case
+      CslEmpty -> []
+      CslText t -> [PTokenStyledText StyledText {body = t, style = styleMaskFrom s}]
+      CslConcat a CslEmpty -> f s a
+      CslConcat (CslConcat a b) c -> f s (CslConcat a (CslConcat b c))
+      CslConcat a b -> f s a <> f s b
+      CslQuoted a -> f s a
+      CslItalic a -> f (Italic : s) a
+      CslNormal a -> f [] a
+      CslBold a -> f (Bold : s) a
+      CslUnderline a -> f (Underline : s) a
+      CslNoDecoration a -> f (filter (/= Underline) s) a
+      CslSmallCaps a -> f s a
+      CslBaseline a -> f s a
+      CslSup a -> f s a
+      CslSub a -> f s a
+      CslNoCase a -> f s a
+      CslDiv t a
+        | t == "LILAC_STYLE_CODE\NUL" -> f (Code : s) a
+        | t == "LILAC_STYLE_VERBATIM\NUL" -> f (Verbatim : s) a
+        | "LILAC_MATH_FRAGMENT\NUL" `T.isPrefixOf` t ->
+            (CP.fromText (T.drop 20 t) :: Prose).unProse
+        | otherwise -> f s a
+      CslLink t a
+        | "LILAC_LINK\NUL" `T.isPrefixOf` t ->
+            (CP.fromText (T.drop 11 t) :: Prose).unProse
+        | "#ref-" `T.isPrefixOf` t ->
+            let uri =
+                  N.URI
+                    { N.uriScheme = "",
+                      N.uriAuthority = Nothing,
+                      N.uriPath = T.unpack t,
+                      N.uriQuery = "",
+                      N.uriFragment = ""
+                    }
+                target = LinkTargetURI uri
+                name = getStyledText $ f s a
+             in [PTokenLink Link {target = target, name = name}]
+        | otherwise -> case (N.parseURI $ T.unpack t) of
+            Nothing -> []
+            Just uri ->
+              let target = LinkTargetURI uri
+                  name = getStyledText $ f s a
+               in [PTokenLink Link {target = target, name = name}]
+    getStyledText [] = []
+    getStyledText (pToken : rest) = case pToken of
+      PTokenStyledText styledText -> styledText : getStyledText rest
+      PTokenLink {}
+      PTokenMathFragment {}
+      PTokenCitation {} -> []
+
+prepareCitations :: GPath -> Object -> Archive -> IO (CP.Result Prose)
+prepareCitations objGPath object archive = do
+  bibPathsRelative <- makeRelativeToObjectPath objGPath object.orgDoc.bibPaths
+  cslPathRelative <- listToMaybe <$> (makeRelativeToObjectPath objGPath $ maybeToList object.orgDoc.cslPath)
+  let bibRefsFromOrgDoc =
+        concat
+          . catMaybes
+          $ map (\bp -> lookup bp archive.bibs) bibPathsRelative
+      CP.Result citations bibliography warnings =
+        f bibRefsFromOrgDoc cslPathRelative
+      resultWithProse =
+        CP.Result
+          { CP.resultCitations = map cslJsonTextToProse citations,
+            CP.resultBibliography = map (\(k, cslJsonText) -> (k, cslJsonTextToProse cslJsonText)) bibliography,
+            CP.resultWarnings = warnings
+          }
+  pure resultWithProse
+  where
+    citeprocOptions =
+      CP.CiteprocOptions
+        { linkCitations = True,
+          linkBibliography = True
+        }
+    blankResult :: CP.Result (CslJson Text)
+    blankResult =
+      CP.Result
+        { CP.resultCitations = [],
+          CP.resultBibliography = [],
+          CP.resultWarnings = ["BLANK CITATION RESULT"]
+        }
+    f bibRefs cslPathRelative
+      | Just cslPath' <- cslPathRelative,
+        Just rawXML <- lookup cslPath' archive.csls,
+        Right citeprocStyle <- parseCitationStyle rawXML =
+          CP.citeproc
+            citeprocOptions
+            citeprocStyle
+            Nothing
+            bibRefs
+            (map citationToCiteprocCitation object.orgDoc.citations)
+      | otherwise = blankResult
+
+weaveCitation :: Int -> HtmlWeaver ()
+weaveCitation n = do
+  weaveConf <- ask
+  let result = weaveConf.citeprocResult
+      citations = result.resultCitations
+  case maybeAt n citations of
+    Just prose -> span_ [class_ "citation"] $ weaveProse prose
+    Nothing -> pure ()
+
+weaveBibliography :: HtmlWeaver ()
+weaveBibliography = do
+  weaveConf <- ask
+  let result = weaveConf.citeprocResult
+      bibliography = result.resultBibliography
+  div_ [class_ "bibliography"] $ do
+    forM_ bibliography $ \(key, prose) -> do
+      div_ [class_ "bib-ref"] $ do
+        let linkAnchor = "ref-" <> key
+        p_ [id_ linkAnchor] $ weaveProse prose

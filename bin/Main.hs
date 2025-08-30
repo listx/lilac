@@ -11,7 +11,7 @@ import Lilac.Types
   ( Archive (objects),
     GPath,
     Object,
-    WeaveConf (WeaveConf, archive, originObjectPath, watch),
+    WeaveConf (WeaveConf, archive, citeprocResult, originObjectPath, watch),
     decodeGPath,
     defaultOrgParserState,
     encodeGPath,
@@ -447,16 +447,18 @@ lilacWeave weaveOpts = do
 
 weaveToDisk :: WeaveOpts -> Archive -> [IO ()] -> GPath -> Object -> [IO ()]
 weaveToDisk weaveOpts archive acc objPath obj =
-  let weaveConf =
-        WeaveConf
-          { archive = archive,
-            originObjectPath = objPath,
-            watch = weaveOpts.watch
-          }
-      fp = decodeGPath objPath
+  let fp = decodeGPath objPath
       ext = P.unsafeEncodeUtf "html"
       outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
-      action =
+      action = do
+        result <- LW.prepareCitations objPath obj archive
+        let weaveConf =
+              WeaveConf
+                { archive = archive,
+                  originObjectPath = objPath,
+                  citeprocResult = result,
+                  watch = weaveOpts.watch
+                }
         LU.writeFileRobustly outPath
           . LW.renderAsText weaveConf
           $ LW.weaveObject obj

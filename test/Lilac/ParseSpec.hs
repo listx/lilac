@@ -39,7 +39,7 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
-    Citation (Citation, cites, prefix, styleVariation, suffix),
+    Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
     Figure (Figure, caption, link, meta),
     Footnote (Footnote, body, name),
@@ -2975,6 +2975,7 @@ parseSpec = do
         citations =
           [ Citation
               { styleVariation = (Just "v1", Just "v2"),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "foo123-.:?!`'/*@+|(){}<>&_^$#%~",
@@ -3020,6 +3021,7 @@ parseSpec = do
         citations =
           [ Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "a",
@@ -3033,6 +3035,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "b",
@@ -3046,6 +3049,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "c",
@@ -3059,6 +3063,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "d",
@@ -3072,6 +3077,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "e",
@@ -3085,6 +3091,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "f",
@@ -3130,6 +3137,7 @@ parseSpec = do
         citations =
           [ Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "a1",
@@ -3157,6 +3165,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "b1",
@@ -3190,6 +3199,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "c1",
@@ -3210,6 +3220,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "d1",
@@ -3242,6 +3253,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "e1",
@@ -3267,6 +3279,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "f1",
@@ -3341,6 +3354,7 @@ parseSpec = do
         citations =
           [ Citation
               { styleVariation = (Nothing, Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "a1",
@@ -3378,6 +3392,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Just "t", Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "source1",
@@ -3416,6 +3431,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Just "t", Nothing),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "foo",
@@ -3449,6 +3465,7 @@ parseSpec = do
               },
             Citation
               { styleVariation = (Just "a", Just "f"),
+                noteNumber = Nothing,
                 cites =
                   [ Cite
                       { id = "@atkey",

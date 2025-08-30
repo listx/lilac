@@ -182,6 +182,7 @@ data OrgParserState = OrgParserState
     footnoteNumber :: Int,
     footnoteNumbers :: Map Text Int,
     footnoteDefinitions :: Map Text Prose,
+    insideFootnoteDefinition :: Maybe Text,
     prevCellIsFootnote :: Bool,
     tanglePaths :: Set Text,
     cslPath :: Maybe FilePath,
@@ -220,6 +221,7 @@ defaultOrgParserState =
       footnoteNumber = 0,
       footnoteNumbers = M.empty,
       footnoteDefinitions = M.empty,
+      insideFootnoteDefinition = Nothing,
       prevCellIsFootnote = False,
       tanglePaths = Set.empty,
       cslPath = Nothing,
@@ -253,7 +255,8 @@ interleaved tests are executed), take a look at the [[id:ebf0d269-79d3-408a-a6e7
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Lilac.Parse
-  ( defaultOrgDoc,
+  ( compressProse,
+    defaultOrgDoc,
     defaultOrgParserConf,
     genHeadingSection,
     genHeadingOidStack,
@@ -261,7 +264,10 @@ module Lilac.Parse
     maskToStyles,
     orgDocParser,
     parseOrgDoc,
+    styleMaskFrom,
     tableHorizontalLine,
+    unparseLink,
+    unparseMathFragment,
     validateOidText,
   )
 where
@@ -353,7 +359,7 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
-    Citation (Citation, cites, prefix, styleVariation, suffix),
+    Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
     Figure (Figure, caption, link, meta),
     Footnote (Footnote, body, name),
@@ -426,6 +432,7 @@ import Lilac.Types as OrgParserState
         insideCitation,
         insideCitePrefix,
         insideCodeBlock,
+        insideFootnoteDefinition,
         insideHeading,
         insideLinkDisplayName,
         listLevels,
@@ -4634,6 +4641,7 @@ footnoteDefinitionParser :: OrgParser Cell
 footnoteDefinitionParser = do
   name <- footnoteReferenceParser
   _ <- spaces
+  modify (\s -> s {insideFootnoteDefinition = Just name})
   (CParagraph prose) <- paragraphParser
   orgParserState <- get
   o <- MP.getOffset
@@ -4648,7 +4656,8 @@ footnoteDefinitionParser = do
     ( \s ->
         s
           { footnoteDefinitions =
-              insert name prose orgParserState.footnoteDefinitions
+              insert name prose orgParserState.footnoteDefinitions,
+            insideFootnoteDefinition = Nothing
           }
     )
   pure $ CFootnote Footnote {name = name, body = prose}
@@ -5188,6 +5197,7 @@ type Citation :: Type
 data Citation = Citation
   { styleVariation :: (Maybe Text, Maybe Text),
     cites :: [Cite],
+    noteNumber :: Maybe Int,
     prefix :: Prose,
     suffix :: Prose
   }
@@ -5256,9 +5266,13 @@ citationParser = do
       pure p
   _ <- MP.optional intraCellWhitespaceParser
   _ <- char ']'
-  let c =
+  let maybeNoteNumber = do
+        footnoteName <- orgParserState.insideFootnoteDefinition
+        lookup footnoteName orgParserState.footnoteNumbers
+      c =
         Citation
           { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
+            noteNumber = maybeNoteNumber,
             cites = cites,
             prefix = fromMaybe (Prose []) citationPrefix,
             suffix = fromMaybe (Prose []) citationSuffix
@@ -5601,6 +5615,7 @@ ps
       citations =
         [ Citation
             { styleVariation = (Just "v1", Just "v2"),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "foo123-.:?!`'/*@+|(){}<>&_^$#%~",
@@ -5658,6 +5673,7 @@ ps
       citations =
         [ Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "a",
@@ -5671,6 +5687,7 @@ ps
             },
           Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "b",
@@ -5684,6 +5701,7 @@ ps
             },
           Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "c",
@@ -5697,6 +5715,7 @@ ps
             },
           Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "d",
@@ -5710,6 +5729,7 @@ ps
             },
           Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "e",
@@ -5723,6 +5743,7 @@ ps
             },
           Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "f",
@@ -5790,6 +5811,7 @@ ps
       citations =
         [ Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "a1",
@@ -5817,6 +5839,7 @@ ps
             },
           Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "b1",
@@ -5850,6 +5873,7 @@ ps
             },
           Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "c1",
@@ -5870,6 +5894,7 @@ ps
             },
           Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "d1",
@@ -5902,6 +5927,7 @@ ps
             },
           Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "e1",
@@ -5927,6 +5953,7 @@ ps
             },
           Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "f1",
@@ -6027,6 +6054,7 @@ ps
       citations =
         [ Citation
             { styleVariation = (Nothing, Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "a1",
@@ -6064,6 +6092,7 @@ ps
             },
           Citation
             { styleVariation = (Just "t", Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "source1",
@@ -6102,6 +6131,7 @@ ps
             },
           Citation
             { styleVariation = (Just "t", Nothing),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "foo",
@@ -6135,6 +6165,7 @@ ps
             },
           Citation
             { styleVariation = (Just "a", Just "f"),
+              noteNumber = Nothing,
               cites =
                 [ Cite
                     { id = "@atkey",
@@ -11485,7 +11516,7 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
-    Citation (Citation, cites, prefix, styleVariation, suffix),
+    Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
     Figure (Figure, caption, link, meta),
     Footnote (Footnote, body, name),

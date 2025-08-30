@@ -1,7 +1,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Lilac.Parse
-  ( defaultOrgDoc,
+  ( compressProse,
+    defaultOrgDoc,
     defaultOrgParserConf,
     genHeadingSection,
     genHeadingOidStack,
@@ -9,7 +10,10 @@ module Lilac.Parse
     maskToStyles,
     orgDocParser,
     parseOrgDoc,
+    styleMaskFrom,
     tableHorizontalLine,
+    unparseLink,
+    unparseMathFragment,
     validateOidText,
   )
 where
@@ -101,7 +105,7 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
-    Citation (Citation, cites, prefix, styleVariation, suffix),
+    Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
     Figure (Figure, caption, link, meta),
     Footnote (Footnote, body, name),
@@ -174,6 +178,7 @@ import Lilac.Types as OrgParserState
         insideCitation,
         insideCitePrefix,
         insideCodeBlock,
+        insideFootnoteDefinition,
         insideHeading,
         insideLinkDisplayName,
         listLevels,
@@ -1867,6 +1872,7 @@ footnoteDefinitionParser :: OrgParser Cell
 footnoteDefinitionParser = do
   name <- footnoteReferenceParser
   _ <- spaces
+  modify (\s -> s {insideFootnoteDefinition = Just name})
   (CParagraph prose) <- paragraphParser
   orgParserState <- get
   o <- MP.getOffset
@@ -1881,7 +1887,8 @@ footnoteDefinitionParser = do
     ( \s ->
         s
           { footnoteDefinitions =
-              insert name prose orgParserState.footnoteDefinitions
+              insert name prose orgParserState.footnoteDefinitions,
+            insideFootnoteDefinition = Nothing
           }
     )
   pure $ CFootnote Footnote {name = name, body = prose}
@@ -2263,9 +2270,13 @@ citationParser = do
       pure p
   _ <- MP.optional intraCellWhitespaceParser
   _ <- char ']'
-  let c =
+  let maybeNoteNumber = do
+        footnoteName <- orgParserState.insideFootnoteDefinition
+        lookup footnoteName orgParserState.footnoteNumbers
+      c =
         Citation
           { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
+            noteNumber = maybeNoteNumber,
             cites = cites,
             prefix = fromMaybe (Prose []) citationPrefix,
             suffix = fromMaybe (Prose []) citationSuffix

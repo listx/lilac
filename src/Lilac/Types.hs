@@ -293,6 +293,7 @@ data OrgParserState = OrgParserState
     footnoteNumber :: Int,
     footnoteNumbers :: Map Text Int,
     footnoteDefinitions :: Map Text Prose,
+    insideFootnoteDefinition :: Maybe Text,
     prevCellIsFootnote :: Bool,
     tanglePaths :: Set Text,
     cslPath :: Maybe FilePath,
@@ -328,6 +329,7 @@ defaultOrgParserState =
       footnoteNumber = 0,
       footnoteNumbers = M.empty,
       footnoteDefinitions = M.empty,
+      insideFootnoteDefinition = Nothing,
       prevCellIsFootnote = False,
       tanglePaths = Set.empty,
       cslPath = Nothing,
@@ -421,6 +423,7 @@ type Citation :: Type
 data Citation = Citation
   { styleVariation :: (Maybe Text, Maybe Text),
     cites :: [Cite],
+    noteNumber :: Maybe Int,
     prefix :: Prose,
     suffix :: Prose
   }
@@ -517,6 +520,7 @@ type WeaveConf :: Type
 data WeaveConf = WeaveConf
   { archive :: Archive,
     originObjectPath :: GPath,
+    citeprocResult :: CP.Result Prose,
     watch :: Bool
   }
 
@@ -535,7 +539,7 @@ data Archive = Archive
     symbols :: Map LinkOid Cell,
     symbolPath :: Map LinkOid GPath,
     csls :: Map FilePath Text,
-    bibs :: Map FilePath (CP.Reference (CslJson Text))
+    bibs :: Map FilePath [CP.Reference (CslJson Text)]
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

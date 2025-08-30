@@ -1,8 +1,10 @@
 module Lilac.Compile
   ( findCycles,
     findExternalOids,
+    makeRelativeToObjectPath,
     mkObject,
     mkArchive,
+    parseCitationStyle,
     readObjectsFrom,
   )
 where
@@ -162,8 +164,7 @@ mkArchive pathObjs = do
   allCslPaths <-
     concat
       <$> mapM (\(gp, o) -> makeRelativeToObjectPath gp $ maybeToList o.orgDoc.cslPath) pathObjs
-  bibContents <- getBibliographies allBibPaths
-  let bibs = zip allBibPaths bibContents
+  bibs <- getBibliographies allBibPaths
   cslRawXMLs <- map fst <$> getCitationStyles allCslPaths
   let csls = zip allCslPaths cslRawXMLs
   if
@@ -328,32 +329,32 @@ getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))
 getCitationStyle filePath = do
   p <- P.encodeUtf filePath
   input <- LU.readFileRobustly p
-  case citationStyleParser input of
+  case parseCitationStyle input of
     Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
     Right style -> pure (input, style)
 
-citationStyleParser :: Text -> Either String (CP.Style (CslJson Text))
-citationStyleParser input = do
+parseCitationStyle :: Text -> Either String (CP.Style (CslJson Text))
+parseCitationStyle input = do
   result <- parseStyle (\_ -> pure mempty) input
   case result of
     Left citeprocError -> Left $ show citeprocError
     Right style -> Right style
 
-getBibliographies :: [FilePath] -> IO [CP.Reference (CslJson Text)]
+getBibliographies :: [FilePath] -> IO [(FilePath, [CP.Reference (CslJson Text)])]
 getBibliographies filePaths = do
   bibs <- mapM getBibliography filePaths
-  pure $ concat bibs
+  pure $ zip filePaths bibs
 
 getBibliography :: FilePath -> IO [CP.Reference (CslJson Text)]
 getBibliography filePath = do
   p <- P.encodeUtf filePath
   input <- LU.readFileRobustly p
-  case bibliographyParser input of
+  case parseBibliography input of
     Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
     Right references -> pure references
 
-bibliographyParser :: Text -> Either String [CP.Reference (CslJson Text)]
-bibliographyParser = eitherDecodeStrictText
+parseBibliography :: Text -> Either String [CP.Reference (CslJson Text)]
+parseBibliography = eitherDecodeStrictText
 
 makeRelativeToObjectPath :: GPath -> [FilePath] -> IO [FilePath]
 makeRelativeToObjectPath objGPath fps = do

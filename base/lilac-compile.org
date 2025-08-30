@@ -21,8 +21,10 @@ be tangled or weaved.
 module Lilac.Compile
   ( findCycles,
     findExternalOids,
+    makeRelativeToObjectPath,
     mkObject,
     mkArchive,
+    parseCitationStyle,
     readObjectsFrom,
   )
 where
@@ -125,10 +127,10 @@ import System.OsPath qualified as P
 <<f:findExternalOids>>
 <<f:getCitationStyles>>
 <<f:getCitationStyle>>
-<<f:citationStyleParser>>
+<<f:parseCitationStyle>>
 <<f:getBibliographies>>
 <<f:getBibliography>>
-<<f:bibliographyParser>>
+<<f:parseBibliography>>
 <<f:makeRelativeToObjectPath>>
 #+end_src
 
@@ -318,7 +320,7 @@ getCitationStyles :: [FilePath] -> IO [(Text, CP.Style (CslJson Text))]
 getCitationStyles filePaths = mapM getCitationStyle filePaths
 #+end_src
 
-For parsing the CSL style file (XML), we read a given path, then defer to [[f:citationStyleParser]].
+For parsing the CSL style file (XML), we read a given path, then defer to [[f:parseCitationStyle]].
 
 #+name: f:getCitationStyle
 #+begin_src haskell
@@ -326,18 +328,18 @@ getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))
 getCitationStyle filePath = do
   p <- P.encodeUtf filePath
   input <- LU.readFileRobustly p
-  case citationStyleParser input of
+  case parseCitationStyle input of
     Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
     Right style -> pure (input, style)
 #+end_src
 
-[[f:citationStyleParser]] just delegates most of the work to ~parseStyle~ from
+[[f:parseCitationStyle]] just delegates most of the work to ~parseStyle~ from
 ~Citeproc.Style~. We expect the contents to be in ~CslJson Text~ format.
 
-#+name: f:citationStyleParser
+#+name: f:parseCitationStyle
 #+begin_src haskell
-citationStyleParser :: Text -> Either String (CP.Style (CslJson Text))
-citationStyleParser input = do
+parseCitationStyle :: Text -> Either String (CP.Style (CslJson Text))
+parseCitationStyle input = do
   result <- parseStyle (\_ -> pure mempty) input
   case result of
     Left citeprocError -> Left $ show citeprocError
@@ -349,10 +351,10 @@ entries in them.
 
 #+name: f:getBibliographies
 #+begin_src haskell
-getBibliographies :: [FilePath] -> IO [CP.Reference (CslJson Text)]
+getBibliographies :: [FilePath] -> IO [(FilePath, [CP.Reference (CslJson Text)])]
 getBibliographies filePaths = do
   bibs <- mapM getBibliography filePaths
-  pure $ concat bibs
+  pure $ zip filePaths bibs
 #+end_src
 
 The [[f:getBibliography]] parses a single JSON file which has a list of references
@@ -364,19 +366,19 @@ getBibliography :: FilePath -> IO [CP.Reference (CslJson Text)]
 getBibliography filePath = do
   p <- P.encodeUtf filePath
   input <- LU.readFileRobustly p
-  case bibliographyParser input of
+  case parseBibliography input of
     Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
     Right references -> pure references
 #+end_src
 
-[[f:bibliographyParser]] just delegates to ~eitherDecodeStrictText~ from ~Data.Aeson~.
+[[f:parseBibliography]] just delegates to ~eitherDecodeStrictText~ from ~Data.Aeson~.
 This is possible because the ~Reference~ type (from ~Citeproc.Types~) has a ~FromJSON~
 instance.
 
-#+name: f:bibliographyParser
+#+name: f:parseBibliography
 #+begin_src haskell
-bibliographyParser :: Text -> Either String [CP.Reference (CslJson Text)]
-bibliographyParser = eitherDecodeStrictText
+parseBibliography :: Text -> Either String [CP.Reference (CslJson Text)]
+parseBibliography = eitherDecodeStrictText
 #+end_src
 
 ** External symbol (OID) detection
@@ -586,7 +588,7 @@ data Archive = Archive
     symbols :: Map LinkOid Cell,
     symbolPath :: Map LinkOid GPath,
     csls :: Map FilePath Text,
-    bibs :: Map FilePath (CP.Reference (CslJson Text))
+    bibs :: Map FilePath [CP.Reference (CslJson Text)]
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -633,8 +635,7 @@ mkArchive pathObjs = do
   allCslPaths <-
     concat
       <$> mapM (\(gp, o) -> makeRelativeToObjectPath gp $ maybeToList o.orgDoc.cslPath) pathObjs
-  bibContents <- getBibliographies allBibPaths
-  let bibs = zip allBibPaths bibContents
+  bibs <- getBibliographies allBibPaths
   cslRawXMLs <- map fst <$> getCitationStyles allCslPaths
   let csls = zip allCslPaths cslRawXMLs
   if

@@ -56,19 +56,53 @@ Weaving concerns are captured in [[file:../src/Lilac/Weave.hs]].
 module Lilac.Weave
   ( commonPrefix,
     getRelativePathWithoutSymlinks,
+    prepareCitations,
     renderAsText,
     weaveObject,
   )
 where
 
-import Citeproc (citeproc)
+import Citeproc
+  ( Result (resultBibliography, resultCitations),
+  )
+import Citeproc qualified as CP
+import Citeproc.CslJson
+  ( CslJson
+      ( CslBaseline,
+        CslBold,
+        CslConcat,
+        CslDiv,
+        CslEmpty,
+        CslItalic,
+        CslLink,
+        CslNoCase,
+        CslNoDecoration,
+        CslNormal,
+        CslQuoted,
+        CslSmallCaps,
+        CslSub,
+        CslSup,
+        CslText,
+        CslUnderline
+      ),
+    parseCslJson,
+  )
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
-import Lilac.Parse (isNumericText, maskToStyles, tableHorizontalLine)
+import Lilac.Compile (makeRelativeToObjectPath, parseCitationStyle)
+import Lilac.Parse
+  ( compressProse,
+    isNumericText,
+    maskToStyles,
+    styleMaskFrom,
+    tableHorizontalLine,
+    unparseLink,
+    unparseMathFragment,
+  )
 import Lilac.Types
-  ( Archive (objects, symbolPath, symbols),
+  ( Archive (bibs, csls, objects, symbolPath, symbols),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell
@@ -82,8 +116,11 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
+    Citation (cites, noteNumber, prefix, styleVariation, suffix),
+    Cite (id, locator, prefix, suffix),
     Figure (caption, link, meta),
     Footnote (body, name),
+    GPath,
     Heading (body, level, section),
     Link (Link, name, target),
     LinkTarget
@@ -102,13 +139,13 @@ import Lilac.Types
       ),
     MathFragment (body, meta),
     Object (orgDoc, symbols),
-    OrgDoc (cells, footnoteNumbers, meta),
+    OrgDoc (bibPaths, cells, citations, cslPath, footnoteNumbers, meta),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose (Prose, unProse),
     Style (Bold, Code, Italic, Underline, Verbatim),
-    StyledText (body, style),
+    StyledText (StyledText, body, style),
     Table (caption, grid, meta),
-    WeaveConf (archive, originObjectPath, watch),
+    WeaveConf (archive, citeprocResult, originObjectPath, watch),
     decodeGPath,
     markingChars,
     markingCharsInvisible,
@@ -164,11 +201,17 @@ import Lucid
     width_,
   )
 import Lucid.Base (hoistHtmlT)
+import Network.URI
+  ( uriAuthority,
+    uriPath,
+    uriScheme,
+  )
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Either (Right),
     Eq,
+    IO,
     Identity,
     Int,
     Maybe (Just, Nothing),
@@ -179,6 +222,8 @@ import Relude
     any,
     ask,
     catMaybes,
+    concat,
+    concatMap,
     drop,
     dropWhile,
     filter,
@@ -190,11 +235,16 @@ import Relude
     fst,
     id,
     isJust,
+    isPrefixOf,
     length,
+    listToMaybe,
     map,
     max,
     maxBound,
     maybe,
+    maybeAt,
+    maybeToList,
+    mempty,
     not,
     notElem,
     null,
@@ -216,6 +266,7 @@ import Relude
     (+),
     (-),
     (.),
+    (/=),
     (<$>),
     (<>),
     (=<<),
@@ -258,6 +309,14 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveFootnote>>
 <<f:commonPrefix>>
 <<f:renderAsText>>
+<<f:proseToCslJsonText>>
+<<f:proseToMaybeCslJsonText>>
+<<f:citationToCiteprocCitation>>
+<<f:citeToCiteprocCitationItems>>
+<<f:cslJsonTextToProse>>
+<<f:prepareCitations>>
+<<f:weaveCitation>>
+<<f:weaveBibliography>>
 #+end_src
 
 * Generate HTML
@@ -283,6 +342,7 @@ type WeaveConf :: Type
 data WeaveConf = WeaveConf
   { archive :: Archive,
     originObjectPath :: GPath,
+    citeprocResult :: CP.Result Prose,
     watch :: Bool
   }
 #+end_src
@@ -412,7 +472,7 @@ weaveCell = \case
   CFigure figure -> weaveFigure figure
   CTable table -> weaveTable table
   CFootnote footnote -> weaveFootnote footnote
-  CBibliography _ -> "PRINT BIBLIOGRAPHY HERE"
+  CBibliography _ -> weaveBibliography
 #+end_src
 
 The [[HTML head]] has some "imports" for the HTML page, including CSS and JS.
@@ -765,7 +825,7 @@ weavePToken = \case
     LinkTargetFilePath {}
     LinkTargetURI {} -> weaveLink link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
-  PTokenCitation {} -> "CITATION"
+  PTokenCitation n -> weaveCitation n
 #+end_src
 
 ** Styled text
@@ -1156,7 +1216,12 @@ isExternalLink = \case
   LinkTargetOid {} -> False
   LinkTargetFootnote {} -> False
   LinkTargetFilePath {} -> True
-  LinkTargetURI {} -> True
+  LinkTargetURI uri
+    | "" <- uri.uriScheme,
+      Nothing <- uri.uriAuthority,
+      "#ref-" `isPrefixOf` uri.uriPath ->
+        False
+    | otherwise -> True
 #+end_src
 
 *** Link anchor
@@ -1425,6 +1490,1223 @@ This demonstrates some of the complexities around ~markingCharacters~.
 |---+----------+----------+----------|
 |   |          |          | foo      |
 
+** Citations
+:PROPERTIES:
+:ID:       7874b9c5-ceac-4820-8804-7732e29f5c60
+:END:
+
+For weaving citations, we use a 4-step process:
+
+  1) Convert the [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] contents of [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Citation][data:Citation]] into ~CslJson Text~,
+     while preserving the information of non-text things like links and math
+     fragments by embedding them as ~CslLink~ for things that ~CslJson Text~ does
+     not support.
+
+  2) Call into =Citeproc.citeproc= to get the transformed ~CslJson Text~ back out.
+
+  3) Convert back the ~CslJson Text~ into [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]].
+
+  4) Weave the [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] as usual.
+
+We can't simply convert [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] into HTML first before calling
+=Citeproc.citeproc= because then that would result in things like ~<a href=...>~ being
+converted into ~&lt;a href=...&gt;~ (entity conversion of the given text).
+
+For the first step, we need a function to convert [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] into ~CslJson
+Text~. For that we have [[f:proseToCslJsonText]]. This function abuses the ~CslDiv~
+constructor to encode information that cannot be represented natively in
+~CslJson~.
+
+#+name: f:proseToCslJsonText
+#+begin_src haskell
+proseToCslJsonText :: Prose -> CslJson Text
+proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
+  where
+    f :: CslJson Text -> PToken -> CslJson Text
+    f acc pToken = case pToken of
+      PTokenStyledText styledText ->
+        let styles = maskToStyles styledText.style
+            body = parseCslJson mempty styledText.body
+         in acc <> applyStyles body styles
+      PTokenLink link ->
+        let encoded = CslLink ("LILAC_LINK\NUL" <> unparseLink link) CslEmpty
+         in acc <> encoded
+      PTokenMathFragment mathFragment ->
+        let encoded = CslDiv ("LILAC_MATH_FRAGMENT\NUL" <> unparseMathFragment mathFragment) CslEmpty
+         in acc <> encoded
+      PTokenCitation {} -> acc
+    applyStyles :: CslJson Text -> [Style] -> CslJson Text
+    applyStyles cslBody styles = foldl' applyStyle cslBody styles
+    applyStyle :: CslJson Text -> Style -> CslJson Text
+    applyStyle acc = \case
+      Bold -> CslBold acc
+      Italic -> CslItalic acc
+      Underline -> CslUnderline acc
+      Verbatim -> CslDiv "LILAC_STYLE_VERBATIM\NUL" acc
+      Code -> CslDiv "LILAC_STYLE_CODE\NUL" acc
+#+end_src
+
+[[f:proseToMaybeCslJsonText]] is a wrapper around [[f:proseToCslJsonText]] to convert it
+easily into a ~Maybe (CslJson Text)~. This is useful because the Citeproc library
+uses this type for constructing its citation objects.
+
+#+name: f:proseToMaybeCslJsonText
+#+begin_src haskell
+proseToMaybeCslJsonText :: Prose -> Maybe (CslJson Text)
+proseToMaybeCslJsonText prose =
+  case proseToCslJsonText prose of
+    CslEmpty -> Nothing
+    cslJson -> Just cslJson
+#+end_src
+
+For calling =Citeproc.citeproc=, we have to convert our internal [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Citation][data:Citation]]
+into Citeproc's own citation type.
+
+#+name: f:citationToCiteprocCitation
+#+begin_src haskell
+citationToCiteprocCitation :: Citation -> CP.Citation (CslJson Text)
+citationToCiteprocCitation citation =
+  CP.Citation
+    { CP.citationId = Nothing,
+      CP.citationNoteNumber = citation.noteNumber,
+      CP.citationPrefix = proseToMaybeCslJsonText citation.prefix,
+      CP.citationSuffix = proseToMaybeCslJsonText citation.suffix,
+      CP.citationItems = concatMap (citeToCiteprocCitationItems sv) citation.cites
+    }
+  where
+    (sv, _) = citation.styleVariation
+#+end_src
+
+The individual [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Cite][data:Cite]] items are converted into Citeproc's ~CitationItem~ type.
+Orgmode has fancy styling capabilities for individual citation items (this is
+~sv1~ in [[f:citeToCiteprocCitationItems]] below), but we only support the ~t~ and ~na~
+style variants (we don't even look at the second element in the
+~citation.styleVariation~ tuple). This is because we rely on CSL to do nearly all
+of the styling for us. CSL itself [[https://citeproc-js.readthedocs.io/en/latest/csl-json/markup.html#cite-items][allows for just a handful of variations]],
+namely:
+
+  - ~suppress-author~: do not show the author name
+
+  - ~author-only~: only show the author name
+
+We achieve the semantic meaning of ~t~ (aka ~text~) and ~na~ (aka ~noauthor~) by using
+combinations of the above. The ~na~ maps 1:1 to ~author-only~ so that's an easy one.
+However the ~t~ style needs to inject the author name (as regular text) just
+before the cite. In order to achieve this, we create two citations, using a
+combination of ~suppress-author~ (~CP.SuppressAuthor~) and ~author-only~
+(~CP.AuthorOnly~) to get what we want. Because we end up creating two citations in
+place of one, the result type of [[f:citeToCiteprocCitationItems]] is a list.
+
+#+name: f:citeToCiteprocCitationItems
+#+begin_src haskell
+citeToCiteprocCitationItems :: Maybe Text -> Cite -> [CP.CitationItem (CslJson Text)]
+citeToCiteprocCitationItems sv cite =
+  let citationItem =
+        CP.CitationItem
+          { CP.citationItemId = CP.ItemId cite.id,
+            CP.citationItemLabel = term,
+            CP.citationItemLocator = coord,
+            CP.citationItemType = CP.NormalCite,
+            CP.citationItemPrefix = proseToMaybeCslJsonText cite.prefix,
+            CP.citationItemSuffix = proseToMaybeCslJsonText cite.suffix,
+            CP.citationItemData = Nothing
+          }
+   in if
+        | Just "t" <- sv ->
+            [ citationItem
+                { CP.citationItemType = CP.AuthorOnly,
+                  CP.citationItemSuffix = Nothing
+                },
+              citationItem
+                { CP.citationItemType = CP.SuppressAuthor,
+                  CP.citationItemPrefix = Nothing
+                }
+            ]
+        | Just "na" <- sv ->
+            [citationItem {CP.citationItemType = CP.SuppressAuthor}]
+        | otherwise -> [citationItem]
+  where
+    (term, coord) = case cite.locator of
+      Just (t, c) -> (Just t, Just c)
+      Nothing -> (Nothing, Nothing)
+#+end_src
+
+The last piece is the conversion of ~CslJson Text~ back into [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]]. We
+have to recursively traverse the nodes in the ~CslJson Text~ tree.
+
+#+name: f:cslJsonTextToProse
+#+begin_src haskell
+cslJsonTextToProse :: CslJson Text -> Prose
+cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
+  where
+    f :: [Style] -> CslJson Text -> [PToken]
+    f s = \case
+      CslEmpty -> []
+      CslText t -> [PTokenStyledText StyledText {body = t, style = styleMaskFrom s}]
+      CslConcat a CslEmpty -> f s a
+      CslConcat (CslConcat a b) c -> f s (CslConcat a (CslConcat b c))
+      CslConcat a b -> f s a <> f s b
+      CslQuoted a -> f s a
+      CslItalic a -> f (Italic : s) a
+      CslNormal a -> f [] a
+      CslBold a -> f (Bold : s) a
+      CslUnderline a -> f (Underline : s) a
+      CslNoDecoration a -> f (filter (/= Underline) s) a
+      CslSmallCaps a -> f s a
+      CslBaseline a -> f s a
+      CslSup a -> f s a
+      CslSub a -> f s a
+      CslNoCase a -> f s a
+      CslDiv t a
+        | t == "LILAC_STYLE_CODE\NUL" -> f (Code : s) a
+        | t == "LILAC_STYLE_VERBATIM\NUL" -> f (Verbatim : s) a
+        | "LILAC_MATH_FRAGMENT\NUL" `T.isPrefixOf` t ->
+            (CP.fromText (T.drop 20 t) :: Prose).unProse
+        | otherwise -> f s a
+      CslLink t a
+        | "LILAC_LINK\NUL" `T.isPrefixOf` t ->
+            (CP.fromText (T.drop 11 t) :: Prose).unProse
+        | "#ref-" `T.isPrefixOf` t ->
+            let uri =
+                  N.URI
+                    { N.uriScheme = "",
+                      N.uriAuthority = Nothing,
+                      N.uriPath = T.unpack t,
+                      N.uriQuery = "",
+                      N.uriFragment = ""
+                    }
+                target = LinkTargetURI uri
+                name = getStyledText $ f s a
+             in [PTokenLink Link {target = target, name = name}]
+        | otherwise -> case (N.parseURI $ T.unpack t) of
+            Nothing -> []
+            Just uri ->
+              let target = LinkTargetURI uri
+                  name = getStyledText $ f s a
+               in [PTokenLink Link {target = target, name = name}]
+    getStyledText [] = []
+    getStyledText (pToken : rest) = case pToken of
+      PTokenStyledText styledText -> styledText : getStyledText rest
+      PTokenLink {}
+      PTokenMathFragment {}
+      PTokenCitation {} -> []
+#+end_src
+
+Unfortunately, we have to discard some information because not everything in
+~CslJson Text~ can be represented by [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]]. The following have no
+equivalent [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b::data:Style][data:Style]]:
+
+  - ~CslSmallCaps~
+
+  - ~CslBaseline~
+
+  - ~CslSup~
+
+  - ~CslSub~
+
+The ~CslNoCase~ is fine to ignore because it's most likely used by =Citeproc= to
+handle case-changing transformations, and is probably not meant to be used
+directly by consumers.
+
+The ~CslDiv~ is used to wrap bibliographical entries inside printed bibliography
+for formatting purposes. We ignore them for now, except for those ~LILAC_STYLE...~
+bits that we've encoded in [[f:proseToCslJsonText]].
+
+Now we have all of the pieces needed to process citations. The idea is to
+process all citations found inside an Org document at once, just before the
+weaving begins in [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]], by calling ~Citeproc.citeproc~ which will get us
+a ~Result a~ which includes the formatted citations as well as the formatted
+bibliography. This part is handled by [[f:prepareCitations]]. Then during the
+weaving process we refer to these formatted citations (of type ~Prose~), before
+finally converting them to HTML again.
+
+#+name: f:prepareCitations
+#+begin_src haskell
+prepareCitations :: GPath -> Object -> Archive -> IO (CP.Result Prose)
+prepareCitations objGPath object archive = do
+  bibPathsRelative <- makeRelativeToObjectPath objGPath object.orgDoc.bibPaths
+  cslPathRelative <- listToMaybe <$> (makeRelativeToObjectPath objGPath $ maybeToList object.orgDoc.cslPath)
+  let bibRefsFromOrgDoc =
+        concat
+          . catMaybes
+          $ map (\bp -> lookup bp archive.bibs) bibPathsRelative
+      CP.Result citations bibliography warnings =
+        f bibRefsFromOrgDoc cslPathRelative
+      resultWithProse =
+        CP.Result
+          { CP.resultCitations = map cslJsonTextToProse citations,
+            CP.resultBibliography = map (\(k, cslJsonText) -> (k, cslJsonTextToProse cslJsonText)) bibliography,
+            CP.resultWarnings = warnings
+          }
+  pure resultWithProse
+  where
+    citeprocOptions =
+      CP.CiteprocOptions
+        { linkCitations = True,
+          linkBibliography = True
+        }
+    blankResult :: CP.Result (CslJson Text)
+    blankResult =
+      CP.Result
+        { CP.resultCitations = [],
+          CP.resultBibliography = [],
+          CP.resultWarnings = ["BLANK CITATION RESULT"]
+        }
+    f bibRefs cslPathRelative
+      | Just cslPath' <- cslPathRelative,
+        Just rawXML <- lookup cslPath' archive.csls,
+        Right citeprocStyle <- parseCitationStyle rawXML =
+          CP.citeproc
+            citeprocOptions
+            citeprocStyle
+            Nothing
+            bibRefs
+            (map citationToCiteprocCitation object.orgDoc.citations)
+      | otherwise = blankResult
+#+end_src
+
+Now we can weave [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Citation][data:Citation]] values into the HTML, with [[f:weaveCitation]].
+
+#+name: f:weaveCitation
+#+begin_src haskell
+weaveCitation :: Int -> HtmlWeaver ()
+weaveCitation n = do
+  weaveConf <- ask
+  let result = weaveConf.citeprocResult
+      citations = result.resultCitations
+  case maybeAt n citations of
+    Just prose -> span_ [class_ "citation"] $ weaveProse prose
+    Nothing -> pure ()
+#+end_src
+
+[[f:weaveBibliography]] weaves the ~#+print_bibliography~ part of the doc.
+
+#+name: f:weaveBibliography
+#+begin_src haskell
+weaveBibliography :: HtmlWeaver ()
+weaveBibliography = do
+  weaveConf <- ask
+  let result = weaveConf.citeprocResult
+      bibliography = result.resultBibliography
+  div_ [class_ "bibliography"] $ do
+    forM_ bibliography $ \(key, prose) -> do
+      div_ [class_ "bib-ref"] $ do
+        let linkAnchor = "ref-" <> key
+        p_ [id_ linkAnchor] $ weaveProse prose
+#+end_src
+
+The ~#ref-...~ style is based on what =Citeproc= uses; for now we choose to use it
+as is. If we wanted to modify it, we would need to tweak how we handle the
+~CslLink~ constructor in inside [[f:cslJsonTextToProse]].
+
+*** Tests
+
+For tests around citation processing, we need a CSL style file (XML) and
+some bibliographical entries.
+
+For the CSL file, we use IEEE style. This is copied from [[https://github.com/citation-style-language/styles/blob/fd6cb3e81762055d107839c3c288c359985f81c8/ieee.csl][here]].
+
+#+header: :tangle test/Lilac/WeaveSpec/ieee.csl
+#+begin_src xml
+<?xml version="1.0" encoding="utf-8"?>
+<style xmlns="http://purl.org/net/xbiblio/csl" class="in-text" version="1.0" demote-non-dropping-particle="sort-only">
+  <info>
+    <title>IEEE</title>
+    <id>http://www.zotero.org/styles/ieee</id>
+    <link href="http://www.zotero.org/styles/ieee" rel="self"/>
+    <!-- <link href="https://ieeeauthorcenter.ieee.org/wp-content/uploads/IEEE-Reference-Guide.pdf" rel="documentation"/> - 2018 guidelines -->
+    <link href="http://journals.ieeeauthorcenter.ieee.org/wp-content/uploads/sites/7/IEEE_Reference_Guide.pdf" rel="documentation"/>
+    <link href="https://journals.ieeeauthorcenter.ieee.org/your-role-in-article-production/ieee-editorial-style-manual/" rel="documentation"/>
+    <author>
+      <name>Michael Berkowitz</name>
+      <email>mberkowi@gmu.edu</email>
+    </author>
+    <contributor>
+      <name>Julian Onions</name>
+      <email>julian.onions@gmail.com</email>
+    </contributor>
+    <contributor>
+      <name>Rintze Zelle</name>
+      <uri>http://twitter.com/rintzezelle</uri>
+    </contributor>
+    <contributor>
+      <name>Stephen Frank</name>
+      <uri>http://www.zotero.org/sfrank</uri>
+    </contributor>
+    <contributor>
+      <name>Sebastian Karcher</name>
+    </contributor>
+    <contributor>
+      <name>Giuseppe Silano</name>
+      <email>g.silano89@gmail.com</email>
+      <uri>http://giuseppesilano.net</uri>
+    </contributor>
+    <contributor>
+      <name>Patrick O'Brien</name>
+    </contributor>
+    <contributor>
+      <name>Brenton M. Wiernik</name>
+    </contributor>
+    <contributor>
+      <name>Oliver Couch</name>
+      <email>oliver.couch@gmail.com</email>
+    </contributor>
+    <category citation-format="numeric"/>
+    <category field="engineering"/>
+    <category field="generic-base"/>
+    <summary>IEEE style as per the 2023 guidelines, V 11.29.2023.</summary>
+    <updated>2024-03-27T11:41:27+00:00</updated>
+    <rights license="http://creativecommons.org/licenses/by-sa/3.0/">This work is licensed under a Creative Commons Attribution-ShareAlike 3.0 License</rights>
+  </info>
+  <locale xml:lang="en">
+    <date form="text">
+      <date-part name="month" form="short" suffix=" "/>
+      <date-part name="day" form="numeric-leading-zeros" suffix=", "/>
+      <date-part name="year"/>
+    </date>
+    <terms>
+      <term name="chapter" form="short">ch.</term>
+      <term name="chapter-number" form="short">ch.</term>
+      <term name="presented at">presented at the</term>
+      <term name="available at">available</term>
+    </terms>
+  </locale>
+  <!-- Macros -->
+  <macro name="status">
+    <choose>
+      <if variable="page issue volume" match="none">
+        <text variable="status" text-case="capitalize-first" suffix="" font-weight="bold"/>
+      </if>
+    </choose>
+  </macro>
+  <macro name="edition">
+    <choose>
+      <if type="bill book chapter graphic legal_case legislation motion_picture paper-conference report song" match="any">
+        <choose>
+          <if is-numeric="edition">
+            <group delimiter=" ">
+              <number variable="edition" form="ordinal"/>
+              <text term="edition" form="short"/>
+            </group>
+          </if>
+          <else>
+            <text variable="edition" text-case="capitalize-first" suffix="."/>
+          </else>
+        </choose>
+      </if>
+    </choose>
+  </macro>
+  <macro name="issued">
+    <choose>
+      <if type="article-journal report" match="any">
+        <date variable="issued">
+          <date-part name="month" form="short" suffix=" "/>
+          <date-part name="year" form="long"/>
+        </date>
+      </if>
+      <else-if type="bill book chapter graphic legal_case legislation song thesis" match="any">
+        <date variable="issued">
+          <date-part name="year" form="long"/>
+        </date>
+      </else-if>
+      <else-if type="paper-conference" match="any">
+        <date variable="issued">
+          <date-part name="month" form="short"/>
+          <date-part name="year" prefix=" "/>
+        </date>
+      </else-if>
+      <else-if type="motion_picture" match="any">
+        <date variable="issued" form="text" prefix="(" suffix=")"/>
+      </else-if>
+      <else>
+        <date variable="issued" form="text"/>
+      </else>
+    </choose>
+  </macro>
+  <macro name="author">
+    <names variable="author">
+      <name and="text" et-al-min="7" et-al-use-first="1" initialize-with=". "/>
+      <label form="short" prefix=", " text-case="capitalize-first"/>
+      <et-al font-style="italic"/>
+      <substitute>
+        <names variable="editor"/>
+        <names variable="translator"/>
+        <text macro="director"/>
+      </substitute>
+    </names>
+  </macro>
+  <macro name="editor">
+    <names variable="editor">
+      <name initialize-with=". " delimiter=", " and="text"/>
+      <label form="short" prefix=", " text-case="capitalize-first"/>
+    </names>
+  </macro>
+  <macro name="director">
+    <names variable="director">
+      <name and="text" et-al-min="7" et-al-use-first="1" initialize-with=". "/>
+      <et-al font-style="italic"/>
+    </names>
+  </macro>
+  <macro name="locators">
+    <group delimiter=", ">
+      <text macro="edition"/>
+      <group delimiter=" ">
+        <text term="volume" form="short"/>
+        <number variable="volume" form="numeric"/>
+      </group>
+      <group delimiter=" ">
+        <number variable="number-of-volumes" form="numeric"/>
+        <text term="volume" form="short" plural="true"/>
+      </group>
+      <group delimiter=" ">
+        <text term="issue" form="short"/>
+        <number variable="issue" form="numeric"/>
+      </group>
+    </group>
+  </macro>
+  <macro name="title">
+    <choose>
+      <if type="bill book graphic legal_case legislation motion_picture song standard software" match="any">
+        <text variable="title" font-style="italic"/>
+      </if>
+      <else>
+        <text variable="title" quotes="true"/>
+      </else>
+    </choose>
+  </macro>
+  <macro name="publisher">
+    <choose>
+      <if type="bill book chapter graphic legal_case legislation motion_picture paper-conference song" match="any">
+        <group delimiter=": ">
+          <text variable="publisher-place"/>
+          <text variable="publisher"/>
+        </group>
+      </if>
+      <else>
+        <group delimiter=", ">
+          <text variable="publisher"/>
+          <text variable="publisher-place"/>
+        </group>
+      </else>
+    </choose>
+  </macro>
+  <macro name="event">
+    <choose>
+      <!-- Published Conference Paper -->
+      <if type="paper-conference speech" match="any">
+        <choose>
+          <if variable="container-title" match="any">
+            <group delimiter=" ">
+              <text term="in"/>
+              <text variable="container-title" font-style="italic"/>
+            </group>
+          </if>
+          <!-- Unpublished Conference Paper -->
+          <else>
+            <group delimiter=" ">
+              <text term="presented at"/>
+              <text variable="event"/>
+            </group>
+          </else>
+        </choose>
+      </if>
+    </choose>
+  </macro>
+  <macro name="access">
+    <choose>
+      <if type="webpage post post-weblog" match="any">
+        <!-- https://url.com/ (accessed Mon. DD, YYYY). -->
+        <choose>
+          <if variable="URL">
+            <group delimiter=". " prefix=" ">
+              <group delimiter=": ">
+                <text term="accessed" text-case="capitalize-first"/>
+                <date variable="accessed" form="text"/>
+              </group>
+              <text term="online" prefix="[" suffix="]" text-case="capitalize-first"/>
+              <group delimiter=": ">
+                <text term="available at" text-case="capitalize-first"/>
+                <text variable="URL"/>
+              </group>
+            </group>
+          </if>
+        </choose>
+      </if>
+      <else-if match="any" variable="DOI">
+        <!-- doi: 10.1000/xyz123. -->
+        <text variable="DOI" prefix=" doi: " suffix="."/>
+      </else-if>
+      <else-if variable="URL">
+        <!-- Accessed: Mon. DD, YYYY. [Medium]. Available: https://URL.com/ -->
+        <group delimiter=". " prefix=" " suffix=". ">
+          <!-- Accessed: Mon. DD, YYYY. -->
+          <group delimiter=": ">
+            <text term="accessed" text-case="capitalize-first"/>
+            <date variable="accessed" form="text"/>
+          </group>
+          <!-- [Online Video]. -->
+          <group prefix="[" suffix="]" delimiter=" ">
+            <choose>
+              <if variable="medium" match="any">
+                <text variable="medium" text-case="capitalize-first"/>
+              </if>
+              <else>
+                <text term="online" text-case="capitalize-first"/>
+                <choose>
+                  <if type="motion_picture">
+                    <text term="video" text-case="capitalize-first"/>
+                  </if>
+                </choose>
+              </else>
+            </choose>
+          </group>
+        </group>
+        <!-- Available: https://URL.com/ -->
+        <group delimiter=": " prefix=" ">
+          <text term="available at" text-case="capitalize-first"/>
+          <text variable="URL"/>
+        </group>
+      </else-if>
+    </choose>
+  </macro>
+  <macro name="page">
+    <choose>
+      <if type="article-journal" variable="number" match="all">
+        <group delimiter=" ">
+          <text value="Art."/>
+          <text term="issue" form="short"/>
+          <text variable="number"/>
+        </group>
+      </if>
+      <else>
+        <group delimiter=" ">
+          <label variable="page" form="short"/>
+          <text variable="page"/>
+        </group>
+      </else>
+    </choose>
+  </macro>
+  <macro name="citation-locator">
+    <group delimiter=" ">
+      <choose>
+        <if locator="page">
+          <label variable="locator" form="short"/>
+        </if>
+        <else>
+          <label variable="locator" form="short" text-case="capitalize-first"/>
+        </else>
+      </choose>
+      <text variable="locator"/>
+    </group>
+  </macro>
+  <macro name="geographic-location">
+    <group delimiter=", " suffix=".">
+      <choose>
+        <if variable="publisher-place">
+          <text variable="publisher-place" text-case="title"/>
+        </if>
+        <else-if variable="event-place">
+          <text variable="event-place" text-case="title"/>
+        </else-if>
+      </choose>
+    </group>
+  </macro>
+  <!-- Series -->
+  <macro name="collection">
+    <choose>
+      <if variable="collection-title" match="any">
+        <text term="in" suffix=" "/>
+        <group delimiter=", " suffix=". ">
+          <text variable="collection-title"/>
+          <text variable="collection-number" prefix="no. "/>
+          <text variable="volume" prefix="vol. "/>
+        </group>
+      </if>
+    </choose>
+  </macro>
+  <!-- Citation -->
+  <citation>
+    <sort>
+      <key variable="citation-number"/>
+    </sort>
+    <layout delimiter=", ">
+      <group prefix="[" suffix="]" delimiter=", ">
+        <text variable="citation-number"/>
+        <text macro="citation-locator"/>
+      </group>
+    </layout>
+  </citation>
+  <!-- Bibliography -->
+  <bibliography entry-spacing="0" second-field-align="flush">
+    <layout>
+      <!-- Citation Number -->
+      <text variable="citation-number" prefix="[" suffix="]"/>
+      <!-- Author(s) -->
+      <text macro="author" suffix=", "/>
+      <!-- Rest of Citation -->
+      <choose>
+        <!-- Specific Formats -->
+        <if type="article-journal">
+          <group delimiter=", ">
+            <text macro="title"/>
+            <text variable="container-title" font-style="italic" form="short"/>
+            <text macro="locators"/>
+            <text macro="page"/>
+            <text macro="issued"/>
+            <text macro="status"/>
+          </group>
+          <choose>
+            <if variable="URL DOI" match="none">
+              <text value="."/>
+            </if>
+            <else>
+              <text value=","/>
+            </else>
+          </choose>
+          <text macro="access"/>
+        </if>
+        <else-if type="paper-conference speech" match="any">
+          <group delimiter=", " suffix=", ">
+            <text macro="title"/>
+            <text macro="event"/>
+            <text macro="editor"/>
+          </group>
+          <text macro="collection"/>
+          <group delimiter=", " suffix=".">
+            <text macro="publisher"/>
+            <text macro="issued"/>
+            <text macro="page"/>
+            <text macro="status"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <else-if type="chapter">
+          <group delimiter=", " suffix=".">
+            <text macro="title"/>
+            <group delimiter=" ">
+              <text term="in" suffix=" "/>
+              <text variable="container-title" font-style="italic"/>
+            </group>
+            <text macro="locators"/>
+            <text macro="editor"/>
+            <text macro="collection"/>
+            <text macro="publisher"/>
+            <text macro="issued"/>
+            <group delimiter=" ">
+              <label variable="chapter-number" form="short"/>
+              <text variable="chapter-number"/>
+            </group>
+            <text macro="page"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <else-if type="report">
+          <group delimiter=", " suffix=".">
+            <text macro="title"/>
+            <text macro="publisher"/>
+            <group delimiter=" ">
+              <text variable="genre"/>
+              <text variable="number"/>
+            </group>
+            <text macro="issued"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <else-if type="thesis">
+          <group delimiter=", " suffix=".">
+            <text macro="title"/>
+            <text variable="genre"/>
+            <text macro="publisher"/>
+            <text macro="issued"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <else-if type="software">
+          <group delimiter=". " suffix=".">
+            <text macro="title"/>
+            <text macro="issued" prefix="(" suffix=")"/>
+            <text variable="genre"/>
+            <text macro="publisher"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <else-if type="article">
+          <group delimiter=", " suffix=".">
+            <text macro="title"/>
+            <text macro="issued"/>
+            <group delimiter=": ">
+              <text macro="publisher" font-style="italic"/>
+              <text variable="number"/>
+            </group>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <else-if type="webpage post-weblog post" match="any">
+          <group delimiter=", " suffix=".">
+            <text macro="title"/>
+            <text variable="container-title"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <else-if type="patent">
+          <group delimiter=", ">
+            <text macro="title"/>
+            <text variable="number"/>
+            <text macro="issued"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <!-- Online Video -->
+        <else-if type="motion_picture">
+          <text macro="geographic-location" suffix=". "/>
+          <group delimiter=", " suffix=".">
+            <text macro="title"/>
+            <text macro="issued"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <else-if type="standard">
+          <group delimiter=", " suffix=".">
+            <text macro="title"/>
+            <group delimiter=" ">
+              <text variable="genre"/>
+              <text variable="number"/>
+            </group>
+            <text macro="geographic-location"/>
+            <text macro="issued"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <!-- Generic/Fallback Formats -->
+        <else-if type="bill book graphic legal_case legislation report song" match="any">
+          <group delimiter=", " suffix=". ">
+            <text macro="title"/>
+            <text macro="locators"/>
+          </group>
+          <text macro="collection"/>
+          <group delimiter=", " suffix=".">
+            <text macro="publisher"/>
+            <text macro="issued"/>
+            <text macro="page"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <else-if type="article-magazine article-newspaper broadcast interview manuscript map patent personal_communication song speech thesis webpage" match="any">
+          <group delimiter=", " suffix=".">
+            <text macro="title"/>
+            <text variable="container-title" font-style="italic"/>
+            <text macro="locators"/>
+            <text macro="publisher"/>
+            <text macro="page"/>
+            <text macro="issued"/>
+          </group>
+          <text macro="access"/>
+        </else-if>
+        <else>
+          <group delimiter=", " suffix=". ">
+            <text macro="title"/>
+            <text variable="container-title" font-style="italic"/>
+            <text macro="locators"/>
+          </group>
+          <text macro="collection"/>
+          <group delimiter=", " suffix=".">
+            <text macro="publisher"/>
+            <text macro="page"/>
+            <text macro="issued"/>
+          </group>
+          <text macro="access"/>
+        </else>
+      </choose>
+    </layout>
+  </bibliography>
+</style>
+#+end_src
+
+Here is a sample bibliography, taken from https://zbib.org and converted from
+BibTeX format into CSL JSON with Pandoc via ~pandoc citations.bib -t csljson -o citations.json~.
+
+#+header: :tangle test/Lilac/WeaveSpec/bib.json
+#+begin_src json
+[
+  {
+    "ISBN": "9780937073803 9780937073810",
+    "author": [
+      {
+        "family": "Knuth",
+        "given": "Donald Ervin"
+      }
+    ],
+    "collection-number": "no. 27",
+    "collection-title": "CSLI lecture notes",
+    "id": "a",
+    "issued": {
+      "date-parts": [
+        [
+          1992
+        ]
+      ]
+    },
+    "keyword": "Computer programming",
+    "publisher": "Center for the Study of Language; Information",
+    "publisher-place": "Stanford, Calif.",
+    "title": "Literate programming",
+    "type": "book"
+  },
+  {
+    "DOI": "10.1145/362929.362947",
+    "ISSN": "0001-0782, 1557-7317",
+    "URL": "https://dl.acm.org/doi/10.1145/362929.362947",
+    "accessed": {
+      "date-parts": [
+        [
+          2025,
+          8,
+          30
+        ]
+      ]
+    },
+    "author": [
+      {
+        "family": "Dijkstra",
+        "given": "Edsger W."
+      }
+    ],
+    "container-title": "Communications of the ACM",
+    "id": "b",
+    "issue": "3",
+    "issued": {
+      "date-parts": [
+        [
+          1968,
+          3
+        ]
+      ]
+    },
+    "page": "147-148",
+    "title": "Letters to the editor: Go to statement considered harmful",
+    "title-short": "Letters to the editor",
+    "type": "article-journal",
+    "volume": "11"
+  },
+  {
+    "DOI": "10.1112/plms/s2-42.1.230",
+    "ISSN": "00246115",
+    "URL": "http://doi.wiley.com/10.1112/plms/s2-42.1.230",
+    "accessed": {
+      "date-parts": [
+        [
+          2025,
+          8,
+          30
+        ]
+      ]
+    },
+    "author": [
+      {
+        "family": "Turing",
+        "given": "A. M."
+      }
+    ],
+    "container-title": "Proceedings of the London Mathematical Society",
+    "id": "c",
+    "issue": "1",
+    "issued": {
+      "date-parts": [
+        [
+          1937
+        ]
+      ]
+    },
+    "page": "230-265",
+    "title": "On Computable Numbers, with an Application to the Entscheidungsproblem",
+    "type": "article-journal",
+    "volume": "s2-42"
+  },
+  {
+    "DOI": "10.1002/j.1538-7305.1948.tb01338.x",
+    "ISSN": "00058580",
+    "URL": "https://ieeexplore.ieee.org/document/6773024",
+    "accessed": {
+      "date-parts": [
+        [
+          2025,
+          8,
+          30
+        ]
+      ]
+    },
+    "author": [
+      {
+        "family": "Shannon",
+        "given": "C. E."
+      }
+    ],
+    "container-title": "Bell System Technical Journal",
+    "id": "d",
+    "issue": "3",
+    "issued": {
+      "date-parts": [
+        [
+          1948,
+          7
+        ]
+      ]
+    },
+    "page": "379-423",
+    "title": "A Mathematical Theory of Communication",
+    "type": "article-journal",
+    "volume": "27"
+  }
+]
+#+end_src
+
+The test cases should check what the result of calling ~Citeproc.citeproc~ looks
+like, after converting back to [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]].
+
+#+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-basic
+#+begin_src org
+,#+bibliography: bib.json
+,#+cite_export: csl ieee.csl
+
+[cite:@a;@b;@c;@d]
+#+end_src
+
+#+name: t:0400-citeproc-basic
+#+begin_src haskell
+expectCiteprocResult
+  "0400-citeproc-basic"
+  CP.Result
+    { resultCitations =
+        <<Expected citations for 0400-citeproc-basic>>,
+      resultBibliography =
+        <<Expected bibliography for 0400-citeproc-basic>>,
+      resultWarnings = []
+    }
+#+end_src
+
+#+name: Expected citations for 0400-citeproc-basic
+#+begin_src haskell
+[ Prose
+    { unProse =
+        [ PTokenLink
+            Link
+              { name =
+                  [ StyledText {body = "[", style = styleMaskFrom []},
+                    StyledText {body = "1", style = styleMaskFrom []},
+                    StyledText {body = "]", style = styleMaskFrom []}
+                  ],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-a",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              },
+          PTokenStyledText
+            StyledText
+              { body = ", ",
+                style = styleMaskFrom []
+              },
+          PTokenLink
+            Link
+              { name =
+                  [ StyledText {body = "[", style = styleMaskFrom []},
+                    StyledText {body = "2", style = styleMaskFrom []},
+                    StyledText {body = "]", style = styleMaskFrom []}
+                  ],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-b",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              },
+          PTokenStyledText StyledText {body = ", ", style = styleMaskFrom []},
+          PTokenLink
+            Link
+              { name =
+                  [ StyledText {body = "[", style = styleMaskFrom []},
+                    StyledText {body = "3", style = styleMaskFrom []},
+                    StyledText {body = "]", style = styleMaskFrom []}
+                  ],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-c",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              },
+          PTokenStyledText StyledText {body = ", ", style = styleMaskFrom []},
+          PTokenLink
+            Link
+              { name =
+                  [ StyledText {body = "[", style = styleMaskFrom []},
+                    StyledText {body = "4", style = styleMaskFrom []},
+                    StyledText {body = "]", style = styleMaskFrom []}
+                  ],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-d",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              }
+        ]
+    }
+]
+#+end_src
+
+#+name: Expected bibliography for 0400-citeproc-basic
+#+begin_src haskell
+[ ( "a",
+    Prose
+      { unProse =
+          [ PTokenStyledText StyledText {body = "[1]D. E. Knuth, ", style = styleMaskFrom []},
+            PTokenStyledText StyledText {body = "Literate programming", style = styleMaskFrom [Italic]},
+            PTokenStyledText StyledText {body = ". in CSLI lecture notes, no. no. 27. Stanford, Calif.: Center for the Study of Language; Information, 1992.", style = styleMaskFrom []}
+          ]
+      }
+  ),
+  ( "b",
+    Prose
+      { unProse =
+          [ PTokenStyledText (StyledText {body = "[2]E. W. Dijkstra, \8220Letters to the editor: Go to statement considered harmful,\8221 ", style = styleMaskFrom []}),
+            PTokenStyledText (StyledText {body = "Communications of the ACM", style = styleMaskFrom [Italic]}),
+            PTokenStyledText (StyledText {body = ", vol. 11, no. 3, pp. 147\8211\&148, Mar. 1968, doi: ", style = styleMaskFrom []}),
+            PTokenLink
+              Link
+                { name =
+                    [ StyledText {body = "10", style = styleMaskFrom []},
+                      StyledText {body = ".", style = styleMaskFrom []},
+                      StyledText {body = "1145", style = styleMaskFrom []},
+                      StyledText {body = "/", style = styleMaskFrom []},
+                      StyledText {body = "362929", style = styleMaskFrom []},
+                      StyledText {body = ".", style = styleMaskFrom []},
+                      StyledText {body = "362947", style = styleMaskFrom []}
+                    ],
+                  target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "doi.org",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "/10.1145/362929.362947",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        }
+                },
+            PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+          ]
+      }
+  ),
+  ( "c",
+    Prose
+      { unProse =
+          [ PTokenStyledText StyledText {body = "[3]A. M. Turing, \8220On Computable Numbers, with an Application to the Entscheidungsproblem,\8221 ", style = styleMaskFrom []},
+            PTokenStyledText StyledText {body = "Proceedings of the London Mathematical Society", style = styleMaskFrom [Italic]},
+            PTokenStyledText StyledText {body = ", vol. s2\8211\&42, no. 1, pp. 230\8211\&265, 1937, doi: ", style = styleMaskFrom []},
+            PTokenLink
+              Link
+                { name =
+                    [ StyledText {body = "10", style = styleMaskFrom []},
+                      StyledText {body = ".", style = styleMaskFrom []},
+                      StyledText {body = "1112", style = styleMaskFrom []},
+                      StyledText {body = "/", style = styleMaskFrom []},
+                      StyledText {body = "plms", style = styleMaskFrom []},
+                      StyledText {body = "/", style = styleMaskFrom []},
+                      StyledText {body = "s2", style = styleMaskFrom []},
+                      StyledText {body = "-", style = styleMaskFrom []},
+                      StyledText {body = "42", style = styleMaskFrom []},
+                      StyledText {body = ".", style = styleMaskFrom []},
+                      StyledText {body = "1", style = styleMaskFrom []},
+                      StyledText {body = ".", style = styleMaskFrom []},
+                      StyledText {body = "230", style = styleMaskFrom []}
+                    ],
+                  target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "doi.org",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "/10.1112/plms/s2-42.1.230",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        }
+                },
+            PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+          ]
+      }
+  ),
+  ( "d",
+    Prose
+      { unProse =
+          [ PTokenStyledText StyledText {body = "[4]C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 ", style = styleMaskFrom []},
+            PTokenStyledText StyledText {body = "Bell System Technical Journal", style = styleMaskFrom [Italic]},
+            PTokenStyledText StyledText {body = ", vol. 27, no. 3, pp. 379\8211\&423, July 1948, doi: ", style = styleMaskFrom []},
+            PTokenLink
+              Link
+                { name =
+                    [ StyledText {body = "10", style = styleMaskFrom []},
+                      StyledText {body = ".", style = styleMaskFrom []},
+                      StyledText {body = "1002", style = styleMaskFrom []},
+                      StyledText {body = "/", style = styleMaskFrom []},
+                      StyledText {body = "j", style = styleMaskFrom []},
+                      StyledText {body = ".", style = styleMaskFrom []},
+                      StyledText {body = "1538", style = styleMaskFrom []},
+                      StyledText {body = "-", style = styleMaskFrom []},
+                      StyledText {body = "7305", style = styleMaskFrom []},
+                      StyledText {body = ".", style = styleMaskFrom []},
+                      StyledText {body = "1948", style = styleMaskFrom []},
+                      StyledText {body = ".", style = styleMaskFrom []},
+                      StyledText {body = "tb01338", style = styleMaskFrom []},
+                      StyledText {body = ".", style = styleMaskFrom []},
+                      StyledText {body = "x", style = styleMaskFrom []}
+                    ],
+                  target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "doi.org",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "/10.1002/j.1538-7305.1948.tb01338.x",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        }
+                },
+            PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+          ]
+      }
+  )
+]
+#+end_src
+
 ** Testing framework
 
 The tests here use Org files as input. The output are HTML documents. For the
@@ -1443,22 +2725,35 @@ helpers]] to take care of some boilerplate.
 #+begin_src haskell
 module Lilac.WeaveSpec (spec) where
 
+import Citeproc
+  ( Result (resultBibliography, resultCitations, resultWarnings),
+  )
+import Citeproc qualified as CP
 import Data.Text qualified as T
 import Lilac.Compile qualified as LC
+import Lilac.Parse (styleMaskFrom)
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( WeaveConf (WeaveConf, archive, originObjectPath, watch),
+  ( Link (Link, name, target),
+    LinkTarget (LinkTargetURI),
+    PToken (PTokenLink, PTokenStyledText),
+    Prose (Prose, unProse),
+    Style (Italic),
+    StyledText (StyledText, body, style),
+    WeaveConf (WeaveConf, archive, citeprocResult, originObjectPath, watch),
     defaultOrgParserState,
     encodeGPath,
     nilOidOrgDoc,
   )
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
+import Network.URI qualified as N
 import Relude
   ( Bool (True),
     Either (Left, Right),
     FilePath,
     IO,
+    Maybe (Just, Nothing),
     String,
     Text,
     foldl',
@@ -1472,6 +2767,7 @@ import Relude
     show,
     ($),
     (.),
+    (<$>),
     (<>),
     (==),
   )
@@ -1514,6 +2810,8 @@ These helpers let us be a bit more concise when writing individual test cases.
 <<f:getWovenPrettyFromPath>>
 <<f:searchOrderedNeedles>>
 <<f:weaveExpect>>
+<<f:getCiteprocResultFromPath>>
+<<f:expectCiteprocResult>>
 #+end_src
 
 [[f:getWovenPrettyFromPath]] weaves the given Org file to a =Text=, by first compiling
@@ -1541,10 +2839,12 @@ getWovenPrettyFromPath path = do
       case maybeArchive of
         Left errMsg -> pure $ Left errMsg
         Right archive -> do
+          result <- LW.prepareCitations inputOrgFileGPath object archive
           let weaveConf =
                 WeaveConf
                   { archive = archive,
                     originObjectPath = inputOrgFileGPath,
+                    citeprocResult = result,
                     watch = True
                   }
           pure
@@ -1607,6 +2907,51 @@ weaveExpect path needles = do
       Left errMsg -> it "programmer error" $ expectationFailure errMsg
 #+end_src
 
+[[f:getCiteprocResultFromPath]] is like [[f:getWovenPrettyFromPath]], but it only
+returns the result of calling [[f:prepareCitations]].
+
+#+name: f:getCiteprocResultFromPath
+#+begin_src haskell
+getCiteprocResultFromPath :: FilePath -> IO (Either String (CP.Result Prose))
+getCiteprocResultFromPath path = do
+  inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
+  inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser defaultOrgParserState)
+          path
+          (nilOidOrgDoc <> inputOrgFile)
+  case parseResult of
+    Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) -> do
+      object <- LC.mkObject orgDoc
+      maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
+      case maybeArchive of
+        Left errMsg -> pure $ Left errMsg
+        Right archive ->
+          Right <$> LW.prepareCitations inputOrgFileGPath object archive
+#+end_src
+
+[[f:expectCiteprocResult]] checks the citations and bibliography for a given Org doc
+in the ~test/Lilac/WeaveSpec~ folder.
+
+#+name: f:expectCiteprocResult
+#+begin_src haskell
+expectCiteprocResult :: FilePath -> CP.Result Prose -> Spec
+expectCiteprocResult path expected = do
+  result <- runIO $ getCiteprocResultFromPath path
+  describe path $ do
+    case result of
+      Right got -> do
+        it "citations" $ do
+          got.resultCitations `shouldBe` expected.resultCitations
+        it "bibliography" $ do
+          got.resultBibliography `shouldBe` expected.resultBibliography
+        it "warnings" $ do
+          got.resultWarnings `shouldBe` expected.resultWarnings
+      Left errMsg -> it "programmer error" $ expectationFailure errMsg
+#+end_src
+
 *** All test cases
 
 #+name: f:weaveSpec
@@ -1617,6 +2962,7 @@ weaveSpec = do
   <<t:0300-weave-lists>>
   <<t:0301-weave-external-links-common-prefix>>
   <<t:0301-weave-external-links>>
+  <<t:0400-citeproc-basic>>
 #+end_src
 
 ** Footnotes
@@ -1636,12 +2982,6 @@ weaveFootnote footnote = do
           weaveProse footnote.body
     | otherwise -> pure ()
 #+end_src
-
-** Citations
-
-For weaving citations, we use a 2-step process. First, we weave the prose
-contents of [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Citation][data:Citation]] into HTML, while preserving the structure. Then we
-call into =Citeproc.citeproc= to get the new HTML strings we want.
 
 * Generate CSS
 :PROPERTIES:
