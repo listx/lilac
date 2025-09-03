@@ -35,6 +35,8 @@ import Clay
     em,
     figcaption,
     fitContent,
+    float,
+    floatLeft,
     fontFamily,
     fontSize,
     fontStyle,
@@ -330,6 +332,10 @@ defaultCss = do
   ".figure-image" & do
     display block
     vh margin (px 0) auto
+  ".csl-left-margin" & do
+    float floatLeft
+  ".csl-right-inline" & do
+    margin 0 0 0 (em 2)
   sup ? do
     ".footnote-link" & do
       a ? do

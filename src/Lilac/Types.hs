@@ -360,6 +360,8 @@ data PToken
   | PTokenLink Link
   | PTokenCitation Int
   | PTokenMathFragment MathFragment
+  | PTokenDivStart Text
+  | PTokenDivEnd
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 

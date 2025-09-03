@@ -50,7 +50,14 @@ import Lilac.Types
     OID,
     Object (Object, externalOids, orgDoc, symbols),
     OrgDoc (bibPaths, cells, cslPath, oid),
-    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
+    PToken
+      ( PTokenCitation,
+        PTokenDivEnd,
+        PTokenDivStart,
+        PTokenLink,
+        PTokenMathFragment,
+        PTokenStyledText
+      ),
     Prose (unProse),
     Table (grid, meta),
     decodeGPath,
@@ -311,7 +318,9 @@ findExternalOids orgDoc =
       PTokenLink link -> getExternal acc link
       PTokenStyledText {}
       PTokenCitation {}
-      PTokenMathFragment {} -> acc
+      PTokenMathFragment {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> acc
     getExternal acc link = case link.target of
       LinkTargetOid linkOid ->
         if member linkOid symbols

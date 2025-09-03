@@ -11,7 +11,12 @@ import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Link (Link, name, target),
     LinkTarget (LinkTargetURI),
-    PToken (PTokenLink, PTokenStyledText),
+    PToken
+      ( PTokenDivEnd,
+        PTokenDivStart,
+        PTokenLink,
+        PTokenStyledText
+      ),
     Prose (Prose, unProse),
     Style (Italic),
     StyledText (StyledText, body, style),
@@ -321,16 +326,25 @@ weaveSpec = do
           [ ( "a",
               Prose
                 { unProse =
-                    [ PTokenStyledText StyledText {body = "[1]D. E. Knuth, ", style = styleMaskFrom []},
+                    [ PTokenDivStart "left-margin",
+                      PTokenStyledText StyledText {body = "[1]", style = styleMaskFrom []},
+                      PTokenDivEnd,
+                      PTokenDivStart "right-inline",
+                      PTokenStyledText StyledText {body = "D. E. Knuth, ", style = styleMaskFrom []},
                       PTokenStyledText StyledText {body = "Literate programming", style = styleMaskFrom [Italic]},
-                      PTokenStyledText StyledText {body = ". in CSLI lecture notes, no. no. 27. Stanford, Calif.: Center for the Study of Language; Information, 1992.", style = styleMaskFrom []}
+                      PTokenStyledText StyledText {body = ". in CSLI lecture notes, no. no. 27. Stanford, Calif.: Center for the Study of Language; Information, 1992.", style = styleMaskFrom []},
+                      PTokenDivEnd
                     ]
                 }
             ),
             ( "b",
               Prose
                 { unProse =
-                    [ PTokenStyledText (StyledText {body = "[2]E. W. Dijkstra, \8220Letters to the editor: Go to statement considered harmful,\8221 ", style = styleMaskFrom []}),
+                    [ PTokenDivStart "left-margin",
+                      PTokenStyledText (StyledText {body = "[2]", style = styleMaskFrom []}),
+                      PTokenDivEnd,
+                      PTokenDivStart "right-inline",
+                      PTokenStyledText (StyledText {body = "E. W. Dijkstra, \8220Letters to the editor: Go to statement considered harmful,\8221 ", style = styleMaskFrom []}),
                       PTokenStyledText (StyledText {body = "Communications of the ACM", style = styleMaskFrom [Italic]}),
                       PTokenStyledText (StyledText {body = ", vol. 11, no. 3, pp. 147\8211\&148, Mar. 1968, doi: ", style = styleMaskFrom []}),
                       PTokenLink
@@ -354,14 +368,19 @@ weaveSpec = do
                                     N.uriFragment = ""
                                   }
                           },
-                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []},
+                      PTokenDivEnd
                     ]
                 }
             ),
             ( "c",
               Prose
                 { unProse =
-                    [ PTokenStyledText StyledText {body = "[3]A. M. Turing, \8220On Computable Numbers, with an Application to the Entscheidungsproblem,\8221 ", style = styleMaskFrom []},
+                    [ PTokenDivStart "left-margin",
+                      PTokenStyledText StyledText {body = "[3]", style = styleMaskFrom []},
+                      PTokenDivEnd,
+                      PTokenDivStart "right-inline",
+                      PTokenStyledText StyledText {body = "A. M. Turing, \8220On Computable Numbers, with an Application to the Entscheidungsproblem,\8221 ", style = styleMaskFrom []},
                       PTokenStyledText StyledText {body = "Proceedings of the London Mathematical Society", style = styleMaskFrom [Italic]},
                       PTokenStyledText StyledText {body = ", vol. s2\8211\&42, no. 1, pp. 230\8211\&265, 1937, doi: ", style = styleMaskFrom []},
                       PTokenLink
@@ -385,14 +404,19 @@ weaveSpec = do
                                     N.uriFragment = ""
                                   }
                           },
-                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []},
+                      PTokenDivEnd
                     ]
                 }
             ),
             ( "d",
               Prose
                 { unProse =
-                    [ PTokenStyledText StyledText {body = "[4]C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 ", style = styleMaskFrom []},
+                    [ PTokenDivStart "left-margin",
+                      PTokenStyledText StyledText {body = "[4]", style = styleMaskFrom []},
+                      PTokenDivEnd,
+                      PTokenDivStart "right-inline",
+                      PTokenStyledText StyledText {body = "C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 ", style = styleMaskFrom []},
                       PTokenStyledText StyledText {body = "Bell System Technical Journal", style = styleMaskFrom [Italic]},
                       PTokenStyledText StyledText {body = ", vol. 27, no. 3, pp. 379\8211\&423, July 1948, doi: ", style = styleMaskFrom []},
                       PTokenLink
@@ -416,7 +440,8 @@ weaveSpec = do
                                     N.uriFragment = ""
                                   }
                           },
-                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []},
+                      PTokenDivEnd
                     ]
                 }
             )

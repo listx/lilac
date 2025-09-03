@@ -142,7 +142,14 @@ import Lilac.Types
       ),
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
-    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
+    PToken
+      ( PTokenCitation,
+        PTokenDivEnd,
+        PTokenDivStart,
+        PTokenLink,
+        PTokenMathFragment,
+        PTokenStyledText
+      ),
     Prose (Prose, unProse),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyleMask (StyleMask),
@@ -649,7 +656,9 @@ proseParser spaceConsumer = do
       PTokenStyledText styledText -> not $ T.null styledText.body
       PTokenLink {}
       PTokenMathFragment {}
-      PTokenCitation {} -> True
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> True
 
 proseSpaceConsumer :: Int -> OrgParser Text
 proseSpaceConsumer expectedIndentLen = do
@@ -1969,7 +1978,9 @@ instance CiteprocOutput Prose where
     where
       f :: Text -> PToken -> Text
       f acc = \case
-        PTokenCitation {} -> acc
+        PTokenCitation {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> acc
         PTokenStyledText styledText
           | T.null styledText.body -> acc
           | otherwise -> acc <> unparseStyledText styledText
@@ -2013,7 +2024,9 @@ instance CiteprocOutput Prose where
               }
         PTokenLink {}
         PTokenCitation {}
-        PTokenMathFragment {} -> pToken
+        PTokenMathFragment {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> pToken
       italicize pToken = case pToken of
         PTokenStyledText styledText ->
           PTokenStyledText
@@ -2023,7 +2036,9 @@ instance CiteprocOutput Prose where
               }
         PTokenLink {}
         PTokenCitation {}
-        PTokenMathFragment {} -> pToken
+        PTokenMathFragment {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> pToken
 
   addFontWeight fontWeight prose = case fontWeight of
     NormalWeight -> Prose $ map unBold prose.unProse
@@ -2039,7 +2054,9 @@ instance CiteprocOutput Prose where
               }
         PTokenLink {}
         PTokenCitation {}
-        PTokenMathFragment {} -> pToken
+        PTokenMathFragment {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> pToken
       unBold pToken = case pToken of
         PTokenStyledText styledText ->
           PTokenStyledText
@@ -2052,7 +2069,9 @@ instance CiteprocOutput Prose where
               }
         PTokenLink {}
         PTokenCitation {}
-        PTokenMathFragment {} -> pToken
+        PTokenMathFragment {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> pToken
 
   addTextDecoration textDecoration prose = case textDecoration of
     NoDecoration -> Prose $ map noUnderline prose.unProse
@@ -2067,7 +2086,9 @@ instance CiteprocOutput Prose where
               }
         PTokenLink {}
         PTokenCitation {}
-        PTokenMathFragment {} -> pToken
+        PTokenMathFragment {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> pToken
       noUnderline pToken = case pToken of
         PTokenStyledText styledText ->
           PTokenStyledText
@@ -2080,7 +2101,9 @@ instance CiteprocOutput Prose where
               }
         PTokenLink {}
         PTokenCitation {}
-        PTokenMathFragment {} -> pToken
+        PTokenMathFragment {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> pToken
 
   addVerticalAlign verticalAlign prose = case verticalAlign of
     BaselineAlign
@@ -2123,7 +2146,9 @@ instance CiteprocOutput Prose where
               }
         PTokenLink {}
         PTokenCitation {}
-        PTokenMathFragment {} -> pToken
+        PTokenMathFragment {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> pToken
       g s =
         let attempts = map (tryRearrange s) punctCombos
          in case find (\(mightHaveMore, _) -> mightHaveMore) attempts of
@@ -2156,7 +2181,9 @@ instance CiteprocOutput Prose where
               }
         PTokenLink {}
         PTokenCitation {}
-        PTokenMathFragment {} -> pToken
+        PTokenMathFragment {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> pToken
 
   addHyperlink url prose = Prose $ maybeToList link <> prose.unProse
     where
@@ -2251,7 +2278,9 @@ dropTextFromStyledText dropFromStart f prose =
                       else (modified : acc, True)
           PTokenLink {}
           PTokenMathFragment {}
-          PTokenCitation {} -> (pToken : acc, pastFirst)
+          PTokenCitation {}
+          PTokenDivStart {}
+          PTokenDivEnd {} -> (pToken : acc, pastFirst)
     dropper = if dropFromStart then T.dropWhile else T.dropWhileEnd
 
 citationParser :: OrgParser Int

@@ -396,7 +396,14 @@ import Lilac.Types
       ),
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
-    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
+    PToken
+      ( PTokenCitation,
+        PTokenDivEnd,
+        PTokenDivStart,
+        PTokenLink,
+        PTokenMathFragment,
+        PTokenStyledText
+      ),
     Prose (Prose, unProse),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyleMask (StyleMask),
@@ -1492,9 +1499,21 @@ data PToken
   | PTokenLink Link
   | PTokenCitation Int
   | PTokenMathFragment MathFragment
+  | PTokenDivStart Text
+  | PTokenDivEnd
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
+
+The ~PTokenDivStart~ and ~PTokenDivEnd~ markers are similar to the [[data:ListMarker]],
+in that they encode start and end points (in HTML). Specifically, they provide
+equivalent functionality of the ~CslDiv~ constructor for the ~CslJson~ type in
+=Citeproc=. Arguably the ~CslDiv~ is more elegant because it encodes a recursive
+list structure (by way of ~CslConcat~ and ~CslEmpty~), and also because it only
+needs a single constructor ~CslDiv~ whereas we require two (~PTokenDivStart~ and
+~PTokenDivEnd~). However this is the price we have to pay for not being recursive.
+It also makes parsing these things difficult, so we avoid parsing them
+altogether from raw text (notice how [[f:proseParser]] does not use them).
 
 The ~proseParser~ can parse a series of [[data:PToken]] values. It is used by both
 [[f:headingParser]] and [[f:paragraphParser]], because they both allow prose text in
@@ -1539,7 +1558,9 @@ proseParser spaceConsumer = do
       PTokenStyledText styledText -> not $ T.null styledText.body
       PTokenLink {}
       PTokenMathFragment {}
-      PTokenCitation {} -> True
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> True
 #+end_src
 
 In [[f:proseParser]], we parse whitespace explicitly with =whitespaceCompressor= which
@@ -1730,7 +1751,9 @@ toText prose = foldl' f T.empty prose.unProse
   where
     f :: Text -> PToken -> Text
     f acc = \case
-      PTokenCitation {} -> acc
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> acc
       PTokenStyledText styledText
         | T.null styledText.body -> acc
         | otherwise -> acc <> unparseStyledText styledText
@@ -1741,6 +1764,12 @@ toText prose = foldl' f T.empty prose.unProse
 We don't support converting [[data:Citation]] back into ~Text~, because that would
 suggest a nested citation (where a citation has another citation inside it),
 which is strictly forbidden, as seen in [[t:0014-citations-nested]].
+
+We also do not support converting ~PTokenDivStart~ and ~PTokenDivEnd~ to ~Text~,
+because we never expect them to be written by humans; they only serve to convert
+~CslJson~ in =Citeproc= back into [[newtype:Prose]]. And also, even if we supported it
+here, if we wanted to round trip back from ~Text~ into [[newtype:Prose]] we would fail
+because [[f:proseParser]] does not support parsing these markers.
 
 Converting a [[data:StyledText]] back into a ~Text~ is straightforward. We simply
 surround the bold text with the appropriate style markers.
@@ -1864,7 +1893,9 @@ dropTextFromStyledText dropFromStart f prose =
                       else (modified : acc, True)
           PTokenLink {}
           PTokenMathFragment {}
-          PTokenCitation {} -> (pToken : acc, pastFirst)
+          PTokenCitation {}
+          PTokenDivStart {}
+          PTokenDivEnd {} -> (pToken : acc, pastFirst)
     dropper = if dropFromStart then T.dropWhile else T.dropWhileEnd
 #+end_src
 
@@ -1897,7 +1928,9 @@ addFontStyle fontStyle prose = case fontStyle of
             }
       PTokenLink {}
       PTokenCitation {}
-      PTokenMathFragment {} -> pToken
+      PTokenMathFragment {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> pToken
     italicize pToken = case pToken of
       PTokenStyledText styledText ->
         PTokenStyledText
@@ -1907,7 +1940,9 @@ addFontStyle fontStyle prose = case fontStyle of
             }
       PTokenLink {}
       PTokenCitation {}
-      PTokenMathFragment {} -> pToken
+      PTokenMathFragment {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> pToken
 #+end_src
 
 For the font weight, we only have one weight, which is ~Bold~.
@@ -1928,7 +1963,9 @@ addFontWeight fontWeight prose = case fontWeight of
             }
       PTokenLink {}
       PTokenCitation {}
-      PTokenMathFragment {} -> pToken
+      PTokenMathFragment {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> pToken
     unBold pToken = case pToken of
       PTokenStyledText styledText ->
         PTokenStyledText
@@ -1941,7 +1978,9 @@ addFontWeight fontWeight prose = case fontWeight of
             }
       PTokenLink {}
       PTokenCitation {}
-      PTokenMathFragment {} -> pToken
+      PTokenMathFragment {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> pToken
 #+end_src
 
 The ~addTextDecoration~ definition is straightforward enough, because there is no
@@ -1962,7 +2001,9 @@ addTextDecoration textDecoration prose = case textDecoration of
             }
       PTokenLink {}
       PTokenCitation {}
-      PTokenMathFragment {} -> pToken
+      PTokenMathFragment {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> pToken
     noUnderline pToken = case pToken of
       PTokenStyledText styledText ->
         PTokenStyledText
@@ -1975,7 +2016,9 @@ addTextDecoration textDecoration prose = case textDecoration of
             }
       PTokenLink {}
       PTokenCitation {}
-      PTokenMathFragment {} -> pToken
+      PTokenMathFragment {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> pToken
 #+end_src
 
 We don't support adding vertical alignment, so we don't do anything here.
@@ -2055,7 +2098,9 @@ movePunctuationInsideQuotes prose =
             }
       PTokenLink {}
       PTokenCitation {}
-      PTokenMathFragment {} -> pToken
+      PTokenMathFragment {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> pToken
     g s =
       let attempts = map (tryRearrange s) punctCombos
        in case find (\(mightHaveMore, _) -> mightHaveMore) attempts of
@@ -2098,7 +2143,9 @@ mapText f prose = Prose $ map g prose.unProse
             }
       PTokenLink {}
       PTokenCitation {}
-      PTokenMathFragment {} -> pToken
+      PTokenMathFragment {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> pToken
 #+end_src
 
 ~addHyperlink~ just adds a URL; we have a rich [[data:Link]] type for this, so that's

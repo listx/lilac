@@ -141,7 +141,14 @@ import Lilac.Types
     MathFragment (body, meta),
     Object (orgDoc, symbols),
     OrgDoc (bibPaths, cells, citations, cslPath, footnoteNumbers, meta),
-    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
+    PToken
+      ( PTokenCitation,
+        PTokenDivEnd,
+        PTokenDivStart,
+        PTokenLink,
+        PTokenMathFragment,
+        PTokenStyledText
+      ),
     Prose (Prose, unProse),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
@@ -799,7 +806,9 @@ getProseContents prose = join $ foldl' f [] prose.unProse
                   link.name
          in linkText : acc
       PTokenMathFragment mathFragment -> mathFragment.body : acc
-      PTokenCitation {} -> acc
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> acc
 #+end_src
 
 For weaving the [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]], [[f:weaveProse]] delegates most of the work to
@@ -827,6 +836,8 @@ weavePToken = \case
     LinkTargetURI {} -> weaveLink link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
   PTokenCitation n -> weaveCitation n
+  PTokenDivStart t -> toHtmlRaw ("<div class=\"csl-" <> t <> "\">" :: Text)
+  PTokenDivEnd -> toHtmlRaw ("</div>" :: Text)
 #+end_src
 
 ** Styled text
@@ -1455,7 +1466,9 @@ weaveTable table = do
             && T.isPrefixOf prefix styledText.body
         PTokenLink {}
         PTokenMathFragment {}
-        PTokenCitation {} -> False
+        PTokenCitation {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> False
     proseHasColgroupStartMarker :: Prose -> Bool
     proseHasColgroupStartMarker = proseHas "<"
     proseHasNonExportMarker :: Prose -> Bool
@@ -1468,7 +1481,9 @@ weaveTable table = do
       PTokenStyledText styledText -> styledText.body
       PTokenLink {}
       PTokenMathFragment {}
-      PTokenCitation {} -> ""
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> ""
 #+end_src
 
 The ~headerRowIndex~ is calculated by examining the table cells in the first
@@ -1535,7 +1550,9 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
       PTokenMathFragment mathFragment ->
         let encoded = CslDiv ("LILAC_MATH_FRAGMENT\NUL" <> unparseMathFragment mathFragment) CslEmpty
          in acc <> encoded
-      PTokenCitation {} -> acc
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd -> acc
     applyStyles :: CslJson Text -> [Style] -> CslJson Text
     applyStyles cslBody styles = foldl' applyStyle cslBody styles
     applyStyle :: CslJson Text -> Style -> CslJson Text
@@ -1663,7 +1680,7 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
         | t == "LILAC_STYLE_VERBATIM\NUL" -> f (Verbatim : s) a
         | "LILAC_MATH_FRAGMENT\NUL" `T.isPrefixOf` t ->
             (CP.fromText (T.drop 20 t) :: Prose).unProse
-        | otherwise -> f s a
+        | otherwise -> [PTokenDivStart t] <> f s a <> [PTokenDivEnd]
       CslLink t a
         | "LILAC_LINK\NUL" `T.isPrefixOf` t ->
             (CP.fromText (T.drop 11 t) :: Prose).unProse
@@ -1690,7 +1707,9 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
       PTokenStyledText styledText -> styledText : getStyledText rest
       PTokenLink {}
       PTokenMathFragment {}
-      PTokenCitation {} -> []
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> []
 #+end_src
 
 Unfortunately, we have to discard some information because not everything in
@@ -1791,9 +1810,9 @@ weaveBibliography = do
       bibliography = result.resultBibliography
   div_ [class_ "bibliography"] $ do
     forM_ bibliography $ \(key, prose) -> do
-      div_ [class_ "bib-ref"] $ do
-        let linkAnchor = "ref-" <> key
-        p_ [id_ linkAnchor] $ weaveProse prose
+      let linkAnchor = "ref-" <> key
+      div_ [class_ "bib-ref", id_ linkAnchor] $ do
+        weaveProse prose
 #+end_src
 
 The ~#ref-...~ style is based on what =Citeproc= uses; for now we choose to use it
@@ -2566,16 +2585,25 @@ expectCiteprocResult
 [ ( "a",
     Prose
       { unProse =
-          [ PTokenStyledText StyledText {body = "[1]D. E. Knuth, ", style = styleMaskFrom []},
+          [ PTokenDivStart "left-margin",
+            PTokenStyledText StyledText {body = "[1]", style = styleMaskFrom []},
+            PTokenDivEnd,
+            PTokenDivStart "right-inline",
+            PTokenStyledText StyledText {body = "D. E. Knuth, ", style = styleMaskFrom []},
             PTokenStyledText StyledText {body = "Literate programming", style = styleMaskFrom [Italic]},
-            PTokenStyledText StyledText {body = ". in CSLI lecture notes, no. no. 27. Stanford, Calif.: Center for the Study of Language; Information, 1992.", style = styleMaskFrom []}
+            PTokenStyledText StyledText {body = ". in CSLI lecture notes, no. no. 27. Stanford, Calif.: Center for the Study of Language; Information, 1992.", style = styleMaskFrom []},
+            PTokenDivEnd
           ]
       }
   ),
   ( "b",
     Prose
       { unProse =
-          [ PTokenStyledText (StyledText {body = "[2]E. W. Dijkstra, \8220Letters to the editor: Go to statement considered harmful,\8221 ", style = styleMaskFrom []}),
+          [ PTokenDivStart "left-margin",
+            PTokenStyledText (StyledText {body = "[2]", style = styleMaskFrom []}),
+            PTokenDivEnd,
+            PTokenDivStart "right-inline",
+            PTokenStyledText (StyledText {body = "E. W. Dijkstra, \8220Letters to the editor: Go to statement considered harmful,\8221 ", style = styleMaskFrom []}),
             PTokenStyledText (StyledText {body = "Communications of the ACM", style = styleMaskFrom [Italic]}),
             PTokenStyledText (StyledText {body = ", vol. 11, no. 3, pp. 147\8211\&148, Mar. 1968, doi: ", style = styleMaskFrom []}),
             PTokenLink
@@ -2599,14 +2627,19 @@ expectCiteprocResult
                           N.uriFragment = ""
                         }
                 },
-            PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+            PTokenStyledText StyledText {body = ".", style = styleMaskFrom []},
+            PTokenDivEnd
           ]
       }
   ),
   ( "c",
     Prose
       { unProse =
-          [ PTokenStyledText StyledText {body = "[3]A. M. Turing, \8220On Computable Numbers, with an Application to the Entscheidungsproblem,\8221 ", style = styleMaskFrom []},
+          [ PTokenDivStart "left-margin",
+            PTokenStyledText StyledText {body = "[3]", style = styleMaskFrom []},
+            PTokenDivEnd,
+            PTokenDivStart "right-inline",
+            PTokenStyledText StyledText {body = "A. M. Turing, \8220On Computable Numbers, with an Application to the Entscheidungsproblem,\8221 ", style = styleMaskFrom []},
             PTokenStyledText StyledText {body = "Proceedings of the London Mathematical Society", style = styleMaskFrom [Italic]},
             PTokenStyledText StyledText {body = ", vol. s2\8211\&42, no. 1, pp. 230\8211\&265, 1937, doi: ", style = styleMaskFrom []},
             PTokenLink
@@ -2630,14 +2663,19 @@ expectCiteprocResult
                           N.uriFragment = ""
                         }
                 },
-            PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+            PTokenStyledText StyledText {body = ".", style = styleMaskFrom []},
+            PTokenDivEnd
           ]
       }
   ),
   ( "d",
     Prose
       { unProse =
-          [ PTokenStyledText StyledText {body = "[4]C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 ", style = styleMaskFrom []},
+          [ PTokenDivStart "left-margin",
+            PTokenStyledText StyledText {body = "[4]", style = styleMaskFrom []},
+            PTokenDivEnd,
+            PTokenDivStart "right-inline",
+            PTokenStyledText StyledText {body = "C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 ", style = styleMaskFrom []},
             PTokenStyledText StyledText {body = "Bell System Technical Journal", style = styleMaskFrom [Italic]},
             PTokenStyledText StyledText {body = ", vol. 27, no. 3, pp. 379\8211\&423, July 1948, doi: ", style = styleMaskFrom []},
             PTokenLink
@@ -2661,7 +2699,8 @@ expectCiteprocResult
                           N.uriFragment = ""
                         }
                 },
-            PTokenStyledText StyledText {body = ".", style = styleMaskFrom []}
+            PTokenStyledText StyledText {body = ".", style = styleMaskFrom []},
+            PTokenDivEnd
           ]
       }
   )
@@ -2697,7 +2736,12 @@ import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Link (Link, name, target),
     LinkTarget (LinkTargetURI),
-    PToken (PTokenLink, PTokenStyledText),
+    PToken
+      ( PTokenDivEnd,
+        PTokenDivStart,
+        PTokenLink,
+        PTokenStyledText
+      ),
     Prose (Prose, unProse),
     Style (Italic),
     StyledText (StyledText, body, style),
@@ -2997,6 +3041,8 @@ import Clay
     em,
     figcaption,
     fitContent,
+    float,
+    floatLeft,
     fontFamily,
     fontSize,
     fontStyle,
@@ -3250,6 +3296,10 @@ defaultCss = do
   ".figure-image" & do
     display block
     vh margin (px 0) auto
+  ".csl-left-margin" & do
+    float floatLeft
+  ".csl-right-inline" & do
+    margin 0 0 0 (em 2)
   sup ? do
     ".footnote-link" & do
       a ? do

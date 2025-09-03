@@ -86,7 +86,14 @@ import Lilac.Types
     MathFragment (body, meta),
     Object (orgDoc, symbols),
     OrgDoc (bibPaths, cells, citations, cslPath, footnoteNumbers, meta),
-    PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
+    PToken
+      ( PTokenCitation,
+        PTokenDivEnd,
+        PTokenDivStart,
+        PTokenLink,
+        PTokenMathFragment,
+        PTokenStyledText
+      ),
     Prose (Prose, unProse),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
@@ -350,7 +357,9 @@ getProseContents prose = join $ foldl' f [] prose.unProse
                   link.name
          in linkText : acc
       PTokenMathFragment mathFragment -> mathFragment.body : acc
-      PTokenCitation {} -> acc
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> acc
 
 weaveDocMeta :: M.Map Text Text -> HtmlWeaver ()
 weaveDocMeta m = do
@@ -459,6 +468,8 @@ weavePToken = \case
     LinkTargetURI {} -> weaveLink link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
   PTokenCitation n -> weaveCitation n
+  PTokenDivStart t -> toHtmlRaw ("<div class=\"csl-" <> t <> "\">" :: Text)
+  PTokenDivEnd -> toHtmlRaw ("</div>" :: Text)
 
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
@@ -769,7 +780,9 @@ weaveTable table = do
             && T.isPrefixOf prefix styledText.body
         PTokenLink {}
         PTokenMathFragment {}
-        PTokenCitation {} -> False
+        PTokenCitation {}
+        PTokenDivStart {}
+        PTokenDivEnd {} -> False
     proseHasColgroupStartMarker :: Prose -> Bool
     proseHasColgroupStartMarker = proseHas "<"
     proseHasNonExportMarker :: Prose -> Bool
@@ -782,7 +795,9 @@ weaveTable table = do
       PTokenStyledText styledText -> styledText.body
       PTokenLink {}
       PTokenMathFragment {}
-      PTokenCitation {} -> ""
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> ""
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest
@@ -841,7 +856,9 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
       PTokenMathFragment mathFragment ->
         let encoded = CslDiv ("LILAC_MATH_FRAGMENT\NUL" <> unparseMathFragment mathFragment) CslEmpty
          in acc <> encoded
-      PTokenCitation {} -> acc
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd -> acc
     applyStyles :: CslJson Text -> [Style] -> CslJson Text
     applyStyles cslBody styles = foldl' applyStyle cslBody styles
     applyStyle :: CslJson Text -> Style -> CslJson Text
@@ -927,7 +944,7 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
         | t == "LILAC_STYLE_VERBATIM\NUL" -> f (Verbatim : s) a
         | "LILAC_MATH_FRAGMENT\NUL" `T.isPrefixOf` t ->
             (CP.fromText (T.drop 20 t) :: Prose).unProse
-        | otherwise -> f s a
+        | otherwise -> [PTokenDivStart t] <> f s a <> [PTokenDivEnd]
       CslLink t a
         | "LILAC_LINK\NUL" `T.isPrefixOf` t ->
             (CP.fromText (T.drop 11 t) :: Prose).unProse
@@ -954,7 +971,9 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
       PTokenStyledText styledText -> styledText : getStyledText rest
       PTokenLink {}
       PTokenMathFragment {}
-      PTokenCitation {} -> []
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> []
 
 prepareCitations :: GPath -> Object -> Archive -> IO (CP.Result Prose)
 prepareCitations objGPath object archive = do
@@ -1014,6 +1033,6 @@ weaveBibliography = do
       bibliography = result.resultBibliography
   div_ [class_ "bibliography"] $ do
     forM_ bibliography $ \(key, prose) -> do
-      div_ [class_ "bib-ref"] $ do
-        let linkAnchor = "ref-" <> key
-        p_ [id_ linkAnchor] $ weaveProse prose
+      let linkAnchor = "ref-" <> key
+      div_ [class_ "bib-ref", id_ linkAnchor] $ do
+        weaveProse prose
