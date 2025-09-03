@@ -2,6 +2,7 @@
 
 module Lilac.Parse
   ( compressProse,
+    compressStyledText,
     defaultOrgDoc,
     defaultOrgParserConf,
     genHeadingSection,
@@ -853,6 +854,22 @@ compressProse prose =
     dropUnnecessary (((PTokenStyledText (StyledText " " _))) : rest) = rest
     dropUnnecessary (((PTokenStyledText (StyledText "" _))) : rest) = rest
     dropUnnecessary tokens = tokens
+
+compressStyledText :: [StyledText] -> [StyledText]
+compressStyledText = reverse . dropUnnecessary . foldl' f []
+  where
+    f :: [StyledText] -> StyledText -> [StyledText]
+    f [] styledText = styledText : []
+    f
+      ((t1@(StyledText body1 style1)) : rest)
+      t2@(StyledText body2 style2)
+        | style1 == style2 =
+            (StyledText (T.concat [body1, body2]) style1) : rest
+        | otherwise = t2 : t1 : rest
+    dropUnnecessary [] = []
+    dropUnnecessary ((StyledText " " _) : rest) = rest
+    dropUnnecessary ((StyledText "" _) : rest) = rest
+    dropUnnecessary styledTexts = styledTexts
 
 assertUniqueCellName :: Text -> OrgParser ()
 assertUniqueCellName cellName = do

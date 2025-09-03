@@ -39,6 +39,7 @@ import Data.Text.Lazy qualified as TL
 import Lilac.Compile (makeRelativeToObjectPath, parseCitationStyle)
 import Lilac.Parse
   ( compressProse,
+    compressStyledText,
     isNumericText,
     maskToStyles,
     styleMaskFrom,
@@ -940,13 +941,13 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
                       N.uriFragment = ""
                     }
                 target = LinkTargetURI uri
-                name = getStyledText $ f s a
+                name = compressStyledText . getStyledText $ f s a
              in [PTokenLink Link {target = target, name = name}]
         | otherwise -> case (N.parseURI $ T.unpack t) of
             Nothing -> []
             Just uri ->
               let target = LinkTargetURI uri
-                  name = getStyledText $ f s a
+                  name = compressStyledText . getStyledText $ f s a
                in [PTokenLink Link {target = target, name = name}]
     getStyledText [] = []
     getStyledText (pToken : rest) = case pToken of

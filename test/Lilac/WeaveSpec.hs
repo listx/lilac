@@ -250,9 +250,7 @@ weaveSpec = do
                   [ PTokenLink
                       Link
                         { name =
-                            [ StyledText {body = "[", style = styleMaskFrom []},
-                              StyledText {body = "1", style = styleMaskFrom []},
-                              StyledText {body = "]", style = styleMaskFrom []}
+                            [ StyledText {body = "[1]", style = styleMaskFrom []}
                             ],
                           target =
                             LinkTargetURI
@@ -272,9 +270,7 @@ weaveSpec = do
                     PTokenLink
                       Link
                         { name =
-                            [ StyledText {body = "[", style = styleMaskFrom []},
-                              StyledText {body = "2", style = styleMaskFrom []},
-                              StyledText {body = "]", style = styleMaskFrom []}
+                            [ StyledText {body = "[2]", style = styleMaskFrom []}
                             ],
                           target =
                             LinkTargetURI
@@ -290,9 +286,7 @@ weaveSpec = do
                     PTokenLink
                       Link
                         { name =
-                            [ StyledText {body = "[", style = styleMaskFrom []},
-                              StyledText {body = "3", style = styleMaskFrom []},
-                              StyledText {body = "]", style = styleMaskFrom []}
+                            [ StyledText {body = "[3]", style = styleMaskFrom []}
                             ],
                           target =
                             LinkTargetURI
@@ -308,9 +302,7 @@ weaveSpec = do
                     PTokenLink
                       Link
                         { name =
-                            [ StyledText {body = "[", style = styleMaskFrom []},
-                              StyledText {body = "4", style = styleMaskFrom []},
-                              StyledText {body = "]", style = styleMaskFrom []}
+                            [ StyledText {body = "[4]", style = styleMaskFrom []}
                             ],
                           target =
                             LinkTargetURI
@@ -344,13 +336,7 @@ weaveSpec = do
                       PTokenLink
                         Link
                           { name =
-                              [ StyledText {body = "10", style = styleMaskFrom []},
-                                StyledText {body = ".", style = styleMaskFrom []},
-                                StyledText {body = "1145", style = styleMaskFrom []},
-                                StyledText {body = "/", style = styleMaskFrom []},
-                                StyledText {body = "362929", style = styleMaskFrom []},
-                                StyledText {body = ".", style = styleMaskFrom []},
-                                StyledText {body = "362947", style = styleMaskFrom []}
+                              [ StyledText {body = "10.1145/362929.362947", style = styleMaskFrom []}
                               ],
                             target =
                               LinkTargetURI
@@ -381,19 +367,7 @@ weaveSpec = do
                       PTokenLink
                         Link
                           { name =
-                              [ StyledText {body = "10", style = styleMaskFrom []},
-                                StyledText {body = ".", style = styleMaskFrom []},
-                                StyledText {body = "1112", style = styleMaskFrom []},
-                                StyledText {body = "/", style = styleMaskFrom []},
-                                StyledText {body = "plms", style = styleMaskFrom []},
-                                StyledText {body = "/", style = styleMaskFrom []},
-                                StyledText {body = "s2", style = styleMaskFrom []},
-                                StyledText {body = "-", style = styleMaskFrom []},
-                                StyledText {body = "42", style = styleMaskFrom []},
-                                StyledText {body = ".", style = styleMaskFrom []},
-                                StyledText {body = "1", style = styleMaskFrom []},
-                                StyledText {body = ".", style = styleMaskFrom []},
-                                StyledText {body = "230", style = styleMaskFrom []}
+                              [ StyledText {body = "10.1112/plms/s2-42.1.230", style = styleMaskFrom []}
                               ],
                             target =
                               LinkTargetURI
@@ -424,21 +398,7 @@ weaveSpec = do
                       PTokenLink
                         Link
                           { name =
-                              [ StyledText {body = "10", style = styleMaskFrom []},
-                                StyledText {body = ".", style = styleMaskFrom []},
-                                StyledText {body = "1002", style = styleMaskFrom []},
-                                StyledText {body = "/", style = styleMaskFrom []},
-                                StyledText {body = "j", style = styleMaskFrom []},
-                                StyledText {body = ".", style = styleMaskFrom []},
-                                StyledText {body = "1538", style = styleMaskFrom []},
-                                StyledText {body = "-", style = styleMaskFrom []},
-                                StyledText {body = "7305", style = styleMaskFrom []},
-                                StyledText {body = ".", style = styleMaskFrom []},
-                                StyledText {body = "1948", style = styleMaskFrom []},
-                                StyledText {body = ".", style = styleMaskFrom []},
-                                StyledText {body = "tb01338", style = styleMaskFrom []},
-                                StyledText {body = ".", style = styleMaskFrom []},
-                                StyledText {body = "x", style = styleMaskFrom []}
+                              [ StyledText {body = "10.1002/j.1538-7305.1948.tb01338.x", style = styleMaskFrom []}
                               ],
                             target =
                               LinkTargetURI
