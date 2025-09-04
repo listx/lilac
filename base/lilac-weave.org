@@ -1509,6 +1509,24 @@ This demonstrates some of the complexities around ~markingCharacters~.
 |---+----------+----------+----------|
 |   |          |          | foo      |
 
+** Footnotes
+
+Footnote definitions are just paragraphs, with a leading number.
+
+#+name: f:weaveFootnote
+#+begin_src haskell
+weaveFootnote :: Footnote -> HtmlWeaver ()
+weaveFootnote footnote = do
+  weaveConf <- ask
+  if
+    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+      Just footnoteNumber <- lookup footnote.name originObj.orgDoc.footnoteNumbers -> do
+        p_ [class_ "footnote-definition", id_ ("footnote-" <> T.show footnoteNumber)] $ do
+          span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
+          weaveProse footnote.body
+    | otherwise -> pure ()
+#+end_src
+
 ** Citations
 :PROPERTIES:
 :ID:       7874b9c5-ceac-4820-8804-7732e29f5c60
@@ -2971,24 +2989,6 @@ weaveSpec = do
   <<t:0301-weave-external-links-common-prefix>>
   <<t:0301-weave-external-links>>
   <<t:0400-citeproc-basic>>
-#+end_src
-
-** Footnotes
-
-Footnote definitions are just paragraphs, with a leading number.
-
-#+name: f:weaveFootnote
-#+begin_src haskell
-weaveFootnote :: Footnote -> HtmlWeaver ()
-weaveFootnote footnote = do
-  weaveConf <- ask
-  if
-    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just footnoteNumber <- lookup footnote.name originObj.orgDoc.footnoteNumbers -> do
-        p_ [class_ "footnote-definition", id_ ("footnote-" <> T.show footnoteNumber)] $ do
-          span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
-          weaveProse footnote.body
-    | otherwise -> pure ()
 #+end_src
 
 * Generate CSS
