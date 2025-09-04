@@ -583,17 +583,16 @@ spliceLinks colorized links = do
 weaveLink :: Link -> HtmlWeaver ()
 weaveLink link = do
   wovenLinkTarget <- weaveLinkTarget link.target
+  let attrs = [href_ wovenLinkTarget] <> linkCategory wovenLinkTarget
   a_
-    [ href_ wovenLinkTarget,
-      class_ linkCategory
-    ]
+    attrs
     $ sequence_
     $ map weaveStyledText link.name
   where
-    linkCategory =
-      if isExternalLink link.target
-        then "external-link"
-        else "internal-link"
+    linkCategory target
+      | isExternalLink link.target = [class_ "external-link"]
+      | "#ref-" `T.isPrefixOf` target = []
+      | otherwise = [class_ "internal-link"]
 
 weaveLinkTarget :: LinkTarget -> HtmlWeaver T.Text
 weaveLinkTarget linkTarget = do

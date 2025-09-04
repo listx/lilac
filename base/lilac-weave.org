@@ -1066,18 +1066,21 @@ Weaving links is fairly straightforward.
 weaveLink :: Link -> HtmlWeaver ()
 weaveLink link = do
   wovenLinkTarget <- weaveLinkTarget link.target
+  let attrs = [href_ wovenLinkTarget] <> linkCategory wovenLinkTarget
   a_
-    [ href_ wovenLinkTarget,
-      class_ linkCategory
-    ]
+    attrs
     $ sequence_
     $ map weaveStyledText link.name
   where
-    linkCategory =
-      if isExternalLink link.target
-        then "external-link"
-        else "internal-link"
+    linkCategory target
+      | isExternalLink link.target = [class_ "external-link"]
+      | "#ref-" `T.isPrefixOf` target = []
+      | otherwise = [class_ "internal-link"]
 #+end_src
+
+Links to bibliographical entries (those starting with ~#ref-~ are not given an
+~internal-link~ class, because we want these links to be simple without any extra
+decorations.
 
 The part we need to put in the ~href="..."~ part is generated separately in
 [[f:weaveLinkTarget]].
