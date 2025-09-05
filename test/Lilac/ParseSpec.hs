@@ -3670,17 +3670,7 @@ parseSpec = do
           Prose
             [ PTokenStyledText
                 StyledText
-                  { body = "no",
-                    style = styleMaskFrom []
-                  },
-              PTokenStyledText
-                StyledText
-                  { body = " ",
-                    style = styleMaskFrom []
-                  },
-              PTokenStyledText
-                StyledText
-                  { body = "style",
+                  { body = "no style",
                     style = styleMaskFrom []
                   }
             ]
@@ -3694,6 +3684,15 @@ parseSpec = do
                   }
             ]
         ),
+        ( "*bo\\*ld (escaped)*",
+          Prose
+            [ PTokenStyledText
+                StyledText
+                  { body = "bo*ld (escaped)",
+                    style = styleMaskFrom [Bold]
+                  }
+            ]
+        ),
         ( "/italic/",
           Prose
             [ PTokenStyledText
@@ -3703,11 +3702,29 @@ parseSpec = do
                   }
             ]
         ),
+        ( "/it\\/alic (escaped)/",
+          Prose
+            [ PTokenStyledText
+                StyledText
+                  { body = "it/alic (escaped)",
+                    style = styleMaskFrom [Italic]
+                  }
+            ]
+        ),
         ( "_underline_",
           Prose
             [ PTokenStyledText
                 StyledText
                   { body = "underline",
+                    style = styleMaskFrom [Underline]
+                  }
+            ]
+        ),
+        ( "_under\\_line (escaped)_",
+          Prose
+            [ PTokenStyledText
+                StyledText
+                  { body = "under_line (escaped)",
                     style = styleMaskFrom [Underline]
                   }
             ]

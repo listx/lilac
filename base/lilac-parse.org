@@ -1718,7 +1718,7 @@ fromText input = case MP.runParser
   ""
   input of
   Left err -> error . T.pack $ MP.errorBundlePretty err
-  Right (prose, _) -> prose
+  Right (prose, _) -> compressProse prose
   where
     customProseParser = do
       leadingWhitespace <- MP.optional spaceConsumer
@@ -1779,7 +1779,7 @@ surround the bold text with the appropriate style markers.
 unparseStyledText :: StyledText -> Text
 unparseStyledText styledText =
   getStyleMarkers styledText.style
-    <> styledText.body
+    <> escapeStyleMarkers styledText.body
     <> getStyleMarkers styledText.style
   where
     getStyleMarkers styleMask =
@@ -1791,6 +1791,12 @@ unparseStyledText styledText =
       Underline -> acc <> "_"
       Verbatim -> acc <> "="
       Code -> acc <> "~"
+    escapeStyleMarkers = T.foldl' escape T.empty
+    escape acc c
+      | mustEscape && c `elem` ("*/_=~" :: String) = acc <> T.pack ['\\', c]
+      | otherwise = acc <> T.singleton c
+    mustEscape =
+      not (isCode styledText.style || isVerbatim styledText.style)
 #+end_src
 
 Converting a [[data:Link]] to ~Text~ is straightforward. We try to avoid duplicating
@@ -1818,7 +1824,13 @@ unparseLink link = case link.target of
           then "[[file:" <> linkTargetText <> "]]"
           else "[[file:" <> linkTargetText <> "][" <> displayName <> "]]"
   where
-    displayName = T.concat $ map unparseStyledText link.name
+    displayName
+      | hasNoStyle link.name = T.concat $ map (\s -> s.body) link.name
+      | otherwise = T.concat $ map unparseStyledText link.name
+    hasNoStyle :: [StyledText] -> Bool
+    hasNoStyle = null . foldl' f []
+    f :: [Style] -> StyledText -> [Style]
+    f acc s = acc <> maskToStyles s.style
 #+end_src
 
 For [[data:MathFragment]], we have to disambiguate the three different kinds of
@@ -2202,17 +2214,7 @@ describe "Text to Prose round trip" $ do
         Prose
           [ PTokenStyledText
               StyledText
-                { body = "no",
-                  style = styleMaskFrom []
-                },
-            PTokenStyledText
-              StyledText
-                { body = " ",
-                  style = styleMaskFrom []
-                },
-            PTokenStyledText
-              StyledText
-                { body = "style",
+                { body = "no style",
                   style = styleMaskFrom []
                 }
           ]
@@ -2226,6 +2228,15 @@ describe "Text to Prose round trip" $ do
                 }
           ]
       ),
+      ( "*bo\\*ld (escaped)*",
+        Prose
+          [ PTokenStyledText
+              StyledText
+                { body = "bo*ld (escaped)",
+                  style = styleMaskFrom [Bold]
+                }
+          ]
+      ),
       ( "/italic/",
         Prose
           [ PTokenStyledText
@@ -2235,11 +2246,29 @@ describe "Text to Prose round trip" $ do
                 }
           ]
       ),
+      ( "/it\\/alic (escaped)/",
+        Prose
+          [ PTokenStyledText
+              StyledText
+                { body = "it/alic (escaped)",
+                  style = styleMaskFrom [Italic]
+                }
+          ]
+      ),
       ( "_underline_",
         Prose
           [ PTokenStyledText
               StyledText
                 { body = "underline",
+                  style = styleMaskFrom [Underline]
+                }
+          ]
+      ),
+      ( "_under\\_line (escaped)_",
+        Prose
+          [ PTokenStyledText
+              StyledText
+                { body = "under_line (escaped)",
                   style = styleMaskFrom [Underline]
                 }
           ]

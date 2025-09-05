@@ -1992,7 +1992,7 @@ instance CiteprocOutput Prose where
     ""
     input of
     Left err -> error . T.pack $ MP.errorBundlePretty err
-    Right (prose, _) -> prose
+    Right (prose, _) -> compressProse prose
     where
       customProseParser = do
         leadingWhitespace <- MP.optional spaceConsumer
@@ -2207,7 +2207,7 @@ instance CiteprocOutput Prose where
 unparseStyledText :: StyledText -> Text
 unparseStyledText styledText =
   getStyleMarkers styledText.style
-    <> styledText.body
+    <> escapeStyleMarkers styledText.body
     <> getStyleMarkers styledText.style
   where
     getStyleMarkers styleMask =
@@ -2219,6 +2219,12 @@ unparseStyledText styledText =
       Underline -> acc <> "_"
       Verbatim -> acc <> "="
       Code -> acc <> "~"
+    escapeStyleMarkers = T.foldl' escape T.empty
+    escape acc c
+      | mustEscape && c `elem` ("*/_=~" :: String) = acc <> T.pack ['\\', c]
+      | otherwise = acc <> T.singleton c
+    mustEscape =
+      not (isCode styledText.style || isVerbatim styledText.style)
 
 unparseLink :: Link -> Text
 unparseLink link = case link.target of
@@ -2239,7 +2245,13 @@ unparseLink link = case link.target of
           then "[[file:" <> linkTargetText <> "]]"
           else "[[file:" <> linkTargetText <> "][" <> displayName <> "]]"
   where
-    displayName = T.concat $ map unparseStyledText link.name
+    displayName
+      | hasNoStyle link.name = T.concat $ map (\s -> s.body) link.name
+      | otherwise = T.concat $ map unparseStyledText link.name
+    hasNoStyle :: [StyledText] -> Bool
+    hasNoStyle = null . foldl' f []
+    f :: [Style] -> StyledText -> [Style]
+    f acc s = acc <> maskToStyles s.style
 
 unparseMathFragment :: MathFragment -> Text
 unparseMathFragment mathFragment = mathStart <> mathFragment.body <> mathEnd
