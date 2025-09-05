@@ -151,7 +151,16 @@ import Lilac.Types
         PTokenStyledText
       ),
     Prose (Prose, unProse),
-    Style (Bold, Code, Italic, Underline, Verbatim),
+    Style
+      ( Bold,
+        Code,
+        Italic,
+        Smallcaps,
+        Subscript,
+        Superscript,
+        Underline,
+        Verbatim
+      ),
     StyleMask (StyleMask),
     StyledText (StyledText, body, style),
     Table (Table, caption, grid, meta),
@@ -2219,6 +2228,9 @@ unparseStyledText styledText =
       Underline -> acc <> "_"
       Verbatim -> acc <> "="
       Code -> acc <> "~"
+      Subscript
+      Superscript
+      Smallcaps -> acc
     escapeStyleMarkers = T.foldl' escape T.empty
     escape acc c
       | mustEscape && c `elem` ("*/_=~" :: String) = acc <> T.pack ['\\', c]

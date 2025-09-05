@@ -405,7 +405,16 @@ import Lilac.Types
         PTokenStyledText
       ),
     Prose (Prose, unProse),
-    Style (Bold, Code, Italic, Underline, Verbatim),
+    Style
+      ( Bold,
+        Code,
+        Italic,
+        Smallcaps,
+        Subscript,
+        Superscript,
+        Underline,
+        Verbatim
+      ),
     StyleMask (StyleMask),
     StyledText (StyledText, body, style),
     Table (Table, caption, grid, meta),
@@ -1791,6 +1800,9 @@ unparseStyledText styledText =
       Underline -> acc <> "_"
       Verbatim -> acc <> "="
       Code -> acc <> "~"
+      Subscript
+      Superscript
+      Smallcaps -> acc
     escapeStyleMarkers = T.foldl' escape T.empty
     escape acc c
       | mustEscape && c `elem` ("*/_=~" :: String) = acc <> T.pack ['\\', c]
@@ -2569,7 +2581,15 @@ should never be needed during exposition.
 #+name: data:Style
 #+begin_src haskell
 type Style :: Type
-data Style = Bold | Italic | Underline | Verbatim | Code
+data Style
+  = Bold
+  | Italic
+  | Underline
+  | Verbatim
+  | Code
+  | Smallcaps
+  | Subscript
+  | Superscript
   deriving stock (Enum, Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
@@ -2577,6 +2597,11 @@ data Style = Bold | Italic | Underline | Verbatim | Code
 The =styleMarkers= keeps track of the characters that activate and deactivate each
 style. It has the syntactic characters we use to /mark/ text with the a supported
 /style/. Hence the term /style markers/.
+
+We don't actually allow users to use the ~Smallcaps~, ~Subscript~, or ~Superscript~
+styles themselves (this is why they're missing from [[f:styleMarkers]]); these are
+used inside [[id:7874b9c5-ceac-4820-8804-7732e29f5c60::f:cslJsonTextToProse][f:cslJsonTextToProse]] and [[id:d6abea81-d620-4ede-9c2c-68f7ea07f847::f:weaveStyledText][f:weaveStyledText]] to preserve these styles
+that ~CslJson~ might generate for citation processing.
 
 #+name: f:styleMarkers
 #+begin_src haskell

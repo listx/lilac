@@ -8,7 +8,9 @@ module Lilac.Weave
 where
 
 import Citeproc
-  ( Result (resultBibliography, resultCitations),
+  ( ItemId (unItemId),
+    Reference (referenceId),
+    Result (resultBibliography, resultCitations),
   )
 import Citeproc qualified as CP
 import Citeproc.CslJson
@@ -95,7 +97,16 @@ import Lilac.Types
         PTokenStyledText
       ),
     Prose (Prose, unProse),
-    Style (Bold, Code, Italic, Underline, Verbatim),
+    Style
+      ( Bold,
+        Code,
+        Italic,
+        Smallcaps,
+        Subscript,
+        Superscript,
+        Underline,
+        Verbatim
+      ),
     StyledText (StyledText, body, style),
     Table (caption, grid, meta),
     WeaveConf (archive, citeprocResult, originObjectPath, watch),
@@ -179,6 +190,7 @@ import Relude
     concatMap,
     drop,
     dropWhile,
+    elem,
     filter,
     flip,
     foldMap',
@@ -490,14 +502,7 @@ weaveStyledText styledText = do
     then b
     else span_ [class_ $ T.unwords styles] b
   where
-    styles = foldl' styleToClasses [] $ maskToStyles styledText.style
-    styleToClasses :: [Text] -> Style -> [Text]
-    styleToClasses acc = \case
-      Bold -> "bold" : acc
-      Italic -> "italic" : acc
-      Underline -> "underline" : acc
-      Verbatim -> "verbatim" : acc
-      Code -> "code" : acc
+    styles = map (T.toLower . T.show) $ maskToStyles styledText.style
 
 weaveListMarker :: ListMarker -> HtmlWeaver ()
 weaveListMarker =
@@ -867,6 +872,9 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
       Underline -> CslUnderline acc
       Verbatim -> CslDiv "LILAC_STYLE_VERBATIM\NUL" acc
       Code -> CslDiv "LILAC_STYLE_CODE\NUL" acc
+      Smallcaps -> CslSmallCaps acc
+      Subscript -> CslSub acc
+      Superscript -> CslSup acc
 
 proseToMaybeCslJsonText :: Prose -> Maybe (CslJson Text)
 proseToMaybeCslJsonText prose =
@@ -933,10 +941,10 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
       CslBold a -> f (Bold : s) a
       CslUnderline a -> f (Underline : s) a
       CslNoDecoration a -> f (filter (/= Underline) s) a
-      CslSmallCaps a -> f s a
-      CslBaseline a -> f s a
-      CslSup a -> f s a
-      CslSub a -> f s a
+      CslSmallCaps a -> f (Smallcaps : s) a
+      CslBaseline a -> f (filter (`notElem` [Subscript, Superscript]) s) a
+      CslSup a -> f (Superscript : s) a
+      CslSub a -> f (Subscript : s) a
       CslNoCase a -> f s a
       CslDiv t a
         | t == "LILAC_STYLE_CODE\NUL" -> f (Code : s) a
@@ -979,7 +987,8 @@ prepareCitations objGPath object archive = do
   bibPathsRelative <- makeRelativeToObjectPath objGPath object.orgDoc.bibPaths
   cslPathRelative <- listToMaybe <$> (makeRelativeToObjectPath objGPath $ maybeToList object.orgDoc.cslPath)
   let bibRefsFromOrgDoc =
-        concat
+        filter neededByCitations
+          . concat
           . catMaybes
           $ map (\bp -> lookup bp archive.bibs) bibPathsRelative
       CP.Result citations bibliography warnings =
@@ -1015,6 +1024,12 @@ prepareCitations objGPath object archive = do
             bibRefs
             (map citationToCiteprocCitation object.orgDoc.citations)
       | otherwise = blankResult
+    neededByCitations bibRef =
+      let citeIds =
+            concatMap
+              (\c -> map (\cite -> cite.id) c.cites)
+              object.orgDoc.citations
+       in bibRef.referenceId.unItemId `elem` citeIds
 
 weaveCitation :: Int -> HtmlWeaver ()
 weaveCitation n = do

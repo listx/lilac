@@ -63,7 +63,9 @@ module Lilac.Weave
 where
 
 import Citeproc
-  ( Result (resultBibliography, resultCitations),
+  ( ItemId (unItemId),
+    Reference (referenceId),
+    Result (resultBibliography, resultCitations),
   )
 import Citeproc qualified as CP
 import Citeproc.CslJson
@@ -150,7 +152,16 @@ import Lilac.Types
         PTokenStyledText
       ),
     Prose (Prose, unProse),
-    Style (Bold, Code, Italic, Underline, Verbatim),
+    Style
+      ( Bold,
+        Code,
+        Italic,
+        Smallcaps,
+        Subscript,
+        Superscript,
+        Underline,
+        Verbatim
+      ),
     StyledText (StyledText, body, style),
     Table (caption, grid, meta),
     WeaveConf (archive, citeprocResult, originObjectPath, watch),
@@ -234,6 +245,7 @@ import Relude
     concatMap,
     drop,
     dropWhile,
+    elem,
     filter,
     flip,
     foldMap',
@@ -854,14 +866,7 @@ weaveStyledText styledText = do
     then b
     else span_ [class_ $ T.unwords styles] b
   where
-    styles = foldl' styleToClasses [] $ maskToStyles styledText.style
-    styleToClasses :: [Text] -> Style -> [Text]
-    styleToClasses acc = \case
-      Bold -> "bold" : acc
-      Italic -> "italic" : acc
-      Underline -> "underline" : acc
-      Verbatim -> "verbatim" : acc
-      Code -> "code" : acc
+    styles = map (T.toLower . T.show) $ maskToStyles styledText.style
 #+end_src
 
 [[t:0300-weave-styled-text]] checks for basic styles, but also whether HTML-sensitive
@@ -1583,6 +1588,9 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
       Underline -> CslUnderline acc
       Verbatim -> CslDiv "LILAC_STYLE_VERBATIM\NUL" acc
       Code -> CslDiv "LILAC_STYLE_CODE\NUL" acc
+      Smallcaps -> CslSmallCaps acc
+      Subscript -> CslSub acc
+      Superscript -> CslSup acc
 #+end_src
 
 [[f:proseToMaybeCslJsonText]] is a wrapper around [[f:proseToCslJsonText]] to convert it
@@ -1691,10 +1699,10 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
       CslBold a -> f (Bold : s) a
       CslUnderline a -> f (Underline : s) a
       CslNoDecoration a -> f (filter (/= Underline) s) a
-      CslSmallCaps a -> f s a
-      CslBaseline a -> f s a
-      CslSup a -> f s a
-      CslSub a -> f s a
+      CslSmallCaps a -> f (Smallcaps : s) a
+      CslBaseline a -> f (filter (`notElem` [Subscript, Superscript]) s) a
+      CslSup a -> f (Superscript : s) a
+      CslSub a -> f (Subscript : s) a
       CslNoCase a -> f s a
       CslDiv t a
         | t == "LILAC_STYLE_CODE\NUL" -> f (Code : s) a
@@ -1733,18 +1741,6 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
       PTokenDivEnd {} -> []
 #+end_src
 
-Unfortunately, we have to discard some information because not everything in
-~CslJson Text~ can be represented by [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]]. The following have no
-equivalent [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b::data:Style][data:Style]]:
-
-  - ~CslSmallCaps~
-
-  - ~CslBaseline~
-
-  - ~CslSup~
-
-  - ~CslSub~
-
 The ~CslNoCase~ is fine to ignore because it's most likely used by =Citeproc= to
 handle case-changing transformations, and is probably not meant to be used
 directly by consumers.
@@ -1768,7 +1764,8 @@ prepareCitations objGPath object archive = do
   bibPathsRelative <- makeRelativeToObjectPath objGPath object.orgDoc.bibPaths
   cslPathRelative <- listToMaybe <$> (makeRelativeToObjectPath objGPath $ maybeToList object.orgDoc.cslPath)
   let bibRefsFromOrgDoc =
-        concat
+        filter neededByCitations
+          . concat
           . catMaybes
           $ map (\bp -> lookup bp archive.bibs) bibPathsRelative
       CP.Result citations bibliography warnings =
@@ -1804,7 +1801,17 @@ prepareCitations objGPath object archive = do
             bibRefs
             (map citationToCiteprocCitation object.orgDoc.citations)
       | otherwise = blankResult
+    neededByCitations bibRef =
+      let citeIds =
+            concatMap
+              (\c -> map (\cite -> cite.id) c.cites)
+              object.orgDoc.citations
+       in bibRef.referenceId.unItemId `elem` citeIds
 #+end_src
+
+The ~neededByCitations~ helper filters out the bibliographical entries so that we
+only print the bibliography that are actually used by the citations. See [[https://github.com/jgm/citeproc/issues/169][this
+upstream issue]].
 
 Now we can weave [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Citation][data:Citation]] values into the HTML, with [[f:weaveCitation]].
 
@@ -2501,8 +2508,8 @@ BibTeX format into CSL JSON with Pandoc via ~pandoc citations.bib -t csljson -o 
 ]
 #+end_src
 
-The test cases should check what the result of calling ~Citeproc.citeproc~ looks
-like, after converting back to [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]].
+Check what the result of calling ~Citeproc.citeproc~ looks like, after converting
+back to [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] using IEEE style.
 
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-basic
 #+begin_src org
@@ -2728,6 +2735,134 @@ expectCiteprocResult
 ]
 #+end_src
 
+Check usage of superscripts.
+
+#+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-superscript
+#+begin_src org
+,#+bibliography: bib.json
+,#+cite_export: csl ../../../base/csl-styles/vancouver-superscript.csl
+
+[cite:@a]
+#+end_src
+
+#+name: t:0400-citeproc-superscript
+#+begin_src haskell
+expectCiteprocResult
+  "0400-citeproc-superscript"
+  CP.Result
+    { resultCitations =
+        <<Expected citations for 0400-citeproc-superscript>>,
+      resultBibliography =
+        <<Expected bibliography for 0400-citeproc-superscript>>,
+      resultWarnings = []
+    }
+#+end_src
+
+#+name: Expected citations for 0400-citeproc-superscript
+#+begin_src haskell
+[ Prose
+    { unProse =
+        [ PTokenLink
+            Link
+              { name =
+                  [ StyledText {body = "1", style = styleMaskFrom [Superscript]}
+                  ],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-a",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              }
+        ]
+    }
+]
+#+end_src
+
+#+name: Expected bibliography for 0400-citeproc-superscript
+#+begin_src haskell
+[ ( "a",
+    Prose
+      { unProse =
+          [ PTokenDivStart "left-margin",
+            PTokenStyledText StyledText {body = "1. ", style = styleMaskFrom []},
+            PTokenDivEnd,
+            PTokenDivStart "right-inline",
+            PTokenStyledText StyledText {body = "Knuth DE. Literate programming. Stanford, Calif.: Center for the Study of Language; Information; 1992. (CSLI lecture notes).", style = styleMaskFrom []},
+            PTokenDivEnd
+          ]
+      }
+  )
+]
+#+end_src
+
+Check usage of small caps.
+
+#+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-smallcaps
+#+begin_src org
+,#+bibliography: bib.json
+,#+cite_export: csl ../../../base/csl-styles/acm-siggraph.csl
+
+[cite:@a]
+#+end_src
+
+#+name: t:0400-citeproc-smallcaps
+#+begin_src haskell
+expectCiteprocResult
+  "0400-citeproc-smallcaps"
+  CP.Result
+    { resultCitations =
+        <<Expected citations for 0400-citeproc-smallcaps>>,
+      resultBibliography =
+        <<Expected bibliography for 0400-citeproc-smallcaps>>,
+      resultWarnings = []
+    }
+#+end_src
+
+#+name: Expected citations for 0400-citeproc-smallcaps
+#+begin_src haskell
+[ Prose
+    { unProse =
+        [ PTokenStyledText StyledText {body = "[", style = styleMaskFrom []},
+          PTokenLink
+            Link
+              { name =
+                  [ StyledText {body = "Knuth 1992", style = styleMaskFrom []}
+                  ],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-a",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              },
+          PTokenStyledText StyledText {body = "]", style = styleMaskFrom []}
+        ]
+    }
+]
+#+end_src
+
+#+name: Expected bibliography for 0400-citeproc-smallcaps
+#+begin_src haskell
+[ ( "a",
+    Prose
+      { unProse =
+          [ PTokenStyledText StyledText {body = "Knuth, D.E.", style = styleMaskFrom [Smallcaps]},
+            PTokenStyledText StyledText {body = " 1992. ", style = styleMaskFrom []},
+            PTokenStyledText StyledText {body = "Literate programming", style = styleMaskFrom [Italic]},
+            PTokenStyledText StyledText {body = ". Center for the Study of Language; Information, Stanford, Calif.", style = styleMaskFrom []}
+          ]
+      }
+  )
+]
+#+end_src
+
 ** Testing framework
 
 The tests here use Org files as input. The output are HTML documents. For the
@@ -2764,7 +2899,7 @@ import Lilac.Types
         PTokenStyledText
       ),
     Prose (Prose, unProse),
-    Style (Italic),
+    Style (Italic, Smallcaps, Superscript),
     StyledText (StyledText, body, style),
     WeaveConf (WeaveConf, archive, citeprocResult, originObjectPath, watch),
     defaultOrgParserState,
@@ -2989,6 +3124,8 @@ weaveSpec = do
   <<t:0301-weave-external-links-common-prefix>>
   <<t:0301-weave-external-links>>
   <<t:0400-citeproc-basic>>
+  <<t:0400-citeproc-superscript>>
+  <<t:0400-citeproc-smallcaps>>
 #+end_src
 
 * Generate CSS

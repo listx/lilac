@@ -366,7 +366,15 @@ data PToken
   deriving anyclass (FromJSON, ToJSON)
 
 type Style :: Type
-data Style = Bold | Italic | Underline | Verbatim | Code
+data Style
+  = Bold
+  | Italic
+  | Underline
+  | Verbatim
+  | Code
+  | Smallcaps
+  | Subscript
+  | Superscript
   deriving stock (Enum, Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 

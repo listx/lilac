@@ -18,7 +18,7 @@ import Lilac.Types
         PTokenStyledText
       ),
     Prose (Prose, unProse),
-    Style (Italic),
+    Style (Italic, Smallcaps, Superscript),
     StyledText (StyledText, body, style),
     WeaveConf (WeaveConf, archive, citeprocResult, originObjectPath, watch),
     defaultOrgParserState,
@@ -442,6 +442,88 @@ weaveSpec = do
                           },
                       PTokenStyledText StyledText {body = ".", style = styleMaskFrom []},
                       PTokenDivEnd
+                    ]
+                }
+            )
+          ],
+        resultWarnings = []
+      }
+
+  expectCiteprocResult
+    "0400-citeproc-superscript"
+    CP.Result
+      { resultCitations =
+          [ Prose
+              { unProse =
+                  [ PTokenLink
+                      Link
+                        { name =
+                            [ StyledText {body = "1", style = styleMaskFrom [Superscript]}
+                            ],
+                          target =
+                            LinkTargetURI
+                              N.URI
+                                { N.uriScheme = "",
+                                  N.uriAuthority = Nothing,
+                                  N.uriPath = "#ref-a",
+                                  N.uriQuery = "",
+                                  N.uriFragment = ""
+                                }
+                        }
+                  ]
+              }
+          ],
+        resultBibliography =
+          [ ( "a",
+              Prose
+                { unProse =
+                    [ PTokenDivStart "left-margin",
+                      PTokenStyledText StyledText {body = "1. ", style = styleMaskFrom []},
+                      PTokenDivEnd,
+                      PTokenDivStart "right-inline",
+                      PTokenStyledText StyledText {body = "Knuth DE. Literate programming. Stanford, Calif.: Center for the Study of Language; Information; 1992. (CSLI lecture notes).", style = styleMaskFrom []},
+                      PTokenDivEnd
+                    ]
+                }
+            )
+          ],
+        resultWarnings = []
+      }
+
+  expectCiteprocResult
+    "0400-citeproc-smallcaps"
+    CP.Result
+      { resultCitations =
+          [ Prose
+              { unProse =
+                  [ PTokenStyledText StyledText {body = "[", style = styleMaskFrom []},
+                    PTokenLink
+                      Link
+                        { name =
+                            [ StyledText {body = "Knuth 1992", style = styleMaskFrom []}
+                            ],
+                          target =
+                            LinkTargetURI
+                              N.URI
+                                { N.uriScheme = "",
+                                  N.uriAuthority = Nothing,
+                                  N.uriPath = "#ref-a",
+                                  N.uriQuery = "",
+                                  N.uriFragment = ""
+                                }
+                        },
+                    PTokenStyledText StyledText {body = "]", style = styleMaskFrom []}
+                  ]
+              }
+          ],
+        resultBibliography =
+          [ ( "a",
+              Prose
+                { unProse =
+                    [ PTokenStyledText StyledText {body = "Knuth, D.E.", style = styleMaskFrom [Smallcaps]},
+                      PTokenStyledText StyledText {body = " 1992. ", style = styleMaskFrom []},
+                      PTokenStyledText StyledText {body = "Literate programming", style = styleMaskFrom [Italic]},
+                      PTokenStyledText StyledText {body = ". Center for the Study of Language; Information, Stanford, Calif.", style = styleMaskFrom []}
                     ]
                 }
             )
