@@ -756,11 +756,11 @@ The Org files are all of the files that make up this project.
 #+begin_src makefile
 org_files = \
 	base/lilac.org \
-	base/lilac-compile.org \
-	base/lilac-parse.org \
-	base/lilac-tangle.org \
-	base/lilac-types.org \
-	base/lilac-weave.org \
+	base/compile.org \
+	base/parse.org \
+	base/tangle.org \
+	base/types.org \
+	base/weave.org \
 	base/fe.org
 backend_org_files = $(filter-out base/fe.org,$(org_files))
 #+end_src
@@ -977,7 +977,7 @@ tangle: base/lilac.larc
 #+end_src
 
 The =lilac= script is the one we created in [[nix/scripts.nix]] to automatically build
-Lilac with Cabal. We use it to tangle =lilac.org=, =lilac-parse.org=, and =fe.org=
+Lilac with Cabal. We use it to tangle =main.org=, =parse.org=, and =fe.org=
 (the frontend).
 
 The ~tangle~ and ~tangle-fe~ are [[id:b649d761-1103-47be-86e4-56a7362a5ecc][sentinel files]] to help GNU Make avoid running the
@@ -1073,11 +1073,11 @@ main()
 {
 	watch \
 		"${SCRIPT_ROOT}/base/lilac.org" \
-		"${SCRIPT_ROOT}/base/lilac-compile.org" \
-		"${SCRIPT_ROOT}/base/lilac-parse.org" \
-		"${SCRIPT_ROOT}/base/lilac-tangle.org" \
-		"${SCRIPT_ROOT}/base/lilac-types.org" \
-		"${SCRIPT_ROOT}/base/lilac-weave.org" \
+		"${SCRIPT_ROOT}/base/compile.org" \
+		"${SCRIPT_ROOT}/base/parse.org" \
+		"${SCRIPT_ROOT}/base/tangle.org" \
+		"${SCRIPT_ROOT}/base/types.org" \
+		"${SCRIPT_ROOT}/base/weave.org" \
 		"${SCRIPT_ROOT}/base/fe.org"
 }
 

@@ -1,10 +1,10 @@
 org_files = \
 	base/lilac.org \
-	base/lilac-compile.org \
-	base/lilac-parse.org \
-	base/lilac-tangle.org \
-	base/lilac-types.org \
-	base/lilac-weave.org \
+	base/compile.org \
+	base/parse.org \
+	base/tangle.org \
+	base/types.org \
+	base/weave.org \
 	base/fe.org
 backend_org_files = $(filter-out base/fe.org,$(org_files))
 
