@@ -128,8 +128,8 @@ spec = parseSpec
 type Parser :: Type -> Type
 type Parser = MP.ParsecT Void Text Identity
 
-p :: FilePath -> OrgDoc -> Spec
-p path expected = do
+shouldParseWith :: FilePath -> OrgDoc -> Spec
+shouldParseWith path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path check
   where
@@ -144,8 +144,8 @@ p path expected = do
         (inputPrefix <> input)
         `shouldParse` (expected, expectedState)
 
-ps :: FilePath -> OrgDoc -> OrgParserState -> Spec
-ps path expected expectedState = do
+shouldParseWithState :: FilePath -> OrgDoc -> OrgParserState -> Spec
+shouldParseWithState path expected expectedState = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path check
   where
@@ -160,8 +160,8 @@ ps path expected expectedState = do
         (inputPrefix <> input)
         `shouldParse` (expected, expectedState')
 
-pf :: FilePath -> String -> Int -> Spec
-pf path errMsg pos = do
+shouldFailWithMessage :: FilePath -> String -> Int -> Spec
+shouldFailWithMessage path errMsg pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
@@ -173,8 +173,8 @@ pf path errMsg pos = do
     inputPrefix = nilOidOrgDoc
     newPos = pos + T.length inputPrefix
 
-pfm :: FilePath -> ET Text -> Int -> Spec
-pfm path errorTrivial pos = do
+shouldFailWithError :: FilePath -> ET Text -> Int -> Spec
+shouldFailWithError path errorTrivial pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
@@ -186,8 +186,8 @@ pfm path errorTrivial pos = do
     inputPrefix = nilOidOrgDoc
     newPos = pos + T.length inputPrefix
 
-pfSimple :: FilePath -> Spec
-pfSimple path = do
+shouldFail :: FilePath -> Spec
+shouldFail path = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
@@ -260,32 +260,32 @@ parseSpec = do
         "base/lilac.org"
         `shouldSucceedOn` input
 
-  p
+  shouldParseWith
     "0001-blankline"
     (L.defaultOrgDoc nilOid [])
 
-  p
+  shouldParseWith
     "0001-comments-only"
     (L.defaultOrgDoc nilOid [])
 
-  ps
+  shouldParseWithState
     "0001-blankline"
     (L.defaultOrgDoc nilOid [])
     defaultOrgParserState
 
-  pfm
+  shouldFailWithError
     "0002-doc-metadata-missing-value"
     (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
     7
 
-  p
+  shouldParseWith
     "0002-doc-metadata-whitespace-before-value"
     $ L.defaultOrgDoc
       nilOid
       [ ("title", "Parse me without leading whitespace")
       ]
 
-  p
+  shouldParseWith
     "0002-doc-metadata"
     $ L.defaultOrgDoc
       nilOid
@@ -295,7 +295,7 @@ parseSpec = do
         ("title", "An Org Document")
       ]
 
-  p
+  shouldParseWith
     "0003-doc-metadata-with-comments"
     $ L.defaultOrgDoc
       nilOid
@@ -305,7 +305,7 @@ parseSpec = do
         ("title", "An Org Document")
       ]
 
-  ps
+  shouldParseWithState
     "0002-doc-metadata-properties-drawer"
     ( L.defaultOrgDoc
         (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
@@ -316,7 +316,7 @@ parseSpec = do
       { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f
       }
 
-  ps
+  shouldParseWithState
     "0002-doc-metadata-properties-drawer-combine"
     ( L.defaultOrgDoc
         (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
@@ -338,12 +338,12 @@ parseSpec = do
         input
         `shouldFailWith` (errFancy 181 . fancy $ MP.ErrorFail "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: [\"foo\"]")
 
-  pf
+  shouldFailWithMessage
     "0004-headings"
     "found 7 asterisks found for this heading, but lilac_maxHeadingLevel = 6"
     46
 
-  ps
+  shouldParseWithState
     "0004-headings-20"
     ( nilOrgDoc
         [ plainHeading 1 [1],
@@ -367,7 +367,7 @@ parseSpec = do
         orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 20}
       }
 
-  ps
+  shouldParseWithState
     "0004-headings-unlimited"
     ( nilOrgDoc
         [ plainHeading 1 [1],
@@ -391,17 +391,17 @@ parseSpec = do
         orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 0}
       }
 
-  pf
+  shouldFailWithMessage
     "0004-headings-limited"
     "found 4 asterisks found for this heading, but lilac_maxHeadingLevel = 3"
     46
 
-  pf
+  shouldFailWithMessage
     "0004-headings-prohibited"
     "headings prohibited because lilac_maxHeadingLevel < 0"
     29
 
-  pf
+  shouldFailWithMessage
     "0004-headings-cannot-skip-level"
     "headings may not skip levels (expected to see level 1 or 2, not 4)"
     8
@@ -471,7 +471,7 @@ parseSpec = do
         [Nothing, Nothing, Just $ fromWords 0x7777777777777777 0x7777777777777777]
         `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
 
-  ps
+  shouldParseWithState
     "0004-properties-drawer-empty"
     ( nilOrgDoc
         [ CHeading
@@ -493,7 +493,7 @@ parseSpec = do
         headingSection = [1]
       }
 
-  ps
+  shouldParseWithState
     "0004-properties-drawer-not-empty"
     ( nilOrgDoc
         [ CHeading
@@ -518,7 +518,7 @@ parseSpec = do
         headingSection = [1]
       }
 
-  ps
+  shouldParseWithState
     "0004-properties-drawer-not-empty-with-comments"
     ( nilOrgDoc
         [ CHeading
@@ -543,32 +543,32 @@ parseSpec = do
         headingSection = [1]
       }
 
-  pf
+  shouldFailWithMessage
     "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
     "indentation does not fit into existing levels"
     36
 
-  pf
+  shouldFailWithMessage
     "0005-paragraph-indentation-mismatch-initial-indent-invalid"
     "indentation does not fit into existing levels"
     21
 
-  pfm
+  shouldFailWithError
     "0005-paragraph-indentation-mismatch-over-list-body"
     (utoks " ")
     14
 
-  pfm
+  shouldFailWithError
     "0005-paragraph-indentation-mismatch-over"
     (utoks " ")
     4
 
-  pfm
+  shouldFailWithError
     "0005-paragraph-indentation-mismatch-under-list-body"
     (utoks "b" <> etoks " ")
     12
 
-  p
+  shouldParseWith
     "0005-prose-paragraphs"
     $ nilOrgDoc
       [ CParagraph
@@ -599,7 +599,7 @@ parseSpec = do
       "empty input"
       `shouldSucceedOn` ""
 
-  p
+  shouldParseWith
     "0005-styled-strings-bold"
     $ nilOrgDoc
       [ CParagraph
@@ -622,7 +622,7 @@ parseSpec = do
             ]
       ]
 
-  p
+  shouldParseWith
     "0005-styled-strings-complex-punctuation"
     $ nilOrgDoc
       [ CParagraph
@@ -644,7 +644,7 @@ parseSpec = do
             ]
       ]
 
-  p
+  shouldParseWith
     "0005-styled-strings-complex"
     $ nilOrgDoc
       [ CParagraph
@@ -678,7 +678,7 @@ parseSpec = do
             ]
       ]
 
-  p
+  shouldParseWith
     "0005-styled-strings-compression"
     $ nilOrgDoc
       [ CParagraph
@@ -690,7 +690,7 @@ parseSpec = do
             ]
       ]
 
-  p
+  shouldParseWith
     "0005-styled-strings-ignore-marker-inside-word"
     $ nilOrgDoc
       [ CParagraph
@@ -700,12 +700,12 @@ parseSpec = do
             ]
       ]
 
-  pf
+  shouldFailWithMessage
     "0005-styled-strings-leftover-active-styles"
     "leftover active styles: [Bold]"
     15
 
-  ps
+  shouldParseWithState
     "0005-styled-strings-messy-boundaries"
     ( nilOrgDoc
         [ CHeading
@@ -737,13 +737,13 @@ parseSpec = do
         headingSection = [1]
       }
 
-  p
+  shouldParseWith
     "0005-styled-strings-no-style"
     $ nilOrgDoc
       [ plainParagraph "foo"
       ]
 
-  p
+  shouldParseWith
     "0005-styled-strings-verbatim-code-ignore-immediate-bold"
     $ nilOrgDoc
       [ CParagraph
@@ -765,7 +765,7 @@ parseSpec = do
             ]
       ]
 
-  p
+  shouldParseWith
     "0005-styled-strings-verbatim-precedence"
     $ nilOrgDoc
       [ CParagraph
@@ -809,7 +809,7 @@ parseSpec = do
             ]
       ]
 
-  p
+  shouldParseWith
     "0005-styled-strings-verbatim"
     $ nilOrgDoc
       [ CParagraph
@@ -823,7 +823,7 @@ parseSpec = do
             ]
       ]
 
-  p
+  shouldParseWith
     "0006-links-inside-parentheses"
     $ nilOrgDoc
       [ CParagraph
@@ -851,7 +851,7 @@ parseSpec = do
             ]
       ]
 
-  p
+  shouldParseWith
     "0006-links-nonlink"
     $ nilOrgDoc
       [ CParagraph
@@ -864,7 +864,7 @@ parseSpec = do
             ]
       ]
 
-  p
+  shouldParseWith
     "0006-links-raw"
     $ nilOrgDoc
       [ CParagraph
@@ -993,7 +993,7 @@ parseSpec = do
             ]
       ]
 
-  ps
+  shouldParseWithState
     "0006-links"
     ( nilOrgDoc
         [ CParagraph
@@ -1074,7 +1074,7 @@ parseSpec = do
         headingSection = [1]
       }
 
-  p
+  shouldParseWith
     "0006-links-web-protocols"
     ( nilOrgDoc
         [ CParagraph
@@ -1165,7 +1165,7 @@ parseSpec = do
         ]
     )
 
-  p
+  shouldParseWith
     "0006-links-oids"
     ( nilOrgDoc
         [ CParagraph
@@ -1414,7 +1414,7 @@ parseSpec = do
         ]
     )
 
-  p
+  shouldParseWith
     "0006-links-oids-lenient-whitespace"
     ( nilOrgDoc
         [ CParagraph
@@ -1443,12 +1443,12 @@ parseSpec = do
         ]
     )
 
-  pf
+  shouldFailWithMessage
     "0007-block-src-without-lang"
     "block type src requires a language specifier"
     11
 
-  ps
+  shouldParseWithState
     "0007-blocks-empty"
     ( nilOrgDoc
         [ CBlock
@@ -1489,7 +1489,7 @@ parseSpec = do
         anonBlockNumber = 2
       }
 
-  ps
+  shouldParseWithState
     "0007-blocks-ending"
     ( nilOrgDoc
         [ CBlock
@@ -1572,7 +1572,7 @@ parseSpec = do
             ]
       }
 
-  ps
+  shouldParseWithState
     "0007-blocks-noweb-off"
     ( nilOrgDoc
         [ CBlock
@@ -1595,7 +1595,7 @@ parseSpec = do
       { anonBlockNumber = 1
       }
 
-  ps
+  shouldParseWithState
     "0007-blocks-noweb"
     ( nilOrgDoc
         [ CBlock
@@ -1648,7 +1648,7 @@ parseSpec = do
       { anonBlockNumber = 1
       }
 
-  ps
+  shouldParseWithState
     "0007-blocks-noweb-intraline"
     ( nilOrgDoc
         [ CBlock
@@ -1718,17 +1718,17 @@ parseSpec = do
       { anonBlockNumber = 1
       }
 
-  pf
+  shouldFailWithMessage
     "0007-blocks-duplicate-names"
     "cell name \"foo\" is not unique"
     52
 
-  pf
+  shouldFailWithMessage
     "0007-blocks-duplicate-tangle-paths"
     "tangle path \"some/path.sh\" is not unique"
     101
 
-  ps
+  shouldParseWithState
     "0007-blocks-special-commas"
     ( nilOrgDoc
         [ CBlock
@@ -1764,22 +1764,22 @@ parseSpec = do
       { anonBlockNumber = 1
       }
 
-  pf
+  shouldFailWithMessage
     "0008-indentation-comment"
     "invalid indentation"
     1
 
-  pf
+  shouldFailWithMessage
     "0008-indentation-headings"
     "invalid indentation"
     1
 
-  pf
+  shouldFailWithMessage
     "0008-indentation-paragraph"
     "invalid indentation"
     1
 
-  p
+  shouldParseWith
     "0009-list-content-simple"
     $ nilOrgDoc
       [ CListItem
@@ -1799,7 +1799,7 @@ parseSpec = do
           ]
       ]
 
-  p
+  shouldParseWith
     "0009-list-indentation-nested-with-text"
     $ nilOrgDoc
       [ plainParagraph "Foo.",
@@ -1852,7 +1852,7 @@ parseSpec = do
         plainParagraph "Bar."
       ]
 
-  p
+  shouldParseWith
     "0009-list-indentation-nested"
     $ nilOrgDoc
       [ CListItem
@@ -1895,24 +1895,24 @@ parseSpec = do
           ]
       ]
 
-  pf
+  shouldFailWithMessage
     "0009-list-nesting-max"
     "max nesting depth exceeded: cannot have more than 6 levels of list items"
     88
 
-  pf
+  shouldFailWithMessage
     "0009-list-nesting-max-8"
     "max nesting depth exceeded: cannot have more than 8 levels of list items"
     156
 
-  p
+  shouldParseWith
     "0009-list-indentation-no-indent"
     $ nilOrgDoc
       [ plainParagraph "1)",
         plainParagraph "2)"
       ]
 
-  p
+  shouldParseWith
     "0009-list-indentation-proper-indent"
     $ nilOrgDoc
       [ CListItem
@@ -1929,7 +1929,7 @@ parseSpec = do
           ]
       ]
 
-  p
+  shouldParseWith
     "0009-list-items-need-blank-line-separator"
     $ nilOrgDoc
       [ CListItem
@@ -1943,42 +1943,42 @@ parseSpec = do
           ]
       ]
 
-  pf
+  shouldFailWithMessage
     "0009-lists-cannot-be-mixed-on-their-own-ordered"
     "expected ORDERED list item at this level"
     23
 
-  pf
+  shouldFailWithMessage
     "0009-lists-cannot-be-mixed-on-their-own"
     "expected UNORDERED list item at this level"
     21
 
-  pf
+  shouldFailWithMessage
     "0009-lists-require-precise-indentation"
     "list item: invalid indentation"
     15
 
-  pf
+  shouldFailWithMessage
     "0009-ordered-lists-require-increment"
     "expected incremented list head 2 but got 1"
     13
 
-  pf
+  shouldFailWithMessage
     "0009-ordered-lists-start-from-0-or-1"
     "starting list head number must be 0 or 1; got 20"
     25
 
-  pfm
+  shouldFailWithError
     "0009-ordered-list-head-needs-parenthesis"
     (utoks "." <> etoks ")" <> elabel "ordered list number")
     3
 
-  pf
+  shouldFailWithMessage
     "0009-ordered-list-head-cannot-use-letters"
     "invalid indentation"
     2
 
-  p
+  shouldParseWith
     "0009-paragraph-can-close-deeper-levels"
     $ nilOrgDoc
       [ CListItem
@@ -2011,7 +2011,7 @@ parseSpec = do
         plainParagraph "Four"
       ]
 
-  p
+  shouldParseWith
     "0009-paragraph-can-separate-mixed-lists"
     $ nilOrgDoc
       [ CListItem
@@ -2058,7 +2058,7 @@ parseSpec = do
         plainParagraph "Four"
       ]
 
-  ps
+  shouldParseWithState
     "0010-standalone-math-fragments"
     ( nilOrgDoc
         [ CMathFragment
@@ -2119,7 +2119,7 @@ parseSpec = do
             ]
       }
 
-  ps
+  shouldParseWithState
     "0010-standalone-math-inside-lists"
     ( nilOrgDoc
         [ CListItem
@@ -2168,7 +2168,7 @@ parseSpec = do
             ]
       }
 
-  ps
+  shouldParseWithState
     "0011-figures-and-blocks"
     ( nilOrgDoc
         [ CBlock
@@ -2323,7 +2323,7 @@ parseSpec = do
         figureNumber = 3
       }
 
-  ps
+  shouldParseWithState
     "0012-tables-and-prose"
     ( nilOrgDoc
         [ CTable
@@ -2542,7 +2542,7 @@ parseSpec = do
         tableNumber = 1
       }
 
-  ps
+  shouldParseWithState
     "0012-tables-inside-lists"
     ( nilOrgDoc
         [ CListItem
@@ -2714,17 +2714,17 @@ parseSpec = do
         tableNumber = 1
       }
 
-  pf
+  shouldFailWithMessage
     "0013-footnotes-broken-link"
     "broken footnote links: hello"
     24
 
-  pf
+  shouldFailWithMessage
     "0013-footnotes-unused-def"
     "unused footnote definitions: hello"
     30
 
-  ps
+  shouldParseWithState
     "0013-footnotes-simple"
     OrgDoc
       { oid = nilOid,
@@ -2792,7 +2792,7 @@ parseSpec = do
         prevCellIsFootnote = True
       }
 
-  ps
+  shouldParseWithState
     "0013-footnotes-complex"
     OrgDoc
       { oid = nilOid,
@@ -2890,12 +2890,12 @@ parseSpec = do
         prevCellIsFootnote = True
       }
 
-  pf
+  shouldFailWithMessage
     "0013-footnotes-multiple-groups"
     "cannot have more than one group of footnote definitions"
     95
 
-  ps
+  shouldParseWithState
     "0014-citations-csl-path"
     OrgDoc
       { oid = nilOid,
@@ -2911,7 +2911,7 @@ parseSpec = do
       }
     defaultOrgParserState
 
-  ps
+  shouldParseWithState
     "0014-citations-csl-json-paths"
     OrgDoc
       { oid = nilOid,
@@ -2930,7 +2930,7 @@ parseSpec = do
       }
     defaultOrgParserState
 
-  ps
+  shouldParseWithState
     "0014-citations-bibliography-location"
     OrgDoc
       { oid = nilOid,
@@ -2946,17 +2946,17 @@ parseSpec = do
       }
     defaultOrgParserState
 
-  pf
+  shouldFailWithMessage
     "0014-citations-print-biblio-missing-csl-style"
     "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
     44
 
-  pf
+  shouldFailWithMessage
     "0014-citations-print-biblio-missing-bib-entries"
     "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
     48
 
-  ps
+  shouldParseWithState
     "0014-citations-single-cite"
     OrgDoc
       { oid = nilOid,
@@ -2992,7 +2992,7 @@ parseSpec = do
       }
     defaultOrgParserState
 
-  ps
+  shouldParseWithState
     "0014-citations-locators"
     OrgDoc
       { oid = nilOid,
@@ -3108,7 +3108,7 @@ parseSpec = do
       }
     defaultOrgParserState
 
-  ps
+  shouldParseWithState
     "0014-citations-locators-affixes"
     OrgDoc
       { oid = nilOid,
@@ -3329,7 +3329,7 @@ parseSpec = do
       }
     defaultOrgParserState
 
-  ps
+  shouldParseWithState
     "0014-citations-worg"
     OrgDoc
       { oid = nilOid,
@@ -3516,12 +3516,12 @@ parseSpec = do
       }
     defaultOrgParserState
 
-  pf
+  shouldFailWithMessage
     "0014-citations-unbalanced-brackets-prefix-opening"
     "unbalanced brackets"
     58
 
-  pfm
+  shouldFailWithError
     "0014-citations-unbalanced-brackets-prefix-closing"
     ( utoks "]"
         <> etoks "[["
@@ -3535,9 +3535,9 @@ parseSpec = do
     )
     57
 
-  pfSimple "0014-citations-unbalanced-brackets-suffix-opening"
+  shouldFail "0014-citations-unbalanced-brackets-suffix-opening"
 
-  pfm
+  shouldFailWithError
     "0014-citations-unbalanced-brackets-suffix-closing"
     ( utoks "]]\n"
         <> etoks "[["
@@ -3550,7 +3550,7 @@ parseSpec = do
     )
     62
 
-  pfm
+  shouldFailWithError
     "0014-citations-extra-semicolons-basic"
     ( utoks ";"
         <> etoks "[["
@@ -3564,7 +3564,7 @@ parseSpec = do
     )
     56
 
-  pfm
+  shouldFailWithError
     "0014-citations-extra-semicolons-consecutive"
     ( utoks ";"
         <> etoks "[["
@@ -3579,12 +3579,12 @@ parseSpec = do
     )
     61
 
-  pf
+  shouldFailWithMessage
     "0014-citations-nested"
     "unbalanced brackets"
     67
 
-  ps
+  shouldParseWithState
     "0014-citations-forbidden-in-verbatim-code"
     OrgDoc
       { oid = nilOid,
@@ -3615,7 +3615,7 @@ parseSpec = do
       }
     defaultOrgParserState
 
-  ps
+  shouldParseWithState
     "0014-citations-forbidden-in-headings"
     OrgDoc
       { oid = nilOid,
@@ -3650,12 +3650,12 @@ parseSpec = do
         headingSection = [1]
       }
 
-  pf
+  shouldFailWithMessage
     "0014-citations-missing-csl-style"
     "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
     28
 
-  pf
+  shouldFailWithMessage
     "0014-citations-missing-bib-entries"
     "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
     32

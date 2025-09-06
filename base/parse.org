@@ -914,7 +914,7 @@ This leaves us with just one newline in
 
 #+name: t:0001-blankline
 #+begin_src haskell
-p
+shouldParseWith
   "0001-blankline"
   (L.defaultOrgDoc nilOid [])
 #+end_src
@@ -934,7 +934,7 @@ a block comment.
 
 #+name: t:0001-comments-only
 #+begin_src haskell
-p
+shouldParseWith
   "0001-comments-only"
   (L.defaultOrgDoc nilOid [])
 #+end_src
@@ -1177,7 +1177,7 @@ Below are some unit test cases for parsing metadata.
 
 #+name: t:0002-doc-metadata:basic
 #+begin_src haskell
-p
+shouldParseWith
   "0002-doc-metadata"
   $ L.defaultOrgDoc
     nilOid
@@ -1222,7 +1222,7 @@ Yet another comment.
 
 #+name: t:0003-doc-metadata-with-comments
 #+begin_src haskell
-p
+shouldParseWith
   "0003-doc-metadata-with-comments"
   $ L.defaultOrgDoc
     nilOid
@@ -1244,7 +1244,7 @@ be indented.
 
 #+name: t:0008-indentation-comment
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0008-indentation-comment"
   "invalid indentation"
   1
@@ -1260,7 +1260,7 @@ Metadata values can have leading whitespace. We ignore such whitespace.
 
 #+name: t:0002-doc-metadata-whitespace-before-value
 #+begin_src haskell
-p
+shouldParseWith
   "0002-doc-metadata-whitespace-before-value"
   $ L.defaultOrgDoc
     nilOid
@@ -1278,7 +1278,7 @@ Metadata values are required (there must be some non-whitespace text for it).
 
 #+name: t:0002-doc-metadata-missing-value
 #+begin_src haskell
-pfm
+shouldFailWithError
   "0002-doc-metadata-missing-value"
   (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
   7
@@ -1296,7 +1296,7 @@ Metadata can also come from top-level properties drawers.
 
 #+name: t:0002-doc-metadata-properties-drawer
 #+begin_src haskell
-ps
+shouldParseWithState
   "0002-doc-metadata-properties-drawer"
   ( L.defaultOrgDoc
       (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
@@ -1313,7 +1313,7 @@ test case file ([[ti:0001-blankline]]) from [[t:0001-blankline]].
 
 #+name: t:0002-doc-metadata-properties-drawer-empty
 #+begin_src haskell
-ps
+shouldParseWithState
   "0001-blankline"
   (L.defaultOrgDoc nilOid [])
   defaultOrgParserState
@@ -1335,7 +1335,7 @@ key\/value metadata lines.
 
 #+name: t:0002-doc-metadata-properties-drawer-combine
 #+begin_src haskell
-ps
+shouldParseWithState
   "0002-doc-metadata-properties-drawer-combine"
   ( L.defaultOrgDoc
       (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
@@ -2669,7 +2669,7 @@ This use of the backslash as an escape character deviates from Orgmode.
 
 #+name: t:0005-styled-strings-ignore-marker-inside-word
 #+begin_src haskell
-p
+shouldParseWith
   "0005-styled-strings-ignore-marker-inside-word"
   $ nilOrgDoc
     [ CParagraph
@@ -2734,7 +2734,7 @@ by the end of the cell (heading or paragraph), all styles must be turned off.
 
 #+name: t:0005-styled-strings-messy-boundaries
 #+begin_src haskell
-ps
+shouldParseWithState
   "0005-styled-strings-messy-boundaries"
   ( nilOrgDoc
       [ CHeading
@@ -2784,7 +2784,7 @@ see it. So the failure from [[f:failIfLeftoverActiveStyles]] gets triggered.
 
 #+name: t:0005-styled-strings-leftover-active-styles
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0005-styled-strings-leftover-active-styles"
   "leftover active styles: [Bold]"
   15
@@ -3159,7 +3159,7 @@ a b  c   d    e      *f g  h   i    j*
 
 #+name: t:0005-styled-strings-compression
 #+begin_src haskell
-p
+shouldParseWith
   "0005-styled-strings-compression"
   $ nilOrgDoc
     [ CParagraph
@@ -3212,7 +3212,7 @@ foo
 
 #+name: t:0005-styled-strings-no-style
 #+begin_src haskell
-p
+shouldParseWith
   "0005-styled-strings-no-style"
   $ nilOrgDoc
     [ plainParagraph "foo"
@@ -3229,7 +3229,7 @@ foo *bar* baz
 
 #+name: t:0005-styled-strings-bold
 #+begin_src haskell
-p
+shouldParseWith
   "0005-styled-strings-bold"
   $ nilOrgDoc
     [ CParagraph
@@ -3263,7 +3263,7 @@ Below we mix things up a bit more, using more styles.
 
 #+name: t:0005-styled-strings-complex
 #+begin_src haskell
-p
+shouldParseWith
   "0005-styled-strings-complex"
   $ nilOrgDoc
     [ CParagraph
@@ -3313,7 +3313,7 @@ Here's another test, which checks some edge cases when dealing with punctuation.
 
 #+name: t:0005-styled-strings-complex-punctuation
 #+begin_src haskell
-p
+shouldParseWith
   "0005-styled-strings-complex-punctuation"
   $ nilOrgDoc
     [ CParagraph
@@ -3355,7 +3355,7 @@ have a style marker inside a word (not at the usual beginning or end of a word).
 
 #+name: t:0005-styled-strings-verbatim
 #+begin_src haskell
-p
+shouldParseWith
   "0005-styled-strings-verbatim"
   $ nilOrgDoc
     [ CParagraph
@@ -3386,7 +3386,7 @@ if it immediately follows a verbatim or code marker.
 
 #+name: t:0005-styled-strings-verbatim-code-ignore-immediate-bold
 #+begin_src haskell
-p
+shouldParseWith
   "0005-styled-strings-verbatim-code-ignore-immediate-bold"
   $ nilOrgDoc
     [ CParagraph
@@ -3433,7 +3433,7 @@ not apply if we're inside a verbatim (or code) region.
 
 #+name: t:0005-styled-strings-verbatim-precedence
 #+begin_src haskell
-p
+shouldParseWith
   "0005-styled-strings-verbatim-precedence"
   $ nilOrgDoc
     <<Expected prose for 0005-styled-strings-verbatim-precedence>>
@@ -3796,7 +3796,7 @@ ok]]
 
 #+name: t:0006-links-oids
 #+begin_src haskell
-p
+shouldParseWith
   "0006-links-oids"
   ( nilOrgDoc
       [ CParagraph
@@ -4065,7 +4065,7 @@ Hello [[id:442c807f-c9d9-45a7-88bf-ffffffffffff::target name with
 
 #+name: t:0006-links-oids-lenient-whitespace
 #+begin_src haskell
-p
+shouldParseWith
   "0006-links-oids-lenient-whitespace"
   ( nilOrgDoc
       [ CParagraph
@@ -4150,7 +4150,7 @@ protocolWebLinkParser = do
 
 #+name: t:0006-links-web-protocols
 #+begin_src haskell
-p
+shouldParseWith
   "0006-links-web-protocols"
   ( nilOrgDoc
       [ CParagraph
@@ -4314,7 +4314,7 @@ foo [[link-target-only]]
 
 #+name: t:0006-links
 #+begin_src haskell
-ps
+shouldParseWithState
   "0006-links"
   ( nilOrgDoc
       [ CParagraph
@@ -4410,7 +4410,7 @@ This way, the input will look like ~[[...~ which will then allow
 
 #+name: t:0006-links-inside-parentheses
 #+begin_src haskell
-p
+shouldParseWith
   "0006-links-inside-parentheses"
   $ nilOrgDoc
     [ CParagraph
@@ -4450,7 +4450,7 @@ non-links.
 
 #+name: t:0006-links-nonlink
 #+begin_src haskell
-p
+shouldParseWith
   "0006-links-nonlink"
   $ nilOrgDoc
     [ CParagraph
@@ -4548,7 +4548,7 @@ Go to ftp://10.0.0.1!
 
 #+name: t:0006-links-raw
 #+begin_src haskell
-p
+shouldParseWith
   "0006-links-raw"
   $ nilOrgDoc
     [ CParagraph
@@ -4890,7 +4890,7 @@ Hello [fn:hello] world.
 
 #+name: t:0013-footnotes-broken-link
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0013-footnotes-broken-link"
   "broken footnote links: hello"
   24
@@ -4908,7 +4908,7 @@ Hello world.
 
 #+name: t:0013-footnotes-unused-def
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0013-footnotes-unused-def"
   "unused footnote definitions: hello"
   30
@@ -4963,7 +4963,7 @@ Hello [fn:hello] world.
 
 #+name: t:0013-footnotes-simple
 #+begin_src haskell
-ps
+shouldParseWithState
   "0013-footnotes-simple"
   OrgDoc
     { oid = nilOid,
@@ -5070,7 +5070,7 @@ Hello [fn:a] world. [fn:b]
 
 #+name: t:0013-footnotes-complex
 #+begin_src haskell
-ps
+shouldParseWithState
   "0013-footnotes-complex"
   OrgDoc
     { oid = nilOid,
@@ -5136,7 +5136,7 @@ Some other text.
 
 #+name: t:0013-footnotes-multiple-groups
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0013-footnotes-multiple-groups"
   "cannot have more than one group of footnote definitions"
   95
@@ -5212,7 +5212,7 @@ validateCslPath maybeCslPath
 
 #+name: t:0014-citations-csl-path
 #+begin_src haskell
-ps
+shouldParseWithState
   "0014-citations-csl-path"
   OrgDoc
     { oid = nilOid,
@@ -5266,7 +5266,7 @@ collectValsFor key kvs =
 
 #+name: t:0014-citations-csl-json-paths
 #+begin_src haskell
-ps
+shouldParseWithState
   "0014-citations-csl-json-paths"
   OrgDoc
     { oid = nilOid,
@@ -5322,7 +5322,7 @@ bibliographyLocationParser = do
 
 #+name: t:0014-citations-bibliography-location
 #+begin_src haskell
-ps
+shouldParseWithState
   "0014-citations-bibliography-location"
   OrgDoc
     { oid = nilOid,
@@ -5351,7 +5351,7 @@ error.
 
 #+name: t:0014-citations-print-biblio-missing-csl-style
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0014-citations-print-biblio-missing-csl-style"
   "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
   44
@@ -5369,7 +5369,7 @@ should also result in an error.
 
 #+name: t:0014-citations-print-biblio-missing-bib-entries
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0014-citations-print-biblio-missing-bib-entries"
   "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   48
@@ -5799,7 +5799,7 @@ Simple citation, without any locators or affixes.
 
 #+name: t:0014-citations-single-cite
 #+begin_src haskell
-ps
+shouldParseWithState
   "0014-citations-single-cite"
   OrgDoc
     { oid = nilOid,
@@ -5858,7 +5858,7 @@ Cite with various (typical) locators.
 
 #+name: t:0014-citations-locators
 #+begin_src haskell
-ps
+shouldParseWithState
   "0014-citations-locators"
   OrgDoc
     { oid = nilOid,
@@ -5997,7 +5997,7 @@ Citations with locators and affixes.
 
 #+name: t:0014-citations-locators-affixes
 #+begin_src haskell
-ps
+shouldParseWithState
   "0014-citations-locators-affixes"
   OrgDoc
     { oid = nilOid,
@@ -6241,7 +6241,7 @@ may be the case that the CSL processor decides to [[https://github.com/jgm/pando
 
 #+name: t:0014-citations-worg
 #+begin_src haskell
-ps
+shouldParseWithState
   "0014-citations-worg"
   OrgDoc
     { oid = nilOid,
@@ -6446,7 +6446,7 @@ Unbalanced brackets are rejected from the cite prefix.
 
 #+name: t:0014-citations-unbalanced-brackets-prefix-opening
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0014-citations-unbalanced-brackets-prefix-opening"
   "unbalanced brackets"
   58
@@ -6462,7 +6462,7 @@ pf
 
 #+name: t:0014-citations-unbalanced-brackets-prefix-closing
 #+begin_src haskell
-pfm
+shouldFailWithError
   "0014-citations-unbalanced-brackets-prefix-closing"
   ( utoks "]"
       <> etoks "[["
@@ -6489,7 +6489,7 @@ Similarly, unbalanced brackets should fail for the cite suffix.
 
 #+name: t:0014-citations-unbalanced-brackets-suffix-opening
 #+begin_src haskell
-pfSimple "0014-citations-unbalanced-brackets-suffix-opening"
+shouldFail "0014-citations-unbalanced-brackets-suffix-opening"
 #+end_src
 
 #+name: ti:0014-citations-unbalanced-brackets-suffix-closing
@@ -6502,7 +6502,7 @@ pfSimple "0014-citations-unbalanced-brackets-suffix-opening"
 
 #+name: t:0014-citations-unbalanced-brackets-suffix-closing
 #+begin_src haskell
-pfm
+shouldFailWithError
   "0014-citations-unbalanced-brackets-suffix-closing"
   ( utoks "]]\n"
       <> etoks "[["
@@ -6528,7 +6528,7 @@ Semicolons must be meaningful; extraneous semicolons are not allowed.
 
 #+name: t:0014-citations-extra-semicolons-basic
 #+begin_src haskell
-pfm
+shouldFailWithError
   "0014-citations-extra-semicolons-basic"
   ( utoks ";"
       <> etoks "[["
@@ -6562,7 +6562,7 @@ cite:
 
 #+name: t:0014-citations-extra-semicolons-consecutive
 #+begin_src haskell
-pfm
+shouldFailWithError
   "0014-citations-extra-semicolons-consecutive"
   ( utoks ";"
       <> etoks "[["
@@ -6592,7 +6592,7 @@ Citations cannot be nested. Because we don't parse for nested citations in
 
 #+name: t:0014-citations-nested
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0014-citations-nested"
   "unbalanced brackets"
   67
@@ -6609,7 +6609,7 @@ Citations inside verbatim or code style markers are ignored.
 
 #+name: t:0014-citations-forbidden-in-verbatim-code
 #+begin_src haskell
-ps
+shouldParseWithState
   "0014-citations-forbidden-in-verbatim-code"
   OrgDoc
     { oid = nilOid,
@@ -6657,7 +6657,7 @@ For simplicity, citations are not allowed in headings. This is controlled by the
 
 #+name: t:0014-citations-forbidden-in-headings
 #+begin_src haskell
-ps
+shouldParseWithState
   "0014-citations-forbidden-in-headings"
   OrgDoc
     { oid = nilOid,
@@ -6710,7 +6710,7 @@ defined is an error.
 
 #+name: t:0014-citations-missing-csl-style
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0014-citations-missing-csl-style"
   "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
   28
@@ -6727,7 +6727,7 @@ Trying to use citations without a CSL style file is an error.
 
 #+name: t:0014-citations-missing-bib-entries
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0014-citations-missing-bib-entries"
   "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   32
@@ -6898,7 +6898,7 @@ underscore_
 
 #+name: t:0005-prose-paragraphs
 #+begin_src haskell
-p
+shouldParseWith
   "0005-prose-paragraphs"
   $ nilOrgDoc
     <<Expected prose for 0005-prose-paragraphs>>
@@ -6941,7 +6941,7 @@ list in some way.
 
 #+name: t:0008-indentation-paragraph
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0008-indentation-paragraph"
   "invalid indentation"
   1
@@ -6967,7 +6967,7 @@ text (see the [[id:c8616126-215d-49be-8874-c2aca7d93a54][discussion of prose tex
 
 #+name: t:0008-indentation-headings
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0008-indentation-headings"
   "invalid indentation"
   1
@@ -7239,7 +7239,7 @@ By default we only allow 6 levels of headings.
 
 #+name: t:0004-headings
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0004-headings"
   "found 7 asterisks found for this heading, but lilac_maxHeadingLevel = 6"
   46
@@ -7269,7 +7269,7 @@ or set it to 0 (unlimited). First we demonstrate using a higher number, 20.
 
 #+name: t:0004-headings-20
 #+begin_src haskell
-ps
+shouldParseWithState
   "0004-headings-20"
   ( nilOrgDoc
       [ plainHeading 1 [1],
@@ -7316,7 +7316,7 @@ Now we check using ~0~ for unlimited nesting.
 
 #+name: t:0004-headings-unlimited
 #+begin_src haskell
-ps
+shouldParseWithState
   "0004-headings-unlimited"
   ( nilOrgDoc
       [ plainHeading 1 [1],
@@ -7356,7 +7356,7 @@ don't have too much nesting.
 
 #+name: t:0004-headings-limited
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0004-headings-limited"
   "found 4 asterisks found for this heading, but lilac_maxHeadingLevel = 3"
   46
@@ -7374,7 +7374,7 @@ We can also prohibit headings entirely, by setting ~lilac_maxHeadingLevel~ to ~-
 
 #+name: t:0004-headings-prohibited
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0004-headings-prohibited"
   "headings prohibited because lilac_maxHeadingLevel < 0"
   29
@@ -7392,7 +7392,7 @@ cannot go from level 1 to level 4 (skipping over levels 2 and 3).
 
 #+name: t:0004-headings-cannot-skip-level
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0004-headings-cannot-skip-level"
   "headings may not skip levels (expected to see level 1 or 2, not 4)"
   8
@@ -7480,7 +7480,7 @@ The =:PROPERTIES:= drawer may be empty.
 
 #+name: t:0004-properties-drawer-empty
 #+begin_src haskell
-ps
+shouldParseWithState
   "0004-properties-drawer-empty"
   ( nilOrgDoc
       [ CHeading
@@ -7516,7 +7516,7 @@ Check we can pick up keys and value from the =:PROPERTIES:= drawer.
 
 #+name: t:0004-properties-drawer-not-empty
 #+begin_src haskell
-ps
+shouldParseWithState
   "0004-properties-drawer-not-empty"
   ( nilOrgDoc
       [ CHeading
@@ -7565,7 +7565,7 @@ This ":KEY:" ignored because it's inside a comment block.
 
 #+name: t:0004-properties-drawer-not-empty-with-comments
 #+begin_src haskell
-ps
+shouldParseWithState
   "0004-properties-drawer-not-empty-with-comments"
   ( nilOrgDoc
       [ CHeading
@@ -7634,7 +7634,7 @@ Below are some examples of valid (empty) code blocks.
 
 #+name: t:0007-blocks-empty
 #+begin_src haskell
-ps
+shouldParseWithState
   "0007-blocks-empty"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-empty>>
@@ -7754,7 +7754,7 @@ b
 
 #+name: t:0007-blocks-duplicate-tangle-paths
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0007-blocks-duplicate-tangle-paths"
   "tangle path \"some/path.sh\" is not unique"
   101
@@ -7797,7 +7797,7 @@ b
 
 #+name: t:0007-blocks-duplicate-names
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0007-blocks-duplicate-names"
   "cell name \"foo\" is not unique"
   52
@@ -8021,7 +8021,7 @@ Non-special commas stay put:
 
 #+name: t:0007-blocks-special-commas
 #+begin_src haskell
-ps
+shouldParseWithState
   "0007-blocks-special-commas"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-special-commas>>
@@ -8308,7 +8308,7 @@ with ~>>~ on the same line.
 
 #+name: t:0007-blocks-noweb
 #+begin_src haskell
-ps
+shouldParseWithState
   "0007-blocks-noweb"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-noweb>>
@@ -8392,7 +8392,7 @@ echo <<bar>> x y z
 
 #+name: t:0007-blocks-noweb-off
 #+begin_src haskell
-ps
+shouldParseWithState
   "0007-blocks-noweb-off"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-noweb-off>>
@@ -8442,7 +8442,7 @@ those contents into an existing line.
 
 #+name: t:0007-blocks-noweb-intraline
 #+begin_src haskell
-ps
+shouldParseWithState
   "0007-blocks-noweb-intraline"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-noweb-intraline>>
@@ -8695,7 +8695,7 @@ A =#+begin_src= without an accompanying language should trigger an error.
 
 #+name: t:0007-block-src-without-lang
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0007-block-src-without-lang"
   "block type src requires a language specifier"
   11
@@ -8741,7 +8741,7 @@ foo
 
 #+name: t:0007-blocks-ending
 #+begin_src haskell
-ps
+shouldParseWithState
   "0007-blocks-ending"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-ending>>
@@ -9576,7 +9576,7 @@ here.
 
 #+name: t:0009-list-indentation-no-indent
 #+begin_src haskell
-p
+shouldParseWith
   "0009-list-indentation-no-indent"
   $ nilOrgDoc
     [ plainParagraph "1)",
@@ -9600,7 +9600,7 @@ Here's a list with the (proper) 2-space indent.
 
 #+name: t:0009-list-indentation-proper-indent
 #+begin_src haskell
-p
+shouldParseWith
   "0009-list-indentation-proper-indent"
   $ nilOrgDoc
     [ CListItem
@@ -9630,7 +9630,7 @@ Ordered lists require a closing parenthesis ~)~ after the number.
 
 #+name: t:0009-ordered-list-head-needs-parenthesis
 #+begin_src haskell
-pfm
+shouldFailWithError
   "0009-ordered-list-head-needs-parenthesis"
   (utoks "." <> etoks ")" <> elabel "ordered list number")
   3
@@ -9646,7 +9646,7 @@ Ordered lists may only use numbers, not letters or Roman numerals.
 
 #+name: t:0009-ordered-list-head-cannot-use-letters
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0009-ordered-list-head-cannot-use-letters"
   "invalid indentation"
   2
@@ -9674,7 +9674,7 @@ Here's a nested example.
 
 #+name: t:0009-list-indentation-nested
 #+begin_src haskell
-p
+shouldParseWith
   "0009-list-indentation-nested"
   $ nilOrgDoc
     [ CListItem
@@ -9740,7 +9740,7 @@ Nesting is limited to 5 levels, for a total of 6 levels by default.
 
 #+name: t:0009-list-nesting-max
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0009-list-nesting-max"
   "max nesting depth exceeded: cannot have more than 6 levels of list items"
   88
@@ -9774,7 +9774,7 @@ test below we increase the nesting level slightly.
 
 #+name: t:0009-list-nesting-max-8
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0009-list-nesting-max-8"
   "max nesting depth exceeded: cannot have more than 8 levels of list items"
   156
@@ -9792,7 +9792,7 @@ We can prohibit list items entirely, much like how we can prohibit them in
 
 #+name: t:0009-lists-prohibited
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0009-list-prohibited"
   "lists prohibited because lilac_maxListLevel < 0"
   29
@@ -9813,7 +9813,7 @@ Now we test whether list items can also hold content (other cells) inside it.
 
 #+name: t:0009-list-content-simple
 #+begin_src haskell
-p
+shouldParseWith
   "0009-list-content-simple"
   $ nilOrgDoc
     [ CListItem
@@ -9865,7 +9865,7 @@ Bar.
 
 #+name: t:0009-list-indentation-nested-with-text
 #+begin_src haskell
-p
+shouldParseWith
   "0009-list-indentation-nested-with-text"
   $ nilOrgDoc
     [ plainParagraph "Foo.",
@@ -9933,7 +9933,7 @@ line is indented too much in the list body.
 
 #+name: t:0005-paragraph-indentation-mismatch-over-list-body
 #+begin_src haskell
-pfm
+shouldFailWithError
   "0005-paragraph-indentation-mismatch-over-list-body"
   (utoks " ")
   14
@@ -9952,7 +9952,7 @@ baz.
 
 #+name: t:0005-paragraph-indentation-mismatch-over
 #+begin_src haskell
-pfm
+shouldFailWithError
   "0005-paragraph-indentation-mismatch-over"
   (utoks " ")
   4
@@ -9971,7 +9971,7 @@ paragraph block.
 
 #+name: t:0005-paragraph-indentation-mismatch-under-list-body
 #+begin_src haskell
-pfm
+shouldFailWithError
   "0005-paragraph-indentation-mismatch-under-list-body"
   (utoks "b" <> etoks " ")
   12
@@ -9992,7 +9992,7 @@ there is non-zero indentation.
 
 #+name: t:0005-paragraph-indentation-mismatch-initial-indent-invalid
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0005-paragraph-indentation-mismatch-initial-indent-invalid"
   "indentation does not fit into existing levels"
   21
@@ -10011,7 +10011,7 @@ pf
 
 #+name: t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
   "indentation does not fit into existing levels"
   36
@@ -10042,7 +10042,7 @@ Four
 
 #+name: t:0009-paragraph-can-close-deeper-levels
 #+begin_src haskell
-p
+shouldParseWith
   "0009-paragraph-can-close-deeper-levels"
   $ nilOrgDoc
     [ CListItem
@@ -10103,7 +10103,7 @@ Four
 
 #+name: t:0009-paragraph-can-separate-mixed-lists
 #+begin_src haskell
-p
+shouldParseWith
   "0009-paragraph-can-separate-mixed-lists"
   $ nilOrgDoc
     [ CListItem
@@ -10167,7 +10167,7 @@ unexpected because the unordered list has not been closed off yet.
 
 #+name: t:0009-lists-cannot-be-mixed-on-their-own
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0009-lists-cannot-be-mixed-on-their-own"
   "expected UNORDERED list item at this level"
   21
@@ -10188,7 +10188,7 @@ an ordered one at the same level).
 
 #+name: t:0009-lists-cannot-be-mixed-on-their-own-ordered
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0009-lists-cannot-be-mixed-on-their-own-ordered"
   "expected ORDERED list item at this level"
   23
@@ -10209,7 +10209,7 @@ trigger an indentation error.
 
 #+name: t:0009-lists-require-precise-indentation
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0009-lists-require-precise-indentation"
   "list item: invalid indentation"
   15
@@ -10228,7 +10228,7 @@ text, as part of the "a" above it.
 
 #+name: t:0009-list-items-need-blank-line-separator
 #+begin_src haskell
-p
+shouldParseWith
   "0009-list-items-need-blank-line-separator"
   $ nilOrgDoc
     [ CListItem
@@ -10257,7 +10257,7 @@ instead.
 
 #+name: t:0009-ordered-lists-require-increment
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0009-ordered-lists-require-increment"
   "expected incremented list head 2 but got 1"
   13
@@ -10277,7 +10277,7 @@ Ordered list items must start from either 0 or 1.
 
 #+name: t:0009-ordered-lists-start-from-0-or-1
 #+begin_src haskell
-pf
+shouldFailWithMessage
   "0009-ordered-lists-start-from-0-or-1"
   "starting list head number must be 0 or 1; got 20"
   25
@@ -10496,7 +10496,7 @@ whitespace for the contents inside (just before the =\end{equation}= marker).
 
 #+name: t:0010-standalone-math-fragments
 #+begin_src haskell
-ps
+shouldParseWithState
   "0010-standalone-math-fragments"
   ( nilOrgDoc
       [ CMathFragment
@@ -10578,7 +10578,7 @@ Standalone math fragments may be included as part of a list item.
 
 #+name: t:0010-standalone-math-inside-lists
 #+begin_src haskell
-ps
+shouldParseWithState
   "0010-standalone-math-inside-lists"
   ( nilOrgDoc
       [ CListItem
@@ -10845,7 +10845,7 @@ g x = x + 1
 
 #+name: t:0011-figures-and-blocks
 #+begin_src haskell
-ps
+shouldParseWithState
   "0011-figures-and-blocks"
   ( nilOrgDoc
       [ CBlock
@@ -11319,7 +11319,7 @@ The test below checks if we can parse a table with all 3 types of prose text
 
 #+name: t:0012-tables-and-prose
 #+begin_src haskell
-ps
+shouldParseWithState
   "0012-tables-and-prose"
   ( nilOrgDoc
       <<Expected cells for 0012-tables-and-prose>>
@@ -11563,7 +11563,7 @@ indented as a list item.
 
 #+name: t:0012-tables-inside-lists
 #+begin_src haskell
-ps
+shouldParseWithState
   "0012-tables-inside-lists"
   ( nilOrgDoc
       <<Expected cells for 0012-tables-inside-lists>>
@@ -11922,11 +11922,11 @@ and then running the [[f:orgDocParser]] against it.
 type Parser :: Type -> Type
 type Parser = <<Concrete type for Megaparsec>>
 
-<<f:p>>
-<<f:ps>>
-<<f:pf>>
-<<f:pfm>>
-<<f:pfSimple>>
+<<f:shouldParseWith>>
+<<f:shouldParseWithState>>
+<<f:shouldFailWithMessage>>
+<<f:shouldFailWithError>>
+<<f:shouldFail>>
 <<f:plainParagraph>>
 <<f:plainHeading>>
 <<f:nilOrgDoc>>
@@ -11938,12 +11938,12 @@ The ~Parser~ type synonym uses the same [[Concrete type for Megaparsec][concrete
 [[t:0005-notFollowedBy-behavior-for-empty-input]].
 
 We need a helper function around =parseOrgDoc=, which will read in a file from a
-given path (to feed to =parseOrgDoc=). We name this helper just =p=.
+given path (to feed to =parseOrgDoc=). We name this helper [[f:shouldParseWith]].
 
-#+name: f:p
+#+name: f:shouldParseWith
 #+begin_src haskell
-p :: FilePath -> OrgDoc -> Spec
-p path expected = do
+shouldParseWith :: FilePath -> OrgDoc -> Spec
+shouldParseWith path expected = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path check
   where
@@ -11959,10 +11959,10 @@ p path expected = do
         `shouldParse` (expected, expectedState)
 #+end_src
 
-For convenience though, [[f:p]] prefixes the file with a required Org ID, with the
-help of [[f:nilOidOrgDoc]]. This way the majority of test cases don't have to worry
-about this detail. The ones that do have to check the behavior of the top-level
-properties drawer have to do it manually, such as in
+For convenience though, [[f:shouldParseWith]] prefixes the file with a required Org
+ID, with the help of [[f:nilOidOrgDoc]]. This way the majority of test cases don't
+have to worry about this detail. The ones that do have to check the behavior of
+the top-level properties drawer have to do it manually, such as in
 [[t:0002-doc-metadata-properties-drawer-clash]].
 
 #+name: f:nilOidOrgDoc
@@ -11995,10 +11995,10 @@ nilOrgDoc cells =
 If we want to check the state (the parsing operation is stateful), we need to
 check the expected end state as well. We do this with =ps= below.
 
-#+name: f:ps
+#+name: f:shouldParseWithState
 #+begin_src haskell
-ps :: FilePath -> OrgDoc -> OrgParserState -> Spec
-ps path expected expectedState = do
+shouldParseWithState :: FilePath -> OrgDoc -> OrgParserState -> Spec
+shouldParseWithState path expected expectedState = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path check
   where
@@ -12014,13 +12014,13 @@ ps path expected expectedState = do
         `shouldParse` (expected, expectedState')
 #+end_src
 
-Sometimes we want to test that a file will fail to parse. We do this with =pf=
-(for "parse fail").
+Sometimes we want to test that a file will fail to parse. We do this with
+[[f:shouldFailWithMessage]].
 
-#+name: f:pf
+#+name: f:shouldFailWithMessage
 #+begin_src haskell
-pf :: FilePath -> String -> Int -> Spec
-pf path errMsg pos = do
+shouldFailWithMessage :: FilePath -> String -> Int -> Spec
+shouldFailWithMessage path errMsg pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
@@ -12039,15 +12039,15 @@ check for failures in parsers where we manually return an error with
 of a failure of the given parser combinators to account for the shape of the
 input text).
 
-The =pfm= helper checks for failures thrown by Megaparsec (the ones that =pf= do not
-check for). The =ET= likely stands for "trivial errors" or (error "trivial"),
-because it is documented in upstream as "Auxiliary type for construction of
-trivial parse errors.".
+The [[f:shouldFailWithError]] helper checks for failures thrown by Megaparsec (the
+ones that [[f:shouldFailWithMessage]] do not check for). The =ET= likely stands for
+"trivial errors" or (error "trivial"), because it is documented in upstream as
+"Auxiliary type for construction of trivial parse errors.".
 
-#+name: f:pfm
+#+name: f:shouldFailWithError
 #+begin_src haskell
-pfm :: FilePath -> ET Text -> Int -> Spec
-pfm path errorTrivial pos = do
+shouldFailWithError :: FilePath -> ET Text -> Int -> Spec
+shouldFailWithError path errorTrivial pos = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
@@ -12060,13 +12060,13 @@ pfm path errorTrivial pos = do
     newPos = pos + T.length inputPrefix
 #+end_src
 
-The [[f:pfSimple]] helper simply asserts that the parse should fail, without regard
+The [[f:shouldFail]] helper simply asserts that the parse should fail, without regard
 to the exact failure message.
 
-#+name: f:pfSimple
+#+name: f:shouldFail
 #+begin_src haskell
-pfSimple :: FilePath -> Spec
-pfSimple path = do
+shouldFail :: FilePath -> Spec
+shouldFail path = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
     it path $ \input -> do
       MP.runParser
