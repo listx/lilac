@@ -3219,8 +3219,16 @@ writeFileRobustly path contentToWrite = do
 #+end_src
 
 The [[f:mkFqcn]] function fully qualifies the name of a cell with the given OID and
-cell name, which will typically be the top-level ID for the Org document that
-contains the cell.
+cell name, which will typically be the parent heading's ID, or the top-level ID for the Org document that
+contains the cell:
+
+  - Parent heading's ID: This is involved when calling ~org-store-link~, because
+    it saves the ID of the parent heading (creating one if one does not exist
+    yet for the heading), which we can insert with ~org-insert-last-stored-link~.
+    Using these native Org functions result in their proliferation.
+
+  - Top-level ID: This acts as a fallback in case there are no headings (such
+    Org documents can exist).
 
 #+name: f:mkFqcn
 #+begin_src haskell
