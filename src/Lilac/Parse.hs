@@ -1224,8 +1224,11 @@ bTokenParser isSrcBlock nowebOn = MP.choice parsers
 
 zeroBTokensParser :: Text -> OrgParser [BToken]
 zeroBTokensParser blockType = do
-  _ <- string $ T.concat ["#+end_", blockType, "\n"]
+  _ <- MP.choice [noBlankLine, blankLine]
   pure []
+  where
+    noBlankLine = string $ T.concat ["#+end_", blockType, "\n"]
+    blankLine = string $ T.concat ["\n#+end_", blockType, "\n"]
 
 someBTokensParser :: Text -> Bool -> OrgParser [BToken]
 someBTokensParser blockType nowebOn =

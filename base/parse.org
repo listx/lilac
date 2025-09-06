@@ -7011,6 +7011,10 @@ Below are some examples of valid (empty) code blocks.
 
 ,#+begin_quote
 ,#+end_quote
+
+,#+begin_src haskell
+
+,#+end_src
 #+end_src
 
 #+name: t:0007-blocks-empty
@@ -7022,7 +7026,7 @@ shouldParseWithState
   )
   defaultOrgParserState
     { cellNames = Set.fromList ["foo"],
-      anonBlockNumber = 2
+      anonBlockNumber = 3
     }
 #+end_src
 
@@ -7056,6 +7060,17 @@ shouldParseWithState
           fromList
             [ ("__anon_block_number", "2"),
               ("__block_type", "quote")
+            ],
+        body = []
+      },
+  CBlock
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__anon_block_number", "3"),
+              ("__block_type", "src"),
+              ("__src_language", "haskell")
             ],
         body = []
       }
@@ -7290,8 +7305,11 @@ empty with =zeroBTokensParser=.
 #+begin_src haskell
 zeroBTokensParser :: Text -> OrgParser [BToken]
 zeroBTokensParser blockType = do
-  _ <- string $ T.concat ["#+end_", blockType, "\n"]
+  _ <- MP.choice [noBlankLine, blankLine]
   pure []
+  where
+    noBlankLine = string $ T.concat ["#+end_", blockType, "\n"]
+    blankLine = string $ T.concat ["\n#+end_", blockType, "\n"]
 #+end_src
 
 If =zeroBTokensParser= fails, then =someBTokensParser= must succeed (hence the use

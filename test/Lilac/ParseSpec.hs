@@ -1183,12 +1183,23 @@ parseSpec = do
                       ("__block_type", "quote")
                     ],
                 body = []
+              },
+          CBlock
+            Block
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__anon_block_number", "3"),
+                      ("__block_type", "src"),
+                      ("__src_language", "haskell")
+                    ],
+                body = []
               }
         ]
     )
     defaultOrgParserState
       { cellNames = Set.fromList ["foo"],
-        anonBlockNumber = 2
+        anonBlockNumber = 3
       }
 
   shouldParseWithState
