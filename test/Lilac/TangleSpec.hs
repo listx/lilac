@@ -144,7 +144,7 @@ tangleSpec = do
     ]
 
   checkExpansion
-    [ "0101-block-expansion-external-parent-headingchild",
+    [ "0101-block-expansion-external-headingchild-parent",
       "0101-block-expansion-external-headingchild"
     ]
     [ ( "equations.txt",

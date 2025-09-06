@@ -185,13 +185,13 @@ The ~expand~ function recursively calls ~expandBlock~ if it detects a ~LinkOid~ 
 link. Otherwise, for ~BTokenString~ tokens it searches for an indentation prefix
 with ~getPrefix~. We need the prefix because we want to indent entire blocks if
 the name of the link referring to it is indented. See
-[[t:0101-block-expansion-prefix]] and [[t:0101-block-expansion-prefix-nested]] for
+[[ti:0101-block-expansion-prefix]] and [[ti:0101-block-expansion-prefix-nested]] for
 examples.
 
 The ~getPrefix~ function is simple and uses any characters it finds, not just
 spaces, looking backwards and stopping at a newline. See
-[[t:0101-block-expansion-prefix-nonspace]] and
-[[t:0101-block-expansion-prefix-nonspace-nested]] for examples.
+[[ti:0101-block-expansion-prefix-nonspace]] and
+[[ti:0101-block-expansion-prefix-nonspace-nested]] for examples.
 
 The ~prependExistingPrefix~ function splits up the given text, and injects the
 prefix on every line in the text except the very first line. This is because
@@ -228,6 +228,7 @@ it "loses information" $ do
 
 Expand a single code block.
 
+#+name: ti:0101-block-expansion
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion
 #+header: :noweb off
 #+begin_src org
@@ -267,6 +268,7 @@ Expand many code blocks in the same place, but the number of repeated expansions
 shouldn't result in a cumulative number of newlines; we should expect just one
 newline for the expanded content.
 
+#+name: ti:0101-block-expansion-deeply-nested
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-deeply-nested
 #+header: :noweb off
 #+begin_src org
@@ -319,6 +321,7 @@ checkExpansion
 
 If the link name is indented, we have to indent the contents of that block.
 
+#+name: ti:0101-block-expansion-prefix
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix
 #+header: :noweb off
 #+begin_src org
@@ -364,6 +367,7 @@ The indentation can be nested. For example if the named block itself links to
 other blocks with an indent, those inner blocks should be indented with the sum
 of the indent found in the current and outer surrounding blocks.
 
+#+name: ti:0101-block-expansion-prefix-nested
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix-nested
 #+header: :noweb off
 #+begin_src org
@@ -413,6 +417,7 @@ checkExpansion
 The prefix is any string, up to the (preceding) newline. So this mean it can
 have non-space characters in it as well.
 
+#+name: ti:0101-block-expansion-prefix-nonspace
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix-nonspace
 #+header: :noweb off
 #+begin_src org
@@ -452,6 +457,7 @@ checkExpansion
 
 Non-space prefixes can also be nested.
 
+#+name: ti:0101-block-expansion-prefix-nonspace-nested
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-prefix-nonspace-nested
 #+header: :noweb off
 #+begin_src org
@@ -500,6 +506,7 @@ checkExpansion
 
 Complex expansions.
 
+#+name: ti:0101-block-expansion-complex
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-complex
 #+header: :noweb off
 #+begin_src org
@@ -589,6 +596,7 @@ checkExpansion
 Due to [[id:51f2edd8-5f8e-4c63-841f-da6c5c41680a::f:padConsecutiveNowebLinks][f:padConsecutiveNowebLinks]], insert extra newlines between consecutive
 Noweb links.
 
+#+name: ti:0102-pad-between-consecutive-links
 #+header: :tangle test/Lilac/TangleSpec/0102-pad-between-consecutive-links
 #+header: :noweb off
 #+begin_src org
@@ -689,6 +697,7 @@ checkExpansion
 
 Insert shebang lines if the user specifies them with the ~:shebang~ header.
 
+#+name: ti:0103-shebang
 #+header: :tangle test/Lilac/TangleSpec/0103-shebang
 #+header: :noweb off
 #+begin_src org
@@ -720,6 +729,7 @@ checkExpansion
 Expand blocks even if they have Noweb links that point to a block from an
 external file.
 
+#+name: ti:0101-block-expansion-external-parent
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-parent
 #+header: :noweb off
 #+begin_src org
@@ -736,6 +746,7 @@ a2
 ,#+end_src
 #+end_src
 
+#+name: ti:0101-block-expansion-external-child
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-child
 #+header: :noweb off
 #+begin_src org
@@ -767,7 +778,8 @@ checkExpansion
 The expansion should work for external Noweb links which refer to a block using
 a heading's ID, not the ID that's set at the file level.
 
-#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-parent-headingchild
+#+name: ti:0101-block-expansion-external-headingchild-parent
+#+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-headingchild-parent
 #+header: :noweb off
 #+begin_src org
 :PROPERTIES:
@@ -783,6 +795,7 @@ a2
 ,#+end_src
 #+end_src
 
+#+name: ti:0101-block-expansion-external-headingchild
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-headingchild
 #+header: :noweb off
 #+begin_src org
@@ -804,7 +817,7 @@ hello from child
 #+name: t:0101-block-expansion-external-headingchild
 #+begin_src haskell
 checkExpansion
-  [ "0101-block-expansion-external-parent-headingchild",
+  [ "0101-block-expansion-external-headingchild-parent",
     "0101-block-expansion-external-headingchild"
   ]
   [ ( "equations.txt",
@@ -819,9 +832,10 @@ checkExpansion
 
 
 An external block itself can refer to another external block. In
-[[t:0101-block-expansion-external-2-hops]] we use a middleman that itself refers to
-the external child block from [[t:0101-block-expansion-external]].
+[[t:0101-block-expansion-external-2-hops]] we use a [[ti:0101-block-expansion-external-2-hops-middleman][middleman]] that itself refers to
+the [[ti:0101-block-expansion-external-child][external child block]] from [[t:0101-block-expansion-external]].
 
+#+name: ti:0101-block-expansion-external-2-hops-parent
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-2-hops-parent
 #+header: :noweb off
 #+begin_src org
@@ -838,6 +852,7 @@ a2
 ,#+end_src
 #+end_src
 
+#+name: ti:0101-block-expansion-external-2-hops-middleman
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-2-hops-middleman
 #+header: :noweb off
 #+begin_src org
@@ -872,6 +887,7 @@ checkExpansion
 We allow two files to refer to each other's code blocks as well, as long as
 there isn't a cycle.
 
+#+name: ti:0101-block-expansion-external-mutual-a
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-mutual-a
 #+header: :noweb off
 #+begin_src org
@@ -891,6 +907,7 @@ hello from c
 ,#+end_src
 #+end_src
 
+#+name: ti:0101-block-expansion-external-mutual-b
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-external-mutual-b
 #+header: :noweb off
 #+begin_src org

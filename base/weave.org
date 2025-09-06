@@ -869,9 +869,10 @@ weaveStyledText styledText = do
     styles = map (T.toLower . T.show) $ maskToStyles styledText.style
 #+end_src
 
-[[t:0300-weave-styled-text]] checks for basic styles, but also whether HTML-sensitive
+[[ti:0300-weave-styled-text]] checks for basic styles, but also whether HTML-sensitive
 characters get escaped (even inside verbatim and code styles)
 
+#+name: ti:0300-weave-styled-text
 #+header: :tangle test/Lilac/WeaveSpec/0300-weave-styled-text
 #+begin_src org
 regular *bold* /italic/ _underline_ =verbatim= ~code~
@@ -923,6 +924,7 @@ weaveListMarker =
 There isn't much to test here, because these markers are so simple. Still, it
 doesn't hurt.
 
+#+name: ti:0300-weave-lists
 #+header: :tangle test/Lilac/WeaveSpec/0300-weave-lists
 #+begin_src org
   1) a
@@ -1994,6 +1996,7 @@ BibTeX format into CSL JSON with Pandoc via ~pandoc citations.bib -t csljson -o 
 Check what the result of calling ~Citeproc.citeproc~ looks like, after converting
 back to [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] using IEEE style.
 
+#+name: ti:0400-citeproc-basic
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-basic
 #+begin_src org
 ,#+bibliography: bib.json
@@ -2220,6 +2223,7 @@ expectCiteprocResult
 
 Check usage of superscripts.
 
+#+name: ti:0400-citeproc-superscript
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-superscript
 #+begin_src org
 ,#+bibliography: bib.json
@@ -2284,6 +2288,7 @@ expectCiteprocResult
 
 Check usage of small caps.
 
+#+name: ti:0400-citeproc-smallcaps
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-smallcaps
 #+begin_src org
 ,#+bibliography: bib.json

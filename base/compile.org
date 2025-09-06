@@ -442,6 +442,7 @@ findExternalOids orgDoc =
 Links to code blocks within the same document, whether explicitly defined with
 an OID or not, shouldn't result in external links.
 
+#+name: ti:0400-no-external-symbols-code-blocks
 #+header: :tangle test/Lilac/CompileSpec/0400-no-external-symbols-code-blocks
 #+header: :noweb off
 #+begin_src org
@@ -481,6 +482,7 @@ checkExternalOids
 Here is a more complex example, with internal links inside headings and
 paragraphs as well.
 
+#+name: ti:0400-no-external-symbols-complex
 #+header: :tangle test/Lilac/CompileSpec/0400-no-external-symbols-complex
 #+header: :noweb off
 #+begin_src org
@@ -517,6 +519,7 @@ checkExternalOids
 
 Check for external links.
 
+#+name: ti:0400-external-symbols
 #+header: :tangle test/Lilac/CompileSpec/0400-external-symbols
 #+header: :noweb off
 #+begin_src org
@@ -540,6 +543,7 @@ checkExternalOids
 
 Here's a more complicated external link.
 
+#+name: ti:0400-external-symbols-newlines
 #+header: :tangle test/Lilac/CompileSpec/0400-external-symbols-newlines
 #+header: :noweb off
 #+begin_src org
@@ -749,6 +753,7 @@ makeRelativeToObjectPath objGPath fps = do
 
 Detect broken Noweb links.
 
+#+name: ti:0401-broken-links-noweb
 #+header: :tangle test/Lilac/CompileSpec/0401-broken-links-noweb
 #+header: :noweb off
 #+begin_src org
@@ -792,6 +797,7 @@ expectArchiveError
 Detect broken links in paragraphs. In this case, ~[[foo]]~ is not a named cell
 anywhere.
 
+#+name: ti:0401-broken-links-paragraph
 #+header: :tangle test/Lilac/CompileSpec/0401-broken-links-paragraph
 #+header: :noweb off
 #+begin_src org
@@ -814,6 +820,7 @@ expectArchiveError
 
 If we define the cell, the error goes away.
 
+#+name: ti:0401-broken-links-paragraph-ok
 #+header: :tangle test/Lilac/CompileSpec/0401-broken-links-paragraph-ok
 #+header: :noweb off
 #+begin_src org
@@ -839,6 +846,7 @@ Below is similar to [[t:0401-broken-links-noweb]], but the broken links have bee
 fixed (we define the ~x~ cell and also the external document (dependency) that has
 cell ~c~).
 
+#+name: ti:0401-broken-links-multi-ok
 #+header: :tangle test/Lilac/CompileSpec/0401-broken-links-multi-ok
 #+header: :noweb off
 #+begin_src org
@@ -873,6 +881,7 @@ xxx
 ,#+end_src
 #+end_src
 
+#+name: ti:0401-broken-links-multi-ok-dependency
 #+header: :tangle test/Lilac/CompileSpec/0401-broken-links-multi-ok-dependency
 #+header: :noweb off
 #+begin_src org
@@ -897,6 +906,7 @@ expectArchiveOk
 Ensure we allow links to an external cell, where the OID is either the top-level
 OID of the external Org doc, or the OID of the parent heading.
 
+#+name: ti:0401-broken-links-multi-ok-alternates-parent
 #+header: :tangle test/Lilac/CompileSpec/0401-broken-links-multi-ok-alternates-parent
 #+header: :noweb off
 #+begin_src org
@@ -908,6 +918,7 @@ OID of the external Org doc, or the OID of the parent heading.
 [[id:00000000-0000-0000-0000-00000000c000::foo]]
 #+end_src
 
+#+name: ti:0401-broken-links-multi-ok-alternates-child
 #+header: :tangle test/Lilac/CompileSpec/0401-broken-links-multi-ok-alternates-child
 #+header: :noweb off
 #+begin_src org
@@ -1073,6 +1084,7 @@ and [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::t:0007-blocks-noweb][t:0007-block
 
 # vale on
 
+#+name: ti:0100-dag-no-loops
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-no-loops
 #+header: :noweb off
 #+begin_src org
@@ -1101,6 +1113,7 @@ checkCycles
 
 Now check for the simplest case of a single self-loop.
 
+#+name: ti:0100-dag-self-loop
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-self-loop
 #+header: :noweb off
 #+begin_src org
@@ -1132,6 +1145,7 @@ checkCycles
 
 Check whether we can detect two independent self-loops.
 
+#+name: ti:0100-dag-self-loops
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-self-loops
 #+header: :noweb off
 #+begin_src org
@@ -1178,6 +1192,7 @@ checkCycles
 Check whether we can detect a back edge to an ancestor. In
 [[t:0100-dag-2-node-loop]] we have a cycle involving 2 nodes.
 
+#+name: ti:0100-dag-2-node-loop
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop
 #+header: :noweb off
 #+begin_src org
@@ -1225,6 +1240,7 @@ checkCycles
 Test case [[t:0100-dag-3-node-loop]] is like the previous one, but where the loop is
 one node longer (involves 3 nodes instead of 2).
 
+#+name: ti:0100-dag-3-node-loop
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-3-node-loop
 #+header: :noweb off
 #+begin_src org
@@ -1288,6 +1304,7 @@ Lastly, we have a test case involving complex loops. There are many back edges
 involved here; we just want to make sure that our algorithm for finding cycles
 is still able to handle such pathological input.
 
+#+name: ti:0100-dag-complex-loops
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-complex-loops
 #+header: :noweb off
 #+begin_src org
@@ -1380,6 +1397,7 @@ checkCycles
 Cycle detection should still work even for cycles that span across
 two files.
 
+#+name: ti:0100-dag-2-node-loop-2-files-parent
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-2-files-parent
 #+header: :noweb off
 #+begin_src org
@@ -1394,6 +1412,7 @@ hello from a
 ,#+end_src
 #+end_src
 
+#+name: ti:0100-dag-2-node-loop-2-files-child
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-2-files-child
 #+header: :noweb off
 #+begin_src org
@@ -1435,6 +1454,7 @@ checkCycles
 
 If three files form a cycle, that should also be detected.
 
+#+name: ti:0100-dag-2-node-loop-3-files-parent
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-3-files-parent
 #+header: :noweb off
 #+begin_src org
@@ -1449,6 +1469,7 @@ hello from a
 ,#+end_src
 #+end_src
 
+#+name: ti:0100-dag-2-node-loop-3-files-middleman
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-3-files-middleman
 #+header: :noweb off
 #+begin_src org
@@ -1462,6 +1483,7 @@ hello from b
 ,#+end_src
 #+end_src
 
+#+name: ti:0100-dag-2-node-loop-3-files-child
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-3-files-child
 #+header: :noweb off
 #+begin_src org
