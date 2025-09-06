@@ -177,7 +177,7 @@ import Prelude qualified (show)
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Cite>>
 
 <<id:e16dd5c7-0a63-4c52-afe9-744fdf853643::newtype:OID>>
-<<tc:Show OID>>
+<<instance:Show OID>>
 <<f:nilOid>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::f:nilOidOrgDoc>>
 <<f:fromWords>>
@@ -223,7 +223,7 @@ fromText t = case Data.UUID.Types.fromText t of
   Nothing -> Nothing
 #+end_src
 
-#+name: tc:Show OID
+#+name: instance:Show OID
 #+begin_src haskell
 instance Show OID where
   show (OID uuid) = Prelude.show uuid

@@ -543,7 +543,7 @@ serve:
 #+end_src
 
 The Nix dependency for Python is injected into the development shell environment
-in [[id:73b60692-f369-4707-a7ee-434cc7a4549f::code:tools][code:tools]].
+in [[id:73b60692-f369-4707-a7ee-434cc7a4549f::nix:tools][nix:tools]].
 
 #+name: tool-python3
 #+begin_src nix
@@ -3005,7 +3005,7 @@ a ? do
       let rawSvg :: String
           rawSvg =
             """
-            <<svg:external-link>>
+            <<external-link-svg>>
             """
           basicEncoder = \case
             '"' -> "%22"
@@ -3033,7 +3033,7 @@ The raw SVG code for the external link is taken mostly from [[https://www.unicod
 had a typo though, where it has ~viewbox~ instead of ~viewBox~ (which is why we use
 the latter here).
 
-#+name: svg:external-link
+#+name: external-link-svg
 #+begin_src xml
 <svg xmlns="http://www.w3.org/2000/svg" class="external-link" viewBox="0 0 60 60">
 <path fill="COLOR" d="M36 24c-1.2 0-2 0.8-2 2v12c0 1.2-0.8 2-2 2h-22c-1.2

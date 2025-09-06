@@ -22,7 +22,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
-    Figure (Figure, caption, link, meta),
+    Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
@@ -74,7 +74,7 @@ import Lilac.Types
     Prose (Prose),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
-    Table (Table, caption, grid, meta),
+    Table (Table, caption, grid, meta, parentOid),
     defaultOrgParserState,
     fromWords,
     nilOid,
@@ -2178,7 +2178,8 @@ parseSpec = do
               },
           CFigure
             Figure
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("__figure_number", "1"),
                       ("width", "100%"),
@@ -2215,7 +2216,8 @@ parseSpec = do
               },
           CFigure
             Figure
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("__figure_number", "2")
                     ],
@@ -2285,7 +2287,8 @@ parseSpec = do
               ],
           CFigure
             Figure
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("__figure_number", "3")
                     ],
@@ -2318,7 +2321,8 @@ parseSpec = do
     ( nilOrgDoc
         [ CTable
             Table
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("name", "tbl:famous-equations"),
                       ("caption", "*Bold*. [[tbl:famous-equations][A self-link]]. \\(E = mc^2\\)"),
@@ -2546,7 +2550,8 @@ parseSpec = do
               ],
           CTable
             Table
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("name", "tbl:famous-equations"),
                       ("bar", "baz"),

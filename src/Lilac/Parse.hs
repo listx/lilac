@@ -108,7 +108,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
-    Figure (Figure, caption, link, meta),
+    Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
@@ -163,7 +163,7 @@ import Lilac.Types
       ),
     StyleMask (StyleMask),
     StyledText (StyledText, body, style),
-    Table (Table, caption, grid, meta),
+    Table (Table, caption, grid, meta, parentOid),
     defaultOrgParserConf,
     defaultOrgParserState,
     fromText,
@@ -1151,7 +1151,7 @@ blockParser = do
       block =
         Block
           { parentOid =
-              firstParent orgParserState.docOid orgParserState.headingOidStack,
+              firstParentOid orgParserState.docOid orgParserState.headingOidStack,
             meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
@@ -1170,11 +1170,11 @@ blockParser = do
           }
     )
   pure $ CBlock block
-  where
-    firstParent :: OID -> [Maybe OID] -> OID
-    firstParent docOid maybeOids = case catMaybes maybeOids of
-      (oid : _) -> oid
-      [] -> docOid
+
+firstParentOid :: OID -> [Maybe OID] -> OID
+firstParentOid docOid maybeOids = case catMaybes maybeOids of
+  (oid : _) -> oid
+  [] -> docOid
 
 blockStartParser ::
   OrgParser
@@ -1705,7 +1705,9 @@ figureParser = do
       pure
         . CFigure
         $ Figure
-          { meta =
+          { parentOid =
+              firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+            meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
                 (delete "type" metaKVs)
@@ -1765,7 +1767,9 @@ tableParser = do
   pure
     . CTable
     $ Table
-      { meta = insert "__table_number" (T.show newTableNumber) metaKVs,
+      { parentOid =
+          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+        meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         caption = caption,
         grid = fromList $ rowsToTuples rows
       }

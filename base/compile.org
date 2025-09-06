@@ -52,7 +52,7 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
-    Figure (meta),
+    Figure (meta, parentOid),
     GPath,
     Heading (body, meta),
     Link (Link, target),
@@ -76,7 +76,7 @@ import Lilac.Types
         PTokenStyledText
       ),
     Prose (unProse),
-    Table (grid, meta),
+    Table (grid, meta, parentOid),
     decodeGPath,
     encodeGPath,
   )
@@ -272,9 +272,9 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
               )
             ]
         | otherwise -> []
-      CFigure figure -> getSymbols Nothing figure.meta cell
+      CFigure figure -> getSymbols (Just figure.parentOid) figure.meta cell
       CMathFragment mathFragment -> getSymbols Nothing mathFragment.meta cell
-      CTable table -> getSymbols Nothing table.meta cell
+      CTable table -> getSymbols (Just table.parentOid) table.meta cell
       CFootnote {}
       CListItem {}
       CParagraph {}

@@ -362,7 +362,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
-    Figure (Figure, caption, link, meta),
+    Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
@@ -417,7 +417,7 @@ import Lilac.Types
       ),
     StyleMask (StyleMask),
     StyledText (StyledText, body, style),
-    Table (Table, caption, grid, meta),
+    Table (Table, caption, grid, meta, parentOid),
     defaultOrgParserConf,
     defaultOrgParserState,
     fromText,
@@ -606,6 +606,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:blockMetaEntryParser>>
 <<f:assertUniqueTanglePath>>
 <<f:blockParser>>
+<<f:firstParentOid>>
 <<f:blockStartParser>>
 <<f:bTokenParser>>
 <<f:zeroBTokensParser>>
@@ -681,6 +682,9 @@ import Text.Megaparsec.Char.Lexer qualified as L
 #+end_src
 
 * Whitespace and comments
+:PROPERTIES:
+:ID:       fbca0c4e-c568-4c12-b89c-7cf334b8d50f
+:END:
 
 Before writing our first parsers, we have to consider the problem of whitespace
 and comments.
@@ -896,6 +900,7 @@ defaultOrgDoc oid metas =
 We should also be able to parse blank documents (not empty, but only has
 whitespace).
 
+#+name: ti:0001-blankline
 #+header: :tangle test/Lilac/ParseSpec/0001-blankline
 #+begin_src org
 
@@ -7774,7 +7779,7 @@ blockParser = do
       block =
         Block
           { parentOid =
-              firstParent orgParserState.docOid orgParserState.headingOidStack,
+              firstParentOid orgParserState.docOid orgParserState.headingOidStack,
             meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
@@ -7793,11 +7798,6 @@ blockParser = do
           }
     )
   pure $ CBlock block
-  where
-    firstParent :: OID -> [Maybe OID] -> OID
-    firstParent docOid maybeOids = case catMaybes maybeOids of
-      (oid : _) -> oid
-      [] -> docOid
 #+end_src
 
 The first thing is to get the start of the block with [[f:blockStartParser]].
@@ -7808,7 +7808,18 @@ Blocks that don't have a name are assigned a ~__anon_block_number~ metadata
 property, so that we can use this information to generate a link anchor for it
 during weaving.
 
-The tricky part is finding out the end of the block. We cannot use a single
+The call to [[f:firstParentOid]] gets the first available [[newtype:OID]] we can find,
+going up the ~headingOidStack~ in [[data:OrgParserState]].
+
+#+name: f:firstParentOid
+#+begin_src haskell
+firstParentOid :: OID -> [Maybe OID] -> OID
+firstParentOid docOid maybeOids = case catMaybes maybeOids of
+  (oid : _) -> oid
+  [] -> docOid
+#+end_src
+
+The tricky part of [[f:blockParser]] is finding out the end of the block. We cannot use a single
 parser and must parse the two cases of whether there is or isn't any content
 inside the block separately, via =zeroBTokensParser= and =someBTokensParser=. We
 need this distinction because we require blocks to end with ="\n#+end_..."= (that
@@ -8341,7 +8352,7 @@ by default. So the only way to disable them would be to set =#+header: :noweb of
 for each block where you'd want it disabled.
 
 Sometimes we'll have Noweb references surrounded by punctuation. For example,
-see how we use ~<<GHC version>>~ in [[id:65e5513b-2167-44d6-bd3a-50fdd9ee020e::code:ghcVersion][code:ghcVersion]]. This is a typical use case
+see how we use ~<<GHC version>>~ in [[id:65e5513b-2167-44d6-bd3a-50fdd9ee020e::nix:ghcVersion][nix:ghcVersion]]. This is a typical use case
 when the referenced block only has 1 line of text in it and we want to inject
 those contents into an existing line.
 
@@ -10513,7 +10524,8 @@ A [[data:Figure][Figure]] is just a link to an image file, preceded by some meta
 #+begin_src haskell
 type Figure :: Type
 data Figure = Figure
-  { meta :: Map Text Text,
+  { parentOid :: OID,
+    meta :: Map Text Text,
     caption :: Prose,
     link :: Link
   }
@@ -10521,7 +10533,9 @@ data Figure = Figure
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-The metadata recognizes certain reserved keys:
+The ~parentOid~ is just like the one in [[data:Block]].
+
+The metadata (~meta~) recognizes certain reserved keys:
 
   - type :: (Required) Used to force there to be at least 1 key\/value pair in
     the metadata. Otherwise when the parser comes across a link to an image on
@@ -10601,7 +10615,9 @@ figureParser = do
       pure
         . CFigure
         $ Figure
-          { meta =
+          { parentOid =
+              firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+            meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
                 (delete "type" metaKVs)
@@ -10730,7 +10746,8 @@ ps
             },
         CFigure
           Figure
-            { meta =
+            { parentOid = nilOid,
+              meta =
                 fromList
                   [ ("__figure_number", "1"),
                     ("width", "100%"),
@@ -10767,7 +10784,8 @@ ps
             },
         CFigure
           Figure
-            { meta =
+            { parentOid = nilOid,
+              meta =
                 fromList
                   [ ("__figure_number", "2")
                   ],
@@ -10837,7 +10855,8 @@ ps
             ],
         CFigure
           Figure
-            { meta =
+            { parentOid = nilOid,
+              meta =
                 fromList
                   [ ("__figure_number", "3")
                   ],
@@ -10883,13 +10902,16 @@ All tables are numbered. A table can also have a caption (just like a
 #+begin_src haskell
 type Table :: Type
 data Table = Table
-  { meta :: Map Text Text,
+  { parentOid :: OID,
+    meta :: Map Text Text,
     caption :: Prose,
     grid :: Map (Int, Int) Prose
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
+
+The ~parentOid~ is just like the one in [[data:Block]].
 
 Below is an example of a table:
 
@@ -10927,7 +10949,9 @@ tableParser = do
   pure
     . CTable
     $ Table
-      { meta = insert "__table_number" (T.show newTableNumber) metaKVs,
+      { parentOid =
+          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+        meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         caption = caption,
         grid = fromList $ rowsToTuples rows
       }
@@ -11196,7 +11220,8 @@ ps
 #+begin_src haskell
 [ CTable
     Table
-      { meta =
+      { parentOid = nilOid,
+        meta =
           fromList
             [ ("name", "tbl:famous-equations"),
               ("caption", "*Bold*. [[tbl:famous-equations][A self-link]]. \\(E = mc^2\\)"),
@@ -11448,7 +11473,8 @@ ps
       ],
   CTable
     Table
-      { meta =
+      { parentOid = nilOid,
+        meta =
           fromList
             [ ("name", "tbl:famous-equations"),
               ("bar", "baz"),
@@ -11650,7 +11676,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
-    Figure (Figure, caption, link, meta),
+    Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
     Link (Link, name, target),
@@ -11702,7 +11728,7 @@ import Lilac.Types
     Prose (Prose),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
-    Table (Table, caption, grid, meta),
+    Table (Table, caption, grid, meta, parentOid),
     defaultOrgParserState,
     fromWords,
     nilOid,

@@ -147,7 +147,8 @@ data Cell
 
 type Figure :: Type
 data Figure = Figure
-  { meta :: Map Text Text,
+  { parentOid :: OID,
+    meta :: Map Text Text,
     caption :: Prose,
     link :: Link
   }
@@ -388,7 +389,8 @@ data StyledText = StyledText
 
 type Table :: Type
 data Table = Table
-  { meta :: Map Text Text,
+  { parentOid :: OID,
+    meta :: Map Text Text,
     caption :: Prose,
     grid :: Map (Int, Int) Prose
   }

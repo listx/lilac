@@ -25,6 +25,8 @@ See [[lilac.cabal]] where we reference this version information.
 
 ** How to read this doc
 
+*** Literate programming and Noweb
+
 This is a literate document, so prose explanations are mixed in with code.
 Typically, all of the content of a code block will be explained by nearby prose.
 Code blocks will typically make use of Noweb references.
@@ -53,10 +55,32 @@ for the following reasons:
 
   2) Using this style can lead to anonymous blocks that don't have a name. IOW,
      avoiding this style forces us to provide a name for all code blocks, and
-     naming everything is generally not a bad thing.
+     naming everything is generally not a bad thing, because explicit is better
+     than implicit.
 
   3) The order of concatenation is implicitly hardcoded to be top-to-bottom.
      This sort of implicit behavior is absent when we only use ~#+name: ...~.
+
+*** Conventions
+
+We follow a particular naming style when referring to code blocks. Because Lilac
+is mostly written in Haskell, many of these prefixes are specific to the Haskell
+programming language.
+
+#+caption: Naming convention of code blocks.
+| Naming prefix | Meaning                  | Example                 |
+|---------------+--------------------------+-------------------------|
+| ~data~          | Data declaration         | [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]]             |
+| ~newtype~       | Newtype declaration      | [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]]           |
+| ~f~             | Function                 | [[f:lilac-main]]            |
+| ~fig~           | Figure                   | [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698::fig:PNG image][fig:PNG image]]           |
+| ~ghc~           | Glasgow Haskell Compiler | [[ghc:Warn everything]]     |
+| ~t~             | Test case                | [[id:fbca0c4e-c568-4c12-b89c-7cf334b8d50f::t:empty-input][t:empty-input]]           |
+| ~tbl~           | Table                    | [[id:6c10afe2-2714-4e85-9121-e96a36d27ba4::tbl:Marking characters][tbl:Marking characters]]  |
+| ~instance~      | Typeclass instance       | [[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62::instance:Show OID][instance:Show OID]]       |
+| ~make~          | Makefile rule            | [[id:77786b08-6211-47b8-940d-6aaefc17ec47::make:Tangle sources][make:Tangle sources]]     |
+| ~module~        | Module file              | [[id:af82950f-ec4a-46e1-9af5-995222cd35e3::module:Lilac.Types][module:Lilac.Types]]      |
+| ~nix~           | Nix configuration        | [[nix:devShell derivation]] |
 
 * Nix build and development environment
 
@@ -163,9 +187,9 @@ in pkgs.lilacPkgs.lilac
 #+end_src
 
 The =nix/release.nix= is used for creating our release builds. It ultimately
-resolves to a single derivation we define in [[Lilac derivation]]. So building this
-with [[make:Build lilac with Nix]] results in just a single package. If we were to
-put ~pkgs.lilacPkgs~ instead of ~pkgs.lilacPkgs.lilac~, Nix will build all
+resolves to a single derivation we define in [[nix:Lilac derivation]]. So building
+this with [[make:Build lilac with Nix]] results in just a single package. If we were
+to put ~pkgs.lilacPkgs~ instead of ~pkgs.lilacPkgs.lilac~, Nix will build all
 derivations it finds under ~pkgs.lilacPkgs~, not just the ~pkgs.lilacPkgs.lilac~ one
 (this may be useful for debugging, for example).
 
@@ -219,20 +243,20 @@ important derivations, ~devShell~ and ~lilac~.
 #+begin_src nix
 { pkgs, fetchFromGitHub, lilacGitVersion }:
 let
-  <<code:devShellEnv>>
-  <<code:scripts>>
-  <<code:tools>>
-  <<code:ghc>>
-  <<code:ourHaskell>>
-  <<code:ghcVersion>>
-  <<code:Haskell overlays>>
-  <<code:projectRoot>>
-  <<code:lilacSource>>
-  <<code:configureHaskellPkg>>
-  <<code:pre-commit-checks>>
+  <<nix:devShellEnv>>
+  <<nix:scripts>>
+  <<nix:tools>>
+  <<nix:ghc>>
+  <<nix:ourHaskell>>
+  <<nix:ghcVersion>>
+  <<nix:Haskell overlays>>
+  <<nix:projectRoot>>
+  <<nix:lilacSource>>
+  <<nix:configureHaskellPkg>>
+  <<nix:pre-commit-checks>>
 in {
-  <<devShell derivation>>
-  <<Lilac derivation>>
+  <<nix:devShell derivation>>
+  <<nix:Lilac derivation>>
 }
 #+end_src
 
@@ -243,7 +267,7 @@ in {
 
 The ~devShell~ is the development environment.
 
-#+name: devShell derivation
+#+name: nix:devShell derivation
 #+begin_src nix
 # Derivation for the shell environment. This is fed into "pkgs.mkShell" to
 # give us the final shell environment.
@@ -264,7 +288,7 @@ The ~devShellEnv~ is another derivation, which is just a collection of symlinks 
 all build dependencies for Lilac, plus some additional scripts and tools, and
 GHC (~ghc~).
 
-#+name: code:devShellEnv
+#+name: nix:devShellEnv
 #+begin_src nix
 devShellEnv = pkgs.buildEnv {
   name = "lilac-devShellEnv";
@@ -275,7 +299,7 @@ devShellEnv = pkgs.buildEnv {
 The ~scripts~ are the custom shell scripts we defined earlier in [[nix/scripts.nix]].
 scripts]].
 
-#+name: code:scripts
+#+name: nix:scripts
 #+begin_src nix
 scripts = import ./scripts.nix { inherit pkgs; };
 #+end_src
@@ -286,7 +310,7 @@ environment. Some tools are categorized as Haskell packages (under the
 compile these tools with the same version of GHC that we are using in [[GHC
 version]].
 
-#+name: code:tools
+#+name: nix:tools
 #+begin_src nix
 tools = [
   <<id:4c96f0c2-7ee5-4be3-ba73-e7c0f5ddc658::tool-python3>>
@@ -314,7 +338,7 @@ invoke ~ghci~, and then load any library you want (needed by Lilac) into it. See
 the file ~.ghc.environment.<arch>-<GHC version>~ (written by cabal) for a list of
 such dependencies.
 
-#+name: code:ghc
+#+name: nix:ghc
 #+begin_src nix
 hlib = pkgs.haskell.lib;
 ghc = ourHaskell.ghc.withPackages
@@ -324,7 +348,7 @@ ghc = ourHaskell.ghc.withPackages
 The ~ourHaskell~ bit is the [[GHC version]] we want to use from Nixpkgs, but with a
 few overlays to tweak it a bit.
 
-#+name: code:ourHaskell
+#+name: nix:ourHaskell
 #+begin_src nix
 lib = pkgs.lib;
 ourHaskell = pkgs.haskell.packages.${ghcVersion}.extend
@@ -335,7 +359,7 @@ The ~ghcVersion~ ultimately comes from [[GHC version]]. It's just the string =gh
 the numeric bits of [[GHC version]] without the dots in it, because this is how
 Nixpkgs names GHC versions.
 
-#+name: code:ghcVersion
+#+name: nix:ghcVersion
 #+begin_src nix
 ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "<<GHC version>>";
 ghcVersion = "ghc" + ghcVersionWithoutDots;
@@ -347,7 +371,7 @@ is ~tweakLilacBuild~ which adjusts the build process so that the [[id:3c576a02-4
 Haskell code]] can use the ~LILAC_GIT_VERSION~ environment variable to use as the
 output for the ~--version~ flag.
 
-#+name: code:Haskell overlays
+#+name: nix:Haskell overlays
 #+begin_src nix
 haskellOverlays =
   [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
@@ -389,7 +413,7 @@ We want to tell Nix to use the local directory path of the project root as the
 starting point (this way, we can build Lilac without having to make a Git commit
 first).
 
-#+name: code:projectRoot
+#+name: nix:projectRoot
 #+begin_src nix
 projectRoot = ../.;
 #+end_src
@@ -404,7 +428,7 @@ actually matter for ~cabal~.
 We use the [[https://github.com/hercules-ci/gitignore.nix/blob/637db329424fd7e46cf4185293b9cc8c88c95394/docs/gitignoreFilter.md][gitignoreFilterWith]] function to filter out all paths that are already
 defined inside the existing [[file:../.gitignore]].
 
-#+name: code:lilacSource
+#+name: nix:lilacSource
 #+begin_src nix
 gnf = import (import ./sources.nix)."gitignore.nix" { inherit lib; };
 lilacSource = lib.cleanSourceWith {
@@ -486,7 +510,7 @@ is a Haskell package, which should be the output of calling ~callCabal2nix~.
 You may want to consult the GHC documentation to make sense out of some of these
 flags. For example, see [[https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html][runtime system (RTS) options]] for the RTS flags.
 
-#+name: code:configureHaskellPkg
+#+name: nix:configureHaskellPkg
 #+begin_src nix
 configureHaskellPkg = haskellPkg:
   let
@@ -503,11 +527,11 @@ configureHaskellPkg = haskellPkg:
 
 *** =lilac= attribute
 
-Recall that the [[code:Haskell overlays]] added the Lilac package to the top-level
+Recall that the [[nix:Haskell overlays]] added the Lilac package to the top-level
 Nixpkgs set of packages, which we named ~ourHaskell~. We expose it now as just
 ~lilac~.
 
-#+name: Lilac derivation
+#+name: nix:Lilac derivation
 #+begin_src nix
 lilac = ourHaskell.lilac;
 #+end_src
@@ -540,7 +564,7 @@ the GitHub commit.
 
 To add something directly from GitHub (such if the latest version on Hackage is still
 too old for us), we can put the following inside the ~injectExternalPackages~
-section in [[code:Haskell overlays]].
+section in [[nix:Haskell overlays]].
 
 #+begin_src nix
   foo-bar =
@@ -562,7 +586,7 @@ defined via Git.
 *** Removing version bounds
 
 You can remove version bound checks on package ~foo-package~ like this inside the
-~jailbreaks~ section of [[code:Haskell overlays]].
+~jailbreaks~ section of [[nix:Haskell overlays]].
 
 #+begin_src nix
 foo-package = pkgs.haskell.lib.doJailbreak(prev.foo-package);
@@ -680,8 +704,8 @@ let pkgs = import ./nix/default.nix { }; in pkgs.lilacPkgs.devShell
 #+end_src
 
 See [[id:e7a371e9-b96f-402d-9ae3-d33ee6a6a48f][=packages.nix=]] for a deeper discussion of the underlying Nix infrastructure,
-including the [[devShell derivation]], which shows how we declaratively define which
-particular executables are made available to our development environment
+including the [[nix:devShell derivation]], which shows how we declaratively define
+which particular executables are made available to our development environment
 (including =scripts.nix=).
 
 The "logo" in the =shellHook= section is just a custom script to show an ASCII-art
@@ -858,8 +882,8 @@ lint
 
 See [[id:b4d2ace9-2d11-4606-b7a3-ce9ad7763c1a][Linters via pre-commit]] for details on what the various linters do.
 
-Note that =pre-commit= isn't defined as a [[code:tools][tool]] in the [[code:devShellEnv]]. This is
-because we only define it in the =mkShell= wrapper in [[devShell derivation]].
+Note that =pre-commit= isn't defined as a [[nix:tools][tool]] in the [[nix:devShellEnv]]. This is
+because we only define it in the =mkShell= wrapper in [[nix:devShell derivation]].
 
 *** Compile Lilac with Lilac
 
@@ -1212,14 +1236,14 @@ so that we can define all of the hook infrastructure in a reproducible way with
 Nix (such as using specific versions of linters, formatters, etc).
 
 For us we already have the set of linters and formatters we are interested in
-defined inside our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][development shell environment]] in [[code:devShellEnv]], so we tell
+defined inside our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][development shell environment]] in [[nix:devShellEnv]], so we tell
 ~git-hooks~ to reuse those same tools.
 
 While formatting isn't important for tangling (the computer doesn't care about
 formatting), it's important for weaving because we want code blocks in woven
 output to still look decent and consistent.
 
-#+name: code:pre-commit-checks
+#+name: nix:pre-commit-checks
 #+begin_src nix
 gitHooksPkgs = import (import ./sources.nix)."git-hooks.nix";
 pre-commit-check = gitHooksPkgs.run {
@@ -1871,7 +1895,7 @@ For the Haskell side of things, we use the traditional ~Cabal~ configuration fil
 because it's simpler than adding [[https://github.com/commercialhaskell/stack][Stack]] into the mix.
 
 The ~cabal~ binary is available to us via the =cabal-install= package in our
-[[code:tools]].
+[[nix:tools]].
 
 #+name: tool-cabal
 #+begin_src nix
@@ -2150,7 +2174,7 @@ GHC2024
 
 For options that should only affect Cabal builds, we want to specify such
 options inside [[cabal.project]] because these settings won't bleed over into
-=cabal2nix= (see [[code:Haskell overlays]]).
+=cabal2nix= (see [[nix:Haskell overlays]]).
 
 #+name: cabal.project
 #+header: :tangle cabal.project
@@ -2218,7 +2242,7 @@ test/*
 #+end_src
 
 We can't put these inside [[id:ae7b1a31-970d-41e4-b15a-8d7f383e1502::.gitignore][.gitignore]] because doing so will remove these files
-from bundling it into a Nix package in [[id:ae7b1a31-970d-41e4-b15a-8d7f383e1502::code:lilacSource][code:lilacSource]] (we actually want the
+from bundling it into a Nix package in [[nix:lilacSource]] (we actually want the
 tangled content because they are required for the build).
 
 * CLI
@@ -2947,7 +2971,7 @@ Haskell, see [[https://stackoverflow.com/questions/5713418/templatehaskell-and-i
 
 However, invoking =git= doesn't work in all cases, especially when building with
 Nix because when Nix builds things it doesn't use the Git repository (see
-[[code:lilacSource]]).
+[[nix:lilacSource]]).
 
 First let's get the imports out of the way.
 
