@@ -672,18 +672,21 @@ proseParser spaceConsumer = do
 proseSpaceConsumer :: Int -> OrgParser Text
 proseSpaceConsumer expectedIndentLen = do
   _ <- beLessGreedy
-  MP.choice
-    [ newlineAndIndentParser expectedIndentLen,
-      spaces
-    ]
+  spaceConsumer
   where
+    spaceConsumer :: OrgParser Text
+    spaceConsumer =
+      MP.choice
+        [ newlineAndIndentParser expectedIndentLen,
+          spaces
+        ]
     spaces :: OrgParser Text
     spaces = MP.takeWhile1P (Just "prose space") (\c -> c == ' ')
     beLessGreedy :: OrgParser ()
     beLessGreedy = do
       orgParserState <- get
       let toAvoid =
-            [ (orgParserState.insideCitePrefix, string " " >> citeIdParser)
+            [ (orgParserState.insideCitePrefix, spaceConsumer >> citeIdParser)
             ]
       forM_
         toAvoid

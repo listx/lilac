@@ -2009,13 +2009,14 @@ back to [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]
 #+begin_src haskell
 expectCiteprocResult
   "0400-citeproc-basic"
-  CP.Result
-    { resultCitations =
-        <<Expected citations for 0400-citeproc-basic>>,
-      resultBibliography =
-        <<Expected bibliography for 0400-citeproc-basic>>,
-      resultWarnings = []
-    }
+  $ Right
+    CP.Result
+      { resultCitations =
+          <<Expected citations for 0400-citeproc-basic>>,
+        resultBibliography =
+          <<Expected bibliography for 0400-citeproc-basic>>,
+        resultWarnings = []
+      }
 #+end_src
 
 #+name: Expected citations for 0400-citeproc-basic
@@ -2220,13 +2221,14 @@ Check usage of superscripts.
 #+begin_src haskell
 expectCiteprocResult
   "0400-citeproc-superscript"
-  CP.Result
-    { resultCitations =
-        <<Expected citations for 0400-citeproc-superscript>>,
-      resultBibliography =
-        <<Expected bibliography for 0400-citeproc-superscript>>,
-      resultWarnings = []
-    }
+  $ Right
+    CP.Result
+      { resultCitations =
+          <<Expected citations for 0400-citeproc-superscript>>,
+        resultBibliography =
+          <<Expected bibliography for 0400-citeproc-superscript>>,
+        resultWarnings = []
+      }
 #+end_src
 
 #+name: Expected citations for 0400-citeproc-superscript
@@ -2283,13 +2285,14 @@ Check usage of small caps.
 #+begin_src haskell
 expectCiteprocResult
   "0400-citeproc-smallcaps"
-  CP.Result
-    { resultCitations =
-        <<Expected citations for 0400-citeproc-smallcaps>>,
-      resultBibliography =
-        <<Expected bibliography for 0400-citeproc-smallcaps>>,
-      resultWarnings = []
-    }
+  $ Right
+    CP.Result
+      { resultCitations =
+          <<Expected citations for 0400-citeproc-smallcaps>>,
+        resultBibliography =
+          <<Expected bibliography for 0400-citeproc-smallcaps>>,
+        resultWarnings = []
+      }
 #+end_src
 
 #+name: Expected citations for 0400-citeproc-smallcaps
@@ -2331,6 +2334,361 @@ expectCiteprocResult
 ]
 #+end_src
 
+We should be able to handle citations written across multiple lines. Because
+this is only a formatting change, we expect to get the same citations and
+bibliography as we did in [[ti:0400-citeproc-smallcaps]].
+
+#+name: ti:0400-citeproc-multiline
+#+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-multiline
+#+begin_src org
+,#+bibliography: bib.json
+,#+cite_export: csl ../../../base/csl-styles/acm-siggraph.csl
+
+[cite:
+@a]
+#+end_src
+
+#+name: t:0400-citeproc-multiline
+#+begin_src haskell
+expectCiteprocResult
+  "0400-citeproc-multiline"
+  $ Right
+    CP.Result
+      { resultCitations =
+          <<Expected citations for 0400-citeproc-smallcaps>>,
+        resultBibliography =
+          <<Expected bibliography for 0400-citeproc-smallcaps>>,
+        resultWarnings = []
+      }
+#+end_src
+
+Check a slightly more complex example, again for a citation spread over multiple
+lines.
+
+#+name: ti:0400-citeproc-multiline-complex
+#+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-multiline-complex
+#+begin_src org
+,#+bibliography: bib.json
+,#+cite_export: csl ../../../base/csl-styles/acm-siggraph.csl
+
+[cite: *bold* /italic/
+@a and really
+~amazing~
+; global suffix]
+#+end_src
+
+#+name: t:0400-citeproc-multiline-complex
+#+begin_src haskell
+expectCiteprocResult
+  "0400-citeproc-multiline-complex"
+  $ Right
+    CP.Result
+      { resultCitations =
+          <<Expected citations for 0400-citeproc-multiline-complex>>,
+        resultBibliography =
+          <<Expected bibliography for 0400-citeproc-smallcaps>>,
+        resultWarnings = []
+      }
+#+end_src
+
+#+name: Expected citations for 0400-citeproc-multiline-complex
+#+begin_src haskell
+[ Prose
+    { unProse =
+        [ ptext "[" [],
+          ptext "bold" [Bold],
+          ptext " " [],
+          ptext "italic" [Italic],
+          PTokenLink
+            Link
+              { name = [stext "Knuth 1992" []],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-a",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              },
+          ptext "and really " [],
+          ptext "amazing" [Code],
+          ptext "global suffix]" []
+        ]
+    }
+]
+#+end_src
+
+Citations can be in a multiline list item. They can also have links and inline
+math in them, thanks to [[f:proseToCslJsonText]] which preserves these prose
+elements in the conversion to ~CslJson Text~.
+
+#+name: ti:0400-citeproc-multiline-complex-list-item
+#+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-multiline-complex-list-item
+#+begin_src org
+,#+bibliography: bib.json
+,#+cite_export: csl ../../../base/csl-styles/acm-siggraph.csl
+
+  - List item [cite: global \(1 + 1
+    = 2\) ;*bold* /italic/ [fn:@a]
+    @a and really
+    ~amazing~;
+    some bit of
+    =@b verbatim=
+    for a @c thing
+    ; global suffix with OID link
+    [[id:00000000-0000-0000-0000-000000000000::foo]]]
+
+[fn:@a] Definition of @a.
+#+end_src
+
+#+name: t:0400-citeproc-multiline-complex-list-item
+#+begin_src haskell
+expectCiteprocResult
+  "0400-citeproc-multiline-complex-list-item"
+  $ Right
+    CP.Result
+      { resultCitations =
+          <<Expected citations for 0400-citeproc-multiline-complex-list-item>>,
+        resultBibliography =
+          <<Expected bibliography for 0400-citeproc-multiline-complex-list-item>>,
+        resultWarnings = []
+      }
+#+end_src
+
+#+name: Expected citations for 0400-citeproc-multiline-complex-list-item
+#+begin_src haskell
+[ Prose
+    { unProse =
+        [ ptext "[global " [],
+          PTokenMathFragment
+            MathFragment
+              { parentOid = nilOid,
+                meta = fromList [],
+                body = "1 + 1\n    = 2"
+              },
+          ptext "bold" [Bold],
+          ptext " " [],
+          ptext "italic" [Italic],
+          PTokenLink
+            Link
+              { name = [stext "1" []],
+                target = LinkTargetFootnote "@a"
+              },
+          PTokenLink
+            Link
+              { name = [stext "Knuth 1992" []],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-a",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              },
+          ptext "and really " [],
+          ptext "amazing" [Code],
+          ptext "; some bit of " [],
+          ptext "@b verbatim" [Verbatim],
+          ptext " for a" [],
+          PTokenLink
+            Link
+              { name = [stext "Turing 1937" []],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-c",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              },
+          ptext "thing global suffix with OID link " [],
+          PTokenLink
+            Link
+              { name = [stext "foo" []],
+                target =
+                  LinkTargetOid
+                    LinkOid
+                      { oid = nilOid,
+                        name = "foo"
+                      }
+              },
+          ptext "]" []
+        ]
+    }
+]
+#+end_src
+
+#+name: Expected bibliography for 0400-citeproc-multiline-complex-list-item
+#+begin_src haskell
+[ ( "a",
+    Prose
+      { unProse =
+          [ ptext "Knuth, D.E." [Smallcaps],
+            ptext " 1992. " [],
+            ptext "Literate programming" [Italic],
+            ptext ". Center for the Study of Language; Information, Stanford, Calif." []
+          ]
+      }
+  ),
+  ( "c",
+    Prose
+      { unProse =
+          [ ptext "Turing, A.M." [Smallcaps],
+            ptext " 1937. " [],
+            PTokenLink
+              Link
+                { name = [stext "On Computable Numbers, with an Application to the Entscheidungsproblem" []],
+                  target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "doi.org",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "/10.1112/plms/s2-42.1.230",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        }
+                },
+            ptext ". " [],
+            ptext "Proceedings of the London Mathematical Society" [Italic],
+            ptext " " [],
+            ptext "s2-42" [Italic],
+            ptext ", 1, 230\8211\&265." []
+          ]
+      }
+  )
+]
+#+end_src
+
+We support the ~/t~ (text) and ~/na~ (no author) citation style variations. The ~/t~
+makes it so that you can use the citation at the beginning of the sentence
+because the author name will be pulled out of the citation delimiters. The ~/na~
+variation simply suppresses the author name from inside the citation.
+
+#+name: ti:0400-citeproc-style-variations
+#+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-style-variations
+#+begin_src org
+,#+bibliography: bib.json
+,#+cite_export: csl ../../../base/csl-styles/acm-siggraph.csl
+
+  - [cite/t:@a] discusses a great programming idea. On an unrelated note, Turing
+    was a pioneer in computer science. He wrote about "computable numbers"
+    before there were computers [cite/na:@c].
+
+#+end_src
+
+#+name: t:0400-citeproc-style-variations
+#+begin_src haskell
+expectCiteprocResult
+  "0400-citeproc-style-variations"
+  $ Right
+    CP.Result
+      { resultCitations =
+          <<Expected citations for 0400-citeproc-style-variations>>,
+        resultBibliography =
+          <<Expected bibliography for 0400-citeproc-multiline-complex-list-item>>,
+        resultWarnings = []
+      }
+#+end_src
+
+#+name: Expected citations for 0400-citeproc-style-variations
+#+begin_src haskell
+[ Prose
+    { unProse =
+        [ ptext "Knuth [" [],
+          PTokenLink
+            Link
+              { name = [stext "1992" []],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-a",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              },
+          ptext "]" []
+        ]
+    },
+  Prose
+    { unProse =
+        [ ptext "[" [],
+          PTokenLink
+            Link
+              { name = [stext "1937" []],
+                target =
+                  LinkTargetURI
+                    N.URI
+                      { N.uriScheme = "",
+                        N.uriAuthority = Nothing,
+                        N.uriPath = "#ref-c",
+                        N.uriQuery = "",
+                        N.uriFragment = ""
+                      }
+              },
+          ptext "]" []
+        ]
+    }
+]
+#+end_src
+
+A citation may not be written across a cell boundary (double newline).
+
+#+name: ti:0400-citeproc-multiline-cell-boundary
+#+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-multiline-cell-boundary
+#+begin_src org
+,#+bibliography: bib.json
+,#+cite_export: csl ../../../base/csl-styles/acm-siggraph.csl
+
+[cite: *bold* /italic/
+@a and really
+~amazing~
+
+; global suffix]
+#+end_src
+
+#+name: t:0400-citeproc-multiline-cell-boundary
+#+begin_src haskell
+expectCiteprocResult
+  "0400-citeproc-multiline-cell-boundary"
+  $ Left "unexpected newline"
+#+end_src
+
+Same thing applies for list items as well.
+
+#+name: ti:0400-citeproc-multiline-cell-boundary-list-item
+#+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-multiline-cell-boundary-list-item
+#+begin_src org
+,#+bibliography: bib.json
+,#+cite_export: csl ../../../base/csl-styles/acm-siggraph.csl
+
+  1) [cite: *bold* /italic/
+     @a and really
+     ~amazing~
+
+     ; global suffix]
+#+end_src
+
+#+name: t:0400-citeproc-multiline-cell-boundary-list-item
+#+begin_src haskell
+expectCiteprocResult
+  "0400-citeproc-multiline-cell-boundary-list-item"
+  $ Left "unexpected newline"
+#+end_src
+
 ** Testing framework
 
 The tests here use Org files as input. The output are HTML documents. For the
@@ -2359,18 +2717,26 @@ import Lilac.Parse (styleMaskFrom)
 import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Link (Link, name, target),
-    LinkTarget (LinkTargetURI),
+    LinkOid (LinkOid, name, oid),
+    LinkTarget
+      ( LinkTargetFootnote,
+        LinkTargetOid,
+        LinkTargetURI
+      ),
+    MathFragment (MathFragment, body, meta, parentOid),
     PToken
       ( PTokenDivEnd,
         PTokenDivStart,
-        PTokenLink
+        PTokenLink,
+        PTokenMathFragment
       ),
     Prose (Prose, unProse),
-    Style (Italic, Smallcaps, Superscript),
+    Style (Bold, Code, Italic, Smallcaps, Superscript, Verbatim),
     StyledText (StyledText, body, style),
     WeaveConf (WeaveConf, archive, citeprocResult, originObjectPath, watch),
     defaultOrgParserState,
     encodeGPath,
+    nilOid,
     nilOidOrgDoc,
     ptext,
     stext,
@@ -2387,9 +2753,11 @@ import Relude
     String,
     Text,
     foldl',
+    fromList,
     fst,
     map,
     mapM_,
+    otherwise,
     pure,
     reverse,
     runStateT,
@@ -2410,6 +2778,7 @@ import Test.Hspec
     it,
     runIO,
     shouldBe,
+    shouldContain,
     shouldStartWith,
   )
 import Text.Megaparsec qualified as MP
@@ -2562,19 +2931,29 @@ getCiteprocResultFromPath path = do
           Right <$> LW.prepareCitations inputOrgFileGPath object archive
 #+end_src
 
-[[f:expectCiteprocResult]] checks the citations and bibliography for a given Org doc
-in the ~test/Lilac/WeaveSpec~ folder.
+[[f:expectCiteprocResult]] takes an ~Either String (CP.Result Prose)~. If it's a ~Right~
+values, it checks the citations and bibliography for a given Org doc in the
+~test/Lilac/WeaveSpec~ folder. If it's a ~Left~ value, it expects the operation to
+fail, and expects to find a substring.
 
 #+name: f:expectCiteprocResult
 #+begin_src haskell
-expectCiteprocResult :: FilePath -> CP.Result Prose -> Spec
+expectCiteprocResult :: FilePath -> Either String (CP.Result Prose) -> Spec
 expectCiteprocResult path expected = do
   result <- runIO $ getCiteprocResultFromPath path
   describe path $ do
-    case result of
-      Right got -> it "result matches expectation" $ do
-        got `shouldBe` expected
-      Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    if
+      | Right got <- result,
+        Right expectedResult <- expected ->
+          it "matches expected result" $ do
+            got `shouldBe` expectedResult
+      | Left errMsg <- result,
+        Left expectedErrorSubstring <- expected ->
+          it "has error substring" $ do
+            errMsg `shouldContain` expectedErrorSubstring
+      | otherwise ->
+          it "unexpected type mismatch" $ do
+            result `shouldBe` expected
 #+end_src
 
 *** All test cases
@@ -2590,6 +2969,12 @@ weaveSpec = do
   <<t:0400-citeproc-basic>>
   <<t:0400-citeproc-superscript>>
   <<t:0400-citeproc-smallcaps>>
+  <<t:0400-citeproc-multiline>>
+  <<t:0400-citeproc-multiline-complex>>
+  <<t:0400-citeproc-multiline-complex-list-item>>
+  <<t:0400-citeproc-multiline-cell-boundary>>
+  <<t:0400-citeproc-multiline-cell-boundary-list-item>>
+  <<t:0400-citeproc-style-variations>>
 #+end_src
 
 * Generate CSS

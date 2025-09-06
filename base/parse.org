@@ -6208,25 +6208,36 @@ This is a top-level function because we reuse it in [[f:linkDisplayNameParser]].
 proseSpaceConsumer :: Int -> OrgParser Text
 proseSpaceConsumer expectedIndentLen = do
   _ <- beLessGreedy
-  MP.choice
-    [ newlineAndIndentParser expectedIndentLen,
-      spaces
-    ]
+  spaceConsumer
   where
+    spaceConsumer :: OrgParser Text
+    spaceConsumer =
+      MP.choice
+        [ newlineAndIndentParser expectedIndentLen,
+          spaces
+        ]
     spaces :: OrgParser Text
     spaces = MP.takeWhile1P (Just "prose space") (\c -> c == ' ')
     beLessGreedy :: OrgParser ()
     beLessGreedy = do
       orgParserState <- get
       let toAvoid =
-            [ (orgParserState.insideCitePrefix, string " " >> citeIdParser)
+            [ (orgParserState.insideCitePrefix, spaceConsumer >> citeIdParser)
             ]
       forM_
         toAvoid
         $ \(condition, p) -> when condition $ MP.notFollowedBy p
 #+end_src
 
-The tricky bit is with ~spaceConsumer~ here. It chooses between either a newline
+There are a couple tricky bits here. The first tricky part is with the
+~beLessGreedy~ helper. It's important that the ~spaceConsumer~ does *not* steal either
+the space or newline just preceding the [[f:citeIdParser]]; otherwise, the
+~citePrefixParser~ in [[f:citeParser]] will never succeed because it requires some
+whitespace, only after which we parse the ~citeId~. This is why ~beLessGreedy~ tries
+to abort the parser if it detects a cite key like ~@foo~ just after the whitespace
+(which will be parsed by ~spaceConsumer~).
+
+The second tricky bit is with ~spaceConsumer~. It chooses between either a newline
 followed by an indent of length ~expectedIndentLen~ (in [[f:newlineAndIndentParser]]),
 or just ~spaces~ which we define to be one or more space characters.
 

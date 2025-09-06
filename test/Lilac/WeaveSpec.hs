@@ -10,18 +10,26 @@ import Lilac.Parse (styleMaskFrom)
 import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Link (Link, name, target),
-    LinkTarget (LinkTargetURI),
+    LinkOid (LinkOid, name, oid),
+    LinkTarget
+      ( LinkTargetFootnote,
+        LinkTargetOid,
+        LinkTargetURI
+      ),
+    MathFragment (MathFragment, body, meta, parentOid),
     PToken
       ( PTokenDivEnd,
         PTokenDivStart,
-        PTokenLink
+        PTokenLink,
+        PTokenMathFragment
       ),
     Prose (Prose, unProse),
-    Style (Italic, Smallcaps, Superscript),
+    Style (Bold, Code, Italic, Smallcaps, Superscript, Verbatim),
     StyledText (StyledText, body, style),
     WeaveConf (WeaveConf, archive, citeprocResult, originObjectPath, watch),
     defaultOrgParserState,
     encodeGPath,
+    nilOid,
     nilOidOrgDoc,
     ptext,
     stext,
@@ -38,9 +46,11 @@ import Relude
     String,
     Text,
     foldl',
+    fromList,
     fst,
     map,
     mapM_,
+    otherwise,
     pure,
     reverse,
     runStateT,
@@ -61,6 +71,7 @@ import Test.Hspec
     it,
     runIO,
     shouldBe,
+    shouldContain,
     shouldStartWith,
   )
 import Text.Megaparsec qualified as MP
@@ -155,14 +166,22 @@ getCiteprocResultFromPath path = do
         Right archive ->
           Right <$> LW.prepareCitations inputOrgFileGPath object archive
 
-expectCiteprocResult :: FilePath -> CP.Result Prose -> Spec
+expectCiteprocResult :: FilePath -> Either String (CP.Result Prose) -> Spec
 expectCiteprocResult path expected = do
   result <- runIO $ getCiteprocResultFromPath path
   describe path $ do
-    case result of
-      Right got -> it "result matches expectation" $ do
-        got `shouldBe` expected
-      Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    if
+      | Right got <- result,
+        Right expectedResult <- expected ->
+          it "matches expected result" $ do
+            got `shouldBe` expectedResult
+      | Left errMsg <- result,
+        Left expectedErrorSubstring <- expected ->
+          it "has error substring" $ do
+            errMsg `shouldContain` expectedErrorSubstring
+      | otherwise ->
+          it "unexpected type mismatch" $ do
+            result `shouldBe` expected
 
 weaveSpec :: Spec
 weaveSpec = do
@@ -244,265 +263,567 @@ weaveSpec = do
 
   expectCiteprocResult
     "0400-citeproc-basic"
-    CP.Result
-      { resultCitations =
-          [ Prose
-              { unProse =
-                  [ PTokenLink
-                      Link
-                        { name = [stext "[1]" []],
-                          target =
-                            LinkTargetURI
-                              N.URI
-                                { N.uriScheme = "",
-                                  N.uriAuthority = Nothing,
-                                  N.uriPath = "#ref-a",
-                                  N.uriQuery = "",
-                                  N.uriFragment = ""
-                                }
-                        },
-                    ptext ", " [],
-                    PTokenLink
-                      Link
-                        { name = [stext "[2]" []],
-                          target =
-                            LinkTargetURI
-                              N.URI
-                                { N.uriScheme = "",
-                                  N.uriAuthority = Nothing,
-                                  N.uriPath = "#ref-b",
-                                  N.uriQuery = "",
-                                  N.uriFragment = ""
-                                }
-                        },
-                    ptext ", " [],
-                    PTokenLink
-                      Link
-                        { name = [stext "[3]" []],
-                          target =
-                            LinkTargetURI
-                              N.URI
-                                { N.uriScheme = "",
-                                  N.uriAuthority = Nothing,
-                                  N.uriPath = "#ref-c",
-                                  N.uriQuery = "",
-                                  N.uriFragment = ""
-                                }
-                        },
-                    ptext ", " [],
-                    PTokenLink
-                      Link
-                        { name = [stext "[4]" []],
-                          target =
-                            LinkTargetURI
-                              N.URI
-                                { N.uriScheme = "",
-                                  N.uriAuthority = Nothing,
-                                  N.uriPath = "#ref-d",
-                                  N.uriQuery = "",
-                                  N.uriFragment = ""
-                                }
-                        }
-                  ]
-              }
-          ],
-        resultBibliography =
-          [ ( "a",
-              Prose
+    $ Right
+      CP.Result
+        { resultCitations =
+            [ Prose
                 { unProse =
-                    [ PTokenDivStart "left-margin",
-                      ptext "[1]" [],
-                      PTokenDivEnd,
-                      PTokenDivStart "right-inline",
-                      ptext "D. E. Knuth, " [],
-                      ptext "Literate programming" [Italic],
-                      ptext ". in CSLI lecture notes, no. no. 27. Stanford, Calif.: Center for the Study of Language; Information, 1992." [],
-                      PTokenDivEnd
-                    ]
-                }
-            ),
-            ( "b",
-              Prose
-                { unProse =
-                    [ PTokenDivStart "left-margin",
-                      ptext "[2]" [],
-                      PTokenDivEnd,
-                      PTokenDivStart "right-inline",
-                      ptext "E. W. Dijkstra, \8220Letters to the editor: Go to statement considered harmful,\8221 " [],
-                      ptext "Communications of the ACM" [Italic],
-                      ptext ", vol. 11, no. 3, pp. 147\8211\&148, Mar. 1968, doi: " [],
-                      PTokenLink
+                    [ PTokenLink
                         Link
-                          { name = [stext "10.1145/362929.362947" []],
+                          { name = [stext "[1]" []],
                             target =
                               LinkTargetURI
                                 N.URI
-                                  { N.uriScheme = "https:",
-                                    N.uriAuthority =
-                                      Just
-                                        N.URIAuth
-                                          { N.uriUserInfo = "",
-                                            N.uriRegName = "doi.org",
-                                            N.uriPort = ""
-                                          },
-                                    N.uriPath = "/10.1145/362929.362947",
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-a",
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
                           },
-                      ptext "." [],
-                      PTokenDivEnd
-                    ]
-                }
-            ),
-            ( "c",
-              Prose
-                { unProse =
-                    [ PTokenDivStart "left-margin",
-                      ptext "[3]" [],
-                      PTokenDivEnd,
-                      PTokenDivStart "right-inline",
-                      ptext "A. M. Turing, \8220On Computable Numbers, with an Application to the Entscheidungsproblem,\8221 " [],
-                      ptext "Proceedings of the London Mathematical Society" [Italic],
-                      ptext ", vol. s2\8211\&42, no. 1, pp. 230\8211\&265, 1937, doi: " [],
+                      ptext ", " [],
                       PTokenLink
                         Link
-                          { name = [stext "10.1112/plms/s2-42.1.230" []],
+                          { name = [stext "[2]" []],
                             target =
                               LinkTargetURI
                                 N.URI
-                                  { N.uriScheme = "https:",
-                                    N.uriAuthority =
-                                      Just
-                                        N.URIAuth
-                                          { N.uriUserInfo = "",
-                                            N.uriRegName = "doi.org",
-                                            N.uriPort = ""
-                                          },
-                                    N.uriPath = "/10.1112/plms/s2-42.1.230",
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-b",
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
                           },
-                      ptext "." [],
-                      PTokenDivEnd
-                    ]
-                }
-            ),
-            ( "d",
-              Prose
-                { unProse =
-                    [ PTokenDivStart "left-margin",
-                      ptext "[4]" [],
-                      PTokenDivEnd,
-                      PTokenDivStart "right-inline",
-                      ptext "C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 " [],
-                      ptext "Bell System Technical Journal" [Italic],
-                      ptext ", vol. 27, no. 3, pp. 379\8211\&423, July 1948, doi: " [],
+                      ptext ", " [],
                       PTokenLink
                         Link
-                          { name =
-                              [ StyledText {body = "10.1002/j.1538-7305.1948.tb01338.x", style = styleMaskFrom []}
-                              ],
+                          { name = [stext "[3]" []],
                             target =
                               LinkTargetURI
                                 N.URI
-                                  { N.uriScheme = "https:",
-                                    N.uriAuthority =
-                                      Just
-                                        N.URIAuth
-                                          { N.uriUserInfo = "",
-                                            N.uriRegName = "doi.org",
-                                            N.uriPort = ""
-                                          },
-                                    N.uriPath = "/10.1002/j.1538-7305.1948.tb01338.x",
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-c",
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
                           },
-                      ptext "." [],
-                      PTokenDivEnd
+                      ptext ", " [],
+                      PTokenLink
+                        Link
+                          { name = [stext "[4]" []],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-d",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          }
                     ]
                 }
-            )
-          ],
-        resultWarnings = []
-      }
+            ],
+          resultBibliography =
+            [ ( "a",
+                Prose
+                  { unProse =
+                      [ PTokenDivStart "left-margin",
+                        ptext "[1]" [],
+                        PTokenDivEnd,
+                        PTokenDivStart "right-inline",
+                        ptext "D. E. Knuth, " [],
+                        ptext "Literate programming" [Italic],
+                        ptext ". in CSLI lecture notes, no. no. 27. Stanford, Calif.: Center for the Study of Language; Information, 1992." [],
+                        PTokenDivEnd
+                      ]
+                  }
+              ),
+              ( "b",
+                Prose
+                  { unProse =
+                      [ PTokenDivStart "left-margin",
+                        ptext "[2]" [],
+                        PTokenDivEnd,
+                        PTokenDivStart "right-inline",
+                        ptext "E. W. Dijkstra, \8220Letters to the editor: Go to statement considered harmful,\8221 " [],
+                        ptext "Communications of the ACM" [Italic],
+                        ptext ", vol. 11, no. 3, pp. 147\8211\&148, Mar. 1968, doi: " [],
+                        PTokenLink
+                          Link
+                            { name = [stext "10.1145/362929.362947" []],
+                              target =
+                                LinkTargetURI
+                                  N.URI
+                                    { N.uriScheme = "https:",
+                                      N.uriAuthority =
+                                        Just
+                                          N.URIAuth
+                                            { N.uriUserInfo = "",
+                                              N.uriRegName = "doi.org",
+                                              N.uriPort = ""
+                                            },
+                                      N.uriPath = "/10.1145/362929.362947",
+                                      N.uriQuery = "",
+                                      N.uriFragment = ""
+                                    }
+                            },
+                        ptext "." [],
+                        PTokenDivEnd
+                      ]
+                  }
+              ),
+              ( "c",
+                Prose
+                  { unProse =
+                      [ PTokenDivStart "left-margin",
+                        ptext "[3]" [],
+                        PTokenDivEnd,
+                        PTokenDivStart "right-inline",
+                        ptext "A. M. Turing, \8220On Computable Numbers, with an Application to the Entscheidungsproblem,\8221 " [],
+                        ptext "Proceedings of the London Mathematical Society" [Italic],
+                        ptext ", vol. s2\8211\&42, no. 1, pp. 230\8211\&265, 1937, doi: " [],
+                        PTokenLink
+                          Link
+                            { name = [stext "10.1112/plms/s2-42.1.230" []],
+                              target =
+                                LinkTargetURI
+                                  N.URI
+                                    { N.uriScheme = "https:",
+                                      N.uriAuthority =
+                                        Just
+                                          N.URIAuth
+                                            { N.uriUserInfo = "",
+                                              N.uriRegName = "doi.org",
+                                              N.uriPort = ""
+                                            },
+                                      N.uriPath = "/10.1112/plms/s2-42.1.230",
+                                      N.uriQuery = "",
+                                      N.uriFragment = ""
+                                    }
+                            },
+                        ptext "." [],
+                        PTokenDivEnd
+                      ]
+                  }
+              ),
+              ( "d",
+                Prose
+                  { unProse =
+                      [ PTokenDivStart "left-margin",
+                        ptext "[4]" [],
+                        PTokenDivEnd,
+                        PTokenDivStart "right-inline",
+                        ptext "C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 " [],
+                        ptext "Bell System Technical Journal" [Italic],
+                        ptext ", vol. 27, no. 3, pp. 379\8211\&423, July 1948, doi: " [],
+                        PTokenLink
+                          Link
+                            { name =
+                                [ StyledText {body = "10.1002/j.1538-7305.1948.tb01338.x", style = styleMaskFrom []}
+                                ],
+                              target =
+                                LinkTargetURI
+                                  N.URI
+                                    { N.uriScheme = "https:",
+                                      N.uriAuthority =
+                                        Just
+                                          N.URIAuth
+                                            { N.uriUserInfo = "",
+                                              N.uriRegName = "doi.org",
+                                              N.uriPort = ""
+                                            },
+                                      N.uriPath = "/10.1002/j.1538-7305.1948.tb01338.x",
+                                      N.uriQuery = "",
+                                      N.uriFragment = ""
+                                    }
+                            },
+                        ptext "." [],
+                        PTokenDivEnd
+                      ]
+                  }
+              )
+            ],
+          resultWarnings = []
+        }
 
   expectCiteprocResult
     "0400-citeproc-superscript"
-    CP.Result
-      { resultCitations =
-          [ Prose
-              { unProse =
-                  [ PTokenLink
-                      Link
-                        { name = [stext "1" [Superscript]],
-                          target =
-                            LinkTargetURI
-                              N.URI
-                                { N.uriScheme = "",
-                                  N.uriAuthority = Nothing,
-                                  N.uriPath = "#ref-a",
-                                  N.uriQuery = "",
-                                  N.uriFragment = ""
-                                }
-                        }
-                  ]
-              }
-          ],
-        resultBibliography =
-          [ ( "a",
-              Prose
+    $ Right
+      CP.Result
+        { resultCitations =
+            [ Prose
                 { unProse =
-                    [ PTokenDivStart "left-margin",
-                      ptext "1. " [],
-                      PTokenDivEnd,
-                      PTokenDivStart "right-inline",
-                      ptext "Knuth DE. Literate programming. Stanford, Calif.: Center for the Study of Language; Information; 1992. (CSLI lecture notes)." [],
-                      PTokenDivEnd
+                    [ PTokenLink
+                        Link
+                          { name = [stext "1" [Superscript]],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-a",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          }
                     ]
                 }
-            )
-          ],
-        resultWarnings = []
-      }
+            ],
+          resultBibliography =
+            [ ( "a",
+                Prose
+                  { unProse =
+                      [ PTokenDivStart "left-margin",
+                        ptext "1. " [],
+                        PTokenDivEnd,
+                        PTokenDivStart "right-inline",
+                        ptext "Knuth DE. Literate programming. Stanford, Calif.: Center for the Study of Language; Information; 1992. (CSLI lecture notes)." [],
+                        PTokenDivEnd
+                      ]
+                  }
+              )
+            ],
+          resultWarnings = []
+        }
 
   expectCiteprocResult
     "0400-citeproc-smallcaps"
-    CP.Result
-      { resultCitations =
-          [ Prose
-              { unProse =
-                  [ ptext "[" [],
-                    PTokenLink
-                      Link
-                        { name = [stext "Knuth 1992" []],
-                          target =
-                            LinkTargetURI
-                              N.URI
-                                { N.uriScheme = "",
-                                  N.uriAuthority = Nothing,
-                                  N.uriPath = "#ref-a",
-                                  N.uriQuery = "",
-                                  N.uriFragment = ""
-                                }
-                        },
-                    ptext "]" []
-                  ]
-              }
-          ],
-        resultBibliography =
-          [ ( "a",
-              Prose
+    $ Right
+      CP.Result
+        { resultCitations =
+            [ Prose
                 { unProse =
-                    [ ptext "Knuth, D.E." [Smallcaps],
-                      ptext " 1992. " [],
-                      ptext "Literate programming" [Italic],
-                      ptext ". Center for the Study of Language; Information, Stanford, Calif." []
+                    [ ptext "[" [],
+                      PTokenLink
+                        Link
+                          { name = [stext "Knuth 1992" []],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-a",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          },
+                      ptext "]" []
                     ]
                 }
-            )
-          ],
-        resultWarnings = []
-      }
+            ],
+          resultBibliography =
+            [ ( "a",
+                Prose
+                  { unProse =
+                      [ ptext "Knuth, D.E." [Smallcaps],
+                        ptext " 1992. " [],
+                        ptext "Literate programming" [Italic],
+                        ptext ". Center for the Study of Language; Information, Stanford, Calif." []
+                      ]
+                  }
+              )
+            ],
+          resultWarnings = []
+        }
+
+  expectCiteprocResult
+    "0400-citeproc-multiline"
+    $ Right
+      CP.Result
+        { resultCitations =
+            [ Prose
+                { unProse =
+                    [ ptext "[" [],
+                      PTokenLink
+                        Link
+                          { name = [stext "Knuth 1992" []],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-a",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          },
+                      ptext "]" []
+                    ]
+                }
+            ],
+          resultBibliography =
+            [ ( "a",
+                Prose
+                  { unProse =
+                      [ ptext "Knuth, D.E." [Smallcaps],
+                        ptext " 1992. " [],
+                        ptext "Literate programming" [Italic],
+                        ptext ". Center for the Study of Language; Information, Stanford, Calif." []
+                      ]
+                  }
+              )
+            ],
+          resultWarnings = []
+        }
+
+  expectCiteprocResult
+    "0400-citeproc-multiline-complex"
+    $ Right
+      CP.Result
+        { resultCitations =
+            [ Prose
+                { unProse =
+                    [ ptext "[" [],
+                      ptext "bold" [Bold],
+                      ptext " " [],
+                      ptext "italic" [Italic],
+                      PTokenLink
+                        Link
+                          { name = [stext "Knuth 1992" []],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-a",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          },
+                      ptext "and really " [],
+                      ptext "amazing" [Code],
+                      ptext "global suffix]" []
+                    ]
+                }
+            ],
+          resultBibliography =
+            [ ( "a",
+                Prose
+                  { unProse =
+                      [ ptext "Knuth, D.E." [Smallcaps],
+                        ptext " 1992. " [],
+                        ptext "Literate programming" [Italic],
+                        ptext ". Center for the Study of Language; Information, Stanford, Calif." []
+                      ]
+                  }
+              )
+            ],
+          resultWarnings = []
+        }
+
+  expectCiteprocResult
+    "0400-citeproc-multiline-complex-list-item"
+    $ Right
+      CP.Result
+        { resultCitations =
+            [ Prose
+                { unProse =
+                    [ ptext "[global " [],
+                      PTokenMathFragment
+                        MathFragment
+                          { parentOid = nilOid,
+                            meta = fromList [],
+                            body = "1 + 1\n    = 2"
+                          },
+                      ptext "bold" [Bold],
+                      ptext " " [],
+                      ptext "italic" [Italic],
+                      PTokenLink
+                        Link
+                          { name = [stext "1" []],
+                            target = LinkTargetFootnote "@a"
+                          },
+                      PTokenLink
+                        Link
+                          { name = [stext "Knuth 1992" []],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-a",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          },
+                      ptext "and really " [],
+                      ptext "amazing" [Code],
+                      ptext "; some bit of " [],
+                      ptext "@b verbatim" [Verbatim],
+                      ptext " for a" [],
+                      PTokenLink
+                        Link
+                          { name = [stext "Turing 1937" []],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-c",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          },
+                      ptext "thing global suffix with OID link " [],
+                      PTokenLink
+                        Link
+                          { name = [stext "foo" []],
+                            target =
+                              LinkTargetOid
+                                LinkOid
+                                  { oid = nilOid,
+                                    name = "foo"
+                                  }
+                          },
+                      ptext "]" []
+                    ]
+                }
+            ],
+          resultBibliography =
+            [ ( "a",
+                Prose
+                  { unProse =
+                      [ ptext "Knuth, D.E." [Smallcaps],
+                        ptext " 1992. " [],
+                        ptext "Literate programming" [Italic],
+                        ptext ". Center for the Study of Language; Information, Stanford, Calif." []
+                      ]
+                  }
+              ),
+              ( "c",
+                Prose
+                  { unProse =
+                      [ ptext "Turing, A.M." [Smallcaps],
+                        ptext " 1937. " [],
+                        PTokenLink
+                          Link
+                            { name = [stext "On Computable Numbers, with an Application to the Entscheidungsproblem" []],
+                              target =
+                                LinkTargetURI
+                                  N.URI
+                                    { N.uriScheme = "https:",
+                                      N.uriAuthority =
+                                        Just
+                                          N.URIAuth
+                                            { N.uriUserInfo = "",
+                                              N.uriRegName = "doi.org",
+                                              N.uriPort = ""
+                                            },
+                                      N.uriPath = "/10.1112/plms/s2-42.1.230",
+                                      N.uriQuery = "",
+                                      N.uriFragment = ""
+                                    }
+                            },
+                        ptext ". " [],
+                        ptext "Proceedings of the London Mathematical Society" [Italic],
+                        ptext " " [],
+                        ptext "s2-42" [Italic],
+                        ptext ", 1, 230\8211\&265." []
+                      ]
+                  }
+              )
+            ],
+          resultWarnings = []
+        }
+
+  expectCiteprocResult
+    "0400-citeproc-multiline-cell-boundary"
+    $ Left "unexpected newline"
+
+  expectCiteprocResult
+    "0400-citeproc-multiline-cell-boundary-list-item"
+    $ Left "unexpected newline"
+
+  expectCiteprocResult
+    "0400-citeproc-style-variations"
+    $ Right
+      CP.Result
+        { resultCitations =
+            [ Prose
+                { unProse =
+                    [ ptext "Knuth [" [],
+                      PTokenLink
+                        Link
+                          { name = [stext "1992" []],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-a",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          },
+                      ptext "]" []
+                    ]
+                },
+              Prose
+                { unProse =
+                    [ ptext "[" [],
+                      PTokenLink
+                        Link
+                          { name = [stext "1937" []],
+                            target =
+                              LinkTargetURI
+                                N.URI
+                                  { N.uriScheme = "",
+                                    N.uriAuthority = Nothing,
+                                    N.uriPath = "#ref-c",
+                                    N.uriQuery = "",
+                                    N.uriFragment = ""
+                                  }
+                          },
+                      ptext "]" []
+                    ]
+                }
+            ],
+          resultBibliography =
+            [ ( "a",
+                Prose
+                  { unProse =
+                      [ ptext "Knuth, D.E." [Smallcaps],
+                        ptext " 1992. " [],
+                        ptext "Literate programming" [Italic],
+                        ptext ". Center for the Study of Language; Information, Stanford, Calif." []
+                      ]
+                  }
+              ),
+              ( "c",
+                Prose
+                  { unProse =
+                      [ ptext "Turing, A.M." [Smallcaps],
+                        ptext " 1937. " [],
+                        PTokenLink
+                          Link
+                            { name = [stext "On Computable Numbers, with an Application to the Entscheidungsproblem" []],
+                              target =
+                                LinkTargetURI
+                                  N.URI
+                                    { N.uriScheme = "https:",
+                                      N.uriAuthority =
+                                        Just
+                                          N.URIAuth
+                                            { N.uriUserInfo = "",
+                                              N.uriRegName = "doi.org",
+                                              N.uriPort = ""
+                                            },
+                                      N.uriPath = "/10.1112/plms/s2-42.1.230",
+                                      N.uriQuery = "",
+                                      N.uriFragment = ""
+                                    }
+                            },
+                        ptext ". " [],
+                        ptext "Proceedings of the London Mathematical Society" [Italic],
+                        ptext " " [],
+                        ptext "s2-42" [Italic],
+                        ptext ", 1, 230\8211\&265." []
+                      ]
+                  }
+              )
+            ],
+          resultWarnings = []
+        }
