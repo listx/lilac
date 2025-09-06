@@ -1640,6 +1640,7 @@ and the footnote reference.
 transformations (adding emphasis, changing cases, etc). The ~CiteprocOutput~
 typeclass instance describes all of these [[https://github.com/jgm/citeproc/blob/8078d4c25380a37e497c7d3dc4384691be8a2b8a/src/Citeproc/Types.hs#L186-L209][these transformations]]:
 
+#+name: CiteprocOutput typeclass
 #+begin_src haskell
 -- | CSL styles require certain formatting transformations to
 -- be defined.  These are defined in the 'CiteprocOutput' class.
@@ -1669,10 +1670,34 @@ class (Semigroup a, Monoid a, Show a, Eq a, Ord a) => CiteprocOutput a where
 
 Any type that has an instance of the ~CiteprocOutput~ typeclass will be able to be
 transformed by Citeproc according to the CSL style file. For us, this type is
-[[newtype:Prose]], which we'll use to format both the [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Citation][data:Citation]] values as well
-as the [[id:909c5265-065a-412c-9305-2cff398ad233][CSL JSON (bibliographical entries)]].
+[[newtype:Prose]], and if we add support for the ~CiteprocOutput~ typeclass for it,
+we'll be able to format both the [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Citation][data:Citation]] values as well as the [[id:909c5265-065a-412c-9305-2cff398ad233][CSL JSON
+(bibliographical entries)]] with [[newtype:Prose]] (so that users could use the
+familiar syntax for [[newtype:Prose]] in the CSL JSON directly, for example).
 
-But first things first. ~CiteprocOutput~ requires the type variable to also be an
+Unfortunately, adding in full support for all of the above functions in
+[[CiteprocOutput typeclass]] is quite tedious and actually not trivial. For example
+you have to know how to move around punctuation (periods and commas) from
+outside of quotes (~".~) to inside (~."~). The =CslJson= type is recursive and encodes
+quotes as a separate constructor, making these transformations easier.
+
+Because of the difficulty, we don't support a full, proper implementation of
+~CiteprocOutput~ for [[newtype:Prose]]; we take shortcuts and avoid doing a proper
+implementation in some places (e.g., [[instance:CiteprocOutput
+Prose:localizeQuotes]]). So instead of using [[newtype:Prose]], we use the ~CslJson~
+type (see [[id:7874b9c5-ceac-4820-8804-7732e29f5c60::f:proseToCslJsonText][f:proseToCslJsonText]]) and convert this back into [[newtype:Prose]] (see
+[[id:7874b9c5-ceac-4820-8804-7732e29f5c60::f:cslJsonTextToProse][f:cslJsonTextToProse]]).
+
+Now you may be thinking, why bother keeping the (unfinished) implementation
+of ~CiteprocOutput~ for [[newtype:Prose]]? It turns out that some of the functions
+are actually quite useful, in particular [[instance:CiteprocOutput Prose:fromText]]
+for implementing [[id:7874b9c5-ceac-4820-8804-7732e29f5c60::f:cslJsonTextToProse][f:cslJsonTextToProse]]. And also, we may decide to avoid this
+conversion to ~CslJson~ in the future; in that scenario, having around this
+unfinished implementation would provide a solid starting point.
+
+*** ~CiteprocOutput~ typeclass implementation for [[newtype:Prose]]
+
+~CiteprocOutput~ requires the type variable to also be an
 instance of ~Semigroup~ and ~Monoid~. Because a [[newtype:Prose]] is just a wrapper
 around a list of [[data:PToken]] values, we don't have to actually define anything
 ourselves here (as the operations have already been defined for the list (~[]~)
