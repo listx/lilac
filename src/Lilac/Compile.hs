@@ -115,7 +115,7 @@ mkSymbols :: OrgDoc -> Map LinkOid Cell
 mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
   where
     f cell = case cell of
-      CBlock block -> getSymbols (Just block.parentOid) block.meta cell
+      CBlock block -> getSymbols block.parentOid block.meta cell
       CHeading heading
         | Just oidText <- lookup "ID" heading.meta,
           Just oid <- LP.validateOidText oidText ->
@@ -127,16 +127,20 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
               )
             ]
         | otherwise -> []
-      CFigure figure -> getSymbols (Just figure.parentOid) figure.meta cell
-      CMathFragment mathFragment -> getSymbols (Just mathFragment.parentOid) mathFragment.meta cell
-      CTable table -> getSymbols (Just table.parentOid) table.meta cell
+      CFigure figure -> getSymbols figure.parentOid figure.meta cell
+      CMathFragment mathFragment -> getSymbols mathFragment.parentOid mathFragment.meta cell
+      CTable table -> getSymbols table.parentOid table.meta cell
       CFootnote {}
       CListItem {}
       CParagraph {}
       CBibliography {} -> []
-    getSymbols :: Maybe OID -> Map Text Text -> Cell -> [(LinkOid, Cell)]
+    getSymbols :: OID -> Map Text Text -> Cell -> [(LinkOid, Cell)]
     getSymbols parentOid cellMeta cell =
-      concatMap requireName $ catMaybes [parentOid, Just $ orgDoc.oid]
+      let oids =
+            if parentOid /= orgDoc.oid
+              then [parentOid, orgDoc.oid]
+              else [orgDoc.oid]
+       in concatMap requireName oids
       where
         requireName oid
           | Just name <- lookup "name" cellMeta =
