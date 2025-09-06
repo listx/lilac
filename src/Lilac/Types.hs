@@ -40,6 +40,8 @@ module Lilac.Types
     nilOidOrgDoc,
     protocolsEmacs,
     protocolsWeb,
+    ptext,
+    stext,
     styleMaskFrom,
   )
 where
@@ -387,6 +389,12 @@ data StyledText = StyledText
   }
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
+
+stext :: Text -> [Style] -> StyledText
+stext body styles = StyledText {body = body, style = styleMaskFrom styles}
+
+ptext :: Text -> [Style] -> PToken
+ptext body styles = PTokenStyledText $ stext body styles
 
 type Table :: Type
 data Table = Table

@@ -14,8 +14,7 @@ import Lilac.Types
     PToken
       ( PTokenDivEnd,
         PTokenDivStart,
-        PTokenLink,
-        PTokenStyledText
+        PTokenLink
       ),
     Prose (Prose, unProse),
     Style (Italic, Smallcaps, Superscript),
@@ -24,6 +23,8 @@ import Lilac.Types
     defaultOrgParserState,
     encodeGPath,
     nilOidOrgDoc,
+    ptext,
+    stext,
   )
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
@@ -249,9 +250,7 @@ weaveSpec = do
               { unProse =
                   [ PTokenLink
                       Link
-                        { name =
-                            [ StyledText {body = "[1]", style = styleMaskFrom []}
-                            ],
+                        { name = [stext "[1]" []],
                           target =
                             LinkTargetURI
                               N.URI
@@ -262,16 +261,10 @@ weaveSpec = do
                                   N.uriFragment = ""
                                 }
                         },
-                    PTokenStyledText
-                      StyledText
-                        { body = ", ",
-                          style = styleMaskFrom []
-                        },
+                    ptext ", " [],
                     PTokenLink
                       Link
-                        { name =
-                            [ StyledText {body = "[2]", style = styleMaskFrom []}
-                            ],
+                        { name = [stext "[2]" []],
                           target =
                             LinkTargetURI
                               N.URI
@@ -282,12 +275,10 @@ weaveSpec = do
                                   N.uriFragment = ""
                                 }
                         },
-                    PTokenStyledText StyledText {body = ", ", style = styleMaskFrom []},
+                    ptext ", " [],
                     PTokenLink
                       Link
-                        { name =
-                            [ StyledText {body = "[3]", style = styleMaskFrom []}
-                            ],
+                        { name = [stext "[3]" []],
                           target =
                             LinkTargetURI
                               N.URI
@@ -298,12 +289,10 @@ weaveSpec = do
                                   N.uriFragment = ""
                                 }
                         },
-                    PTokenStyledText StyledText {body = ", ", style = styleMaskFrom []},
+                    ptext ", " [],
                     PTokenLink
                       Link
-                        { name =
-                            [ StyledText {body = "[4]", style = styleMaskFrom []}
-                            ],
+                        { name = [stext "[4]" []],
                           target =
                             LinkTargetURI
                               N.URI
@@ -322,12 +311,12 @@ weaveSpec = do
               Prose
                 { unProse =
                     [ PTokenDivStart "left-margin",
-                      PTokenStyledText StyledText {body = "[1]", style = styleMaskFrom []},
+                      ptext "[1]" [],
                       PTokenDivEnd,
                       PTokenDivStart "right-inline",
-                      PTokenStyledText StyledText {body = "D. E. Knuth, ", style = styleMaskFrom []},
-                      PTokenStyledText StyledText {body = "Literate programming", style = styleMaskFrom [Italic]},
-                      PTokenStyledText StyledText {body = ". in CSLI lecture notes, no. no. 27. Stanford, Calif.: Center for the Study of Language; Information, 1992.", style = styleMaskFrom []},
+                      ptext "D. E. Knuth, " [],
+                      ptext "Literate programming" [Italic],
+                      ptext ". in CSLI lecture notes, no. no. 27. Stanford, Calif.: Center for the Study of Language; Information, 1992." [],
                       PTokenDivEnd
                     ]
                 }
@@ -336,17 +325,15 @@ weaveSpec = do
               Prose
                 { unProse =
                     [ PTokenDivStart "left-margin",
-                      PTokenStyledText (StyledText {body = "[2]", style = styleMaskFrom []}),
+                      ptext "[2]" [],
                       PTokenDivEnd,
                       PTokenDivStart "right-inline",
-                      PTokenStyledText (StyledText {body = "E. W. Dijkstra, \8220Letters to the editor: Go to statement considered harmful,\8221 ", style = styleMaskFrom []}),
-                      PTokenStyledText (StyledText {body = "Communications of the ACM", style = styleMaskFrom [Italic]}),
-                      PTokenStyledText (StyledText {body = ", vol. 11, no. 3, pp. 147\8211\&148, Mar. 1968, doi: ", style = styleMaskFrom []}),
+                      ptext "E. W. Dijkstra, \8220Letters to the editor: Go to statement considered harmful,\8221 " [],
+                      ptext "Communications of the ACM" [Italic],
+                      ptext ", vol. 11, no. 3, pp. 147\8211\&148, Mar. 1968, doi: " [],
                       PTokenLink
                         Link
-                          { name =
-                              [ StyledText {body = "10.1145/362929.362947", style = styleMaskFrom []}
-                              ],
+                          { name = [stext "10.1145/362929.362947" []],
                             target =
                               LinkTargetURI
                                 N.URI
@@ -363,7 +350,7 @@ weaveSpec = do
                                     N.uriFragment = ""
                                   }
                           },
-                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []},
+                      ptext "." [],
                       PTokenDivEnd
                     ]
                 }
@@ -372,17 +359,15 @@ weaveSpec = do
               Prose
                 { unProse =
                     [ PTokenDivStart "left-margin",
-                      PTokenStyledText StyledText {body = "[3]", style = styleMaskFrom []},
+                      ptext "[3]" [],
                       PTokenDivEnd,
                       PTokenDivStart "right-inline",
-                      PTokenStyledText StyledText {body = "A. M. Turing, \8220On Computable Numbers, with an Application to the Entscheidungsproblem,\8221 ", style = styleMaskFrom []},
-                      PTokenStyledText StyledText {body = "Proceedings of the London Mathematical Society", style = styleMaskFrom [Italic]},
-                      PTokenStyledText StyledText {body = ", vol. s2\8211\&42, no. 1, pp. 230\8211\&265, 1937, doi: ", style = styleMaskFrom []},
+                      ptext "A. M. Turing, \8220On Computable Numbers, with an Application to the Entscheidungsproblem,\8221 " [],
+                      ptext "Proceedings of the London Mathematical Society" [Italic],
+                      ptext ", vol. s2\8211\&42, no. 1, pp. 230\8211\&265, 1937, doi: " [],
                       PTokenLink
                         Link
-                          { name =
-                              [ StyledText {body = "10.1112/plms/s2-42.1.230", style = styleMaskFrom []}
-                              ],
+                          { name = [stext "10.1112/plms/s2-42.1.230" []],
                             target =
                               LinkTargetURI
                                 N.URI
@@ -399,7 +384,7 @@ weaveSpec = do
                                     N.uriFragment = ""
                                   }
                           },
-                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []},
+                      ptext "." [],
                       PTokenDivEnd
                     ]
                 }
@@ -408,12 +393,12 @@ weaveSpec = do
               Prose
                 { unProse =
                     [ PTokenDivStart "left-margin",
-                      PTokenStyledText StyledText {body = "[4]", style = styleMaskFrom []},
+                      ptext "[4]" [],
                       PTokenDivEnd,
                       PTokenDivStart "right-inline",
-                      PTokenStyledText StyledText {body = "C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 ", style = styleMaskFrom []},
-                      PTokenStyledText StyledText {body = "Bell System Technical Journal", style = styleMaskFrom [Italic]},
-                      PTokenStyledText StyledText {body = ", vol. 27, no. 3, pp. 379\8211\&423, July 1948, doi: ", style = styleMaskFrom []},
+                      ptext "C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 " [],
+                      ptext "Bell System Technical Journal" [Italic],
+                      ptext ", vol. 27, no. 3, pp. 379\8211\&423, July 1948, doi: " [],
                       PTokenLink
                         Link
                           { name =
@@ -435,7 +420,7 @@ weaveSpec = do
                                     N.uriFragment = ""
                                   }
                           },
-                      PTokenStyledText StyledText {body = ".", style = styleMaskFrom []},
+                      ptext "." [],
                       PTokenDivEnd
                     ]
                 }
@@ -452,9 +437,7 @@ weaveSpec = do
               { unProse =
                   [ PTokenLink
                       Link
-                        { name =
-                            [ StyledText {body = "1", style = styleMaskFrom [Superscript]}
-                            ],
+                        { name = [stext "1" [Superscript]],
                           target =
                             LinkTargetURI
                               N.URI
@@ -473,10 +456,10 @@ weaveSpec = do
               Prose
                 { unProse =
                     [ PTokenDivStart "left-margin",
-                      PTokenStyledText StyledText {body = "1. ", style = styleMaskFrom []},
+                      ptext "1. " [],
                       PTokenDivEnd,
                       PTokenDivStart "right-inline",
-                      PTokenStyledText StyledText {body = "Knuth DE. Literate programming. Stanford, Calif.: Center for the Study of Language; Information; 1992. (CSLI lecture notes).", style = styleMaskFrom []},
+                      ptext "Knuth DE. Literate programming. Stanford, Calif.: Center for the Study of Language; Information; 1992. (CSLI lecture notes)." [],
                       PTokenDivEnd
                     ]
                 }
@@ -491,12 +474,10 @@ weaveSpec = do
       { resultCitations =
           [ Prose
               { unProse =
-                  [ PTokenStyledText StyledText {body = "[", style = styleMaskFrom []},
+                  [ ptext "[" [],
                     PTokenLink
                       Link
-                        { name =
-                            [ StyledText {body = "Knuth 1992", style = styleMaskFrom []}
-                            ],
+                        { name = [stext "Knuth 1992" []],
                           target =
                             LinkTargetURI
                               N.URI
@@ -507,7 +488,7 @@ weaveSpec = do
                                   N.uriFragment = ""
                                 }
                         },
-                    PTokenStyledText StyledText {body = "]", style = styleMaskFrom []}
+                    ptext "]" []
                   ]
               }
           ],
@@ -515,10 +496,10 @@ weaveSpec = do
           [ ( "a",
               Prose
                 { unProse =
-                    [ PTokenStyledText StyledText {body = "Knuth, D.E.", style = styleMaskFrom [Smallcaps]},
-                      PTokenStyledText StyledText {body = " 1992. ", style = styleMaskFrom []},
-                      PTokenStyledText StyledText {body = "Literate programming", style = styleMaskFrom [Italic]},
-                      PTokenStyledText StyledText {body = ". Center for the Study of Language; Information, Stanford, Calif.", style = styleMaskFrom []}
+                    [ ptext "Knuth, D.E." [Smallcaps],
+                      ptext " 1992. " [],
+                      ptext "Literate programming" [Italic],
+                      ptext ". Center for the Study of Language; Information, Stanford, Calif." []
                     ]
                 }
             )

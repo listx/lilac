@@ -79,6 +79,8 @@ import Lilac.Types
     fromWords,
     nilOid,
     nilOidOrgDoc,
+    ptext,
+    stext,
     styleMaskFrom,
   )
 import Lilac.Util qualified as LU
@@ -478,11 +480,7 @@ parseSpec = do
             Heading
               { level = 1,
                 section = [1],
-                body =
-                  Prose
-                    [ PTokenStyledText
-                        StyledText {body = "foo", style = styleMaskFrom []}
-                    ],
+                body = Prose [ptext "foo" []],
                 meta = fromList []
               }
         ]
@@ -500,11 +498,7 @@ parseSpec = do
             Heading
               { level = 1,
                 section = [1],
-                body =
-                  Prose
-                    [ PTokenStyledText
-                        StyledText {body = "foo", style = styleMaskFrom []}
-                    ],
+                body = Prose [ptext "foo" []],
                 meta =
                   fromList
                     [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
@@ -525,11 +519,7 @@ parseSpec = do
             Heading
               { level = 1,
                 section = [1],
-                body =
-                  Prose
-                    [ PTokenStyledText
-                        StyledText {body = "foo", style = styleMaskFrom []}
-                    ],
+                body = Prose [ptext "foo" []],
                 meta =
                   fromList
                     [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
@@ -573,24 +563,11 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText {body = "a b c d e ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "f g h i j", style = styleMaskFrom [Bold]}
+            [ ptext "a b c d e " [],
+              ptext "f g h i j" [Bold]
             ],
-        CParagraph
-          $ Prose
-            [ PTokenStyledText
-                StyledText {body = "x y z foo bar", style = styleMaskFrom []}
-            ],
-        CParagraph
-          $ Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "multiple lines with underscore",
-                    style = styleMaskFrom [Underline]
-                  }
-            ]
+        CParagraph $ Prose [ptext "x y z foo bar" []],
+        CParagraph $ Prose [ptext "multiple lines with underscore" [Underline]]
       ]
 
   it "accepts empty input for \"notFollowedBy (char ' ')\"" $ do
@@ -604,21 +581,9 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "foo ",
-                    style = styleMaskFrom []
-                  },
-              PTokenStyledText
-                StyledText
-                  { body = "bar",
-                    style = styleMaskFrom [Bold]
-                  },
-              PTokenStyledText
-                StyledText
-                  { body = " baz",
-                    style = styleMaskFrom []
-                  }
+            [ ptext "foo " [],
+              ptext "bar" [Bold],
+              ptext " baz" []
             ]
       ]
 
@@ -627,20 +592,13 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText {body = "(foo ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "bar", style = styleMaskFrom [Verbatim]},
-              PTokenStyledText
-                StyledText {body = "). What's up? and ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "that!", style = styleMaskFrom [Bold]},
-              PTokenStyledText
-                StyledText {body = " ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "(italic)", style = styleMaskFrom [Italic]},
-              PTokenStyledText
-                StyledText {body = ". It's #1!", style = styleMaskFrom []}
+            [ ptext "(foo " [],
+              ptext "bar" [Verbatim],
+              ptext "). What's up? and " [],
+              ptext "that!" [Bold],
+              ptext " " [],
+              ptext "(italic)" [Italic],
+              ptext ". It's #1!" []
             ]
       ]
 
@@ -649,32 +607,16 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText {body = "foo ", style = styleMaskFrom [Bold]},
-              PTokenStyledText
-                StyledText {body = "bar ", style = styleMaskFrom [Bold, Italic]},
-              PTokenStyledText
-                StyledText
-                  { body = "underlined bold and italic",
-                    style = styleMaskFrom [Bold, Italic, Underline]
-                  },
-              PTokenStyledText
-                StyledText {body = " baz", style = styleMaskFrom [Bold]},
-              PTokenStyledText
-                StyledText {body = " ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "verbatim  text", style = styleMaskFrom [Verbatim]},
-              PTokenStyledText
-                StyledText {body = " ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "x  y  z", style = styleMaskFrom [Code]},
-              PTokenStyledText
-                StyledText {body = " ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText
-                  { body = "bold",
-                    style = styleMaskFrom [Bold]
-                  }
+            [ ptext "foo " [Bold],
+              ptext "bar " [Bold, Italic],
+              ptext "underlined bold and italic" [Bold, Italic, Underline],
+              ptext " baz" [Bold],
+              ptext " " [],
+              ptext "verbatim  text" [Verbatim],
+              ptext " " [],
+              ptext "x  y  z" [Code],
+              ptext " " [],
+              ptext "bold" [Bold]
             ]
       ]
 
@@ -683,10 +625,8 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText {body = "a b c d e ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "f g h i j", style = styleMaskFrom [Bold]}
+            [ ptext "a b c d e " [],
+              ptext "f g h i j" [Bold]
             ]
       ]
 
@@ -695,8 +635,7 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText {body = "foo and/or 1/2 bar \\ a\\b", style = styleMaskFrom [Italic]}
+            [ ptext "foo and/or 1/2 bar \\ a\\b" [Italic]
             ]
       ]
 
@@ -714,18 +653,12 @@ parseSpec = do
                 section = [1],
                 body =
                   Prose
-                    [ PTokenStyledText
-                        StyledText {body = "foo ", style = styleMaskFrom [Bold]},
-                      PTokenStyledText
-                        StyledText {body = "bar baz a", style = styleMaskFrom []},
-                      PTokenStyledText
-                        StyledText {body = "b", style = styleMaskFrom [Bold]},
-                      PTokenStyledText
-                        StyledText {body = "c (", style = styleMaskFrom []},
-                      PTokenStyledText
-                        StyledText {body = "ok", style = styleMaskFrom [Bold]},
-                      PTokenStyledText
-                        StyledText {body = ") yes", style = styleMaskFrom []}
+                    [ ptext "foo " [Bold],
+                      ptext "bar baz a" [],
+                      ptext "b" [Bold],
+                      ptext "c (" [],
+                      ptext "ok" [Bold],
+                      ptext ") yes" []
                     ],
                 meta = fromList []
               }
@@ -748,20 +681,13 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText {body = "*a", style = styleMaskFrom [Verbatim]},
-              PTokenStyledText
-                StyledText {body = " ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "b*", style = styleMaskFrom [Verbatim]},
-              PTokenStyledText
-                StyledText {body = " ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "*c", style = styleMaskFrom [Code]},
-              PTokenStyledText
-                StyledText {body = " ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "d*", style = styleMaskFrom [Code]}
+            [ ptext "*a" [Verbatim],
+              ptext " " [],
+              ptext "b*" [Verbatim],
+              ptext " " [],
+              ptext "*c" [Code],
+              ptext " " [],
+              ptext "d*" [Code]
             ]
       ]
 
@@ -770,8 +696,7 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText {body = "[[foo", style = styleMaskFrom [Verbatim]}
+            [ ptext "[[foo" [Verbatim]
             ],
         CParagraph
           $ Prose
@@ -784,28 +709,20 @@ parseSpec = do
                             name = "hello"
                           },
                     name =
-                      [ StyledText
-                          { body = "hello",
-                            style = styleMaskFrom []
-                          }
+                      [ stext "hello" []
                       ]
                   },
-              PTokenStyledText
-                StyledText {body = " there", style = styleMaskFrom []}
+              ptext " there" []
             ],
         CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText {body = "\\(1 + 1 ", style = styleMaskFrom [Verbatim]},
-              PTokenStyledText
-                StyledText {body = " ", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "\\(2 * 2\\)", style = styleMaskFrom [Code]}
+            [ ptext "\\(1 + 1 " [Verbatim],
+              ptext " " [],
+              ptext "\\(2 * 2\\)" [Code]
             ],
         CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText {body = "[[bar]]", style = styleMaskFrom [Code]}
+            [ ptext "[[bar]]" [Code]
             ]
       ]
 
@@ -814,12 +731,9 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText {body = "(", style = styleMaskFrom []},
-              PTokenStyledText
-                StyledText {body = "import ./.", style = styleMaskFrom [Verbatim]},
-              PTokenStyledText
-                StyledText {body = ") hello", style = styleMaskFrom []}
+            [ ptext "(" [],
+              ptext "import ./." [Verbatim],
+              ptext ") hello" []
             ]
       ]
 
@@ -828,40 +742,20 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "(",
-                    style = styleMaskFrom []
-                  },
+            [ ptext "(" [],
               PTokenLink
                 Link
                   { target = LinkTargetFilePath "foo/bar",
-                    name =
-                      [ StyledText
-                          { body = "foo/bar",
-                            style = styleMaskFrom []
-                          }
-                      ]
+                    name = [stext "foo/bar" []]
                   },
-              PTokenStyledText
-                StyledText
-                  { body = ")",
-                    style = styleMaskFrom []
-                  }
+              ptext ")" []
             ]
       ]
 
   shouldParseWith
     "0006-links-nonlink"
     $ nilOrgDoc
-      [ CParagraph
-          $ Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "[hi]",
-                    style = styleMaskFrom []
-                  }
-            ]
+      [ CParagraph $ Prose [ptext "[hi]" []]
       ]
 
   shouldParseWith
@@ -869,11 +763,7 @@ parseSpec = do
     $ nilOrgDoc
       [ CParagraph
           $ Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "See ",
-                    style = styleMaskFrom []
-                  },
+            [ ptext "See " [],
               PTokenLink
                 Link
                   { target =
@@ -891,18 +781,9 @@ parseSpec = do
                             N.uriQuery = "",
                             N.uriFragment = ""
                           },
-                    name =
-                      [ StyledText
-                          { body = "https://foo.org",
-                            style = styleMaskFrom []
-                          }
-                      ]
+                    name = [stext "https://foo.org" []]
                   },
-              PTokenStyledText
-                StyledText
-                  { body = ", or ",
-                    style = styleMaskFrom []
-                  },
+              ptext ", or " [],
               PTokenLink
                 Link
                   { target =
@@ -920,18 +801,9 @@ parseSpec = do
                             N.uriQuery = "",
                             N.uriFragment = ""
                           },
-                    name =
-                      [ StyledText
-                          { body = "https://bar.net",
-                            style = styleMaskFrom []
-                          }
-                      ]
+                    name = [stext "https://bar.net" []]
                   },
-              PTokenStyledText
-                StyledText
-                  { body = ". Try ",
-                    style = styleMaskFrom []
-                  },
+              ptext ". Try " [],
               PTokenLink
                 Link
                   { target =
@@ -949,18 +821,9 @@ parseSpec = do
                             N.uriQuery = "",
                             N.uriFragment = ""
                           },
-                    name =
-                      [ StyledText
-                          { body = "http://localhost:3000",
-                            style = styleMaskFrom []
-                          }
-                      ]
+                    name = [stext "http://localhost:3000" []]
                   },
-              PTokenStyledText
-                StyledText
-                  { body = "? Go to ",
-                    style = styleMaskFrom []
-                  },
+              ptext "? Go to " [],
               PTokenLink
                 Link
                   { target =
@@ -978,18 +841,9 @@ parseSpec = do
                             N.uriQuery = "",
                             N.uriFragment = ""
                           },
-                    name =
-                      [ StyledText
-                          { body = "ftp://10.0.0.1",
-                            style = styleMaskFrom []
-                          }
-                      ]
+                    name = [stext "ftp://10.0.0.1" []]
                   },
-              PTokenStyledText
-                StyledText
-                  { body = "!",
-                    style = styleMaskFrom []
-                  }
+              ptext "!" []
             ]
       ]
 
@@ -998,11 +852,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CParagraph
             $ Prose
-              [ PTokenStyledText
-                  StyledText
-                    { body = "foo ",
-                      style = styleMaskFrom []
-                    },
+              [ ptext "foo " [],
                 PTokenLink
                   Link
                     { target =
@@ -1011,12 +861,7 @@ parseSpec = do
                             { oid = nilOid,
                               name = "link-target-only"
                             },
-                      name =
-                        [ StyledText
-                            { body = "link-target-only",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "link-target-only" []]
                     }
               ],
           CHeading
@@ -1033,12 +878,7 @@ parseSpec = do
                                   { oid = nilOid,
                                     name = "link-target"
                                   },
-                            name =
-                              [ StyledText
-                                  { body = "link-name",
-                                    style = styleMaskFrom []
-                                  }
-                              ]
+                            name = [stext "link-name" []]
                           }
                     ],
                 meta = fromList []
@@ -1053,18 +893,9 @@ parseSpec = do
                             { oid = nilOid,
                               name = "a"
                             },
-                      name =
-                        [ StyledText
-                            { body = "a",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "a" []]
                     },
-                PTokenStyledText
-                  StyledText
-                    { body = " b",
-                      style = styleMaskFrom []
-                    }
+                ptext " b" []
               ]
         ]
     )
@@ -1096,18 +927,9 @@ parseSpec = do
                               N.uriQuery = "",
                               N.uriFragment = ""
                             },
-                      name =
-                        [ StyledText
-                            { body = "http://foo.org",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "http://foo.org" []]
                     },
-                PTokenStyledText
-                  StyledText
-                    { body = " ",
-                      style = styleMaskFrom []
-                    },
+                ptext " " [],
                 PTokenLink
                   Link
                     { target =
@@ -1125,18 +947,9 @@ parseSpec = do
                               N.uriQuery = "",
                               N.uriFragment = ""
                             },
-                      name =
-                        [ StyledText
-                            { body = "https://foo.org",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "https://foo.org" []]
                     },
-                PTokenStyledText
-                  StyledText
-                    { body = " ",
-                      style = styleMaskFrom []
-                    },
+                ptext " " [],
                 PTokenLink
                   Link
                     { target =
@@ -1154,12 +967,7 @@ parseSpec = do
                               N.uriQuery = "",
                               N.uriFragment = ""
                             },
-                      name =
-                        [ StyledText
-                            { body = "hello",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "hello" []]
                     }
               ]
         ]
@@ -1179,17 +987,10 @@ parseSpec = do
                               name = ""
                             },
                       name =
-                        [ StyledText
-                            { body = "id:442c807f-c9d9-45a7-88bf-ffffffffffff",
-                              style = styleMaskFrom []
-                            }
+                        [ stext "id:442c807f-c9d9-45a7-88bf-ffffffffffff" []
                         ]
                     },
-                PTokenStyledText
-                  StyledText
-                    { body = " ",
-                      style = styleMaskFrom []
-                    },
+                ptext " " [],
                 PTokenLink
                   Link
                     { target =
@@ -1199,17 +1000,10 @@ parseSpec = do
                               name = ""
                             },
                       name =
-                        [ StyledText
-                            { body = "bar",
-                              style = styleMaskFrom []
-                            }
+                        [ stext "bar" []
                         ]
                     },
-                PTokenStyledText
-                  StyledText
-                    { body = " ",
-                      style = styleMaskFrom []
-                    },
+                ptext " " [],
                 PTokenLink
                   Link
                     { target =
@@ -1219,25 +1013,12 @@ parseSpec = do
                               name = ""
                             },
                       name =
-                        [ StyledText
-                            { body = "bar",
-                              style = styleMaskFrom []
-                            },
-                          StyledText
-                            { body = " ",
-                              style = styleMaskFrom []
-                            },
-                          StyledText
-                            { body = "[]",
-                              style = styleMaskFrom [Verbatim]
-                            }
+                        [ stext "bar" [],
+                          stext " " [],
+                          stext "[]" [Verbatim]
                         ]
                     },
-                PTokenStyledText
-                  StyledText
-                    { body = " ",
-                      style = styleMaskFrom []
-                    },
+                ptext " " [],
                 PTokenLink
                   Link
                     { target =
@@ -1247,25 +1028,12 @@ parseSpec = do
                               name = ""
                             },
                       name =
-                        [ StyledText
-                            { body = "bar",
-                              style = styleMaskFrom []
-                            },
-                          StyledText
-                            { body = " ",
-                              style = styleMaskFrom []
-                            },
-                          StyledText
-                            { body = "ok",
-                              style = styleMaskFrom []
-                            }
+                        [ stext "bar" [],
+                          stext " " [],
+                          stext "ok" []
                         ]
                     },
-                PTokenStyledText
-                  StyledText
-                    { body = " ",
-                      style = styleMaskFrom []
-                    },
+                ptext " " [],
                 PTokenLink
                   Link
                     { target =
@@ -1274,18 +1042,9 @@ parseSpec = do
                             { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
                               name = "foo"
                             },
-                      name =
-                        [ StyledText
-                            { body = "abc",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "abc" []]
                     },
-                PTokenStyledText
-                  StyledText
-                    { body = " ",
-                      style = styleMaskFrom []
-                    },
+                ptext " " [],
                 PTokenLink
                   Link
                     { target =
@@ -1294,12 +1053,7 @@ parseSpec = do
                             { oid = nilOid,
                               name = "foo"
                             },
-                      name =
-                        [ StyledText
-                            { body = "abc",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "abc" []]
                     }
               ],
           CListItem
@@ -1308,42 +1062,17 @@ parseSpec = do
             ],
           CParagraph
             $ Prose
-              [ PTokenStyledText
-                  StyledText
-                    { body = "link name across list indentation ",
-                      style = styleMaskFrom []
-                    },
+              [ ptext "link name across list indentation " [],
                 PTokenLink
                   Link
                     { name =
-                        [ StyledText
-                            { body = "italic",
-                              style = styleMaskFrom [Italic]
-                            },
-                          StyledText
-                            { body = " ",
-                              style = styleMaskFrom []
-                            },
-                          StyledText
-                            { body = "def",
-                              style = styleMaskFrom []
-                            },
-                          StyledText
-                            { body = " ",
-                              style = styleMaskFrom []
-                            },
-                          StyledText
-                            { body = "ghi]",
-                              style = styleMaskFrom []
-                            },
-                          StyledText
-                            { body = " ",
-                              style = styleMaskFrom []
-                            },
-                          StyledText
-                            { body = "!",
-                              style = styleMaskFrom []
-                            }
+                        [ stext "italic" [Italic],
+                          stext " " [],
+                          stext "def" [],
+                          stext " " [],
+                          stext "ghi]" [],
+                          stext " " [],
+                          stext "!" []
                         ],
                       target =
                         LinkTargetOid
@@ -1359,19 +1088,10 @@ parseSpec = do
             ],
           CParagraph
             $ Prose
-              [ PTokenStyledText
-                  StyledText
-                    { body = "link target with spaces ",
-                      style = styleMaskFrom []
-                    },
+              [ ptext "link target with spaces " [],
                 PTokenLink
                   Link
-                    { name =
-                        [ StyledText
-                            { body = "foo bar baz",
-                              style = styleMaskFrom []
-                            }
-                        ],
+                    { name = [stext "foo bar baz" []],
                       target =
                         LinkTargetOid
                           LinkOid
@@ -1386,19 +1106,10 @@ parseSpec = do
             ],
           CParagraph
             $ Prose
-              [ PTokenStyledText
-                  StyledText
-                    { body = "oid with spaces ",
-                      style = styleMaskFrom []
-                    },
+              [ ptext "oid with spaces " [],
                 PTokenLink
                   Link
-                    { name =
-                        [ StyledText
-                            { body = "a b c",
-                              style = styleMaskFrom []
-                            }
-                        ],
+                    { name = [stext "a b c" []],
                       target =
                         LinkTargetOid
                           LinkOid
@@ -1419,11 +1130,7 @@ parseSpec = do
     ( nilOrgDoc
         [ CParagraph
             $ Prose
-              [ PTokenStyledText
-                  StyledText
-                    { body = "Hello ",
-                      style = styleMaskFrom []
-                    },
+              [ ptext "Hello " [],
                 PTokenLink
                   Link
                     { target =
@@ -1432,12 +1139,7 @@ parseSpec = do
                             { oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff,
                               name = "target name with newline and space is still treated as space"
                             },
-                      name =
-                        [ StyledText
-                            { body = "foo",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "foo" []]
                     }
               ]
         ]
@@ -1616,12 +1318,7 @@ parseSpec = do
                                 { oid = nilOid,
                                   name = "foo"
                                 },
-                          name =
-                            [ StyledText
-                                { body = "foo",
-                                  style = styleMaskFrom []
-                                }
-                            ]
+                          name = [stext "foo" []]
                         },
                     BTokenString "\n\n<<quux\n>>\necho ",
                     BTokenLink
@@ -1632,12 +1329,7 @@ parseSpec = do
                                 { oid = nilOid,
                                   name = "bar"
                                 },
-                          name =
-                            [ StyledText
-                                { body = "bar",
-                                  style = styleMaskFrom []
-                                }
-                            ]
+                          name = [stext "bar" []]
                         },
                     BTokenString " x y z"
                   ]
@@ -1670,12 +1362,7 @@ parseSpec = do
                                 { oid = nilOid,
                                   name = "foo"
                                 },
-                          name =
-                            [ StyledText
-                                { body = "foo",
-                                  style = styleMaskFrom []
-                                }
-                            ]
+                          name = [stext "foo" []]
                         },
                     BTokenString ") and \"",
                     BTokenLink
@@ -1686,12 +1373,7 @@ parseSpec = do
                                 { oid = nilOid,
                                   name = "bar"
                                 },
-                          name =
-                            [ StyledText
-                                { body = "bar",
-                                  style = styleMaskFrom []
-                                }
-                            ]
+                          name = [stext "bar" []]
                         },
                     BTokenString "\" and <",
                     BTokenLink
@@ -1702,12 +1384,7 @@ parseSpec = do
                                 { oid = nilOid,
                                   name = "ok"
                                 },
-                          name =
-                            [ StyledText
-                                { body = "ok",
-                                  style = styleMaskFrom []
-                                }
-                            ]
+                          name = [stext "ok" []]
                         },
                     BTokenString ">"
                   ]
@@ -2126,14 +1803,7 @@ parseSpec = do
             [ LOrderedStart,
               LItemStart
             ],
-          CParagraph
-            $ Prose
-              [ PTokenStyledText
-                  StyledText
-                    { body = "foo",
-                      style = styleMaskFrom []
-                    }
-              ],
+          CParagraph $ Prose [ptext "foo" []],
           CMathFragment
             MathFragment
               { parentOid = nilOid,
@@ -2195,18 +1865,12 @@ parseSpec = do
                     ],
                 caption =
                   Prose
-                    [ PTokenStyledText
-                        StyledText {body = "hello", style = styleMaskFrom [Verbatim]}
+                    [ ptext "hello" [Verbatim]
                     ],
                 link =
                   Link
                     { target = LinkTargetFilePath "image/hello.png",
-                      name =
-                        [ StyledText
-                            { body = "image/hello.png",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "image/hello.png" []]
                     }
               },
           CBlock
@@ -2232,12 +1896,7 @@ parseSpec = do
                 link =
                   Link
                     { target = LinkTargetFilePath "image/world.png",
-                      name =
-                        [ StyledText
-                            { body = "image/world.png",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "image/world.png" []]
                     }
               },
           CListItem
@@ -2249,12 +1908,7 @@ parseSpec = do
               [ PTokenLink
                   Link
                     { target = LinkTargetFilePath "not-figure",
-                      name =
-                        [ StyledText
-                            { body = "not-figure",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "not-figure" []]
                     }
               ],
           CListItem
@@ -2266,12 +1920,7 @@ parseSpec = do
               [ PTokenLink
                   Link
                     { target = LinkTargetFilePath "not-a-figure-2",
-                      name =
-                        [ StyledText
-                            { body = "not-a-figure-2",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "not-a-figure-2" []]
                     }
               ],
           CParagraph
@@ -2284,12 +1933,7 @@ parseSpec = do
                             { oid = nilOid,
                               name = "not a figure"
                             },
-                      name =
-                        [ StyledText
-                            { body = "not a figure",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "not a figure" []]
                     }
               ],
           CFigure
@@ -2303,12 +1947,7 @@ parseSpec = do
                 link =
                   Link
                     { target = LinkTargetFilePath "foo.png",
-                      name =
-                        [ StyledText
-                            { body = "foo.png",
-                              style = styleMaskFrom []
-                            }
-                        ]
+                      name = [stext "foo.png" []]
                     }
               }
         ]
@@ -2337,70 +1976,41 @@ parseSpec = do
                     ],
                 caption =
                   Prose
-                    [ PTokenStyledText
-                        StyledText {body = "Bold", style = styleMaskFrom [Bold]},
-                      PTokenStyledText
-                        StyledText {body = ".", style = styleMaskFrom []},
-                      PTokenStyledText
-                        StyledText {body = " ", style = styleMaskFrom []},
+                    [ ptext "Bold" [Bold],
+                      ptext "." [],
+                      ptext " " [],
                       PTokenLink
                         Link
                           { name =
-                              [ StyledText {body = "A", style = styleMaskFrom []},
-                                StyledText {body = " ", style = styleMaskFrom []},
-                                StyledText {body = "self-link", style = styleMaskFrom []}
+                              [ stext "A" [],
+                                stext " " [],
+                                stext "self-link" []
                               ],
                             target =
                               LinkTargetOid
                                 LinkOid {oid = nilOid, name = "tbl:famous-equations"}
                           },
-                      PTokenStyledText
-                        StyledText {body = ".", style = styleMaskFrom []},
-                      PTokenStyledText
-                        StyledText {body = " ", style = styleMaskFrom []},
+                      ptext "." [],
+                      ptext " " [],
                       PTokenMathFragment
                         MathFragment {parentOid = nilOid, meta = fromList [], body = "E = mc^2"}
                     ],
                 grid =
                   fromList
                     [ ( (1, 1),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Name",
-                                  style = styleMaskFrom []
-                                }
-                          ]
+                        Prose [ptext "Name" []]
                       ),
                       ( (1, 2),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Equation",
-                                  style = styleMaskFrom []
-                                }
-                          ]
+                        Prose [ptext "Equation" []]
                       ),
                       ( (1, 3),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Link",
-                                  style = styleMaskFrom []
-                                }
-                          ]
+                        Prose [ptext "Link" []]
                       ),
                       ( (2, 1),
                         L.tableHorizontalLine
                       ),
                       ( (3, 1),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Pythagoras | Foo",
-                                  style = styleMaskFrom []
-                                }
-                          ]
+                        Prose [ptext "Pythagoras | Foo" []]
                       ),
                       ( (3, 2),
                         Prose
@@ -2431,27 +2041,14 @@ parseSpec = do
                                           N.uriQuery = "",
                                           N.uriFragment = ""
                                         },
-                                  name =
-                                    [ StyledText
-                                        { body = "Wiki",
-                                          style = styleMaskFrom []
-                                        }
-                                    ]
+                                  name = [stext "Wiki" []]
                                 }
                           ]
                       ),
                       ( (4, 1),
                         Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Albert ",
-                                  style = styleMaskFrom []
-                                },
-                            PTokenStyledText
-                              StyledText
-                                { body = "Einstein",
-                                  style = styleMaskFrom [Bold]
-                                }
+                          [ ptext "Albert " [],
+                            ptext "Einstein" [Bold]
                           ]
                       ),
                       ( (4, 2),
@@ -2483,53 +2080,16 @@ parseSpec = do
                                           N.uriQuery = "",
                                           N.uriFragment = ""
                                         },
-                                  name =
-                                    [ StyledText
-                                        { body = "Wiki",
-                                          style = styleMaskFrom []
-                                        }
-                                    ]
+                                  name = [stext "Wiki" []]
                                 }
                           ]
                       ),
-                      ( (5, 1),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Unknown",
-                                  style = styleMaskFrom []
-                                }
-                          ]
-                      ),
+                      ((5, 1), Prose [ptext "Unknown" []]),
                       ((5, 2), Prose []),
                       ((5, 3), Prose []),
-                      ( (6, 1),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "_",
-                                  style = styleMaskFrom []
-                                }
-                          ]
-                      ),
-                      ( (6, 2),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "*",
-                                  style = styleMaskFrom []
-                                }
-                          ]
-                      ),
-                      ( (6, 3),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "/",
-                                  style = styleMaskFrom []
-                                }
-                          ]
-                      )
+                      ((6, 1), Prose [ptext "_" []]),
+                      ((6, 2), Prose [ptext "*" []]),
+                      ((6, 3), Prose [ptext "/" []])
                     ]
               }
         ]
@@ -2549,14 +2109,7 @@ parseSpec = do
             [ LOrderedStart,
               LItemStart
             ],
-          CParagraph
-            $ Prose
-              [ PTokenStyledText
-                  StyledText
-                    { body = "foo",
-                      style = styleMaskFrom []
-                    }
-              ],
+          CParagraph $ Prose [ptext "foo" []],
           CTable
             Table
               { parentOid = nilOid,
@@ -2570,43 +2123,19 @@ parseSpec = do
                 grid =
                   fromList
                     [ ( (1, 1),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Name",
-                                  style = styleMaskFrom []
-                                }
-                          ]
+                        Prose [ptext "Name" []]
                       ),
                       ( (1, 2),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Equation",
-                                  style = styleMaskFrom []
-                                }
-                          ]
+                        Prose [ptext "Equation" []]
                       ),
                       ( (1, 3),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Link",
-                                  style = styleMaskFrom []
-                                }
-                          ]
+                        Prose [ptext "Link" []]
                       ),
                       ( (2, 1),
                         L.tableHorizontalLine
                       ),
                       ( (3, 1),
-                        Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Pythagoras | Foo",
-                                  style = styleMaskFrom []
-                                }
-                          ]
+                        Prose [ptext "Pythagoras | Foo" []]
                       ),
                       ( (3, 2),
                         Prose
@@ -2637,27 +2166,14 @@ parseSpec = do
                                           N.uriQuery = "",
                                           N.uriFragment = ""
                                         },
-                                  name =
-                                    [ StyledText
-                                        { body = "Wiki",
-                                          style = styleMaskFrom []
-                                        }
-                                    ]
+                                  name = [stext "Wiki" []]
                                 }
                           ]
                       ),
                       ( (4, 1),
                         Prose
-                          [ PTokenStyledText
-                              StyledText
-                                { body = "Albert ",
-                                  style = styleMaskFrom []
-                                },
-                            PTokenStyledText
-                              StyledText
-                                { body = "Einstein",
-                                  style = styleMaskFrom [Bold]
-                                }
+                          [ ptext "Albert " [],
+                            ptext "Einstein" [Bold]
                           ]
                       ),
                       ( (4, 2),
@@ -2689,12 +2205,7 @@ parseSpec = do
                                           N.uriQuery = "",
                                           N.uriFragment = ""
                                         },
-                                  name =
-                                    [ StyledText
-                                        { body = "Wiki",
-                                          style = styleMaskFrom []
-                                        }
-                                    ]
+                                  name = [stext "Wiki" []]
                                 }
                           ]
                       )
@@ -2731,35 +2242,18 @@ parseSpec = do
         cells =
           [ CParagraph
               $ Prose
-                [ PTokenStyledText
-                    StyledText
-                      { body = "Hello",
-                        style = styleMaskFrom []
-                      },
+                [ ptext "Hello" [],
                   PTokenLink
                     Link
                       { target = LinkTargetFootnote "hello",
-                        name =
-                          [ StyledText
-                              { body = "1",
-                                style = styleMaskFrom []
-                              }
-                          ]
+                        name = [stext "1" []]
                       },
-                  PTokenStyledText
-                    StyledText
-                      { body = " world.",
-                        style = styleMaskFrom []
-                      }
+                  ptext " world." []
                 ],
             CFootnote
               Footnote
                 { name = "hello",
-                  body =
-                    Prose
-                      [ PTokenStyledText
-                          StyledText {body = "Foo.", style = styleMaskFrom []}
-                      ]
+                  body = Prose [ptext "Foo." []]
                 }
           ],
         footnoteNumbers =
@@ -2780,13 +2274,7 @@ parseSpec = do
         footnoteDefinitions =
           fromList
             [ ( "hello",
-                Prose
-                  [ PTokenStyledText
-                      StyledText
-                        { body = "Foo.",
-                          style = styleMaskFrom []
-                        }
-                  ]
+                Prose [ptext "Foo." []]
               )
             ],
         prevCellIsFootnote = True
@@ -2799,54 +2287,28 @@ parseSpec = do
         cells =
           [ CParagraph
               $ Prose
-                [ PTokenStyledText
-                    StyledText
-                      { body = "Hello",
-                        style = styleMaskFrom []
-                      },
+                [ ptext "Hello" [],
                   PTokenLink
                     Link
                       { target = LinkTargetFootnote "a",
-                        name =
-                          [ StyledText
-                              { body = "1",
-                                style = styleMaskFrom []
-                              }
-                          ]
+                        name = [stext "1" []]
                       },
-                  PTokenStyledText
-                    StyledText
-                      { body = " world.",
-                        style = styleMaskFrom []
-                      },
+                  ptext " world." [],
                   PTokenLink
                     Link
                       { target = LinkTargetFootnote "b",
-                        name =
-                          [ StyledText
-                              { body = "2",
-                                style = styleMaskFrom []
-                              }
-                          ]
+                        name = [stext "2" []]
                       }
                 ],
             CFootnote
               Footnote
                 { name = "b",
-                  body =
-                    Prose
-                      [ PTokenStyledText
-                          StyledText {body = "Definition of b.", style = styleMaskFrom []}
-                      ]
+                  body = Prose [ptext "Definition of b." []]
                 },
             CFootnote
               Footnote
                 { name = "a",
-                  body =
-                    Prose
-                      [ PTokenStyledText
-                          StyledText {body = "Definition of a.", style = styleMaskFrom []}
-                      ]
+                  body = Prose [ptext "Definition of a." []]
                 }
           ],
         footnoteNumbers =
@@ -2868,24 +2330,8 @@ parseSpec = do
             ],
         footnoteDefinitions =
           fromList
-            [ ( "a",
-                Prose
-                  [ PTokenStyledText
-                      StyledText
-                        { body = "Definition of a.",
-                          style = styleMaskFrom []
-                        }
-                  ]
-              ),
-              ( "b",
-                Prose
-                  [ PTokenStyledText
-                      StyledText
-                        { body = "Definition of b.",
-                          style = styleMaskFrom []
-                        }
-                  ]
-              )
+            [ ("a", Prose [ptext "Definition of a." []]),
+              ("b", Prose [ptext "Definition of b." []])
             ],
         prevCellIsFootnote = True
       }
@@ -3000,15 +2446,15 @@ parseSpec = do
           [ CParagraph
               $ Prose
                 [ PTokenCitation 0,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 1,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 2,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 3,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 4,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 5
                 ]
           ],
@@ -3116,15 +2562,15 @@ parseSpec = do
           [ CParagraph
               $ Prose
                 [ PTokenCitation 0,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 1,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 2,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 3,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 4,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 5
                 ]
           ],
@@ -3139,22 +2585,8 @@ parseSpec = do
                   [ Cite
                       { id = "a1",
                         locator = Just ("page", "15"),
-                        prefix =
-                          Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "prefix",
-                                    style = styleMaskFrom []
-                                  }
-                            ],
-                        suffix =
-                          Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "suffix",
-                                    style = styleMaskFrom []
-                                  }
-                            ]
+                        prefix = Prose [ptext "prefix" []],
+                        suffix = Prose [ptext "suffix" []]
                       }
                   ],
                 prefix = Prose [],
@@ -3173,22 +2605,8 @@ parseSpec = do
                     Cite
                       { id = "b2",
                         locator = Just ("chapter", "4"),
-                        prefix =
-                          Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "a really long prefix, maybe?",
-                                    style = styleMaskFrom []
-                                  }
-                            ],
-                        suffix =
-                          Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "more suffix",
-                                    style = styleMaskFrom []
-                                  }
-                            ]
+                        prefix = Prose [ptext "a really long prefix, maybe?" []],
+                        suffix = Prose [ptext "more suffix" []]
                       }
                   ],
                 prefix = Prose [],
@@ -3204,11 +2622,7 @@ parseSpec = do
                         prefix = Prose [],
                         suffix =
                           Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "suffix with balanced [[brackets] and @sign]",
-                                    style = styleMaskFrom []
-                                  }
+                            [ ptext "suffix with balanced [[brackets] and @sign]" []
                             ]
                       }
                   ],
@@ -3228,14 +2642,7 @@ parseSpec = do
                     Cite
                       { id = "d2",
                         locator = Nothing,
-                        prefix =
-                          Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "prefix",
-                                    style = styleMaskFrom []
-                                  }
-                            ],
+                        prefix = Prose [ptext "prefix" []],
                         suffix = Prose []
                       },
                     Cite
@@ -3257,16 +2664,8 @@ parseSpec = do
                         locator = Just ("section", "1.22.3"),
                         prefix =
                           Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "@ ",
-                                    style = styleMaskFrom []
-                                  },
-                              PTokenStyledText
-                                StyledText
-                                  { body = "see also",
-                                    style = styleMaskFrom [Italic]
-                                  }
+                            [ ptext "@ " [],
+                              ptext "see also" [Italic]
                             ],
                         suffix = Prose []
                       }
@@ -3289,31 +2688,11 @@ parseSpec = do
                         locator = Just ("volume", "3-4"),
                         prefix =
                           Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "foo",
-                                    style = styleMaskFrom [Bold]
-                                  },
-                              PTokenStyledText
-                                StyledText
-                                  { body = " ",
-                                    style = styleMaskFrom []
-                                  },
-                              PTokenStyledText
-                                StyledText
-                                  { body = "@fake1",
-                                    style = styleMaskFrom [Verbatim]
-                                  },
-                              PTokenStyledText
-                                StyledText
-                                  { body = " ",
-                                    style = styleMaskFrom []
-                                  },
-                              PTokenStyledText
-                                StyledText
-                                  { body = "@fake2",
-                                    style = styleMaskFrom [Code]
-                                  }
+                            [ ptext "foo" [Bold],
+                              ptext " " [],
+                              ptext "@fake1" [Verbatim],
+                              ptext " " [],
+                              ptext "@fake2" [Code]
                             ],
                         suffix = Prose []
                       }
@@ -3337,11 +2716,11 @@ parseSpec = do
           [ CParagraph
               $ Prose
                 [ PTokenCitation 0,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 1,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 2,
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
+                  ptext " " [],
                   PTokenCitation 3
                 ]
           ],
@@ -3362,29 +2741,13 @@ parseSpec = do
                   ],
                 prefix =
                   Prose
-                    [ PTokenStyledText
-                        StyledText
-                          { body = "global",
-                            style = styleMaskFrom [Bold]
-                          },
-                      PTokenStyledText
-                        StyledText
-                          { body = " prefix",
-                            style = styleMaskFrom []
-                          }
+                    [ ptext "global" [Bold],
+                      ptext " prefix" []
                     ],
                 suffix =
                   Prose
-                    [ PTokenStyledText
-                        StyledText
-                          { body = "global ",
-                            style = styleMaskFrom []
-                          },
-                      PTokenStyledText
-                        StyledText
-                          { body = "suffix",
-                            style = styleMaskFrom [Verbatim]
-                          }
+                    [ ptext "global " [],
+                      ptext "suffix" [Verbatim]
                     ]
               },
             Citation
@@ -3404,26 +2767,11 @@ parseSpec = do
                         suffix = Prose []
                       }
                   ],
-                prefix =
-                  Prose
-                    [ PTokenStyledText
-                        StyledText
-                          { body = "see",
-                            style = styleMaskFrom []
-                          }
-                    ],
+                prefix = Prose [ptext "see" []],
                 suffix =
                   Prose
-                    [ PTokenStyledText
-                        StyledText
-                          { body = "by Smith ",
-                            style = styleMaskFrom []
-                          },
-                      PTokenStyledText
-                        StyledText
-                          { body = "et al.",
-                            style = styleMaskFrom [Italic]
-                          }
+                    [ ptext "by Smith " [],
+                      ptext "et al." [Italic]
                     ]
               },
             Citation
@@ -3443,22 +2791,8 @@ parseSpec = do
                         suffix = Prose []
                       }
                   ],
-                prefix =
-                  Prose
-                    [ PTokenStyledText
-                        StyledText
-                          { body = "see",
-                            style = styleMaskFrom []
-                          }
-                    ],
-                suffix =
-                  Prose
-                    [ PTokenStyledText
-                        StyledText
-                          { body = "by foo",
-                            style = styleMaskFrom []
-                          }
-                    ]
+                prefix = Prose [ptext "see" []],
+                suffix = Prose [ptext "by foo" []]
               },
             Citation
               { styleVariation = (Just "a", Just "f"),
@@ -3467,45 +2801,17 @@ parseSpec = do
                   [ Cite
                       { id = "@atkey",
                         locator = Nothing,
-                        prefix =
-                          Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "the very important",
-                                    style = styleMaskFrom []
-                                  }
-                            ],
-                        suffix =
-                          Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "@ once",
-                                    style = styleMaskFrom []
-                                  }
-                            ]
+                        prefix = Prose [ptext "the very important" []],
+                        suffix = Prose [ptext "@ once" []]
                       },
                     Cite
                       { id = "baz",
                         locator = Just ("volume", "3"),
-                        prefix =
-                          Prose
-                            [ PTokenStyledText
-                                StyledText
-                                  { body = "the crucial",
-                                    style = styleMaskFrom []
-                                  }
-                            ],
+                        prefix = Prose [ptext "the crucial" []],
                         suffix = Prose []
                       }
                   ],
-                prefix =
-                  Prose
-                    [ PTokenStyledText
-                        StyledText
-                          { body = "c.f.",
-                            style = styleMaskFrom []
-                          }
-                    ],
+                prefix = Prose [ptext "c.f." []],
                 suffix = Prose []
               }
           ],
@@ -3591,17 +2897,9 @@ parseSpec = do
         cells =
           [ CParagraph
               $ Prose
-                [ PTokenStyledText
-                    StyledText
-                      { body = "[cite:@foo]",
-                        style = styleMaskFrom [Code]
-                      },
-                  PTokenStyledText StyledText {body = " ", style = styleMaskFrom []},
-                  PTokenStyledText
-                    StyledText
-                      { body = "[cite:@bar]",
-                        style = styleMaskFrom [Verbatim]
-                      }
+                [ ptext "[cite:@foo]" [Code],
+                  ptext " " [],
+                  ptext "[cite:@bar]" [Verbatim]
                 ]
           ],
         footnoteNumbers = M.empty,
@@ -3624,14 +2922,7 @@ parseSpec = do
               Heading
                 { level = 1,
                   section = [1],
-                  body =
-                    Prose
-                      [ PTokenStyledText
-                          StyledText
-                            { body = "heading [cite:@foo]",
-                              style = styleMaskFrom []
-                            }
-                      ],
+                  body = Prose [ptext "heading [cite:@foo]" []],
                   meta = fromList []
                 }
           ],
@@ -3664,85 +2955,31 @@ parseSpec = do
     checkTextToProseRoundTrip
       "can handle StyledText"
       [ ( "no style",
-          Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "no style",
-                    style = styleMaskFrom []
-                  }
-            ]
+          Prose [ptext "no style" []]
         ),
         ( "*bold*",
-          Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "bold",
-                    style = styleMaskFrom [Bold]
-                  }
-            ]
+          Prose [ptext "bold" [Bold]]
         ),
         ( "*bo\\*ld (escaped)*",
-          Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "bo*ld (escaped)",
-                    style = styleMaskFrom [Bold]
-                  }
-            ]
+          Prose [ptext "bo*ld (escaped)" [Bold]]
         ),
         ( "/italic/",
-          Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "italic",
-                    style = styleMaskFrom [Italic]
-                  }
-            ]
+          Prose [ptext "italic" [Italic]]
         ),
         ( "/it\\/alic (escaped)/",
-          Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "it/alic (escaped)",
-                    style = styleMaskFrom [Italic]
-                  }
-            ]
+          Prose [ptext "it/alic (escaped)" [Italic]]
         ),
         ( "_underline_",
-          Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "underline",
-                    style = styleMaskFrom [Underline]
-                  }
-            ]
+          Prose [ptext "underline" [Underline]]
         ),
         ( "_under\\_line (escaped)_",
-          Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "under_line (escaped)",
-                    style = styleMaskFrom [Underline]
-                  }
-            ]
+          Prose [ptext "under_line (escaped)" [Underline]]
         ),
         ( "=*/_~verbatim=",
-          Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "*/_~verbatim",
-                    style = styleMaskFrom [Verbatim]
-                  }
-            ]
+          Prose [ptext "*/_~verbatim" [Verbatim]]
         ),
         ( "~*/_=code~",
-          Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = "*/_=code",
-                    style = styleMaskFrom [Code]
-                  }
-            ]
+          Prose [ptext "*/_=code" [Code]]
         )
       ]
     checkTextToProseRoundTrip
@@ -3751,12 +2988,7 @@ parseSpec = do
           Prose
             [ PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
-                            style = styleMaskFrom []
-                          }
-                      ],
+                  { name = [stext "id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1" []],
                     target =
                       LinkTargetOid
                         LinkOid
@@ -3770,12 +3002,7 @@ parseSpec = do
           Prose
             [ PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "foo",
-                            style = styleMaskFrom [Bold]
-                          }
-                      ],
+                  { name = [stext "foo" [Bold]],
                     target =
                       LinkTargetOid
                         LinkOid
@@ -3789,12 +3016,7 @@ parseSpec = do
           Prose
             [ PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "bar",
-                            style = styleMaskFrom [Italic]
-                          }
-                      ],
+                  { name = [stext "bar" [Italic]],
                     target =
                       LinkTargetOid
                         LinkOid
@@ -3811,12 +3033,7 @@ parseSpec = do
           Prose
             [ PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "1",
-                            style = styleMaskFrom []
-                          }
-                      ],
+                  { name = [stext "1" []],
                     target = LinkTargetFootnote "abc"
                   }
             ]
@@ -3825,32 +3042,17 @@ parseSpec = do
           Prose
             [ PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "1",
-                            style = styleMaskFrom []
-                          }
-                      ],
+                  { name = [stext "1" []],
                     target = LinkTargetFootnote "abc"
                   },
               PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "2",
-                            style = styleMaskFrom []
-                          }
-                      ],
+                  { name = [stext "2" []],
                     target = LinkTargetFootnote "xyz"
                   },
               PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "1",
-                            style = styleMaskFrom []
-                          }
-                      ],
+                  { name = [stext "1" []],
                     target = LinkTargetFootnote "abc"
                   }
             ]
@@ -3862,12 +3064,7 @@ parseSpec = do
           Prose
             [ PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "bar",
-                            style = styleMaskFrom []
-                          }
-                      ],
+                  { name = [stext "bar" []],
                     target =
                       LinkTargetURI
                         N.URI
@@ -3890,12 +3087,7 @@ parseSpec = do
           Prose
             [ PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "https://foo2.org",
-                            style = styleMaskFrom []
-                          }
-                      ],
+                  { name = [stext "https://foo2.org" []],
                     target =
                       LinkTargetURI
                         N.URI
@@ -3921,12 +3113,7 @@ parseSpec = do
           Prose
             [ PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "foo/bar",
-                            style = styleMaskFrom []
-                          }
-                      ],
+                  { name = [stext "foo/bar" []],
                     target = LinkTargetFilePath "foo/bar"
                   }
             ]
@@ -3935,12 +3122,7 @@ parseSpec = do
           Prose
             [ PTokenLink
                 Link
-                  { name =
-                      [ StyledText
-                          { body = "baz",
-                            style = styleMaskFrom []
-                          }
-                      ],
+                  { name = [stext "baz" []],
                     target = LinkTargetFilePath "foo/bar"
                   }
             ]
