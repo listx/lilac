@@ -40,6 +40,7 @@ import Clay
     fontFamily,
     fontSize,
     fontStyle,
+    fontVariant,
     fontWeight,
     h1,
     h2,
@@ -75,6 +76,7 @@ import Clay
     scroll,
     serif,
     sideRight,
+    smallCaps,
     solid,
     span,
     sup,
@@ -88,6 +90,9 @@ import Clay
     top,
     tr,
     underline,
+    vAlignSub,
+    vAlignSuper,
+    verticalAlign,
     width,
     (#),
     (&),
@@ -336,6 +341,12 @@ defaultCss = do
     float floatLeft
   ".csl-right-inline" & do
     margin 0 0 0 (em 2)
+  ".superscript" & do
+    verticalAlign vAlignSuper
+  ".subscript" & do
+    verticalAlign vAlignSub
+  ".smallcaps" & do
+    fontVariant smallCaps
   sup ? do
     ".footnote-link" & do
       a ? do
