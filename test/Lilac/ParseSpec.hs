@@ -1,25 +1,6 @@
 module Lilac.ParseSpec (spec) where
 
-import Citeproc
-  ( CiteprocOutput,
-    addDisplay,
-    addFontStyle,
-    addFontVariant,
-    addFontWeight,
-    addHyperlink,
-    addQuotes,
-    addTextCase,
-    addTextDecoration,
-    addVerticalAlign,
-    dropTextWhile,
-    dropTextWhileEnd,
-    fromText,
-    inNote,
-    localizeQuotes,
-    mapText,
-    movePunctuationInsideQuotes,
-    toText,
-  )
+import Citeproc qualified as CP
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -260,8 +241,8 @@ checkTextToProseRoundTrip :: String -> [(Text, Prose)] -> Spec
 checkTextToProseRoundTrip msg testCases = do
   it msg $ do
     forM_ testCases $ \(text, prose) -> do
-      fromText text `shouldBe` prose
-      toText prose `shouldBe` text
+      CP.fromText text `shouldBe` prose
+      CP.toText prose `shouldBe` text
 
 parseSpec :: Spec
 parseSpec = do
@@ -3964,20 +3945,20 @@ parseSpec = do
 
   describe "Drop text chars from Prose" $ do
     it "can handle plain text from the front" $ do
-      dropTextWhile (== 'a') (fromText "aa b *cc*" :: Prose)
-        `shouldBe` (fromText " b *cc*")
+      CP.dropTextWhile (== 'a') (CP.fromText "aa b *cc*" :: Prose)
+        `shouldBe` (CP.fromText " b *cc*")
     it "can handle plain text from the back" $ do
-      dropTextWhileEnd (== 'c') (fromText "aa b *cc*" :: Prose)
-        `shouldBe` (fromText "aa b ")
+      CP.dropTextWhileEnd (== 'c') (CP.fromText "aa b *cc*" :: Prose)
+        `shouldBe` (CP.fromText "aa b ")
     it "can handle styled (italic) text from the front" $ do
-      dropTextWhile (== 'a') (fromText "/aa/ b *cc*" :: Prose)
-        `shouldBe` (fromText " b *cc*")
+      CP.dropTextWhile (== 'a') (CP.fromText "/aa/ b *cc*" :: Prose)
+        `shouldBe` (CP.fromText " b *cc*")
     it "can handle styled (italic) text from the back" $ do
-      dropTextWhileEnd (== 'c') (fromText "/aa/ b *cc*" :: Prose)
-        `shouldBe` (fromText "/aa/ b ")
+      CP.dropTextWhileEnd (== 'c') (CP.fromText "/aa/ b *cc*" :: Prose)
+        `shouldBe` (CP.fromText "/aa/ b ")
     it "skips over non-text elements from the front" $ do
-      dropTextWhile (== 'a') (fromText "[[foo]]/aa/ b *cc*" :: Prose)
-        `shouldBe` (fromText "[[foo]] b *cc*")
+      CP.dropTextWhile (== 'a') (CP.fromText "[[foo]]/aa/ b *cc*" :: Prose)
+        `shouldBe` (CP.fromText "[[foo]] b *cc*")
     it "skips over non-text elements from the back" $ do
-      dropTextWhileEnd (== 'c') (fromText "/aa/ b *cc*[[foo]]" :: Prose)
-        `shouldBe` (fromText "/aa/ b [[foo]]")
+      CP.dropTextWhileEnd (== 'c') (CP.fromText "/aa/ b *cc*[[foo]]" :: Prose)
+        `shouldBe` (CP.fromText "/aa/ b [[foo]]")

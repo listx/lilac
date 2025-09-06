@@ -44,8 +44,8 @@ module Lilac.Types
   )
 where
 
+import Citeproc qualified as CP
 import Citeproc.CslJson (CslJson)
-import Citeproc.Types qualified as CP
 import Data.Aeson
   ( FromJSON,
     FromJSONKey,

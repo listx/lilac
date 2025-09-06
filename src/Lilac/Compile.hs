@@ -9,11 +9,8 @@ module Lilac.Compile
   )
 where
 
+import Citeproc qualified as CP
 import Citeproc.CslJson (CslJson)
-import Citeproc.Style
-  ( parseStyle,
-  )
-import Citeproc.Types qualified as CP
 import Data.Aeson (eitherDecodeStrictText)
 import Data.Graph qualified as G
 import Data.Map.Strict qualified as M
@@ -344,7 +341,7 @@ getCitationStyle filePath = do
 
 parseCitationStyle :: Text -> Either String (CP.Style (CslJson Text))
 parseCitationStyle input = do
-  result <- parseStyle (\_ -> pure mempty) input
+  result <- CP.parseStyle (\_ -> pure mempty) input
   case result of
     Left citeprocError -> Left $ show citeprocError
     Right style -> Right style
