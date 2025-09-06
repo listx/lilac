@@ -2586,13 +2586,8 @@ expectCiteprocResult path expected = do
   result <- runIO $ getCiteprocResultFromPath path
   describe path $ do
     case result of
-      Right got -> do
-        it "citations" $ do
-          got.resultCitations `shouldBe` expected.resultCitations
-        it "bibliography" $ do
-          got.resultBibliography `shouldBe` expected.resultBibliography
-        it "warnings" $ do
-          got.resultWarnings `shouldBe` expected.resultWarnings
+      Right got -> it "result matches expectation" $ do
+        got `shouldBe` expected
       Left errMsg -> it "programmer error" $ expectationFailure errMsg
 #+end_src
 
