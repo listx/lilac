@@ -4168,7 +4168,7 @@ rawLinkParser = do
     remainderChar :: OrgParser Char
     remainderChar = do
       c <- MP.satisfy N.isAllowedInURI
-      when (isPunctuation c) $ do
+      when (isPunctuation c && c /= '/') $ do
         MP.notFollowedBy (char ' ')
         MP.notFollowedBy (char '\n')
       pure c
@@ -4179,8 +4179,12 @@ followed by some punctuation, like https://funloop.org, then we want the
 punctuation plus the whitespace immediately after it to be excluded from the
 link. The punctuation may or may not be part of the allowed characters in
 =N.isAllowedInURI=. We fix this problem by running some additional checks if we
-ever encounter punctuation, with [[f:isPunctuation]]. The [[f:isAlphaNumChar]] helper is
-taken from [[https://hackage.haskell.org/package/network-uri][network-uri]].
+ever encounter punctuation, with [[f:isPunctuation]], where the [[f:isAlphaNumChar]]
+helper is taken from [[https://hackage.haskell.org/package/network-uri][network-uri]].
+
+However, the above rule about excluding punctuation doesn't apply for the ~/~
+(slash) character because sometimes a URL may end with a slash. In such cases,
+we would still want to include the slash it as part of the URL.
 
 The [[f:isPunctuation]] parser (and its parts) are generic and useful enough that we
 expose them as top-level functions.
@@ -4215,6 +4219,7 @@ isDigitChar c = c >= '0' && c <= '9'
 See https://foo.org, or https://bar.net.
 Try http://localhost:3000?
 Go to ftp://10.0.0.1!
+https://a.com/path/to/something/
 #+end_src
 
 #+name: t:0006-links-raw
@@ -4304,7 +4309,26 @@ shouldParseWith
                         },
                   name = [stext "ftp://10.0.0.1" []]
                 },
-            ptext "!" []
+            ptext "! " [],
+            PTokenLink
+              Link
+                { target =
+                    LinkTargetURI
+                      N.URI
+                        { N.uriScheme = "https:",
+                          N.uriAuthority =
+                            Just
+                              N.URIAuth
+                                { N.uriUserInfo = "",
+                                  N.uriRegName = "a.com",
+                                  N.uriPort = ""
+                                },
+                          N.uriPath = "/path/to/something/",
+                          N.uriQuery = "",
+                          N.uriFragment = ""
+                        },
+                  name = [stext "https://a.com/path/to/something/" []]
+                }
           ]
     ]
 #+end_src

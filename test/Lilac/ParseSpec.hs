@@ -843,7 +843,26 @@ parseSpec = do
                           },
                     name = [stext "ftp://10.0.0.1" []]
                   },
-              ptext "!" []
+              ptext "! " [],
+              PTokenLink
+                Link
+                  { target =
+                      LinkTargetURI
+                        N.URI
+                          { N.uriScheme = "https:",
+                            N.uriAuthority =
+                              Just
+                                N.URIAuth
+                                  { N.uriUserInfo = "",
+                                    N.uriRegName = "a.com",
+                                    N.uriPort = ""
+                                  },
+                            N.uriPath = "/path/to/something/",
+                            N.uriQuery = "",
+                            N.uriFragment = ""
+                          },
+                    name = [stext "https://a.com/path/to/something/" []]
+                  }
             ]
       ]
 
