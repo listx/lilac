@@ -239,7 +239,8 @@ data ListMarker
 
 type MathFragment :: Type
 data MathFragment = MathFragment
-  { meta :: Map Text Text,
+  { parentOid :: OID,
+    meta :: Map Text Text,
     body :: Text
   }
   deriving stock (Eq, Generic, Ord, Show)

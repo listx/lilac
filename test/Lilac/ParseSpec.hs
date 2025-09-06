@@ -41,7 +41,7 @@ import Lilac.Types
         LUnorderedEnd,
         LUnorderedStart
       ),
-    MathFragment (MathFragment, body, meta),
+    MathFragment (MathFragment, body, meta, parentOid),
     OrgDoc
       ( OrgDoc,
         bibPaths,
@@ -2063,7 +2063,8 @@ parseSpec = do
     ( nilOrgDoc
         [ CMathFragment
             MathFragment
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("__equation_number", "1")
                     ],
@@ -2071,7 +2072,8 @@ parseSpec = do
               },
           CMathFragment
             MathFragment
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("__equation_number", "2")
                     ],
@@ -2079,7 +2081,8 @@ parseSpec = do
               },
           CMathFragment
             MathFragment
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("__equation_anon_number", "1")
                     ],
@@ -2087,7 +2090,8 @@ parseSpec = do
               },
           CMathFragment
             MathFragment
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("name", "eq:x")
                     ],
@@ -2095,7 +2099,8 @@ parseSpec = do
               },
           CMathFragment
             MathFragment
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("__equation_number", "3"),
                       ("name", "eq:y")
@@ -2131,7 +2136,8 @@ parseSpec = do
               ],
           CMathFragment
             MathFragment
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("name", "eq:x")
                     ],
@@ -2139,7 +2145,8 @@ parseSpec = do
               },
           CMathFragment
             MathFragment
-              { meta =
+              { parentOid = nilOid,
+                meta =
                   fromList
                     [ ("__equation_number", "1"),
                       ("name", "eq:y")
@@ -2352,7 +2359,7 @@ parseSpec = do
                       PTokenStyledText
                         StyledText {body = " ", style = styleMaskFrom []},
                       PTokenMathFragment
-                        MathFragment {meta = fromList [], body = "E = mc^2"}
+                        MathFragment {parentOid = nilOid, meta = fromList [], body = "E = mc^2"}
                     ],
                 grid =
                   fromList
@@ -2399,7 +2406,8 @@ parseSpec = do
                         Prose
                           [ PTokenMathFragment
                               MathFragment
-                                { meta = fromList [],
+                                { parentOid = nilOid,
+                                  meta = fromList [],
                                   body = "a^2 + b^2 = c^2"
                                 }
                           ]
@@ -2450,7 +2458,8 @@ parseSpec = do
                         Prose
                           [ PTokenMathFragment
                               MathFragment
-                                { meta = fromList [],
+                                { parentOid = nilOid,
+                                  meta = fromList [],
                                   body = "E = mc^2"
                                 }
                           ]
@@ -2603,7 +2612,8 @@ parseSpec = do
                         Prose
                           [ PTokenMathFragment
                               MathFragment
-                                { meta = fromList [],
+                                { parentOid = nilOid,
+                                  meta = fromList [],
                                   body = "a^2 + b^2 = c^2"
                                 }
                           ]
@@ -2654,7 +2664,8 @@ parseSpec = do
                         Prose
                           [ PTokenMathFragment
                               MathFragment
-                                { meta = fromList [],
+                                { parentOid = nilOid,
+                                  meta = fromList [],
                                   body = "E = mc^2"
                                 }
                           ]
@@ -3941,7 +3952,8 @@ parseSpec = do
           Prose
             [ PTokenMathFragment
                 MathFragment
-                  { body = "4 = 2 * 2",
+                  { parentOid = nilOid,
+                    body = "4 = 2 * 2",
                     meta = fromList []
                   }
             ]

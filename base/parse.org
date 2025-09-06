@@ -382,7 +382,7 @@ import Lilac.Types
         LUnorderedEnd,
         LUnorderedStart
       ),
-    MathFragment (MathFragment, body, meta),
+    MathFragment (MathFragment, body, meta, parentOid),
     OID,
     OrgDoc
       ( OrgDoc,
@@ -2541,7 +2541,8 @@ describe "Text to Prose round trip" $ do
         Prose
           [ PTokenMathFragment
               MathFragment
-                { body = "4 = 2 * 2",
+                { parentOid = nilOid,
+                  body = "4 = 2 * 2",
                   meta = fromList []
                 }
           ]
@@ -6693,11 +6694,14 @@ mathFragmentInlineParser :: OrgParser MathFragment
 mathFragmentInlineParser = do
   failIfVerbatimOrCode
 
+  orgParserState <- get
   _ <- string "\\("
   latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
   pure
     MathFragment
-      { meta = fromList [],
+      { parentOid =
+          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+        meta = fromList [],
         body = T.pack latex
       }
 #+end_src
@@ -10200,7 +10204,8 @@ only support math, we call them /math/ fragments.
 #+begin_src haskell
 type MathFragment :: Type
 data MathFragment = MathFragment
-  { meta :: Map Text Text,
+  { parentOid :: OID,
+    meta :: Map Text Text,
     body :: Text
   }
   deriving stock (Eq, Generic, Ord, Show)
@@ -10288,7 +10293,9 @@ mathFragmentNumberedParser = do
   modify (\s -> s {equationNumber = number})
   pure
     MathFragment
-      { meta =
+      { parentOid =
+          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+        meta =
           insert "__equation_number" (T.pack $ show number) metaKVs,
         body = trimTrailingWhitespace $ T.pack latex
       }
@@ -10324,7 +10331,9 @@ mathFragmentUnnumberedParser = do
       pure $ Just n
   pure
     MathFragment
-      { meta = case anonNumber of
+      { parentOid =
+          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+        meta = case anonNumber of
           Just n ->
             insert "__equation_anon_number" (T.pack $ show n) metaKVs
           Nothing -> metaKVs,
@@ -10394,7 +10403,8 @@ ps
   ( nilOrgDoc
       [ CMathFragment
           MathFragment
-            { meta =
+            { parentOid = nilOid,
+              meta =
                 fromList
                   [ ("__equation_number", "1")
                   ],
@@ -10402,7 +10412,8 @@ ps
             },
         CMathFragment
           MathFragment
-            { meta =
+            { parentOid = nilOid,
+              meta =
                 fromList
                   [ ("__equation_number", "2")
                   ],
@@ -10410,7 +10421,8 @@ ps
             },
         CMathFragment
           MathFragment
-            { meta =
+            { parentOid = nilOid,
+              meta =
                 fromList
                   [ ("__equation_anon_number", "1")
                   ],
@@ -10418,7 +10430,8 @@ ps
             },
         CMathFragment
           MathFragment
-            { meta =
+            { parentOid = nilOid,
+              meta =
                 fromList
                   [ ("name", "eq:x")
                   ],
@@ -10426,7 +10439,8 @@ ps
             },
         CMathFragment
           MathFragment
-            { meta =
+            { parentOid = nilOid,
+              meta =
                 fromList
                   [ ("__equation_number", "3"),
                     ("name", "eq:y")
@@ -10482,7 +10496,8 @@ ps
             ],
         CMathFragment
           MathFragment
-            { meta =
+            { parentOid = nilOid,
+              meta =
                 fromList
                   [ ("name", "eq:x")
                   ],
@@ -10490,7 +10505,8 @@ ps
             },
         CMathFragment
           MathFragment
-            { meta =
+            { parentOid = nilOid,
+              meta =
                 fromList
                   [ ("__equation_number", "1"),
                     ("name", "eq:y")
@@ -11251,7 +11267,7 @@ ps
               PTokenStyledText
                 StyledText {body = " ", style = styleMaskFrom []},
               PTokenMathFragment
-                MathFragment {meta = fromList [], body = "E = mc^2"}
+                MathFragment {parentOid = nilOid, meta = fromList [], body = "E = mc^2"}
             ],
         grid =
           fromList
@@ -11298,7 +11314,8 @@ ps
                 Prose
                   [ PTokenMathFragment
                       MathFragment
-                        { meta = fromList [],
+                        { parentOid = nilOid,
+                          meta = fromList [],
                           body = "a^2 + b^2 = c^2"
                         }
                   ]
@@ -11349,7 +11366,8 @@ ps
                 Prose
                   [ PTokenMathFragment
                       MathFragment
-                        { meta = fromList [],
+                        { parentOid = nilOid,
+                          meta = fromList [],
                           body = "E = mc^2"
                         }
                   ]
@@ -11526,7 +11544,8 @@ ps
                 Prose
                   [ PTokenMathFragment
                       MathFragment
-                        { meta = fromList [],
+                        { parentOid = nilOid,
+                          meta = fromList [],
                           body = "a^2 + b^2 = c^2"
                         }
                   ]
@@ -11577,7 +11596,8 @@ ps
                 Prose
                   [ PTokenMathFragment
                       MathFragment
-                        { meta = fromList [],
+                        { parentOid = nilOid,
+                          meta = fromList [],
                           body = "E = mc^2"
                         }
                   ]
@@ -11695,7 +11715,7 @@ import Lilac.Types
         LUnorderedEnd,
         LUnorderedStart
       ),
-    MathFragment (MathFragment, body, meta),
+    MathFragment (MathFragment, body, meta, parentOid),
     OrgDoc
       ( OrgDoc,
         bibPaths,

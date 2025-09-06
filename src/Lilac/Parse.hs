@@ -128,7 +128,7 @@ import Lilac.Types
         LUnorderedEnd,
         LUnorderedStart
       ),
-    MathFragment (MathFragment, body, meta),
+    MathFragment (MathFragment, body, meta, parentOid),
     OID,
     OrgDoc
       ( OrgDoc,
@@ -1056,11 +1056,14 @@ mathFragmentInlineParser :: OrgParser MathFragment
 mathFragmentInlineParser = do
   failIfVerbatimOrCode
 
+  orgParserState <- get
   _ <- string "\\("
   latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
   pure
     MathFragment
-      { meta = fromList [],
+      { parentOid =
+          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+        meta = fromList [],
         body = T.pack latex
       }
 
@@ -1642,7 +1645,9 @@ mathFragmentNumberedParser = do
   modify (\s -> s {equationNumber = number})
   pure
     MathFragment
-      { meta =
+      { parentOid =
+          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+        meta =
           insert "__equation_number" (T.pack $ show number) metaKVs,
         body = trimTrailingWhitespace $ T.pack latex
       }
@@ -1667,7 +1672,9 @@ mathFragmentUnnumberedParser = do
       pure $ Just n
   pure
     MathFragment
-      { meta = case anonNumber of
+      { parentOid =
+          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+        meta = case anonNumber of
           Just n ->
             insert "__equation_anon_number" (T.pack $ show n) metaKVs
           Nothing -> metaKVs,

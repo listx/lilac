@@ -43,7 +43,7 @@ import Lilac.Types
         LinkTargetOid,
         LinkTargetURI
       ),
-    MathFragment (meta),
+    MathFragment (meta, parentOid),
     OID,
     Object (Object, externalOids, orgDoc, symbols),
     OrgDoc (bibPaths, cells, cslPath, oid),
@@ -128,7 +128,7 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
             ]
         | otherwise -> []
       CFigure figure -> getSymbols (Just figure.parentOid) figure.meta cell
-      CMathFragment mathFragment -> getSymbols Nothing mathFragment.meta cell
+      CMathFragment mathFragment -> getSymbols (Just mathFragment.parentOid) mathFragment.meta cell
       CTable table -> getSymbols (Just table.parentOid) table.meta cell
       CFootnote {}
       CListItem {}
