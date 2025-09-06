@@ -766,13 +766,13 @@ textParser styleMask
   | isCode styleMask =
       MP.takeWhile1P (Just "code") isNotCodeMarker
   | otherwise = do
-      ws <-
-        MP.some
-          $ MP.choice
-            [ MP.label "normal characters" normalChars,
-              escapedSymbolParser styleMask
-            ]
-      pure $ T.concat ws
+      word <-
+        MP.choice
+          [ MP.try $ slashSeparatedWords,
+            MP.label "normal characters" normalChars,
+            escapedSymbolParser styleMask
+          ]
+      pure word
   where
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
@@ -825,6 +825,46 @@ escapedSymbolParser styleMask = do
   if s == "vert{}"
     then pure "|"
     else pure s
+
+slashSeparatedWords :: OrgParser Text
+slashSeparatedWords = do
+  let wordParser :: OrgParser Text
+      wordParser = do
+        _ <- cannotStartWithClosingPunc
+        MP.takeWhile1P (Just "slash-separated words") isWordChar
+  firstWord <- wordParser
+  remainingWords <-
+    MP.some $ do
+      _ <- MP.notFollowedBy $ MP.choice [string "/ ", string "/\n"]
+      _ <- char '/'
+      word <- wordParser
+      pure $ "/" <> word
+  when (lastWordIsMeaningless $ reverse remainingWords)
+    $ fail "last word is not meaningful; unlikely to be intended as a slash-separated-word"
+  let allWords = firstWord : remainingWords
+  when (hasLinkDelimiter allWords)
+    $ fail "has link delimiter \"[[\"; unlikely to be intended as a slash-separated-word"
+  pure $ T.concat allWords
+  where
+    cannotStartWithClosingPunc :: OrgParser ()
+    cannotStartWithClosingPunc =
+      MP.notFollowedBy
+        $ MP.choice
+          [ string "]",
+            string "}",
+            string ")",
+            string "]]"
+          ]
+    isWordChar c = not (isSpace c) && c `notElem` (keys styleMarkers <> "\\")
+    lastWordIsMeaningless :: [Text] -> Bool
+    lastWordIsMeaningless = \case
+      [] -> True
+      (lastWord : [])
+        | lastWord `elem` ["/.", "/,", "/:"] -> True
+        | otherwise -> False
+      _ -> False
+    hasLinkDelimiter :: [Text] -> Bool
+    hasLinkDelimiter = or . map ("[[" `T.isInfixOf`)
 
 maskToStyles :: StyleMask -> [Style]
 maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask

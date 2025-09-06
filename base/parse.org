@@ -586,6 +586,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:styledTextParser>>
 <<f:textParser>>
 <<f:escapedSymbolParser>>
+<<f:slashSeparatedWords>>
 <<f:maskToStyles>>
 <<f:toStyleMask>>
 <<f:styleMaskFlip>>
@@ -771,10 +772,10 @@ lexeme = L.lexeme skipNewlinesAndComments
 
 The =orgDocParser= first needs to parse any metadata associated with the document,
 such as the document ID, title and author. It starts by skipping any leading
-whitespace\/comments. We have to do this first because all of the other parsers
+whitespace/comments. We have to do this first because all of the other parsers
 we use will follow the pattern of parsing the thing we want, followed by
 skipping over as much trailing whitespace as possible. In other words, none of
-the parsers are able to deal with leading whitespace\/comments, so we have to
+the parsers are able to deal with leading whitespace/comments, so we have to
 deal with it here separately.
 
 #+name: f:orgDocParser
@@ -2563,28 +2564,35 @@ styleMarkers =
 #+end_src
 
 Characters in the =styleMarkers= can be escaped with a backslash. For example, the
-slashes inside "1\/2" and "and\/or" should not be interpreted as style markers
-but as slashes. If you want to write a literal backslash, you must use "\\".
-This use of the backslash as an escape character deviates from Orgmode.
+strings "1\*2" and "a\_b" are interpreted as ~1*2~ and ~a_b~, because they act to
+escape the style markers ~*~ and ~_~, respectively. If you want to write a literal
+backslash, you must use "\\". This use of the backslash as an escape character
+deviates from Orgmode.
 
-#+name: ti:0005-styled-strings-ignore-marker-inside-word
-#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-ignore-marker-inside-word
+This rule also applies for slashes, such as 1\/2 in
+[[ti:0005-styled-strings-escape-marker]]. However, for slashes there is a simpler
+(and arguably more intuitive syntax) where slashes inside a word are not treated
+as style markers, so they don't need to be escaped. See [[f:slashSeparatedWords]]
+and [[ti:0005-styled-strings-slash-separated-words]].
+
+#+name: ti:0005-styled-strings-escape-marker
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-escape-marker
 #+begin_src org
 /foo and\/or 1\/2 bar \\ a\\b/
 #+end_src
 
-#+name: t:0005-styled-strings-ignore-marker-inside-word
+#+name: t:0005-styled-strings-escape-marker
 #+begin_src haskell
 shouldParseWith
-  "0005-styled-strings-ignore-marker-inside-word"
+  "0005-styled-strings-escape-marker"
   $ nilOrgDoc
     [ CParagraph
         $ Prose
-          <<Expected prose for 0005-styled-strings-ignore-marker-inside-word>>
+          <<Expected prose for 0005-styled-strings-escape-marker>>
     ]
 #+end_src
 
-#+name: Expected prose for 0005-styled-strings-ignore-marker-inside-word
+#+name: Expected prose for 0005-styled-strings-escape-marker
 #+begin_src haskell
 [ ptext "foo and/or 1/2 bar \\ a\\b" [Italic]
 ]
@@ -2778,13 +2786,13 @@ textParser styleMask
   | isCode styleMask =
       MP.takeWhile1P (Just "code") isNotCodeMarker
   | otherwise = do
-      ws <-
-        MP.some
-          $ MP.choice
-            [ MP.label "normal characters" normalChars,
-              escapedSymbolParser styleMask
-            ]
-      pure $ T.concat ws
+      word <-
+        MP.choice
+          [ MP.try $ slashSeparatedWords,
+            MP.label "normal characters" normalChars,
+            escapedSymbolParser styleMask
+          ]
+      pure word
   where
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
@@ -2830,7 +2838,8 @@ characters used for activating (and deactivating) styles in [[f:styleMarkers]], 
 take special care to escape these characters with [[f:escapedSymbolParser]]. If the
 style markers are not escaped, using any of them will immediately try to
 activate or deactivate a style (modulo the special consideration for verbatim
-and code markers as discussed in [[f:isStyleMarker]]).
+and code markers as discussed in [[f:isStyleMarker]], but also in
+[[f:slashSeparatedWords]]).
 
 #+name: f:escapedSymbolParser
 #+begin_src haskell
@@ -2856,6 +2865,62 @@ style marker), Orgmode is unable to deal with this in Emacs (so pressing ~TAB~
 will mess up the alignment of table cells). For this reason, we use =\vert{}=
 instead. Of course, outside of tables the pipe character can be written raw like
 this "|" without issue.
+
+There is one exception to this, and it's what we call "slash-separated words".
+These are cases where we see one or more slash characters inside an alphanumeric
+word, such as and/or, or a plain (non-math) fraction like 1/2, or even something
+like 1/2/3. In these cases, we don't want the slashes to be treated as italic
+style markers.
+
+#+name: f:slashSeparatedWords
+#+begin_src haskell
+slashSeparatedWords :: OrgParser Text
+slashSeparatedWords = do
+  let wordParser :: OrgParser Text
+      wordParser = do
+        _ <- cannotStartWithClosingPunc
+        MP.takeWhile1P (Just "slash-separated words") isWordChar
+  firstWord <- wordParser
+  remainingWords <-
+    MP.some $ do
+      _ <- MP.notFollowedBy $ MP.choice [string "/ ", string "/\n"]
+      _ <- char '/'
+      word <- wordParser
+      pure $ "/" <> word
+  when (lastWordIsMeaningless $ reverse remainingWords)
+    $ fail "last word is not meaningful; unlikely to be intended as a slash-separated-word"
+  let allWords = firstWord : remainingWords
+  when (hasLinkDelimiter allWords)
+    $ fail "has link delimiter \"[[\"; unlikely to be intended as a slash-separated-word"
+  pure $ T.concat allWords
+  where
+    cannotStartWithClosingPunc :: OrgParser ()
+    cannotStartWithClosingPunc =
+      MP.notFollowedBy
+        $ MP.choice
+          [ string "]",
+            string "}",
+            string ")",
+            string "]]"
+          ]
+    isWordChar c = not (isSpace c) && c `notElem` (keys styleMarkers <> "\\")
+    lastWordIsMeaningless :: [Text] -> Bool
+    lastWordIsMeaningless = \case
+      [] -> True
+      (lastWord : [])
+        | lastWord `elem` ["/.", "/,", "/:"] -> True
+        | otherwise -> False
+      _ -> False
+    hasLinkDelimiter :: [Text] -> Bool
+    hasLinkDelimiter = or . map ("[[" `T.isInfixOf`)
+#+end_src
+
+The rules inside [[f:slashSeparatedWords]] are a "best effort" attempt, not
+something that is always correct. For the cases where we need more flexibility,
+you can use escaped slashes like in
+[[ti:0005-styled-strings-escape-marker]].
+
+See [[ti:0005-styled-strings-slash-separated-words]] for some real-world examples.
 
 ** =StyleMask= details
 :PROPERTIES:
@@ -3203,6 +3268,35 @@ Note how we preserve the information of having no space character between the
   ptext " " [],
   ptext "(italic)" [Italic],
   ptext ". It's #1!" []
+]
+#+end_src
+
+Check that we can parse slashes inside words as slashes, not as italic style
+markers.
+
+#+name: ti:0005-styled-strings-slash-separated-words
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-slash-separated-words
+#+begin_src org
+/italic fraction 1/2/ foo and/or bar /A+/B-/ +1/+2. key/value
+#+end_src
+
+#+name: t:0005-styled-strings-slash-separated-words
+#+begin_src haskell
+shouldParseWith
+  "0005-styled-strings-slash-separated-words"
+  $ nilOrgDoc
+    [ CParagraph
+        $ Prose
+          <<Expected prose for 0005-styled-strings-slash-separated-words>>
+    ]
+#+end_src
+
+#+name: Expected prose for 0005-styled-strings-slash-separated-words
+#+begin_src haskell
+[ ptext "italic fraction 1/2" [Italic],
+  ptext " foo and/or bar " [],
+  ptext "A+/B-" [Italic],
+  ptext " +1/+2. key/value" []
 ]
 #+end_src
 
@@ -5981,14 +6075,8 @@ Semicolons must be meaningful; extraneous semicolons are not allowed.
 shouldFailWithError
   "0014-citations-extra-semicolons-basic"
   ( utoks ";"
-      <> etoks "[["
-      <> etoks "[fn:"
-      <> etoks "\\("
       <> etoks "@"
-      <> etoks "\\"
-      <> elabel "(raw link) protocol"
       <> elabel "intra-cell whitespace"
-      <> elabel "normal characters"
   )
   56
 #+end_src
@@ -6015,15 +6103,9 @@ cite:
 shouldFailWithError
   "0014-citations-extra-semicolons-consecutive"
   ( utoks ";"
-      <> etoks "[["
-      <> etoks "[fn:"
-      <> etoks "\\("
       <> etoks "@"
-      <> etoks "\\"
       <> etoks "]"
-      <> elabel "(raw link) protocol"
       <> elabel "intra-cell whitespace"
-      <> elabel "normal characters"
   )
   61
 #+end_src
@@ -11400,9 +11482,10 @@ parseSpec = do
   <<t:0005-notFollowedBy-behavior-for-empty-input>>
   <<t:0005-styled-strings-bold>>
   <<t:0005-styled-strings-complex-punctuation>>
+  <<t:0005-styled-strings-slash-separated-words>>
   <<t:0005-styled-strings-complex>>
   <<t:0005-styled-strings-compression>>
-  <<t:0005-styled-strings-ignore-marker-inside-word>>
+  <<t:0005-styled-strings-escape-marker>>
   <<t:0005-styled-strings-leftover-active-styles>>
   <<t:0005-styled-strings-messy-boundaries>>
   <<t:0005-styled-strings-no-style>>

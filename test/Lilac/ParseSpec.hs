@@ -603,6 +603,18 @@ parseSpec = do
       ]
 
   shouldParseWith
+    "0005-styled-strings-slash-separated-words"
+    $ nilOrgDoc
+      [ CParagraph
+          $ Prose
+            [ ptext "italic fraction 1/2" [Italic],
+              ptext " foo and/or bar " [],
+              ptext "A+/B-" [Italic],
+              ptext " +1/+2. key/value" []
+            ]
+      ]
+
+  shouldParseWith
     "0005-styled-strings-complex"
     $ nilOrgDoc
       [ CParagraph
@@ -631,7 +643,7 @@ parseSpec = do
       ]
 
   shouldParseWith
-    "0005-styled-strings-ignore-marker-inside-word"
+    "0005-styled-strings-escape-marker"
     $ nilOrgDoc
       [ CParagraph
           $ Prose
@@ -2889,29 +2901,17 @@ parseSpec = do
   shouldFailWithError
     "0014-citations-extra-semicolons-basic"
     ( utoks ";"
-        <> etoks "[["
-        <> etoks "[fn:"
-        <> etoks "\\("
         <> etoks "@"
-        <> etoks "\\"
-        <> elabel "(raw link) protocol"
         <> elabel "intra-cell whitespace"
-        <> elabel "normal characters"
     )
     56
 
   shouldFailWithError
     "0014-citations-extra-semicolons-consecutive"
     ( utoks ";"
-        <> etoks "[["
-        <> etoks "[fn:"
-        <> etoks "\\("
         <> etoks "@"
-        <> etoks "\\"
         <> etoks "]"
-        <> elabel "(raw link) protocol"
         <> elabel "intra-cell whitespace"
-        <> elabel "normal characters"
     )
     61
 
