@@ -780,7 +780,8 @@ weaveHeading :: Heading -> HtmlWeaver ()
 weaveHeading heading =
   hN [id_ linkAnchor] $ do
     a_ [href_ $ "#" <> linkAnchor] $ do
-      toHtml $ sectionText <> " "
+      toHtml sectionText
+      toHtmlRaw ("&emsp;&ensp;" :: Text)
       weaveProse heading.body
   where
     hN = case heading.level of
