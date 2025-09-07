@@ -3,6 +3,8 @@
 :END:
 #+title: Lilac Compile
 
+#+bibliography: bib.json
+#+cite_export: csl csl-styles/ieee.csl
 #+lilac_maxHeadingLevel: 3
 
 * Compiling
@@ -969,15 +971,15 @@ Specifically, we want to build a /directed/ graph where we treat all blocks as
 nodes (vertices) and the dependency of Noweb links as edges. So if a block =x=
 depends on a Noweb link =y=, then =x= would point to =y=.
 
-From CLRS 3rd, Ch 22 p. 614 we can find a more formal definition of cycles in a
-directed graph:
+From [cite:@clrs_2009 ch. 22] (p. 614) we can find a more formal definition of
+cycles in a directed graph:
 
 #+begin_quote
 A directed graph G is acyclic if and only if a depth-first search of G yields no
 back edges.
 #+end_quote
 
-And a back edge is defined like this in CLRS p. 609:
+And a back edge is defined like this in [cite:@clrs_2009 p. 609]:
 
 #+begin_quote
 Back edges are those edges (u, v) connecting a vertex u to an ancestor v in a
@@ -1697,3 +1699,7 @@ compileSpec = do
   <<t:0100-dag-2-node-loop-2-files>>
   <<t:0100-dag-2-node-loop-3-files>>
 #+end_src
+
+* Bibliography
+
+#+print_bibliography:
