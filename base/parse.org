@@ -1097,7 +1097,7 @@ defaultOrgParserConf =
     }
 #+end_src
 
-Parsing Lilac extensions involves parsing known key\/value combinations, and
+Parsing Lilac extensions involves parsing known key/value combinations, and
 updating the ~OrgParserState~ accordingly.
 
 #+name: f:lilacExtensionsParser
@@ -1321,7 +1321,7 @@ shouldParseWithState
 #+end_src
 
 Combine metadata together, from the top-level properties drawer and also the
-key\/value metadata lines.
+key/value metadata lines.
 
 #+name: ti:0002-doc-metadata-properties-drawer-combine
 #+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer-combine
@@ -2564,12 +2564,12 @@ styleMarkers =
 #+end_src
 
 Characters in the =styleMarkers= can be escaped with a backslash. For example, the
-strings "1\*2" and "a\_b" are interpreted as ~1*2~ and ~a_b~, because they act to
+strings ~1\*2~ and ~a\_b~ are interpreted as ~1*2~ and ~a_b~, because they act to
 escape the style markers ~*~ and ~_~, respectively. If you want to write a literal
-backslash, you must use "\\". This use of the backslash as an escape character
+backslash, you must use ~\\~. This use of the backslash as an escape character
 deviates from Orgmode.
 
-This rule also applies for slashes, such as 1\/2 in
+This rule also applies for slashes, such as ~1\/2~ in
 [[ti:0005-styled-strings-escape-marker]]. However, for slashes there is a simpler
 (and arguably more intuitive syntax) where slashes inside a word are not treated
 as style markers, so they don't need to be escaped. See [[f:slashSeparatedWords]]
@@ -6923,7 +6923,7 @@ In vanilla Orgmode, drawers look like
 
 and the contents may be anything but another [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][heading]] or another (nested) drawer.
 In Lilac, we only parse the =:PROPERTIES:= drawer, which is a special drawer that
-can contain key\/value pairs that Org recognizes. One of these is the =:ID:= key,
+can contain key/value pairs that Org recognizes. One of these is the =:ID:= key,
 which can have an OID as the value, and which can be used as a link target from
 elsewhere in the document (in Orgmode this can be done with ~org-id-store-link~).
 
@@ -7197,12 +7197,12 @@ shouldParseWithState
 ** Metadata
 
 Blocks can have associated metadata, as we can see from the test case above. The
-metadata is made up of any number of special key\/value pairs that are written
+metadata is made up of any number of special key/value pairs that are written
 in the form of =#+header: :key value= lines. The special line =#+name: foo= gives
 the block a unique name (if it's not globally unique, we'll complain about it
 [[f:assertUniqueCellName]]), which can be the target of an internal link.
 
-Vanilla Org allows you to place these key\/value pairs on the same line as the
+Vanilla Org allows you to place these key/value pairs on the same line as the
 =#+begin_...= line, but we don't allow this. This enforces a cleaner style and
 also simplifies the parser.
 
@@ -7610,7 +7610,7 @@ blockStartParser = do
     isSrcLanguageChar c = isAsciiLower c || c == '-'
 #+end_src
 
-We first have to use the same try\/lookAhead trick we use in [[f:figureParser]] at
+We first have to use the same try/lookAhead trick we use in [[f:figureParser]] at
 the beginning, because otherwise our parser thinks that as soon as we parse a
 =#+name=, that it will be a block. This is not true because other things (like
 figures) can have a =#+name= associated with them.
@@ -10136,7 +10136,7 @@ The ~parentOid~ is just like the one in [[data:Block]].
 
 The metadata (~meta~) recognizes certain reserved keys:
 
-  - type :: (Required) Used to force there to be at least 1 key\/value pair in
+  - type :: (Required) Used to force there to be at least 1 key/value pair in
     the metadata. Otherwise when the parser comes across a link to an image on
     its own without metadata, it is ambiguous whether the link is part of a
     1-link paragraph cell, or as part of a figure cell.
@@ -10461,7 +10461,7 @@ shouldParseWithState
 
 Tables are like [[data:Figure][figures]] in that they have some metadata. Unlike a figure which
 is just a link, a table has a two-dimensional grid with some information in each
-row\/column. The requirement is that the first non-whitespace character starts
+row/column. The requirement is that the first non-whitespace character starts
 with a vertical bar (=|=), also known as the pipe character in UNIX.
 
 All tables are numbered. A table can also have a caption (just like a
