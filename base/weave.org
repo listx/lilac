@@ -173,6 +173,7 @@ import Lucid
   ( HtmlT,
     a_,
     alt_,
+    aside_,
     async_,
     body_,
     charset_,
@@ -185,6 +186,7 @@ import Lucid
     doctypehtml_,
     figcaption_,
     figure_,
+    footer_,
     h1_,
     h2_,
     h3_,
@@ -197,8 +199,11 @@ import Lucid
     href_,
     id_,
     img_,
+    li_,
     link_,
+    main_,
     meta_,
+    nav_,
     p_,
     pre_,
     rel_,
@@ -217,6 +222,7 @@ import Lucid
     toHtmlRaw,
     tr_,
     type_,
+    ul_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -287,6 +293,7 @@ import Relude
     (-),
     (.),
     (/=),
+    (<),
     (<$>),
     (<>),
     (=<<),
@@ -337,6 +344,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:prepareCitations>>
 <<f:weaveCitation>>
 <<f:weaveBibliography>>
+<<f:weaveToc>>
 #+end_src
 
 * Generate HTML
@@ -435,8 +443,18 @@ weaveObject object = do
   doctypehtml_ $ do
     <<HTML head>>
     body_ $ do
-      weaveDocMeta object.orgDoc.meta
-      forM_ rearrangedCells weaveCell
+      div_ [class_ "navbar"] $ do
+        toHtml @Text "NAVBAR"
+      nav_ [class_ "toc"] $ do
+        ul_ $ do
+          weaveToc object.orgDoc.cells
+      main_ $ do
+        weaveDocMeta object.orgDoc.meta
+        forM_ rearrangedCells weaveCell
+      aside_ [class_ "sidebar"] $ do
+        toHtml @Text "SIDEBAR"
+      footer_ $ do
+        toHtml @Text "FOOTER"
   where
     rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
     beforeFootnotes = takeWhile (not . isFootnote) object.orgDoc.cells
@@ -2690,6 +2708,67 @@ expectCiteprocResult
   $ Left "unexpected newline"
 #+end_src
 
+** Table of Contents
+
+The /Table of Contents/ or TOC is automatically generated and inserted into the
+left sidebar. It serves as a navigation menu of the first three levels of
+headings.
+
+Eventually we want to support collapsible headings inside the TOC. The
+traditional way to do this is to toggle the visibility of child elements when
+clicking to expand/collapse the parent heading. Selecting child elements is
+easiest when there is a hierarchical (nested) structure. The simplest way to do
+this is to use unordered list items.
+
+So what we need to do is convert the flat heading cells into a nested structure.
+The spirit of this is very similar to how we computed the section numbers for
+each heading in [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31::f:headingParser][f:headingParser]]. Every time we enter a nesting level, we'll have
+to create a new unordered list tag (~<ul>~), and every time we leave a level (and
+we may leave more than one level at once), we have to close those unordered list
+tags (with ~</ul>~).
+
+#+name: f:weaveToc
+#+begin_src haskell
+weaveToc :: [Cell] -> HtmlWeaver ()
+weaveToc cells =
+  let actions = reverse . fst $ foldl' f ([], 1) cells
+   in sequence_ actions
+  where
+    f :: ([HtmlWeaver ()], Int) -> Cell -> ([HtmlWeaver ()], Int)
+    f (actions, prevLevel) = \case
+      CHeading heading ->
+        let weaveTocHeading :: HtmlWeaver ()
+            weaveTocHeading =
+              li_ [class_ $ "toc-level-" <> show heading.level] $ do
+                a_ [href_ $ "#" <> linkAnchor] $ do
+                  toHtml sectionText
+                  toHtmlRaw ("&ensp;" :: Text)
+                  weaveProse heading.body
+            sectionText = getSectionText heading
+            linkAnchor = getLinkAnchor $ CHeading heading
+            unnestLevel :: Int -> HtmlWeaver ()
+            unnestLevel levelDiff =
+              forM_ [1 .. levelDiff] $ \_ -> weaveListMarker LUnorderedEnd
+            action :: HtmlWeaver ()
+            action
+              | prevLevel < heading.level = do
+                  weaveListMarker LUnorderedStart
+                  weaveTocHeading
+              | prevLevel > heading.level = do
+                  unnestLevel (prevLevel - heading.level)
+                  weaveTocHeading
+              | otherwise = weaveTocHeading
+         in (action : actions, heading.level)
+      CFootnote {}
+      CBlock {}
+      CFigure {}
+      CListItem {}
+      CMathFragment {}
+      CParagraph {}
+      CTable {}
+      CBibliography {} -> (actions, prevLevel)
+#+end_src
+
 ** Testing framework
 
 The tests here use Org files as input. The output are HTML documents. For the
@@ -3003,12 +3082,14 @@ import Clay
     a,
     absolute,
     alignSide,
+    aside,
     auto,
     backgroundColor,
     block,
     body,
     bold,
     border,
+    borderBottom,
     borderBottomLeftRadius,
     borderBottomRightRadius,
     borderBottomWidth,
@@ -3016,6 +3097,7 @@ import Clay
     borderCollapse,
     borderLeft,
     borderRadius,
+    borderRight,
     borderStyle,
     borderTop,
     borderTopLeftRadius,
@@ -3038,6 +3120,10 @@ import Clay
     fontStyle,
     fontVariant,
     fontWeight,
+    footer,
+    fr,
+    grid,
+    gridTemplateColumns,
     h1,
     h2,
     h3,
@@ -3049,11 +3135,16 @@ import Clay
     html,
     inlineBlock,
     italic,
+    listStyleType,
+    main_,
     margin,
     marginBottom,
     marginLeft,
+    marginTop,
+    minHeight,
     minWidth,
     monospace,
+    nav,
     none,
     normal,
     overflowY,
@@ -3065,6 +3156,7 @@ import Clay
     pt,
     px,
     relative,
+    rem,
     renderWith,
     rgb,
     sansSerif,
@@ -3073,6 +3165,7 @@ import Clay
     sideRight,
     smallCaps,
     solid,
+    sticky,
     sup,
     table,
     tbody,
@@ -3083,11 +3176,14 @@ import Clay
     thead,
     top,
     tr,
+    ul,
     underline,
     vAlignSub,
     vAlignSuper,
     verticalAlign,
+    vh,
     width,
+    zIndex,
     (#),
     (&),
     (-:),
@@ -3211,13 +3307,101 @@ html ? do
   ev padding $ px 0
   backgroundColor colorBg
   color colorText
-body ? do
-  overflowY scroll
   fontSerif
-  width $ px 800
+body ? do
+  minHeight (vh 100)
+  display grid
+  "grid-column-gap" -: "20px"
+  gridTemplateColumns [px 360, px 800, fr 1]
+  "grid-template-rows" -: "auto 1fr auto"
+  "grid-template-areas"
+    -: """
+       "navbar navbar navbar"
+       "toc    main   sidebar"
+       "toc    footer sidebar"
+       """
   yx margin (px 0) auto
+  overflowY scroll
+<<css:navbar>>
+<<css:toc>>
+main_ ? do
+  "grid-area" -: "main"
+  marginLeft (px 20)
+aside ? do
+  "grid-area" -: "sidebar"
+footer ? do
+  "grid-area" -: "footer"
 div ? do
   noMargin
+#+end_src
+
+The ~<body>~ uses a CSS grid layout to create two columns, one for the table of
+contents on the left (250 pixels wide), and the second column for the main
+content (800 pixels).
+
+*** Navigation bar
+:PROPERTIES:
+:ID:       35d768c0-3e2f-498a-8437-e4137c4500ba
+:END:
+
+#+name: css:navbar
+#+begin_src haskell
+div # ".navbar" ? do
+  "grid-area" -: "navbar"
+  zIndex 1
+  top $ px 0
+  height $ rem 3
+  position sticky
+  borderBottom (px 1) solid colorCodeBorder
+  backgroundColor colorBg
+#+end_src
+
+We have to set the ~zIndex~ to 1 because otherwise code blocks can be displayed on
+top of the navbar when we scroll down the page.
+
+The total height of the navbar is \(3em + 1px\) because of the 1-pixel border at
+the bottom.
+
+#+name: css:navbar-height
+#+begin_src txt
+calc(3rem + 1px)
+#+end_src
+
+The navbar causes a problem for links that point to elements inside the page,
+because the browser will normally go to the target element by putting it at the
+top of the page, but the navbar will sit on top of it. So we have to adjust it.
+
+#+name: css:navbar-link-target-adjustment
+#+begin_src txt
+calc(3rem + 1px + 10px)
+#+end_src
+
+See how this is used in [[id:7ce2cd61-ef7e-43bd-b0ee-b47c24cb3051][Internal links]].
+
+*** Table of contents (TOC)
+
+#+name: css:toc
+#+begin_src haskell
+nav # ".toc" ? do
+  "grid-area" -: "toc"
+  fontSans
+  "height"
+    -: """
+       calc(100vh - <<css:navbar-height>>)
+       """
+  "top" -: "<<css:navbar-height>>"
+  position sticky
+  overflowY auto
+  "align-self" -: "start"
+  ul ? do
+    padding (px 0) (px 20) (px 0) (px 20)
+  borderRight (px 1) solid colorCodeBorder
+".toc-level-1" & do
+  listStyleType none
+".toc-level-2" & do
+  listStyleType none
+".toc-level-3" & do
+  listStyleType none
 #+end_src
 
 ** Headings
@@ -3228,6 +3412,7 @@ The headings are set to all use sans-serif font ([[f:fontSans]]).
 #+begin_src haskell
 h1 ? do
   fontSize (pt 36)
+  marginTop (px 0)
   marginBottom (pt $ -16)
 h2 ? do
   fontSize (pt 26)
@@ -3313,7 +3498,24 @@ a ? do
     fontMono
     roundedRectangleLink
   <<css:Links (external)>>
+<<css:Move past navbar for internal links>>
 #+end_src
+
+*** Internal links
+:PROPERTIES:
+:ID:       7ce2cd61-ef7e-43bd-b0ee-b47c24cb3051
+:END:
+
+When we click on internal links, we want to scroll past down the navbar before
+ending at the target. For this, there is the ~scroll-margin-top~ property.
+
+#+name: css:Move past navbar for internal links
+#+begin_src haskell
+":target" & do
+  "scroll-margin-top" -: "<<css:navbar-link-target-adjustment>>"
+#+end_src
+
+*** External links
 
 External links get a special superscript-like icon with an arrow sticking out of
 a box. This just visually indicates that the user will be leaving the current

@@ -7,12 +7,14 @@ import Clay
     a,
     absolute,
     alignSide,
+    aside,
     auto,
     backgroundColor,
     block,
     body,
     bold,
     border,
+    borderBottom,
     borderBottomLeftRadius,
     borderBottomRightRadius,
     borderBottomWidth,
@@ -20,6 +22,7 @@ import Clay
     borderCollapse,
     borderLeft,
     borderRadius,
+    borderRight,
     borderStyle,
     borderTop,
     borderTopLeftRadius,
@@ -42,6 +45,10 @@ import Clay
     fontStyle,
     fontVariant,
     fontWeight,
+    footer,
+    fr,
+    grid,
+    gridTemplateColumns,
     h1,
     h2,
     h3,
@@ -53,11 +60,16 @@ import Clay
     html,
     inlineBlock,
     italic,
+    listStyleType,
+    main_,
     margin,
     marginBottom,
     marginLeft,
+    marginTop,
+    minHeight,
     minWidth,
     monospace,
+    nav,
     none,
     normal,
     overflowY,
@@ -69,6 +81,7 @@ import Clay
     pt,
     px,
     relative,
+    rem,
     renderWith,
     rgb,
     sansSerif,
@@ -77,6 +90,7 @@ import Clay
     sideRight,
     smallCaps,
     solid,
+    sticky,
     sup,
     table,
     tbody,
@@ -87,11 +101,14 @@ import Clay
     thead,
     top,
     tr,
+    ul,
     underline,
     vAlignSub,
     vAlignSuper,
     verticalAlign,
+    vh,
     width,
+    zIndex,
     (#),
     (&),
     (-:),
@@ -157,16 +174,63 @@ defaultCss = do
     ev padding $ px 0
     backgroundColor colorBg
     color colorText
-  body ? do
-    overflowY scroll
     fontSerif
-    width $ px 800
+  body ? do
+    minHeight (vh 100)
+    display grid
+    "grid-column-gap" -: "20px"
+    gridTemplateColumns [px 360, px 800, fr 1]
+    "grid-template-rows" -: "auto 1fr auto"
+    "grid-template-areas"
+      -: """
+         "navbar navbar navbar"
+         "toc    main   sidebar"
+         "toc    footer sidebar"
+         """
     yx margin (px 0) auto
+    overflowY scroll
+  div # ".navbar" ? do
+    "grid-area" -: "navbar"
+    zIndex 1
+    top $ px 0
+    height $ rem 3
+    position sticky
+    borderBottom (px 1) solid colorCodeBorder
+    backgroundColor colorBg
+
+  nav # ".toc" ? do
+    "grid-area" -: "toc"
+    fontSans
+    "height"
+      -: """
+         calc(100vh - calc(3rem + 1px))
+         """
+    "top" -: "calc(3rem + 1px)"
+    position sticky
+    overflowY auto
+    "align-self" -: "start"
+    ul ? do
+      padding (px 0) (px 20) (px 0) (px 20)
+    borderRight (px 1) solid colorCodeBorder
+  ".toc-level-1" & do
+    listStyleType none
+  ".toc-level-2" & do
+    listStyleType none
+  ".toc-level-3" & do
+    listStyleType none
+  main_ ? do
+    "grid-area" -: "main"
+    marginLeft (px 20)
+  aside ? do
+    "grid-area" -: "sidebar"
+  footer ? do
+    "grid-area" -: "footer"
   div ? do
     noMargin
 
   h1 ? do
     fontSize (pt 36)
+    marginTop (px 0)
     marginBottom (pt $ -16)
   h2 ? do
     fontSize (pt 26)
@@ -267,6 +331,9 @@ defaultCss = do
         width (em 1)
         height (em 1)
         margin 0 (em (-0.2)) 0 0
+
+  ":target" & do
+    "scroll-margin-top" -: "calc(3rem + 1px + 10px)"
 
   pre ? do
     noMargin

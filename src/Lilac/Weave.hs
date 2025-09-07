@@ -118,6 +118,7 @@ import Lucid
   ( HtmlT,
     a_,
     alt_,
+    aside_,
     async_,
     body_,
     charset_,
@@ -130,6 +131,7 @@ import Lucid
     doctypehtml_,
     figcaption_,
     figure_,
+    footer_,
     h1_,
     h2_,
     h3_,
@@ -142,8 +144,11 @@ import Lucid
     href_,
     id_,
     img_,
+    li_,
     link_,
+    main_,
     meta_,
+    nav_,
     p_,
     pre_,
     rel_,
@@ -162,6 +167,7 @@ import Lucid
     toHtmlRaw,
     tr_,
     type_,
+    ul_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -232,6 +238,7 @@ import Relude
     (-),
     (.),
     (/=),
+    (<),
     (<$>),
     (<>),
     (=<<),
@@ -305,8 +312,18 @@ weaveObject object = do
         ]
         ("" :: Text)
     body_ $ do
-      weaveDocMeta object.orgDoc.meta
-      forM_ rearrangedCells weaveCell
+      div_ [class_ "navbar"] $ do
+        toHtml @Text "NAVBAR"
+      nav_ [class_ "toc"] $ do
+        ul_ $ do
+          weaveToc object.orgDoc.cells
+      main_ $ do
+        weaveDocMeta object.orgDoc.meta
+        forM_ rearrangedCells weaveCell
+      aside_ [class_ "sidebar"] $ do
+        toHtml @Text "SIDEBAR"
+      footer_ $ do
+        toHtml @Text "FOOTER"
   where
     rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
     beforeFootnotes = takeWhile (not . isFootnote) object.orgDoc.cells
@@ -1051,3 +1068,42 @@ weaveBibliography = do
       let linkAnchor = "ref-" <> key
       div_ [class_ "bib-ref", id_ linkAnchor] $ do
         weaveProse prose
+
+weaveToc :: [Cell] -> HtmlWeaver ()
+weaveToc cells =
+  let actions = reverse . fst $ foldl' f ([], 1) cells
+   in sequence_ actions
+  where
+    f :: ([HtmlWeaver ()], Int) -> Cell -> ([HtmlWeaver ()], Int)
+    f (actions, prevLevel) = \case
+      CHeading heading ->
+        let weaveTocHeading :: HtmlWeaver ()
+            weaveTocHeading =
+              li_ [class_ $ "toc-level-" <> show heading.level] $ do
+                a_ [href_ $ "#" <> linkAnchor] $ do
+                  toHtml sectionText
+                  toHtmlRaw ("&ensp;" :: Text)
+                  weaveProse heading.body
+            sectionText = getSectionText heading
+            linkAnchor = getLinkAnchor $ CHeading heading
+            unnestLevel :: Int -> HtmlWeaver ()
+            unnestLevel levelDiff =
+              forM_ [1 .. levelDiff] $ \_ -> weaveListMarker LUnorderedEnd
+            action :: HtmlWeaver ()
+            action
+              | prevLevel < heading.level = do
+                  weaveListMarker LUnorderedStart
+                  weaveTocHeading
+              | prevLevel > heading.level = do
+                  unnestLevel (prevLevel - heading.level)
+                  weaveTocHeading
+              | otherwise = weaveTocHeading
+         in (action : actions, heading.level)
+      CFootnote {}
+      CBlock {}
+      CFigure {}
+      CListItem {}
+      CMathFragment {}
+      CParagraph {}
+      CTable {}
+      CBibliography {} -> (actions, prevLevel)
