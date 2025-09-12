@@ -161,7 +161,7 @@ defaultCss = do
     overflowY scroll
     fontSerif
     width $ px 800
-    vh margin (px 0) auto
+    yx margin (px 0) auto
   div ? do
     noMargin
 
@@ -201,7 +201,7 @@ defaultCss = do
     backgroundColor colorCodeBg
     border (px 1) solid colorCodeBorder
     ev borderRadius (px 4)
-    vh padding 0 (em 0.2)
+    yx padding 0 (em 0.2)
   ".smallcaps" & do
     fontVariant smallCaps
   ".subscript" & do
@@ -282,7 +282,7 @@ defaultCss = do
     minWidth fitContent
     position relative
   ".code-block-name" & do
-    vh padding 0 (px 8)
+    yx padding 0 (px 8)
     border (px 1) solid colorCodeBorder
     borderBottomWidth 0
     borderTopLeftRadius (px 5) (px 5)
@@ -297,7 +297,7 @@ defaultCss = do
     borderBottomLeftRadius (px 5) (px 5)
     borderBottomRightRadius (px 5) (px 5)
     border (px 1) solid colorCodeBorder
-    vh padding (px 2) (px 8)
+    yx padding (px 2) (px 8)
     minWidth fitContent
   (".code-block-container" # hover) |> ".side-popup" ? do
     display block
@@ -316,9 +316,9 @@ defaultCss = do
 
   ".figure-image" & do
     display block
-    vh margin (px 0) auto
+    yx margin (px 0) auto
   figcaption ? do
-    vh margin (px 10) auto
+    yx margin (px 10) auto
     textAlign center
     fontStyle italic
     width (pct 80)
@@ -327,11 +327,11 @@ defaultCss = do
     fontSans
     borderCollapse collapse
     border (px 1) solid colorCodeBorder
-    vh margin (px 0) auto
+    yx margin (px 0) auto
     th ? do
-      vh padding (px 4) (px 8)
+      yx padding (px 4) (px 8)
     td ? do
-      vh padding (px 4) (px 8)
+      yx padding (px 4) (px 8)
       ".table-cell-numeric" & do
         textAlign $ alignSide sideRight
     thead ? do
@@ -356,8 +356,8 @@ defaultCss = do
       a ? do
         borderStyle none
         ev borderRadius (px 0)
-        vh padding 0 (px 0)
-        vh margin (px 0) 0
+        yx padding 0 (px 0)
+        yx margin (px 0) 0
         fontStyle normal
         ".internal-link" & do
           backgroundColor $ rgbHex 0xffffff
@@ -383,8 +383,8 @@ roundedRectangleLink = do
   backgroundColor colorNowebLinkBg
   fontStyle italic
   ev borderRadius (px 5)
-  vh padding 0 (px 5)
-  vh margin (px 2) 0
+  yx padding 0 (px 5)
+  yx margin (px 2) 0
   display inlineBlock
   border (px 1) solid colorCodeBorder
   ":hover" & do
@@ -398,8 +398,8 @@ roundedRectangleLink = do
 noMargin :: Css
 noMargin = ev margin $ px 0
 
-vh :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Size sz -> Css
-vh f x y = f x y x y
+yx :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Size sz -> Css
+yx f x y = f x y x y
 
 ev :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Css
 ev f x = f x x x x
