@@ -3266,10 +3266,10 @@ defined in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b::data:Style][data:Style]].
   textDecoration underline
 ".verbatim" & do
   fontMono
-  fontSize (pt 10)
+  fontSize (em 0.8)
 ".code" & do
   fontMono
-  fontSize (pt 10)
+  fontSize (em 0.8)
   backgroundColor colorCodeBg
   border (px 1) solid colorCodeBorder
   ev borderRadius (px 4)
@@ -3282,7 +3282,7 @@ defined in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b::data:Style][data:Style]].
   verticalAlign vAlignSuper
 #+end_src
 
-The ~verbatim~ and ~code~ classes use a smaller 10 pt font size, because otherwise
+The ~verbatim~ and ~code~ classes use a smaller 0.8 em font size, because otherwise
 they look too big (because typically monospaced font tends to look bigger than
 non-monospaced font).
 
@@ -3378,7 +3378,7 @@ the latter here).
 #+begin_src haskell
 roundedRectangleLink :: Css
 roundedRectangleLink = do
-  fontSize (pt 10)
+  fontSize (em 0.8)
   color colorNowebLinkFg
   backgroundColor colorNowebLinkBg
   fontStyle italic
