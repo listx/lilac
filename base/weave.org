@@ -3132,6 +3132,7 @@ import Clay
     h6,
     height,
     hover,
+    hr,
     html,
     inlineBlock,
     italic,
@@ -3414,6 +3415,7 @@ h1 ? do
   fontSize (pt 36)
   marginTop (px 0)
   marginBottom (pt $ -16)
+<<css:h1 (title) underline>>
 h2 ? do
   fontSize (pt 26)
 h3 ? do
@@ -3435,6 +3437,16 @@ forM_ [h1, h2, h3, h4, h5, h6] $ \hN -> do
 
 Thanks to Haskell we can define some repetitive things here via a loop, instead
 of copy-pasting the same configuration across all headings.
+
+#+name: css:h1 (title) underline
+#+begin_src haskell
+hr ? do
+  border (px 0) solid colorCodeBorder
+  borderBottom (px 2) solid colorCodeBorder
+#+end_src
+
+The [[css:h1 (title) underline]] changes the horizontal rule (which is only used for
+the title) to look a bit subdued (without the default black color).
 
 ** Styled text
 

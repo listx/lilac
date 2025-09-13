@@ -57,6 +57,7 @@ import Clay
     h6,
     height,
     hover,
+    hr,
     html,
     inlineBlock,
     italic,
@@ -232,6 +233,9 @@ defaultCss = do
     fontSize (pt 36)
     marginTop (px 0)
     marginBottom (pt $ -16)
+  hr ? do
+    border (px 0) solid colorCodeBorder
+    borderBottom (px 2) solid colorCodeBorder
   h2 ? do
     fontSize (pt 26)
   h3 ? do
