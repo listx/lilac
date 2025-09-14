@@ -1062,7 +1062,8 @@ weaveToc cells = do
             weaveTocHeading =
               li_ [class_ $ "toc-level-" <> show heading.level] $ do
                 a_ [href_ $ "#" <> linkAnchor] $ do
-                  toHtml sectionText
+                  span_ [class_ "bold"] $ do
+                    toHtml sectionText
                   toHtmlRaw ("&ensp;" :: Text)
                   weaveProse heading.body
             sectionText = getSectionText heading
