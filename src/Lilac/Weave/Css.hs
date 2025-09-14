@@ -233,6 +233,7 @@ defaultCss = do
     "grid-area" -: "sidebar"
   footer ? do
     "grid-area" -: "footer"
+    marginLeft (px 20)
     div # ".lilac-stamp" ? do
       fontSans
       fontSize $ rem 0.8
