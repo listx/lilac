@@ -181,7 +181,7 @@ defaultCss = do
     minHeight (vh 100)
     display grid
     "grid-column-gap" -: "20px"
-    gridTemplateColumns [px 360, px 800, fr 1]
+    gridTemplateColumns [px 300, px 800, fr 1]
     "grid-template-rows" -: "auto 1fr auto"
     "grid-template-areas"
       -: """
