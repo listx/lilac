@@ -23,10 +23,18 @@ import Lilac.Types
         PTokenLink,
         PTokenMathFragment
       ),
+    ProjectConf (ProjectConf, homepage, name, repo, version),
     Prose (Prose, unProse),
     Style (Bold, Code, Italic, Smallcaps, Superscript, Verbatim),
     StyledText (StyledText, body, style),
-    WeaveConf (WeaveConf, archive, citeprocResult, originObjectPath, watch),
+    WeaveConf
+      ( WeaveConf,
+        archive,
+        citeprocResult,
+        originObjectPath,
+        projectConf,
+        watch
+      ),
     defaultOrgParserState,
     encodeGPath,
     nilOid,
@@ -97,9 +105,17 @@ getWovenPrettyFromPath path = do
         Left errMsg -> pure $ Left errMsg
         Right archive -> do
           result <- LW.prepareCitations inputOrgFileGPath object archive
-          let weaveConf =
+          let projectConf =
+                ProjectConf
+                  { name = "Test Project",
+                    homepage = Nothing,
+                    repo = Nothing,
+                    version = Nothing
+                  }
+              weaveConf =
                 WeaveConf
-                  { archive = archive,
+                  { projectConf = projectConf,
+                    archive = archive,
                     originObjectPath = inputOrgFileGPath,
                     citeprocResult = result,
                     watch = True

@@ -11,7 +11,15 @@ import Lilac.Types
   ( Archive (objects),
     GPath,
     Object,
-    WeaveConf (WeaveConf, archive, citeprocResult, originObjectPath, watch),
+    ProjectConf,
+    WeaveConf
+      ( WeaveConf,
+        archive,
+        citeprocResult,
+        originObjectPath,
+        projectConf,
+        watch
+      ),
     decodeGPath,
     defaultOrgParserState,
     encodeGPath,
@@ -134,7 +142,8 @@ type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [OsPath],
     outDir :: OsPath,
-    watch :: Bool
+    watch :: Bool,
+    projectConf :: OsPath
   }
 
 type CompileOpts :: Type
@@ -256,6 +265,18 @@ weaveOptsHandler =
                   """
                   Inject JS to make the HTML page live-reload.
                   Uses https://livejs.com/live.js.
+                  """
+            )
+        )
+    <*> ( option
+            readOsPath
+            ( long "project-conf"
+                <> metavar "PROJECT_CONF"
+                <> value (P.unsafeEncodeUtf ".lilac.json")
+                <> showDefault
+                <> help
+                  """
+                  Project configuration file.
                   """
             )
         )
@@ -425,16 +446,22 @@ tangle globalOpts tangleOpts archive = do
 
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
+  projectConf <- readProjectConf
   writeCssFile
-  mapM_ weaveArchiveFile $ weaveOpts.inputs
+  mapM_ (weaveArchiveFile projectConf) $ weaveOpts.inputs
   where
+    readProjectConf = do
+      input <- LU.readFileRobustly weaveOpts.projectConf
+      case LW.parseProjectConf input of
+        Left errMsg -> die errMsg
+        Right projectConf -> pure projectConf
     writeCssFile = do
       cssPath <- do
         cssDir <- P.encodeUtf "css"
         css <- P.encodeUtf "default.css"
         pure $ P.joinPath [weaveOpts.outDir, cssDir, css]
       LU.writeFileRobustly cssPath $ LWC.genCss
-    weaveArchiveFile inputPath = do
+    weaveArchiveFile projectConf inputPath = do
       text <- LU.readFileRobustly inputPath
       case eitherDecodeStrictText text :: Either String Archive of
         Left errMsg -> die errMsg
@@ -442,11 +469,21 @@ lilacWeave weaveOpts = do
           fp <- P.decodeUtf inputPath
           putStrLn $ "Weaving " <> fp
           sequence_
-            $ M.foldlWithKey' (weaveToDisk weaveOpts archive) [] archive.objects
+            $ M.foldlWithKey'
+              (weaveToDisk weaveOpts projectConf archive)
+              []
+              archive.objects
           putStrLn "Finished weaving."
 
-weaveToDisk :: WeaveOpts -> Archive -> [IO ()] -> GPath -> Object -> [IO ()]
-weaveToDisk weaveOpts archive acc objPath obj =
+weaveToDisk ::
+  WeaveOpts ->
+  ProjectConf ->
+  Archive ->
+  [IO ()] ->
+  GPath ->
+  Object ->
+  [IO ()]
+weaveToDisk weaveOpts projectConf archive acc objPath obj =
   let fp = decodeGPath objPath
       ext = P.unsafeEncodeUtf "html"
       outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
@@ -454,7 +491,8 @@ weaveToDisk weaveOpts archive acc objPath obj =
         result <- LW.prepareCitations objPath obj archive
         let weaveConf =
               WeaveConf
-                { archive = archive,
+                { projectConf = projectConf,
+                  archive = archive,
                   originObjectPath = objPath,
                   citeprocResult = result,
                   watch = weaveOpts.watch

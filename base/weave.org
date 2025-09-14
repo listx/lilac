@@ -1,7 +1,7 @@
 :PROPERTIES:
 :ID:       e4cc0d4f-b129-4d94-be1c-3c0212527ae7
 :END:
-#+title: Lilac Weave
+#+title: Weave
 
 #+lilac_maxHeadingLevel: 3
 
@@ -21,6 +21,109 @@ reasons:
   3) We want to eventually make our HTML pages interactive, and interactivity is
      easier in HTML.
 
+** Project configuration
+:PROPERTIES:
+:ID:       df128041-ada8-4d77-a373-111416002dae
+:END:
+
+The starting point of weaving is the concept of /project configuration/. Project
+configuration defines some global settings that apply to all weavable artifacts
+found in a [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]], which itself is composed of a collection of [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]]
+values. Project configuration is encoded in [[data:ProjectConf]].
+
+#+name: data:ProjectConf
+#+begin_src haskell
+type ProjectConf :: Type
+data ProjectConf = ProjectConf
+  { name :: Text,
+    homepage :: Maybe N.URI,
+    repo :: Maybe N.URI,
+    version :: Maybe Text
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+The fields are:
+
+  - name :: Name of the project. This is used in the [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]].
+
+  - homepage :: URL of the homepage. This is used as the link target to describe
+    the ~name~ in the navbar. It could very well be the case that this target
+    merely points to one of the other woven object files.
+
+  - repo :: URL of the source code repository (the assumption being that the Org
+    docs and tangled files are all open source and belonging to the same Gt
+    repo).
+
+  - version :: Human-friendly version information. This is used to describe the
+    version of the Org source code used for weaving; if possible, the ~repo~ field
+    should also reference the same version. If this is ~Nothing~, version
+    information is omitted from the woven output.
+
+Project configuration isn't part of [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] because it may be the case in
+the future that a single project could be used for multiple archive files.
+
+*** Simple project configuration
+
+The [[data:ProjectConf]] would be very difficult to use if we expect users to write
+the JSON version of it manually, because it is a precise type. So instead we let
+users write a simplified, "simple" version of it in JSON (as
+[[data:RawProjectConf]]). During weaving we parse this and convert it to
+[[data:ProjectConf]].
+
+#+name: data:RawProjectConf
+#+begin_src haskell
+type RawProjectConf :: Type
+data RawProjectConf = RawProjectConf
+  { name :: Text,
+    homepage :: Text,
+    repo :: Text,
+    version :: Text
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+#+name: f:parseRawProjectConf
+#+begin_src haskell
+parseRawProjectConf :: Text -> Either String RawProjectConf
+parseRawProjectConf = eitherDecodeStrictText
+#+end_src
+
+#+name: f:parseProjectConf
+#+begin_src haskell
+parseProjectConf :: Text -> Either String ProjectConf
+parseProjectConf input = case parseRawProjectConf input of
+  Left errMsg -> Left errMsg
+  Right rawProjectConf ->
+    Right
+      ProjectConf
+        { name = rawProjectConf.name,
+          homepage = N.parseURI $ T.unpack rawProjectConf.homepage,
+          repo = N.parseURI $ T.unpack rawProjectConf.repo,
+          version =
+            if T.null rawProjectConf.version
+              then Nothing
+              else Just rawProjectConf.version
+        }
+#+end_src
+
+*** Project configuration for Lilac
+
+We define the project configuration for Lilac itself in here, as a JSON file.
+
+#+name: json:RawProjectConfig for Lilac
+#+header: :tangle .lilac.json
+#+begin_src json
+{
+    "name": "Lilac",
+    "homepage": "https://github.com/listx/lilac",
+    "repo": "https://github.com/listx/lilac",
+    "version": "<<id:a8d786d5-8522-454b-971d-fa1b46c5aecc::Lilac version>>"
+}
+#+end_src
+
 ** Architecture
 :PROPERTIES:
 :ID:       8f5752c0-6162-4de6-9ceb-f78ba584722c
@@ -32,7 +135,7 @@ document, but JS is necessary for making things dynamic.
 
 At this stage, the architecture we have in mind for weaving is the following:
 
-  1) Convert the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] into HTML.
+  1) Convert the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] (found inside a [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]) into HTML.
 
   2) Generate CSS separately.
 
@@ -56,6 +159,7 @@ Weaving concerns are captured in [[file:../src/Lilac/Weave.hs]].
 module Lilac.Weave
   ( commonPrefix,
     getRelativePathWithoutSymlinks,
+    parseProjectConf,
     prepareCitations,
     renderAsText,
     weaveObject,
@@ -89,6 +193,7 @@ import Citeproc.CslJson
       ),
     parseCslJson,
   )
+import Data.Aeson (eitherDecodeStrictText)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
@@ -151,7 +256,9 @@ import Lilac.Types
         PTokenMathFragment,
         PTokenStyledText
       ),
+    ProjectConf (ProjectConf, homepage, name, repo, version),
     Prose (Prose, unProse),
+    RawProjectConf (homepage, name, repo, version),
     Style
       ( Bold,
         Code,
@@ -164,7 +271,13 @@ import Lilac.Types
       ),
     StyledText (StyledText, body, style),
     Table (caption, grid, meta),
-    WeaveConf (archive, citeprocResult, originObjectPath, watch),
+    WeaveConf
+      ( archive,
+        citeprocResult,
+        originObjectPath,
+        projectConf,
+        watch
+      ),
     decodeGPath,
     markingChars,
     markingCharsInvisible,
@@ -234,8 +347,9 @@ import Network.URI
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
-    Either (Right),
+    Either (Left, Right),
     Eq,
+    FilePath,
     IO,
     Identity,
     Int,
@@ -345,6 +459,10 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveCitation>>
 <<f:weaveBibliography>>
 <<f:weaveToc>>
+<<f:parseRawProjectConf>>
+<<f:parseProjectConf>>
+<<f:weaveNavbar>>
+<<f:weaveBreadcrumbs>>
 #+end_src
 
 * Generate HTML
@@ -368,7 +486,8 @@ available to all parsing functions in [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643:
 #+begin_src haskell
 type WeaveConf :: Type
 data WeaveConf = WeaveConf
-  { archive :: Archive,
+  { projectConf :: ProjectConf,
+    archive :: Archive,
     originObjectPath :: GPath,
     citeprocResult :: CP.Result Prose,
     watch :: Bool
@@ -444,7 +563,7 @@ weaveObject object = do
     <<HTML head>>
     body_ $ do
       div_ [class_ "navbar"] $ do
-        toHtml @Text "NAVBAR"
+        weaveNavbar
       nav_ [class_ "toc"] $ do
         ul_ $ do
           weaveToc object.orgDoc.cells
@@ -773,7 +892,7 @@ weaveDocMeta m = do
   case lookup "title" m of
     Nothing -> pure ()
     Just title -> do
-      h1_ [] $ toHtml title
+      h1_ [id_ "#"] $ toHtml title
       hr_ []
   f "author" $ p_ [class_ "doc-meta-author"]
   f "date" $ p_ [class_ "doc-meta-date"]
@@ -2769,6 +2888,97 @@ weaveToc cells =
       CBibliography {} -> (actions, prevLevel)
 #+end_src
 
+** Navigation bar
+
+The navigation bar is at the top of the page as a horizontal bar.
+
+#+name: f:weaveNavbar
+#+begin_src haskell
+weaveNavbar :: HtmlWeaver ()
+weaveNavbar = do
+  div_ [class_ "breadcrumbs"] $ do
+    weaveBreadcrumbs
+#+end_src
+
+One of the things in the navbar is the "breadcrumbs", which is the path that
+points to the current document. This path is constructed by starting with the
+project name, followed by the path to the object currently being woven, which is
+taken from the ~originObjectPath~ field from [[data:WeaveConf]].
+
+The breadcrumbs are made up of three pieces:
+
+  1) project name
+
+  2) middle
+
+  3) Org document name
+
+The middle part can be any number of intervening directory names (can be empty).
+Only the project name and Org document name are guaranteed to exist. This is
+because the project name comes from [[data:ProjectConf]], and the Org document name
+comes from the ~originObjectPath~ from [[data:WeaveConf]].
+
+The breadcrumbs are woven in [[f:weaveBreadcrumbs]].
+
+#+name: f:weaveBreadcrumbs
+#+begin_src haskell
+weaveBreadcrumbs :: HtmlWeaver ()
+weaveBreadcrumbs = do
+  weaveConf <- ask
+  weaveProjectName weaveConf.projectConf
+  let breadcrumbsTail =
+        map osPathDecoder
+          . P.splitDirectories
+          . P.unsafeEncodeUtf
+          $ decodeGPath weaveConf.originObjectPath
+      breadcrumbsMiddle = reverse . drop 1 $ reverse breadcrumbsTail
+      breadcrumbLast =
+        convertObjectExtensionToOrg . take 1 $ reverse breadcrumbsTail
+  forM_ breadcrumbsMiddle $ \breadcrumb -> do
+    weaveBreadcrumbSeparator
+    weaveBreadcrumb breadcrumb
+  forM_ breadcrumbLast $ \breadcrumb -> do
+    weaveBreadcrumbSeparator
+    a_ [href_ "#"] $ do
+      weaveBreadcrumb breadcrumb
+  where
+    osPathDecoder osp = case P.decodeUtf osp :: Maybe FilePath of
+      Nothing -> "LILAC_ERROR_INVALID_OSPATH"
+      Just fp -> T.pack fp
+    weaveProjectName :: ProjectConf -> HtmlWeaver ()
+    weaveProjectName projectConf = case projectConf.homepage of
+      Nothing -> do
+        weaveBreadcrumb projectConf.name
+      Just uri -> do
+        let homepageLinkTarget = T.pack $ N.uriToString id uri ""
+        a_ [href_ homepageLinkTarget] $ do
+          weaveBreadcrumb projectConf.name
+    weaveBreadcrumb :: Text -> HtmlWeaver ()
+    weaveBreadcrumb breadcrumb = do
+      span_ [class_ "breadcrumb"] $ do
+        toHtml breadcrumb
+    weaveBreadcrumbSeparator :: HtmlWeaver ()
+    weaveBreadcrumbSeparator = do
+      toHtml @Text " "
+      span_ [class_ "breadcrumb-separator"] $ do
+        toHtml @Text "/"
+      toHtml @Text " "
+    convertObjectExtensionToOrg :: [Text] -> [Text]
+    convertObjectExtensionToOrg [] = []
+    convertObjectExtensionToOrg (objName : rest) =
+      let parts = T.split (== '.') objName
+          withoutObjectExtension = drop 1 $ reverse parts
+          withOrgExtension = ".org" : withoutObjectExtension
+       in (T.concat $ reverse withOrgExtension) : rest
+#+end_src
+
+The ~convertObjectExtensionToOrg~ function converts something like ~foo.lobj~ into
+~foo.org~.
+
+The reliance on ~originObjectPath~ assumes that the archive has object paths that
+are relative to the repository root. It could be that this is not true, but we
+don't bother to handle that edge case here.
+
 ** Testing framework
 
 The tests here use Org files as input. The output are HTML documents. For the
@@ -2810,10 +3020,18 @@ import Lilac.Types
         PTokenLink,
         PTokenMathFragment
       ),
+    ProjectConf (ProjectConf, homepage, name, repo, version),
     Prose (Prose, unProse),
     Style (Bold, Code, Italic, Smallcaps, Superscript, Verbatim),
     StyledText (StyledText, body, style),
-    WeaveConf (WeaveConf, archive, citeprocResult, originObjectPath, watch),
+    WeaveConf
+      ( WeaveConf,
+        archive,
+        citeprocResult,
+        originObjectPath,
+        projectConf,
+        watch
+      ),
     defaultOrgParserState,
     encodeGPath,
     nilOid,
@@ -2919,9 +3137,17 @@ getWovenPrettyFromPath path = do
         Left errMsg -> pure $ Left errMsg
         Right archive -> do
           result <- LW.prepareCitations inputOrgFileGPath object archive
-          let weaveConf =
+          let projectConf =
+                ProjectConf
+                  { name = "Test Project",
+                    homepage = Nothing,
+                    repo = Nothing,
+                    version = Nothing
+                  }
+              weaveConf =
                 WeaveConf
-                  { archive = archive,
+                  { projectConf = projectConf,
+                    archive = archive,
                     originObjectPath = inputOrgFileGPath,
                     citeprocResult = result,
                     watch = True
@@ -3166,6 +3392,7 @@ import Clay
     sideRight,
     smallCaps,
     solid,
+    span,
     sticky,
     sup,
     table,
@@ -3340,7 +3567,7 @@ The ~<body>~ uses a CSS grid layout to create two columns, one for the table of
 contents on the left (250 pixels wide), and the second column for the main
 content (800 pixels).
 
-*** Navigation bar
+** Navigation bar
 :PROPERTIES:
 :ID:       35d768c0-3e2f-498a-8437-e4137c4500ba
 :END:
@@ -3351,10 +3578,11 @@ div # ".navbar" ? do
   "grid-area" -: "navbar"
   zIndex 1
   top $ px 0
-  height $ rem 3
+  height $ rem 4
   position sticky
   borderBottom (px 1) solid colorCodeBorder
   backgroundColor colorBg
+  <<css:breadcrumbs>>
 #+end_src
 
 We have to set the ~zIndex~ to 1 because otherwise code blocks can be displayed on
@@ -3365,7 +3593,7 @@ the bottom.
 
 #+name: css:navbar-height
 #+begin_src txt
-calc(3rem + 1px)
+calc(4rem + 1px)
 #+end_src
 
 The navbar causes a problem for links that point to elements inside the page,
@@ -3374,12 +3602,26 @@ top of the page, but the navbar will sit on top of it. So we have to adjust it.
 
 #+name: css:navbar-link-target-adjustment
 #+begin_src txt
-calc(3rem + 1px + 10px)
+calc(4rem + 1px + 10px)
 #+end_src
 
 See how this is used in [[id:7ce2cd61-ef7e-43bd-b0ee-b47c24cb3051][Internal links]].
 
-*** Table of contents (TOC)
+*** Breadcrumbs
+
+The breadcrumbs should be large and prominent at the top of the page.
+
+#+name: css:breadcrumbs
+#+begin_src haskell
+div # ".breadcrumbs" ? do
+  fontSans
+  fontSize $ rem 1.6
+  margin (px 12) 0 (px 10) (px 20)
+span # ".breadcrumb-separator" ? do
+  color colorBreadcrumbSeparator
+#+end_src
+
+** Table of contents (TOC)
 
 #+name: css:toc
 #+begin_src haskell
@@ -3880,6 +4122,9 @@ colorCodeBg = colorFrom "#f7f7f7"
 
 colorCodeBorder :: Color
 colorCodeBorder = colorFrom "#cccccc"
+
+colorBreadcrumbSeparator :: Color
+colorBreadcrumbSeparator = colorFrom "#888888"
 
 colorNowebLinkFg :: Color
 colorNowebLinkFg = colorFrom "#2161ac"

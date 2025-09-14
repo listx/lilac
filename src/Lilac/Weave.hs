@@ -1,6 +1,7 @@
 module Lilac.Weave
   ( commonPrefix,
     getRelativePathWithoutSymlinks,
+    parseProjectConf,
     prepareCitations,
     renderAsText,
     weaveObject,
@@ -34,6 +35,7 @@ import Citeproc.CslJson
       ),
     parseCslJson,
   )
+import Data.Aeson (eitherDecodeStrictText)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
@@ -96,7 +98,9 @@ import Lilac.Types
         PTokenMathFragment,
         PTokenStyledText
       ),
+    ProjectConf (ProjectConf, homepage, name, repo, version),
     Prose (Prose, unProse),
+    RawProjectConf (homepage, name, repo, version),
     Style
       ( Bold,
         Code,
@@ -109,7 +113,13 @@ import Lilac.Types
       ),
     StyledText (StyledText, body, style),
     Table (caption, grid, meta),
-    WeaveConf (archive, citeprocResult, originObjectPath, watch),
+    WeaveConf
+      ( archive,
+        citeprocResult,
+        originObjectPath,
+        projectConf,
+        watch
+      ),
     decodeGPath,
     markingChars,
     markingCharsInvisible,
@@ -179,8 +189,9 @@ import Network.URI
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
-    Either (Right),
+    Either (Left, Right),
     Eq,
+    FilePath,
     IO,
     Identity,
     Int,
@@ -313,7 +324,7 @@ weaveObject object = do
         ("" :: Text)
     body_ $ do
       div_ [class_ "navbar"] $ do
-        toHtml @Text "NAVBAR"
+        weaveNavbar
       nav_ [class_ "toc"] $ do
         ul_ $ do
           weaveToc object.orgDoc.cells
@@ -395,7 +406,7 @@ weaveDocMeta m = do
   case lookup "title" m of
     Nothing -> pure ()
     Just title -> do
-      h1_ [] $ toHtml title
+      h1_ [id_ "#"] $ toHtml title
       hr_ []
   f "author" $ p_ [class_ "doc-meta-author"]
   f "date" $ p_ [class_ "doc-meta-date"]
@@ -1107,3 +1118,75 @@ weaveToc cells =
       CParagraph {}
       CTable {}
       CBibliography {} -> (actions, prevLevel)
+
+parseRawProjectConf :: Text -> Either String RawProjectConf
+parseRawProjectConf = eitherDecodeStrictText
+
+parseProjectConf :: Text -> Either String ProjectConf
+parseProjectConf input = case parseRawProjectConf input of
+  Left errMsg -> Left errMsg
+  Right rawProjectConf ->
+    Right
+      ProjectConf
+        { name = rawProjectConf.name,
+          homepage = N.parseURI $ T.unpack rawProjectConf.homepage,
+          repo = N.parseURI $ T.unpack rawProjectConf.repo,
+          version =
+            if T.null rawProjectConf.version
+              then Nothing
+              else Just rawProjectConf.version
+        }
+
+weaveNavbar :: HtmlWeaver ()
+weaveNavbar = do
+  div_ [class_ "breadcrumbs"] $ do
+    weaveBreadcrumbs
+
+weaveBreadcrumbs :: HtmlWeaver ()
+weaveBreadcrumbs = do
+  weaveConf <- ask
+  weaveProjectName weaveConf.projectConf
+  let breadcrumbsTail =
+        map osPathDecoder
+          . P.splitDirectories
+          . P.unsafeEncodeUtf
+          $ decodeGPath weaveConf.originObjectPath
+      breadcrumbsMiddle = reverse . drop 1 $ reverse breadcrumbsTail
+      breadcrumbLast =
+        convertObjectExtensionToOrg . take 1 $ reverse breadcrumbsTail
+  forM_ breadcrumbsMiddle $ \breadcrumb -> do
+    weaveBreadcrumbSeparator
+    weaveBreadcrumb breadcrumb
+  forM_ breadcrumbLast $ \breadcrumb -> do
+    weaveBreadcrumbSeparator
+    a_ [href_ "#"] $ do
+      weaveBreadcrumb breadcrumb
+  where
+    osPathDecoder osp = case P.decodeUtf osp :: Maybe FilePath of
+      Nothing -> "LILAC_ERROR_INVALID_OSPATH"
+      Just fp -> T.pack fp
+    weaveProjectName :: ProjectConf -> HtmlWeaver ()
+    weaveProjectName projectConf = case projectConf.homepage of
+      Nothing -> do
+        weaveBreadcrumb projectConf.name
+      Just uri -> do
+        let homepageLinkTarget = T.pack $ N.uriToString id uri ""
+        a_ [href_ homepageLinkTarget] $ do
+          weaveBreadcrumb projectConf.name
+    weaveBreadcrumb :: Text -> HtmlWeaver ()
+    weaveBreadcrumb breadcrumb = do
+      span_ [class_ "breadcrumb"] $ do
+        toHtml breadcrumb
+    weaveBreadcrumbSeparator :: HtmlWeaver ()
+    weaveBreadcrumbSeparator = do
+      toHtml @Text " "
+      span_ [class_ "breadcrumb-separator"] $ do
+        toHtml @Text "/"
+      toHtml @Text " "
+    convertObjectExtensionToOrg :: [Text] -> [Text]
+    convertObjectExtensionToOrg [] = []
+    convertObjectExtensionToOrg (objName : rest) =
+      let parts = T.split (== '.') objName
+          withoutObjectExtension = drop 1 $ reverse parts
+          withOrgExtension = ".org" : withoutObjectExtension
+       in (T.concat $ reverse withOrgExtension) : rest

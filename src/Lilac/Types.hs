@@ -22,6 +22,8 @@ module Lilac.Types
     OrgParserConf (..),
     OrgParserState (..),
     PToken (..),
+    ProjectConf (..),
+    RawProjectConf (..),
     Prose (..),
     Style (..),
     StyleMask (..),
@@ -539,7 +541,8 @@ protocolsWeb =
 
 type WeaveConf :: Type
 data WeaveConf = WeaveConf
-  { archive :: Archive,
+  { projectConf :: ProjectConf,
+    archive :: Archive,
     originObjectPath :: GPath,
     citeprocResult :: CP.Result Prose,
     watch :: Bool
@@ -561,6 +564,26 @@ data Archive = Archive
     symbolPath :: Map LinkOid GPath,
     csls :: Map FilePath Text,
     bibs :: Map FilePath [CP.Reference (CslJson Text)]
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
+type ProjectConf :: Type
+data ProjectConf = ProjectConf
+  { name :: Text,
+    homepage :: Maybe N.URI,
+    repo :: Maybe N.URI,
+    version :: Maybe Text
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
+type RawProjectConf :: Type
+data RawProjectConf = RawProjectConf
+  { name :: Text,
+    homepage :: Text,
+    repo :: Text,
+    version :: Text
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

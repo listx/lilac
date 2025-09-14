@@ -91,6 +91,7 @@ import Clay
     sideRight,
     smallCaps,
     solid,
+    span,
     sticky,
     sup,
     table,
@@ -194,19 +195,25 @@ defaultCss = do
     "grid-area" -: "navbar"
     zIndex 1
     top $ px 0
-    height $ rem 3
+    height $ rem 4
     position sticky
     borderBottom (px 1) solid colorCodeBorder
     backgroundColor colorBg
+    div # ".breadcrumbs" ? do
+      fontSans
+      fontSize $ rem 1.6
+      margin (px 12) 0 (px 10) (px 20)
+    span # ".breadcrumb-separator" ? do
+      color colorBreadcrumbSeparator
 
   nav # ".toc" ? do
     "grid-area" -: "toc"
     fontSans
     "height"
       -: """
-         calc(100vh - calc(3rem + 1px))
+         calc(100vh - calc(4rem + 1px))
          """
-    "top" -: "calc(3rem + 1px)"
+    "top" -: "calc(4rem + 1px)"
     position sticky
     overflowY auto
     "align-self" -: "start"
@@ -337,7 +344,7 @@ defaultCss = do
         margin 0 (em (-0.2)) 0 0
 
   ":target" & do
-    "scroll-margin-top" -: "calc(3rem + 1px + 10px)"
+    "scroll-margin-top" -: "calc(4rem + 1px + 10px)"
 
   pre ? do
     noMargin
@@ -510,6 +517,9 @@ colorCodeBg = colorFrom "#f7f7f7"
 
 colorCodeBorder :: Color
 colorCodeBorder = colorFrom "#cccccc"
+
+colorBreadcrumbSeparator :: Color
+colorBreadcrumbSeparator = colorFrom "#888888"
 
 colorNowebLinkFg :: Color
 colorNowebLinkFg = colorFrom "#2161ac"
