@@ -464,6 +464,8 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveNavbar>>
 <<f:weaveBreadcrumbs>>
 <<f:weaveFooter>>
+<<f:weaveMain>>
+<<f:weaveSidebar>>
 #+end_src
 
 * Generate HTML
@@ -549,8 +551,9 @@ The top-level weaving function is [[f:weaveObject]], which weaves a [[id:01da95f
 value.
 
 The [[f:weaveObject]] function sets up the main HTML bits (like the title, head,
-style sheets, etc), before finally delegating to [[f:weaveCell]] for the bulk of the
-work.
+style sheets, etc), before finally delegating to various helper functions:
+
+[[f:weaveCell]] for the bulk of the work.
 
 #+name: f:weaveObject
 #+begin_src haskell
@@ -563,42 +566,11 @@ weaveObject object = do
   doctypehtml_ $ do
     <<HTML head>>
     body_ $ do
-      div_ [class_ "navbar"] $ do
-        weaveNavbar
-      nav_ [class_ "toc"] $ do
-        ul_ $ do
-          weaveToc object.orgDoc.cells
-      main_ $ do
-        weaveDocMeta object.orgDoc.meta
-        forM_ rearrangedCells weaveCell
-      aside_ [class_ "sidebar"] $ do
-        toHtml @Text "SIDEBAR"
+      weaveNavbar
+      weaveToc object.orgDoc.cells
+      weaveMain object.orgDoc
+      weaveSidebar
       weaveFooter
-  where
-    rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
-    beforeFootnotes = takeWhile (not . isFootnote) object.orgDoc.cells
-    afterFootnotes =
-      dropWhile isFootnote
-        $ dropWhile (not . isFootnote) object.orgDoc.cells
-    sortedFootnotes =
-      sortOn getSortingKey
-        $ takeWhile isFootnote
-        $ dropWhile (not . isFootnote) object.orgDoc.cells
-    getSortingKey cell
-      | (CFootnote footnote) <- cell,
-        Just n <- lookup footnote.name object.orgDoc.footnoteNumbers =
-          n
-      | otherwise = maxBound :: Int
-    isFootnote = \case
-      CFootnote {} -> True
-      CBlock {}
-      CFigure {}
-      CHeading {}
-      CListItem {}
-      CMathFragment {}
-      CParagraph {}
-      CTable {}
-      CBibliography {} -> False
 #+end_src
 
 The use of ~toHtml~ is to help Haskell infer the correct type. This is because
@@ -879,6 +851,42 @@ getSectionText heading =
     . map T.show
     . reverse
     $ heading.section
+#+end_src
+
+** Main content
+
+#+name: f:weaveMain
+#+begin_src haskell
+weaveMain :: OrgDoc -> HtmlWeaver ()
+weaveMain orgDoc = do
+  main_ $ do
+    weaveDocMeta orgDoc.meta
+    forM_ rearrangedCells weaveCell
+  where
+    rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
+    beforeFootnotes = takeWhile (not . isFootnote) orgDoc.cells
+    afterFootnotes =
+      dropWhile isFootnote
+        $ dropWhile (not . isFootnote) orgDoc.cells
+    sortedFootnotes =
+      sortOn getSortingKey
+        $ takeWhile isFootnote
+        $ dropWhile (not . isFootnote) orgDoc.cells
+    getSortingKey cell
+      | (CFootnote footnote) <- cell,
+        Just n <- lookup footnote.name orgDoc.footnoteNumbers =
+          n
+      | otherwise = maxBound :: Int
+    isFootnote = \case
+      CFootnote {} -> True
+      CBlock {}
+      CFigure {}
+      CHeading {}
+      CListItem {}
+      CMathFragment {}
+      CParagraph {}
+      CTable {}
+      CBibliography {} -> False
 #+end_src
 
 ** Document metadata
@@ -2852,9 +2860,11 @@ tags (with ~</ul>~).
 #+name: f:weaveToc
 #+begin_src haskell
 weaveToc :: [Cell] -> HtmlWeaver ()
-weaveToc cells =
-  let actions = reverse . fst $ foldl' f ([], 1) cells
-   in sequence_ actions
+weaveToc cells = do
+  nav_ [class_ "toc"] $ do
+    ul_ $ do
+      let actions = reverse . fst $ foldl' f ([], 1) cells
+      sequence_ actions
   where
     f :: ([HtmlWeaver ()], Int) -> Cell -> ([HtmlWeaver ()], Int)
     f (actions, prevLevel) = \case
@@ -2899,8 +2909,9 @@ The navigation bar is at the top of the page as a horizontal bar.
 #+begin_src haskell
 weaveNavbar :: HtmlWeaver ()
 weaveNavbar = do
-  div_ [class_ "breadcrumbs"] $ do
-    weaveBreadcrumbs
+  div_ [class_ "navbar"] $ do
+    div_ [class_ "breadcrumbs"] $ do
+      weaveBreadcrumbs
 #+end_src
 
 One of the things in the navbar is the "breadcrumbs", which is the path that
@@ -2981,6 +2992,16 @@ The ~convertObjectExtensionToOrg~ function converts something like ~foo.lobj~ in
 The reliance on ~originObjectPath~ assumes that the archive has object paths that
 are relative to the repository root. It could be that this is not true, but we
 don't bother to handle that edge case here.
+
+** Sidebar
+
+#+name: f:weaveSidebar
+#+begin_src haskell
+weaveSidebar :: HtmlWeaver ()
+weaveSidebar = do
+  aside_ [class_ "sidebar"] $ do
+    toHtml @Text "SIDEBAR"
+#+end_src
 
 ** Footer
 
