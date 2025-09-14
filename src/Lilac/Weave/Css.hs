@@ -371,7 +371,6 @@ defaultCss = do
     borderTopLeftRadius (px 5) (px 5)
     borderTopRightRadius (px 5) (px 5)
     fontSans
-    fontStyle italic
   ".code-block-body" & do
     margin 0 0 (em 1) 0
     fontMono
@@ -464,7 +463,6 @@ roundedRectangleLink = do
   fontSize (em 0.8)
   color colorNowebLinkFg
   backgroundColor colorNowebLinkBg
-  fontStyle italic
   ev borderRadius (px 5)
   yx padding 0 (px 5)
   yx margin (px 2) 0
