@@ -154,7 +154,6 @@ import Lucid
     href_,
     id_,
     img_,
-    li_,
     link_,
     main_,
     meta_,
@@ -177,7 +176,6 @@ import Lucid
     toHtmlRaw,
     tr_,
     type_,
-    ul_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -1051,35 +1049,32 @@ weaveBibliography = do
 weaveToc :: [Cell] -> HtmlWeaver ()
 weaveToc cells = do
   nav_ [class_ "toc"] $ do
-    ul_ $ do
-      let actions = reverse . fst $ foldl' f ([], 1) cells
-      sequence_ actions
+    let (actions, lastHeadingLevel) = foldl' f ([], 0) cells
+    sequence_ $ reverse actions
+    when (lastHeadingLevel > 0) $ do
+      closeHeadingLevels lastHeadingLevel
   where
     f :: ([HtmlWeaver ()], Int) -> Cell -> ([HtmlWeaver ()], Int)
     f (actions, prevLevel) = \case
       CHeading heading ->
         let weaveTocHeading :: HtmlWeaver ()
-            weaveTocHeading =
-              li_ [class_ $ "toc-level-" <> show heading.level] $ do
-                a_ [href_ $ "#" <> linkAnchor] $ do
-                  span_ [class_ "bold"] $ do
-                    toHtml sectionText
-                  toHtmlRaw ("&ensp;" :: Text)
-                  weaveProse heading.body
-            sectionText = getSectionText heading
+            weaveTocHeading = do
+              toHtmlRaw ("<li class=\"toc-level-" <> show heading.level <> "\">" :: Text)
+              a_ [href_ $ "#" <> linkAnchor] $ do
+                weaveProse heading.body
             linkAnchor = getLinkAnchor $ CHeading heading
-            unnestLevel :: Int -> HtmlWeaver ()
-            unnestLevel levelDiff =
-              forM_ [1 .. levelDiff] $ \_ -> weaveListMarker LUnorderedEnd
             action :: HtmlWeaver ()
             action
               | prevLevel < heading.level = do
-                  weaveListMarker LUnorderedStart
+                  weaveListMarker LOrderedStart
                   weaveTocHeading
               | prevLevel > heading.level = do
-                  unnestLevel (prevLevel - heading.level)
+                  closeHeadingLevels (prevLevel - heading.level)
+                  weaveListMarker LItemEnd
                   weaveTocHeading
-              | otherwise = weaveTocHeading
+              | otherwise = do
+                  weaveListMarker LItemEnd
+                  weaveTocHeading
          in (action : actions, heading.level)
       CFootnote {}
       CBlock {}
@@ -1089,6 +1084,11 @@ weaveToc cells = do
       CParagraph {}
       CTable {}
       CBibliography {} -> (actions, prevLevel)
+    closeHeadingLevels :: Int -> HtmlWeaver ()
+    closeHeadingLevels levelDiff =
+      forM_ [1 .. levelDiff] $ \_ -> do
+        weaveListMarker LItemEnd
+        weaveListMarker LOrderedEnd
 
 parseRawProjectConf :: Text -> Either String RawProjectConf
 parseRawProjectConf = eitherDecodeStrictText

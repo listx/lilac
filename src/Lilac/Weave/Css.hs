@@ -59,8 +59,10 @@ import Clay
     hover,
     hr,
     html,
+    indent,
     inlineBlock,
     italic,
+    li,
     listStyleType,
     main_,
     margin,
@@ -73,8 +75,10 @@ import Clay
     nav,
     none,
     normal,
+    ol,
     overflowY,
     padding,
+    paddingLeft,
     pct,
     position,
     pre,
@@ -99,11 +103,11 @@ import Clay
     td,
     textAlign,
     textDecoration,
+    textIndent,
     th,
     thead,
     top,
     tr,
-    ul,
     underline,
     vAlignSub,
     vAlignSuper,
@@ -217,15 +221,18 @@ defaultCss = do
     position sticky
     overflowY auto
     "align-self" -: "start"
-    ul ? do
-      padding (px 0) (px 20) (px 0) (px 20)
+    padding (px 0) (px 20) (px 0) (px 20)
+    ol ? do
+      paddingLeft $ em 1.5
+      textIndent (indent . em $ -1.5)
+      "counter-reset" -: "toc-section"
+      listStyleType none
+    li ? do
+      "::before" & do
+        "counter-increment" -: "toc-section"
+        "content" -: "counters(toc-section, \".\") \" \""
+        fontWeight bold
     borderRight (px 1) solid colorCodeBorder
-  ".toc-level-1" & do
-    listStyleType none
-  ".toc-level-2" & do
-    listStyleType none
-  ".toc-level-3" & do
-    listStyleType none
   main_ ? do
     "grid-area" -: "main"
     marginLeft (px 20)
