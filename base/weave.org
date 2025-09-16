@@ -3462,7 +3462,6 @@ import Clay
     div,
     em,
     figcaption,
-    fitContent,
     flex,
     flexDirection,
     float,
@@ -3499,7 +3498,6 @@ import Clay
     marginRight,
     marginTop,
     minHeight,
-    minWidth,
     monospace,
     nav,
     none,
@@ -3526,7 +3524,6 @@ import Clay
     smallCaps,
     solid,
     span,
-    sticky,
     sup,
     table,
     tbody,
@@ -3544,7 +3541,6 @@ import Clay
     verticalAlign,
     vh,
     width,
-    zIndex,
     (#),
     (&),
     (-:),
@@ -3674,7 +3670,6 @@ html ? do
 body ? do
   minHeight (vh 100)
   display grid
-  "grid-column-gap" -: "20px"
   gridTemplateColumns [px 300, px 800, fr 1]
   "grid-template-rows" -: "auto 1fr"
   "grid-template-areas"
@@ -3709,17 +3704,11 @@ content (800 pixels).
 #+begin_src haskell
 div # ".navbar" ? do
   "grid-area" -: "navbar"
-  zIndex 1
-  top $ px 0
   height $ rem 4
-  position sticky
   borderBottom (px 1) solid colorCodeBorder
   backgroundColor colorBg
   <<css:breadcrumbs>>
 #+end_src
-
-We have to set the ~zIndex~ to 1 because otherwise code blocks can be displayed on
-top of the navbar when we scroll down the page.
 
 The total height of the navbar is \(3em + 1px\) because of the 1-pixel border at
 the bottom.
@@ -3755,13 +3744,13 @@ span # ".breadcrumb-separator" ? do
 ** Table of contents (TOC)
 
 The TOC is sticky and scrolls independently of the main content; it does this
-with [[css:Sticky under navbar]].
+with [[css:Column under navbar]].
 
 #+name: css:toc
 #+begin_src haskell
 nav # ".toc" ? do
   "grid-area" -: "toc"
-  <<css:Sticky under navbar>>
+  <<css:Column under navbar>>
   fontSans
   ol ? do
     marginTop $ px 0
@@ -3777,19 +3766,16 @@ nav # ".toc" ? do
   borderRight (px 1) solid colorCodeBorder
 #+end_src
 
-To be sticky under the navbar, we have to set the ~top~ property to be calculated
-based on the height of the navbar.
+Columns under the navbar each have their own scrollbars. In order to do this
+they need to have their ~height~ defined.
 
-#+name: css:Sticky under navbar
+#+name: css:Column under navbar
 #+begin_src haskell
 "height"
   -: """
      calc(100vh - <<css:navbar-height>>)
      """
-"top" -: "<<css:navbar-height>>"
-position sticky
 overflowY auto
-"align-self" -: "start"
 padding (px 0) (px 20) (px 0) (px 20)
 #+end_src
 
@@ -3800,7 +3786,7 @@ padding (px 0) (px 20) (px 0) (px 20)
 main_ ? do
   "grid-area" -: "main"
   marginLeft (px 20)
-  <<css:Sticky under navbar>>
+  <<css:Column under navbar>>
   paddingLeft (px 24)
   p # ".main-bottom-spacer" ? do
     yx margin (px 40) 0
@@ -3810,13 +3796,13 @@ main_ ? do
 
 The sidebar should be similar to the TOC, in that it remains sticky in a fixed
 position, while still being independently scrollable from the main content. This
-is done by reusing the settings from [[css:Sticky under navbar]].
+is done by reusing the settings from [[css:Column under navbar]].
 
 #+name: css:Sidebar
 #+begin_src haskell
 aside ? do
   "grid-area" -: "sidebar"
-  <<css:Sticky under navbar>>
+  <<css:Column under navbar>>
   fontSans
   borderLeft (px 1) solid colorCodeBorder
   display flex

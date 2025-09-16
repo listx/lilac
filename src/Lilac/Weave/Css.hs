@@ -38,7 +38,6 @@ import Clay
     div,
     em,
     figcaption,
-    fitContent,
     flex,
     flexDirection,
     float,
@@ -75,7 +74,6 @@ import Clay
     marginRight,
     marginTop,
     minHeight,
-    minWidth,
     monospace,
     nav,
     none,
@@ -102,7 +100,6 @@ import Clay
     smallCaps,
     solid,
     span,
-    sticky,
     sup,
     table,
     tbody,
@@ -120,7 +117,6 @@ import Clay
     verticalAlign,
     vh,
     width,
-    zIndex,
     (#),
     (&),
     (-:),
@@ -192,7 +188,6 @@ defaultCss = do
   body ? do
     minHeight (vh 100)
     display grid
-    "grid-column-gap" -: "20px"
     gridTemplateColumns [px 300, px 800, fr 1]
     "grid-template-rows" -: "auto 1fr"
     "grid-template-areas"
@@ -204,10 +199,7 @@ defaultCss = do
     overflowY hidden
   div # ".navbar" ? do
     "grid-area" -: "navbar"
-    zIndex 1
-    top $ px 0
     height $ rem 4
-    position sticky
     borderBottom (px 1) solid colorCodeBorder
     backgroundColor colorBg
     div # ".breadcrumbs" ? do
@@ -223,10 +215,7 @@ defaultCss = do
       -: """
          calc(100vh - calc(4rem + 1px))
          """
-    "top" -: "calc(4rem + 1px)"
-    position sticky
     overflowY auto
-    "align-self" -: "start"
     padding (px 0) (px 20) (px 0) (px 20)
     fontSans
     ol ? do
@@ -249,10 +238,7 @@ defaultCss = do
       -: """
          calc(100vh - calc(4rem + 1px))
          """
-    "top" -: "calc(4rem + 1px)"
-    position sticky
     overflowY auto
-    "align-self" -: "start"
     padding (px 0) (px 20) (px 0) (px 20)
     paddingLeft (px 24)
     p # ".main-bottom-spacer" ? do
@@ -264,10 +250,7 @@ defaultCss = do
       -: """
          calc(100vh - calc(4rem + 1px))
          """
-    "top" -: "calc(4rem + 1px)"
-    position sticky
     overflowY auto
-    "align-self" -: "start"
     padding (px 0) (px 20) (px 0) (px 20)
     fontSans
     borderLeft (px 1) solid colorCodeBorder
