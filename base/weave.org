@@ -3077,7 +3077,7 @@ weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
 weaveTangledBlocksList blocks = do
   div_ [class_ "tangled-blocks"] $ do
     p_ [class_ "widget-title"] $ do
-      toHtml @Text "Tangled Blocks"
+      toHtml @Text "Tangled Files"
     let tangledBlocks = catMaybes $ map getTangled blocks
     when (not $ null tangledBlocks) $ do
       ol_ [] $ do
