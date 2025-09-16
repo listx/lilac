@@ -1538,7 +1538,8 @@ weaveTable table = do
         forM_ (rows visibleRows) $ \row ->
           if row == [Prose []]
             then do
-              tr_ [class_ "table-horizontal-line"] ""
+              tr_ [class_ "table-horizontal-line"] $ do
+                td_ [] $ toHtml @Text ""
             else do
               tr_ [] $ do
                 forM_ row $ \prose -> do
