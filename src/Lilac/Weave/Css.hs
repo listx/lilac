@@ -33,11 +33,14 @@ import Clay
     code,
     collapse,
     color,
+    column,
     display,
     div,
     em,
     figcaption,
     fitContent,
+    flex,
+    flexDirection,
     float,
     floatLeft,
     fontFamily,
@@ -266,6 +269,8 @@ defaultCss = do
     padding (px 0) (px 20) (px 0) (px 20)
     fontSans
     borderLeft (px 1) solid colorCodeBorder
+    display flex
+    flexDirection column
     div # ".tangled-blocks" ? do
       ol ? do
         paddingLeft $ rem 1
@@ -274,10 +279,9 @@ defaultCss = do
   footer ? do
     marginLeft (px 20)
     marginRight (px 20)
-    "height" -: "4rem"
-    bottom $ px 0
-    position sticky
+    marginTop auto
     div # ".lilac-stamp" ? do
+      textAlign $ alignSide sideRight
       fontSans
       fontSize $ rem 0.8
       marginBottom (px 10)
