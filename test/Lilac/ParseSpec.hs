@@ -342,8 +342,8 @@ parseSpec = do
 
   shouldFailWithMessage
     "0004-headings"
-    "found 7 asterisks found for this heading, but lilac_maxHeadingLevel = 6"
-    46
+    "found 4 asterisks found for this heading, but lilac_maxHeadingLevel = 3"
+    19
 
   shouldParseWithState
     "0004-headings-20"
@@ -395,8 +395,8 @@ parseSpec = do
 
   shouldFailWithMessage
     "0004-headings-limited"
-    "found 4 asterisks found for this heading, but lilac_maxHeadingLevel = 3"
-    46
+    "found 3 asterisks found for this heading, but lilac_maxHeadingLevel = 2"
+    39
 
   shouldFailWithMessage
     "0004-headings-prohibited"
@@ -406,7 +406,7 @@ parseSpec = do
   shouldFailWithMessage
     "0004-headings-cannot-skip-level"
     "headings may not skip levels (expected to see level 1 or 2, not 4)"
-    8
+    35
 
   describe "genHeadingSection" $ do
     it "gets the base case" $ do
@@ -1616,8 +1616,8 @@ parseSpec = do
 
   shouldFailWithMessage
     "0009-list-nesting-max"
-    "max nesting depth exceeded: cannot have more than 6 levels of list items"
-    88
+    "max nesting depth exceeded: cannot have more than 3 levels of list items"
+    37
 
   shouldFailWithMessage
     "0009-list-nesting-max-8"

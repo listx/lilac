@@ -273,8 +273,8 @@ data OrgParserConf = OrgParserConf
 defaultOrgParserConf :: OrgParserConf
 defaultOrgParserConf =
   OrgParserConf
-    { maxHeadingLevel = 6,
-      maxListLevel = 6
+    { maxHeadingLevel = 3,
+      maxListLevel = 3
     }
 
 type OrgParserState :: Type

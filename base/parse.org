@@ -3,8 +3,6 @@
 :END:
 #+title: Lilac Parse
 
-#+lilac_maxHeadingLevel: 3
-
 * Overview
 :PROPERTIES:
 :ID:       e16dd5c7-0a63-4c52-afe9-744fdf853643
@@ -1092,8 +1090,8 @@ data OrgParserConf = OrgParserConf
 defaultOrgParserConf :: OrgParserConf
 defaultOrgParserConf =
   OrgParserConf
-    { maxHeadingLevel = 6,
-      maxListLevel = 6
+    { maxHeadingLevel = 3,
+      maxListLevel = 3
     }
 #+end_src
 
@@ -6733,7 +6731,7 @@ describe "genHeadingOidStack" $ do
 
 ** Tests
 
-By default we only allow 6 levels of headings.
+By default we only allow 3 levels of headings.
 
 #+name: ti:0004-headings
 #+header: :tangle test/Lilac/ParseSpec/0004-headings
@@ -6751,11 +6749,11 @@ By default we only allow 6 levels of headings.
 #+begin_src haskell
 shouldFailWithMessage
   "0004-headings"
-  "found 7 asterisks found for this heading, but lilac_maxHeadingLevel = 6"
-  46
+  "found 4 asterisks found for this heading, but lilac_maxHeadingLevel = 3"
+  19
 #+end_src
 
-We can have many levels of headings beyond the 6 that we have by default, by
+We can have many levels of headings beyond the 3 that we have by default, by
 setting the [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][~lilac_maxHeadingLevel~]] metadata. We can set it to some high number,
 or set it to 0 (unlimited). First we demonstrate using a higher number, 20.
 
@@ -6851,13 +6849,13 @@ shouldParseWithState
     }
 #+end_src
 
-Here we set it to a number less than 6. This is useful for ensuring that we
+Here we set it to a number less than 3. This is useful for ensuring that we
 don't have too much nesting.
 
 #+name: ti:0004-headings-limited
 #+header: :tangle test/Lilac/ParseSpec/0004-headings-limited
 #+begin_src org
-,#+lilac_maxHeadingLevel: 3
+,#+lilac_maxHeadingLevel: 2
 ,* a
 ,** b
 ,*** c
@@ -6868,8 +6866,8 @@ don't have too much nesting.
 #+begin_src haskell
 shouldFailWithMessage
   "0004-headings-limited"
-  "found 4 asterisks found for this heading, but lilac_maxHeadingLevel = 3"
-  46
+  "found 3 asterisks found for this heading, but lilac_maxHeadingLevel = 2"
+  39
 #+end_src
 
 We can also prohibit headings entirely, by setting ~lilac_maxHeadingLevel~ to ~-1~.
@@ -6896,6 +6894,7 @@ cannot go from level 1 to level 4 (skipping over levels 2 and 3).
 #+name: ti:0004-headings-cannot-skip-level
 #+header: :tangle test/Lilac/ParseSpec/0004-headings-cannot-skip-level
 #+begin_src org
+,#+lilac_maxHeadingLevel: 6
 ,* a
 ,**** d
 #+end_src
@@ -6905,7 +6904,7 @@ cannot go from level 1 to level 4 (skipping over levels 2 and 3).
 shouldFailWithMessage
   "0004-headings-cannot-skip-level"
   "headings may not skip levels (expected to see level 1 or 2, not 4)"
-  8
+  35
 #+end_src
 
 * Drawers
@@ -9221,20 +9220,14 @@ Nesting is limited to 5 levels, for a total of 6 levels by default.
       - 3
 
         - 4
-
-          - 5
-
-            - 6
-
-              - 7
 #+end_src
 
 #+name: t:0009-list-nesting-max
 #+begin_src haskell
 shouldFailWithMessage
   "0009-list-nesting-max"
-  "max nesting depth exceeded: cannot have more than 6 levels of list items"
-  88
+  "max nesting depth exceeded: cannot have more than 3 levels of list items"
+  37
 #+end_src
 
 You can change this behavior with the ~lilac_maxListLevel~ [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extension]]. In the
