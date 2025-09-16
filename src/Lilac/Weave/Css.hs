@@ -245,7 +245,6 @@ defaultCss = do
   main_ ? do
     "grid-area" -: "main"
     marginLeft (px 20)
-    overflowX hidden
     "height"
       -: """
          calc(100vh - calc(4rem + 1px))
@@ -416,7 +415,6 @@ defaultCss = do
     ev borderRadius (px 5)
   ".code-block-container" & do
     yx margin (px 16) 0
-    minWidth fitContent
     position relative
     fontSize (rem 0.8)
     a ? do
@@ -431,6 +429,7 @@ defaultCss = do
     borderTopRightRadius (px 5) (px 5)
     fontSans
   ".code-block-body" & do
+    overflowX auto
     margin 0 0 (em 1) 0
     fontMono
     backgroundColor colorCodeBg
@@ -439,7 +438,6 @@ defaultCss = do
     borderBottomRightRadius (px 5) (px 5)
     border (px 1) solid colorCodeBorder
     yx padding (px 2) (px 8)
-    minWidth fitContent
   (".code-block-container" # hover) |> ".side-popup" ? do
     display block
     a # hover ? do
