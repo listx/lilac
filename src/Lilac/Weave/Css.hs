@@ -392,6 +392,7 @@ defaultCss = do
     fontSize (rem 0.8)
     a ? do
       fontSize (rem 0.8)
+      display inlineBlock
       yx margin (px 2) 0
   ".code-block-name" & do
     yx padding 0 (px 8)
@@ -494,7 +495,6 @@ roundedRectangleLink = do
   backgroundColor colorNowebLinkBg
   ev borderRadius (px 5)
   yx padding 0 (px 3)
-  display inlineBlock
   border (px 1) solid colorCodeBorder
   ":hover" & do
     border (px 1) solid colorNowebLinkFg
