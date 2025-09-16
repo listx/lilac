@@ -872,6 +872,7 @@ weaveMain orgDoc = do
   main_ $ do
     weaveDocMeta orgDoc.meta
     forM_ rearrangedCells weaveCell
+    p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
   where
     rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
     beforeFootnotes = takeWhile (not . isFootnote) orgDoc.cells
@@ -3798,6 +3799,8 @@ main_ ? do
   marginLeft (px 20)
   overflowX hidden
   <<css:Sticky under navbar>>
+  p # ".main-bottom-spacer" ? do
+    yx margin (px 40) 0
 #+end_src
 
 ** Sidebar
@@ -4151,6 +4154,10 @@ for the bibliographical entries when using ~#+print_bibliography:~.
 
 #+name: css:Citations
 #+begin_src haskell
+".bibliography" & do
+  marginTop (rem 1)
+".bib-ref" & do
+  marginTop (rem 0.5)
 ".csl-left-margin" & do
   float floatLeft
 ".csl-right-inline" & do

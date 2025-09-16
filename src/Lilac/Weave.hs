@@ -1208,6 +1208,7 @@ weaveMain orgDoc = do
   main_ $ do
     weaveDocMeta orgDoc.meta
     forM_ rearrangedCells weaveCell
+    p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
   where
     rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
     beforeFootnotes = takeWhile (not . isFootnote) orgDoc.cells

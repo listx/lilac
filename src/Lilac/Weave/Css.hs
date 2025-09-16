@@ -255,6 +255,8 @@ defaultCss = do
     overflowY auto
     "align-self" -: "start"
     padding (px 0) (px 20) (px 0) (px 20)
+    p # ".main-bottom-spacer" ? do
+      yx margin (px 40) 0
 
   aside ? do
     "grid-area" -: "sidebar"
@@ -485,6 +487,10 @@ defaultCss = do
   ".table-vertical-line-col" & do
     borderLeft (px 1) solid colorCodeBorder
 
+  ".bibliography" & do
+    marginTop (rem 1)
+  ".bib-ref" & do
+    marginTop (rem 0.5)
   ".csl-left-margin" & do
     float floatLeft
   ".csl-right-inline" & do
