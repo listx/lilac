@@ -386,7 +386,7 @@ weaveDocMeta m = do
   case lookup "title" m of
     Nothing -> pure ()
     Just title -> do
-      h1_ [id_ "#"] $ toHtml title
+      h1_ [id_ "top"] $ toHtml title
       hr_ [class_ "title-underline"]
   f "author" $ p_ [class_ "doc-meta-author"]
   f "date" $ p_ [class_ "doc-meta-date"]
@@ -1153,7 +1153,7 @@ weaveBreadcrumbs = do
     weaveBreadcrumb breadcrumb
   forM_ breadcrumbLast $ \breadcrumb -> do
     weaveBreadcrumbSeparator
-    a_ [href_ "#"] $ do
+    a_ [href_ "#top"] $ do
       weaveBreadcrumb breadcrumb
   where
     osPathDecoder osp = case P.decodeUtf osp :: Maybe FilePath of
