@@ -412,6 +412,11 @@ defaultCss = do
     borderTopLeftRadius (px 5) (px 5)
     borderTopRightRadius (px 5) (px 5)
     fontSans
+  ".code-block-tangle-path" & do
+    yx padding 0 (px 8)
+    border (px 1) solid colorCodeBorder
+    borderBottomWidth 0
+    fontSans
   ".code-block-body" & do
     overflowX auto
     margin 0 0 (em 1) 0

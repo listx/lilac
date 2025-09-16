@@ -530,10 +530,13 @@ weaveBlock block = do
     div_ [class_ "side-popup"] $ do
       a_ [href_ $ "#" <> linkAnchor] $ do
         toHtmlRaw ("&#x1F517;" :: String)
-    maybeAssignName
-    let bodyBorder = case lookup "name" block.meta of
-          Just _ -> ""
-          Nothing -> " fully-rounded"
+    maybeWeaveName
+    maybeWeaveTanglePath
+    let bodyBorder
+          | Nothing <- lookup "name" block.meta,
+            Nothing <- lookup "tangle" block.meta =
+              " fully-rounded"
+          | otherwise = ""
     pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
       let bodyText = getBlockContentsWithoutLinks block.body
       case lookup "__src_language" block.meta of
@@ -547,11 +550,20 @@ weaveBlock block = do
           toHtmlRaw =<< spliceLinks colorized links
         Nothing -> code_ $ toHtml bodyText
   where
-    maybeAssignName =
+    maybeWeaveName =
       case lookup "name" block.meta of
         Just name ->
           div_ [class_ "code-block-name"] $ do
             code_ $ toHtml name
+        Nothing -> pure ()
+    maybeWeaveTanglePath =
+      case lookup "tangle" block.meta of
+        Just path ->
+          div_ [class_ "code-block-tangle-path"] $ do
+            code_ $ do
+              span_ [class_ "bold"] $ do
+                toHtmlRaw @Text "&#x1F4C4; "
+                toHtml path
         Nothing -> pure ()
     getBlockContentsWithoutLinks :: [BToken] -> Text
     getBlockContentsWithoutLinks = T.concat . map bTokenToText
