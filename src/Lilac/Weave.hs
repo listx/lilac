@@ -1118,6 +1118,7 @@ weaveBreadcrumbs :: HtmlWeaver ()
 weaveBreadcrumbs = do
   weaveConf <- ask
   weaveProjectName weaveConf.projectConf
+  weaveProjectVersion weaveConf.projectConf
   let breadcrumbsTail =
         map osPathDecoder
           . P.splitDirectories
@@ -1145,6 +1146,10 @@ weaveBreadcrumbs = do
         let homepageLinkTarget = T.pack $ N.uriToString id uri ""
         a_ [href_ homepageLinkTarget] $ do
           weaveBreadcrumb projectConf.name
+    weaveProjectVersion :: ProjectConf -> HtmlWeaver ()
+    weaveProjectVersion projectConf = case projectConf.version of
+      Nothing -> pure ()
+      Just version -> toHtml $ " " <> version
     weaveBreadcrumb :: Text -> HtmlWeaver ()
     weaveBreadcrumb breadcrumb = do
       span_ [class_ "breadcrumb"] $ do

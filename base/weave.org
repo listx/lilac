@@ -2918,13 +2918,15 @@ points to the current document. This path is constructed by starting with the
 project name, followed by the path to the object currently being woven, which is
 taken from the ~originObjectPath~ field from [[data:WeaveConf]].
 
-The breadcrumbs are made up of three pieces:
+The breadcrumbs are made up of four pieces:
 
   1) project name
 
-  2) middle
+  2) (optional) project version
 
-  3) Org document name
+  3) middle
+
+  4) Org document name
 
 The middle part can be any number of intervening directory names (can be empty).
 Only the project name and Org document name are guaranteed to exist. This is
@@ -2939,6 +2941,7 @@ weaveBreadcrumbs :: HtmlWeaver ()
 weaveBreadcrumbs = do
   weaveConf <- ask
   weaveProjectName weaveConf.projectConf
+  weaveProjectVersion weaveConf.projectConf
   let breadcrumbsTail =
         map osPathDecoder
           . P.splitDirectories
@@ -2966,6 +2969,10 @@ weaveBreadcrumbs = do
         let homepageLinkTarget = T.pack $ N.uriToString id uri ""
         a_ [href_ homepageLinkTarget] $ do
           weaveBreadcrumb projectConf.name
+    weaveProjectVersion :: ProjectConf -> HtmlWeaver ()
+    weaveProjectVersion projectConf = case projectConf.version of
+      Nothing -> pure ()
+      Just version -> toHtml $ " " <> version
     weaveBreadcrumb :: Text -> HtmlWeaver ()
     weaveBreadcrumb breadcrumb = do
       span_ [class_ "breadcrumb"] $ do
