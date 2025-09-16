@@ -371,6 +371,8 @@ defaultCss = do
   ".code-block-container" & do
     minWidth fitContent
     position relative
+    a ? do
+      yx margin (px 2) 0
   ".code-block-name" & do
     yx padding 0 (px 8)
     border (px 1) solid colorCodeBorder
@@ -471,8 +473,7 @@ roundedRectangleLink = do
   color colorNowebLinkFg
   backgroundColor colorNowebLinkBg
   ev borderRadius (px 5)
-  yx padding 0 (px 5)
-  yx margin (px 2) 0
+  yx padding 0 (px 3)
   display inlineBlock
   border (px 1) solid colorCodeBorder
   ":hover" & do
