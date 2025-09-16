@@ -154,10 +154,12 @@ import Lucid
     href_,
     id_,
     img_,
+    li_,
     link_,
     main_,
     meta_,
     nav_,
+    ol_,
     p_,
     pre_,
     rel_,
@@ -237,6 +239,7 @@ import Relude
     sequence_,
     show,
     snd,
+    sort,
     sortOn,
     take,
     takeWhile,
@@ -325,8 +328,19 @@ weaveObject object = do
       weaveNavbar
       weaveToc object.orgDoc.cells
       weaveMain object.orgDoc
-      weaveSidebar
+      weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
       weaveFooter
+  where
+    getBlock = \case
+      CBlock block -> Just block
+      CHeading {}
+      CListItem {}
+      CParagraph {}
+      CMathFragment {}
+      CFigure {}
+      CTable {}
+      CFootnote {}
+      CBibliography {} -> Nothing
 
 weaveCell :: Cell -> HtmlWeaver ()
 weaveCell = \case
@@ -1220,7 +1234,27 @@ weaveMain orgDoc = do
       CTable {}
       CBibliography {} -> False
 
-weaveSidebar :: HtmlWeaver ()
-weaveSidebar = do
+weaveSidebar :: [Block] -> HtmlWeaver ()
+weaveSidebar blocks = do
   aside_ [class_ "sidebar"] $ do
-    toHtml @Text "SIDEBAR"
+    weaveTangledBlocksList blocks
+
+weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
+weaveTangledBlocksList blocks = do
+  div_ [class_ "tangled-blocks"] $ do
+    p_ [class_ "widget-title"] $ do
+      toHtml @Text "Tangled Blocks"
+    let tangledBlocks = catMaybes $ map getTangled blocks
+    when (not $ null tangledBlocks) $ do
+      ol_ [] $ do
+        forM_ (sort tangledBlocks) $ \(path, block) -> do
+          li_ [] $ do
+            let linkAnchor = getLinkAnchor $ CBlock block
+            a_ [href_ $ "#" <> linkAnchor] $ do
+              toHtml path
+  where
+    getTangled :: Block -> Maybe (Text, Block)
+    getTangled b
+      | Just path <- lookup "tangle" b.meta =
+          Just (path, b)
+      | otherwise = Nothing

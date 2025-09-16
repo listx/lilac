@@ -309,10 +309,12 @@ import Lucid
     href_,
     id_,
     img_,
+    li_,
     link_,
     main_,
     meta_,
     nav_,
+    ol_,
     p_,
     pre_,
     rel_,
@@ -392,6 +394,7 @@ import Relude
     sequence_,
     show,
     snd,
+    sort,
     sortOn,
     take,
     takeWhile,
@@ -462,6 +465,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveFooter>>
 <<f:weaveMain>>
 <<f:weaveSidebar>>
+<<f:weaveTangledBlocksList>>
 #+end_src
 
 * Generate HTML
@@ -565,8 +569,19 @@ weaveObject object = do
       weaveNavbar
       weaveToc object.orgDoc.cells
       weaveMain object.orgDoc
-      weaveSidebar
+      weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
       weaveFooter
+  where
+    getBlock = \case
+      CBlock block -> Just block
+      CHeading {}
+      CListItem {}
+      CParagraph {}
+      CMathFragment {}
+      CFigure {}
+      CTable {}
+      CFootnote {}
+      CBibliography {} -> Nothing
 #+end_src
 
 The use of ~toHtml~ is to help Haskell infer the correct type. This is because
@@ -3021,12 +3036,41 @@ don't bother to handle that edge case here.
 
 ** Sidebar
 
+The sidebar shows additional information about the current document.
+
 #+name: f:weaveSidebar
 #+begin_src haskell
-weaveSidebar :: HtmlWeaver ()
-weaveSidebar = do
+weaveSidebar :: [Block] -> HtmlWeaver ()
+weaveSidebar blocks = do
   aside_ [class_ "sidebar"] $ do
-    toHtml @Text "SIDEBAR"
+    weaveTangledBlocksList blocks
+#+end_src
+
+To better support Literate Programming, we list all files that are tangled from
+here in [[f:weaveTangledBlocksList]]. This goes through all code blocks that
+are tangled from the current document, and sorts them based on the tangled path.
+
+#+name: f:weaveTangledBlocksList
+#+begin_src haskell
+weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
+weaveTangledBlocksList blocks = do
+  div_ [class_ "tangled-blocks"] $ do
+    p_ [class_ "widget-title"] $ do
+      toHtml @Text "Tangled Blocks"
+    let tangledBlocks = catMaybes $ map getTangled blocks
+    when (not $ null tangledBlocks) $ do
+      ol_ [] $ do
+        forM_ (sort tangledBlocks) $ \(path, block) -> do
+          li_ [] $ do
+            let linkAnchor = getLinkAnchor $ CBlock block
+            a_ [href_ $ "#" <> linkAnchor] $ do
+              toHtml path
+  where
+    getTangled :: Block -> Maybe (Text, Block)
+    getTangled b
+      | Just path <- lookup "tangle" b.meta =
+          Just (path, b)
+      | otherwise = Nothing
 #+end_src
 
 ** Footer
@@ -3452,6 +3496,7 @@ import Clay
     normal,
     ol,
     overflowY,
+    p,
     padding,
     paddingLeft,
     pct,
@@ -3750,6 +3795,14 @@ is done by reusing the settings from [[css:Sticky under navbar]].
 aside ? do
   "grid-area" -: "sidebar"
   <<css:Sticky under navbar>>
+  borderLeft (px 1) solid colorCodeBorder
+  div # ".tangled-blocks" ? do
+    p # ".widget-title" ? do
+      fontWeight bold
+      marginBottom $ px 0
+    ol ? do
+      paddingLeft $ rem 1
+      marginTop $ px 0
 #+end_src
 
 ** Footer

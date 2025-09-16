@@ -77,6 +77,7 @@ import Clay
     normal,
     ol,
     overflowY,
+    p,
     padding,
     paddingLeft,
     pct,
@@ -250,6 +251,14 @@ defaultCss = do
     overflowY auto
     "align-self" -: "start"
     padding (px 0) (px 20) (px 0) (px 20)
+    borderLeft (px 1) solid colorCodeBorder
+    div # ".tangled-blocks" ? do
+      p # ".widget-title" ? do
+        fontWeight bold
+        marginBottom $ px 0
+      ol ? do
+        paddingLeft $ rem 1
+        marginTop $ px 0
 
   footer ? do
     "grid-area" -: "footer"

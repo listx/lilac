@@ -123,7 +123,7 @@ data BToken
   = BTokenString Text
   | BTokenPadding
   | BTokenLink Link
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Block :: Type
@@ -132,7 +132,7 @@ data Block = Block
     meta :: Map Text Text,
     body :: [BToken]
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Cell :: Type
