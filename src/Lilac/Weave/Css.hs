@@ -371,7 +371,9 @@ defaultCss = do
   ".code-block-container" & do
     minWidth fitContent
     position relative
+    fontSize (rem 0.8)
     a ? do
+      fontSize (rem 0.8)
       yx margin (px 2) 0
   ".code-block-name" & do
     yx padding 0 (px 8)
