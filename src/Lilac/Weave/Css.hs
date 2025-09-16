@@ -238,6 +238,17 @@ defaultCss = do
     marginLeft (px 20)
   aside ? do
     "grid-area" -: "sidebar"
+    fontSans
+    "height"
+      -: """
+         calc(100vh - calc(4rem + 1px))
+         """
+    "top" -: "calc(4rem + 1px)"
+    position sticky
+    overflowY auto
+    "align-self" -: "start"
+    padding (px 0) (px 20) (px 0) (px 20)
+
   footer ? do
     "grid-area" -: "footer"
     marginLeft (px 20)

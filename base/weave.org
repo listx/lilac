@@ -3634,8 +3634,7 @@ body ? do
 main_ ? do
   "grid-area" -: "main"
   marginLeft (px 20)
-aside ? do
-  "grid-area" -: "sidebar"
+<<css:Sidebar>>
 <<css:Footer>>
 div ? do
   noMargin
@@ -3701,20 +3700,14 @@ span # ".breadcrumb-separator" ? do
 
 ** Table of contents (TOC)
 
+The TOC is sticky and scrolls independently of the main content; it does this
+with [[css:Sticky under navbar]].
+
 #+name: css:toc
 #+begin_src haskell
 nav # ".toc" ? do
   "grid-area" -: "toc"
-  fontSans
-  "height"
-    -: """
-       calc(100vh - <<css:navbar-height>>)
-       """
-  "top" -: "<<css:navbar-height>>"
-  position sticky
-  overflowY auto
-  "align-self" -: "start"
-  padding (px 0) (px 20) (px 0) (px 20)
+  <<css:Sticky under navbar>>
   ol ? do
     paddingLeft $ em 1.5
     textIndent (indent . em $ -1.5)
@@ -3726,6 +3719,36 @@ nav # ".toc" ? do
       "content" -: "counters(toc-section, \".\") \" \""
       fontWeight bold
   borderRight (px 1) solid colorCodeBorder
+#+end_src
+
+To be sticky under the navbar, we have to set the ~top~ property to be calculated
+based on the height of the navbar.
+
+#+name: css:Sticky under navbar
+#+begin_src haskell
+fontSans
+"height"
+  -: """
+     calc(100vh - <<css:navbar-height>>)
+     """
+"top" -: "<<css:navbar-height>>"
+position sticky
+overflowY auto
+"align-self" -: "start"
+padding (px 0) (px 20) (px 0) (px 20)
+#+end_src
+
+** Sidebar
+
+The sidebar should be similar to the TOC, in that it remains sticky in a fixed
+position, while still being independently scrollable from the main content. This
+is done by reusing the settings from [[css:Sticky under navbar]].
+
+#+name: css:Sidebar
+#+begin_src haskell
+aside ? do
+  "grid-area" -: "sidebar"
+  <<css:Sticky under navbar>>
 #+end_src
 
 ** Footer
