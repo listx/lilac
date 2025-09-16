@@ -140,6 +140,8 @@ import Relude
     fromIntegral,
     otherwise,
     pure,
+    when,
+    zip,
     ($),
     (.),
     (<),
@@ -266,6 +268,8 @@ defaultCss = do
   hr ? do
     border (px 0) solid colorCodeBorder
     borderBottom (px 2) solid colorCodeBorder
+    ".title-underline" & do
+      marginBottom (rem 2)
   h2 ? do
     fontSize (pt 26)
   h3 ? do
@@ -276,9 +280,11 @@ defaultCss = do
     fontSize (pt 16)
   h6 ? do
     fontSize (pt 14)
-  forM_ [h1, h2, h3, h4, h5, h6] $ \hN -> do
+  forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) $ \(n, hN) -> do
     hN ? do
       fontSans
+      marginTop (px 0)
+      when (n > 1) $ marginBottom (px 0)
       a ? do
         color $ rgbHex 0
         ":visited" & do
@@ -380,6 +386,7 @@ defaultCss = do
   ".fully-rounded" & do
     ev borderRadius (px 5)
   ".code-block-container" & do
+    yx margin (px 16) 0
     minWidth fitContent
     position relative
     fontSize (rem 0.8)

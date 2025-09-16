@@ -374,7 +374,7 @@ weaveDocMeta m = do
     Nothing -> pure ()
     Just title -> do
       h1_ [id_ "#"] $ toHtml title
-      hr_ []
+      hr_ [class_ "title-underline"]
   f "author" $ p_ [class_ "doc-meta-author"]
   f "date" $ p_ [class_ "doc-meta-date"]
   where
