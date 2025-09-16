@@ -329,7 +329,6 @@ weaveObject object = do
       weaveToc object.orgDoc.cells
       weaveMain object.orgDoc
       weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
-      weaveFooter
   where
     getBlock = \case
       CBlock block -> Just block
@@ -1240,6 +1239,7 @@ weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
   aside_ [class_ "sidebar"] $ do
     weaveTangledBlocksList blocks
+    weaveFooter
 
 weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
 weaveTangledBlocksList blocks = do

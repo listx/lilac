@@ -56,6 +56,7 @@ import Clay
     h5,
     h6,
     height,
+    hidden,
     hover,
     hr,
     html,
@@ -68,6 +69,7 @@ import Clay
     margin,
     marginBottom,
     marginLeft,
+    marginRight,
     marginTop,
     minHeight,
     minWidth,
@@ -76,6 +78,7 @@ import Clay
     none,
     normal,
     ol,
+    overflowX,
     overflowY,
     p,
     padding,
@@ -91,7 +94,6 @@ import Clay
     renderWith,
     rgb,
     sansSerif,
-    scroll,
     serif,
     sideRight,
     smallCaps,
@@ -189,15 +191,14 @@ defaultCss = do
     display grid
     "grid-column-gap" -: "20px"
     gridTemplateColumns [px 300, px 800, fr 1]
-    "grid-template-rows" -: "auto 1fr auto"
+    "grid-template-rows" -: "auto 1fr"
     "grid-template-areas"
       -: """
          "navbar navbar navbar"
          "toc    main   sidebar"
-         "toc    footer sidebar"
          """
     yx margin (px 0) auto
-    overflowY scroll
+    overflowY hidden
   div # ".navbar" ? do
     "grid-area" -: "navbar"
     zIndex 1
@@ -215,7 +216,6 @@ defaultCss = do
 
   nav # ".toc" ? do
     "grid-area" -: "toc"
-    fontSans
     "height"
       -: """
          calc(100vh - calc(4rem + 1px))
@@ -225,6 +225,7 @@ defaultCss = do
     overflowY auto
     "align-self" -: "start"
     padding (px 0) (px 20) (px 0) (px 20)
+    fontSans
     ol ? do
       marginTop $ px 0
       paddingLeft $ em 1.5
@@ -237,12 +238,11 @@ defaultCss = do
         "content" -: "counters(toc-section, \".\") \" \""
         fontWeight bold
     borderRight (px 1) solid colorCodeBorder
+
   main_ ? do
     "grid-area" -: "main"
     marginLeft (px 20)
-  aside ? do
-    "grid-area" -: "sidebar"
-    fontSans
+    overflowX hidden
     "height"
       -: """
          calc(100vh - calc(4rem + 1px))
@@ -252,6 +252,19 @@ defaultCss = do
     overflowY auto
     "align-self" -: "start"
     padding (px 0) (px 20) (px 0) (px 20)
+
+  aside ? do
+    "grid-area" -: "sidebar"
+    "height"
+      -: """
+         calc(100vh - calc(4rem + 1px))
+         """
+    "top" -: "calc(4rem + 1px)"
+    position sticky
+    overflowY auto
+    "align-self" -: "start"
+    padding (px 0) (px 20) (px 0) (px 20)
+    fontSans
     borderLeft (px 1) solid colorCodeBorder
     div # ".tangled-blocks" ? do
       ol ? do
@@ -259,8 +272,11 @@ defaultCss = do
         marginTop $ px 0
 
   footer ? do
-    "grid-area" -: "footer"
     marginLeft (px 20)
+    marginRight (px 20)
+    "height" -: "4rem"
+    bottom $ px 0
+    position sticky
     div # ".lilac-stamp" ? do
       fontSans
       fontSize $ rem 0.8
@@ -381,9 +397,6 @@ defaultCss = do
         width (em 1)
         height (em 1)
         margin 0 (em (-0.2)) 0 0
-
-  ":target" & do
-    "scroll-margin-top" -: "calc(4rem + 1px + 10px)"
 
   pre ? do
     noMargin

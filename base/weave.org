@@ -570,7 +570,6 @@ weaveObject object = do
       weaveToc object.orgDoc.cells
       weaveMain object.orgDoc
       weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
-      weaveFooter
   where
     getBlock = \case
       CBlock block -> Just block
@@ -3046,6 +3045,7 @@ weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
   aside_ [class_ "sidebar"] $ do
     weaveTangledBlocksList blocks
+    weaveFooter
 #+end_src
 
 To better support Literate Programming, we list all files that are tangled from
@@ -3477,6 +3477,7 @@ import Clay
     h5,
     h6,
     height,
+    hidden,
     hover,
     hr,
     html,
@@ -3489,6 +3490,7 @@ import Clay
     margin,
     marginBottom,
     marginLeft,
+    marginRight,
     marginTop,
     minHeight,
     minWidth,
@@ -3497,6 +3499,7 @@ import Clay
     none,
     normal,
     ol,
+    overflowX,
     overflowY,
     p,
     padding,
@@ -3512,7 +3515,6 @@ import Clay
     renderWith,
     rgb,
     sansSerif,
-    scroll,
     serif,
     sideRight,
     smallCaps,
@@ -3668,20 +3670,17 @@ body ? do
   display grid
   "grid-column-gap" -: "20px"
   gridTemplateColumns [px 300, px 800, fr 1]
-  "grid-template-rows" -: "auto 1fr auto"
+  "grid-template-rows" -: "auto 1fr"
   "grid-template-areas"
     -: """
        "navbar navbar navbar"
        "toc    main   sidebar"
-       "toc    footer sidebar"
        """
   yx margin (px 0) auto
-  overflowY scroll
+  overflowY hidden
 <<css:navbar>>
 <<css:toc>>
-main_ ? do
-  "grid-area" -: "main"
-  marginLeft (px 20)
+<<css:Main content>>
 <<css:Sidebar>>
 <<css:Footer>>
 div ? do
@@ -3733,8 +3732,6 @@ top of the page, but the navbar will sit on top of it. So we have to adjust it.
 calc(4rem + 1px + 10px)
 #+end_src
 
-See how this is used in [[id:7ce2cd61-ef7e-43bd-b0ee-b47c24cb3051][Internal links]].
-
 *** Breadcrumbs
 
 The breadcrumbs should be large and prominent at the top of the page.
@@ -3759,6 +3756,7 @@ with [[css:Sticky under navbar]].
 nav # ".toc" ? do
   "grid-area" -: "toc"
   <<css:Sticky under navbar>>
+  fontSans
   ol ? do
     marginTop $ px 0
     paddingLeft $ em 1.5
@@ -3778,7 +3776,6 @@ based on the height of the navbar.
 
 #+name: css:Sticky under navbar
 #+begin_src haskell
-fontSans
 "height"
   -: """
      calc(100vh - <<css:navbar-height>>)
@@ -3788,6 +3785,17 @@ position sticky
 overflowY auto
 "align-self" -: "start"
 padding (px 0) (px 20) (px 0) (px 20)
+#+end_src
+
+** Main content
+
+#+name: css:Main content
+#+begin_src haskell
+main_ ? do
+  "grid-area" -: "main"
+  marginLeft (px 20)
+  overflowX hidden
+  <<css:Sticky under navbar>>
 #+end_src
 
 ** Sidebar
@@ -3801,6 +3809,7 @@ is done by reusing the settings from [[css:Sticky under navbar]].
 aside ? do
   "grid-area" -: "sidebar"
   <<css:Sticky under navbar>>
+  fontSans
   borderLeft (px 1) solid colorCodeBorder
   div # ".tangled-blocks" ? do
     ol ? do
@@ -3813,12 +3822,20 @@ aside ? do
 #+name: css:Footer
 #+begin_src haskell
 footer ? do
-  "grid-area" -: "footer"
   marginLeft (px 20)
+  marginRight (px 20)
+  "height" -: "<<css:Footer height>>"
+  bottom $ px 0
+  position sticky
   div # ".lilac-stamp" ? do
     fontSans
     fontSize $ rem 0.8
     marginBottom (px 10)
+#+end_src
+
+#+name: css:Footer height
+#+begin_src txt
+4rem
 #+end_src
 
 ** Headings
@@ -3931,21 +3948,6 @@ a ? do
     fontMono
     roundedRectangleLink
   <<css:Links (external)>>
-<<css:Move past navbar for internal links>>
-#+end_src
-
-*** Internal links
-:PROPERTIES:
-:ID:       7ce2cd61-ef7e-43bd-b0ee-b47c24cb3051
-:END:
-
-When we click on internal links, we want to scroll past down the navbar before
-ending at the target. For this, there is the ~scroll-margin-top~ property.
-
-#+name: css:Move past navbar for internal links
-#+begin_src haskell
-":target" & do
-  "scroll-margin-top" -: "<<css:navbar-link-target-adjustment>>"
 #+end_src
 
 *** External links
