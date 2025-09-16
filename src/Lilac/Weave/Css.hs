@@ -281,10 +281,10 @@ defaultCss = do
     textDecoration underline
   ".verbatim" & do
     fontMono
-    fontSize (em 0.8)
+    fontSize (em 0.9)
   ".code" & do
     fontMono
-    fontSize (em 0.8)
+    fontSize (em 0.9)
     backgroundColor colorCodeBg
     border (px 1) solid colorCodeBorder
     ev borderRadius (px 4)
@@ -467,7 +467,7 @@ defaultCss = do
 
 roundedRectangleLink :: Css
 roundedRectangleLink = do
-  fontSize (em 0.8)
+  fontSize (em 0.9)
   color colorNowebLinkFg
   backgroundColor colorNowebLinkBg
   ev borderRadius (px 5)
