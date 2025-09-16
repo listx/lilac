@@ -254,6 +254,7 @@ defaultCss = do
     overflowY auto
     "align-self" -: "start"
     padding (px 0) (px 20) (px 0) (px 20)
+    paddingLeft (px 24)
     p # ".main-bottom-spacer" ? do
       yx margin (px 40) 0
 

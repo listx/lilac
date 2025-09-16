@@ -1413,6 +1413,9 @@ isExternalLink = \case
 
 *** Link anchor
 
+The link anchor is necessary because some blocks will be anonymous and will not
+be linkable if we only try to link the block's name.
+
 The link anchor uses the link symbol "🔗" with Unicode code point ~U+1F517~.
 
 #+name: HTML link symbol
@@ -3798,6 +3801,7 @@ main_ ? do
   "grid-area" -: "main"
   marginLeft (px 20)
   <<css:Sticky under navbar>>
+  paddingLeft (px 24)
   p # ".main-bottom-spacer" ? do
     yx margin (px 40) 0
 #+end_src
