@@ -1069,6 +1069,8 @@ weaveBibliography = do
 weaveToc :: [Cell] -> HtmlWeaver ()
 weaveToc cells = do
   nav_ [class_ "toc"] $ do
+    p_ [class_ "widget-title"] $ do
+      toHtml @Text "Contents"
     let (actions, lastHeadingLevel) = foldl' f ([], 0) cells
     sequence_ $ reverse actions
     when (lastHeadingLevel > 0) $ do

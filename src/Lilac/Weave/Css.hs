@@ -226,6 +226,7 @@ defaultCss = do
     "align-self" -: "start"
     padding (px 0) (px 20) (px 0) (px 20)
     ol ? do
+      marginTop $ px 0
       paddingLeft $ em 1.5
       textIndent (indent . em $ -1.5)
       "counter-reset" -: "toc-section"
@@ -253,9 +254,6 @@ defaultCss = do
     padding (px 0) (px 20) (px 0) (px 20)
     borderLeft (px 1) solid colorCodeBorder
     div # ".tangled-blocks" ? do
-      p # ".widget-title" ? do
-        fontWeight bold
-        marginBottom $ px 0
       ol ? do
         paddingLeft $ rem 1
         marginTop $ px 0
@@ -269,6 +267,9 @@ defaultCss = do
       marginBottom (px 10)
   div ? do
     noMargin
+  p # ".widget-title" ? do
+    fontWeight bold
+    marginBottom $ px 0
 
   h1 ? do
     fontSize (pt 36)
