@@ -405,17 +405,12 @@ defaultCss = do
       fontSize (rem 0.8)
       display inlineBlock
       yx margin (px 2) 0
-  ".code-block-name" & do
+  ".code-block-meta" & do
     yx padding 0 (px 8)
     border (px 1) solid colorCodeBorder
     borderBottomWidth 0
     borderTopLeftRadius (px 5) (px 5)
     borderTopRightRadius (px 5) (px 5)
-    fontSans
-  ".code-block-tangle-path" & do
-    yx padding 0 (px 8)
-    border (px 1) solid colorCodeBorder
-    borderBottomWidth 0
     fontSans
   ".code-block-body" & do
     overflowX auto

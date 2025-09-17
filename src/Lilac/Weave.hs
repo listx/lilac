@@ -131,6 +131,7 @@ import Lucid
     aside_,
     async_,
     body_,
+    br_,
     charset_,
     class_,
     code_,
@@ -530,8 +531,7 @@ weaveBlock block = do
     div_ [class_ "side-popup"] $ do
       a_ [href_ $ "#" <> linkAnchor] $ do
         toHtmlRaw ("&#x1F517;" :: String)
-    maybeWeaveName
-    maybeWeaveTanglePath
+    maybeWeaveNameAndTanglePath
     let bodyBorder
           | Nothing <- lookup "name" block.meta,
             Nothing <- lookup "tangle" block.meta =
@@ -550,21 +550,26 @@ weaveBlock block = do
           toHtmlRaw =<< spliceLinks colorized links
         Nothing -> code_ $ toHtml bodyText
   where
-    maybeWeaveName =
-      case lookup "name" block.meta of
-        Just name ->
-          div_ [class_ "code-block-name"] $ do
+    maybeWeaveNameAndTanglePath
+      | Just name <- lookup "name" block.meta,
+        Just path <- lookup "tangle" block.meta =
+          div_ [class_ "code-block-meta"] $ do
             code_ $ toHtml name
-        Nothing -> pure ()
-    maybeWeaveTanglePath =
-      case lookup "tangle" block.meta of
-        Just path ->
-          div_ [class_ "code-block-tangle-path"] $ do
+            br_ []
             code_ $ do
               span_ [class_ "bold"] $ do
-                toHtmlRaw @Text "&#x1F4C4; "
+                toHtmlRaw @Text "&#x1F3AF; "
                 toHtml path
-        Nothing -> pure ()
+      | Just name <- lookup "name" block.meta =
+          div_ [class_ "code-block-meta"] $ do
+            code_ $ toHtml name
+      | Just path <- lookup "tangle" block.meta =
+          div_ [class_ "code-block-meta"] $ do
+            code_ $ do
+              span_ [class_ "bold"] $ do
+                toHtmlRaw @Text "&#x1F3AF; "
+                toHtml path
+      | otherwise = pure ()
     getBlockContentsWithoutLinks :: [BToken] -> Text
     getBlockContentsWithoutLinks = T.concat . map bTokenToText
       where
