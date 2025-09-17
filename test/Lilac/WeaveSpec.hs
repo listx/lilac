@@ -203,7 +203,7 @@ weaveSpec :: Spec
 weaveSpec = do
   weaveExpect
     "0300-weave-styled-text"
-    [ "<p>regular ",
+    [ "<p><span id=\"c-0\"></span>regular ",
       "<span class=\"bold\">bold</span> ",
       "<span class=\"italic\">italic</span> ",
       "<span class=\"underline\">underline</span> ",
@@ -221,19 +221,19 @@ weaveSpec = do
       [ """
         <ol>
           <li>
-            <p>
+            <p><span id="c-1"></span>
               a
             </p>
             <ul>
               <li>
-                <p>
+                <p><span id="c-3"></span>
                   b
                 </p>
               </li>
             </ul>
           </li>
           <li>
-            <p>
+            <p><span id="c-5"></span>
               c
             </p>
           </li>

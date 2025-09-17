@@ -14,6 +14,7 @@ import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
     FilePath,
+    Int,
     String,
     isRight,
     pure,
@@ -22,6 +23,7 @@ import Relude
   )
 import Test.Hspec
   ( Spec,
+    describe,
     expectationFailure,
     it,
     runIO,
@@ -311,3 +313,13 @@ compileSpec = do
             ]
         }
     ]
+
+  describe "cumulativeOffsets sanity check" $ do
+    it "works for empty case" $ do
+      let input = [] :: [(Int, String)]
+          output = [] :: [(Int, String)]
+      LC.cumulativeOffsets input `shouldBe` output
+    it "works for simple case" $ do
+      let input = [(3, "a"), (9, "b"), (1, "c"), (2, "d")] :: [(Int, String)]
+          output = [(0, "a"), (3, "b"), (12, "c"), (13, "d")] :: [(Int, String)]
+      LC.cumulativeOffsets input `shouldBe` output

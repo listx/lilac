@@ -1,5 +1,6 @@
 module Lilac.Compile
-  ( findCycles,
+  ( cumulativeOffsets,
+    findCycles,
     findExternalOids,
     makeRelativeToObjectPath,
     mkObject,
@@ -13,12 +14,24 @@ import Citeproc qualified as CP
 import Citeproc.CslJson (CslJson)
 import Data.Aeson (eitherDecodeStrictText)
 import Data.Graph qualified as G
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( Archive (Archive, bibs, csls, objects, symbolPath, symbols),
+  ( Archive
+      ( Archive,
+        bibs,
+        csls,
+        objects,
+        offsets,
+        offsetsInverted,
+        symbolEdges,
+        symbolPath,
+        symbols
+      ),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
     Cell
@@ -46,7 +59,7 @@ import Lilac.Types
     MathFragment (meta, parentOid),
     OID,
     Object (Object, externalOids, orgDoc, symbols),
-    OrgDoc (bibPaths, cells, cslPath, oid),
+    OrgDoc (bibPaths, cells, cslPath, oid, pseudoEdges),
     PToken
       ( PTokenCitation,
         PTokenDivEnd,
@@ -56,7 +69,9 @@ import Lilac.Types
         PTokenStyledText
       ),
     Prose (unProse),
+    PseudoEdge (PseudoEdge),
     Table (grid, meta, parentOid),
+    cellIdxToObjCell,
     decodeGPath,
     encodeGPath,
   )
@@ -65,6 +80,7 @@ import Relude
   ( Either (Left, Right),
     FilePath,
     IO,
+    Int,
     Map,
     Maybe (Just, Nothing),
     String,
@@ -73,6 +89,7 @@ import Relude
     concat,
     concatMap,
     elem,
+    filter,
     fmap,
     foldl',
     foldlM,
@@ -81,6 +98,7 @@ import Relude
     intercalate,
     length,
     map,
+    mapAccumL,
     mapM,
     maybeToList,
     mempty,
@@ -88,9 +106,11 @@ import Relude
     pure,
     repeat,
     show,
+    snd,
     sort,
     zip,
     ($),
+    (+),
     (.),
     (/=),
     (<$>),
@@ -98,7 +118,7 @@ import Relude
     (=<<),
     (>),
   )
-import Relude.Extra.Map (elems, insert, keys, lookup, member)
+import Relude.Extra.Map (elems, insert, keys, lookup, member, toPairs)
 import System.Exit (die)
 import System.OsPath qualified as P
 
@@ -111,11 +131,11 @@ mkObject orgDoc = do
         externalOids = findExternalOids orgDoc
       }
 
-mkSymbols :: OrgDoc -> Map LinkOid Cell
-mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
+mkSymbols :: OrgDoc -> Map LinkOid Int
+mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
   where
-    f cell = case cell of
-      CBlock block -> getSymbols block.parentOid block.meta cell
+    f (localCellIdx, cell) = case cell of
+      CBlock block -> getSymbols block.parentOid block.meta localCellIdx
       CHeading heading
         | Just oidText <- lookup "ID" heading.meta,
           Just oid <- LP.validateOidText oidText ->
@@ -123,19 +143,19 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
                   { oid = oid,
                     name = T.empty
                   },
-                cell
+                localCellIdx
               )
             ]
         | otherwise -> []
-      CFigure figure -> getSymbols figure.parentOid figure.meta cell
-      CMathFragment mathFragment -> getSymbols mathFragment.parentOid mathFragment.meta cell
-      CTable table -> getSymbols table.parentOid table.meta cell
+      CFigure figure -> getSymbols figure.parentOid figure.meta localCellIdx
+      CMathFragment mathFragment -> getSymbols mathFragment.parentOid mathFragment.meta localCellIdx
+      CTable table -> getSymbols table.parentOid table.meta localCellIdx
       CFootnote {}
       CListItem {}
       CParagraph {}
       CBibliography {} -> []
-    getSymbols :: OID -> Map Text Text -> Cell -> [(LinkOid, Cell)]
-    getSymbols parentOid cellMeta cell =
+    getSymbols :: OID -> Map Text Text -> Int -> [(LinkOid, Int)]
+    getSymbols parentOid cellMeta localCellIdx =
       let oids =
             if parentOid /= orgDoc.oid
               then [parentOid, orgDoc.oid]
@@ -148,7 +168,7 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
                     { oid = oid,
                       name = name
                     },
-                  cell
+                  localCellIdx
                 )
               ]
           | Just tanglePath <- lookup "tangle" cellMeta =
@@ -156,7 +176,7 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
                     { oid = oid,
                       name = tanglePath <> "\NUL"
                     },
-                  cell
+                  localCellIdx
                 )
               ]
           | otherwise = []
@@ -164,7 +184,8 @@ mkSymbols orgDoc = fromList $ concatMap f orgDoc.cells
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
   let (objects, symbols, symbolPath) =
-        foldl' concatObjs (mempty, mempty, mempty) pathObjs
+        foldl' concatObjs (mempty, mempty, mempty) offsetsFull
+      symbolEdges = foldl' (finalizeEdges symbols) [] offsetsFull
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
     concat
@@ -190,28 +211,52 @@ mkArchive pathObjs = do
               { objects = objects,
                 symbols = symbols,
                 symbolPath = symbolPath,
+                symbolEdges = symbolEdges,
+                offsets = offsets,
+                offsetsInverted = offsetsInverted,
                 csls = fromList csls,
                 bibs = fromList bibs
               }
   where
+    offsets :: IntMap GPath
+    offsets =
+      IntMap.fromList
+        $ map (\(offset, (path, _obj)) -> (offset, path)) offsetsFull
+    offsetsFull =
+      cumulativeOffsets
+        . filter (\(numCells, _) -> numCells > 0)
+        . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
+        $ sort pathObjs
+    offsetsInverted =
+      M.fromList . map (\(offset, path) -> (path, offset)) $ toPairs offsets
     concatObjs ::
-      (Map GPath Object, Map LinkOid Cell, Map LinkOid GPath) ->
-      (GPath, Object) ->
-      (Map GPath Object, Map LinkOid Cell, Map LinkOid GPath)
-    concatObjs (accObjs, accSyms, accSymPaths) (path, obj) =
+      (Map GPath Object, Map LinkOid Int, Map LinkOid GPath) ->
+      (Int, (GPath, Object)) ->
+      (Map GPath Object, Map LinkOid Int, Map LinkOid GPath)
+    concatObjs (accObjs, accSyms, accSymPaths) (offset, (path, obj)) =
       ( insert path obj accObjs,
-        obj.symbols <> accSyms,
+        (M.map (+ offset) obj.symbols) <> accSyms,
         (fromList $ zip (keys obj.symbols) (repeat path)) <> accSymPaths
       )
+    finalizeEdges ::
+      Map LinkOid Int ->
+      [G.Edge] ->
+      (Int, (GPath, Object)) ->
+      [G.Edge]
+    finalizeEdges syms acc (offset, (_, obj)) =
+      let f (PseudoEdge (localCellIdx, linkOid)) = case lookup linkOid syms of
+            Nothing -> Nothing
+            Just targetCellIdx -> Just (localCellIdx + offset, targetCellIdx)
+       in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
     findBrokenLinks ::
       Map GPath Object ->
-      Map LinkOid Cell ->
+      Map LinkOid Int ->
       [(GPath, LinkOid)]
     findBrokenLinks objs syms =
       foldl' (getBrokenLink syms) []
         $ allExternalOids objs
     getBrokenLink ::
-      Map LinkOid Cell ->
+      Map LinkOid Int ->
       [(GPath, LinkOid)] ->
       (GPath, LinkOid) ->
       [(GPath, LinkOid)]
@@ -273,16 +318,19 @@ findCycles :: Archive -> [G.Tree LinkOid]
 findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
   where
     blocks = foldl' getBlocksFromAllSymbols [] $ elems archive.symbols
-    getBlocksFromAllSymbols acc cell = case cell of
-      CBlock b -> b : acc
-      CHeading {}
-      CListItem {}
-      CParagraph {}
-      CMathFragment {}
-      CFigure {}
-      CTable {}
-      CFootnote {}
-      CBibliography {} -> acc
+    getBlocksFromAllSymbols acc globalCellIdx
+      | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
+          case cell of
+            CBlock b -> b : acc
+            CHeading {}
+            CListItem {}
+            CParagraph {}
+            CMathFragment {}
+            CFigure {}
+            CTable {}
+            CFootnote {}
+            CBibliography {} -> acc
+      | otherwise = acc
     (graph, vertexToNode, _) = buildGraph blocks
     toLinkOid vertex =
       let (_, selfLink, _) = vertexToNode vertex
@@ -293,6 +341,14 @@ findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
         elem selfLink outLinks =
           tree : acc
       | otherwise = acc
+
+cumulativeOffsets :: [(Int, a)] -> [(Int, a)]
+cumulativeOffsets xs = snd (mapAccumL f 0 xs)
+  where
+    f :: Int -> (Int, a) -> (Int, (Int, a))
+    f currentSum (offset, x) =
+      let newSum = currentSum + offset
+       in (newSum, (currentSum, x))
 
 findExternalOids :: OrgDoc -> [LinkOid]
 findExternalOids orgDoc =

@@ -23,6 +23,7 @@ module Lilac.Types
     OrgParserState (..),
     PToken (..),
     ProjectConf (..),
+    PseudoEdge (..),
     RawProjectConf (..),
     Prose (..),
     Style (..),
@@ -30,6 +31,7 @@ module Lilac.Types
     StyledText (..),
     Table (..),
     WeaveConf (..),
+    cellIdxToObjCell,
     decodeGPath,
     defaultOrgParserConf,
     defaultOrgParserState,
@@ -69,6 +71,9 @@ import Data.Aeson.Types
   )
 import Data.Bits (setBit)
 import Data.Bits.Bitwise (toListLE)
+import Data.Graph qualified as G
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -109,11 +114,14 @@ import Relude
     show,
     toEnum,
     zip,
+    (!!?),
     ($),
+    (-),
     (.),
     (<>),
     (>),
   )
+import Relude.Extra.Map (lookup)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Prelude qualified (show)
@@ -146,7 +154,7 @@ data Cell
   | CTable Table
   | CFootnote Footnote
   | CBibliography ()
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Figure :: Type
@@ -156,7 +164,7 @@ data Figure = Figure
     caption :: Prose,
     link :: Link
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Heading :: Type
@@ -166,7 +174,7 @@ data Heading = Heading
     body :: Prose,
     meta :: Map Text Text
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Level :: Type
@@ -238,7 +246,7 @@ data ListMarker
   | LUnorderedEnd
   | LItemStart
   | LItemEnd
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type MathFragment :: Type
@@ -254,13 +262,14 @@ type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
+    pseudoEdges :: [PseudoEdge],
     footnoteNumbers :: Map Text Int,
     cslPath :: Maybe FilePath,
     bibPaths :: [FilePath],
     citations :: [Citation],
     meta :: Map Text Text
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type OrgParserConf :: Type
@@ -293,6 +302,8 @@ data OrgParserState = OrgParserState
     equationNumber :: Int,
     anonEquationNumber :: Int,
     cellNames :: Set Text,
+    cellNumber :: Int,
+    pseudoEdges :: [PseudoEdge],
     anonBlockNumber :: Int,
     figureNumber :: Int,
     tableNumber :: Int,
@@ -329,6 +340,8 @@ defaultOrgParserState =
       equationNumber = 0,
       anonEquationNumber = 0,
       cellNames = Set.empty,
+      cellNumber = 0,
+      pseudoEdges = [],
       anonBlockNumber = 0,
       figureNumber = 0,
       tableNumber = 0,
@@ -405,7 +418,7 @@ data Table = Table
     caption :: Prose,
     grid :: Map (Int, Int) Prose
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 instance Show StyleMask where
@@ -439,7 +452,7 @@ data Footnote = Footnote
   { name :: Text,
     body :: Prose
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Citation :: Type
@@ -450,7 +463,7 @@ data Citation = Citation
     prefix :: Prose,
     suffix :: Prose
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Cite :: Type
@@ -460,7 +473,7 @@ data Cite = Cite
     prefix :: Prose,
     suffix :: Prose
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type OID :: Type
@@ -490,6 +503,11 @@ fromText :: Text -> Maybe OID
 fromText t = case Data.UUID.Types.fromText t of
   Just uuid -> Just $ OID uuid
   Nothing -> Nothing
+
+type PseudoEdge :: Type
+newtype PseudoEdge = PseudoEdge (Int, LinkOid)
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
 
 type OrgParser :: Type -> Type
 type OrgParser = StateT OrgParserState (MP.ParsecT Void Text Identity)
@@ -551,22 +569,33 @@ data WeaveConf = WeaveConf
 type Object :: Type
 data Object = Object
   { orgDoc :: OrgDoc,
-    symbols :: Map LinkOid Cell,
+    symbols :: Map LinkOid Int,
     externalOids :: [LinkOid]
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object,
-    symbols :: Map LinkOid Cell,
+    symbols :: Map LinkOid Int,
     symbolPath :: Map LinkOid GPath,
+    symbolEdges :: [G.Edge],
+    offsets :: IntMap GPath,
+    offsetsInverted :: Map GPath Int,
     csls :: Map FilePath Text,
     bibs :: Map FilePath [CP.Reference (CslJson Text)]
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
+
+cellIdxToObjCell :: Archive -> Int -> Maybe (Object, Cell)
+cellIdxToObjCell archive globalCellIdx
+  | Just (offset, path) <- IntMap.lookupLE globalCellIdx archive.offsets,
+    Just obj <- lookup path archive.objects,
+    Just cell <- obj.orgDoc.cells !!? (globalCellIdx - offset) =
+      Just (obj, cell)
+  | otherwise = Nothing
 
 type ProjectConf :: Type
 data ProjectConf = ProjectConf

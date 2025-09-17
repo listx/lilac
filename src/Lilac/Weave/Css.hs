@@ -111,6 +111,7 @@ import Clay
     thead,
     top,
     tr,
+    ul,
     underline,
     vAlignSub,
     vAlignSuper,
@@ -258,6 +259,10 @@ defaultCss = do
     flexDirection column
     div # ".tangled-blocks" ? do
       ol ? do
+        paddingLeft $ rem 1
+        marginTop $ px 0
+    div # ".backlinks" ? do
+      ul ? do
         paddingLeft $ rem 1
         marginTop $ px 0
 

@@ -49,13 +49,14 @@ type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
+    pseudoEdges :: [PseudoEdge],
     footnoteNumbers :: Map Text Int,
     cslPath :: Maybe FilePath,
     bibPaths :: [FilePath],
     citations :: [Citation],
     meta :: Map Text Text
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -69,6 +70,26 @@ rearranges the footnote definitions so that they are woven in the order they are
 referenced, not the order in which they are defined (parsed). This is unlike
 every other cell where the order of writing them (cell-by-cell) is preserved
 during weaving.
+
+The ~pseudoEdges~ are edges that are ultimately used to create a graph
+representation of links between cells. In that representation, we want to use
+global cell index numbers to represent the universe of all cells in a
+[[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]. However, inside the parser for a single Org document, we don't
+have access to this global cell index number, as that is computed separately in
+[[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:mkArchive][f:mkArchive]]. Also, we don't know the target cell's number either, and the best
+information we have is just a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]. Because of these issues, we call the
+edges here "pseudo" edges. To represent these edges, we use a ~newtype~.
+
+#+name: newtype:PseudoEdge
+#+begin_src haskell
+type PseudoEdge :: Type
+newtype PseudoEdge = PseudoEdge (Int, LinkOid)
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+The [[newtype:PseudoEdge]] represents a link between a local cell index and a target
+cell via the [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]].
 
 The ~deriving anyclass (ToJSON)~ is needed to create the default implementation for
 JSON conversion automatically for us. It is the equivalent of writing a default
@@ -174,6 +195,8 @@ data OrgParserState = OrgParserState
     equationNumber :: Int,
     anonEquationNumber :: Int,
     cellNames :: Set Text,
+    cellNumber :: Int,
+    pseudoEdges :: [PseudoEdge],
     anonBlockNumber :: Int,
     figureNumber :: Int,
     tableNumber :: Int,
@@ -213,6 +236,8 @@ defaultOrgParserState =
       equationNumber = 0,
       anonEquationNumber = 0,
       cellNames = Set.empty,
+      cellNumber = 0,
+      pseudoEdges = [],
       anonBlockNumber = 0,
       figureNumber = 0,
       tableNumber = 0,
@@ -389,7 +414,8 @@ import Lilac.Types
         cslPath,
         footnoteNumbers,
         meta,
-        oid
+        oid,
+        pseudoEdges
       ),
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
@@ -402,6 +428,7 @@ import Lilac.Types
         PTokenStyledText
       ),
     Prose (Prose, unProse),
+    PseudoEdge (PseudoEdge),
     Style
       ( Bold,
         Code,
@@ -431,6 +458,7 @@ import Lilac.Types as OrgParserState
         bibPaths,
         bracketBalance,
         cellNames,
+        cellNumber,
         citations,
         continuationIndent,
         cslPath,
@@ -453,6 +481,7 @@ import Lilac.Types as OrgParserState
         listMarkers,
         orgParserConf,
         prevCellIsFootnote,
+        pseudoEdges,
         styleMask,
         tableNumber,
         tanglePaths
@@ -786,6 +815,7 @@ orgDocParser = do
   MP.eof
   footnoteNumbers <- reconcileFootnotes
   citations <- collectCitations
+  orgParserState <- get
   resetState
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
@@ -799,10 +829,14 @@ orgDocParser = do
         CTable {}
         CFootnote {}
         CBibliography {} -> True
+  let meaningfulCells = filter meaningfulCell cells
+  when (orgParserState.cellNumber /= length meaningfulCells)
+    $ fail ("mismatch: cellNumber: " <> show orgParserState.cellNumber <> " len meaningfulCells: " <> (show $ length meaningfulCells))
   pure
     $ OrgDoc
       { oid = docOid,
         cells = filter meaningfulCell cells,
+        pseudoEdges = orgParserState.pseudoEdges,
         footnoteNumbers = footnoteNumbers,
         cslPath = cslPath,
         bibPaths = bibPaths,
@@ -833,7 +867,9 @@ resetState =
     s
       { OrgParserState.bibPaths = [],
         OrgParserState.citations = [],
-        OrgParserState.cslPath = Nothing
+        OrgParserState.cslPath = Nothing,
+        OrgParserState.cellNumber = 0,
+        OrgParserState.pseudoEdges = []
       }
 #+end_src
 
@@ -882,6 +918,7 @@ defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
       cells = [],
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -1395,7 +1432,7 @@ data Cell
   | CTable Table
   | CFootnote Footnote
   | CBibliography ()
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -1427,6 +1464,8 @@ cellParser = do
           detectInvalidIndentation
         ]
   modify (\s -> s {bracketBalance = 0})
+  when (cell /= CListItem [])
+    $ modify (\s -> s {cellNumber = s.cellNumber + 1})
   pure cell
   where
     resetContinuationIndent :: OrgParser a -> OrgParser a
@@ -2587,6 +2626,7 @@ shouldParseWith
         $ Prose
           <<Expected prose for 0005-styled-strings-escape-marker>>
     ]
+    []
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-escape-marker
@@ -2657,6 +2697,7 @@ shouldParseWithState
               meta = fromList []
             }
       ]
+      []
   )
   defaultOrgParserState
     { headingOidStack = [Nothing],
@@ -3127,6 +3168,7 @@ shouldParseWith
         $ Prose
           <<Expected prose for 0005-styled-strings-compression>>
     ]
+    []
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-compression
@@ -3176,6 +3218,7 @@ shouldParseWith
   $ nilOrgDoc
     [ plainParagraph "foo"
     ]
+    []
 #+end_src
 
 The next case tests a simple case where one word is in bold.
@@ -3198,6 +3241,7 @@ shouldParseWith
             ptext " baz" []
           ]
     ]
+    []
 #+end_src
 
 Below we mix things up a bit more, using more styles.
@@ -3217,6 +3261,7 @@ shouldParseWith
         $ Prose
           <<Expected prose for 0005-styled-strings-complex>>
     ]
+    []
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-complex
@@ -3251,6 +3296,7 @@ shouldParseWith
         $ Prose
           <<Expected prose for 0005-styled-strings-complex-punctuation>>
     ]
+    []
 #+end_src
 
 Note how we preserve the information of having no space character between the
@@ -3286,6 +3332,7 @@ shouldParseWith
         $ Prose
           <<Expected prose for 0005-styled-strings-slash-separated-words>>
     ]
+    []
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-slash-separated-words
@@ -3315,6 +3362,7 @@ shouldParseWith
         $ Prose
           <<Expected prose for 0005-styled-strings-verbatim>>
     ]
+    []
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-verbatim
@@ -3343,6 +3391,7 @@ shouldParseWith
         $ Prose
           <<Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold>>
     ]
+    []
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-verbatim-code-ignore-immediate-bold
@@ -3380,6 +3429,7 @@ shouldParseWith
   "0005-styled-strings-verbatim-precedence"
   $ nilOrgDoc
     <<Expected prose for 0005-styled-strings-verbatim-precedence>>
+    [PseudoEdge (1, LinkOid {oid = fromWords 0 0, name = "hello"})]
 #+end_src
 
 #+name: Expected prose for 0005-styled-strings-verbatim-precedence
@@ -3619,6 +3669,9 @@ Note that in [[f:linkParser]] we don't parse [[id:81e1c841-5de8-4111-9b18-f33bea
 exist inside [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code blocks]].
 
 ** OID links
+:PROPERTIES:
+:ID:       dabccd5e-930e-4571-899f-1bfbdeab3d5e
+:END:
 
 The [[f:oidLinkParser]] closely resembles the [[f:nowebLinkParser]], because they both
 encode a [[data:LinkOid]], the only difference being where they are used (Noweb
@@ -3648,14 +3701,16 @@ oidLinkParser = do
       [ MP.try $ string "]" >> pure [implicitNameStyledText],
         MP.try linkDisplayNameParser
       ]
+  let linkOid =
+        LinkOid
+          { oid = oid,
+            name = name
+          }
+      edge = PseudoEdge (orgParserState.cellNumber, linkOid)
+  modify (\s -> s {OrgParserState.pseudoEdges = edge : s.pseudoEdges})
   pure
     $ Link
-      { target =
-          LinkTargetOid
-            LinkOid
-              { oid = oid,
-                name = name
-              },
+      { target = LinkTargetOid linkOid,
         name = displayName
       }
   where
@@ -3667,6 +3722,9 @@ oidLinkParser = do
         $ protocolsWeb
         <> protocolsEmacs
 #+end_src
+
+[[f:oidLinkParser]] creates a "pseudo" edge, from the current ~cellNumber~ to the
+~linkOid~. This is used for [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4][backlink]] generation.
 
 [[f:linkDisplayNameParser]] just gets the name of the text to display. It is reused
 in [[f:protocolWebLinkParser]]. It uses the ~proseParser'~ helper which is very
@@ -3880,6 +3938,16 @@ shouldParseWith
             LUnorderedEnd
           ]
       ]
+      [ PseudoEdge (6, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "a b c"}),
+        PseudoEdge (4, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo bar baz"}),
+        PseudoEdge (2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo"}),
+        PseudoEdge (0, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo"}),
+        PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "foo"}),
+        PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
+        PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
+        PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
+        PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""})
+      ]
   )
 #+end_src
 
@@ -3920,6 +3988,7 @@ shouldParseWith
                   }
             ]
       ]
+      [PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "target name with newline and space is still treated as space"})]
   )
 #+end_src
 
@@ -4044,6 +4113,7 @@ shouldParseWith
                   }
             ]
       ]
+      []
   )
 #+end_src
 
@@ -4170,6 +4240,9 @@ shouldParseWithState
               ptext " b" []
             ]
       ]
+      [ PseudoEdge (2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "a"}),
+        PseudoEdge (0, LinkOid {oid = fromWords 0 0, name = "link-target-only"})
+      ]
   )
   defaultOrgParserState
     { headingOidStack = [Nothing],
@@ -4206,6 +4279,7 @@ shouldParseWith
             ptext ")" []
           ]
     ]
+    []
 #+end_src
 
 Sometimes we have text that look like links initially but turn out to be
@@ -4224,6 +4298,7 @@ shouldParseWith
   $ nilOrgDoc
     [ CParagraph $ Prose [ptext "[hi]" []]
     ]
+    []
 #+end_src
 
 ** Raw links
@@ -4422,6 +4497,7 @@ shouldParseWith
                 }
           ]
     ]
+    []
 #+end_src
 
 ** Noweb links
@@ -4536,7 +4612,7 @@ data Footnote = Footnote
   { name :: Text,
     body :: Prose
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -4698,6 +4774,7 @@ shouldParseWithState
     { oid = nilOid,
       cells =
         <<Expected cells for 0013-footnotes-simple>>,
+      pseudoEdges = [],
       footnoteNumbers =
         fromList
           [ ("hello", 1)
@@ -4773,6 +4850,7 @@ shouldParseWithState
     { oid = nilOid,
       cells =
         <<Expected cells for 0013-footnotes-complex>>,
+      pseudoEdges = [],
       footnoteNumbers =
         fromList
           [ ("a", 1),
@@ -4898,6 +4976,7 @@ shouldParseWithState
   OrgDoc
     { oid = nilOid,
       cells = [],
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = [],
@@ -4952,6 +5031,7 @@ shouldParseWithState
   OrgDoc
     { oid = nilOid,
       cells = [],
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths =
@@ -5008,6 +5088,7 @@ shouldParseWithState
   OrgDoc
     { oid = nilOid,
       cells = [CBibliography ()],
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
@@ -5077,7 +5158,7 @@ data Citation = Citation
     prefix :: Prose,
     suffix :: Prose
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -5094,7 +5175,7 @@ data Cite = Cite
     prefix :: Prose,
     suffix :: Prose
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -5486,6 +5567,7 @@ shouldParseWithState
     { oid = nilOid,
       cells =
         <<Expected prose for 0014-citations-single-cite>>,
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
@@ -5545,6 +5627,7 @@ shouldParseWithState
     { oid = nilOid,
       cells =
         <<Expected prose for 0014-citations-locators>>,
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
@@ -5684,6 +5767,7 @@ shouldParseWithState
     { oid = nilOid,
       cells =
         <<Expected prose for 0014-citations-locators-affixes>>,
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
@@ -5861,6 +5945,7 @@ shouldParseWithState
     { oid = nilOid,
       cells =
         <<Expected prose for 0014-citations-worg>>,
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
@@ -6144,6 +6229,7 @@ shouldParseWithState
     { oid = nilOid,
       cells =
         <<Expected prose for 0014-citations-forbidden-in-verbatim-code>>,
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -6191,6 +6277,7 @@ shouldParseWithState
                 meta = fromList []
               }
         ],
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -6422,6 +6509,7 @@ shouldParseWith
   "0005-prose-paragraphs"
   $ nilOrgDoc
     <<Expected prose for 0005-prose-paragraphs>>
+    []
 #+end_src
 
 #+name: Expected prose for 0005-prose-paragraphs
@@ -6503,7 +6591,7 @@ data Heading = Heading
     body :: Prose,
     meta :: Map Text Text
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -6792,6 +6880,7 @@ shouldParseWithState
         plainHeading 11 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       ]
+      []
   )
   defaultOrgParserState
     { headingOidStack = take 12 $ repeat Nothing,
@@ -6839,6 +6928,7 @@ shouldParseWithState
         plainHeading 11 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       ]
+      []
   )
   defaultOrgParserState
     { headingOidStack = take 12 $ repeat Nothing,
@@ -6999,6 +7089,7 @@ shouldParseWithState
               meta = fromList []
             }
       ]
+      []
   )
   defaultOrgParserState
     { headingOidStack = [Nothing],
@@ -7034,6 +7125,7 @@ shouldParseWithState
                   ]
             }
       ]
+      []
   )
   defaultOrgParserState
     { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
@@ -7079,6 +7171,7 @@ shouldParseWithState
                   ]
             }
       ]
+      []
   )
   defaultOrgParserState
     { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
@@ -7138,6 +7231,7 @@ shouldParseWithState
   "0007-blocks-empty"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-empty>>
+      []
   )
   defaultOrgParserState
     { cellNames = Set.fromList ["foo"],
@@ -7539,6 +7633,7 @@ shouldParseWithState
   "0007-blocks-special-commas"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-special-commas>>
+      []
   )
   defaultOrgParserState
     { anonBlockNumber = 1
@@ -7826,6 +7921,7 @@ shouldParseWithState
   "0007-blocks-noweb"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-noweb>>
+      []
   )
   defaultOrgParserState
     { anonBlockNumber = 1
@@ -7900,6 +7996,7 @@ shouldParseWithState
   "0007-blocks-noweb-off"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-noweb-off>>
+      []
   )
   defaultOrgParserState
     { anonBlockNumber = 1
@@ -7950,6 +8047,7 @@ shouldParseWithState
   "0007-blocks-noweb-intraline"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-noweb-intraline>>
+      []
   )
   defaultOrgParserState
     { anonBlockNumber = 1
@@ -8234,6 +8332,7 @@ shouldParseWithState
   "0007-blocks-ending"
   ( nilOrgDoc
       <<Expected blocks for 0007-blocks-ending>>
+      []
   )
   defaultOrgParserState
     { cellNames =
@@ -8602,7 +8701,7 @@ data ListMarker
   | LUnorderedEnd
   | LItemStart
   | LItemEnd
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -9071,6 +9170,7 @@ shouldParseWith
     [ plainParagraph "1)",
       plainParagraph "2)"
     ]
+    []
 #+end_src
 
 The list-like text is parsed as plain paragraphs in
@@ -9105,6 +9205,7 @@ shouldParseWith
           LOrderedEnd
         ]
     ]
+    []
 #+end_src
 
 Ordered lists require a closing parenthesis ~)~ after the number.
@@ -9205,6 +9306,7 @@ shouldParseWith
           LOrderedEnd ------- End outer ordered list.
         ]
     ]
+    []
 #+end_src
 
 Nesting is limited to 5 levels, for a total of 6 levels by default.
@@ -9315,6 +9417,7 @@ shouldParseWith
           LOrderedEnd
         ]
     ]
+    []
 #+end_src
 
 Here's a more involved example using paragraph text for list items, following
@@ -9400,6 +9503,7 @@ shouldParseWith
         ],
       plainParagraph "Bar."
     ]
+    []
 #+end_src
 
 Check whether we can detect invalid indentations for paragraphs that are
@@ -9557,6 +9661,7 @@ shouldParseWith
         ],
       plainParagraph "Four"
     ]
+    []
 #+end_src
 
 Paragraphs can close off list items, so we can mix ordered and unordered list
@@ -9632,6 +9737,7 @@ shouldParseWith
         ],
       plainParagraph "Four"
     ]
+    []
 #+end_src
 
 It's an error if there is no separation between list types (if we suddenly try
@@ -9724,6 +9830,7 @@ shouldParseWith
           LOrderedEnd
         ]
     ]
+    []
 #+end_src
 
 Ordered list items at the same level must increment by one each time. In the
@@ -10029,6 +10136,7 @@ shouldParseWithState
               body = "1 + 1 = 2"
             }
       ]
+      []
   )
   defaultOrgParserState
     { equationNumber = 3,
@@ -10093,6 +10201,7 @@ shouldParseWithState
             LOrderedEnd
           ]
       ]
+      []
   )
   defaultOrgParserState
     { equationNumber = 1,
@@ -10120,7 +10229,7 @@ data Figure = Figure
     caption :: Prose,
     link :: Link
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -10434,6 +10543,7 @@ shouldParseWithState
                   }
             }
       ]
+      [PseudoEdge (8, LinkOid {oid = fromWords 0 0, name = "not a figure"})]
   )
   defaultOrgParserState
     { cellNames =
@@ -10468,7 +10578,7 @@ data Table = Table
     caption :: Prose,
     grid :: Map (Int, Int) Prose
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
@@ -10768,6 +10878,7 @@ shouldParseWithState
   "0012-tables-and-prose"
   ( nilOrgDoc
       <<Expected cells for 0012-tables-and-prose>>
+      []
   )
   defaultOrgParserState
     { cellNames =
@@ -10933,6 +11044,7 @@ shouldParseWithState
   "0012-tables-inside-lists"
   ( nilOrgDoc
       <<Expected cells for 0012-tables-inside-lists>>
+      []
   )
   defaultOrgParserState
     { cellNames =
@@ -11143,7 +11255,8 @@ import Lilac.Types
         cslPath,
         footnoteNumbers,
         meta,
-        oid
+        oid,
+        pseudoEdges
       ),
     OrgParserConf (maxHeadingLevel),
     OrgParserState
@@ -11165,6 +11278,7 @@ import Lilac.Types
       ),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose (Prose),
+    PseudoEdge (PseudoEdge),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, caption, grid, meta, parentOid),
@@ -11298,11 +11412,12 @@ nilOidOrgDoc =
 
 #+name: f:nilOrgDoc
 #+begin_src haskell
-nilOrgDoc :: [Cell] -> OrgDoc
-nilOrgDoc cells =
+nilOrgDoc :: [Cell] -> [PseudoEdge] -> OrgDoc
+nilOrgDoc cells pseudoEdges =
   OrgDoc
     { oid = nilOid,
       cells = cells,
+      pseudoEdges = pseudoEdges,
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],

@@ -138,7 +138,8 @@ import Lilac.Types
         cslPath,
         footnoteNumbers,
         meta,
-        oid
+        oid,
+        pseudoEdges
       ),
     OrgParser,
     OrgParserConf (maxHeadingLevel, maxListLevel),
@@ -151,6 +152,7 @@ import Lilac.Types
         PTokenStyledText
       ),
     Prose (Prose, unProse),
+    PseudoEdge (PseudoEdge),
     Style
       ( Bold,
         Code,
@@ -180,6 +182,7 @@ import Lilac.Types as OrgParserState
         bibPaths,
         bracketBalance,
         cellNames,
+        cellNumber,
         citations,
         continuationIndent,
         cslPath,
@@ -202,6 +205,7 @@ import Lilac.Types as OrgParserState
         listMarkers,
         orgParserConf,
         prevCellIsFootnote,
+        pseudoEdges,
         styleMask,
         tableNumber,
         tanglePaths
@@ -343,6 +347,7 @@ orgDocParser = do
   MP.eof
   footnoteNumbers <- reconcileFootnotes
   citations <- collectCitations
+  orgParserState <- get
   resetState
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
@@ -356,10 +361,14 @@ orgDocParser = do
         CTable {}
         CFootnote {}
         CBibliography {} -> True
+  let meaningfulCells = filter meaningfulCell cells
+  when (orgParserState.cellNumber /= length meaningfulCells)
+    $ fail ("mismatch: cellNumber: " <> show orgParserState.cellNumber <> " len meaningfulCells: " <> (show $ length meaningfulCells))
   pure
     $ OrgDoc
       { oid = docOid,
         cells = filter meaningfulCell cells,
+        pseudoEdges = orgParserState.pseudoEdges,
         footnoteNumbers = footnoteNumbers,
         cslPath = cslPath,
         bibPaths = bibPaths,
@@ -372,6 +381,7 @@ defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
       cells = [],
+      pseudoEdges = [],
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -491,6 +501,8 @@ cellParser = do
           detectInvalidIndentation
         ]
   modify (\s -> s {bracketBalance = 0})
+  when (cell /= CListItem [])
+    $ modify (\s -> s {cellNumber = s.cellNumber + 1})
   pure cell
   where
     resetContinuationIndent :: OrgParser a -> OrgParser a
@@ -1322,14 +1334,16 @@ oidLinkParser = do
       [ MP.try $ string "]" >> pure [implicitNameStyledText],
         MP.try linkDisplayNameParser
       ]
+  let linkOid =
+        LinkOid
+          { oid = oid,
+            name = name
+          }
+      edge = PseudoEdge (orgParserState.cellNumber, linkOid)
+  modify (\s -> s {OrgParserState.pseudoEdges = edge : s.pseudoEdges})
   pure
     $ Link
-      { target =
-          LinkTargetOid
-            LinkOid
-              { oid = oid,
-                name = name
-              },
+      { target = LinkTargetOid linkOid,
         name = displayName
       }
   where
@@ -2441,7 +2455,9 @@ resetState =
     s
       { OrgParserState.bibPaths = [],
         OrgParserState.citations = [],
-        OrgParserState.cslPath = Nothing
+        OrgParserState.cslPath = Nothing,
+        OrgParserState.cellNumber = 0,
+        OrgParserState.pseudoEdges = []
       }
 
 deleteRedundantKeys :: (Ord k) => Map k v -> [k] -> Map k v

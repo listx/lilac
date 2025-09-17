@@ -37,6 +37,7 @@ import Citeproc.CslJson
   )
 import Data.Aeson (eitherDecodeStrictText)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
+import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
@@ -52,7 +53,16 @@ import Lilac.Parse
     unparseMathFragment,
   )
 import Lilac.Types
-  ( Archive (bibs, csls, objects, symbolPath, symbols),
+  ( Archive
+      ( bibs,
+        csls,
+        objects,
+        offsets,
+        offsetsInverted,
+        symbolEdges,
+        symbolPath,
+        symbols
+      ),
     BToken (BTokenLink, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell
@@ -120,6 +130,7 @@ import Lilac.Types
         projectConf,
         watch
       ),
+    cellIdxToObjCell,
     decodeGPath,
     markingChars,
     markingCharsInvisible,
@@ -180,6 +191,7 @@ import Lucid
     toHtmlRaw,
     tr_,
     type_,
+    ul_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -197,7 +209,9 @@ import Relude
     IO,
     Identity,
     Int,
+    Map,
     Maybe (Just, Nothing),
+    Ord,
     ReaderT,
     String,
     Text,
@@ -254,13 +268,14 @@ import Relude
     (/=),
     (<),
     (<$>),
+    (<=),
     (<>),
     (=<<),
     (==),
     (>),
     (||),
   )
-import Relude.Extra.Map (keys, lookup, lookupDefault)
+import Relude.Extra.Map (keys, lookup, lookupDefault, toPairs)
 import Skylighting qualified as Sky
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -342,16 +357,16 @@ weaveObject object = do
       CFootnote {}
       CBibliography {} -> Nothing
 
-weaveCell :: Cell -> HtmlWeaver ()
-weaveCell = \case
-  CHeading heading -> weaveHeading heading
+weaveCell :: (Int, Cell) -> HtmlWeaver ()
+weaveCell (cellIdx, cell) = case cell of
+  CHeading heading -> weaveHeading cellIdx heading
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
-  CParagraph prose -> p_ $ weaveProse prose
+  CParagraph prose -> p_ $ weaveProse [cellIdx] prose
   CBlock block -> weaveBlock block
   CMathFragment mathFragment -> weaveMathFragmentStandalone mathFragment
-  CFigure figure -> weaveFigure figure
-  CTable table -> weaveTable table
-  CFootnote footnote -> weaveFootnote footnote
+  CFigure figure -> weaveFigure cellIdx figure
+  CTable table -> weaveTable cellIdx table
+  CFootnote footnote -> weaveFootnote cellIdx footnote
   CBibliography _ -> weaveBibliography
 
 toSafeHtmlId :: Text -> Text
@@ -396,13 +411,13 @@ weaveDocMeta m = do
       Nothing -> pure ()
       Just x -> element $ toHtml x
 
-weaveHeading :: Heading -> HtmlWeaver ()
-weaveHeading heading =
+weaveHeading :: Int -> Heading -> HtmlWeaver ()
+weaveHeading cellIdx heading =
   hN [id_ linkAnchor] $ do
     a_ [href_ $ "#" <> linkAnchor] $ do
       toHtml sectionText
       toHtmlRaw ("&emsp;&ensp;" :: Text)
-      weaveProse heading.body
+      weaveProse [cellIdx] heading.body
   where
     hN = case heading.level of
       1 -> h2_
@@ -411,7 +426,7 @@ weaveHeading heading =
       4 -> h5_
       _ -> h6_
     sectionText = getSectionText heading
-    linkAnchor = getLinkAnchor $ CHeading heading
+    linkAnchor = getLinkAnchor Nothing $ CHeading heading
 
 getSectionText :: Heading -> Text
 getSectionText heading =
@@ -420,8 +435,8 @@ getSectionText heading =
     . reverse
     $ heading.section
 
-getLinkAnchor :: Cell -> Text
-getLinkAnchor = \case
+getLinkAnchor :: Maybe Int -> Cell -> Text
+getLinkAnchor globalCellIdx = \case
   CHeading heading ->
     T.intercalate
       "-"
@@ -430,7 +445,9 @@ getLinkAnchor = \case
         toSafeHtmlId $ getProseContents heading.body
       ]
   CListItem {} -> ""
-  CParagraph {} -> ""
+  CParagraph {} -> case globalCellIdx of
+    Just idx -> "c-" <> T.show idx
+    Nothing -> ""
   CBlock block ->
     let ref
           | Just name <- lookup "name" block.meta =
@@ -475,8 +492,12 @@ getLinkAnchor = \case
   CFootnote {} -> ""
   CBibliography {} -> ""
 
-weaveProse :: Prose -> HtmlWeaver ()
-weaveProse prose = sequence_ $ map weavePToken prose.unProse
+weaveProse :: [Int] -> Prose -> HtmlWeaver ()
+weaveProse cellIdxs prose = do
+  when (not $ null cellIdxs) $ do
+    span_ [id_ ("c-" <> (T.intercalate "-" $ map T.show cellIdxs))] $ do
+      pure ()
+  sequence_ $ map weavePToken prose.unProse
 
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
@@ -579,7 +600,7 @@ weaveBlock block = do
           BTokenPadding -> ""
           BTokenLink (Link _name (LinkTargetOid _)) -> "\NUL"
           BTokenLink {} -> ""
-    linkAnchor = getLinkAnchor $ CBlock block
+    linkAnchor = getLinkAnchor Nothing $ CBlock block
 
 colorizeText :: Text -> Text -> HtmlWeaver ()
 colorizeText lang txt
@@ -635,16 +656,18 @@ weaveLinkTarget linkTarget = do
   pure $ case linkTarget of
     LinkTargetOid linkOid
       | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-        Just internalCell <- lookup linkOid originObj.symbols ->
-          "#" <> getLinkAnchor internalCell
-      | Just externalCell <- lookup linkOid weaveConf.archive.symbols,
+        Just cellIdx <- lookup linkOid originObj.symbols,
+        Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive cellIdx ->
+          "#" <> getLinkAnchor (Just cellIdx) internalCell
+      | Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
+        Just (_, externalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx,
         Just externalObjGPath <- lookup linkOid weaveConf.archive.symbolPath,
         Just toObjPath <- P.encodeUtf $ decodeGPath externalObjGPath,
         Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
         Right str <-
           P.decodeWith utf8 utf8
             $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt ->
-          (T.pack str) <> "#" <> getLinkAnchor externalCell
+          (T.pack str) <> "#" <> getLinkAnchor (Just globalCellIdx) externalCell
       | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
       where
         htmlExt = P.unsafeEncodeUtf "html"
@@ -656,8 +679,8 @@ weaveLinkTarget linkTarget = do
     LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
     LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
 
-weaveFigure :: Figure -> HtmlWeaver ()
-weaveFigure figure = do
+weaveFigure :: Int -> Figure -> HtmlWeaver ()
+weaveFigure cellIdx figure = do
   wovenLinkTarget <- weaveLinkTarget figure.link.target
   let captionPrefix =
         "Figure "
@@ -669,7 +692,7 @@ weaveFigure figure = do
       toHtml $ case figure.caption.unProse of
         [] -> "." :: Text
         _ -> ": " :: Text
-      weaveProse figure.caption
+      weaveProse [cellIdx] figure.caption
     img_
       $ [ id_ linkAnchor,
           src_ wovenLinkTarget,
@@ -685,7 +708,7 @@ weaveFigure figure = do
                ]
          )
   where
-    linkAnchor = getLinkAnchor $ CFigure figure
+    linkAnchor = getLinkAnchor Nothing $ CFigure figure
 
 weaveMathFragmentStandalone :: MathFragment -> HtmlWeaver ()
 weaveMathFragmentStandalone mathFragment = do
@@ -697,13 +720,13 @@ weaveMathFragmentStandalone mathFragment = do
     a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ do
       begMarker <> toHtml mathFragment.body <> endMarker
   where
-    linkAnchor = getLinkAnchor $ CMathFragment mathFragment
+    linkAnchor = getLinkAnchor Nothing $ CMathFragment mathFragment
 
 weaveMathFragmentInline :: MathFragment -> HtmlWeaver ()
 weaveMathFragmentInline mathFragment = "\\(" <> toHtml mathFragment.body <> "\\)"
 
-weaveTable :: Table -> HtmlWeaver ()
-weaveTable table = do
+weaveTable :: Int -> Table -> HtmlWeaver ()
+weaveTable cellIdx table = do
   let captionPrefix =
         "Table "
           <> lookupDefault "table-number-error" "__table_number" table.meta
@@ -714,7 +737,7 @@ weaveTable table = do
       toHtml $ case table.caption.unProse of
         [] -> "." :: Text
         _ -> ": " :: Text
-      weaveProse table.caption
+      weaveProse [cellIdx] table.caption
     table_ [] $ do
       forM_ (zip [1 :: Int ..] getColgroups) $ \(groupIdx, numCols) -> do
         let colgroupAttrs =
@@ -729,7 +752,7 @@ weaveTable table = do
       thead_ [] $ do
         tr_ [] $ do
           forM_ columnNames $ \prose -> do
-            th_ [] $ weaveProse prose
+            th_ [] $ weaveProse [] prose
       tbody_ [] $ do
         forM_ (rows visibleRows) $ \row ->
           if row == [Prose []]
@@ -743,9 +766,9 @@ weaveTable table = do
                         if mostlyNumeric prose
                           then [class_ "table-cell-numeric"]
                           else []
-                  td_ tdAttrs $ weaveProse prose
+                  td_ tdAttrs $ weaveProse [] prose
   where
-    linkAnchor = getLinkAnchor $ CTable table
+    linkAnchor = getLinkAnchor Nothing $ CTable table
     hideMarkingCharInFirstColumn :: [((Int, Int), Prose)] -> [Prose]
     hideMarkingCharInFirstColumn = \case
       [] -> []
@@ -856,15 +879,15 @@ getRelativePathWithoutSymlinks src dest
     isDestChildOfSrc = dirsSrc == commonPathPrefix
     remainingDest = drop (length commonPathPrefix) dirsDest
 
-weaveFootnote :: Footnote -> HtmlWeaver ()
-weaveFootnote footnote = do
+weaveFootnote :: Int -> Footnote -> HtmlWeaver ()
+weaveFootnote cellIdx footnote = do
   weaveConf <- ask
   if
     | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
       Just footnoteNumber <- lookup footnote.name originObj.orgDoc.footnoteNumbers -> do
         p_ [class_ "footnote-definition", id_ ("footnote-" <> T.show footnoteNumber)] $ do
           span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
-          weaveProse footnote.body
+          weaveProse [cellIdx] footnote.body
     | otherwise -> pure ()
 
 commonPrefix :: (Eq a) => [a] -> [a] -> [a]
@@ -1068,7 +1091,7 @@ weaveCitation n = do
   let result = weaveConf.citeprocResult
       citations = result.resultCitations
   case maybeAt n citations of
-    Just prose -> span_ [class_ "citation"] $ weaveProse prose
+    Just prose -> span_ [class_ "citation"] $ weaveProse [] prose
     Nothing -> pure ()
 
 weaveBibliography :: HtmlWeaver ()
@@ -1080,7 +1103,7 @@ weaveBibliography = do
     forM_ bibliography $ \(key, prose) -> do
       let linkAnchor = "ref-" <> key
       div_ [class_ "bib-ref", id_ linkAnchor] $ do
-        weaveProse prose
+        weaveProse [] prose
 
 weaveToc :: [Cell] -> HtmlWeaver ()
 weaveToc cells = do
@@ -1099,8 +1122,8 @@ weaveToc cells = do
             weaveTocHeading = do
               toHtmlRaw ("<li class=\"toc-level-" <> show heading.level <> "\">" :: Text)
               a_ [href_ $ "#" <> linkAnchor] $ do
-                weaveProse heading.body
-            linkAnchor = getLinkAnchor $ CHeading heading
+                weaveProse [] heading.body
+            linkAnchor = getLinkAnchor Nothing $ CHeading heading
             action :: HtmlWeaver ()
             action
               | prevLevel < heading.level = do
@@ -1227,21 +1250,23 @@ weaveMain orgDoc = do
     forM_ rearrangedCells weaveCell
     p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
   where
+    cellsWithIdx = zip [0 :: Int ..] orgDoc.cells
     rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
-    beforeFootnotes = takeWhile (not . isFootnote) orgDoc.cells
+    beforeFootnotes = takeWhile (not . isFootnote) cellsWithIdx
     afterFootnotes =
       dropWhile isFootnote
-        $ dropWhile (not . isFootnote) orgDoc.cells
+        $ dropWhile (not . isFootnote) cellsWithIdx
     sortedFootnotes =
-      sortOn getSortingKey
+      sortOn (\(_, cell) -> getSortingKey cell)
         $ takeWhile isFootnote
-        $ dropWhile (not . isFootnote) orgDoc.cells
+        $ dropWhile (not . isFootnote) cellsWithIdx
     getSortingKey cell
       | (CFootnote footnote) <- cell,
         Just n <- lookup footnote.name orgDoc.footnoteNumbers =
           n
       | otherwise = maxBound :: Int
-    isFootnote = \case
+    isFootnote :: (Int, Cell) -> Bool
+    isFootnote (_, cell) = case cell of
       CFootnote {} -> True
       CBlock {}
       CFigure {}
@@ -1256,19 +1281,20 @@ weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
   aside_ [class_ "sidebar"] $ do
     weaveTangledBlocksList blocks
+    weaveBacklinks
     weaveFooter
 
 weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
 weaveTangledBlocksList blocks = do
   div_ [class_ "tangled-blocks"] $ do
     p_ [class_ "widget-title"] $ do
-      toHtml @Text "Tangled Files"
+      toHtml @Text "Tangled files"
     let tangledBlocks = catMaybes $ map getTangled blocks
     when (not $ null tangledBlocks) $ do
       ol_ [] $ do
         forM_ (sort tangledBlocks) $ \(path, block) -> do
           li_ [] $ do
-            let linkAnchor = getLinkAnchor $ CBlock block
+            let linkAnchor = getLinkAnchor Nothing $ CBlock block
             a_ [href_ $ "#" <> linkAnchor] $ do
               toHtml path
   where
@@ -1277,3 +1303,80 @@ weaveTangledBlocksList blocks = do
       | Just path <- lookup "tangle" b.meta =
           Just (path, b)
       | otherwise = Nothing
+
+weaveBacklinks :: HtmlWeaver ()
+weaveBacklinks = do
+  weaveConf <- ask
+  let maybeOffset =
+        lookup
+          weaveConf.originObjectPath
+          weaveConf.archive.offsetsInverted
+      maybeCellCount = do
+        obj <- lookup weaveConf.originObjectPath weaveConf.archive.objects
+        let size = length obj.orgDoc.cells
+        offset <- maybeOffset
+        pure $ offset + size
+      cellIdxInCurrentObj idx
+        | Just lo <- maybeOffset,
+          Just hi <- maybeCellCount =
+            lo <= idx && idx <= (hi - 1)
+        | otherwise = False
+      backlinkFromExternalObj (from, to) =
+        (not $ cellIdxInCurrentObj from) && cellIdxInCurrentObj to
+      externalCellIdxs =
+        sort
+          . map fst
+          $ filter backlinkFromExternalObj weaveConf.archive.symbolEdges
+      backlinksByPath :: Map GPath [Int]
+      backlinksByPath =
+        groupTuples
+          . catMaybes
+          $ map
+            ( \globalCellIdx ->
+                (\(_, p) -> Just (p, globalCellIdx))
+                  =<< IntMap.lookupLE globalCellIdx weaveConf.archive.offsets
+            )
+            externalCellIdxs
+      backlinks =
+        sequence_
+          . map f
+          . sortOn (\(_, links) -> -(length links))
+          $ toPairs backlinksByPath
+      htmlExt = P.unsafeEncodeUtf "html"
+      orgExt = P.unsafeEncodeUtf "org"
+      f (_, []) = pure ()
+      f (externalObjGPath, idxs@(globalCellIdx : _))
+        | Just (_, externalCell) <-
+            cellIdxToObjCell weaveConf.archive globalCellIdx,
+          Just (offset, _) <- IntMap.lookupLE globalCellIdx weaveConf.archive.offsets,
+          Just toObjPath <-
+            P.encodeUtf $ decodeGPath externalObjGPath,
+          Just fromObjPath <-
+            P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+          Right str <-
+            P.decodeWith utf8 utf8
+              $ P.replaceExtension
+                (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+                htmlExt,
+          Right externalOrgDocName <-
+            P.decodeWith utf8 utf8
+              $ P.replaceExtension
+                (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+                orgExt = do
+            let linkAnchor =
+                  T.pack str
+                    <> "#"
+                    <> (getLinkAnchor (Just $ globalCellIdx - offset) externalCell)
+                linkName = T.pack externalOrgDocName <> " (" <> T.show (length idxs) <> ")"
+            li_ [] $ do
+              a_ [href_ linkAnchor] $ do
+                toHtml linkName
+        | otherwise = pure ()
+  div_ [class_ "backlinks"] $ do
+    p_ [class_ "widget-title"] $ do
+      toHtml @Text "Backlinks"
+    ul_ [] $ do
+      backlinks
+
+groupTuples :: (Ord a) => [(a, Int)] -> Map a [Int]
+groupTuples = foldl' (\m (x, n) -> M.insertWith (<>) x [n] m) mempty

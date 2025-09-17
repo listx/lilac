@@ -40,7 +40,9 @@ import Lilac.Types
       ),
     Link (Link),
     LinkTarget (LinkTargetOid),
-    Object (symbols),
+    Object (orgDoc, symbols),
+    OrgDoc (cells),
+    cellIdxToObjCell,
   )
 import Relude
   ( Bool (False, True),
@@ -52,6 +54,7 @@ import Relude
     map,
     otherwise,
     reverse,
+    (!!?),
     ($),
     (.),
     (/=),
@@ -112,21 +115,24 @@ expandRootBlocks archive outDir = map expandRootBlock rootBlocks
       Object ->
       [[(OsPath, Block)]]
     getRootBlocksFromObject acc object =
-      foldl' getRootBlock [] object.symbols : acc
-    getRootBlock acc cell = case cell of
-      CBlock b
-        | Just tPath <- lookup "tangle" b.meta,
-          Just tOsPath <- P.encodeUtf $ T.unpack tPath ->
-            (P.combine outDir tOsPath, b) : acc
-        | otherwise -> acc
-      CHeading {}
-      CListItem {}
-      CParagraph {}
-      CMathFragment {}
-      CFigure {}
-      CTable {}
-      CFootnote {}
-      CBibliography {} -> acc
+      foldl' (getRootBlock object.orgDoc.cells) [] object.symbols : acc
+    getRootBlock cells acc localCellIdx
+      | Just cell <- cells !!? localCellIdx =
+          case cell of
+            CBlock b
+              | Just tPath <- lookup "tangle" b.meta,
+                Just tOsPath <- P.encodeUtf $ T.unpack tPath ->
+                  (P.combine outDir tOsPath, b) : acc
+              | otherwise -> acc
+            CHeading {}
+            CListItem {}
+            CParagraph {}
+            CMathFragment {}
+            CFigure {}
+            CTable {}
+            CFootnote {}
+            CBibliography {} -> acc
+      | otherwise = acc
     expandRootBlock :: (OsPath, Block) -> (OsPath, Text)
     expandRootBlock (p, rootBlock) =
       ( P.combine outDir p,
@@ -161,7 +167,8 @@ expandBlock archive block existingPrefix =
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
     expand (acc, prefix) (BTokenLink (Link _ (LinkTargetOid linkOid)))
-      | Just (CBlock targetBlock) <- lookup linkOid archive.symbols =
+      | Just globalCellIdx <- lookup linkOid archive.symbols,
+        Just (_, (CBlock targetBlock)) <- cellIdxToObjCell archive globalCellIdx =
           ( acc <> (expandBlock archive targetBlock $ existingPrefix <> prefix),
             prefix
           )

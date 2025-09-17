@@ -50,7 +50,8 @@ import Lilac.Types
         cslPath,
         footnoteNumbers,
         meta,
-        oid
+        oid,
+        pseudoEdges
       ),
     OrgParserConf (maxHeadingLevel),
     OrgParserState
@@ -72,6 +73,7 @@ import Lilac.Types
       ),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose (Prose),
+    PseudoEdge (PseudoEdge),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, caption, grid, meta, parentOid),
@@ -227,11 +229,12 @@ plainHeading level section =
         meta = fromList []
       }
 
-nilOrgDoc :: [Cell] -> OrgDoc
-nilOrgDoc cells =
+nilOrgDoc :: [Cell] -> [PseudoEdge] -> OrgDoc
+nilOrgDoc cells pseudoEdges =
   OrgDoc
     { oid = nilOid,
       cells = cells,
+      pseudoEdges = pseudoEdges,
       footnoteNumbers = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -361,6 +364,7 @@ parseSpec = do
           plainHeading 11 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
           plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ]
+        []
     )
     defaultOrgParserState
       { headingOidStack = take 12 $ repeat Nothing,
@@ -385,6 +389,7 @@ parseSpec = do
           plainHeading 11 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
           plainHeading 12 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ]
+        []
     )
     defaultOrgParserState
       { headingOidStack = take 12 $ repeat Nothing,
@@ -484,6 +489,7 @@ parseSpec = do
                 meta = fromList []
               }
         ]
+        []
     )
     defaultOrgParserState
       { headingOidStack = [Nothing],
@@ -505,6 +511,7 @@ parseSpec = do
                     ]
               }
         ]
+        []
     )
     defaultOrgParserState
       { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
@@ -526,6 +533,7 @@ parseSpec = do
                     ]
               }
         ]
+        []
     )
     defaultOrgParserState
       { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
@@ -569,6 +577,7 @@ parseSpec = do
         CParagraph $ Prose [ptext "x y z foo bar" []],
         CParagraph $ Prose [ptext "multiple lines with underscore" [Underline]]
       ]
+      []
 
   it "accepts empty input for \"notFollowedBy (char ' ')\"" $ do
     MP.parse
@@ -586,6 +595,7 @@ parseSpec = do
               ptext " baz" []
             ]
       ]
+      []
 
   shouldParseWith
     "0005-styled-strings-complex-punctuation"
@@ -601,6 +611,7 @@ parseSpec = do
               ptext ". It's #1!" []
             ]
       ]
+      []
 
   shouldParseWith
     "0005-styled-strings-slash-separated-words"
@@ -613,6 +624,7 @@ parseSpec = do
               ptext " +1/+2. key/value" []
             ]
       ]
+      []
 
   shouldParseWith
     "0005-styled-strings-complex"
@@ -631,6 +643,7 @@ parseSpec = do
               ptext "bold" [Bold]
             ]
       ]
+      []
 
   shouldParseWith
     "0005-styled-strings-compression"
@@ -641,6 +654,7 @@ parseSpec = do
               ptext "f g h i j" [Bold]
             ]
       ]
+      []
 
   shouldParseWith
     "0005-styled-strings-escape-marker"
@@ -650,6 +664,7 @@ parseSpec = do
             [ ptext "foo and/or 1/2 bar \\ a\\b" [Italic]
             ]
       ]
+      []
 
   shouldFailWithMessage
     "0005-styled-strings-leftover-active-styles"
@@ -675,6 +690,7 @@ parseSpec = do
                 meta = fromList []
               }
         ]
+        []
     )
     defaultOrgParserState
       { headingOidStack = [Nothing],
@@ -687,6 +703,7 @@ parseSpec = do
     $ nilOrgDoc
       [ plainParagraph "foo"
       ]
+      []
 
   shouldParseWith
     "0005-styled-strings-verbatim-code-ignore-immediate-bold"
@@ -702,6 +719,7 @@ parseSpec = do
               ptext "d*" [Code]
             ]
       ]
+      []
 
   shouldParseWith
     "0005-styled-strings-verbatim-precedence"
@@ -737,6 +755,7 @@ parseSpec = do
             [ ptext "[[bar]]" [Code]
             ]
       ]
+      [PseudoEdge (1, LinkOid {oid = fromWords 0 0, name = "hello"})]
 
   shouldParseWith
     "0005-styled-strings-verbatim"
@@ -748,6 +767,7 @@ parseSpec = do
               ptext ") hello" []
             ]
       ]
+      []
 
   shouldParseWith
     "0006-links-inside-parentheses"
@@ -763,12 +783,14 @@ parseSpec = do
               ptext ")" []
             ]
       ]
+      []
 
   shouldParseWith
     "0006-links-nonlink"
     $ nilOrgDoc
       [ CParagraph $ Prose [ptext "[hi]" []]
       ]
+      []
 
   shouldParseWith
     "0006-links-raw"
@@ -877,6 +899,7 @@ parseSpec = do
                   }
             ]
       ]
+      []
 
   shouldParseWithState
     "0006-links"
@@ -928,6 +951,9 @@ parseSpec = do
                     },
                 ptext " b" []
               ]
+        ]
+        [ PseudoEdge (2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "a"}),
+          PseudoEdge (0, LinkOid {oid = fromWords 0 0, name = "link-target-only"})
         ]
     )
     defaultOrgParserState
@@ -1002,6 +1028,7 @@ parseSpec = do
                     }
               ]
         ]
+        []
     )
 
   shouldParseWith
@@ -1154,6 +1181,16 @@ parseSpec = do
               LUnorderedEnd
             ]
         ]
+        [ PseudoEdge (6, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "a b c"}),
+          PseudoEdge (4, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo bar baz"}),
+          PseudoEdge (2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo"}),
+          PseudoEdge (0, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo"}),
+          PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "foo"}),
+          PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
+          PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
+          PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
+          PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""})
+        ]
     )
 
   shouldParseWith
@@ -1174,6 +1211,7 @@ parseSpec = do
                     }
               ]
         ]
+        [PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "target name with newline and space is still treated as space"})]
     )
 
   shouldFailWithMessage
@@ -1227,6 +1265,7 @@ parseSpec = do
                 body = []
               }
         ]
+        []
     )
     defaultOrgParserState
       { cellNames = Set.fromList ["foo"],
@@ -1303,6 +1342,7 @@ parseSpec = do
                 body = [BTokenString "#+end_example"]
               }
         ]
+        []
     )
     defaultOrgParserState
       { cellNames =
@@ -1334,6 +1374,7 @@ parseSpec = do
                   ]
               }
         ]
+        []
     )
     defaultOrgParserState
       { anonBlockNumber = 1
@@ -1377,6 +1418,7 @@ parseSpec = do
                   ]
               }
         ]
+        []
     )
     defaultOrgParserState
       { anonBlockNumber = 1
@@ -1432,6 +1474,7 @@ parseSpec = do
                   ]
               }
         ]
+        []
     )
     defaultOrgParserState
       { anonBlockNumber = 1
@@ -1478,6 +1521,7 @@ parseSpec = do
                   ]
               }
         ]
+        []
     )
     defaultOrgParserState
       { anonBlockNumber = 1
@@ -1517,6 +1561,7 @@ parseSpec = do
             LOrderedEnd
           ]
       ]
+      []
 
   shouldParseWith
     "0009-list-indentation-nested-with-text"
@@ -1570,6 +1615,7 @@ parseSpec = do
           ],
         plainParagraph "Bar."
       ]
+      []
 
   shouldParseWith
     "0009-list-indentation-nested"
@@ -1613,6 +1659,7 @@ parseSpec = do
             LOrderedEnd ------- End outer ordered list.
           ]
       ]
+      []
 
   shouldFailWithMessage
     "0009-list-nesting-max"
@@ -1630,6 +1677,7 @@ parseSpec = do
       [ plainParagraph "1)",
         plainParagraph "2)"
       ]
+      []
 
   shouldParseWith
     "0009-list-indentation-proper-indent"
@@ -1647,6 +1695,7 @@ parseSpec = do
             LOrderedEnd
           ]
       ]
+      []
 
   shouldParseWith
     "0009-list-items-need-blank-line-separator"
@@ -1661,6 +1710,7 @@ parseSpec = do
             LOrderedEnd
           ]
       ]
+      []
 
   shouldFailWithMessage
     "0009-lists-cannot-be-mixed-on-their-own-ordered"
@@ -1729,6 +1779,7 @@ parseSpec = do
           ],
         plainParagraph "Four"
       ]
+      []
 
   shouldParseWith
     "0009-paragraph-can-separate-mixed-lists"
@@ -1776,6 +1827,7 @@ parseSpec = do
           ],
         plainParagraph "Four"
       ]
+      []
 
   shouldParseWithState
     "0010-standalone-math-fragments"
@@ -1827,6 +1879,7 @@ parseSpec = do
                 body = "1 + 1 = 2"
               }
         ]
+        []
     )
     defaultOrgParserState
       { equationNumber = 3,
@@ -1870,6 +1923,7 @@ parseSpec = do
               LOrderedEnd
             ]
         ]
+        []
     )
     defaultOrgParserState
       { equationNumber = 1,
@@ -1993,6 +2047,7 @@ parseSpec = do
                     }
               }
         ]
+        [PseudoEdge (8, LinkOid {oid = fromWords 0 0, name = "not a figure"})]
     )
     defaultOrgParserState
       { cellNames =
@@ -2135,6 +2190,7 @@ parseSpec = do
                     ]
               }
         ]
+        []
     )
     defaultOrgParserState
       { cellNames =
@@ -2258,6 +2314,7 @@ parseSpec = do
               LOrderedEnd
             ]
         ]
+        []
     )
     defaultOrgParserState
       { cellNames =
@@ -2298,6 +2355,7 @@ parseSpec = do
                   body = Prose [ptext "Foo." []]
                 }
           ],
+        pseudoEdges = [],
         footnoteNumbers =
           fromList
             [ ("hello", 1)
@@ -2353,6 +2411,7 @@ parseSpec = do
                   body = Prose [ptext "Definition of a." []]
                 }
           ],
+        pseudoEdges = [],
         footnoteNumbers =
           fromList
             [ ("a", 1),
@@ -2388,6 +2447,7 @@ parseSpec = do
     OrgDoc
       { oid = nilOid,
         cells = [],
+        pseudoEdges = [],
         footnoteNumbers = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = [],
@@ -2404,6 +2464,7 @@ parseSpec = do
     OrgDoc
       { oid = nilOid,
         cells = [],
+        pseudoEdges = [],
         footnoteNumbers = M.empty,
         cslPath = Nothing,
         bibPaths =
@@ -2423,6 +2484,7 @@ parseSpec = do
     OrgDoc
       { oid = nilOid,
         cells = [CBibliography ()],
+        pseudoEdges = [],
         footnoteNumbers = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
@@ -2454,6 +2516,7 @@ parseSpec = do
                 [ PTokenCitation 0
                 ]
           ],
+        pseudoEdges = [],
         footnoteNumbers = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
@@ -2500,6 +2563,7 @@ parseSpec = do
                   PTokenCitation 5
                 ]
           ],
+        pseudoEdges = [],
         footnoteNumbers = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
@@ -2616,6 +2680,7 @@ parseSpec = do
                   PTokenCitation 5
                 ]
           ],
+        pseudoEdges = [],
         footnoteNumbers = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
@@ -2766,6 +2831,7 @@ parseSpec = do
                   PTokenCitation 3
                 ]
           ],
+        pseudoEdges = [],
         footnoteNumbers = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
@@ -2932,6 +2998,7 @@ parseSpec = do
                   ptext "[cite:@bar]" [Verbatim]
                 ]
           ],
+        pseudoEdges = [],
         footnoteNumbers = M.empty,
         cslPath = Nothing,
         bibPaths = [],
@@ -2956,6 +3023,7 @@ parseSpec = do
                   meta = fromList []
                 }
           ],
+        pseudoEdges = [],
         footnoteNumbers = M.empty,
         cslPath = Nothing,
         bibPaths = [],

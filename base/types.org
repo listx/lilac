@@ -47,6 +47,7 @@ module Lilac.Types
     OrgParserState (..),
     PToken (..),
     ProjectConf (..),
+    PseudoEdge (..),
     RawProjectConf (..),
     Prose (..),
     Style (..),
@@ -54,6 +55,7 @@ module Lilac.Types
     StyledText (..),
     Table (..),
     WeaveConf (..),
+    cellIdxToObjCell,
     decodeGPath,
     defaultOrgParserConf,
     defaultOrgParserState,
@@ -93,6 +95,9 @@ import Data.Aeson.Types
   )
 import Data.Bits (setBit)
 import Data.Bits.Bitwise (toListLE)
+import Data.Graph qualified as G
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -133,11 +138,14 @@ import Relude
     show,
     toEnum,
     zip,
+    (!!?),
     ($),
+    (-),
     (.),
     (<>),
     (>),
   )
+import Relude.Extra.Map (lookup)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Prelude qualified (show)
@@ -187,6 +195,8 @@ import Prelude qualified (show)
 <<f:fromWords>>
 <<f:fromText>>
 
+<<id:e16dd5c7-0a63-4c52-afe9-744fdf853643::newtype:PseudoEdge>>
+
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:OrgParser>>
 
 <<newtype:GPath>>
@@ -203,6 +213,7 @@ import Prelude qualified (show)
 
 <<id:01da95fe-ba23-4481-9833-428423392f5f::data:Object>>
 <<id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive>>
+<<id:25827c17-2015-434b-b686-db3d72b2ee4d::f:cellIdxToObjCell>>
 
 <<id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf>>
 <<id:df128041-ada8-4d77-a373-111416002dae::data:RawProjectConf>>
