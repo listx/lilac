@@ -1996,7 +1996,6 @@ executable lilac
       <<GHC threaded flags>>
   build-depends:
       aeson
-    , aeson-pretty
     , ansi-terminal
     , base >=4.7 && <5
     , directory
@@ -2272,8 +2271,7 @@ The boilerplate involves [[id:ce9af5ef-6559-4ffb-82c1-a439214eda6d][option handl
 #+begin_src haskell
 module Main (main) where
 
-import Data.Aeson (ToJSON, eitherDecodeStrictText)
-import Data.Aeson.Encode.Pretty qualified as EP
+import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
 import Data.Map.Strict qualified as M
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
@@ -2358,7 +2356,6 @@ import Relude
     show,
     sort,
     when,
-    writeFileLBS,
     ($),
     (&&),
     (+),
@@ -2388,7 +2385,6 @@ import Text.Megaparsec qualified as MP
 <<f:tangle>>
 <<f:lilacWeave>>
 <<f:weaveToDisk>>
-<<f:writeJSONPretty>>
 <<f:putStrColor>>
 <<f:putStrLnColor>>
 #+end_src
@@ -2472,27 +2468,7 @@ lilacCompile _globalOpts compileOpts = do
       outPath <- do
         let base = P.replaceExtension inputPath $ P.unsafeEncodeUtf "lobj"
         P.decodeUtf base
-      writeJSONPretty outPath obj
-#+end_src
-
-The [[f:writeJSONPretty]] helper relies on ~Data.Aeson.Encode.Pretty~ to make the JSON
-we write even more human-friendly (which is useful for debugging if we need to
-modify the JSON, for example).
-
-#+name: f:writeJSONPretty
-#+begin_src haskell
-writeJSONPretty :: (ToJSON a) => FilePath -> a -> IO ()
-writeJSONPretty path marshalMe =
-  writeFileLBS
-    path
-    $ EP.encodePretty'
-      EP.Config
-        { EP.confIndent = EP.Spaces 2,
-          EP.confCompare = mempty,
-          EP.confNumFormat = EP.Generic,
-          EP.confTrailingNewline = True
-        }
-      marshalMe
+      encodeFile outPath obj
 #+end_src
 
 *** Archiving
@@ -2512,7 +2488,7 @@ lilacArchive archiveOpts = do
       outPath <- do
         let base = P.replaceExtension archiveOpts.outFile $ P.unsafeEncodeUtf "larc"
         P.decodeUtf base
-      writeJSONPretty outPath archive
+      encodeFile outPath archive
   where
     readObjectDirectly :: GPath -> IO (GPath, Object)
     readObjectDirectly gPath = do

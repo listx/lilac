@@ -1,7 +1,6 @@
 module Main (main) where
 
-import Data.Aeson (ToJSON, eitherDecodeStrictText)
-import Data.Aeson.Encode.Pretty qualified as EP
+import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
 import Data.Map.Strict qualified as M
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
@@ -86,7 +85,6 @@ import Relude
     show,
     sort,
     when,
-    writeFileLBS,
     ($),
     (&&),
     (+),
@@ -371,7 +369,7 @@ lilacCompile _globalOpts compileOpts = do
       outPath <- do
         let base = P.replaceExtension inputPath $ P.unsafeEncodeUtf "lobj"
         P.decodeUtf base
-      writeJSONPretty outPath obj
+      encodeFile outPath obj
 
 lilacArchive :: ArchiveOpts -> IO ()
 lilacArchive archiveOpts = do
@@ -383,7 +381,7 @@ lilacArchive archiveOpts = do
       outPath <- do
         let base = P.replaceExtension archiveOpts.outFile $ P.unsafeEncodeUtf "larc"
         P.decodeUtf base
-      writeJSONPretty outPath archive
+      encodeFile outPath archive
   where
     readObjectDirectly :: GPath -> IO (GPath, Object)
     readObjectDirectly gPath = do
@@ -501,19 +499,6 @@ weaveToDisk weaveOpts projectConf archive acc objPath obj =
           . LW.renderAsText weaveConf
           $ LW.weaveObject obj
    in action : acc
-
-writeJSONPretty :: (ToJSON a) => FilePath -> a -> IO ()
-writeJSONPretty path marshalMe =
-  writeFileLBS
-    path
-    $ EP.encodePretty'
-      EP.Config
-        { EP.confIndent = EP.Spaces 2,
-          EP.confCompare = mempty,
-          EP.confNumFormat = EP.Generic,
-          EP.confTrailingNewline = True
-        }
-      marshalMe
 
 putStrColor :: [C.SGR] -> String -> IO ()
 putStrColor sgrs s = do
