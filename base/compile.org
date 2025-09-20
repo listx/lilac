@@ -1,20 +1,15 @@
 :PROPERTIES:
 :ID:       b9c034c1-5499-44e6-855c-6c16e1693cb8
 :END:
-#+title: Lilac Compile
+#+title: Compile
 
 #+bibliography: bib.json
 #+cite_export: csl csl-styles/ieee.csl
 
-* Compiling
-:PROPERTIES:
-:ID:       ed1fae4a-1109-40a8-9c65-458886fadf3d
-:END:
-
-Compiling is the intermediate step we perform on Org files, such that they can
+Compilation is the intermediate step we perform on Org files, such that they can
 be tangled or weaved.
 
-** =Lilac.Compile= module
+* =Lilac.Compile= module
 
 #+name: module:Lilac.Compile
 #+header: :tangle src/Lilac/Compile.hs
@@ -139,7 +134,7 @@ import System.OsPath qualified as P
 <<f:makeRelativeToObjectPath>>
 #+end_src
 
-** Object generation
+* Object generation
 :PROPERTIES:
 :ID:       01da95fe-ba23-4481-9833-428423392f5f
 :END:
@@ -314,7 +309,7 @@ like ~[[foo bar]]~ shouldn't be considered external, because they refer to cells
 that have been named like ~foo bar~ inside the current Org file, not an external
 Org file.
 
-*** Citation dependencies
+** Citation dependencies
 :PROPERTIES:
 :ID:       4194fc81-a28d-451f-b4bd-f2f522b5a750
 :END:
@@ -390,7 +385,7 @@ parseBibliography :: Text -> Either String [CP.Reference (CslJson Text)]
 parseBibliography = eitherDecodeStrictText
 #+end_src
 
-** External symbol (OID) detection
+* External symbol (OID) detection
 
 [[f:findExternalOids]] looks for ~LinkTargetOid~ links that point to cells that are
 not inside the current Org file. We just look at all
@@ -438,7 +433,7 @@ findExternalOids orgDoc =
     symbols = mkSymbols orgDoc
 #+end_src
 
-*** Tests
+** Tests
 
 Links to code blocks within the same document, whether explicitly defined with
 an OID or not, shouldn't result in external links.
@@ -572,7 +567,7 @@ checkExternalOids
   ]
 #+end_src
 
-** Archives
+* Archives
 :PROPERTIES:
 :ID:       25827c17-2015-434b-b686-db3d72b2ee4d
 :END:
@@ -750,7 +745,7 @@ makeRelativeToObjectPath objGPath fps = do
       P.decodeUtf relPath
 #+end_src
 
-*** Tests
+** Tests
 
 Detect broken Noweb links.
 
@@ -946,7 +941,7 @@ expectArchiveOk
   ]
 #+end_src
 
-** Cycle detection for Noweb links
+* Cycle detection for Noweb links
 :PROPERTIES:
 :ID:       ff5876bf-a144-4a08-bba4-15638e3590d5
 :END:
@@ -1069,7 +1064,7 @@ Checking for back edges means just seeing whether there is more than one vertex,
 or if there are any self-loops; these concerns are encoded in the ~f~ helper
 function.
 
-*** Tests
+** Tests
 
 We use the [[f:checkCycles]] helper (powered by [[f:findCycles]] underneath) to detect
 cycles (or lack thereof).
@@ -1535,11 +1530,11 @@ checkCycles
 #+end_src
 
 
-** Testing framework
+* Testing framework
 
 The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]].
 
-*** Test module and helpers
+** Test module and helpers
 :PROPERTIES:
 :ID:       ffb739b6-f38e-48bc-a260-7104802c69f4
 :END:
@@ -1672,7 +1667,7 @@ checkCycles paths expectedCycles = do
       (LC.findCycles archive) `shouldBe` expectedCycles
 #+end_src
 
-*** All test cases
+** All test cases
 
 Below are all of the individual test cases.
 
