@@ -1176,16 +1176,9 @@ function.
 We use the [[f:checkCycles]] helper (powered by [[f:findCycles]] underneath) to detect
 cycles (or lack thereof).
 
-# Sadly, vale gets confused for some reason and thinks we should be capitalizing
-# "noweb" even when they're inside verbatim text. So we have to turn it off
-# temporarily here.
-# vale off
-
 First let's check for the happy path where there are no cycles. Note the use of
 ~:noweb off~ so as to preserve the Noweb link declaration (see [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::f:nowebLinkParser][f:nowebLinkParser]]
 and [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::t:0007-blocks-noweb][t:0007-blocks-noweb]] for more sample usage of ~:noweb off~).
-
-# vale on
 
 #+name: ti:0100-dag-no-loops
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-no-loops
