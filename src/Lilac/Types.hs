@@ -579,7 +579,6 @@ type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object,
     symbols :: Map LinkOid Int,
-    symbolPath :: Map LinkOid GPath,
     symbolEdges :: [G.Edge],
     offsets :: IntMap GPath,
     offsetsInverted :: Map GPath Int,

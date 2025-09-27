@@ -29,7 +29,6 @@ import Lilac.Types
         offsets,
         offsetsInverted,
         symbolEdges,
-        symbolPath,
         symbols
       ),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -118,7 +117,7 @@ import Relude
     (=<<),
     (>),
   )
-import Relude.Extra.Map (elems, insert, keys, lookup, member, toPairs)
+import Relude.Extra.Map (elems, insert, lookup, member, toPairs)
 import System.Exit (die)
 import System.OsPath qualified as P
 
@@ -183,8 +182,8 @@ mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
 
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
-  let (objects, symbols, symbolPath) =
-        foldl' concatObjs (mempty, mempty, mempty) offsetsFull
+  let (objects, symbols) =
+        foldl' concatObjs (mempty, mempty) offsetsFull
       symbolEdges = foldl' (finalizeEdges symbols) [] offsetsFull
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
@@ -210,7 +209,6 @@ mkArchive pathObjs = do
             Archive
               { objects = objects,
                 symbols = symbols,
-                symbolPath = symbolPath,
                 symbolEdges = symbolEdges,
                 offsets = offsets,
                 offsetsInverted = offsetsInverted,
@@ -230,13 +228,12 @@ mkArchive pathObjs = do
     offsetsInverted =
       M.fromList . map (\(offset, path) -> (path, offset)) $ toPairs offsets
     concatObjs ::
-      (Map GPath Object, Map LinkOid Int, Map LinkOid GPath) ->
+      (Map GPath Object, Map LinkOid Int) ->
       (Int, (GPath, Object)) ->
-      (Map GPath Object, Map LinkOid Int, Map LinkOid GPath)
-    concatObjs (accObjs, accSyms, accSymPaths) (offset, (path, obj)) =
+      (Map GPath Object, Map LinkOid Int)
+    concatObjs (accObjs, accSyms) (offset, (path, obj)) =
       ( insert path obj accObjs,
-        (M.map (+ offset) obj.symbols) <> accSyms,
-        (fromList $ zip (keys obj.symbols) (repeat path)) <> accSymPaths
+        (M.map (+ offset) obj.symbols) <> accSyms
       )
     finalizeEdges ::
       Map LinkOid Int ->

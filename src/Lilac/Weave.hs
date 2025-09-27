@@ -60,7 +60,6 @@ import Lilac.Types
         offsets,
         offsetsInverted,
         symbolEdges,
-        symbolPath,
         symbols
       ),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -661,7 +660,7 @@ weaveLinkTarget linkTarget = do
           "#" <> getLinkAnchor (Just cellIdx) internalCell
       | Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
         Just (_, externalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx,
-        Just externalObjGPath <- lookup linkOid weaveConf.archive.symbolPath,
+        Just (_, externalObjGPath) <- IntMap.lookupLE globalCellIdx weaveConf.archive.offsets,
         Just toObjPath <- P.encodeUtf $ decodeGPath externalObjGPath,
         Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
         Right str <-

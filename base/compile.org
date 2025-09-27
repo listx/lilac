@@ -45,7 +45,6 @@ import Lilac.Types
         offsets,
         offsetsInverted,
         symbolEdges,
-        symbolPath,
         symbols
       ),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -134,7 +133,7 @@ import Relude
     (=<<),
     (>),
   )
-import Relude.Extra.Map (elems, insert, keys, lookup, member, toPairs)
+import Relude.Extra.Map (elems, insert, lookup, member, toPairs)
 import System.Exit (die)
 import System.OsPath qualified as P
 
@@ -617,7 +616,6 @@ type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object,
     symbols :: Map LinkOid Int,
-    symbolPath :: Map LinkOid GPath,
     symbolEdges :: [G.Edge],
     offsets :: IntMap GPath,
     offsetsInverted :: Map GPath Int,
@@ -636,11 +634,9 @@ was found. We have to use ~GPath~ because there is no ~ToJSONKey~ instance for
 The other fields in [[data:Archive]] are based on the ~objects~:
 
   - The ~symbols~ is a table for finding the cell (in one of the objects found in
-    the archive) that corresponds to a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]].
-
-  - The ~symbolPath~ is used for determining which [[data:Object]] contains the given
-    [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]], by returning the unique [[id:2d98229c-e318-434b-916b-364c04021306::newtype:GPath][newtype:GPath]] key of the object (which
-    can be then looked up in the ~objects~ field).
+    the archive) that corresponds to a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]. It contains a globally
+    unique index of the cell, which can be used with ~offsets~ to find the actual
+    cell we are interested in.
 
   - The ~symbolEdges~ is a list of all links (edges) between cells (vertices),
     where the edges are created by a reference (via [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) from one cell
@@ -674,8 +670,8 @@ the information as a ~Text~ value, because there is no ~ToJSON~ instance for the
 #+begin_src haskell
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
-  let (objects, symbols, symbolPath) =
-        foldl' concatObjs (mempty, mempty, mempty) offsetsFull
+  let (objects, symbols) =
+        foldl' concatObjs (mempty, mempty) offsetsFull
       symbolEdges = foldl' (finalizeEdges symbols) [] offsetsFull
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
@@ -701,7 +697,6 @@ mkArchive pathObjs = do
             Archive
               { objects = objects,
                 symbols = symbols,
-                symbolPath = symbolPath,
                 symbolEdges = symbolEdges,
                 offsets = offsets,
                 offsetsInverted = offsetsInverted,
@@ -721,13 +716,12 @@ mkArchive pathObjs = do
     offsetsInverted =
       M.fromList . map (\(offset, path) -> (path, offset)) $ toPairs offsets
     concatObjs ::
-      (Map GPath Object, Map LinkOid Int, Map LinkOid GPath) ->
+      (Map GPath Object, Map LinkOid Int) ->
       (Int, (GPath, Object)) ->
-      (Map GPath Object, Map LinkOid Int, Map LinkOid GPath)
-    concatObjs (accObjs, accSyms, accSymPaths) (offset, (path, obj)) =
+      (Map GPath Object, Map LinkOid Int)
+    concatObjs (accObjs, accSyms) (offset, (path, obj)) =
       ( insert path obj accObjs,
-        (M.map (+ offset) obj.symbols) <> accSyms,
-        (fromList $ zip (keys obj.symbols) (repeat path)) <> accSymPaths
+        (M.map (+ offset) obj.symbols) <> accSyms
       )
     finalizeEdges ::
       Map LinkOid Int ->
