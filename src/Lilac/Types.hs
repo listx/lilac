@@ -629,16 +629,35 @@ cellIdxToName :: Archive -> Int -> Int -> Maybe Text
 cellIdxToName archive globalCellIdx offset
   | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
       case cell of
-        CHeading heading -> Just $ (getSectionText heading) <> " " <> (getProseContents heading.body)
+        CHeading heading ->
+          Just $ (getSectionText heading) <> " " <> (getProseContents heading.body)
         CParagraph _ -> Just $ "Paragraph" <> localCellIdx
-        CFigure _ -> Just $ "Figure" <> localCellIdx
-        CTable _ -> Just $ "Table" <> localCellIdx
+        CFigure figure
+          | Just name <- lookup "name" figure.meta ->
+              Just name
+          | Just figureNum <- lookup "__figure_number" figure.meta ->
+              Just $ "Figure " <> figureNum
+          | otherwise -> Just "Figure"
+        CTable table
+          | Just name <- lookup "name" table.meta ->
+              Just name
+          | Just tableNum <- lookup "__table_number" table.meta ->
+              Just $ "Table " <> tableNum
+          | otherwise -> Just "Table"
         CFootnote _ -> Just $ "Footnote" <> localCellIdx
         CBlock block
-          | Just name <- lookup "name" block.meta -> Just name
+          | Just name <- lookup "name" block.meta ->
+              Just name
           | otherwise -> Just $ "Anonymous Block" <> localCellIdx
+        CMathFragment mathFragment
+          | Just name <- lookup "name" mathFragment.meta ->
+              Just name
+          | Just eqNum <- lookup "__equation_number" mathFragment.meta ->
+              Just $ "Equation " <> eqNum
+          | Just eqNum <- lookup "__equation_anon_number" mathFragment.meta ->
+              Just $ "Anonymous Equation " <> eqNum
+          | otherwise -> Just "Math Fragment"
         CListItem {}
-        CMathFragment {}
         CBibliography {} -> Nothing
   | otherwise = Nothing
   where
