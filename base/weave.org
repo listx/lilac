@@ -3113,13 +3113,17 @@ weaveTangledBlocksList blocks = do
     p_ [class_ "widget-title"] $ do
       toHtml @Text "Tangled files"
     let tangledBlocks = catMaybes $ map getTangled blocks
-    when (not $ null tangledBlocks) $ do
-      ol_ [] $ do
-        forM_ (sort tangledBlocks) $ \(path, block) -> do
-          li_ [] $ do
-            let linkAnchor = getLinkAnchor Nothing $ CBlock block
-            a_ [href_ $ "#" <> linkAnchor] $ do
-              toHtml path
+    if (null tangledBlocks)
+      then do
+        p_ [] $ do
+          toHtml @Text "None"
+      else do
+        ol_ [] $ do
+          forM_ (sort tangledBlocks) $ \(path, block) -> do
+            li_ [] $ do
+              let linkAnchor = getLinkAnchor Nothing $ CBlock block
+              a_ [href_ $ "#" <> linkAnchor] $ do
+                toHtml path
   where
     getTangled :: Block -> Maybe (Text, Block)
     getTangled b
