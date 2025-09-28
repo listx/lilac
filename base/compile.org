@@ -802,6 +802,30 @@ cellIdxToObjCell archive globalCellIdx
   | otherwise = Nothing
 #+end_src
 
+[[f:cellIdxToName]] gives a human-friendly name of the cell.
+
+#+name: f:cellIdxToName
+#+begin_src haskell
+cellIdxToName :: Archive -> Int -> Int -> Maybe Text
+cellIdxToName archive globalCellIdx offset
+  | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
+      case cell of
+        CHeading heading -> Just $ (getSectionText heading) <> " " <> (getProseContents heading.body)
+        CParagraph _ -> Just $ "Paragraph" <> localCellIdx
+        CFigure _ -> Just $ "Figure" <> localCellIdx
+        CTable _ -> Just $ "Table" <> localCellIdx
+        CFootnote _ -> Just $ "Footnote" <> localCellIdx
+        CBlock block
+          | Just name <- lookup "name" block.meta -> Just name
+          | otherwise -> Just $ "Anonymous Block" <> localCellIdx
+        CListItem {}
+        CMathFragment {}
+        CBibliography {} -> Nothing
+  | otherwise = Nothing
+  where
+    localCellIdx = " (Cell " <> (T.show $ globalCellIdx - offset) <> ")"
+#+end_src
+
 [[f:readObjectsFrom]] reads files from a given parent directory, and converts them
 into [[data:Object]] values. This is used in tests where we want to read multiple objects for a test case.
 

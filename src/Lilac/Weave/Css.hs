@@ -265,6 +265,8 @@ defaultCss = do
       ul ? do
         paddingLeft $ rem 1
         marginTop $ px 0
+        ol ? do
+          paddingLeft $ rem 1
 
   footer ? do
     marginLeft (px 20)

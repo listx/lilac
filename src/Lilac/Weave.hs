@@ -80,7 +80,7 @@ import Lilac.Types
     Figure (caption, link, meta),
     Footnote (body, name),
     GPath,
-    Heading (body, level, section),
+    Heading (body, level),
     Link (Link, name, target),
     LinkTarget
       ( LinkTargetFilePath,
@@ -129,8 +129,11 @@ import Lilac.Types
         projectConf,
         watch
       ),
+    cellIdxToName,
     cellIdxToObjCell,
     decodeGPath,
+    getProseContents,
+    getSectionText,
     markingChars,
     markingCharsInvisible,
   )
@@ -374,25 +377,6 @@ toSafeHtmlId = T.map onlyKeepSomeChars
       | T.elem c "-_:." = c
       | otherwise = '-'
 
-getProseContents :: Prose -> Text
-getProseContents prose = join $ foldl' f [] prose.unProse
-  where
-    join = T.intercalate "" . reverse
-    f acc = \case
-      PTokenStyledText styledText -> styledText.body : acc
-      PTokenLink link ->
-        let linkText =
-              join
-                $ foldl'
-                  (\acc' n -> n.body : acc')
-                  []
-                  link.name
-         in linkText : acc
-      PTokenMathFragment mathFragment -> mathFragment.body : acc
-      PTokenCitation {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> acc
-
 weaveDocMeta :: M.Map Text Text -> HtmlWeaver ()
 weaveDocMeta m = do
   case lookup "title" m of
@@ -424,15 +408,8 @@ weaveHeading cellIdx heading =
     sectionText = getSectionText heading
     linkAnchor = getLinkAnchor Nothing $ CHeading heading
 
-getSectionText :: Heading -> Text
-getSectionText heading =
-  T.intercalate "."
-    . map T.show
-    . reverse
-    $ heading.section
-
 getLinkAnchor :: Maybe Int -> Cell -> Text
-getLinkAnchor globalCellIdx = \case
+getLinkAnchor localCellIdx = \case
   CHeading heading ->
     T.intercalate
       "-"
@@ -441,7 +418,7 @@ getLinkAnchor globalCellIdx = \case
         toSafeHtmlId $ getProseContents heading.body
       ]
   CListItem {} -> ""
-  CParagraph {} -> case globalCellIdx of
+  CParagraph {} -> case localCellIdx of
     Just idx -> "c-" <> T.show idx
     Nothing -> ""
   CBlock block ->
@@ -1319,31 +1296,54 @@ weaveBacklinks = do
   where
     weaveBacklink :: WeaveConf -> (GPath, [G.Edge]) -> HtmlWeaver ()
     weaveBacklink _ (_, []) = toHtmlRaw @Text ""
-    weaveBacklink weaveConf (externalObjGPath, idxs@((externalIdx, _) : _))
-      | Just (_, externalCell) <-
-          cellIdxToObjCell weaveConf.archive externalIdx,
-        Just (offset, _) <-
-          IntMap.lookupLE externalIdx weaveConf.archive.offsets,
-        Just toObjPath <-
-          P.encodeUtf $ decodeGPath externalObjGPath,
-        Just fromObjPath <-
-          P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
-        Right str <-
-          P.decodeWith utf8 utf8
-            $ P.replaceExtension
-              (getRelativePathWithoutSymlinks fromObjPath toObjPath)
-              (P.unsafeEncodeUtf "html"),
-        Right externalOrgDocName <-
-          P.decodeWith utf8 utf8
-            $ P.replaceExtension
-              (getRelativePathWithoutSymlinks fromObjPath toObjPath)
-              (P.unsafeEncodeUtf "org") = do
-          let linkAnchor =
-                T.pack str
-                  <> "#"
-                  <> (getLinkAnchor (Just $ externalIdx - offset) externalCell)
-              linkName = T.pack externalOrgDocName <> " (" <> T.show (length idxs) <> ")"
-          li_ [] $ do
-            a_ [href_ linkAnchor] $ do
-              toHtml linkName
-      | otherwise = pure ()
+    weaveBacklink weaveConf (externalObjGPath, edges) = do
+      let externalOrgDocName
+            | Just toObjPath <-
+                P.encodeUtf $ decodeGPath externalObjGPath,
+              Just fromObjPath <-
+                P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+              Right externalOrgDocName' <-
+                P.decodeWith utf8 utf8
+                  $ P.replaceExtension
+                    (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+                    (P.unsafeEncodeUtf "org") =
+                externalOrgDocName'
+            | otherwise = "???"
+          weight = T.show $ length edges
+          f (externalIdx, internalIdx)
+            | Just (_, externalCell) <-
+                cellIdxToObjCell weaveConf.archive externalIdx,
+              Just (_, internalCell) <-
+                cellIdxToObjCell weaveConf.archive internalIdx,
+              Just (offset, _) <-
+                IntMap.lookupLE externalIdx weaveConf.archive.offsets,
+              Just toObjPath <-
+                P.encodeUtf $ decodeGPath externalObjGPath,
+              Just fromObjPath <-
+                P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+              Right str <-
+                P.decodeWith utf8 utf8
+                  $ P.replaceExtension
+                    (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+                    (P.unsafeEncodeUtf "html") = do
+                let externalLinkAnchor =
+                      T.pack str
+                        <> "#"
+                        <> (getLinkAnchor (Just externalCellIdx) externalCell)
+                    internalLinkAnchor =
+                      "#" <> (getLinkAnchor (Just internalCellIdx) internalCell)
+                    externalName = fromMaybe "???" $ cellIdxToName weaveConf.archive externalIdx offset
+                    internalName = fromMaybe "???" $ cellIdxToName weaveConf.archive internalIdx offset
+                    externalCellIdx = externalIdx - offset
+                    internalCellIdx = internalIdx - offset
+                li_ [] $ do
+                  a_ [href_ externalLinkAnchor] $ do
+                    toHtml externalName
+                  toHtmlRaw @Text " &#x2192; "
+                  a_ [href_ internalLinkAnchor] $ do
+                    toHtml internalName
+            | otherwise = pure ()
+      li_ [] $ do
+        toHtml $ T.pack externalOrgDocName <> " (" <> weight <> ")"
+        ol_ [] $ do
+          forM_ (sort edges) f

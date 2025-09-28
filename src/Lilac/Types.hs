@@ -31,6 +31,7 @@ module Lilac.Types
     StyledText (..),
     Table (..),
     WeaveConf (..),
+    cellIdxToName,
     cellIdxToObjCell,
     decodeGPath,
     defaultOrgParserConf,
@@ -38,6 +39,8 @@ module Lilac.Types
     encodeGPath,
     Lilac.Types.fromText,
     fromWords,
+    getProseContents,
+    getSectionText,
     markingChars,
     markingCharsInvisible,
     nilOid,
@@ -111,6 +114,7 @@ import Relude
     mempty,
     otherwise,
     pure,
+    reverse,
     show,
     toEnum,
     zip,
@@ -176,6 +180,32 @@ data Heading = Heading
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
+
+getProseContents :: Prose -> Text
+getProseContents prose = join $ foldl' f [] prose.unProse
+  where
+    join = T.intercalate "" . reverse
+    f acc = \case
+      PTokenStyledText styledText -> styledText.body : acc
+      PTokenLink link ->
+        let linkText =
+              join
+                $ foldl'
+                  (\acc' n -> n.body : acc')
+                  []
+                  link.name
+         in linkText : acc
+      PTokenMathFragment mathFragment -> mathFragment.body : acc
+      PTokenCitation {}
+      PTokenDivStart {}
+      PTokenDivEnd {} -> acc
+
+getSectionText :: Heading -> Text
+getSectionText heading =
+  T.intercalate "."
+    . map T.show
+    . reverse
+    $ heading.section
 
 type Level :: Type
 data Level = Level
@@ -594,6 +624,25 @@ cellIdxToObjCell archive globalCellIdx
     Just cell <- obj.orgDoc.cells !!? (globalCellIdx - offset) =
       Just (obj, cell)
   | otherwise = Nothing
+
+cellIdxToName :: Archive -> Int -> Int -> Maybe Text
+cellIdxToName archive globalCellIdx offset
+  | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
+      case cell of
+        CHeading heading -> Just $ (getSectionText heading) <> " " <> (getProseContents heading.body)
+        CParagraph _ -> Just $ "Paragraph" <> localCellIdx
+        CFigure _ -> Just $ "Figure" <> localCellIdx
+        CTable _ -> Just $ "Table" <> localCellIdx
+        CFootnote _ -> Just $ "Footnote" <> localCellIdx
+        CBlock block
+          | Just name <- lookup "name" block.meta -> Just name
+          | otherwise -> Just $ "Anonymous Block" <> localCellIdx
+        CListItem {}
+        CMathFragment {}
+        CBibliography {} -> Nothing
+  | otherwise = Nothing
+  where
+    localCellIdx = " (Cell " <> (T.show $ globalCellIdx - offset) <> ")"
 
 type ProjectConf :: Type
 data ProjectConf = ProjectConf
