@@ -193,7 +193,6 @@ import Lucid
     toHtmlRaw,
     tr_,
     type_,
-    ul_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -1288,7 +1287,7 @@ weaveBacklinks = do
         p_ [] $ do
           toHtml @Text "None"
       Just backlinksByPath -> do
-        ul_ [] $ do
+        ol_ [] $ do
           let sorted =
                 sortOn (\(_, links) -> -(length links))
                   $ toPairs backlinksByPath
