@@ -23,12 +23,11 @@ import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Archive
       ( Archive,
+        backlinks,
         bibs,
         csls,
         objects,
         offsets,
-        offsetsInverted,
-        symbolEdges,
         symbols
       ),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -117,7 +116,7 @@ import Relude
     (=<<),
     (>),
   )
-import Relude.Extra.Map (elems, insert, lookup, member, toPairs)
+import Relude.Extra.Map (elems, insert, lookup, member)
 import System.Exit (die)
 import System.OsPath qualified as P
 
@@ -184,7 +183,7 @@ mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
   let (objects, symbols) =
         foldl' concatObjs (mempty, mempty) offsetsFull
-      symbolEdges = foldl' (finalizeEdges symbols) [] offsetsFull
+      backlinks = mkBacklinks $ foldl' (finalizeEdges symbols) [] offsetsFull
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
     concat
@@ -209,9 +208,8 @@ mkArchive pathObjs = do
             Archive
               { objects = objects,
                 symbols = symbols,
-                symbolEdges = symbolEdges,
+                backlinks = backlinks,
                 offsets = offsets,
-                offsetsInverted = offsetsInverted,
                 csls = fromList csls,
                 bibs = fromList bibs
               }
@@ -225,8 +223,6 @@ mkArchive pathObjs = do
         . filter (\(numCells, _) -> numCells > 0)
         . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
         $ sort pathObjs
-    offsetsInverted =
-      M.fromList . map (\(offset, path) -> (path, offset)) $ toPairs offsets
     concatObjs ::
       (Map GPath Object, Map LinkOid Int) ->
       (Int, (GPath, Object)) ->
@@ -245,6 +241,15 @@ mkArchive pathObjs = do
             Nothing -> Nothing
             Just targetCellIdx -> Just (localCellIdx + offset, targetCellIdx)
        in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
+    mkBacklinks :: [G.Edge] -> Map GPath (Map GPath [G.Edge])
+    mkBacklinks symbolEdges =
+      let f acc (from, to)
+            | Just (_, fromPath) <- IntMap.lookupLE from offsets,
+              Just (_, toPath) <- IntMap.lookupLE to offsets,
+              fromPath /= toPath =
+                M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+            | otherwise = acc
+       in M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
     findBrokenLinks ::
       Map GPath Object ->
       Map LinkOid Int ->

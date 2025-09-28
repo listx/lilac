@@ -579,9 +579,8 @@ type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object,
     symbols :: Map LinkOid Int,
-    symbolEdges :: [G.Edge],
+    backlinks :: Map GPath (Map GPath [G.Edge]),
     offsets :: IntMap GPath,
-    offsetsInverted :: Map GPath Int,
     csls :: Map FilePath Text,
     bibs :: Map FilePath [CP.Reference (CslJson Text)]
   }

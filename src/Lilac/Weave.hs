@@ -37,6 +37,7 @@ import Citeproc.CslJson
   )
 import Data.Aeson (eitherDecodeStrictText)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
+import Data.Graph qualified as G
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
@@ -54,12 +55,11 @@ import Lilac.Parse
   )
 import Lilac.Types
   ( Archive
-      ( bibs,
+      ( backlinks,
+        bibs,
         csls,
         objects,
         offsets,
-        offsetsInverted,
-        symbolEdges,
         symbols
       ),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -208,9 +208,7 @@ import Relude
     IO,
     Identity,
     Int,
-    Map,
     Maybe (Just, Nothing),
-    Ord,
     ReaderT,
     String,
     Text,
@@ -267,7 +265,6 @@ import Relude
     (/=),
     (<),
     (<$>),
-    (<=),
     (<>),
     (=<<),
     (==),
@@ -1306,76 +1303,47 @@ weaveTangledBlocksList blocks = do
 weaveBacklinks :: HtmlWeaver ()
 weaveBacklinks = do
   weaveConf <- ask
-  let maybeOffset =
-        lookup
-          weaveConf.originObjectPath
-          weaveConf.archive.offsetsInverted
-      maybeCellCount = do
-        obj <- lookup weaveConf.originObjectPath weaveConf.archive.objects
-        let size = length obj.orgDoc.cells
-        offset <- maybeOffset
-        pure $ offset + size
-      cellIdxInCurrentObj idx
-        | Just lo <- maybeOffset,
-          Just hi <- maybeCellCount =
-            lo <= idx && idx <= (hi - 1)
-        | otherwise = False
-      backlinkFromExternalObj (from, to) =
-        (not $ cellIdxInCurrentObj from) && cellIdxInCurrentObj to
-      externalCellIdxs =
-        sort
-          . map fst
-          $ filter backlinkFromExternalObj weaveConf.archive.symbolEdges
-      backlinksByPath :: Map GPath [Int]
-      backlinksByPath =
-        groupTuples
-          . catMaybes
-          $ map
-            ( \globalCellIdx ->
-                (\(_, p) -> Just (p, globalCellIdx))
-                  =<< IntMap.lookupLE globalCellIdx weaveConf.archive.offsets
-            )
-            externalCellIdxs
-      backlinks =
-        sequence_
-          . map f
-          . sortOn (\(_, links) -> -(length links))
-          $ toPairs backlinksByPath
-      htmlExt = P.unsafeEncodeUtf "html"
-      orgExt = P.unsafeEncodeUtf "org"
-      f (_, []) = pure ()
-      f (externalObjGPath, idxs@(globalCellIdx : _))
-        | Just (_, externalCell) <-
-            cellIdxToObjCell weaveConf.archive globalCellIdx,
-          Just (offset, _) <- IntMap.lookupLE globalCellIdx weaveConf.archive.offsets,
-          Just toObjPath <-
-            P.encodeUtf $ decodeGPath externalObjGPath,
-          Just fromObjPath <-
-            P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
-          Right str <-
-            P.decodeWith utf8 utf8
-              $ P.replaceExtension
-                (getRelativePathWithoutSymlinks fromObjPath toObjPath)
-                htmlExt,
-          Right externalOrgDocName <-
-            P.decodeWith utf8 utf8
-              $ P.replaceExtension
-                (getRelativePathWithoutSymlinks fromObjPath toObjPath)
-                orgExt = do
-            let linkAnchor =
-                  T.pack str
-                    <> "#"
-                    <> (getLinkAnchor (Just $ globalCellIdx - offset) externalCell)
-                linkName = T.pack externalOrgDocName <> " (" <> T.show (length idxs) <> ")"
-            li_ [] $ do
-              a_ [href_ linkAnchor] $ do
-                toHtml linkName
-        | otherwise = pure ()
   div_ [class_ "backlinks"] $ do
     p_ [class_ "widget-title"] $ do
       toHtml @Text "Backlinks"
-    ul_ [] $ do
-      backlinks
-
-groupTuples :: (Ord a) => [(a, Int)] -> Map a [Int]
-groupTuples = foldl' (\m (x, n) -> M.insertWith (<>) x [n] m) mempty
+    case lookup weaveConf.originObjectPath weaveConf.archive.backlinks of
+      Nothing -> do
+        p_ [] $ do
+          toHtml @Text "None"
+      Just backlinksByPath -> do
+        ul_ [] $ do
+          let sorted =
+                sortOn (\(_, links) -> -(length links))
+                  $ toPairs backlinksByPath
+          sequence_ $ map (weaveBacklink weaveConf) sorted
+  where
+    weaveBacklink :: WeaveConf -> (GPath, [G.Edge]) -> HtmlWeaver ()
+    weaveBacklink _ (_, []) = toHtmlRaw @Text ""
+    weaveBacklink weaveConf (externalObjGPath, idxs@((externalIdx, _) : _))
+      | Just (_, externalCell) <-
+          cellIdxToObjCell weaveConf.archive externalIdx,
+        Just (offset, _) <-
+          IntMap.lookupLE externalIdx weaveConf.archive.offsets,
+        Just toObjPath <-
+          P.encodeUtf $ decodeGPath externalObjGPath,
+        Just fromObjPath <-
+          P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+        Right str <-
+          P.decodeWith utf8 utf8
+            $ P.replaceExtension
+              (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+              (P.unsafeEncodeUtf "html"),
+        Right externalOrgDocName <-
+          P.decodeWith utf8 utf8
+            $ P.replaceExtension
+              (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+              (P.unsafeEncodeUtf "org") = do
+          let linkAnchor =
+                T.pack str
+                  <> "#"
+                  <> (getLinkAnchor (Just $ externalIdx - offset) externalCell)
+              linkName = T.pack externalOrgDocName <> " (" <> T.show (length idxs) <> ")"
+          li_ [] $ do
+            a_ [href_ linkAnchor] $ do
+              toHtml linkName
+      | otherwise = pure ()

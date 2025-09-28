@@ -39,12 +39,11 @@ import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Archive
       ( Archive,
+        backlinks,
         bibs,
         csls,
         objects,
         offsets,
-        offsetsInverted,
-        symbolEdges,
         symbols
       ),
     BToken (BTokenLink, BTokenPadding, BTokenString),
@@ -133,7 +132,7 @@ import Relude
     (=<<),
     (>),
   )
-import Relude.Extra.Map (elems, insert, lookup, member, toPairs)
+import Relude.Extra.Map (elems, insert, lookup, member)
 import System.Exit (die)
 import System.OsPath qualified as P
 
@@ -616,9 +615,8 @@ type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object,
     symbols :: Map LinkOid Int,
-    symbolEdges :: [G.Edge],
+    backlinks :: Map GPath (Map GPath [G.Edge]),
     offsets :: IntMap GPath,
-    offsetsInverted :: Map GPath Int,
     csls :: Map FilePath Text,
     bibs :: Map FilePath [CP.Reference (CslJson Text)]
   }
@@ -638,19 +636,17 @@ The other fields in [[data:Archive]] are based on the ~objects~:
     unique index of the cell, which can be used with ~offsets~ to find the actual
     cell we are interested in.
 
-  - The ~symbolEdges~ is a list of all links (edges) between cells (vertices),
-    where the edges are created by a reference (via [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) from one cell
-    to another. They are based on [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::newtype:PseudoEdge][newtype:PseudoEdge]] which are constructed in
-    [[id:dabccd5e-930e-4571-899f-1bfbdeab3d5e::f:oidLinkParser][f:oidLinkParser]]. See [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]] for how they are used during weaving.
+  - The ~backlinks~ is a map where the keys are the paths (of objects) and the
+    values are the backlinks to that object. The backlinks are themselves a map
+    because we want to organize all of the backlinks by the document they are
+    starting out from. The actual backlinks are just edges between cells
+    (vertices) where the edges are created by a reference (via [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]])
+    from one cell to another. They are based on [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::newtype:PseudoEdge][newtype:PseudoEdge]] which are
+    constructed in [[id:dabccd5e-930e-4571-899f-1bfbdeab3d5e::f:oidLinkParser][f:oidLinkParser]]. See [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]] for how they are used
+    during weaving.
 
   - The ~offsets~ is the offset of each object's cells, in relation to the global
     list of all cells in the archive.
-
-  - The ~offsetsInverted~ is the same as ~offsets~, but where the keys and
-    values are swapped. This swapping is safe because we discard documents that
-    have zero cells in it (which guarantees that the ~offsets~ values are
-    unique, so that when they becomes keys in ~offsetsInverted~, they are still
-    unique and thus avoid any hash collision).
 
 To construct the archive, [[f:mkArchive]] reads a list of paths and the objects that
 are found on those paths. The main check that is performed is to see that there
@@ -672,7 +668,7 @@ mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
   let (objects, symbols) =
         foldl' concatObjs (mempty, mempty) offsetsFull
-      symbolEdges = foldl' (finalizeEdges symbols) [] offsetsFull
+      backlinks = mkBacklinks $ foldl' (finalizeEdges symbols) [] offsetsFull
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
     concat
@@ -697,9 +693,8 @@ mkArchive pathObjs = do
             Archive
               { objects = objects,
                 symbols = symbols,
-                symbolEdges = symbolEdges,
+                backlinks = backlinks,
                 offsets = offsets,
-                offsetsInverted = offsetsInverted,
                 csls = fromList csls,
                 bibs = fromList bibs
               }
@@ -713,8 +708,6 @@ mkArchive pathObjs = do
         . filter (\(numCells, _) -> numCells > 0)
         . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
         $ sort pathObjs
-    offsetsInverted =
-      M.fromList . map (\(offset, path) -> (path, offset)) $ toPairs offsets
     concatObjs ::
       (Map GPath Object, Map LinkOid Int) ->
       (Int, (GPath, Object)) ->
@@ -733,6 +726,15 @@ mkArchive pathObjs = do
             Nothing -> Nothing
             Just targetCellIdx -> Just (localCellIdx + offset, targetCellIdx)
        in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
+    mkBacklinks :: [G.Edge] -> Map GPath (Map GPath [G.Edge])
+    mkBacklinks symbolEdges =
+      let f acc (from, to)
+            | Just (_, fromPath) <- IntMap.lookupLE from offsets,
+              Just (_, toPath) <- IntMap.lookupLE to offsets,
+              fromPath /= toPath =
+                M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+            | otherwise = acc
+       in M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
     findBrokenLinks ::
       Map GPath Object ->
       Map LinkOid Int ->
