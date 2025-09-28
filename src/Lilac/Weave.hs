@@ -461,7 +461,9 @@ getLinkAnchor localCellIdx = \case
               "tbl-" <> tableNum
           | otherwise = "table-num-error"
      in toSafeHtmlId ref
-  CFootnote {} -> ""
+  CFootnote footnote ->
+    let ref = "footnote-" <> footnote.name
+     in toSafeHtmlId ref
   CBibliography {} -> ""
 
 weaveProse :: [Int] -> Prose -> HtmlWeaver ()
@@ -643,11 +645,7 @@ weaveLinkTarget linkTarget = do
       | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
       where
         htmlExt = P.unsafeEncodeUtf "html"
-    LinkTargetFootnote name
-      | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-        Just footnoteNumber <- lookup name originObj.orgDoc.footnoteNumbers ->
-          (T.pack "#footnote-") <> (T.show footnoteNumber)
-      | otherwise -> "#LILAC_BROKEN_LINK"
+    LinkTargetFootnote name -> (T.pack "#footnote-") <> name
     LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
     LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
 
@@ -857,7 +855,7 @@ weaveFootnote cellIdx footnote = do
   if
     | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
       Just footnoteNumber <- lookup footnote.name originObj.orgDoc.footnoteNumbers -> do
-        p_ [class_ "footnote-definition", id_ ("footnote-" <> T.show footnoteNumber)] $ do
+        p_ [class_ "footnote-definition", id_ ("footnote-" <> footnote.name)] $ do
           span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
           weaveProse [cellIdx] footnote.body
     | otherwise -> pure ()

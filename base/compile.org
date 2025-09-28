@@ -827,7 +827,7 @@ cellIdxToName archive globalCellIdx offset
           | Just tableNum <- lookup "__table_number" table.meta ->
               Just $ "Table " <> tableNum
           | otherwise -> Just "Table"
-        CFootnote _ -> Just $ "Footnote" <> localCellIdx
+        CFootnote footnote -> Just $ "Footnote (fn:" <> footnote.name <> ")"
         CBlock block
           | Just name <- lookup "name" block.meta ->
               Just name
