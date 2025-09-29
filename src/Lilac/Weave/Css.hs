@@ -62,7 +62,6 @@ import Clay
     hover,
     hr,
     html,
-    indent,
     inlineBlock,
     italic,
     listStyleType,
@@ -105,7 +104,6 @@ import Clay
     td,
     textAlign,
     textDecoration,
-    textIndent,
     th,
     thead,
     top,
@@ -219,8 +217,7 @@ defaultCss = do
     fontSans
     ol ? do
       marginTop $ px 0
-      paddingLeft $ em 1.5
-      textIndent (indent . em $ -1.5)
+      paddingLeft $ rem 0
       listStyleType none
     span # ".toc-counter" ? do
       marginRight $ rem 0.3
