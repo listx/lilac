@@ -2879,6 +2879,11 @@ activate or deactivate a style (modulo the special consideration for verbatim
 and code markers as discussed in [[f:isStyleMarker]], but also in
 [[f:slashSeparatedWords]]).
 
+[[f:escapedSymbolParser]] also lets users insert a newline character with ~\n~. This
+way, you can write multiline text inside a table, even if the table is not
+taking up the full width of the HTML page (at which point the browser will
+insert soft newlines on its own).
+
 #+name: f:escapedSymbolParser
 #+begin_src haskell
 escapedSymbolParser :: StyleMask -> OrgParser Text
@@ -2889,11 +2894,13 @@ escapedSymbolParser styleMask = do
       [ do
           c <- MP.satisfy (\c -> isStyleMarker styleMask c || c == '\\')
           pure $ T.singleton c,
+        string "n",
         string "vert{}"
       ]
-  if s == "vert{}"
-    then pure "|"
-    else pure s
+  pure $ case s of
+    "vert{}" -> "|"
+    "n" -> "\n"
+    _ -> s
 #+end_src
 
 The word =\vert{}= can be used to escape a pipe character inside [[data:Table][table]] cells,

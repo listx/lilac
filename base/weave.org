@@ -1044,7 +1044,12 @@ weavePToken = \case
 #+begin_src haskell
 weaveStyledText :: StyledText -> HtmlWeaver ()
 weaveStyledText styledText = do
-  let b = toHtml $ styledText.body
+  weaveConf <- ask
+  let b = toHtmlRaw $ T.intercalate "<br>" parts
+      parts =
+        map
+          (\x -> renderAsText weaveConf $ toHtml x)
+          $ T.splitOn "\n" styledText.body
   if styles == []
     then b
     else span_ [class_ $ T.unwords styles] b

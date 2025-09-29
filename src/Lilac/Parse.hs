@@ -832,11 +832,13 @@ escapedSymbolParser styleMask = do
       [ do
           c <- MP.satisfy (\c -> isStyleMarker styleMask c || c == '\\')
           pure $ T.singleton c,
+        string "n",
         string "vert{}"
       ]
-  if s == "vert{}"
-    then pure "|"
-    else pure s
+  pure $ case s of
+    "vert{}" -> "|"
+    "n" -> "\n"
+    _ -> s
 
 slashSeparatedWords :: OrgParser Text
 slashSeparatedWords = do
