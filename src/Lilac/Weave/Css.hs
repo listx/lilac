@@ -65,7 +65,6 @@ import Clay
     indent,
     inlineBlock,
     italic,
-    li,
     listStyleType,
     main_,
     margin,
@@ -222,13 +221,9 @@ defaultCss = do
       marginTop $ px 0
       paddingLeft $ em 1.5
       textIndent (indent . em $ -1.5)
-      "counter-reset" -: "toc-section"
       listStyleType none
-    li ? do
-      "::before" & do
-        "counter-increment" -: "toc-section"
-        "content" -: "counters(toc-section, \".\") \" \""
-        fontWeight bold
+    span # ".toc-counter" ? do
+      marginRight $ rem 0.3
     borderRight (px 1) solid colorCodeBorder
 
   main_ ? do

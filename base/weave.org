@@ -2942,8 +2942,11 @@ weaveToc cells = do
         let weaveTocHeading :: HtmlWeaver ()
             weaveTocHeading = do
               toHtmlRaw ("<li class=\"toc-level-" <> show heading.level <> "\">" :: Text)
+              span_ [class_ "toc-counter", class_ "bold"] $ do
+                toHtml sectionText
               a_ [href_ $ "#" <> linkAnchor] $ do
                 weaveProse [] heading.body
+            sectionText = getSectionText heading
             linkAnchor = getLinkAnchor Nothing $ CHeading heading
             action :: HtmlWeaver ()
             action
@@ -3636,7 +3639,6 @@ import Clay
     indent,
     inlineBlock,
     italic,
-    li,
     listStyleType,
     main_,
     margin,
@@ -3903,13 +3905,9 @@ nav # ".toc" ? do
     marginTop $ px 0
     paddingLeft $ em 1.5
     textIndent (indent . em $ -1.5)
-    "counter-reset" -: "toc-section"
     listStyleType none
-  li ? do
-    "::before" & do
-      "counter-increment" -: "toc-section"
-      "content" -: "counters(toc-section, \".\") \" \""
-      fontWeight bold
+  span # ".toc-counter" ? do
+    marginRight $ rem 0.3
   borderRight (px 1) solid colorCodeBorder
 #+end_src
 

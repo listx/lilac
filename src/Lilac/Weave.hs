@@ -1091,8 +1091,11 @@ weaveToc cells = do
         let weaveTocHeading :: HtmlWeaver ()
             weaveTocHeading = do
               toHtmlRaw ("<li class=\"toc-level-" <> show heading.level <> "\">" :: Text)
+              span_ [class_ "toc-counter", class_ "bold"] $ do
+                toHtml sectionText
               a_ [href_ $ "#" <> linkAnchor] $ do
                 weaveProse [] heading.body
+            sectionText = getSectionText heading
             linkAnchor = getLinkAnchor Nothing $ CHeading heading
             action :: HtmlWeaver ()
             action
