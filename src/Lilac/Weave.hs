@@ -1301,7 +1301,7 @@ weaveBacklinks = do
     weaveBacklink :: WeaveConf -> (GPath, [G.Edge]) -> HtmlWeaver ()
     weaveBacklink _ (_, []) = toHtmlRaw @Text ""
     weaveBacklink weaveConf (externalObjGPath, edges) = do
-      let externalOrgDocName
+      let (externalOrgDocName, externalOrgDocHref)
             | Just toObjPath <-
                 P.encodeUtf $ decodeGPath externalObjGPath,
               Just fromObjPath <-
@@ -1310,9 +1310,14 @@ weaveBacklinks = do
                 P.decodeWith utf8 utf8
                   $ P.replaceExtension
                     (getRelativePathWithoutSymlinks fromObjPath toObjPath)
-                    (P.unsafeEncodeUtf "org") =
-                externalOrgDocName'
-            | otherwise = "???"
+                    (P.unsafeEncodeUtf "org"),
+              Right href <-
+                P.decodeWith utf8 utf8
+                  $ P.replaceExtension
+                    (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+                    (P.unsafeEncodeUtf "html") = do
+                (externalOrgDocName', T.pack href)
+            | otherwise = ("???", "")
           weight = T.show $ length edges
           f (externalIdx, internalIdx)
             | Just (_, externalCell) <-
@@ -1348,6 +1353,7 @@ weaveBacklinks = do
                     toHtml internalName
             | otherwise = pure ()
       li_ [] $ do
-        toHtml $ T.pack externalOrgDocName <> " (" <> weight <> ")"
+        a_ [href_ externalOrgDocHref] $ do
+          toHtml $ T.pack externalOrgDocName <> " (" <> weight <> ")"
         ol_ [] $ do
           forM_ (sort edges) f
