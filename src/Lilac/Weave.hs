@@ -630,9 +630,10 @@ weaveLinkTarget linkTarget = do
   pure $ case linkTarget of
     LinkTargetOid linkOid
       | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-        Just cellIdx <- lookup linkOid originObj.symbols,
-        Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive cellIdx ->
-          "#" <> getLinkAnchor (Just cellIdx) internalCell
+        Just _ <- lookup linkOid originObj.symbols,
+        Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
+        Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx ->
+          "#" <> getLinkAnchor (Just globalCellIdx) internalCell
       | Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
         Just (_, externalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx,
         Just (_, externalObjGPath) <- IntMap.lookupLE globalCellIdx weaveConf.archive.offsets,

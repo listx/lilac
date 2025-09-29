@@ -1300,7 +1300,10 @@ Links to bibliographical entries (those starting with ~#ref-~ are not given an
 decorations.
 
 The part we need to put in the ~href="..."~ part is generated separately in
-[[f:weaveLinkTarget]].
+[[f:weaveLinkTarget]]. The ~Just _ <- lookup linkOid originObj.symbols~ part is needed
+to check that the ~linkOid~ exists in the current object's list of local symbols;
+this is the only way we can ensure that the ~linkOid~ is a local one internal to
+the current document.
 
 #+name: f:weaveLinkTarget
 #+begin_src haskell
@@ -1310,9 +1313,10 @@ weaveLinkTarget linkTarget = do
   pure $ case linkTarget of
     LinkTargetOid linkOid
       | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-        Just cellIdx <- lookup linkOid originObj.symbols,
-        Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive cellIdx ->
-          "#" <> getLinkAnchor (Just cellIdx) internalCell
+        Just _ <- lookup linkOid originObj.symbols,
+        Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
+        Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx ->
+          "#" <> getLinkAnchor (Just globalCellIdx) internalCell
       | Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
         Just (_, externalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx,
         Just (_, externalObjGPath) <- IntMap.lookupLE globalCellIdx weaveConf.archive.offsets,
