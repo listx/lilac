@@ -583,7 +583,7 @@ colorizeText lang txt
       toHtmlRaw
         . Text.Blaze.Html.Renderer.Text.renderHtml
         $ Sky.formatHtmlInline Sky.defaultFormatOpts lines
-  | otherwise = code_ $ toHtml txt
+  | otherwise = code_ $ toHtmlRaw txt
   where
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 
