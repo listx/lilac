@@ -11,10 +11,14 @@
 :ID:       a8d786d5-8522-454b-971d-fa1b46c5aecc
 :END:
 
-This is Lilac, a performance-minded rewrite of an [[https://github.com/listx/lilac-legacy][Emacs Lisp extension of the
-same name]]. It is written in [[https://www.haskell.org/][Haskell]], and is designed specifically for [[https://en.wikipedia.org/wiki/Literate_programming][Literate
-Programming]] [cite:@knuth_literate_1984] using [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][Noweb]] [cite:@ramsey_literate_1994]
-references.
+Lilac is a [[https://en.wikipedia.org/wiki/Literate_programming][literate programming]] [cite:@knuth_literate_1984] (LP) tool.
+Specifically it can read Orgmode files to tangle (i.e., extract) code blocks
+using [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][Noweb]] [cite:@ramsey_literate_1994] references, and also weave the same
+files to HTML for a more pleasant reading experience.
+
+If you want to learn how to use Lilac, read the INSERT-USER-GUIDE-HERE.
+
+** Version
 
 The current Lilac version is
 
@@ -25,7 +29,112 @@ The current Lilac version is
 
 See [[lilac.cabal]] where we reference this version information.
 
+** About this project
+
+This project originally started out as [[https://github.com/listx/lilac-legacy][an extension to Emacs Orgmode]], to fix
+most of the nondeterminism issues of Orgmode's weaving (aka "export") process.
+
+Sometime later, it was determined that Orgmode's HTML export was simply too slow
+(it could take 10+ seconds on large documents). This project was then rewritten
+in [[https://www.haskell.org/][Haskell]], mainly for performance but also for maintainability.
+
+** Major differences with vanilla Org
+
+*** Compilation step
+
+Orgmode tangles and weaves from Org files directly. There is no intermediate
+compilation step.
+
+Lilac adds a compilation step in order to cache some computations. Basically, an
+Org doc must be compiled into a Lilac Object (~*.lobj~), and then one or more of
+these objects are archived into a Lilac Archive (~*.larc~). It is this archive
+file which is then tangled or woven as needed.
+
+*** List item spacing required
+
+List items /must/ be indented from the main text with two leading spaces, and also
+must have an empty blank line. See [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]].
+
+These spacing requirements were determined to be necessary in order to maximize
+readability in raw Org (plaintext) form.
+
+*** Noweb links can reference blocks from other files
+
+You can reference code blocks in other files, as long as those files are also
+compiled (into objects) and become part of the archive.
+
+*** No ~#+include~ support
+
+The ability to declaratively copy/paste chunks of other files is not supported,
+because doing so results in unreadable raw Org files (you would have to open up
+a the linked page separately to see what was actually included).
+
+*** Headings must be linked via their ID (UUID)
+
+You cannot link to headings by their name, or by a "search" of a file path. You
+must instead always use UUID links.
+
+By the same token, all documents require a UUID, so that even if you don't have
+a heading, other documents can still reference a named code block in your doc
+via the top-level document UUID.
+
+** Full listing of supported features
+
+#+caption: Org feature parity.
+| Name        | Supported? |
+|-------------+------------|
+| Radio links | No         |
+| Headings    | Yes        |
+| Citations   | Yes        |
+
+** Comparison with other LP tools
+
+#+caption: Comparison of LP tools.
+| Name          | Written in   | Written with LP?\n(Does it use itself?) | Markup language\n(Input syntax) | Tangle-able languages |
+|---------------+--------------+-----------------------------------------+---------------------------------+-----------------------|
+| [[id:a8d786d5-8522-454b-971d-fa1b46c5aecc][Lilac]]         | Haskell      | Yes                                     | Orgmode                         | Any                   |
+| [[https://orgmode.org/][Emacs Orgmode]] | Emacs Lisp   | No                                      | Orgmode                         | Any                   |
+| [[https://github.com/entangled/entangled.py/][Entangled]]     | Python       | No                                      | Markdown                        | Any                   |
+| [[https://github.com/justinmeiners/srcweave][srcweave]]      | Common Lisp  | No                                      | Markdown                        | Any                   |
+| [[http://www.ross.net/funnelweb/index.shtml][FunnelWeb]]     | C            | No                                      | TeX                             | Any                   |
+| [[https://github.com/rixed/portia/blob/master/intro.fw][Portia]]        | OCaml        | Yes                                     | Any                             | Any                   |
+| [[https://github.com/nrnrnr/noweb][Noweb]]         | C, Awk, Icon | Yes                                     | TeX                             | Any                   |
+| [[https://github.com/zyedidia/Literate][Literate]]      | D            | Yes                                     | Markdown                        | Any                   |
+| [[https://github.com/ascherer/cweb][CWEB]]          | C            | Yes                                     | TeX                             | C, C++                |
+
 ** How to read this doc
+:PROPERTIES:
+:ID:       8dba443c-60e0-4242-b3c9-6c5e589e5c7f
+:END:
+
+This document references many things in other docs. All of the docs for this
+project are described below:
+
+  - [[id:8dba443c-60e0-4242-b3c9-6c5e589e5c7f][=base/lilac.org= (this doc)]] :: Describes the overall project, the
+    development environment, and the implementation of the CLI. Arguably the CLI
+    section could be moved out to a separate doc, but it's here for now.
+
+  - [[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf][=base/parse.org=]] :: Describes the Org syntax parser. This parser allows us
+    to create machine-friendly intermediate representations (an object (~*.lobj~)
+    and archive (~*.larc~)) of an Org document, which are created by the ~compile~
+    and ~archive~ subcommands of the CLI, respectively.
+
+  - [[id:7ec06750-f75d-4722-870a-f6df0fd9c1fd][=base/types.org=]] :: Describes the types used to represent the
+    machine-friendly intermediate representation of an Org document. The types
+    here are used heavily by [[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf][=parse.org=]] as well as all of the other pieces.
+
+  - [[id:b9c034c1-5499-44e6-855c-6c16e1693cb8][=base/compile.org=]] :: Describes the compilation processes, which power the
+    ~compile~ and ~archive~ subcommands. These steps check for things like broken
+    links and the absence of any cycles in Noweb references.
+
+  - [[id:512acfd6-4360-40f6-a684-649d6d2fcfba][=base/tangle.org=]] :: Describes the ~tangle~ process. Most of the hard work is
+    done during compilation, so this document is pretty short.
+
+  - [[id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7][=base/weave.org=]] :: Describes the ~weave~ process, which converts all of the
+    Org documents inside an archive (~*.larc~) into an HTML page, styled with CSS.
+
+  - [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][=base/fe.org=]] :: Describes the frontend framework for making the HTML page
+    interactive (beyond just HTML/CSS).
 
 *** Literate programming and Noweb
 
@@ -1766,6 +1875,7 @@ navbar
 Niv
 Nixkell
 Nixpkgs
+OCaml
 OIDs
 Orgmode
 Pandoc
@@ -2261,6 +2371,9 @@ from bundling it into a Nix package in [[nix:lilacSource]] (we actually want the
 tangled content because they are required for the build).
 
 * CLI
+:PROPERTIES:
+:ID:       fd90f502-c5bb-411b-b056-793e783f2c22
+:END:
 
 The CLI has two main parts: the boilerplate and use of the modules (libraries)
 that Lilac provides. In this sense it's a somewhat thin wrapper.
