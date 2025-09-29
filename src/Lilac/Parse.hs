@@ -5,7 +5,7 @@ module Lilac.Parse
     compressStyledText,
     defaultOrgDoc,
     defaultOrgParserConf,
-    genHeadingSection,
+    genSectionNumber,
     genHeadingOidStack,
     isNumericText,
     maskToStyles,
@@ -194,7 +194,7 @@ import Lilac.Types as OrgParserState
         footnoteNumbers,
         headingLevel,
         headingOidStack,
-        headingSection,
+        headingSectionNumber,
         insideCitation,
         insideCitePrefix,
         insideCodeBlock,
@@ -551,7 +551,7 @@ headingParser = do
   _ <- char '\n'
   failIfLeftoverActiveStyles
   props <- propertiesDrawerParser
-  let newHeadingSection = genHeadingSection lenStars orgParserState.headingSection
+  let newHeadingSection = genSectionNumber lenStars orgParserState.headingSectionNumber
       newHeadingOidStack =
         genHeadingOidStack
           (lookup "ID" props)
@@ -560,7 +560,7 @@ headingParser = do
   put
     orgParserState
       { headingLevel = lenStars,
-        headingSection = newHeadingSection,
+        headingSectionNumber = newHeadingSection,
         headingOidStack = newHeadingOidStack,
         insideHeading = False
       }
@@ -590,8 +590,8 @@ failIfHeadingNestsWithoutDirectParent current found =
       <> show found
       <> ")"
 
-genHeadingSection :: Int -> [Int] -> [Int]
-genHeadingSection level prevSection
+genSectionNumber :: Int -> [Int] -> [Int]
+genSectionNumber level prevSection
   | null prevSection = 1 : (take (level - 1) $ repeat 0)
   | length prevSection == level = bumpDeepestSection prevSection
   | length prevSection > level =

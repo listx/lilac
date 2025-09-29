@@ -66,7 +66,7 @@ import Lilac.Types
         footnoteNumbers,
         headingLevel,
         headingOidStack,
-        headingSection,
+        headingSectionNumber,
         orgParserConf,
         prevCellIsFootnote,
         tableNumber
@@ -369,7 +369,7 @@ parseSpec = do
     defaultOrgParserState
       { headingOidStack = take 12 $ repeat Nothing,
         headingLevel = 12,
-        headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        headingSectionNumber = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 20}
       }
 
@@ -394,7 +394,7 @@ parseSpec = do
     defaultOrgParserState
       { headingOidStack = take 12 $ repeat Nothing,
         headingLevel = 12,
-        headingSection = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        headingSectionNumber = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         orgParserConf = L.defaultOrgParserConf {maxHeadingLevel = 0}
       }
 
@@ -413,22 +413,22 @@ parseSpec = do
     "headings may not skip levels (expected to see level 1 or 2, not 4)"
     35
 
-  describe "genHeadingSection" $ do
+  describe "genSectionNumber" $ do
     it "gets the base case" $ do
-      L.genHeadingSection 2 [] `shouldBe` [1, 0]
-      L.genHeadingSection 1 [] `shouldBe` [1]
-      L.genHeadingSection 0 [] `shouldBe` [1]
-      L.genHeadingSection (-1) [] `shouldBe` [1]
+      L.genSectionNumber 2 [] `shouldBe` [1, 0]
+      L.genSectionNumber 1 [] `shouldBe` [1]
+      L.genSectionNumber 0 [] `shouldBe` [1]
+      L.genSectionNumber (-1) [] `shouldBe` [1]
     it "bumps the last level if the nesting level matches" $ do
-      L.genHeadingSection 1 [1] `shouldBe` [2]
-      L.genHeadingSection 2 [1, 1] `shouldBe` [2, 1]
-      L.genHeadingSection 3 [1, 1, 1] `shouldBe` [2, 1, 1]
+      L.genSectionNumber 1 [1] `shouldBe` [2]
+      L.genSectionNumber 2 [1, 1] `shouldBe` [2, 1]
+      L.genSectionNumber 3 [1, 1, 1] `shouldBe` [2, 1, 1]
     it "truncates, then increments the (newst) deepest level if we unnest" $ do
-      L.genHeadingSection 1 [3, 5] `shouldBe` [6]
-      L.genHeadingSection 3 [3, 5, 6, 7] `shouldBe` [6, 6, 7]
+      L.genSectionNumber 1 [3, 5] `shouldBe` [6]
+      L.genSectionNumber 3 [3, 5, 6, 7] `shouldBe` [6, 6, 7]
     it "grows the section if we nest deeper" $ do
-      L.genHeadingSection 3 [2, 2] `shouldBe` [1, 2, 2]
-      L.genHeadingSection 5 [2, 2] `shouldBe` [1, 0, 0, 2, 2]
+      L.genSectionNumber 3 [2, 2] `shouldBe` [1, 2, 2]
+      L.genSectionNumber 5 [2, 2] `shouldBe` [1, 0, 0, 2, 2]
 
   describe "genHeadingOidStack" $ do
     it "replaces the head if the nesting level matches (no heading yet)" $ do
@@ -494,7 +494,7 @@ parseSpec = do
     defaultOrgParserState
       { headingOidStack = [Nothing],
         headingLevel = 1,
-        headingSection = [1]
+        headingSectionNumber = [1]
       }
 
   shouldParseWithState
@@ -516,7 +516,7 @@ parseSpec = do
     defaultOrgParserState
       { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
         headingLevel = 1,
-        headingSection = [1]
+        headingSectionNumber = [1]
       }
 
   shouldParseWithState
@@ -538,7 +538,7 @@ parseSpec = do
     defaultOrgParserState
       { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
         headingLevel = 1,
-        headingSection = [1]
+        headingSectionNumber = [1]
       }
 
   shouldFailWithMessage
@@ -695,7 +695,7 @@ parseSpec = do
     defaultOrgParserState
       { headingOidStack = [Nothing],
         headingLevel = 1,
-        headingSection = [1]
+        headingSectionNumber = [1]
       }
 
   shouldParseWith
@@ -959,7 +959,7 @@ parseSpec = do
     defaultOrgParserState
       { headingOidStack = [Nothing],
         headingLevel = 1,
-        headingSection = [1]
+        headingSectionNumber = [1]
       }
 
   shouldParseWith
@@ -3036,7 +3036,7 @@ parseSpec = do
     defaultOrgParserState
       { headingOidStack = [Nothing],
         headingLevel = 1,
-        headingSection = [1]
+        headingSectionNumber = [1]
       }
 
   shouldFailWithMessage

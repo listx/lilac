@@ -133,7 +133,7 @@ import Lilac.Types
     cellIdxToObjCell,
     decodeGPath,
     getProseContents,
-    getSectionText,
+    getSectionNumber,
     markingChars,
     markingCharsInvisible,
   )
@@ -404,7 +404,7 @@ weaveHeading cellIdx heading =
       3 -> h4_
       4 -> h5_
       _ -> h6_
-    sectionText = getSectionText heading
+    sectionText = getSectionNumber heading
     linkAnchor = getLinkAnchor Nothing $ CHeading heading
 
 getLinkAnchor :: Maybe Int -> Cell -> Text
@@ -413,7 +413,7 @@ getLinkAnchor localCellIdx = \case
     T.intercalate
       "-"
       [ "h",
-        getSectionText heading,
+        getSectionNumber heading,
         toSafeHtmlId $ getProseContents heading.body
       ]
   CListItem {} -> ""
@@ -1095,7 +1095,7 @@ weaveToc cells = do
                 toHtml sectionText
               a_ [href_ $ "#" <> linkAnchor] $ do
                 weaveProse [] heading.body
-            sectionText = getSectionText heading
+            sectionText = getSectionNumber heading
             linkAnchor = getLinkAnchor Nothing $ CHeading heading
             action :: HtmlWeaver ()
             action

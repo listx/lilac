@@ -813,7 +813,7 @@ cellIdxToName archive globalCellIdx offset
   | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
       case cell of
         CHeading heading ->
-          Just $ (getSectionText heading) <> " " <> (getProseContents heading.body)
+          Just $ (getSectionNumber heading) <> " " <> (getProseContents heading.body)
         CParagraph _ -> Just $ "Paragraph" <> localCellIdx
         CFigure figure
           | Just name <- lookup "name" figure.meta ->

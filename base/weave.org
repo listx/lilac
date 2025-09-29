@@ -288,7 +288,7 @@ import Lilac.Types
     cellIdxToObjCell,
     decodeGPath,
     getProseContents,
-    getSectionText,
+    getSectionNumber,
     markingChars,
     markingCharsInvisible,
   )
@@ -809,7 +809,7 @@ getLinkAnchor localCellIdx = \case
     T.intercalate
       "-"
       [ "h",
-        getSectionText heading,
+        getSectionNumber heading,
         toSafeHtmlId $ getProseContents heading.body
       ]
   CListItem {} -> ""
@@ -870,13 +870,13 @@ be the same as the order of usage (when the footnote definition is referenced).
 This discrepancy makes automatic numbering slightly more difficult, and we
 choose to not go through that exercise for the [[id:4127feee-755d-430e-8fef-192e95143790::data:Footnote][data:Footnote]] type, for ease of parsing.
 
-The [[f:getSectionText]] function just retrieves the numeric heading section number,
+The [[f:getSectionNumber]] function just retrieves the numeric heading section number,
 as a ~Text~ value.
 
-#+name: f:getSectionText
+#+name: f:getSectionNumber
 #+begin_src haskell
-getSectionText :: Heading -> Text
-getSectionText heading =
+getSectionNumber :: Heading -> Text
+getSectionNumber heading =
   T.intercalate "."
     . map T.show
     . reverse
@@ -968,7 +968,7 @@ weaveHeading cellIdx heading =
       3 -> h4_
       4 -> h5_
       _ -> h6_
-    sectionText = getSectionText heading
+    sectionText = getSectionNumber heading
     linkAnchor = getLinkAnchor Nothing $ CHeading heading
 #+end_src
 
@@ -2946,7 +2946,7 @@ weaveToc cells = do
                 toHtml sectionText
               a_ [href_ $ "#" <> linkAnchor] $ do
                 weaveProse [] heading.body
-            sectionText = getSectionText heading
+            sectionText = getSectionNumber heading
             linkAnchor = getLinkAnchor Nothing $ CHeading heading
             action :: HtmlWeaver ()
             action

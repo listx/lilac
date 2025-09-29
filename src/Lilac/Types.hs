@@ -40,7 +40,7 @@ module Lilac.Types
     Lilac.Types.fromText,
     fromWords,
     getProseContents,
-    getSectionText,
+    getSectionNumber,
     markingChars,
     markingCharsInvisible,
     nilOid,
@@ -200,8 +200,8 @@ getProseContents prose = join $ foldl' f [] prose.unProse
       PTokenDivStart {}
       PTokenDivEnd {} -> acc
 
-getSectionText :: Heading -> Text
-getSectionText heading =
+getSectionNumber :: Heading -> Text
+getSectionNumber heading =
   T.intercalate "."
     . map T.show
     . reverse
@@ -321,7 +321,7 @@ data OrgParserState = OrgParserState
   { docOid :: OID,
     headingOidStack :: [Maybe OID],
     headingLevel :: Int,
-    headingSection :: [Int],
+    headingSectionNumber :: [Int],
     insideHeading :: Bool,
     styleMask :: StyleMask,
     insideCodeBlock :: Bool,
@@ -359,7 +359,7 @@ defaultOrgParserState =
     { docOid = nilOid,
       headingOidStack = [],
       headingLevel = 0,
-      headingSection = [],
+      headingSectionNumber = [],
       insideHeading = False,
       styleMask = styleMaskFrom [],
       insideCodeBlock = False,
@@ -630,7 +630,7 @@ cellIdxToName archive globalCellIdx offset
   | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
       case cell of
         CHeading heading ->
-          Just $ (getSectionText heading) <> " " <> (getProseContents heading.body)
+          Just $ (getSectionNumber heading) <> " " <> (getProseContents heading.body)
         CParagraph _ -> Just $ "Paragraph" <> localCellIdx
         CFigure figure
           | Just name <- lookup "name" figure.meta ->
