@@ -457,6 +457,11 @@ defaultCss = do
         ".table-horizontal-line" & do
           borderTop (px 1) solid colorCodeBorder
           ev padding (px 0)
+          td ? do
+            backgroundColor colorCodeBorder
+            yx padding (px 0) (px 0)
+        ".table-body-row" & do
+          borderTop (px 1) solid colorCodeBorder
   ".table-vertical-line-colgroup" & do
     borderLeft (px 3) solid colorCodeBorder
   ".table-vertical-line-col" & do

@@ -737,7 +737,7 @@ weaveTable cellIdx table = do
                 forM_ columnNames $ \_ -> do
                   td_ [] $ toHtml @Text ""
             else do
-              tr_ [] $ do
+              tr_ [class_ "table-body-row"] $ do
                 forM_ row $ \prose -> do
                   let tdAttrs =
                         if mostlyNumeric prose

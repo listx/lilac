@@ -1620,7 +1620,7 @@ weaveTable cellIdx table = do
                 forM_ columnNames $ \_ -> do
                   td_ [] $ toHtml @Text ""
             else do
-              tr_ [] $ do
+              tr_ [class_ "table-body-row"] $ do
                 forM_ row $ \prose -> do
                   let tdAttrs =
                         if mostlyNumeric prose
@@ -4262,6 +4262,11 @@ table ? do
       ".table-horizontal-line" & do
         borderTop (px 1) solid colorCodeBorder
         ev padding (px 0)
+        td ? do
+          backgroundColor colorCodeBorder
+          yx padding (px 0) (px 0)
+      ".table-body-row" & do
+        borderTop (px 1) solid colorCodeBorder
 ".table-vertical-line-colgroup" & do
   borderLeft (px 3) solid colorCodeBorder
 ".table-vertical-line-col" & do
