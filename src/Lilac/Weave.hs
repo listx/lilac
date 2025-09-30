@@ -734,7 +734,8 @@ weaveTable cellIdx table = do
           if row == [Prose []]
             then do
               tr_ [class_ "table-horizontal-line"] $ do
-                td_ [] $ toHtml @Text ""
+                forM_ columnNames $ \_ -> do
+                  td_ [] $ toHtml @Text ""
             else do
               tr_ [] $ do
                 forM_ row $ \prose -> do
