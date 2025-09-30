@@ -663,11 +663,11 @@ weaveFigure cellIdx figure = do
           <> lookupDefault "figure-number-error" "__figure_number" figure.meta
   figure_ [id_ linkAnchor] $ do
     figcaption_ [] $ do
-      a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ do
+      a_ [href_ $ "#" <> linkAnchor, class_ "self-link", class_ "caption-prefix"] $ do
         toHtml captionPrefix
       toHtml $ case figure.caption.unProse of
         [] -> "." :: Text
-        _ -> ": " :: Text
+        _ -> ". " :: Text
       weaveProse [cellIdx] figure.caption
     img_
       $ [ id_ linkAnchor,
@@ -708,11 +708,11 @@ weaveTable cellIdx table = do
           <> lookupDefault "table-number-error" "__table_number" table.meta
   figure_ [id_ linkAnchor] $ do
     figcaption_ [] $ do
-      a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ do
+      a_ [href_ $ "#" <> linkAnchor, class_ "self-link", class_ "caption-prefix"] $ do
         toHtml captionPrefix
       toHtml $ case table.caption.unProse of
         [] -> "." :: Text
-        _ -> ": " :: Text
+        _ -> ". " :: Text
       weaveProse [cellIdx] table.caption
     table_ [] $ do
       forM_ (zip [1 :: Int ..] getColgroups) $ \(groupIdx, numCols) -> do

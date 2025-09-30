@@ -436,8 +436,10 @@ defaultCss = do
   figcaption ? do
     yx margin (px 10) auto
     textAlign center
-    fontStyle italic
     width (pct 80)
+    fontSans
+  ".caption-prefix" & do
+    fontWeight bold
 
   table ? do
     fontSans
