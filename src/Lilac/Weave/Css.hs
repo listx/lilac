@@ -444,7 +444,7 @@ defaultCss = do
   table ? do
     fontSans
     borderCollapse collapse
-    border (px 1) solid colorCodeBorder
+    border (px 2) solid colorCodeBorder
     yx margin (px 0) auto
     th ? do
       yx padding (px 4) (px 8)
