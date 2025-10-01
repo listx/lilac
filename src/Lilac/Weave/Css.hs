@@ -251,7 +251,6 @@ defaultCss = do
     ol ? do
       paddingLeft $ rem 1.5
       marginTop $ px 0
-      fontMono
       fontSize (rem 0.9)
 
   footer ? do

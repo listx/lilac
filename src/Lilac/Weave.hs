@@ -1279,7 +1279,7 @@ weaveTangledBlocksList blocks = do
           forM_ (sort tangledBlocks) $ \(path, block) -> do
             li_ [] $ do
               let linkAnchor = getLinkAnchor Nothing $ CBlock block
-              a_ [href_ $ "#" <> linkAnchor] $ do
+              a_ [href_ $ "#" <> linkAnchor, class_ "verbatim"] $ do
                 toHtml path
   where
     getTangled :: Block -> Maybe (Text, Block)
@@ -1348,16 +1348,18 @@ weaveBacklinks = do
                         <> (getLinkAnchor (Just externalCellIdx) externalCell)
                     internalLinkAnchor =
                       "#" <> (getLinkAnchor (Just internalCellIdx) internalCell)
-                    externalName = fromMaybe "???" $ cellIdxToName weaveConf.archive externalIdx offset
-                    internalName = fromMaybe "???" $ cellIdxToName weaveConf.archive internalIdx offset
+                    noName = Prose [PTokenStyledText $ StyledText {body = "???", style = styleMaskFrom []}]
+                    externalName = fromMaybe noName $ cellIdxToName weaveConf.archive externalIdx offset
+                    internalName = fromMaybe noName $ cellIdxToName weaveConf.archive internalIdx offset
                     externalCellIdx = externalIdx - offset
                     internalCellIdx = internalIdx - offset
                 li_ [] $ do
                   a_ [href_ externalLinkAnchor] $ do
-                    toHtml externalName
-                  toHtmlRaw @Text " &#x2192; "
+                    weaveProse [] externalName
+                  span_ [class_ "verbatim"] $ do
+                    toHtmlRaw @Text " &#x2192; "
                   a_ [href_ internalLinkAnchor] $ do
-                    toHtml internalName
+                    weaveProse [] internalName
             | otherwise = pure ()
       li_ [] $ do
         a_ [href_ externalOrgDocHref] $ do

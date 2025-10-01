@@ -625,43 +625,55 @@ cellIdxToObjCell archive globalCellIdx
       Just (obj, cell)
   | otherwise = Nothing
 
-cellIdxToName :: Archive -> Int -> Int -> Maybe Text
+cellIdxToName :: Archive -> Int -> Int -> Maybe Prose
 cellIdxToName archive globalCellIdx offset
   | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
       case cell of
         CHeading heading ->
-          Just $ (getSectionNumber heading) <> " " <> (getProseContents heading.body)
-        CParagraph _ -> Just $ "Paragraph" <> localCellIdx
+          plain $ "§ " <> (getSectionNumber heading) <> " " <> (getProseContents heading.body)
+        CParagraph _ ->
+          Just
+            $ Prose
+              [ PTokenStyledText $ StyledText {body = "¶ (", style = styleMaskFrom []},
+                PTokenStyledText $ StyledText {body = cellRef, style = styleMaskFrom [Verbatim]},
+                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+              ]
         CFigure figure
-          | Just name <- lookup "name" figure.meta ->
-              Just name
+          | Just name <- lookup "name" figure.meta -> verbatim name
           | Just figureNum <- lookup "__figure_number" figure.meta ->
-              Just $ "Figure " <> figureNum
-          | otherwise -> Just "Figure"
+              plain $ "Figure " <> figureNum
+          | otherwise -> plain "Figure"
         CTable table
-          | Just name <- lookup "name" table.meta ->
-              Just name
+          | Just name <- lookup "name" table.meta -> verbatim name
           | Just tableNum <- lookup "__table_number" table.meta ->
-              Just $ "Table " <> tableNum
-          | otherwise -> Just "Table"
-        CFootnote footnote -> Just $ "Footnote (fn:" <> footnote.name <> ")"
+              plain $ "Table " <> tableNum
+          | otherwise -> plain "Table"
+        CFootnote footnote ->
+          Just
+            $ Prose
+              [ PTokenStyledText $ StyledText {body = "Footnote (", style = styleMaskFrom []},
+                PTokenStyledText $ StyledText {body = "fn:" <> footnote.name, style = styleMaskFrom [Verbatim]},
+                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+              ]
         CBlock block
           | Just name <- lookup "name" block.meta ->
-              Just name
-          | otherwise -> Just $ "Anonymous Block" <> localCellIdx
+              verbatim name
+          | otherwise -> plain $ "Anonymous Block" <> cellRef
         CMathFragment mathFragment
           | Just name <- lookup "name" mathFragment.meta ->
-              Just name
+              verbatim name
           | Just eqNum <- lookup "__equation_number" mathFragment.meta ->
-              Just $ "Equation " <> eqNum
+              plain $ "Equation " <> eqNum
           | Just eqNum <- lookup "__equation_anon_number" mathFragment.meta ->
-              Just $ "Anonymous Equation " <> eqNum
-          | otherwise -> Just "Math Fragment"
+              plain $ "Anonymous Equation " <> eqNum
+          | otherwise -> plain "Math Fragment"
         CListItem {}
         CBibliography {} -> Nothing
   | otherwise = Nothing
   where
-    localCellIdx = " (Cell " <> (T.show $ globalCellIdx - offset) <> ")"
+    cellRef = "Cell " <> (T.show $ globalCellIdx - offset)
+    plain body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom []}]
+    verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
 
 type ProjectConf :: Type
 data ProjectConf = ProjectConf
