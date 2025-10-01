@@ -132,6 +132,7 @@ import Lilac.Types
     cellIdxToName,
     cellIdxToObjCell,
     decodeGPath,
+    getCellName,
     getProseContents,
     getSectionNumber,
     markingChars,
@@ -1262,6 +1263,7 @@ weaveSidebar blocks = do
   aside_ [class_ "sidebar"] $ do
     weaveTangledBlocksList blocks
     weaveBacklinks
+    weaveNamedCellsIndex
     weaveFooter
 
 weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
@@ -1366,3 +1368,23 @@ weaveBacklinks = do
           toHtml $ T.pack externalOrgDocName <> " (" <> weight <> ")"
         ol_ [] $ do
           forM_ (sort edges) f
+
+weaveNamedCellsIndex :: HtmlWeaver ()
+weaveNamedCellsIndex = do
+  weaveConf <- ask
+  div_ [class_ "named-cells-index"] $ do
+    p_ [class_ "widget-title"] $ do
+      let cells = do
+            obj <- lookup weaveConf.originObjectPath weaveConf.archive.objects
+            pure obj.orgDoc.cells
+          namedCells =
+            sort
+              $ [(prose, cell) | cell <- (fromMaybe [] cells), Just prose <- [getCellName cell]]
+          lenNamedCells = T.show $ length namedCells
+      toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
+      ol_ [] $ do
+        forM_ namedCells $ \(prose, cell) -> do
+          li_ [] $ do
+            let linkAnchor = "#" <> getLinkAnchor Nothing cell
+            a_ [href_ linkAnchor] $ do
+              weaveProse [] prose

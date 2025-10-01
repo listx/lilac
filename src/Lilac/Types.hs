@@ -39,6 +39,7 @@ module Lilac.Types
     encodeGPath,
     Lilac.Types.fromText,
     fromWords,
+    getCellName,
     getProseContents,
     getSectionNumber,
     markingChars,
@@ -673,6 +674,36 @@ cellIdxToName archive globalCellIdx offset
   where
     cellRef = "Cell " <> (T.show $ globalCellIdx - offset)
     plain body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom []}]
+    verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
+
+getCellName :: Cell -> Maybe Prose
+getCellName = \case
+  CFigure figure
+    | Just name <- lookup "name" figure.meta -> verbatim name
+    | otherwise -> Nothing
+  CTable table
+    | Just name <- lookup "name" table.meta -> verbatim name
+    | otherwise -> Nothing
+  CFootnote footnote ->
+    Just
+      $ Prose
+        [ PTokenStyledText $ StyledText {body = "Footnote (", style = styleMaskFrom []},
+          PTokenStyledText $ StyledText {body = "fn:" <> footnote.name, style = styleMaskFrom [Verbatim]},
+          PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+        ]
+  CBlock block
+    | Just name <- lookup "name" block.meta ->
+        verbatim name
+    | otherwise -> Nothing
+  CMathFragment mathFragment
+    | Just name <- lookup "name" mathFragment.meta ->
+        verbatim name
+    | otherwise -> Nothing
+  CHeading {}
+  CParagraph {}
+  CListItem {}
+  CBibliography {} -> Nothing
+  where
     verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
 
 type ProjectConf :: Type

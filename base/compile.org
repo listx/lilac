@@ -863,6 +863,43 @@ cellIdxToName archive globalCellIdx offset
     verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
 #+end_src
 
+[[f:getCellName]] is similar to [[f:cellIdxToName]], but it only returns a
+~Just~ value if the cell is a block, figure, table, footnote, or math fragment
+that has a ~#+name: ...~.
+
+#+name: f:getCellName
+#+begin_src haskell
+getCellName :: Cell -> Maybe Prose
+getCellName = \case
+  CFigure figure
+    | Just name <- lookup "name" figure.meta -> verbatim name
+    | otherwise -> Nothing
+  CTable table
+    | Just name <- lookup "name" table.meta -> verbatim name
+    | otherwise -> Nothing
+  CFootnote footnote ->
+    Just
+      $ Prose
+        [ PTokenStyledText $ StyledText {body = "Footnote (", style = styleMaskFrom []},
+          PTokenStyledText $ StyledText {body = "fn:" <> footnote.name, style = styleMaskFrom [Verbatim]},
+          PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+        ]
+  CBlock block
+    | Just name <- lookup "name" block.meta ->
+        verbatim name
+    | otherwise -> Nothing
+  CMathFragment mathFragment
+    | Just name <- lookup "name" mathFragment.meta ->
+        verbatim name
+    | otherwise -> Nothing
+  CHeading {}
+  CParagraph {}
+  CListItem {}
+  CBibliography {} -> Nothing
+  where
+    verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
+#+end_src
+
 [[f:readObjectsFrom]] reads files from a given parent directory, and converts them
 into [[data:Object]] values. This is used in tests where we want to read multiple objects for a test case.
 
