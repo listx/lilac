@@ -396,7 +396,7 @@ weaveHeading cellIdx heading =
   hN [id_ linkAnchor] $ do
     a_ [href_ $ "#" <> linkAnchor] $ do
       toHtml sectionText
-      toHtmlRaw ("&emsp;&ensp;" :: Text)
+      toHtmlRaw ("&emsp;&thinsp;" :: Text)
       weaveProse [cellIdx] heading.body
   where
     hN = case heading.level of

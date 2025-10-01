@@ -10,6 +10,7 @@ import Clay
     aside,
     auto,
     backgroundColor,
+    before,
     block,
     body,
     bold,
@@ -34,6 +35,7 @@ import Clay
     collapse,
     color,
     column,
+    content,
     display,
     div,
     em,
@@ -64,6 +66,8 @@ import Clay
     html,
     inlineBlock,
     italic,
+    left,
+    li,
     listStyleType,
     main_,
     margin,
@@ -98,6 +102,7 @@ import Clay
     smallCaps,
     solid,
     span,
+    stringContent,
     sup,
     table,
     tbody,
@@ -214,25 +219,33 @@ defaultCss = do
          """
     overflowY auto
     padding (px 0) (px 20) (px 0) (px 20)
+    paddingLeft (px 30)
     fontSans
     ol ? do
       marginTop $ px 0
       paddingLeft $ rem 0
       listStyleType none
+      li # ".toc-level-1" ? do
+        position relative
+        before & do
+          content $ stringContent "■"
+          marginLeft (em $ -1)
+          position absolute
+          left (px 0)
     span # ".toc-counter" ? do
       marginRight $ rem 0.3
     borderRight (px 1) solid colorCodeBorder
 
   main_ ? do
     "grid-area" -: "main"
-    marginLeft (px 20)
+    marginLeft (px 10)
     "height"
       -: """
          calc(100vh - calc(4rem + 1px))
          """
     overflowY auto
     padding (px 0) (px 20) (px 0) (px 20)
-    paddingLeft (px 24)
+    paddingLeft (px 42)
     p # ".main-bottom-spacer" ? do
       yx margin (px 40) 0
 
@@ -272,6 +285,7 @@ defaultCss = do
     fontSize (pt 36)
     marginTop (px 0)
     marginBottom (pt $ -16)
+    prependSymbol "●" (em $ -0.8)
   hr ? do
     border (px 0) solid colorCodeBorder
     borderBottom (px 2) solid colorCodeBorder
@@ -279,6 +293,7 @@ defaultCss = do
       marginBottom (rem 2)
   h2 ? do
     fontSize (pt 26)
+    prependSymbol "■" (em $ -1)
   h3 ? do
     fontSize (pt 22)
   h4 ? do
@@ -289,6 +304,7 @@ defaultCss = do
     fontSize (pt 14)
   forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) $ \(n, hN) -> do
     hN ? do
+      position relative
       fontSans
       marginTop (px 0)
       when (n > 1) $ marginBottom (px 0)
@@ -595,3 +611,12 @@ fontSans = do
 fontMono :: Css
 fontMono = do
   fontFamily ["Source Code Pro"] [monospace]
+
+prependSymbol :: Text -> Size sz -> Css
+prependSymbol prefix spacing =
+  before & do
+    content $ stringContent prefix
+    marginLeft spacing
+    position absolute
+    top (px 0)
+    left (px 0)
