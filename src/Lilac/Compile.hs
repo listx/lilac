@@ -181,8 +181,9 @@ mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
 
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
-  let (objects, symbols) =
+  let (objects, symbolsWithoutTopLevelUUIDs) =
         foldl' concatObjs (mempty, mempty) offsetsFull
+      symbols = injectTopLevelUUIDs symbolsWithoutTopLevelUUIDs
       backlinks = mkBacklinks $ foldl' (finalizeEdges symbols) [] offsetsFull
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
@@ -214,6 +215,18 @@ mkArchive pathObjs = do
                 bibs = fromList bibs
               }
   where
+    injectTopLevelUUIDs :: Map LinkOid Int -> Map LinkOid Int
+    injectTopLevelUUIDs linkOids =
+      let topLevelLinkOids =
+            fromList
+              $ zip (map (mkLinkOid . snd) $ sort pathObjs) [-1, -2 ..]
+          mkLinkOid :: Object -> LinkOid
+          mkLinkOid obj =
+            LinkOid
+              { oid = obj.orgDoc.oid,
+                name = ""
+              }
+       in linkOids <> topLevelLinkOids
     offsets :: IntMap GPath
     offsets =
       IntMap.fromList

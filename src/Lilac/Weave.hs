@@ -216,6 +216,7 @@ import Relude
     String,
     Text,
     Type,
+    abs,
     any,
     ask,
     catMaybes,
@@ -260,6 +261,7 @@ import Relude
     takeWhile,
     when,
     zip,
+    (!!?),
     ($),
     (&&),
     (+),
@@ -635,6 +637,12 @@ weaveLinkTarget linkTarget = do
   weaveConf <- ask
   pure $ case linkTarget of
     LinkTargetOid linkOid
+      | Just n <- lookup linkOid weaveConf.archive.symbols,
+        n < 0,
+        Just objPath <- (sort $ keys weaveConf.archive.objects) !!? (abs n - 1) ->
+          if objPath == weaveConf.originObjectPath
+            then "#top"
+            else getExternalRelPath objPath weaveConf.originObjectPath
       | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
         Just _ <- lookup linkOid originObj.symbols,
         Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
@@ -642,16 +650,22 @@ weaveLinkTarget linkTarget = do
           "#" <> getLinkAnchor (Just globalCellIdx) internalCell
       | Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
         Just (_, externalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx,
-        Just (_, externalObjGPath) <- IntMap.lookupLE globalCellIdx weaveConf.archive.offsets,
-        Just toObjPath <- P.encodeUtf $ decodeGPath externalObjGPath,
-        Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
-        Right str <-
-          P.decodeWith utf8 utf8
-            $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt ->
-          (T.pack str) <> "#" <> getLinkAnchor (Just globalCellIdx) externalCell
-      | otherwise -> "#LILAC_BROKEN_LINK-" <> show linkOid
+        Just (_, externalObjGPath) <- IntMap.lookupLE globalCellIdx weaveConf.archive.offsets ->
+          (getExternalRelPath externalObjGPath weaveConf.originObjectPath)
+            <> "#"
+            <> getLinkAnchor (Just globalCellIdx) externalCell
+      | otherwise -> showBrokenLink
       where
+        showBrokenLink = "#LILAC_BROKEN_LINK-" <> show linkOid
         htmlExt = P.unsafeEncodeUtf "html"
+        getExternalRelPath extPath intPath
+          | Just toObjPath <- P.encodeUtf $ decodeGPath extPath,
+            Just fromObjPath <- P.encodeUtf $ decodeGPath intPath,
+            Right str <-
+              P.decodeWith utf8 utf8
+                $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt =
+              T.pack str
+          | otherwise = showBrokenLink
     LinkTargetFootnote name -> (T.pack "#footnote-") <> name
     LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
     LinkTargetURI uri -> T.pack $ N.uriToString id uri ""

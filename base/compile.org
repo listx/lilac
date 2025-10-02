@@ -636,6 +636,12 @@ The other fields in [[data:Archive]] are based on the ~objects~:
     unique index of the cell, which can be used with ~offsets~ to find the actual
     cell we are interested in.
 
+    Now it could be the case that the user decides to link to the top-level UUID
+    of the document. These require special treatment because they do not
+    correspond to any given cell. So instead, we use negative numbers so as not
+    to collide with the regular cell index numbers. The negative numbers encode
+    which object we are referring to, and require special handling.
+
   - The ~backlinks~ is a map where the keys are the paths (of objects) and the
     values are the backlinks to that object. The backlinks are themselves a map
     because we want to organize all of the backlinks by the document they are
@@ -666,8 +672,9 @@ the information as a ~Text~ value, because there is no ~ToJSON~ instance for the
 #+begin_src haskell
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
-  let (objects, symbols) =
+  let (objects, symbolsWithoutTopLevelUUIDs) =
         foldl' concatObjs (mempty, mempty) offsetsFull
+      symbols = injectTopLevelUUIDs symbolsWithoutTopLevelUUIDs
       backlinks = mkBacklinks $ foldl' (finalizeEdges symbols) [] offsetsFull
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
@@ -699,6 +706,18 @@ mkArchive pathObjs = do
                 bibs = fromList bibs
               }
   where
+    injectTopLevelUUIDs :: Map LinkOid Int -> Map LinkOid Int
+    injectTopLevelUUIDs linkOids =
+      let topLevelLinkOids =
+            fromList
+              $ zip (map (mkLinkOid . snd) $ sort pathObjs) [-1, -2 ..]
+          mkLinkOid :: Object -> LinkOid
+          mkLinkOid obj =
+            LinkOid
+              { oid = obj.orgDoc.oid,
+                name = ""
+              }
+       in linkOids <> topLevelLinkOids
     offsets :: IntMap GPath
     offsets =
       IntMap.fromList
