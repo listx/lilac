@@ -1349,8 +1349,6 @@ weaveBacklinks = do
           f (externalIdx, internalIdx)
             | Just (_, externalCell) <-
                 cellIdxToObjCell weaveConf.archive externalIdx,
-              Just (_, internalCell) <-
-                cellIdxToObjCell weaveConf.archive internalIdx,
               Just (offset, _) <-
                 IntMap.lookupLE externalIdx weaveConf.archive.offsets,
               Just toObjPath <-
@@ -1366,11 +1364,18 @@ weaveBacklinks = do
                       T.pack str
                         <> "#"
                         <> (getLinkAnchor (Just externalCellIdx) externalCell)
-                    internalLinkAnchor =
-                      "#" <> (getLinkAnchor (Just internalCellIdx) internalCell)
+                    internalLinkAnchor
+                      | Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive internalIdx =
+                          "#" <> (getLinkAnchor (Just internalCellIdx) internalCell)
+                      | internalIdx < 0 = "#top"
+                      | otherwise = "#LINK_ERROR"
                     noName = Prose [PTokenStyledText $ StyledText {body = "???", style = styleMaskFrom []}]
                     externalName = fromMaybe noName $ cellIdxToName weaveConf.archive externalIdx offset
-                    internalName = fromMaybe noName $ cellIdxToName weaveConf.archive internalIdx offset
+                    internalName
+                      | Just name <- cellIdxToName weaveConf.archive internalIdx offset =
+                          name
+                      | internalIdx < 0 = Prose [PTokenStyledText $ StyledText {body = "^ Top", style = styleMaskFrom []}]
+                      | otherwise = noName
                     externalCellIdx = externalIdx - offset
                     internalCellIdx = internalIdx - offset
                 li_ [] $ do

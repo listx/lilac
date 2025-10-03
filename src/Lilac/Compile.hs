@@ -83,6 +83,7 @@ import Relude
     Maybe (Just, Nothing),
     String,
     Text,
+    abs,
     catMaybes,
     concat,
     concatMap,
@@ -107,10 +108,13 @@ import Relude
     snd,
     sort,
     zip,
+    (!!?),
     ($),
     (+),
+    (-),
     (.),
     (/=),
+    (<),
     (<$>),
     (<>),
     (=<<),
@@ -183,7 +187,7 @@ mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
   let (objects, symbolsWithoutTopLevelUUIDs) =
         foldl' concatObjs (mempty, mempty) offsetsFull
-      symbols = injectTopLevelUUIDs symbolsWithoutTopLevelUUIDs
+      symbols = topLevelUUIDs <> symbolsWithoutTopLevelUUIDs
       backlinks = mkBacklinks $ foldl' (finalizeEdges symbols) [] offsetsFull
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
@@ -215,8 +219,8 @@ mkArchive pathObjs = do
                 bibs = fromList bibs
               }
   where
-    injectTopLevelUUIDs :: Map LinkOid Int -> Map LinkOid Int
-    injectTopLevelUUIDs linkOids =
+    topLevelUUIDs :: Map LinkOid Int
+    topLevelUUIDs =
       let topLevelLinkOids =
             fromList
               $ zip (map (mkLinkOid . snd) $ sort pathObjs) [-1, -2 ..]
@@ -226,7 +230,7 @@ mkArchive pathObjs = do
               { oid = obj.orgDoc.oid,
                 name = ""
               }
-       in linkOids <> topLevelLinkOids
+       in topLevelLinkOids
     offsets :: IntMap GPath
     offsets =
       IntMap.fromList
@@ -259,6 +263,11 @@ mkArchive pathObjs = do
       let f acc (from, to)
             | Just (_, fromPath) <- IntMap.lookupLE from offsets,
               Just (_, toPath) <- IntMap.lookupLE to offsets,
+              fromPath /= toPath =
+                M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+            | Just (_, fromPath) <- IntMap.lookupLE from offsets,
+              to < 0,
+              Just toPath <- (sort $ map fst pathObjs) !!? (abs to - 1),
               fromPath /= toPath =
                 M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
             | otherwise = acc
