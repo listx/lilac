@@ -179,21 +179,25 @@ is mostly written in Haskell, many of these prefixes are specific to the Haskell
 programming language.
 
 #+caption: Naming convention of code blocks.
-| Naming prefix | Meaning                     | Example                 |
-|---------------+-----------------------------+-------------------------|
-| ~data~          | Haskell ~data~ declaration    | [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]]             |
-| ~newtype~       | Haskell ~newtype~ declaration | [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]]           |
-| ~eq~            | Mathematical equation       | [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f::eq:Pythagorean Theorem][eq:Pythagorean Theorem]]  |
-| ~f~             | Function                    | [[f:lilac-main]]            |
-| ~fig~           | Figure                      | [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698::fig:PNG image][fig:PNG image]]           |
-| ~ghc~           | Glasgow Haskell Compiler    | [[ghc:Warn everything]]     |
-| ~t~             | Test case                   | [[id:fbca0c4e-c568-4c12-b89c-7cf334b8d50f::t:empty-input][t:empty-input]]           |
-| ~ti~            | Test case input             | [[id:fbca0c4e-c568-4c12-b89c-7cf334b8d50f::ti:0001-blankline][ti:0001-blankline]]       |
-| ~tbl~           | Table                       | [[id:6c10afe2-2714-4e85-9121-e96a36d27ba4::tbl:Marking characters][tbl:Marking characters]]  |
-| ~instance~      | Haskell typeclass instance  | [[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62::instance:Show OID][instance:Show OID]]       |
-| ~make~          | Makefile rule               | [[id:77786b08-6211-47b8-940d-6aaefc17ec47::make:Tangle sources][make:Tangle sources]]     |
-| ~module~        | Module file                 | [[id:af82950f-ec4a-46e1-9af5-995222cd35e3::module:Lilac.Types][module:Lilac.Types]]      |
-| ~nix~           | Nix configuration           | [[nix:devShell derivation]] |
+| Naming prefix | Meaning                     | Example                     |
+|---------------+-----------------------------+-----------------------------|
+| ~data~          | Haskell ~data~ declaration    | [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]]                 |
+| ~newtype~       | Haskell ~newtype~ declaration | [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]]               |
+| ~eq~            | Mathematical equation       | [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f::eq:Pythagorean Theorem][eq:Pythagorean Theorem]]      |
+| ~f~             | Function                    | [[f:lilac-main]]                |
+| ~fig~           | Figure                      | [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698::fig:PNG image][fig:PNG image]]               |
+| ~ghc~           | Glasgow Haskell Compiler    | [[ghc:Warn everything]]         |
+| ~t~             | Test case                   | [[id:fbca0c4e-c568-4c12-b89c-7cf334b8d50f::t:empty-input][t:empty-input]]               |
+| ~ti~            | Test case input             | [[id:fbca0c4e-c568-4c12-b89c-7cf334b8d50f::ti:0001-blankline][ti:0001-blankline]]           |
+| ~tbl~           | Table                       | [[id:6c10afe2-2714-4e85-9121-e96a36d27ba4::tbl:Marking characters][tbl:Marking characters]]      |
+| ~instance~      | Haskell typeclass instance  | [[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62::instance:Show OID][instance:Show OID]]           |
+| ~make~          | Makefile rule               | [[id:77786b08-6211-47b8-940d-6aaefc17ec47::make:Tangle sources][make:Tangle sources]]         |
+| ~module~        | Module file                 | [[id:af82950f-ec4a-46e1-9af5-995222cd35e3::module:Lilac.Types][module:Lilac.Types]]          |
+| ~nix~           | Nix configuration           | [[nix:devShell derivation]]     |
+| ~ns~            | Clojure(Script) namespace   | [[id:48d6dc87-f5fc-4a36-bef4-85b9d4207f05::ns:lilac.core][ns:lilac.core]]               |
+| ~exp~           | Clojure(Script) expression  | [[id:385c2480-a748-4091-903e-5a48351de6e0::exp:404-fallback][exp:404-fallback]]            |
+| ~cfg~           | Configuration               | [[id:90d66ea1-a994-4fdb-b969-c28cec04352d::cfg:figwheel-main.edn][cfg:figwheel-main.edn]]       |
+| ~sh~            | Shell script                | [[id:783de6bf-e36b-4c9e-a405-2a86d0897795::sh:invoke-dev-build-watcher][sh:invoke-dev-build-watcher]] |
 
 * Nix build and development environment
 
@@ -426,7 +430,7 @@ version]].
 #+name: nix:tools
 #+begin_src nix
 tools = [
-  <<id:4c96f0c2-7ee5-4be3-ba73-e7c0f5ddc658::tool-python3>>
+  <<id:473e9718-2454-43d9-9f17-c895ec1b9de5::tools-fe>>
   <<tool-niv>>
   <<tool-cabal>>
   <<tool-editorconfig-checker>>
@@ -571,10 +575,15 @@ file at the root of the project.
 #+name: .gitignore
 #+header: :tangle .gitignore
 #+begin_src gitignore
+.cpcache
 .direnv
 .ghc.environment*
 .hie
+.rebel_readline_history
 <<Generated pre-commit config>>
+base/cljs-dev
+base/cljs-prod
+base/*.js
 cabal.project.local
 dist-newstyle
 orgdoc.json
@@ -865,6 +874,9 @@ watch_dir nix
 #+end_src
 
 ** =Makefile=
+:PROPERTIES:
+:ID:       5bbaf57a-217d-4e45-88bf-021c4c67b591
+:END:
 
 We use the traditional =make= command to encode some common operations. This way
 we don't have to memorize exactly how to invoke certain commands.
@@ -878,7 +890,7 @@ we don't have to memorize exactly how to invoke certain commands.
 <<make:Compile sources>>
 <<make:Tangle sources>>
 <<make:Weave>>
-<<id:4c96f0c2-7ee5-4be3-ba73-e7c0f5ddc658::make:Serve>>
+<<id:783de6bf-e36b-4c9e-a405-2a86d0897795::make:Start frontend development environment (CLJS REPL)>>
 <<make:Build lilac with Cabal>>
 <<make:Build lilac with Nix>>
 <<make:Update Nix dependencies>>
@@ -1176,7 +1188,7 @@ tangle_and_test_and_weave()
 {
 	tangle || true
 	if tangle; then
-		if ! make -C "${SCRIPT_ROOT}" test; then
+		if ((__test_hs)) && ! make -C "${SCRIPT_ROOT}" test; then
 			reset_tangled_program_files
 		fi
 	fi
@@ -1208,6 +1220,11 @@ watch()
 
 main()
 {
+	__test_hs=1
+	if [[ "${1:-}" == "fe" ]]; then
+		__test_hs=0
+	fi
+
 	watch \
 		"${SCRIPT_ROOT}/base/lilac.org" \
 		"${SCRIPT_ROOT}/base/compile.org" \
@@ -1247,12 +1264,12 @@ file outside of the call to =tangle-loop.sh=.
 
 *** Weave Lilac with Lilac
 
-For weaving, use the =site= directory.
+For weaving, use the =base= directory.
 
 #+name: make:Weave
 #+begin_src makefile
 weave: base/lilac.larc
-	lilac weave --watch $< --out-dir base
+	lilac weave $< --out-dir base
 	touch weave
 #+end_src
 
@@ -1264,8 +1281,8 @@ weave
 #+end_src
 
 It's useful to serve the generated pages through a server (instead of making the
-browser fetch it via the ~file://~ protocol), because it gives us access to hot
-reloading. Hot reloading is discussed again at [[id:4c96f0c2-7ee5-4be3-ba73-e7c0f5ddc658::Hot reload script][Hot reload script]].
+browser fetch it via the ~file://~ protocol), because it gives us a richer
+frontend development experience. See [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][Frontend]].
 
 *** Build =lilac=
 
@@ -1832,6 +1849,7 @@ by default. We expect this list to grow over time.
 #+header: :tangle .vale/styles/config/vocabularies/Lilac/accept.txt
 #+begin_src txt
 [Bb]acklinks
+[Ff]igwheel
 [Nn]oweb
 [Uu]nmarshaling
 autogenerate
@@ -1844,6 +1862,7 @@ canonicalization
 canonicalize
 canonicalized
 Citeproc
+classpath
 combinator
 combinators
 declaratively
@@ -1856,6 +1875,7 @@ Direnv
 Elisp
 formatter
 formatters
+GHC
 Git
 Hackage
 hardcode
@@ -1868,6 +1888,7 @@ Makefiles
 Megaparsec
 memoize
 memoizes
+middleware
 monospaced
 multiline
 namespace
@@ -2406,8 +2427,7 @@ import Lilac.Types
         archive,
         citeprocResult,
         originObjectPath,
-        projectConf,
-        watch
+        projectConf
       ),
     decodeGPath,
     defaultOrgParserState,
@@ -2731,7 +2751,7 @@ lilacWeave weaveOpts = do
           putStrLn $ "Weaving " <> fp
           sequence_
             $ M.foldlWithKey'
-              (weaveToDisk weaveOpts projectConf archive)
+              (weaveToDisk projectConf archive)
               []
               archive.objects
           putStrLn "Finished weaving."
@@ -2743,14 +2763,13 @@ just a thin wrapper around [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObj
 #+name: f:weaveToDisk
 #+begin_src haskell
 weaveToDisk ::
-  WeaveOpts ->
   ProjectConf ->
   Archive ->
   [IO ()] ->
   GPath ->
   Object ->
   [IO ()]
-weaveToDisk weaveOpts projectConf archive acc objPath obj =
+weaveToDisk projectConf archive acc objPath obj =
   let fp = decodeGPath objPath
       ext = P.unsafeEncodeUtf "html"
       outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
@@ -2761,8 +2780,7 @@ weaveToDisk weaveOpts projectConf archive acc objPath obj =
                 { projectConf = projectConf,
                   archive = archive,
                   originObjectPath = objPath,
-                  citeprocResult = result,
-                  watch = weaveOpts.watch
+                  citeprocResult = result
                 }
         LU.writeFileRobustly outPath
           . LW.renderAsText weaveConf
@@ -2891,7 +2909,6 @@ type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [OsPath],
     outDir :: OsPath,
-    watch :: Bool,
     projectConf :: OsPath
   }
 #+end_src
@@ -2911,17 +2928,6 @@ weaveOptsHandler =
                 <> help
                   """
                   Directory for saving the HTML files.
-                  """
-            )
-        )
-    <*> ( flag
-            False
-            True
-            ( long "watch"
-                <> help
-                  """
-                  Inject JS to make the HTML page live-reload.
-                  Uses https://livejs.com/live.js.
                   """
             )
         )

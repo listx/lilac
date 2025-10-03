@@ -593,8 +593,7 @@ data WeaveConf = WeaveConf
   { projectConf :: ProjectConf,
     archive :: Archive,
     originObjectPath :: GPath,
-    citeprocResult :: CP.Result Prose,
-    watch :: Bool
+    citeprocResult :: CP.Result Prose
   }
 
 type Object :: Type

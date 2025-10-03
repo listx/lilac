@@ -126,8 +126,7 @@ import Lilac.Types
       ( archive,
         citeprocResult,
         originObjectPath,
-        projectConf,
-        watch
+        projectConf
       ),
     cellIdxToName,
     cellIdxToObjCell,
@@ -193,7 +192,6 @@ import Lucid
     toHtml,
     toHtmlRaw,
     tr_,
-    type_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -288,7 +286,6 @@ type HtmlWeaver a = HtmlT (ReaderT WeaveConf Identity) a
 
 weaveObject :: Object -> HtmlWeaver ()
 weaveObject object = do
-  weaveConf <- ask
   let title' = toHtml $ case lookup "title" object.orgDoc.meta of
         Just title -> title
         Nothing -> "Untitled"
@@ -296,13 +293,6 @@ weaveObject object = do
     head_ $ do
       meta_ [charset_ "utf-8"]
       title_ title'
-      when weaveConf.watch
-        $ script_
-          [ type_ "text/javascript",
-            src_ "https://livejs.com/live.js"
-          ]
-          ("" :: Text)
-
       link_ [rel_ "stylesheet", href_ "./css/default.css"]
       link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
       link_
@@ -339,6 +329,12 @@ weaveObject object = do
         [ id_ "MathJax-script",
           async_ "",
           src_ "https://cdn.jsdelivr.net/npm/mathjax@3.0.1/es5/tex-mml-chtml.js"
+        ]
+        ("" :: Text)
+
+      script_
+        [ id_ "lilac-fe-script",
+          src_ "lilac.js"
         ]
         ("" :: Text)
     body_ $ do

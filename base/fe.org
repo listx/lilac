@@ -1,11 +1,260 @@
 :PROPERTIES:
 :ID:       6d407e24-fb34-460a-83bd-7b39cf7a56bb
 :END:
-#+title: Lilac Frontend
+#+title: Frontend
 
 * Introduction
 :PROPERTIES:
 :ID:       3c0adfb2-3d51-4cf0-a2f7-6c66f372c2f1
 :END:
 
-The frontend uses ClojureScript.
+We write [[https://clojure.org/][Clojure]] instead of [[https://en.wikipedia.org/wiki/JavaScript][JavaScript]] (JS) to add interactivity to the woven
+HTML documents. For clarity, here are some definitions:
+
+  - Clojure :: Lisp dialect which traditionally targets the JVM (Java runtime).
+
+  - [[https://clojurescript.org/][ClojureScript]] (CLJS) :: Clojure library which is able to convert Clojure
+    code into JavaScript. In a sense this is a Clojure to JS compiler.
+
+  - [[https://github.com/google/closure-compiler][Closure]] :: Library developed by Google which performs optimizations on JS.
+    It is a JS to JS optimizer. ClojureScript uses this to clean up the JS code
+    that it generates.
+
+The main reason for using Clojure is because it is a much more
+pleasant language to use than JS. It is also more established than something
+like [[https://engineering.iog.io/2023-01-24-javascript-browser-tutorial/][GHC's JS backend]].
+
+* ClojureScript with Figwheel
+:PROPERTIES:
+:ID:       a56e18d0-3c66-4202-8fd7-79f9597d07ed
+:END:
+
+There are three major CLJS tech stacks:
+
+  1) The "official" tooling. This is what was described above.
+
+  2) [[https://github.com/bhauman/figwheel-main][Figwheel]]. This is an older library that pioneered hot code reloading of
+     CLJS (as JS) during development.
+
+  3) [[https://github.com/thheller/shadow-cljs][shadow-cljs]]. This is a newer library that has tighter integration with NPM
+     and the JS ecosystem. For example, to create a new project with it you must
+     use the ~npx~ command which depends on having [[https://nodejs.org/en][Node.js]] installed.
+
+We choose to use Figwheel because it's a smaller library with fewer moving
+parts. Eventually when we feel the need to leverage NPM libraries (such as
+[[https://react.dev/][React]]), we could make the move to =shadow-cljs=.
+
+** Dependencies
+:PROPERTIES:
+:ID:       473e9718-2454-43d9-9f17-c895ec1b9de5
+:END:
+
+Because of the relative immaturity of the Nix package manager's integration with
+Clojure [fn:nix-clojure], we don't bother trying to set up a fully reproducible
+environment with it. Instead we just install the =clojure= binary and let it
+do the work of fetching all dependencies.
+
+#+name: tools-fe
+#+begin_src nix
+pkgs.clojure
+#+end_src
+
+As this is a Clojure project, we have to declare dependencies using ~deps.edn~,
+where we declare the dependency on Figwheel.
+
+#+name: cfg:deps.edn
+#+header: :tangle deps.edn
+#+begin_src clojure
+{:deps {com.bhauman/figwheel-main {:mvn/version "0.2.20"}
+        com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
+ :paths ["base" "src/fe"]}
+#+end_src
+
+The ~:paths ["target"]~ is necessary for helping
+
+#+begin_src sh
+clj -M -m figwheel.main
+#+end_src
+
+work properly. Otherwise we'll see an error like
+
+#+begin_src txt
+[Figwheel:WARNING] Attempting to dynamically add "target" to classpath!
+[Figwheel:WARNING] Target directory "target" is not on the classpath
+[Figwheel:WARNING] Please fix this by adding "target" to your classpath
+#+end_src
+
+** Build configuration file
+:PROPERTIES:
+:ID:       783de6bf-e36b-4c9e-a405-2a86d0897795
+:END:
+
+The build configuration file is the main way of configuring a particular ~build~.
+These are essentially compiler options (because CLJS to JS compilation is the
+main part of the build process).
+
+#+name: cfg:lilac-fe-build
+#+header: :tangle lilac.cljs.edn
+#+begin_src clojure
+{:main lilac.core
+ :optimizations :none
+ :output-to "base/lilac.dev.js"
+ :output-dir "base/cljs-dev"
+ :asset-path "cljs-dev"}
+#+end_src
+
+We can use the above like this:
+
+#+name: sh:invoke-dev-build-watcher
+#+begin_src sh
+clojure -M -m figwheel.main --build lilac --repl
+#+end_src
+
+This will create a REPL that can evaluate CLJS and run it as JS in the browser
+tab at http://localhost:8080/base/lilac.html per the ~:open-url~ setting in
+[[cfg:figwheel-main.edn]]. The ~lilac~ in ~--build lilac~ comes from the ~lilac~ string
+in ~lilac.cljs.edn~ (this is a Figwheel convention).
+
+The ~:optimizations~ option is set to ~:none~ in [[cfg:lilac-fe-build]] because
+that's required for the REPL to work. Actually it is already the default value,
+but we specify it here for explicitness.
+
+The traditional way to invoke [[sh:invoke-dev-build-watcher]] without typing
+everything out is to save it as an ~:aliases~ entry inside ~deps.edn~. However we
+have a unified Makefile interface already at [[id:5bbaf57a-217d-4e45-88bf-021c4c67b591][=Makefile=]], and so we comply with
+that instead for consistency.
+
+#+name: make:Start frontend development environment (CLJS REPL)
+#+begin_src makefile
+dev-cljs:
+	<<sh:invoke-dev-build-watcher>>
+.PHONY: cljs
+#+end_src
+
+*** Optimized production build
+
+We have to run this in order to get a single minified JS file.
+
+#+name: cfg:lilac-fe-build-prod
+#+header: :tangle lilac-prod.cljs.edn
+#+begin_src clojure
+{:main lilac.core
+ :optimizations :advanced
+ :output-to "base/lilac.prod.js"
+ :output-dir "base/cljs-prod"
+ :asset-path "cljs-prod"}
+#+end_src
+
+You can run it like this:
+
+#+begin_src sh
+clojure -M -m figwheel.main --build lilac-prod --repl
+#+end_src
+
+** Figwheel configuration
+:PROPERTIES:
+:ID:       90d66ea1-a994-4fdb-b969-c28cec04352d
+:END:
+
+The [[cfg:figwheel-main.edn]] is a place to store common configuration options
+across all build files.
+
+#+name: cfg:figwheel-main.edn
+#+header: :tangle figwheel-main.edn
+#+begin_src clojure
+{:watch-dirs ["src/fe"]
+ :css-dirs ["base/css"]
+ :ring-server-options {:host "localhost" :port 8080 :join? false}
+ :ring-handler lilac.handler/development-app
+ :open-url "http://localhost:8080/base/lilac.html"
+ :target-dir "base"
+ :clean-outputs true}
+#+end_src
+
+If you want to override these common ones in a build, you have to specify it
+using metadata. For example, you could do
+
+#+begin_src clojure
+^{:css-dirs ["css"]}
+{:main lilac.core}
+#+end_src
+
+in [[cfg:lilac-fe-build]] and it would override the ~:css-dirs~ option only for
+that build.
+
+** Custom Ring handler
+:PROPERTIES:
+:ID:       385c2480-a748-4091-903e-5a48351de6e0
+:END:
+
+By default, Figwheel uses the [[https://github.com/ring-clojure/ring][Ring]] web library. It has a hardcoded default where
+the static files to be served by the web server process must be located in a
+folder named ~public~ somewhere along the classpath. However we don't want to use
+~public~ because we use a top-level folder already called ~base~ which is the base
+of all of our LP documentation, which are woven into HTML files in that folder.
+And for simplicity we want to serve the ~base~ folder prefix, because this hides
+less information and is more transparent of what is being served. In order to do
+this, we have to write our own Ring handler.
+
+#+name: ns:lilac.handler
+#+header: :tangle src/fe/lilac/handler.clj
+#+begin_src clojure
+(ns lilac.handler
+  (:require [ring.middleware.file :refer [wrap-file]]
+            [ring.middleware.not-modified :refer [wrap-not-modified]]
+            [ring.middleware.content-type :refer [wrap-content-type]]))
+
+(def development-app
+  (-> <<exp:404-fallback>>
+      (wrap-content-type)
+      (wrap-not-modified)
+      <<exp:serve-files-from-project-root>>))
+#+end_src
+
+We start out with the fallback code, because this creates a default response if
+the request cannot be handled otherwise by any of the other middleware.
+
+#+name: exp:404-fallback
+#+begin_src clojure
+(constantly {:status 404 :headers {} :body "Not Found"})
+#+end_src
+
+This is the crucial bit. It lets us serve all files starting from the project
+root.
+
+#+name: exp:serve-files-from-project-root
+#+begin_src clojure
+(wrap-file ".")
+#+end_src
+
+* =lilac.core= module
+:PROPERTIES:
+:ID:       48d6dc87-f5fc-4a36-bef4-85b9d4207f05
+:END:
+
+This is the main top-level module where we load all of our custom JS behavior.
+
+#+name: ns:lilac.core
+#+header: :tangle src/fe/lilac/core.cljs
+#+begin_src clojure
+(ns lilac.core)
+
+(defn msg-successful-load []
+  "Lilac loaded successfully.")
+
+(js/console.log (msg-successful-load))
+#+end_src
+
+The following can start the REPL but also automatically load the given
+namespace, so that saving that file automatically reloads it.
+
+#+begin_src sh
+clojure -M -m figwheel.main --compile lilac.core --repl
+#+end_src
+
+However, it's easier to put these and other options into a [[id:783de6bf-e36b-4c9e-a405-2a86d0897795][Build configuration file]] and use that instead.
+
+* Footnotes
+
+[fn:nix-clojure] As of October 2025, there is no mention of Clojure in
+https://nixos.org/manual/nixpkgs/stable/#chap-language-support.

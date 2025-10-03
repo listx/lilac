@@ -281,8 +281,7 @@ import Lilac.Types
       ( archive,
         citeprocResult,
         originObjectPath,
-        projectConf,
-        watch
+        projectConf
       ),
     cellIdxToName,
     cellIdxToObjCell,
@@ -348,7 +347,6 @@ import Lucid
     toHtml,
     toHtmlRaw,
     tr_,
-    type_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -509,8 +507,7 @@ data WeaveConf = WeaveConf
   { projectConf :: ProjectConf,
     archive :: Archive,
     originObjectPath :: GPath,
-    citeprocResult :: CP.Result Prose,
-    watch :: Bool
+    citeprocResult :: CP.Result Prose
   }
 #+end_src
 
@@ -576,7 +573,6 @@ style sheets, etc), before finally delegating to various helper functions:
 #+begin_src haskell
 weaveObject :: Object -> HtmlWeaver ()
 weaveObject object = do
-  weaveConf <- ask
   let title' = toHtml $ case lookup "title" object.orgDoc.meta of
         Just title -> title
         Nothing -> "Untitled"
@@ -638,52 +634,10 @@ The [[HTML head]] has some "imports" for the HTML page, including CSS and JS.
 head_ $ do
   meta_ [charset_ "utf-8"]
   title_ title'
-  <<Hot reload script>>
   <<Styles and fonts>>
   <<MathJax customization>>
   <<MathJax script>>
-#+end_src
-
-*** Hot reload
-:PROPERTIES:
-:ID:       4c96f0c2-7ee5-4be3-ba73-e7c0f5ddc658
-:END:
-
-The [[Hot reload script]] is a simple third-party development tool which reloads the
-page if there is a change in the HTML, CSS, or JS. It requires a web server, so
-we pull in
-
-#+name: Hot reload script
-#+begin_src haskell
-when weaveConf.watch
-  $ script_
-    [ type_ "text/javascript",
-      src_ "https://livejs.com/live.js"
-    ]
-    ("" :: Text)
-#+end_src
-
-The ~live.js~ script only works with a web server, so we declare Python as a
-dependency because you can easily start up a web server with
-
-#+begin_src sh
-make serve
-#+end_src
-
-because we have a =Makefile= rule which serves the =site= directory.
-
-#+name: make:Serve
-#+begin_src makefile
-serve:
-	python3 -m http.server 8080 -d .
-#+end_src
-
-The Nix dependency for Python is injected into the development shell environment
-in [[id:73b60692-f369-4707-a7ee-434cc7a4549f::nix:tools][nix:tools]].
-
-#+name: tool-python3
-#+begin_src nix
-pkgs.python3
+  <<ClojureScript frontend script>>
 #+end_src
 
 *** CSS styles and fonts
@@ -771,6 +725,20 @@ necessary for making it ignore verbatim and code styles from [[id:d6abea81-d620-
 options: {
     ignoreHtmlClass: 'verbatim|code'
 }
+#+end_src
+
+*** ClojureScript frontend
+
+The [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][ClojureScript frontend]] generates a single JS file called ~lilac.js~. We have
+to import this into every page.
+
+#+name: ClojureScript frontend script
+#+begin_src haskell
+script_
+  [ id_ "lilac-fe-script",
+    src_ "lilac.js"
+  ]
+  ("" :: Text)
 #+end_src
 
 ** Unique names
@@ -3369,8 +3337,7 @@ import Lilac.Types
         archive,
         citeprocResult,
         originObjectPath,
-        projectConf,
-        watch
+        projectConf
       ),
     defaultOrgParserState,
     encodeGPath,
@@ -3489,8 +3456,7 @@ getWovenPrettyFromPath path = do
                   { projectConf = projectConf,
                     archive = archive,
                     originObjectPath = inputOrgFileGPath,
-                    citeprocResult = result,
-                    watch = True
+                    citeprocResult = result
                   }
           pure
             . Right

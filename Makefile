@@ -30,11 +30,12 @@ tangle: base/lilac.larc
 	touch tangle
 
 weave: base/lilac.larc
-	lilac weave --watch $< --out-dir base
+	lilac weave $< --out-dir base
 	touch weave
 
-serve:
-	python3 -m http.server 8080 -d .
+dev-cljs:
+	clojure -M -m figwheel.main --build lilac --repl
+.PHONY: cljs
 
 build: $(org_files) lilac.cabal
 	cabal build

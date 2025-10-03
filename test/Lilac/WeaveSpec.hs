@@ -32,8 +32,7 @@ import Lilac.Types
         archive,
         citeprocResult,
         originObjectPath,
-        projectConf,
-        watch
+        projectConf
       ),
     defaultOrgParserState,
     encodeGPath,
@@ -117,8 +116,7 @@ getWovenPrettyFromPath path = do
                   { projectConf = projectConf,
                     archive = archive,
                     originObjectPath = inputOrgFileGPath,
-                    citeprocResult = result,
-                    watch = True
+                    citeprocResult = result
                   }
           pure
             . Right

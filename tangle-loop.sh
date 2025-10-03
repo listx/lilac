@@ -33,7 +33,7 @@ tangle_and_test_and_weave()
 {
 	tangle || true
 	if tangle; then
-		if ! make -C "${SCRIPT_ROOT}" test; then
+		if ((__test_hs)) && ! make -C "${SCRIPT_ROOT}" test; then
 			reset_tangled_program_files
 		fi
 	fi
@@ -65,6 +65,11 @@ watch()
 
 main()
 {
+	__test_hs=1
+	if [[ "${1:-}" == "fe" ]]; then
+		__test_hs=0
+	fi
+
 	watch \
 		"${SCRIPT_ROOT}/base/lilac.org" \
 		"${SCRIPT_ROOT}/base/compile.org" \

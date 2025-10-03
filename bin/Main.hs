@@ -16,8 +16,7 @@ import Lilac.Types
         archive,
         citeprocResult,
         originObjectPath,
-        projectConf,
-        watch
+        projectConf
       ),
     decodeGPath,
     defaultOrgParserState,
@@ -140,7 +139,6 @@ type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [OsPath],
     outDir :: OsPath,
-    watch :: Bool,
     projectConf :: OsPath
   }
 
@@ -252,17 +250,6 @@ weaveOptsHandler =
                 <> help
                   """
                   Directory for saving the HTML files.
-                  """
-            )
-        )
-    <*> ( flag
-            False
-            True
-            ( long "watch"
-                <> help
-                  """
-                  Inject JS to make the HTML page live-reload.
-                  Uses https://livejs.com/live.js.
                   """
             )
         )
@@ -468,20 +455,19 @@ lilacWeave weaveOpts = do
           putStrLn $ "Weaving " <> fp
           sequence_
             $ M.foldlWithKey'
-              (weaveToDisk weaveOpts projectConf archive)
+              (weaveToDisk projectConf archive)
               []
               archive.objects
           putStrLn "Finished weaving."
 
 weaveToDisk ::
-  WeaveOpts ->
   ProjectConf ->
   Archive ->
   [IO ()] ->
   GPath ->
   Object ->
   [IO ()]
-weaveToDisk weaveOpts projectConf archive acc objPath obj =
+weaveToDisk projectConf archive acc objPath obj =
   let fp = decodeGPath objPath
       ext = P.unsafeEncodeUtf "html"
       outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
@@ -492,8 +478,7 @@ weaveToDisk weaveOpts projectConf archive acc objPath obj =
                 { projectConf = projectConf,
                   archive = archive,
                   originObjectPath = objPath,
-                  citeprocResult = result,
-                  watch = weaveOpts.watch
+                  citeprocResult = result
                 }
         LU.writeFileRobustly outPath
           . LW.renderAsText weaveConf
