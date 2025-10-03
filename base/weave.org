@@ -3829,6 +3829,11 @@ genCss =
     ]
 #+end_src
 
+*** Sizing
+
+We prefer to use ~rem~ (root element) over ~em~ (element), because ~rem~ doesn't
+compound over nested elements like ~em~ does.
+
 ** =Skylighting= (Kate-based syntax highlighting)
 
 We make a small tweak to =kate= to make some colors easier on the eyes. The
@@ -3976,7 +3981,7 @@ nav # ".toc" ? do
       position relative
       before & do
         content $ stringContent "■"
-        marginLeft (em $ -1)
+        marginLeft (rem $ -1)
         position absolute
         left (px 0)
   span # ".toc-counter" ? do
@@ -4042,7 +4047,7 @@ footer ? do
   div # ".lilac-stamp" ? do
     textAlign $ alignSide sideRight
     fontSans
-    fontSize $ rem 0.8
+    fontSize $ rem 0.9
     marginBottom (px 10)
 #+end_src
 
@@ -4061,11 +4066,11 @@ h1 ? do
   fontSize (pt 36)
   marginTop (px 0)
   marginBottom (pt $ -16)
-  prependSymbol "●" (em $ -0.8)
+  prependSymbol "●" (rem $ -2.4)
 <<css:h1 (title) underline>>
 h2 ? do
   fontSize (pt 26)
-  prependSymbol "■" (em $ -1)
+  prependSymbol "■" (rem $ -2.15)
 h3 ? do
   fontSize (pt 22)
 h4 ? do
@@ -4221,9 +4226,9 @@ HTML generation.
             <> "')"
     "content" -: cssProp
     display inlineBlock
-    width (em 1)
-    height (em 1)
-    margin 0 (em (-0.2)) 0 0
+    width (rem 1)
+    height (rem 1)
+    margin 0 (rem (-0.2)) 0 0
 #+end_src
 
 The raw SVG code for the external link is taken mostly from [[https://www.unicode.org/L2/L2018/18303-external-link.pdf][here]]. That document
@@ -4250,7 +4255,7 @@ the latter here).
 #+begin_src haskell
 roundedRectangleLink :: Css
 roundedRectangleLink = do
-  fontSize (em 0.9)
+  fontSize (rem 0.9)
   color colorNowebLinkFg
   backgroundColor colorNowebLinkBg
   ev borderRadius (px 5)
@@ -4282,9 +4287,9 @@ code ? do
 ".code-block-container" & do
   yx margin (px 16) 0
   position relative
-  fontSize (rem 0.8)
+  fontSize (rem 0.9)
   a ? do
-    fontSize (rem 0.8)
+    fontSize (rem 0.9)
     display inlineBlock
     yx margin (px 2) 0
 ".code-block-meta" & do
@@ -4296,7 +4301,7 @@ code ? do
   fontSans
 ".code-block-body" & do
   overflowX auto
-  margin 0 0 (em 1) 0
+  margin 0 0 (rem 1) 0
   fontMono
   backgroundColor colorCodeBg
   color colorCodeFg
@@ -4396,7 +4401,7 @@ for the bibliographical entries when using ~#+print_bibliography:~.
 ".csl-left-margin" & do
   float floatLeft
 ".csl-right-inline" & do
-  margin 0 0 0 (em 2)
+  margin 0 0 0 (rem 2)
 #+end_src
 
 ** Document metadata

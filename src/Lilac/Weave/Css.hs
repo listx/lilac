@@ -229,7 +229,7 @@ defaultCss = do
         position relative
         before & do
           content $ stringContent "■"
-          marginLeft (em $ -1)
+          marginLeft (rem $ -1)
           position absolute
           left (px 0)
     span # ".toc-counter" ? do
@@ -273,7 +273,7 @@ defaultCss = do
     div # ".lilac-stamp" ? do
       textAlign $ alignSide sideRight
       fontSans
-      fontSize $ rem 0.8
+      fontSize $ rem 0.9
       marginBottom (px 10)
   div ? do
     noMargin
@@ -285,7 +285,7 @@ defaultCss = do
     fontSize (pt 36)
     marginTop (px 0)
     marginBottom (pt $ -16)
-    prependSymbol "●" (em $ -0.8)
+    prependSymbol "●" (rem $ -2.4)
   hr ? do
     border (px 0) solid colorCodeBorder
     borderBottom (px 2) solid colorCodeBorder
@@ -293,7 +293,7 @@ defaultCss = do
       marginBottom (rem 2)
   h2 ? do
     fontSize (pt 26)
-    prependSymbol "■" (em $ -1)
+    prependSymbol "■" (rem $ -2.15)
   h3 ? do
     fontSize (pt 22)
   h4 ? do
@@ -391,9 +391,9 @@ defaultCss = do
                 <> "')"
         "content" -: cssProp
         display inlineBlock
-        width (em 1)
-        height (em 1)
-        margin 0 (em (-0.2)) 0 0
+        width (rem 1)
+        height (rem 1)
+        margin 0 (rem (-0.2)) 0 0
 
   pre ? do
     noMargin
@@ -408,9 +408,9 @@ defaultCss = do
   ".code-block-container" & do
     yx margin (px 16) 0
     position relative
-    fontSize (rem 0.8)
+    fontSize (rem 0.9)
     a ? do
-      fontSize (rem 0.8)
+      fontSize (rem 0.9)
       display inlineBlock
       yx margin (px 2) 0
   ".code-block-meta" & do
@@ -422,7 +422,7 @@ defaultCss = do
     fontSans
   ".code-block-body" & do
     overflowX auto
-    margin 0 0 (em 1) 0
+    margin 0 0 (rem 1) 0
     fontMono
     backgroundColor colorCodeBg
     color colorCodeFg
@@ -491,7 +491,7 @@ defaultCss = do
   ".csl-left-margin" & do
     float floatLeft
   ".csl-right-inline" & do
-    margin 0 0 0 (em 2)
+    margin 0 0 0 (rem 2)
 
   sup ? do
     ".footnote-link" & do
@@ -520,7 +520,7 @@ defaultCss = do
 
 roundedRectangleLink :: Css
 roundedRectangleLink = do
-  fontSize (em 0.9)
+  fontSize (rem 0.9)
   color colorNowebLinkFg
   backgroundColor colorNowebLinkBg
   ev borderRadius (px 5)
