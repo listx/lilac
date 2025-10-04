@@ -232,6 +232,13 @@ defaultCss = do
           marginLeft (rem $ -1)
           position absolute
           left (px 0)
+      li # ".toc-level-2" ? do
+        position relative
+        before & do
+          content $ stringContent "◇"
+          marginLeft (rem $ -1)
+          position absolute
+          left (px 0)
     span # ".toc-counter" ? do
       marginRight $ rem 0.3
     borderRight (px 1) solid colorCodeBorder
@@ -296,6 +303,7 @@ defaultCss = do
     prependSymbol "■" (rem $ -2.15)
   h3 ? do
     fontSize (pt 22)
+    prependSymbol "◇" (rem $ -2.15)
   h4 ? do
     fontSize (pt 18)
   h5 ? do
