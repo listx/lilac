@@ -226,7 +226,7 @@ update-nix:
 
 The ~niv~ tool is available in our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][development shell]].
 
-#+name: tool-niv
+#+name: nix:tool-niv
 #+begin_src nix
 pkgs.niv
 #+end_src
@@ -430,15 +430,15 @@ version]].
 #+name: nix:tools
 #+begin_src nix
 tools = [
-  <<id:473e9718-2454-43d9-9f17-c895ec1b9de5::tools-fe>>
-  <<tool-niv>>
-  <<tool-cabal>>
-  <<tool-editorconfig-checker>>
-  <<tool-shellcheck>>
-  <<tool-shfmt>>
-  <<tool-nixfmt>>
-  <<tool-ormolu>>
-  <<tool-vale>>
+  <<id:473e9718-2454-43d9-9f17-c895ec1b9de5::nix:tools-fe>>
+  <<nix:tool-niv>>
+  <<nix:tool-cabal>>
+  <<nix:tool-editorconfig-checker>>
+  <<nix:tool-shellcheck>>
+  <<nix:tool-shfmt>>
+  <<nix:tool-nixfmt>>
+  <<nix:tool-ormolu>>
+  <<nix:tool-vale>>
 ];
 #+end_src
 
@@ -1448,7 +1448,7 @@ editorconfig-checker = {
 
 We use the standalone [[https://github.com/editorconfig-checker/editorconfig-checker][editorconfig-checker]] Go tool to check for conformance.
 
-#+name: tool-editorconfig-checker
+#+name: nix:tool-editorconfig-checker
 #+begin_src nix
 pkgs.editorconfig-checker
 #+end_src
@@ -1468,7 +1468,7 @@ nixfmt-rfc-style = {
 };
 #+end_src
 
-#+name: tool-nixfmt
+#+name: nix:tool-nixfmt
 #+begin_src nix
 ourHaskell.nixfmt
 #+end_src
@@ -1489,7 +1489,7 @@ ormolu = {
 };
 #+end_src
 
-#+name: tool-ormolu
+#+name: nix:tool-ormolu
 #+begin_src nix
 ourHaskell.ormolu
 #+end_src
@@ -1510,7 +1510,7 @@ shfmt = {
 };
 #+end_src
 
-#+name: tool-shfmt
+#+name: nix:tool-shfmt
 #+begin_src nix
 pkgs.shfmt
 #+end_src
@@ -1523,7 +1523,7 @@ shellcheck = {
 };
 #+end_src
 
-#+name: tool-shellcheck
+#+name: nix:tool-shellcheck
 #+begin_src nix
 pkgs.shellcheck
 #+end_src
@@ -1837,7 +1837,7 @@ Vocab = Lilac
 BasedOnStyles = Vale
 #+end_src
 
-#+name: tool-vale
+#+name: nix:tool-vale
 #+begin_src nix
 pkgs.vale
 #+end_src
@@ -2045,7 +2045,7 @@ because it's simpler than adding [[https://github.com/commercialhaskell/stack][S
 The ~cabal~ binary is available to us via the =cabal-install= package in our
 [[nix:tools]].
 
-#+name: tool-cabal
+#+name: nix:tool-cabal
 #+begin_src nix
 pkgs.cabal-install
 #+end_src
