@@ -235,7 +235,7 @@ defaultCss = do
       li # ".toc-level-2" ? do
         position relative
         before & do
-          content $ stringContent "◇"
+          content $ stringContent "○"
           marginLeft (rem $ -1)
           position absolute
           left (px 0)
@@ -303,7 +303,7 @@ defaultCss = do
     prependSymbol "■" (rem $ -2.15)
   h3 ? do
     fontSize (pt 22)
-    prependSymbol "◇" (rem $ -2.15)
+    prependSymbol "○" (rem $ -2.03)
   h4 ? do
     fontSize (pt 18)
   h5 ? do
