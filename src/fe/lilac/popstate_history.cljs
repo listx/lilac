@@ -1,0 +1,14 @@
+(ns lilac.popstate-history
+  (:require [clojure.string :as str]))
+
+(defn handle-popstate []
+  (let [current-hash
+        (if (str/blank? js/window.location.hash)
+          "#top"
+          js/window.location.hash)
+        id (.substring current-hash 1)]
+    (when-let [target-el (js/document.getElementById id)]
+      (.scrollIntoView target-el))))
+
+(defn init []
+  (.addEventListener js/window "popstate" handle-popstate))

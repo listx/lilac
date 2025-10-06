@@ -237,11 +237,13 @@ This is the main top-level module where we load all of our custom JS behavior.
 #+name: ns:lilac.core
 #+header: :tangle src/fe/lilac/core.cljs
 #+begin_src clojure
-(ns lilac.core)
+(ns lilac.core
+  (:require [lilac.popstate-history :as history]))
 
 (defn msg-successful-load []
   "Lilac loaded successfully.")
 
+(.addEventListener js/document "DOMContentLoaded" history/init)
 (js/console.log (msg-successful-load))
 #+end_src
 
@@ -253,6 +255,38 @@ clojure -M -m figwheel.main --compile lilac.core --repl
 #+end_src
 
 However, it's easier to put these and other options into a [[id:783de6bf-e36b-4c9e-a405-2a86d0897795][Build configuration file]] and use that instead.
+
+** Internal link history
+
+By default, browsers do not consider links that point to locations in the
+current page as navigable history items. So after clicking on a bunch of
+internal pointing links, if you press the back button on your mouse you'd only
+see the URL bar change, but the window won't change locations.
+
+In [[ns:lilac.popstate-history]] we make the browser treat internal links as worthy
+of being included in the history, so that the back button works to move around
+(to previously visited locations) in the current page. It works by creating an
+event listener which fires for every ~popstate~ event, is the equivalent of the
+back button.
+
+#+name: ns:lilac.popstate-history
+#+header: :tangle src/fe/lilac/popstate_history.cljs
+#+begin_src clojure
+(ns lilac.popstate-history
+  (:require [clojure.string :as str]))
+
+(defn handle-popstate []
+  (let [current-hash
+        (if (str/blank? js/window.location.hash)
+          "#top"
+          js/window.location.hash)
+        id (.substring current-hash 1)]
+    (when-let [target-el (js/document.getElementById id)]
+      (.scrollIntoView target-el))))
+
+(defn init []
+  (.addEventListener js/window "popstate" handle-popstate))
+#+end_src
 
 * Footnotes
 
