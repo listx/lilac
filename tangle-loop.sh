@@ -77,7 +77,8 @@ main()
 		"${SCRIPT_ROOT}/base/tangle.org" \
 		"${SCRIPT_ROOT}/base/types.org" \
 		"${SCRIPT_ROOT}/base/weave.org" \
-		"${SCRIPT_ROOT}/base/fe.org"
+		"${SCRIPT_ROOT}/base/fe.org" \
+		"${SCRIPT_ROOT}/base/artifacts/plan.org"
 }
 
 main "$@"

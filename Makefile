@@ -5,7 +5,8 @@ org_files = \
 	base/tangle.org \
 	base/types.org \
 	base/weave.org \
-	base/fe.org
+	base/fe.org \
+	base/artifacts/plan.org
 backend_org_files = $(filter-out base/fe.org,$(org_files))
 
 test: $(org_files)

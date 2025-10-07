@@ -1,0 +1,324 @@
+:PROPERTIES:
+:ID:       48e76342-2498-44c5-9ed9-830cb80995fd
+:END:
+#+title: Plan
+
+#+lilac_maxHeadingLevel: 5
+
+This document explains planned work (what's on the roadmap, etc).
+
+  - The [[id:f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4][Release blockers]] section lists all TODOs that must be completed before a
+    release is created. These are categorized into release versions.
+
+  - The [[id:b27d3e53-ada2-4f9e-9f38-18e9252b8229][Backlog]] section lists medium-term TODO items.
+
+  - The [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]] section lists TODO items that are much more difficult to do, but
+    are still interesting.
+
+New TODOs start out in the [[id:b27d3e53-ada2-4f9e-9f38-18e9252b8229][Backlog]] and then end up in either [[id:f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4][Release blockers]]
+or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
+
+* Release blockers
+:PROPERTIES:
+:ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
+:END:
+
+** For release ~0.9.0.0~
+
+*** TODO backlinks: group entries within each external doc by target link within current doc
+
+This way we can see what was roughly the most important thing in the current doc
+for another doc.
+
+*** TODO highlight the background of toc contents as they come into the viewport
+
+
+This requires use of the Intersection Observer API: https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API.
+
+*** TODO parse and weave definition lists
+
+These are written like ~foo :: bar~, and are always the first part of a list
+item's prose (paragraph).
+
+The point is to allow users to provide definitions wherever they want, and then
+to collect ALL such definitions across the entire project to automatically
+create a GLOSSARY page or section, which can link back to the places where these
+definitions reside. This lets users freely define things wherever they like.
+
+It's almost like embedding Wiktionary entries into Wikipedia articles. There
+will probably need to be some sort of classification system though, so that
+certain categories of definitions can be (optionally) separated from each other.
+
+Maybe something like:
+
+  - term (word or phrase) :: [CSV of, certain, tags] definition
+
+  - another term :: definition (no tags in this one)
+
+To reduce verbosity we can allow the setting of tags for all items in the
+definition list, like this:
+
+#+begin_src org
+,#+dl_tags_csv: foo, bar, baz
+
+  - term :: this has the tags foo, bar, and baz applied to it
+#+end_src
+
+If we want to minimize changes to the parser, we can just say that the
+~dl_tags_csv~ property is something that is set at the heading level. Either as
+metadata or in the properties drawer. And then all lists inside it can inherit
+these tags. So we can set it once at the top level of the doc, even.
+
+Hmm, Org already allows FILETAGS or similar. We could just reuse that one also.
+
+**** TODO allow glossary generation
+
+Something like
+
+  - ~#+print_glossary: global~ to print all definitions found in the objects in
+    the archive
+
+  - ~#+print_glossary: local~ to only print definitions (again) found in the
+    current document (object).
+
+  - ~#+print_glossary: tags=foo,bar~ only print definitions that match these tags.
+    E.g. ~#+print_glossary: tags=noun~ only prints definitions that are for nouns.
+
+*** TODO write user guide
+
+The problem with most of the existing docs are that they are geared toward
+programmers. We need something for regular Orgmode users who may not be
+programmers, and who don't really care about how Lilac is implemented.
+
+**** TODO explain project motivation, and differences with vanilla Org
+
+#+begin_quote
+The other problem with Org is that the syntax highlighting of code blocks
+only works properly if you are exporting to HTML interactively. If you use Emacs
+in batch mode (non-interactively), the syntax highlighting won't work.
+
+Yet another problem is that tangling doesn't work very well with =#+include=
+statements; that is, if you use =#+include= you must tangle each included file
+separately from the main one.
+
+LV2 is designed to fix these shortcomings, while still maintaining Orgmode
+syntax; this way users can edit Org files in Emacs and still enjoy most of the
+benefits of using Org interactively for day-to-day writing.
+#+end_quote
+
+Compare features against the table in the README of
+https://github.com/tecosaur/Org.jl.
+
+*** TODO add diagram of strongly-connected-components and self-loops
+See CLRS page 616 which shows a graph that has a self loop and
+strongly-connected-components.
+
+*** TODO create release-notes.org
+
+We have to have a simple document which summarizes the changes going into a
+release. We should get into the habit of writing out entries for this ahead of a
+release (so that we don't do it all at once, but piecemeal as each thing is finished).
+
+**** TODO define versioning semantics
+
+Maybe just copy what Linux does and create a new major version once the minor
+version gets too big (20s or 30s).
+
+**** TODO codify rules about weaving and releasing
+
+We should probably co-locate woven HTML with the rest of the code, for
+simplicity during hosting (that way the HTML can link to raw tangled code, and
+those links will automatically just work).
+
+We should only generate docs as part of a release version. This way we avoid
+churn while we mess around with merges and such of Org files (in particular we
+will avoid conflicts that will arise in the HTML which auto-numbers things
+sequentially, for example). This implies some sort of structured release process
+like in the Git project (~main~ should only be advanced to catch up to ~next~, for example).
+
+*** TODO inject JS file into ~lilac~ binary
+
+This file needs to be generated (written to disk) as part of the ~lilac weave~
+command. This means injecting the contents of ~lilac.prod.js~ into the binary,
+using the [[https://hackage.haskell.org/package/file-embed-0.0.16.0/docs/Data-FileEmbed.html][file-embed]] library.
+
+We really only need to do this just before the public release of Lilac, because
+we don't need it during development of Lilac itself. We should probably need a
+~--skip-js-generation~ flag, which would skip JS generation when we're working on
+Lilac to weave itself during Lilac development.
+
+* Backlog
+:PROPERTIES:
+:ID:       b27d3e53-ada2-4f9e-9f38-18e9252b8229
+:END:
+
+Ideally the backlog would use something like a Story Map to encode both time and
+priority as two separate dimensions. However we just have a flat list of items
+for now because we don't have a good way of representing story maps.
+
+** TODO make table heading sticky (stay put if scrolling, like Wikipedia's tables)
+
+E.g. https://en.wikipedia.org/wiki/Geometric_Shapes_(Unicode_block)#cite_ref-final_11-0
+
+** TODO add html-tidy as a linter
+
+** TODO blocks: show ancestry (parent(s), children)
+
+This could be a dropdown or popup, where we show how it's used in relation to
+other blocks.
+
+** TODO keyboard-driven navigation
+
+Cell-wise movement (j/k for next/prev cell, h/l to expand/close tree).
+
+** TODO support intra-block links
+
+There were a few times when we wanted this, so support it.
+
+#+begin_src emacs-lisp
+  (save-excursion              ;   (ref:sc)
+     (goto-char (point-min))   ;   (ref:jump)
+#+end_src
+
+#+begin_src org
+In [[(sc)]] we remember the current position. [[(jump)]] jumps to point-min.
+#+end_src
+
+** TODO fail parse if any block header starts with a double underscore
+Such headers are reserved by Lilac.
+
+** TODO (Git integration) add raw git links
+If there is text like 68541ad (capture unhandled edge case for parsing styled
+text, 2025-01-26) (hash, parenthetical with a YYYY-MM-DD date at the end),
+convert it to a link. You'd need to have a "default Git repo" setting somewhere,
+probably in the doc metadata, and Lilac would have to learn how to read out this
+information locally using Git CLI or something else.
+
+This may be avoided if we can just copy out the Org-formatted info directly out
+of =tig= where we get this info. Then we can just paste out of =tig= directly into
+here (with the right link that points to GitHub for example), and we're fine.
+The only downside with this is if we change Git hosting providers, in which case
+our existing links would point to the wrong (older) provider.
+
+** TODO "raw" or "copy-editor" view of code cells
+
+This could be a widget where we show the exact view of the raw UTF-8 used to
+write the cell. We could add subtle bits for representing spaces, newlines, and
+others (maybe even a Unicode codepoint view, similar to how you can describe the
+character underneath point in Emacs).
+
+* Icebox
+:PROPERTIES:
+:ID:       dcfbeff2-5a2e-4a84-bdb7-dae80e867838
+:END:
+
+** TODO track time-sensitive things with invisible timestamps only the compiler can see?
+
+Sort of like citations, but, imagine if we link to something (e.g., a version of
+software in 2025). And then we want to check if that's still accurate. We need
+some way of knowing what info (from an external source) may be out of date.
+
+We need some hidden way of saying "please remember a special TIMESTAMP" and then
+have the compiler spew warnings if the "freshness" has not been renewed.
+Basically the idea of document "freshness", but more granular. Instead of doc
+freshness, we could check for freshness of specific parts. So any phrase like
+"as of YYYY" could be earmarked for checking.
+
+We could use a special link with a timestamp, like this:
+
+#+begin_example
+[lilac_freshness_expiry:<TIMESTAMP>]
+#+end_example
+
+Aside: we probably don't need document freshness because it's a bit moot in the
+world of literate programming where the doc itself requires updates to it (you
+can't just update code alone without updating docs with literate programming).
+
+** TODO Orgmode formatter
+
+If we can "render" an OrgDoc back out to Text, we can format it. What we need is
+a way to also track comments though, so that comments are preserved in the
+formatting process. So we can't use lexeme any more and we need to manually
+parse comments and also skip whitespace between every cell.
+
+This doesn't seem too difficult to do... One ugly thing though is how to do line
+wrapping...
+
+** TODO allow some kind of inline "commentary" system
+
+Allow writing comments that refer to the previous cell. And then display the
+comment for the cell on hover, for example.
+
+** TODO tangle/detangle interop
+There are several ways to understand the relationship between Org and tangled
+files:
+
+  - add special comments in the tangled text (this is what Org can do and
+    presumably Orgmode can already understand how to detangle (jump to the right
+    Org block) using such special comments)
+
+  - add LINE and COLUMN pragmas (or ~#line~ directives) in the target language, if
+    it supports such pragmas
+
+  - do a fresh parse of Org, then ask "where does this tangled line come from?"
+
+The last option is the most compute-intensive, but also the least messy. This is
+because the first two options result in peppering the tangled output with lots
+of custom line numbers, which can all change completely if we modify a single
+line near the beginning of the Org file.
+
+How about a special commenting style that is removed from line numbers? For
+example we could add comments saying "BEGIN f:foo" and "END f:foo" to say that
+the text belongs to a particular named block. Then we can easily just search for
+that block name. We don't have to worry about line numbers either.
+
+The problem with the above is we have to litter our source code output with such
+generated, mechanical noise. Instead, we should have a separate ~.loc~ file
+("Location file") or similar which encodes this information for us when we
+tangle. Then the tool we use can just read this info when interpreting line
+number information from compiler errors.
+
+The ~.loc~ file is what the JS world does with their "source maps". It's an
+external file that knows how to map a JS file into another file (the original
+file).
+
+Our ~tangle-loop.sh~ can use ~sed~ to just replace the line number info with what we
+find in ~.loc~. And then we can keep this stuff removed (outside of) source
+control.
+
+*** Chicken-egg issues
+
+When developing Lilac, we should be able to tangle ourselves (build shouldn't be
+broken). Then if we introduce some error so the build breaks, we should still be
+able to generate the correct ~.loc~ file with the first ~tangle()~ invocation. Then
+on the second invocation of ~tangle()~ we will be unable to build ourselves. In
+this broken state, it's important to be able to interpret the ~.loc~ file with a
+tool that is not native to Lilac (the understanding is that Lilac is broken). So
+we have to design the ~.loc~ file in such a way that any rudimentary (such as
+~Bash~) tool can understand it.
+
+*** Reference
+
+Noweb just uses a flag to set this for the source language. See https://man.cx/notangle(1).
+
+See https://github.com/ghc/ghc/blob/master/utils/unlit/unlit.c for GHC/Haskell
+which claims the CPP understands line pragmas.
+
+Compare with https://zyedidia.github.io/literate/manual.html. There it appears
+they support either injecting line number directives or pragmas as above, but
+also support understanding the compiler errors when they are fed into the =lit=
+program which can perform substitutions of those line numbers on the fly(?).
+
+In Haskell there is both a LINE and COLUMN pragma. See
+https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/pragmas.html#line-pragma.
+
+See https://gcc.gnu.org/onlinedocs/cpp/Line-Control.html for GCC and C.
+
+For an example, see: https://learn.microsoft.com/en-us/cpp/preprocessor/hash-line-directive-c-cpp?view=msvc-170
+
+** TODO blocks: teach "pad-consecutive-noweb" (?) boolean metadata
+Allow users to disable automatic padding per-block.
+
+** TODO doc: teach "pad-consecutive-noweb" (?) boolean metadata
+Allow users to set document-wide default for disabling automatic padding (which
+can be overridden at the block level)

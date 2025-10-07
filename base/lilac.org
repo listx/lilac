@@ -136,6 +136,11 @@ project are described below:
   - [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][=base/fe.org=]] :: Describes the frontend framework for making the HTML page
     interactive (beyond just HTML/CSS).
 
+There is also the ~artifacts~ folder which has additional documentation
+surrounding the Lilac project, not just how it's implemented.
+
+  - [[id:48e76342-2498-44c5-9ed9-830cb80995fd][=base/artifacts/plan.org=]] :: Explains where we're headed as a project.
+
 *** Literate programming and Noweb
 
 This is a literate document, so prose explanations are mixed in with code.
@@ -910,7 +915,8 @@ org_files = \
 	base/tangle.org \
 	base/types.org \
 	base/weave.org \
-	base/fe.org
+	base/fe.org \
+	base/artifacts/plan.org
 backend_org_files = $(filter-out base/fe.org,$(org_files))
 #+end_src
 
@@ -1232,7 +1238,8 @@ main()
 		"${SCRIPT_ROOT}/base/tangle.org" \
 		"${SCRIPT_ROOT}/base/types.org" \
 		"${SCRIPT_ROOT}/base/weave.org" \
-		"${SCRIPT_ROOT}/base/fe.org"
+		"${SCRIPT_ROOT}/base/fe.org" \
+		"${SCRIPT_ROOT}/base/artifacts/plan.org"
 }
 
 main "$@"
@@ -1850,6 +1857,7 @@ by default. We expect this list to grow over time.
 #+begin_src txt
 [Bb]acklinks
 [Ff]igwheel
+[Gg]it
 [Nn]oweb
 [Uu]nmarshaling
 autogenerate
@@ -1863,6 +1871,7 @@ canonicalize
 canonicalized
 Citeproc
 classpath
+codepoint
 combinator
 combinators
 declaratively
@@ -1871,17 +1880,18 @@ dedented
 Dependabot
 dereference
 dereferenced
+detangle
 Direnv
 Elisp
 formatter
 formatters
 GHC
-Git
 Hackage
 hardcode
 hardcoded
 hashmap
 Hspec
+interop
 Lucid's
 Makefile
 Makefiles
@@ -1904,6 +1914,8 @@ PDF
 PDFs
 pilcrow
 plaintext
+pragma
+pragmas
 prepend
 prepended
 prepending
@@ -1925,9 +1937,12 @@ subcommands
 subgraph
 substring
 substrings
+TODOs
 toolchain
 typeclass
+viewport
 weavable
+Wiktionary
 #+end_src
 
 *** Sort file contents
