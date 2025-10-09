@@ -45,8 +45,7 @@ import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
 import Network.URI qualified as N
 import Relude
-  ( Bool (True),
-    Either (Left, Right),
+  ( Either (Left, Right),
     FilePath,
     IO,
     Maybe (Just, Nothing),
