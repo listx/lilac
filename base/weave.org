@@ -281,6 +281,7 @@ import Lilac.Types
       ( archive,
         citeprocResult,
         originObjectPath,
+        outDir,
         projectConf
       ),
     cellIdxToName,
@@ -459,6 +460,8 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveMathFragmentInline>>
 <<f:weaveTable>>
 <<f:getRelativePathWithoutSymlinks>>
+<<f:getRelativeCssPath>>
+<<f:getRelativeJsPath>>
 <<f:weaveFootnote>>
 <<f:commonPrefix>>
 <<f:renderAsText>>
@@ -507,6 +510,7 @@ data WeaveConf = WeaveConf
   { projectConf :: ProjectConf,
     archive :: Archive,
     originObjectPath :: GPath,
+    outDir :: GPath,
     citeprocResult :: CP.Result Prose
   }
 #+end_src
@@ -648,7 +652,8 @@ from Google Fonts.
 
 #+name: Styles and fonts
 #+begin_src haskell
-link_ [rel_ "stylesheet", href_ "./css/default.css"]
+relativeCssPath <- getRelativeCssPath
+link_ [rel_ "stylesheet", href_ relativeCssPath]
 link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
 link_
   [ rel_ "preconnect",
@@ -664,6 +669,27 @@ let fontsLink =
           "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
         ]
 link_ [rel_ "stylesheet", href_ fontsLink]
+#+end_src
+
+[[f:getRelativeCssPath]] gets the relative path to the CSS file (relative from the
+current document location).
+
+#+name: f:getRelativeCssPath
+#+begin_src haskell
+getRelativeCssPath :: HtmlWeaver Text
+getRelativeCssPath = do
+  weaveConf <- ask
+  let result :: Maybe String
+      result = do
+        objPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath
+        out <- P.encodeUtf $ decodeGPath weaveConf.outDir
+        cssDir <- P.encodeUtf "css"
+        css <- P.encodeUtf "default.css"
+        let cssPath = P.joinPath [out, cssDir, css]
+            relativeCssPath = getRelativePathWithoutSymlinks objPath cssPath
+        final <- P.decodeUtf relativeCssPath
+        pure final
+  pure . T.pack $ fromMaybe "css/default.css" result
 #+end_src
 
 *** MathJax
@@ -734,11 +760,33 @@ to import this into every page.
 
 #+name: ClojureScript frontend script
 #+begin_src haskell
+relativeJsPath <- getRelativeJsPath
 script_
   [ id_ "lilac-fe-script",
-    src_ "lilac.js"
+    src_ relativeJsPath
   ]
   ("" :: Text)
+#+end_src
+
+[[f:getRelativeJsPath]] gets the path to the JS script we compile (from [[id:783de6bf-e36b-4c9e-a405-2a86d0897795][Build
+configuration file]]), relative to the object being woven; also see
+[[f:getRelativeCssPath]] which this function is based on (and quite similar to).
+
+#+name: f:getRelativeJsPath
+#+begin_src haskell
+getRelativeJsPath :: HtmlWeaver Text
+getRelativeJsPath = do
+  weaveConf <- ask
+  let result :: Maybe String
+      result = do
+        objPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath
+        out <- P.encodeUtf $ decodeGPath weaveConf.outDir
+        js <- P.encodeUtf "lilac.js"
+        let cssPath = P.joinPath [out, js]
+            relativeCssPath = getRelativePathWithoutSymlinks objPath cssPath
+        final <- P.decodeUtf relativeCssPath
+        pure final
+  pure . T.pack $ fromMaybe "lilac.js" result
 #+end_src
 
 ** Unique names
@@ -3337,6 +3385,7 @@ import Lilac.Types
         archive,
         citeprocResult,
         originObjectPath,
+        outDir,
         projectConf
       ),
     defaultOrgParserState,
@@ -3429,6 +3478,7 @@ getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
 getWovenPrettyFromPath path = do
   inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
+  outDir <- encodeGPath "test/Lilac/WeaveSpec/"
   let parseResult =
         MP.runParser
           (runStateT LP.orgDocParser defaultOrgParserState)
@@ -3455,6 +3505,7 @@ getWovenPrettyFromPath path = do
                   { projectConf = projectConf,
                     archive = archive,
                     originObjectPath = inputOrgFileGPath,
+                    outDir = outDir,
                     citeprocResult = result
                   }
           pure

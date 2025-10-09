@@ -126,6 +126,7 @@ import Lilac.Types
       ( archive,
         citeprocResult,
         originObjectPath,
+        outDir,
         projectConf
       ),
     cellIdxToName,
@@ -293,7 +294,8 @@ weaveObject object = do
     head_ $ do
       meta_ [charset_ "utf-8"]
       title_ title'
-      link_ [rel_ "stylesheet", href_ "./css/default.css"]
+      relativeCssPath <- getRelativeCssPath
+      link_ [rel_ "stylesheet", href_ relativeCssPath]
       link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
       link_
         [ rel_ "preconnect",
@@ -332,9 +334,10 @@ weaveObject object = do
         ]
         ("" :: Text)
 
+      relativeJsPath <- getRelativeJsPath
       script_
         [ id_ "lilac-fe-script",
-          src_ "lilac.js"
+          src_ relativeJsPath
         ]
         ("" :: Text)
     body_ $ do
@@ -866,6 +869,35 @@ getRelativePathWithoutSymlinks src dest
     commonPathPrefix = commonPrefix dirsSrc dirsDest
     isDestChildOfSrc = dirsSrc == commonPathPrefix
     remainingDest = drop (length commonPathPrefix) dirsDest
+
+getRelativeCssPath :: HtmlWeaver Text
+getRelativeCssPath = do
+  weaveConf <- ask
+  let result :: Maybe String
+      result = do
+        objPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath
+        out <- P.encodeUtf $ decodeGPath weaveConf.outDir
+        cssDir <- P.encodeUtf "css"
+        css <- P.encodeUtf "default.css"
+        let cssPath = P.joinPath [out, cssDir, css]
+            relativeCssPath = getRelativePathWithoutSymlinks objPath cssPath
+        final <- P.decodeUtf relativeCssPath
+        pure final
+  pure . T.pack $ fromMaybe "css/default.css" result
+
+getRelativeJsPath :: HtmlWeaver Text
+getRelativeJsPath = do
+  weaveConf <- ask
+  let result :: Maybe String
+      result = do
+        objPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath
+        out <- P.encodeUtf $ decodeGPath weaveConf.outDir
+        js <- P.encodeUtf "lilac.js"
+        let cssPath = P.joinPath [out, js]
+            relativeCssPath = getRelativePathWithoutSymlinks objPath cssPath
+        final <- P.decodeUtf relativeCssPath
+        pure final
+  pure . T.pack $ fromMaybe "lilac.js" result
 
 weaveFootnote :: Int -> Footnote -> HtmlWeaver ()
 weaveFootnote cellIdx footnote = do

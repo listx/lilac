@@ -16,6 +16,7 @@ import Lilac.Types
         archive,
         citeprocResult,
         originObjectPath,
+        outDir,
         projectConf
       ),
     decodeGPath,
@@ -433,7 +434,7 @@ lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
   projectConf <- readProjectConf
   writeCssFile
-  mapM_ (weaveArchiveFile projectConf) $ weaveOpts.inputs
+  mapM_ (weaveArchiveFile projectConf weaveOpts.outDir) $ weaveOpts.inputs
   where
     readProjectConf = do
       input <- LU.readFileRobustly weaveOpts.projectConf
@@ -446,28 +447,30 @@ lilacWeave weaveOpts = do
         css <- P.encodeUtf "default.css"
         pure $ P.joinPath [weaveOpts.outDir, cssDir, css]
       LU.writeFileRobustly cssPath $ LWC.genCss
-    weaveArchiveFile projectConf inputPath = do
+    weaveArchiveFile projectConf outDir inputPath = do
       text <- LU.readFileRobustly inputPath
       case eitherDecodeStrictText text :: Either String Archive of
         Left errMsg -> die errMsg
         Right archive -> do
           fp <- P.decodeUtf inputPath
+          outDir' <- encodeGPath =<< P.decodeUtf outDir
           putStrLn $ "Weaving " <> fp
           sequence_
             $ M.foldlWithKey'
-              (weaveToDisk projectConf archive)
+              (weaveToDisk projectConf outDir' archive)
               []
               archive.objects
           putStrLn "Finished weaving."
 
 weaveToDisk ::
   ProjectConf ->
+  GPath ->
   Archive ->
   [IO ()] ->
   GPath ->
   Object ->
   [IO ()]
-weaveToDisk projectConf archive acc objPath obj =
+weaveToDisk projectConf outDir archive acc objPath obj =
   let fp = decodeGPath objPath
       ext = P.unsafeEncodeUtf "html"
       outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
@@ -478,6 +481,7 @@ weaveToDisk projectConf archive acc objPath obj =
                 { projectConf = projectConf,
                   archive = archive,
                   originObjectPath = objPath,
+                  outDir = outDir,
                   citeprocResult = result
                 }
         LU.writeFileRobustly outPath
