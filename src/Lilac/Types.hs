@@ -627,7 +627,7 @@ cellIdxToObjCell archive globalCellIdx
   | otherwise = Nothing
 
 cellIdxToName :: Archive -> Int -> Int -> Maybe Prose
-cellIdxToName archive globalCellIdx offset
+cellIdxToName archive offset globalCellIdx
   | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
       case cell of
         CHeading heading ->

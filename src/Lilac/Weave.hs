@@ -39,6 +39,7 @@ import Data.Aeson (eitherDecodeStrictText)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Graph qualified as G
 import Data.IntMap.Strict qualified as IntMap
+import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
@@ -219,6 +220,7 @@ import Relude
     any,
     ask,
     catMaybes,
+    comparing,
     concat,
     concatMap,
     drop,
@@ -243,9 +245,11 @@ import Relude
     maybeAt,
     maybeToList,
     mempty,
+    negate,
     not,
     notElem,
     null,
+    on,
     otherwise,
     pure,
     replicate,
@@ -255,6 +259,7 @@ import Relude
     show,
     snd,
     sort,
+    sortBy,
     sortOn,
     take,
     takeWhile,
@@ -646,13 +651,13 @@ weaveLinkTarget linkTarget = do
         Just _ <- lookup linkOid originObj.symbols,
         Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
         Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx ->
-          "#" <> getLinkAnchor (Just globalCellIdx) internalCell
+          "#" <> getLinkAnchor Nothing internalCell
       | Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
         Just (_, externalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx,
         Just (_, externalObjGPath) <- IntMap.lookupLE globalCellIdx weaveConf.archive.offsets ->
           (getExternalRelPath externalObjGPath weaveConf.originObjectPath)
             <> "#"
-            <> getLinkAnchor (Just globalCellIdx) externalCell
+            <> getLinkAnchor Nothing externalCell
       | otherwise -> showBrokenLink
       where
         showBrokenLink = "#LILAC_BROKEN_LINK-" <> show linkOid
@@ -1347,11 +1352,11 @@ weaveBacklinks = do
           let sorted =
                 sortOn (\(_, links) -> -(length links))
                   $ toPairs backlinksByPath
-          sequence_ $ map (weaveBacklink weaveConf) sorted
+          sequence_ $ map (weaveBacklinksForExternalObj weaveConf) sorted
   where
-    weaveBacklink :: WeaveConf -> (GPath, [G.Edge]) -> HtmlWeaver ()
-    weaveBacklink _ (_, []) = toHtmlRaw @Text ""
-    weaveBacklink weaveConf (externalObjGPath, edges) = do
+    weaveBacklinksForExternalObj :: WeaveConf -> (GPath, [G.Edge]) -> HtmlWeaver ()
+    weaveBacklinksForExternalObj _ (_, []) = toHtmlRaw @Text ""
+    weaveBacklinksForExternalObj weaveConf (externalObjGPath, edges) = do
       let (externalOrgDocName, externalOrgDocHref)
             | Just toObjPath <-
                 P.encodeUtf $ decodeGPath externalObjGPath,
@@ -1370,7 +1375,27 @@ weaveBacklinks = do
                 (externalOrgDocName', T.pack href)
             | otherwise = ("???", "")
           weight = T.show $ length edges
-          f (externalIdx, internalIdx)
+          f :: ([Int], Int) -> HtmlWeaver ()
+          f ([], _) = pure ()
+          f (externalIdxs@(externalIdx : _), internalIdx) = do
+            let (internalLinkAnchor, internalName) =
+                  (getInternalLinkAnchor internalIdx, getInternalName internalIdx)
+            li_ [] $ do
+              if (length externalIdxs > 1)
+                then do
+                  a_ [href_ internalLinkAnchor] $ do
+                    weaveProse [] internalName
+                    toHtml @Text $ " (" <> (T.show $ length externalIdxs) <> ")"
+                  ol_ [] $ do
+                    sequence_ $ map (linkToExternalCell True) externalIdxs
+                else do
+                  a_ [href_ internalLinkAnchor] $ do
+                    weaveProse [] internalName
+                  span_ [class_ "verbatim"] $ do
+                    toHtmlRaw @Text " &#x2190; "
+                  linkToExternalCell False externalIdx
+          linkToExternalCell :: Bool -> Int -> HtmlWeaver ()
+          linkToExternalCell asListItem externalIdx
             | Just (_, externalCell) <-
                 cellIdxToObjCell weaveConf.archive externalIdx,
               Just (offset, _) <-
@@ -1388,33 +1413,44 @@ weaveBacklinks = do
                       T.pack str
                         <> "#"
                         <> (getLinkAnchor (Just externalCellIdx) externalCell)
-                    internalLinkAnchor
-                      | Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive internalIdx =
-                          "#" <> (getLinkAnchor (Just internalCellIdx) internalCell)
-                      | internalIdx < 0 = "#top"
-                      | otherwise = "#LINK_ERROR"
-                    noName = Prose [PTokenStyledText $ StyledText {body = "???", style = styleMaskFrom []}]
-                    externalName = fromMaybe noName $ cellIdxToName weaveConf.archive externalIdx offset
-                    internalName
-                      | Just name <- cellIdxToName weaveConf.archive internalIdx offset =
-                          name
-                      | internalIdx < 0 = Prose [PTokenStyledText $ StyledText {body = "^ Top", style = styleMaskFrom []}]
-                      | otherwise = noName
+                    externalName = fromMaybe noName $ cellIdxToName weaveConf.archive offset externalIdx
                     externalCellIdx = externalIdx - offset
-                    internalCellIdx = internalIdx - offset
-                li_ [] $ do
-                  a_ [href_ externalLinkAnchor] $ do
-                    weaveProse [] externalName
-                  span_ [class_ "verbatim"] $ do
-                    toHtmlRaw @Text " &#x2192; "
-                  a_ [href_ internalLinkAnchor] $ do
-                    weaveProse [] internalName
+                    externalLink =
+                      a_ [href_ externalLinkAnchor] $ do
+                        weaveProse [] externalName
+                if asListItem
+                  then li_ [] $ externalLink
+                  else externalLink
             | otherwise = pure ()
+          getInternalLinkAnchor internalIdx
+            | Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive internalIdx =
+                "#" <> (getLinkAnchor Nothing internalCell)
+            | internalIdx < 0 = "#top"
+            | otherwise = "#LINK_ERROR"
+          getInternalName internalIdx
+            | Just name <- cellIdxToName weaveConf.archive 0 internalIdx =
+                name
+            | internalIdx < 0 = Prose [PTokenStyledText $ StyledText {body = "^ Top", style = styleMaskFrom []}]
+            | otherwise = noName
+          noName = Prose [PTokenStyledText $ StyledText {body = "???", style = styleMaskFrom []}]
+          groupedByTarget :: [G.Edge] -> [([Int], Int)]
+          groupedByTarget =
+            let coalesce :: [(Int, Int)] -> [([Int], Int)]
+                coalesce [] = []
+                coalesce group@((_, target) : _) =
+                  [(reverse $ map fst group, target)]
+             in sortBy
+                  ( comparing (negate . length . fst)
+                      <> comparing (cellIdxToName weaveConf.archive 0 . snd)
+                  )
+                  . concatMap coalesce
+                  . groupBy ((==) `on` snd)
+                  . sortOn snd
       li_ [] $ do
         a_ [href_ externalOrgDocHref] $ do
           toHtml $ T.pack externalOrgDocName <> " (" <> weight <> ")"
         ol_ [] $ do
-          forM_ (sort edges) f
+          forM_ (groupedByTarget edges) f
 
 weaveNamedCellsIndex :: HtmlWeaver ()
 weaveNamedCellsIndex = do

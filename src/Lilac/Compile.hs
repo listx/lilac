@@ -188,7 +188,9 @@ mkArchive pathObjs = do
   let (objects, symbolsWithoutTopLevelUUIDs) =
         foldl' concatObjs (mempty, mempty) offsetsFull
       symbols = topLevelUUIDs <> symbolsWithoutTopLevelUUIDs
-      backlinks = mkBacklinks $ foldl' (finalizeEdges symbols) [] offsetsFull
+      backlinks =
+        mkBacklinks pathObjs offsets
+          $ foldl' (finalizeEdges symbols) [] offsetsFull
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
     concat
@@ -235,6 +237,7 @@ mkArchive pathObjs = do
     offsets =
       IntMap.fromList
         $ map (\(offset, (path, _obj)) -> (offset, path)) offsetsFull
+    offsetsFull :: [(Int, (GPath, Object))]
     offsetsFull =
       cumulativeOffsets
         . filter (\(numCells, _) -> numCells > 0)
@@ -248,30 +251,6 @@ mkArchive pathObjs = do
       ( insert path obj accObjs,
         (M.map (+ offset) obj.symbols) <> accSyms
       )
-    finalizeEdges ::
-      Map LinkOid Int ->
-      [G.Edge] ->
-      (Int, (GPath, Object)) ->
-      [G.Edge]
-    finalizeEdges syms acc (offset, (_, obj)) =
-      let f (PseudoEdge (localCellIdx, linkOid)) = case lookup linkOid syms of
-            Nothing -> Nothing
-            Just targetCellIdx -> Just (localCellIdx + offset, targetCellIdx)
-       in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
-    mkBacklinks :: [G.Edge] -> Map GPath (Map GPath [G.Edge])
-    mkBacklinks symbolEdges =
-      let f acc (from, to)
-            | Just (_, fromPath) <- IntMap.lookupLE from offsets,
-              Just (_, toPath) <- IntMap.lookupLE to offsets,
-              fromPath /= toPath =
-                M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-            | Just (_, fromPath) <- IntMap.lookupLE from offsets,
-              to < 0,
-              Just toPath <- (sort $ map fst pathObjs) !!? (abs to - 1),
-              fromPath /= toPath =
-                M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-            | otherwise = acc
-       in M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
     findBrokenLinks ::
       Map GPath Object ->
       Map LinkOid Int ->
@@ -296,6 +275,36 @@ mkArchive pathObjs = do
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
+
+finalizeEdges ::
+  Map LinkOid Int ->
+  [G.Edge] ->
+  (Int, (GPath, Object)) ->
+  [G.Edge]
+finalizeEdges syms acc (offset, (_, obj)) =
+  let f (PseudoEdge (localCellIdx, linkOid)) = case lookup linkOid syms of
+        Nothing -> Nothing
+        Just targetCellIdx -> Just (localCellIdx + offset, targetCellIdx)
+   in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
+
+mkBacklinks ::
+  [(GPath, Object)] ->
+  IntMap GPath ->
+  [G.Edge] ->
+  Map GPath (Map GPath [G.Edge])
+mkBacklinks pathObjs offsets symbolEdges =
+  let f acc (from, to)
+        | Just (_, fromPath) <- IntMap.lookupLE from offsets,
+          Just (_, toPath) <- IntMap.lookupLE to offsets,
+          fromPath /= toPath =
+            M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+        | Just (_, fromPath) <- IntMap.lookupLE from offsets,
+          to < 0,
+          Just toPath <- (sort $ map fst pathObjs) !!? (abs to - 1),
+          fromPath /= toPath =
+            M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+        | otherwise = acc
+   in M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
 
 readObjectsFrom :: FilePath -> [FilePath] -> IO [(GPath, Object)]
 readObjectsFrom parentDir = foldlM f []

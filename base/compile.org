@@ -143,6 +143,8 @@ import System.OsPath qualified as P
 <<f:mkObject>>
 <<f:mkSymbols>>
 <<f:mkArchive>>
+<<f:finalizeEdges>>
+<<f:mkBacklinks>>
 <<f:readObjectsFrom>>
 <<f:buildGraph>>
 <<f:findCycles>>
@@ -656,7 +658,10 @@ The other fields in [[data:Archive]] are based on the ~objects~:
     during weaving.
 
   - The ~offsets~ is the offset of each object's cells, in relation to the global
-    list of all cells in the archive.
+    (flattened) list of all cells in the archive. For example, if the object is
+    the first one in the list, the offset is 0. The offset grows depending on
+    how many cells each object has. So if the first object has 100 cells, the
+    offset for the second object in the list is 100.
 
 To construct the archive, [[f:mkArchive]] reads a list of paths and the objects that
 are found on those paths. The main check that is performed is to see that there
@@ -679,7 +684,9 @@ mkArchive pathObjs = do
   let (objects, symbolsWithoutTopLevelUUIDs) =
         foldl' concatObjs (mempty, mempty) offsetsFull
       symbols = topLevelUUIDs <> symbolsWithoutTopLevelUUIDs
-      backlinks = mkBacklinks $ foldl' (finalizeEdges symbols) [] offsetsFull
+      backlinks =
+        mkBacklinks pathObjs offsets
+          $ foldl' (finalizeEdges symbols) [] offsetsFull
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
     concat
@@ -726,6 +733,7 @@ mkArchive pathObjs = do
     offsets =
       IntMap.fromList
         $ map (\(offset, (path, _obj)) -> (offset, path)) offsetsFull
+    offsetsFull :: [(Int, (GPath, Object))]
     offsetsFull =
       cumulativeOffsets
         . filter (\(numCells, _) -> numCells > 0)
@@ -739,30 +747,6 @@ mkArchive pathObjs = do
       ( insert path obj accObjs,
         (M.map (+ offset) obj.symbols) <> accSyms
       )
-    finalizeEdges ::
-      Map LinkOid Int ->
-      [G.Edge] ->
-      (Int, (GPath, Object)) ->
-      [G.Edge]
-    finalizeEdges syms acc (offset, (_, obj)) =
-      let f (PseudoEdge (localCellIdx, linkOid)) = case lookup linkOid syms of
-            Nothing -> Nothing
-            Just targetCellIdx -> Just (localCellIdx + offset, targetCellIdx)
-       in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
-    mkBacklinks :: [G.Edge] -> Map GPath (Map GPath [G.Edge])
-    mkBacklinks symbolEdges =
-      let f acc (from, to)
-            | Just (_, fromPath) <- IntMap.lookupLE from offsets,
-              Just (_, toPath) <- IntMap.lookupLE to offsets,
-              fromPath /= toPath =
-                M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-            | Just (_, fromPath) <- IntMap.lookupLE from offsets,
-              to < 0,
-              Just toPath <- (sort $ map fst pathObjs) !!? (abs to - 1),
-              fromPath /= toPath =
-                M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-            | otherwise = acc
-       in M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
     findBrokenLinks ::
       Map GPath Object ->
       Map LinkOid Int ->
@@ -787,6 +771,63 @@ mkArchive pathObjs = do
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
+#+end_src
+
+[[f:finalizeEdges]] looks at each object's ~pseudoEdges~ into edges using symbols (~Map
+LinkOid Int~) and offsets. Each ~PseudoEdge~ links from the object's local cell
+index (without any offsets) into a ~LinkOid~ target. We need to perform two transformations:
+
+  1) Convert the local index into a global one, by adding the offset to it.
+
+  2) Convert the ~LinkOid~ target into a global cell index, by looking it up in
+     the global symbols (~Map LinkOid Int~).
+
+#+name: f:finalizeEdges
+#+begin_src haskell
+finalizeEdges ::
+  Map LinkOid Int ->
+  [G.Edge] ->
+  (Int, (GPath, Object)) ->
+  [G.Edge]
+finalizeEdges syms acc (offset, (_, obj)) =
+  let f (PseudoEdge (localCellIdx, linkOid)) = case lookup linkOid syms of
+        Nothing -> Nothing
+        Just targetCellIdx -> Just (localCellIdx + offset, targetCellIdx)
+   in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
+#+end_src
+
+[[f:mkBacklinks]] takes the edges which contain global cell index information for
+both the starting and ending vertices, and then transforms them into the final
+shape ~Map GPath (Map GPath [G.Edge])~:
+
+#+begin_src txt
+Map GPath (Map GPath [G.Edge])
+      |          |       |
+      |          |       `---> List of edges (source cell idx, target cell idx)
+      |          `---> Source object path
+      `----> Target object path
+#+end_src
+
+#+name: f:mkBacklinks
+#+begin_src haskell
+mkBacklinks ::
+  [(GPath, Object)] ->
+  IntMap GPath ->
+  [G.Edge] ->
+  Map GPath (Map GPath [G.Edge])
+mkBacklinks pathObjs offsets symbolEdges =
+  let f acc (from, to)
+        | Just (_, fromPath) <- IntMap.lookupLE from offsets,
+          Just (_, toPath) <- IntMap.lookupLE to offsets,
+          fromPath /= toPath =
+            M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+        | Just (_, fromPath) <- IntMap.lookupLE from offsets,
+          to < 0,
+          Just toPath <- (sort $ map fst pathObjs) !!? (abs to - 1),
+          fromPath /= toPath =
+            M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+        | otherwise = acc
+   in M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
 #+end_src
 
 The [[f:cumulativeOffsets]] takes a list of offsets (each offset inside a tuple),
@@ -841,7 +882,7 @@ that if we do ~&para;~ the ~&~ will get escaped to ~&amp;~, which would result i
 #+name: f:cellIdxToName
 #+begin_src haskell
 cellIdxToName :: Archive -> Int -> Int -> Maybe Prose
-cellIdxToName archive globalCellIdx offset
+cellIdxToName archive offset globalCellIdx
   | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
       case cell of
         CHeading heading ->
