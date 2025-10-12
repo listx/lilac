@@ -190,7 +190,7 @@ import Citeproc.CslJson
       ),
     parseCslJson,
   )
-import Data.Aeson (eitherDecodeStrictText)
+import Data.Aeson (eitherDecodeStrictText, encode)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Graph qualified as G
 import Data.IntMap.Strict qualified as IntMap
@@ -198,6 +198,7 @@ import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
+import Data.Text.Lazy.Encoding qualified as TLE
 import Lilac.Compile (makeRelativeToObjectPath, parseCitationStyle)
 import Lilac.Parse
   ( compressProse,
@@ -236,7 +237,7 @@ import Lilac.Types
     Figure (caption, link, meta),
     Footnote (body, name),
     GPath,
-    Heading (body, level),
+    Heading (body, level, section),
     Link (Link, name, target),
     LinkTarget
       ( LinkTargetFilePath,
@@ -350,6 +351,7 @@ import Lucid
     toHtml,
     toHtmlRaw,
     tr_,
+    type_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -367,6 +369,7 @@ import Relude
     IO,
     Identity,
     Int,
+    Map,
     Maybe (Just, Nothing),
     ReaderT,
     String,
@@ -430,13 +433,14 @@ import Relude
     (/=),
     (<),
     (<$>),
+    (<=),
     (<>),
     (=<<),
     (==),
     (>),
     (||),
   )
-import Relude.Extra.Map (keys, lookup, lookupDefault, toPairs)
+import Relude.Extra.Map (insert, keys, lookup, lookupDefault, toPairs)
 import Skylighting qualified as Sky
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -483,6 +487,8 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveCitation>>
 <<f:weaveBibliography>>
 <<f:weaveToc>>
+<<f:genHeadingAncestry>>
+<<f:weaveHeadingAncestry>>
 <<f:parseRawProjectConf>>
 <<f:parseProjectConf>>
 <<f:weaveNavbar>>
@@ -594,8 +600,36 @@ weaveObject object = do
     body_ $ do
       weaveNavbar
       weaveToc object.orgDoc.cells
-      weaveMain object.orgDoc
+      let cellsWithIdx = zip [0 :: Int ..] object.orgDoc.cells
+          rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
+          beforeFootnotes = takeWhile (not . isFootnote) cellsWithIdx
+          afterFootnotes =
+            dropWhile isFootnote
+              $ dropWhile (not . isFootnote) cellsWithIdx
+          sortedFootnotes =
+            sortOn (\(_, cell) -> getSortingKey cell)
+              $ takeWhile isFootnote
+              $ dropWhile (not . isFootnote) cellsWithIdx
+          getSortingKey cell
+            | (CFootnote footnote) <- cell,
+              Just n <- lookup footnote.name object.orgDoc.footnoteNumbers =
+                n
+            | otherwise = maxBound :: Int
+          isFootnote :: (Int, Cell) -> Bool
+          isFootnote (_, cell) = case cell of
+            CFootnote {} -> True
+            CBlock {}
+            CFigure {}
+            CHeading {}
+            CListItem {}
+            CMathFragment {}
+            CParagraph {}
+            CTable {}
+            CBibliography {} -> False
+      weaveMain object.orgDoc.meta rearrangedCells
       weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
+      weaveHeadingAncestry rearrangedCells
+      <<ClojureScript frontend script>>
   where
     getBlock = \case
       CBlock block -> Just block
@@ -650,7 +684,6 @@ head_ $ do
   <<Styles and fonts>>
   <<MathJax customization>>
   <<MathJax script>>
-  <<ClojureScript frontend script>>
 #+end_src
 
 *** CSS styles and fonts
@@ -917,7 +950,18 @@ getSectionNumber heading =
 Every cell has a cell index. We can use this information to give every cell a
 unique ID. This ID is not human friendly, but it's good for assigning every cell
 a numeric ID so that we can refer to them easily from code (we also assign all
-of these a class of ~cell-idx~ so that we can select them all at once).
+of these a class of ~cell-idx~ so that we can select them all at once; see
+[[f:cellIdxAttrs]]).
+
+Originally we added this code to be used for [[f:genHeadingAncestry]], but then
+realized that we actually don't need it there. To clarify, we don't need to
+attach a unique ID to every cell and then add observers to all of them; instead
+we can just group non-heading cells underneath each heading together into a
+~<div>~ to check for the intersection of that overall ~<div>~ with the viewport.
+
+This code is still here though because eventually we want to add keyboard-driven
+navigation, and for that we'll need to highlight the "current" cell, identified
+by its unique ID.
 
 #+name: f:wrapWith
 #+begin_src haskell
@@ -950,40 +994,20 @@ cellIdxAttrs cellIdx = [id_ ("c-" <> T.show cellIdx), class_ "cell-idx"]
 
 #+name: f:weaveMain
 #+begin_src haskell
-weaveMain :: OrgDoc -> HtmlWeaver ()
-weaveMain orgDoc = do
+weaveMain :: Map Text Text -> [(Int, Cell)] -> HtmlWeaver ()
+weaveMain docMeta rearrangedCells = do
   main_ $ do
-    weaveDocMeta orgDoc.meta
+    weaveDocMeta docMeta
     forM_ rearrangedCells weaveCell
     p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
-  where
-    cellsWithIdx = zip [0 :: Int ..] orgDoc.cells
-    rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
-    beforeFootnotes = takeWhile (not . isFootnote) cellsWithIdx
-    afterFootnotes =
-      dropWhile isFootnote
-        $ dropWhile (not . isFootnote) cellsWithIdx
-    sortedFootnotes =
-      sortOn (\(_, cell) -> getSortingKey cell)
-        $ takeWhile isFootnote
-        $ dropWhile (not . isFootnote) cellsWithIdx
-    getSortingKey cell
-      | (CFootnote footnote) <- cell,
-        Just n <- lookup footnote.name orgDoc.footnoteNumbers =
-          n
-      | otherwise = maxBound :: Int
-    isFootnote :: (Int, Cell) -> Bool
-    isFootnote (_, cell) = case cell of
-      CFootnote {} -> True
-      CBlock {}
-      CFigure {}
-      CHeading {}
-      CListItem {}
-      CMathFragment {}
-      CParagraph {}
-      CTable {}
-      CBibliography {} -> False
+    let isHeading = \case
+          CHeading {} -> True
+          _ -> False
+    when (any isHeading $ map snd rearrangedCells) $ toHtmlRaw @Text "</div>"
 #+end_src
+
+The closing ~</div>~ tag is for closing up any heading container ~<div>~ elements
+that were created in [[f:weaveHeading]].
 
 ** Document metadata
 
@@ -1015,10 +1039,19 @@ Headings might sound simple, but because they are made up of arbitrary text,
 it's fairly involved. The body of a heading is made up of a list of [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]]
 values. So, we have to weave each type of token separately.
 
+The heading creates and closes a ~heading-container-...~ ~<div>~ element, to
+essentially group all non-heading cells up to the next heading together. This is
+needed for [[id:c4c13ce7-23d9-49d9-8d3f-6faecf839afa][Active headings TOC indicator]]. Specifically, grouping up cells like
+this lets us easily track which parts are being viewed (and we only have to keep
+track of these ~<div>~ elements, instead of tracking each cell individually).
+
 #+name: f:weaveHeading
 #+begin_src haskell
 weaveHeading :: Int -> Heading -> HtmlWeaver ()
-weaveHeading cellIdx heading =
+weaveHeading cellIdx heading = do
+  when (heading.section /= [1]) $ toHtmlRaw @Text "</div>"
+  let containerId = "heading-container-" <> linkAnchor
+  toHtmlRaw $ "<div id=\"" <> containerId <> "\" class=\"heading-container\">"
   hN [id_ linkAnchor] $ do
     wrapWith cellIdx $ do
       a_ [href_ $ "#" <> linkAnchor] $ do
@@ -3000,6 +3033,9 @@ expectCiteprocResult
 #+end_src
 
 ** Table of Contents (TOC)
+:PROPERTIES:
+:ID:       e38fb4d1-72e1-40e0-905e-95bc8be2bf0b
+:END:
 
 The /Table of Contents/ or TOC is automatically generated and inserted into the
 left sidebar. It serves as a navigation menu of the first three levels of
@@ -3036,10 +3072,11 @@ weaveToc cells = do
         let weaveTocHeading :: HtmlWeaver ()
             weaveTocHeading = do
               toHtmlRaw ("<li class=\"toc-level-" <> show heading.level <> "\">" :: Text)
-              span_ [class_ "toc-counter"] $ do
-                toHtml sectionText
-              a_ [href_ $ "#" <> linkAnchor] $ do
-                weaveProse heading.body
+              div_ [class_ "toc-entry"] $ do
+                span_ [class_ "toc-counter"] $ do
+                  toHtml sectionText
+                a_ [href_ $ "#" <> linkAnchor] $ do
+                  weaveProse heading.body
             sectionText = getSectionNumber heading
             linkAnchor = getLinkAnchor Nothing $ CHeading heading
             action :: HtmlWeaver ()
@@ -3080,6 +3117,99 @@ heading level with ~closeHeadingLevels lastHeadingLevel~.
 
 The ~closeHeadingLevels~ helper is called again inside the ~action~ helper to close
 off heading levels when we jump from a nested heading to a less nested one.
+
+*** Heading ancestry
+:PROPERTIES:
+:ID:       4651cdd2-5f79-46e0-af4a-5344d71c7ea6
+:END:
+
+For [[id:c4c13ce7-23d9-49d9-8d3f-6faecf839afa][Active headings TOC indicator]] we want to highlight all visible headings as
+well as all of their parent headings ("ancestor" headings) in the document. We
+need to generate a "heading ancestry" map where the keys are individual
+headings, and the values are lists of other headings which are considered its
+ancestors.
+
+To be a bit more precise though, we need ancestry information for all cells, not
+just headings, because it could be the case that the viewport is not showing any
+headings, but only the paragraphs (or other non-heading cells, such as a code
+block or table) that belong to a heading. What we can do is group a heading and
+all of its non-heading children into a single ~<div>~ wrapper. Then we can just
+check for whether this wrapper is visible. So the heading ancestry should be
+available for all heading wrappers in the document, where the keys are the
+headings (and their children that the wrappers have grouped up together) and the
+values are the headings we want to highlight in the TOC as being active.
+
+In [[f:genHeadingAncestry]] we fold over all cells, but skip over any non-heading
+cell. For headings, we get the unique ID of it by calling [[f:getLinkAnchor]]. This
+is used as the map key. And whenever we detect [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][Headings]] we update the list of
+ancestor headings (also using [[f:getLinkAnchor]] to get the name), and use this as
+the basis of the map value (with a minor tweak via ~ancestorsOf~).
+
+Se update the heading ancestry as follows:
+
+  1) If the list is empty, push the current heading into the list.
+
+  2) Otherwise, compare current heading level with heading level of the first
+     element (most nested) of the list:
+
+     - If current one is higher, pop off elements until we see one that's even
+       higher and push this one.
+
+     - If they're equal, then pop off one element and push this one.
+
+     - If current one is lower, then just push into the list (no popping).
+
+#+name: f:genHeadingAncestry
+#+begin_src haskell
+genHeadingAncestry :: [Cell] -> Map Text [Text]
+genHeadingAncestry = snd . foldl' f ([], mempty)
+  where
+    f ::
+      ([Heading], Map Text [Text]) ->
+      Cell ->
+      ([Heading], Map Text [Text])
+    f ([], m) cell@(CHeading heading) =
+      let updatedAncestry = [heading]
+          key = getLinkAnchor Nothing cell
+          val = [] :: [Text]
+       in (updatedAncestry, insert key val m)
+    f (ancestry@(a : as), m) cell@(CHeading heading) =
+      let updatedAncestry
+            | heading.level < a.level =
+                heading
+                  : (dropWhile (\a' -> heading.level <= a'.level) ancestry)
+            | heading.level > a.level = heading : ancestry
+            | otherwise = heading : as
+          key = getLinkAnchor Nothing cell
+          val =
+            map
+              (getLinkAnchor Nothing . CHeading)
+              $ ancestorsOf heading ancestry
+       in (updatedAncestry, insert key val m)
+    f acc _ = acc
+    ancestorsOf :: Heading -> [Heading] -> [Heading]
+    ancestorsOf leafHeading ancestry
+      | null ancestry = []
+      | otherwise = dropWhile (\a' -> leafHeading.level <= a'.level) ancestry
+#+end_src
+
+The ~ancestorsOf~ tweak is needed because we can't use either the existing
+~ancestry~ (from the previous iteration) or the ~updatedAncestry~ as is. This is
+because ~ancestry~ is simply outdated (it may have an elaborate hierarchy that is
+not relevant to a new top-level heading), and ~updatedAncestry~ includes the
+current heading (and the current heading cannot be its own ancestor).
+
+We then convert this map into a JSON object and embed it into the document
+directly, so that the frontend code can parse and reference it.
+
+#+name: f:weaveHeadingAncestry
+#+begin_src haskell
+weaveHeadingAncestry :: [(Int, Cell)] -> HtmlWeaver ()
+weaveHeadingAncestry rearrangedCells = do
+  let headingAncestry = genHeadingAncestry $ map snd rearrangedCells
+  script_ [id_ "heading-ancestry", type_ "application/json"] $ do
+    toHtmlRaw . TLE.decodeUtf8 $ encode headingAncestry
+#+end_src
 
 ** Navigation bar
 
@@ -3836,6 +3966,7 @@ import Clay
     p,
     padding,
     paddingLeft,
+    paddingRight,
     pct,
     position,
     pre,
@@ -4110,6 +4241,16 @@ nav # ".toc" ? do
         marginLeft (rem $ -1)
         position absolute
         left (px 0)
+    div ? do
+      paddingRight $ px 8
+      paddingLeft $ px 20
+      marginLeft $ px (-20)
+      ".active" & do
+        backgroundColor colorTocActive
+        borderRight (px 4) solid colorNowebLinkFg
+        paddingRight $ px 4
+      ".active-ancestor" & do
+        backgroundColor colorTocActiveAncestor
   span # ".toc-counter" ? do
     marginRight $ rem 0.3
   borderRight (px 1) solid colorCodeBorder
@@ -4700,6 +4841,12 @@ colorNowebLinkVisitedFg = colorFrom "#7d3c98"
 
 colorNowebLinkVisitedBg :: Color
 colorNowebLinkVisitedBg = colorFrom "#f8e9ff"
+
+colorTocActive :: Color
+colorTocActive = colorFrom "#eafaff"
+
+colorTocActiveAncestor :: Color
+colorTocActiveAncestor = colorFrom "#ededed"
 #+end_src
 
 * ClojureScript frontend

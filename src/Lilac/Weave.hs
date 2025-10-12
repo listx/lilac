@@ -35,7 +35,7 @@ import Citeproc.CslJson
       ),
     parseCslJson,
   )
-import Data.Aeson (eitherDecodeStrictText)
+import Data.Aeson (eitherDecodeStrictText, encode)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Graph qualified as G
 import Data.IntMap.Strict qualified as IntMap
@@ -43,6 +43,7 @@ import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
+import Data.Text.Lazy.Encoding qualified as TLE
 import Lilac.Compile (makeRelativeToObjectPath, parseCitationStyle)
 import Lilac.Parse
   ( compressProse,
@@ -81,7 +82,7 @@ import Lilac.Types
     Figure (caption, link, meta),
     Footnote (body, name),
     GPath,
-    Heading (body, level),
+    Heading (body, level, section),
     Link (Link, name, target),
     LinkTarget
       ( LinkTargetFilePath,
@@ -195,6 +196,7 @@ import Lucid
     toHtml,
     toHtmlRaw,
     tr_,
+    type_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -212,6 +214,7 @@ import Relude
     IO,
     Identity,
     Int,
+    Map,
     Maybe (Just, Nothing),
     ReaderT,
     String,
@@ -275,13 +278,14 @@ import Relude
     (/=),
     (<),
     (<$>),
+    (<=),
     (<>),
     (=<<),
     (==),
     (>),
     (||),
   )
-import Relude.Extra.Map (keys, lookup, lookupDefault, toPairs)
+import Relude.Extra.Map (insert, keys, lookup, lookupDefault, toPairs)
 import Skylighting qualified as Sky
 import System.IO (utf8)
 import System.OsPath (OsPath)
@@ -339,18 +343,44 @@ weaveObject object = do
           src_ "https://cdn.jsdelivr.net/npm/mathjax@3.0.1/es5/tex-mml-chtml.js"
         ]
         ("" :: Text)
-
+    body_ $ do
+      weaveNavbar
+      weaveToc object.orgDoc.cells
+      let cellsWithIdx = zip [0 :: Int ..] object.orgDoc.cells
+          rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
+          beforeFootnotes = takeWhile (not . isFootnote) cellsWithIdx
+          afterFootnotes =
+            dropWhile isFootnote
+              $ dropWhile (not . isFootnote) cellsWithIdx
+          sortedFootnotes =
+            sortOn (\(_, cell) -> getSortingKey cell)
+              $ takeWhile isFootnote
+              $ dropWhile (not . isFootnote) cellsWithIdx
+          getSortingKey cell
+            | (CFootnote footnote) <- cell,
+              Just n <- lookup footnote.name object.orgDoc.footnoteNumbers =
+                n
+            | otherwise = maxBound :: Int
+          isFootnote :: (Int, Cell) -> Bool
+          isFootnote (_, cell) = case cell of
+            CFootnote {} -> True
+            CBlock {}
+            CFigure {}
+            CHeading {}
+            CListItem {}
+            CMathFragment {}
+            CParagraph {}
+            CTable {}
+            CBibliography {} -> False
+      weaveMain object.orgDoc.meta rearrangedCells
+      weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
+      weaveHeadingAncestry rearrangedCells
       relativeJsPath <- getRelativeJsPath
       script_
         [ id_ "lilac-fe-script",
           src_ relativeJsPath
         ]
         ("" :: Text)
-    body_ $ do
-      weaveNavbar
-      weaveToc object.orgDoc.cells
-      weaveMain object.orgDoc
-      weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
   where
     getBlock = \case
       CBlock block -> Just block
@@ -399,7 +429,10 @@ weaveDocMeta m = do
       Just x -> element $ toHtml x
 
 weaveHeading :: Int -> Heading -> HtmlWeaver ()
-weaveHeading cellIdx heading =
+weaveHeading cellIdx heading = do
+  when (heading.section /= [1]) $ toHtmlRaw @Text "</div>"
+  let containerId = "heading-container-" <> linkAnchor
+  toHtmlRaw $ "<div id=\"" <> containerId <> "\" class=\"heading-container\">"
   hN [id_ linkAnchor] $ do
     wrapWith cellIdx $ do
       a_ [href_ $ "#" <> linkAnchor] $ do
@@ -1163,10 +1196,11 @@ weaveToc cells = do
         let weaveTocHeading :: HtmlWeaver ()
             weaveTocHeading = do
               toHtmlRaw ("<li class=\"toc-level-" <> show heading.level <> "\">" :: Text)
-              span_ [class_ "toc-counter"] $ do
-                toHtml sectionText
-              a_ [href_ $ "#" <> linkAnchor] $ do
-                weaveProse heading.body
+              div_ [class_ "toc-entry"] $ do
+                span_ [class_ "toc-counter"] $ do
+                  toHtml sectionText
+                a_ [href_ $ "#" <> linkAnchor] $ do
+                  weaveProse heading.body
             sectionText = getSectionNumber heading
             linkAnchor = getLinkAnchor Nothing $ CHeading heading
             action :: HtmlWeaver ()
@@ -1195,6 +1229,43 @@ weaveToc cells = do
       forM_ [1 .. levelDiff] $ \_ -> do
         weaveListMarker LItemEnd
         weaveListMarker LOrderedEnd
+
+genHeadingAncestry :: [Cell] -> Map Text [Text]
+genHeadingAncestry = snd . foldl' f ([], mempty)
+  where
+    f ::
+      ([Heading], Map Text [Text]) ->
+      Cell ->
+      ([Heading], Map Text [Text])
+    f ([], m) cell@(CHeading heading) =
+      let updatedAncestry = [heading]
+          key = getLinkAnchor Nothing cell
+          val = [] :: [Text]
+       in (updatedAncestry, insert key val m)
+    f (ancestry@(a : as), m) cell@(CHeading heading) =
+      let updatedAncestry
+            | heading.level < a.level =
+                heading
+                  : (dropWhile (\a' -> heading.level <= a'.level) ancestry)
+            | heading.level > a.level = heading : ancestry
+            | otherwise = heading : as
+          key = getLinkAnchor Nothing cell
+          val =
+            map
+              (getLinkAnchor Nothing . CHeading)
+              $ ancestorsOf heading ancestry
+       in (updatedAncestry, insert key val m)
+    f acc _ = acc
+    ancestorsOf :: Heading -> [Heading] -> [Heading]
+    ancestorsOf leafHeading ancestry
+      | null ancestry = []
+      | otherwise = dropWhile (\a' -> leafHeading.level <= a'.level) ancestry
+
+weaveHeadingAncestry :: [(Int, Cell)] -> HtmlWeaver ()
+weaveHeadingAncestry rearrangedCells = do
+  let headingAncestry = genHeadingAncestry $ map snd rearrangedCells
+  script_ [id_ "heading-ancestry", type_ "application/json"] $ do
+    toHtmlRaw . TLE.decodeUtf8 $ encode headingAncestry
 
 parseRawProjectConf :: Text -> Either String RawProjectConf
 parseRawProjectConf = eitherDecodeStrictText
@@ -1288,39 +1359,16 @@ weaveFooter = do
         $ do
           toHtml @Text "Lilac"
 
-weaveMain :: OrgDoc -> HtmlWeaver ()
-weaveMain orgDoc = do
+weaveMain :: Map Text Text -> [(Int, Cell)] -> HtmlWeaver ()
+weaveMain docMeta rearrangedCells = do
   main_ $ do
-    weaveDocMeta orgDoc.meta
+    weaveDocMeta docMeta
     forM_ rearrangedCells weaveCell
     p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
-  where
-    cellsWithIdx = zip [0 :: Int ..] orgDoc.cells
-    rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
-    beforeFootnotes = takeWhile (not . isFootnote) cellsWithIdx
-    afterFootnotes =
-      dropWhile isFootnote
-        $ dropWhile (not . isFootnote) cellsWithIdx
-    sortedFootnotes =
-      sortOn (\(_, cell) -> getSortingKey cell)
-        $ takeWhile isFootnote
-        $ dropWhile (not . isFootnote) cellsWithIdx
-    getSortingKey cell
-      | (CFootnote footnote) <- cell,
-        Just n <- lookup footnote.name orgDoc.footnoteNumbers =
-          n
-      | otherwise = maxBound :: Int
-    isFootnote :: (Int, Cell) -> Bool
-    isFootnote (_, cell) = case cell of
-      CFootnote {} -> True
-      CBlock {}
-      CFigure {}
-      CHeading {}
-      CListItem {}
-      CMathFragment {}
-      CParagraph {}
-      CTable {}
-      CBibliography {} -> False
+    let isHeading = \case
+          CHeading {} -> True
+          _ -> False
+    when (any isHeading $ map snd rearrangedCells) $ toHtmlRaw @Text "</div>"
 
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do

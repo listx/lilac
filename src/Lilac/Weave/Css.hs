@@ -86,6 +86,7 @@ import Clay
     p,
     padding,
     paddingLeft,
+    paddingRight,
     pct,
     position,
     pre,
@@ -239,6 +240,16 @@ defaultCss = do
           marginLeft (rem $ -1)
           position absolute
           left (px 0)
+      div ? do
+        paddingRight $ px 8
+        paddingLeft $ px 20
+        marginLeft $ px (-20)
+        ".active" & do
+          backgroundColor colorTocActive
+          borderRight (px 4) solid colorNowebLinkFg
+          paddingRight $ px 4
+        ".active-ancestor" & do
+          backgroundColor colorTocActiveAncestor
     span # ".toc-counter" ? do
       marginRight $ rem 0.3
     borderRight (px 1) solid colorCodeBorder
@@ -604,6 +615,12 @@ colorNowebLinkVisitedFg = colorFrom "#7d3c98"
 
 colorNowebLinkVisitedBg :: Color
 colorNowebLinkVisitedBg = colorFrom "#f8e9ff"
+
+colorTocActive :: Color
+colorTocActive = colorFrom "#eafaff"
+
+colorTocActiveAncestor :: Color
+colorTocActiveAncestor = colorFrom "#ededed"
 
 type Parser :: Type -> Type
 type Parser = MP.Parsec Void Text

@@ -238,12 +238,14 @@ This is the main top-level module where we load all of our custom JS behavior.
 #+header: :tangle src/fe/lilac/core.cljs
 #+begin_src clojure
 (ns lilac.core
-  (:require [lilac.popstate-history :as history]))
+  (:require [lilac.popstate-history :as history]
+            [lilac.toc-active-entries :as tae]))
 
 (defn msg-successful-load []
   "Lilac loaded successfully.")
 
-(.addEventListener js/document "DOMContentLoaded" history/init)
+(history/init)
+(tae/init)
 (js/console.log (msg-successful-load))
 #+end_src
 
@@ -288,7 +290,229 @@ back button.
   (.addEventListener js/window "popstate" handle-popstate))
 #+end_src
 
+** Active headings TOC indicator
+:PROPERTIES:
+:ID:       c4c13ce7-23d9-49d9-8d3f-6faecf839afa
+:END:
+
+This works by checking which heading container ~<div>~ elements are visible in the
+viewport. Heading containers are created in [[id:c036cf17-0f61-4f07-bf76-bbe8b4eeb12e::f:weaveHeading][f:weaveHeading]]. Every time
+visibility changes, we update the ~visible-headings~ atom, which is a set of visible
+heading IDs. We also update the ~active~ and ~active-ancestor~ classes of
+the items in the [[id:e38fb4d1-72e1-40e0-905e-95bc8be2bf0b][Table of Contents (TOC)]]. We highlight the active heading from
+the visible heading containers, and also all of their ancestor headings by
+reading in the [[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6][Heading ancestry]] information, which is woven in as a JSON object
+in the HTML inside [[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6::f:weaveHeadingAncestry][f:weaveHeadingAncestry]].
+
+The ~init~ function has three parts:
+
+  1) Read in the heading ancestry JSON (as a native Clojure map), via
+     [[f:get-heading-ancestry]].
+
+  2) Assign [[f:update-toc-highlights]] as a callback to fire whenever the
+     ~visible-headings~ atom changes.
+
+  3) Use the browser's [[https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API][Intersection Observer API]] to watch all heading
+     containers. Make the ~update-visible-headings~ function get called (as another
+     kind of callback) any time a heading container becomes (or no longer
+     becomes) visible in the viewport. The ~update-visible-headings~ modifies the
+     ~visible-headings~ atom.
+
+#+name: ns:lilac.toc-active-entries
+#+header: :tangle src/fe/lilac/toc_active_entries.cljs
+#+begin_src clojure
+(ns lilac.toc-active-entries
+  (:require [clojure.walk :refer [keywordize-keys]]
+            [clojure.set]))
+
+(defonce visible-headings (atom #{}))
+
+<<f:get-heading-ancestry>>
+<<f:update-visible-headings>>
+<<f:update-toc-highlights>>
+<<f:maybe-scroll-toc>>
+
+(defn init []
+  (let [heading-ancestry (get-heading-ancestry)]
+
+    (add-watch visible-headings :lilac-toc-updater
+      (fn [_key atom _old-state _new-state]
+        (update-toc-highlights heading-ancestry @atom)
+        (maybe-scroll-toc @atom)))
+
+    (let [options #js {:rootMargin "0px 0px 0px 0px" :threshold 0}
+          heading-containers (.querySelectorAll js/document ".heading-container")
+          observer (new js/IntersectionObserver update-visible-headings options)]
+      (doseq [heading-container heading-containers]
+        (.observe observer heading-container)))))
+#+end_src
+
+The ~:rootMargin "0px 0px 0px 0px"~ bit just makes the viewport the thing to check
+intersections against, and the ~:threshold 0~ makes the observer sensitive to even
+just 1 pixel of intersection.
+
+Now let's look at how we get the heading ancestry from the JSON. Recall that it
+is woven into the document by [[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6::f:weaveHeadingAncestry][f:weaveHeadingAncestry]] ([[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] calls it).
+It gets woven with the ~#heading-ancestry~ ID, and so we use that to find the
+element from the DOM.
+
+#+name: f:get-heading-ancestry
+#+begin_src clojure
+(defn get-heading-ancestry []
+  (if-let [script-tag (.querySelector js/document "#heading-ancestry")]
+    (let [json-string (.-textContent script-tag)
+          js-object (.parse js/JSON json-string)]
+      (keywordize-keys (js->clj js-object)))
+    (do
+      (.error js/console "Warning: Heading ancestry data not found; using empty map.")
+      {})))
+#+end_src
+
+If we find the element, we convert the JSON map into a Clojure one. The main
+transformation is the conversion of string keys into keywords, with
+~keywordize-keys~. This makes the map lookup faster (as strings require
+character-by-character comparison).
+
+Next is [[f:update-visible-headings]] which updates the ~visible-headings~ atom
+whenever there is an intersection event created by the ~observer~ in ~init~. Because
+we observe the heading /containers/, we have to extract the heading ID that they
+contain, by dropping the first 18 characters (the ~heading-container-~ part of
+their ID; see [[id:c036cf17-0f61-4f07-bf76-bbe8b4eeb12e::f:weaveHeading][f:weaveHeading]] to see its construction).
+
+#+name: f:update-visible-headings
+#+begin_src clojure
+(defn update-visible-headings [entries]
+  (doseq [entry entries]
+    (let [heading-container-id (.. entry -target -id)
+          heading-id (subs heading-container-id 18)
+          visible? (.-isIntersecting entry)
+          modifier (if visible? conj disj)]
+      (swap! visible-headings modifier heading-id))))
+#+end_src
+
+The Intersection Observer API passes along a list of [[https://developer.mozilla.org/en-US/docs/Web/API/IntersectionObserverEntry][~IntersectionObserverEntry~]]
+objects. This object has the following properties of interest to us:
+
+  - ~target~ :: The DOM element whose intersection with the root changed.
+
+  - ~isIntersecting~ :: True if intersecting (visible in viewport), false if not.
+
+The code in [[f:update-visible-headings]] uses some special characters. The ~..~ in ~(..
+entry -target -id)~ is a threading macro, which threads the result of the
+previous operation as the /object/ for the next operation. So we start with the
+~entry~ object and then access its ~target~ property, which gives us the element
+(heading container), and then the ~id~ of that element.
+
+The ~.-~ in ~(.-isIntersecting entry)~ is for accessing the ~isIntersecting~ property
+of the ~entry~ object.
+
+#+caption: CLJS and JS interop syntax.
+| Intent          | ClojureScript syntax | JS equivalent    |
+|-----------------+----------------------+------------------|
+| Property access | ~(.-prop obj)~         | ~obj.prop~         |
+| Method call     | ~(.method obj args)~   | ~obj.method(args)~ |
+
+[[f:update-toc-highlights]] calculates ~visible-headings-with-ancestors~, which is the
+set of relevant ancestor headings for the current set of ~visible-headings~, and
+uses this to check each TOC entry. It highlights the active headings (and their
+ancestors).
+
+#+name: f:update-toc-highlights
+#+begin_src clojure
+(defn update-toc-highlights [ancestry visible-headings]
+  (let [toc-entries (.querySelectorAll js/document ".toc-entry")
+        toc-container (.querySelector js/document ".toc")
+        visible-headings-with-ancestors
+          (reduce (fn [acc id]
+                      (let [ancestors (set (get ancestry (keyword id) []))]
+                        (clojure.set/union acc ancestors)))
+            visible-headings
+            visible-headings)]
+
+    (doseq [toc-entry toc-entries]
+      (when-let [toc-entry-link (.querySelector toc-entry "a")]
+        (let [heading (subs (.-hash toc-entry-link) 1)
+              class-list (.-classList toc-entry)]
+          (cond
+            (contains? visible-headings heading)
+            (do
+              (.add class-list "active")
+              (.remove class-list "active-ancestor"))
+
+            (contains? visible-headings-with-ancestors heading)
+            (do
+              (.add class-list "active-ancestor")
+              (.remove class-list "active"))
+
+            :else
+            (do
+              (.remove class-list "active")
+              (.remove class-list "active-ancestor"))))))))
+#+end_src
+
+The ~heading (subs (.-hash toc-entry-link) 1)~ bit is for removing the initial ~#~
+part of the ID (so ~foo~ instead of ~#foo~).
+
+[[f:maybe-scroll-toc]] (potentially) scrolls the TOC so that it shows the active
+heading. We want to scroll all the way up or down if the active heading is the
+first or last TOC entry. These "all the way" conditions have to come first
+because otherwise the other two conditions, which are more general, will only do
+the minimum amount of scrolling.
+
+The other two scrolling cases are if we want to scroll up or down, depending on
+the relative position of the TOC entry and where the TOC container is located.
+We scroll up if we see that the first active TOC entry is above the TOC
+container, and more importantly, scroll to this first active TOC entry. And we
+do something similar for the opposite case (for scrolling down). These cases
+ensure that we essentially show /all/ active headings, not just the first or last
+one. For example, if we need to scroll up but only scroll to the last active TOC
+entry (and there are other entries above it), we will still leave some of these
+other active entries out of view.
+
+#+name: f:maybe-scroll-toc
+#+begin_src clojure
+(defn maybe-scroll-toc [visible-headings]
+  (let [toc-entries (.querySelectorAll js/document ".toc-entry")
+        toc-container (.querySelector js/document ".toc")
+        all-active-entries
+          (filter (fn [toc-entry]
+                    (when-let [toc-entry-link (.querySelector toc-entry "a")]
+                      (contains? visible-headings (subs (.-hash toc-entry-link) 1))))
+                  toc-entries)
+
+        first-active (first all-active-entries)
+        last-active (last all-active-entries)]
+
+    (when (seq all-active-entries)
+      (let [toc-rect (.getBoundingClientRect toc-container)
+            first-active-rect (.getBoundingClientRect first-active)
+            last-active-rect (.getBoundingClientRect last-active)]
+
+        (cond
+          (= first-active (first toc-entries))
+          (.scrollTo toc-container #js
+                     {:top 0 :behavior "instant"})
+
+          (= last-active (last toc-entries))
+          (.scrollTo toc-container #js
+                     {:top (.-scrollHeight toc-container) :behavior "instant"})
+
+          (< (.-top first-active-rect) (.-top toc-rect))
+          (.scrollIntoView first-active #js
+                           {:behavior "instant" :block "start"})
+
+          (> (.-bottom last-active-rect) (.-bottom toc-rect))
+          (.scrollIntoView last-active #js
+                           {:behavior "instant" :block "end"})
+
+          :else nil)))))
+#+end_src
+
+When ClojureScript encounters ~#js~, it converts the Clojure data structure that
+follows it into its nearest JavaScript equivalent. So for Clojure maps, it
+creates a JSON object.
+
 * Footnotes
 
 [fn:nix-clojure] As of October 2025, there is no mention of Clojure in
-https://nixos.org/manual/nixpkgs/stable/#chap-language-support.
+https://nixos.org/manual/nixpkgs/stable/#chap-language-support ([[https://github.com/NixOS/nixpkgs/tree/e30894533104c2b000292ae0e4daf0caddd55341/doc/languages-frameworks][source code]]).
