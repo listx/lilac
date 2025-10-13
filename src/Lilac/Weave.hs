@@ -140,7 +140,8 @@ import Lilac.Types
     markingCharsInvisible,
   )
 import Lucid
-  ( HtmlT,
+  ( Attributes,
+    HtmlT,
     a_,
     alt_,
     aside_,
@@ -366,13 +367,13 @@ weaveCell :: (Int, Cell) -> HtmlWeaver ()
 weaveCell (cellIdx, cell) = case cell of
   CHeading heading -> weaveHeading cellIdx heading
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
-  CParagraph prose -> p_ $ weaveProse [cellIdx] prose
-  CBlock block -> weaveBlock block
-  CMathFragment mathFragment -> weaveMathFragmentStandalone mathFragment
+  CParagraph prose -> p_ [] $ wrapWith cellIdx $ weaveProse prose
+  CBlock block -> weaveBlock cellIdx block
+  CMathFragment mathFragment -> weaveMathFragmentStandalone cellIdx mathFragment
   CFigure figure -> weaveFigure cellIdx figure
   CTable table -> weaveTable cellIdx table
   CFootnote footnote -> weaveFootnote cellIdx footnote
-  CBibliography _ -> weaveBibliography
+  CBibliography _ -> weaveBibliography cellIdx
 
 toSafeHtmlId :: Text -> Text
 toSafeHtmlId = T.map onlyKeepSomeChars
@@ -400,10 +401,11 @@ weaveDocMeta m = do
 weaveHeading :: Int -> Heading -> HtmlWeaver ()
 weaveHeading cellIdx heading =
   hN [id_ linkAnchor] $ do
-    a_ [href_ $ "#" <> linkAnchor] $ do
-      toHtml sectionText
-      toHtmlRaw ("&emsp;&thinsp;" :: Text)
-      weaveProse [cellIdx] heading.body
+    wrapWith cellIdx $ do
+      a_ [href_ $ "#" <> linkAnchor] $ do
+        toHtml sectionText
+        toHtmlRaw ("&emsp;&thinsp;" :: Text)
+        weaveProse heading.body
   where
     hN = case heading.level of
       1 -> h2_
@@ -473,12 +475,21 @@ getLinkAnchor localCellIdx = \case
      in toSafeHtmlId ref
   CBibliography {} -> ""
 
-weaveProse :: [Int] -> Prose -> HtmlWeaver ()
-weaveProse cellIdxs prose = do
-  when (not $ null cellIdxs) $ do
-    span_ [id_ ("c-" <> (T.intercalate "-" $ map T.show cellIdxs))] $ do
-      pure ()
-  sequence_ $ map weavePToken prose.unProse
+cellIdxAttrs :: Int -> [Attributes]
+cellIdxAttrs cellIdx = [id_ ("c-" <> T.show cellIdx), class_ "cell-idx"]
+
+wrapWith :: Int -> HtmlWeaver () -> HtmlWeaver ()
+wrapWith cellIdx wrapMe = do
+  span_ (cellIdxAttrs cellIdx) $ do
+    wrapMe
+
+wrapWithDiv :: Int -> HtmlWeaver () -> HtmlWeaver ()
+wrapWithDiv cellIdx wrapMe = do
+  div_ (cellIdxAttrs cellIdx) $ do
+    wrapMe
+
+weaveProse :: Prose -> HtmlWeaver ()
+weaveProse prose = sequence_ $ map weavePToken prose.unProse
 
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
@@ -531,31 +542,32 @@ weaveListMarker =
     LItemStart -> "<li>"
     LItemEnd -> "</li>"
 
-weaveBlock :: Block -> HtmlWeaver ()
-weaveBlock block = do
+weaveBlock :: Int -> Block -> HtmlWeaver ()
+weaveBlock cellIdx block = do
   weaveConf <- ask
-  div_ [class_ "code-block-container", id_ linkAnchor] $ do
-    div_ [class_ "side-popup"] $ do
-      a_ [href_ $ "#" <> linkAnchor] $ do
-        toHtmlRaw ("&#x1F517;" :: String)
-    maybeWeaveNameAndTanglePath
-    let bodyBorder
-          | Nothing <- lookup "name" block.meta,
-            Nothing <- lookup "tangle" block.meta =
-              " fully-rounded"
-          | otherwise = ""
-    pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
-      let bodyText = getBlockContentsWithoutLinks block.body
-      case lookup "__src_language" block.meta of
-        Just lang -> do
-          let colorized = renderAsText weaveConf $ colorizeText lang bodyText
-              getLink = \case
-                BTokenLink l -> Just l
-                BTokenString {}
-                BTokenPadding {} -> Nothing
-              links = catMaybes $ map getLink block.body
-          toHtmlRaw =<< spliceLinks colorized links
-        Nothing -> code_ $ toHtml bodyText
+  wrapWithDiv cellIdx $ do
+    div_ [class_ "code-block-container", id_ linkAnchor] $ do
+      div_ [class_ "side-popup"] $ do
+        a_ [href_ $ "#" <> linkAnchor] $ do
+          toHtmlRaw ("&#x1F517;" :: String)
+      maybeWeaveNameAndTanglePath
+      let bodyBorder
+            | Nothing <- lookup "name" block.meta,
+              Nothing <- lookup "tangle" block.meta =
+                " fully-rounded"
+            | otherwise = ""
+      pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
+        let bodyText = getBlockContentsWithoutLinks block.body
+        case lookup "__src_language" block.meta of
+          Just lang -> do
+            let colorized = renderAsText weaveConf $ colorizeText lang bodyText
+                getLink = \case
+                  BTokenLink l -> Just l
+                  BTokenString {}
+                  BTokenPadding {} -> Nothing
+                links = catMaybes $ map getLink block.body
+            toHtmlRaw =<< spliceLinks colorized links
+          Nothing -> code_ $ toHtml bodyText
   where
     maybeWeaveNameAndTanglePath
       | Just name <- lookup "name" block.meta,
@@ -682,12 +694,13 @@ weaveFigure cellIdx figure = do
           <> lookupDefault "figure-number-error" "__figure_number" figure.meta
   figure_ [id_ linkAnchor] $ do
     figcaption_ [] $ do
-      a_ [href_ $ "#" <> linkAnchor, class_ "self-link", class_ "caption-prefix"] $ do
-        toHtml captionPrefix
-      toHtml $ case figure.caption.unProse of
-        [] -> "." :: Text
-        _ -> ". " :: Text
-      weaveProse [cellIdx] figure.caption
+      wrapWith cellIdx $ do
+        a_ [href_ $ "#" <> linkAnchor, class_ "self-link", class_ "caption-prefix"] $ do
+          toHtml captionPrefix
+        toHtml $ case figure.caption.unProse of
+          [] -> "." :: Text
+          _ -> ". " :: Text
+        weaveProse figure.caption
     img_
       $ [ id_ linkAnchor,
           src_ wovenLinkTarget,
@@ -705,15 +718,16 @@ weaveFigure cellIdx figure = do
   where
     linkAnchor = getLinkAnchor Nothing $ CFigure figure
 
-weaveMathFragmentStandalone :: MathFragment -> HtmlWeaver ()
-weaveMathFragmentStandalone mathFragment = do
+weaveMathFragmentStandalone :: Int -> MathFragment -> HtmlWeaver ()
+weaveMathFragmentStandalone cellIdx mathFragment = do
   let (begMarker, endMarker)
         | Just _ <- lookup "__equation_number" mathFragment.meta =
             ("\\begin{equation}", "\\end{equation}")
         | otherwise = ("\\[", "\\]")
   p_ [id_ linkAnchor] $ do
-    a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ do
-      begMarker <> toHtml mathFragment.body <> endMarker
+    wrapWith cellIdx $ do
+      a_ [href_ $ "#" <> linkAnchor, class_ "self-link"] $ do
+        begMarker <> toHtml mathFragment.body <> endMarker
   where
     linkAnchor = getLinkAnchor Nothing $ CMathFragment mathFragment
 
@@ -727,12 +741,13 @@ weaveTable cellIdx table = do
           <> lookupDefault "table-number-error" "__table_number" table.meta
   figure_ [id_ linkAnchor] $ do
     figcaption_ [] $ do
-      a_ [href_ $ "#" <> linkAnchor, class_ "self-link", class_ "caption-prefix"] $ do
-        toHtml captionPrefix
-      toHtml $ case table.caption.unProse of
-        [] -> "." :: Text
-        _ -> ". " :: Text
-      weaveProse [cellIdx] table.caption
+      wrapWith cellIdx $ do
+        a_ [href_ $ "#" <> linkAnchor, class_ "self-link", class_ "caption-prefix"] $ do
+          toHtml captionPrefix
+        toHtml $ case table.caption.unProse of
+          [] -> "." :: Text
+          _ -> ". " :: Text
+        weaveProse table.caption
     table_ [] $ do
       forM_ (zip [1 :: Int ..] getColgroups) $ \(groupIdx, numCols) -> do
         let colgroupAttrs =
@@ -747,7 +762,7 @@ weaveTable cellIdx table = do
       thead_ [] $ do
         tr_ [] $ do
           forM_ columnNames $ \prose -> do
-            th_ [] $ weaveProse [] prose
+            th_ [] $ weaveProse prose
       tbody_ [] $ do
         forM_ (rows visibleRows) $ \row ->
           if row == [Prose []]
@@ -762,7 +777,7 @@ weaveTable cellIdx table = do
                         if mostlyNumeric prose
                           then [class_ "table-cell-numeric"]
                           else []
-                  td_ tdAttrs $ weaveProse [] prose
+                  td_ tdAttrs $ weaveProse prose
   where
     linkAnchor = getLinkAnchor Nothing $ CTable table
     hideMarkingCharInFirstColumn :: [((Int, Int), Prose)] -> [Prose]
@@ -911,8 +926,9 @@ weaveFootnote cellIdx footnote = do
     | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
       Just footnoteNumber <- lookup footnote.name originObj.orgDoc.footnoteNumbers -> do
         p_ [class_ "footnote-definition", id_ ("footnote-" <> footnote.name)] $ do
-          span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
-          weaveProse [cellIdx] footnote.body
+          wrapWith cellIdx $ do
+            span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
+            weaveProse footnote.body
     | otherwise -> pure ()
 
 commonPrefix :: (Eq a) => [a] -> [a] -> [a]
@@ -1116,19 +1132,20 @@ weaveCitation n = do
   let result = weaveConf.citeprocResult
       citations = result.resultCitations
   case maybeAt n citations of
-    Just prose -> span_ [class_ "citation"] $ weaveProse [] prose
+    Just prose -> span_ [class_ "citation"] $ weaveProse prose
     Nothing -> pure ()
 
-weaveBibliography :: HtmlWeaver ()
-weaveBibliography = do
+weaveBibliography :: Int -> HtmlWeaver ()
+weaveBibliography cellIdx = do
   weaveConf <- ask
   let result = weaveConf.citeprocResult
       bibliography = result.resultBibliography
   div_ [class_ "bibliography"] $ do
-    forM_ bibliography $ \(key, prose) -> do
-      let linkAnchor = "ref-" <> key
-      div_ [class_ "bib-ref", id_ linkAnchor] $ do
-        weaveProse [] prose
+    wrapWithDiv cellIdx $ do
+      forM_ bibliography $ \(key, prose) -> do
+        let linkAnchor = "ref-" <> key
+        div_ [class_ "bib-ref", id_ linkAnchor] $ do
+          weaveProse prose
 
 weaveToc :: [Cell] -> HtmlWeaver ()
 weaveToc cells = do
@@ -1149,7 +1166,7 @@ weaveToc cells = do
               span_ [class_ "toc-counter"] $ do
                 toHtml sectionText
               a_ [href_ $ "#" <> linkAnchor] $ do
-                weaveProse [] heading.body
+                weaveProse heading.body
             sectionText = getSectionNumber heading
             linkAnchor = getLinkAnchor Nothing $ CHeading heading
             action :: HtmlWeaver ()
@@ -1384,13 +1401,13 @@ weaveBacklinks = do
               if (length externalIdxs > 1)
                 then do
                   a_ [href_ internalLinkAnchor] $ do
-                    weaveProse [] internalName
+                    weaveProse internalName
                     toHtml @Text $ " (" <> (T.show $ length externalIdxs) <> ")"
                   ol_ [] $ do
                     sequence_ $ map (linkToExternalCell True) externalIdxs
                 else do
                   a_ [href_ internalLinkAnchor] $ do
-                    weaveProse [] internalName
+                    weaveProse internalName
                   span_ [class_ "verbatim"] $ do
                     toHtmlRaw @Text " &#x2190; "
                   linkToExternalCell False externalIdx
@@ -1417,7 +1434,7 @@ weaveBacklinks = do
                     externalCellIdx = externalIdx - offset
                     externalLink =
                       a_ [href_ externalLinkAnchor] $ do
-                        weaveProse [] externalName
+                        weaveProse externalName
                 if asListItem
                   then li_ [] $ externalLink
                   else externalLink
@@ -1470,4 +1487,4 @@ weaveNamedCellsIndex = do
           li_ [] $ do
             let linkAnchor = "#" <> getLinkAnchor Nothing cell
             a_ [href_ linkAnchor] $ do
-              weaveProse [] prose
+              weaveProse prose
