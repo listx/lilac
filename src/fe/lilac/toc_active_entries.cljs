@@ -69,21 +69,19 @@
             last-active-rect (.getBoundingClientRect last-active)]
 
         (cond
-          (= first-active (first toc-entries))
-          (.scrollTo toc-container #js
-                     {:top 0 :behavior "instant"})
-
-          (= last-active (last toc-entries))
-          (.scrollTo toc-container #js
-                     {:top (.-scrollHeight toc-container) :behavior "instant"})
-
           (< (.-top first-active-rect) (.-top toc-rect))
-          (.scrollIntoView first-active #js
-                           {:behavior "instant" :block "start"})
+          (if (= first-active (first toc-entries))
+            (.scrollTo toc-container #js
+                       {:top 0 :behavior "instant"})
+            (.scrollIntoView first-active #js
+                             {:behavior "instant" :block "start"}))
 
           (> (.-bottom last-active-rect) (.-bottom toc-rect))
-          (.scrollIntoView last-active #js
-                           {:behavior "instant" :block "end"})
+          (if (= last-active (last toc-entries))
+            (.scrollTo toc-container #js
+                       {:top (.-scrollHeight toc-container) :behavior "instant"})
+            (.scrollIntoView last-active #js
+                             {:behavior "instant" :block "end"}))
 
           :else nil)))))
 

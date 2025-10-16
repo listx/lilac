@@ -454,20 +454,10 @@ The ~heading (subs (.-hash toc-entry-link) 1)~ bit is for removing the initial ~
 part of the ID (so ~foo~ instead of ~#foo~).
 
 [[f:maybe-scroll-toc]] (potentially) scrolls the TOC so that it shows the active
-heading. We want to scroll all the way up or down if the active heading is the
-first or last TOC entry. These "all the way" conditions have to come first
-because otherwise the other two conditions, which are more general, will only do
-the minimum amount of scrolling.
-
-The other two scrolling cases are if we want to scroll up or down, depending on
-the relative position of the TOC entry and where the TOC container is located.
-We scroll up if we see that the first active TOC entry is above the TOC
-container, and more importantly, scroll to this first active TOC entry. And we
-do something similar for the opposite case (for scrolling down). These cases
-ensure that we essentially show /all/ active headings, not just the first or last
-one. For example, if we need to scroll up but only scroll to the last active TOC
-entry (and there are other entries above it), we will still leave some of these
-other active entries out of view.
+heading. We scroll up or down, depending on the relative position of the TOC
+entry and where the TOC container is located. And within each case, we scroll
+all the way to the top or all the way to the bottom if the active heading is the
+first or last TOC entry.
 
 #+name: f:maybe-scroll-toc
 #+begin_src clojure
@@ -489,24 +479,29 @@ other active entries out of view.
             last-active-rect (.getBoundingClientRect last-active)]
 
         (cond
-          (= first-active (first toc-entries))
-          (.scrollTo toc-container #js
-                     {:top 0 :behavior "instant"})
-
-          (= last-active (last toc-entries))
-          (.scrollTo toc-container #js
-                     {:top (.-scrollHeight toc-container) :behavior "instant"})
-
           (< (.-top first-active-rect) (.-top toc-rect))
-          (.scrollIntoView first-active #js
-                           {:behavior "instant" :block "start"})
+          (if (= first-active (first toc-entries))
+            (.scrollTo toc-container #js
+                       {:top 0 :behavior "instant"})
+            (.scrollIntoView first-active #js
+                             {:behavior "instant" :block "start"}))
 
           (> (.-bottom last-active-rect) (.-bottom toc-rect))
-          (.scrollIntoView last-active #js
-                           {:behavior "instant" :block "end"})
+          (if (= last-active (last toc-entries))
+            (.scrollTo toc-container #js
+                       {:top (.-scrollHeight toc-container) :behavior "instant"})
+            (.scrollIntoView last-active #js
+                             {:behavior "instant" :block "end"}))
 
           :else nil)))))
 #+end_src
+
+We scroll up if we see that the /first/ active TOC entry is above the TOC
+container. This way we show /all/ active headings, not just the first or last one.
+For example, if we need to scroll up but only scroll to the last active TOC
+entry (and there are other entries above it), we will still leave some of these
+other active entries out of view. We do the equivalent thing for scrolling down
+(where we check for the bounding box of the /last/ active TOC entry).
 
 When ClojureScript encounters ~#js~, it converts the Clojure data structure that
 follows it into its nearest JavaScript equivalent. So for Clojure maps, it
