@@ -97,4 +97,8 @@
           heading-containers (.querySelectorAll js/document ".heading-container")
           observer (new js/IntersectionObserver update-visible-headings options)]
       (doseq [heading-container heading-containers]
-        (.observe observer heading-container)))))
+        (.observe observer heading-container)))
+
+    (let [toc-entry-links (.querySelectorAll js/document ".toc-entry a")]
+      (doseq [link toc-entry-links]
+        (.addEventListener link "click" #(reset! visible-headings #{}))))))

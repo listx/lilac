@@ -304,7 +304,7 @@ the visible heading containers, and also all of their ancestor headings by
 reading in the [[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6][Heading ancestry]] information, which is woven in as a JSON object
 in the HTML inside [[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6::f:weaveHeadingAncestry][f:weaveHeadingAncestry]].
 
-The ~init~ function has three parts:
+The ~init~ function has four parts:
 
   1) Read in the heading ancestry JSON (as a native Clojure map), via
      [[f:get-heading-ancestry]].
@@ -317,6 +317,15 @@ The ~init~ function has three parts:
      kind of callback) any time a heading container becomes (or no longer
      becomes) visible in the viewport. The ~update-visible-headings~ modifies the
      ~visible-headings~ atom.
+
+  4) Assign click handlers to TOC entry links, so that if a user clicks on a
+     link from the TOC, we trigger a reset of the ~visible-headings~ atom, so that
+     the Intersection Observer API can populate that atom again in its callback.
+     This way, we cleanly separate what the user does in the main viewport
+     (scrolling it to trigger the Intersection Observer API), and what the user
+     does in the TOC by clicking on links. If we don't have these click
+     handlers in the TOC, then clicking on the TOC can potentially end up with
+     weird snapping behavior.
 
 #+name: ns:lilac.toc-active-entries
 #+header: :tangle src/fe/lilac/toc_active_entries.cljs
@@ -344,7 +353,11 @@ The ~init~ function has three parts:
           heading-containers (.querySelectorAll js/document ".heading-container")
           observer (new js/IntersectionObserver update-visible-headings options)]
       (doseq [heading-container heading-containers]
-        (.observe observer heading-container)))))
+        (.observe observer heading-container)))
+
+    (let [toc-entry-links (.querySelectorAll js/document ".toc-entry a")]
+      (doseq [link toc-entry-links]
+        (.addEventListener link "click" #(reset! visible-headings #{}))))))
 #+end_src
 
 The ~:rootMargin "0px 0px 0px 0px"~ bit just makes the viewport the thing to check
