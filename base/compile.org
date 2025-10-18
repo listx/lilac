@@ -46,7 +46,7 @@ import Lilac.Types
         offsets,
         symbols
       ),
-    BToken (BTokenLink, BTokenPadding, BTokenString),
+    BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
     Cell
       ( CBibliography,
@@ -62,11 +62,12 @@ import Lilac.Types
     Figure (meta, parentOid),
     GPath,
     Heading (body, meta),
-    Link (Link, target),
+    Link (target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
         LinkTargetFootnote,
+        LinkTargetLineLabel,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -437,24 +438,26 @@ findExternalOids orgDoc =
       CMathFragment {}
       CBibliography {} -> []
     g acc = \case
-      BTokenLink link -> getExternal acc link
+      BTokenLinkTarget linkTarget -> getExternal acc linkTarget
       BTokenString {}
       BTokenPadding -> acc
     h acc = \case
-      PTokenLink link -> getExternal acc link
+      PTokenLink link -> getExternal' acc link
       PTokenStyledText {}
       PTokenCitation {}
       PTokenMathFragment {}
       PTokenDivStart {}
       PTokenDivEnd {} -> acc
-    getExternal acc link = case link.target of
+    getExternal acc linkTarget = case linkTarget of
       LinkTargetOid linkOid ->
         if member linkOid symbols
           then acc
           else linkOid : acc
+      LinkTargetLineLabel {}
       LinkTargetFootnote {}
       LinkTargetFilePath {}
       LinkTargetURI {} -> acc
+    getExternal' acc link = getExternal acc link.target
     symbols = mkSymbols orgDoc
 #+end_src
 
@@ -1285,8 +1288,8 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
                 $ map getOutLinks block.body
       | otherwise = acc
     getOutLinks = \case
-      BTokenLink (Link _ (LinkTargetOid linkOid)) -> Just linkOid
-      BTokenLink {}
+      BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
+      BTokenLinkTarget {}
       BTokenPadding {}
       BTokenString {} -> Nothing
 #+end_src
@@ -1340,8 +1343,9 @@ We use the [[f:checkCycles]] helper (powered by [[f:findCycles]] underneath) to 
 cycles (or lack thereof).
 
 First let's check for the happy path where there are no cycles. Note the use of
-~:noweb off~ so as to preserve the Noweb link declaration (see [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::f:nowebLinkParser][f:nowebLinkParser]]
-and [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::t:0007-blocks-noweb][t:0007-blocks-noweb]] for more sample usage of ~:noweb off~).
+~:noweb off~ so as to preserve the Noweb link declaration (see
+[[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::f:nowebLinkTargetParser][f:nowebLinkTargetParser]] and [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::t:0007-blocks-noweb][t:0007-blocks-noweb]] for more sample usage of ~:noweb
+off~).
 
 #+name: ti:0100-dag-no-loops
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-no-loops

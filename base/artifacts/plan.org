@@ -24,6 +24,18 @@ or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 :END:
 
 ** For release ~0.9.0.0~
+
+*** TODO make intra-document links less jarring when clicked on
+
+Instead of always making the browser go to the linked target (to put it at the
+top of the page), check if it's already in view of the current viewport. Avoid
+jumping when the link is already in view.
+
+*** TODO when clicking on a link to another part of the document, highlight the target
+
+Make it obvious what's being targeted when clicking on a link, even if we don't
+scroll the page (if the target is already in the viewport).
+
 *** TODO parse and weave definition lists
 
 These are written like ~foo :: bar~, and are always the first part of a list
@@ -159,19 +171,6 @@ other blocks.
 ** TODO keyboard-driven navigation
 
 Cell-wise movement (j/k for next/prev cell, h/l to expand/close tree).
-
-** TODO support intra-block links
-
-There were a few times when we wanted this, so support it.
-
-#+begin_src emacs-lisp
-  (save-excursion              ;   (ref:sc)
-     (goto-char (point-min))   ;   (ref:jump)
-#+end_src
-
-#+begin_src org
-In [[(sc)]] we remember the current position. [[(jump)]] jumps to point-min.
-#+end_src
 
 ** TODO fail parse if any block header starts with a double underscore
 Such headers are reserved by Lilac.

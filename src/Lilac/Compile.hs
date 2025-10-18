@@ -30,7 +30,7 @@ import Lilac.Types
         offsets,
         symbols
       ),
-    BToken (BTokenLink, BTokenPadding, BTokenString),
+    BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
     Cell
       ( CBibliography,
@@ -46,11 +46,12 @@ import Lilac.Types
     Figure (meta, parentOid),
     GPath,
     Heading (body, meta),
-    Link (Link, target),
+    Link (target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
         LinkTargetFootnote,
+        LinkTargetLineLabel,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -342,8 +343,8 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
                 $ map getOutLinks block.body
       | otherwise = acc
     getOutLinks = \case
-      BTokenLink (Link _ (LinkTargetOid linkOid)) -> Just linkOid
-      BTokenLink {}
+      BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
+      BTokenLinkTarget {}
       BTokenPadding {}
       BTokenString {} -> Nothing
 
@@ -401,24 +402,26 @@ findExternalOids orgDoc =
       CMathFragment {}
       CBibliography {} -> []
     g acc = \case
-      BTokenLink link -> getExternal acc link
+      BTokenLinkTarget linkTarget -> getExternal acc linkTarget
       BTokenString {}
       BTokenPadding -> acc
     h acc = \case
-      PTokenLink link -> getExternal acc link
+      PTokenLink link -> getExternal' acc link
       PTokenStyledText {}
       PTokenCitation {}
       PTokenMathFragment {}
       PTokenDivStart {}
       PTokenDivEnd {} -> acc
-    getExternal acc link = case link.target of
+    getExternal acc linkTarget = case linkTarget of
       LinkTargetOid linkOid ->
         if member linkOid symbols
           then acc
           else linkOid : acc
+      LinkTargetLineLabel {}
       LinkTargetFootnote {}
       LinkTargetFilePath {}
       LinkTargetURI {} -> acc
+    getExternal' acc link = getExternal acc link.target
     symbols = mkSymbols orgDoc
 
 getCitationStyles :: [FilePath] -> IO [(Text, CP.Style (CslJson Text))]

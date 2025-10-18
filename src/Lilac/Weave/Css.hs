@@ -420,6 +420,8 @@ defaultCss = do
     noMargin
     a ? do
       roundedRectangleLink
+      span ? do
+        color colorNowebLinkFg
   ".sourceCode" & do
     noMargin
   ".fully-rounded" & do

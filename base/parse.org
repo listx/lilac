@@ -51,6 +51,7 @@ data OrgDoc = OrgDoc
     cells :: [Cell],
     pseudoEdges :: [PseudoEdge],
     footnoteNumbers :: Map Text Int,
+    lineLabels :: Map Text Int,
     cslPath :: Maybe FilePath,
     bibPaths :: [FilePath],
     citations :: [Citation],
@@ -197,6 +198,9 @@ data OrgParserState = OrgParserState
     cellNames :: Set Text,
     cellNumber :: Int,
     pseudoEdges :: [PseudoEdge],
+    lineLabelNumber :: Int,
+    lineLabels :: Map Text Int,
+    lineLabelReferences :: Set Text,
     anonBlockNumber :: Int,
     figureNumber :: Int,
     tableNumber :: Int,
@@ -238,6 +242,9 @@ defaultOrgParserState =
       cellNames = Set.empty,
       cellNumber = 0,
       pseudoEdges = [],
+      lineLabelNumber = 0,
+      lineLabels = M.empty,
+      lineLabelReferences = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
       tableNumber = 0,
@@ -369,7 +376,7 @@ import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Lilac.Types
-  ( BToken (BTokenLink, BTokenPadding, BTokenString),
+  ( BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell
       ( CBibliography,
@@ -393,6 +400,7 @@ import Lilac.Types
     LinkTarget
       ( LinkTargetFilePath,
         LinkTargetFootnote,
+        LinkTargetLineLabel,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -413,6 +421,7 @@ import Lilac.Types
         citations,
         cslPath,
         footnoteNumbers,
+        lineLabels,
         meta,
         oid,
         pseudoEdges
@@ -477,6 +486,9 @@ import Lilac.Types as OrgParserState
         insideFootnoteDefinition,
         insideHeading,
         insideLinkDisplayName,
+        lineLabelNumber,
+        lineLabelReferences,
+        lineLabels,
         listLevels,
         listMarkers,
         orgParserConf,
@@ -620,6 +632,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:compressProse>>
 <<f:compressStyledText>>
 <<f:assertUniqueCellName>>
+<<f:assertUniqueLineLabel>>
 <<f:linkParser>>
 <<f:linkDisplayNameParser>>
 <<f:failIfVerbatimOrCode>>
@@ -638,9 +651,13 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:bTokenParser>>
 <<f:zeroBTokensParser>>
 <<f:someBTokensParser>>
-<<f:nowebLinkParser>>
+<<f:nowebLinkTargetParser>>
+<<f:lineLabelParser>>
+<<f:lineLabelRefParser>>
+<<f:lineLabelLinkParser>>
 <<f:oidLinkParser>>
 <<f:oidReferenceParser>>
+<<f:compressedTextParser>>
 <<f:ignoreSpecialCommas>>
 <<f:compressBTokens>>
 <<f:padConsecutiveNowebLinks>>
@@ -677,6 +694,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:footnoteReferenceParser>>
 <<f:footnoteDefinitionParser>>
 <<f:reconcileFootnotes>>
+<<f:reconcileLineLabels>>
 <<f:validateOidText>>
 <<f:validateCslPath>>
 <<f:collectValsFor>>
@@ -813,6 +831,7 @@ orgDocParser = do
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
+  lineLabels <- reconcileLineLabels
   footnoteNumbers <- reconcileFootnotes
   citations <- collectCitations
   orgParserState <- get
@@ -838,6 +857,7 @@ orgDocParser = do
         cells = filter meaningfulCell cells,
         pseudoEdges = orgParserState.pseudoEdges,
         footnoteNumbers = footnoteNumbers,
+        lineLabels = lineLabels,
         cslPath = cslPath,
         bibPaths = bibPaths,
         citations = citations,
@@ -920,6 +940,7 @@ defaultOrgDoc oid metas =
       cells = [],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
       citations = [],
@@ -1900,6 +1921,7 @@ unparseLink link = case link.target of
      in if linkTargetText == displayName
           then "[[" <> linkTargetText <> "]]"
           else "[[" <> linkTargetText <> "][" <> displayName <> "]]"
+  LinkTargetLineLabel name -> "[[(" <> name <> ")]]"
   LinkTargetFootnote name -> "[fn:" <> name <> "]"
   LinkTargetURI uri ->
     let linkTargetText = T.pack $ N.uriToString id uri ""
@@ -3525,6 +3547,7 @@ to. For now, this data structure only supports the following cases:
 type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
+  | LinkTargetLineLabel Text
   | LinkTargetFootnote Text
   | LinkTargetURI N.URI
   | LinkTargetFilePath FilePath
@@ -3579,6 +3602,10 @@ In summary we support the following link types in an Org document:
     or ~[[target][name]]~) where ~target~ is just a plain text string (such as a URL
     or some other entity in the document), and ~name~ is what is displayed to the
     user when the link is rendered.
+
+  - ~LinkTargetLineLabel~ :: a link that points to a reference /inside/ a code block. This
+    is useful for referring to different areas inside a code block, without
+    having to break up the code block into multiple separate parts.
 
   - ~LinkTargetURI~ :: a link that points to a traditional URI; these are the most
     common types of links on the internet, the most famous example being
@@ -3645,7 +3672,8 @@ linkParser = do
   failIfVerbatimOrCode
 
   MP.choice
-    [ MP.try oidLinkParser,
+    [ MP.try lineLabelLinkParser,
+      MP.try oidLinkParser,
       MP.try protocolWebLinkParser,
       MP.try fileLinkParser,
       MP.try footnoteLinkParser,
@@ -3680,8 +3708,8 @@ exist inside [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code blocks]].
 :ID:       dabccd5e-930e-4571-899f-1bfbdeab3d5e
 :END:
 
-The [[f:oidLinkParser]] closely resembles the [[f:nowebLinkParser]], because they both
-encode a [[data:LinkOid]], the only difference being where they are used (Noweb
+The [[f:oidLinkParser]] closely resembles the [[f:nowebLinkTargetParser]], because they
+both encode a [[data:LinkOid]], the only difference being where they are used (Noweb
 links are used exclusively inside code blocks to refer to other code blocks).
 
 #+name: f:oidLinkParser
@@ -3997,6 +4025,167 @@ shouldParseWith
       ]
       [PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "target name with newline and space is still treated as space"})]
   )
+#+end_src
+
+** Line labels
+:PROPERTIES:
+:ID:       da4aa2a7-3896-4969-aa5e-5e3d842c35db
+:END:
+
+Line labels are embedded inside a block, and can be linked to from outside the
+block. Below is an example; we give two code blocks, the first with the line
+labels disabled and the second with the same content but with line labels
+enabled, so that you can see the full syntax if you're reading this from HTML:
+
+#+header: :line-label off
+#+begin_src emacs-lisp
+(save-excursion              ; (ref:a)
+   (goto-char (point-min))   ; (ref:foo)
+#+end_src
+
+#+begin_src emacs-lisp
+(save-excursion              ; (ref:a)
+   (goto-char (point-min))   ; (ref:foo)
+#+end_src
+
+The ~(ref:a)~ and ~(ref:foo)~ will become targets that can be linked to via ~[[(a)]]~
+and ~[[(foo)]]~. So now you can write [[(a)]] and [[(foo)]] to refer to specific lines in
+the example above.
+
+The line label must start with a ~(ref:~ and end with a closing parenthesis ~)~, as
+[[f:lineLabelParser]] demonstrates:
+
+#+name: f:lineLabelParser
+#+begin_src haskell
+lineLabelParser :: OrgParser LinkTarget
+lineLabelParser = do
+  _ <- string "(ref:"
+  o <- MP.getOffset
+  lineLabel <- lineLabelRefParser
+  _ <- string ")"
+  assertUniqueLineLabel lineLabel o
+  pure $ LinkTargetLineLabel lineLabel
+#+end_src
+
+Valid characters for a line label are handled by [[f:lineLabelRefParser]]. This uses
+[[f:compressedTextParser]] to let the user refer to line labels more freely, without
+having to be exact about whitespace; see the discussion at
+[[f:compressedTextParser]] for more details.
+
+#+name: f:lineLabelRefParser
+#+begin_src haskell
+lineLabelRefParser :: OrgParser Text
+lineLabelRefParser =
+  MP.label "line label" $ compressedTextParser "()[]<>"
+#+end_src
+
+The line labels must be unique inside a document; otherwise you'll run into a
+parse error, per [[f:assertUniqueLineLabel]]. [[f:assertUniqueLineLabel]] is virtually
+the same as [[f:assertUniqueCellName]].
+
+#+name: f:assertUniqueLineLabel
+#+begin_src haskell
+assertUniqueLineLabel :: Text -> Int -> OrgParser ()
+assertUniqueLineLabel lineLabel offset = do
+  orgParserState <- get
+  when (member lineLabel orgParserState.lineLabels) $ do
+    MP.setOffset offset
+    fail
+      $ "line label "
+      <> show lineLabel
+      <> " is not unique"
+  let num = orgParserState.lineLabelNumber + 1
+  put
+    orgParserState
+      { lineLabels =
+          insert
+            lineLabel
+            num
+            orgParserState.lineLabels,
+        lineLabelNumber = num
+      }
+#+end_src
+
+#+name: ti:0006-unique-line-labels
+#+header: :tangle test/Lilac/ParseSpec/0006-unique-line-labels
+#+header: :line-label off
+#+begin_src org
+,#+begin_src sh
+a (ref:x)
+,#+end_src
+
+,#+begin_src sh
+b (ref:x)
+,#+end_src
+#+end_src
+
+#+name: t:0006-unique-line-labels
+#+begin_src haskell
+shouldFailWithMessage
+  "0006-unique-line-labels"
+  "line label \"x\" is not unique"
+  58
+#+end_src
+
+The [[f:lineLabelParser]] is used in [[f:bTokenParser]], if the block being parsed does
+not have ~#+header: :line-label off~.
+
+The syntax for linking to a line label ~(ref:foo)~ is ~[[(foo)]]~. Note that the
+parentheses surround the line label, to distinguish it from other cells that can
+be named (via ~#+name: ...~, such as other blocks). A cell's name may not begin
+with an opening parenthesis, so that ~[[(foo)]]~ always links to the line label
+named ~foo~, not a cell named ~(foo)~; this prohibition of an opening parenthesis is
+codified in [[f:metaEntryParser]].
+
+Parsing of line label links is handled by [[f:lineLabelLinkParser]].
+
+#+name: f:lineLabelLinkParser
+#+begin_src haskell
+lineLabelLinkParser :: OrgParser Link
+lineLabelLinkParser = do
+  _ <- string "[[("
+  lineLabel <- lineLabelRefParser
+  _ <- string ")]]"
+  modify
+    ( \s ->
+        s
+          { OrgParserState.lineLabelReferences =
+              Set.insert lineLabel s.lineLabelReferences
+          }
+    )
+  pure
+    $ Link
+      { target = LinkTargetLineLabel lineLabel,
+        name = []
+      }
+#+end_src
+
+Unlike other links that use the double bracket syntax, these line label links
+cannot be given a custom name; instead they are always named numerically when
+woven (see [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveLink][f:weaveLink]]). During weaving, the line labels are always numbered
+starting at number ~1~, and increment upwards. Each block resets the counter back
+to ~1~. The ~lineLabels~ and ~lineLabelNumber~ fields in [[data:OrgParserState]] keep
+track of this numbering strategy. And just like for footnotes, we check how
+these line labels are used in [[f:reconcileLineLabels]], which is based heavily off
+of [[f:reconcileFootnotes]].
+
+#+name: f:reconcileLineLabels
+#+begin_src haskell
+reconcileLineLabels :: OrgParser (Map Text Int)
+reconcileLineLabels = do
+  orgParserState <- get
+  let referenced = orgParserState.lineLabelReferences
+      defined = M.keysSet orgParserState.lineLabels
+      brokenLinks = Set.difference referenced defined
+      unusedDefs = Set.difference defined referenced
+      hasBrokenLinks = length brokenLinks /= 0
+      hasUnusedDefs = length unusedDefs /= 0
+      brokenLinksMsg = T.unpack . unwords $ toList brokenLinks
+      unusedDefsMsg = T.unpack . unwords $ toList unusedDefs
+  if
+    | hasBrokenLinks -> fail $ "broken line label links: " <> brokenLinksMsg
+    | hasUnusedDefs -> fail $ "unused line labels: " <> unusedDefsMsg
+    | otherwise -> pure orgParserState.lineLabels
 #+end_src
 
 ** Links to recognized web protocols
@@ -4528,8 +4717,8 @@ hello world
 #+end_src
 
 Note that if no such Noweb reference is defined, Lilac will error out. See
-[[f:nowebLinkParser]] for parsing details (it is discussed along with [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][Blocks]] because
-that's the only place where these links may be defined).
+[[f:nowebLinkTargetParser]] for parsing details (it is discussed along with [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][Blocks]]
+because that's the only place where these links may be defined).
 
 Noweb links are powered by [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] which can reference blocks in the
 current Org file or any other Org file (as long as those other Org files are
@@ -4786,6 +4975,7 @@ shouldParseWithState
         fromList
           [ ("hello", 1)
           ],
+      lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
       citations = [],
@@ -4803,7 +4993,8 @@ shouldParseWithState
               Prose [ptext "Foo." []]
             )
           ],
-      prevCellIsFootnote = True
+      prevCellIsFootnote = True,
+      lineLabels = M.empty
     }
 #+end_src
 
@@ -4863,6 +5054,7 @@ shouldParseWithState
           [ ("a", 1),
             ("b", 2)
           ],
+      lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
       citations = [],
@@ -4880,7 +5072,8 @@ shouldParseWithState
           [ ("a", Prose [ptext "Definition of a." []]),
             ("b", Prose [ptext "Definition of b." []])
           ],
-      prevCellIsFootnote = True
+      prevCellIsFootnote = True,
+      lineLabels = M.empty
     }
 #+end_src
 
@@ -4985,6 +5178,7 @@ shouldParseWithState
       cells = [],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = [],
       citations = [],
@@ -5040,6 +5234,7 @@ shouldParseWithState
       cells = [],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths =
         [ "a.json",
@@ -5097,6 +5292,7 @@ shouldParseWithState
       cells = [CBibliography ()],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
       citations = [],
@@ -5576,6 +5772,7 @@ shouldParseWithState
         <<Expected prose for 0014-citations-single-cite>>,
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
       citations =
@@ -5636,6 +5833,7 @@ shouldParseWithState
         <<Expected prose for 0014-citations-locators>>,
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
       citations =
@@ -5776,6 +5974,7 @@ shouldParseWithState
         <<Expected prose for 0014-citations-locators-affixes>>,
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
       citations =
@@ -5954,6 +6153,7 @@ shouldParseWithState
         <<Expected prose for 0014-citations-worg>>,
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
       citations =
@@ -6099,6 +6299,7 @@ shouldFailWithError
   "0014-citations-unbalanced-brackets-prefix-closing"
   ( utoks "]"
       <> etoks "[["
+      <> etoks "[[("
       <> etoks "[fn:"
       <> etoks "\\("
       <> etoks "@"
@@ -6139,6 +6340,7 @@ shouldFailWithError
   "0014-citations-unbalanced-brackets-suffix-closing"
   ( utoks "]]\n"
       <> etoks "[["
+      <> etoks "[[("
       <> etoks "[fn:"
       <> etoks "\\("
       <> etoks "\\"
@@ -6238,6 +6440,7 @@ shouldParseWithState
         <<Expected prose for 0014-citations-forbidden-in-verbatim-code>>,
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
       citations = [],
@@ -6286,6 +6489,7 @@ shouldParseWithState
         ],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
       citations = [],
@@ -7430,7 +7634,7 @@ type BToken :: Type
 data BToken
   = BTokenString Text
   | BTokenPadding
-  | BTokenLink Link
+  | BTokenLinkTarget LinkTarget
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
@@ -7448,11 +7652,14 @@ blockParser = do
   let nowebOff =
         (== Just "off")
           $ lookup "noweb" metaKVs
+      lineLabelOff =
+        (== Just "off")
+          $ lookup "line-label" metaKVs
   modify (\s -> s {insideCodeBlock = True})
   bTokens <-
     MP.choice
       [ zeroBTokensParser blockType,
-        someBTokensParser blockType (not nowebOff)
+        someBTokensParser blockType (not nowebOff) (not lineLabelOff)
       ]
   let newAnonBlockNumber = case blockName of
         Just _ -> orgParserState.anonBlockNumber
@@ -7478,7 +7685,8 @@ blockParser = do
     ( \s ->
         s
           { anonBlockNumber = newAnonBlockNumber,
-            insideCodeBlock = False
+            insideCodeBlock = False,
+            lineLabelNumber = 0
           }
     )
   pure $ CBlock block
@@ -7533,10 +7741,10 @@ of ~MP.choice~ in [[f:blockParser]]).
 
 #+name: f:someBTokensParser
 #+begin_src haskell
-someBTokensParser :: Text -> Bool -> OrgParser [BToken]
-someBTokensParser blockType nowebOn =
+someBTokensParser :: Text -> Bool -> Bool -> OrgParser [BToken]
+someBTokensParser blockType nowebOn lineLabelOn =
   MP.someTill
-    (bTokenParser (blockType == "src") nowebOn)
+    (bTokenParser (blockType == "src") nowebOn lineLabelOn)
     (string $ T.concat ["\n#+end_", blockType, "\n"])
 #+end_src
 
@@ -7722,13 +7930,13 @@ language; see [[ti:0007-block-src-without-lang]].
 
 Now let's dig into the actual block tokens (~[BToken]~) which form the contents of
 the code block. These ~BToken~ values can be either text (~BTokenString~) or a Noweb
-link (~BTokenLink~). Essentially all of the complexity around [[f:bTokenParser]] is
-due to the need to detect Noweb references in a robust way.
+link (~BTokenLinkTarget~). Essentially all of the complexity around [[f:bTokenParser]]
+is due to the need to detect Noweb references in a robust way.
 
 #+name: f:bTokenParser
 #+begin_src haskell
-bTokenParser :: Bool -> Bool -> OrgParser BToken
-bTokenParser isSrcBlock nowebOn = MP.choice parsers
+bTokenParser :: Bool -> Bool -> Bool -> OrgParser BToken
+bTokenParser isSrcBlock nowebOn lineLabelOn = MP.choice parsers
   where
     baseParsers :: [OrgParser BToken]
     baseParsers =
@@ -7741,10 +7949,11 @@ bTokenParser isSrcBlock nowebOn = MP.choice parsers
           . T.singleton
           <$> (MP.label "space inside block" $ MP.satisfy isSpace)
       ]
-    parsers =
-      if isSrcBlock && nowebOn
-        then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
-        else baseParsers
+    parsers = [p | (b, p) <- extraParsers, b] <> baseParsers
+    extraParsers =
+      [ (isSrcBlock && nowebOn, BTokenLinkTarget <$> MP.try nowebLinkTargetParser),
+        (lineLabelOn, BTokenLinkTarget <$> lineLabelParser)
+      ]
 #+end_src
 
 The need to detect Noweb references is why ~baseParsers~ has individual (separate)
@@ -7760,7 +7969,7 @@ parser for the ~left angle bracket~ is there to take care of an edge case where 
 Noweb reference is immediately preceded by another left angle bracket ~<~; see
 [[t:0007-blocks-noweb-intraline]] for details.
 
-** =nowebLinkParser=
+** =nowebLinkTargetParser=
 :PROPERTIES:
 :ID:       d9b8b9d6-0334-4d9a-9146-d6bd158f0d77
 :END:
@@ -7773,28 +7982,19 @@ consuming, the initial =<<= bit). Backtracking allows the other parsers in
 =baseParsers= to parse the remaining text that failed to be parsed as a valid
 Noweb link.
 
-#+name: f:nowebLinkParser
+#+name: f:nowebLinkTargetParser
 #+begin_src haskell
-nowebLinkParser :: OrgParser Link
-nowebLinkParser = do
+nowebLinkTargetParser :: OrgParser LinkTarget
+nowebLinkTargetParser = do
   _ <- string "<<"
   (oid, linkName) <- oidReferenceParser "<>"
   _ <- string ">>"
   pure
-    $ Link
-      { target =
-          LinkTargetOid
-            LinkOid
-              { oid = oid,
-                name = linkName
-              },
-        name =
-          [ StyledText
-              { body = linkName,
-                style = styleMaskFrom []
-              }
-          ]
-      }
+    $ LinkTargetOid
+      LinkOid
+        { oid = oid,
+          name = linkName
+        }
 #+end_src
 
 The [[f:oidReferenceParser]] parses information about the origin of the
@@ -7836,15 +8036,42 @@ oidReferenceParser disallowedChars =
       name <- targetName
       pure (orgParserState.docOid, name)
     targetName :: OrgParser Text
-    targetName = do
-      orgParserState <- get
-      tn <-
-        proseParser'
-          $ proseSpaceConsumer'
-            orgParserState.insideCodeBlock
-      pure $ compressWhitespace tn
+    targetName = compressedTextParser disallowedChars
+#+end_src
+
+The [[f:compressedTextParser]] is more lenient about how whitespace is interpreted,
+so that if the user wants to refer to a target that has spaces in it, they can
+write that target over multiple lines. That is, a user may refer to a target
+name like ~foo bar baz~ in the following ways:
+
+#+begin_src org
+[[foo bar
+baz]]
+
+[[foo
+bar
+baz]]
+
+[[foo
+bar baz]]
+#+end_src
+
+All of the above implicit OID links refer to the same ~foo bar baz~ target, even
+though they are written slightly differently.
+
+#+name: f:compressedTextParser
+#+begin_src haskell
+compressedTextParser :: [Char] -> OrgParser Text
+compressedTextParser disallowedChars = do
+  orgParserState <- get
+  tn <-
+    proseParser'
+      $ proseSpaceConsumer'
+        orgParserState.insideCodeBlock
+  pure $ compressWhitespace tn
+  where
     compressWhitespace = T.unwords . T.words
-    proseSpaceConsumer' :: Bool -> OrgParser Text
+    proseSpaceConsumer' :: Bool -> OrgParser Text -- (ref:proseSpaceConsumer')
     proseSpaceConsumer' insideCodeBlock
       | insideCodeBlock = spaces
       | otherwise =
@@ -7885,13 +8112,14 @@ oidReferenceParser disallowedChars =
             && (not $ isSpace c)
 #+end_src
 
-Unlike [[f:proseSpaceConsumer]], the ~proseSpaceConsumer'~ does *not* check for the
-correctness of the indentation following a newline (it does not take an
-~expectedIndentLen~ parameter). This is because we want to be more generous for
-the case where OID links are found in prose, because sometimes indentation can
-get silently added when using =fill-paragraph= in Emacs (if the OID link target
-gets unlucky and ends up getting hard wrapped by =fill-paragraph=). Otherwise,
-this parser will fail, which would then make the OID link become wrongly parsed.
+Unlike [[f:proseSpaceConsumer]], the ~proseSpaceConsumer'~ [[(proseSpaceConsumer')]] does
+*not* check for the correctness of the indentation following a newline (it does
+not take an ~expectedIndentLen~ parameter). This is because we want to be more
+generous for the case where OID links are found in prose, because sometimes
+indentation can get silently added when using =fill-paragraph= in Emacs (if the
+OID link target gets unlucky and ends up getting hard wrapped by
+=fill-paragraph=). Otherwise, this parser will fail, which would then make the OID
+link become wrongly parsed.
 
 Now we could punish the user for having erroneous indentation, but because
 =org-toggle-link-display= can hide this error caused by =fill-paragraph= (and
@@ -7948,27 +8176,19 @@ shouldParseWithState
               ("__src_language", "sh")
             ],
         body =
-          [ BTokenLink
-              Link
-                { target =
-                    LinkTargetOid
-                      LinkOid
-                        { oid = nilOid,
-                          name = "foo"
-                        },
-                  name = [stext "foo" []]
-                },
+          [ BTokenLinkTarget
+              $ LinkTargetOid
+                LinkOid
+                  { oid = nilOid,
+                    name = "foo"
+                  },
             BTokenString "\n\n<<quux\n>>\necho ",
-            BTokenLink
-              Link
-                { target =
-                    LinkTargetOid
-                      LinkOid
-                        { oid = nilOid,
-                          name = "bar"
-                        },
-                  name = [stext "bar" []]
-                },
+            BTokenLinkTarget
+              $ LinkTargetOid
+                LinkOid
+                  { oid = nilOid,
+                    name = "bar"
+                  },
             BTokenString " x y z"
           ]
       }
@@ -8075,38 +8295,26 @@ shouldParseWithState
             ],
         body =
           [ BTokenString "(",
-            BTokenLink
-              Link
-                { target =
-                    LinkTargetOid
-                      LinkOid
-                        { oid = nilOid,
-                          name = "foo"
-                        },
-                  name = [stext "foo" []]
-                },
+            BTokenLinkTarget
+              $ LinkTargetOid
+                LinkOid
+                  { oid = nilOid,
+                    name = "foo"
+                  },
             BTokenString ") and \"",
-            BTokenLink
-              Link
-                { target =
-                    LinkTargetOid
-                      LinkOid
-                        { oid = nilOid,
-                          name = "bar"
-                        },
-                  name = [stext "bar" []]
-                },
+            BTokenLinkTarget
+              $ LinkTargetOid
+                LinkOid
+                  { oid = nilOid,
+                    name = "bar"
+                  },
             BTokenString "\" and <",
-            BTokenLink
-              Link
-                { target =
-                    LinkTargetOid
-                      LinkOid
-                        { oid = nilOid,
-                          name = "ok"
-                        },
-                  name = [stext "ok" []]
-                },
+            BTokenLinkTarget
+              $ LinkTargetOid
+                LinkOid
+                  { oid = nilOid,
+                    name = "ok"
+                  },
             BTokenString ">"
           ]
       }
@@ -8170,10 +8378,10 @@ block's body ~BToken~ values, as ~BTokenString "\n"~. This is what we do by call
 
 The high-level algorithm is as follows:
 
-  1) Concatenate the ~BToken~ values together (using the ~Text~ representation).
-     For ~BTokenString~ values we use the inner text information as is. For
-     ~BTokenLink~ we use the target, but also inject a special [[link-marker]] which
-     uses an ASCII ~NUL~ character.
+  1) Concatenate the ~BToken~ values together (using the ~Text~ representation). For
+     ~BTokenString~ values we use the inner text information as is. For
+     ~BTokenLinkTarget~ we use the target, but also inject a special [[link-marker]]
+     which uses an ASCII ~NUL~ character.
 
   2) Split the contents by newline.
 
@@ -8190,8 +8398,8 @@ The high-level algorithm is as follows:
      blocks, not after every consecutive block).
 
   5) Using the information from the previous step, iterate through all ~BToken~
-     values and whenever we see a ~BTokenLink~, inject the newline (if the link
-     was marked as needing a newline).
+     values and whenever we see a ~BTokenLinkTarget~, inject the newline (if the
+     link was marked as needing a newline).
 
 The markers are just simple boolean values (one for each Noweb link found in the
 block).
@@ -8208,9 +8416,9 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
-      BTokenLink (Link _name (LinkTargetOid linkOid)) ->
+      BTokenLinkTarget (LinkTargetOid linkOid) ->
         <<link-marker>> <> (T.show linkOid)
-      BTokenLink {} -> ""
+      BTokenLinkTarget {} -> ""
 #+end_src
 
 The ~<<link-marker>>~ is just a special marker we use to keep track of where the
@@ -8265,12 +8473,12 @@ padConsecutiveNowebLinks blockBody =
   where
     f (acc, bools) text@(BTokenString _) = (text : acc, bools)
     f (acc, bools) BTokenPadding = (acc, bools)
-    f (acc, bools) link@(BTokenLink _) =
+    f (acc, bools) linkTarget@(BTokenLinkTarget _) =
       case bools of
         (padLink : rest)
-          | padLink -> (BTokenPadding : link : acc, rest)
-          | otherwise -> (link : acc, rest)
-        [] -> (link : acc, [])
+          | padLink -> (BTokenPadding : linkTarget : acc, rest)
+          | otherwise -> (linkTarget : acc, rest)
+        [] -> (linkTarget : acc, [])
 #+end_src
 
 See [[id:c78d3f21-b295-4f19-b720-ab50dedb3252::t:0102-pad-between-consecutive-links][t:0102-pad-between-consecutive-links]] for an example of this padding
@@ -10315,6 +10523,7 @@ figureParser = do
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetOid {}
+    LinkTargetLineLabel {}
     LinkTargetURI {}
     LinkTargetFootnote {} -> fail "'file:...' required for link to figures"
     LinkTargetFilePath _ -> do
@@ -10391,10 +10600,40 @@ metaEntryParser = do
   key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
   _ <- MP.label "(meta) separator" $ string ": "
   _ <- many $ char ' '
-  value <- MP.takeWhile1P (Just "(meta) value letter") (\c -> c /= '\n')
+  value <-
+    if key == "name"
+      then do
+        first <- MP.satisfy (\c -> c /= '(' && isValueLetter c) -- (ref:non-line-label name)
+        rest <- MP.takeWhileP (Just "(meta) value letter") isValueLetter
+        pure $ T.cons first rest
+      else MP.takeWhile1P (Just "(meta) value letter") isValueLetter
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+    isValueLetter c = c /= '\n'
+#+end_src
+
+For the ~#+name~ key, we prohibit the use of the opening parenthesis as the first
+character of the name at [[(non-line-label name)]], because then that would make
+~[[(foo)]]~ ambiguous (it could refer to either something named ~(foo)~, or it could
+refer to an [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][intra-block target]] ~(ref:foo)~.
+
+#+name: ti:0007-blocks-no-name-with-opening-parenthesis
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-no-name-with-opening-parenthesis
+#+header: :line-label off
+#+begin_src org
+,#+name: (a)
+,#+begin_src sh
+a
+,#+end_src
+#+end_src
+
+#+name: t:0007-blocks-no-name-with-opening-parenthesis
+#+begin_src haskell
+shouldFailWithError
+  "0007-blocks-no-name-with-opening-parenthesis"
+  (utoks "(" <> etoks " ")
+  8
 #+end_src
 
 ** Tests
@@ -11219,7 +11458,7 @@ import Data.Text qualified as T
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Types
-  ( BToken (BTokenLink, BTokenString),
+  ( BToken (BTokenLinkTarget, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell
       ( CBibliography,
@@ -11261,6 +11500,7 @@ import Lilac.Types
         citations,
         cslPath,
         footnoteNumbers,
+        lineLabels,
         meta,
         oid,
         pseudoEdges
@@ -11279,6 +11519,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSectionNumber,
+        lineLabels,
         orgParserConf,
         prevCellIsFootnote,
         tableNumber
@@ -11426,6 +11667,7 @@ nilOrgDoc cells pseudoEdges =
       cells = cells,
       pseudoEdges = pseudoEdges,
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
       citations = [],
@@ -11613,6 +11855,7 @@ parseSpec = do
   <<t:0006-links-web-protocols>>
   <<t:0006-links-oids>>
   <<t:0006-links-oids-lenient-whitespace>>
+  <<t:0006-unique-line-labels>>
   <<t:0007-block-src-without-lang>>
   <<t:0007-blocks-empty>>
   <<t:0007-blocks-ending>>
@@ -11622,6 +11865,7 @@ parseSpec = do
   <<t:0007-blocks-duplicate-names>>
   <<t:0007-blocks-duplicate-tangle-paths>>
   <<t:0007-blocks-special-commas>>
+  <<t:0007-blocks-no-name-with-opening-parenthesis>>
   <<t:0008-indentation-comment>>
   <<t:0008-indentation-headings>>
   <<t:0008-indentation-paragraph>>

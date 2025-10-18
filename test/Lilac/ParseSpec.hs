@@ -7,7 +7,7 @@ import Data.Text qualified as T
 import Data.Void (Void)
 import Lilac.Parse qualified as L
 import Lilac.Types
-  ( BToken (BTokenLink, BTokenString),
+  ( BToken (BTokenLinkTarget, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell
       ( CBibliography,
@@ -49,6 +49,7 @@ import Lilac.Types
         citations,
         cslPath,
         footnoteNumbers,
+        lineLabels,
         meta,
         oid,
         pseudoEdges
@@ -67,6 +68,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSectionNumber,
+        lineLabels,
         orgParserConf,
         prevCellIsFootnote,
         tableNumber
@@ -236,6 +238,7 @@ nilOrgDoc cells pseudoEdges =
       cells = cells,
       pseudoEdges = pseudoEdges,
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
       citations = [],
@@ -1215,6 +1218,11 @@ parseSpec = do
     )
 
   shouldFailWithMessage
+    "0006-unique-line-labels"
+    "line label \"x\" is not unique"
+    58
+
+  shouldFailWithMessage
     "0007-block-src-without-lang"
     "block type src requires a language specifier"
     11
@@ -1393,27 +1401,19 @@ parseSpec = do
                       ("__src_language", "sh")
                     ],
                 body =
-                  [ BTokenLink
-                      Link
-                        { target =
-                            LinkTargetOid
-                              LinkOid
-                                { oid = nilOid,
-                                  name = "foo"
-                                },
-                          name = [stext "foo" []]
-                        },
+                  [ BTokenLinkTarget
+                      $ LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "foo"
+                          },
                     BTokenString "\n\n<<quux\n>>\necho ",
-                    BTokenLink
-                      Link
-                        { target =
-                            LinkTargetOid
-                              LinkOid
-                                { oid = nilOid,
-                                  name = "bar"
-                                },
-                          name = [stext "bar" []]
-                        },
+                    BTokenLinkTarget
+                      $ LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "bar"
+                          },
                     BTokenString " x y z"
                   ]
               }
@@ -1438,38 +1438,26 @@ parseSpec = do
                     ],
                 body =
                   [ BTokenString "(",
-                    BTokenLink
-                      Link
-                        { target =
-                            LinkTargetOid
-                              LinkOid
-                                { oid = nilOid,
-                                  name = "foo"
-                                },
-                          name = [stext "foo" []]
-                        },
+                    BTokenLinkTarget
+                      $ LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "foo"
+                          },
                     BTokenString ") and \"",
-                    BTokenLink
-                      Link
-                        { target =
-                            LinkTargetOid
-                              LinkOid
-                                { oid = nilOid,
-                                  name = "bar"
-                                },
-                          name = [stext "bar" []]
-                        },
+                    BTokenLinkTarget
+                      $ LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "bar"
+                          },
                     BTokenString "\" and <",
-                    BTokenLink
-                      Link
-                        { target =
-                            LinkTargetOid
-                              LinkOid
-                                { oid = nilOid,
-                                  name = "ok"
-                                },
-                          name = [stext "ok" []]
-                        },
+                    BTokenLinkTarget
+                      $ LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "ok"
+                          },
                     BTokenString ">"
                   ]
               }
@@ -1526,6 +1514,11 @@ parseSpec = do
     defaultOrgParserState
       { anonBlockNumber = 1
       }
+
+  shouldFailWithError
+    "0007-blocks-no-name-with-opening-parenthesis"
+    (utoks "(" <> etoks " ")
+    8
 
   shouldFailWithMessage
     "0008-indentation-comment"
@@ -2360,6 +2353,7 @@ parseSpec = do
           fromList
             [ ("hello", 1)
             ],
+        lineLabels = M.empty,
         cslPath = Nothing,
         bibPaths = [],
         citations = [],
@@ -2377,7 +2371,8 @@ parseSpec = do
                 Prose [ptext "Foo." []]
               )
             ],
-        prevCellIsFootnote = True
+        prevCellIsFootnote = True,
+        lineLabels = M.empty
       }
 
   shouldParseWithState
@@ -2417,6 +2412,7 @@ parseSpec = do
             [ ("a", 1),
               ("b", 2)
             ],
+        lineLabels = M.empty,
         cslPath = Nothing,
         bibPaths = [],
         citations = [],
@@ -2434,7 +2430,8 @@ parseSpec = do
             [ ("a", Prose [ptext "Definition of a." []]),
               ("b", Prose [ptext "Definition of b." []])
             ],
-        prevCellIsFootnote = True
+        prevCellIsFootnote = True,
+        lineLabels = M.empty
       }
 
   shouldFailWithMessage
@@ -2449,6 +2446,7 @@ parseSpec = do
         cells = [],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = [],
         citations = [],
@@ -2466,6 +2464,7 @@ parseSpec = do
         cells = [],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        lineLabels = M.empty,
         cslPath = Nothing,
         bibPaths =
           [ "a.json",
@@ -2486,6 +2485,7 @@ parseSpec = do
         cells = [CBibliography ()],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
         citations = [],
@@ -2518,6 +2518,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
         citations =
@@ -2565,6 +2566,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
         citations =
@@ -2682,6 +2684,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
         citations =
@@ -2833,6 +2836,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
         citations =
@@ -2939,6 +2943,7 @@ parseSpec = do
     "0014-citations-unbalanced-brackets-prefix-closing"
     ( utoks "]"
         <> etoks "[["
+        <> etoks "[[("
         <> etoks "[fn:"
         <> etoks "\\("
         <> etoks "@"
@@ -2955,6 +2960,7 @@ parseSpec = do
     "0014-citations-unbalanced-brackets-suffix-closing"
     ( utoks "]]\n"
         <> etoks "[["
+        <> etoks "[[("
         <> etoks "[fn:"
         <> etoks "\\("
         <> etoks "\\"
@@ -3000,6 +3006,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        lineLabels = M.empty,
         cslPath = Nothing,
         bibPaths = [],
         citations = [],
@@ -3025,6 +3032,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        lineLabels = M.empty,
         cslPath = Nothing,
         bibPaths = [],
         citations = [],

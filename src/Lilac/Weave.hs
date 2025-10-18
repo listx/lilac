@@ -64,7 +64,7 @@ import Lilac.Types
         offsets,
         symbols
       ),
-    BToken (BTokenLink, BTokenPadding, BTokenString),
+    BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell
       ( CBibliography,
@@ -84,9 +84,11 @@ import Lilac.Types
     GPath,
     Heading (body, level, section),
     Link (Link, name, target),
+    LinkOid (LinkOid),
     LinkTarget
       ( LinkTargetFilePath,
         LinkTargetFootnote,
+        LinkTargetLineLabel,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -100,7 +102,15 @@ import Lilac.Types
       ),
     MathFragment (body, meta),
     Object (orgDoc, symbols),
-    OrgDoc (bibPaths, cells, citations, cslPath, footnoteNumbers, meta),
+    OrgDoc
+      ( bibPaths,
+        cells,
+        citations,
+        cslPath,
+        footnoteNumbers,
+        lineLabels,
+        meta
+      ),
     PToken
       ( PTokenCitation,
         PTokenDivEnd,
@@ -530,10 +540,11 @@ weavePToken = \case
   PTokenLink link -> case link.target of
     LinkTargetFootnote {} -> do
       sup_ [class_ "footnote-link"] $ do
-        weaveLink link
+        weaveLink False link
     LinkTargetOid {}
+    LinkTargetLineLabel {}
     LinkTargetFilePath {}
-    LinkTargetURI {} -> weaveLink link
+    LinkTargetURI {} -> weaveLink False link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
   PTokenCitation n -> weaveCitation n
   PTokenDivStart t -> toHtmlRaw ("<div class=\"csl-" <> t <> "\">" :: Text)
@@ -541,7 +552,8 @@ weavePToken = \case
 
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
-  LinkTargetOid {} -> False
+  LinkTargetOid {}
+  LinkTargetLineLabel {}
   LinkTargetFootnote {} -> False
   LinkTargetFilePath {} -> True
   LinkTargetURI uri
@@ -595,7 +607,21 @@ weaveBlock cellIdx block = do
           Just lang -> do
             let colorized = renderAsText weaveConf $ colorizeText lang bodyText
                 getLink = \case
-                  BTokenLink l -> Just l
+                  BTokenLinkTarget lt ->
+                    let body' = case lt of
+                          LinkTargetOid (LinkOid _oid n) -> n
+                          LinkTargetLineLabel n -> n
+                          _ -> "weaveBlock error"
+                        name' =
+                          StyledText
+                            { body = body',
+                              style = styleMaskFrom []
+                            }
+                     in Just
+                          $ Link
+                            { target = lt,
+                              name = [name']
+                            }
                   BTokenString {}
                   BTokenPadding {} -> Nothing
                 links = catMaybes $ map getLink block.body
@@ -629,8 +655,9 @@ weaveBlock cellIdx block = do
         bTokenToText = \case
           BTokenString text -> text
           BTokenPadding -> ""
-          BTokenLink (Link _name (LinkTargetOid _)) -> "\NUL"
-          BTokenLink {} -> ""
+          BTokenLinkTarget (LinkTargetOid _) -> "\NUL"
+          BTokenLinkTarget (LinkTargetLineLabel _) -> "\NUL"
+          BTokenLinkTarget {} -> ""
     linkAnchor = getLinkAnchor Nothing $ CBlock block
 
 colorizeText :: Text -> Text -> HtmlWeaver ()
@@ -652,7 +679,7 @@ spliceLinks colorized links = do
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
-            : (renderAsText weaveConf $ weaveLink link)
+            : (renderAsText weaveConf $ weaveLink True link)
             : acc,
           links'
         )
@@ -663,14 +690,34 @@ spliceLinks colorized links = do
     . foldl' f (take 1 colorizedStrs, links)
     $ drop 1 colorizedStrs
 
-weaveLink :: Link -> HtmlWeaver ()
-weaveLink link = do
+weaveLink :: Bool -> Link -> HtmlWeaver ()
+weaveLink insideBlock link = do
+  weaveConf <- ask
   wovenLinkTarget <- weaveLinkTarget link.target
-  let attrs = [href_ wovenLinkTarget] <> linkCategory wovenLinkTarget
+  let attrs =
+        [href_ wovenLinkTarget]
+          <> linkCategory wovenLinkTarget
+          <> lineLabelAttr
+      lineLabelAttr =
+        case link.target of
+          LinkTargetLineLabel name ->
+            if insideBlock
+              then [id_ ("ib-" <> toSafeHtmlId name)] --
+              else []
+          _ -> []
+      linkName =
+        case link.target of
+          LinkTargetLineLabel name
+            | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+              Just num <- lookup name originObj.orgDoc.lineLabels ->
+                [StyledText {body = T.show num, style = styleMaskFrom [Bold]}]
+            | otherwise ->
+                [StyledText {body = "weaveLink error", style = styleMaskFrom []}]
+          _ -> link.name
   a_
     attrs
     $ sequence_
-    $ map weaveStyledText link.name
+    $ map weaveStyledText linkName
   where
     linkCategory target
       | isExternalLink link.target =
@@ -715,6 +762,7 @@ weaveLinkTarget linkTarget = do
                 $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt =
               T.pack str
           | otherwise = showBrokenLink
+    LinkTargetLineLabel name -> (T.pack "#ib-") <> toSafeHtmlId name
     LinkTargetFootnote name -> (T.pack "#footnote-") <> name
     LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
     LinkTargetURI uri -> T.pack $ N.uriToString id uri ""

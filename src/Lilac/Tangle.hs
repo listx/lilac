@@ -3,7 +3,7 @@ module Lilac.Tangle (expandRootBlocks) where
 import Data.Text qualified as T
 import Lilac.Types
   ( Archive (objects, symbols),
-    BToken (BTokenLink, BTokenPadding, BTokenString),
+    BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell
       ( CBibliography,
@@ -16,7 +16,6 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
-    Link (Link),
     LinkTarget (LinkTargetOid),
     Object (orgDoc, symbols),
     OrgDoc (cells),
@@ -99,7 +98,7 @@ expandBlock archive block existingPrefix =
       (acc <> "\n", "")
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLink (Link _ (LinkTargetOid linkOid)))
+    expand (acc, prefix) (BTokenLinkTarget (LinkTargetOid linkOid))
       | Just globalCellIdx <- lookup linkOid archive.symbols,
         Just (_, (CBlock targetBlock)) <- cellIdxToObjCell archive globalCellIdx =
           ( acc <> (expandBlock archive targetBlock $ existingPrefix <> prefix),

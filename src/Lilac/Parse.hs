@@ -93,7 +93,7 @@ import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Lilac.Types
-  ( BToken (BTokenLink, BTokenPadding, BTokenString),
+  ( BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell
       ( CBibliography,
@@ -117,6 +117,7 @@ import Lilac.Types
     LinkTarget
       ( LinkTargetFilePath,
         LinkTargetFootnote,
+        LinkTargetLineLabel,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -137,6 +138,7 @@ import Lilac.Types
         citations,
         cslPath,
         footnoteNumbers,
+        lineLabels,
         meta,
         oid,
         pseudoEdges
@@ -201,6 +203,9 @@ import Lilac.Types as OrgParserState
         insideFootnoteDefinition,
         insideHeading,
         insideLinkDisplayName,
+        lineLabelNumber,
+        lineLabelReferences,
+        lineLabels,
         listLevels,
         listMarkers,
         orgParserConf,
@@ -345,6 +350,7 @@ orgDocParser = do
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
+  lineLabels <- reconcileLineLabels
   footnoteNumbers <- reconcileFootnotes
   citations <- collectCitations
   orgParserState <- get
@@ -370,6 +376,7 @@ orgDocParser = do
         cells = filter meaningfulCell cells,
         pseudoEdges = orgParserState.pseudoEdges,
         footnoteNumbers = footnoteNumbers,
+        lineLabels = lineLabels,
         cslPath = cslPath,
         bibPaths = bibPaths,
         citations = citations,
@@ -383,6 +390,7 @@ defaultOrgDoc oid metas =
       cells = [],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
       citations = [],
@@ -959,12 +967,33 @@ assertUniqueCellName cellName = do
       { cellNames = Set.insert cellName orgParserState.cellNames
       }
 
+assertUniqueLineLabel :: Text -> Int -> OrgParser ()
+assertUniqueLineLabel lineLabel offset = do
+  orgParserState <- get
+  when (member lineLabel orgParserState.lineLabels) $ do
+    MP.setOffset offset
+    fail
+      $ "line label "
+      <> show lineLabel
+      <> " is not unique"
+  let num = orgParserState.lineLabelNumber + 1
+  put
+    orgParserState
+      { lineLabels =
+          insert
+            lineLabel
+            num
+            orgParserState.lineLabels,
+        lineLabelNumber = num
+      }
+
 linkParser :: OrgParser Link
 linkParser = do
   failIfVerbatimOrCode
 
   MP.choice
-    [ MP.try oidLinkParser,
+    [ MP.try lineLabelLinkParser,
+      MP.try oidLinkParser,
       MP.try protocolWebLinkParser,
       MP.try fileLinkParser,
       MP.try footnoteLinkParser,
@@ -1196,11 +1225,14 @@ blockParser = do
   let nowebOff =
         (== Just "off")
           $ lookup "noweb" metaKVs
+      lineLabelOff =
+        (== Just "off")
+          $ lookup "line-label" metaKVs
   modify (\s -> s {insideCodeBlock = True})
   bTokens <-
     MP.choice
       [ zeroBTokensParser blockType,
-        someBTokensParser blockType (not nowebOff)
+        someBTokensParser blockType (not nowebOff) (not lineLabelOff)
       ]
   let newAnonBlockNumber = case blockName of
         Just _ -> orgParserState.anonBlockNumber
@@ -1226,7 +1258,8 @@ blockParser = do
     ( \s ->
         s
           { anonBlockNumber = newAnonBlockNumber,
-            insideCodeBlock = False
+            insideCodeBlock = False,
+            lineLabelNumber = 0
           }
     )
   pure $ CBlock block
@@ -1260,8 +1293,8 @@ blockStartParser = do
   where
     isSrcLanguageChar c = isAsciiLower c || c == '-'
 
-bTokenParser :: Bool -> Bool -> OrgParser BToken
-bTokenParser isSrcBlock nowebOn = MP.choice parsers
+bTokenParser :: Bool -> Bool -> Bool -> OrgParser BToken
+bTokenParser isSrcBlock nowebOn lineLabelOn = MP.choice parsers
   where
     baseParsers :: [OrgParser BToken]
     baseParsers =
@@ -1274,10 +1307,11 @@ bTokenParser isSrcBlock nowebOn = MP.choice parsers
           . T.singleton
           <$> (MP.label "space inside block" $ MP.satisfy isSpace)
       ]
-    parsers =
-      if isSrcBlock && nowebOn
-        then ((BTokenLink <$> MP.try nowebLinkParser) : baseParsers)
-        else baseParsers
+    parsers = [p | (b, p) <- extraParsers, b] <> baseParsers
+    extraParsers =
+      [ (isSrcBlock && nowebOn, BTokenLinkTarget <$> MP.try nowebLinkTargetParser),
+        (lineLabelOn, BTokenLinkTarget <$> lineLabelParser)
+      ]
 
 zeroBTokensParser :: Text -> OrgParser [BToken]
 zeroBTokensParser blockType = do
@@ -1287,31 +1321,53 @@ zeroBTokensParser blockType = do
     noBlankLine = string $ T.concat ["#+end_", blockType, "\n"]
     blankLine = string $ T.concat ["\n#+end_", blockType, "\n"]
 
-someBTokensParser :: Text -> Bool -> OrgParser [BToken]
-someBTokensParser blockType nowebOn =
+someBTokensParser :: Text -> Bool -> Bool -> OrgParser [BToken]
+someBTokensParser blockType nowebOn lineLabelOn =
   MP.someTill
-    (bTokenParser (blockType == "src") nowebOn)
+    (bTokenParser (blockType == "src") nowebOn lineLabelOn)
     (string $ T.concat ["\n#+end_", blockType, "\n"])
 
-nowebLinkParser :: OrgParser Link
-nowebLinkParser = do
+nowebLinkTargetParser :: OrgParser LinkTarget
+nowebLinkTargetParser = do
   _ <- string "<<"
   (oid, linkName) <- oidReferenceParser "<>"
   _ <- string ">>"
   pure
+    $ LinkTargetOid
+      LinkOid
+        { oid = oid,
+          name = linkName
+        }
+
+lineLabelParser :: OrgParser LinkTarget
+lineLabelParser = do
+  _ <- string "(ref:"
+  o <- MP.getOffset
+  lineLabel <- lineLabelRefParser
+  _ <- string ")"
+  assertUniqueLineLabel lineLabel o
+  pure $ LinkTargetLineLabel lineLabel
+
+lineLabelRefParser :: OrgParser Text
+lineLabelRefParser =
+  MP.label "line label" $ compressedTextParser "()[]<>"
+
+lineLabelLinkParser :: OrgParser Link
+lineLabelLinkParser = do
+  _ <- string "[[("
+  lineLabel <- lineLabelRefParser
+  _ <- string ")]]"
+  modify
+    ( \s ->
+        s
+          { OrgParserState.lineLabelReferences =
+              Set.insert lineLabel s.lineLabelReferences
+          }
+    )
+  pure
     $ Link
-      { target =
-          LinkTargetOid
-            LinkOid
-              { oid = oid,
-                name = linkName
-              },
-        name =
-          [ StyledText
-              { body = linkName,
-                style = styleMaskFrom []
-              }
-          ]
+      { target = LinkTargetLineLabel lineLabel,
+        name = []
       }
 
 oidLinkParser :: OrgParser Link
@@ -1384,15 +1440,19 @@ oidReferenceParser disallowedChars =
       name <- targetName
       pure (orgParserState.docOid, name)
     targetName :: OrgParser Text
-    targetName = do
-      orgParserState <- get
-      tn <-
-        proseParser'
-          $ proseSpaceConsumer'
-            orgParserState.insideCodeBlock
-      pure $ compressWhitespace tn
+    targetName = compressedTextParser disallowedChars
+
+compressedTextParser :: [Char] -> OrgParser Text
+compressedTextParser disallowedChars = do
+  orgParserState <- get
+  tn <-
+    proseParser'
+      $ proseSpaceConsumer'
+        orgParserState.insideCodeBlock
+  pure $ compressWhitespace tn
+  where
     compressWhitespace = T.unwords . T.words
-    proseSpaceConsumer' :: Bool -> OrgParser Text
+    proseSpaceConsumer' :: Bool -> OrgParser Text --
     proseSpaceConsumer' insideCodeBlock
       | insideCodeBlock = spaces
       | otherwise =
@@ -1475,12 +1535,12 @@ padConsecutiveNowebLinks blockBody =
   where
     f (acc, bools) text@(BTokenString _) = (text : acc, bools)
     f (acc, bools) BTokenPadding = (acc, bools)
-    f (acc, bools) link@(BTokenLink _) =
+    f (acc, bools) linkTarget@(BTokenLinkTarget _) =
       case bools of
         (padLink : rest)
-          | padLink -> (BTokenPadding : link : acc, rest)
-          | otherwise -> (link : acc, rest)
-        [] -> (link : acc, [])
+          | padLink -> (BTokenPadding : linkTarget : acc, rest)
+          | otherwise -> (linkTarget : acc, rest)
+        [] -> (linkTarget : acc, [])
 
 getLinkPaddingBools :: [BToken] -> [Bool]
 getLinkPaddingBools blockBody =
@@ -1507,9 +1567,9 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
-      BTokenLink (Link _name (LinkTargetOid linkOid)) ->
+      BTokenLinkTarget (LinkTargetOid linkOid) ->
         "\NUL_link" <> (T.show linkOid)
-      BTokenLink {} -> ""
+      BTokenLinkTarget {} -> ""
 
 zeroIndent :: OrgParser (Int, Int)
 zeroIndent = do
@@ -1767,6 +1827,7 @@ figureParser = do
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetOid {}
+    LinkTargetLineLabel {}
     LinkTargetURI {}
     LinkTargetFootnote {} -> fail "'file:...' required for link to figures"
     LinkTargetFilePath _ -> do
@@ -1814,10 +1875,17 @@ metaEntryParser = do
   key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
   _ <- MP.label "(meta) separator" $ string ": "
   _ <- many $ char ' '
-  value <- MP.takeWhile1P (Just "(meta) value letter") (\c -> c /= '\n')
+  value <-
+    if key == "name"
+      then do
+        first <- MP.satisfy (\c -> c /= '(' && isValueLetter c) --
+        rest <- MP.takeWhileP (Just "(meta) value letter") isValueLetter
+        pure $ T.cons first rest
+      else MP.takeWhile1P (Just "(meta) value letter") isValueLetter
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+    isValueLetter c = c /= '\n'
 
 tableParser :: OrgParser Cell
 tableParser = do
@@ -2019,6 +2087,22 @@ reconcileFootnotes = do
     | hasBrokenLinks -> fail $ "broken footnote links: " <> brokenLinksMsg
     | hasUnusedDefs -> fail $ "unused footnote definitions: " <> unusedDefsMsg
     | otherwise -> pure orgParserState.footnoteNumbers
+
+reconcileLineLabels :: OrgParser (Map Text Int)
+reconcileLineLabels = do
+  orgParserState <- get
+  let referenced = orgParserState.lineLabelReferences
+      defined = M.keysSet orgParserState.lineLabels
+      brokenLinks = Set.difference referenced defined
+      unusedDefs = Set.difference defined referenced
+      hasBrokenLinks = length brokenLinks /= 0
+      hasUnusedDefs = length unusedDefs /= 0
+      brokenLinksMsg = T.unpack . unwords $ toList brokenLinks
+      unusedDefsMsg = T.unpack . unwords $ toList unusedDefs
+  if
+    | hasBrokenLinks -> fail $ "broken line label links: " <> brokenLinksMsg
+    | hasUnusedDefs -> fail $ "unused line labels: " <> unusedDefsMsg
+    | otherwise -> pure orgParserState.lineLabels
 
 validateOidText :: (MonadFail m) => Text -> m OID
 validateOidText oidText = case Lilac.Types.fromText oidText of
@@ -2318,6 +2402,7 @@ unparseLink link = case link.target of
      in if linkTargetText == displayName
           then "[[" <> linkTargetText <> "]]"
           else "[[" <> linkTargetText <> "][" <> displayName <> "]]"
+  LinkTargetLineLabel name -> "[[(" <> name <> ")]]"
   LinkTargetFootnote name -> "[fn:" <> name <> "]"
   LinkTargetURI uri ->
     let linkTargetText = T.pack $ N.uriToString id uri ""

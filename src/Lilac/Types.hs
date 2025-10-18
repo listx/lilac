@@ -135,7 +135,7 @@ type BToken :: Type
 data BToken
   = BTokenString Text
   | BTokenPadding
-  | BTokenLink Link
+  | BTokenLinkTarget LinkTarget
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
@@ -263,6 +263,7 @@ parseJSONLinkOid t = do
 type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
+  | LinkTargetLineLabel Text
   | LinkTargetFootnote Text
   | LinkTargetURI N.URI
   | LinkTargetFilePath FilePath
@@ -295,6 +296,7 @@ data OrgDoc = OrgDoc
     cells :: [Cell],
     pseudoEdges :: [PseudoEdge],
     footnoteNumbers :: Map Text Int,
+    lineLabels :: Map Text Int,
     cslPath :: Maybe FilePath,
     bibPaths :: [FilePath],
     citations :: [Citation],
@@ -335,6 +337,9 @@ data OrgParserState = OrgParserState
     cellNames :: Set Text,
     cellNumber :: Int,
     pseudoEdges :: [PseudoEdge],
+    lineLabelNumber :: Int,
+    lineLabels :: Map Text Int,
+    lineLabelReferences :: Set Text,
     anonBlockNumber :: Int,
     figureNumber :: Int,
     tableNumber :: Int,
@@ -373,6 +378,9 @@ defaultOrgParserState =
       cellNames = Set.empty,
       cellNumber = 0,
       pseudoEdges = [],
+      lineLabelNumber = 0,
+      lineLabels = M.empty,
+      lineLabelReferences = Set.empty,
       anonBlockNumber = 0,
       figureNumber = 0,
       tableNumber = 0,
