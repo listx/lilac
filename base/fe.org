@@ -239,13 +239,15 @@ This is the main top-level module where we load all of our custom JS behavior.
 #+begin_src clojure
 (ns lilac.core
   (:require [lilac.popstate-history :as history]
-            [lilac.toc-active-entries :as tae]))
+            [lilac.toc-active-entries :as tae]
+            [lilac.lazy-scroll :as lazy-scroll]))
 
 (defn msg-successful-load []
   "Lilac loaded successfully.")
 
 (history/init)
 (tae/init)
+(lazy-scroll/init)
 (js/console.log (msg-successful-load))
 #+end_src
 
@@ -258,14 +260,17 @@ clojure -M -m figwheel.main --compile lilac.core --repl
 
 However, it's easier to put these and other options into a [[id:783de6bf-e36b-4c9e-a405-2a86d0897795][Build configuration file]] and use that instead.
 
-** Internal link history
+** Anchor link history
+:PROPERTIES:
+:ID:       318d5b9d-b42b-4fe7-b44c-0b5a5452f3d8
+:END:
 
 By default, browsers do not consider links that point to locations in the
-current page as navigable history items. So after clicking on a bunch of
-internal pointing links, if you press the back button on your mouse you'd only
+current page (aka /anchor links/) as navigable history items. So after clicking on
+a bunch of anchor links, if you press the back button on your mouse you'd only
 see the URL bar change, but the window won't change locations.
 
-In [[ns:lilac.popstate-history]] we make the browser treat internal links as worthy
+In [[ns:lilac.popstate-history]] we make the browser treat anchor links as worthy
 of being included in the history, so that the back button works to move around
 (to previously visited locations) in the current page. It works by creating an
 event listener which fires for every ~popstate~ event, is the equivalent of the
@@ -275,7 +280,8 @@ back button.
 #+header: :tangle src/fe/lilac/popstate_history.cljs
 #+begin_src clojure
 (ns lilac.popstate-history
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [lilac.focus :refer [activate]]))
 
 (defn handle-popstate []
   (let [current-hash
@@ -284,7 +290,7 @@ back button.
           js/window.location.hash)
         id (.substring current-hash 1)]
     (when-let [target-el (js/document.getElementById id)]
-      (.scrollIntoView target-el))))
+      (activate target-el))))
 
 (defn init []
   (.addEventListener js/window "popstate" handle-popstate))
@@ -519,6 +525,201 @@ other active entries out of view. We do the equivalent thing for scrolling down
 When ClojureScript encounters ~#js~, it converts the Clojure data structure that
 follows it into its nearest JavaScript equivalent. So for Clojure maps, it
 creates a JSON object.
+
+** Lazy scroll
+
+We don't want to do the default scroll behavior if the link target is already
+visible in the viewport (where scrolling means putting the target element at the
+very top of the page). In short, we should only scroll if we need to. The
+prevention of unconditional scrolling is handled in [[ns:lilac.lazy-scroll]].
+
+#+name: ns:lilac.lazy-scroll
+#+header: :tangle src/fe/lilac/lazy_scroll.cljs
+#+begin_src clojure
+(ns lilac.lazy-scroll
+  (:require [lilac.focus :refer [activate]]
+            [clojure.string :as str]))
+
+<<f:href->id>>
+<<f:get-breadcrumbs-height>>
+<<f:visible?>>
+<<f:maybe-scroll>>
+<<f:maybe-scroll-by-hash>>
+<<f:weaken-anchor-links>>
+
+(defn init [] ; (ref:lazy-scroll/init)
+  (weaken-anchor-links) ; (ref:lazy-scroll/weaken-anchor-links)
+  (.addEventListener js/window "popstate" maybe-scroll-by-hash) ; (ref:lazy-scroll/by-history)
+  (maybe-scroll-by-hash nil)) ; (ref:lazy-scroll/page-load)
+#+end_src
+
+The [[(lazy-scroll/init)]] is the entrypoint. It is concerned with three types of events:
+
+  1) clicking of links [[(lazy-scroll/weaken-anchor-links)]]
+
+  2) changing of URL history (pressing the forward/back button of the mouse
+     /without/ clicking on a link) [[(lazy-scroll/by-history)]]
+
+  3) initial page load [[(lazy-scroll/page-load)]]
+
+The last two are handled directly in [[(lazy-scroll/init)]], and both rely on
+[[f:maybe-scroll-by-hash]].
+
+When we're clicking the forward and back (history) buttons on a mouse, we call
+[[f:maybe-scroll-by-hash]] (which tries to scroll to the element in the current
+history (URL)) because pressing these mouse buttons are not associated with
+click events (otherwise, just [[f:weaken-anchor-links]] will suffice).
+
+The initial page load [[(lazy-scroll/page-load)]], is an edge case where there is no
+associated event (no mouse click or history manipulation is involved), but where
+the URL could still end with an anchor at the end.
+
+Let's now examine [[f:weaken-anchor-links]] which also relies on
+[[f:maybe-scroll-by-hash]].
+
+#+name: f:weaken-anchor-links
+#+begin_src clojure
+(defn- weaken-anchor-links []
+  (let [links (-> js/document (.querySelectorAll "a[href^=\"#\"]"))]
+    (doseq [link links]
+      (.addEventListener link "click"
+        (fn [event]
+          (let [href (.getAttribute link "href")
+                id (href->id href)]
+            (when-let [target-element (-> js/document (.getElementById id))]
+              (do
+                (.preventDefault event) ; (ref:prevent-default-jump)
+                (.pushState (.-history js/window) nil nil href) ; (ref:history)
+                (maybe-scroll-by-hash nil)))))))))
+#+end_src
+
+[[(prevent-default-jump)]] disables the browser's default action which performs the
+scrolling unconditionally. Instead, we invoke [[f:maybe-scroll-by-hash]] to only
+scroll if we have to. [[(history)]] is necessary because otherwise the browser
+history is not modified when clicking on an anchor link (in [[id:318d5b9d-b42b-4fe7-b44c-0b5a5452f3d8][Anchor link
+history]] we made the browser treat anchor links as history-modifying events).
+
+Let's finally look at [[f:maybe-scroll-by-hash]], which is the real workhorse. It
+just tries to find the current anchor (aka /fragment identifier/, or the bit that
+starts with a hash like ~#foo~ in ~href=#foo~), and then:
+
+  1) activates it [[(activate)]] by calling into [[f:activate]] from [[ns:lilac.focus]], and
+
+  2) calls [[f:maybe-scroll]] [[(call-maybe-scroll)]].
+
+#+name: f:maybe-scroll-by-hash
+#+begin_src clojure
+(defn- maybe-scroll-by-hash [_popstate-event]
+  (let [href (.-hash (.-location js/window))
+        id (href->id href)]
+    (when-let [target-element (-> js/document (.getElementById id))]
+      (activate target-element) ; (ref:activate)
+      (maybe-scroll target-element)))) ; (ref:call-maybe-scroll)
+#+end_src
+
+[[f:href->id]] just retrieves the anchor.
+
+#+name: f:href->id
+#+begin_src clojure
+(defn- href->id [href]
+  (let [href (.-hash (.-location js/window))
+        href-final (if str/blank? href "#top")
+        id (.substring href 1)]
+    id))
+#+end_src
+
+[[f:maybe-scroll]] only scrolls to the target element if it is out view (outside the
+viewport).
+
+#+name: f:maybe-scroll
+#+begin_src clojure
+(defn- maybe-scroll [elt]
+  (when-not (visible? elt)
+    (.scrollIntoView elt)))
+#+end_src
+
+The visibility check is done inside [[f:visible?]].
+
+#+name: f:visible?
+#+begin_src clojure
+(defn- visible? [elt]
+  (let [rect (.getBoundingClientRect elt) ; (ref:element-position)
+        bch (get-breadcrumbs-height)
+        rect-top (- (.-top rect) bch)
+        rect-bottom (- (.-bottom rect) bch)
+        window-height (.-innerHeight js/window)
+        is-visible (and (< rect-top window-height) ; (ref:element-visibility)
+                        (> rect-bottom 0))]
+    is-visible))
+#+end_src
+
+At [[(element-position)]] we calculate the bounding box of the target element, and
+perform a "is it visible" check at [[(element-visibility)]]. The [[id:649018db-d088-4a08-920c-0d64a0be27cd::css:breadcrumbs][css:breadcrumbs]]
+element hides whatever is underneath it from the human user, but for purposes of
+the viewport (and ~.getBoundingClientRect~) it is ignored. So we have to
+compensate for it with [[f:get-breadcrumbs-height]].
+
+#+name: f:get-breadcrumbs-height
+#+begin_src clojure
+(defn- get-breadcrumbs-height []
+  (or (some-> js/document
+              (.querySelector ".breadcrumbs")
+              (.-parentElement)
+              (.-offsetHeight))
+      0))
+#+end_src
+
+** Element activation
+
+Activating the target element means adding the ~active~ HTML class to it, as seen
+in [[ns:lilac.focus]].
+
+#+name: ns:lilac.focus
+#+header: :tangle src/fe/lilac/focus.cljs
+#+begin_src clojure
+(ns lilac.focus)
+
+<<f:deactivate-other-elements>>
+<<f:activate-element>>
+<<f:activate>>
+#+end_src
+
+The public function is [[f:activate]], which just calls [[f:deactivate-other-elements]]
+and [[f:activate-element]].
+
+#+name: f:activate
+#+begin_src clojure
+(defn activate [elt]
+  (deactivate-other-elements (.-id elt))
+  (activate-element elt))
+#+end_src
+
+[[f:activate-element]] is simple because it just adds the ~active~ class to the class
+list (i.e., convert ~class="foo"~ to ~class="foo active"~ for a given HTML element).
+
+#+name: f:activate-element
+#+begin_src clojure
+(defn- activate-element [elt]
+  (let [class-list (.-classList elt)]
+    (.add class-list "active")))
+#+end_src
+
+The tricky part is [[f:deactivate-other-elements]]. If we don't do this, we'll end
+up just activating new elements while leaving previously-activated ones still
+active. Since all anchor links point to things inside the ~<main>~ HTML element,
+we limit our search of elements to anchors somewhere along the hierarchy
+underneath ~<main>~ [[(child-anchors)]].
+
+#+name: f:deactivate-other-elements
+#+begin_src clojure
+(defn- deactivate-other-elements [active-id]
+  (when-let [main-elt (-> js/document (.querySelector "main"))]
+    (let [child-anchors (-> main-elt (.querySelectorAll "[id]"))] ; (ref:child-anchors)
+      (doseq [elt child-anchors]
+        (when (not= (.-id elt) active-id)
+          (let [class-list (.-classList elt)]
+            (.remove class-list "active")))))))
+#+end_src
 
 * Footnotes
 

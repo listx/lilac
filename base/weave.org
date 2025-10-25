@@ -3974,6 +3974,7 @@ import Clay
     div,
     em,
     figcaption,
+    fitContent,
     flex,
     flexDirection,
     float,
@@ -4009,6 +4010,7 @@ import Clay
     marginLeft,
     marginRight,
     marginTop,
+    maxWidth,
     minHeight,
     monospace,
     nav,
@@ -4056,6 +4058,7 @@ import Clay
     width,
     (#),
     (&),
+    (**),
     (-:),
     (?),
     (|>),
@@ -4252,8 +4255,12 @@ calc(4rem + 1px + 10px)
 #+end_src
 
 *** Breadcrumbs
+:PROPERTIES:
+:ID:       649018db-d088-4a08-920c-0d64a0be27cd
+:END:
 
-The breadcrumbs should be large and prominent at the top of the page.
+The breadcrumbs ([[f:weaveBreadcrumbs]]) should be large and prominent at the top of
+the page.
 
 #+name: css:breadcrumbs
 #+begin_src haskell
@@ -4329,9 +4336,9 @@ padding (px 0) (px 20) (px 0) (px 20)
 #+begin_src haskell
 main_ ? do
   "grid-area" -: "main"
-  marginLeft (px 10)
+  marginLeft (px 17)
   <<css:Column under navbar>>
-  paddingLeft (px 42)
+  paddingLeft (px 45)
   p # ".main-bottom-spacer" ? do
     yx margin (px 40) 0
 #+end_src
@@ -4386,7 +4393,7 @@ The headings are set to all use sans-serif font ([[f:fontSans]]).
 h1 ? do
   fontSize (pt 36)
   marginTop (px 0)
-  marginBottom (pt $ -16)
+  marginBottom (px 0)
   prependSymbol "●" (rem $ -2.4)
 <<css:h1 (title) underline>>
 h2 ? do
@@ -4411,6 +4418,14 @@ forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) $ \(n, hN) -> do
       color $ rgbHex 0
       ":visited" & do
         color colorText
+    border (px 1) solid colorBg
+    yx padding 0 (px 5)
+    marginLeft (px (-7))
+    maxWidth fitContent
+    ".active" & do
+      border (px 1) solid colorActiveBorder
+      backgroundColor colorActiveBg
+      ev borderRadius (px 5)
 #+end_src
 
 We use [[f:prependSymbol]] to prepend some text (the black square symbol ~U+25A0~ (■))
@@ -4439,9 +4454,9 @@ Thanks to Haskell we can define some repetitive things in [[css:Headings]] via a
 #+begin_src haskell
 hr ? do
   border (px 0) solid colorCodeBorder
-  borderBottom (px 2) solid colorCodeBorder
+  borderBottom (px 1) solid colorCodeBorder
   ".title-underline" & do
-    marginBottom (rem 2)
+    marginBottom (rem 1)
 #+end_src
 
 The [[css:h1 (title) underline]] changes the horizontal rule to look a bit subdued
@@ -4633,6 +4648,16 @@ code ? do
   borderBottomRightRadius (px 5) (px 5)
   border (px 1) solid colorCodeBorder
   yx padding (px 2) (px 8)
+".active" ** ".code-block-meta" ? do
+  fontWeight bold
+  border (px 1) solid colorActiveBorder
+  borderBottomWidth 0
+".active" ** ".code-block-body" ? do
+  border (px 1) solid colorActiveBorder
+  backgroundColor colorActiveBg
+".code-block-body" ** ".sourceCode" ** ".active" ? do
+  border (px 1) solid colorActiveBorder
+  backgroundColor colorActiveBg
 <<css:Block link anchor>>
 #+end_src
 
@@ -4903,6 +4928,12 @@ colorTocActive = colorFrom "#eafaff"
 
 colorTocActiveAncestor :: Color
 colorTocActiveAncestor = colorFrom "#ededed"
+
+colorActiveBg :: Color
+colorActiveBg = colorFrom "#f1ffef"
+
+colorActiveBorder :: Color
+colorActiveBorder = colorFrom "#008000"
 #+end_src
 
 * ClojureScript frontend

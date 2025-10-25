@@ -40,6 +40,7 @@ import Clay
     div,
     em,
     figcaption,
+    fitContent,
     flex,
     flexDirection,
     float,
@@ -75,6 +76,7 @@ import Clay
     marginLeft,
     marginRight,
     marginTop,
+    maxWidth,
     minHeight,
     monospace,
     nav,
@@ -122,6 +124,7 @@ import Clay
     width,
     (#),
     (&),
+    (**),
     (-:),
     (?),
     (|>),
@@ -256,14 +259,14 @@ defaultCss = do
 
   main_ ? do
     "grid-area" -: "main"
-    marginLeft (px 10)
+    marginLeft (px 17)
     "height"
       -: """
          calc(100vh - calc(4rem + 1px))
          """
     overflowY auto
     padding (px 0) (px 20) (px 0) (px 20)
-    paddingLeft (px 42)
+    paddingLeft (px 45)
     p # ".main-bottom-spacer" ? do
       yx margin (px 40) 0
 
@@ -302,13 +305,13 @@ defaultCss = do
   h1 ? do
     fontSize (pt 36)
     marginTop (px 0)
-    marginBottom (pt $ -16)
+    marginBottom (px 0)
     prependSymbol "●" (rem $ -2.4)
   hr ? do
     border (px 0) solid colorCodeBorder
-    borderBottom (px 2) solid colorCodeBorder
+    borderBottom (px 1) solid colorCodeBorder
     ".title-underline" & do
-      marginBottom (rem 2)
+      marginBottom (rem 1)
   h2 ? do
     fontSize (pt 26)
     prependSymbol "■" (rem $ -2.15)
@@ -331,6 +334,14 @@ defaultCss = do
         color $ rgbHex 0
         ":visited" & do
           color colorText
+      border (px 1) solid colorBg
+      yx padding 0 (px 5)
+      marginLeft (px (-7))
+      maxWidth fitContent
+      ".active" & do
+        border (px 1) solid colorActiveBorder
+        backgroundColor colorActiveBg
+        ev borderRadius (px 5)
 
   ".bold" & do
     fontWeight bold
@@ -451,6 +462,16 @@ defaultCss = do
     borderBottomRightRadius (px 5) (px 5)
     border (px 1) solid colorCodeBorder
     yx padding (px 2) (px 8)
+  ".active" ** ".code-block-meta" ? do
+    fontWeight bold
+    border (px 1) solid colorActiveBorder
+    borderBottomWidth 0
+  ".active" ** ".code-block-body" ? do
+    border (px 1) solid colorActiveBorder
+    backgroundColor colorActiveBg
+  ".code-block-body" ** ".sourceCode" ** ".active" ? do
+    border (px 1) solid colorActiveBorder
+    backgroundColor colorActiveBg
   (".code-block-container" # hover) |> ".side-popup" ? do
     display block
     a # hover ? do
@@ -623,6 +644,12 @@ colorTocActive = colorFrom "#eafaff"
 
 colorTocActiveAncestor :: Color
 colorTocActiveAncestor = colorFrom "#ededed"
+
+colorActiveBg :: Color
+colorActiveBg = colorFrom "#f1ffef"
+
+colorActiveBorder :: Color
+colorActiveBorder = colorFrom "#008000"
 
 type Parser :: Type -> Type
 type Parser = MP.Parsec Void Text
