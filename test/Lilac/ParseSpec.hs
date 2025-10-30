@@ -1458,7 +1458,13 @@ parseSpec = do
                           { oid = nilOid,
                             name = "ok"
                           },
-                    BTokenString ">"
+                    BTokenString "> ",
+                    BTokenLinkTarget
+                      $ LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "a->b"
+                          }
                   ]
               }
         ]

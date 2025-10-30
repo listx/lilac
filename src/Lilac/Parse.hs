@@ -1330,7 +1330,8 @@ someBTokensParser blockType nowebOn lineLabelOn =
 nowebLinkTargetParser :: OrgParser LinkTarget
 nowebLinkTargetParser = do
   _ <- string "<<"
-  (oid, linkName) <- oidReferenceParser "<>"
+  _ <- MP.notFollowedBy $ string "<" --
+  (oid, linkName) <- oidReferenceParser "" ">>"
   _ <- string ">>"
   pure
     $ LinkTargetOid
@@ -1350,7 +1351,7 @@ lineLabelParser = do
 
 lineLabelRefParser :: OrgParser Text
 lineLabelRefParser =
-  MP.label "line label" $ compressedTextParser "()[]<>"
+  MP.label "line label" $ compressedTextParser "()[]<>" ">>"
 
 lineLabelLinkParser :: OrgParser Link
 lineLabelLinkParser = do
@@ -1374,7 +1375,7 @@ oidLinkParser :: OrgParser Link
 oidLinkParser = do
   _ <- string "[["
   avoidParsingKnownProtocols
-  (oid, name) <- oidReferenceParser "[]"
+  (oid, name) <- oidReferenceParser "[]" "]]"
   orgParserState <- get
   let mask = orgParserState.styleMask
       implicitName
@@ -1413,8 +1414,8 @@ oidLinkParser = do
         $ protocolsWeb
         <> protocolsEmacs
 
-oidReferenceParser :: [Char] -> OrgParser (OID, Text)
-oidReferenceParser disallowedChars =
+oidReferenceParser :: [Char] -> [Char] -> OrgParser (OID, Text)
+oidReferenceParser disallowedChars ending =
   MP.choice
     [ MP.try explicitFQCN,
       MP.try explicitOID,
@@ -1425,10 +1426,10 @@ oidReferenceParser disallowedChars =
     explicitOID = do
       _ <- string "id:"
       oidText <-
-        MP.takeWhile1P
-          (Just "oid char")
-          (`notElem` (':' : disallowedChars))
-      oid <- validateOidText oidText
+        MP.some $ do
+          _ <- MP.notFollowedBy . string $ T.pack ending
+          MP.noneOf $ ':' : disallowedChars
+      oid <- validateOidText $ T.pack oidText
       pure (oid, "")
     explicitFQCN = do
       (oid, _) <- explicitOID
@@ -1440,10 +1441,10 @@ oidReferenceParser disallowedChars =
       name <- targetName
       pure (orgParserState.docOid, name)
     targetName :: OrgParser Text
-    targetName = compressedTextParser disallowedChars
+    targetName = compressedTextParser disallowedChars ending
 
-compressedTextParser :: [Char] -> OrgParser Text
-compressedTextParser disallowedChars = do
+compressedTextParser :: [Char] -> [Char] -> OrgParser Text
+compressedTextParser disallowedChars ending = do
   orgParserState <- get
   tn <-
     proseParser'
@@ -1487,7 +1488,9 @@ compressedTextParser disallowedChars = do
           cs <- MP.some $ normalChar
           pure $ T.pack cs
         normalChar :: OrgParser Char
-        normalChar = MP.satisfy isNormalChar
+        normalChar = do
+          _ <- MP.notFollowedBy . string $ T.pack ending
+          MP.satisfy isNormalChar
         isNormalChar c =
           notElem c disallowedChars
             && (not $ isSpace c)

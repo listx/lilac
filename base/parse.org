@@ -3718,7 +3718,7 @@ oidLinkParser :: OrgParser Link
 oidLinkParser = do
   _ <- string "[["
   avoidParsingKnownProtocols
-  (oid, name) <- oidReferenceParser "[]"
+  (oid, name) <- oidReferenceParser "[]" "]]"
   orgParserState <- get
   let mask = orgParserState.styleMask
       implicitName
@@ -4076,7 +4076,7 @@ having to be exact about whitespace; see the discussion at
 #+begin_src haskell
 lineLabelRefParser :: OrgParser Text
 lineLabelRefParser =
-  MP.label "line label" $ compressedTextParser "()[]<>"
+  MP.label "line label" $ compressedTextParser "()[]<>" ">>"
 #+end_src
 
 The line labels must be unique inside a document; otherwise you'll run into a
@@ -7976,7 +7976,7 @@ Noweb reference is immediately preceded by another left angle bracket ~<~; see
 
 The last piece is the business of parsing Noweb references. A Noweb reference is
 surrounded by the double-angle-bracket delimiters =<<= and =>>=. The name itself can
-be anything other than a newline or angle brackets. We wrap this with =MP.try= in
+be anything other than a newline. We wrap this with =MP.try= in
 [[f:bTokenParser]], because we need to backtrack if we fail (after parsing, and
 consuming, the initial =<<= bit). Backtracking allows the other parsers in
 =baseParsers= to parse the remaining text that failed to be parsed as a valid
@@ -7987,7 +7987,8 @@ Noweb link.
 nowebLinkTargetParser :: OrgParser LinkTarget
 nowebLinkTargetParser = do
   _ <- string "<<"
-  (oid, linkName) <- oidReferenceParser "<>"
+  _ <- MP.notFollowedBy $ string "<" -- (ref:open-angle-bracket-check)
+  (oid, linkName) <- oidReferenceParser "" ">>"
   _ <- string ">>"
   pure
     $ LinkTargetOid
@@ -7996,6 +7997,10 @@ nowebLinkTargetParser = do
           name = linkName
         }
 #+end_src
+
+[[(open-angle-bracket-check)]] lets us parse ~<<<ok>>>~ as ~<~ followed by a Noweb link
+of ~ok~. If we didn't have this, we would treat the initial ~<<~ as starting the
+Noweb link and end up with ~<ok~ instead. See [[ti:0007-blocks-noweb-intraline]].
 
 The [[f:oidReferenceParser]] parses information about the origin of the
 block being referenced, which we call the block origin signature. For now the
@@ -8009,8 +8014,8 @@ that information at hand.
 
 #+name: f:oidReferenceParser
 #+begin_src haskell
-oidReferenceParser :: [Char] -> OrgParser (OID, Text)
-oidReferenceParser disallowedChars =
+oidReferenceParser :: [Char] -> [Char] -> OrgParser (OID, Text)
+oidReferenceParser disallowedChars ending =
   MP.choice
     [ MP.try explicitFQCN,
       MP.try explicitOID,
@@ -8021,10 +8026,10 @@ oidReferenceParser disallowedChars =
     explicitOID = do
       _ <- string "id:"
       oidText <-
-        MP.takeWhile1P
-          (Just "oid char")
-          (`notElem` (':' : disallowedChars))
-      oid <- validateOidText oidText
+        MP.some $ do
+          _ <- MP.notFollowedBy . string $ T.pack ending
+          MP.noneOf $ ':' : disallowedChars
+      oid <- validateOidText $ T.pack oidText
       pure (oid, "")
     explicitFQCN = do
       (oid, _) <- explicitOID
@@ -8036,7 +8041,7 @@ oidReferenceParser disallowedChars =
       name <- targetName
       pure (orgParserState.docOid, name)
     targetName :: OrgParser Text
-    targetName = compressedTextParser disallowedChars
+    targetName = compressedTextParser disallowedChars ending
 #+end_src
 
 The [[f:compressedTextParser]] is more lenient about how whitespace is interpreted,
@@ -8061,8 +8066,8 @@ though they are written slightly differently.
 
 #+name: f:compressedTextParser
 #+begin_src haskell
-compressedTextParser :: [Char] -> OrgParser Text
-compressedTextParser disallowedChars = do
+compressedTextParser :: [Char] -> [Char] -> OrgParser Text
+compressedTextParser disallowedChars ending = do
   orgParserState <- get
   tn <-
     proseParser'
@@ -8106,7 +8111,9 @@ compressedTextParser disallowedChars = do
           cs <- MP.some $ normalChar
           pure $ T.pack cs
         normalChar :: OrgParser Char
-        normalChar = MP.satisfy isNormalChar
+        normalChar = do
+          _ <- MP.notFollowedBy . string $ T.pack ending
+          MP.satisfy isNormalChar
         isNormalChar c =
           notElem c disallowedChars
             && (not $ isSpace c)
@@ -8264,7 +8271,7 @@ those contents into an existing line.
 #+header: :noweb off
 #+begin_src org
 ,#+begin_src sh
-(<<foo>>) and "<<bar>>" and <<<ok>>>
+(<<foo>>) and "<<bar>>" and <<<ok>>> <<a->b>>
 ,#+end_src
 #+end_src
 
@@ -8315,7 +8322,13 @@ shouldParseWithState
                   { oid = nilOid,
                     name = "ok"
                   },
-            BTokenString ">"
+            BTokenString "> ",
+            BTokenLinkTarget
+              $ LinkTargetOid
+                LinkOid
+                  { oid = nilOid,
+                    name = "a->b"
+                  }
           ]
       }
 ]
