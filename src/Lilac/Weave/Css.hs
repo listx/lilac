@@ -472,6 +472,8 @@ defaultCss = do
   ".code-block-body" ** ".sourceCode" ** ".active" ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
+    "::after" & do
+      "content" -: "\" 👈\""
   (".code-block-container" # hover) |> ".side-popup" ? do
     display block
     a # hover ? do
