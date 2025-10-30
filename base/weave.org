@@ -834,9 +834,9 @@ getRelativeJsPath = do
         objPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath
         out <- P.encodeUtf $ decodeGPath weaveConf.outDir
         js <- P.encodeUtf "lilac.js"
-        let cssPath = P.joinPath [out, js]
-            relativeCssPath = getRelativePathWithoutSymlinks objPath cssPath
-        final <- P.decodeUtf relativeCssPath
+        let jsPath = P.joinPath [out, js]
+            relativeJsPath = getRelativePathWithoutSymlinks objPath jsPath
+        final <- P.decodeUtf relativeJsPath
         pure final
   pure . T.pack $ fromMaybe "lilac.js" result
 #+end_src
