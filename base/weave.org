@@ -806,6 +806,9 @@ options: {
 #+end_src
 
 *** ClojureScript frontend
+:PROPERTIES:
+:ID:       da789584-7748-4258-a2ff-36567bbedbc8
+:END:
 
 The [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][ClojureScript frontend]] generates a single JS file called ~lilac.js~. We have
 to import this into every page.
@@ -833,8 +836,9 @@ getRelativeJsPath = do
       result = do
         objPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath
         out <- P.encodeUtf $ decodeGPath weaveConf.outDir
+        jsDir <- P.encodeUtf "js"
         js <- P.encodeUtf "lilac.js"
-        let jsPath = P.joinPath [out, js]
+        let jsPath = P.joinPath [out, jsDir, js]
             relativeJsPath = getRelativePathWithoutSymlinks objPath jsPath
         final <- P.decodeUtf relativeJsPath
         pure final
