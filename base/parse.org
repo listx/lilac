@@ -975,6 +975,10 @@ shouldParseWith
   (L.defaultOrgDoc nilOid [])
 #+end_src
 
+Aside: [[ti:0001-blankline]] in HTML looks like there is no content (this is
+intentional), because [[f:zeroBTokensParser]] parses it the same way it parses a
+block with zero bytes in it (see [[ti:0007-blocks-empty]]).
+
 Parsing comments should also result in a blank document.
 
 #+name: ti:0001-comments-only
