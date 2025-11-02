@@ -36,8 +36,11 @@ import Clay
     color,
     column,
     content,
+    dd,
     display,
     div,
+    dl,
+    dt,
     em,
     figcaption,
     fitContent,
@@ -65,6 +68,7 @@ import Clay
     hover,
     hr,
     html,
+    inline,
     inlineBlock,
     italic,
     left,
@@ -121,6 +125,7 @@ import Clay
     vAlignSuper,
     verticalAlign,
     vh,
+    whiteSpace,
     width,
     (#),
     (&),
@@ -129,6 +134,7 @@ import Clay
     (?),
     (|>),
   )
+import Clay.Text qualified as ClayText
 import Data.Bits
   ( shiftR,
     (.&.),
@@ -554,6 +560,21 @@ defaultCss = do
             ":hover" & do
               borderStyle none
               textDecoration underline
+
+  dl ? do
+    marginTop $ rem 1
+  dt ? do
+    display inlineBlock
+    fontWeight bold
+    fontSans
+    ".inner-dt" & do
+      marginTop $ rem 1
+  dd ? do
+    display inline
+    marginLeft (rem 0.5)
+    "::after" & do
+      "content" -: "\"\\a\"" --
+      whiteSpace ClayText.pre
 
   ".doc-meta-author" & do
     fontStyle italic

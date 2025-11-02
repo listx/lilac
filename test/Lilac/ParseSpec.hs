@@ -3273,3 +3273,8 @@ parseSpec = do
     it "skips over non-text elements from the back" $ do
       CP.dropTextWhileEnd (== 'c') (CP.fromText "/aa/ b *cc*[[foo]]" :: Prose)
         `shouldBe` (CP.fromText "/aa/ b [[foo]]")
+
+  shouldFailWithMessage
+    "0015-glossary-duplicate-term"
+    "glossary term \"foo\" is not unique"
+    14

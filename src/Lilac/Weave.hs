@@ -71,6 +71,7 @@ import Lilac.Types
         CBlock,
         CFigure,
         CFootnote,
+        CGlossaryTerm,
         CHeading,
         CListItem,
         CMathFragment,
@@ -82,6 +83,7 @@ import Lilac.Types
     Figure (caption, link, meta),
     Footnote (body, name),
     GPath,
+    GlossaryTerm (definition, term),
     Heading (body, level, section),
     Link (Link, name, target),
     LinkOid (LinkOid),
@@ -165,8 +167,10 @@ import Lucid
     col_,
     colgroup_,
     crossorigin_,
+    dd_,
     div_,
     doctypehtml_,
+    dt_,
     figcaption_,
     figure_,
     footer_,
@@ -380,6 +384,7 @@ weaveObject object = do
             CListItem {}
             CMathFragment {}
             CParagraph {}
+            CGlossaryTerm {}
             CTable {}
             CBibliography {} -> False
       weaveMain object.orgDoc.meta rearrangedCells
@@ -397,6 +402,7 @@ weaveObject object = do
       CHeading {}
       CListItem {}
       CParagraph {}
+      CGlossaryTerm {}
       CMathFragment {}
       CFigure {}
       CTable {}
@@ -413,6 +419,7 @@ weaveCell (cellIdx, cell) = case cell of
   CFigure figure -> weaveFigure cellIdx figure
   CTable table -> weaveTable cellIdx table
   CFootnote footnote -> weaveFootnote cellIdx footnote
+  CGlossaryTerm glossaryTerm -> weaveGlossaryTerm cellIdx glossaryTerm
   CBibliography _ -> weaveBibliography cellIdx
 
 toSafeHtmlId :: Text -> Text
@@ -515,6 +522,9 @@ getLinkAnchor localCellIdx = \case
      in toSafeHtmlId ref
   CFootnote footnote ->
     let ref = "footnote-" <> footnote.name
+     in toSafeHtmlId ref
+  CGlossaryTerm glossaryTerm ->
+    let ref = "glossary-" <> toSafeHtmlId glossaryTerm.term
      in toSafeHtmlId ref
   CBibliography {} -> ""
 
@@ -1013,6 +1023,34 @@ weaveFootnote cellIdx footnote = do
             weaveProse footnote.body
     | otherwise -> pure ()
 
+weaveGlossaryTerm :: Int -> GlossaryTerm -> HtmlWeaver ()
+weaveGlossaryTerm cellIdx glossaryTerm = do
+  weaveConf <- ask
+  let dlStart :: HtmlWeaver ()
+      dlStart = toHtmlRaw @Text "<dl>"
+      dlEnd :: HtmlWeaver ()
+      dlEnd = toHtmlRaw @Text "</dl>"
+      isGlossaryTerm idx --
+        | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+          Just internalCell <- originObj.orgDoc.cells !!? idx,
+          CGlossaryTerm _ <- internalCell =
+            True
+        | otherwise = False
+      isFirstGlossaryTerm = not . isGlossaryTerm $ cellIdx - 1
+      isLastGlossaryTerm = not . isGlossaryTerm $ cellIdx + 1
+  when (isFirstGlossaryTerm) dlStart --
+  wrapWithDiv cellIdx $ do
+    let maybeInnerVerticalMargin
+          | isFirstGlossaryTerm = []
+          | otherwise = [class_ "inner-dt"]
+    dt_ ([id_ linkAnchor] <> maybeInnerVerticalMargin) $ do
+      toHtml $ glossaryTerm.term
+    dd_ $ do
+      weaveProse glossaryTerm.definition
+  when (isLastGlossaryTerm) dlEnd --
+  where
+    linkAnchor = getLinkAnchor Nothing $ CGlossaryTerm glossaryTerm
+
 commonPrefix :: (Eq a) => [a] -> [a] -> [a]
 commonPrefix xs ys = map fst . takeWhile (\(x, y) -> (x == y)) $ zip xs ys
 
@@ -1271,6 +1309,7 @@ weaveToc cells = do
       CListItem {}
       CMathFragment {}
       CParagraph {}
+      CGlossaryTerm {}
       CTable {}
       CBibliography {} -> (actions, prevLevel)
     closeHeadingLevels :: Int -> HtmlWeaver ()

@@ -209,6 +209,9 @@ data OrgParserState = OrgParserState
     footnoteDefinitions :: Map Text Prose,
     insideFootnoteDefinition :: Maybe Text,
     prevCellIsFootnote :: Bool,
+    glossary :: Map Text Prose,
+    glossaryTermOffset :: Int,
+    insideParagraph :: Bool,
     tanglePaths :: Set Text,
     cslPath :: Maybe FilePath,
     bibPaths :: [FilePath],
@@ -253,6 +256,9 @@ defaultOrgParserState =
       footnoteDefinitions = M.empty,
       insideFootnoteDefinition = Nothing,
       prevCellIsFootnote = False,
+      glossary = M.empty,
+      glossaryTermOffset = 0,
+      insideParagraph = False,
       tanglePaths = Set.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -383,6 +389,7 @@ import Lilac.Types
         CBlock,
         CFigure,
         CFootnote,
+        CGlossaryTerm,
         CHeading,
         CListItem,
         CMathFragment,
@@ -393,6 +400,7 @@ import Lilac.Types
     Cite (Cite, id, locator, prefix, suffix),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
+    GlossaryTerm (GlossaryTerm, definition, term),
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
     Link (Link, name, target),
@@ -477,6 +485,8 @@ import Lilac.Types as OrgParserState
         footnoteDefinitions,
         footnoteNumber,
         footnoteNumbers,
+        glossary,
+        glossaryTermOffset,
         headingLevel,
         headingOidStack,
         headingSectionNumber,
@@ -486,6 +496,7 @@ import Lilac.Types as OrgParserState
         insideFootnoteDefinition,
         insideHeading,
         insideLinkDisplayName,
+        insideParagraph,
         lineLabelNumber,
         lineLabelReferences,
         lineLabels,
@@ -629,6 +640,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:toStyleMask>>
 <<f:styleMaskFlip>>
 <<f:isVerbatim>>
+<<f:isEmptyMask>>
 <<f:compressProse>>
 <<f:compressStyledText>>
 <<f:assertUniqueCellName>>
@@ -695,6 +707,9 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:footnoteDefinitionParser>>
 <<f:reconcileFootnotes>>
 <<f:reconcileLineLabels>>
+<<f:convertToGlossaryTerm>>
+<<f:assertUniqueGlossaryTerm>>
+<<f:isGlossaryTermDelimiter>>
 <<f:validateOidText>>
 <<f:validateCslPath>>
 <<f:collectValsFor>>
@@ -842,6 +857,7 @@ orgDocParser = do
         CHeading {}
         CListItem {}
         CParagraph {}
+        CGlossaryTerm {}
         CBlock {}
         CMathFragment {}
         CFigure {}
@@ -1456,6 +1472,7 @@ data Cell
   | CFigure Figure
   | CTable Table
   | CFootnote Footnote
+  | CGlossaryTerm GlossaryTerm
   | CBibliography ()
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -2850,12 +2867,20 @@ textParser styleMask
   | isCode styleMask =
       MP.takeWhile1P (Just "code") isNotCodeMarker
   | otherwise = do
+      o <- MP.getOffset
       word <-
         MP.choice
           [ MP.try $ slashSeparatedWords,
             MP.label "normal characters" normalChars,
             escapedSymbolParser styleMask
           ]
+      orgParserState <- get
+      let haveNotSeenGlossaryTermDelimiterYet =
+            orgParserState.insideParagraph && orgParserState.glossaryTermOffset == 0
+          wordIsGlossaryTermDelimiter = word == "::" && isEmptyMask styleMask
+
+      when (haveNotSeenGlossaryTermDelimiterYet && wordIsGlossaryTermDelimiter) $ do
+        modify (\s -> s {glossaryTermOffset = o}) -- (ref:glossary-term-delimiter-detection)
       pure word
   where
     isNotVerbatimMarker c = c /= '='
@@ -3113,6 +3138,14 @@ isVerbatim (StyleMask a) = testBit a (fromEnum Verbatim)
 
 isCode :: StyleMask -> Bool
 isCode (StyleMask a) = testBit a (fromEnum Code)
+#+end_src
+
+[[f:isEmptyMask]] checks whether any styles are active.
+
+#+name: f:isEmptyMask
+#+begin_src haskell
+isEmptyMask :: StyleMask -> Bool
+isEmptyMask (StyleMask a) = a == 0
 #+end_src
 
 We stated earlier around [[t:0005-styled-strings-leftover-active-styles]] that we don't
@@ -4900,7 +4933,7 @@ reconcileFootnotes = do
     | otherwise -> pure orgParserState.footnoteNumbers
 #+end_src
 
-** Tests
+*** Tests
 
 Check for broken links.
 
@@ -6599,10 +6632,18 @@ paragraph.
 paragraphParser :: OrgParser Cell
 paragraphParser = do
   orgParserState <- get
+  modify (\s -> s {insideParagraph = True, glossaryTermOffset = 0})
   prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer orgParserState.continuationIndent
   failIfLeftoverActiveStyles
-  pure . CParagraph $ compressProse prose
+  orgParserState' <- get
+  modify (\s -> s {insideParagraph = False})
+  if orgParserState'.glossaryTermOffset > 0
+    then convertToGlossaryTerm prose orgParserState'.glossaryTermOffset -- (ref:check-for-glossaryTerm)
+    else pure . CParagraph $ compressProse prose
 #+end_src
+
+The check at [[(check-for-glossaryTerm)]] is for seeing if the current paragraph
+qualifies as a [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][glossary term]]. If not, we parse it as a normal paragraph.
 
 The [[f:proseSpaceConsumer]] knows how to parse spaces across lines (while taking
 into account the existing level of indentation in the current line, if any).
@@ -9084,7 +9125,7 @@ listItemsEndParser :: OrgParser Cell
 listItemsEndParser = do
   orgParserState <- get
   when (null orgParserState.listMarkers) $ do
-    fail "no pending ListMarker objects to close off"
+    fail "no pending ListMarker objects to close off" -- (ref:list-items-end-failure-with-no-input)
   when (orgParserState.continuationIndent /= 0) $ do
     fail "not at beginning of line"
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
@@ -10104,6 +10145,199 @@ shouldFailWithMessage
   "starting list head number must be 0 or 1; got 20"
   25
 #+end_src
+
+* Description lists, aka glossary terms
+:PROPERTIES:
+:ID:       73acf466-6941-4c3b-9d6d-e0843d9b0480
+:END:
+
+[[https://orgmode.org/manual/Plain-Lists.html][Description lists]] are unordered list items that have a term followed by two
+colons (~::~), and a prose description of that term. Structurally they are quite
+similar to footnote definitions, which also have a leading ~name~ followed by the
+~body~ (see [[data:Footnote]]).
+
+The term "description list" comes from [[https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/dl][HTML]], and it would appear that Orgmode
+borrowed the idea quite directly. For example, vanilla Orgmode will export the
+following Org syntax
+
+#+begin_src org
+  - foo /hello/ :: bar
+
+  - baz :: quux
+#+end_src
+
+to HTML as
+
+#+begin_src html
+<dl class="org-dl">
+<dt>foo <i>hello</i></dt><dd>bar</dd>
+
+<dt>baz</dt><dd>quux</dd>
+</dl>
+#+end_src
+
+In HTML it is perfectly valid to have multiple ~<dt>~ (term) elements, or multiple
+~<dd>~ (definition) elements, or both.
+
+There are three differences worth noting for Lilac:
+
+   1) Only one term and one description is allowed. If multiple terms mean the
+      same thing, there should be multiple entries and all but one should
+      redirect (with a link) to the entry that has the full definition. Multiple
+      definitions for a single term are not allowed. Instead, you should use
+      terms like ~foo (1) :: ...~ and ~foo (2) :: ...~ to define two different
+      definitions for the same term.
+
+   2) We don't call these description lists because that language is
+      too close to the implementation detail. Instead we call them "glossary
+      terms" (or simply "terms") because that's what they are used for most of
+      the time.
+
+      The other use case is for describing multiple key-value pairs,
+      where all the pairs describe the same bigger concept. For example, the
+      keys /Name/, /Birth date/, /City of birth/, etc could be used for describing a
+      person. However Lilac does not support this use case.
+
+   3) Lilac treats each key-value pair as a single [[data:Cell]]. And so, you can
+      write them anywhere a cell is expected. So whereas Orgmode only allows
+      them inside unordered lists, in Lilac you can write them as their own
+      independent paragraphs, or in ordered lists, etc.
+
+      This way Lilac can mix and match description list items with other items
+      (it does not need the [[https://emacs.stackexchange.com/questions/17244/org-mode-list-with-a-mix-of-unordered-and-description-list-items][Orgmode workarounds described here]]). See
+      [[id:eee95795-b51b-4de5-b39d-8dda436da451][how glossary terms are woven]] to see how this plays out during HTML export.
+
+With those things out of the way, let's look at [[data:GlossaryTerm]], our take on
+definition list entries:
+
+#+name: data:GlossaryTerm
+#+begin_src haskell
+type GlossaryTerm :: Type
+data GlossaryTerm = GlossaryTerm
+  { term :: Text,
+    definition :: Prose
+  }
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+Glossary terms are created from [[newtype:Prose]] in [[f:convertToGlossaryTerm]]. A
+paragraph is checked if it looks like a glossary term entry in
+[[f:paragraphParser]], and delegates to [[f:convertToGlossaryTerm]] if so.
+
+#+name: f:convertToGlossaryTerm
+#+begin_src haskell
+convertToGlossaryTerm :: Prose -> Int -> OrgParser Cell
+convertToGlossaryTerm prose offset =
+  toGlossaryTerm
+    $ foldl' f ([], "", []) prose.unProse
+  where
+    f (termPTokens, term', def) pToken
+      | term' == "" =
+          if isGlossaryTermDelimiter pToken
+            then
+              ( termPTokens,
+                toText . Prose . reverse $ dropWhitespacePToken termPTokens,
+                def
+              )
+            else (pToken : termPTokens, term', def)
+      | otherwise = (termPTokens, term', pToken : def)
+    dropWhitespacePToken :: [PToken] -> [PToken] -- (ref:dropWhitespacePToken)
+    dropWhitespacePToken [] = []
+    dropWhitespacePToken tokens@(pToken : rest)
+      | (PTokenStyledText styledText) <- pToken,
+        Just (_, ' ') <- T.unsnoc styledText.body =
+          rest
+      | otherwise = tokens
+    toGlossaryTerm :: ([PToken], Text, [PToken]) -> OrgParser Cell
+    toGlossaryTerm (_, term', def) = do
+      let proseDefinition = compressProse . Prose $ reverse def
+      assertUniqueGlossaryTerm term' proseDefinition offset
+      pure
+        $ CGlossaryTerm
+          GlossaryTerm
+            { term = term',
+              definition = proseDefinition
+            }
+#+end_src
+
+[[(dropWhitespacePToken)]] removes any whitespace token just before the ~::~
+delimiter. This is needed because otherwise the ~term~ string will end with
+trailing whitespace.
+
+[[f:convertToGlossaryTerm]] just checks each ~PToken~ in ~prose~ if it looks like a
+glossary term delimiter, via [[f:isGlossaryTermDelimiter]].
+
+#+name: f:isGlossaryTermDelimiter
+#+begin_src haskell
+isGlossaryTermDelimiter :: PToken -> Bool
+isGlossaryTermDelimiter = \case
+  PTokenStyledText styledText ->
+    styledText.body == "::" && maskToStyles styledText.style == []
+  _ -> False
+#+end_src
+
+The important bit here is the check of whether no styles are on when
+encountering the string ~::~. This way, we don't interpret strings like
+
+#+begin_src org
+Foo ~a::b~ bar.
+#+end_src
+
+as a glossary term because the ~::~ will be inside the code (=~=) delimiters.
+
+You may be thinking why we don't just use a raw string for the term (why do we
+check each ~PToken~ individually in [[f:convertToGlossaryTerm]]?). The reasons is because
+otherwise, a string like ~foo =a::b=~ will be interpreted as a glossary term of
+~foo =a~ and a definition of ~b=~. So the search for the delimiter /must/ take into
+account style markers, and the only way to do that is with ~PToken~ values.
+
+#+name: f:assertUniqueGlossaryTerm
+#+begin_src haskell
+assertUniqueGlossaryTerm :: Text -> Prose -> Int -> OrgParser ()
+assertUniqueGlossaryTerm term proseDefinition offset = do
+  orgParserState <- get
+  when (member term orgParserState.glossary) $ do
+    MP.setOffset offset -- (ref:glossary-term-offset)
+    fail -- (ref:fail-because-duplicate-term)
+      $ "glossary term "
+      <> show term
+      <> " is not unique"
+  put
+    orgParserState
+      { glossary =
+          insert
+            term
+            proseDefinition
+            orgParserState.glossary
+      }
+#+end_src
+
+#+name: ti:0015-glossary-duplicate-term
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-duplicate-term
+#+begin_src org
+foo :: 1
+
+foo :: 2
+#+end_src
+
+#+name: t:0015-glossary-duplicate-term
+#+begin_src haskell
+shouldFailWithMessage
+  "0015-glossary-duplicate-term"
+  "glossary term \"foo\" is not unique"
+  14
+#+end_src
+
+Originally we naively set the [[(glossary-term-offset)]] to be the beginning of the
+paragraph (as seen by [[f:paragraphParser]]). However, this had the side effect of
+making Megaparsec think that we had not consumed any input when failing at
+[[(fail-because-duplicate-term)]]. So then Megaparsec would also report other parser
+errors for those parsers that also did not consume any input and still signaled
+a failure in [[f:cellParser]], namely in [[f:listItemsEndParser]]
+([[(list-items-end-failure-with-no-input)]]). In order to suppress that error, we
+changed [[f:textParser]] to set a ~glossaryTermOffset~ if it detected the glossary
+term delimiter ([[(glossary-term-delimiter-detection)]]) [fn:megaparsec-errors].
 
 * Standalone math fragments
 :PROPERTIES:
@@ -11935,6 +12169,7 @@ parseSpec = do
   <<t:0014-citations-missing-bib-entries>>
   <<Text to Prose round trip>>
   <<Drop text chars from Prose>>
+  <<t:0015-glossary-duplicate-term>>
 #+end_src
 
 * Footnotes
@@ -11945,3 +12180,8 @@ avoid any unintentional overlap of meaning.
 
 [fn:semigroup-monoid-for-list] For example, see [[https://hackage.haskell.org/package/ghc-internal-9.1201.0/docs/src/GHC.Internal.Base.html#line-713][the implementation for GHC
 9.12]] (found via [[https://hackage.haskell.org/package/base-4.21.0.0/docs/Data-Semigroup.html#t:Semigroup][base-4.21.0.0]]).
+
+[fn:megaparsec-errors] We're supposed to use things like ~MP.region~ or
+~MP.parseError~ according to the [[https://markkarpov.com/tutorial/megaparsec.html#controlling-location-of-parse-errors][Megaparsec tutorial]], but it doesn't seem to work
+(at least with the way we've constructed things with relation to our use of
+[[f:listItemsEndParser]] in [[f:cellParser]]).

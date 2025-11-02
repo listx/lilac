@@ -100,6 +100,7 @@ import Lilac.Types
         CBlock,
         CFigure,
         CFootnote,
+        CGlossaryTerm,
         CHeading,
         CListItem,
         CMathFragment,
@@ -110,6 +111,7 @@ import Lilac.Types
     Cite (Cite, id, locator, prefix, suffix),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
+    GlossaryTerm (GlossaryTerm, definition, term),
     Heading (Heading, body, level, meta, section),
     Level (Level, indent, number),
     Link (Link, name, target),
@@ -194,6 +196,8 @@ import Lilac.Types as OrgParserState
         footnoteDefinitions,
         footnoteNumber,
         footnoteNumbers,
+        glossary,
+        glossaryTermOffset,
         headingLevel,
         headingOidStack,
         headingSectionNumber,
@@ -203,6 +207,7 @@ import Lilac.Types as OrgParserState
         insideFootnoteDefinition,
         insideHeading,
         insideLinkDisplayName,
+        insideParagraph,
         lineLabelNumber,
         lineLabelReferences,
         lineLabels,
@@ -361,6 +366,7 @@ orgDocParser = do
         CHeading {}
         CListItem {}
         CParagraph {}
+        CGlossaryTerm {}
         CBlock {}
         CMathFragment {}
         CFigure {}
@@ -786,12 +792,20 @@ textParser styleMask
   | isCode styleMask =
       MP.takeWhile1P (Just "code") isNotCodeMarker
   | otherwise = do
+      o <- MP.getOffset
       word <-
         MP.choice
           [ MP.try $ slashSeparatedWords,
             MP.label "normal characters" normalChars,
             escapedSymbolParser styleMask
           ]
+      orgParserState <- get
+      let haveNotSeenGlossaryTermDelimiterYet =
+            orgParserState.insideParagraph && orgParserState.glossaryTermOffset == 0
+          wordIsGlossaryTermDelimiter = word == "::" && isEmptyMask styleMask
+
+      when (haveNotSeenGlossaryTermDelimiterYet && wordIsGlossaryTermDelimiter) $ do
+        modify (\s -> s {glossaryTermOffset = o}) --
       pure word
   where
     isNotVerbatimMarker c = c /= '='
@@ -916,6 +930,9 @@ isVerbatim (StyleMask a) = testBit a (fromEnum Verbatim)
 
 isCode :: StyleMask -> Bool
 isCode (StyleMask a) = testBit a (fromEnum Code)
+
+isEmptyMask :: StyleMask -> Bool
+isEmptyMask (StyleMask a) = a == 0
 
 compressProse :: Prose -> Prose
 compressProse prose =
@@ -1156,9 +1173,14 @@ mathFragmentInlineParser = do
 paragraphParser :: OrgParser Cell
 paragraphParser = do
   orgParserState <- get
+  modify (\s -> s {insideParagraph = True, glossaryTermOffset = 0})
   prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer orgParserState.continuationIndent
   failIfLeftoverActiveStyles
-  pure . CParagraph $ compressProse prose
+  orgParserState' <- get
+  modify (\s -> s {insideParagraph = False})
+  if orgParserState'.glossaryTermOffset > 0
+    then convertToGlossaryTerm prose orgParserState'.glossaryTermOffset --
+    else pure . CParagraph $ compressProse prose
 
 newlineAndIndentParser :: Int -> OrgParser Text
 newlineAndIndentParser expectedIndentLen = do
@@ -1615,7 +1637,7 @@ listItemsEndParser :: OrgParser Cell
 listItemsEndParser = do
   orgParserState <- get
   when (null orgParserState.listMarkers) $ do
-    fail "no pending ListMarker objects to close off"
+    fail "no pending ListMarker objects to close off" --
   when (orgParserState.continuationIndent /= 0) $ do
     fail "not at beginning of line"
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
@@ -2106,6 +2128,63 @@ reconcileLineLabels = do
     | hasBrokenLinks -> fail $ "broken line label links: " <> brokenLinksMsg
     | hasUnusedDefs -> fail $ "unused line labels: " <> unusedDefsMsg
     | otherwise -> pure orgParserState.lineLabels
+
+convertToGlossaryTerm :: Prose -> Int -> OrgParser Cell
+convertToGlossaryTerm prose offset =
+  toGlossaryTerm
+    $ foldl' f ([], "", []) prose.unProse
+  where
+    f (termPTokens, term', def) pToken
+      | term' == "" =
+          if isGlossaryTermDelimiter pToken
+            then
+              ( termPTokens,
+                toText . Prose . reverse $ dropWhitespacePToken termPTokens,
+                def
+              )
+            else (pToken : termPTokens, term', def)
+      | otherwise = (termPTokens, term', pToken : def)
+    dropWhitespacePToken :: [PToken] -> [PToken] --
+    dropWhitespacePToken [] = []
+    dropWhitespacePToken tokens@(pToken : rest)
+      | (PTokenStyledText styledText) <- pToken,
+        Just (_, ' ') <- T.unsnoc styledText.body =
+          rest
+      | otherwise = tokens
+    toGlossaryTerm :: ([PToken], Text, [PToken]) -> OrgParser Cell
+    toGlossaryTerm (_, term', def) = do
+      let proseDefinition = compressProse . Prose $ reverse def
+      assertUniqueGlossaryTerm term' proseDefinition offset
+      pure
+        $ CGlossaryTerm
+          GlossaryTerm
+            { term = term',
+              definition = proseDefinition
+            }
+
+assertUniqueGlossaryTerm :: Text -> Prose -> Int -> OrgParser ()
+assertUniqueGlossaryTerm term proseDefinition offset = do
+  orgParserState <- get
+  when (member term orgParserState.glossary) $ do
+    MP.setOffset offset --
+    fail --
+      $ "glossary term "
+      <> show term
+      <> " is not unique"
+  put
+    orgParserState
+      { glossary =
+          insert
+            term
+            proseDefinition
+            orgParserState.glossary
+      }
+
+isGlossaryTermDelimiter :: PToken -> Bool
+isGlossaryTermDelimiter = \case
+  PTokenStyledText styledText ->
+    styledText.body == "::" && maskToStyles styledText.style == []
+  _ -> False
 
 validateOidText :: (MonadFail m) => Text -> m OID
 validateOidText oidText = case Lilac.Types.fromText oidText of

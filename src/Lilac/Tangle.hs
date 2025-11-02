@@ -10,6 +10,7 @@ import Lilac.Types
         CBlock,
         CFigure,
         CFootnote,
+        CGlossaryTerm,
         CHeading,
         CListItem,
         CMathFragment,
@@ -68,6 +69,7 @@ expandRootBlocks archive outDir = map expandRootBlock rootBlocks
             CFigure {}
             CTable {}
             CFootnote {}
+            CGlossaryTerm {}
             CBibliography {} -> acc
       | otherwise = acc
     expandRootBlock :: (OsPath, Block) -> (OsPath, Text)

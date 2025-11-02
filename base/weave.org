@@ -226,6 +226,7 @@ import Lilac.Types
         CBlock,
         CFigure,
         CFootnote,
+        CGlossaryTerm,
         CHeading,
         CListItem,
         CMathFragment,
@@ -237,6 +238,7 @@ import Lilac.Types
     Figure (caption, link, meta),
     Footnote (body, name),
     GPath,
+    GlossaryTerm (definition, term),
     Heading (body, level, section),
     Link (Link, name, target),
     LinkOid (LinkOid),
@@ -320,8 +322,10 @@ import Lucid
     col_,
     colgroup_,
     crossorigin_,
+    dd_,
     div_,
     doctypehtml_,
+    dt_,
     figcaption_,
     figure_,
     footer_,
@@ -486,6 +490,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:getRelativeCssPath>>
 <<f:getRelativeJsPath>>
 <<f:weaveFootnote>>
+<<f:weaveGlossaryTerm>>
 <<f:commonPrefix>>
 <<f:renderAsText>>
 <<f:proseToCslJsonText>>
@@ -634,6 +639,7 @@ weaveObject object = do
             CListItem {}
             CMathFragment {}
             CParagraph {}
+            CGlossaryTerm {}
             CTable {}
             CBibliography {} -> False
       weaveMain object.orgDoc.meta rearrangedCells
@@ -646,6 +652,7 @@ weaveObject object = do
       CHeading {}
       CListItem {}
       CParagraph {}
+      CGlossaryTerm {}
       CMathFragment {}
       CFigure {}
       CTable {}
@@ -681,6 +688,7 @@ weaveCell (cellIdx, cell) = case cell of
   CFigure figure -> weaveFigure cellIdx figure
   CTable table -> weaveTable cellIdx table
   CFootnote footnote -> weaveFootnote cellIdx footnote
+  CGlossaryTerm glossaryTerm -> weaveGlossaryTerm cellIdx glossaryTerm
   CBibliography _ -> weaveBibliography cellIdx
 #+end_src
 
@@ -935,6 +943,9 @@ getLinkAnchor localCellIdx = \case
      in toSafeHtmlId ref
   CFootnote footnote ->
     let ref = "footnote-" <> footnote.name
+     in toSafeHtmlId ref
+  CGlossaryTerm glossaryTerm ->
+    let ref = "glossary-" <> toSafeHtmlId glossaryTerm.term
      in toSafeHtmlId ref
   CBibliography {} -> ""
 #+end_src
@@ -1932,6 +1943,72 @@ weaveFootnote cellIdx footnote = do
             weaveProse footnote.body
     | otherwise -> pure ()
 #+end_src
+
+** Glossary terms
+:PROPERTIES:
+:ID:       eee95795-b51b-4de5-b39d-8dda436da451
+:END:
+
+[[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Description lists, aka glossary terms]] are similar to footnote definitions in
+that they are mostly composed of paragraphs. So [[f:weaveProse]] again does most of
+the work.
+
+#+name: f:weaveGlossaryTerm
+#+begin_src haskell
+weaveGlossaryTerm :: Int -> GlossaryTerm -> HtmlWeaver ()
+weaveGlossaryTerm cellIdx glossaryTerm = do
+  weaveConf <- ask
+  let dlStart :: HtmlWeaver ()
+      dlStart = toHtmlRaw @Text "<dl>"
+      dlEnd :: HtmlWeaver ()
+      dlEnd = toHtmlRaw @Text "</dl>"
+      isGlossaryTerm idx -- (ref:isGlossaryTerm)
+        | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+          Just internalCell <- originObj.orgDoc.cells !!? idx,
+          CGlossaryTerm _ <- internalCell =
+            True
+        | otherwise = False
+      isFirstGlossaryTerm = not . isGlossaryTerm $ cellIdx - 1
+      isLastGlossaryTerm = not . isGlossaryTerm $ cellIdx + 1
+  when (isFirstGlossaryTerm) dlStart -- (ref:use-dlStart)
+  wrapWithDiv cellIdx $ do
+    let maybeInnerVerticalMargin
+          | isFirstGlossaryTerm = []
+          | otherwise = [class_ "inner-dt"]
+    dt_ ([id_ linkAnchor] <> maybeInnerVerticalMargin) $ do
+      toHtml $ glossaryTerm.term
+    dd_ $ do
+      weaveProse glossaryTerm.definition
+  when (isLastGlossaryTerm) dlEnd -- (ref:use-dlEnd)
+  where
+    linkAnchor = getLinkAnchor Nothing $ CGlossaryTerm glossaryTerm
+#+end_src
+
+We don't wrap everything inside a ~<dl>~ tag because it may be the case that many
+more glossary terms exist after this (current) cell being woven. In that case,
+we want to close off the ~<dl>~ only at the very end. That's what [[(use-dlStart)]]
+and [[(use-dlEnd)]] are for. The ~isGlossaryTerm~ helper at [[(isGlossaryTerm)]] checks if the
+given cell index points to a glossary term cell, /and/ that it is for the same
+(current) object being woven (we may cross over into another object because the
+~cellIdx~ is a global cell index across all objects in an [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]).
+
+The ~dlStart~ and ~dlEnd~ bits don't really mean much if we have glossary terms
+inside list items, because each list item marker in between each item will break
+up the continuity of glossary terms. So we'll end up with multiple singleton
+description lists (each with just one glossary term in it) instead of just one
+description list tag.
+
+For example, look at the HTML for the following:
+
+  - a :: This is in its own ~<dl>~ tag.
+
+  - b :: This is also in its own (separate) ~<dl>~ tag.
+
+Contrast this with the following which share the same ~<dl>~ tag:
+
+c :: x
+
+d :: y
 
 ** Citations
 :PROPERTIES:
@@ -3156,6 +3233,7 @@ weaveToc cells = do
       CListItem {}
       CMathFragment {}
       CParagraph {}
+      CGlossaryTerm {}
       CTable {}
       CBibliography {} -> (actions, prevLevel)
     closeHeadingLevels :: Int -> HtmlWeaver ()
@@ -3974,8 +4052,11 @@ import Clay
     color,
     column,
     content,
+    dd,
     display,
     div,
+    dl,
+    dt,
     em,
     figcaption,
     fitContent,
@@ -4003,6 +4084,7 @@ import Clay
     hover,
     hr,
     html,
+    inline,
     inlineBlock,
     italic,
     left,
@@ -4059,6 +4141,7 @@ import Clay
     vAlignSuper,
     verticalAlign,
     vh,
+    whiteSpace,
     width,
     (#),
     (&),
@@ -4067,6 +4150,7 @@ import Clay
     (?),
     (|>),
   )
+import Clay.Text qualified as ClayText
 import Data.Bits
   ( shiftR,
     (.&.),
@@ -4182,6 +4266,7 @@ defaultCss = do
   <<css:Tables>>
   <<css:Citations>>
   <<css:Footnotes>>
+  <<css:Glossary terms>>
   <<css:Document metadata>>
 #+end_src
 
@@ -4741,6 +4826,33 @@ sup ? do
             borderStyle none
             textDecoration underline
 #+end_src
+
+** Glossary terms
+
+For glossary terms, we want to place the definition (~<dd>~) on the /same line/ as
+the term (~<dt>~). To do this we place a newline character (the string ~\a~ in CSS)
+after a ~<dd>~ at [[(newline-after-dd)]].
+
+#+name: css:Glossary terms
+#+begin_src haskell
+dl ? do
+  marginTop $ rem 1
+dt ? do
+  display inlineBlock
+  fontWeight bold
+  fontSans
+  ".inner-dt" & do
+    marginTop $ rem 1
+dd ? do
+  display inline
+  marginLeft (rem 0.5)
+  "::after" & do
+    "content" -: "\"\\a\"" -- (ref:newline-after-dd)
+    whiteSpace ClayText.pre
+#+end_src
+
+See [[https://stackoverflow.com/a/66030381/437583][this StackOverflow post]] for more discussion around styling description lists
+this way.
 
 ** Citations
 

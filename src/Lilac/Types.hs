@@ -8,6 +8,7 @@ module Lilac.Types
     Figure (..),
     Footnote (..),
     GPath,
+    GlossaryTerm (..),
     Heading (..),
     Level (..),
     Link (..),
@@ -158,6 +159,7 @@ data Cell
   | CFigure Figure
   | CTable Table
   | CFootnote Footnote
+  | CGlossaryTerm GlossaryTerm
   | CBibliography ()
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -348,6 +350,9 @@ data OrgParserState = OrgParserState
     footnoteDefinitions :: Map Text Prose,
     insideFootnoteDefinition :: Maybe Text,
     prevCellIsFootnote :: Bool,
+    glossary :: Map Text Prose,
+    glossaryTermOffset :: Int,
+    insideParagraph :: Bool,
     tanglePaths :: Set Text,
     cslPath :: Maybe FilePath,
     bibPaths :: [FilePath],
@@ -389,6 +394,9 @@ defaultOrgParserState =
       footnoteDefinitions = M.empty,
       insideFootnoteDefinition = Nothing,
       prevCellIsFootnote = False,
+      glossary = M.empty,
+      glossaryTermOffset = 0,
+      insideParagraph = False,
       tanglePaths = Set.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -490,6 +498,14 @@ type Footnote :: Type
 data Footnote = Footnote
   { name :: Text,
     body :: Prose
+  }
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
+type GlossaryTerm :: Type
+data GlossaryTerm = GlossaryTerm
+  { term :: Text,
+    definition :: Prose
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -647,6 +663,13 @@ cellIdxToName archive offset globalCellIdx
                 PTokenStyledText $ StyledText {body = cellRef, style = styleMaskFrom [Verbatim]},
                 PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
               ]
+        CGlossaryTerm glossaryTerm ->
+          Just
+            $ Prose
+              [ PTokenStyledText $ StyledText {body = "✿" <> glossaryTerm.term <> " (", style = styleMaskFrom []},
+                PTokenStyledText $ StyledText {body = cellRef, style = styleMaskFrom [Verbatim]},
+                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+              ]
         CFigure figure
           | Just name <- lookup "name" figure.meta -> verbatim name
           | Just figureNum <- lookup "__figure_number" figure.meta ->
@@ -709,6 +732,7 @@ getCellName = \case
     | otherwise -> Nothing
   CHeading {}
   CParagraph {}
+  CGlossaryTerm {}
   CListItem {}
   CBibliography {} -> Nothing
   where

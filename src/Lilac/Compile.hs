@@ -37,6 +37,7 @@ import Lilac.Types
         CBlock,
         CFigure,
         CFootnote,
+        CGlossaryTerm,
         CHeading,
         CListItem,
         CMathFragment,
@@ -45,6 +46,7 @@ import Lilac.Types
       ),
     Figure (meta, parentOid),
     GPath,
+    GlossaryTerm (definition),
     Heading (body, meta),
     Link (target),
     LinkOid (LinkOid, name, oid),
@@ -156,6 +158,7 @@ mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
       CFootnote {}
       CListItem {}
       CParagraph {}
+      CGlossaryTerm {}
       CBibliography {} -> []
     getSymbols :: OID -> Map Text Text -> Int -> [(LinkOid, Int)]
     getSymbols parentOid cellMeta localCellIdx =
@@ -359,6 +362,7 @@ findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
             CHeading {}
             CListItem {}
             CParagraph {}
+            CGlossaryTerm {}
             CMathFragment {}
             CFigure {}
             CTable {}
@@ -395,6 +399,7 @@ findExternalOids orgDoc =
       CBlock block -> foldl' g [] block.body
       CHeading heading -> foldl' h [] heading.body.unProse
       CParagraph prose -> foldl' h [] prose.unProse
+      CGlossaryTerm glossaryTerm -> foldl' h [] glossaryTerm.definition.unProse
       CTable table -> foldl' (\acc prose -> foldl' h acc prose.unProse) [] table.grid
       CFigure {}
       CFootnote {}
