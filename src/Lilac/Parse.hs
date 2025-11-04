@@ -2132,14 +2132,14 @@ reconcileLineLabels = do
 convertToGlossaryTerm :: Prose -> Int -> OrgParser Cell
 convertToGlossaryTerm prose offset =
   toGlossaryTerm
-    $ foldl' f ([], "", []) prose.unProse
+    $ foldl' f ([], Prose [], []) prose.unProse
   where
-    f (termPTokens, term', def) pToken
-      | term' == "" =
+    f (termPTokens, term'@(Prose finalTermPTokens), def) pToken
+      | finalTermPTokens == [] =
           if isGlossaryTermDelimiter pToken
             then
               ( termPTokens,
-                toText . Prose . reverse $ dropWhitespacePToken termPTokens,
+                Prose . reverse $ dropWhitespacePToken termPTokens,
                 def
               )
             else (pToken : termPTokens, term', def)
@@ -2151,10 +2151,10 @@ convertToGlossaryTerm prose offset =
         Just (_, ' ') <- T.unsnoc styledText.body =
           rest
       | otherwise = tokens
-    toGlossaryTerm :: ([PToken], Text, [PToken]) -> OrgParser Cell
+    toGlossaryTerm :: ([PToken], Prose, [PToken]) -> OrgParser Cell
     toGlossaryTerm (_, term', def) = do
       let proseDefinition = compressProse . Prose $ reverse def
-      assertUniqueGlossaryTerm term' proseDefinition offset
+      assertUniqueGlossaryTerm (toText term') proseDefinition offset
       pure
         $ CGlossaryTerm
           GlossaryTerm

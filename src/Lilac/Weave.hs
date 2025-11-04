@@ -44,7 +44,7 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding qualified as TLE
-import Lilac.Compile (makeRelativeToObjectPath, parseCitationStyle)
+import Lilac.Compile (cellIdxToName, makeRelativeToObjectPath, parseCitationStyle)
 import Lilac.Parse
   ( compressProse,
     compressStyledText,
@@ -143,7 +143,6 @@ import Lilac.Types
         outDir,
         projectConf
       ),
-    cellIdxToName,
     cellIdxToObjCell,
     decodeGPath,
     getCellName,
@@ -524,7 +523,7 @@ getLinkAnchor localCellIdx = \case
     let ref = "footnote-" <> footnote.name
      in toSafeHtmlId ref
   CGlossaryTerm glossaryTerm ->
-    let ref = "glossary-" <> toSafeHtmlId glossaryTerm.term
+    let ref = "glossary-" <> toSafeHtmlId (CP.toText @Prose glossaryTerm.term)
      in toSafeHtmlId ref
   CBibliography {} -> ""
 
@@ -1044,7 +1043,7 @@ weaveGlossaryTerm cellIdx glossaryTerm = do
           | isFirstGlossaryTerm = []
           | otherwise = [class_ "inner-dt"]
     dt_ ([id_ linkAnchor] <> maybeInnerVerticalMargin) $ do
-      toHtml $ glossaryTerm.term
+      weaveProse glossaryTerm.term
     dd_ $ do
       weaveProse glossaryTerm.definition
   when (isLastGlossaryTerm) dlEnd --

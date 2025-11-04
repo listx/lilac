@@ -32,7 +32,6 @@ module Lilac.Types
     StyledText (..),
     Table (..),
     WeaveConf (..),
-    cellIdxToName,
     cellIdxToObjCell,
     decodeGPath,
     defaultOrgParserConf,
@@ -504,7 +503,7 @@ data Footnote = Footnote
 
 type GlossaryTerm :: Type
 data GlossaryTerm = GlossaryTerm
-  { term :: Text,
+  { term :: Prose,
     definition :: Prose
   }
   deriving stock (Eq, Ord, Generic, Show)
@@ -649,63 +648,6 @@ cellIdxToObjCell archive globalCellIdx
     Just cell <- obj.orgDoc.cells !!? (globalCellIdx - offset) =
       Just (obj, cell)
   | otherwise = Nothing
-
-cellIdxToName :: Archive -> Int -> Int -> Maybe Prose
-cellIdxToName archive offset globalCellIdx
-  | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
-      case cell of
-        CHeading heading ->
-          plain $ "§ " <> (getSectionNumber heading) <> " " <> (getProseContents heading.body)
-        CParagraph _ ->
-          Just
-            $ Prose
-              [ PTokenStyledText $ StyledText {body = "¶ (", style = styleMaskFrom []},
-                PTokenStyledText $ StyledText {body = cellRef, style = styleMaskFrom [Verbatim]},
-                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
-              ]
-        CGlossaryTerm glossaryTerm ->
-          Just
-            $ Prose
-              [ PTokenStyledText $ StyledText {body = "✿" <> glossaryTerm.term <> " (", style = styleMaskFrom []},
-                PTokenStyledText $ StyledText {body = cellRef, style = styleMaskFrom [Verbatim]},
-                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
-              ]
-        CFigure figure
-          | Just name <- lookup "name" figure.meta -> verbatim name
-          | Just figureNum <- lookup "__figure_number" figure.meta ->
-              plain $ "Figure " <> figureNum
-          | otherwise -> plain "Figure"
-        CTable table
-          | Just name <- lookup "name" table.meta -> verbatim name
-          | Just tableNum <- lookup "__table_number" table.meta ->
-              plain $ "Table " <> tableNum
-          | otherwise -> plain "Table"
-        CFootnote footnote ->
-          Just
-            $ Prose
-              [ PTokenStyledText $ StyledText {body = "Footnote (", style = styleMaskFrom []},
-                PTokenStyledText $ StyledText {body = "fn:" <> footnote.name, style = styleMaskFrom [Verbatim]},
-                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
-              ]
-        CBlock block
-          | Just name <- lookup "name" block.meta ->
-              verbatim name
-          | otherwise -> plain $ "Anonymous Block" <> cellRef
-        CMathFragment mathFragment
-          | Just name <- lookup "name" mathFragment.meta ->
-              verbatim name
-          | Just eqNum <- lookup "__equation_number" mathFragment.meta ->
-              plain $ "Equation " <> eqNum
-          | Just eqNum <- lookup "__equation_anon_number" mathFragment.meta ->
-              plain $ "Anonymous Equation " <> eqNum
-          | otherwise -> plain "Math Fragment"
-        CListItem {}
-        CBibliography {} -> Nothing
-  | otherwise = Nothing
-  where
-    cellRef = "Cell " <> (T.show $ globalCellIdx - offset)
-    plain body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom []}]
-    verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
 
 getCellName :: Cell -> Maybe Prose
 getCellName = \case

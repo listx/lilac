@@ -15,7 +15,8 @@ be tangled or weaved.
 #+header: :tangle src/Lilac/Compile.hs
 #+begin_src haskell
 module Lilac.Compile
-  ( cumulativeOffsets,
+  ( cellIdxToName,
+    cumulativeOffsets,
     findCycles,
     findExternalOids,
     makeRelativeToObjectPath,
@@ -61,8 +62,9 @@ import Lilac.Types
         CTable
       ),
     Figure (meta, parentOid),
+    Footnote (name),
     GPath,
-    GlossaryTerm (definition),
+    GlossaryTerm (definition, term),
     Heading (body, meta),
     Link (target),
     LinkOid (LinkOid, name, oid),
@@ -85,12 +87,17 @@ import Lilac.Types
         PTokenMathFragment,
         PTokenStyledText
       ),
-    Prose (unProse),
+    Prose (Prose, unProse),
     PseudoEdge (PseudoEdge),
+    Style (Verbatim),
+    StyledText (StyledText, body, style),
     Table (grid, meta, parentOid),
     cellIdxToObjCell,
     decodeGPath,
     encodeGPath,
+    getProseContents,
+    getSectionNumber,
+    styleMaskFrom,
   )
 import Lilac.Util qualified as LU
 import Relude
@@ -160,6 +167,7 @@ import System.OsPath qualified as P
 <<f:getBibliography>>
 <<f:parseBibliography>>
 <<f:makeRelativeToObjectPath>>
+<<f:cellIdxToName>>
 #+end_src
 
 * Object generation
@@ -904,7 +912,7 @@ cellIdxToName archive offset globalCellIdx
         CGlossaryTerm glossaryTerm ->
           Just
             $ Prose
-              [ PTokenStyledText $ StyledText {body = "✿" <> glossaryTerm.term <> " (", style = styleMaskFrom []},
+              [ PTokenStyledText $ StyledText {body = "✿ " <> (CP.toText @Prose glossaryTerm.term) <> " (", style = styleMaskFrom []},
                 PTokenStyledText $ StyledText {body = cellRef, style = styleMaskFrom [Verbatim]},
                 PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
               ]
