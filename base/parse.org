@@ -385,8 +385,8 @@ import Lilac.Types
   ( BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell
-      ( CBibliography,
-        CBlock,
+      ( CBlock,
+        CCommand,
         CFigure,
         CFootnote,
         CGlossaryTerm,
@@ -398,6 +398,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
+    Command (PrintBibliography),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     GlossaryTerm (GlossaryTerm, definition, term),
@@ -863,7 +864,7 @@ orgDocParser = do
         CFigure {}
         CTable {}
         CFootnote {}
-        CBibliography {} -> True
+        CCommand {} -> True
   let meaningfulCells = filter meaningfulCell cells
   when (orgParserState.cellNumber /= length meaningfulCells)
     $ fail ("mismatch: cellNumber: " <> show orgParserState.cellNumber <> " len meaningfulCells: " <> (show $ length meaningfulCells))
@@ -1473,7 +1474,7 @@ data Cell
   | CTable Table
   | CFootnote Footnote
   | CGlossaryTerm GlossaryTerm
-  | CBibliography ()
+  | CCommand Command
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
@@ -1482,6 +1483,17 @@ All of the different cell types describe some sort of content, except for one,
 =CListItem=. The =CListItem= is purely structural because it only describes itself
 and relies on /other cells/ for displaying any useful information. See
 [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]] to see how this is used.
+
+The [[data:Command]] encodes information about /generated/ content, such as [[id:e24de101-bf1d-418b-a18f-b1a98fea9696][Printing bibliographies]].
+
+#+name: data:Command
+#+begin_src haskell
+type Command :: Type
+data Command
+  = PrintBibliography
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
 
 The =cellParser= is responsible for parsing these different recognized values of
 [[data:Cell]].
@@ -5309,7 +5321,7 @@ bibliographyLocationParser = do
     $ fail "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
   when (orgParserState.bibPaths == [])
     $ fail "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
-  pure $ CBibliography ()
+  pure $ CCommand PrintBibliography
 #+end_src
 
 #+name: ti:0014-citations-bibliography-location
@@ -5326,7 +5338,7 @@ shouldParseWithState
   "0014-citations-bibliography-location"
   OrgDoc
     { oid = nilOid,
-      cells = [CBibliography ()],
+      cells = [CCommand PrintBibliography],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
       lineLabels = M.empty,
@@ -11712,8 +11724,8 @@ import Lilac.Types
   ( BToken (BTokenLinkTarget, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell
-      ( CBibliography,
-        CBlock,
+      ( CBlock,
+        CCommand,
         CFigure,
         CFootnote,
         CHeading,
@@ -11724,6 +11736,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
+    Command (PrintBibliography),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),

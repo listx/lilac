@@ -5,6 +5,7 @@ module Lilac.Types
     Cell (..),
     Citation (..),
     Cite (..),
+    Command (..),
     Figure (..),
     Footnote (..),
     GPath,
@@ -161,7 +162,13 @@ data Cell
   | CTable Table
   | CFootnote Footnote
   | CGlossaryTerm GlossaryTerm
-  | CBibliography ()
+  | CCommand Command
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
+type Command :: Type
+data Command
+  = PrintBibliography
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
@@ -686,7 +693,7 @@ getCellName = \case
   CParagraph {}
   CGlossaryTerm {}
   CListItem {}
-  CBibliography {} -> Nothing
+  CCommand {} -> Nothing
   where
     verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
 

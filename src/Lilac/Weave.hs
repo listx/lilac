@@ -67,8 +67,8 @@ import Lilac.Types
     BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell
-      ( CBibliography,
-        CBlock,
+      ( CBlock,
+        CCommand,
         CFigure,
         CFootnote,
         CGlossaryTerm,
@@ -80,6 +80,7 @@ import Lilac.Types
       ),
     Citation (cites, noteNumber, prefix, styleVariation, suffix),
     Cite (id, locator, prefix, suffix),
+    Command (PrintBibliography),
     Figure (caption, link, meta),
     Footnote (body, name),
     GPath,
@@ -386,7 +387,7 @@ weaveObject object = do
             CParagraph {}
             CGlossaryTerm {}
             CTable {}
-            CBibliography {} -> False
+            CCommand {} -> False
       weaveMain object.orgDoc.meta rearrangedCells
       weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
       weaveHeadingAncestry rearrangedCells
@@ -407,7 +408,7 @@ weaveObject object = do
       CFigure {}
       CTable {}
       CFootnote {}
-      CBibliography {} -> Nothing
+      CCommand {} -> Nothing
 
 weaveCell :: (Int, Cell) -> HtmlWeaver ()
 weaveCell (cellIdx, cell) = case cell of
@@ -420,7 +421,8 @@ weaveCell (cellIdx, cell) = case cell of
   CTable table -> weaveTable cellIdx table
   CFootnote footnote -> weaveFootnote cellIdx footnote
   CGlossaryTerm glossaryTerm -> weaveGlossaryTerm cellIdx glossaryTerm
-  CBibliography _ -> weaveBibliography cellIdx
+  CCommand cmd -> case cmd of
+    PrintBibliography -> weaveBibliography cellIdx
 
 toSafeHtmlId :: Text -> Text
 toSafeHtmlId = T.map onlyKeepSomeChars
@@ -526,7 +528,7 @@ getLinkAnchor localCellIdx = \case
   CGlossaryTerm glossaryTerm ->
     let ref = "glossary-" <> toSafeHtmlId (CP.toText @Prose $ stripLinks glossaryTerm.term)
      in toSafeHtmlId ref
-  CBibliography {} -> ""
+  CCommand {} -> ""
 
 cellIdxAttrs :: Int -> [Attributes]
 cellIdxAttrs cellIdx = [id_ ("c-" <> T.show cellIdx), class_ "cell-idx"]
@@ -1311,7 +1313,7 @@ weaveToc cells = do
       CParagraph {}
       CGlossaryTerm {}
       CTable {}
-      CBibliography {} -> (actions, prevLevel)
+      CCommand {} -> (actions, prevLevel)
     closeHeadingLevels :: Int -> HtmlWeaver ()
     closeHeadingLevels levelDiff =
       forM_ [1 .. levelDiff] $ \_ -> do

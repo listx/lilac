@@ -10,8 +10,8 @@ import Lilac.Types
   ( BToken (BTokenLinkTarget, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell
-      ( CBibliography,
-        CBlock,
+      ( CBlock,
+        CCommand,
         CFigure,
         CFootnote,
         CHeading,
@@ -22,6 +22,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
+    Command (PrintBibliography),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
@@ -2488,7 +2489,7 @@ parseSpec = do
     "0014-citations-bibliography-location"
     OrgDoc
       { oid = nilOid,
-        cells = [CBibliography ()],
+        cells = [CCommand PrintBibliography],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
         lineLabels = M.empty,

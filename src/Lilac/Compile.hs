@@ -34,8 +34,8 @@ import Lilac.Types
     BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (body, meta, parentOid),
     Cell
-      ( CBibliography,
-        CBlock,
+      ( CBlock,
+        CCommand,
         CFigure,
         CFootnote,
         CGlossaryTerm,
@@ -167,7 +167,7 @@ mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
       CListItem {}
       CParagraph {}
       CGlossaryTerm {}
-      CBibliography {} -> []
+      CCommand {} -> []
     getSymbols :: OID -> Map Text Text -> Int -> [(LinkOid, Int)]
     getSymbols parentOid cellMeta localCellIdx =
       let oids =
@@ -375,7 +375,7 @@ findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
             CFigure {}
             CTable {}
             CFootnote {}
-            CBibliography {} -> acc
+            CCommand {} -> acc
       | otherwise = acc
     (graph, vertexToNode, _) = buildGraph blocks
     toLinkOid vertex =
@@ -413,7 +413,7 @@ findExternalOids orgDoc =
       CFootnote {}
       CListItem {}
       CMathFragment {}
-      CBibliography {} -> []
+      CCommand {} -> []
     g acc = \case
       BTokenLinkTarget linkTarget -> getExternal acc linkTarget
       BTokenString {}
@@ -533,7 +533,7 @@ cellIdxToName archive offset globalCellIdx
               plain $ "Anonymous Equation " <> eqNum
           | otherwise -> plain "Math Fragment"
         CListItem {}
-        CBibliography {} -> Nothing
+        CCommand {} -> Nothing
   | otherwise = Nothing
   where
     cellRef = "Cell " <> (T.show $ globalCellIdx - offset)

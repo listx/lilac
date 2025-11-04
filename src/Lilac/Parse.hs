@@ -96,8 +96,8 @@ import Lilac.Types
   ( BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (Block, body, meta, parentOid),
     Cell
-      ( CBibliography,
-        CBlock,
+      ( CBlock,
+        CCommand,
         CFigure,
         CFootnote,
         CGlossaryTerm,
@@ -109,6 +109,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
+    Command (PrintBibliography),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     GlossaryTerm (GlossaryTerm, definition, term),
@@ -372,7 +373,7 @@ orgDocParser = do
         CFigure {}
         CTable {}
         CFootnote {}
-        CBibliography {} -> True
+        CCommand {} -> True
   let meaningfulCells = filter meaningfulCell cells
   when (orgParserState.cellNumber /= length meaningfulCells)
     $ fail ("mismatch: cellNumber: " <> show orgParserState.cellNumber <> " len meaningfulCells: " <> (show $ length meaningfulCells))
@@ -2219,7 +2220,7 @@ bibliographyLocationParser = do
     $ fail "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
   when (orgParserState.bibPaths == [])
     $ fail "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
-  pure $ CBibliography ()
+  pure $ CCommand PrintBibliography
 
 instance CiteprocOutput Prose where
   toText prose = foldl' f T.empty prose.unProse

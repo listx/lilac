@@ -222,8 +222,8 @@ import Lilac.Types
     BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell
-      ( CBibliography,
-        CBlock,
+      ( CBlock,
+        CCommand,
         CFigure,
         CFootnote,
         CGlossaryTerm,
@@ -235,6 +235,7 @@ import Lilac.Types
       ),
     Citation (cites, noteNumber, prefix, styleVariation, suffix),
     Cite (id, locator, prefix, suffix),
+    Command (PrintBibliography),
     Figure (caption, link, meta),
     Footnote (body, name),
     GPath,
@@ -641,7 +642,7 @@ weaveObject object = do
             CParagraph {}
             CGlossaryTerm {}
             CTable {}
-            CBibliography {} -> False
+            CCommand {} -> False
       weaveMain object.orgDoc.meta rearrangedCells
       weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
       weaveHeadingAncestry rearrangedCells
@@ -657,7 +658,7 @@ weaveObject object = do
       CFigure {}
       CTable {}
       CFootnote {}
-      CBibliography {} -> Nothing
+      CCommand {} -> Nothing
 #+end_src
 
 The use of ~toHtml~ is to help Haskell infer the correct type. This is because
@@ -689,7 +690,8 @@ weaveCell (cellIdx, cell) = case cell of
   CTable table -> weaveTable cellIdx table
   CFootnote footnote -> weaveFootnote cellIdx footnote
   CGlossaryTerm glossaryTerm -> weaveGlossaryTerm cellIdx glossaryTerm
-  CBibliography _ -> weaveBibliography cellIdx
+  CCommand cmd -> case cmd of
+    PrintBibliography -> weaveBibliography cellIdx
 #+end_src
 
 The [[HTML head]] has some "imports" for the HTML page, including CSS and JS.
@@ -947,7 +949,7 @@ getLinkAnchor localCellIdx = \case
   CGlossaryTerm glossaryTerm ->
     let ref = "glossary-" <> toSafeHtmlId (CP.toText @Prose $ stripLinks glossaryTerm.term)
      in toSafeHtmlId ref
-  CBibliography {} -> ""
+  CCommand {} -> ""
 #+end_src
 
 We don't generate link anchors for footnote cells (~CFootnote~) because the cell
@@ -3235,7 +3237,7 @@ weaveToc cells = do
       CParagraph {}
       CGlossaryTerm {}
       CTable {}
-      CBibliography {} -> (actions, prevLevel)
+      CCommand {} -> (actions, prevLevel)
     closeHeadingLevels :: Int -> HtmlWeaver ()
     closeHeadingLevels levelDiff =
       forM_ [1 .. levelDiff] $ \_ -> do

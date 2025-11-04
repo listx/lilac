@@ -6,8 +6,8 @@ import Lilac.Types
     BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (body, meta),
     Cell
-      ( CBibliography,
-        CBlock,
+      ( CBlock,
+        CCommand,
         CFigure,
         CFootnote,
         CGlossaryTerm,
@@ -70,7 +70,7 @@ expandRootBlocks archive outDir = map expandRootBlock rootBlocks
             CTable {}
             CFootnote {}
             CGlossaryTerm {}
-            CBibliography {} -> acc
+            CCommand {} -> acc
       | otherwise = acc
     expandRootBlock :: (OsPath, Block) -> (OsPath, Text)
     expandRootBlock (p, rootBlock) =
