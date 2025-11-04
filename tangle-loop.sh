@@ -12,6 +12,7 @@ get_tangled_program_files()
 
 reset_tangled_program_files()
 {
+	__ok_to_lint=0
 	echo >&2 "Error encountered; cleaning Haskell tangle paths."
 	>/dev/null git checkout -- "${tangled_program_files[@]}" \
 		Makefile \
@@ -26,6 +27,7 @@ tangle()
 		reset_tangled_program_files
 		return 1
 	fi
+	__ok_to_lint=1
 	return 0
 }
 
@@ -33,13 +35,21 @@ tangle_and_test_and_weave()
 {
 	tangle || true
 	if tangle; then
-		if ((__test_hs)) && ! make -C "${SCRIPT_ROOT}" test; then
-			reset_tangled_program_files
+		if ((__test_hs)); then
+			if ! make -C "${SCRIPT_ROOT}" test; then
+				reset_tangled_program_files
+				return
+			else
+				__ok_to_lint=1
+			fi
 		fi
 	fi
 	echo "----------------------------------------"
 	if ! time make -C "${SCRIPT_ROOT}" weave; then
 		reset_tangled_program_files
+		return
+	else
+		__ok_to_lint=1
 	fi
 }
 
@@ -57,7 +67,9 @@ watch()
 		if [[ ! "${s1}" == "${s2}" ]]; then
 			s1="${s2}"
 			tangle_and_test_and_weave
-			make -C "${SCRIPT_ROOT}" lint || true
+			if ((__ok_to_lint)); then
+				make -C "${SCRIPT_ROOT}" lint || true
+			fi
 		fi
 		sleep 1
 	done
@@ -69,6 +81,7 @@ main()
 	if [[ "${1:-}" == "fe" ]]; then
 		__test_hs=0
 	fi
+	__ok_to_lint=1
 
 	watch \
 		"${SCRIPT_ROOT}/base/lilac.org" \
