@@ -1130,8 +1130,7 @@ tangle: base/lilac.larc
 #+end_src
 
 The =lilac= script is the one we created in [[nix/scripts.nix]] to automatically build
-Lilac with Cabal. We use it to tangle =main.org=, =parse.org=, and =fe.org=
-(the frontend).
+Lilac with Cabal.
 
 The ~tangle~ and ~tangle-fe~ are [[id:b649d761-1103-47be-86e4-56a7362a5ecc][sentinel files]] to help GNU Make avoid running the
 tangling operation if there is nothing to do.
@@ -1152,7 +1151,9 @@ So we need another way of tangling every time this file (=lilac.org=) is changed
 We can do that with [[https://facebook.github.io/watchman/][Watchman]], but that would be unnecessarily heavy-handed
 because we don't need to watch a directory or multiple files. Instead we can
 just have a script which sleeps one second and checks the timestamp of
-=lilac.org=, and if it's different than before, run =lilac tangle lilac.org=.
+=lilac.org= (and other files we care about), and if it's different than before,
+tangle it (and also run tests and weave and lint as needed). That's what we do
+in [[tangle-loop.sh]].
 
 #+name: tangle-loop.sh
 #+header: :tangle tangle-loop.sh
@@ -1162,77 +1163,13 @@ set -euo pipefail
 
 SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
 
-get_tangled_program_files()
-{
-	git -C "${SCRIPT_ROOT}" grep -P '^#\+header: :tangle' -- '*.org' \
-		| awk '{print $3}' \
-		| grep '\.\(cabal\|hs\|nix\|sh\)$'
-}
-
-reset_tangled_program_files()
-{
-	__ok_to_lint=0
-	echo >&2 "Error encountered; cleaning Haskell tangle paths."
-	>/dev/null git checkout -- "${tangled_program_files[@]}" \
-		Makefile \
-		.gitignore \
-		nix
-}
-
-tangle()
-{
-	mapfile -t tangled_program_files < <(get_tangled_program_files)
-	if ! time make -C "${SCRIPT_ROOT}" tangle; then
-		reset_tangled_program_files
-		return 1
-	fi
-	__ok_to_lint=1
-	return 0
-}
-
-tangle_and_test_and_weave()
-{
-	tangle || true
-	if tangle; then
-		if ((__test_hs)); then
-			if ! make -C "${SCRIPT_ROOT}" test; then
-				reset_tangled_program_files
-				return
-			else
-				__ok_to_lint=1
-			fi
-		fi
-	fi
-	echo "----------------------------------------"
-	if ! time make -C "${SCRIPT_ROOT}" weave; then
-		reset_tangled_program_files
-		return
-	else
-		__ok_to_lint=1
-	fi
-}
-
-watch()
-{
-	local s1
-	local s2
-	local files=("$@")
-
-	s1="$(stat -c %Y "${files[@]}")"
-
-	tangle_and_test_and_weave
-	while true; do
-		s2="$(stat -c %Y "${files[@]}")"
-		if [[ ! "${s1}" == "${s2}" ]]; then
-			s1="${s2}"
-			tangle_and_test_and_weave
-			if ((__ok_to_lint)); then
-				make -C "${SCRIPT_ROOT}" lint || true
-			fi
-		fi
-		sleep 1
-	done
-}
+<<f:tangle-loop:get_tangled_program_files>>
+<<f:tangle-loop:clean_build_files>>
+<<f:tangle-loop:reset_tangled_program_files>>
+<<f:tangle-loop:reset_everything>>
+<<f:tangle-loop:tangle>>
+<<f:tangle-loop:run_all_checks>>
+<<f:tangle-loop:watch>>
 
 main()
 {
@@ -1256,32 +1193,183 @@ main()
 main "$@"
 #+end_src
 
-The ceremony with ~git checkout~ is there if it turns out we edited Lilac's own
-sources and broke the build. In this case we want to undo the broken (tangled)
-changes, which we can do by simply resetting the Haskell source code back to the
-checked-in state with ~git checkout~. This is safe because the changes we want to
-try out are always stored in the Org files (=lilac.org=, etc), because we use
-Literate Programming. If we didn't use Literate Programming we would be very
-cautious of resetting any source code files, but we don't have that worry here.
+The ~main()~ entrypoint above sets up two global variables ~__test_hs~ and
+~__ok_to_lint~, before entering the loop in [[f:tangle-loop:watch]].
 
-The ~tangle_and_test()~ function calls ~tangle()~ twice, because if we modify
-Lilac's behavior (by editing a Haskell block), the newly-compiled Lilac will be
-created in the first invocation of ~tangle()~. The second invocation will then
-use the new Lilac version to tangle itself again. It's a simple (albeit ugly)
-way of ensuring that we're always tangling with the latest Lilac version.
+#+name: f:tangle-loop:watch
+#+begin_src bash
+watch()
+{
+	local s1
+	local s2
+	local files=("$@")
 
-The ~tangle_and_test()~ function also runs the unit tests, as a convenience
-function, but only if the previous call to ~tangle~ succeeds. This way, we only
-try to run the unit tests if Lilac can tangle itself. As for the unit tests, the
-exist code is ignored with ~|| true~ because oftentimes the tests break when we're
-adding new tests, but we don't want to break out of the ~while~ loop.
+	s1="$(stat -c %Y "${files[@]}")"
 
-The initial call to ~tangle_and_test()~ outside of the ~while~ loop in the ~watch()~
-function is there for convenience, just in case we've modified the =lilac.org=
-file outside of the call to =tangle-loop.sh=.
+	run_all_checks # (ref:initial-call-tangle)
+	while true; do
+		s2="$(stat -c %Y "${files[@]}")"
+		if [[ ! "${s1}" == "${s2}" ]]; then
+			s1="${s2}"
+			run_all_checks
+		fi
+		sleep 1
+	done
+}
+#+end_src
 
-Linting is only performed if there are no errors during tangling, testing, and
-weaving. It is performed at the very end because it's the slowest operation.
+[[f:tangle-loop:watch]] checks for timestamps on the files we're interested in every
+second, and runs [[f:tangle-loop:run_all_checks]] if it detects a
+timestamp change.
+
+#+name: f:tangle-loop:run_all_checks
+#+begin_src bash
+run_all_checks()
+{
+	tangle || true  # (ref:tangle-one)
+	if tangle; then # (ref:tangle-two)
+		if ((__test_hs)); then
+			if ! make -C "${SCRIPT_ROOT}" test; then # (ref:unit-tests)
+				reset_everything
+				return
+			else
+				__ok_to_lint=1
+			fi
+		fi
+	fi
+
+	echo "----------------------------------------"
+
+	if ! time make -C "${SCRIPT_ROOT}" weave; then
+		reset_everything
+		return
+	else
+		__ok_to_lint=1
+	fi
+
+	echo "----------------------------------------"
+
+	if ((__ok_to_lint)); then
+		make -C "${SCRIPT_ROOT}" lint || true
+	fi
+}
+#+end_src
+
+[[f:tangle-loop:run_all_checks]] tangles first, runs all tests, weaves, and finally
+runs the linter. If any of the earlier steps fail, then the later steps abort
+execution.
+
+[[f:tangle-loop:run_all_checks]] calls ~tangle()~ twice (at [[(tangle-one)]]
+and [[(tangle-two)]]), because if we modify Lilac's behavior (by editing a Haskell
+block), the newly-compiled Lilac will be created in the first invocation of
+~tangle()~. The second invocation will then use the new Lilac version to tangle
+itself again. It's a simple (albeit ugly) way of ensuring that we're always
+tangling with the latest Lilac version.
+
+[[f:tangle-loop:run_all_checks]] also runs the unit tests at [[(unit-tests)]], as a
+convenience function, but only if the previous call to ~tangle~ succeeds. This
+way, we only try to run the unit tests if Lilac can tangle itself. As for the
+unit tests, the exit code is ignored with ~|| true~ because oftentimes the tests
+break when we're adding new tests, but we don't want to break out of the ~while~
+loop.
+
+The initial call to ~run_all_checks()~ in the ~watch()~ function (outside
+of the ~while~ loop) at [[(initial-call-tangle)]] is there for convenience, just in
+case we've modified the =lilac.org= file outside of the call to =tangle-loop.sh=.
+
+#+name: f:tangle-loop:tangle
+#+begin_src bash
+tangle()
+{
+	mapfile -t tangled_program_files < <(get_tangled_program_files) # (ref:tangled-files-array)
+	if ! time make -C "${SCRIPT_ROOT}" tangle; then
+		reset_everything
+		return 1
+	fi
+	__ok_to_lint=1
+	return 0
+}
+#+end_src
+
+[[f:tangle-loop:tangle]] tangles source code; however it also resets the
+~tangled_program_files~ global variable, because it may be the case that the
+program files are slightly different than before when we tangle new code blocks
+from an Org file.
+
+If anything goes wrong during tangling, we call [[f:tangle-loop:reset_everything]]
+to reset all tangled code blocks to their previously known (good) state in
+[[f:tangle-loop:reset_tangled_program_files]], and also delete any intermediate
+build artifacts to get us to a clean state.
+
+#+name: f:tangle-loop:reset_everything
+#+begin_src bash
+reset_everything()
+{
+	reset_tangled_program_files
+	clean_build_files
+}
+#+end_src
+
+[[f:tangle-loop:reset_everything]] calls ~reset_tangled_program_files()~ and also
+~clean_build_files()~, which cleans up incremental build artifacts like ~*.lobj~ and
+~*.larc~ files. This is needed if we make a change to the structure of [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]]
+or anything else that's serialized out to a file and read back in. For example,
+if we rename a field to a new name, then any existing build artifact with the
+old name will become invalid and fail to parse; in this case the best thing to
+do is remove the old build artifact (via ~clean_build_files()~) and build these
+files again from scratch.
+
+The [[f:tangle-loop:reset_tangled_program_files]] function assumes that the current
+Git commit has a working Lilac version. Based on this assumption, it runs ~git
+checkout~ on tangled files at [[(git-checkout)]] if there are any errors. So if it
+turns out we edited Lilac's own sources and broke the build, we want to undo the
+broken (tangled) changes, which we can do by simply resetting the Haskell source
+code back to the checked-in state with ~git checkout~. This is safe because the
+changes we want to try out are always stored in the Org files (=lilac.org=, etc),
+because we use Literate Programming. If we didn't use Literate Programming we
+would be very cautious of resetting any source code files, but we don't have
+that worry here.
+
+#+name: f:tangle-loop:reset_tangled_program_files
+#+begin_src bash
+reset_tangled_program_files()
+{
+	__ok_to_lint=0
+	echo >&2 "Error encountered; cleaning Haskell tangle paths."
+	>/dev/null git checkout -- "${tangled_program_files[@]}" \ (ref:git-checkout)
+		Makefile \
+		.gitignore \
+		nix
+}
+#+end_src
+
+Note that the ~tangled_program_files~ is created by calling
+[[f:tangle-loop:get_tangled_program_files]] at [[(tangled-files-array)]], which only
+looks at the tangled Cabal, Haskell, Nix, or shell files. This means you can
+make changes to the original Org files to make Lilac compile or pass tests
+again, as needed, by tweaking those code blocks responsible for these file
+types.
+
+#+name: f:tangle-loop:get_tangled_program_files
+#+begin_src bash
+get_tangled_program_files()
+{
+	git -C "${SCRIPT_ROOT}" grep -P '^#\+header: :tangle' -- '*.org' \
+		| awk '{print $3}' \
+		| grep '\.\(cabal\|hs\|nix\|sh\)$'
+}
+#+end_src
+
+Lastly, [[f:tangle-loop:clean_build_files]] just runs [[make:Clean]].
+
+#+name: f:tangle-loop:clean_build_files
+#+begin_src bash
+clean_build_files()
+{
+	echo >&2 "Cleaning build files."
+	make -C "${SCRIPT_ROOT}" clean
+}
+#+end_src
 
 *** Weave Lilac with Lilac
 

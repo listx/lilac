@@ -10,6 +10,12 @@ get_tangled_program_files()
 		| grep '\.\(cabal\|hs\|nix\|sh\)$'
 }
 
+clean_build_files()
+{
+	echo >&2 "Cleaning build files."
+	make -C "${SCRIPT_ROOT}" clean
+}
+
 reset_tangled_program_files()
 {
 	__ok_to_lint=0
@@ -20,36 +26,50 @@ reset_tangled_program_files()
 		nix
 }
 
+reset_everything()
+{
+	reset_tangled_program_files
+	clean_build_files
+}
+
 tangle()
 {
-	mapfile -t tangled_program_files < <(get_tangled_program_files)
+	mapfile -t tangled_program_files < <(get_tangled_program_files) #
 	if ! time make -C "${SCRIPT_ROOT}" tangle; then
-		reset_tangled_program_files
+		reset_everything
 		return 1
 	fi
 	__ok_to_lint=1
 	return 0
 }
 
-tangle_and_test_and_weave()
+run_all_checks()
 {
-	tangle || true
-	if tangle; then
+	tangle || true  #
+	if tangle; then #
 		if ((__test_hs)); then
-			if ! make -C "${SCRIPT_ROOT}" test; then
-				reset_tangled_program_files
+			if ! make -C "${SCRIPT_ROOT}" test; then #
+				reset_everything
 				return
 			else
 				__ok_to_lint=1
 			fi
 		fi
 	fi
+
 	echo "----------------------------------------"
+
 	if ! time make -C "${SCRIPT_ROOT}" weave; then
-		reset_tangled_program_files
+		reset_everything
 		return
 	else
 		__ok_to_lint=1
+	fi
+
+	echo "----------------------------------------"
+
+	if ((__ok_to_lint)); then
+		make -C "${SCRIPT_ROOT}" lint || true
 	fi
 }
 
@@ -61,15 +81,12 @@ watch()
 
 	s1="$(stat -c %Y "${files[@]}")"
 
-	tangle_and_test_and_weave
+	run_all_checks #
 	while true; do
 		s2="$(stat -c %Y "${files[@]}")"
 		if [[ ! "${s1}" == "${s2}" ]]; then
 			s1="${s2}"
-			tangle_and_test_and_weave
-			if ((__ok_to_lint)); then
-				make -C "${SCRIPT_ROOT}" lint || true
-			fi
+			run_all_checks
 		fi
 		sleep 1
 	done
