@@ -711,7 +711,7 @@ weaveLink insideBlock link = do
         case link.target of
           LinkTargetLineLabel name ->
             if insideBlock
-              then [id_ ("ib-" <> toSafeHtmlId name)] --
+              then [id_ ("ib-" <> toSafeHtmlId name)] -- (ref:line label self-link)
               else []
           _ -> []
       linkName =
@@ -1029,7 +1029,7 @@ weaveGlossaryTerm cellIdx glossaryTerm = do
       dlStart = toHtmlRaw @Text "<dl>"
       dlEnd :: HtmlWeaver ()
       dlEnd = toHtmlRaw @Text "</dl>"
-      isGlossaryTerm idx --
+      isGlossaryTerm idx -- (ref:isGlossaryTerm)
         | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
           Just internalCell <- originObj.orgDoc.cells !!? idx,
           CGlossaryTerm _ <- internalCell =
@@ -1037,7 +1037,7 @@ weaveGlossaryTerm cellIdx glossaryTerm = do
         | otherwise = False
       isFirstGlossaryTerm = not . isGlossaryTerm $ cellIdx - 1
       isLastGlossaryTerm = not . isGlossaryTerm $ cellIdx + 1
-  when (isFirstGlossaryTerm) dlStart --
+  when (isFirstGlossaryTerm) dlStart -- (ref:use-dlStart)
   wrapWithDiv cellIdx $ do
     let maybeInnerVerticalMargin
           | isFirstGlossaryTerm = []
@@ -1046,7 +1046,7 @@ weaveGlossaryTerm cellIdx glossaryTerm = do
       weaveProse glossaryTerm.term
     dd_ $ do
       weaveProse glossaryTerm.definition
-  when (isLastGlossaryTerm) dlEnd --
+  when (isLastGlossaryTerm) dlEnd -- (ref:use-dlEnd)
   where
     linkAnchor = getLinkAnchor Nothing $ CGlossaryTerm glossaryTerm
 

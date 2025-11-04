@@ -501,7 +501,7 @@ cellIdxToName archive offset globalCellIdx
             $ Prose
               [ PTokenStyledText $ StyledText {body = "✿ ", style = styleMaskFrom []}
               ]
-            <> Prose (concatMap stripLink glossaryTerm.term.unProse) --
+            <> Prose (concatMap stripLink glossaryTerm.term.unProse) -- (ref:stripLink)
         CFigure figure
           | Just name <- lookup "name" figure.meta -> verbatim name
           | Just figureNum <- lookup "__figure_number" figure.meta ->

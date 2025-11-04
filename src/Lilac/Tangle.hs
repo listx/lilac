@@ -17,7 +17,7 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
-    LinkTarget (LinkTargetOid),
+    LinkTarget (LinkTargetLineLabel, LinkTargetOid),
     Object (orgDoc, symbols),
     OrgDoc (cells),
     cellIdxToObjCell,
@@ -107,6 +107,8 @@ expandBlock archive block existingPrefix =
             prefix
           )
       | otherwise = (acc, prefix)
+    expand (acc, prefix) (BTokenLinkTarget (LinkTargetLineLabel lineLabel)) =
+      (acc <> "(ref:" <> lineLabel <> ")", prefix)
     expand (acc, prefix) _ = (acc, prefix)
     getPrefix text = T.takeWhileEnd (/= '\n') text
     prependExistingPrefix text =

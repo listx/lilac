@@ -2,7 +2,7 @@
 
 (defn- deactivate-other-elements [active-id]
   (when-let [main-elt (-> js/document (.querySelector "main"))]
-    (let [child-anchors (-> main-elt (.querySelectorAll "[id]"))] ;
+    (let [child-anchors (-> main-elt (.querySelectorAll "[id]"))] ; (ref:child-anchors)
       (doseq [elt child-anchors]
         (when (not= (.-id elt) active-id)
           (let [class-list (.-classList elt)]
