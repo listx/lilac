@@ -66,7 +66,7 @@ import Lilac.Types
     GPath,
     GlossaryTerm (definition, term),
     Heading (body, meta),
-    Link (target),
+    Link (name, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
@@ -912,10 +912,9 @@ cellIdxToName archive offset globalCellIdx
         CGlossaryTerm glossaryTerm ->
           Just
             $ Prose
-              [ PTokenStyledText $ StyledText {body = "✿ " <> (CP.toText @Prose glossaryTerm.term) <> " (", style = styleMaskFrom []},
-                PTokenStyledText $ StyledText {body = cellRef, style = styleMaskFrom [Verbatim]},
-                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+              [ PTokenStyledText $ StyledText {body = "✿ ", style = styleMaskFrom []}
               ]
+            <> Prose (concatMap stripLink glossaryTerm.term.unProse) -- (ref:stripLink)
         CFigure figure
           | Just name <- lookup "name" figure.meta -> verbatim name
           | Just figureNum <- lookup "__figure_number" figure.meta ->
@@ -952,7 +951,16 @@ cellIdxToName archive offset globalCellIdx
     cellRef = "Cell " <> (T.show $ globalCellIdx - offset)
     plain body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom []}]
     verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
+    stripLink = \case
+      PTokenLink link -> map (PTokenStyledText $) link.name
+      pToken -> [pToken]
 #+end_src
+
+We have to convert links (~PTokenLink~) into styled text (~PTokenStyledText~) at
+[[(stripLink)]] because otherwise when we create backlinks at [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]], we
+can potentially end up with nested ~<a>~ tags (because backlink generation means
+always wrapping the name of a backlink with a link (~<a>~ tag) to that backlink),
+which would be illegal HTML (HTML does not allow nesting of ~<a>~ tags).
 
 [[f:getCellName]] is similar to [[f:cellIdxToName]], but it only returns a
 ~Just~ value if the cell is a block, figure, table, footnote, or math fragment
