@@ -61,7 +61,7 @@ these tags. So we can set it once at the top level of the doc, even.
 
 Hmm, Org already allows FILETAGS or similar. We could just reuse that one also.
 
-**** TODO allow glossary generation
+**** IN-PROGRESS allow glossary generation
 
 Something like
 
@@ -71,8 +71,15 @@ Something like
   - ~#+print_glossary: local~ to only print definitions (again) found in the
     current document (object).
 
-  - ~#+print_glossary: tags=foo,bar~ only print definitions that match these tags.
-    E.g. ~#+print_glossary: tags=noun~ only prints definitions that are for nouns.
+This means teaching OrgDoc about all found glossary terms (just promote the
+~glossary~ field in the ~OrgParserState~), and then concatenating those during
+archive generation. We also have to recognize the ~print_glossary~ command as a
+Cell.
+
+***** TODO refactor Bibliography cell
+
+Refactor ~CBibliography~ into ~CCommand~ and then have it be
+either ~PrintBibliography~ or ~PrintGlossary~.
 
 *** TODO fix bug where clicking on already-active TOC item leads to un-highlighting it
 
