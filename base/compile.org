@@ -66,7 +66,7 @@ import Lilac.Types
     GPath,
     GlossaryTerm (definition, term),
     Heading (body, meta),
-    Link (name, target),
+    Link (target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
@@ -97,6 +97,7 @@ import Lilac.Types
     encodeGPath,
     getProseContents,
     getSectionNumber,
+    stripLinks,
     styleMaskFrom,
   )
 import Lilac.Util qualified as LU
@@ -914,7 +915,7 @@ cellIdxToName archive offset globalCellIdx
             $ Prose
               [ PTokenStyledText $ StyledText {body = "✿ ", style = styleMaskFrom []}
               ]
-            <> Prose (concatMap stripLink glossaryTerm.term.unProse) -- (ref:stripLink)
+            <> stripLinks glossaryTerm.term -- (ref:stripLinks)
         CFigure figure
           | Just name <- lookup "name" figure.meta -> verbatim name
           | Just figureNum <- lookup "__figure_number" figure.meta ->
@@ -951,16 +952,26 @@ cellIdxToName archive offset globalCellIdx
     cellRef = "Cell " <> (T.show $ globalCellIdx - offset)
     plain body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom []}]
     verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
+#+end_src
+
+We have to convert links (~PTokenLink~) into styled text (~PTokenStyledText~) at
+[[(stripLinks)]] because otherwise when we create backlinks at [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]], we
+can potentially end up with nested ~<a>~ tags (because backlink generation means
+always wrapping the name of a backlink with a link (~<a>~ tag) to that backlink),
+which would be illegal HTML (HTML does not allow nesting of ~<a>~ tags).
+[[f:stripLinks]] just takes the display name of any link and turns that into styled
+text.
+
+#+name: f:stripLinks
+#+begin_src haskell
+stripLinks :: Prose -> Prose
+stripLinks (Prose pTokens) = Prose (concatMap stripLink pTokens)
+  where
+    stripLink :: PToken -> [PToken]
     stripLink = \case
       PTokenLink link -> map (PTokenStyledText $) link.name
       pToken -> [pToken]
 #+end_src
-
-We have to convert links (~PTokenLink~) into styled text (~PTokenStyledText~) at
-[[(stripLink)]] because otherwise when we create backlinks at [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]], we
-can potentially end up with nested ~<a>~ tags (because backlink generation means
-always wrapping the name of a backlink with a link (~<a>~ tag) to that backlink),
-which would be illegal HTML (HTML does not allow nesting of ~<a>~ tags).
 
 [[f:getCellName]] is similar to [[f:cellIdxToName]], but it only returns a
 ~Just~ value if the cell is a block, figure, table, footnote, or math fragment

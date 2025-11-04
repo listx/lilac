@@ -50,7 +50,7 @@ import Lilac.Types
     GPath,
     GlossaryTerm (definition, term),
     Heading (body, meta),
-    Link (name, target),
+    Link (target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
@@ -81,6 +81,7 @@ import Lilac.Types
     encodeGPath,
     getProseContents,
     getSectionNumber,
+    stripLinks,
     styleMaskFrom,
   )
 import Lilac.Util qualified as LU
@@ -501,7 +502,7 @@ cellIdxToName archive offset globalCellIdx
             $ Prose
               [ PTokenStyledText $ StyledText {body = "✿ ", style = styleMaskFrom []}
               ]
-            <> Prose (concatMap stripLink glossaryTerm.term.unProse) -- (ref:stripLink)
+            <> stripLinks glossaryTerm.term -- (ref:stripLinks)
         CFigure figure
           | Just name <- lookup "name" figure.meta -> verbatim name
           | Just figureNum <- lookup "__figure_number" figure.meta ->
@@ -538,6 +539,3 @@ cellIdxToName archive offset globalCellIdx
     cellRef = "Cell " <> (T.show $ globalCellIdx - offset)
     plain body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom []}]
     verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
-    stripLink = \case
-      PTokenLink link -> map (PTokenStyledText $) link.name
-      pToken -> [pToken]

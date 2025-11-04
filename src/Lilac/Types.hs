@@ -50,6 +50,7 @@ module Lilac.Types
     protocolsWeb,
     ptext,
     stext,
+    stripLinks,
     styleMaskFrom,
   )
 where
@@ -107,6 +108,7 @@ import Relude
     Word64,
     Word8,
     catMaybes,
+    concatMap,
     fail,
     foldl',
     fromEnum,
@@ -648,6 +650,14 @@ cellIdxToObjCell archive globalCellIdx
     Just cell <- obj.orgDoc.cells !!? (globalCellIdx - offset) =
       Just (obj, cell)
   | otherwise = Nothing
+
+stripLinks :: Prose -> Prose
+stripLinks (Prose pTokens) = Prose (concatMap stripLink pTokens)
+  where
+    stripLink :: PToken -> [PToken]
+    stripLink = \case
+      PTokenLink link -> map (PTokenStyledText $) link.name
+      pToken -> [pToken]
 
 getCellName :: Cell -> Maybe Prose
 getCellName = \case

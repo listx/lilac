@@ -150,6 +150,7 @@ import Lilac.Types
     getSectionNumber,
     markingChars,
     markingCharsInvisible,
+    stripLinks,
   )
 import Lucid
   ( Attributes,
@@ -523,7 +524,7 @@ getLinkAnchor localCellIdx = \case
     let ref = "footnote-" <> footnote.name
      in toSafeHtmlId ref
   CGlossaryTerm glossaryTerm ->
-    let ref = "glossary-" <> toSafeHtmlId (CP.toText @Prose glossaryTerm.term)
+    let ref = "glossary-" <> toSafeHtmlId (CP.toText @Prose $ stripLinks glossaryTerm.term)
      in toSafeHtmlId ref
   CBibliography {} -> ""
 
