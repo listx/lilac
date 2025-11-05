@@ -573,7 +573,7 @@ defaultCss = do
     display inline
     marginLeft (rem 0.5)
     "::after" & do
-      "content" -: "\"\\a\"" -- (ref:newline-after-dd)
+      "content" -: "\"\\a\"" --
       whiteSpace ClayText.pre
 
   ".doc-meta-author" & do

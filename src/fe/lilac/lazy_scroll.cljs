@@ -16,12 +16,12 @@
       0))
 
 (defn- visible? [elt]
-  (let [rect (.getBoundingClientRect elt) ; (ref:element-position)
+  (let [rect (.getBoundingClientRect elt) ;
         bch (get-breadcrumbs-height)
         rect-top (- (.-top rect) bch)
         rect-bottom (- (.-bottom rect) bch)
         window-height (.-innerHeight js/window)
-        is-visible (and (< rect-top window-height) ; (ref:element-visibility)
+        is-visible (and (< rect-top window-height) ;
                         (> rect-bottom 0))]
     is-visible))
 
@@ -33,8 +33,8 @@
   (let [href (.-hash (.-location js/window))
         id (href->id href)]
     (when-let [target-element (-> js/document (.getElementById id))]
-      (activate target-element) ; (ref:activate)
-      (maybe-scroll target-element)))) ; (ref:call-maybe-scroll)
+      (activate target-element) ;
+      (maybe-scroll target-element)))) ;
 
 (defn- weaken-anchor-links []
   (let [links (-> js/document (.querySelectorAll "a[href^=\"#\"]"))]
@@ -45,11 +45,11 @@
                 id (href->id href)]
             (when-let [target-element (-> js/document (.getElementById id))]
               (do
-                (.preventDefault event) ; (ref:prevent-default-jump)
-                (.pushState (.-history js/window) nil nil href) ; (ref:history)
+                (.preventDefault event) ;
+                (.pushState (.-history js/window) nil nil href) ;
                 (maybe-scroll-by-hash nil)))))))))
 
-(defn init [] ; (ref:lazy-scroll/init)
-  (weaken-anchor-links) ; (ref:lazy-scroll/weaken-anchor-links)
-  (.addEventListener js/window "popstate" maybe-scroll-by-hash) ; (ref:lazy-scroll/by-history)
-  (maybe-scroll-by-hash nil)) ; (ref:lazy-scroll/page-load)
+(defn init [] ;
+  (weaken-anchor-links) ;
+  (.addEventListener js/window "popstate" maybe-scroll-by-hash) ;
+  (maybe-scroll-by-hash nil)) ;

@@ -806,7 +806,7 @@ textParser styleMask
           wordIsGlossaryTermDelimiter = word == "::" && isEmptyMask styleMask
 
       when (haveNotSeenGlossaryTermDelimiterYet && wordIsGlossaryTermDelimiter) $ do
-        modify (\s -> s {glossaryTermOffset = o}) -- (ref:glossary-term-delimiter-detection)
+        modify (\s -> s {glossaryTermOffset = o}) --
       pure word
   where
     isNotVerbatimMarker c = c /= '='
@@ -1180,7 +1180,7 @@ paragraphParser = do
   orgParserState' <- get
   modify (\s -> s {insideParagraph = False})
   if orgParserState'.glossaryTermOffset > 0
-    then convertToGlossaryTerm prose orgParserState'.glossaryTermOffset -- (ref:check-for-glossaryTerm)
+    then convertToGlossaryTerm prose orgParserState'.glossaryTermOffset --
     else pure . CParagraph $ compressProse prose
 
 newlineAndIndentParser :: Int -> OrgParser Text
@@ -1353,7 +1353,7 @@ someBTokensParser blockType nowebOn lineLabelOn =
 nowebLinkTargetParser :: OrgParser LinkTarget
 nowebLinkTargetParser = do
   _ <- string "<<"
-  _ <- MP.notFollowedBy $ string "<" -- (ref:open-angle-bracket-check)
+  _ <- MP.notFollowedBy $ string "<" --
   (oid, linkName) <- oidReferenceParser "" ">>"
   _ <- string ">>"
   pure
@@ -1476,7 +1476,7 @@ compressedTextParser disallowedChars ending = do
   pure $ compressWhitespace tn
   where
     compressWhitespace = T.unwords . T.words
-    proseSpaceConsumer' :: Bool -> OrgParser Text -- (ref:proseSpaceConsumer')
+    proseSpaceConsumer' :: Bool -> OrgParser Text --
     proseSpaceConsumer' insideCodeBlock
       | insideCodeBlock = spaces
       | otherwise =
@@ -1638,7 +1638,7 @@ listItemsEndParser :: OrgParser Cell
 listItemsEndParser = do
   orgParserState <- get
   when (null orgParserState.listMarkers) $ do
-    fail "no pending ListMarker objects to close off" -- (ref:list-items-end-failure-with-no-input)
+    fail "no pending ListMarker objects to close off" --
   when (orgParserState.continuationIndent /= 0) $ do
     fail "not at beginning of line"
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
@@ -1904,7 +1904,7 @@ metaEntryParser = do
   value <-
     if key == "name"
       then do
-        first <- MP.satisfy (\c -> c /= '(' && isValueLetter c) -- (ref:non-line-label name)
+        first <- MP.satisfy (\c -> c /= '(' && isValueLetter c) --
         rest <- MP.takeWhileP (Just "(meta) value letter") isValueLetter
         pure $ T.cons first rest
       else MP.takeWhile1P (Just "(meta) value letter") isValueLetter
@@ -2145,7 +2145,7 @@ convertToGlossaryTerm prose offset =
               )
             else (pToken : termPTokens, term', def)
       | otherwise = (termPTokens, term', pToken : def)
-    dropWhitespacePToken :: [PToken] -> [PToken] -- (ref:dropWhitespacePToken)
+    dropWhitespacePToken :: [PToken] -> [PToken] --
     dropWhitespacePToken [] = []
     dropWhitespacePToken tokens@(pToken : rest)
       | (PTokenStyledText styledText) <- pToken,
@@ -2167,8 +2167,8 @@ assertUniqueGlossaryTerm :: Text -> Prose -> Int -> OrgParser ()
 assertUniqueGlossaryTerm term proseDefinition offset = do
   orgParserState <- get
   when (member term orgParserState.glossary) $ do
-    MP.setOffset offset -- (ref:glossary-term-offset)
-    fail -- (ref:fail-because-duplicate-term)
+    MP.setOffset offset --
+    fail --
       $ "glossary term "
       <> show term
       <> " is not unique"

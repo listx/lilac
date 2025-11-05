@@ -502,7 +502,7 @@ cellIdxToName archive offset globalCellIdx
             $ Prose
               [ PTokenStyledText $ StyledText {body = "✿ ", style = styleMaskFrom []}
               ]
-            <> stripLinks glossaryTerm.term -- (ref:stripLinks)
+            <> stripLinks glossaryTerm.term --
         CFigure figure
           | Just name <- lookup "name" figure.meta -> verbatim name
           | Just figureNum <- lookup "__figure_number" figure.meta ->
