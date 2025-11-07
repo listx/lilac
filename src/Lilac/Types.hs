@@ -169,6 +169,7 @@ data Cell
 type Command :: Type
 data Command
   = PrintBibliography
+  | PrintGlossary Bool
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
@@ -306,6 +307,7 @@ data OrgDoc = OrgDoc
     cells :: [Cell],
     pseudoEdges :: [PseudoEdge],
     footnoteNumbers :: Map Text Int,
+    glossary :: Map Text Int,
     lineLabels :: Map Text Int,
     cslPath :: Maybe FilePath,
     bibPaths :: [FilePath],
@@ -358,7 +360,7 @@ data OrgParserState = OrgParserState
     footnoteDefinitions :: Map Text Prose,
     insideFootnoteDefinition :: Maybe Text,
     prevCellIsFootnote :: Bool,
-    glossary :: Map Text Prose,
+    glossary :: Map Text Int,
     glossaryTermOffset :: Int,
     insideParagraph :: Bool,
     tanglePaths :: Set Text,

@@ -80,7 +80,7 @@ import Lilac.Types
       ),
     Citation (cites, noteNumber, prefix, styleVariation, suffix),
     Cite (id, locator, prefix, suffix),
-    Command (PrintBibliography),
+    Command (PrintBibliography, PrintGlossary),
     Figure (caption, link, meta),
     Footnote (body, name),
     GPath,
@@ -111,6 +111,7 @@ import Lilac.Types
         citations,
         cslPath,
         footnoteNumbers,
+        glossary,
         lineLabels,
         meta
       ),
@@ -423,6 +424,7 @@ weaveCell (cellIdx, cell) = case cell of
   CGlossaryTerm glossaryTerm -> weaveGlossaryTerm cellIdx glossaryTerm
   CCommand cmd -> case cmd of
     PrintBibliography -> weaveBibliography cellIdx
+    PrintGlossary isGlobal -> weaveGlossary isGlobal
 
 toSafeHtmlId :: Text -> Text
 toSafeHtmlId = T.map onlyKeepSomeChars
@@ -525,9 +527,16 @@ getLinkAnchor localCellIdx = \case
   CFootnote footnote ->
     let ref = "footnote-" <> footnote.name
      in toSafeHtmlId ref
-  CGlossaryTerm glossaryTerm ->
-    let ref = "glossary-" <> toSafeHtmlId (CP.toText @Prose $ stripLinks glossaryTerm.term)
-     in toSafeHtmlId ref
+  CGlossaryTerm glossaryTerm -> case localCellIdx of
+    Just idx ->
+      let ref =
+            "glossary-"
+              <> "c-"
+              <> T.show idx
+              <> "-"
+              <> toSafeHtmlId (CP.toText @Prose $ stripLinks glossaryTerm.term)
+       in toSafeHtmlId ref
+    Nothing -> ""
   CCommand {} -> ""
 
 cellIdxAttrs :: Int -> [Attributes]
@@ -1042,16 +1051,19 @@ weaveGlossaryTerm cellIdx glossaryTerm = do
       isLastGlossaryTerm = not . isGlossaryTerm $ cellIdx + 1
   when (isFirstGlossaryTerm) dlStart --
   wrapWithDiv cellIdx $ do
-    let maybeInnerVerticalMargin
-          | isFirstGlossaryTerm = []
-          | otherwise = [class_ "inner-dt"]
-    dt_ ([id_ linkAnchor] <> maybeInnerVerticalMargin) $ do
-      weaveProse glossaryTerm.term
-    dd_ $ do
-      weaveProse glossaryTerm.definition
+    div_ [id_ linkAnchor, class_ "glossary-term"] $ do
+      let maybeInnerVerticalMargin
+            | isFirstGlossaryTerm = []
+            | otherwise = [class_ "inner-dt"]
+      dt_ maybeInnerVerticalMargin $ do
+        weaveProse glossaryTerm.term
+      dd_ $ do
+        a_ [href_ $ "#" <> linkAnchor, class_ "glossary-term-anchor"] $ do
+          toHtmlRaw @Text "&#x1F517;"
+        weaveProse glossaryTerm.definition
   when (isLastGlossaryTerm) dlEnd --
   where
-    linkAnchor = getLinkAnchor Nothing $ CGlossaryTerm glossaryTerm
+    linkAnchor = getLinkAnchor (Just cellIdx) $ CGlossaryTerm glossaryTerm
 
 commonPrefix :: (Eq a) => [a] -> [a] -> [a]
 commonPrefix xs ys = map fst . takeWhile (\(x, y) -> (x == y)) $ zip xs ys
@@ -1268,6 +1280,44 @@ weaveBibliography cellIdx = do
         let linkAnchor = "ref-" <> key
         div_ [class_ "bib-ref", id_ linkAnchor] $ do
           weaveProse prose
+
+weaveGlossary :: Bool -> HtmlWeaver ()
+weaveGlossary isGlobal = do
+  weaveConf <- ask
+  if
+    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+      not isGlobal -> do
+        let terms =
+              sortBy
+                (comparing (toTextVisible . CP.fromText . fst)) --
+                $ M.toList originObj.orgDoc.glossary
+            termIdxs = zip [0 ..] $ map snd terms
+        when (termIdxs /= []) $ toHtmlRaw @Text "<dl>"
+        forM_ termIdxs $ weaveCollectedGlossaryTerm weaveConf
+        when (termIdxs /= []) $ toHtmlRaw @Text "</dl>"
+    | otherwise -> pure ()
+
+weaveCollectedGlossaryTerm :: WeaveConf -> (Int, Int) -> HtmlWeaver ()
+weaveCollectedGlossaryTerm weaveConf (termIdx, localCellIdx)
+  | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+    Just internalCell <- originObj.orgDoc.cells !!? localCellIdx,
+    CGlossaryTerm glossaryTerm <- internalCell = do
+      dt_ maybeInnerVerticalMargin $ do
+        weaveProse glossaryTerm.term
+      dd_ $ do
+        let linkAnchor = getLinkAnchor (Just localCellIdx) internalCell
+        a_ [href_ $ "#" <> linkAnchor] $ do
+          toHtml @Text "↑"
+        weaveProse glossaryTerm.definition
+  | otherwise = toHtml @Text "error: glossary term not found"
+  where
+    maybeInnerVerticalMargin =
+      if termIdx == 0
+        then []
+        else [class_ "inner-dt"]
+
+toTextVisible :: Prose -> Text
+toTextVisible prose = CP.toText @Prose $ stripLinks prose
 
 weaveToc :: [Cell] -> HtmlWeaver ()
 weaveToc cells = do

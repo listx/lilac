@@ -22,7 +22,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
-    Command (PrintBibliography),
+    Command (PrintBibliography, PrintGlossary),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
@@ -50,6 +50,7 @@ import Lilac.Types
         citations,
         cslPath,
         footnoteNumbers,
+        glossary,
         lineLabels,
         meta,
         oid,
@@ -66,6 +67,7 @@ import Lilac.Types
         footnoteDefinitions,
         footnoteNumber,
         footnoteNumbers,
+        glossary,
         headingLevel,
         headingOidStack,
         headingSectionNumber,
@@ -91,7 +93,7 @@ import Lilac.Types
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
-  ( Bool (True),
+  ( Bool (False, True),
     FilePath,
     Identity,
     Int,
@@ -239,6 +241,7 @@ nilOrgDoc cells pseudoEdges =
       cells = cells,
       pseudoEdges = pseudoEdges,
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -2360,6 +2363,7 @@ parseSpec = do
           fromList
             [ ("hello", 1)
             ],
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Nothing,
         bibPaths = [],
@@ -2379,6 +2383,7 @@ parseSpec = do
               )
             ],
         prevCellIsFootnote = True,
+        glossary = M.empty,
         lineLabels = M.empty
       }
 
@@ -2419,6 +2424,7 @@ parseSpec = do
             [ ("a", 1),
               ("b", 2)
             ],
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Nothing,
         bibPaths = [],
@@ -2438,6 +2444,7 @@ parseSpec = do
               ("b", Prose [ptext "Definition of b." []])
             ],
         prevCellIsFootnote = True,
+        glossary = M.empty,
         lineLabels = M.empty
       }
 
@@ -2453,6 +2460,7 @@ parseSpec = do
         cells = [],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = [],
@@ -2471,6 +2479,7 @@ parseSpec = do
         cells = [],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Nothing,
         bibPaths =
@@ -2492,6 +2501,7 @@ parseSpec = do
         cells = [CCommand PrintBibliography],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
@@ -2525,6 +2535,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
@@ -2573,6 +2584,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
@@ -2691,6 +2703,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
@@ -2843,6 +2856,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
         bibPaths = ["a.json"],
@@ -3013,6 +3027,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Nothing,
         bibPaths = [],
@@ -3039,6 +3054,7 @@ parseSpec = do
           ],
         pseudoEdges = [],
         footnoteNumbers = M.empty,
+        glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Nothing,
         bibPaths = [],
@@ -3279,3 +3295,41 @@ parseSpec = do
     "0015-glossary-duplicate-term"
     "glossary term \"foo\" is not unique"
     14
+
+  shouldParseWithState
+    "0015-glossary-location"
+    OrgDoc
+      { oid = nilOid,
+        cells = [CCommand $ PrintGlossary False],
+        pseudoEdges = [],
+        footnoteNumbers = M.empty,
+        glossary = M.empty,
+        lineLabels = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        citations = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+    defaultOrgParserState
+
+  shouldParseWithState
+    "0015-glossary-location-global"
+    OrgDoc
+      { oid = nilOid,
+        cells = [CCommand $ PrintGlossary True],
+        pseudoEdges = [],
+        footnoteNumbers = M.empty,
+        glossary = M.empty,
+        lineLabels = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        citations = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+    defaultOrgParserState

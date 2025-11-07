@@ -51,6 +51,7 @@ data OrgDoc = OrgDoc
     cells :: [Cell],
     pseudoEdges :: [PseudoEdge],
     footnoteNumbers :: Map Text Int,
+    glossary :: Map Text Int,
     lineLabels :: Map Text Int,
     cslPath :: Maybe FilePath,
     bibPaths :: [FilePath],
@@ -71,6 +72,10 @@ rearranges the footnote definitions so that they are woven in the order they are
 referenced, not the order in which they are defined (parsed). This is unlike
 every other cell where the order of writing them (cell-by-cell) is preserved
 during weaving.
+
+For the ~glossary~, see [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Description lists, aka glossary terms]]. We save all
+glossary terms we find for this document, so that we can print them out later,
+much like citations.
 
 The ~pseudoEdges~ are edges that are ultimately used to create a graph
 representation of links between cells. In that representation, we want to use
@@ -209,7 +214,7 @@ data OrgParserState = OrgParserState
     footnoteDefinitions :: Map Text Prose,
     insideFootnoteDefinition :: Maybe Text,
     prevCellIsFootnote :: Bool,
-    glossary :: Map Text Prose,
+    glossary :: Map Text Int,
     glossaryTermOffset :: Int,
     insideParagraph :: Bool,
     tanglePaths :: Set Text,
@@ -398,7 +403,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
-    Command (PrintBibliography),
+    Command (PrintBibliography, PrintGlossary),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     GlossaryTerm (GlossaryTerm, definition, term),
@@ -430,6 +435,7 @@ import Lilac.Types
         citations,
         cslPath,
         footnoteNumbers,
+        glossary,
         lineLabels,
         meta,
         oid,
@@ -711,6 +717,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:convertToGlossaryTerm>>
 <<f:assertUniqueGlossaryTerm>>
 <<f:isGlossaryTermDelimiter>>
+<<f:glossaryLocationParser>>
 <<f:validateOidText>>
 <<f:validateCslPath>>
 <<f:collectValsFor>>
@@ -874,6 +881,7 @@ orgDocParser = do
         cells = filter meaningfulCell cells,
         pseudoEdges = orgParserState.pseudoEdges,
         footnoteNumbers = footnoteNumbers,
+        glossary = orgParserState.glossary,
         lineLabels = lineLabels,
         cslPath = cslPath,
         bibPaths = bibPaths,
@@ -957,6 +965,7 @@ defaultOrgDoc oid metas =
       cells = [],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -1060,7 +1069,8 @@ docMetaEntryParser = do
           [ "#+begin_",
             "#+name: ",
             "#+header: ",
-            "#+print_bibliography:"
+            "#+print_bibliography:",
+            "#+print_glossary:"
           ]
     avoidParsingLilacExtensions :: OrgParser ()
     avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
@@ -1491,6 +1501,7 @@ The [[data:Command]] encodes information about /generated/ content, such as [[id
 type Command :: Type
 data Command
   = PrintBibliography
+  | PrintGlossary Bool
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
@@ -1514,6 +1525,7 @@ cellParser = do
           toggleFootnote False $ resetContinuationIndent mathFragmentStandaloneParser,
           toggleFootnote True $ resetContinuationIndent footnoteDefinitionParser,
           toggleFootnote False $ resetContinuationIndent bibliographyLocationParser,
+          toggleFootnote False $ resetContinuationIndent glossaryLocationParser,
           toggleFootnote False $ resetContinuationIndent paragraphParser,
           detectInvalidIndentation
         ]
@@ -5024,6 +5036,7 @@ shouldParseWithState
         fromList
           [ ("hello", 1)
           ],
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -5043,6 +5056,7 @@ shouldParseWithState
             )
           ],
       prevCellIsFootnote = True,
+      glossary = M.empty,
       lineLabels = M.empty
     }
 #+end_src
@@ -5103,6 +5117,7 @@ shouldParseWithState
           [ ("a", 1),
             ("b", 2)
           ],
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -5122,6 +5137,7 @@ shouldParseWithState
             ("b", Prose [ptext "Definition of b." []])
           ],
       prevCellIsFootnote = True,
+      glossary = M.empty,
       lineLabels = M.empty
     }
 #+end_src
@@ -5227,6 +5243,7 @@ shouldParseWithState
       cells = [],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = [],
@@ -5283,6 +5300,7 @@ shouldParseWithState
       cells = [],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths =
@@ -5341,6 +5359,7 @@ shouldParseWithState
       cells = [CCommand PrintBibliography],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
@@ -5821,6 +5840,7 @@ shouldParseWithState
         <<Expected prose for 0014-citations-single-cite>>,
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
@@ -5882,6 +5902,7 @@ shouldParseWithState
         <<Expected prose for 0014-citations-locators>>,
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
@@ -6023,6 +6044,7 @@ shouldParseWithState
         <<Expected prose for 0014-citations-locators-affixes>>,
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
@@ -6202,6 +6224,7 @@ shouldParseWithState
         <<Expected prose for 0014-citations-worg>>,
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
       bibPaths = ["a.json"],
@@ -6489,6 +6512,7 @@ shouldParseWithState
         <<Expected prose for 0014-citations-forbidden-in-verbatim-code>>,
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -6538,6 +6562,7 @@ shouldParseWithState
         ],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -10264,7 +10289,7 @@ convertToGlossaryTerm prose offset =
     toGlossaryTerm :: ([PToken], Prose, [PToken]) -> OrgParser Cell
     toGlossaryTerm (_, term', def) = do
       let proseDefinition = compressProse . Prose $ reverse def
-      assertUniqueGlossaryTerm (toText term') proseDefinition offset
+      assertUniqueGlossaryTerm (toText term') offset
       pure
         $ CGlossaryTerm
           GlossaryTerm
@@ -10306,8 +10331,8 @@ account style markers, and the only way to do that is with ~PToken~ values.
 
 #+name: f:assertUniqueGlossaryTerm
 #+begin_src haskell
-assertUniqueGlossaryTerm :: Text -> Prose -> Int -> OrgParser ()
-assertUniqueGlossaryTerm term proseDefinition offset = do
+assertUniqueGlossaryTerm :: Text -> Int -> OrgParser ()
+assertUniqueGlossaryTerm term offset = do
   orgParserState <- get
   when (member term orgParserState.glossary) $ do
     MP.setOffset offset -- (ref:glossary-term-offset)
@@ -10317,10 +10342,10 @@ assertUniqueGlossaryTerm term proseDefinition offset = do
       <> " is not unique"
   put
     orgParserState
-      { glossary =
+      { OrgParserState.glossary =
           insert
             term
-            proseDefinition
+            orgParserState.cellNumber
             orgParserState.glossary
       }
 #+end_src
@@ -10350,6 +10375,54 @@ a failure in [[f:cellParser]], namely in [[f:listItemsEndParser]]
 ([[(list-items-end-failure-with-no-input)]]). In order to suppress that error, we
 changed [[f:textParser]] to set a ~glossaryTermOffset~ if it detected the glossary
 term delimiter ([[(glossary-term-delimiter-detection)]]) [fn:megaparsec-errors].
+
+** Printing glossaries
+:PROPERTIES:
+:ID:       e8ad30e5-5305-40e7-80ed-78bcec636ec1
+:END:
+
+Similar to [[id:e24de101-bf1d-418b-a18f-b1a98fea9696][Printing bibliographies]], we would like to allow users to print a
+collection of all glossary terms found in the document (with links back to where
+the term was originally defined --- for added context). We use the line
+~#+print_glossary: local~ for this. The ~local~ just means printing the glossary
+terms found in the current document. In the future we will allow this to be
+~global~ to print all glossary terms found in the entire [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]].
+
+#+name: f:glossaryLocationParser
+#+begin_src haskell
+glossaryLocationParser :: OrgParser Cell
+glossaryLocationParser = do
+  _ <- string "#+print_glossary: local"
+  pure . CCommand $ PrintGlossary False
+#+end_src
+
+#+name: ti:0015-glossary-location
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-location
+#+begin_src org
+,#+print_glossary: local
+#+end_src
+
+#+name: t:0015-glossary-location
+#+begin_src haskell
+shouldParseWithState
+  "0015-glossary-location"
+  OrgDoc
+    { oid = nilOid,
+      cells = [CCommand $ PrintGlossary False],
+      pseudoEdges = [],
+      footnoteNumbers = M.empty,
+      glossary = M.empty,
+      lineLabels = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      citations = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
+  defaultOrgParserState
+#+end_src
 
 * Standalone math fragments
 :PROPERTIES:
@@ -10857,7 +10930,8 @@ metaEntryParser = do
     $ map
       string
       [ "#+begin_",
-        "#+print_bibliography:"
+        "#+print_bibliography:",
+        "#+print_glossary:"
       ]
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
@@ -11736,7 +11810,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
-    Command (PrintBibliography),
+    Command (PrintBibliography, PrintGlossary),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
@@ -11764,6 +11838,7 @@ import Lilac.Types
         citations,
         cslPath,
         footnoteNumbers,
+        glossary,
         lineLabels,
         meta,
         oid,
@@ -11780,6 +11855,7 @@ import Lilac.Types
         footnoteDefinitions,
         footnoteNumber,
         footnoteNumbers,
+        glossary,
         headingLevel,
         headingOidStack,
         headingSectionNumber,
@@ -11805,7 +11881,7 @@ import Lilac.Types
 import Lilac.Util qualified as LU
 import Network.URI qualified as N
 import Relude
-  ( Bool (True),
+  ( Bool (False, True),
     FilePath,
     Identity,
     Int,
@@ -11931,6 +12007,7 @@ nilOrgDoc cells pseudoEdges =
       cells = cells,
       pseudoEdges = pseudoEdges,
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -12183,6 +12260,7 @@ parseSpec = do
   <<Text to Prose round trip>>
   <<Drop text chars from Prose>>
   <<t:0015-glossary-duplicate-term>>
+  <<t:0015-glossary-location>>
 #+end_src
 
 * Footnotes

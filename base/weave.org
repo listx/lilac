@@ -235,7 +235,7 @@ import Lilac.Types
       ),
     Citation (cites, noteNumber, prefix, styleVariation, suffix),
     Cite (id, locator, prefix, suffix),
-    Command (PrintBibliography),
+    Command (PrintBibliography, PrintGlossary),
     Figure (caption, link, meta),
     Footnote (body, name),
     GPath,
@@ -266,6 +266,7 @@ import Lilac.Types
         citations,
         cslPath,
         footnoteNumbers,
+        glossary,
         lineLabels,
         meta
       ),
@@ -502,6 +503,9 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:prepareCitations>>
 <<f:weaveCitation>>
 <<f:weaveBibliography>>
+<<f:weaveGlossary>>
+<<f:weaveCollectedGlossaryTerm>>
+<<f:toTextVisible>>
 <<f:weaveToc>>
 <<f:genHeadingAncestry>>
 <<f:weaveHeadingAncestry>>
@@ -692,6 +696,7 @@ weaveCell (cellIdx, cell) = case cell of
   CGlossaryTerm glossaryTerm -> weaveGlossaryTerm cellIdx glossaryTerm
   CCommand cmd -> case cmd of
     PrintBibliography -> weaveBibliography cellIdx
+    PrintGlossary isGlobal -> weaveGlossary isGlobal
 #+end_src
 
 The [[HTML head]] has some "imports" for the HTML page, including CSS and JS.
@@ -946,9 +951,16 @@ getLinkAnchor localCellIdx = \case
   CFootnote footnote ->
     let ref = "footnote-" <> footnote.name
      in toSafeHtmlId ref
-  CGlossaryTerm glossaryTerm ->
-    let ref = "glossary-" <> toSafeHtmlId (CP.toText @Prose $ stripLinks glossaryTerm.term)
-     in toSafeHtmlId ref
+  CGlossaryTerm glossaryTerm -> case localCellIdx of
+    Just idx ->
+      let ref =
+            "glossary-"
+              <> "c-"
+              <> T.show idx
+              <> "-"
+              <> toSafeHtmlId (CP.toText @Prose $ stripLinks glossaryTerm.term)
+       in toSafeHtmlId ref
+    Nothing -> ""
   CCommand {} -> ""
 #+end_src
 
@@ -1974,16 +1986,19 @@ weaveGlossaryTerm cellIdx glossaryTerm = do
       isLastGlossaryTerm = not . isGlossaryTerm $ cellIdx + 1
   when (isFirstGlossaryTerm) dlStart -- (ref:use-dlStart)
   wrapWithDiv cellIdx $ do
-    let maybeInnerVerticalMargin
-          | isFirstGlossaryTerm = []
-          | otherwise = [class_ "inner-dt"]
-    dt_ ([id_ linkAnchor] <> maybeInnerVerticalMargin) $ do
-      weaveProse glossaryTerm.term
-    dd_ $ do
-      weaveProse glossaryTerm.definition
+    div_ [id_ linkAnchor, class_ "glossary-term"] $ do
+      let maybeInnerVerticalMargin
+            | isFirstGlossaryTerm = []
+            | otherwise = [class_ "inner-dt"]
+      dt_ maybeInnerVerticalMargin $ do
+        weaveProse glossaryTerm.term
+      dd_ $ do
+        a_ [href_ $ "#" <> linkAnchor, class_ "glossary-term-anchor"] $ do
+          toHtmlRaw @Text <<HTML link symbol>>
+        weaveProse glossaryTerm.definition
   when (isLastGlossaryTerm) dlEnd -- (ref:use-dlEnd)
   where
-    linkAnchor = getLinkAnchor Nothing $ CGlossaryTerm glossaryTerm
+    linkAnchor = getLinkAnchor (Just cellIdx) $ CGlossaryTerm glossaryTerm
 #+end_src
 
 We don't wrap everything inside a ~<dl>~ tag because it may be the case that many
@@ -2011,6 +2026,70 @@ Contrast this with the following which share the same ~<dl>~ tag:
 c :: x
 
 d :: y
+
+*** Weaving all glossary terms
+
+A user may want to have a combine list of all glossary terms defined in the
+document, as discussed in [[id:e8ad30e5-5305-40e7-80ed-78bcec636ec1][Printing glossaries]].
+
+#+name: f:weaveGlossary
+#+begin_src haskell
+weaveGlossary :: Bool -> HtmlWeaver ()
+weaveGlossary isGlobal = do
+  weaveConf <- ask
+  if
+    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+      not isGlobal -> do
+        let terms =
+              sortBy
+                (comparing (toTextVisible . CP.fromText . fst)) -- (ref:glossary-term-compare-visible)
+                $ M.toList originObj.orgDoc.glossary
+            termIdxs = zip [0 ..] $ map snd terms
+        when (termIdxs /= []) $ toHtmlRaw @Text "<dl>"
+        forM_ termIdxs $ weaveCollectedGlossaryTerm weaveConf
+        when (termIdxs /= []) $ toHtmlRaw @Text "</dl>"
+    | otherwise -> pure ()
+#+end_src
+
+Sorting of glossary terms means sorting what's visible for the human user. So
+for links, it means only using the display name, not the target of the link
+which may have a long (random) UUID. This means using a custom comparing
+function for the prose at [[(glossary-term-compare-visible)]], to remove all links
+so that we only use the display text of links. We can do this with
+[[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:stripLinks][f:stripLinks]], just like we did for [[f:getLinkAnchor]], in [[f:toTextVisible]].
+
+#+name: f:toTextVisible
+#+begin_src haskell
+toTextVisible :: Prose -> Text
+toTextVisible prose = CP.toText @Prose $ stripLinks prose
+#+end_src
+
+In [[f:weaveCollectedGlossaryTerm]], because we only have the cell index, we first
+pull out the glossary cell to find the ~CGlossaryTerm~ we want to weave. We also
+insert a link back to the place where the glossary term was originally defined,
+to give the user additional context.
+
+#+name: f:weaveCollectedGlossaryTerm
+#+begin_src haskell
+weaveCollectedGlossaryTerm :: WeaveConf -> (Int, Int) -> HtmlWeaver ()
+weaveCollectedGlossaryTerm weaveConf (termIdx, localCellIdx)
+  | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+    Just internalCell <- originObj.orgDoc.cells !!? localCellIdx,
+    CGlossaryTerm glossaryTerm <- internalCell = do
+      dt_ maybeInnerVerticalMargin $ do
+        weaveProse glossaryTerm.term
+      dd_ $ do
+        let linkAnchor = getLinkAnchor (Just localCellIdx) internalCell
+        a_ [href_ $ "#" <> linkAnchor] $ do
+          toHtml @Text "↑"
+        weaveProse glossaryTerm.definition
+  | otherwise = toHtml @Text "error: glossary term not found"
+  where
+    maybeInnerVerticalMargin =
+      if termIdx == 0
+        then []
+        else [class_ "inner-dt"]
+#+end_src
 
 ** Citations
 :PROPERTIES:
@@ -4851,6 +4930,17 @@ dd ? do
   "::after" & do
     "content" -: "\"\\a\"" -- (ref:newline-after-dd)
     whiteSpace ClayText.pre
+  a # ".glossary-term-anchor" ? do
+    fontSize (em 0.7)
+    ":hover" & do
+      textDecoration none
+div # ".glossary-term" ? do
+  border (px 1) solid colorBg
+  ev padding (px 5)
+  ".active" & do
+    border (px 1) solid colorActiveBorder
+    backgroundColor colorActiveBg
+    ev borderRadius (px 5)
 #+end_src
 
 See [[https://stackoverflow.com/a/66030381/437583][this StackOverflow post]] for more discussion around styling description lists

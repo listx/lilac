@@ -575,6 +575,17 @@ defaultCss = do
     "::after" & do
       "content" -: "\"\\a\"" --
       whiteSpace ClayText.pre
+    a # ".glossary-term-anchor" ? do
+      fontSize (em 0.7)
+      ":hover" & do
+        textDecoration none
+  div # ".glossary-term" ? do
+    border (px 1) solid colorBg
+    ev padding (px 5)
+    ".active" & do
+      border (px 1) solid colorActiveBorder
+      backgroundColor colorActiveBg
+      ev borderRadius (px 5)
 
   ".doc-meta-author" & do
     fontStyle italic

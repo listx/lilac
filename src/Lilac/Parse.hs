@@ -109,7 +109,7 @@ import Lilac.Types
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
     Cite (Cite, id, locator, prefix, suffix),
-    Command (PrintBibliography),
+    Command (PrintBibliography, PrintGlossary),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     GlossaryTerm (GlossaryTerm, definition, term),
@@ -141,6 +141,7 @@ import Lilac.Types
         citations,
         cslPath,
         footnoteNumbers,
+        glossary,
         lineLabels,
         meta,
         oid,
@@ -383,6 +384,7 @@ orgDocParser = do
         cells = filter meaningfulCell cells,
         pseudoEdges = orgParserState.pseudoEdges,
         footnoteNumbers = footnoteNumbers,
+        glossary = orgParserState.glossary,
         lineLabels = lineLabels,
         cslPath = cslPath,
         bibPaths = bibPaths,
@@ -397,6 +399,7 @@ defaultOrgDoc oid metas =
       cells = [],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
+      glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
       bibPaths = [],
@@ -430,7 +433,8 @@ docMetaEntryParser = do
           [ "#+begin_",
             "#+name: ",
             "#+header: ",
-            "#+print_bibliography:"
+            "#+print_bibliography:",
+            "#+print_glossary:"
           ]
     avoidParsingLilacExtensions :: OrgParser ()
     avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
@@ -512,6 +516,7 @@ cellParser = do
           toggleFootnote False $ resetContinuationIndent mathFragmentStandaloneParser,
           toggleFootnote True $ resetContinuationIndent footnoteDefinitionParser,
           toggleFootnote False $ resetContinuationIndent bibliographyLocationParser,
+          toggleFootnote False $ resetContinuationIndent glossaryLocationParser,
           toggleFootnote False $ resetContinuationIndent paragraphParser,
           detectInvalidIndentation
         ]
@@ -1895,7 +1900,8 @@ metaEntryParser = do
     $ map
       string
       [ "#+begin_",
-        "#+print_bibliography:"
+        "#+print_bibliography:",
+        "#+print_glossary:"
       ]
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
@@ -2155,7 +2161,7 @@ convertToGlossaryTerm prose offset =
     toGlossaryTerm :: ([PToken], Prose, [PToken]) -> OrgParser Cell
     toGlossaryTerm (_, term', def) = do
       let proseDefinition = compressProse . Prose $ reverse def
-      assertUniqueGlossaryTerm (toText term') proseDefinition offset
+      assertUniqueGlossaryTerm (toText term') offset
       pure
         $ CGlossaryTerm
           GlossaryTerm
@@ -2163,8 +2169,8 @@ convertToGlossaryTerm prose offset =
               definition = proseDefinition
             }
 
-assertUniqueGlossaryTerm :: Text -> Prose -> Int -> OrgParser ()
-assertUniqueGlossaryTerm term proseDefinition offset = do
+assertUniqueGlossaryTerm :: Text -> Int -> OrgParser ()
+assertUniqueGlossaryTerm term offset = do
   orgParserState <- get
   when (member term orgParserState.glossary) $ do
     MP.setOffset offset --
@@ -2174,10 +2180,10 @@ assertUniqueGlossaryTerm term proseDefinition offset = do
       <> " is not unique"
   put
     orgParserState
-      { glossary =
+      { OrgParserState.glossary =
           insert
             term
-            proseDefinition
+            orgParserState.cellNumber
             orgParserState.glossary
       }
 
@@ -2186,6 +2192,11 @@ isGlossaryTermDelimiter = \case
   PTokenStyledText styledText ->
     styledText.body == "::" && maskToStyles styledText.style == []
   _ -> False
+
+glossaryLocationParser :: OrgParser Cell
+glossaryLocationParser = do
+  _ <- string "#+print_glossary: local"
+  pure . CCommand $ PrintGlossary False
 
 validateOidText :: (MonadFail m) => Text -> m OID
 validateOidText oidText = case Lilac.Types.fromText oidText of
