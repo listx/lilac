@@ -10392,8 +10392,13 @@ terms found in the current document. In the future we will allow this to be
 #+begin_src haskell
 glossaryLocationParser :: OrgParser Cell
 glossaryLocationParser = do
-  _ <- string "#+print_glossary: local"
-  pure . CCommand $ PrintGlossary False
+  _ <- string "#+print_glossary: "
+  isGlobal <-
+    MP.choice
+      [ string "local" >> pure False,
+        string "global" >> pure True
+      ]
+  pure . CCommand $ PrintGlossary isGlobal
 #+end_src
 
 #+name: ti:0015-glossary-location
@@ -10409,6 +10414,34 @@ shouldParseWithState
   OrgDoc
     { oid = nilOid,
       cells = [CCommand $ PrintGlossary False],
+      pseudoEdges = [],
+      footnoteNumbers = M.empty,
+      glossary = M.empty,
+      lineLabels = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      citations = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
+  defaultOrgParserState
+#+end_src
+
+#+name: ti:0015-glossary-location-global
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-location-global
+#+begin_src org
+,#+print_glossary: global
+#+end_src
+
+#+name: t:0015-glossary-location-global
+#+begin_src haskell
+shouldParseWithState
+  "0015-glossary-location-global"
+  OrgDoc
+    { oid = nilOid,
+      cells = [CCommand $ PrintGlossary True],
       pseudoEdges = [],
       footnoteNumbers = M.empty,
       glossary = M.empty,
@@ -12261,6 +12294,7 @@ parseSpec = do
   <<Drop text chars from Prose>>
   <<t:0015-glossary-duplicate-term>>
   <<t:0015-glossary-location>>
+  <<t:0015-glossary-location-global>>
 #+end_src
 
 * Footnotes

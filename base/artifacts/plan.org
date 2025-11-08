@@ -25,57 +25,6 @@ or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 
 ** For release ~0.9.0.0~
 
-*** IN-PROGRESS parse and weave description lists
-
-These are written like ~foo :: bar~, and are always the first part of a list
-item's prose (paragraph).
-
-The point is to allow users to provide definitions wherever they want, and then
-to collect ALL such definitions across the entire project to automatically
-create a GLOSSARY page or section, which can link back to the places where these
-definitions reside. This lets users freely define things wherever they like.
-
-It's almost like embedding Wiktionary entries into Wikipedia articles. There
-will probably need to be some sort of classification system though, so that
-certain categories of definitions can be (optionally) separated from each other.
-
-Maybe something like:
-
-  - term (word or phrase) :: [CSV of, certain, tags] definition
-
-  - another term :: definition (no tags in this one)
-
-To reduce verbosity we can allow the setting of tags for all items in the
-definition list, like this:
-
-#+begin_src org
-,#+dl_tags_csv: foo, bar, baz
-
-  - term :: this has the tags foo, bar, and baz applied to it
-#+end_src
-
-If we want to minimize changes to the parser, we can just say that the
-~dl_tags_csv~ property is something that is set at the heading level. Either as
-metadata or in the properties drawer. And then all lists inside it can inherit
-these tags. So we can set it once at the top level of the doc, even.
-
-Hmm, Org already allows FILETAGS or similar. We could just reuse that one also.
-
-**** IN-PROGRESS allow glossary generation
-
-Something like
-
-  - ~#+print_glossary: global~ to print all definitions found in the objects in
-    the archive
-
-  - ~#+print_glossary: local~ to only print definitions (again) found in the
-    current document (object).
-
-This means teaching OrgDoc about all found glossary terms (just promote the
-~glossary~ field in the ~OrgParserState~), and then concatenating those during
-archive generation. We also have to recognize the ~print_glossary~ command as a
-Cell.
-
 *** TODO fix bug where clicking on already-active TOC item leads to un-highlighting it
 
 It should instead be a NOP if clicking on an already-active TOC item, because

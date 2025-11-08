@@ -586,6 +586,8 @@ defaultCss = do
       border (px 1) solid colorActiveBorder
       backgroundColor colorActiveBg
       ev borderRadius (px 5)
+  span # ".glossary-external-source" ? do
+    fontSans
 
   ".doc-meta-author" & do
     fontStyle italic

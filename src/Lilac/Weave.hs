@@ -60,6 +60,7 @@ import Lilac.Types
       ( backlinks,
         bibs,
         csls,
+        glossary,
         objects,
         offsets,
         symbols
@@ -153,6 +154,7 @@ import Lilac.Types
     markingChars,
     markingCharsInvisible,
     stripLinks,
+    stripStyles,
   )
 import Lucid
   ( Attributes,
@@ -272,6 +274,7 @@ import Relude
     on,
     otherwise,
     pure,
+    repeat,
     replicate,
     reverse,
     runReaderT,
@@ -1285,39 +1288,104 @@ weaveGlossary :: Bool -> HtmlWeaver ()
 weaveGlossary isGlobal = do
   weaveConf <- ask
   if
-    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      not isGlobal -> do
-        let terms =
-              sortBy
-                (comparing (toTextVisible . CP.fromText . fst)) --
-                $ M.toList originObj.orgDoc.glossary
-            termIdxs = zip [0 ..] $ map snd terms
-        when (termIdxs /= []) $ toHtmlRaw @Text "<dl>"
-        forM_ termIdxs $ weaveCollectedGlossaryTerm weaveConf
-        when (termIdxs /= []) $ toHtmlRaw @Text "</dl>"
+    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects -> do
+        let terms :: [(Int, GPath)]
+            terms
+              | isGlobal =
+                  map (\((_term, path), localCellIdx) -> (localCellIdx, path))
+                    $ sortBy
+                      ( comparing (toNormalizedText . CP.fromText . fst . fst)
+                          <> comparing (snd . fst)
+                      )
+                    $ M.toList weaveConf.archive.glossary
+              | otherwise =
+                  map (\(_term, localCellIdx) -> (localCellIdx, weaveConf.originObjectPath))
+                    $ sortBy
+                      (comparing (toNormalizedText . CP.fromText . fst)) --
+                    $ M.toList originObj.orgDoc.glossary
+            terms' = zip (True : repeat False) terms
+        when (terms' /= []) $ toHtmlRaw @Text "<dl>"
+        forM_ terms' weaveCollectedGlossaryTerm
+        when (terms' /= []) $ toHtmlRaw @Text "</dl>"
     | otherwise -> pure ()
 
-weaveCollectedGlossaryTerm :: WeaveConf -> (Int, Int) -> HtmlWeaver ()
-weaveCollectedGlossaryTerm weaveConf (termIdx, localCellIdx)
-  | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-    Just internalCell <- originObj.orgDoc.cells !!? localCellIdx,
-    CGlossaryTerm glossaryTerm <- internalCell = do
-      dt_ maybeInnerVerticalMargin $ do
-        weaveProse glossaryTerm.term
-      dd_ $ do
+weaveCollectedGlossaryTerm :: (Bool, (Int, GPath)) -> HtmlWeaver ()
+weaveCollectedGlossaryTerm (isFirstTerm, (localCellIdx, objPath)) = do
+  weaveConf <- ask
+  if
+    | True <- objPath == weaveConf.originObjectPath, --
+      Just originObj <-
+        lookup weaveConf.originObjectPath weaveConf.archive.objects,
+      Just internalCell <- originObj.orgDoc.cells !!? localCellIdx,
+      CGlossaryTerm glossaryTerm <- internalCell -> do
         let linkAnchor = getLinkAnchor (Just localCellIdx) internalCell
-        a_ [href_ $ "#" <> linkAnchor] $ do
-          toHtml @Text "↑"
-        weaveProse glossaryTerm.definition
-  | otherwise = toHtml @Text "error: glossary term not found"
+        dt_ maybeInnerVerticalMargin $ do
+          weaveProse glossaryTerm.term
+        dd_ $ do
+          a_ [href_ $ "#" <> linkAnchor] $ do
+            toHtml @Text "↑"
+          weaveProse glossaryTerm.definition
+    | True <- objPath /= weaveConf.originObjectPath, --
+      Just extObj <- lookup objPath weaveConf.archive.objects,
+      Just externalCell <- extObj.orgDoc.cells !!? localCellIdx,
+      CGlossaryTerm glossaryTerm <- externalCell -> do
+        (externalLinkAnchor, externalOrgDocName) <-
+          getRelativeOrgDocCellLink objPath localCellIdx externalCell
+        dt_ maybeInnerVerticalMargin $ do
+          weaveProse glossaryTerm.term
+        dd_ $ do
+          a_ [href_ externalLinkAnchor] $ do
+            span_ [class_ "glossary-external-source"] $ do
+              weaveProse
+                $ Prose
+                  [ PTokenStyledText
+                      StyledText
+                        { body = "[" <> externalOrgDocName <> "]", --
+                          style = styleMaskFrom []
+                        }
+                  ]
+          weaveProse glossaryTerm.definition
+    | otherwise -> toHtml @Text "error: glossary term processing error"
   where
     maybeInnerVerticalMargin =
-      if termIdx == 0
+      if isFirstTerm
         then []
         else [class_ "inner-dt"]
 
-toTextVisible :: Prose -> Text
-toTextVisible prose = CP.toText @Prose $ stripLinks prose
+getRelativeOrgDocCellLink :: GPath -> Int -> Cell -> HtmlWeaver (Text, Text)
+getRelativeOrgDocCellLink objPath externalCellIdx externalCell = do
+  (externalOrgDocName, externalOrgDocPath) <- getRelativeOrgDocLink objPath
+  let externalLinkAnchor =
+        externalOrgDocPath
+          <> "#"
+          <> (getLinkAnchor (Just externalCellIdx) externalCell)
+  pure (externalLinkAnchor, externalOrgDocName)
+
+getRelativeOrgDocLink :: GPath -> HtmlWeaver (Text, Text)
+getRelativeOrgDocLink objPath = do
+  weaveConf <- ask
+  if
+    | Just toObjPath <- P.encodeUtf $ decodeGPath objPath,
+      Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+      Right externalOrgDocName <-
+        P.decodeWith utf8 utf8
+          $ P.replaceExtension
+            (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+            (P.unsafeEncodeUtf "org"),
+      Right externalOrgDocPath <-
+        P.decodeWith utf8 utf8
+          $ P.replaceExtension
+            (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+            (P.unsafeEncodeUtf "html") ->
+        pure (T.pack externalOrgDocName, T.pack externalOrgDocPath)
+    | otherwise -> pure ("ERROR", "???")
+
+toNormalizedText :: Prose -> Text
+toNormalizedText prose =
+  T.toLower
+    . CP.toText @Prose
+    . stripStyles
+    $ stripLinks prose
 
 weaveToc :: [Cell] -> HtmlWeaver ()
 weaveToc cells = do
@@ -1557,29 +1625,14 @@ weaveBacklinks = do
           let sorted =
                 sortOn (\(_, links) -> -(length links))
                   $ toPairs backlinksByPath
-          sequence_ $ map (weaveBacklinksForExternalObj weaveConf) sorted
+          sequence_ $ map weaveBacklinksForExternalObj sorted
   where
-    weaveBacklinksForExternalObj :: WeaveConf -> (GPath, [G.Edge]) -> HtmlWeaver ()
-    weaveBacklinksForExternalObj _ (_, []) = toHtmlRaw @Text ""
-    weaveBacklinksForExternalObj weaveConf (externalObjGPath, edges) = do
-      let (externalOrgDocName, externalOrgDocHref)
-            | Just toObjPath <-
-                P.encodeUtf $ decodeGPath externalObjGPath,
-              Just fromObjPath <-
-                P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
-              Right externalOrgDocName' <-
-                P.decodeWith utf8 utf8
-                  $ P.replaceExtension
-                    (getRelativePathWithoutSymlinks fromObjPath toObjPath)
-                    (P.unsafeEncodeUtf "org"),
-              Right href <-
-                P.decodeWith utf8 utf8
-                  $ P.replaceExtension
-                    (getRelativePathWithoutSymlinks fromObjPath toObjPath)
-                    (P.unsafeEncodeUtf "html") = do
-                (externalOrgDocName', T.pack href)
-            | otherwise = ("???", "")
-          weight = T.show $ length edges
+    weaveBacklinksForExternalObj :: (GPath, [G.Edge]) -> HtmlWeaver ()
+    weaveBacklinksForExternalObj (_, []) = toHtmlRaw @Text ""
+    weaveBacklinksForExternalObj (externalObjGPath, edges) = do
+      weaveConf <- ask
+      (externalOrgDocName, externalOrgDocPath) <- getRelativeOrgDocLink externalObjGPath
+      let weight = T.show $ length edges
           f :: ([Int], Int) -> HtmlWeaver ()
           f ([], _) = pure ()
           f (externalIdxs@(externalIdx : _), internalIdx) = do
@@ -1604,23 +1657,11 @@ weaveBacklinks = do
             | Just (_, externalCell) <-
                 cellIdxToObjCell weaveConf.archive externalIdx,
               Just (offset, _) <-
-                IntMap.lookupLE externalIdx weaveConf.archive.offsets,
-              Just toObjPath <-
-                P.encodeUtf $ decodeGPath externalObjGPath,
-              Just fromObjPath <-
-                P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
-              Right str <-
-                P.decodeWith utf8 utf8
-                  $ P.replaceExtension
-                    (getRelativePathWithoutSymlinks fromObjPath toObjPath)
-                    (P.unsafeEncodeUtf "html") = do
-                let externalLinkAnchor =
-                      T.pack str
-                        <> "#"
-                        <> (getLinkAnchor (Just externalCellIdx) externalCell)
-                    externalName = fromMaybe noName $ cellIdxToName weaveConf.archive offset externalIdx
+                IntMap.lookupLE externalIdx weaveConf.archive.offsets = do
+                let externalName = fromMaybe noName $ cellIdxToName weaveConf.archive offset externalIdx
                     externalCellIdx = externalIdx - offset
-                    externalLink =
+                (externalLinkAnchor, _) <- getRelativeOrgDocCellLink externalObjGPath externalCellIdx externalCell
+                let externalLink =
                       a_ [href_ externalLinkAnchor] $ do
                         weaveProse externalName
                 if asListItem
@@ -1652,8 +1693,8 @@ weaveBacklinks = do
                   . groupBy ((==) `on` snd)
                   . sortOn snd
       li_ [] $ do
-        a_ [href_ externalOrgDocHref] $ do
-          toHtml $ T.pack externalOrgDocName <> " (" <> weight <> ")"
+        a_ [href_ externalOrgDocPath] $ do
+          toHtml $ externalOrgDocName <> " (" <> weight <> ")"
         ol_ [] $ do
           forM_ (groupedByTarget edges) f
 

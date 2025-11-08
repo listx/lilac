@@ -2195,8 +2195,13 @@ isGlossaryTermDelimiter = \case
 
 glossaryLocationParser :: OrgParser Cell
 glossaryLocationParser = do
-  _ <- string "#+print_glossary: local"
-  pure . CCommand $ PrintGlossary False
+  _ <- string "#+print_glossary: "
+  isGlobal <-
+    MP.choice
+      [ string "local" >> pure False,
+        string "global" >> pure True
+      ]
+  pure . CCommand $ PrintGlossary isGlobal
 
 validateOidText :: (MonadFail m) => Text -> m OID
 validateOidText oidText = case Lilac.Types.fromText oidText of

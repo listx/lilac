@@ -27,6 +27,7 @@ import Lilac.Types
         backlinks,
         bibs,
         csls,
+        glossary,
         objects,
         offsets,
         symbols
@@ -62,7 +63,7 @@ import Lilac.Types
     MathFragment (meta, parentOid),
     OID,
     Object (Object, externalOids, orgDoc, symbols),
-    OrgDoc (bibPaths, cells, cslPath, oid, pseudoEdges),
+    OrgDoc (bibPaths, cells, cslPath, glossary, oid, pseudoEdges),
     PToken
       ( PTokenCitation,
         PTokenDivEnd,
@@ -197,8 +198,8 @@ mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
 
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
-  let (objects, symbolsWithoutTopLevelUUIDs) =
-        foldl' concatObjs (mempty, mempty) offsetsFull
+  let (objects, symbolsWithoutTopLevelUUIDs, glossary) =
+        foldl' concatObjs (mempty, mempty, mempty) offsetsFull
       symbols = topLevelUUIDs <> symbolsWithoutTopLevelUUIDs
       backlinks =
         mkBacklinks pathObjs offsets
@@ -227,6 +228,7 @@ mkArchive pathObjs = do
             Archive
               { objects = objects,
                 symbols = symbols,
+                glossary = glossary,
                 backlinks = backlinks,
                 offsets = offsets,
                 csls = fromList csls,
@@ -256,12 +258,13 @@ mkArchive pathObjs = do
         . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
         $ sort pathObjs
     concatObjs ::
-      (Map GPath Object, Map LinkOid Int) ->
+      (Map GPath Object, Map LinkOid Int, Map (Text, GPath) Int) ->
       (Int, (GPath, Object)) ->
-      (Map GPath Object, Map LinkOid Int)
-    concatObjs (accObjs, accSyms) (offset, (path, obj)) =
+      (Map GPath Object, Map LinkOid Int, Map (Text, GPath) Int)
+    concatObjs (accObjs, accSyms, accGloss) (offset, (path, obj)) =
       ( insert path obj accObjs,
-        (M.map (+ offset) obj.symbols) <> accSyms
+        (M.map (+ offset) obj.symbols) <> accSyms,
+        (M.mapKeys (\term -> (term, path)) obj.orgDoc.glossary) <> accGloss
       )
     findBrokenLinks ::
       Map GPath Object ->

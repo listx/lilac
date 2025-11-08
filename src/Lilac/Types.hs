@@ -52,6 +52,7 @@ module Lilac.Types
     ptext,
     stext,
     stripLinks,
+    stripStyles,
     styleMaskFrom,
   )
 where
@@ -644,6 +645,7 @@ type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object,
     symbols :: Map LinkOid Int,
+    glossary :: Map (Text, GPath) Int,
     backlinks :: Map GPath (Map GPath [G.Edge]),
     offsets :: IntMap GPath,
     csls :: Map FilePath Text,
@@ -666,6 +668,14 @@ stripLinks (Prose pTokens) = Prose (concatMap stripLink pTokens)
     stripLink :: PToken -> [PToken]
     stripLink = \case
       PTokenLink link -> map (PTokenStyledText $) link.name
+      pToken -> [pToken]
+
+stripStyles :: Prose -> Prose
+stripStyles (Prose pTokens) = Prose (concatMap stripStyle pTokens)
+  where
+    stripStyle :: PToken -> [PToken]
+    stripStyle = \case
+      PTokenStyledText styledText -> [PTokenStyledText $ StyledText {body = styledText.body, style = styleMaskFrom []}]
       pToken -> [pToken]
 
 getCellName :: Cell -> Maybe Prose
