@@ -266,7 +266,7 @@ import Lilac.Types
         cells,
         citations,
         cslPath,
-        footnoteNumbers,
+        footnoteRefs,
         glossary,
         lineLabels,
         meta
@@ -495,6 +495,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:getRelativeCssPath>>
 <<f:getRelativeJsPath>>
 <<f:weaveFootnote>>
+<<f:weaveFootnoteBacklink>>
 <<f:weaveGlossaryTerm>>
 <<f:commonPrefix>>
 <<f:renderAsText>>
@@ -637,7 +638,7 @@ weaveObject object = do
               $ dropWhile (not . isFootnote) cellsWithIdx
           getSortingKey cell
             | (CFootnote footnote) <- cell,
-              Just n <- lookup footnote.name object.orgDoc.footnoteNumbers =
+              Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
                 n
             | otherwise = maxBound :: Int
           isFootnote :: (Int, Cell) -> Bool
@@ -1955,11 +1956,34 @@ weaveFootnote cellIdx footnote = do
   weaveConf <- ask
   if
     | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just footnoteNumber <- lookup footnote.name originObj.orgDoc.footnoteNumbers -> do
+      Just (footnoteNumber, referrerCellIdx) <- lookup footnote.name originObj.orgDoc.footnoteRefs -> do
         p_ [class_ "footnote-definition", id_ ("footnote-" <> footnote.name)] $ do
           wrapWith cellIdx $ do
             span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
             weaveProse footnote.body
+            weaveFootnoteBacklink referrerCellIdx -- (ref:footnote-backlink)
+    | otherwise -> pure ()
+#+end_src
+
+At [[(footnote-backlink)]] we try to add a link back to the place (~referrerCellIdx~)
+where we first made a reference to this footnote definition. The
+[[f:weaveFootnoteBacklink]] function just tries to find the cell index in the
+current document, and if it is found, links to that cell.
+
+#+name: f:weaveFootnoteBacklink
+#+begin_src haskell
+weaveFootnoteBacklink :: Int -> HtmlWeaver ()
+weaveFootnoteBacklink localCellIdx = do
+  weaveConf <- ask
+  if
+    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+      Just internalCell <- originObj.orgDoc.cells !!? localCellIdx,
+      Just name <- cellIdxToName weaveConf.archive 0 localCellIdx -> do
+        toHtml @Text " "
+        let linkAnchor = "#" <> getLinkAnchor (Just localCellIdx) internalCell
+        a_ [href_ linkAnchor, class_ "footnote-backlink"] $ do
+          toHtml @Text "↑ "
+          weaveProse name
     | otherwise -> pure ()
 #+end_src
 
@@ -5006,6 +5030,8 @@ p # ".footnote-definition" ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
     ev borderRadius (px 5)
+  a # ".footnote-backlink" ? do
+    display inlineBlock
 #+end_src
 
 ** Glossary terms

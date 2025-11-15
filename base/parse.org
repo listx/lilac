@@ -50,7 +50,7 @@ data OrgDoc = OrgDoc
   { oid :: OID,
     cells :: [Cell],
     pseudoEdges :: [PseudoEdge],
-    footnoteNumbers :: Map Text Int,
+    footnoteRefs :: Map Text (Int, Int),
     glossary :: Map Text Int,
     lineLabels :: Map Text Int,
     cslPath :: Maybe FilePath,
@@ -62,7 +62,7 @@ data OrgDoc = OrgDoc
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-Footnotes get their own separate data structure called ~footnoteNumbers~ (on top
+Footnotes get their own separate data structure called ~footnoteRefs~ (on top
 of the footnote cells in ~cells~), because we have to remember the order of when
 these footnotes are referenced from other cells (anywhere we could have prose,
 such as paragraphs, headings, etc). This ordering is needed to determine which
@@ -210,7 +210,7 @@ data OrgParserState = OrgParserState
     figureNumber :: Int,
     tableNumber :: Int,
     footnoteNumber :: Int,
-    footnoteNumbers :: Map Text Int,
+    footnoteRefs :: Map Text (Int, Int),
     footnoteDefinitions :: Map Text Prose,
     insideFootnoteDefinition :: Maybe Text,
     prevCellIsFootnote :: Bool,
@@ -257,7 +257,7 @@ defaultOrgParserState =
       figureNumber = 0,
       tableNumber = 0,
       footnoteNumber = 0,
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       footnoteDefinitions = M.empty,
       insideFootnoteDefinition = Nothing,
       prevCellIsFootnote = False,
@@ -434,7 +434,7 @@ import Lilac.Types
         cells,
         citations,
         cslPath,
-        footnoteNumbers,
+        footnoteRefs,
         glossary,
         lineLabels,
         meta,
@@ -491,7 +491,7 @@ import Lilac.Types as OrgParserState
         figureNumber,
         footnoteDefinitions,
         footnoteNumber,
-        footnoteNumbers,
+        footnoteRefs,
         glossary,
         glossaryTermOffset,
         headingLevel,
@@ -855,7 +855,7 @@ orgDocParser = do
   cells <- many cellParser
   MP.eof
   lineLabels <- reconcileLineLabels
-  footnoteNumbers <- reconcileFootnotes
+  footnoteRefs <- reconcileFootnotes
   citations <- collectCitations
   orgParserState <- get
   resetState
@@ -880,7 +880,7 @@ orgDocParser = do
       { oid = docOid,
         cells = filter meaningfulCell cells,
         pseudoEdges = orgParserState.pseudoEdges,
-        footnoteNumbers = footnoteNumbers,
+        footnoteRefs = footnoteRefs,
         glossary = orgParserState.glossary,
         lineLabels = lineLabels,
         cslPath = cslPath,
@@ -964,7 +964,7 @@ defaultOrgDoc oid metas =
     { oid = oid,
       cells = [],
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
@@ -4834,20 +4834,23 @@ footnoteLinkParser :: OrgParser Link
 footnoteLinkParser = do
   name <- footnoteReferenceParser
   orgParserState <- get
-  displayName <- case lookup name orgParserState.footnoteNumbers of
+  displayName <- case lookup name orgParserState.footnoteRefs of
     Nothing -> do
       let newFootnoteNumber = orgParserState.footnoteNumber + 1
-          newFootnoteNumbers =
-            insert name newFootnoteNumber orgParserState.footnoteNumbers
+          newFootnoteRefs =
+            insert
+              name
+              (newFootnoteNumber, orgParserState.cellNumber)
+              orgParserState.footnoteRefs
       modify
         ( \s ->
             s
               { footnoteNumber = newFootnoteNumber,
-                footnoteNumbers = newFootnoteNumbers
+                footnoteRefs = newFootnoteRefs
               }
         )
       pure $ T.show newFootnoteNumber
-    Just n -> do
+    Just (n, _) -> do
       pure $ T.show n
   pure
     $ Link
@@ -4940,10 +4943,10 @@ definition without an associated link, it's considered an error.
 
 #+name: f:reconcileFootnotes
 #+begin_src haskell
-reconcileFootnotes :: OrgParser (Map Text Int)
+reconcileFootnotes :: OrgParser (Map Text (Int, Int))
 reconcileFootnotes = do
   orgParserState <- get
-  let referenced = M.keysSet orgParserState.footnoteNumbers
+  let referenced = M.keysSet orgParserState.footnoteRefs
       defined = M.keysSet orgParserState.footnoteDefinitions
       brokenLinks = Set.difference referenced defined
       unusedDefs = Set.difference defined referenced
@@ -4954,7 +4957,7 @@ reconcileFootnotes = do
   if
     | hasBrokenLinks -> fail $ "broken footnote links: " <> brokenLinksMsg
     | hasUnusedDefs -> fail $ "unused footnote definitions: " <> unusedDefsMsg
-    | otherwise -> pure orgParserState.footnoteNumbers
+    | otherwise -> pure orgParserState.footnoteRefs
 #+end_src
 
 *** Tests
@@ -5032,9 +5035,9 @@ shouldParseWithState
       cells =
         <<Expected cells for 0013-footnotes-simple>>,
       pseudoEdges = [],
-      footnoteNumbers =
+      footnoteRefs =
         fromList
-          [ ("hello", 1)
+          [ ("hello", (1, 0))
           ],
       glossary = M.empty,
       lineLabels = M.empty,
@@ -5045,9 +5048,9 @@ shouldParseWithState
     }
   defaultOrgParserState
     { footnoteNumber = 1,
-      footnoteNumbers =
+      footnoteRefs =
         fromList
-          [ ("hello", 1)
+          [ ("hello", (1, 0))
           ],
       footnoteDefinitions =
         fromList
@@ -5112,10 +5115,10 @@ shouldParseWithState
       cells =
         <<Expected cells for 0013-footnotes-complex>>,
       pseudoEdges = [],
-      footnoteNumbers =
+      footnoteRefs =
         fromList
-          [ ("a", 1),
-            ("b", 2)
+          [ ("a", (1, 0)),
+            ("b", (2, 0))
           ],
       glossary = M.empty,
       lineLabels = M.empty,
@@ -5126,10 +5129,10 @@ shouldParseWithState
     }
   defaultOrgParserState
     { footnoteNumber = 2,
-      footnoteNumbers =
+      footnoteRefs =
         fromList
-          [ ("a", 1),
-            ("b", 2)
+          [ ("a", (1, 0)),
+            ("b", (2, 0))
           ],
       footnoteDefinitions =
         fromList
@@ -5242,7 +5245,7 @@ shouldParseWithState
     { oid = nilOid,
       cells = [],
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
@@ -5299,7 +5302,7 @@ shouldParseWithState
     { oid = nilOid,
       cells = [],
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
@@ -5358,7 +5361,7 @@ shouldParseWithState
     { oid = nilOid,
       cells = [CCommand PrintBibliography],
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
@@ -5496,7 +5499,7 @@ citationParser = do
   _ <- char ']'
   let maybeNoteNumber = do
         footnoteName <- orgParserState.insideFootnoteDefinition
-        lookup footnoteName orgParserState.footnoteNumbers
+        fmap fst $ lookup footnoteName orgParserState.footnoteRefs
       c =
         Citation
           { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
@@ -5839,7 +5842,7 @@ shouldParseWithState
       cells =
         <<Expected prose for 0014-citations-single-cite>>,
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
@@ -5901,7 +5904,7 @@ shouldParseWithState
       cells =
         <<Expected prose for 0014-citations-locators>>,
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
@@ -6043,7 +6046,7 @@ shouldParseWithState
       cells =
         <<Expected prose for 0014-citations-locators-affixes>>,
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
@@ -6223,7 +6226,7 @@ shouldParseWithState
       cells =
         <<Expected prose for 0014-citations-worg>>,
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Just "foo.csl",
@@ -6511,7 +6514,7 @@ shouldParseWithState
       cells =
         <<Expected prose for 0014-citations-forbidden-in-verbatim-code>>,
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
@@ -6561,7 +6564,7 @@ shouldParseWithState
               }
         ],
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
@@ -10415,7 +10418,7 @@ shouldParseWithState
     { oid = nilOid,
       cells = [CCommand $ PrintGlossary False],
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
@@ -10443,7 +10446,7 @@ shouldParseWithState
     { oid = nilOid,
       cells = [CCommand $ PrintGlossary True],
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
@@ -11870,7 +11873,7 @@ import Lilac.Types
         cells,
         citations,
         cslPath,
-        footnoteNumbers,
+        footnoteRefs,
         glossary,
         lineLabels,
         meta,
@@ -11887,7 +11890,7 @@ import Lilac.Types
         figureNumber,
         footnoteDefinitions,
         footnoteNumber,
-        footnoteNumbers,
+        footnoteRefs,
         glossary,
         headingLevel,
         headingOidStack,
@@ -12039,7 +12042,7 @@ nilOrgDoc cells pseudoEdges =
     { oid = nilOid,
       cells = cells,
       pseudoEdges = pseudoEdges,
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,

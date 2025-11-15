@@ -49,7 +49,7 @@ import Lilac.Types
         cells,
         citations,
         cslPath,
-        footnoteNumbers,
+        footnoteRefs,
         glossary,
         lineLabels,
         meta,
@@ -66,7 +66,7 @@ import Lilac.Types
         figureNumber,
         footnoteDefinitions,
         footnoteNumber,
-        footnoteNumbers,
+        footnoteRefs,
         glossary,
         headingLevel,
         headingOidStack,
@@ -240,7 +240,7 @@ nilOrgDoc cells pseudoEdges =
     { oid = nilOid,
       cells = cells,
       pseudoEdges = pseudoEdges,
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
@@ -2359,9 +2359,9 @@ parseSpec = do
                 }
           ],
         pseudoEdges = [],
-        footnoteNumbers =
+        footnoteRefs =
           fromList
-            [ ("hello", 1)
+            [ ("hello", (1, 0))
             ],
         glossary = M.empty,
         lineLabels = M.empty,
@@ -2372,9 +2372,9 @@ parseSpec = do
       }
     defaultOrgParserState
       { footnoteNumber = 1,
-        footnoteNumbers =
+        footnoteRefs =
           fromList
-            [ ("hello", 1)
+            [ ("hello", (1, 0))
             ],
         footnoteDefinitions =
           fromList
@@ -2419,10 +2419,10 @@ parseSpec = do
                 }
           ],
         pseudoEdges = [],
-        footnoteNumbers =
+        footnoteRefs =
           fromList
-            [ ("a", 1),
-              ("b", 2)
+            [ ("a", (1, 0)),
+              ("b", (2, 0))
             ],
         glossary = M.empty,
         lineLabels = M.empty,
@@ -2433,10 +2433,10 @@ parseSpec = do
       }
     defaultOrgParserState
       { footnoteNumber = 2,
-        footnoteNumbers =
+        footnoteRefs =
           fromList
-            [ ("a", 1),
-              ("b", 2)
+            [ ("a", (1, 0)),
+              ("b", (2, 0))
             ],
         footnoteDefinitions =
           fromList
@@ -2459,7 +2459,7 @@ parseSpec = do
       { oid = nilOid,
         cells = [],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
@@ -2478,7 +2478,7 @@ parseSpec = do
       { oid = nilOid,
         cells = [],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Nothing,
@@ -2500,7 +2500,7 @@ parseSpec = do
       { oid = nilOid,
         cells = [CCommand PrintBibliography],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
@@ -2534,7 +2534,7 @@ parseSpec = do
                 ]
           ],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
@@ -2583,7 +2583,7 @@ parseSpec = do
                 ]
           ],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
@@ -2702,7 +2702,7 @@ parseSpec = do
                 ]
           ],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
@@ -2855,7 +2855,7 @@ parseSpec = do
                 ]
           ],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Just "foo.csl",
@@ -3026,7 +3026,7 @@ parseSpec = do
                 ]
           ],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Nothing,
@@ -3053,7 +3053,7 @@ parseSpec = do
                 }
           ],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Nothing,
@@ -3302,7 +3302,7 @@ parseSpec = do
       { oid = nilOid,
         cells = [CCommand $ PrintGlossary False],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Nothing,
@@ -3321,7 +3321,7 @@ parseSpec = do
       { oid = nilOid,
         cells = [CCommand $ PrintGlossary True],
         pseudoEdges = [],
-        footnoteNumbers = M.empty,
+        footnoteRefs = M.empty,
         glossary = M.empty,
         lineLabels = M.empty,
         cslPath = Nothing,

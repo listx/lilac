@@ -111,7 +111,7 @@ import Lilac.Types
         cells,
         citations,
         cslPath,
-        footnoteNumbers,
+        footnoteRefs,
         glossary,
         lineLabels,
         meta
@@ -377,7 +377,7 @@ weaveObject object = do
               $ dropWhile (not . isFootnote) cellsWithIdx
           getSortingKey cell
             | (CFootnote footnote) <- cell,
-              Just n <- lookup footnote.name object.orgDoc.footnoteNumbers =
+              Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
                 n
             | otherwise = maxBound :: Int
           isFootnote :: (Int, Cell) -> Bool
@@ -1030,11 +1030,26 @@ weaveFootnote cellIdx footnote = do
   weaveConf <- ask
   if
     | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just footnoteNumber <- lookup footnote.name originObj.orgDoc.footnoteNumbers -> do
+      Just (footnoteNumber, referrerCellIdx) <- lookup footnote.name originObj.orgDoc.footnoteRefs -> do
         p_ [class_ "footnote-definition", id_ ("footnote-" <> footnote.name)] $ do
           wrapWith cellIdx $ do
             span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
             weaveProse footnote.body
+            weaveFootnoteBacklink referrerCellIdx --
+    | otherwise -> pure ()
+
+weaveFootnoteBacklink :: Int -> HtmlWeaver ()
+weaveFootnoteBacklink localCellIdx = do
+  weaveConf <- ask
+  if
+    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+      Just internalCell <- originObj.orgDoc.cells !!? localCellIdx,
+      Just name <- cellIdxToName weaveConf.archive 0 localCellIdx -> do
+        toHtml @Text " "
+        let linkAnchor = "#" <> getLinkAnchor (Just localCellIdx) internalCell
+        a_ [href_ linkAnchor, class_ "footnote-backlink"] $ do
+          toHtml @Text "↑ "
+          weaveProse name
     | otherwise -> pure ()
 
 weaveGlossaryTerm :: Int -> GlossaryTerm -> HtmlWeaver ()

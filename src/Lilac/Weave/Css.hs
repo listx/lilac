@@ -580,6 +580,8 @@ defaultCss = do
       border (px 1) solid colorActiveBorder
       backgroundColor colorActiveBg
       ev borderRadius (px 5)
+    a # ".footnote-backlink" ? do
+      display inlineBlock
 
   dl ? do
     marginTop $ rem 1

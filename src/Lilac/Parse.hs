@@ -140,7 +140,7 @@ import Lilac.Types
         cells,
         citations,
         cslPath,
-        footnoteNumbers,
+        footnoteRefs,
         glossary,
         lineLabels,
         meta,
@@ -197,7 +197,7 @@ import Lilac.Types as OrgParserState
         figureNumber,
         footnoteDefinitions,
         footnoteNumber,
-        footnoteNumbers,
+        footnoteRefs,
         glossary,
         glossaryTermOffset,
         headingLevel,
@@ -358,7 +358,7 @@ orgDocParser = do
   cells <- many cellParser
   MP.eof
   lineLabels <- reconcileLineLabels
-  footnoteNumbers <- reconcileFootnotes
+  footnoteRefs <- reconcileFootnotes
   citations <- collectCitations
   orgParserState <- get
   resetState
@@ -383,7 +383,7 @@ orgDocParser = do
       { oid = docOid,
         cells = filter meaningfulCell cells,
         pseudoEdges = orgParserState.pseudoEdges,
-        footnoteNumbers = footnoteNumbers,
+        footnoteRefs = footnoteRefs,
         glossary = orgParserState.glossary,
         lineLabels = lineLabels,
         cslPath = cslPath,
@@ -398,7 +398,7 @@ defaultOrgDoc oid metas =
     { oid = oid,
       cells = [],
       pseudoEdges = [],
-      footnoteNumbers = M.empty,
+      footnoteRefs = M.empty,
       glossary = M.empty,
       lineLabels = M.empty,
       cslPath = Nothing,
@@ -2048,20 +2048,23 @@ footnoteLinkParser :: OrgParser Link
 footnoteLinkParser = do
   name <- footnoteReferenceParser
   orgParserState <- get
-  displayName <- case lookup name orgParserState.footnoteNumbers of
+  displayName <- case lookup name orgParserState.footnoteRefs of
     Nothing -> do
       let newFootnoteNumber = orgParserState.footnoteNumber + 1
-          newFootnoteNumbers =
-            insert name newFootnoteNumber orgParserState.footnoteNumbers
+          newFootnoteRefs =
+            insert
+              name
+              (newFootnoteNumber, orgParserState.cellNumber)
+              orgParserState.footnoteRefs
       modify
         ( \s ->
             s
               { footnoteNumber = newFootnoteNumber,
-                footnoteNumbers = newFootnoteNumbers
+                footnoteRefs = newFootnoteRefs
               }
         )
       pure $ T.show newFootnoteNumber
-    Just n -> do
+    Just (n, _) -> do
       pure $ T.show n
   pure
     $ Link
@@ -2104,10 +2107,10 @@ footnoteDefinitionParser = do
     spaces :: OrgParser Text
     spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 
-reconcileFootnotes :: OrgParser (Map Text Int)
+reconcileFootnotes :: OrgParser (Map Text (Int, Int))
 reconcileFootnotes = do
   orgParserState <- get
-  let referenced = M.keysSet orgParserState.footnoteNumbers
+  let referenced = M.keysSet orgParserState.footnoteRefs
       defined = M.keysSet orgParserState.footnoteDefinitions
       brokenLinks = Set.difference referenced defined
       unusedDefs = Set.difference defined referenced
@@ -2118,7 +2121,7 @@ reconcileFootnotes = do
   if
     | hasBrokenLinks -> fail $ "broken footnote links: " <> brokenLinksMsg
     | hasUnusedDefs -> fail $ "unused footnote definitions: " <> unusedDefsMsg
-    | otherwise -> pure orgParserState.footnoteNumbers
+    | otherwise -> pure orgParserState.footnoteRefs
 
 reconcileLineLabels :: OrgParser (Map Text Int)
 reconcileLineLabels = do
@@ -2599,7 +2602,7 @@ citationParser = do
   _ <- char ']'
   let maybeNoteNumber = do
         footnoteName <- orgParserState.insideFootnoteDefinition
-        lookup footnoteName orgParserState.footnoteNumbers
+        fmap fst $ lookup footnoteName orgParserState.footnoteRefs
       c =
         Citation
           { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
