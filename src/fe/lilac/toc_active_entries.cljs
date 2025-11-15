@@ -86,19 +86,26 @@
           :else nil)))))
 
 (defn init []
-  (let [heading-ancestry (get-heading-ancestry)]
+  (let [heading-ancestry (get-heading-ancestry)] ;
 
     (add-watch visible-headings :lilac-toc-updater
       (fn [_key atom _old-state _new-state]
-        (update-toc-highlights heading-ancestry @atom)
+        (update-toc-highlights heading-ancestry @atom) ;
         (maybe-scroll-toc @atom)))
 
     (let [options #js {:rootMargin "0px 0px 0px 0px" :threshold 0}
-          heading-containers (.querySelectorAll js/document ".heading-container")
-          observer (new js/IntersectionObserver update-visible-headings options)]
+          heading-containers
+            (.querySelectorAll js/document ".heading-container")
+          observer
+            (new js/IntersectionObserver update-visible-headings options)]
       (doseq [heading-container heading-containers]
-        (.observe observer heading-container)))
+        (.observe observer heading-container))) ;
 
     (let [toc-entry-links (.querySelectorAll js/document ".toc-entry a")]
       (doseq [link toc-entry-links]
-        (.addEventListener link "click" #(reset! visible-headings #{}))))))
+        (.addEventListener
+           link "click"
+           (fn [event]
+             (let [clicked-link (.-currentTarget event)]
+               (when-not (.contains (.-classList clicked-link) "active")
+                 #(reset! visible-headings #{}))))))))) ;

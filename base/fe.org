@@ -349,25 +349,29 @@ in the HTML inside [[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6::f:weaveHeadingAnce
 The ~init~ function has four parts:
 
   1) Read in the heading ancestry JSON (as a native Clojure map), via
-     [[f:get-heading-ancestry]].
+     [[f:get-heading-ancestry]] at [[(read-ancestry)]].
 
   2) Assign [[f:update-toc-highlights]] as a callback to fire whenever the
-     ~visible-headings~ atom changes.
+     ~visible-headings~ atom changes at [[(toc-callback)]].
 
-  3) Use the browser's [[https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API][Intersection Observer API]] to watch all heading
-     containers. Make the ~update-visible-headings~ function get called (as another
-     kind of callback) any time a heading container becomes (or no longer
-     becomes) visible in the viewport. The ~update-visible-headings~ modifies the
-     ~visible-headings~ atom.
+  3) Use the browser's [[https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API][Intersection Observer API]] to watch all heading containers
+     at [[(watch-heading-containers)]]. Make the ~update-visible-headings~ function
+     get called (as another kind of callback) any time a heading container
+     becomes (or no longer becomes) visible in the viewport. The
+     ~update-visible-headings~ modifies the ~visible-headings~ atom.
 
   4) Assign click handlers to TOC entry links, so that if a user clicks on a
-     link from the TOC, we trigger a reset of the ~visible-headings~ atom, so that
-     the Intersection Observer API can populate that atom again in its callback.
-     This way, we cleanly separate what the user does in the main viewport
-     (scrolling it to trigger the Intersection Observer API), and what the user
-     does in the TOC by clicking on links. If we don't have these click
-     handlers in the TOC, then clicking on the TOC can potentially end up with
-     weird snapping behavior.
+     link from the TOC, we trigger a reset of the ~visible-headings~ atom at
+     [[(reset-headings-on-click)]]. This is so that the Intersection Observer API
+     can populate that atom again in its callback. This way, we cleanly separate
+     what the user does in the main viewport (scrolling it to trigger the
+     Intersection Observer API), and what the user does in the TOC by clicking
+     on links. If we don't have these click handlers in the TOC, then clicking
+     on the TOC can potentially end up with weird snapping behavior.
+
+     Note that the reset of the atom is only done if the heading that is clicked
+     on is not already active (that is, we don't do anything if the heading is
+     already visible).
 
 #+name: ns:lilac.toc-active-entries
 #+header: :tangle src/fe/lilac/toc_active_entries.cljs
@@ -384,22 +388,29 @@ The ~init~ function has four parts:
 <<f:maybe-scroll-toc>>
 
 (defn init []
-  (let [heading-ancestry (get-heading-ancestry)]
+  (let [heading-ancestry (get-heading-ancestry)] ; (ref:read-ancestry)
 
     (add-watch visible-headings :lilac-toc-updater
       (fn [_key atom _old-state _new-state]
-        (update-toc-highlights heading-ancestry @atom)
+        (update-toc-highlights heading-ancestry @atom) ; (ref:toc-callback)
         (maybe-scroll-toc @atom)))
 
     (let [options #js {:rootMargin "0px 0px 0px 0px" :threshold 0}
-          heading-containers (.querySelectorAll js/document ".heading-container")
-          observer (new js/IntersectionObserver update-visible-headings options)]
+          heading-containers
+            (.querySelectorAll js/document ".heading-container")
+          observer
+            (new js/IntersectionObserver update-visible-headings options)]
       (doseq [heading-container heading-containers]
-        (.observe observer heading-container)))
+        (.observe observer heading-container))) ; (ref:watch-heading-containers)
 
     (let [toc-entry-links (.querySelectorAll js/document ".toc-entry a")]
       (doseq [link toc-entry-links]
-        (.addEventListener link "click" #(reset! visible-headings #{}))))))
+        (.addEventListener
+           link "click"
+           (fn [event]
+             (let [clicked-link (.-currentTarget event)]
+               (when-not (.contains (.-classList clicked-link) "active")
+                 #(reset! visible-headings #{}))))))))) ; (ref:reset-headings-on-click)
 #+end_src
 
 The ~:rootMargin "0px 0px 0px 0px"~ bit just makes the viewport the thing to check
