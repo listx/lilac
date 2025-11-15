@@ -1,7 +1,9 @@
 module Main (main) where
 
 import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
+import Data.FileEmbed (embedFile)
 import Data.Map.Strict qualified as M
+import Data.Text.Encoding qualified as TE
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -140,7 +142,9 @@ type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [OsPath],
     outDir :: OsPath,
-    projectConf :: OsPath
+    projectConf :: OsPath,
+    writeCss :: Bool,
+    writeJs :: Bool
   }
 
 type CompileOpts :: Type
@@ -263,6 +267,26 @@ weaveOptsHandler =
                 <> help
                   """
                   Project configuration file.
+                  """
+            )
+        )
+    <*> ( flag
+            False
+            True
+            ( long "write-css"
+                <> help
+                  """
+                  Write CSS file. This does not require Org mode input.
+                  """
+            )
+        )
+    <*> ( flag
+            False
+            True
+            ( long "write-js"
+                <> help
+                  """
+                  Write JS file. This does not require Org mode input.
                   """
             )
         )
@@ -433,7 +457,8 @@ tangle globalOpts tangleOpts archive = do
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
   projectConf <- readProjectConf
-  writeCssFile
+  when weaveOpts.writeCss writeCssFile
+  when weaveOpts.writeJs writeJsFile
   mapM_ (weaveArchiveFile projectConf weaveOpts.outDir) $ weaveOpts.inputs
   where
     readProjectConf = do
@@ -447,6 +472,12 @@ lilacWeave weaveOpts = do
         css <- P.encodeUtf "default.css"
         pure $ P.joinPath [weaveOpts.outDir, cssDir, css]
       LU.writeFileRobustly cssPath $ LWC.genCss
+    writeJsFile = do
+      jsPath <- do
+        jsDir <- P.encodeUtf "js"
+        js <- P.encodeUtf "lilac.js"
+        pure $ P.joinPath [weaveOpts.outDir, jsDir, js]
+      LU.writeFileRobustly jsPath lilacJs
     weaveArchiveFile projectConf outDir inputPath = do
       text <- LU.readFileRobustly inputPath
       case eitherDecodeStrictText text :: Either String Archive of
@@ -488,6 +519,9 @@ weaveToDisk projectConf outDir archive acc objPath obj =
           . LW.renderAsText weaveConf
           $ LW.weaveObject obj
    in action : acc
+
+lilacJs :: Text
+lilacJs = TE.decodeUtf8 $(embedFile "base/js/lilac.js.injectme")
 
 putStrColor :: [C.SGR] -> String -> IO ()
 putStrColor sgrs s = do

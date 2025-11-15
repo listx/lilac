@@ -96,17 +96,6 @@ will avoid conflicts that will arise in the HTML which auto-numbers things
 sequentially, for example). This implies some sort of structured release process
 like in the Git project (~main~ should only be advanced to catch up to ~next~, for example).
 
-*** TODO inject JS file into ~lilac~ binary
-
-This file needs to be generated (written to disk) as part of the ~lilac weave~
-command. This means injecting the contents of ~lilac.prod.js~ into the binary,
-using the [[https://hackage.haskell.org/package/file-embed-0.0.16.0/docs/Data-FileEmbed.html][file-embed]] library.
-
-We really only need to do this just before the public release of Lilac, because
-we don't need it during development of Lilac itself. We should probably need a
-~--skip-js-generation~ flag, which would skip JS generation when we're working on
-Lilac to weave itself during Lilac development.
-
 * Backlog
 :PROPERTIES:
 :ID:       b27d3e53-ada2-4f9e-9f38-18e9252b8229

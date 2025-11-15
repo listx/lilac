@@ -31,12 +31,18 @@ tangle: base/lilac.larc
 	touch tangle
 
 weave: base/lilac.larc
-	lilac weave $< --out-dir base
+	lilac weave $< --out-dir base --write-css #
 	touch weave
 
 dev-cljs:
 	clojure -M -m figwheel.main --build lilac --repl
 .PHONY: cljs
+
+prod-cljs:
+	clojure -M -m figwheel.main --build-once lilac-prod
+
+	cp -f base/js/lilac.js base/js/lilac.js.injectme
+.PHONY: prod-cljs
 
 build: $(org_files) lilac.cabal
 	cabal build

@@ -183,9 +183,44 @@ We have to run this in order to get a single minified JS file.
 
 You can run it like this:
 
+#+name: sh:gen-prod-cljs
 #+begin_src sh
-clojure -M -m figwheel.main --build lilac-prod
+clojure -M -m figwheel.main --build-once lilac-prod
 #+end_src
+
+Or if you're using the [[id:5bbaf57a-217d-4e45-88bf-021c4c67b591::Makefile][Makefile]], you can just do ~make prod-cljs~, which will
+invoke the following rule:
+
+#+name: make:Build prod JS
+#+begin_src makefile
+prod-cljs:
+	<<sh:gen-prod-cljs>>
+	<<sh:update-injectable>>
+.PHONY: prod-cljs
+#+end_src
+
+[[sh:update-injectable]] simply overwrites the path ~base/js/lilac.js.injectme~ with
+what's in ~base/js/lilac.js~. We cannot simply inject ~base/js/lilac.js~ directly
+because it's shared with the development environment by [[cfg:lilac-fe-build]].
+
+#+name: sh:update-injectable
+#+begin_src sh
+cp -f base/js/lilac.js base/js/lilac.js.injectme
+#+end_src
+
+If we are readying Lilac for a production release, it will need to have the
+contents of the single JavaScript file (at ~base/js/lilac.js~) injected into the
+CLI binary. To perform this injection, we have to
+
+  1) Run ~make prod-cljs~ to ensure we have the latest ~base/js/lilac.js~ file. This
+     also creates a ~base/js/lilac.js.injectme~ which is a copy of the just-created
+     (production) ~base/js/lilac.js~ file.
+
+  2) Recompile the CLI. This can be done with ~make tangle~ because tangling
+     itself relies on the locally compiled version of the ~lilac~ CLI. Because we
+     use the [[https://hackage.haskell.org/package/file-embed][file-embed]] library to inject the JavaScript file into the CLI in
+     [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]], Cabal will automatically detect whether the
+     JavaScript file has changed and recompile the CLI if needed.
 
 ** Figwheel configuration
 :PROPERTIES:

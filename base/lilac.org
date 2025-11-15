@@ -894,6 +894,7 @@ we don't have to memorize exactly how to invoke certain commands.
 <<make:Tangle sources>>
 <<make:Weave>>
 <<id:783de6bf-e36b-4c9e-a405-2a86d0897795::make:Start frontend development environment (CLJS REPL)>>
+<<id:7e6758c8-a642-4cfa-9e03-498163d6ce68::make:Build prod JS>>
 <<make:Build lilac with Cabal>>
 <<make:Build lilac with Nix>>
 <<make:Update Nix dependencies>>
@@ -1378,7 +1379,7 @@ For weaving, use the =base= directory.
 #+name: make:Weave
 #+begin_src makefile
 weave: base/lilac.larc
-	lilac weave $< --out-dir base
+	lilac weave $< --out-dir base --write-css # (ref:weave-write-css)
 	touch weave
 #+end_src
 
@@ -1389,9 +1390,25 @@ Ignore the =weave= file because it's a [[id:b649d761-1103-47be-86e4-56a7362a5ecc
 weave
 #+end_src
 
-It's useful to serve the generated pages through a server (instead of making the
-browser fetch it via the ~file://~ protocol), because it gives us a richer
-frontend development experience. See [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][Frontend]].
+We add ~--write-css~ the flag at [[(weave-write-css)]] because we want to regenerate
+(every time) the CSS file from Haskell sources in [[id:7147b743-084d-4abc-8561-5417c7fe10b3::f:genCss][f:genCss]], in case anything in
+there changed. However we don't do the same for JavaScript (we don't supply
+~--write-js~), because we don't want to overwrite the same ~base/js/lilac.js~ path
+used by [[id:783de6bf-e36b-4c9e-a405-2a86d0897795::make:Start frontend development environment (CLJS REPL)][make:Start frontend development environment (CLJS REPL)]].
+
+To clarify, there are 2 flavors of JavaScript artifacts, development and
+production. The development version is not a single JavaScript file and is not
+optimized; this allows us to get a ClojureScript REPL where we can play around
+with a direct connection to a browser. The production flavor is a single,
+optimized JavaScript file and does not have ClojureScript REPL support. The
+production flavor is copied out to another file ~base/js/lilac.js.injectme~ by
+[[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::sh:update-injectable][sh:update-injectable]]. It is this separate file which is injected into Haskell in
+[[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7::f:lilacJs][f:lilacJs]], so that Lilac is able to generate this file on its own. When we're developing Lilac with Lilac, we generally want to only look at the development
+version of the JavaScript because this allows REPL interaction. This is why we
+don't use ~--write-js~ in [[make:Weave]].
+
+For serving the woven HTML pages through a server (instead of making the browser
+fetch it via the ~file://~ protocol), see [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][Frontend]].
 
 *** Build =lilac=
 
@@ -2255,10 +2272,12 @@ executable lilac
     , base >=4.7 && <5
     , directory
     , filepath
+    , file-embed
     , lilac
     , optparse-applicative
     , megaparsec
     , relude
+    , text
   default-language: <<Language edition>>
 
 test-suite spec
@@ -2530,7 +2549,9 @@ The boilerplate involves [[id:ce9af5ef-6559-4ffb-82c1-a439214eda6d][option handl
 module Main (main) where
 
 import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
+import Data.FileEmbed (embedFile)
 import Data.Map.Strict qualified as M
+import Data.Text.Encoding qualified as TE
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -2643,6 +2664,7 @@ import Text.Megaparsec qualified as MP
 <<f:tangle>>
 <<f:lilacWeave>>
 <<f:weaveToDisk>>
+<<f:lilacJs>>
 <<f:putStrColor>>
 <<f:putStrLnColor>>
 #+end_src
@@ -2690,7 +2712,7 @@ lilac globalOpts = case globalOpts.subcommand of
   Weave weaveOpts -> lilacWeave weaveOpts
 #+end_src
 
-*** Compiling
+** Compiling
 :PROPERTIES:
 :ID:       c80fd6a6-7eb2-4672-99cc-a5a10c1fda69
 :END:
@@ -2729,7 +2751,7 @@ lilacCompile _globalOpts compileOpts = do
       encodeFile outPath obj
 #+end_src
 
-*** Archiving
+** Archiving
 :PROPERTIES:
 :ID:       75173d6f-c210-46a0-8acf-689deeacd250
 :END:
@@ -2758,7 +2780,7 @@ lilacArchive archiveOpts = do
         Right obj -> pure (gPath, obj)
 #+end_src
 
-*** Tangling
+** Tangling
 :PROPERTIES:
 :ID:       27b05a30-83ff-4c47-b320-f53747424a68
 :END:
@@ -2838,7 +2860,7 @@ scenarios) is fine because it will most likely result in the comparison
 ~existingContent /= contentToWrite~ in [[f:tangle]] failing (assuming the
 ~contentToWrite~ is not empty), resulting in the file being marked for tangling.
 
-*** Weaving
+** Weaving
 
 The [[f:lilacWeave]] function weaves the [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] into HTML.
 
@@ -2847,7 +2869,8 @@ The [[f:lilacWeave]] function weaves the [[id:e16dd5c7-0a63-4c52-afe9-744fdf8536
 lilacWeave :: WeaveOpts -> IO ()
 lilacWeave weaveOpts = do
   projectConf <- readProjectConf
-  writeCssFile
+  when weaveOpts.writeCss writeCssFile
+  when weaveOpts.writeJs writeJsFile
   mapM_ (weaveArchiveFile projectConf weaveOpts.outDir) $ weaveOpts.inputs
   where
     readProjectConf = do
@@ -2861,6 +2884,12 @@ lilacWeave weaveOpts = do
         css <- P.encodeUtf "default.css"
         pure $ P.joinPath [weaveOpts.outDir, cssDir, css]
       LU.writeFileRobustly cssPath $ LWC.genCss
+    writeJsFile = do
+      jsPath <- do
+        jsDir <- P.encodeUtf "js"
+        js <- P.encodeUtf "lilac.js"
+        pure $ P.joinPath [weaveOpts.outDir, jsDir, js]
+      LU.writeFileRobustly jsPath lilacJs
     weaveArchiveFile projectConf outDir inputPath = do
       text <- LU.readFileRobustly inputPath
       case eitherDecodeStrictText text :: Either String Archive of
@@ -2908,6 +2937,26 @@ weaveToDisk projectConf outDir archive acc objPath obj =
           . LW.renderAsText weaveConf
           $ LW.weaveObject obj
    in action : acc
+#+end_src
+
+*** JavaScript injection
+:PROPERTIES:
+:ID:       e31aed94-98f5-4c47-b9ab-e82a529e5be7
+:END:
+
+We use ClojureScript to generate the JavaScript we need at [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::make:Build prod JS][make:Build prod JS]].
+That generates a single self-contained JavaScript file. We would like to put
+this into our CLI, because then the CLI really becomes the complete HTML, CSS
+and JavaScript generation solution, using only Org files as dependencies.
+
+We use the [[https://hackage.haskell.org/package/file-embed][file-embed]] library to inject the JavaScript file into our CLI. The
+~embedFile~ function returns a ~ByteString~, so we convert it into ~Text~ with
+~TE.decodeUtf8~.
+
+#+name: f:lilacJs
+#+begin_src haskell
+lilacJs :: Text
+lilacJs = TE.decodeUtf8 $(embedFile "base/js/lilac.js.injectme")
 #+end_src
 
 ** Option handling boilerplate
@@ -3031,7 +3080,9 @@ type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [OsPath],
     outDir :: OsPath,
-    projectConf :: OsPath
+    projectConf :: OsPath,
+    writeCss :: Bool,
+    writeJs :: Bool
   }
 #+end_src
 
@@ -3062,6 +3113,26 @@ weaveOptsHandler =
                 <> help
                   """
                   Project configuration file.
+                  """
+            )
+        )
+    <*> ( flag
+            False
+            True
+            ( long "write-css"
+                <> help
+                  """
+                  Write CSS file. This does not require Org mode input.
+                  """
+            )
+        )
+    <*> ( flag
+            False
+            True
+            ( long "write-js"
+                <> help
+                  """
+                  Write JS file. This does not require Org mode input.
                   """
             )
         )
