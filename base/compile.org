@@ -7,7 +7,15 @@
 #+cite_export: csl csl-styles/ieee.csl
 
 Compilation is the intermediate step we perform on Org files, such that they can
-be tangled or woven.
+be tangled or woven. In order to tangle or weave, we require an /archive/, which
+is made up of /objects/.
+
+  - object :: An even more machine-friendly representation of a single Org
+    document.
+
+  - archive :: A self-contained collection of objects. All objects inside an
+    archive can link to each other (headings, code blocks, etc) without any
+    issues.
 
 * =Lilac.Compile= module
 
@@ -2020,6 +2028,10 @@ compileSpec = do
   <<t:0100-dag-2-node-loop-3-files>>
   <<t:0500-cumulativeOffsets-sanity>>
 #+end_src
+
+* Glossary
+
+#+print_glossary: local
 
 * Bibliography
 
