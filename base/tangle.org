@@ -13,7 +13,7 @@ of a literate document. It is the opposite of documentation generation found in
 many programming language environments, such as =javadoc=, where documentation is
 extracted from source code.
 
-** =Lilac.Tangle= module
+* =Lilac.Tangle= module
 
 Tangling concerns are captured in [[file:../src/Lilac/Tangle.hs]].
 
@@ -69,7 +69,7 @@ import System.OsPath qualified as P
 <<f:expandBlock>>
 #+end_src
 
-** Tangling overview
+* Tangling overview
 
 Tangling essentially boils down to the following:
 
@@ -87,7 +87,10 @@ to the computer for interpretation by it, while the third is a way to avoid
 unnecessarily busting the modification timestamp cache for Makefiles (because
 they use file modification timestamps to see whether we need to rerun a rule).
 
-** Block expansion for tangling
+* Block expansion for tangling
+:PROPERTIES:
+:ID:       ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba
+:END:
 
 We examine the given [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] for all of the root blocks (blocks which
 specify the ~:tangle~ header, and thus require writing to the file system) in it,
@@ -231,7 +234,7 @@ it "loses information" $ do
   T.unlines withoutNewline `shouldBe` T.unlines withNewline
 #+end_src
 
-*** Tests
+** Tests
 :PROPERTIES:
 :ID:       c78d3f21-b295-4f19-b720-ab50dedb3252
 :END:
@@ -947,11 +950,11 @@ checkExpansion
   ]
 #+end_src
 
-** Testing framework
+* Testing framework
 
 The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]].
 
-*** Test module and helpers
+** Test module and helpers
 :PROPERTIES:
 :ID:       3990627d-69f5-4c30-b3d7-abb3edaa0d13
 :END:
@@ -1018,7 +1021,7 @@ checkExpansion paths expectedExpansions = do
         `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
 #+end_src
 
-*** All test cases
+** All test cases
 
 Below are all of the individual test cases.
 
