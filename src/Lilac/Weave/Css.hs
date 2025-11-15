@@ -38,11 +38,13 @@ import Clay
     content,
     dd,
     display,
+    displayTable,
     div,
     dl,
     dt,
     em,
     figcaption,
+    figure,
     fitContent,
     flex,
     flexDirection,
@@ -500,11 +502,20 @@ defaultCss = do
     yx margin (px 0) auto
   figcaption ? do
     yx margin (px 10) auto
+    yx padding 0 (px 5)
     textAlign center
-    width (pct 80)
     fontSans
+    maxWidth (pct 80)
+    display displayTable
+    border (px 1) solid colorBg
+    ev borderRadius (px 5)
   ".caption-prefix" & do
     fontWeight bold
+  figure # ".active" ? do
+    figcaption ? do
+      border (px 1) solid colorActiveBorder
+      backgroundColor colorActiveBg
+      ev borderRadius (px 5)
 
   table ? do
     fontSans

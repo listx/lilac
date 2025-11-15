@@ -4203,11 +4203,13 @@ import Clay
     content,
     dd,
     display,
+    displayTable,
     div,
     dl,
     dt,
     em,
     figcaption,
+    figure,
     fitContent,
     flex,
     flexDirection,
@@ -4910,14 +4912,35 @@ code ? do
   yx margin (px 0) auto
 figcaption ? do
   yx margin (px 10) auto
+  yx padding 0 (px 5)
   textAlign center
-  width (pct 80)
   fontSans
+  maxWidth (pct 80)
+  display displayTable
+  border (px 1) solid colorBg
+  ev borderRadius (px 5)
 ".caption-prefix" & do
   fontWeight bold
+<<css:active-figures>>
+#+end_src
+
+Active figure captions are highlighted, just like for headings. Tables and
+figures use the same ~figcaption~ HTML element for the caption, so we only need to
+specify the CSS in one place, for both figures and [[id:b7175bc2-b545-4abf-8660-df9e43b3adff][Tables]].
+
+#+name: css:active-figures
+#+begin_src haskell
+figure # ".active" ? do
+  figcaption ? do
+    border (px 1) solid colorActiveBorder
+    backgroundColor colorActiveBg
+    ev borderRadius (px 5)
 #+end_src
 
 ** Tables
+:PROPERTIES:
+:ID:       b7175bc2-b545-4abf-8660-df9e43b3adff
+:END:
 
 #+name: css:Tables
 #+begin_src haskell
