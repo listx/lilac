@@ -25,18 +25,21 @@ or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 
 ** For release ~0.9.0.0~
 
-** TODO clicking on an already-active item should un-activate it
+*** TODO fail parse if any block header starts with a double underscore
+Such headers are reserved by Lilac.
+
+*** TODO clicking on an already-active item should un-activate it
 
 Sometimes we don't want the highlight to be there. Clicking on the thing again
 should un-highlight it (remove "active" class), and also clear it from the
 current URL.
 
-** TODO blocks: show source language or block type (example, quote, etc)
+*** TODO blocks: show source language or block type (example, quote, etc)
 
 This should be straightforward. The hard part is figuring how to display
 this information in a clean way without drawing too much attention to itself.
 
-** TODO blocks: show ancestry (parent(s), children)
+*** TODO blocks: show ancestry (parent(s), children)
 
 This could be a dropdown or popup, where we show how it's used in relation to
 other blocks.
@@ -122,22 +125,6 @@ E.g. https://en.wikipedia.org/wiki/Geometric_Shapes_(Unicode_block)#cite_ref-fin
 ** TODO keyboard-driven navigation
 
 Cell-wise movement (j/k for next/prev cell, h/l to expand/close tree).
-
-** TODO fail parse if any block header starts with a double underscore
-Such headers are reserved by Lilac.
-
-** TODO (Git integration) add raw git links
-If there is text like 68541ad (capture unhandled edge case for parsing styled
-text, 2025-01-26) (hash, parenthetical with a YYYY-MM-DD date at the end),
-convert it to a link. You'd need to have a "default Git repo" setting somewhere,
-probably in the doc metadata, and Lilac would have to learn how to read out this
-information locally using Git CLI or something else.
-
-This may be avoided if we can just copy out the Org-formatted info directly out
-of =tig= where we get this info. Then we can just paste out of =tig= directly into
-here (with the right link that points to GitHub for example), and we're fine.
-The only downside with this is if we change Git hosting providers, in which case
-our existing links would point to the wrong (older) provider.
 
 ** TODO "raw" or "copy-editor" view of code cells
 
@@ -263,3 +250,16 @@ Allow users to disable automatic padding per-block.
 ** TODO doc: teach "pad-consecutive-noweb" (?) boolean metadata
 Allow users to set document-wide default for disabling automatic padding (which
 can be overridden at the block level)
+
+** TODO (Git integration) add raw git links
+If there is text like 68541ad (capture unhandled edge case for parsing styled
+text, 2025-01-26) (hash, parenthetical with a YYYY-MM-DD date at the end),
+convert it to a link. You'd need to have a "default Git repo" setting somewhere,
+probably in the doc metadata, and Lilac would have to learn how to read out this
+information locally using Git CLI or something else.
+
+This may be avoided if we can just copy out the Org-formatted info directly out
+of =tig= where we get this info. Then we can just paste out of =tig= directly into
+here (with the right link that points to GitHub for example), and we're fine.
+The only downside with this is if we change Git hosting providers, in which case
+our existing links would point to the wrong (older) provider.
