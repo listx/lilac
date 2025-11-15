@@ -4974,6 +4974,15 @@ sup ? do
           ":hover" & do
             borderStyle none
             textDecoration underline
+p # ".footnote-definition" ? do
+  border (px 1) solid colorBg
+  ev borderRadius (px 5)
+  marginLeft (px (-7))
+  yx padding 0 (px 5)
+  ".active" & do
+    border (px 1) solid colorActiveBorder
+    backgroundColor colorActiveBg
+    ev borderRadius (px 5)
 #+end_src
 
 ** Glossary terms
