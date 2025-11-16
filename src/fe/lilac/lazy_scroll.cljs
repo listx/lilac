@@ -1,11 +1,11 @@
 (ns lilac.lazy-scroll
-  (:require [lilac.focus :refer [activate]]
+  (:require [lilac.focus :refer [activate activate-element deactivate-element]]
             [clojure.string :as str]))
 
 (defn- href->id [href]
   (let [href (.-hash (.-location js/window))
         href-final (if str/blank? href "#top")
-        id (.substring href 1)]
+        id (.substring href-final 1)]
     id))
 
 (defn- get-breadcrumbs-height []
@@ -42,12 +42,17 @@
       (.addEventListener link "click"
         (fn [event]
           (let [href (.getAttribute link "href")
-                id (href->id href)]
+                id (href->id href)
+                old-href (.-hash js/location)]
             (when-let [target-element (-> js/document (.getElementById id))]
-              (do
-                (.preventDefault event) ;
-                (.pushState (.-history js/window) nil nil href) ;
-                (maybe-scroll-by-hash nil)))))))))
+              (.preventDefault event) ;
+              (if (= href old-href)
+                (if (.contains (.-classList target-element) "active") ;
+                  (deactivate-element target-element)
+                  (activate-element target-element))
+                (do
+                  (.pushState (.-history js/window) nil nil href) ;
+                  (maybe-scroll-by-hash nil))))))))))
 
 (defn init [] ;
   (weaken-anchor-links) ;

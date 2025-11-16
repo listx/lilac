@@ -1,14 +1,17 @@
 (ns lilac.focus)
 
+(defn deactivate-element [elt]
+  (let [class-list (.-classList elt)]
+    (.remove class-list "active")))
+
 (defn- deactivate-other-elements [active-id]
   (when-let [main-elt (-> js/document (.querySelector "main"))]
     (let [child-anchors (-> main-elt (.querySelectorAll "[id]"))] ;
       (doseq [elt child-anchors]
         (when (not= (.-id elt) active-id)
-          (let [class-list (.-classList elt)]
-            (.remove class-list "active")))))))
+          (deactivate-element elt))))))
 
-(defn- activate-element [elt]
+(defn activate-element [elt]
   (let [class-list (.-classList elt)]
     (.add class-list "active")))
 

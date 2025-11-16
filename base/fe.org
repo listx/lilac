@@ -619,7 +619,7 @@ prevention of unconditional scrolling is handled in [[ns:lilac.lazy-scroll]].
 #+header: :tangle src/fe/lilac/lazy_scroll.cljs
 #+begin_src clojure
 (ns lilac.lazy-scroll
-  (:require [lilac.focus :refer [activate]]
+  (:require [lilac.focus :refer [activate activate-element deactivate-element]]
             [clojure.string :as str]))
 
 <<f:href->id>>
@@ -667,12 +667,17 @@ Let's now examine [[f:weaken-anchor-links]] which also relies on
       (.addEventListener link "click"
         (fn [event]
           (let [href (.getAttribute link "href")
-                id (href->id href)]
+                id (href->id href)
+                old-href (.-hash js/location)]
             (when-let [target-element (-> js/document (.getElementById id))]
-              (do
-                (.preventDefault event) ; (ref:prevent-default-jump)
-                (.pushState (.-history js/window) nil nil href) ; (ref:history)
-                (maybe-scroll-by-hash nil)))))))))
+              (.preventDefault event) ; (ref:prevent-default-jump)
+              (if (= href old-href)
+                (if (.contains (.-classList target-element) "active") ; (ref:toggle-active-element)
+                  (deactivate-element target-element)
+                  (activate-element target-element))
+                (do
+                  (.pushState (.-history js/window) nil nil href) ; (ref:history)
+                  (maybe-scroll-by-hash nil))))))))))
 #+end_src
 
 [[(prevent-default-jump)]] disables the browser's default action which performs the
@@ -680,6 +685,14 @@ scrolling unconditionally. Instead, we invoke [[f:maybe-scroll-by-hash]] to only
 scroll if we have to. [[(history)]] is necessary because otherwise the browser
 history is not modified when clicking on an anchor link (in [[id:318d5b9d-b42b-4fe7-b44c-0b5a5452f3d8][Anchor link
 history]] we made the browser treat anchor links as history-modifying events).
+
+The check at [[(toggle-active-element)]] removes the ~active~ class if the user is
+clicking on the same link twice in a row. This lets the user effectively
+un-highlight the target of a link, just in case the highlighted CSS is too
+jarring on the eyes. It does not affect the history, so it doesn't matter how
+many times the user clicks on the same link pointing to the same target
+(pressing the back button will get them immediately back to the other element
+just before they started spamming the current target).
 
 Let's finally look at [[f:maybe-scroll-by-hash]], which is the real workhorse. It
 just tries to find the current anchor (aka /fragment identifier/, or the bit that
@@ -706,7 +719,7 @@ starts with a hash like ~#foo~ in ~href=#foo~), and then:
 (defn- href->id [href]
   (let [href (.-hash (.-location js/window))
         href-final (if str/blank? href "#top")
-        id (.substring href 1)]
+        id (.substring href-final 1)]
     id))
 #+end_src
 
@@ -761,6 +774,7 @@ in [[ns:lilac.focus]].
 #+begin_src clojure
 (ns lilac.focus)
 
+<<f:deactivate-element>>
 <<f:deactivate-other-elements>>
 <<f:activate-element>>
 <<f:activate>>
@@ -781,7 +795,7 @@ list (i.e., convert ~class="foo"~ to ~class="foo active"~ for a given HTML eleme
 
 #+name: f:activate-element
 #+begin_src clojure
-(defn- activate-element [elt]
+(defn activate-element [elt]
   (let [class-list (.-classList elt)]
     (.add class-list "active")))
 #+end_src
@@ -799,8 +813,17 @@ underneath ~<main>~ [[(child-anchors)]].
     (let [child-anchors (-> main-elt (.querySelectorAll "[id]"))] ; (ref:child-anchors)
       (doseq [elt child-anchors]
         (when (not= (.-id elt) active-id)
-          (let [class-list (.-classList elt)]
-            (.remove class-list "active")))))))
+          (deactivate-element elt))))))
+#+end_src
+
+Deactivating an element just means removing the "active" class from its list of
+classes.
+
+#+name: f:deactivate-element
+#+begin_src clojure
+(defn deactivate-element [elt]
+  (let [class-list (.-classList elt)]
+    (.remove class-list "active")))
 #+end_src
 
 * Glossary
