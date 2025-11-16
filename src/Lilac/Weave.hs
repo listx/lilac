@@ -165,6 +165,7 @@ import Lucid
     async_,
     body_,
     br_,
+    button_,
     charset_,
     class_,
     code_,
@@ -616,15 +617,18 @@ weaveBlock cellIdx block = do
   weaveConf <- ask
   wrapWithDiv cellIdx $ do
     div_ [class_ "code-block-container", id_ linkAnchor] $ do
-      div_ [class_ "side-popup"] $ do
+      div_ [class_ "code-block-controls"] $ do
+        button_ [class_ "toggle-code-block-meta-raw"] $ pure ()
         a_ [href_ $ "#" <> linkAnchor] $ do
           toHtmlRaw ("&#x1F517;" :: String)
       maybeWeaveNameAndTanglePath
-      let bodyBorder
+      let (rawBorder, bodyBorder)
             | Nothing <- lookup "name" block.meta,
               Nothing <- lookup "tangle" block.meta =
-                " fully-rounded"
-            | otherwise = ""
+                (" top-rounded", " fully-rounded")
+            | otherwise = ("", "")
+      div_ [class_ $ "code-block-meta-raw hidden" <> rawBorder] $ do
+        sequence_ . map weaveBlockMeta $ M.toList block.meta
       pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
         let bodyText = getBlockContentsWithoutLinks block.body
         case lookup "__src_language" block.meta of
@@ -683,6 +687,16 @@ weaveBlock cellIdx block = do
           BTokenLinkTarget (LinkTargetLineLabel _) -> "\NUL"
           BTokenLinkTarget {} -> ""
     linkAnchor = getLinkAnchor Nothing $ CBlock block
+
+weaveBlockMeta :: (Text, Text) -> HtmlWeaver ()
+weaveBlockMeta (k, v) = do
+  div_ [class_ "block-meta-key-value"] $ do
+    span_ [class_ "block-meta-key"] $ do
+      toHtml k
+    span_ [class_ "block-meta-separator"] $ do
+      toHtmlRaw @Text " = "
+    span_ [class_ "block-meta-value"] $ do
+      toHtml v
 
 colorizeText :: Text -> Text -> HtmlWeaver ()
 colorizeText lang txt

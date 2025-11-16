@@ -311,7 +311,8 @@ This is the main top-level module where we load all of our custom JS behavior.
 (ns lilac.core
   (:require [lilac.popstate-history :as history]
             [lilac.toc-active-entries :as tae]
-            [lilac.lazy-scroll :as lazy-scroll]))
+            [lilac.lazy-scroll :as lazy-scroll]
+            [lilac.toggle-block-metadata :as tbm]))
 
 (defn msg-successful-load []
   "Lilac loaded successfully.")
@@ -319,6 +320,7 @@ This is the main top-level module where we load all of our custom JS behavior.
 (history/init)
 (tae/init)
 (lazy-scroll/init)
+(tbm/init)
 (js/console.log (msg-successful-load))
 #+end_src
 
@@ -824,6 +826,43 @@ classes.
 (defn deactivate-element [elt]
   (let [class-list (.-classList elt)]
     (.remove class-list "active")))
+#+end_src
+
+** Toggle code block metadata
+
+We want to toggle the display of a code block's metadata, so that the user can
+see things like the underlying language.
+
+#+name: ns:lilac.toggle-block-metadata
+#+header: :tangle src/fe/lilac/toggle_block_metadata.cljs
+#+begin_src clojure
+(ns lilac.toggle-block-metadata)
+
+<<f:init-toggle-buttons>>
+
+(defn init []
+  (init-toggle-buttons))
+#+end_src
+
+#+name: f:init-toggle-buttons
+#+begin_src clojure
+(defn- init-toggle-buttons []
+  (let [buttons (-> js/document
+                    (.querySelectorAll "button.toggle-code-block-meta-raw"))]
+    (doseq [button buttons]
+      (.addEventListener button "click"
+        (fn [event]
+          (when-let [grandparent
+                       (some-> button
+                               (.-parentElement)
+                               (.-parentElement))]
+              (let [raw (.querySelector grandparent ".code-block-meta-raw")
+                    minimal-meta (.querySelector grandparent ".code-block-meta")
+                    body (.querySelector grandparent ".code-block-body")]
+                (.toggle (.-classList raw) "hidden")
+                (when (or (.contains (.-classList body) "fully-rounded")
+                          (nil? minimal-meta))
+                  (.toggle (.-classList body) "fully-rounded")))))))))
 #+end_src
 
 * Glossary

@@ -30,6 +30,7 @@ import Clay
     borderTopRightRadius,
     bottom,
     boxSizing,
+    button,
     center,
     code,
     collapse,
@@ -38,6 +39,7 @@ import Clay
     content,
     dd,
     display,
+    displayNone,
     displayTable,
     div,
     dl,
@@ -89,6 +91,7 @@ import Clay
     none,
     normal,
     ol,
+    opacity,
     overflowX,
     overflowY,
     p,
@@ -127,6 +130,8 @@ import Clay
     vAlignSuper,
     verticalAlign,
     vh,
+    visibility,
+    visible,
     whiteSpace,
     width,
     (#),
@@ -202,7 +207,7 @@ defaultCss = do
   body ? do
     minHeight (vh 100)
     display grid
-    gridTemplateColumns [px 300, px 800, fr 1]
+    gridTemplateColumns [px 300, px 810, fr 1]
     "grid-template-rows" -: "auto 1fr"
     "grid-template-areas"
       -: """
@@ -274,7 +279,7 @@ defaultCss = do
          """
     overflowY auto
     padding (px 0) (px 20) (px 0) (px 20)
-    paddingLeft (px 45)
+    paddingLeft (px 50)
     p # ".main-bottom-spacer" ? do
       yx margin (px 40) 0
 
@@ -374,6 +379,9 @@ defaultCss = do
   ".superscript" & do
     verticalAlign vAlignSuper
 
+  ".align-right" & do
+    textAlign $ alignSide sideRight
+
   a ? do
     color colorNowebLinkFg
     textDecoration none
@@ -433,6 +441,71 @@ defaultCss = do
         height (rem 1)
         margin 0 (rem (-0.2)) 0 0
 
+  ".code-block-container" & do
+    display grid
+    gridTemplateColumns [px 50, fr 1]
+    margin (px 16) 0 (px 16) (px (-50))
+    position relative
+    fontSize (rem 0.9)
+    a ? do
+      fontSize (rem 0.9)
+      display inlineBlock
+      yx margin (px 2) 0
+  forM_
+    [".code-block-meta", ".code-block-meta-raw", ".code-block-body"]
+    $ \child -> do
+      ".code-block-container" |> child ? do
+        "grid-column" -: "2"
+
+  ".code-block-controls" & do
+    padding (px 2) (px 5) 0 0
+    width (px 50)
+    textAlign $ alignSide sideRight
+    boxSizing borderBox
+    top (px 0)
+    bottom (px 0)
+    position absolute
+    "grid-column" -: "1"
+    "grid-row" -: "1"
+    visibility hidden --
+    opacity 0 --
+    a # hover ? do
+      textDecoration none
+    button # ".toggle-code-block-meta-raw" ? do
+      "::before" & do
+        "content" -: "\"M\""
+      marginRight $ px 5
+      "border" -: "0"
+      "cursor" -: "pointer"
+      ev borderRadius (px 2)
+      border (px 1) solid colorCodeBorder
+  (".code-block-container" # hover) |> ".code-block-controls" ? do
+    visibility visible
+    opacity 1
+
+  ".code-block-meta" & do
+    yx padding 0 (px 8)
+    border (px 1) solid colorCodeBorder
+    borderBottomWidth 0
+    borderTopLeftRadius (px 5) (px 5)
+    borderTopRightRadius (px 5) (px 5)
+    fontSans
+  ".active" ** ".code-block-meta" ? do
+    fontWeight bold
+    border (px 1) solid colorActiveBorder
+    borderBottomWidth 0
+
+  div # ".code-block-meta-raw" ? do
+    yx padding 0 (px 8)
+    fontMono
+    border (px 1) solid colorCodeBorder
+    borderBottomWidth 0
+    ".hidden" & do
+      display displayNone
+  ".active" ** ".code-block-meta-raw" ? do
+    border (px 1) solid colorActiveBorder
+    borderBottomWidth 0
+
   pre ? do
     noMargin
   code ? do
@@ -443,23 +516,6 @@ defaultCss = do
         color colorNowebLinkFg
   ".sourceCode" & do
     noMargin
-  ".fully-rounded" & do
-    ev borderRadius (px 5)
-  ".code-block-container" & do
-    yx margin (px 16) 0
-    position relative
-    fontSize (rem 0.9)
-    a ? do
-      fontSize (rem 0.9)
-      display inlineBlock
-      yx margin (px 2) 0
-  ".code-block-meta" & do
-    yx padding 0 (px 8)
-    border (px 1) solid colorCodeBorder
-    borderBottomWidth 0
-    borderTopLeftRadius (px 5) (px 5)
-    borderTopRightRadius (px 5) (px 5)
-    fontSans
   ".code-block-body" & do
     overflowX auto
     margin 0 0 (rem 1) 0
@@ -470,10 +526,6 @@ defaultCss = do
     borderBottomRightRadius (px 5) (px 5)
     border (px 1) solid colorCodeBorder
     yx padding (px 2) (px 8)
-  ".active" ** ".code-block-meta" ? do
-    fontWeight bold
-    border (px 1) solid colorActiveBorder
-    borderBottomWidth 0
   ".active" ** ".code-block-body" ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
@@ -482,20 +534,12 @@ defaultCss = do
     backgroundColor colorActiveBg
     "::after" & do
       "content" -: "\" 👈\""
-  (".code-block-container" # hover) |> ".side-popup" ? do
-    display block
-    a # hover ? do
-      textDecoration none
-  ".side-popup" & do
-    marginLeft (px $ -50)
-    padding (px 2) (px 5) 0 0
-    width (px 50)
-    textAlign $ alignSide sideRight
-    boxSizing borderBox
-    top (px 0)
-    bottom (px 0)
-    position absolute
-    display none
+
+  ".fully-rounded" & do
+    ev borderRadius (px 5)
+  ".top-rounded" & do
+    borderTopLeftRadius (px 5) (px 5)
+    borderTopRightRadius (px 5) (px 5)
 
   ".figure-image" & do
     display block

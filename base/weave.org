@@ -320,6 +320,7 @@ import Lucid
     async_,
     body_,
     br_,
+    button_,
     charset_,
     class_,
     code_,
@@ -483,6 +484,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveStyledText>>
 <<f:weaveListMarker>>
 <<f:weaveBlock>>
+<<f:weaveBlockMeta>>
 <<f:colorizeText>>
 <<f:spliceLinks>>
 <<f:weaveLink>>
@@ -1313,15 +1315,18 @@ weaveBlock cellIdx block = do
   weaveConf <- ask
   wrapWithDiv cellIdx $ do
     div_ [class_ "code-block-container", id_ linkAnchor] $ do
-      div_ [class_ "side-popup"] $ do
+      div_ [class_ "code-block-controls"] $ do
+        button_ [class_ "toggle-code-block-meta-raw"] $ pure ()
         a_ [href_ $ "#" <> linkAnchor] $ do
           toHtmlRaw (<<HTML link symbol>> :: String)
       maybeWeaveNameAndTanglePath
-      let bodyBorder
+      let (rawBorder, bodyBorder)
             | Nothing <- lookup "name" block.meta,
               Nothing <- lookup "tangle" block.meta =
-                " fully-rounded"
-            | otherwise = ""
+                (" top-rounded", " fully-rounded")
+            | otherwise = ("", "")
+      div_ [class_ $ "code-block-meta-raw hidden" <> rawBorder] $ do
+        sequence_ . map weaveBlockMeta $ M.toList block.meta
       pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
         let bodyText = getBlockContentsWithoutLinks block.body
         case lookup "__src_language" block.meta of
@@ -1380,6 +1385,19 @@ weaveBlock cellIdx block = do
           BTokenLinkTarget (LinkTargetLineLabel _) -> "\NUL"
           BTokenLinkTarget {} -> ""
     linkAnchor = getLinkAnchor Nothing $ CBlock block
+#+end_src
+
+#+name: f:weaveBlockMeta
+#+begin_src haskell
+weaveBlockMeta :: (Text, Text) -> HtmlWeaver ()
+weaveBlockMeta (k, v) = do
+  div_ [class_ "block-meta-key-value"] $ do
+    span_ [class_ "block-meta-key"] $ do
+      toHtml k
+    span_ [class_ "block-meta-separator"] $ do
+      toHtmlRaw @Text " = "
+    span_ [class_ "block-meta-value"] $ do
+      toHtml v
 #+end_src
 
 The ~"&#x1F3AF;"~ encodes a "direct hit" or "bullseye" emoji (🎯) and is what we
@@ -1675,34 +1693,6 @@ The link anchor uses the link symbol "🔗" with Unicode code point ~U+1F517~.
 #+begin_src haskell
 "&#x1F517;"
 #+end_src
-
-We want to display this symbol inside a containing ~div~, because the symbol
-itself is too small and we want to have the symbol displayed even when we move
-the mouse slightly away from it. For this purpose, we have the ~.side-popup~
-class.
-
-#+name: css:Block link anchor
-#+begin_src haskell
-(".code-block-container" # hover) |> ".side-popup" ? do
-  display block
-  a # hover ? do
-    textDecoration none
-".side-popup" & do
-  marginLeft (px $ -50)
-  padding (px 2) (px 5) 0 0
-  width (px 50)
-  textAlign $ alignSide sideRight
-  boxSizing borderBox
-  top (px 0)
-  bottom (px 0)
-  position absolute
-  display none
-#+end_src
-
-Initially the ~.side-popup~ is not displayed at all (invisible), and it shows up
-only when the containing ~.code-block-container~ is hovered. This keeps the page
-free of clutter (otherwise we'd have these link anchors showing up for all
-blocks at all times, which is noisy).
 
 ** Figures
 :PROPERTIES:
@@ -4219,6 +4209,7 @@ import Clay
     borderTopRightRadius,
     bottom,
     boxSizing,
+    button,
     center,
     code,
     collapse,
@@ -4227,6 +4218,7 @@ import Clay
     content,
     dd,
     display,
+    displayNone,
     displayTable,
     div,
     dl,
@@ -4278,6 +4270,7 @@ import Clay
     none,
     normal,
     ol,
+    opacity,
     overflowX,
     overflowY,
     p,
@@ -4316,6 +4309,8 @@ import Clay
     vAlignSuper,
     verticalAlign,
     vh,
+    visibility,
+    visible,
     whiteSpace,
     width,
     (#),
@@ -4438,6 +4433,7 @@ defaultCss = do
   <<css:Layout>>
   <<css:Headings>>
   <<css:StyledTextStyles>>
+  <<css:Misc styles>>
   <<css:Links>>
   <<css:Code blocks>>
   <<css:Figures>>
@@ -4464,7 +4460,7 @@ html ? do
 body ? do
   minHeight (vh 100)
   display grid
-  gridTemplateColumns [px 300, px 800, fr 1]
+  gridTemplateColumns [px 300, px 810, fr 1]
   "grid-template-rows" -: "auto 1fr"
   "grid-template-areas"
     -: """
@@ -4605,7 +4601,7 @@ main_ ? do
   "grid-area" -: "main"
   marginLeft (px 17)
   <<css:Column under navbar>>
-  paddingLeft (px 45)
+  paddingLeft (px 50)
   p # ".main-bottom-spacer" ? do
     yx margin (px 40) 0
 #+end_src
@@ -4765,6 +4761,14 @@ The ~verbatim~ and ~code~ classes use a smaller 0.9 em font size, because otherw
 they look too big (because typically monospaced font tends to look bigger than
 non-monospaced font).
 
+*** Miscellaneous style rules
+
+#+name: css:Misc styles
+#+begin_src haskell
+".align-right" & do
+  textAlign $ alignSide sideRight
+#+end_src
+
 ** Links
 
 By default, browsers underline all links. We only underline them when the mouse
@@ -4878,6 +4882,121 @@ roundedRectangleLink = do
 
 #+name: css:Code blocks
 #+begin_src haskell
+<<css:Block grid layout>>
+<<css:Block controls>>
+<<css:Block meta>>
+<<css:Block meta raw>>
+<<css:Block body>>
+<<css:Block rounding>>
+#+end_src
+
+Code blocks use a 2-column layout, with the first column being the
+~.code-block-controls~ and the second column being all the rest.
+
+#+name: css:Block grid layout
+#+begin_src haskell
+".code-block-container" & do
+  display grid
+  gridTemplateColumns [px 50, fr 1]
+  margin (px 16) 0 (px 16) (px (-50))
+  position relative
+  fontSize (rem 0.9)
+  a ? do
+    fontSize (rem 0.9)
+    display inlineBlock
+    yx margin (px 2) 0
+forM_
+  [".code-block-meta", ".code-block-meta-raw", ".code-block-body"]
+  $ \child -> do
+    ".code-block-container" |> child ? do
+      "grid-column" -: "2"
+#+end_src
+
+Initially, the ~.code-block-controls~ in the first column are hidden. On hovering
+over it or the overall container we display it.
+
+#+name: css:Block controls
+#+begin_src haskell
+".code-block-controls" & do
+  padding (px 2) (px 5) 0 0
+  width (px 50)
+  textAlign $ alignSide sideRight
+  boxSizing borderBox
+  top (px 0)
+  bottom (px 0)
+  position absolute
+  "grid-column" -: "1"
+  "grid-row" -: "1"
+  visibility hidden -- (ref:css-visibility)
+  opacity 0 -- (ref:css-opacity)
+  <<css:Block controls buttons>>
+(".code-block-container" # hover) |> ".code-block-controls" ? do
+  visibility visible
+  opacity 1
+#+end_src
+
+We need to use both /visibility/ [[(css-visibility)]] and /opacity/ [[(css-opacity)]] to
+hide/unhide the controls. Visibility hides the element without changing the
+layout, while opacity hides it visually.
+
+#+name: css:Block controls buttons
+#+begin_src haskell
+a # hover ? do
+  textDecoration none
+button # ".toggle-code-block-meta-raw" ? do
+  "::before" & do
+    "content" -: "\"M\""
+  marginRight $ px 5
+  "border" -: "0"
+  "cursor" -: "pointer"
+  ev borderRadius (px 2)
+  border (px 1) solid colorCodeBorder
+#+end_src
+
+The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
+
+  1) ~.code-block-meta~ :: The name or tangle path. These attributes are so common
+     (and important) that we always display them where possible.
+
+  2) ~.code-block-meta-raw~ :: Other metadata such as the programming language
+     syntax of the code block. These attributes are typically not as
+     interesting, and so require the user to press a button (labeled ~M~) in the
+     ~.code-block-controls~ container to reveal them.
+
+  3) ~.code-block-body~ :: Main body of the block, which contains the actual code
+     that have been fenced by ~#+begin_...~ and ~#+end_...~.
+
+#+name: css:Block meta
+#+begin_src haskell
+".code-block-meta" & do
+  yx padding 0 (px 8)
+  border (px 1) solid colorCodeBorder
+  borderBottomWidth 0
+  borderTopLeftRadius (px 5) (px 5)
+  borderTopRightRadius (px 5) (px 5)
+  fontSans
+".active" ** ".code-block-meta" ? do
+  fontWeight bold
+  border (px 1) solid colorActiveBorder
+  borderBottomWidth 0
+#+end_src
+
+#+name: css:Block meta raw
+#+begin_src haskell
+div # ".code-block-meta-raw" ? do
+  yx padding 0 (px 8)
+  fontMono
+  border (px 1) solid colorCodeBorder
+  borderBottomWidth 0
+  ".hidden" & do
+    display displayNone
+".active" ** ".code-block-meta-raw" ? do
+  border (px 1) solid colorActiveBorder
+  borderBottomWidth 0
+#+end_src
+
+#+name: css:Block body
+#+begin_src haskell
 pre ? do
   noMargin
 code ? do
@@ -4888,23 +5007,6 @@ code ? do
       color colorNowebLinkFg
 ".sourceCode" & do
   noMargin
-".fully-rounded" & do
-  ev borderRadius (px 5)
-".code-block-container" & do
-  yx margin (px 16) 0
-  position relative
-  fontSize (rem 0.9)
-  a ? do
-    fontSize (rem 0.9)
-    display inlineBlock
-    yx margin (px 2) 0
-".code-block-meta" & do
-  yx padding 0 (px 8)
-  border (px 1) solid colorCodeBorder
-  borderBottomWidth 0
-  borderTopLeftRadius (px 5) (px 5)
-  borderTopRightRadius (px 5) (px 5)
-  fontSans
 ".code-block-body" & do
   overflowX auto
   margin 0 0 (rem 1) 0
@@ -4915,19 +5017,35 @@ code ? do
   borderBottomRightRadius (px 5) (px 5)
   border (px 1) solid colorCodeBorder
   yx padding (px 2) (px 8)
-".active" ** ".code-block-meta" ? do
-  fontWeight bold
-  border (px 1) solid colorActiveBorder
-  borderBottomWidth 0
 ".active" ** ".code-block-body" ? do
   border (px 1) solid colorActiveBorder
   backgroundColor colorActiveBg
+<<css:Block line labels>>
+#+end_src
+
+Active line labels get a special highlight with a [[https://en.wikipedia.org/wiki/Manicule][manicule]] (hand pointing with
+index finger) symbol.
+
+#+name: css:Block line labels
+#+begin_src haskell
 ".code-block-body" ** ".sourceCode" ** ".active" ? do
   border (px 1) solid colorActiveBorder
   backgroundColor colorActiveBg
   "::after" & do
     "content" -: "\" 👈\""
-<<css:Block link anchor>>
+#+end_src
+
+The [[css:Block rounding]] is to handle cases where we may or may not have a
+~.code-block-meta~, which affects how we will round off the corners of the
+[[css:Block body]] and [[css:Block meta raw]].
+
+#+name: css:Block rounding
+#+begin_src haskell
+".fully-rounded" & do
+  ev borderRadius (px 5)
+".top-rounded" & do
+  borderTopLeftRadius (px 5) (px 5)
+  borderTopRightRadius (px 5) (px 5)
 #+end_src
 
 ** Figures
