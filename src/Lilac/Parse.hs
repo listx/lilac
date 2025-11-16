@@ -416,6 +416,7 @@ docMetaEntryParser :: OrgParser (Text, Text)
 docMetaEntryParser = do
   avoidParsingBlockMetadata
   avoidParsingLilacExtensions
+  _ <- MP.notFollowedBy $ string "#+__" --
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
   _ <- MP.label "(doc meta) separator" $ string ": "
@@ -1904,6 +1905,7 @@ metaEntryParser = do
         "#+print_glossary:"
       ]
   _ <- string "#+"
+  o <- MP.getOffset
   key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
   _ <- MP.label "(meta) separator" $ string ": "
   _ <- many $ char ' '
@@ -1914,6 +1916,10 @@ metaEntryParser = do
         rest <- MP.takeWhileP (Just "(meta) value letter") isValueLetter
         pure $ T.cons first rest
       else MP.takeWhile1P (Just "(meta) value letter") isValueLetter
+  when (T.isPrefixOf "__" key) --
+    $ do
+      MP.setOffset o
+      fail ("cannot use leading double underscores for metadata key: " <> show key)
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]

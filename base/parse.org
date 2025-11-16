@@ -1052,6 +1052,7 @@ docMetaEntryParser :: OrgParser (Text, Text)
 docMetaEntryParser = do
   avoidParsingBlockMetadata
   avoidParsingLilacExtensions
+  _ <- MP.notFollowedBy $ string "#+__" -- (ref:avoid-double-underscores)
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
   _ <- MP.label "(doc meta) separator" $ string ": "
@@ -1085,6 +1086,14 @@ value.
 
 Similarly, we also do not parse any [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extensions]] because they can only be
 parsed by the [[f:lilacExtensionsParser]].
+
+We avoid parsing keys with a double underscore at [[(avoid-double-underscores)]],
+because that's reserved for internal use by Lilac. If we don't do this, then
+such metadata keys (with a leading double underscore) that are set for cells
+(like blocks or tables) will be interpreted as document metadata, which isn't
+what we want. In other words, having the restriction at
+[[(avoid-double-underscores)]] allows the failure condition at
+[[(fail-if-double-underscore)]] to trigger.
 
 The [[f:docMetaParser]] first checks for the top-level ~:PROPERTIES:~ drawer with
 [[f:propertiesDrawerParser]]. Then it just parses =docMetaEntryParser= multiple times,
@@ -10970,6 +10979,7 @@ metaEntryParser = do
         "#+print_glossary:"
       ]
   _ <- string "#+"
+  o <- MP.getOffset
   key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
   _ <- MP.label "(meta) separator" $ string ": "
   _ <- many $ char ' '
@@ -10980,6 +10990,10 @@ metaEntryParser = do
         rest <- MP.takeWhileP (Just "(meta) value letter") isValueLetter
         pure $ T.cons first rest
       else MP.takeWhile1P (Just "(meta) value letter") isValueLetter
+  when (T.isPrefixOf "__" key) -- (ref:fail-if-double-underscore)
+    $ do
+      MP.setOffset o
+      fail ("cannot use leading double underscores for metadata key: " <> show key)
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
@@ -11173,6 +11187,26 @@ shouldParseWithState
           ],
       figureNumber = 3
     }
+#+end_src
+
+Metadata keys that start with a double underscore are not allowed, because
+Lilac expects to use them for itself internally.
+
+#+name: ti:0016-metadata-reserved-underscores
+#+header: :tangle test/Lilac/ParseSpec/0016-metadata-reserved-underscores
+#+begin_src org
+,#+__block_type: example
+,#+begin_src haskell
+f = 1 + 1
+,#+end_src
+#+end_src
+
+#+name: t:0016-metadata-reserved-underscores
+#+begin_src haskell
+shouldFailWithMessage
+  "0016-metadata-reserved-underscores"
+  "cannot use leading double underscores for metadata key: \"__block_type\""
+  2
 #+end_src
 
 * Tables
@@ -12298,6 +12332,7 @@ parseSpec = do
   <<t:0015-glossary-duplicate-term>>
   <<t:0015-glossary-location>>
   <<t:0015-glossary-location-global>>
+  <<t:0016-metadata-reserved-underscores>>
 #+end_src
 
 * Glossary

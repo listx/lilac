@@ -3333,3 +3333,8 @@ parseSpec = do
             ]
       }
     defaultOrgParserState
+
+  shouldFailWithMessage
+    "0016-metadata-reserved-underscores"
+    "cannot use leading double underscores for metadata key: \"__block_type\""
+    2
