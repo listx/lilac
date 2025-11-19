@@ -24,6 +24,7 @@ import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Archive
       ( Archive,
+        ancestry,
         backlinks,
         bibs,
         csls,
@@ -106,6 +107,7 @@ import Relude
     foldlM,
     fromList,
     fst,
+    intNub,
     intercalate,
     length,
     map,
@@ -132,7 +134,7 @@ import Relude
     (=<<),
     (>),
   )
-import Relude.Extra.Map (elems, insert, lookup, member)
+import Relude.Extra.Map (elems, insert, insertWith, lookup, member)
 import System.Exit (die)
 import System.OsPath qualified as P
 
@@ -186,10 +188,20 @@ mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
                   localCellIdx
                 )
               ]
-          | Just tanglePath <- lookup "tangle" cellMeta =
+          | Just tanglePath <- lookup "tangle" cellMeta --
+            =
               [ ( LinkOid
                     { oid = oid,
                       name = tanglePath <> "\NUL"
+                    },
+                  localCellIdx
+                )
+              ]
+          | Just anonBlockNumber <- lookup "__anon_block_number" cellMeta --
+            =
+              [ ( LinkOid
+                    { oid = oid,
+                      name = anonBlockNumber <> "\NUL__anon_block_number"
                     },
                   localCellIdx
                 )
@@ -223,17 +235,19 @@ mkArchive pathObjs = do
             "\n"
             (map showBrokenLink brokenLinks)
     | otherwise ->
-        pure
-          $ Right
-            Archive
-              { objects = objects,
-                symbols = symbols,
-                glossary = glossary,
-                backlinks = backlinks,
-                offsets = offsets,
-                csls = fromList csls,
-                bibs = fromList bibs
-              }
+        let archive =
+              Archive
+                { objects = objects,
+                  symbols = symbols,
+                  ancestry = mempty,
+                  glossary = glossary,
+                  backlinks = backlinks,
+                  offsets = offsets,
+                  csls = fromList csls,
+                  bibs = fromList bibs
+                }
+            ancestry = mkBlockAncestry archive $ getBlockIdxsFromArchive archive
+         in pure $ Right archive {ancestry = ancestry}
   where
     topLevelUUIDs :: Map LinkOid Int
     topLevelUUIDs =
@@ -362,11 +376,11 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
       BTokenPadding {}
       BTokenString {} -> Nothing
 
-findCycles :: Archive -> [G.Tree LinkOid]
-findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
+getBlocksFromArchive :: Archive -> [Block]
+getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
   where
-    blocks = foldl' getBlocksFromAllSymbols [] $ elems archive.symbols
-    getBlocksFromAllSymbols acc globalCellIdx
+    f :: [Block] -> Int -> [Block]
+    f acc globalCellIdx
       | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
           case cell of
             CBlock b -> b : acc
@@ -380,7 +394,60 @@ findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
             CFootnote {}
             CCommand {} -> acc
       | otherwise = acc
-    (graph, vertexToNode, _) = buildGraph blocks
+
+getBlockIdxsFromArchive :: Archive -> [Int]
+getBlockIdxsFromArchive archive = foldl' f [] $ elems archive.symbols
+  where
+    f :: [Int] -> Int -> [Int]
+    f acc globalCellIdx
+      | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
+          case cell of
+            CBlock {} -> globalCellIdx : acc
+            CHeading {}
+            CListItem {}
+            CParagraph {}
+            CGlossaryTerm {}
+            CMathFragment {}
+            CFigure {}
+            CTable {}
+            CFootnote {}
+            CCommand {} -> acc
+      | otherwise = acc
+
+mkBlockAncestry :: Archive -> [Int] -> Map Int [Int]
+mkBlockAncestry archive blockIdxs = foldl' f mempty blockIdxs
+  where
+    f :: Map Int [Int] -> Int -> Map Int [Int]
+    f acc blockIdx
+      | Just (_, CBlock block) <- cellIdxToObjCell archive blockIdx =
+          ( \childLinks ->
+              foldl'
+                ( \acc' childLink ->
+                    case lookup childLink archive.symbols of
+                      Just childIdx ->
+                        insertWith
+                          (\old new -> intNub (old <> new))
+                          childIdx
+                          [blockIdx]
+                          acc'
+                      Nothing -> acc'
+                )
+                acc
+                childLinks
+          )
+            . catMaybes
+            $ map getChildLinks block.body
+      | otherwise = acc
+    getChildLinks = \case
+      BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
+      BTokenLinkTarget {}
+      BTokenPadding {}
+      BTokenString {} -> Nothing
+
+findCycles :: Archive -> [G.Tree LinkOid]
+findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
+  where
+    (graph, vertexToNode, _) = buildGraph $ getBlocksFromArchive archive
     toLinkOid vertex =
       let (_, selfLink, _) = vertexToNode vertex
        in selfLink

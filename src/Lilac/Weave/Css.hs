@@ -490,6 +490,9 @@ defaultCss = do
     borderTopLeftRadius (px 5) (px 5)
     borderTopRightRadius (px 5) (px 5)
     fontSans
+    a ? do
+      ".parent-block-arrow" & do
+        marginLeft (em 0.25)
   ".active" ** ".code-block-meta" ? do
     fontWeight bold
     border (px 1) solid colorActiveBorder

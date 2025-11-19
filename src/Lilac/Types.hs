@@ -645,6 +645,7 @@ type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object,
     symbols :: Map LinkOid Int,
+    ancestry :: Map Int [Int],
     glossary :: Map (Text, GPath) Int,
     backlinks :: Map GPath (Map GPath [G.Edge]),
     offsets :: IntMap GPath,

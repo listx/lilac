@@ -39,7 +39,7 @@ import Data.Aeson (eitherDecodeStrictText, encode)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Graph qualified as G
 import Data.IntMap.Strict qualified as IntMap
-import Data.List (groupBy)
+import Data.List (groupBy, partition)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
@@ -57,7 +57,8 @@ import Lilac.Parse
   )
 import Lilac.Types
   ( Archive
-      ( backlinks,
+      ( ancestry,
+        backlinks,
         bibs,
         csls,
         glossary,
@@ -66,7 +67,7 @@ import Lilac.Types
         symbols
       ),
     BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
-    Block (body, meta),
+    Block (body, meta, parentOid),
     Cell
       ( CBlock,
         CCommand,
@@ -262,6 +263,7 @@ import Relude
     length,
     listToMaybe,
     map,
+    mapMaybe,
     max,
     maxBound,
     maybe,
@@ -657,25 +659,28 @@ weaveBlock cellIdx block = do
           Nothing -> code_ $ toHtml bodyText
   where
     maybeWeaveNameAndTanglePath
-      | Just name <- lookup "name" block.meta,
-        Just path <- lookup "tangle" block.meta =
+      | Nothing <- lookup "name" block.meta,
+        Nothing <- lookup "tangle" block.meta =
+          pure ()
+      | otherwise = do
           div_ [class_ "code-block-meta"] $ do
-            code_ $ toHtml name
-            br_ []
-            code_ $ do
-              span_ [class_ "bold"] $ do
-                toHtmlRaw @Text "&#x1F3AF; "
-                toHtml path
-      | Just name <- lookup "name" block.meta =
-          div_ [class_ "code-block-meta"] $ do
-            code_ $ toHtml name
-      | Just path <- lookup "tangle" block.meta =
-          div_ [class_ "code-block-meta"] $ do
-            code_ $ do
-              span_ [class_ "bold"] $ do
-                toHtmlRaw @Text "&#x1F3AF; "
-                toHtml path
-      | otherwise = pure ()
+            if
+              | Just name <- lookup "name" block.meta,
+                Just path <- lookup "tangle" block.meta -> do
+                  code_ $ toHtml name
+                  br_ []
+                  code_ $ do
+                    span_ [class_ "bold"] $ do
+                      toHtmlRaw @Text "&#x1F3AF; "
+                      toHtml path
+              | Just name <- lookup "name" block.meta -> do
+                  code_ $ toHtml name
+              | Just path <- lookup "tangle" block.meta -> do
+                  code_ $ do
+                    span_ [class_ "bold"] $ do
+                      toHtmlRaw @Text "&#x1F3AF; "
+                      toHtml path
+            weaveBlockAncestry block
     getBlockContentsWithoutLinks :: [BToken] -> Text
     getBlockContentsWithoutLinks = T.concat . map bTokenToText
       where
@@ -687,6 +692,73 @@ weaveBlock cellIdx block = do
           BTokenLinkTarget (LinkTargetLineLabel _) -> "\NUL"
           BTokenLinkTarget {} -> ""
     linkAnchor = getLinkAnchor Nothing $ CBlock block
+
+weaveBlockAncestry :: Block -> HtmlWeaver ()
+weaveBlockAncestry block = case lookup "name" block.meta of
+  Nothing -> pure () --
+  Just name -> do
+    weaveConf <- ask
+    let archive = weaveConf.archive
+        selfLinkOid = LinkOid block.parentOid name
+        parentIdxs = do
+          selfIdx <- lookup selfLinkOid archive.symbols
+          lookup selfIdx archive.ancestry
+        parents = mapMaybe f $ fromMaybe [] parentIdxs
+        f :: Int -> Maybe (Int, [Int], GPath, Block, Prose)
+        f parentIdx = do
+          grandParentIdxs <-
+            pure . fromMaybe [] $ lookup parentIdx archive.ancestry
+          (_, cell) <- cellIdxToObjCell archive parentIdx
+          parentBlock <-
+            case cell of
+              CBlock b -> Just b
+              _ -> Nothing
+          (offset, path) <- IntMap.lookupLE parentIdx archive.offsets
+          prose <- cellIdxToName archive offset parentIdx
+          pure (parentIdx, grandParentIdxs, path, parentBlock, prose)
+        (roots, nonRoots) =
+          partition (\(_, ancestors, _, _, _) -> null ancestors) parents
+        getName :: (Int, [Int], GPath, Block, Prose) -> Text
+        getName (_, _, _, b, _) =
+          T.toLower . fromMaybe "" $ lookup "name" b.meta
+        roots' = sortOn getName roots
+        nonRoots' = sortOn getName nonRoots
+    forM_ roots' weaveParentBlock
+    forM_ nonRoots' weaveParentBlock
+
+weaveParentBlock ::
+  (Int, [Int], GPath, Block, Prose) ->
+  HtmlWeaver ()
+weaveParentBlock (globalIdx, ancestors, objPath, _, _) = do
+  weaveConf <- ask
+  (linkAnchor, _externalOrgDocName) <- linkToCellIdx globalIdx
+  if objPath == weaveConf.originObjectPath
+    then do
+      a_ [href_ $ "#" <> linkAnchor, class_ "parent-block-arrow"] $ do
+        if null ancestors
+          then toHtml @Text " ⇑"
+          else toHtml @Text " ↑"
+    else do
+      a_ [href_ linkAnchor, class_ "parent-block-arrow"] $ do
+        if null ancestors
+          then toHtml @Text " ⇪"
+          else toHtml @Text " ⇧"
+
+linkToCellIdx :: Int -> HtmlWeaver (Text, Text)
+linkToCellIdx globalCellIdx = do
+  weaveConf <- ask
+  if
+    | Just (offset, gpath) <-
+        IntMap.lookupLE globalCellIdx weaveConf.archive.offsets,
+      Just (_, cell) <- cellIdxToObjCell weaveConf.archive globalCellIdx -> do
+        let localCellIdx = globalCellIdx - offset
+        if gpath == weaveConf.originObjectPath
+          then do
+            let linkAnchor = getLinkAnchor (Just localCellIdx) cell
+            pure (linkAnchor, "")
+          else do
+            getRelativeOrgDocCellLink gpath localCellIdx cell
+    | otherwise -> pure ("", "")
 
 weaveBlockMeta :: (Text, Text) -> HtmlWeaver ()
 weaveBlockMeta (k, v) = do
