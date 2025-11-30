@@ -106,7 +106,7 @@ import Lilac.Types
         LUnorderedStart
       ),
     MathFragment (body, meta),
-    Object (orgDoc, symbols),
+    Object (orgDoc),
     OrgDoc
       ( bibPaths,
         cells,
@@ -731,34 +731,37 @@ weaveParentBlock ::
   HtmlWeaver ()
 weaveParentBlock (globalIdx, ancestors, objPath, _, _) = do
   weaveConf <- ask
-  (linkAnchor, _externalOrgDocName) <- linkToCellIdx globalIdx
-  if objPath == weaveConf.originObjectPath
-    then do
-      a_ [href_ $ "#" <> linkAnchor, class_ "parent-block-arrow"] $ do
-        if null ancestors
-          then toHtml @Text " ⇑"
-          else toHtml @Text " ↑"
-    else do
-      a_ [href_ linkAnchor, class_ "parent-block-arrow"] $ do
-        if null ancestors
-          then toHtml @Text " ⇪"
-          else toHtml @Text " ⇧"
+  case getLinkToCellIdx weaveConf globalIdx of
+    Nothing -> pure ()
+    Just (_externalOrgDocName, linkAnchor, _) ->
+      if objPath == weaveConf.originObjectPath
+        then do
+          a_ [href_ $ "#" <> linkAnchor, class_ "parent-block-arrow"] $ do
+            if null ancestors
+              then toHtml @Text " ⇑"
+              else toHtml @Text " ↑"
+        else do
+          a_ [href_ linkAnchor, class_ "parent-block-arrow"] $ do
+            if null ancestors
+              then toHtml @Text " ⇪"
+              else toHtml @Text " ⇧"
 
-linkToCellIdx :: Int -> HtmlWeaver (Text, Text)
-linkToCellIdx globalCellIdx = do
-  weaveConf <- ask
-  if
-    | Just (offset, gpath) <-
-        IntMap.lookupLE globalCellIdx weaveConf.archive.offsets,
-      Just (_, cell) <- cellIdxToObjCell weaveConf.archive globalCellIdx -> do
-        let localCellIdx = globalCellIdx - offset
-        if gpath == weaveConf.originObjectPath
-          then do
-            let linkAnchor = getLinkAnchor (Just localCellIdx) cell
-            pure (linkAnchor, "")
-          else do
-            getRelativeOrgDocCellLink gpath localCellIdx cell
-    | otherwise -> pure ("", "")
+getLinkToCellIdx :: WeaveConf -> Int -> Maybe (Text, Text, Prose)
+getLinkToCellIdx weaveConf globalCellIdx
+  | Just (offset, gpath) <-
+      IntMap.lookupLE globalCellIdx weaveConf.archive.offsets,
+    Just (_, cell) <- cellIdxToObjCell weaveConf.archive globalCellIdx,
+    Just cellName <- cellIdxToName weaveConf.archive offset globalCellIdx =
+      let localCellIdx = globalCellIdx - offset
+       in if gpath == weaveConf.originObjectPath
+            then do
+              let linkAnchor = getLinkAnchor (Just localCellIdx) cell
+              Just ("", linkAnchor, cellName)
+            else do
+              (linkAnchor, docName) <-
+                getRelativeOrgDocCellLink weaveConf gpath localCellIdx cell
+              Just (docName, linkAnchor, cellName)
+  | otherwise = Nothing
 
 weaveBlockMeta :: (Text, Text) -> HtmlWeaver ()
 weaveBlockMeta (k, v) = do
@@ -841,26 +844,19 @@ weaveLink insideBlock link = do
 weaveLinkTarget :: LinkTarget -> HtmlWeaver T.Text
 weaveLinkTarget linkTarget = do
   weaveConf <- ask
-  pure $ case linkTarget of
+  case linkTarget of
     LinkTargetOid linkOid
       | Just n <- lookup linkOid weaveConf.archive.symbols,
         n < 0,
         Just objPath <- (sort $ keys weaveConf.archive.objects) !!? (abs n - 1) ->
-          if objPath == weaveConf.originObjectPath
-            then "#top"
-            else getExternalRelPath objPath weaveConf.originObjectPath
-      | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-        Just _ <- lookup linkOid originObj.symbols,
-        Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
-        Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx ->
-          "#" <> getLinkAnchor Nothing internalCell
+          pure
+            $ if objPath == weaveConf.originObjectPath
+              then "#top"
+              else getExternalRelPath objPath weaveConf.originObjectPath
       | Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
-        Just (_, externalCell) <- cellIdxToObjCell weaveConf.archive globalCellIdx,
-        Just (_, externalObjGPath) <- IntMap.lookupLE globalCellIdx weaveConf.archive.offsets ->
-          (getExternalRelPath externalObjGPath weaveConf.originObjectPath)
-            <> "#"
-            <> getLinkAnchor Nothing externalCell
-      | otherwise -> showBrokenLink
+        Just (_, linkAnchor, _) <- getLinkToCellIdx weaveConf globalCellIdx ->
+          pure linkAnchor
+      | otherwise -> pure showBrokenLink
       where
         showBrokenLink = "#LILAC_BROKEN_LINK-" <> show linkOid
         htmlExt = P.unsafeEncodeUtf "html"
@@ -872,10 +868,10 @@ weaveLinkTarget linkTarget = do
                 $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt =
               T.pack str
           | otherwise = showBrokenLink
-    LinkTargetLineLabel name -> (T.pack "#ib-") <> toSafeHtmlId name
-    LinkTargetFootnote name -> (T.pack "#footnote-") <> name
-    LinkTargetFilePath path -> T.pack $ N.escapeURIString N.isUnescapedInURI path
-    LinkTargetURI uri -> T.pack $ N.uriToString id uri ""
+    LinkTargetLineLabel name -> pure $ (T.pack "#ib-") <> toSafeHtmlId name
+    LinkTargetFootnote name -> pure $ (T.pack "#footnote-") <> name
+    LinkTargetFilePath path -> pure . T.pack $ N.escapeURIString N.isUnescapedInURI path
+    LinkTargetURI uri -> pure . T.pack $ N.uriToString id uri ""
 
 weaveFigure :: Int -> Figure -> HtmlWeaver ()
 weaveFigure cellIdx figure = do
@@ -1429,9 +1425,13 @@ weaveCollectedGlossaryTerm (isFirstTerm, (localCellIdx, objPath)) = do
     | True <- objPath /= weaveConf.originObjectPath, --
       Just extObj <- lookup objPath weaveConf.archive.objects,
       Just externalCell <- extObj.orgDoc.cells !!? localCellIdx,
-      CGlossaryTerm glossaryTerm <- externalCell -> do
-        (externalLinkAnchor, externalOrgDocName) <-
-          getRelativeOrgDocCellLink objPath localCellIdx externalCell
+      CGlossaryTerm glossaryTerm <- externalCell,
+      Just (externalLinkAnchor, externalOrgDocName) <-
+        getRelativeOrgDocCellLink
+          weaveConf
+          objPath
+          localCellIdx
+          externalCell -> do
         dt_ maybeInnerVerticalMargin $ do
           weaveProse glossaryTerm.term
         dd_ $ do
@@ -1453,33 +1453,38 @@ weaveCollectedGlossaryTerm (isFirstTerm, (localCellIdx, objPath)) = do
         then []
         else [class_ "inner-dt"]
 
-getRelativeOrgDocCellLink :: GPath -> Int -> Cell -> HtmlWeaver (Text, Text)
-getRelativeOrgDocCellLink objPath externalCellIdx externalCell = do
-  (externalOrgDocName, externalOrgDocPath) <- getRelativeOrgDocLink objPath
-  let externalLinkAnchor =
-        externalOrgDocPath
-          <> "#"
-          <> (getLinkAnchor (Just externalCellIdx) externalCell)
-  pure (externalLinkAnchor, externalOrgDocName)
+getRelativeOrgDocCellLink ::
+  WeaveConf ->
+  GPath ->
+  Int ->
+  Cell ->
+  Maybe (Text, Text)
+getRelativeOrgDocCellLink weaveConf objPath externalCellIdx externalCell
+  | Just (externalOrgDocName, externalOrgDocPath) <-
+      getRelativeOrgDocLink weaveConf objPath =
+      let externalLinkAnchor =
+            externalOrgDocPath
+              <> "#"
+              <> (getLinkAnchor (Just externalCellIdx) externalCell)
+       in Just (externalLinkAnchor, externalOrgDocName)
+  | otherwise = Nothing
 
-getRelativeOrgDocLink :: GPath -> HtmlWeaver (Text, Text)
-getRelativeOrgDocLink objPath = do
-  weaveConf <- ask
-  if
-    | Just toObjPath <- P.encodeUtf $ decodeGPath objPath,
-      Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
-      Right externalOrgDocName <-
-        P.decodeWith utf8 utf8
-          $ P.replaceExtension
-            (getRelativePathWithoutSymlinks fromObjPath toObjPath)
-            (P.unsafeEncodeUtf "org"),
-      Right externalOrgDocPath <-
-        P.decodeWith utf8 utf8
-          $ P.replaceExtension
-            (getRelativePathWithoutSymlinks fromObjPath toObjPath)
-            (P.unsafeEncodeUtf "html") ->
-        pure (T.pack externalOrgDocName, T.pack externalOrgDocPath)
-    | otherwise -> pure ("ERROR", "???")
+getRelativeOrgDocLink :: WeaveConf -> GPath -> Maybe (Text, Text)
+getRelativeOrgDocLink weaveConf objPath
+  | Just toObjPath <- P.encodeUtf $ decodeGPath objPath,
+    Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+    Right externalOrgDocName <-
+      P.decodeWith utf8 utf8
+        $ P.replaceExtension
+          (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+          (P.unsafeEncodeUtf "org"),
+    Right externalOrgDocPath <-
+      P.decodeWith utf8 utf8
+        $ P.replaceExtension
+          (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+          (P.unsafeEncodeUtf "html") =
+      Just (T.pack externalOrgDocName, T.pack externalOrgDocPath)
+  | otherwise = Nothing
 
 toNormalizedText :: Prose -> Text
 toNormalizedText prose =
@@ -1732,7 +1737,6 @@ weaveBacklinks = do
     weaveBacklinksForExternalObj (_, []) = toHtmlRaw @Text ""
     weaveBacklinksForExternalObj (externalObjGPath, edges) = do
       weaveConf <- ask
-      (externalOrgDocName, externalOrgDocPath) <- getRelativeOrgDocLink externalObjGPath
       let weight = T.show $ length edges
           f :: ([Int], Int) -> HtmlWeaver ()
           f ([], _) = pure ()
@@ -1754,21 +1758,16 @@ weaveBacklinks = do
                     toHtmlRaw @Text " &#x2190; "
                   linkToExternalCell False externalIdx
           linkToExternalCell :: Bool -> Int -> HtmlWeaver ()
-          linkToExternalCell asListItem externalIdx
-            | Just (_, externalCell) <-
-                cellIdxToObjCell weaveConf.archive externalIdx,
-              Just (offset, _) <-
-                IntMap.lookupLE externalIdx weaveConf.archive.offsets = do
-                let externalName = fromMaybe noName $ cellIdxToName weaveConf.archive offset externalIdx
-                    externalCellIdx = externalIdx - offset
-                (externalLinkAnchor, _) <- getRelativeOrgDocCellLink externalObjGPath externalCellIdx externalCell
+          linkToExternalCell asListItem externalIdx =
+            case getLinkToCellIdx weaveConf externalIdx of
+              Nothing -> pure ()
+              Just (_, externalLinkAnchor, externalCellName) -> do
                 let externalLink =
                       a_ [href_ externalLinkAnchor] $ do
-                        weaveProse externalName
+                        weaveProse externalCellName
                 if asListItem
                   then li_ [] $ externalLink
                   else externalLink
-            | otherwise = pure ()
           getInternalLinkAnchor internalIdx
             | Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive internalIdx =
                 "#" <> (getLinkAnchor Nothing internalCell)
@@ -1793,11 +1792,14 @@ weaveBacklinks = do
                   . concatMap coalesce
                   . groupBy ((==) `on` snd)
                   . sortOn snd
-      li_ [] $ do
-        a_ [href_ externalOrgDocPath] $ do
-          toHtml $ externalOrgDocName <> " (" <> weight <> ")"
-        ol_ [] $ do
-          forM_ (groupedByTarget edges) f
+      case getRelativeOrgDocLink weaveConf externalObjGPath of
+        Nothing -> pure ()
+        Just (externalOrgDocName, externalOrgDocPath) -> do
+          li_ [] $ do
+            a_ [href_ externalOrgDocPath] $ do
+              toHtml $ externalOrgDocName <> " (" <> weight <> ")"
+            ol_ [] $ do
+              forM_ (groupedByTarget edges) f
 
 weaveNamedCellsIndex :: HtmlWeaver ()
 weaveNamedCellsIndex = do
