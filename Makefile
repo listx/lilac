@@ -1,5 +1,6 @@
 org_files = \
 	base/lilac.org \
+	base/user-manual.org \
 	base/compile.org \
 	base/parse.org \
 	base/tangle.org \

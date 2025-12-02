@@ -13,10 +13,11 @@
 
 Lilac is a [[https://en.wikipedia.org/wiki/Literate_programming][literate programming]] [cite:@knuth_literate_1984] (LP) tool.
 Specifically it can read Orgmode files to tangle (i.e., extract) code blocks
-using [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][Noweb]] [cite:@ramsey_literate_1994] references, and also weave the same
-files to HTML for a more pleasant reading experience.
+using [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][Noweb]] [cite:@ramsey_literate_1994] references, and also weave (i.e.,
+publish) the same files to HTML for a more pleasant reading experience.
 
-If you want to learn how to use Lilac, read the INSERT-USER-GUIDE-HERE.
+This document is mainly concerned with how Lilac is implemented. If you simply
+want to learn how to /use/ Lilac, read the [[id:75bea01b-b487-4709-978b-2156f4233ebb][User Manual]].
 
 ** Version
 
@@ -29,78 +30,7 @@ The current Lilac version is
 
 See [[lilac.cabal]] where we reference this version information.
 
-** About this project
-
-This project originally started out as [[https://github.com/listx/lilac-legacy][an extension to Emacs Orgmode]], to fix
-most of the nondeterminism issues of Orgmode's weaving (aka "export") process.
-
-Sometime later, it was determined that Orgmode's HTML export was simply too slow
-(it could take 10+ seconds on large documents). This project was then rewritten
-in [[https://www.haskell.org/][Haskell]], mainly for performance but also for maintainability.
-
-** Major differences with vanilla Org
-
-*** Compilation step
-
-Orgmode tangles and weaves from Org files directly. There is no intermediate
-compilation step.
-
-Lilac adds a compilation step in order to cache some computations. Basically, an
-Org doc must be compiled into a Lilac Object (~*.lobj~), and then one or more of
-these objects are archived into a Lilac Archive (~*.larc~). It is this archive
-file which is then tangled or woven as needed.
-
-*** List item spacing required
-
-List items /must/ be indented from the main text with two leading spaces, and also
-must have an empty blank line. See [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]].
-
-These spacing requirements were determined to be necessary in order to maximize
-readability in raw Org (plaintext) form.
-
-*** Noweb links can reference blocks from other files
-
-You can reference code blocks in other files, as long as those files are also
-compiled (into objects) and become part of the archive.
-
-*** No ~#+include~ support
-
-The ability to declaratively copy/paste chunks of other files is not supported,
-because doing so results in unreadable raw Org files (you would have to open up
-a the linked page separately to see what was actually included).
-
-*** Headings must be linked via their ID (UUID)
-
-You cannot link to headings by their name, or by a "search" of a file path. You
-must instead always use UUID links.
-
-By the same token, all documents require a UUID, so that even if you don't have
-a heading, other documents can still reference a named code block in your doc
-via the top-level document UUID.
-
-** Full listing of supported features
-
-#+caption: Org feature parity.
-| Name        | Supported? |
-|-------------+------------|
-| Radio links | No         |
-| Headings    | Yes        |
-| Citations   | Yes        |
-
-** Comparison with other LP tools
-
-#+caption: Comparison of LP tools.
-| Name          | Written in   | Written with LP?\n(Does it use itself?) | Markup language\n(Input syntax) | Tangle-able languages |
-|---------------+--------------+-----------------------------------------+---------------------------------+-----------------------|
-| [[id:a8d786d5-8522-454b-971d-fa1b46c5aecc][Lilac]]         | Haskell      | Yes                                     | Orgmode                         | Any                   |
-| [[https://orgmode.org/][Emacs Orgmode]] | Emacs Lisp   | No                                      | Orgmode                         | Any                   |
-| [[https://github.com/entangled/entangled.py/][Entangled]]     | Python       | No                                      | Markdown                        | Any                   |
-| [[https://github.com/justinmeiners/srcweave][srcweave]]      | Common Lisp  | No                                      | Markdown                        | Any                   |
-| [[http://www.ross.net/funnelweb/index.shtml][FunnelWeb]]     | C            | No                                      | TeX                             | Any                   |
-| [[https://github.com/rixed/portia/blob/master/intro.fw][Portia]]        | OCaml        | Yes                                     | Any                             | Any                   |
-| [[https://github.com/nrnrnr/noweb][Noweb]]         | C, Awk, Icon | Yes                                     | TeX                             | Any                   |
-| [[https://github.com/zyedidia/Literate][Literate]]      | D            | Yes                                     | Markdown                        | Any                   |
-| [[https://github.com/ascherer/cweb][CWEB]]          | C            | Yes                                     | TeX                             | C, C++                |
+--------------------------- PROOFREAD BELOW ------------------------------
 
 ** How to read this doc
 :PROPERTIES:
@@ -910,6 +840,7 @@ The Org files are all of the files that make up this project.
 #+begin_src makefile
 org_files = \
 	base/lilac.org \
+	base/user-manual.org \
 	base/compile.org \
 	base/parse.org \
 	base/tangle.org \
@@ -1183,6 +1114,7 @@ main()
 
 	watch \
 		"${SCRIPT_ROOT}/base/lilac.org" \
+		"${SCRIPT_ROOT}/base/user-manual.org" \
 		"${SCRIPT_ROOT}/base/compile.org" \
 		"${SCRIPT_ROOT}/base/parse.org" \
 		"${SCRIPT_ROOT}/base/tangle.org" \
@@ -2043,6 +1975,7 @@ prepend
 prepended
 prepending
 preprocessor
+preprocessors
 Protobuf
 Protobufs
 quux
@@ -3609,6 +3542,8 @@ contains the cell:
 mkFqcn :: OID -> Text -> Text
 mkFqcn oid name = "id:" <> T.pack (show oid) <> "::" <> name
 #+end_src
+
+* Footnotes
 
 * Glossary (Global)
 

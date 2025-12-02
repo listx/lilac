@@ -1,0 +1,106 @@
+:PROPERTIES:
+:ID:       75bea01b-b487-4709-978b-2156f4233ebb
+:END:
+#+title: User Manual
+
+#+bibliography: bib.json
+#+cite_export: csl csl-styles/ieee.csl
+
+* Introduction
+
+Lilac originally started out as [[https://github.com/listx/lilac-legacy][an extension to Emacs Orgmode]], to fix
+most of the nondeterminism issues of Orgmode's weaving (aka "export") process.
+
+Sometime later, it was determined that Orgmode's HTML export was simply too slow
+(it could take 10+ seconds on large documents). This project was then rewritten
+in [[https://www.haskell.org/][Haskell]], mainly for performance but also for maintainability.
+
+* Major differences with vanilla Org
+
+This section may be useful for existing Orgmode users, to see at a glance what
+is and isn't supported.
+
+Orgmode is quite complex. Some features have been purposely left out, mainly for
+simplicity or readability.
+
+** Compilation step
+
+Orgmode tangles and weaves from Org files directly. There is no intermediate
+compilation step.
+
+Lilac adds a compilation step in order to cache some computations. Basically, an
+Org doc must be compiled into a Lilac Object (~*.lobj~), and then one or more of
+these objects are archived into a Lilac Archive (~*.larc~). It is this archive
+file which is then tangled or woven as needed.
+
+** List item spacing required
+
+List items /must/ be indented from the main text with two leading spaces, and also
+must have an empty blank line. See [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]].
+
+These spacing requirements were determined to be necessary in order to maximize
+readability in raw Org (plaintext) form.
+
+** Noweb links can reference blocks from other files
+
+You can reference code blocks in other files, as long as those files are also
+compiled (into objects) and become part of the archive.
+
+** No ~#+include~ support
+
+The ability to declaratively copy/paste chunks of other files is not supported,
+because doing so results in unreadable raw Org files (you would have to open up
+the linked page separately to see what was actually included).
+
+** Headings must be linked via their ID (UUID)
+
+You cannot link to headings by their name, or by a "search" of a file path. You
+must instead always use UUID links.
+
+By the same token, all documents require a UUID, so that even if you don't have
+a heading, other documents can still reference a named code block in your doc
+via the top-level document UUID.
+
+* Full listing of supported features
+
+#+caption: Org feature parity.
+| Name        | Supported? |
+|-------------+------------|
+| Radio links | No         |
+| Headings    | Yes        |
+| Citations   | Yes        |
+
+* Comparison with other LP tools
+
+#+caption: Comparison of LP tools.
+| Name          | Written in   | Written with LP?\n(Does it use itself?) | Markup language\n(Input syntax) | Tangle-able languages |
+|---------------+--------------+-----------------------------------------+---------------------------------+-----------------------|
+| [[id:a8d786d5-8522-454b-971d-fa1b46c5aecc][Lilac]]         | Haskell      | Yes                                     | Orgmode                         | Any                   |
+| [[https://orgmode.org/][Emacs Orgmode]] | Emacs Lisp   | No                                      | Orgmode                         | Any                   |
+| [[https://github.com/entangled/entangled.py/][Entangled]]     | Python       | No                                      | Markdown                        | Any                   |
+| [[https://github.com/justinmeiners/srcweave][srcweave]]      | Common Lisp  | No                                      | Markdown                        | Any                   |
+| [[http://www.ross.net/funnelweb/index.shtml][FunnelWeb]]     | C            | No                                      | FunnelWeb [fn:web-markup]       | Any                   |
+| [[https://github.com/rixed/portia/blob/master/intro.fw][Portia]]        | OCaml        | Yes                                     | Any                             | Any                   |
+| [[https://github.com/nrnrnr/noweb][Noweb]]         | C, Awk, Icon | Yes                                     | Noweb [fn:web-markup]           | Any                   |
+| [[https://github.com/zyedidia/Literate][Literate]]      | D            | Yes                                     | Markdown                        | Any                   |
+| [[https://github.com/ascherer/cweb][CWEB]]          | C            | Yes                                     | TeX [fn:web-markup]             | C, C++                |
+
+* Footnotes
+
+[fn:web-markup] For CWEB, it has the ~cweave~ utility which then converts this to
+TeX, after which it can be converted as a PDF. However, both FunnelWeb and Noweb
+can support any documentation language, not just TeX --- although, you are still
+required to use that same documentation language directly in your input file. For
+example, Noweb input files with the ~*.nw~ file syntax can be processed by either
+an HTML backend /if/ you have HTML already inside the ~*.nw~ files. In a sense both
+FunnelWeb and Noweb are just text preprocessors --- they have no knowledge of
+the underlying documentation syntax (HTML, TeX, or otherwise) used in the input
+files.
+
+* Glossary
+
+#+print_glossary: local
+
+* Bibliography
+
+#+print_bibliography:

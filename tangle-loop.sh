@@ -102,6 +102,7 @@ main()
 
 	watch \
 		"${SCRIPT_ROOT}/base/lilac.org" \
+		"${SCRIPT_ROOT}/base/user-manual.org" \
 		"${SCRIPT_ROOT}/base/compile.org" \
 		"${SCRIPT_ROOT}/base/parse.org" \
 		"${SCRIPT_ROOT}/base/tangle.org" \
