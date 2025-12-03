@@ -287,6 +287,7 @@ import Relude
     sort,
     sortBy,
     sortOn,
+    swap,
     take,
     takeWhile,
     when,
@@ -1124,12 +1125,15 @@ weaveFootnoteBacklink :: Int -> HtmlWeaver ()
 weaveFootnoteBacklink localCellIdx = do
   weaveConf <- ask
   if
-    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just internalCell <- originObj.orgDoc.cells !!? localCellIdx,
-      Just name <- cellIdxToName weaveConf.archive 0 localCellIdx -> do
+    | Just offset <-
+        lookup weaveConf.originObjectPath
+          . M.fromList
+          . map swap
+          $ IntMap.toList weaveConf.archive.offsets,
+      Just (_, linkAnchor, name) <-
+        getLinkToCellIdx weaveConf (localCellIdx + offset) -> do
         toHtml @Text " "
-        let linkAnchor = "#" <> getLinkAnchor (Just localCellIdx) internalCell
-        a_ [href_ linkAnchor, class_ "footnote-backlink"] $ do
+        a_ [href_ $ "#" <> linkAnchor, class_ "footnote-backlink"] $ do
           toHtml @Text "↑ "
           weaveProse name
     | otherwise -> pure ()
