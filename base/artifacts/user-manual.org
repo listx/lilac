@@ -3,8 +3,8 @@
 :END:
 #+title: User Manual
 
-#+bibliography: bib.json
-#+cite_export: csl csl-styles/ieee.csl
+#+bibliography: ../bib.json
+#+cite_export: csl ../csl-styles/ieee.csl
 
 * Introduction
 
@@ -60,6 +60,26 @@ must instead always use UUID links.
 By the same token, all documents require a UUID, so that even if you don't have
 a heading, other documents can still reference a named code block in your doc
 via the top-level document UUID.
+
+** No implicit concatenation of multiple blocks sharing the same name
+
+Orgmode allows multiple code blocks all sharing the same ~#+header: :noweb-ref
+bar~ metadata, where during tangling these code blocks will be concatenated
+together, in the order that they appear in the doc. *However, we do not allow
+this style for the following reasons:*
+
+  1) Orgmode doesn't have good navigation support for it.
+     ~org-babel-goto-named-src-block~ only supports ~#+name: ...~ metadata.
+
+  2) Using this style can lead to anonymous blocks that don't have a name. IOW,
+     avoiding this style forces us to provide a name for all code blocks, and
+     naming everything is generally not a bad thing, because explicit is better
+     than implicit.
+
+  3) The order of concatenation is implicitly hardcoded to be top-to-bottom.
+     When we only use ~#+name: ...~, we can choose any order we want, not just
+     top-to-bottom (by naming the children and choosing how to order the
+     exposition of these child blocks).
 
 * Full listing of supported features
 
