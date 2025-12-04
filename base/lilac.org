@@ -834,7 +834,9 @@ we don't have to memorize exactly how to invoke certain commands.
 
 *** Org files
 
-The Org files are all of the files that make up this project.
+The Org files are all of the files that make up this project. We could discover
+these files like in [[tangle-loop.sh]], but we list them out here explicitly for
+now.
 
 #+name: make:Org files
 #+begin_src makefile
@@ -1112,16 +1114,8 @@ main()
 	fi
 	__ok_to_lint=1
 
-	watch \
-		"${SCRIPT_ROOT}/base/lilac.org" \
-		"${SCRIPT_ROOT}/base/user-manual.org" \
-		"${SCRIPT_ROOT}/base/compile.org" \
-		"${SCRIPT_ROOT}/base/parse.org" \
-		"${SCRIPT_ROOT}/base/tangle.org" \
-		"${SCRIPT_ROOT}/base/types.org" \
-		"${SCRIPT_ROOT}/base/weave.org" \
-		"${SCRIPT_ROOT}/base/fe.org" \
-		"${SCRIPT_ROOT}/base/artifacts/plan.org"
+	readarray -t org_files < <(find base -type f -regex '.+\.org$')
+	watch "${org_files[@]}"
 }
 
 main "$@"

@@ -100,16 +100,8 @@ main()
 	fi
 	__ok_to_lint=1
 
-	watch \
-		"${SCRIPT_ROOT}/base/lilac.org" \
-		"${SCRIPT_ROOT}/base/user-manual.org" \
-		"${SCRIPT_ROOT}/base/compile.org" \
-		"${SCRIPT_ROOT}/base/parse.org" \
-		"${SCRIPT_ROOT}/base/tangle.org" \
-		"${SCRIPT_ROOT}/base/types.org" \
-		"${SCRIPT_ROOT}/base/weave.org" \
-		"${SCRIPT_ROOT}/base/fe.org" \
-		"${SCRIPT_ROOT}/base/artifacts/plan.org"
+	readarray -t org_files < <(find base -type f -regex '.+\.org$')
+	watch "${org_files[@]}"
 }
 
 main "$@"
