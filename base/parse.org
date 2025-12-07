@@ -4580,7 +4580,7 @@ rawLinkParser :: OrgParser Link
 rawLinkParser = do
   _ <- MP.try . MP.lookAhead $ do
     _ <- MP.takeWhile1P (Just "(raw link) protocol") isAlphaChar
-    _ <- char ':'
+    _ <- string "://"
     pure ()
   candidate <- MP.some $ MP.try remainderChar
   case N.parseURI candidate of
