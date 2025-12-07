@@ -855,8 +855,10 @@ weaveLinkTarget linkTarget = do
               then "#top"
               else getExternalRelPath objPath weaveConf.originObjectPath
       | Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
-        Just (_, linkAnchor, _) <- getLinkToCellIdx weaveConf globalCellIdx ->
-          pure linkAnchor
+        Just (docName, linkAnchor, _) <- getLinkToCellIdx weaveConf globalCellIdx ->
+          if docName == "" --
+            then pure $ "#" <> linkAnchor
+            else pure linkAnchor
       | otherwise -> pure showBrokenLink
       where
         showBrokenLink = "#LILAC_BROKEN_LINK-" <> show linkOid

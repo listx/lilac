@@ -1592,7 +1592,7 @@ Unlike Noweb links, line label links inside blocks point to themselves. That's
 why [[(line label self-link)]] uses the ~id~ HTML attribute.
 
 The part we need to put in the ~href="..."~ part is generated separately in
-[[f:weaveLinkTarget]]. The ~Just _ <- lookup linkOid originObj.symbols~ part is needed
+[[f:weaveLinkTarget]]. The ~docName == ""~ part at [[(link-target-is-internal-cell)]] is needed
 to check that the ~linkOid~ exists in the current object's list of local symbols;
 this is the only way we can ensure that the ~linkOid~ is a local one internal to
 the current document.
@@ -1612,8 +1612,10 @@ weaveLinkTarget linkTarget = do
               then "#top"
               else getExternalRelPath objPath weaveConf.originObjectPath
       | Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
-        Just (_, linkAnchor, _) <- getLinkToCellIdx weaveConf globalCellIdx ->
-          pure linkAnchor
+        Just (docName, linkAnchor, _) <- getLinkToCellIdx weaveConf globalCellIdx ->
+          if docName == "" -- (ref:link-target-is-internal-cell)
+            then pure $ "#" <> linkAnchor
+            else pure linkAnchor
       | otherwise -> pure showBrokenLink
       where
         showBrokenLink = "#LILAC_BROKEN_LINK-" <> show linkOid
