@@ -3,9 +3,6 @@ set -euo pipefail
 
 SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
 
-# Files which are tracked outside of our tangling step, but for legitimate
-# reasons (generated code, symlinks to dependencies, or LICENSE files,
-# typically).
 known_not_tangled=(
 	LICENSE
 
@@ -28,7 +25,6 @@ known_not_tangled=(
 	.vale/styles/.gitkeep
 )
 
-# List all files we explicitly tangle from Org files.
 tangled_files()
 {
 	unset GIT_LITERAL_PATHSPECS
@@ -37,7 +33,6 @@ tangled_files()
 		| sort -u
 }
 
-# List all files checked into version control.
 tracked_files()
 {
 	git -C "${SCRIPT_ROOT}" ls-files \
@@ -47,9 +42,8 @@ tracked_files()
 main()
 {
 	echo >&2 -n "$0: checking tangled vs tracked files... "
-	# Combine tangled files and those which are tracked but not tangled. This
-	# list should match the sum of all tangled files (modulo HTML and Org
-	# files).
+
+	# (ref:tangled-tracked-diff)
 	if diff -u \
 		<(printf '%s\n' "$(tangled_files)" "${known_not_tangled[@]}" | sort) \
 		<(tracked_files); then

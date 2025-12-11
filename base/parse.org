@@ -4267,6 +4267,24 @@ reconcileLineLabels = do
     | otherwise -> pure orgParserState.lineLabels
 #+end_src
 
+*** Tangling behavior
+:PROPERTIES:
+:ID:       8a920078-c090-42c4-8894-1b1cacaf0e15
+:END:
+
+By default, line labels are stripped in the tangling process in [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba::f:expandBlock][f:expandBlock]].
+However, sometimes you'd want to tangle these line labels in the source code.
+One such use case is if you are using a linter for the source code, that doesn't
+like trailing comment characters.
+
+You can do that with
+
+#+begin_src org
+,#+header: :line-label tangle
+#+end_src
+
+for the source code block in question. See [[id:2804111e-fa41-4cbe-9480-2666dd4a02e5::nix/release.nix][nix\/release.nix]] for an example.
+
 ** Links to recognized web protocols
 
 Links to web protocols like ~https://~ should be parsed as a ~LinkTargetURI~, but

@@ -69,7 +69,7 @@ let
     in "${repo}") { });
   };
 
-  injectLilac = final: prev: {
+  injectLilac = final: prev: { # (ref:injectLilac)
     lilac = configureHaskellPkg (prev.callCabal2nix "lilac" lilacSource { });
   };
 
@@ -84,11 +84,12 @@ let
 
   projectRoot = ../.;
 
-  gnf = import (import ./sources.nix)."gitignore.nix" { inherit lib; };
+  gnf =
+    import (import ./sources.nix)."gitignore.nix" { inherit lib; }; # (ref:gnf)
   lilacSource = lib.cleanSourceWith {
     src = projectRoot;
-    name = baseNameOf projectRoot + "-src";
-    filter = let
+    name = baseNameOf projectRoot + "-src"; # (ref:lilacSource name)
+    filter = let # (ref:gnf-memoization)
       filterFunc = gnf.gitignoreFilterWith {
         basePath = projectRoot;
         extraRules = ''
@@ -169,14 +170,7 @@ let
         always_run = true;
         entry = "./unit-test.sh";
         pass_filenames = false;
-        stages = [ "pre-push" ];
-      };
-
-      no-fixme = {
-        name = "no-FIXME.sh";
-        enable = true;
-        entry = "./no-FIXME.sh";
-        stages = [ "commit-msg" ];
+        stages = [ "pre-push" ]; # (ref:pre-push)
       };
 
       vale = {
@@ -194,10 +188,8 @@ let
 
   toolOpts = opts: builtins.concatStringsSep " " opts;
 in {
-  # Derivation for the shell environment. This is fed into "pkgs.mkShell" to
-  # give us the final shell environment.
   devShell = pkgs.mkShell {
-    buildInputs = [ devShellEnv ];
+    buildInputs = [ devShellEnv ]; # (ref:devShellEnv)
     shellHook = ''
       export LD_LIBRARY_PATH=${devShellEnv}/lib:$LD_LIBRARY_PATH
       # Used when building with cabal.
@@ -207,6 +199,6 @@ in {
       logo
     '';
   };
-
-  lilac = ourHaskell.lilac;
+  # (ref:devShell drv)
+  lilac = ourHaskell.lilac; # (ref:lilac drv)
 }
