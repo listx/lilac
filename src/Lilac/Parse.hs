@@ -794,10 +794,12 @@ styledTextParser = do
 
 textParser :: StyleMask -> OrgParser Text
 textParser styleMask
-  | isVerbatim styleMask =
-      MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
-  | isCode styleMask =
-      MP.takeWhile1P (Just "code") isNotCodeMarker
+  | isVerbatim styleMask = do
+      t <- MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
+      pure $ T.map newlineToSpace t
+  | isCode styleMask = do
+      t <- MP.takeWhile1P (Just "code") isNotCodeMarker
+      pure $ T.map newlineToSpace t
   | otherwise = do
       o <- MP.getOffset
       word <-
@@ -815,6 +817,7 @@ textParser styleMask
         modify (\s -> s {glossaryTermOffset = o}) --
       pure word
   where
+    newlineToSpace c = if c == '\n' then ' ' else c
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
     normalChars :: OrgParser Text

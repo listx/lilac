@@ -2895,10 +2895,12 @@ input.
 #+begin_src haskell
 textParser :: StyleMask -> OrgParser Text
 textParser styleMask
-  | isVerbatim styleMask =
-      MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
-  | isCode styleMask =
-      MP.takeWhile1P (Just "code") isNotCodeMarker
+  | isVerbatim styleMask = do
+      t <- MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
+      pure $ T.map newlineToSpace t
+  | isCode styleMask = do
+      t <- MP.takeWhile1P (Just "code") isNotCodeMarker
+      pure $ T.map newlineToSpace t
   | otherwise = do
       o <- MP.getOffset
       word <-
@@ -2916,6 +2918,7 @@ textParser styleMask
         modify (\s -> s {glossaryTermOffset = o}) -- (ref:glossary-term-delimiter-detection)
       pure word
   where
+    newlineToSpace c = if c == '\n' then ' ' else c
     isNotVerbatimMarker c = c /= '='
     isNotCodeMarker c = c /= '~'
     normalChars :: OrgParser Text
@@ -2954,6 +2957,12 @@ textParser styleMask
         && (not $ isSpace c)
         && (not $ c == '\\')
 #+end_src
+
+For the verbatim and code styles, we replace newlines with spaces, because in
+practice newlines can get inserted only because we're wrapping the source text
+(in Org mode) at 80 columns. If the user wants to put in a piece of multiline
+text with specific newlines, they should just use a source code block instead of
+an inline style.
 
 Because of the way =isStyleMarker= and =isProseWord= checks membership of the
 characters used for activating (and deactivating) styles in [[f:styleMarkers]], we
