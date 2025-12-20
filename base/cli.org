@@ -11,8 +11,9 @@
 :ID:       fd90f502-c5bb-411b-b056-793e783f2c22
 :END:
 
-The CLI has two main parts: the boilerplate and use of the modules (libraries)
-that Lilac provides. In this sense it's a somewhat thin wrapper.
+The CLI has two main parts: the use of the modules (libraries) that Lilac
+provides (the "functional core", if you will), and the boilerplate around that
+to interact with the real world (the "imperative shell").
 
 The boilerplate involves [[id:ce9af5ef-6559-4ffb-82c1-a439214eda6d][option handling]] (where we use [[https://hackage.haskell.org/package/optparse-applicative][optparse-applicative]]) and
 [[id:3c576a02-418b-431b-ab96-e4936e977fb7][injecting the Git version information]] into the version string.
@@ -148,7 +149,7 @@ import Text.Megaparsec qualified as MP
 :ID:       efe3cfcc-b77d-469c-9d92-2e160e2a1b51
 :END:
 
-In Haskell, like C, execution starts with =main=.
+In Haskell, like C, execution starts with the =main= function.
 
 #+name: f:lilac-main
 #+begin_src haskell
@@ -177,7 +178,7 @@ main = do
 #+end_src
 
 Once the CLI arguments and options are handled, we call [[f:lilac]], which branches
-out into the =check=, =tangle= and =weave= subcommands.
+out into various subcommands.
 
 #+name: f:lilac
 #+begin_src haskell
@@ -189,6 +190,194 @@ lilac globalOpts = case globalOpts.subcommand of
   Weave weaveOpts -> lilacWeave weaveOpts
 #+end_src
 
+Before we can ~tangle~ or ~weave~, we have to first compile Org files into object
+files, and then create archives out of these object files.
+
+** General option handling boilerplate
+:PROPERTIES:
+:ID:       ce9af5ef-6559-4ffb-82c1-a439214eda6d
+:END:
+
+The option handling code is made up of some declarative configuration of the
+options, and the functions that operate on them.
+
+#+name: Option handling
+#+begin_src haskell
+<<f:readOsPath>>
+<<f:readGPath>>
+<<data:GlobalOpts>>
+<<data:Subcommand>>
+<<data:TangleOpts>>
+<<data:WeaveOpts>>
+<<data:CompileOpts>>
+<<data:ArchiveOpts>>
+<<data:OptionHandler>>
+<<f:globalOptionsHandler>>
+<<f:subcommandHandler>>
+<<f:tangleOptsHandler>>
+<<f:weaveOptsHandler>>
+<<f:compileOptsHandler>>
+<<f:archiveOptsHandler>>
+#+end_src
+
+One useful helper we have to write ourselves is a parser that can understand how
+to parse ~OsPath~ from command line arguments. This is needed because
+~Options.Applicative~ does not know how to parse ~OsPath~ values (only ~FilePath~).
+
+#+name: f:readOsPath
+#+begin_src haskell
+readOsPath :: ReadM OsPath
+readOsPath = f =<< str
+  where
+    f :: (MonadFail m) => FilePath -> m OsPath
+    f maybeOsPath
+      | Just osPath <- P.encodeUtf maybeOsPath,
+        P.isValid osPath =
+          pure osPath
+      | otherwise = fail $ "invalid OsPath: " <> maybeOsPath
+#+end_src
+
+Another helper is a parser for [[id:2d98229c-e318-434b-916b-364c04021306::newtype:GPath][newtype:GPath]], whose type we need for
+[[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]].
+
+#+name: f:readGPath
+#+begin_src haskell
+readGPath :: ReadM GPath
+readGPath = encodeGPath =<< str
+#+end_src
+
+Notice that the option handling boilerplate does not describe error handling
+(what to do when a required option is missing, etc), because all of that is
+given to us for free by =Options.Applicative=.
+
+** Global and subcommand options
+
+The [[data:GlobalOpts]] are options that can affect more than one subcommand
+(thought not all subcommands currently use them).
+
+#+name: data:GlobalOpts
+#+begin_src haskell
+type GlobalOpts :: Type
+data GlobalOpts = GlobalOpts
+  { subcommand :: Subcommand,
+    color :: Bool,
+    verbose :: Bool
+  }
+#+end_src
+
+The most important field here is probably ~subcommand~, which informs our binary
+which subcommand the user chose --- ~compile~, ~archive~, ~tangle~, or ~weave~.
+
+#+name: data:Subcommand
+#+begin_src haskell
+type Subcommand :: Type
+data Subcommand
+  = Compile CompileOpts
+  | Archive ArchiveOpts
+  | Tangle TangleOpts
+  | Weave WeaveOpts
+#+end_src
+
+Each of these ~<...>Opts~ data types require their own option /handler/, so that
+~Options.Applicative~ can generate all of the option handling behaviors for us.
+This involves setting default option values, help text, what types of arguments
+are expected for some options, etc. All of these concerns are handled within the
+~Options.Applicative.Parser~ type. However, we use the type [[data:OptionHandler]] for
+option parsing on the CLI, because the alternative of calling it as just ~Parser~
+feels a bit confusing, given how we already use [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::type:OrgParser][type:OrgParser]] (and the concept
+of a "parser" in general) to mean the Org parsing mechanism we have in
+[[id:5ce50c9a-5413-48d9-8bba-e465a4eb527c::module:Lilac.Parse][module:Lilac.Parse]]).
+
+#+name: data:OptionHandler
+#+begin_src haskell
+type OptionHandler :: Type -> Type
+type OptionHandler = Options.Applicative.Parser
+#+end_src
+
+Let's first look at the [[f:globalOptionsHandler]], the handler for all global
+options (apart from the help and version flags which we add into ~mainOptions~ in
+[[f:lilac-main]]).
+
+#+name: f:globalOptionsHandler
+#+begin_src haskell
+globalOptionsHandler :: OptionHandler GlobalOpts
+globalOptionsHandler =
+  GlobalOpts
+    <$> subcommandHandler
+    <*> ( flag
+            True
+            False
+            ( long "no-color"
+                <> help
+                  """
+                  Do not print in color (i.e., suppress ANSI escape codes).
+                  """
+            )
+        )
+    <*> ( flag
+            False
+            True
+            ( long "verbose"
+                <> help
+                  """
+                  Be more descriptive about what's happening.
+                  """
+            )
+        )
+#+end_src
+
+The global options in [[f:globalOptionsHandler]] can be provided anywhere on the
+command line (unlike subcommand options which must come /after/ the subcommand).
+
+In case you're not familiar with applicative syntax, the basic idea is that you
+use ~<$>~ (map) followed by as many ~<*>~ (apply) bits. In [[f:globalOptionsHandler]] we
+use 3 of these in total (1 ~<$>~ and 2 ~<*>~) because [[data:GlobalOpts]] has 3 fields.
+This is the beauty of ~Options.Applicative~ --- things just line up in a
+declarative way.
+
+Now let's look at [[f:subcommandHandler]].
+
+#+name: f:subcommandHandler
+#+begin_src haskell
+subcommandHandler :: OptionHandler Subcommand
+subcommandHandler =
+  hsubparser -- (ref:hsubparser)
+    $ metavar "SUBCOMMAND"
+    <> cmdCompile
+    <> cmdArchive
+    <> cmdTangle
+    <> cmdWeave
+  where
+    cmdCompile =
+      command
+        "compile"
+        $ info
+          (Compile <$> compileOptsHandler)
+          (progDesc "Compile Org files into objects.")
+    cmdArchive =
+      command
+        "archive"
+        $ info
+          (Archive <$> archiveOptsHandler)
+          (progDesc "Combine objects into a single archive.")
+    cmdTangle =
+      command
+        "tangle"
+        $ info
+          (Tangle <$> tangleOptsHandler)
+          (progDesc "Extract source code from archives.")
+    cmdWeave =
+      command
+        "weave"
+        $ info
+          (Weave <$> weaveOptsHandler)
+          (progDesc "Generate HTML documentation from archives.")
+#+end_src
+
+This just delegates to ~hsubparser~ [[(hsubparser)]], which combines a group of
+individual subcommands into a single parser. Notice that each of the subcommands
+in turn delegate to a ~<...>OptsHandler~ function.
+
 * Compiling
 :PROPERTIES:
 :ID:       c80fd6a6-7eb2-4672-99cc-a5a10c1fda69
@@ -196,9 +385,37 @@ lilac globalOpts = case globalOpts.subcommand of
 
 The [[f:lilacCompile]] function creates "object" files for all given Org files.
 Object files encode information about the Org file in a nice, machine-readable
-way. They are essentially the machine equivalent of human-readable Org files.
+way. They are essentially the machine-readable equivalent of human-readable Org
+files.
 
-The created files have the ~.lobj~ extension to indicate "Lilac object".
+The created files have the ~.lobj~ extension to indicate "Lilac object". The
+=compile= subcommand writes an object (=*.lobj=) file for the given Org file. This
+object file is used to perform some amount of processing (compilation) for the
+Org file, such that subsequent steps like tangling or weaving can trust that the
+input is well-formed. This is similar to how the C programming language
+toolchain uses object files (by compiling C files).
+
+#+name: data:CompileOpts
+#+begin_src haskell
+type CompileOpts :: Type
+data CompileOpts = CompileOpts
+  { inputs :: [OsPath]
+  }
+#+end_src
+
+The ~inputs~ option just takes a list of paths to Org files.
+
+#+name: f:compileOptsHandler
+#+begin_src haskell
+compileOptsHandler :: OptionHandler CompileOpts
+compileOptsHandler =
+  CompileOpts
+    <$> (some $ argument readOsPath (metavar "ORG_FILES..."))
+#+end_src
+
+In [[f:lilacCompile]], for each Org file, we run [[id:fbca0c4e-c568-4c12-b89c-7cf334b8d50f::f:orgDocParser][f:orgDocParser]] [[(run-orgDocParser)]]
+and then call [[id:01da95fe-ba23-4481-9833-428423392f5f::f:mkObject][f:mkObject]] [[(run-mkObject)]] to turn it into an object, before
+writing it back onto disk (next to where we found the Org file).
 
 #+name: f:lilacCompile
 #+begin_src haskell
@@ -211,14 +428,14 @@ lilacCompile _globalOpts compileOpts = do
       input <- LU.readFileRobustly inputPath
       let parseResult =
             MP.runParser
-              (runStateT LP.orgDocParser defaultOrgParserState)
+              (runStateT LP.orgDocParser defaultOrgParserState) -- (ref:run-orgDocParser)
               (show inputPath)
               input
       case parseResult of
         Left errBundle -> do
           die $ MP.errorBundlePretty errBundle
         Right (orgDoc, _) -> do
-          obj <- LC.mkObject orgDoc
+          obj <- LC.mkObject orgDoc -- (ref:run-mkObject)
           pure (obj, inputPath)
     writeObjToPath :: (ToJSON a) => (a, OsPath) -> IO ()
     writeObjToPath (obj, inputPath) = do
@@ -233,6 +450,54 @@ lilacCompile _globalOpts compileOpts = do
 :ID:       75173d6f-c210-46a0-8acf-689deeacd250
 :END:
 
+The ~archive~ subcommand writes an archive (=*.larc=) file for the given set of
+Lilac object files (generated with the =compile= subcommand). See [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] for
+details; essentially this is just a collection of multiple [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] files to
+allow for multi-Org-file tangling (where code blocks from one Org file can
+reference blocks from other files).
+
+#+name: data:ArchiveOpts
+#+begin_src haskell
+type ArchiveOpts :: Type
+data ArchiveOpts = ArchiveOpts
+  { inputs :: [GPath],
+    outFile :: OsPath
+  }
+#+end_src
+
+#+name: f:archiveOptsHandler
+#+begin_src haskell
+archiveOptsHandler :: OptionHandler ArchiveOpts
+archiveOptsHandler =
+  ArchiveOpts
+    <$> ( some
+            $ argument
+              readGPath
+              ( metavar "OBJECTS..."
+                  <> help
+                    """
+                    Objects to combine into an archive.
+                    """
+              )
+        )
+    <*> ( option
+            readOsPath
+            ( long "out-file"
+                <> metavar "FILE"
+                <> value (P.unsafeEncodeUtf "out.larc")
+                <> showDefault
+                <> help
+                  """
+                  Output file path for the archive.
+                  """
+            )
+        )
+#+end_src
+
+The act of archiving is pretty simple. It just reads in all of the object files
+and then calls [[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:mkArchive][f:mkArchive]] on them to create and archive, before writing it out
+to disk based on the ~--out-file~ option.
+
 #+name: f:lilacArchive
 #+begin_src haskell
 lilacArchive :: ArchiveOpts -> IO ()
@@ -243,7 +508,9 @@ lilacArchive archiveOpts = do
     Left errMsg -> die errMsg
     Right archive -> do
       outPath <- do
-        let base = P.replaceExtension archiveOpts.outFile $ P.unsafeEncodeUtf "larc"
+        let base =
+              P.replaceExtension archiveOpts.outFile
+                $ P.unsafeEncodeUtf "larc"
         P.decodeUtf base
       encodeFile outPath archive
   where
@@ -262,8 +529,49 @@ lilacArchive archiveOpts = do
 :ID:       27b05a30-83ff-4c47-b320-f53747424a68
 :END:
 
-The [[f:lilacTangle]] function tangles all blocks (which have been marked for
-tangling) from a given list of Org files.
+The ~tangle~ subcommand runs [[f:lilacTangle]]. It can tangle all code blocks (which
+have been marked for tangling) found in all archives specified with the ~inputs~
+field.
+
+#+name: data:TangleOpts
+#+begin_src haskell
+type TangleOpts :: Type
+data TangleOpts = TangleOpts
+  { inputs :: [GPath],
+    outDir :: OsPath
+  }
+#+end_src
+
+The ~outDir~ field can "direct" the tangling to be done at any other arbitrary
+location. See the help text in [[f:tangleOptsHandler]] for details.
+
+#+name: f:tangleOptsHandler
+#+begin_src haskell
+tangleOptsHandler :: OptionHandler TangleOpts
+tangleOptsHandler =
+  TangleOpts
+    <$> (some $ argument readGPath (metavar "ARCHIVES..."))
+    <*> ( option
+            readOsPath
+            ( long "out-dir"
+                <> metavar "DIR"
+                <> value mempty
+                <> showDefault
+                <> help
+                  """
+                  Directory used for tangling. It's the starting point from
+                  which all of the code blocks' ":tangle" header will be a
+                  child of. Typically you'd want this to point to your repo's
+                  root directory, so you can tangle a file in any location in
+                  the repo root, regardless of where your Org files are authored
+                  and checked into version control.
+                  """
+            )
+        )
+#+end_src
+
+The [[f:lilacTangle]] function calls [[f:tangle]] for each of the archive files in the
+given list of inputs.
 
 #+name: f:lilacTangle
 #+begin_src haskell
@@ -327,8 +635,10 @@ tangle globalOpts tangleOpts archive = do
         else putStrLn
 #+end_src
 
-We sort the paths first so that the output is less confusing. Only tangled paths
-are printed, because otherwise the output can be overly verbose.
+
+Most of the heavy lifting around determining /what/ to tangle is done by
+[[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba::f:expandRootBlocks][f:expandRootBlocks]]. We sort the paths so that the output is less confusing. Only
+tangled paths are printed, because otherwise the output can be overly verbose.
 
 The function [[id:85a464eb-e220-40d7-ae49-5edc349ee6b4::f:readFileRobustly][f:readFileRobustly]] will return the empty string if there was any
 error encountered while reading the file. One common scenario is if the file
@@ -339,7 +649,82 @@ scenarios) is fine because it will most likely result in the comparison
 
 * Weaving
 
-The [[f:lilacWeave]] function weaves the [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]] into HTML.
+The ~weave~ subcommand is similar to ~tangle~ in that it takes a list of archives to
+process. There are a few more options here though, because weaving is a more
+complex process than tangling.
+
+#+name: data:WeaveOpts
+#+begin_src haskell
+type WeaveOpts :: Type
+data WeaveOpts = WeaveOpts
+  { inputs :: [OsPath],
+    outDir :: OsPath,
+    projectConf :: OsPath,
+    writeCss :: Bool,
+    writeJs :: Bool
+  }
+#+end_src
+
+The ~projectConf~ is a path to the [[id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf][data:ProjectConf]]. The ~writeJs~ field is only
+meant to be used when /not/ developing Lilac (when you're using Lilac in
+production), because this option makes Lilac just write the hardcoded JavaScript
+it has embedded inside itself (see [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]] and [[id:6edfd979-a0d1-4f87-bfa7-129db7a3025b][Weave Lilac with
+Lilac]]).
+
+#+name: f:weaveOptsHandler
+#+begin_src haskell
+weaveOptsHandler :: OptionHandler WeaveOpts
+weaveOptsHandler =
+  WeaveOpts
+    <$> (some $ argument readOsPath (metavar "ARCHIVES..."))
+    <*> ( option
+            readOsPath
+            ( long "out-dir"
+                <> metavar "DIR"
+                <> value (P.unsafeEncodeUtf ".")
+                <> showDefault
+                <> help
+                  """
+                  Directory for saving the HTML files.
+                  """
+            )
+        )
+    <*> ( option
+            readOsPath
+            ( long "project-conf"
+                <> metavar "PROJECT_CONF"
+                <> value (P.unsafeEncodeUtf ".lilac.json")
+                <> showDefault
+                <> help
+                  """
+                  Project configuration file.
+                  """
+            )
+        )
+    <*> ( flag
+            False
+            True
+            ( long "write-css"
+                <> help
+                  """
+                  Write CSS file. This does not require Org mode input.
+                  """
+            )
+        )
+    <*> ( flag
+            False
+            True
+            ( long "write-js"
+                <> help
+                  """
+                  Write JS file. This does not require Org mode input.
+                  """
+            )
+        )
+#+end_src
+
+The [[f:lilacWeave]] function weaves all objects (Org files) it finds inside an
+archive to HTML.
 
 #+name: f:lilacWeave
 #+begin_src haskell
@@ -416,6 +801,10 @@ weaveToDisk projectConf outDir archive acc objPath obj =
    in action : acc
 #+end_src
 
+Unlike tangling where we chose which output directory to use for the tangled
+outputs, here for weaving we always use the same path where the object files are
+located, and then change the extension to be ~.html~.
+
 ** JavaScript injection
 :PROPERTIES:
 :ID:       e31aed94-98f5-4c47-b9ab-e82a529e5be7
@@ -423,8 +812,12 @@ weaveToDisk projectConf outDir archive acc objPath obj =
 
 We use ClojureScript to generate the JavaScript we need at [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::make:Build prod JS][make:Build prod JS]].
 That generates a single self-contained JavaScript file. We would like to put
-this into our CLI, because then the CLI really becomes the complete HTML, CSS
-and JavaScript generation solution, using only Org files as dependencies.
+this into our CLI (just as we do for CSS generation at [[id:8017befd-7628-46cf-a090-72fdbb00fb5a][Generate CSS]]), because
+then the CLI really becomes the complete HTML, CSS and JavaScript generation
+solution, using only Org files as dependencies.
+
+See [[id:6edfd979-a0d1-4f87-bfa7-129db7a3025b][Weave Lilac with Lilac]] which discusses how the ~lilac.js.injectme~ JavaScript
+file is generated.
 
 We use the [[https://hackage.haskell.org/package/file-embed][file-embed]] library to inject the JavaScript file into our CLI. The
 ~embedFile~ function returns a ~ByteString~, so we convert it into ~Text~ with
@@ -435,347 +828,6 @@ We use the [[https://hackage.haskell.org/package/file-embed][file-embed]] librar
 lilacJs :: Text
 lilacJs = TE.decodeUtf8 $(embedFile "base/js/lilac.js.injectme")
 #+end_src
-
-* Option handling boilerplate
-:PROPERTIES:
-:ID:       ce9af5ef-6559-4ffb-82c1-a439214eda6d
-:END:
-
-The option handling code is made up of some declarative configuration of the
-options, and the functions that operate on them.
-
-#+name: Option handling
-#+begin_src haskell
-<<f:readOsPath>>
-<<f:readGPath>>
-<<data:GlobalOpts>>
-<<data:Subcommand>>
-<<data:TangleOpts>>
-<<data:WeaveOpts>>
-<<data:CompileOpts>>
-<<data:ArchiveOpts>>
-<<data:OptionHandler>>
-<<f:globalOptionsHandler>>
-<<f:subcommandHandler>>
-<<f:tangleOptsHandler>>
-<<f:weaveOptsHandler>>
-<<f:compileOptsHandler>>
-<<f:archiveOptsHandler>>
-#+end_src
-
-One useful helper we have to write ourselves is a parser that can understand how
-to parse ~OsPath~ from command line arguments. This is needed because
-~Options.Applicative~ does not know how to parse ~OsPath~ values (only ~FilePath~).
-
-#+name: f:readOsPath
-#+begin_src haskell
-readOsPath :: ReadM OsPath
-readOsPath = f =<< str
-  where
-    f :: (MonadFail m) => FilePath -> m OsPath
-    f maybeOsPath
-      | Just osPath <- P.encodeUtf maybeOsPath,
-        P.isValid osPath =
-          pure osPath
-      | otherwise = fail $ "invalid OsPath: " <> maybeOsPath
-#+end_src
-
-Another helper is a parser for [[id:2d98229c-e318-434b-916b-364c04021306::newtype:GPath][newtype:GPath]], whose type we need for
-[[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]].
-
-#+name: f:readGPath
-#+begin_src haskell
-readGPath :: ReadM GPath
-readGPath = encodeGPath =<< str
-#+end_src
-
-The global options for the Lilac CLI are encoded in [[data:GlobalOpts]].
-
-#+name: data:GlobalOpts
-#+begin_src haskell
-type GlobalOpts :: Type
-data GlobalOpts = GlobalOpts
-  { subcommand :: Subcommand,
-    color :: Bool,
-    verbose :: Bool
-  }
-#+end_src
-
-We use subcommands to capture major behaviors --- =check=, =tangle=, and =weave=.
-
-#+name: data:Subcommand
-#+begin_src haskell
-type Subcommand :: Type
-data Subcommand
-  = Tangle TangleOpts
-  | Weave WeaveOpts
-  | Compile CompileOpts
-  | Archive ArchiveOpts
-#+end_src
-
-The =tangle= subcommand runs [[f:lilacTangle]], and requires an ~inputs~ option.
-
-#+name: data:TangleOpts
-#+begin_src haskell
-type TangleOpts :: Type
-data TangleOpts = TangleOpts
-  { inputs :: [GPath],
-    outDir :: OsPath
-  }
-#+end_src
-
-#+name: f:tangleOptsHandler
-#+begin_src haskell
-tangleOptsHandler :: OptionHandler TangleOpts
-tangleOptsHandler =
-  TangleOpts
-    <$> (some $ argument readGPath (metavar "ARCHIVES..."))
-    <*> ( option
-            readOsPath
-            ( long "out-dir"
-                <> metavar "DIR"
-                <> value mempty
-                <> showDefault
-                <> help
-                  """
-                  Directory used for tangling. It's the starting point from
-                  which all of the code blocks' ":tangle" header will be a
-                  child of. Typically you'd want this to point to your repo's
-                  root directory, so you can tangle a file in any location in
-                  the repo root, regardless of where your Org files are authored
-                  and checked into version control.
-                  """
-            )
-        )
-#+end_src
-
-The =weave= subcommand requires an ~input~ option as well.
-
-#+name: data:WeaveOpts
-#+begin_src haskell
-type WeaveOpts :: Type
-data WeaveOpts = WeaveOpts
-  { inputs :: [OsPath],
-    outDir :: OsPath,
-    projectConf :: OsPath,
-    writeCss :: Bool,
-    writeJs :: Bool
-  }
-#+end_src
-
-#+name: f:weaveOptsHandler
-#+begin_src haskell
-weaveOptsHandler :: OptionHandler WeaveOpts
-weaveOptsHandler =
-  WeaveOpts
-    <$> (some $ argument readOsPath (metavar "ARCHIVES..."))
-    <*> ( option
-            readOsPath
-            ( long "out-dir"
-                <> metavar "DIR"
-                <> value (P.unsafeEncodeUtf ".")
-                <> showDefault
-                <> help
-                  """
-                  Directory for saving the HTML files.
-                  """
-            )
-        )
-    <*> ( option
-            readOsPath
-            ( long "project-conf"
-                <> metavar "PROJECT_CONF"
-                <> value (P.unsafeEncodeUtf ".lilac.json")
-                <> showDefault
-                <> help
-                  """
-                  Project configuration file.
-                  """
-            )
-        )
-    <*> ( flag
-            False
-            True
-            ( long "write-css"
-                <> help
-                  """
-                  Write CSS file. This does not require Org mode input.
-                  """
-            )
-        )
-    <*> ( flag
-            False
-            True
-            ( long "write-js"
-                <> help
-                  """
-                  Write JS file. This does not require Org mode input.
-                  """
-            )
-        )
-#+end_src
-
-The =compile= subcommand writes an object (=*.lobj=) file for the given Org file.
-This object file is used to perform some amount of "compilation" for the Org file,
-such that subsequent steps like tangling or weaving only need to use the object
-files. This is rather similar to how the C programming language toolchain uses
-object files (by compiling C files), and has all of the pros (and cons) of
-that setup. We believe that the benefits are worth it, which is why we adopt the
-same "architecture" here.
-
-#+name: data:CompileOpts
-#+begin_src haskell
-type CompileOpts :: Type
-data CompileOpts = CompileOpts
-  { inputs :: [OsPath]
-  }
-#+end_src
-
-#+name: f:compileOptsHandler
-#+begin_src haskell
-compileOptsHandler :: OptionHandler CompileOpts
-compileOptsHandler =
-  CompileOpts
-    <$> (some $ argument readOsPath (metavar "ORG_FILES..."))
-#+end_src
-
-The ~archive~ subcommand writes an archive (=*.larc=) file for the given set of
-Lilac object files (generated with the =compile= subcommand). See [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] for
-details; essentially this is just a collection of multiple [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] files to
-allow for multi-Org-file tangling (where code blocks from one Org file can
-reference blocks from other files).
-
-#+name: data:ArchiveOpts
-#+begin_src haskell
-type ArchiveOpts :: Type
-data ArchiveOpts = ArchiveOpts
-  { inputs :: [GPath],
-    outFile :: OsPath
-  }
-#+end_src
-
-#+name: f:archiveOptsHandler
-#+begin_src haskell
-archiveOptsHandler :: OptionHandler ArchiveOpts
-archiveOptsHandler =
-  ArchiveOpts
-    <$> ( some
-            $ argument
-              readGPath
-              ( metavar "OBJECTS..."
-                  <> help
-                    """
-                    Objects to combine into an archive.
-                    """
-              )
-        )
-    <*> ( option
-            readOsPath
-            ( long "out-file"
-                <> metavar "FILE"
-                <> value (P.unsafeEncodeUtf "out.larc")
-                <> showDefault
-                <> help
-                  """
-                  Output file path for the archive.
-                  """
-            )
-        )
-#+end_src
-
-That's it for the data structures for option handling. The next concern is
-understanding how to display and parse these options on the command line (that
-is, how we can perform option parsing on the CLI so that they end up as these
-data structures we've defined above).
-
-We use the type [[data:OptionHandler]] for option parsing on the CLI, because the
-alternative of calling it as =Parser= feels a bit confusing, given how we already
-use [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::type:OrgParser][type:OrgParser]] (and the concept of a "parser" in general) to mean the Org
-parsing mechanism we have in [[id:5ce50c9a-5413-48d9-8bba-e465a4eb527c::module:Lilac.Parse][module:Lilac.Parse]]).
-
-#+name: data:OptionHandler
-#+begin_src haskell
-type OptionHandler :: Type -> Type
-type OptionHandler = Options.Applicative.Parser
-#+end_src
-
-The [[f:globalOptionsHandler]] is the handler for all global options (apart from the
-help and version flags which we add into ~mainOptions~ in [[f:lilac-main]]).
-
-#+name: f:globalOptionsHandler
-#+begin_src haskell
-globalOptionsHandler :: OptionHandler GlobalOpts
-globalOptionsHandler =
-  GlobalOpts
-    <$> subcommandHandler
-    <*> ( flag
-            True
-            False
-            ( long "no-color"
-                <> help
-                  """
-                  Do not print in color (i.e., suppress ANSI escape codes).
-                  """
-            )
-        )
-    <*> ( flag
-            False
-            True
-            ( long "verbose"
-                <> help
-                  """
-                  Be more descriptive about what's happening.
-                  """
-            )
-        )
-#+end_src
-
-The global options in [[f:globalOptionsHandler]] can be provided anywhere on the
-command line (unlike subcommand options which must come /after/ the subcommand).
-
-#+name: f:subcommandHandler
-#+begin_src haskell
-subcommandHandler :: OptionHandler Subcommand
-subcommandHandler =
-  hsubparser
-    $ metavar "SUBCOMMAND"
-    <> cmdArchive
-    <> cmdCompile
-    <> cmdTangle
-    <> cmdWeave
-  where
-    cmdArchive =
-      command
-        "archive"
-        $ info
-          (Archive <$> archiveOptsHandler)
-          (progDesc "Combine objects into a single archive.")
-    cmdCompile =
-      command
-        "compile"
-        $ info
-          (Compile <$> compileOptsHandler)
-          (progDesc "Compile Org files into objects.")
-    cmdTangle =
-      command
-        "tangle"
-        $ info
-          (Tangle <$> tangleOptsHandler)
-          (progDesc "Extract source code from archives.")
-    cmdWeave =
-      command
-        "weave"
-        $ info
-          (Weave <$> weaveOptsHandler)
-          (progDesc "Generate HTML documentation from archives.")
-#+end_src
-
-The [[f:subcommandHandler]] is where we specify each of the different behaviors
-(subcommands) of =lilac=.
-
-Notice that the option handling boilerplate does not describe error handling
-(what to do when a required option is missing, etc), because all of that is
-given to us for free by =Options.Applicative=.
 
 * Git version injection
 :PROPERTIES:
@@ -979,21 +1031,21 @@ boldWhite =
 :ID:       85a464eb-e220-40d7-ae49-5edc349ee6b4
 :END:
 
+These utility functions are used by multiple modules, not just the CLI. But we
+place them here because they deal with IO.
+
 #+name: module:Lilac.Util
 #+header: :tangle src/Lilac/Util.hs
 #+begin_src haskell
 module Lilac.Util
-  ( mkFqcn,
-    readFrom,
+  ( readFrom,
     readFileRobustly,
     writeFileRobustly,
   )
 where
 
 import Control.Exception (catch)
-import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
-import Lilac.Types (OID)
 import Relude
   ( Bool (True),
     FilePath,
@@ -1017,12 +1069,9 @@ import System.OsPath qualified as P
 <<f:readFrom>>
 <<f:readFileRobustly>>
 <<f:writeFileRobustly>>
-<<f:mkFqcn>>
 #+end_src
 
-[[f:readFrom]] reads a path from the given prefix, and returns a =Text=. We'll
-be using this a lot because most of the tests here are based on parsing some
-input file path.
+[[f:readFrom]] reads a path from the given prefix, and returns a =Text=.
 
 #+name: f:readFrom
 #+begin_src haskell
@@ -1033,7 +1082,8 @@ readFrom prefix path = do
 #+end_src
 
 The functions [[f:readFileRobustly]] and [[f:writeFileRobustly]] are able to handle
-errors. This helps us to avoid crashing the program in an embarrassing fashion.
+errors. This helps us to avoid crashing the program if a path doesn't exist, for
+example.
 
 #+name: f:readFileRobustly
 #+begin_src haskell
@@ -1063,29 +1113,3 @@ writeFileRobustly path contentToWrite = do
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
 #+end_src
-
-The [[f:mkFqcn]] function fully qualifies the name of a cell with the given OID and
-cell name, which will typically be the parent heading's ID, or the top-level ID for the Org document that
-contains the cell:
-
-  - Parent heading's ID: This is involved when calling ~org-store-link~, because
-    it saves the ID of the parent heading (creating one if one does not exist
-    yet for the heading), which we can insert with ~org-insert-last-stored-link~.
-    Using these native Org functions result in their proliferation.
-
-  - Top-level ID: This acts as a fallback in case there are no headings (such
-    Org documents can exist).
-
-#+name: f:mkFqcn
-#+begin_src haskell
-mkFqcn :: OID -> Text -> Text
-mkFqcn oid name = "id:" <> T.pack (show oid) <> "::" <> name
-#+end_src
-
-* Glossary
-
-#+print_glossary: local
-
-* Bibliography
-
-#+print_bibliography:

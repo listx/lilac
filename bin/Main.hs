@@ -127,10 +127,10 @@ data GlobalOpts = GlobalOpts
 
 type Subcommand :: Type
 data Subcommand
-  = Tangle TangleOpts
-  | Weave WeaveOpts
-  | Compile CompileOpts
+  = Compile CompileOpts
   | Archive ArchiveOpts
+  | Tangle TangleOpts
+  | Weave WeaveOpts
 
 type TangleOpts :: Type
 data TangleOpts = TangleOpts
@@ -188,25 +188,25 @@ globalOptionsHandler =
 
 subcommandHandler :: OptionHandler Subcommand
 subcommandHandler =
-  hsubparser
+  hsubparser --
     $ metavar "SUBCOMMAND"
-    <> cmdArchive
     <> cmdCompile
+    <> cmdArchive
     <> cmdTangle
     <> cmdWeave
   where
-    cmdArchive =
-      command
-        "archive"
-        $ info
-          (Archive <$> archiveOptsHandler)
-          (progDesc "Combine objects into a single archive.")
     cmdCompile =
       command
         "compile"
         $ info
           (Compile <$> compileOptsHandler)
           (progDesc "Compile Org files into objects.")
+    cmdArchive =
+      command
+        "archive"
+        $ info
+          (Archive <$> archiveOptsHandler)
+          (progDesc "Combine objects into a single archive.")
     cmdTangle =
       command
         "tangle"
@@ -367,14 +367,14 @@ lilacCompile _globalOpts compileOpts = do
       input <- LU.readFileRobustly inputPath
       let parseResult =
             MP.runParser
-              (runStateT LP.orgDocParser defaultOrgParserState)
+              (runStateT LP.orgDocParser defaultOrgParserState) --
               (show inputPath)
               input
       case parseResult of
         Left errBundle -> do
           die $ MP.errorBundlePretty errBundle
         Right (orgDoc, _) -> do
-          obj <- LC.mkObject orgDoc
+          obj <- LC.mkObject orgDoc --
           pure (obj, inputPath)
     writeObjToPath :: (ToJSON a) => (a, OsPath) -> IO ()
     writeObjToPath (obj, inputPath) = do
@@ -391,7 +391,9 @@ lilacArchive archiveOpts = do
     Left errMsg -> die errMsg
     Right archive -> do
       outPath <- do
-        let base = P.replaceExtension archiveOpts.outFile $ P.unsafeEncodeUtf "larc"
+        let base =
+              P.replaceExtension archiveOpts.outFile
+                $ P.unsafeEncodeUtf "larc"
         P.decodeUtf base
       encodeFile outPath archive
   where

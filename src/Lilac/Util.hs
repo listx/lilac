@@ -1,15 +1,12 @@
 module Lilac.Util
-  ( mkFqcn,
-    readFrom,
+  ( readFrom,
     readFileRobustly,
     writeFileRobustly,
   )
 where
 
 import Control.Exception (catch)
-import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
-import Lilac.Types (OID)
 import Relude
   ( Bool (True),
     FilePath,
@@ -53,6 +50,3 @@ writeFileRobustly path contentToWrite = do
   where
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
-
-mkFqcn :: OID -> Text -> Text
-mkFqcn oid name = "id:" <> T.pack (show oid) <> "::" <> name
