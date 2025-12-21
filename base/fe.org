@@ -273,13 +273,17 @@ this, we have to write our own Ring handler.
 (ns lilac.handler
   (:require [ring.middleware.file :refer [wrap-file]]
             [ring.middleware.not-modified :refer [wrap-not-modified]]
-            [ring.middleware.content-type :refer [wrap-content-type]]))
+            [ring.middleware.content-type :refer [wrap-content-type]]
+            [clojure.string :as str]))
+
+<<middleware:wrap-autorefresh>>
 
 (def development-app
   (-> <<exp:404-fallback>>
-      (wrap-content-type)
-      (wrap-not-modified)
-      <<exp:serve-files-from-project-root>>))
+      <<exp:serve-files-from-project-root>>
+      (wrap-content-type) ; (ref:wrap-content-type)
+      (wrap-not-modified) ; (ref:wrap-not-modified)
+      (wrap-autorefresh)))
 #+end_src
 
 We start out with the fallback code, because this creates a default response if
@@ -297,6 +301,102 @@ root.
 #+begin_src clojure
 (wrap-file ".")
 #+end_src
+
+The ~wrap-content-type~ [[(wrap-content-type)]] adds the ~Content-Type~ header to the
+response, and ~wrap-not-modified~ [[(wrap-not-modified)]] sends a ~304 Not Modified~
+response if the browser's request is for the same file as what the browser
+already has.
+
+Now we come to [[middleware:wrap-autorefresh]], perhaps the most interesting
+middleware in our middleware stack. This middleware injects a special JavaScript
+function which runs every second, that fetches the contents of the server again
+and then replaces it, so that we end up refreshing the HTML content after every
+second. The nice thing is that this works without a browser refresh. Now we can
+edit our Org files and have [[id:77786b08-6211-47b8-940d-6aaefc17ec47::tangle-loop.sh][tangle-loop.sh]] running in the background to
+regenerate our HTML files on Org file changes, and then also have a browser
+window open to refresh the scrolled-to area.
+
+#+name: middleware:wrap-autorefresh
+#+begin_src clojure
+(defn wrap-autorefresh [handler]
+  (fn [request]
+    (let [response (handler request)]
+      (if (and (= 200 (:status response)) ; (ref:HTML-response)
+               (clojure.string/includes?
+                 (get-in response [:headers "Content-Type"] "") "text/html"))
+        (let [body-str (slurp (:body response))
+              script
+              "<script>
+                <<soft-refresh>>
+              </script>"]
+          (-> response
+              (assoc :body
+                     (clojure.string/replace body-str "</body>"
+                                             (str script "</body>")))
+              (update :headers dissoc "Content-Length")))
+        response))))
+#+end_src
+
+The check at [[(HTML-response)]] guards it so that we only perform this injection
+into the response body if we're dealing with an HTML page.
+
+#+name: soft-refresh
+#+begin_src js
+(function() {
+  const parser = new DOMParser();
+  let mainEl = null;
+  let resp = null;
+  let html = null;
+  let doc = null;
+  let currentScroll = 0;
+
+  let lastScrollTime = 0;
+  window.addEventListener('scroll', function(e) {
+    lastScrollTime = Date.now();
+  }, true);
+
+  async function softRefreshLoop() {
+    try {
+      if (Date.now() - lastScrollTime < 1500) { // (ref:cancel-if-recently-scrolled)
+        return;
+      }
+
+      mainEl = document.querySelector('main');
+      currentScroll = mainEl.scrollTop; // (ref:main-element-scroll-pos)
+
+      resp = await fetch(window.location.href);
+      html = await resp.text();
+      doc = parser.parseFromString(html, 'text/html');
+      document.body.innerHTML = doc.body.innerHTML;
+
+      mainEl = document.querySelector('main');
+      mainEl.scrollTop = currentScroll; // (ref:main-element-restore-scroll-pos)
+    } catch (e) {
+      console.error('Soft refresh failed', e);
+    } finally {
+      setTimeout(softRefreshLoop, 1000);
+    }
+  }
+
+  softRefreshLoop();
+})();
+#+end_src
+
+We save the scroll position of the main element at [[(main-element-scroll-pos)]],
+because that's what we use in the CSS grid layout for the main body (see [[id:ccad6989-83ec-405f-876f-9bfb5c6ae357][Main
+content]] and [[id:eda7626d-42fd-45d3-b0f8-940710413295][Page layout]]). After fetching the new body and doing the
+replacement, we restore the old scroll position at
+[[(main-element-restore-scroll-pos)]].
+
+If we have recently scrolled the window, we cancel the soft refresh at
+[[(cancel-if-recently-scrolled)]], because otherwise we'll get weird jerky movements
+when [[(main-element-restore-scroll-pos)]] resets the scroll position at the same
+time that the user is in the middle of scrolling the page themselves.
+
+*** Caveats
+
+Unfortunately, [[soft-refresh]] interferes with [[ns:lilac.lazy-scroll][ns:lilac.lazy-scroll]], probably
+because the latter is only invoked once on the first page load.
 
 * =lilac.core= module
 :PROPERTIES:
