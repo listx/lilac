@@ -304,19 +304,19 @@ data MathFragment = MathFragment
 
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
-  { oid :: OID,
-    cells :: [Cell],
-    pseudoEdges :: [PseudoEdge],
-    footnoteRefs :: Map Text (Int, Int),
-    glossary :: Map Text Int,
-    lineLabels :: Map Text Int,
-    cslPath :: Maybe FilePath,
-    bibPaths :: [FilePath],
-    citations :: [Citation],
-    meta :: Map Text Text
+  { oid :: OID, --
+    meta :: Map Text Text, --
+    cells :: [Cell], --
+    pseudoEdges :: [PseudoEdge], --
+    footnoteRefs :: Map Text (Int, Int), --
+    glossary :: Map Text Int, --
+    lineLabels :: Map Text Int, --
+    cslPath :: Maybe FilePath, --
+    bibPaths :: [FilePath], --
+    citations :: [Citation] --
   }
   deriving stock (Eq, Ord, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (FromJSON, ToJSON) --
 
 type OrgParserConf :: Type
 data OrgParserConf = OrgParserConf
@@ -334,44 +334,44 @@ defaultOrgParserConf =
 
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { docOid :: OID,
-    headingOidStack :: [Maybe OID],
-    headingLevel :: Int,
-    headingSectionNumber :: [Int],
-    insideHeading :: Bool,
-    styleMask :: StyleMask,
-    insideCodeBlock :: Bool,
-    insideLinkDisplayName :: Bool,
-    listLevels :: [Level],
-    listMarkers :: [ListMarker],
-    continuationIndent :: Int,
-    equationNumber :: Int,
-    anonEquationNumber :: Int,
-    cellNames :: Set Text,
-    cellNumber :: Int,
-    pseudoEdges :: [PseudoEdge],
-    lineLabelNumber :: Int,
-    lineLabels :: Map Text Int,
-    lineLabelReferences :: Set Text,
-    anonBlockNumber :: Int,
-    figureNumber :: Int,
-    tableNumber :: Int,
-    footnoteNumber :: Int,
-    footnoteRefs :: Map Text (Int, Int),
-    footnoteDefinitions :: Map Text Prose,
-    insideFootnoteDefinition :: Maybe Text,
-    prevCellIsFootnote :: Bool,
-    glossary :: Map Text Int,
-    glossaryTermOffset :: Int,
-    insideParagraph :: Bool,
-    tanglePaths :: Set Text,
-    cslPath :: Maybe FilePath,
-    bibPaths :: [FilePath],
-    insideCitation :: Bool,
-    bracketBalance :: Int,
-    insideCitePrefix :: Bool,
-    citations :: [Citation],
-    orgParserConf :: OrgParserConf
+  { docOid :: OID, --
+    headingOidStack :: [Maybe OID], --
+    headingLevel :: Int, --
+    headingSectionNumber :: [Int], --
+    insideHeading :: Bool, --
+    cellNames :: Set Text, --
+    cellNumber :: Int, --
+    pseudoEdges :: [PseudoEdge], --
+    tanglePaths :: Set Text, --
+    insideCodeBlock :: Bool, --
+    anonBlockNumber :: Int, --
+    lineLabelNumber :: Int, --
+    lineLabels :: Map Text Int, --
+    lineLabelReferences :: Set Text, --
+    styleMask :: StyleMask, --
+    insideLinkDisplayName :: Bool, --
+    insideParagraph :: Bool, --
+    listLevels :: [Level], --
+    listMarkers :: [ListMarker], --
+    continuationIndent :: Int, --
+    footnoteNumber :: Int, --
+    footnoteRefs :: Map Text (Int, Int), --
+    footnoteDefinitions :: Map Text Prose, --
+    insideFootnoteDefinition :: Maybe Text, --
+    prevCellIsFootnote :: Bool, --
+    glossary :: Map Text Int, --
+    glossaryTermOffset :: Int, --
+    cslPath :: Maybe FilePath, --
+    bibPaths :: [FilePath], --
+    insideCitation :: Bool, --
+    insideCitePrefix :: Bool, --
+    bracketBalance :: Int, --
+    citations :: [Citation], --
+    equationNumber :: Int, --
+    anonEquationNumber :: Int, --
+    figureNumber :: Int, --
+    tableNumber :: Int, --
+    orgParserConf :: OrgParserConf --
   }
   deriving stock (Eq, Show)
 
@@ -383,23 +383,21 @@ defaultOrgParserState =
       headingLevel = 0,
       headingSectionNumber = [],
       insideHeading = False,
-      styleMask = styleMaskFrom [],
-      insideCodeBlock = False,
-      insideLinkDisplayName = False,
-      listLevels = [],
-      listMarkers = [],
-      continuationIndent = 0,
-      equationNumber = 0,
-      anonEquationNumber = 0,
       cellNames = Set.empty,
       cellNumber = 0,
       pseudoEdges = [],
+      tanglePaths = Set.empty,
+      insideCodeBlock = False,
+      anonBlockNumber = 0,
       lineLabelNumber = 0,
       lineLabels = M.empty,
       lineLabelReferences = Set.empty,
-      anonBlockNumber = 0,
-      figureNumber = 0,
-      tableNumber = 0,
+      styleMask = styleMaskFrom [],
+      insideLinkDisplayName = False,
+      insideParagraph = False,
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
       footnoteNumber = 0,
       footnoteRefs = M.empty,
       footnoteDefinitions = M.empty,
@@ -407,14 +405,16 @@ defaultOrgParserState =
       prevCellIsFootnote = False,
       glossary = M.empty,
       glossaryTermOffset = 0,
-      insideParagraph = False,
-      tanglePaths = Set.empty,
       cslPath = Nothing,
       bibPaths = [],
       insideCitation = False,
-      bracketBalance = 0,
       insideCitePrefix = False,
+      bracketBalance = 0,
       citations = [],
+      equationNumber = 0,
+      anonEquationNumber = 0,
+      figureNumber = 0,
+      tableNumber = 0,
       orgParserConf = defaultOrgParserConf
     }
 

@@ -1167,7 +1167,7 @@ reset_everything()
 
 [[f:tangle-loop:reset_everything]] calls ~reset_tangled_program_files()~ and also
 ~clean_build_files()~, which cleans up incremental build artifacts like ~*.lobj~ and
-~*.larc~ files. This is needed if we make a change to the structure of [[id:e16dd5c7-0a63-4c52-afe9-744fdf853643::data:OrgDoc][data:OrgDoc]]
+~*.larc~ files. This is needed if we make a change to the structure of [[id:5df15f17-c630-4ddf-bade-66084c430a07::data:OrgDoc][data:OrgDoc]]
 or anything else that's serialized out to a file and read back in. For example,
 if we rename a field to a new name, then any existing build artifact with the
 old name will become invalid and fail to parse; in this case the best thing to

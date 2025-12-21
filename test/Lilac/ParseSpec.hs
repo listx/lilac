@@ -287,7 +287,10 @@ parseSpec = do
 
   shouldFailWithError
     "0002-doc-metadata-missing-value"
-    (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
+    ( utoks ":\n"
+        <> elabel "(doc meta) separator"
+        <> elabel "(doc meta) keyword letter"
+    )
     7
 
   shouldParseWith
@@ -342,13 +345,25 @@ parseSpec = do
       { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f
       }
 
-  before (LU.readFrom "test/Lilac/ParseSpec/" "0002-doc-metadata-properties-drawer-clash") $ do
-    it "0002-doc-metadata-properties-drawer-clash" $ \input -> do
-      MP.runParser
-        (runStateT L.orgDocParser defaultOrgParserState)
+  before
+    ( LU.readFrom
+        "test/Lilac/ParseSpec/"
         "0002-doc-metadata-properties-drawer-clash"
-        input
-        `shouldFailWith` (errFancy 181 . fancy $ MP.ErrorFail "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: [\"foo\"]")
+    )
+    $ do
+      it "0002-doc-metadata-properties-drawer-clash" $ \input -> do
+        MP.runParser
+          (runStateT L.orgDocParser defaultOrgParserState)
+          "0002-doc-metadata-properties-drawer-clash"
+          input
+          `shouldFailWith` ( errFancy 181
+                               . fancy
+                               $ MP.ErrorFail
+                                 ( "conflicting keys in the top-level PROPERTIES"
+                                     <> " drawer and document metadata"
+                                     <> " key/values: [\"foo\"]"
+                                 )
+                           )
 
   shouldFailWithMessage
     "0004-headings"

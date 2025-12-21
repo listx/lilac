@@ -2,18 +2,18 @@
 :ID:       442c807f-c9d9-45a7-88bf-d38cbbca09cf
 :END:
 #+title: Parse
+#+lilac_maxListLevel: 4
 
 * Overview
 :PROPERTIES:
 :ID:       e16dd5c7-0a63-4c52-afe9-744fdf853643
 :END:
 
------------------------------- PROOFREAD BELOW ---------------------------------
-
 We use [[https://github.com/mrkkrp/megaparsec][Megaparsec]] to parse an Org document. The parsing requires us to read in
 everything in a single Org file.
 
-We use a *list of /cells/* [fn:cell] for parsing, where each cell can be a
+We use a *list of /cells/* [fn:cell] [[(field-cells)]] for parsing, where each cell
+can be a
 
   - [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][heading]] (aka [[https://orgmode.org/manual/Headlines.html][headlines]]),
 
@@ -33,75 +33,79 @@ We use a *list of /cells/* [fn:cell] for parsing, where each cell can be a
 
   - [[id:a54a7762-a861-42b1-b2c8-2b760281052c][citation]].
 
-This scheme is good for quickly making sense of the overall document structure
-in linear fashion, start to finish. It also simplifies the parsing data
-structure --- we just parse one cell after the other. Though using a tree data
-structure for the headings could be useful for situations where tree-based
+This list-of-cells scheme is good for quickly making sense of the overall
+document structure in linear fashion, start to finish. It also simplifies the
+data structure --- we just parse one cell after the other. Though using a tree
+data structure for the headings could be useful for situations where tree-based
 manipulations are desirable, we will never need to do such manipulations for
 purposes of weaving the Org input into HTML (or any other format). Hence our
 preference for arranging the cells as a list instead of a tree.
 
-In summary an Org document is made up of cells, as well as some
-metadata (the title, author name, etc). The doc also has an OID, which
-allows other Org files to refer to this Org file.
+In summary an Org document is made up of cells, as well as some metadata
+[[(field-meta)]] (such as the title, author name, etc). The doc also has an OID
+[[(field-oid)]], which allows other Org files to refer to it (even if the Org file
+does not have any headings, which are the only other things that can have OIDs).
+
+** ~OrgDoc~ data structure
+:PROPERTIES:
+:ID:       5df15f17-c630-4ddf-bade-66084c430a07
+:END:
+
+The ~OrgDoc~ is important because it's what we end up with after we're done
+parsing a raw Org file.
 
 #+name: data:OrgDoc
 #+begin_src haskell
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
-  { oid :: OID,
-    cells :: [Cell],
-    pseudoEdges :: [PseudoEdge],
-    footnoteRefs :: Map Text (Int, Int),
-    glossary :: Map Text Int,
-    lineLabels :: Map Text Int,
-    cslPath :: Maybe FilePath,
-    bibPaths :: [FilePath],
-    citations :: [Citation],
-    meta :: Map Text Text
+  { oid :: OID, -- (ref:field-oid)
+    meta :: Map Text Text, -- (ref:field-meta)
+    cells :: [Cell], -- (ref:field-cells)
+    pseudoEdges :: [PseudoEdge], -- (ref:field-pseudoEdges)
+    footnoteRefs :: Map Text (Int, Int), -- (ref:field-footnoteRefs)
+    glossary :: Map Text Int, -- (ref:field-glossary)
+    lineLabels :: Map Text Int, -- (ref:field-lineLabels)
+    cslPath :: Maybe FilePath, -- (ref:field-cslPath)
+    bibPaths :: [FilePath], -- (ref:field-bibPaths)
+    citations :: [Citation] -- (ref:field-citations)
   }
   deriving stock (Eq, Ord, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (FromJSON, ToJSON) -- (ref:deriving-anyclass)
 #+end_src
 
-Footnotes get their own separate data structure called ~footnoteRefs~ (on top
-of the footnote cells in ~cells~), because we have to remember the order of when
-these footnotes are referenced from other cells (anywhere we could have prose,
-such as paragraphs, headings, etc). This ordering is needed to determine which
-number to display as a superscript when creating the link to the footnote
-definition. This same ordering information is used in [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] which
-rearranges the footnote definitions so that they are woven in the order they are
-referenced, not the order in which they are defined (parsed). This is unlike
-every other cell where the order of writing them (cell-by-cell) is preserved
-during weaving.
+As stated earlier, we use a list of cells [[(field-cells)]] to represent most of the
+document content. The ~oid~ [[(field-oid)]] is a unique identifier for the document.
+Every Org file we parse is required to have a
 
-For the ~glossary~, see [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Description lists, aka glossary terms]]. We save all
-glossary terms we find for this document, so that we can print them out later,
-much like citations.
+#+begin_src txt
+:PROPERTIES:
+:ID:       xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+:END:
+#+end_src
 
-The ~pseudoEdges~ are edges that are ultimately used to create a graph
-representation of links between cells. In that representation, we want to use
-global cell index numbers to represent the universe of all cells in a
-[[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]. However, inside the parser for a single Org document, we don't
-have access to this global cell index number, as that is computed separately in
-[[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:mkArchive][f:mkArchive]]. Also, we don't know the target cell's number either, and the best
-information we have is just a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]. Because of these issues, we call the
-edges here "pseudo" edges. To represent these edges, we use a ~newtype~.
+at the beginning of the document to uniquely identify it. It is parsed into an
+~OID~ type, which just wraps around a UUID. This way we can be agnostic about the
+concrete details of a UUID in the rest of the program.
 
-#+name: newtype:PseudoEdge
+#+name: newtype:OID
 #+begin_src haskell
-type PseudoEdge :: Type
-newtype PseudoEdge = PseudoEdge (Int, LinkOid)
-  deriving stock (Eq, Ord, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
+type OID :: Type
+newtype OID = OID UUID
+  deriving stock (Eq, Ord, Generic)
+  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
 #+end_src
 
-The [[newtype:PseudoEdge]] represents a link between a local cell index and a target
-cell via the [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]].
+There are some helpers in [[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62][Org ID (OID)]] for this type, which plays a big role in
+Lilac because OIDs are also used for headings; OIDs for documents and headings
+form the building block of Org links between them.
 
-The ~deriving anyclass (ToJSON)~ is needed to create the default implementation for
-JSON conversion automatically for us. It is the equivalent of writing a default
-instance like
+The ~meta~ field [[(field-meta)]] captures all document metadata, in a simple
+key/value map. One example is ~#+title: ...~ used to specify the human-friendly
+title of the document.
+
+The ~deriving anyclass (ToJSON)~ [[(deriving-anyclass)]] is needed to create the
+default implementation for JSON conversion automatically for us. It is the
+equivalent of writing a default instance like
 
 #+begin_src haskell
 instance ToJSON OrgDoc
@@ -116,42 +120,125 @@ to use ~deriving stock (Eq, Generic, Show, ToJSON)~ we get an error like
 #+end_quote
 
 which is why we use the ~deriving anyclass~ variant. All child types also require
-the same ~deriving anyclass (ToJSON)~ declaration for this to work. At the end of it
-though, we can use the ~encode~ and ~encodeFile~ functions from =Data.Aeson=.
+the same ~deriving anyclass (ToJSON)~ declaration for this to work. At the end of
+it though, we can use the ~encode~ and ~encodeFile~ functions from ~Data.Aeson~.
 
-#+name: newtype:OID
+** Auxiliary data structures
+
+We also need several other auxiliary data structures to encode various bits of
+information beyond just what the cells have in them. Basically all of these
+auxiliary bits encode information about relationships /between/ certain cells.
+
+*** ~pseudoEdges~
+:PROPERTIES:
+:ID:       3dcdfd21-5e2e-45bf-90bd-3a6a919724c5
+:END:
+
+The ~pseudoEdges~ [[(field-pseudoEdges)]] are edges that are ultimately used to create
+a graph representation of links between cells (and ultimately they are finalized
+in [[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:finalizeEdges][f:finalizeEdges]] and used to generate backlinks at [[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:mkBacklinks][f:mkBacklinks]]). In that
+final representation, we want to use global cell index numbers to represent the
+universe of all cells in a [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]. However, inside the parser for a single
+Org document, we don't have access to this global cell index number, as that is
+computed separately in [[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:mkArchive][f:mkArchive]] (in other words, this computation depends on
+what other Org files (as objects) are included in the archive). Also, we don't
+know the target cell's number either, and the best information we have is just a
+[[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]. Because of these issues, we call the edges here "pseudo" edges. To
+represent these edges, we use a ~newtype~.
+
+#+name: newtype:PseudoEdge
 #+begin_src haskell
-type OID :: Type
-newtype OID = OID UUID
-  deriving stock (Eq, Ord, Generic)
-  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
+type PseudoEdge :: Type
+newtype PseudoEdge = PseudoEdge (Int, LinkOid)
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-The OID wraps around a UUID. This way we can be agnostic about the concrete
-details of a UUID in the rest of the program. There are some helpers in [[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62][Org ID
-(OID)]] for this type, which plays a big role in Lilac because it is the building
-block of Org links to headings and other (external) Org documents.
+The [[newtype:PseudoEdge]] represents a link between a local cell index and a target
+cell via the [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]. Both of these values are immediately available to us,
+so that's why we use them for the pseudo edge representation (there's no need to
+compute these values lazily after the fact when there is more information
+available).
 
-The top-level parsing function is =parseOrgDoc=, which takes some raw text input
-and parses it into a rich =OrgDoc= type.
+*** ~footnoteRefs~
+
+Footnotes get their own separate data structure called ~footnoteRefs~
+[[(field-footnoteRefs)]], because we have to remember the order of when these
+footnotes are referenced from other cells (anywhere we could have prose, such as
+paragraphs, headings, etc). This ordering is needed to determine which number to
+display as a superscript when creating the link to the footnote definition. This
+same ordering information is used in [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] which rearranges the footnote
+definitions so that they are woven in the order they are referenced, not the
+order in which they are defined (parsed). This is unlike every other cell where
+the order of parsing them (cell-by-cell) is preserved during weaving.
+
+*** ~glossary~
+
+For the ~glossary~ [[(field-glossary)]], see [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Description lists, aka glossary terms]]. We
+save all glossary terms we find for this document, so that we can print them out
+later, much like citations.
+
+*** ~lineLabels~
+
+The ~lineLabels~ [[(field-lineLabels)]] are for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]] (named positions /inside/ a
+code block, which you can link to from the prose text). We reset the numbering
+of these back to 1 every time we see a new code block, so we keep track of the
+assigned numbers here with a map.
+
+*** Citations
+:PROPERTIES:
+:ID:       a72a7d6a-a127-4233-b67a-3800961ef766
+:END:
+
+The ~cslPath~ [[(field-cslPath)]] is the path to the citation style file we want to
+use for generating citations (for all of the citations used in the ~OrgDoc~).
+
+The ~bibPaths~ [[(field-bibPaths)]] is the list of files that each have a list of
+bibliographical works that we want to cite. This is a list of files, and not
+just a single list, because we want to allow users to be able to use multiple
+files in case they want to reference a work already captured in a separate file
+somewhere else (essentially amounting to file reuse).
+
+Finally the ~citations~ [[(field-citations)]] are the stylized citations used by the
+~OrgDoc~. See [[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]] for details.
+
+** Top-level parser ~parseOrgDoc~
+
+The top-level parsing function is [[f:parseOrgDoc]], which takes some raw text input
+and parses it into an ~OrgDoc~ ([[id:5df15f17-c630-4ddf-bade-66084c430a07::data:OrgDoc][data:OrgDoc]]), using the [[f:orgDocParser]] as the main
+workhorse [[(main-combinator-orgDocParser)]].
 
 #+name: f:parseOrgDoc
 #+begin_src haskell
 parseOrgDoc :: Text -> Either Text OrgDoc
 parseOrgDoc input = case MP.runParser
-  (runStateT orgDocParser defaultOrgParserState)
+  (runStateT orgDocParser defaultOrgParserState) -- (ref:main-combinator-orgDocParser)
   ""
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
   Right (orgDoc, _orgParserState) -> Right orgDoc
 #+end_src
 
-The [[f:orgDocParser]] is the main parser combinator; it is itself composed of other
-parser combinators. All of these parsers live inside the =OrgParser= monadic type,
-which is defined as a state monad transformer (=StateT=) with =OrgParserState=,
-which wraps around the inner =Parsec Void Text= monad, where =Void= is the custom
-error component and =Text= is the type of the text being parsed. Using =Void= for
-the custom error component means that we'll be defaulting to the default error
+The [[f:orgDocParser]] is itself composed of other parser combinators. The
+hierarchy of the main parsers look like this:
+
+  - [[f:parseOrgDoc]]
+
+    - [[f:orgDocParser]]
+
+      - [[f:cellParser]]
+
+        - [[f:headingParser]]
+
+        - [[f:paragraphParser]]
+
+        - ... /etc/
+
+All of these parsers live inside the [[type:OrgParser]] monadic type, which is
+defined as a state monad transformer (~StateT~) with [[data:OrgParserState]], which
+wraps around the inner ~Parsec Void Text~ monad, where ~Void~ is the custom error
+component and ~Text~ is the type of the text being parsed. Using ~Void~ for the
+custom error component means that we'll be defaulting to the default error
 handling mechanism that ships with Megaparsec.
 
 #+name: type:OrgParser
@@ -169,67 +256,62 @@ use concrete types like this for speed optimizations.
 MP.ParsecT Void Text Identity
 #+end_src
 
-The =OrgParserState= is the custom state we want to use while parsing. You can
-think of it as a mutable variable we keep modifying as we make progress during
-parsing.
+** ~OrgParserState~
+:PROPERTIES:
+:ID:       6cf4d5a5-ec4a-426e-8549-0a899ad77729
+:END:
 
-The ~headingLevel~ is the last-seen heading level we parsed. See
-[[t:0004-headings-cannot-skip-level]] for how we use it.
-
-The ~headingSectionNumber~ is the last-generated heading section number. This is what we
-use to assign each heading its section number.
-
-The =styleMask= is discussed in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][the section on parsing styled strings]].
-The =listLevels= and =listMarkers= are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]]. The
-=continuationIndent= is used to keep track of how much indentation to expect
-inside a single (contiguous) piece of content; see [[f:paragraphParser]] and
-[[f:listHeadIndentLevelParser]] for a usage example.
+The [[data:OrgParserState]] is the custom state we want to use while parsing. It's a
+mutable variable which we keep updating as we make progress during parsing.
 
 #+name: data:OrgParserState
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { docOid :: OID,
-    headingOidStack :: [Maybe OID],
-    headingLevel :: Int,
-    headingSectionNumber :: [Int],
-    insideHeading :: Bool,
-    styleMask :: StyleMask,
-    insideCodeBlock :: Bool,
-    insideLinkDisplayName :: Bool,
-    listLevels :: [Level],
-    listMarkers :: [ListMarker],
-    continuationIndent :: Int,
-    equationNumber :: Int,
-    anonEquationNumber :: Int,
-    cellNames :: Set Text,
-    cellNumber :: Int,
-    pseudoEdges :: [PseudoEdge],
-    lineLabelNumber :: Int,
-    lineLabels :: Map Text Int,
-    lineLabelReferences :: Set Text,
-    anonBlockNumber :: Int,
-    figureNumber :: Int,
-    tableNumber :: Int,
-    footnoteNumber :: Int,
-    footnoteRefs :: Map Text (Int, Int),
-    footnoteDefinitions :: Map Text Prose,
-    insideFootnoteDefinition :: Maybe Text,
-    prevCellIsFootnote :: Bool,
-    glossary :: Map Text Int,
-    glossaryTermOffset :: Int,
-    insideParagraph :: Bool,
-    tanglePaths :: Set Text,
-    cslPath :: Maybe FilePath,
-    bibPaths :: [FilePath],
-    insideCitation :: Bool,
-    bracketBalance :: Int,
-    insideCitePrefix :: Bool,
-    citations :: [Citation],
-    orgParserConf :: OrgParserConf
+  { docOid :: OID, -- (ref:field-ops-docOid)
+    headingOidStack :: [Maybe OID], -- (ref:field-ops-headingOidStack)
+    headingLevel :: Int, -- (ref:field-ops-headingLevel)
+    headingSectionNumber :: [Int], -- (ref:field-ops-headingSectionNumber)
+    insideHeading :: Bool, -- (ref:field-ops-insideHeading)
+    cellNames :: Set Text, -- (ref:field-ops-cellNames)
+    cellNumber :: Int, -- (ref:field-ops-cellNumber)
+    pseudoEdges :: [PseudoEdge], -- (ref:field-ops-pseudoEdges)
+    tanglePaths :: Set Text, -- (ref:field-ops-tanglePaths)
+    insideCodeBlock :: Bool, -- (ref:field-ops-insideCodeBlock)
+    anonBlockNumber :: Int, -- (ref:field-ops-anonBlockNumber)
+    lineLabelNumber :: Int, -- (ref:field-ops-lineLabelNumber)
+    lineLabels :: Map Text Int, -- (ref:field-ops-lineLabels)
+    lineLabelReferences :: Set Text, -- (ref:field-ops-lineLabelReferences)
+    styleMask :: StyleMask, -- (ref:field-ops-styleMask)
+    insideLinkDisplayName :: Bool, -- (ref:field-ops-insideLinkDisplayName)
+    insideParagraph :: Bool, -- (ref:field-ops-insideParagraph)
+    listLevels :: [Level], -- (ref:field-ops-listLevels)
+    listMarkers :: [ListMarker], -- (ref:field-ops-listMarkers)
+    continuationIndent :: Int, -- (ref:field-ops-continuationIndent)
+    footnoteNumber :: Int, -- (ref:field-ops-footnoteNumber)
+    footnoteRefs :: Map Text (Int, Int), -- (ref:field-ops-footnoteRefs)
+    footnoteDefinitions :: Map Text Prose, -- (ref:field-ops-footnoteDefinitions)
+    insideFootnoteDefinition :: Maybe Text, -- (ref:field-ops-insideFootnoteDefinition)
+    prevCellIsFootnote :: Bool, -- (ref:field-ops-prevCellIsFootnote)
+    glossary :: Map Text Int, -- (ref:field-ops-glossary)
+    glossaryTermOffset :: Int, -- (ref:field-ops-glossaryTermOffset)
+    cslPath :: Maybe FilePath, -- (ref:field-ops-cslPath)
+    bibPaths :: [FilePath], -- (ref:field-ops-bibPaths)
+    insideCitation :: Bool, -- (ref:field-ops-insideCitation)
+    insideCitePrefix :: Bool, -- (ref:field-ops-insideCitePrefix)
+    bracketBalance :: Int, -- (ref:field-ops-bracketBalance)
+    citations :: [Citation], -- (ref:field-ops-citations)
+    equationNumber :: Int, -- (ref:field-ops-equationNumber)
+    anonEquationNumber :: Int, -- (ref:field-ops-anonEquationNumber)
+    figureNumber :: Int, -- (ref:field-ops-figureNumber)
+    tableNumber :: Int, -- (ref:field-ops-tableNumber)
+    orgParserConf :: OrgParserConf -- (ref:field-ops-orgParserConf)
   }
   deriving stock (Eq, Show)
 #+end_src
+
+Running the ~orgDocParser~ [[(main-combinator-orgDocParser)]] requires a default set
+of values for the ~OrgParserState~, which we provide with [[f:defaultOrgParserState]].
 
 #+name: f:defaultOrgParserState
 #+begin_src haskell
@@ -241,23 +323,21 @@ defaultOrgParserState =
       headingLevel = 0,
       headingSectionNumber = [],
       insideHeading = False,
-      styleMask = styleMaskFrom [],
-      insideCodeBlock = False,
-      insideLinkDisplayName = False,
-      listLevels = [],
-      listMarkers = [],
-      continuationIndent = 0,
-      equationNumber = 0,
-      anonEquationNumber = 0,
       cellNames = Set.empty,
       cellNumber = 0,
       pseudoEdges = [],
+      tanglePaths = Set.empty,
+      insideCodeBlock = False,
+      anonBlockNumber = 0,
       lineLabelNumber = 0,
       lineLabels = M.empty,
       lineLabelReferences = Set.empty,
-      anonBlockNumber = 0,
-      figureNumber = 0,
-      tableNumber = 0,
+      styleMask = styleMaskFrom [],
+      insideLinkDisplayName = False,
+      insideParagraph = False,
+      listLevels = [],
+      listMarkers = [],
+      continuationIndent = 0,
       footnoteNumber = 0,
       footnoteRefs = M.empty,
       footnoteDefinitions = M.empty,
@@ -265,31 +345,175 @@ defaultOrgParserState =
       prevCellIsFootnote = False,
       glossary = M.empty,
       glossaryTermOffset = 0,
-      insideParagraph = False,
-      tanglePaths = Set.empty,
       cslPath = Nothing,
       bibPaths = [],
       insideCitation = False,
-      bracketBalance = 0,
       insideCitePrefix = False,
+      bracketBalance = 0,
       citations = [],
+      equationNumber = 0,
+      anonEquationNumber = 0,
+      figureNumber = 0,
+      tableNumber = 0,
       orgParserConf = defaultOrgParserConf
     }
 #+end_src
 
-The ~anonBlockNumber~ is used to give some unique name (in lieu of actual names)
-for anonymous blocks. This is needed for generating link anchors for it during
-weaving.
+Now let's examine all of the various fields of [[data:OrgParserState]].
+
+*** Fields for headings
+
+There are a couple things to keep track of for [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][Headings]].
+
+  1) Headings may or may not have their own OID. Typically, OIDs for headings
+     are only created when running ~org-store-link~ in Emacs, which will
+     automatically create one for us when we want to refer to a named cell (you
+     put your cursor over the cell and run ~org-store-link~). All named cells
+     within a heading use the closest OID when going up the heading hierarchy.
+
+  2) Headings also have a /section number/, starting with 1 and incrementing with
+     subsequent headings at the same level. Each level has its own counter,
+     separated with a dot. E.g., "1.2" and "2.13" are valid section numbers. We
+     need to keep track of these numbers (and know how to increment them, etc),
+     as we parse headings at different levels.
+
+The fields below mostly deal with one of these two concerns.
+
+The ~docOid~ [[(field-ops-docOid)]] is what becomes the ~oid~ [[(field-oid)]] of
+[[data:OrgDoc]]. If there are no headings, then this ~docOid~ is what is used as a
+unique prefix to identify named cells (any cell with a ~#+name: ...~, such as a
+code block) from other Org files.
+
+The ~headingOidStack~ [[(field-ops-headingOidStack)]] is a stack of OIDs, with the
+first one being the ~docOid~ and later ones being OIDs of headings encountered at
+deeper levels. This is used to keep track of the current OID to use for named
+cells; if we are at a deeply nested heading with its own OID, but then move out
+of it, we need to know which OID to use. Using ~headingOidStack~, we just pop off
+those ones we don't need any more and refer to the OID of the closest heading up
+the hierarchy (ending at the ~docOid~ if needed as a fallback).
+
+The ~headingLevel~ [[(field-ops-headingLevel)]] is the last-seen heading level we
+parsed. See [[t:0004-headings-cannot-skip-level]] for how we use it. This is used
+for determining how many levels to pop off the ~headingOidStack~ when we exit a
+nested level. It's also used to calculate the ~headingSectionNumber~.
+
+The ~headingSectionNumber~ [[(field-ops-headingSectionNumber)]] is the last-generated
+heading section number. This is what we use to assign each new heading its
+section number (by incrementing the correct part of it).
+
+The ~insideHeading~ [[(field-ops-insideHeading)]] boolean is used to keep track of
+whether we are currently parsing things from inside a heading or not. This is
+used, for example, to disable parsing of citations from inside headings; i.e.,
+citations are not recognized when they are placed inside headings (see
+[[f:proseParser]]).
+
+*** Fields for cells
+
+Cell names must be unique inside a single Org file, and this is tracked with
+~cellNames~ [[(field-ops-cellNames)]].
+
+All cells, even if they are not named, are sequentially numbered in ~cellNumber~
+[[(field-ops-cellNumber)]]. This is used to encode the starting vertex of each edge
+in ~pseudoEdges~ [[(field-ops-pseudoEdges)]] (see [[id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5][~pseudoEdges~]]).
+
+*** Fields for code blocks
+
+The ~tanglePaths~ [[(field-ops-tanglePaths)]] is used in [[f:assertUniqueTanglePath]] to
+check that no two blocks tangle to the same filesystem path.
+
+The ~insideCodeBlock~ boolean [[(field-ops-insideCodeBlock)]] tracks whether we're
+inside a code block; see [[f:compressedTextParser]] for how this is used.
+
+The ~anonBlockNumber~ [[(field-ops-anonBlockNumber)]] is used to keep track of all
+anonymous blocks. Anonymous blocks can link out to other named blocks, and for
+such links we have to refer back to the anonymous block. As these blocks are
+anonymous we have to give them an artificial name, which is the anonymous block
+number (a sequential counter). See [[f:blockParser]] for details.
+
+*** Fields for line labels
+
+The ~lineLabelNumber~ [[(field-ops-lineLabelNumber)]] is a sequential counter for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line
+labels]] which is reset at every code block.
+
+The ~lineLabels~ map [[(field-ops-lineLabels)]] associates the label with the label
+number, and this number is used to display the link in the text (source) as well as the code block (destination).
+
+The ~lineLabelReferences~ [[(field-ops-lineLabelReferences)]] is used to make sure
+that a line label discussed in the prose text (source) outside of a code block
+has a matching label in a code block (destination) somewhere else in the same
+Org document.
+
+*** Fields for prose text
+
+The ~styleMask~ [[(field-ops-styleMask)]] is discussed in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][the section on parsing
+styled strings]], which are one of the main building blocks of [[id:c8616126-215d-49be-8874-c2aca7d93a54][Prose]].
+
+The ~insideLinkDisplayName~ [[(field-ops-insideLinkDisplayName)]] and ~insideParagraph~
+[[(field-ops-insideParagraph)]] booleans are both used in [[f:textParser]].
+
+*** Fields for list items
+
+The ~listLevels~ [[(field-ops-listLevels)]] and ~listMarkers~ [[(field-ops-listMarkers)]]
+are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]].
+
+Indentation is very important for knowing which things belong under which list
+items, and the ~continuationIndent~ [[(field-ops-continuationIndent)]] is used to keep
+track of how much indentation to expect inside a single (contiguous) piece of
+content; see [[f:paragraphParser]] and [[f:listHeadIndentLevelParser]] for a usage
+example.
+
+*** Fields for footnotes
+
+[[id:4127feee-755d-430e-8fef-192e95143790][Footnotes]] are numbered (~footnoteNumber~ [[(field-ops-footnoteNumber)]]), and also
+have an association with cell numbers (~footnoteRefs~ [[(field-ops-footnoteRefs)]]).
+The footnote definitions are kept in a single map (~footnoteDefinitions~
+[[(field-ops-footnoteDefinitions)]]).
+
+Like other booleans that tweak the behavior of the parser, footnotes also need
+to do this via ~insideFootnoteDefinition~ [[(field-ops-insideFootnoteDefinition)]].
+
+Footnote definitions must be kept in a single group of contiguous cells, and
+this is checked with ~prevCellIsFootnote~ [[(field-ops-prevCellIsFootnote)]] (also see
+[[f:footnoteDefinitionParser]]).
+
+*** Fields for the glossary
+
+[[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Description lists, aka glossary terms]] are tracked with the ~glossary~
+[[(field-ops-glossary)]]. The ~glossaryTermOffset~ [[(field-ops-glossaryTermOffset)]] is
+used to improve error messages (see [[t:0015-glossary-duplicate-term]]).kj
+
+*** Fields for citations
+
+[[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]] require a number of fields. The ~cslPath~ [[(field-ops-cslPath)]],
+~bibPaths~ [[(field-ops-bibPaths)]], and ~citations~ [[(field-ops-citations)]] fields are the same in purpose as the ones discussed at [[id:a72a7d6a-a127-4233-b67a-3800961ef766][Citations]] up above.
+
+The ~insideCitation~ [[(field-ops-insideCitation)]], ~insideCitePrefix~
+[[(field-ops-insideCitePrefix)]], and ~bracketBalance~ [[(field-ops-bracketBalance)]]
+fields all deal with the lower level details of parsing these citations
+correctly (being strict about what we accept).
+
+*** Fields for miscellaneous sequential counters
+
+Mathematical equations, figures, and tables all need to get numbered. These are
+handled by ~equationNumber~ [[(field-ops-equationNumber)]], ~anonEquationNumber~
+[[(field-ops-anonEquationNumber)]], ~figureNumber~ [[(field-ops-figureNumber)]], and
+~tableNumber~ [[(field-ops-tableNumber)]].
+
+*** Fields for Lilac extensions
+
+[[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extensions]] can alter the behavior of the parser. These are encapsulated in
+the [[data:OrgParserConf]], which we capture in ~orgParserConf~
+[[(field-ops-orgParserConf)]].
 
 * =Lilac.Parse= module
 :PROPERTIES:
 :ID:       5ce50c9a-5413-48d9-8bba-e465a4eb527c
 :END:
 
-The parsing mechanism is in [[file:../src/Lilac/Parse.hs]], which we describe below.
-We discuss each parser and interleave some tests for the smaller parsers. If you
-are curious about the overall testing framework itself (where and how these
-interleaved tests are executed), take a look at the [[id:ebf0d269-79d3-408a-a6e7-baf720d73837][Testing framework]].
+The parsing mechanism is in the ~Lilac.Parse~ module. We discuss each parser and
+interleave some tests for the smaller parsers. If you are curious about the
+overall testing framework itself (where and how these interleaved tests are
+executed), take a look at the [[id:ebf0d269-79d3-408a-a6e7-baf720d73837][Testing framework]].
 
 #+name: module:Lilac.Parse
 #+header: :tangle src/Lilac/Parse.hs
@@ -751,108 +975,25 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:intraCellWhitespaceParser>>
 #+end_src
 
-* Whitespace and comments
+* ~orgDocParser~
 :PROPERTIES:
-:ID:       fbca0c4e-c568-4c12-b89c-7cf334b8d50f
+:ID:       0aa99372-14d1-4023-8db9-85b9078bc498
 :END:
 
-Before writing our first parsers, we have to consider the problem of whitespace
-and comments.
-
-Any syntax that is expected to be used by humans have some designation for
-whitespace to separate meaningful tokens from each other. One way to deal with
-(necessary) whitespace is to bake in whitespace parsers into each token we want
-to parse. This gets cumbersome so we want to instead be able to teach parsers to
-be able to skip over trailing whitespace. This way, these parsers will all know
-how to deal with whitespace in a uniform way. For example, this is what we do in
-[[f:cellParser]] where we wrap all of the major =Cell= parsers with a =lexeme=.
-
-A slightly separate problem is how to deal with comments. In a sense they are
-just like whitespace because they hold no meaningful information on their own.
-Luckily, =Text.Megaparsec.Char.Lexer= provides a =space= helper which can create a
-parser that skips over whitespace as well as comments. This is what we use below
-to define =skipNewlinesAndComments=. See [[https://markkarpov.com/tutorial/megaparsec.html#lexing][the Megaparsec tutorial]] for more
-information.
-
-#+name: f:skipNewlinesAndComments
-#+begin_src haskell
-skipNewlinesAndComments :: OrgParser ()
-skipNewlinesAndComments =
-  L.space
-    whiteSpaceParser
-    singleLineCommentParser
-    blockCommentParser
-  where
-    whiteSpaceParser :: OrgParser ()
-    whiteSpaceParser = do
-      _ <- MP.takeWhile1P (Just "newline") (== '\n')
-      orgParserState <- get
-      _ <-
-        MP.optional
-          . MP.label "indentation for next thing"
-          $ MP.count orgParserState.continuationIndent (char ' ')
-      pure ()
-    singleLineCommentParser :: OrgParser ()
-    singleLineCommentParser = L.skipLineComment "# "
-    blockCommentParser :: OrgParser ()
-    blockCommentParser = L.skipBlockComment "#+begin_comment\n" "#+end_comment\n"
-#+end_src
-
-The three arguments to =L.space= (where =L= stands for =Text.Megaparsec.Char.Lexer=)
-are the parsers for whitespace, single-line comments, and block comments.
-=L.space= will try to repeatedly apply the three given parsers; it only stops
-parsing when faced with input where all three parsers fail.
-
-We only parse newline characters in =whiteSpaceParser= above. We don't parse
-spaces. This is because we do not want to skip over any /indentation/ --- that is,
-space characters immediately following a newline. Such indentation could be an
-error (for example, for headings or paragraphs), or a necessary part of a cell
-(such as =CListItem= cells in [[f:listItemsEndParser]]), and so we leave that
-determination up to other parsers.
-
-It's important that we use =takeWhile1P= for =whiteSpaceParser= (where the =1= denotes
-that it requires at least 1 newline character) because otherwise if it is
-allowed to accept 0 newlines, it may loop forever upon seeing non-newline input.
-
-The ="# "= for =singleLineCommentParser= signifies that single-line comments start
-with a pound sign and a space. The =blockCommentParser= uses =L.skipBlockComment= to
-denote a region of text which is considered a commented area. We include
-explicit newlines in =blockCommentParser= because we want to ensure that block
-comment markers are always on their own line (e.g., ~#+end_comment~ is valid, but
-~#+end_comment foo~ is not).
-
-=Text.Megaparsec.Char.Lexer= also defines a =L.skipBlockCommentNested= helper, which
-is able to understand if the ending marker of a block (=#+end_comment\n= for us)
-should be ignored because it's nested and instead skip past it to find the true
-(non-nested) ending marker. That's a little too complicated (and it's probably
-not very commonly needed). So we use the non-nested =L.skipBlockComment= to keep
-the syntax simple.
-
-Lastly we have =lexeme=, which wraps around any other parser to make it consume
-trailing /newlines and comments/. This is used in [[f:cellParser]]. Note that it
-does not consume any trailing spaces, because space characters are important for
-detecting indentation and we wouldn't want to skip past them.
-
-#+name: f:lexeme
-#+begin_src haskell
-lexeme :: OrgParser a -> OrgParser a
-lexeme = L.lexeme skipNewlinesAndComments
-#+end_src
-
-The =orgDocParser= first needs to parse any metadata associated with the document,
-such as the document ID, title and author. It starts by skipping any leading
-whitespace/comments. We have to do this first because all of the other parsers
-we use will follow the pattern of parsing the thing we want, followed by
-skipping over as much trailing whitespace as possible. In other words, none of
-the parsers are able to deal with leading whitespace/comments, so we have to
-deal with it here separately.
+At a high level, the [[f:orgDocParser]] delegates most of the work to the
+[[f:cellParser]], which in turn delegates work again to the individual parsers that
+know how to parse different cells. We have to filter out cells that look like
+~CListItem []~ with ~meaningfulCell~ [[(drop-meaningless-cells)]] because they are a
+by-product of parsing [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]] (this can happen when [[f:listItemsEndParser]]
+detects maximum indentation that matches the most-deeply-nested item (in which
+case no list items end)).
 
 #+name: f:orgDocParser
 #+begin_src haskell
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
-  _ <- optional skipNewlinesAndComments
-  (docOid, cslPath, bibPaths, meta) <- docMetaParser
+  _ <- optional skipNewlinesAndComments -- (ref:first-newlines-comments-skip)
+  (docOid, cslPath, bibPaths, meta) <- docMetaParser -- (ref:doc-metadata-parsing)
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
@@ -874,9 +1015,14 @@ orgDocParser = do
         CTable {}
         CFootnote {}
         CCommand {} -> True
-  let meaningfulCells = filter meaningfulCell cells
+  let meaningfulCells = filter meaningfulCell cells -- (ref:drop-meaningless-cells)
   when (orgParserState.cellNumber /= length meaningfulCells)
-    $ fail ("mismatch: cellNumber: " <> show orgParserState.cellNumber <> " len meaningfulCells: " <> (show $ length meaningfulCells))
+    $ fail
+      ( "mismatch: cellNumber: "
+          <> show orgParserState.cellNumber
+          <> " len meaningfulCells: "
+          <> (show $ length meaningfulCells)
+      )
   pure
     $ OrgDoc
       { oid = docOid,
@@ -888,172 +1034,138 @@ orgDocParser = do
         cslPath = cslPath,
         bibPaths = bibPaths,
         citations = citations,
-        meta = deleteRedundantKeys meta ["cite_export"]
+        meta = deleteRedundantKeys meta ["cite_export"] -- (ref:deleteRedundantKeys)
       }
 #+end_src
 
-The =orgDocParser= delegates most of the work to the [[f:cellParser]], which in turn
-delegates work again to the individual parsers that know how to parse different
-cells. We have to filter out cells that look like =CListItem []= in ~meaningfulCell~
-because that can happen when [[f:listItemsEndParser]] detects maximum indentation
-that matches the most-deeply-nested item (in which case no list items end).
+We now look at some of the less obvious parts (other than [[f:cellParser]] for
+[[id:ed81c307-9172-4436-8672-583ea8ecb1f9][Cells]]) first:
 
-See [[f:docMetaParser]] to see how ~docMetaParser~ works.
+  - *Initial leading newlines and comments*. The [[f:orgDocParser]] first starts by
+    skipping any leading whitespace/comments [[(first-newlines-comments-skip)]]. We
+    have to do this first because all of the other parsers we use will follow
+    the pattern of parsing the thing we want, followed by skipping over as much
+    trailing whitespace (but not leading indentation) as possible. In other
+    words, none of the parsers are able to deal with leading
+    whitespace/comments, so we have to deal with it here separately as the very
+    first thing we check for.
 
-We call [[f:resetState]] to clear some state from [[data:OrgParserState]], because
-otherwise it gets too polluted during testing. Also, it's not like we're
-throwing away information because everything we need is still captured elsewhere
-(just check the fields that have the same name in both [[data:OrgParserState]] and
-[[data:OrgDoc]]).
+  - *Document metadata*. We need to parse any metadata associated with the
+    document [[(doc-metadata-parsing)]], such as the document ID, title and author.
+    See [[f:docMetaParser]] for details.
 
-#+name: f:resetState
+  - *Reconciliation of some data structures*. Once we've finished parsing the
+    entire document, we can then make assertions such as "all footnote
+    references must have a corresponding definition" or "all referenced line
+    labels must exist in code blocks". We call this process /reconciliation/ and
+    this is done for footnotes and line labels.
+
+  - *Resetting of some stateful fields*. Some of our unit tests check for the
+    state of the [[data:OrgParserState]] with the [[f:shouldParseWithState]] helper;
+    more on this at
+
+** Whitespace and comments
+:PROPERTIES:
+:ID:       fbca0c4e-c568-4c12-b89c-7cf334b8d50f
+:END:
+
+Before writing our first parsers, we have to consider the problem of whitespace
+and comments.
+
+Any syntax that is expected to be used by humans have some designation for
+whitespace to separate meaningful tokens from each other. One way to deal with
+(necessary) whitespace is to bake in whitespace parsers into each token we want
+to parse. This gets cumbersome so we want to instead be able to teach parsers to
+be able to skip over trailing whitespace. This way, these parsers will all know
+how to deal with whitespace in a uniform way. For example, this is what we do in
+[[f:cellParser]] where we wrap all of the major ~Cell~ parsers with a ~lexeme~.
+
+A slightly different problem is how to deal with comments. In a sense they are
+just like whitespace because they hold no meaningful information on their own.
+Luckily, ~Text.Megaparsec.Char.Lexer~ provides a ~space~ helper which can create a
+parser that skips over whitespace as well as comments. This is what we use below
+to define [[f:skipNewlinesAndComments]]. See [[https://markkarpov.com/tutorial/megaparsec.html#lexing][the Megaparsec tutorial]] for more
+information.
+
+#+name: f:skipNewlinesAndComments
 #+begin_src haskell
-resetState :: OrgParser ()
-resetState =
-  modify $ \s ->
-    s
-      { OrgParserState.bibPaths = [],
-        OrgParserState.citations = [],
-        OrgParserState.cslPath = Nothing,
-        OrgParserState.cellNumber = 0,
-        OrgParserState.pseudoEdges = []
-      }
-#+end_src
-
-In [[f:resetState]] we cannot simply refer to the field alone in the record update,
-like this
-
-#+begin_src haskell
-  modify (\s -> s {citations = []})
-#+end_src
-
-because it will result in an [[https://errors.haskell.org/messages/GHC-02256/]["Ambiguous record update" error]], because both
-[[data:OrgDoc]] and [[data:OrgParserState]] have a field named ~citations~. So we work
-around this by importing the latter through ~import Lilac.Types as OrgParserState~
-in [[module:Lilac.Parse]]. See [[https://discourse.haskell.org/t/what-are-you-supposed-to-do-about-wambiguous-fields/9545][this discussion from 2024]] for more information.
-
-In a similar vein to [[f:resetState]], [[f:deleteRedundantKeys]] removes certain entries
-from the given map data structure. In the case of [[f:orgDocParser]], it removes
-keys that won't be used because the information in those keys have already been
-parsed and saved elsewhere.
-
-#+name: f:deleteRedundantKeys
-#+begin_src haskell
-deleteRedundantKeys :: (Ord k) => Map k v -> [k] -> Map k v
-deleteRedundantKeys = foldl' (flip M.delete)
-#+end_src
-
-We should be able to parse empty input.
-
-#+name: t:empty-input
-#+begin_src haskell
-it "empty input" $ do
-  MP.runParser
-    (runStateT L.orgDocParser defaultOrgParserState)
-    "empty input"
-    nilOidOrgDoc
-    `shouldParse` (L.defaultOrgDoc nilOid [], defaultOrgParserState)
-#+end_src
-
-The =defaultOrgDoc= is just a default (mostly blank) ~OrgDoc~. It's useful for
-testing.
-
-#+name: f:defaultOrgDoc
-#+begin_src haskell
-defaultOrgDoc :: OID -> [(Text, Text)] -> OrgDoc
-defaultOrgDoc oid metas =
-  OrgDoc
-    { oid = oid,
-      cells = [],
-      pseudoEdges = [],
-      footnoteRefs = M.empty,
-      glossary = M.empty,
-      lineLabels = M.empty,
-      cslPath = Nothing,
-      bibPaths = [],
-      citations = [],
-      meta = fromList metas'
-    }
+skipNewlinesAndComments :: OrgParser ()
+skipNewlinesAndComments =
+  L.space whiteSpaceParser singleLineCommentParser blockCommentParser -- (ref:L.space-arguments)
   where
-    metas' =
-      if oid == nilOid
-        then ("ID", "00000000-0000-0000-0000-000000000000") : metas
-        else metas
+    whiteSpaceParser :: OrgParser ()
+    whiteSpaceParser = do
+      _ <- MP.takeWhile1P (Just "newline") (== '\n') -- (ref:whiteSpaceParser-newline-only)
+      orgParserState <- get
+      _ <-
+        MP.optional
+          . MP.label "indentation for next thing"
+          $ MP.count orgParserState.continuationIndent (char ' ')
+      pure ()
+    singleLineCommentParser :: OrgParser ()
+    singleLineCommentParser = L.skipLineComment "# " -- (ref:singleLineCommentParser)
+    blockCommentParser :: OrgParser ()
+    blockCommentParser =
+      L.skipBlockComment
+        "#+begin_comment\n"
+        "#+end_comment\n" -- (ref:blockCommentParser)
 #+end_src
 
-We should also be able to parse blank documents (not empty, but only has
-whitespace).
+The three arguments to ~L.space~ [[(L.space-arguments)]] (where ~L~ stands for
+~Text.Megaparsec.Char.Lexer~) are the parsers for whitespace, single-line
+comments, and block comments. ~L.space~ will try to repeatedly apply the three
+given parsers; it only stops parsing when faced with input where all three
+parsers fail.
 
-#+name: ti:0001-blankline
-#+header: :tangle test/Lilac/ParseSpec/0001-blankline
-#+begin_src org
+We only parse newline characters in ~whiteSpaceParser~
+[[(whiteSpaceParser-newline-only)]]. We don't parse spaces. This is because we do
+not want to skip over any /indentation/ --- that is, space characters immediately
+following a newline. Such indentation could be an error (for example, for
+headings or paragraphs), or a necessary part of a cell (such as ~CListItem~ cells
+in [[f:listItemsEndParser]]), and so we leave that determination up to other
+parsers.
 
+It's important that we use ~takeWhile1P~ for ~whiteSpaceParser~ (where the ~1~ denotes
+that it requires at least 1 newline character) because otherwise if it is
+allowed to accept 0 newlines (as with ~takeWhileP~), it may loop forever upon
+seeing non-newline input.
 
-#+end_src
+Single-line comments use ~"# "~ [[(singleLineCommentParser)]], whereas multi-line
+comments expect an opening and closing delimiter [[(blockCommentParser)]]. We
+include explicit newlines in ~blockCommentParser~ because we want to ensure that
+block comment markers are always on their own line (e.g., ~#+end_comment~ is
+valid, but ~#+end_comment foo~ is not).
 
-We have to put in two newlines above because during parsing we will lose one
-newline (it is used to parse the ~"\n#+end_src"~ string; see [[f:someBTokensParser]]).
-This leaves us with just one newline in
-[[file:../test/Lilac/ParseSpec/0001-blankline]].
+~Text.Megaparsec.Char.Lexer~ also defines a ~L.skipBlockCommentNested~ helper, which
+is able to understand if the ending marker of a block (~#+end_comment\n~ for us)
+should be ignored because it's nested and instead skip past it to find the true
+(non-nested) ending marker. That's a little too complicated, so we use the
+non-nested ~L.skipBlockComment~ to keep the syntax simple.
 
-#+name: t:0001-blankline
+Lastly we have [[f:lexeme]], which wraps around any other parser to make it consume
+trailing newlines /and comments/. This is used in [[f:cellParser]]. We just reuse
+[[f:skipNewlinesAndComments]] as the main workhorse here.
+
+#+name: f:lexeme
 #+begin_src haskell
-shouldParseWith
-  "0001-blankline"
-  (L.defaultOrgDoc nilOid [])
+lexeme :: OrgParser a -> OrgParser a
+lexeme = L.lexeme skipNewlinesAndComments
 #+end_src
 
-Aside: [[ti:0001-blankline]] in HTML looks like there is no content (this is
-intentional), because [[f:zeroBTokensParser]] parses it the same way it parses a
-block with zero bytes in it (see [[ti:0007-blocks-empty]]).
-
-Parsing comments should also result in a blank document.
-
-#+name: ti:0001-comments-only
-#+header: :tangle test/Lilac/ParseSpec/0001-comments-only
-#+begin_src org
-# This is a single-line comment.
-
-,#+begin_comment
-This is inside
-a block comment.
-,#+end_comment
-#+end_src
-
-#+name: t:0001-comments-only
-#+begin_src haskell
-shouldParseWith
-  "0001-comments-only"
-  (L.defaultOrgDoc nilOid [])
-#+end_src
-
-At the other end of the spectrum, Lilac should be able to parse itself
-(=lilac.org=).
-
-#+name: t:self-parse
-#+begin_src haskell
-before (LU.readFrom "" "base/lilac.org") $ do
-  it "self-parse" $ \input -> do
-    MP.runParser
-      (runStateT L.orgDocParser defaultOrgParserState)
-      "base/lilac.org"
-      `shouldSucceedOn` input
-#+end_src
-
-* =docMetaParser=
+** ~docMetaParser~
 
 An Org document's metadata is the first meaningful thing that could be parsed.
 Metadata can be created with a ~:PROPERTIES:~ drawer, or with a line that looks
-like =#+key: value= where =key= is a string and =value= is a series of tokens (it can
+like ~#+key: value~ where ~key~ is a string and ~value~ is a series of tokens (it can
 have multiple words in it). The key and value syntax is trickier, so we look at
-that first with =docMetaEntryParser= below.
+that first with [[f:docMetaEntryParser]] below.
 
 #+name: f:docMetaEntryParser
 #+begin_src haskell
 docMetaEntryParser :: OrgParser (Text, Text)
 docMetaEntryParser = do
-  avoidParsingBlockMetadata
-  avoidParsingLilacExtensions
+  avoidParsingBlockMetadata -- (ref:avoidParsingBlockMetadata)
+  avoidParsingLilacExtensions -- (ref:avoidParsingLilacExtensions)
   _ <- MP.notFollowedBy $ string "#+__" -- (ref:avoid-double-underscores)
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
@@ -1079,27 +1191,26 @@ docMetaEntryParser = do
     avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
 #+end_src
 
-Note how it also has to tiptoe around blocks by checking that it is not looking
-at block-related syntax with =avoidParsingBlockMetadata=. This is important
-because otherwise if an Org document begins with a [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code block]] as the first
-thing (before [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][headings]] or anything else), we may consume that as part of
-~docMetaParser~ and fail because we think we are expecting ~: ~ followed by a
-value.
+We have to tiptoe around code blocks by checking that it is not looking at
+block-related metadata syntax with ~avoidParsingBlockMetadata~
+[[(avoidParsingBlockMetadata)]]. This is important because otherwise if an Org
+document begins with a [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code block]] as the first thing (before [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][headings]] or
+anything else), we may consume that as part of ~docMetaParser~ and fail because we
+think we are expecting ~: ~ followed by a value when we encounter ~#+begin_src
+...~.
 
-Similarly, we also do not parse any [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extensions]] because they can only be
-parsed by the [[f:lilacExtensionsParser]].
+Similarly, we also do not parse any [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extensions]]
+[[(avoidParsingLilacExtensions)]] because they can only be parsed by the
+[[f:lilacExtensionsParser]].
 
-We avoid parsing keys with a double underscore at [[(avoid-double-underscores)]],
-because that's reserved for internal use by Lilac. If we don't do this, then
-such metadata keys (with a leading double underscore) that are set for cells
-(like blocks or tables) will be interpreted as document metadata, which isn't
-what we want. In other words, having the restriction at
+We avoid parsing keys with a double underscore [[(avoid-double-underscores)]],
+because that's reserved for internal use by Lilac. Having the restriction at
 [[(avoid-double-underscores)]] allows the failure condition at
-[[(fail-if-double-underscore)]] to trigger.
+[[(fail-if-double-underscore)]] in [[f:metaEntryParser]] to trigger.
 
 The [[f:docMetaParser]] first checks for the top-level ~:PROPERTIES:~ drawer with
-[[f:propertiesDrawerParser]]. Then it just parses =docMetaEntryParser= multiple times,
-while consuming any trailing whitespace or comments with [[f:lexeme]].
+[[f:propertiesDrawerParser]]. Then it just parses [[f:docMetaEntryParser]] multiple
+times, while consuming any trailing whitespace or comments with [[f:lexeme]].
 
 #+name: f:docMetaParser
 #+begin_src haskell
@@ -1114,12 +1225,13 @@ docMetaParser = do
   let conflictingKeys = keys $ M.intersection topLevelDrawerProps metaKVs
   when (not $ null conflictingKeys)
     $ fail
-    $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
+    $ "conflicting keys in the top-level PROPERTIES drawer "
+    <> "and document metadata key/values: "
     <> (show conflictingKeys)
   case lookup "ID" topLevelDrawerProps of
     Nothing -> fail $ "required document ID property not found"
     Just oidText -> do
-      oid <- validateOidText oidText
+      oid <- validateOidText oidText -- (ref:validateOidText oidText)
       cslPath <- case lookup "cite_export" metaKVs of
         Just maybeCslPath -> validateCslPath maybeCslPath
         Nothing -> pure Nothing
@@ -1132,8 +1244,8 @@ docMetaParser = do
       pure (oid, cslPath, bibPaths, topLevelDrawerProps <> metaKVs)
 #+end_src
 
-OID validation in [[f:validateOidText]] delegates to the ~Lilac.Types.fromText~
-helper.
+OID validation in [[f:validateOidText]] [[(validateOidText oidText)]] delegates to the
+[[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62::f:fromText][f:fromText]] helper from ~Lilac.Types~.
 
 #+name: f:validateOidText
 #+begin_src haskell
@@ -1154,7 +1266,7 @@ directory changes). See [[id:ca12051e-cd17-4d8d-996a-767695441d48][Drawers]] for
 The special key ~#+cite_export: ...~ is parsed separately as the ~cslPath~, using
 the [[f:validateCslPath]] helper. This is needed for supporting [[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]].
 
-** Lilac extensions
+*** Lilac extensions
 :PROPERTIES:
 :ID:       84edd33a-a146-4a46-ac0a-cd1c3d0926d3
 :END:
@@ -1174,6 +1286,8 @@ Below is a list of supported extensions:
   - ~lilac_maxListLevel~ :: [[f:maxListLevelParser]] This has the same semantics as
     ~lilac_maxHeadingLevel~ but is for list items, not headings.
 
+These extensions are encoded inside the [[data:OrgParserConf]].
+
 #+name: data:OrgParserConf
 #+begin_src haskell
 type OrgParserConf :: Type
@@ -1183,6 +1297,8 @@ data OrgParserConf = OrgParserConf
   }
   deriving stock (Eq, Show)
 #+end_src
+
+The default preferences are saved in [[f:defaultOrgParserConf]].
 
 #+name: f:defaultOrgParserConf
 #+begin_src haskell
@@ -1194,8 +1310,8 @@ defaultOrgParserConf =
     }
 #+end_src
 
-Parsing Lilac extensions involves parsing known key/value combinations, and
-updating the ~OrgParserState~ accordingly.
+If you want to deviate from the defaults, you have to specify these in your
+top-level document metadata, for [[f:lilacExtensionsParser]] to pick up.
 
 #+name: f:lilacExtensionsParser
 #+begin_src haskell
@@ -1225,7 +1341,7 @@ maxHeadingLevelParser = do
   put orgParserState {orgParserConf = opc}
 #+end_src
 
-The ~signedIntParser~ knows how to parse a signed integer. The
+The [[f:signedIntParser]] knows how to parse a signed integer. The
 ~parserBetweenSignAndNumber~ is the parser for parsing the area between the sign
 (~-~) and the number. Here we define it as ~pure ()~ meaning that nothing is
 allowed. The usual use case here is to use a whitespace parser, so as to allow a
@@ -1242,9 +1358,8 @@ signedIntParser = L.signed parserBetweenSignAndNumber number
     parserBetweenSignAndNumber = pure ()
 #+end_src
 
-Although we don't "return" anything (the type signature of
-[[f:lilacExtensionsParser]] is just ~OrgParser ()~), we still use ~put~ inside the
-parsers so that they modify the [[data:OrgParserState]].
+[[f:maxListLevelParser]] closely resembles [[f:maxHeadingLevelParser]], and similarly
+updates the ~orgParserConf~ field inside [[f:defaultOrgParserState]].
 
 #+name: f:maxListLevelParser
 #+begin_src haskell
@@ -1258,223 +1373,55 @@ maxListLevelParser = do
   put orgParserState {orgParserConf = opc}
 #+end_src
 
-Unsurprisingly, [[f:maxListLevelParser]] closely resembles [[f:maxHeadingLevelParser]].
-
-** Tests
-
-Below are some unit test cases for parsing metadata.
-
-#+name: ti:0002-doc-metadata:basic
-#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata
-#+begin_src org
-,#+title: An Org Document
-,#+author: A. U. Thor
-,#+property: header-args+ :noweb no-export
-,#+auto_tangle: t
-#+end_src
-
-#+name: t:0002-doc-metadata:basic
-#+begin_src haskell
-shouldParseWith
-  "0002-doc-metadata"
-  $ L.defaultOrgDoc
-    nilOid
-    [ ("author", "A. U. Thor"),
-      ("auto_tangle", "t"),
-      ("property", "header-args+ :noweb no-export"),
-      ("title", "An Org Document")
-    ]
-#+end_src
-
-Note that we currently don't do any intelligent processing of the metadata
-fields. For example, the value of the =property= key above is a mess because it
-itself contains a key and value (=:noweb= and =no-export=).
-
-Below is the same as the test above, but with some whitespace and comments
-sprinkled in between.
-
-#+name: ti:0003-doc-metadata-with-comments
-#+header: :tangle test/Lilac/ParseSpec/0003-doc-metadata-with-comments
-#+begin_src org
-,#+title: An Org Document
-# This is a comment line.
-,#+author: A. U. Thor
-# This is another comment line.
-
-
-# Note the whitespace above this line.
-,#+property: header-args+ :noweb no-export
-# Below is a block comment.
-,#+begin_comment
-Yet another comment.
-,#+end_comment
-,#+auto_tangle: t
-
-# Last comment followed by some trailing newlines.
-
-
-
-
-
-#+end_src
-
-#+name: t:0003-doc-metadata-with-comments
-#+begin_src haskell
-shouldParseWith
-  "0003-doc-metadata-with-comments"
-  $ L.defaultOrgDoc
-    nilOid
-    [ ("author", "A. U. Thor"),
-      ("auto_tangle", "t"),
-      ("property", "header-args+ :noweb no-export"),
-      ("title", "An Org Document")
-    ]
-#+end_src
-
-Indentation is invalid for document metadata. Even single-line comments may not
-be indented.
-
-#+name: ti:0008-indentation-comment
-#+header: :tangle test/Lilac/ParseSpec/0008-indentation-comment
-#+begin_src org
- # invalid comment (it's indented)
-#+end_src
-
-#+name: t:0008-indentation-comment
-#+begin_src haskell
-shouldFailWithMessage
-  "0008-indentation-comment"
-  "invalid indentation"
-  1
-#+end_src
-
-Metadata values can have leading whitespace. We ignore such whitespace.
-
-#+name: ti:0002-doc-metadata-whitespace-before-value
-#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value
-#+begin_src org
-,#+title:             Parse me without leading whitespace
-#+end_src
-
-#+name: t:0002-doc-metadata-whitespace-before-value
-#+begin_src haskell
-shouldParseWith
-  "0002-doc-metadata-whitespace-before-value"
-  $ L.defaultOrgDoc
-    nilOid
-    [ ("title", "Parse me without leading whitespace")
-    ]
-#+end_src
-
-Metadata values are required (there must be some non-whitespace text for it).
-
-#+name: ti:0002-doc-metadata-missing-value
-#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-missing-value
-#+begin_src org
-,#+title:
-#+end_src
-
-#+name: t:0002-doc-metadata-missing-value
-#+begin_src haskell
-shouldFailWithError
-  "0002-doc-metadata-missing-value"
-  (utoks ":\n" <> elabel "(doc meta) separator" <> elabel "(doc meta) keyword letter")
-  7
-#+end_src
-
-Metadata can also come from top-level properties drawers.
-
-#+name: ti:0002-doc-metadata-properties-drawer
-#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer
-#+begin_src org
+** Resetting of state
 :PROPERTIES:
-:ID:       7af1aa3e-41ca-4810-a001-2fdf10768f2f
+:ID:       6a181f3b-b12e-451f-b195-5775b05aab65
 :END:
-#+end_src
 
-#+name: t:0002-doc-metadata-properties-drawer
+We call [[f:resetState]] in [[f:orgDocParser]] to clear some state from
+[[data:OrgParserState]], because otherwise it gets too polluted during testing.
+Also, it's not like we're throwing away information because everything we need
+is still captured elsewhere (just check the fields that have the same name in
+both [[data:OrgParserState]] and [[data:OrgDoc]]).
+
+#+name: f:resetState
 #+begin_src haskell
-shouldParseWithState
-  "0002-doc-metadata-properties-drawer"
-  ( L.defaultOrgDoc
-      (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
-      [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
-      ]
-  )
-  defaultOrgParserState
-    { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f
-    }
+resetState :: OrgParser ()
+resetState =
+  modify $ \s ->
+    s
+      { OrgParserState.bibPaths = [],
+        OrgParserState.citations = [],
+        OrgParserState.cslPath = Nothing,
+        OrgParserState.cellNumber = 0,
+        OrgParserState.pseudoEdges = []
+      }
 #+end_src
 
-If the ~:ID:~ is missing, we assign a nil (all zero bits) OID. We reuse the same
-test case file ([[ti:0001-blankline]]) from [[t:0001-blankline]].
+In [[f:resetState]] we cannot simply refer to the field alone in the record update,
+like this
 
-#+name: t:0002-doc-metadata-properties-drawer-empty
 #+begin_src haskell
-shouldParseWithState
-  "0001-blankline"
-  (L.defaultOrgDoc nilOid [])
-  defaultOrgParserState
+  modify (\s -> s {citations = []})
 #+end_src
 
-Combine metadata together, from the top-level properties drawer and also the
-key/value metadata lines.
+because it will result in an [[https://errors.haskell.org/messages/GHC-02256/]["Ambiguous record update" error]], because both
+[[data:OrgDoc]] and [[data:OrgParserState]] have a field named ~citations~. So we work
+around this by importing the latter through ~import Lilac.Types as OrgParserState~
+in [[module:Lilac.Parse]]. See [[https://discourse.haskell.org/t/what-are-you-supposed-to-do-about-wambiguous-fields/9545][this discussion from 2024]] for more information.
 
-#+name: ti:0002-doc-metadata-properties-drawer-combine
-#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer-combine
-#+begin_src org
-:PROPERTIES:
-:ID:       7af1aa3e-41ca-4810-a001-2fdf10768f2f
-:END:
-,#+title: An Org Document
-,#+author: A. U. Thor
-,#+property: header-args+ :noweb no-export
-#+end_src
+In a similar vein to [[f:resetState]], [[f:deleteRedundantKeys]] [[(deleteRedundantKeys)]]
+removes certain entries from the given map data structure. In the case of
+[[f:orgDocParser]], it removes keys that won't be used because the information in
+those keys have already been parsed and saved elsewhere.
 
-#+name: t:0002-doc-metadata-properties-drawer-combine
+#+name: f:deleteRedundantKeys
 #+begin_src haskell
-shouldParseWithState
-  "0002-doc-metadata-properties-drawer-combine"
-  ( L.defaultOrgDoc
-      (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
-      [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
-        ("author", "A. U. Thor"),
-        ("property", "header-args+ :noweb no-export"),
-        ("title", "An Org Document")
-      ]
-  )
-  defaultOrgParserState
-    { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f
-    }
+deleteRedundantKeys :: (Ord k) => Map k v -> [k] -> Map k v
+deleteRedundantKeys = foldl' (flip M.delete)
 #+end_src
 
-If there is a clash, error out instead of silently choosing precedence.
-
-#+name: ti:0002-doc-metadata-properties-drawer-clash
-#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer-clash
-#+begin_src org
-:PROPERTIES:
-:ID:       00000000-0000-0000-0000-000000000000
-:foo:      bar
-:END:
-,#+title: An Org Document
-,#+author: A. U. Thor
-,#+property: header-args+ :noweb no-export
-,#+foo: xyz
-#+end_src
-
-#+name: t:0002-doc-metadata-properties-drawer-clash
-#+begin_src haskell
-before (LU.readFrom "test/Lilac/ParseSpec/" "0002-doc-metadata-properties-drawer-clash") $ do
-  it "0002-doc-metadata-properties-drawer-clash" $ \input -> do
-    MP.runParser
-      (runStateT L.orgDocParser defaultOrgParserState)
-      "0002-doc-metadata-properties-drawer-clash"
-      input
-      `shouldFailWith` (errFancy 181 . fancy $ MP.ErrorFail "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: [\"foo\"]")
-#+end_src
-
-* Cells
+** Cells
 :PROPERTIES:
 :ID:       ed81c307-9172-4436-8672-583ea8ecb1f9
 :END:
@@ -1603,6 +1550,342 @@ type checker --- we will always fail if the =takeWhile1P= succeeds (the
 The ~bracketBalance~ is set to 0 in [[f:cellParser]] after a cell is parsed, because
 we're not interested in cross-cell issues about unbalanced brackets. See
 [[f:failIfUnbalancedBrackets]].
+
+The rest of this document is mainly concerned with describing all of the
+different building blocks used for constructing cells.
+
+** Tests
+:PROPERTIES:
+:ID:       765aab71-b548-4aef-8895-0e3c75198041
+:END:
+
+These tests check for mostly empty documents, and also those with some metadata.
+
+We should be able to parse empty input.
+
+#+name: t:empty-input
+#+begin_src haskell
+it "empty input" $ do
+  MP.runParser
+    (runStateT L.orgDocParser defaultOrgParserState)
+    "empty input"
+    nilOidOrgDoc
+    `shouldParse` (L.defaultOrgDoc nilOid [], defaultOrgParserState)
+#+end_src
+
+The [[f:defaultOrgDoc]] is just a default (mostly blank) ~OrgDoc~. It's useful for
+testing.
+
+#+name: f:defaultOrgDoc
+#+begin_src haskell
+defaultOrgDoc :: OID -> [(Text, Text)] -> OrgDoc
+defaultOrgDoc oid metas =
+  OrgDoc
+    { oid = oid,
+      cells = [],
+      pseudoEdges = [],
+      footnoteRefs = M.empty,
+      glossary = M.empty,
+      lineLabels = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      citations = [],
+      meta = fromList metas'
+    }
+  where
+    metas' =
+      if oid == nilOid
+        then ("ID", "00000000-0000-0000-0000-000000000000") : metas
+        else metas
+#+end_src
+
+We should also be able to parse blank documents (not empty, but only has
+whitespace).
+
+#+name: ti:0001-blankline
+#+header: :tangle test/Lilac/ParseSpec/0001-blankline
+#+begin_src org
+
+
+#+end_src
+
+We have to put in two newlines above because during parsing we will lose one
+newline (it is used to parse the ~"\n#+end_src"~ string; see [[f:someBTokensParser]]).
+This leaves us with just one newline in
+[[file:../test/Lilac/ParseSpec/0001-blankline]].
+
+#+name: t:0001-blankline
+#+begin_src haskell
+shouldParseWith
+  "0001-blankline"
+  (L.defaultOrgDoc nilOid [])
+#+end_src
+
+Aside: [[ti:0001-blankline]] in HTML looks like there is no content (this is
+intentional), because [[f:zeroBTokensParser]] parses it the same way it parses a
+block with zero bytes in it (see [[ti:0007-blocks-empty]]).
+
+Parsing comments should also result in a blank document.
+
+#+name: ti:0001-comments-only
+#+header: :tangle test/Lilac/ParseSpec/0001-comments-only
+#+begin_src org
+# This is a single-line comment.
+
+,#+begin_comment
+This is inside
+a block comment.
+,#+end_comment
+#+end_src
+
+#+name: t:0001-comments-only
+#+begin_src haskell
+shouldParseWith
+  "0001-comments-only"
+  (L.defaultOrgDoc nilOid [])
+#+end_src
+
+At the other end of the spectrum, Lilac should be able to parse itself
+(=lilac.org=).
+
+#+name: t:self-parse
+#+begin_src haskell
+before (LU.readFrom "" "base/lilac.org") $ do
+  it "self-parse" $ \input -> do
+    MP.runParser
+      (runStateT L.orgDocParser defaultOrgParserState)
+      "base/lilac.org"
+      `shouldSucceedOn` input
+#+end_src
+
+*** Document metadata
+
+Below are some unit test cases for parsing metadata.
+
+#+name: ti:0002-doc-metadata:basic
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata
+#+begin_src org
+,#+title: An Org Document
+,#+author: A. U. Thor
+,#+property: header-args+ :noweb no-export
+,#+auto_tangle: t
+#+end_src
+
+#+name: t:0002-doc-metadata:basic
+#+begin_src haskell
+shouldParseWith
+  "0002-doc-metadata"
+  $ L.defaultOrgDoc
+    nilOid
+    [ ("author", "A. U. Thor"),
+      ("auto_tangle", "t"),
+      ("property", "header-args+ :noweb no-export"),
+      ("title", "An Org Document")
+    ]
+#+end_src
+
+Note that we currently don't do any intelligent processing of the metadata
+fields. For example, the value of the =property= key above is a mess because it
+itself contains a key and value (=:noweb= and =no-export=).
+
+Below is the same as the test above, but with some whitespace and comments
+sprinkled in between.
+
+#+name: ti:0003-doc-metadata-with-comments
+#+header: :tangle test/Lilac/ParseSpec/0003-doc-metadata-with-comments
+#+begin_src org
+,#+title: An Org Document
+# This is a comment line.
+,#+author: A. U. Thor
+# This is another comment line.
+
+
+# Note the whitespace above this line.
+,#+property: header-args+ :noweb no-export
+# Below is a block comment.
+,#+begin_comment
+Yet another comment.
+,#+end_comment
+,#+auto_tangle: t
+
+# Last comment followed by some trailing newlines.
+
+
+
+
+
+#+end_src
+
+#+name: t:0003-doc-metadata-with-comments
+#+begin_src haskell
+shouldParseWith
+  "0003-doc-metadata-with-comments"
+  $ L.defaultOrgDoc
+    nilOid
+    [ ("author", "A. U. Thor"),
+      ("auto_tangle", "t"),
+      ("property", "header-args+ :noweb no-export"),
+      ("title", "An Org Document")
+    ]
+#+end_src
+
+Indentation is invalid for document metadata. Even single-line comments may not
+be indented.
+
+#+name: ti:0008-indentation-comment
+#+header: :tangle test/Lilac/ParseSpec/0008-indentation-comment
+#+begin_src org
+ # invalid comment (it's indented)
+#+end_src
+
+#+name: t:0008-indentation-comment
+#+begin_src haskell
+shouldFailWithMessage
+  "0008-indentation-comment"
+  "invalid indentation"
+  1
+#+end_src
+
+Metadata values can have leading whitespace. We ignore such whitespace.
+
+#+name: ti:0002-doc-metadata-whitespace-before-value
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-whitespace-before-value
+#+begin_src org
+,#+title:             Parse me without leading whitespace
+#+end_src
+
+#+name: t:0002-doc-metadata-whitespace-before-value
+#+begin_src haskell
+shouldParseWith
+  "0002-doc-metadata-whitespace-before-value"
+  $ L.defaultOrgDoc
+    nilOid
+    [ ("title", "Parse me without leading whitespace")
+    ]
+#+end_src
+
+Metadata values are required (there must be some non-whitespace text for it).
+
+#+name: ti:0002-doc-metadata-missing-value
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-missing-value
+#+begin_src org
+,#+title:
+#+end_src
+
+#+name: t:0002-doc-metadata-missing-value
+#+begin_src haskell
+shouldFailWithError
+  "0002-doc-metadata-missing-value"
+  ( utoks ":\n"
+      <> elabel "(doc meta) separator"
+      <> elabel "(doc meta) keyword letter"
+  )
+  7
+#+end_src
+
+Metadata can also come from top-level properties drawers.
+
+#+name: ti:0002-doc-metadata-properties-drawer
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer
+#+begin_src org
+:PROPERTIES:
+:ID:       7af1aa3e-41ca-4810-a001-2fdf10768f2f
+:END:
+#+end_src
+
+#+name: t:0002-doc-metadata-properties-drawer
+#+begin_src haskell
+shouldParseWithState
+  "0002-doc-metadata-properties-drawer"
+  ( L.defaultOrgDoc
+      (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
+      [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f")
+      ]
+  )
+  defaultOrgParserState
+    { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f
+    }
+#+end_src
+
+If the ~:ID:~ is missing, we assign a nil (all zero bits) OID. We reuse the same
+test case file ([[ti:0001-blankline]]) from [[t:0001-blankline]].
+
+#+name: t:0002-doc-metadata-properties-drawer-empty
+#+begin_src haskell
+shouldParseWithState
+  "0001-blankline"
+  (L.defaultOrgDoc nilOid [])
+  defaultOrgParserState
+#+end_src
+
+Metadata from the top-level properties drawer and also the key/value metadata
+lines get combined together into a single map.
+
+#+name: ti:0002-doc-metadata-properties-drawer-combine
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer-combine
+#+begin_src org
+:PROPERTIES:
+:ID:       7af1aa3e-41ca-4810-a001-2fdf10768f2f
+:END:
+,#+title: An Org Document
+,#+author: A. U. Thor
+,#+property: header-args+ :noweb no-export
+#+end_src
+
+#+name: t:0002-doc-metadata-properties-drawer-combine
+#+begin_src haskell
+shouldParseWithState
+  "0002-doc-metadata-properties-drawer-combine"
+  ( L.defaultOrgDoc
+      (fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f)
+      [ ("ID", "7af1aa3e-41ca-4810-a001-2fdf10768f2f"),
+        ("author", "A. U. Thor"),
+        ("property", "header-args+ :noweb no-export"),
+        ("title", "An Org Document")
+      ]
+  )
+  defaultOrgParserState
+    { docOid = fromWords 0x7af1aa3e41ca4810 0xa0012fdf10768f2f
+    }
+#+end_src
+
+If there is a clash, error out instead of silently choosing precedence.
+
+#+name: ti:0002-doc-metadata-properties-drawer-clash
+#+header: :tangle test/Lilac/ParseSpec/0002-doc-metadata-properties-drawer-clash
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-000000000000
+:foo:      bar
+:END:
+,#+title: An Org Document
+,#+author: A. U. Thor
+,#+property: header-args+ :noweb no-export
+,#+foo: xyz
+#+end_src
+
+#+name: t:0002-doc-metadata-properties-drawer-clash
+#+begin_src haskell
+before
+  ( LU.readFrom
+      "test/Lilac/ParseSpec/"
+      "0002-doc-metadata-properties-drawer-clash"
+  )
+  $ do
+    it "0002-doc-metadata-properties-drawer-clash" $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser defaultOrgParserState)
+        "0002-doc-metadata-properties-drawer-clash"
+        input
+        `shouldFailWith` ( errFancy 181
+                             . fancy
+                             $ MP.ErrorFail
+                               ( "conflicting keys in the top-level PROPERTIES"
+                                   <> " drawer and document metadata"
+                                   <> " key/values: [\"foo\"]"
+                               )
+                         )
+#+end_src
 
 * Prose
 :PROPERTIES:
@@ -12116,7 +12399,7 @@ nilOrgDoc cells pseudoEdges =
 #+end_src
 
 If we want to check the state (the parsing operation is stateful), we need to
-check the expected end state as well. We do this with =ps= below.
+check the expected end state as well. We do this with [[f:shouldParseWithState]].
 
 #+name: f:shouldParseWithState
 #+begin_src haskell

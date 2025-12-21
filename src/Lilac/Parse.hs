@@ -320,14 +320,11 @@ import Text.Megaparsec.Char.Lexer qualified as L
 
 skipNewlinesAndComments :: OrgParser ()
 skipNewlinesAndComments =
-  L.space
-    whiteSpaceParser
-    singleLineCommentParser
-    blockCommentParser
+  L.space whiteSpaceParser singleLineCommentParser blockCommentParser --
   where
     whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = do
-      _ <- MP.takeWhile1P (Just "newline") (== '\n')
+      _ <- MP.takeWhile1P (Just "newline") (== '\n') --
       orgParserState <- get
       _ <-
         MP.optional
@@ -335,16 +332,19 @@ skipNewlinesAndComments =
           $ MP.count orgParserState.continuationIndent (char ' ')
       pure ()
     singleLineCommentParser :: OrgParser ()
-    singleLineCommentParser = L.skipLineComment "# "
+    singleLineCommentParser = L.skipLineComment "# " --
     blockCommentParser :: OrgParser ()
-    blockCommentParser = L.skipBlockComment "#+begin_comment\n" "#+end_comment\n"
+    blockCommentParser =
+      L.skipBlockComment
+        "#+begin_comment\n"
+        "#+end_comment\n" --
 
 lexeme :: OrgParser a -> OrgParser a
 lexeme = L.lexeme skipNewlinesAndComments
 
 parseOrgDoc :: Text -> Either Text OrgDoc
 parseOrgDoc input = case MP.runParser
-  (runStateT orgDocParser defaultOrgParserState)
+  (runStateT orgDocParser defaultOrgParserState) --
   ""
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
@@ -352,8 +352,8 @@ parseOrgDoc input = case MP.runParser
 
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
-  _ <- optional skipNewlinesAndComments
-  (docOid, cslPath, bibPaths, meta) <- docMetaParser
+  _ <- optional skipNewlinesAndComments --
+  (docOid, cslPath, bibPaths, meta) <- docMetaParser --
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
@@ -375,9 +375,14 @@ orgDocParser = do
         CTable {}
         CFootnote {}
         CCommand {} -> True
-  let meaningfulCells = filter meaningfulCell cells
+  let meaningfulCells = filter meaningfulCell cells --
   when (orgParserState.cellNumber /= length meaningfulCells)
-    $ fail ("mismatch: cellNumber: " <> show orgParserState.cellNumber <> " len meaningfulCells: " <> (show $ length meaningfulCells))
+    $ fail
+      ( "mismatch: cellNumber: "
+          <> show orgParserState.cellNumber
+          <> " len meaningfulCells: "
+          <> (show $ length meaningfulCells)
+      )
   pure
     $ OrgDoc
       { oid = docOid,
@@ -389,7 +394,7 @@ orgDocParser = do
         cslPath = cslPath,
         bibPaths = bibPaths,
         citations = citations,
-        meta = deleteRedundantKeys meta ["cite_export"]
+        meta = deleteRedundantKeys meta ["cite_export"] --
       }
 
 defaultOrgDoc :: OID -> [(Text, Text)] -> OrgDoc
@@ -414,8 +419,8 @@ defaultOrgDoc oid metas =
 
 docMetaEntryParser :: OrgParser (Text, Text)
 docMetaEntryParser = do
-  avoidParsingBlockMetadata
-  avoidParsingLilacExtensions
+  avoidParsingBlockMetadata --
+  avoidParsingLilacExtensions --
   _ <- MP.notFollowedBy $ string "#+__" --
   _ <- string "#+"
   key <- MP.takeWhile1P (Just "(doc meta) keyword letter") isKeywordLetter
@@ -451,12 +456,13 @@ docMetaParser = do
   let conflictingKeys = keys $ M.intersection topLevelDrawerProps metaKVs
   when (not $ null conflictingKeys)
     $ fail
-    $ "conflicting keys in the top-level PROPERTIES drawer and document metadata key/values: "
+    $ "conflicting keys in the top-level PROPERTIES drawer "
+    <> "and document metadata key/values: "
     <> (show conflictingKeys)
   case lookup "ID" topLevelDrawerProps of
     Nothing -> fail $ "required document ID property not found"
     Just oidText -> do
-      oid <- validateOidText oidText
+      oid <- validateOidText oidText --
       cslPath <- case lookup "cite_export" metaKVs of
         Just maybeCslPath -> validateCslPath maybeCslPath
         Nothing -> pure Nothing
