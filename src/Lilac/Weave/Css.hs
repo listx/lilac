@@ -521,7 +521,6 @@ defaultCss = do
     noMargin
   ".code-block-body" & do
     overflowX auto
-    margin 0 0 (rem 1) 0
     fontMono
     backgroundColor colorCodeBg
     color colorCodeFg
