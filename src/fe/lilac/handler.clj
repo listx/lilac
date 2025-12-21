@@ -14,42 +14,56 @@
               script
               "<script>
                 (function() {
-                  const parser = new DOMParser();
-                  let mainEl = null;
-                  let resp = null;
-                  let html = null;
-                  let doc = null;
-                  let currentScroll = 0;
+                  const scrollSelectors = ['nav.toc', 'main', 'aside.sidebar']; //
+                  const storageKey = 'dev-scroll-map';
 
                   let lastScrollTime = 0;
-                  window.addEventListener('scroll', function(e) {
+                  window.addEventListener('scroll', () => { //
                     lastScrollTime = Date.now();
                   }, true);
 
-                  async function softRefreshLoop() {
-                    try {
-                      if (Date.now() - lastScrollTime < 1500) { //
-                        return;
-                      }
-
-                      mainEl = document.querySelector('main');
-                      currentScroll = mainEl.scrollTop; //
-
-                      resp = await fetch(window.location.href);
-                      html = await resp.text();
-                      doc = parser.parseFromString(html, 'text/html');
-                      document.body.innerHTML = doc.body.innerHTML;
-
-                      mainEl = document.querySelector('main');
-                      mainEl.scrollTop = currentScroll; //
-                    } catch (e) {
-                      console.error('Soft refresh failed', e);
-                    } finally {
-                      setTimeout(softRefreshLoop, 1000);
+                  function setScrollPositions(map) {
+                    for (let sel in map) {
+                      let el = document.querySelector(sel);
+                      if (el) el.scrollTop = map[sel];
                     }
                   }
 
-                  softRefreshLoop();
+                  function getScrollPositions(selectors) {
+                    let map = {};
+                    selectors.forEach(sel => {
+                      let el = document.querySelector(sel);
+                      if (el) map[sel] = el.scrollTop;
+                    });
+                    return map;
+                  }
+
+                  const rawData = localStorage.getItem(storageKey);
+                  if (rawData) {
+                    const prevScrollPositions = JSON.parse(rawData);
+                    setTimeout(() => {
+                      setScrollPositions(prevScrollPositions); //
+                      localStorage.removeItem(storageKey);
+                    }, 100); //
+                  }
+
+                  function refreshPage() {
+                    const isPaused = localStorage.getItem('dev-pause-refresh') === 'true';
+                    const recentlyScrolled = (Date.now() - lastScrollTime) < 1500; //
+
+                    if (isPaused || recentlyScrolled) { //
+                      setTimeout(refreshPage, 500); //
+                      return;
+                    }
+
+                    const currentScrollPositions = getScrollPositions(scrollSelectors);
+                    localStorage.setItem(storageKey,
+                                         JSON.stringify(currentScrollPositions)); //
+
+                    window.location.reload(); //
+                  }
+
+                  setTimeout(refreshPage, 1000); //
                 })();
               </script>"]
           (-> response

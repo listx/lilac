@@ -4,11 +4,15 @@
             [lilac.lazy-scroll :as lazy-scroll]
             [lilac.toggle-block-metadata :as tbm]))
 
-(defn msg-successful-load []
-  "Lilac loaded successfully.")
+(defn toggle-refresh-pause! []
+  (let [k "dev-pause-refresh"
+        current (.getItem js/localStorage k)
+        new-val (if (= current "true") "false" "true")]
+    (.setItem js/localStorage k new-val)
+    (if (= new-val "true") :PAUSED :ACTIVE)))
 
 (history/init)
 (tae/init)
 (lazy-scroll/init)
 (tbm/init)
-(js/console.log (msg-successful-load))
+(js/console.log "Lilac loaded successfully.")

@@ -307,14 +307,15 @@ response, and ~wrap-not-modified~ [[(wrap-not-modified)]] sends a ~304 Not Modif
 response if the browser's request is for the same file as what the browser
 already has.
 
+*** Automatic page refresh
+
 Now we come to [[middleware:wrap-autorefresh]], perhaps the most interesting
-middleware in our middleware stack. This middleware injects a special JavaScript
-function which runs every second, that fetches the contents of the server again
-and then replaces it, so that we end up refreshing the HTML content after every
-second. The nice thing is that this works without a browser refresh. Now we can
-edit our Org files and have [[id:77786b08-6211-47b8-940d-6aaefc17ec47::tangle-loop.sh][tangle-loop.sh]] running in the background to
-regenerate our HTML files on Org file changes, and then also have a browser
-window open to refresh the scrolled-to area.
+middleware in our middleware stack. This middleware injects some JavaScript
+which refreshes the page every second (while keeping track of scroll positions
+to restore them post-refresh). This lets us see the HTML changes in the browser
+automatically (without having to perform a manual refresh); now we can run
+[[id:77786b08-6211-47b8-940d-6aaefc17ec47::tangle-loop.sh][tangle-loop.sh]] in the background (which also performs weaving) and edit the Org
+files in Emacs while seeing those HTML changes show up in the browser.
 
 #+name: middleware:wrap-autorefresh
 #+begin_src clojure
@@ -327,7 +328,7 @@ window open to refresh the scrolled-to area.
         (let [body-str (slurp (:body response))
               script
               "<script>
-                <<soft-refresh>>
+                <<hard-refresh>>
               </script>"]
           (-> response
               (assoc :body
@@ -340,63 +341,110 @@ window open to refresh the scrolled-to area.
 The check at [[(HTML-response)]] guards it so that we only perform this injection
 into the response body if we're dealing with an HTML page.
 
-#+name: soft-refresh
+Now we get to the script which refreshes the page. We want to first load the
+scroll positions (that were saved from the previous invocation, if any), then
+save the current scroll positions (to local storage), and then finally do a hard
+refresh. The one other thing we do is avoid performing the hard refresh if
+either the page has been recently scrolled (if the user is interacting withe the
+page by scrolling), or if the user has decided to cancel pausing by setting a
+separate ~dev-pause-refresh~ key to ~true~.
+
+#+name: hard-refresh
 #+begin_src js
 (function() {
-  const parser = new DOMParser();
-  let mainEl = null;
-  let resp = null;
-  let html = null;
-  let doc = null;
-  let currentScroll = 0;
+  const scrollSelectors = ['nav.toc', 'main', 'aside.sidebar']; // (ref:scrollSelectors)
+  const storageKey = 'dev-scroll-map';
 
   let lastScrollTime = 0;
-  window.addEventListener('scroll', function(e) {
+  window.addEventListener('scroll', () => { // (ref:lastScrollTimeListener)
     lastScrollTime = Date.now();
   }, true);
 
-  async function softRefreshLoop() {
-    try {
-      if (Date.now() - lastScrollTime < 1500) { // (ref:cancel-if-recently-scrolled)
-        return;
-      }
-
-      mainEl = document.querySelector('main');
-      currentScroll = mainEl.scrollTop; // (ref:main-element-scroll-pos)
-
-      resp = await fetch(window.location.href);
-      html = await resp.text();
-      doc = parser.parseFromString(html, 'text/html');
-      document.body.innerHTML = doc.body.innerHTML;
-
-      mainEl = document.querySelector('main');
-      mainEl.scrollTop = currentScroll; // (ref:main-element-restore-scroll-pos)
-    } catch (e) {
-      console.error('Soft refresh failed', e);
-    } finally {
-      setTimeout(softRefreshLoop, 1000);
+  function setScrollPositions(map) {
+    for (let sel in map) {
+      let el = document.querySelector(sel);
+      if (el) el.scrollTop = map[sel];
     }
   }
 
-  softRefreshLoop();
+  function getScrollPositions(selectors) {
+    let map = {};
+    selectors.forEach(sel => {
+      let el = document.querySelector(sel);
+      if (el) map[sel] = el.scrollTop;
+    });
+    return map;
+  }
+
+  const rawData = localStorage.getItem(storageKey);
+  if (rawData) {
+    const prevScrollPositions = JSON.parse(rawData);
+    setTimeout(() => {
+      setScrollPositions(prevScrollPositions); // (ref:restore-scroll-pos)
+      localStorage.removeItem(storageKey);
+    }, 100); // (ref:page-render-delay)
+  }
+
+  function refreshPage() {
+    const isPaused = localStorage.getItem('dev-pause-refresh') === 'true';
+    const recentlyScrolled = (Date.now() - lastScrollTime) < 1500; // (ref:recentlyScrolled)
+
+    if (isPaused || recentlyScrolled) { // (ref:cancel-if-recently-scrolled)
+      setTimeout(refreshPage, 500); // (ref:fast-refresh-delay)
+      return;
+    }
+
+    const currentScrollPositions = getScrollPositions(scrollSelectors);
+    localStorage.setItem(storageKey,
+                         JSON.stringify(currentScrollPositions)); // (ref:save-scroll-pos)
+
+    window.location.reload(); // (ref:hard-refresh)
+  }
+
+  setTimeout(refreshPage, 1000); // (ref:normal-refresh-delay)
 })();
 #+end_src
 
-We save the scroll position of the main element at [[(main-element-scroll-pos)]],
-because that's what we use in the CSS grid layout for the main body (see [[id:ccad6989-83ec-405f-876f-9bfb5c6ae357][Main
-content]] and [[id:eda7626d-42fd-45d3-b0f8-940710413295][Page layout]]). After fetching the new body and doing the
-replacement, we restore the old scroll position at
-[[(main-element-restore-scroll-pos)]].
+The scrollable elements [[(scrollSelectors)]] are based on those top-level ones
+described in [[id:ccad6989-83ec-405f-876f-9bfb5c6ae357][Main content]] and [[id:eda7626d-42fd-45d3-b0f8-940710413295][Page layout]]. The event listener at
+[[(lastScrollTimeListener)]] updates the value of ~lastScrollTime~ so that we can tell
+how recently the user scrolled anything on the page at [[(recentlyScrolled)]].
 
-If we have recently scrolled the window, we cancel the soft refresh at
-[[(cancel-if-recently-scrolled)]], because otherwise we'll get weird jerky movements
-when [[(main-element-restore-scroll-pos)]] resets the scroll position at the same
-time that the user is in the middle of scrolling the page themselves.
+Restoration of any previously saved scroll positions is handled at
+[[(restore-scroll-pos)]]. The 100 millisecond delay at [[(page-render-delay)]] gives the
+browser time to finish rendering the page before we attempt to restore the
+scroll positions (otherwise, the DOM may not have been parsed yet for the
+JavaScript to look at and manipulate).
 
-*** Caveats
+Now we get to the refreshing logic. If we have recently scrolled the window, we
+cancel the refresh at [[(cancel-if-recently-scrolled)]], because otherwise
+we'll get a surprise refresh as we're scrolling through some content ourselves.
+The other condition which cancels a refresh is if the developer explicitly
+requests it by invoking [[f:toggle-refresh-pause!]].
 
-Unfortunately, [[soft-refresh]] interferes with [[ns:lilac.lazy-scroll][ns:lilac.lazy-scroll]], probably
-because the latter is only invoked once on the first page load.
+Before refreshing, we save the scroll position of the scrollable elements at
+[[(save-scroll-pos)]]. The hard refresh [[(hard-refresh)]] guarantees that we clear the
+heap of any listeners and such on the current page. While we could forego a hard
+refresh and do a DOM replacement in JavaScript, such a strategy is tricky to
+avoid memory leaks. This is why we do a simple hard refresh.
+
+We wait one second [[(normal-refresh-delay)]] before refreshing by default. We wait
+just half a second [[(fast-refresh-delay)]] if the refresh was canceled, so that
+we're more responsive if the user either stops scrolling or if they invoke
+[[f:toggle-refresh-pause!]]. Running ~(lilac.core/toggle-refresh-pause!)~ in the
+ClojureScript REPL (which you get by running ~make dev-cljs~ from [[make:Start
+frontend development environment (CLJS REPL)]]) will result in pausing the refresh
+loop.
+
+#+name: f:toggle-refresh-pause!
+#+begin_src clojure
+(defn toggle-refresh-pause! []
+  (let [k "dev-pause-refresh"
+        current (.getItem js/localStorage k)
+        new-val (if (= current "true") "false" "true")]
+    (.setItem js/localStorage k new-val)
+    (if (= new-val "true") :PAUSED :ACTIVE)))
+#+end_src
 
 * =lilac.core= module
 :PROPERTIES:
@@ -414,14 +462,13 @@ This is the main top-level module where we load all of our custom JS behavior.
             [lilac.lazy-scroll :as lazy-scroll]
             [lilac.toggle-block-metadata :as tbm]))
 
-(defn msg-successful-load []
-  "Lilac loaded successfully.")
+<<f:toggle-refresh-pause!>>
 
 (history/init)
 (tae/init)
 (lazy-scroll/init)
 (tbm/init)
-(js/console.log (msg-successful-load))
+(js/console.log "Lilac loaded successfully.")
 #+end_src
 
 The following can start the REPL but also automatically load the given
