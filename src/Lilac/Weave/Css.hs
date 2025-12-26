@@ -365,9 +365,11 @@ defaultCss = do
   ".verbatim" & do
     fontMono
     fontSize (em 0.9)
+    whiteSpace ClayText.pre
   ".code" & do
     fontMono
     fontSize (em 0.9)
+    whiteSpace ClayText.pre
     backgroundColor colorCodeBg
     border (px 1) solid colorCodeBorder
     ev borderRadius (px 4)
