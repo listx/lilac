@@ -545,7 +545,7 @@ cellParser = do
 
 detectInvalidIndentation :: OrgParser Cell
 detectInvalidIndentation = do
-  _ <- MP.hidden $ MP.takeWhile1P (Just "indentation") (== ' ')
+  _ <- MP.hidden $ onlySpaces
   void
     $ MP.fancyFailure
     . Set.singleton
@@ -574,7 +574,7 @@ headingParser = do
   failIfHeadingNestsWithoutDirectParent currentHeadingLevel lenStars
   _ <- char ' '
   modify (\s -> s {insideHeading = True})
-  prose <- proseParser $ whitespaceCompressor spaceConsumer
+  prose <- proseParser $ whitespaceCompressor onlySpaces
   _ <- char '\n'
   failIfLeftoverActiveStyles
   props <- propertiesDrawerParser
@@ -600,8 +600,6 @@ headingParser = do
           meta = props
         }
   where
-    spaceConsumer :: OrgParser Text
-    spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
     starsParser :: OrgParser Text
     starsParser = MP.takeWhile1P (Just "heading star") (\c -> c == '*')
 
@@ -661,7 +659,7 @@ propertiesEntryParser = do
   _ <- char ':'
   key <- MP.label "property key" . MP.some $ MP.noneOf ['\n', ':', ' ']
   _ <- char ':'
-  _ <- MP.takeWhile1P (Just "space") (== ' ')
+  _ <- onlySpaces
   value <-
     MP.manyTill
       (MP.label "property value" MP.anySingle)
@@ -673,10 +671,10 @@ proseParser spaceConsumer = do
   orgParserState <- get
   let avoidCitations =
         orgParserState.insideHeading || orgParserState.insideCitation
-  a <- MP.choice $ baseParsers avoidCitations
+  a <- MP.choice $ baseParsers avoidCitations --
   b <-
     MP.many
-      $ MP.choice (spacePTokenParser : baseParsers avoidCitations)
+      $ MP.choice (spacePTokenParser : baseParsers avoidCitations) --
   pure . Prose . filter nonEmpty $ a : b
   where
     spacePTokenParser = do
@@ -717,10 +715,8 @@ proseSpaceConsumer expectedIndentLen = do
     spaceConsumer =
       MP.choice
         [ newlineAndIndentParser expectedIndentLen,
-          spaces
+          onlySpaces
         ]
-    spaces :: OrgParser Text
-    spaces = MP.takeWhile1P (Just "prose space") (\c -> c == ' ')
     beLessGreedy :: OrgParser ()
     beLessGreedy = do
       orgParserState <- get
@@ -733,14 +729,16 @@ proseSpaceConsumer expectedIndentLen = do
 
 whitespaceCompressor :: OrgParser Text -> OrgParser Text
 whitespaceCompressor spaceConsumer = do
-  _ <- spaceConsumer
-
+  _ <- spaceConsumer --
   MP.lookAhead
     $ MP.choice
       [ MP.eof >> pure "",
-        footnoteReferenceParser >> pure "",
+        footnoteReferenceParser >> pure "", --
         MP.anySingle >> pure " "
       ]
+
+onlySpaces :: OrgParser Text
+onlySpaces = MP.takeWhile1P (Just "space") (== ' ')
 
 styleMarkers :: Map Char Style
 styleMarkers =
@@ -1493,15 +1491,12 @@ compressedTextParser disallowedChars ending = do
     compressWhitespace = T.unwords . T.words
     proseSpaceConsumer' :: Bool -> OrgParser Text --
     proseSpaceConsumer' insideCodeBlock
-      | insideCodeBlock = spaces
+      | insideCodeBlock = onlySpaces
       | otherwise =
           MP.choice
             [ string "\n",
-              spaces
+              onlySpaces
             ]
-      where
-        spaces :: OrgParser Text
-        spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
     proseParser' :: OrgParser Text -> OrgParser Text
     proseParser' spaceConsumer = do
       a <- MP.choice baseParsers
@@ -1623,7 +1618,7 @@ zeroIndent = do
 someIndent :: OrgParser (Int, Int)
 someIndent = do
   orgParserState <- get
-  indentFound <- T.length <$> MP.takeWhile1P (Just "indentation") (== ' ')
+  indentFound <- T.length <$> onlySpaces
   let levelsToDropPerIndentationIncrement :: [(Int, Int)]
       levelsToDropPerIndentationIncrement =
         zip [0 ..]
@@ -1677,7 +1672,7 @@ getEndingListMarkers levelsToDrop = concatMap f . take levelsToDrop
 listHeadIndentLevelParser :: OrgParser Level
 listHeadIndentLevelParser = do
   minimalIndentation
-  spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
+  spaces <- onlySpaces
   listHead <- unorderedHeadParser <|> orderedHeadParser
   let level =
         Level
@@ -1968,12 +1963,9 @@ tableFormulaParser = do
 
 captionParser :: OrgParser Prose
 captionParser = do
-  caption <- proseParser $ whitespaceCompressor spaceConsumer
+  caption <- proseParser $ whitespaceCompressor onlySpaces
   failIfLeftoverActiveStyles
   pure caption
-  where
-    spaceConsumer :: OrgParser Text
-    spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
 
 tableLineParser :: OrgParser [Prose]
 tableLineParser = do
@@ -1998,7 +1990,7 @@ tableHorizontalLine =
 tableRowParser :: OrgParser [Prose]
 tableRowParser = do
   _ <- char '|'
-  _ <- spaces
+  _ <- onlySpaces
   tableCells <- MP.some $ emptyTableCellParser <|> tableCellParser
   _ <- char '\n'
   orgParserState <- get
@@ -2011,32 +2003,28 @@ tableRowParser = do
     emptyTableCellParser :: OrgParser Prose
     emptyTableCellParser = do
       _ <- char '|'
-      _ <- MP.optional spaces
+      _ <- MP.optional onlySpaces
       pure $ Prose []
-    spaces :: OrgParser Text
-    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
 
 tableCellParser :: OrgParser Prose
 tableCellParser = do
   prose <- onlyMarkingCharacterParser <|> (proseParser $ whitespaceCompressor spacesInsideProse)
-  _ <- MP.optional spaces
+  _ <- MP.optional onlySpaces
   _ <- char '|'
-  _ <- MP.optional spaces
+  _ <- MP.optional onlySpaces
   pure $ compressProse prose
   where
-    spaces :: OrgParser Text
-    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
     spacesInsideProse :: OrgParser Text
     spacesInsideProse = do
-      _ <- MP.try $ MP.lookAhead (spaces >> tableCellContent)
-      spaces
+      _ <- MP.try $ MP.lookAhead (onlySpaces >> tableCellContent)
+      onlySpaces
     tableCellContent :: OrgParser ()
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
     onlyMarkingCharacterParser :: OrgParser Prose
     onlyMarkingCharacterParser = do
       c <- MP.satisfy (`elem` markingChars)
       _ <- MP.try . MP.lookAhead $ do
-        _ <- MP.takeWhile1P (Just "table whitespace (marking char)") (== ' ')
+        _ <- onlySpaces
         _ <- char '|'
         pure ()
       pure
@@ -2097,7 +2085,7 @@ footnoteReferenceParser = do
 footnoteDefinitionParser :: OrgParser Cell
 footnoteDefinitionParser = do
   name <- footnoteReferenceParser
-  _ <- spaces
+  _ <- onlySpaces
   modify (\s -> s {insideFootnoteDefinition = Just name})
   (CParagraph prose) <- paragraphParser
   orgParserState <- get
@@ -2118,9 +2106,6 @@ footnoteDefinitionParser = do
           }
     )
   pure $ CFootnote Footnote {name = name, body = prose}
-  where
-    spaces :: OrgParser Text
-    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 
 reconcileFootnotes :: OrgParser (Map Text (Int, Int))
 reconcileFootnotes = do
@@ -2271,7 +2256,10 @@ instance CiteprocOutput Prose where
         PTokenMathFragment mathFragment -> acc <> unparseMathFragment mathFragment
 
   fromText input = case MP.runParser
-    (runStateT customProseParser defaultOrgParserState)
+    ( runStateT
+        customProseParser --
+        defaultOrgParserState
+    )
     ""
     input of
     Left err -> error . T.pack $ MP.errorBundlePretty err
@@ -2283,7 +2271,12 @@ instance CiteprocOutput Prose where
         case leadingWhitespace of
           Nothing -> pure rest
           Just s ->
-            let w = PTokenStyledText StyledText {body = s, style = styleMaskFrom []}
+            let w =
+                  PTokenStyledText
+                    StyledText
+                      { body = s,
+                        style = styleMaskFrom []
+                      }
              in pure . Prose $ w : rest.unProse
       spaceConsumer :: OrgParser Text
       spaceConsumer = T.pack <$> intraCellWhitespaceParser
@@ -2440,7 +2433,11 @@ instance CiteprocOutput Prose where
       tryRearrange s punctCombo
         | (prefix, remainder) <- T.breakOn punctCombo s,
           not (T.null remainder) =
-            (True, prefix <> T.reverse punctCombo <> T.drop (T.length punctCombo) remainder)
+            ( True,
+              prefix
+                <> T.reverse punctCombo
+                <> T.drop (T.length punctCombo) remainder
+            )
         | otherwise = (False, s)
       punctCombos :: [Text]
       punctCombos =

@@ -861,6 +861,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:proseParser>>
 <<f:proseSpaceConsumer>>
 <<f:whitespaceCompressor>>
+<<f:onlySpaces>>
 <<f:styleMarkers>>
 <<f:failIfLeftoverActiveStyles>>
 <<f:styleMarkerParser>>
@@ -1532,13 +1533,19 @@ the overall parser.
 #+begin_src haskell
 detectInvalidIndentation :: OrgParser Cell
 detectInvalidIndentation = do
-  _ <- MP.hidden $ MP.takeWhile1P (Just "indentation") (== ' ')
+  _ <- MP.hidden $ onlySpaces
   void
     $ MP.fancyFailure
     . Set.singleton
     . MP.ErrorFail
     $ "invalid indentation"
   pure $ CListItem []
+#+end_src
+
+#+name: f:onlySpaces
+#+begin_src haskell
+onlySpaces :: OrgParser Text
+onlySpaces = MP.takeWhile1P (Just "space") (== ' ')
 #+end_src
 
 We signal the error with ~invalid ...~ so as to not shadow the typical ~unexpected
@@ -1894,7 +1901,7 @@ before
 
 Prose is a series of contiguous prose text, which can have some styling (bold,
 italic, etc) as well as links, citations, footnote links, etc, or /tokens/. So
-it's just a list of these /prose/ tokens (~PToken~).
+it's just a list of these /prose/ tokens ([[data:PToken]]).
 
 #+name: newtype:Prose
 #+begin_src haskell
@@ -1906,7 +1913,7 @@ newtype Prose = Prose
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-A =PToken= can be a [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][styled string]], [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][link]], [[id:a54a7762-a861-42b1-b2c8-2b760281052c][citation]], or [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][math fragment]]. For the
+A ~PToken~ can be a [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][styled string]], [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][link]], [[id:a54a7762-a861-42b1-b2c8-2b760281052c][citation]], or [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][math fragment]]. For the
 citation, we only store the index of it (starting from 0), to act as a "pointer"
 to the list of all citations in the entire document, collected in
 [[f:collectCitations]].
@@ -1928,14 +1935,16 @@ data PToken
 The ~PTokenDivStart~ and ~PTokenDivEnd~ markers are similar to the [[data:ListMarker]],
 in that they encode start and end points (in HTML). Specifically, they provide
 equivalent functionality of the ~CslDiv~ constructor for the ~CslJson~ type in
-=Citeproc=. Arguably the ~CslDiv~ is more elegant because it encodes a recursive
-list structure (by way of ~CslConcat~ and ~CslEmpty~), and also because it only
-needs a single constructor ~CslDiv~ whereas we require two (~PTokenDivStart~ and
-~PTokenDivEnd~). However this is the price we have to pay for not being recursive.
-It also makes parsing these things difficult, so we avoid parsing them
-altogether from raw text (notice how [[f:proseParser]] does not use them).
+~Citeproc~. This is needed in order to render citations (e.g., see [[id:82a9d21b-3779-492a-af39-bd3ea4ea875d::Expected bibliography for 0400-citeproc-basic][Expected
+bibliography for 0400-citeproc-basic]]). Arguably the ~CslDiv~ is more elegant
+because it encodes a recursive list structure (by way of ~CslConcat~ and
+~CslEmpty~), and also because it only needs a single constructor ~CslDiv~ whereas we
+require two (~PTokenDivStart~ and ~PTokenDivEnd~). However this is the price we have
+to pay for not being recursive. It also makes parsing these things difficult, so
+we avoid parsing them altogether from raw text (notice how [[f:proseParser]] does
+not use them).
 
-The ~proseParser~ can parse a series of [[data:PToken]] values. It is used by both
+The [[f:proseParser]] can parse a series of [[data:PToken]] values. It is used by both
 [[f:headingParser]] and [[f:paragraphParser]], because they both allow prose text in
 them. In particular, it avoids parsing [[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]] inside headings and also if
 we're already inside another citation (no nesting allowed).
@@ -1947,10 +1956,10 @@ proseParser spaceConsumer = do
   orgParserState <- get
   let avoidCitations =
         orgParserState.insideHeading || orgParserState.insideCitation
-  a <- MP.choice $ baseParsers avoidCitations
+  a <- MP.choice $ baseParsers avoidCitations -- (ref:invoke-baseParsers)
   b <-
     MP.many
-      $ MP.choice (spacePTokenParser : baseParsers avoidCitations)
+      $ MP.choice (spacePTokenParser : baseParsers avoidCitations) -- (ref:parse-spaces-and-ptokens)
   pure . Prose . filter nonEmpty $ a : b
   where
     spacePTokenParser = do
@@ -1983,73 +1992,81 @@ proseParser spaceConsumer = do
       PTokenDivEnd {} -> True
 #+end_src
 
-In [[f:proseParser]], we parse whitespace explicitly with =whitespaceCompressor= which
-consumes whitespace based on the provided =spaceConsumer=. We first parse among
-the non-whitespace parsers in =baseParsers=, then parse additional tokens that may
-include whitespace with =spacePTokenParser=. This way, we force the prose to
-initially start out without any indentation (because the preceding cell, if any,
-would have swallowed up trailing whitespace automatically via =lexeme= in
-[[f:cellParser]]); otherwise, [[f:detectInvalidIndentation]] would not get a chance to
-detect this (invalid) indentation.
+We first parse among the non-whitespace parsers in ~baseParsers~
+[[(invoke-baseParsers)]], then parse additional tokens that may include whitespace
+[[(parse-spaces-and-ptokens)]]. This way, we force the prose to initially start out
+without any indentation (because the preceding cell, if any, would have
+swallowed up trailing whitespace automatically via ~lexeme~ in [[f:cellParser]]);
+otherwise, [[f:detectInvalidIndentation]] would not get a chance to detect this
+(invalid) indentation.
 
-It may appear that we could alternatively skip past spaces inside prose text
-by making a =lexeme=-like wrapper which skips newlines /and spaces/ for each parser
-in =baseParsers=. However, that approach has a problem. Consider the case of
-parsing something like
+It may appear that we could alternatively skip past spaces inside prose text by
+making a ~lexeme~-like wrapper which skips newlines /and spaces/ for each parser in
+~baseParsers~. However, that approach has a problem. Consider the case of parsing
+something like
 
 #+begin_src org
 =foo=...
 #+end_src
 
-where the ~...~ will get parsed separately from the =foo=. We'll end up with two
-=PTokenStyledText= objects, one for =foo= and another for ~...~. This is a problem
+where the ~...~ will get parsed separately from the ~foo~. We'll end up with two
+~PTokenStyledText~ objects, one for ~foo~ and another for ~...~. This is a problem
 because we'll also parse
 
 #+begin_src org
 =foo= ...
 #+end_src
 
-exactly the same way as two =PTokenStyledText= objects. This is because the space
-between the =foo= and ~...~ will get eaten up by the wrapper /and discarded/.
+exactly the same way as two ~PTokenStyledText~ objects. This is because the space
+between the ~foo~ and ~...~ will get eaten up by the wrapper /and discarded/.
 And now we're in the position where we have to, on export, guess (due to
-information loss) if we need to insert whitespace between the =foo= and ~...~.
+information loss) if we need to insert whitespace between the ~foo~ and ~...~.
 
-Instead, explicitly parsing the whitespace with =whitespaceCompressor= lets us
+Instead, explicitly parsing the whitespace with [[f:whitespaceCompressor]] lets us
 parse the two cases above differently, because we save all whitespace we parsed
-as their own =PTokenStyledText= objects. We call it a "compressor" because no
-matter how many spaces the =spaceConsumer= consumes, we construct only 0 or 1
-space characters in the =StyledText= object.
+as their own ~PTokenStyledText~ objects. We call it a "compressor" because no
+matter how many spaces the ~spaceConsumer~ [[(whitespaceCompressor-spaceConsumer)]]
+consumes, we construct only 0 or 1 space characters in the [[data:StyledText]]
+object.
 
 #+name: f:whitespaceCompressor
 #+begin_src haskell
 whitespaceCompressor :: OrgParser Text -> OrgParser Text
 whitespaceCompressor spaceConsumer = do
-  _ <- spaceConsumer
-
+  _ <- spaceConsumer -- (ref:whitespaceCompressor-spaceConsumer)
   MP.lookAhead
     $ MP.choice
       [ MP.eof >> pure "",
-        footnoteReferenceParser >> pure "",
+        footnoteReferenceParser >> pure "", -- (ref:foonote-ref-whitespace)
         MP.anySingle >> pure " "
       ]
 #+end_src
 
-This parser only succeeds if it finds at least one non-newline whitespace
-character. Each time it succeeds, it "compresses" the whitespace to a single
-space character --- unless it sees that the input stream ends, in which case we
-use an empty string instead (0 space characters). Note that we also do a second
-level of "compression" in [[f:compressProse]], where we will drop =StyledText= objects
-with an empty string as the body.
+This parser only succeeds if the given ~spaceConsumer~ succeeds. And then it
+decides to report 0 or 1 space characters depending on what follows
+(~MP.lookAhead~). Note that we also do a second level of "compression" in
+[[f:compressProse]], where we will drop ~StyledText~ objects with an empty string as
+the body.
 
-Whitespace compression also happens when we detect [[id:4127feee-755d-430e-8fef-192e95143790][footnote]] references. This
-way, at weaving time it can ignore any whitespace between non-whitespace text
-and the footnote reference.
+Whitespace compression also happens when we detect [[id:4127feee-755d-430e-8fef-192e95143790][footnote]] references
+[[(foonote-ref-whitespace)]]. Specifically, if there is a prose token, some
+whitespace, and then a footnote reference, we ignore the whitespace. For
+example, if we have
+
+#+begin_src org
+foo [[fn:bar]]
+#+end_src
+
+then the space between ~foo~ and ~[[fn:bar]]~ is ignored. This way, when we weave
+this we can get the footnote number superscript "attached" to the ~foo~ instead of
+having it float around by itself which will look odd.
 
 ** Compatibility with ~CiteprocOutput~
 
 [[https://hackage.haskell.org/package/citeproc][Citeproc]] will read the [[id:15706715-c648-4866-b757-ea4a1aad0570][CSL style file (XML)]] to understand how to make formatting
-transformations (adding emphasis, changing cases, etc). The ~CiteprocOutput~
-typeclass instance describes all of these [[https://github.com/jgm/citeproc/blob/8078d4c25380a37e497c7d3dc4384691be8a2b8a/src/Citeproc/Types.hs#L186-L209][these transformations]]:
+transformations (adding emphasis, changing cases, etc) to citations based on the
+specific style. The ~CiteprocOutput~ typeclass instance describes all of these
+[[https://github.com/jgm/citeproc/blob/8078d4c25380a37e497c7d3dc4384691be8a2b8a/src/Citeproc/Types.hs#L186-L209][transformations]]:
 
 #+name: CiteprocOutput typeclass
 #+begin_src haskell
@@ -2153,13 +2170,16 @@ instance CiteprocOutput Prose where
 
 The functions ~toText~ and ~fromText~ are for converting the value (in this case
 [[newtype:Prose]]) to and from a textual representation. For us this means,
-converting [[newtype:Prose]] from text (parsing) and back to text again. Let's look
-at the parsing first.
+converting text to [[newtype:Prose]] (parsing) and back to text again. Let's look at
+the parsing first.
 
 #+name: instance:CiteprocOutput Prose:fromText
 #+begin_src haskell
 fromText input = case MP.runParser
-  (runStateT customProseParser defaultOrgParserState)
+  ( runStateT
+      customProseParser -- (ref:citeproc-customProseParser)
+      defaultOrgParserState
+  )
   ""
   input of
   Left err -> error . T.pack $ MP.errorBundlePretty err
@@ -2171,7 +2191,12 @@ fromText input = case MP.runParser
       case leadingWhitespace of
         Nothing -> pure rest
         Just s ->
-          let w = PTokenStyledText StyledText {body = s, style = styleMaskFrom []}
+          let w =
+                PTokenStyledText
+                  StyledText
+                    { body = s,
+                      style = styleMaskFrom []
+                    }
            in pure . Prose $ w : rest.unProse
     spaceConsumer :: OrgParser Text
     spaceConsumer = T.pack <$> intraCellWhitespaceParser
@@ -2183,12 +2208,12 @@ whitespace, because in regular Org documents we expect indentation to have
 semantic meaning for [[id:58f69993-599d-4389-ba47-3056b1bb2350][list items]]. However for citations, we don't expect to have
 to deal with list items at all, so we can still parse indentation. The only
 caveat is that we have to do it manually by creating a custom parser. That's
-what we do with the ~customProseParser~ helper above.
+what we do with the ~customProseParser~ [[(citeproc-customProseParser)]] helper above.
 
-The definition of ~toText~ is a bit more involved, though perhaps mechanical. The
-key is to convert the [[data:PToken]] values back into the Orgmode syntax. That way
-we can guarantee no loss of information going from ~Text~ to ~Prose~ and back again
-to ~Text~.
+The definition of ~toText~ is a bit more involved, though perhaps mechanical.
+The key is to convert the [[data:PToken]] values back into the Orgmode syntax. That
+way we can guarantee no loss of information going from ~Text~ to ~Prose~ and back
+again to ~Text~.
 
 #+name: instance:CiteprocOutput Prose:toText
 #+begin_src haskell
@@ -2570,7 +2595,11 @@ movePunctuationInsideQuotes prose =
     tryRearrange s punctCombo
       | (prefix, remainder) <- T.breakOn punctCombo s,
         not (T.null remainder) =
-          (True, prefix <> T.reverse punctCombo <> T.drop (T.length punctCombo) remainder)
+          ( True,
+            prefix
+              <> T.reverse punctCombo
+              <> T.drop (T.length punctCombo) remainder
+          )
       | otherwise = (False, s)
     punctCombos :: [Text]
     punctCombos =
@@ -5227,7 +5256,7 @@ different order.
 footnoteDefinitionParser :: OrgParser Cell
 footnoteDefinitionParser = do
   name <- footnoteReferenceParser
-  _ <- spaces
+  _ <- onlySpaces
   modify (\s -> s {insideFootnoteDefinition = Just name})
   (CParagraph prose) <- paragraphParser
   orgParserState <- get
@@ -5248,9 +5277,6 @@ footnoteDefinitionParser = do
           }
     )
   pure $ CFootnote Footnote {name = name, body = prose}
-  where
-    spaces :: OrgParser Text
-    spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
 #+end_src
 
 The document is expected to have only one contiguous group of footnote
@@ -7021,10 +7047,8 @@ proseSpaceConsumer expectedIndentLen = do
     spaceConsumer =
       MP.choice
         [ newlineAndIndentParser expectedIndentLen,
-          spaces
+          onlySpaces
         ]
-    spaces :: OrgParser Text
-    spaces = MP.takeWhile1P (Just "prose space") (\c -> c == ' ')
     beLessGreedy :: OrgParser ()
     beLessGreedy = do
       orgParserState <- get
@@ -7243,7 +7267,7 @@ headingParser = do
   failIfHeadingNestsWithoutDirectParent currentHeadingLevel lenStars
   _ <- char ' '
   modify (\s -> s {insideHeading = True})
-  prose <- proseParser $ whitespaceCompressor spaceConsumer
+  prose <- proseParser $ whitespaceCompressor onlySpaces
   _ <- char '\n'
   failIfLeftoverActiveStyles
   props <- propertiesDrawerParser
@@ -7269,8 +7293,6 @@ headingParser = do
           meta = props
         }
   where
-    spaceConsumer :: OrgParser Text
-    spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
     starsParser :: OrgParser Text
     starsParser = MP.takeWhile1P (Just "heading star") (\c -> c == '*')
 #+end_src
@@ -7670,7 +7692,7 @@ propertiesEntryParser = do
   _ <- char ':'
   key <- MP.label "property key" . MP.some $ MP.noneOf ['\n', ':', ' ']
   _ <- char ':'
-  _ <- MP.takeWhile1P (Just "space") (== ' ')
+  _ <- onlySpaces
   value <-
     MP.manyTill
       (MP.label "property value" MP.anySingle)
@@ -8484,15 +8506,12 @@ compressedTextParser disallowedChars ending = do
     compressWhitespace = T.unwords . T.words
     proseSpaceConsumer' :: Bool -> OrgParser Text -- (ref:proseSpaceConsumer')
     proseSpaceConsumer' insideCodeBlock
-      | insideCodeBlock = spaces
+      | insideCodeBlock = onlySpaces
       | otherwise =
           MP.choice
             [ string "\n",
-              spaces
+              onlySpaces
             ]
-      where
-        spaces :: OrgParser Text
-        spaces = MP.takeWhile1P (Just "space") (\c -> c == ' ')
     proseParser' :: OrgParser Text -> OrgParser Text
     proseParser' spaceConsumer = do
       a <- MP.choice baseParsers
@@ -9426,7 +9445,7 @@ existing list levels we have and how much indentation they expect.
 someIndent :: OrgParser (Int, Int)
 someIndent = do
   orgParserState <- get
-  indentFound <- T.length <$> MP.takeWhile1P (Just "indentation") (== ' ')
+  indentFound <- T.length <$> onlySpaces
   let levelsToDropPerIndentationIncrement :: [(Int, Int)]
       levelsToDropPerIndentationIncrement =
         zip [0 ..]
@@ -9580,7 +9599,7 @@ encoded in =listHeadIndentLevelParser= below.
 listHeadIndentLevelParser :: OrgParser Level
 listHeadIndentLevelParser = do
   minimalIndentation
-  spaces <- MP.takeWhile1P (Just "indentation") (== ' ')
+  spaces <- onlySpaces
   listHead <- unorderedHeadParser <|> orderedHeadParser
   let level =
         Level
@@ -11603,12 +11622,9 @@ enrich the [[f:metaParser]] to hold values that can be either raw text or prose.
 #+begin_src haskell
 captionParser :: OrgParser Prose
 captionParser = do
-  caption <- proseParser $ whitespaceCompressor spaceConsumer
+  caption <- proseParser $ whitespaceCompressor onlySpaces
   failIfLeftoverActiveStyles
   pure caption
-  where
-    spaceConsumer :: OrgParser Text
-    spaceConsumer = MP.takeWhile1P (Just "space") (== ' ')
 #+end_src
 
 The [[f:tableFormulaParser]] checks for a table formula line, which is neither
@@ -11673,7 +11689,7 @@ which is never expected to be the last line of a table.
 tableRowParser :: OrgParser [Prose]
 tableRowParser = do
   _ <- char '|'
-  _ <- spaces
+  _ <- onlySpaces
   tableCells <- MP.some $ emptyTableCellParser <|> tableCellParser
   _ <- char '\n'
   orgParserState <- get
@@ -11686,10 +11702,8 @@ tableRowParser = do
     emptyTableCellParser :: OrgParser Prose
     emptyTableCellParser = do
       _ <- char '|'
-      _ <- MP.optional spaces
+      _ <- MP.optional onlySpaces
       pure $ Prose []
-    spaces :: OrgParser Text
-    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
 #+end_src
 
 The ~emptyTableCellParser~ parses an empty table cell (because [[f:proseParser]]
@@ -11708,24 +11722,22 @@ extra columns that we don't want).
 tableCellParser :: OrgParser Prose
 tableCellParser = do
   prose <- onlyMarkingCharacterParser <|> (proseParser $ whitespaceCompressor spacesInsideProse)
-  _ <- MP.optional spaces
+  _ <- MP.optional onlySpaces
   _ <- char '|'
-  _ <- MP.optional spaces
+  _ <- MP.optional onlySpaces
   pure $ compressProse prose
   where
-    spaces :: OrgParser Text
-    spaces = MP.takeWhile1P (Just "table whitespace") (== ' ')
     spacesInsideProse :: OrgParser Text
     spacesInsideProse = do
-      _ <- MP.try $ MP.lookAhead (spaces >> tableCellContent)
-      spaces
+      _ <- MP.try $ MP.lookAhead (onlySpaces >> tableCellContent)
+      onlySpaces
     tableCellContent :: OrgParser ()
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
     onlyMarkingCharacterParser :: OrgParser Prose
     onlyMarkingCharacterParser = do
       c <- MP.satisfy (`elem` markingChars)
       _ <- MP.try . MP.lookAhead $ do
-        _ <- MP.takeWhile1P (Just "table whitespace (marking char)") (== ' ')
+        _ <- onlySpaces
         _ <- char '|'
         pure ()
       pure
