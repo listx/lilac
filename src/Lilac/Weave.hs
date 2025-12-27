@@ -1266,7 +1266,10 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
     f :: [Style] -> CslJson Text -> [PToken]
     f s = \case
       CslEmpty -> []
-      CslText t -> [PTokenStyledText StyledText {body = t, style = styleMaskFrom s}]
+      CslText t ->
+        [ PTokenStyledText
+            StyledText {body = t, style = styleMaskFrom s}
+        ]
       CslConcat a CslEmpty -> f s a
       CslConcat (CslConcat a b) c -> f s (CslConcat a (CslConcat b c))
       CslConcat a b -> f s a <> f s b

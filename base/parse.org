@@ -216,7 +216,7 @@ parseOrgDoc input = case MP.runParser
   ""
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
-  Right (orgDoc, _orgParserState) -> Right orgDoc
+  Right (orgDoc, _pState) -> Right orgDoc
 #+end_src
 
 The [[f:orgDocParser]] is itself composed of other parser combinators. The
@@ -869,11 +869,13 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:styledTextParser>>
 <<f:textParser>>
 <<f:escapedSymbolParser>>
+<<f:verbatimCodeParser>>
 <<f:slashSeparatedWords>>
 <<f:maskToStyles>>
 <<f:toStyleMask>>
 <<f:styleMaskFlip>>
 <<f:isVerbatim>>
+<<f:isCode>>
 <<f:isEmptyMask>>
 <<f:compressProse>>
 <<f:compressStyledText>>
@@ -1001,7 +1003,7 @@ orgDocParser = do
   lineLabels <- reconcileLineLabels
   footnoteRefs <- reconcileFootnotes
   citations <- collectCitations
-  orgParserState <- get
+  pState <- get
   resetState
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
@@ -1017,10 +1019,10 @@ orgDocParser = do
         CFootnote {}
         CCommand {} -> True
   let meaningfulCells = filter meaningfulCell cells -- (ref:drop-meaningless-cells)
-  when (orgParserState.cellNumber /= length meaningfulCells)
+  when (pState.cellNumber /= length meaningfulCells)
     $ fail
       ( "mismatch: cellNumber: "
-          <> show orgParserState.cellNumber
+          <> show pState.cellNumber
           <> " len meaningfulCells: "
           <> (show $ length meaningfulCells)
       )
@@ -1028,9 +1030,9 @@ orgDocParser = do
     $ OrgDoc
       { oid = docOid,
         cells = filter meaningfulCell cells,
-        pseudoEdges = orgParserState.pseudoEdges,
+        pseudoEdges = pState.pseudoEdges,
         footnoteRefs = footnoteRefs,
-        glossary = orgParserState.glossary,
+        glossary = pState.glossary,
         lineLabels = lineLabels,
         cslPath = cslPath,
         bibPaths = bibPaths,
@@ -1097,11 +1099,11 @@ skipNewlinesAndComments =
     whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = do
       _ <- MP.takeWhile1P (Just "newline") (== '\n') -- (ref:whiteSpaceParser-newline-only)
-      orgParserState <- get
+      pState <- get
       _ <-
         MP.optional
           . MP.label "indentation for next thing"
-          $ MP.count orgParserState.continuationIndent (char ' ')
+          $ MP.count pState.continuationIndent (char ' ')
       pure ()
     singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = L.skipLineComment "# " -- (ref:singleLineCommentParser)
@@ -1328,18 +1330,18 @@ lilacExtensionsParser = do
 
 The [[f:maxHeadingLevelParser]] resembles the [[f:docMetaEntryParser]], but the main
 difference is that it does not return anything (its type is ~OrgParser ()~).
-Instead it just modifies the ~orgParserState~.
+Instead it just modifies the ~pState~.
 
 #+name: f:maxHeadingLevelParser
 #+begin_src haskell
 maxHeadingLevelParser :: OrgParser ()
 maxHeadingLevelParser = do
-  orgParserState <- get
+  pState <- get
   _ <- string $ "#+lilac_maxHeadingLevel: "
   _ <- many $ char ' '
   val <- signedIntParser
-  let opc = orgParserState.orgParserConf {maxHeadingLevel = val}
-  put orgParserState {orgParserConf = opc}
+  let opc = pState.orgParserConf {maxHeadingLevel = val}
+  put pState {orgParserConf = opc}
 #+end_src
 
 The [[f:signedIntParser]] knows how to parse a signed integer. The
@@ -1366,12 +1368,12 @@ updates the ~orgParserConf~ field inside [[f:defaultOrgParserState]].
 #+begin_src haskell
 maxListLevelParser :: OrgParser ()
 maxListLevelParser = do
-  orgParserState <- get
+  pState <- get
   _ <- string $ "#+lilac_maxListLevel: "
   _ <- many $ char ' '
   val <- signedIntParser
-  let opc = orgParserState.orgParserConf {maxListLevel = val}
-  put orgParserState {orgParserConf = opc}
+  let opc = pState.orgParserConf {maxListLevel = val}
+  put pState {orgParserConf = opc}
 #+end_src
 
 ** Resetting of state
@@ -1953,9 +1955,9 @@ we're already inside another citation (no nesting allowed).
 #+begin_src haskell
 proseParser :: OrgParser Text -> OrgParser Prose
 proseParser spaceConsumer = do
-  orgParserState <- get
+  pState <- get
   let avoidCitations =
-        orgParserState.insideHeading || orgParserState.insideCitation
+        pState.insideHeading || pState.insideCitation
   a <- MP.choice $ baseParsers avoidCitations -- (ref:invoke-baseParsers)
   b <-
     MP.many
@@ -2905,13 +2907,13 @@ describe "Drop text chars from Prose" $ do
       `shouldBe` (CP.fromText "/aa/ b [[foo]]")
 #+end_src
 
-* Styled strings
+* Styled text
 :PROPERTIES:
 :ID:       b616c1e2-6b42-41cf-8e5d-c1832f95b59b
 :END:
 
-A =StyledText= is just some text that has one or more styles attached to it.  Here
-are some examples: *bold*, /italic/, _underline_, =verbatim=, and ~code~.
+A [[data:StyledText]] is just some text that has one or more styles attached to it.
+Here are some examples: *bold*, /italic/, _underline_, =verbatim=, and ~code~.
 
 #+name: data:StyledText
 #+begin_src haskell
@@ -2926,13 +2928,13 @@ data StyledText = StyledText
 
 The [[newtype:StyleMask]] is a low-level bit mask that can store multiple boolean
 values of each of the supported [[data:Style]] bits. If the string has no style,
-then it's not stylized at all and the =StyleMask= will be 0 (no bits set). See
+then it's not stylized at all and the mask will be 0 (no bits set). See
 [[id:87cd7d62-1f5c-4442-87ff-e1f2a68a8e56][=StyleMask= details]] for a discussion of how this data structure is used and
-transformed into a list of =Style= values. For now, we can just pretend that the
-=StyleMask= is like a list of [[data:Style]] values.
+transformed into a list of [[data:Style]] values. For now, we can just pretend that
+the ~StyleMask~ is like a list of [[data:Style]] values.
 
-In order to save some keystrokes, we use a couple functions, [[f:stext]] and
-[[f:ptext]].
+In order to save some keystrokes (especially in test cases), we use a couple
+functions, [[f:stext]] and [[f:ptext]].
 
 #+name: f:stext
 #+begin_src haskell
@@ -2967,9 +2969,9 @@ data Style
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-The =styleMarkers= keeps track of the characters that activate and deactivate each
-style. It has the syntactic characters we use to /mark/ text with the a supported
-/style/. Hence the term /style markers/.
+The [[f:styleMarkers]] keeps track of the characters that activate and deactivate
+each style. It has the syntactic characters we use to /mark/ text with the a
+supported /style/.
 
 We don't actually allow users to use the ~Smallcaps~, ~Subscript~, or ~Superscript~
 styles themselves (this is why they're missing from [[f:styleMarkers]]); these are
@@ -2989,8 +2991,8 @@ styleMarkers =
     ]
 #+end_src
 
-Characters in the =styleMarkers= can be escaped with a backslash. For example, the
-strings ~1\*2~ and ~a\_b~ are interpreted as ~1*2~ and ~a_b~, because they act to
+Characters in the [[f:styleMarkers]] can be escaped with a backslash. For example,
+the strings ~1\*2~ and ~a\_b~ are interpreted as ~1*2~ and ~a_b~, because they act to
 escape the style markers ~*~ and ~_~, respectively. If you want to write a literal
 backslash, you must use ~\\~. This use of the backslash as an escape character
 deviates from Orgmode.
@@ -3029,8 +3031,8 @@ shouldParseWith
 
 Parsing styled strings is somewhat tricky, because of two main problems:
 
-  1) the markers use the same character for both activation and deactivation,
-     and
+  1) the style markers use the same character for both activation and
+     deactivation, and
 
   2) the styles can be nested or interleaved.
 
@@ -3053,8 +3055,8 @@ this restriction.
 #+begin_src haskell
 failIfLeftoverActiveStyles :: OrgParser ()
 failIfLeftoverActiveStyles = do
-  orgParserState <- get
-  let (StyleMask mask) = orgParserState.styleMask
+  pState <- get
+  let (StyleMask mask) = pState.styleMask
   when (mask /= 0) $ do
     fail
       $ "leftover active styles: "
@@ -3125,12 +3127,10 @@ shouldFailWithMessage
   15
 #+end_src
 
-Note that we don't wait until seeing the closing marker to see if we should
-stylize the text at hand; the =StyleMask= is "strict" in this sense. This way, we
-can start parsing stylized text without needing to see a corresponding ending
-marker. This imperative style is easier to think about, and is one of the
-reasons why we decided to go with having the =StyleMask= in the
-[[data:OrgParserState]].
+Note that as soon as we see a style marker we stylize the text at hand; the
+~StyleMask~ is "strict" in this sense. This way, we can start parsing stylized
+text without needing to see a corresponding ending marker. This imperative style
+is easy to think about.
 
 The algorithm for parsing [[data:StyledText]] requires parsing style markers (and
 only style markers), or parsing other text that will be affected by style
@@ -3140,15 +3140,15 @@ markers. Let's first look at the simpler case, that of parsing style markers.
 #+begin_src haskell
 styleMarkerParser :: OrgParser StyledText
 styleMarkerParser = do
-  orgParserState <- get
+  pState <- get
 
-  let mask = orgParserState.styleMask
+  let mask = pState.styleMask
   c <- MP.satisfy $ isStyleMarker mask
   styleMask <- toStyleMask c
 
-  let newMask = styleMaskFlip mask styleMask
+  let newMask = styleMaskFlip mask styleMask -- (ref:call-styleMaskFlip)
+  put pState {styleMask = newMask}
 
-  put orgParserState {styleMask = newMask}
   pure
     StyledText
       { body = "",
@@ -3157,19 +3157,19 @@ styleMarkerParser = do
 #+end_src
 
 All we do is parse a single style marker character, and flip the bit for it as
-either on or off, with [[f:styleMaskFlip]]. Ideally we wouldn't even bother
-returning anything at the end of [[f:styleMarkerParser]] (because we've updated the
-~orgParserState~ and that's the only essential thing we must do). But because of
-the way it is used in [[f:proseParser]], we have to return a ~StyledText~. We return
-an empty ~body~ field though, so that we can filter it out in the ~nonEmpty~ helper
-in [[f:proseParser]].
+either on or off, with [[f:styleMaskFlip]] [[(call-styleMaskFlip)]]. Ideally we wouldn't
+even bother returning anything at the end of [[f:styleMarkerParser]] (because we've
+updated the ~pState~ and that's the only essential thing we must do). But because
+of the way it is used in [[f:proseParser]], we have to return a ~StyledText~. We
+return an empty ~body~ field though, so that we can filter it out with the
+~nonEmpty~ helper in [[f:proseParser]].
 
 We cannot parse multiple style markers in one go, because [[f:isStyleMarker]]
 changes behavior depending on the current active style mask. If we are in a
 verbatim or code style, we ignore all other style markers except for those that
 will end the current (verbatim or code) style. Otherwise, we won't be able to
 write stuff like ~*~ because we would think that the asterisk in there is starting
-a bold style (which it is not because it is surrounded by =~= to mark code).
+a bold style (which it is not because it is surrounded by ~\~~ to mark code).
 
 #+name: f:isStyleMarker
 #+begin_src haskell
@@ -3180,7 +3180,7 @@ isStyleMarker styleMask c
   | otherwise = member c styleMarkers
 #+end_src
 
-Parsing actual styled text requires reading the state of the =StyleMask=, and then
+Parsing actual styled text requires reading the state of the ~StyleMask~, and then
 reading some text. This is done in [[f:styledTextParser]]. It delegates essentially
 all of the work to [[f:textParser]].
 
@@ -3188,10 +3188,9 @@ all of the work to [[f:textParser]].
 #+begin_src haskell
 styledTextParser :: OrgParser StyledText
 styledTextParser = do
-  orgParserState <- get
+  pState <- get
 
-  let mask = orgParserState.styleMask
-
+  let mask = pState.styleMask
   text <- textParser mask
 
   pure
@@ -3209,50 +3208,48 @@ input.
 #+begin_src haskell
 textParser :: StyleMask -> OrgParser Text
 textParser styleMask
-  | isVerbatim styleMask = do
-      t <- MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
-      pure $ T.map newlineToSpace t
-  | isCode styleMask = do
-      t <- MP.takeWhile1P (Just "code") isNotCodeMarker
-      pure $ T.map newlineToSpace t
+  | isVerbatim styleMask || isCode styleMask = do
+      t <- verbatimCodeParser styleMask
+      pure $ T.map newlineToSpace t -- (ref:call-newlineToSpace)
   | otherwise = do
       o <- MP.getOffset
       word <-
         MP.choice
           [ MP.try $ slashSeparatedWords,
             MP.label "normal characters" normalChars,
-            escapedSymbolParser styleMask
+            escapedSymbolParser styleMask -- (ref:call-escapedSymbolParser)
           ]
-      orgParserState <- get
+      pState <- get
       let haveNotSeenGlossaryTermDelimiterYet =
-            orgParserState.insideParagraph && orgParserState.glossaryTermOffset == 0
+            pState.insideParagraph && pState.glossaryTermOffset == 0
           wordIsGlossaryTermDelimiter = word == "::" && isEmptyMask styleMask
-
-      when (haveNotSeenGlossaryTermDelimiterYet && wordIsGlossaryTermDelimiter) $ do
-        modify (\s -> s {glossaryTermOffset = o}) -- (ref:glossary-term-delimiter-detection)
+      when
+        ( haveNotSeenGlossaryTermDelimiterYet
+            && wordIsGlossaryTermDelimiter
+        )
+        $ do
+          modify (\s -> s {glossaryTermOffset = o}) -- (ref:glossary-term-delimiter-detection)
       pure word
   where
     newlineToSpace c = if c == '\n' then ' ' else c
-    isNotVerbatimMarker c = c /= '='
-    isNotCodeMarker c = c /= '~'
     normalChars :: OrgParser Text
     normalChars = do
       cs <- MP.some $ normalChar
       pure $ T.pack cs
     normalChar :: OrgParser Char
     normalChar = do
-      orgParserState <- get
+      pState <- get
       let toAvoid =
-            [ (orgParserState.insideCitation, string ";"),
-              (orgParserState.insideCitePrefix, citeIdParser),
-              ( orgParserState.insideCitation
-                  && (orgParserState.bracketBalance == 0),
+            [ (pState.insideCitation, string ";"),
+              (pState.insideCitePrefix, citeIdParser),
+              ( pState.insideCitation
+                  && (pState.bracketBalance == 0),
                 string "]"
               ),
-              (orgParserState.insideLinkDisplayName, string "]]"),
-              ( not orgParserState.insideCitation
-                  && not orgParserState.insideCitePrefix
-                  && not orgParserState.insideLinkDisplayName,
+              (pState.insideLinkDisplayName, string "]]"),
+              ( not pState.insideCitation
+                  && not pState.insideCitePrefix
+                  && not pState.insideLinkDisplayName,
                 string "[["
               )
             ]
@@ -3272,24 +3269,72 @@ textParser styleMask
         && (not $ c == '\\')
 #+end_src
 
-For the verbatim and code styles, we replace newlines with spaces, because in
-practice newlines can get inserted only because we're wrapping the source text
-(in Org mode) at 80 columns. If the user wants to put in a piece of multiline
-text with specific newlines, they should just use a source code block instead of
-an inline style.
+For the verbatim and code styles, we replace newlines with spaces with calls to
+~newlineToSpace~ [[(call-newlineToSpace)]], because in practice newlines can get
+inserted only because we're wrapping the source text (in Org mode) at 80
+columns. If the user wants to put in a piece of multiline text with specific
+newlines, they should just use a source code block instead of an inline verbatim
+or code style.
 
-Because of the way =isStyleMarker= and =isProseWord= checks membership of the
-characters used for activating (and deactivating) styles in [[f:styleMarkers]], we
-take special care to escape these characters with [[f:escapedSymbolParser]]. If the
-style markers are not escaped, using any of them will immediately try to
-activate or deactivate a style (modulo the special consideration for verbatim
-and code markers as discussed in [[f:isStyleMarker]], but also in
-[[f:slashSeparatedWords]]).
+The verbatim and code styles rely on [[f:verbatimCodeParser]] to parse text inside
+those styles. We support escaping the closing style marker with a backslash ~\\~,
+because this is the only way to allow using the styles with the closing markers.
+That is, if we just did a simple
 
-[[f:escapedSymbolParser]] also lets users insert a newline character with ~\n~. This
-way, you can write multiline text inside a table, even if the table is not
-taking up the full width of the HTML page (at which point the browser will
-insert soft newlines on its own).
+#+begin_src haskell
+MP.takeWhile1P (Just "code") (\c -> c /= '~')
+#+end_src
+
+then there would be no way to write something like
+
+#+begin_src txt
+~~~
+#+end_src
+
+to have ~\~~ (tilde) inside a code style. You'd have to write
+
+#+begin_src txt
+=~=
+#+end_src
+
+to enclose the tilde inside a verbatim style. However, because of
+[[(verbatimCodeParser-escapedSymbol)]], we can write
+
+#+begin_src txt
+~\~~
+#+end_src
+
+to stylize a single tilde with the code style. The disadvantage is that we have
+to always escape a backslash ~\\~ if we want just a single backslash without doing
+any escaping.
+
+#+name: f:verbatimCodeParser
+#+begin_src haskell
+verbatimCodeParser :: StyleMask -> OrgParser Text
+verbatimCodeParser styleMask = do
+  parts <-
+    MP.some
+      $ MP.choice
+        [ escapedSymbol, -- (ref:verbatimCodeParser-escapedSymbol)
+          MP.takeWhile1P Nothing isNotClosingOrEscape
+        ]
+  pure $ T.concat parts
+  where
+    escapedSymbol :: OrgParser Text
+    escapedSymbol = do
+      _ <- char '\\'
+      c <- MP.satisfy (\c -> not $ isSpace c)
+      if
+        | isVerbatim styleMask && c `elem` ['=', '\\'] -> pure $ T.singleton c
+        | isCode styleMask && c `elem` ['~', '\\'] -> pure $ T.singleton c
+        | otherwise -> pure $ "\\" <> T.singleton c
+    isNotClosingOrEscape c
+      | isVerbatim styleMask = c /= '=' && c /= '\\'
+      | otherwise = c /= '~' && c /= '\\'
+#+end_src
+
+Back to [[f:textParser]]. We take special care to escape style markers with
+[[f:escapedSymbolParser]] [[(call-escapedSymbolParser)]].
 
 #+name: f:escapedSymbolParser
 #+begin_src haskell
@@ -3310,19 +3355,24 @@ escapedSymbolParser styleMask = do
     _ -> s
 #+end_src
 
-The word =\vert{}= can be used to escape a pipe character inside [[data:Table][table]] cells,
+[[f:escapedSymbolParser]] also lets users insert a newline character with ~\n~. This
+way, you can write multiline text inside a table, even if the table is not
+taking up the full width of the HTML page (at which point the browser will
+insert soft newlines on its own).
+
+The word ~\vert{}~ can be used to escape a pipe character inside [[data:Table][table]] cells,
 because although our Megaparsec-powered parser is powerful enough to handle
-escaping pipe characters with =\|= (for consistency with =\/= to escape the italic
+escaping pipe characters with ~\|~ (for consistency with ~\/~ to escape the italic
 style marker), Orgmode is unable to deal with this in Emacs (so pressing ~TAB~
-will mess up the alignment of table cells). For this reason, we use =\vert{}=
+will mess up the alignment of table cells). For this reason, we use ~\vert{}~
 instead. Of course, outside of tables the pipe character can be written raw like
 this "|" without issue.
 
-There is one exception to this, and it's what we call "slash-separated words".
-These are cases where we see one or more slash characters inside an alphanumeric
-word, such as and/or, or a plain (non-math) fraction like 1/2, or even something
-like 1/2/3. In these cases, we don't want the slashes to be treated as italic
-style markers.
+There is one exception to the "style markers must always be balanced" rule, and
+it's what we call "slash-separated words". These are cases where we see one or
+more slash characters inside an alphanumeric word, such as and/or, or a plain
+(non-math) fraction like 1/2, or even something like 1/2/3. In these cases, we
+don't want the slashes to be treated as italic style markers.
 
 #+name: f:slashSeparatedWords
 #+begin_src haskell
@@ -3340,10 +3390,18 @@ slashSeparatedWords = do
       word <- wordParser
       pure $ "/" <> word
   when (lastWordIsMeaningless $ reverse remainingWords)
-    $ fail "last word is not meaningful; unlikely to be intended as a slash-separated-word"
+    $ fail
+      """
+      last word is not meaningful; unlikely to be
+      intended as a slash-separated-word
+      """
   let allWords = firstWord : remainingWords
   when (hasLinkDelimiter allWords)
-    $ fail "has link delimiter \"[[\"; unlikely to be intended as a slash-separated-word"
+    $ fail
+      """
+      has link delimiter \"[[\"; unlikely to be
+      intended as a slash-separated-word
+      """
   pure $ T.concat allWords
   where
     cannotStartWithClosingPunc :: OrgParser ()
@@ -3380,14 +3438,14 @@ See [[ti:0005-styled-strings-slash-separated-words]] for some real-world example
 :END:
 
 The previous section explained how we parse styled strings without getting into
-the implementation behind the =StyleMask=. We now get into these implementation
-details.
+the implementation behind the [[newtype:StyleMask]]. We now get into these
+implementation details.
 
-The =StyleMask= is an 8-bit word, which can hold boolean values for the 6
-different =Style= data constructors, e.g. [[data:Style][Bold, Italic, etc]]. It's a
-space-efficient type to replace an equivalent map or list of =[Style]= values. We
-use a =newtype= around a =Word8= (an 8-bit word) so as to keep it distinct from
-=Word8= itself.
+The ~StyleMask~ is an 8-bit word, which can hold boolean values for the 6
+different ~Style~ data constructors, e.g. [[data:Style][Bold, Italic, etc]]. It's a
+space-efficient type to replace an equivalent map or list of ~[Style]~ values. We
+use a ~newtype~ around a ~Word8~ (an 8-bit word) so as to keep it distinct from
+~Word8~ itself.
 
 #+name: newtype:StyleMask
 #+begin_src haskell
@@ -3397,11 +3455,11 @@ newtype StyleMask = StyleMask Word8
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-We have a custom =Show= instance because the default =Show= would just treat the
-=Word8= as a number. Instead we want to show what the binary bits (turned on
-inside the =Word8=) would represent in terms of actual styles. We have to import
-=Prelude= because of the way =Relude= redefines =show= (and we need to use the =show=
-that =Prelude= uses; see [[https://github.com/snoyberg/basic-prelude/issues/67#issuecomment-221628073][this related discussion for the Basic Prelude library, a
+We have a custom ~Show~ instance because the default ~Show~ would just treat the
+~Word8~ as a number. Instead we want to show what the binary bits (turned on
+inside the ~Word8~) would represent in terms of actual styles. We have to import
+~Prelude~ because of the way ~Relude~ redefines ~show~ (and we need to use the ~show~
+that ~Prelude~ uses; see [[https://github.com/snoyberg/basic-prelude/issues/67#issuecomment-221628073][this related discussion for the Basic Prelude library, a
 Relude alternative, for reference]]).
 
 #+name: instance:Show Stylemask
@@ -3423,11 +3481,9 @@ instance Show StyleMask where
 #+end_src
 
 The shown text string is prefixed with [[f:styleMaskFrom]] because that function is
-used as a constructor function to create a =StyleMask= easily from scratch;
-otherwise we'd have to write magic-looking numbers to construct =StyleMask=
-values, such as in test cases like [[ti:0005-styled-strings-messy-boundaries]]. This
-follows the tradition used in =Data.Map= where they also use a constructor
-function (=fromList=) when =show=-ing a =Map= data structure.
+used as a constructor function to create a ~StyleMask~ easily from scratch. This
+follows the tradition used in ~Data.Map~ where they also use a constructor
+function (~fromList~) when ~show~-ing a ~Map~ data structure.
 
 #+name: f:styleMaskFrom
 #+begin_src haskell
@@ -3439,7 +3495,7 @@ styleMaskFrom ss = StyleMask $ foldl' f (0 :: Word8) ss
 #+end_src
 
 Similarly, we sometimes want to go the other direction --- that is, deconstruct
-a =StyleMask= into =[Style]=. So we have [[f:maskToStyles]].
+a ~StyleMask~ into ~[Style]~. So we have [[f:maskToStyles]].
 
 #+name: f:maskToStyles
 #+begin_src haskell
@@ -3453,12 +3509,12 @@ maskToStyles (StyleMask mask) = foldl' f [] $ zip [0 ..] $ toListLE mask
         else acc
 #+end_src
 
-We have a helper function [[f:toStyleMask]] to convert =Char= into a =StyleMask=. This
-is used to [[f:styleMarkerParser][construct a style mask from a style marker]] in the input Org doc. The
-=toStyleMask= function runs inside a =MonadFail= monad, because the =Char= type could
-hold a value that is not a valid style marker. The use of =MonadFail= is seamless
-inside =ParsecT= (the monad we use inside =OrgParser=), because =ParsecT= has a
-=MonadFail= instance.
+We have a helper function [[f:toStyleMask]] to convert ~Char~ (a style marker
+character) into a ~StyleMask~. This is used to [[f:styleMarkerParser][construct a style mask from a
+style marker]] in the input Org doc. The ~toStyleMask~ function runs inside a
+~MonadFail~ monad, because the ~Char~ type could hold a value that is not a
+valid style marker. The use of ~MonadFail~ is seamless inside ~ParsecT~ (the
+monad we use inside ~OrgParser~), because ~ParsecT~ has a ~MonadFail~ instance.
 
 #+name: f:toStyleMask
 #+begin_src haskell
@@ -3474,9 +3530,9 @@ styleToStyleMask :: (MonadFail m) => Style -> m StyleMask
 styleToStyleMask s = pure $ StyleMask (setBit 0 $ fromEnum s)
 #+end_src
 
-[[f:styleMaskFlip]] is a helper to perform a binary XOR operation on two =StyleMask=
+[[f:styleMaskFlip]] is a helper to perform a binary XOR operation on two ~StyleMask~
 objects, so that callers don't have to perform the deconstruction and
-reconstruction of the underlying =Word8= primitive themselves. This operation is
+reconstruction of the underlying ~Word8~ primitive themselves. This operation is
 used to either turn on bits, or turn off bits if they're already on.
 
 #+name: f:styleMaskFlip
@@ -3491,7 +3547,10 @@ We also have some helpers to check whether particular styles are active.
 #+begin_src haskell
 isVerbatim :: StyleMask -> Bool
 isVerbatim (StyleMask a) = testBit a (fromEnum Verbatim)
+#+end_src
 
+#+name: f:isCode
+#+begin_src haskell
 isCode :: StyleMask -> Bool
 isCode (StyleMask a) = testBit a (fromEnum Code)
 #+end_src
@@ -3504,20 +3563,20 @@ isEmptyMask :: StyleMask -> Bool
 isEmptyMask (StyleMask a) = a == 0
 #+end_src
 
-We stated earlier around [[t:0005-styled-strings-leftover-active-styles]] that we don't
-have to wait to see the ending style marker to start parsing styled text. While
-this is true, the downside is that by the time we construct a =StyledText=, we
-have no knowledge of future =StyledText= objects that have not yet been parsed.
-This can lead to a proliferation of =StyledText= objects that all share the same
-style, but are still parsed into separate =PToken= objects. That is, instead of
-just one =PToken= with a single =StyledText= object with a sizable ~body~ field, we
+We stated earlier around [[t:0005-styled-strings-leftover-active-styles]] that we
+don't have to wait to see the ending style marker to start parsing styled text.
+While this is true, the downside is that by the time we construct a ~StyledText~,
+we have no knowledge of future ~StyledText~ objects that have not yet been parsed.
+This can lead to a proliferation of ~StyledText~ objects that all share the same
+style, but are still parsed into separate ~PToken~ objects. That is, instead of
+just one ~PToken~ with a single ~StyledText~ object with a sizable ~body~ field, we
 could end up with ~[PToken]~ where each of the elements has a small ~body~, but with
-the same overall meaning.
+the same overall style.
 
-Obviously, having a list of =PToken= objects when we can just have a single one is
+Obviously, having a list of ~PToken~ objects when we can just have a single one is
 problematic, if not wasteful. We want to join up sequences of styled text that
-share the same style, and make them use a single =StyledText= object. For this
-purpose, we have =compressProse=.
+share the same style, and make them use a single ~StyledText~ object. For this
+purpose, there is [[f:compressProse]].
 
 #+name: f:compressProse
 #+begin_src haskell
@@ -3525,7 +3584,7 @@ compressProse :: Prose -> Prose
 compressProse prose =
   Prose
     . reverse
-    . dropUnnecessary
+    . dropUnnecessary -- (ref:dropUnnecessary)
     $ foldl' f [] prose.unProse
   where
     f :: [PToken] -> PToken -> [PToken]
@@ -3534,7 +3593,8 @@ compressProse prose =
       ((t1@(PTokenStyledText (StyledText body1 style1))) : rest)
       t2@(PTokenStyledText (StyledText body2 style2))
         | style1 == style2 =
-            (PTokenStyledText $ StyledText (T.concat [body1, body2]) style1) : rest
+            (PTokenStyledText $ StyledText (T.concat [body1, body2]) style1)
+              : rest
         | otherwise = t2 : t1 : rest
     f acc token = token : acc
     dropUnnecessary [] = []
@@ -3548,11 +3608,11 @@ time (one that's already in the accumulator (~acc~) from the previous iteration
 and one from the current ~token~ at hand), joining them if they share the same
 style.
 
-=compressProse= also eliminates trailing whitespace, with =dropUnnecessary=.
-Trailing whitespace can occur if the last word of a paragraph at the end of the
-file ends with an active =StyleMask= followed by a newline (trailing whitespace
-between paragraphs can't occur because the =lexeme= in [[f:cellParser]] will skip past
-them). For example, if the input text looks like
+[[f:compressProse]] also eliminates trailing whitespace, with ~dropUnnecessary~
+[[(dropUnnecessary)]]. Trailing whitespace can occur if the last word of a paragraph
+at the end of the file ends with an active ~StyleMask~ followed by a newline
+(trailing whitespace between paragraphs can't occur because the ~lexeme~ in
+[[f:cellParser]] will skip past them). For example, if the input text looks like
 
 #+begin_src org
 _foo
@@ -3561,17 +3621,17 @@ bar_
 
 then the last underscore can be followed by a newline (assuming the editor used
 to edit this file is UNIX-friendly and appends a trailing newline), in which
-case that newline would get parsed by the =spaceConsumer= in [[f:paragraphParser]] as
-its own separate =StyledText= object as a single space character. We want to
+case that newline would get parsed by the ~spaceConsumer~ in [[f:paragraphParser]] as
+its own separate ~StyledText~ object as a single space character. We want to
 eliminate these objects because they don't add any useful information for Lilac
-itself, and so we use =dropUnnecessary= above to filter them out.
+itself, and so we use ~dropUnnecessary~ above to filter them out.
 
-=dropUnnecessary= also removes tokens with an empty string as the =StyledText=
+~dropUnnecessary~ also removes tokens with an empty string as the ~StyledText~
 object. This can occur when we parse trailing newlines at the end of the line
 even without style markers, from [[f:whitespaceCompressor]].
 
-Here we test how we minimize the number of =PToken= objects; although the
-individual letters are spaced out with multiple spaces, we only use two =PToken=
+Here we test how we minimize the number of ~PToken~ objects; although the
+individual letters are spaced out with multiple spaces, we only use two ~PToken~
 objects (one for the plain text and another for the bold text) and each of these
 objects have just single spaces between the letters.
 
@@ -3671,7 +3731,7 @@ Below we mix things up a bit more, using more styles.
 #+name: ti:0005-styled-strings-complex
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-complex
 #+begin_src org
-,*foo /bar _underlined  bold  and  italic_/ baz* =verbatim  text= ~x  y  z~ *bold*
+,*foo /bar _underlined  bold italic_/ baz* =verbatim  text= ~x  y  z~ *bold*
 #+end_src
 
 #+name: t:0005-styled-strings-complex
@@ -3690,7 +3750,7 @@ shouldParseWith
 #+begin_src haskell
 [ ptext "foo " [Bold],
   ptext "bar " [Bold, Italic],
-  ptext "underlined bold and italic" [Bold, Italic, Underline],
+  ptext "underlined bold italic" [Bold, Italic, Underline],
   ptext " baz" [Bold],
   ptext " " [],
   ptext "verbatim  text" [Verbatim],
@@ -3766,7 +3826,7 @@ shouldParseWith
 ]
 #+end_src
 
-This is another test, involving the =Verbatim= style. It checks the case where we
+This is another test, involving the ~Verbatim~ style. It checks the case where we
 have a style marker inside a word (not at the usual beginning or end of a word).
 
 #+name: ti:0005-styled-strings-verbatim
@@ -3796,7 +3856,7 @@ shouldParseWith
 #+end_src
 
 This is another test to check that the bold style marker (asterisk) is ignored
-if it immediately follows a verbatim or code marker.
+if inside a verbatim or code marker.
 
 #+name: ti:0005-styled-strings-verbatim-code-ignore-immediate-bold
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-verbatim-code-ignore-immediate-bold
@@ -3885,6 +3945,43 @@ shouldParseWith
   CParagraph
     $ Prose
       [ ptext "[[bar]]" [Code]
+      ]
+]
+#+end_src
+
+[[ti:0005-styled-strings-escaping]] checks how we handle symbol escaping inside
+verbatim and code styles (compare against [[f:verbatimCodeParser]]).
+
+#+name: ti:0005-styled-strings-escaping
+#+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-escaping
+#+begin_src org
+=\\= =\== =\(= ~\\~ ~\~~ ~\(~
+#+end_src
+
+#+name: t:0005-styled-strings-escaping
+#+begin_src haskell
+shouldParseWith
+  "0005-styled-strings-escaping"
+  $ nilOrgDoc
+    <<Expected prose for 0005-styled-strings-escaping>>
+    []
+#+end_src
+
+#+name: Expected prose for 0005-styled-strings-escaping
+#+begin_src haskell
+[ CParagraph
+    $ Prose
+      [ ptext "\\" [Verbatim],
+        ptext " " [],
+        ptext "=" [Verbatim],
+        ptext " " [],
+        ptext "\\(" [Verbatim],
+        ptext " " [],
+        ptext "\\" [Code],
+        ptext " " [],
+        ptext "~" [Code],
+        ptext " " [],
+        ptext "\\(" [Code]
       ]
 ]
 #+end_src
@@ -4083,8 +4180,8 @@ precedence over parsing links. See, for example
 #+begin_src haskell
 failIfVerbatimOrCode :: OrgParser ()
 failIfVerbatimOrCode = do
-  orgParserState <- get
-  let mask = orgParserState.styleMask
+  pState <- get
+  let mask = pState.styleMask
   when (isVerbatim mask || isCode mask)
     $ fail "aborting because verbatim or code style is active"
 #+end_src
@@ -4112,8 +4209,8 @@ oidLinkParser = do
   _ <- string "[["
   avoidParsingKnownProtocols
   (oid, name) <- oidReferenceParser "[]" "]]"
-  orgParserState <- get
-  let mask = orgParserState.styleMask
+  pState <- get
+  let mask = pState.styleMask
       implicitName
         | T.null name = "id:" <> T.show oid
         | otherwise = name
@@ -4134,7 +4231,7 @@ oidLinkParser = do
           { oid = oid,
             name = name
           }
-      edge = PseudoEdge (orgParserState.cellNumber, linkOid)
+      edge = PseudoEdge (pState.cellNumber, linkOid)
   modify (\s -> s {OrgParserState.pseudoEdges = edge : s.pseudoEdges})
   pure
     $ Link
@@ -4165,13 +4262,13 @@ reuse the same [[f:proseSpaceConsumer]] that [[f:paragraphParser]] uses.
 #+begin_src haskell
 linkDisplayNameParser :: OrgParser [StyledText]
 linkDisplayNameParser = do
-  orgParserState <- get
+  pState <- get
   modify (\s -> s {insideLinkDisplayName = True})
   linkDisplayName <-
     MP.between
       (string "[")
       (string "]]")
-      (proseParser' $ proseSpaceConsumer orgParserState.continuationIndent)
+      (proseParser' $ proseSpaceConsumer pState.continuationIndent)
   modify (\s -> s {insideLinkDisplayName = False})
   pure linkDisplayName
   where
@@ -4480,21 +4577,21 @@ the same as [[f:assertUniqueCellName]].
 #+begin_src haskell
 assertUniqueLineLabel :: Text -> Int -> OrgParser ()
 assertUniqueLineLabel lineLabel offset = do
-  orgParserState <- get
-  when (member lineLabel orgParserState.lineLabels) $ do
+  pState <- get
+  when (member lineLabel pState.lineLabels) $ do
     MP.setOffset offset
     fail
       $ "line label "
       <> show lineLabel
       <> " is not unique"
-  let num = orgParserState.lineLabelNumber + 1
+  let num = pState.lineLabelNumber + 1
   put
-    orgParserState
+    pState
       { lineLabels =
           insert
             lineLabel
             num
-            orgParserState.lineLabels,
+            pState.lineLabels,
         lineLabelNumber = num
       }
 #+end_src
@@ -4566,9 +4663,9 @@ of [[f:reconcileFootnotes]].
 #+begin_src haskell
 reconcileLineLabels :: OrgParser (Map Text Int)
 reconcileLineLabels = do
-  orgParserState <- get
-  let referenced = orgParserState.lineLabelReferences
-      defined = M.keysSet orgParserState.lineLabels
+  pState <- get
+  let referenced = pState.lineLabelReferences
+      defined = M.keysSet pState.lineLabels
       brokenLinks = Set.difference referenced defined
       unusedDefs = Set.difference defined referenced
       hasBrokenLinks = length brokenLinks /= 0
@@ -4578,7 +4675,7 @@ reconcileLineLabels = do
   if
     | hasBrokenLinks -> fail $ "broken line label links: " <> brokenLinksMsg
     | hasUnusedDefs -> fail $ "unused line labels: " <> unusedDefsMsg
-    | otherwise -> pure orgParserState.lineLabels
+    | otherwise -> pure pState.lineLabels
 #+end_src
 
 *** Tangling behavior
@@ -4615,8 +4712,8 @@ protocolWebLinkParser = do
       (string "]")
       uriParser
 
-  orgParserState <- get
-  let mask = orgParserState.styleMask
+  pState <- get
+  let mask = pState.styleMask
       implicitName = maybeUri
       implicitNameStyledText =
         StyledText
@@ -4751,8 +4848,8 @@ fileLinkParser = do
       (string "]")
       filePathParser
 
-  orgParserState <- get
-  let mask = orgParserState.styleMask
+  pState <- get
+  let mask = pState.styleMask
       implicitName = maybeFilePath
       implicitNameStyledText =
         StyledText
@@ -5183,15 +5280,15 @@ style it (with a numeric superscript).
 footnoteLinkParser :: OrgParser Link
 footnoteLinkParser = do
   name <- footnoteReferenceParser
-  orgParserState <- get
-  displayName <- case lookup name orgParserState.footnoteRefs of
+  pState <- get
+  displayName <- case lookup name pState.footnoteRefs of
     Nothing -> do
-      let newFootnoteNumber = orgParserState.footnoteNumber + 1
+      let newFootnoteNumber = pState.footnoteNumber + 1
           newFootnoteRefs =
             insert
               name
-              (newFootnoteNumber, orgParserState.cellNumber)
-              orgParserState.footnoteRefs
+              (newFootnoteNumber, pState.cellNumber)
+              pState.footnoteRefs
       modify
         ( \s ->
             s
@@ -5259,11 +5356,11 @@ footnoteDefinitionParser = do
   _ <- onlySpaces
   modify (\s -> s {insideFootnoteDefinition = Just name})
   (CParagraph prose) <- paragraphParser
-  orgParserState <- get
+  pState <- get
   o <- MP.getOffset
   when
-    ( (not orgParserState.prevCellIsFootnote)
-        && (orgParserState.footnoteDefinitions /= M.empty)
+    ( (not pState.prevCellIsFootnote)
+        && (pState.footnoteDefinitions /= M.empty)
     )
     $ do
       MP.setOffset o
@@ -5272,7 +5369,7 @@ footnoteDefinitionParser = do
     ( \s ->
         s
           { footnoteDefinitions =
-              insert name prose orgParserState.footnoteDefinitions,
+              insert name prose pState.footnoteDefinitions,
             insideFootnoteDefinition = Nothing
           }
     )
@@ -5292,9 +5389,9 @@ definition without an associated link, it's considered an error.
 #+begin_src haskell
 reconcileFootnotes :: OrgParser (Map Text (Int, Int))
 reconcileFootnotes = do
-  orgParserState <- get
-  let referenced = M.keysSet orgParserState.footnoteRefs
-      defined = M.keysSet orgParserState.footnoteDefinitions
+  pState <- get
+  let referenced = M.keysSet pState.footnoteRefs
+      defined = M.keysSet pState.footnoteDefinitions
       brokenLinks = Set.difference referenced defined
       unusedDefs = Set.difference defined referenced
       hasBrokenLinks = length brokenLinks /= 0
@@ -5304,7 +5401,7 @@ reconcileFootnotes = do
   if
     | hasBrokenLinks -> fail $ "broken footnote links: " <> brokenLinksMsg
     | hasUnusedDefs -> fail $ "unused footnote definitions: " <> unusedDefsMsg
-    | otherwise -> pure orgParserState.footnoteRefs
+    | otherwise -> pure pState.footnoteRefs
 #+end_src
 
 *** Tests
@@ -5684,10 +5781,10 @@ processor, but we do not, for simplicity.
 bibliographyLocationParser :: OrgParser Cell
 bibliographyLocationParser = do
   _ <- string "#+print_bibliography:"
-  orgParserState <- get
-  when (orgParserState.cslPath == Nothing)
+  pState <- get
+  when (pState.cslPath == Nothing)
     $ fail "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
-  when (orgParserState.bibPaths == [])
+  when (pState.bibPaths == [])
     $ fail "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   pure $ CCommand PrintBibliography
 #+end_src
@@ -5814,11 +5911,11 @@ structures.
 citationParser :: OrgParser Int
 citationParser = do
   failIfVerbatimOrCode
-  orgParserState <- get
+  pState <- get
   _ <- string "[cite"
-  when (orgParserState.cslPath == Nothing)
+  when (pState.cslPath == Nothing)
     $ fail "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
-  when (orgParserState.bibPaths == [])
+  when (pState.bibPaths == [])
     $ fail "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   modify (\s -> s {insideCitation = True})
   sv1 <- MP.optional $ char '/' >> MP.label "style variation 1" svParser
@@ -5845,8 +5942,8 @@ citationParser = do
   _ <- MP.optional intraCellWhitespaceParser
   _ <- char ']'
   let maybeNoteNumber = do
-        footnoteName <- orgParserState.insideFootnoteDefinition
-        fmap fst $ lookup footnoteName orgParserState.footnoteRefs
+        footnoteName <- pState.insideFootnoteDefinition
+        fmap fst $ lookup footnoteName pState.footnoteRefs
       c =
         Citation
           { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
@@ -5862,7 +5959,7 @@ citationParser = do
             citations = c : s.citations
           }
     )
-  pure $ length orgParserState.citations
+  pure $ length pState.citations
   where
     svParser :: OrgParser [Char]
     svParser =
@@ -5910,8 +6007,8 @@ citation at a time.
 #+begin_src haskell
 collectCitations :: OrgParser [Citation]
 collectCitations = do
-  orgParserState <- get
-  pure $ reverse orgParserState.citations
+  pState <- get
+  pure $ reverse pState.citations
 #+end_src
 
 The [[f:citeParser]] parses a single [[data:Cite]]. A cite is composed of four pieces:
@@ -6148,8 +6245,8 @@ cite /id/ such as ~@foo~).
 citeAffixParser :: Bool -> OrgParser Prose
 citeAffixParser isPrefix = do
   modify (\s -> s {insideCitePrefix = isPrefix})
-  orgParserState <- get
-  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer orgParserState.continuationIndent
+  pState <- get
+  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer pState.continuationIndent
   modify (\s -> s {insideCitePrefix = False})
   failIfLeftoverActiveStyles
   failIfUnbalancedBrackets
@@ -6163,8 +6260,8 @@ have not been balanced by the end of the citation.
 #+begin_src haskell
 failIfUnbalancedBrackets :: OrgParser ()
 failIfUnbalancedBrackets = do
-  orgParserState <- get
-  when (orgParserState.bracketBalance /= 0) $ do
+  pState <- get
+  when (pState.bracketBalance /= 0) $ do
     fail "unbalanced brackets"
 #+end_src
 
@@ -6978,13 +7075,13 @@ mathFragmentInlineParser :: OrgParser MathFragment
 mathFragmentInlineParser = do
   failIfVerbatimOrCode
 
-  orgParserState <- get
+  pState <- get
   _ <- string "\\("
   latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
   pure
     MathFragment
       { parentOid =
-          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+          firstParentOid pState.docOid pState.headingOidStack,
         meta = fromList [],
         body = T.pack latex
       }
@@ -7018,14 +7115,14 @@ paragraph.
 #+begin_src haskell
 paragraphParser :: OrgParser Cell
 paragraphParser = do
-  orgParserState <- get
+  pState <- get
   modify (\s -> s {insideParagraph = True, glossaryTermOffset = 0})
-  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer orgParserState.continuationIndent
+  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer pState.continuationIndent
   failIfLeftoverActiveStyles
-  orgParserState' <- get
+  pState' <- get
   modify (\s -> s {insideParagraph = False})
-  if orgParserState'.glossaryTermOffset > 0
-    then convertToGlossaryTerm prose orgParserState'.glossaryTermOffset -- (ref:check-for-glossaryTerm)
+  if pState'.glossaryTermOffset > 0
+    then convertToGlossaryTerm prose pState'.glossaryTermOffset -- (ref:check-for-glossaryTerm)
     else pure . CParagraph $ compressProse prose
 #+end_src
 
@@ -7051,9 +7148,9 @@ proseSpaceConsumer expectedIndentLen = do
         ]
     beLessGreedy :: OrgParser ()
     beLessGreedy = do
-      orgParserState <- get
+      pState <- get
       let toAvoid =
-            [ (orgParserState.insideCitePrefix, spaceConsumer >> citeIdParser)
+            [ (pState.insideCitePrefix, spaceConsumer >> citeIdParser)
             ]
       forM_
         toAvoid
@@ -7248,15 +7345,15 @@ easy to have simple rules for it.
 #+begin_src haskell
 headingParser :: OrgParser Cell
 headingParser = do
-  orgParserState <- get
+  pState <- get
   _ <- MP.try $ MP.lookAhead (starsParser >> char ' ')
-  let opc = orgParserState.orgParserConf
+  let opc = pState.orgParserConf
   stars <- starsParser
   when (opc.maxHeadingLevel < 0) $ do
     fail
       $ "headings prohibited because lilac_maxHeadingLevel < 0"
   let lenStars = T.length stars
-      currentHeadingLevel = orgParserState.headingLevel
+      currentHeadingLevel = pState.headingLevel
   when (opc.maxHeadingLevel > 0 && lenStars > opc.maxHeadingLevel) $ do
     fail
       $ "found "
@@ -7271,14 +7368,14 @@ headingParser = do
   _ <- char '\n'
   failIfLeftoverActiveStyles
   props <- propertiesDrawerParser
-  let newHeadingSection = genSectionNumber lenStars orgParserState.headingSectionNumber
+  let newHeadingSection = genSectionNumber lenStars pState.headingSectionNumber
       newHeadingOidStack =
         genHeadingOidStack
           (lookup "ID" props)
           lenStars
-          orgParserState.headingOidStack
+          pState.headingOidStack
   put
-    orgParserState
+    pState
       { headingLevel = lenStars,
         headingSectionNumber = newHeadingSection,
         headingOidStack = newHeadingOidStack,
@@ -7967,14 +8064,14 @@ that is, no two code blocks may share the same tangle path.
 #+begin_src haskell
 assertUniqueTanglePath :: Text -> Text -> Int -> OrgParser ()
 assertUniqueTanglePath "tangle" path offset = do
-  orgParserState <- get
-  when (Set.member path orgParserState.tanglePaths)
+  pState <- get
+  when (Set.member path pState.tanglePaths)
     $ do
       MP.setOffset $ offset
       fail $ "tangle path " <> show path <> " is not unique"
   put
-    orgParserState
-      { tanglePaths = Set.insert path orgParserState.tanglePaths
+    pState
+      { tanglePaths = Set.insert path pState.tanglePaths
       }
 assertUniqueTanglePath _ _ _ = pure ()
 #+end_src
@@ -8012,15 +8109,15 @@ once, which is not allowed.
 #+begin_src haskell
 assertUniqueCellName :: Text -> OrgParser ()
 assertUniqueCellName cellName = do
-  orgParserState <- get
-  when (Set.member cellName orgParserState.cellNames)
+  pState <- get
+  when (Set.member cellName pState.cellNames)
     . fail
     $ "cell name "
     <> show cellName
     <> " is not unique"
   put
-    orgParserState
-      { cellNames = Set.insert cellName orgParserState.cellNames
+    pState
+      { cellNames = Set.insert cellName pState.cellNames
       }
 #+end_src
 
@@ -8075,7 +8172,7 @@ Let's see how we parse the block itself with =blockParser=.
 #+begin_src haskell
 blockParser :: OrgParser Cell
 blockParser = do
-  orgParserState <- get
+  pState <- get
   (blockName, metaKVs, blockType, srcLang) <- blockStartParser
   let nowebOff =
         (== Just "off")
@@ -8090,15 +8187,15 @@ blockParser = do
         someBTokensParser blockType (not nowebOff) (not lineLabelOff)
       ]
   let newAnonBlockNumber = case blockName of
-        Just _ -> orgParserState.anonBlockNumber
-        Nothing -> orgParserState.anonBlockNumber + 1
+        Just _ -> pState.anonBlockNumber
+        Nothing -> pState.anonBlockNumber + 1
       anonBlockMeta = case blockName of
         Just _ -> Nothing
         Nothing -> Just ("__anon_block_number", T.show newAnonBlockNumber)
       block =
         Block
           { parentOid =
-              firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+              firstParentOid pState.docOid pState.headingOidStack,
             meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
@@ -8465,9 +8562,9 @@ oidReferenceParser disallowedChars ending =
       name <- targetName
       pure (oid, name)
     implicit = do
-      orgParserState <- get
+      pState <- get
       name <- targetName
-      pure (orgParserState.docOid, name)
+      pure (pState.docOid, name)
     targetName :: OrgParser Text
     targetName = compressedTextParser disallowedChars ending
 #+end_src
@@ -8496,11 +8593,11 @@ though they are written slightly differently.
 #+begin_src haskell
 compressedTextParser :: [Char] -> [Char] -> OrgParser Text
 compressedTextParser disallowedChars ending = do
-  orgParserState <- get
+  pState <- get
   tn <-
     proseParser'
       $ proseSpaceConsumer'
-        orgParserState.insideCodeBlock
+        pState.insideCodeBlock
   pure $ compressWhitespace tn
   where
     compressWhitespace = T.unwords . T.words
@@ -9420,9 +9517,9 @@ captured by =someIndent= in the same function.
 #+begin_src haskell
 zeroIndent :: OrgParser (Int, Int)
 zeroIndent = do
-  orgParserState <- get
+  pState <- get
   _ <- MP.eof <|> MP.notFollowedBy (char ' ')
-  let listLevelsToClose = length orgParserState.listLevels
+  let listLevelsToClose = length pState.listLevels
       continuationIndent = 0 :: Int
   pure (listLevelsToClose, continuationIndent)
 #+end_src
@@ -9444,13 +9541,13 @@ existing list levels we have and how much indentation they expect.
 #+begin_src haskell
 someIndent :: OrgParser (Int, Int)
 someIndent = do
-  orgParserState <- get
+  pState <- get
   indentFound <- T.length <$> onlySpaces
   let levelsToDropPerIndentationIncrement :: [(Int, Int)]
       levelsToDropPerIndentationIncrement =
         zip [0 ..]
           . map getContinuationIndentForLevel
-          $ orgParserState.listLevels
+          $ pState.listLevels
       matchingIndent =
         find
           (\(_, continuationIndent) -> indentFound == continuationIndent)
@@ -9460,9 +9557,9 @@ someIndent = do
     Just x -> pure x
 #+end_src
 
-It should be noted that the ~orgParserState.listLevels~ is grown by prepending to
+It should be noted that the ~pState.listLevels~ is grown by prepending to
 the list in [[f:listItemNester]]. So the most-deeply-nested level will be at the
-head of the list in ~orgParserState.listLevels~. That's why we use ~zip [0 ..]~ ---
+head of the list in ~pState.listLevels~. That's why we use ~zip [0 ..]~ ---
 we want to drop 0 levels if we see indentation matching the most deeply-nested
 list item.
 
@@ -9503,17 +9600,17 @@ we do in [[f:listItemsEndParser]].
 #+begin_src haskell
 listItemsEndParser :: OrgParser Cell
 listItemsEndParser = do
-  orgParserState <- get
-  when (null orgParserState.listMarkers) $ do
+  pState <- get
+  when (null pState.listMarkers) $ do
     fail "no pending ListMarker objects to close off" -- (ref:list-items-end-failure-with-no-input)
-  when (orgParserState.continuationIndent /= 0) $ do
+  when (pState.continuationIndent /= 0) $ do
     fail "not at beginning of line"
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
-  let markers = getEndingListMarkers levelsToDrop orgParserState.listLevels
+  let markers = getEndingListMarkers levelsToDrop pState.listLevels
   put
-    orgParserState
-      { listLevels = drop levelsToDrop orgParserState.listLevels,
-        listMarkers = drop (levelsToDrop * 2) orgParserState.listMarkers,
+    pState
+      { listLevels = drop levelsToDrop pState.listLevels,
+        listMarkers = drop (levelsToDrop * 2) pState.listMarkers,
         continuationIndent = continuationIndent
       }
   pure $ CListItem markers
@@ -9522,8 +9619,8 @@ listItemsEndParser = do
 In [[f:listItemsEndParser]], note that we initially fail the parser if there are no
 pending =ListMarker= objects (no list levels to close off), or if we're not at the
 beginning of the line (because otherwise we cannot measure indentation
-accurately), by checking =orgParserState.continuationIndent=. This check of
-=orgParserState.continuationIndent= is required because there is no easy way to
+accurately), by checking =pState.continuationIndent=. This check of
+=pState.continuationIndent= is required because there is no easy way to
 check for the just-parsed token (or character) in Megaparsec --- all parsers
 only see what's in front of it. So then it's up to other parsers to set this to
 some value greater than =1= (we do this in [[f:listHeadIndentLevelParser]] which is
@@ -9664,8 +9761,8 @@ This is what we do in =listItemStartParser= below.
 listItemStartParser :: OrgParser Cell
 listItemStartParser = do
   _ <- MP.try $ MP.lookAhead listHeadIndentLevelParser
-  orgParserState <- get
-  let levels = orgParserState.listLevels
+  pState <- get
+  let levels = pState.listLevels
   level <- listHeadIndentLevelParser
   listMarkers <-
     if nestsBeyond levels level
@@ -9709,27 +9806,27 @@ listItemNester level levels = do
     Just 1 -> pure ()
     Just n -> fail $ "starting list head number must be 0 or 1; got " <> show n
     Nothing -> pure ()
-  orgParserState <- get
+  pState <- get
   let newMarker = case level.number of
         Just _ -> LOrderedStart
         Nothing -> LUnorderedStart
-      opc = orgParserState.orgParserConf
+      opc = pState.orgParserConf
   when (opc.maxListLevel > 0 && length levels == opc.maxListLevel) $ do
     fail
       $ "max nesting depth exceeded: cannot have more than "
       <> show opc.maxListLevel
       <> " levels of list items"
   put
-    orgParserState
+    pState
       { listLevels = level : levels,
-        listMarkers = LItemStart : newMarker : orgParserState.listMarkers
+        listMarkers = LItemStart : newMarker : pState.listMarkers
       }
   pure [newMarker, LItemStart]
 #+end_src
 
 We enforce some additional rules here, such as forcing the nesting list head to
 start off with either 0 or 1 (see [[t:0009-ordered-lists-start-from-0-or-1]]). The
-rest of the function just updates the ~orgParserState~ to have the additional
+rest of the function just updates the ~pState~ to have the additional
 ~level~ as the new most-deeply-nested level, and also grows the ~listMarkers~
 accordingly.
 
@@ -9788,12 +9885,12 @@ listItemFitter level levels =
   where
     fitter :: Int -> OrgParser [ListMarker]
     fitter levelsToDrop = do
-      orgParserState <- get
-      let markers = getEndingListMarkers levelsToDrop orgParserState.listLevels
+      pState <- get
+      let markers = getEndingListMarkers levelsToDrop pState.listLevels
       put
-        orgParserState
-          { listLevels = level : drop (levelsToDrop + 1) orgParserState.listLevels,
-            listMarkers = drop (levelsToDrop * 2) orgParserState.listMarkers
+        pState
+          { listLevels = level : drop (levelsToDrop + 1) pState.listLevels,
+            listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
       pure $ markers <> [LItemEnd, LItemStart]
 #+end_src
@@ -10676,20 +10773,20 @@ account style markers, and the only way to do that is with ~PToken~ values.
 #+begin_src haskell
 assertUniqueGlossaryTerm :: Text -> Int -> OrgParser ()
 assertUniqueGlossaryTerm term offset = do
-  orgParserState <- get
-  when (member term orgParserState.glossary) $ do
+  pState <- get
+  when (member term pState.glossary) $ do
     MP.setOffset offset -- (ref:glossary-term-offset)
     fail -- (ref:fail-because-duplicate-term)
       $ "glossary term "
       <> show term
       <> " is not unique"
   put
-    orgParserState
+    pState
       { OrgParserState.glossary =
           insert
             term
-            orgParserState.cellNumber
-            orgParserState.glossary
+            pState.cellNumber
+            pState.glossary
       }
 #+end_src
 
@@ -10894,8 +10991,8 @@ Let's first see how to parse =\begin{equation}=.
 #+begin_src haskell
 mathFragmentNumberedParser :: OrgParser MathFragment
 mathFragmentNumberedParser = do
-  orgParserState <- get
-  let number = orgParserState.equationNumber + 1
+  pState <- get
+  let number = pState.equationNumber + 1
 
   metaKVs <- metaParser
   _ <- lexeme $ string "\\begin{equation}"
@@ -10908,7 +11005,7 @@ mathFragmentNumberedParser = do
   pure
     MathFragment
       { parentOid =
-          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+          firstParentOid pState.docOid pState.headingOidStack,
         meta =
           insert "__equation_number" (T.pack $ show number) metaKVs,
         body = trimTrailingWhitespace $ T.pack latex
@@ -10930,7 +11027,7 @@ Parsing unnumbered equations is almost the same.
 #+begin_src haskell
 mathFragmentUnnumberedParser :: OrgParser MathFragment
 mathFragmentUnnumberedParser = do
-  orgParserState <- get
+  pState <- get
   metaKVs <- metaParser
   _ <- lexeme $ string "\\["
   latex <-
@@ -10940,13 +11037,13 @@ mathFragmentUnnumberedParser = do
   anonNumber <- case lookup "name" metaKVs of
     Just _ -> pure Nothing
     Nothing -> do
-      let n = orgParserState.anonEquationNumber + 1
+      let n = pState.anonEquationNumber + 1
       modify (\s -> s {anonEquationNumber = n})
       pure $ Just n
   pure
     MathFragment
       { parentOid =
-          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+          firstParentOid pState.docOid pState.headingOidStack,
         meta = case anonNumber of
           Just n ->
             insert "__equation_anon_number" (T.pack $ show n) metaKVs
@@ -10967,7 +11064,7 @@ mathFragmentStandaloneParser =
 #+end_src
 
 Unlike [[f:tableLineParser]] and [[f:tableRowParser]], we don't use
-~orgParserState.continuationIndent~ to check which lines are part of the math
+~pState.continuationIndent~ to check which lines are part of the math
 fragment; we simply parse everything up until the end marker (~\end{equation}~ or
 ~\]~). This simplifies the parsing implementation. The downside is that we may
 accept input where the indentation across multiple math lines looks messy, but
@@ -11218,8 +11315,8 @@ accepting any link).
 #+begin_src haskell
 figureParser :: OrgParser Cell
 figureParser = do
-  orgParserState <- get
-  when (orgParserState.listLevels /= [])
+  pState <- get
+  when (pState.listLevels /= [])
     $ fail "figures are not allowed inside list items"
   _ <- MP.try $ MP.lookAhead (metaParser >> fileLinkParser >> endOfCell)
   metaKVs <- metaParser
@@ -11227,11 +11324,11 @@ figureParser = do
     $ fail "type must be 'figure'"
   caption <- case lookup "caption" metaKVs of
     Nothing -> pure $ Prose []
-    Just s -> case MP.runParser (runStateT captionParser orgParserState) "" s of
+    Just s -> case MP.runParser (runStateT captionParser pState) "" s of
       Left err -> fail $ MP.errorBundlePretty err
-      Right (prose, _orgParserState) -> pure prose
+      Right (prose, _pState) -> pure prose
   link <- fileLinkParser
-  let newFigureNumber = orgParserState.figureNumber + 1
+  let newFigureNumber = pState.figureNumber + 1
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetOid {}
@@ -11244,7 +11341,7 @@ figureParser = do
         . CFigure
         $ Figure
           { parentOid =
-              firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+              firstParentOid pState.docOid pState.headingOidStack,
             meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
@@ -11589,23 +11686,23 @@ are ignored.
 #+begin_src haskell
 tableParser :: OrgParser Cell
 tableParser = do
-  orgParserState <- get
+  pState <- get
   _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
   metaKVs <- metaParser
   caption <- case lookup "caption" metaKVs of
     Nothing -> pure $ Prose []
-    Just s -> case MP.runParser (runStateT captionParser orgParserState) "" s of
+    Just s -> case MP.runParser (runStateT captionParser pState) "" s of
       Left err -> fail $ MP.errorBundlePretty err
-      Right (prose, _orgParserState) -> pure prose
+      Right (prose, _pState) -> pure prose
   rows <- MP.some $ tableLineParser <|> tableRowParser
   _ <- MP.optional tableFormulaParser
-  let newTableNumber = orgParserState.tableNumber + 1
+  let newTableNumber = pState.tableNumber + 1
   modify (\s -> s {tableNumber = newTableNumber})
   pure
     . CTable
     $ Table
       { parentOid =
-          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+          firstParentOid pState.docOid pState.headingOidStack,
         meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         caption = caption,
         grid = fromList $ rowsToTuples rows
@@ -11656,10 +11753,10 @@ tableLineParser = do
   _ <- string "|-"
   _ <- MP.takeWhile1P (Just "table line characters") isTableLineChar
   _ <- char '\n'
-  orgParserState <- get
+  pState <- get
   _ <-
     MP.label "indentation for next table line"
-      $ MP.count orgParserState.continuationIndent (char ' ')
+      $ MP.count pState.continuationIndent (char ' ')
   pure [tableHorizontalLine]
   where
     isTableLineChar c = c == '-' || c == '+' || c == '|'
@@ -11692,11 +11789,11 @@ tableRowParser = do
   _ <- onlySpaces
   tableCells <- MP.some $ emptyTableCellParser <|> tableCellParser
   _ <- char '\n'
-  orgParserState <- get
+  pState <- get
   _ <-
     MP.optional
       . MP.label "indentation for next table line"
-      $ MP.count orgParserState.continuationIndent (char ' ')
+      $ MP.count pState.continuationIndent (char ' ')
   pure tableCells
   where
     emptyTableCellParser :: OrgParser Prose
@@ -12583,6 +12680,7 @@ parseSpec = do
   <<t:0005-styled-strings-verbatim-code-ignore-immediate-bold>>
   <<t:0005-styled-strings-verbatim-precedence>>
   <<t:0005-styled-strings-verbatim>>
+  <<t:0005-styled-strings-escaping>>
   <<t:0006-links-inside-parentheses>>
   <<t:0006-links-nonlink>>
   <<t:0006-links-raw>>

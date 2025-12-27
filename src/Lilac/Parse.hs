@@ -325,11 +325,11 @@ skipNewlinesAndComments =
     whiteSpaceParser :: OrgParser ()
     whiteSpaceParser = do
       _ <- MP.takeWhile1P (Just "newline") (== '\n') --
-      orgParserState <- get
+      pState <- get
       _ <-
         MP.optional
           . MP.label "indentation for next thing"
-          $ MP.count orgParserState.continuationIndent (char ' ')
+          $ MP.count pState.continuationIndent (char ' ')
       pure ()
     singleLineCommentParser :: OrgParser ()
     singleLineCommentParser = L.skipLineComment "# " --
@@ -348,7 +348,7 @@ parseOrgDoc input = case MP.runParser
   ""
   input of
   Left err -> Left . T.pack $ MP.errorBundlePretty err
-  Right (orgDoc, _orgParserState) -> Right orgDoc
+  Right (orgDoc, _pState) -> Right orgDoc
 
 orgDocParser :: OrgParser OrgDoc
 orgDocParser = do
@@ -360,7 +360,7 @@ orgDocParser = do
   lineLabels <- reconcileLineLabels
   footnoteRefs <- reconcileFootnotes
   citations <- collectCitations
-  orgParserState <- get
+  pState <- get
   resetState
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
@@ -376,10 +376,10 @@ orgDocParser = do
         CFootnote {}
         CCommand {} -> True
   let meaningfulCells = filter meaningfulCell cells --
-  when (orgParserState.cellNumber /= length meaningfulCells)
+  when (pState.cellNumber /= length meaningfulCells)
     $ fail
       ( "mismatch: cellNumber: "
-          <> show orgParserState.cellNumber
+          <> show pState.cellNumber
           <> " len meaningfulCells: "
           <> (show $ length meaningfulCells)
       )
@@ -387,9 +387,9 @@ orgDocParser = do
     $ OrgDoc
       { oid = docOid,
         cells = filter meaningfulCell cells,
-        pseudoEdges = orgParserState.pseudoEdges,
+        pseudoEdges = pState.pseudoEdges,
         footnoteRefs = footnoteRefs,
-        glossary = orgParserState.glossary,
+        glossary = pState.glossary,
         lineLabels = lineLabels,
         cslPath = cslPath,
         bibPaths = bibPaths,
@@ -485,21 +485,21 @@ lilacExtensionsParser = do
 
 maxHeadingLevelParser :: OrgParser ()
 maxHeadingLevelParser = do
-  orgParserState <- get
+  pState <- get
   _ <- string $ "#+lilac_maxHeadingLevel: "
   _ <- many $ char ' '
   val <- signedIntParser
-  let opc = orgParserState.orgParserConf {maxHeadingLevel = val}
-  put orgParserState {orgParserConf = opc}
+  let opc = pState.orgParserConf {maxHeadingLevel = val}
+  put pState {orgParserConf = opc}
 
 maxListLevelParser :: OrgParser ()
 maxListLevelParser = do
-  orgParserState <- get
+  pState <- get
   _ <- string $ "#+lilac_maxListLevel: "
   _ <- many $ char ' '
   val <- signedIntParser
-  let opc = orgParserState.orgParserConf {maxListLevel = val}
-  put orgParserState {orgParserConf = opc}
+  let opc = pState.orgParserConf {maxListLevel = val}
+  put pState {orgParserConf = opc}
 
 signedIntParser :: OrgParser Int
 signedIntParser = L.signed parserBetweenSignAndNumber number
@@ -555,15 +555,15 @@ detectInvalidIndentation = do
 
 headingParser :: OrgParser Cell
 headingParser = do
-  orgParserState <- get
+  pState <- get
   _ <- MP.try $ MP.lookAhead (starsParser >> char ' ')
-  let opc = orgParserState.orgParserConf
+  let opc = pState.orgParserConf
   stars <- starsParser
   when (opc.maxHeadingLevel < 0) $ do
     fail
       $ "headings prohibited because lilac_maxHeadingLevel < 0"
   let lenStars = T.length stars
-      currentHeadingLevel = orgParserState.headingLevel
+      currentHeadingLevel = pState.headingLevel
   when (opc.maxHeadingLevel > 0 && lenStars > opc.maxHeadingLevel) $ do
     fail
       $ "found "
@@ -578,14 +578,14 @@ headingParser = do
   _ <- char '\n'
   failIfLeftoverActiveStyles
   props <- propertiesDrawerParser
-  let newHeadingSection = genSectionNumber lenStars orgParserState.headingSectionNumber
+  let newHeadingSection = genSectionNumber lenStars pState.headingSectionNumber
       newHeadingOidStack =
         genHeadingOidStack
           (lookup "ID" props)
           lenStars
-          orgParserState.headingOidStack
+          pState.headingOidStack
   put
-    orgParserState
+    pState
       { headingLevel = lenStars,
         headingSectionNumber = newHeadingSection,
         headingOidStack = newHeadingOidStack,
@@ -668,9 +668,9 @@ propertiesEntryParser = do
 
 proseParser :: OrgParser Text -> OrgParser Prose
 proseParser spaceConsumer = do
-  orgParserState <- get
+  pState <- get
   let avoidCitations =
-        orgParserState.insideHeading || orgParserState.insideCitation
+        pState.insideHeading || pState.insideCitation
   a <- MP.choice $ baseParsers avoidCitations --
   b <-
     MP.many
@@ -719,9 +719,9 @@ proseSpaceConsumer expectedIndentLen = do
         ]
     beLessGreedy :: OrgParser ()
     beLessGreedy = do
-      orgParserState <- get
+      pState <- get
       let toAvoid =
-            [ (orgParserState.insideCitePrefix, spaceConsumer >> citeIdParser)
+            [ (pState.insideCitePrefix, spaceConsumer >> citeIdParser)
             ]
       forM_
         toAvoid
@@ -752,8 +752,8 @@ styleMarkers =
 
 failIfLeftoverActiveStyles :: OrgParser ()
 failIfLeftoverActiveStyles = do
-  orgParserState <- get
-  let (StyleMask mask) = orgParserState.styleMask
+  pState <- get
+  let (StyleMask mask) = pState.styleMask
   when (mask /= 0) $ do
     fail
       $ "leftover active styles: "
@@ -761,15 +761,15 @@ failIfLeftoverActiveStyles = do
 
 styleMarkerParser :: OrgParser StyledText
 styleMarkerParser = do
-  orgParserState <- get
+  pState <- get
 
-  let mask = orgParserState.styleMask
+  let mask = pState.styleMask
   c <- MP.satisfy $ isStyleMarker mask
   styleMask <- toStyleMask c
 
-  let newMask = styleMaskFlip mask styleMask
+  let newMask = styleMaskFlip mask styleMask --
+  put pState {styleMask = newMask}
 
-  put orgParserState {styleMask = newMask}
   pure
     StyledText
       { body = "",
@@ -784,10 +784,9 @@ isStyleMarker styleMask c
 
 styledTextParser :: OrgParser StyledText
 styledTextParser = do
-  orgParserState <- get
+  pState <- get
 
-  let mask = orgParserState.styleMask
-
+  let mask = pState.styleMask
   text <- textParser mask
 
   pure
@@ -798,50 +797,48 @@ styledTextParser = do
 
 textParser :: StyleMask -> OrgParser Text
 textParser styleMask
-  | isVerbatim styleMask = do
-      t <- MP.takeWhile1P (Just "verbatim text") isNotVerbatimMarker
-      pure $ T.map newlineToSpace t
-  | isCode styleMask = do
-      t <- MP.takeWhile1P (Just "code") isNotCodeMarker
-      pure $ T.map newlineToSpace t
+  | isVerbatim styleMask || isCode styleMask = do
+      t <- verbatimCodeParser styleMask
+      pure $ T.map newlineToSpace t --
   | otherwise = do
       o <- MP.getOffset
       word <-
         MP.choice
           [ MP.try $ slashSeparatedWords,
             MP.label "normal characters" normalChars,
-            escapedSymbolParser styleMask
+            escapedSymbolParser styleMask --
           ]
-      orgParserState <- get
+      pState <- get
       let haveNotSeenGlossaryTermDelimiterYet =
-            orgParserState.insideParagraph && orgParserState.glossaryTermOffset == 0
+            pState.insideParagraph && pState.glossaryTermOffset == 0
           wordIsGlossaryTermDelimiter = word == "::" && isEmptyMask styleMask
-
-      when (haveNotSeenGlossaryTermDelimiterYet && wordIsGlossaryTermDelimiter) $ do
-        modify (\s -> s {glossaryTermOffset = o}) --
+      when
+        ( haveNotSeenGlossaryTermDelimiterYet
+            && wordIsGlossaryTermDelimiter
+        )
+        $ do
+          modify (\s -> s {glossaryTermOffset = o}) --
       pure word
   where
     newlineToSpace c = if c == '\n' then ' ' else c
-    isNotVerbatimMarker c = c /= '='
-    isNotCodeMarker c = c /= '~'
     normalChars :: OrgParser Text
     normalChars = do
       cs <- MP.some $ normalChar
       pure $ T.pack cs
     normalChar :: OrgParser Char
     normalChar = do
-      orgParserState <- get
+      pState <- get
       let toAvoid =
-            [ (orgParserState.insideCitation, string ";"),
-              (orgParserState.insideCitePrefix, citeIdParser),
-              ( orgParserState.insideCitation
-                  && (orgParserState.bracketBalance == 0),
+            [ (pState.insideCitation, string ";"),
+              (pState.insideCitePrefix, citeIdParser),
+              ( pState.insideCitation
+                  && (pState.bracketBalance == 0),
                 string "]"
               ),
-              (orgParserState.insideLinkDisplayName, string "]]"),
-              ( not orgParserState.insideCitation
-                  && not orgParserState.insideCitePrefix
-                  && not orgParserState.insideLinkDisplayName,
+              (pState.insideLinkDisplayName, string "]]"),
+              ( not pState.insideCitation
+                  && not pState.insideCitePrefix
+                  && not pState.insideLinkDisplayName,
                 string "[["
               )
             ]
@@ -876,6 +873,28 @@ escapedSymbolParser styleMask = do
     "n" -> "\n"
     _ -> s
 
+verbatimCodeParser :: StyleMask -> OrgParser Text
+verbatimCodeParser styleMask = do
+  parts <-
+    MP.some
+      $ MP.choice
+        [ escapedSymbol, --
+          MP.takeWhile1P Nothing isNotClosingOrEscape
+        ]
+  pure $ T.concat parts
+  where
+    escapedSymbol :: OrgParser Text
+    escapedSymbol = do
+      _ <- char '\\'
+      c <- MP.satisfy (\c -> not $ isSpace c)
+      if
+        | isVerbatim styleMask && c `elem` ['=', '\\'] -> pure $ T.singleton c
+        | isCode styleMask && c `elem` ['~', '\\'] -> pure $ T.singleton c
+        | otherwise -> pure $ "\\" <> T.singleton c
+    isNotClosingOrEscape c
+      | isVerbatim styleMask = c /= '=' && c /= '\\'
+      | otherwise = c /= '~' && c /= '\\'
+
 slashSeparatedWords :: OrgParser Text
 slashSeparatedWords = do
   let wordParser :: OrgParser Text
@@ -890,10 +909,18 @@ slashSeparatedWords = do
       word <- wordParser
       pure $ "/" <> word
   when (lastWordIsMeaningless $ reverse remainingWords)
-    $ fail "last word is not meaningful; unlikely to be intended as a slash-separated-word"
+    $ fail
+      """
+      last word is not meaningful; unlikely to be
+      intended as a slash-separated-word
+      """
   let allWords = firstWord : remainingWords
   when (hasLinkDelimiter allWords)
-    $ fail "has link delimiter \"[[\"; unlikely to be intended as a slash-separated-word"
+    $ fail
+      """
+      has link delimiter \"[[\"; unlikely to be
+      intended as a slash-separated-word
+      """
   pure $ T.concat allWords
   where
     cannotStartWithClosingPunc :: OrgParser ()
@@ -952,7 +979,7 @@ compressProse :: Prose -> Prose
 compressProse prose =
   Prose
     . reverse
-    . dropUnnecessary
+    . dropUnnecessary --
     $ foldl' f [] prose.unProse
   where
     f :: [PToken] -> PToken -> [PToken]
@@ -961,7 +988,8 @@ compressProse prose =
       ((t1@(PTokenStyledText (StyledText body1 style1))) : rest)
       t2@(PTokenStyledText (StyledText body2 style2))
         | style1 == style2 =
-            (PTokenStyledText $ StyledText (T.concat [body1, body2]) style1) : rest
+            (PTokenStyledText $ StyledText (T.concat [body1, body2]) style1)
+              : rest
         | otherwise = t2 : t1 : rest
     f acc token = token : acc
     dropUnnecessary [] = []
@@ -987,34 +1015,34 @@ compressStyledText = reverse . dropUnnecessary . foldl' f []
 
 assertUniqueCellName :: Text -> OrgParser ()
 assertUniqueCellName cellName = do
-  orgParserState <- get
-  when (Set.member cellName orgParserState.cellNames)
+  pState <- get
+  when (Set.member cellName pState.cellNames)
     . fail
     $ "cell name "
     <> show cellName
     <> " is not unique"
   put
-    orgParserState
-      { cellNames = Set.insert cellName orgParserState.cellNames
+    pState
+      { cellNames = Set.insert cellName pState.cellNames
       }
 
 assertUniqueLineLabel :: Text -> Int -> OrgParser ()
 assertUniqueLineLabel lineLabel offset = do
-  orgParserState <- get
-  when (member lineLabel orgParserState.lineLabels) $ do
+  pState <- get
+  when (member lineLabel pState.lineLabels) $ do
     MP.setOffset offset
     fail
       $ "line label "
       <> show lineLabel
       <> " is not unique"
-  let num = orgParserState.lineLabelNumber + 1
+  let num = pState.lineLabelNumber + 1
   put
-    orgParserState
+    pState
       { lineLabels =
           insert
             lineLabel
             num
-            orgParserState.lineLabels,
+            pState.lineLabels,
         lineLabelNumber = num
       }
 
@@ -1033,13 +1061,13 @@ linkParser = do
 
 linkDisplayNameParser :: OrgParser [StyledText]
 linkDisplayNameParser = do
-  orgParserState <- get
+  pState <- get
   modify (\s -> s {insideLinkDisplayName = True})
   linkDisplayName <-
     MP.between
       (string "[")
       (string "]]")
-      (proseParser' $ proseSpaceConsumer orgParserState.continuationIndent)
+      (proseParser' $ proseSpaceConsumer pState.continuationIndent)
   modify (\s -> s {insideLinkDisplayName = False})
   pure linkDisplayName
   where
@@ -1061,8 +1089,8 @@ linkDisplayNameParser = do
 
 failIfVerbatimOrCode :: OrgParser ()
 failIfVerbatimOrCode = do
-  orgParserState <- get
-  let mask = orgParserState.styleMask
+  pState <- get
+  let mask = pState.styleMask
   when (isVerbatim mask || isCode mask)
     $ fail "aborting because verbatim or code style is active"
 
@@ -1074,8 +1102,8 @@ protocolWebLinkParser = do
       (string "]")
       uriParser
 
-  orgParserState <- get
-  let mask = orgParserState.styleMask
+  pState <- get
+  let mask = pState.styleMask
       implicitName = maybeUri
       implicitNameStyledText =
         StyledText
@@ -1110,8 +1138,8 @@ fileLinkParser = do
       (string "]")
       filePathParser
 
-  orgParserState <- get
-  let mask = orgParserState.styleMask
+  pState <- get
+  let mask = pState.styleMask
       implicitName = maybeFilePath
       implicitNameStyledText =
         StyledText
@@ -1173,27 +1201,27 @@ mathFragmentInlineParser :: OrgParser MathFragment
 mathFragmentInlineParser = do
   failIfVerbatimOrCode
 
-  orgParserState <- get
+  pState <- get
   _ <- string "\\("
   latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
   pure
     MathFragment
       { parentOid =
-          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+          firstParentOid pState.docOid pState.headingOidStack,
         meta = fromList [],
         body = T.pack latex
       }
 
 paragraphParser :: OrgParser Cell
 paragraphParser = do
-  orgParserState <- get
+  pState <- get
   modify (\s -> s {insideParagraph = True, glossaryTermOffset = 0})
-  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer orgParserState.continuationIndent
+  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer pState.continuationIndent
   failIfLeftoverActiveStyles
-  orgParserState' <- get
+  pState' <- get
   modify (\s -> s {insideParagraph = False})
-  if orgParserState'.glossaryTermOffset > 0
-    then convertToGlossaryTerm prose orgParserState'.glossaryTermOffset --
+  if pState'.glossaryTermOffset > 0
+    then convertToGlossaryTerm prose pState'.glossaryTermOffset --
     else pure . CParagraph $ compressProse prose
 
 newlineAndIndentParser :: Int -> OrgParser Text
@@ -1243,20 +1271,20 @@ metaNameParser = do
 
 assertUniqueTanglePath :: Text -> Text -> Int -> OrgParser ()
 assertUniqueTanglePath "tangle" path offset = do
-  orgParserState <- get
-  when (Set.member path orgParserState.tanglePaths)
+  pState <- get
+  when (Set.member path pState.tanglePaths)
     $ do
       MP.setOffset $ offset
       fail $ "tangle path " <> show path <> " is not unique"
   put
-    orgParserState
-      { tanglePaths = Set.insert path orgParserState.tanglePaths
+    pState
+      { tanglePaths = Set.insert path pState.tanglePaths
       }
 assertUniqueTanglePath _ _ _ = pure ()
 
 blockParser :: OrgParser Cell
 blockParser = do
-  orgParserState <- get
+  pState <- get
   (blockName, metaKVs, blockType, srcLang) <- blockStartParser
   let nowebOff =
         (== Just "off")
@@ -1271,15 +1299,15 @@ blockParser = do
         someBTokensParser blockType (not nowebOff) (not lineLabelOff)
       ]
   let newAnonBlockNumber = case blockName of
-        Just _ -> orgParserState.anonBlockNumber
-        Nothing -> orgParserState.anonBlockNumber + 1
+        Just _ -> pState.anonBlockNumber
+        Nothing -> pState.anonBlockNumber + 1
       anonBlockMeta = case blockName of
         Just _ -> Nothing
         Nothing -> Just ("__anon_block_number", T.show newAnonBlockNumber)
       block =
         Block
           { parentOid =
-              firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+              firstParentOid pState.docOid pState.headingOidStack,
             meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
@@ -1412,8 +1440,8 @@ oidLinkParser = do
   _ <- string "[["
   avoidParsingKnownProtocols
   (oid, name) <- oidReferenceParser "[]" "]]"
-  orgParserState <- get
-  let mask = orgParserState.styleMask
+  pState <- get
+  let mask = pState.styleMask
       implicitName
         | T.null name = "id:" <> T.show oid
         | otherwise = name
@@ -1434,7 +1462,7 @@ oidLinkParser = do
           { oid = oid,
             name = name
           }
-      edge = PseudoEdge (orgParserState.cellNumber, linkOid)
+      edge = PseudoEdge (pState.cellNumber, linkOid)
   modify (\s -> s {OrgParserState.pseudoEdges = edge : s.pseudoEdges})
   pure
     $ Link
@@ -1473,19 +1501,19 @@ oidReferenceParser disallowedChars ending =
       name <- targetName
       pure (oid, name)
     implicit = do
-      orgParserState <- get
+      pState <- get
       name <- targetName
-      pure (orgParserState.docOid, name)
+      pure (pState.docOid, name)
     targetName :: OrgParser Text
     targetName = compressedTextParser disallowedChars ending
 
 compressedTextParser :: [Char] -> [Char] -> OrgParser Text
 compressedTextParser disallowedChars ending = do
-  orgParserState <- get
+  pState <- get
   tn <-
     proseParser'
       $ proseSpaceConsumer'
-        orgParserState.insideCodeBlock
+        pState.insideCodeBlock
   pure $ compressWhitespace tn
   where
     compressWhitespace = T.unwords . T.words
@@ -1609,21 +1637,21 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
 
 zeroIndent :: OrgParser (Int, Int)
 zeroIndent = do
-  orgParserState <- get
+  pState <- get
   _ <- MP.eof <|> MP.notFollowedBy (char ' ')
-  let listLevelsToClose = length orgParserState.listLevels
+  let listLevelsToClose = length pState.listLevels
       continuationIndent = 0 :: Int
   pure (listLevelsToClose, continuationIndent)
 
 someIndent :: OrgParser (Int, Int)
 someIndent = do
-  orgParserState <- get
+  pState <- get
   indentFound <- T.length <$> onlySpaces
   let levelsToDropPerIndentationIncrement :: [(Int, Int)]
       levelsToDropPerIndentationIncrement =
         zip [0 ..]
           . map getContinuationIndentForLevel
-          $ orgParserState.listLevels
+          $ pState.listLevels
       matchingIndent =
         find
           (\(_, continuationIndent) -> indentFound == continuationIndent)
@@ -1646,17 +1674,17 @@ getContinuationIndentForLevel level = level.indent + maybeNum + punctuation + sp
 
 listItemsEndParser :: OrgParser Cell
 listItemsEndParser = do
-  orgParserState <- get
-  when (null orgParserState.listMarkers) $ do
+  pState <- get
+  when (null pState.listMarkers) $ do
     fail "no pending ListMarker objects to close off" --
-  when (orgParserState.continuationIndent /= 0) $ do
+  when (pState.continuationIndent /= 0) $ do
     fail "not at beginning of line"
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
-  let markers = getEndingListMarkers levelsToDrop orgParserState.listLevels
+  let markers = getEndingListMarkers levelsToDrop pState.listLevels
   put
-    orgParserState
-      { listLevels = drop levelsToDrop orgParserState.listLevels,
-        listMarkers = drop (levelsToDrop * 2) orgParserState.listMarkers,
+    pState
+      { listLevels = drop levelsToDrop pState.listLevels,
+        listMarkers = drop (levelsToDrop * 2) pState.listMarkers,
         continuationIndent = continuationIndent
       }
   pure $ CListItem markers
@@ -1720,8 +1748,8 @@ unorderedHeadParser = do
 listItemStartParser :: OrgParser Cell
 listItemStartParser = do
   _ <- MP.try $ MP.lookAhead listHeadIndentLevelParser
-  orgParserState <- get
-  let levels = orgParserState.listLevels
+  pState <- get
+  let levels = pState.listLevels
   level <- listHeadIndentLevelParser
   listMarkers <-
     if nestsBeyond levels level
@@ -1741,20 +1769,20 @@ listItemNester level levels = do
     Just 1 -> pure ()
     Just n -> fail $ "starting list head number must be 0 or 1; got " <> show n
     Nothing -> pure ()
-  orgParserState <- get
+  pState <- get
   let newMarker = case level.number of
         Just _ -> LOrderedStart
         Nothing -> LUnorderedStart
-      opc = orgParserState.orgParserConf
+      opc = pState.orgParserConf
   when (opc.maxListLevel > 0 && length levels == opc.maxListLevel) $ do
     fail
       $ "max nesting depth exceeded: cannot have more than "
       <> show opc.maxListLevel
       <> " levels of list items"
   put
-    orgParserState
+    pState
       { listLevels = level : levels,
-        listMarkers = LItemStart : newMarker : orgParserState.listMarkers
+        listMarkers = LItemStart : newMarker : pState.listMarkers
       }
   pure [newMarker, LItemStart]
 
@@ -1779,19 +1807,19 @@ listItemFitter level levels =
   where
     fitter :: Int -> OrgParser [ListMarker]
     fitter levelsToDrop = do
-      orgParserState <- get
-      let markers = getEndingListMarkers levelsToDrop orgParserState.listLevels
+      pState <- get
+      let markers = getEndingListMarkers levelsToDrop pState.listLevels
       put
-        orgParserState
-          { listLevels = level : drop (levelsToDrop + 1) orgParserState.listLevels,
-            listMarkers = drop (levelsToDrop * 2) orgParserState.listMarkers
+        pState
+          { listLevels = level : drop (levelsToDrop + 1) pState.listLevels,
+            listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
       pure $ markers <> [LItemEnd, LItemStart]
 
 mathFragmentNumberedParser :: OrgParser MathFragment
 mathFragmentNumberedParser = do
-  orgParserState <- get
-  let number = orgParserState.equationNumber + 1
+  pState <- get
+  let number = pState.equationNumber + 1
 
   metaKVs <- metaParser
   _ <- lexeme $ string "\\begin{equation}"
@@ -1804,7 +1832,7 @@ mathFragmentNumberedParser = do
   pure
     MathFragment
       { parentOid =
-          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+          firstParentOid pState.docOid pState.headingOidStack,
         meta =
           insert "__equation_number" (T.pack $ show number) metaKVs,
         body = trimTrailingWhitespace $ T.pack latex
@@ -1815,7 +1843,7 @@ trimTrailingWhitespace = T.dropWhileEnd (\c -> T.elem c " \n\r\t")
 
 mathFragmentUnnumberedParser :: OrgParser MathFragment
 mathFragmentUnnumberedParser = do
-  orgParserState <- get
+  pState <- get
   metaKVs <- metaParser
   _ <- lexeme $ string "\\["
   latex <-
@@ -1825,13 +1853,13 @@ mathFragmentUnnumberedParser = do
   anonNumber <- case lookup "name" metaKVs of
     Just _ -> pure Nothing
     Nothing -> do
-      let n = orgParserState.anonEquationNumber + 1
+      let n = pState.anonEquationNumber + 1
       modify (\s -> s {anonEquationNumber = n})
       pure $ Just n
   pure
     MathFragment
       { parentOid =
-          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+          firstParentOid pState.docOid pState.headingOidStack,
         meta = case anonNumber of
           Just n ->
             insert "__equation_anon_number" (T.pack $ show n) metaKVs
@@ -1846,8 +1874,8 @@ mathFragmentStandaloneParser =
 
 figureParser :: OrgParser Cell
 figureParser = do
-  orgParserState <- get
-  when (orgParserState.listLevels /= [])
+  pState <- get
+  when (pState.listLevels /= [])
     $ fail "figures are not allowed inside list items"
   _ <- MP.try $ MP.lookAhead (metaParser >> fileLinkParser >> endOfCell)
   metaKVs <- metaParser
@@ -1855,11 +1883,11 @@ figureParser = do
     $ fail "type must be 'figure'"
   caption <- case lookup "caption" metaKVs of
     Nothing -> pure $ Prose []
-    Just s -> case MP.runParser (runStateT captionParser orgParserState) "" s of
+    Just s -> case MP.runParser (runStateT captionParser pState) "" s of
       Left err -> fail $ MP.errorBundlePretty err
-      Right (prose, _orgParserState) -> pure prose
+      Right (prose, _pState) -> pure prose
   link <- fileLinkParser
-  let newFigureNumber = orgParserState.figureNumber + 1
+  let newFigureNumber = pState.figureNumber + 1
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetOid {}
@@ -1872,7 +1900,7 @@ figureParser = do
         . CFigure
         $ Figure
           { parentOid =
-              firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+              firstParentOid pState.docOid pState.headingOidStack,
             meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
@@ -1931,23 +1959,23 @@ metaEntryParser = do
 
 tableParser :: OrgParser Cell
 tableParser = do
-  orgParserState <- get
+  pState <- get
   _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
   metaKVs <- metaParser
   caption <- case lookup "caption" metaKVs of
     Nothing -> pure $ Prose []
-    Just s -> case MP.runParser (runStateT captionParser orgParserState) "" s of
+    Just s -> case MP.runParser (runStateT captionParser pState) "" s of
       Left err -> fail $ MP.errorBundlePretty err
-      Right (prose, _orgParserState) -> pure prose
+      Right (prose, _pState) -> pure prose
   rows <- MP.some $ tableLineParser <|> tableRowParser
   _ <- MP.optional tableFormulaParser
-  let newTableNumber = orgParserState.tableNumber + 1
+  let newTableNumber = pState.tableNumber + 1
   modify (\s -> s {tableNumber = newTableNumber})
   pure
     . CTable
     $ Table
       { parentOid =
-          firstParentOid orgParserState.docOid orgParserState.headingOidStack,
+          firstParentOid pState.docOid pState.headingOidStack,
         meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         caption = caption,
         grid = fromList $ rowsToTuples rows
@@ -1972,10 +2000,10 @@ tableLineParser = do
   _ <- string "|-"
   _ <- MP.takeWhile1P (Just "table line characters") isTableLineChar
   _ <- char '\n'
-  orgParserState <- get
+  pState <- get
   _ <-
     MP.label "indentation for next table line"
-      $ MP.count orgParserState.continuationIndent (char ' ')
+      $ MP.count pState.continuationIndent (char ' ')
   pure [tableHorizontalLine]
   where
     isTableLineChar c = c == '-' || c == '+' || c == '|'
@@ -1993,11 +2021,11 @@ tableRowParser = do
   _ <- onlySpaces
   tableCells <- MP.some $ emptyTableCellParser <|> tableCellParser
   _ <- char '\n'
-  orgParserState <- get
+  pState <- get
   _ <-
     MP.optional
       . MP.label "indentation for next table line"
-      $ MP.count orgParserState.continuationIndent (char ' ')
+      $ MP.count pState.continuationIndent (char ' ')
   pure tableCells
   where
     emptyTableCellParser :: OrgParser Prose
@@ -2050,15 +2078,15 @@ rowToTuples (rowIndex, row)
 footnoteLinkParser :: OrgParser Link
 footnoteLinkParser = do
   name <- footnoteReferenceParser
-  orgParserState <- get
-  displayName <- case lookup name orgParserState.footnoteRefs of
+  pState <- get
+  displayName <- case lookup name pState.footnoteRefs of
     Nothing -> do
-      let newFootnoteNumber = orgParserState.footnoteNumber + 1
+      let newFootnoteNumber = pState.footnoteNumber + 1
           newFootnoteRefs =
             insert
               name
-              (newFootnoteNumber, orgParserState.cellNumber)
-              orgParserState.footnoteRefs
+              (newFootnoteNumber, pState.cellNumber)
+              pState.footnoteRefs
       modify
         ( \s ->
             s
@@ -2088,11 +2116,11 @@ footnoteDefinitionParser = do
   _ <- onlySpaces
   modify (\s -> s {insideFootnoteDefinition = Just name})
   (CParagraph prose) <- paragraphParser
-  orgParserState <- get
+  pState <- get
   o <- MP.getOffset
   when
-    ( (not orgParserState.prevCellIsFootnote)
-        && (orgParserState.footnoteDefinitions /= M.empty)
+    ( (not pState.prevCellIsFootnote)
+        && (pState.footnoteDefinitions /= M.empty)
     )
     $ do
       MP.setOffset o
@@ -2101,7 +2129,7 @@ footnoteDefinitionParser = do
     ( \s ->
         s
           { footnoteDefinitions =
-              insert name prose orgParserState.footnoteDefinitions,
+              insert name prose pState.footnoteDefinitions,
             insideFootnoteDefinition = Nothing
           }
     )
@@ -2109,9 +2137,9 @@ footnoteDefinitionParser = do
 
 reconcileFootnotes :: OrgParser (Map Text (Int, Int))
 reconcileFootnotes = do
-  orgParserState <- get
-  let referenced = M.keysSet orgParserState.footnoteRefs
-      defined = M.keysSet orgParserState.footnoteDefinitions
+  pState <- get
+  let referenced = M.keysSet pState.footnoteRefs
+      defined = M.keysSet pState.footnoteDefinitions
       brokenLinks = Set.difference referenced defined
       unusedDefs = Set.difference defined referenced
       hasBrokenLinks = length brokenLinks /= 0
@@ -2121,13 +2149,13 @@ reconcileFootnotes = do
   if
     | hasBrokenLinks -> fail $ "broken footnote links: " <> brokenLinksMsg
     | hasUnusedDefs -> fail $ "unused footnote definitions: " <> unusedDefsMsg
-    | otherwise -> pure orgParserState.footnoteRefs
+    | otherwise -> pure pState.footnoteRefs
 
 reconcileLineLabels :: OrgParser (Map Text Int)
 reconcileLineLabels = do
-  orgParserState <- get
-  let referenced = orgParserState.lineLabelReferences
-      defined = M.keysSet orgParserState.lineLabels
+  pState <- get
+  let referenced = pState.lineLabelReferences
+      defined = M.keysSet pState.lineLabels
       brokenLinks = Set.difference referenced defined
       unusedDefs = Set.difference defined referenced
       hasBrokenLinks = length brokenLinks /= 0
@@ -2137,7 +2165,7 @@ reconcileLineLabels = do
   if
     | hasBrokenLinks -> fail $ "broken line label links: " <> brokenLinksMsg
     | hasUnusedDefs -> fail $ "unused line labels: " <> unusedDefsMsg
-    | otherwise -> pure orgParserState.lineLabels
+    | otherwise -> pure pState.lineLabels
 
 convertToGlossaryTerm :: Prose -> Int -> OrgParser Cell
 convertToGlossaryTerm prose offset =
@@ -2174,20 +2202,20 @@ convertToGlossaryTerm prose offset =
 
 assertUniqueGlossaryTerm :: Text -> Int -> OrgParser ()
 assertUniqueGlossaryTerm term offset = do
-  orgParserState <- get
-  when (member term orgParserState.glossary) $ do
+  pState <- get
+  when (member term pState.glossary) $ do
     MP.setOffset offset --
     fail --
       $ "glossary term "
       <> show term
       <> " is not unique"
   put
-    orgParserState
+    pState
       { OrgParserState.glossary =
           insert
             term
-            orgParserState.cellNumber
-            orgParserState.glossary
+            pState.cellNumber
+            pState.glossary
       }
 
 isGlossaryTermDelimiter :: PToken -> Bool
@@ -2234,10 +2262,10 @@ collectValsFor key kvs =
 bibliographyLocationParser :: OrgParser Cell
 bibliographyLocationParser = do
   _ <- string "#+print_bibliography:"
-  orgParserState <- get
-  when (orgParserState.cslPath == Nothing)
+  pState <- get
+  when (pState.cslPath == Nothing)
     $ fail "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
-  when (orgParserState.bibPaths == [])
+  when (pState.bibPaths == [])
     $ fail "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   pure $ CCommand PrintBibliography
 
@@ -2582,11 +2610,11 @@ dropTextFromStyledText dropFromStart f prose =
 citationParser :: OrgParser Int
 citationParser = do
   failIfVerbatimOrCode
-  orgParserState <- get
+  pState <- get
   _ <- string "[cite"
-  when (orgParserState.cslPath == Nothing)
+  when (pState.cslPath == Nothing)
     $ fail "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
-  when (orgParserState.bibPaths == [])
+  when (pState.bibPaths == [])
     $ fail "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
   modify (\s -> s {insideCitation = True})
   sv1 <- MP.optional $ char '/' >> MP.label "style variation 1" svParser
@@ -2613,8 +2641,8 @@ citationParser = do
   _ <- MP.optional intraCellWhitespaceParser
   _ <- char ']'
   let maybeNoteNumber = do
-        footnoteName <- orgParserState.insideFootnoteDefinition
-        fmap fst $ lookup footnoteName orgParserState.footnoteRefs
+        footnoteName <- pState.insideFootnoteDefinition
+        fmap fst $ lookup footnoteName pState.footnoteRefs
       c =
         Citation
           { styleVariation = (T.pack <$> sv1, T.pack <$> sv2),
@@ -2630,7 +2658,7 @@ citationParser = do
             citations = c : s.citations
           }
     )
-  pure $ length orgParserState.citations
+  pure $ length pState.citations
   where
     svParser :: OrgParser [Char]
     svParser =
@@ -2647,8 +2675,8 @@ citationParser = do
 
 collectCitations :: OrgParser [Citation]
 collectCitations = do
-  orgParserState <- get
-  pure $ reverse orgParserState.citations
+  pState <- get
+  pure $ reverse pState.citations
 
 resetState :: OrgParser ()
 resetState =
@@ -2666,8 +2694,8 @@ deleteRedundantKeys = foldl' (flip M.delete)
 
 failIfUnbalancedBrackets :: OrgParser ()
 failIfUnbalancedBrackets = do
-  orgParserState <- get
-  when (orgParserState.bracketBalance /= 0) $ do
+  pState <- get
+  when (pState.bracketBalance /= 0) $ do
     fail "unbalanced brackets"
 
 citeParser :: OrgParser Cite
@@ -2828,8 +2856,8 @@ citeLocatorCoordRangeParser = do
 citeAffixParser :: Bool -> OrgParser Prose
 citeAffixParser isPrefix = do
   modify (\s -> s {insideCitePrefix = isPrefix})
-  orgParserState <- get
-  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer orgParserState.continuationIndent
+  pState <- get
+  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer pState.continuationIndent
   modify (\s -> s {insideCitePrefix = False})
   failIfLeftoverActiveStyles
   failIfUnbalancedBrackets

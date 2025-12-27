@@ -655,7 +655,7 @@ parseSpec = do
           $ Prose
             [ ptext "foo " [Bold],
               ptext "bar " [Bold, Italic],
-              ptext "underlined bold and italic" [Bold, Italic, Underline],
+              ptext "underlined bold italic" [Bold, Italic, Underline],
               ptext " baz" [Bold],
               ptext " " [],
               ptext "verbatim  text" [Verbatim],
@@ -787,6 +787,26 @@ parseSpec = do
             [ ptext "(" [],
               ptext "import ./." [Verbatim],
               ptext ") hello" []
+            ]
+      ]
+      []
+
+  shouldParseWith
+    "0005-styled-strings-escaping"
+    $ nilOrgDoc
+      [ CParagraph
+          $ Prose
+            [ ptext "\\" [Verbatim],
+              ptext " " [],
+              ptext "=" [Verbatim],
+              ptext " " [],
+              ptext "\\(" [Verbatim],
+              ptext " " [],
+              ptext "\\" [Code],
+              ptext " " [],
+              ptext "~" [Code],
+              ptext " " [],
+              ptext "\\(" [Code]
             ]
       ]
       []
