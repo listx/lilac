@@ -3995,8 +3995,7 @@ A link has
 
   - a name :: what's displayed to the reader, and
 
-  - a target :: where we want to take the reader when the click on the link
-    (including any metadata).
+  - a target :: where we want to take the reader when they click on the link.
 
 #+name: data:Link
 #+begin_src haskell
@@ -4012,25 +4011,51 @@ data Link = Link
 The [[data:LinkTarget]] is a rich definition of the kind of target we are linking
 to. For now, this data structure only supports the following cases:
 
-  1) [[data:LinkOid]] (links to either another part of the current Org document or
-     another (external) Org document).
+  1) [[data:LinkOid]], which links to either another part of the current Org
+     document or another (external) Org document. "External" doesn't mean any
+     Org document; it must be compiled inside the same [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]].
 
-  2) A link to a [[id:4127feee-755d-430e-8fef-192e95143790][footnote definition]]. These also use [[data:LinkOid]] internally,
+     These are also used for Noweb reference inside another code block (because
+     code blocks are just cells). They can be used to also link to figures,
+     which are also cells. [[fig:PNG image][Example]]
+
+     When inside code blocks, these use angle brackets (e.g., ~<<foo>>~). This can
+     reference code blocks in other files by the [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org ID (OID)]], where the syntax
+     is ~<<id:...::foo>>~ where ~...~ is the OID and ~foo~ is the name of the code
+     block at that OID (either using the top-level OID of the document or the
+     OID of the closest enclosing heading). We have to use an OID-to-file map
+     data structure (which is parsed [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][here]]).
+
+     When used outside of code blocks, square brackets are used (e.g.,
+     ~[[target]]~ or ~[[target][name]]~) where ~target~ is just a plain text string
+     (such as a URL or some other entity in the document), and ~name~ is what is
+     displayed to the user when the link is rendered.
+
+  2) A [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][line label]], which is a link that points to a reference /inside/ a code
+     block. This is useful for referring to different areas inside a code block,
+     without having to break up the code block into multiple separate parts.
+
+  3) A [[id:4127feee-755d-430e-8fef-192e95143790][footnote definition]]. These also use [[data:LinkOid]] internally,
      and always refer to footnote definitions within the same Org document.
 
-  3) URI (a typical web link, most common example being =https://...=).
+  4) URI (a typical web link, most common example being ~https://...~).
 
-  4) File path. These links are only useful because they let you go open that
+  5) File path. These links are only useful because they let you go open that
      file on disk locally in Emacs. On weaving these links are checked if they
      refer to a path inside the current Git repo. If they are inside, then we
-     calculate what the link /should/ target (based on weaving configuration),
+     calculate what the link /should/ target (based on the weaving configuration),
      assuming that the entire Git repo is also being served somewhere on the
      internet.
 
-     If the file path is pointing to a place outside the Git repo, then on
+     If the file path is pointing to a place outside the Git repo, then upon
      weaving we display it as a path description (and not as a link), because
      the link will be broken anyway (again, assuming that only the content
      inside the Git repo is accessible by a link).
+
+There are also [[id:8fe81206-f50d-4200-a95e-99278e0ad410][Raw links]] which is prose text that looks like a URL. For example,
+https://www.haskell.org is an example of a raw link. This is a convenience
+facility because ~[[https://www.haskell.org]]~ behaves the same way as
+~https://www.haskell.org~.
 
 #+name: data:LinkTarget
 #+begin_src haskell
@@ -4045,14 +4070,11 @@ data LinkTarget
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-A Noweb link points to a code block with the given =name=, as well as the [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org ID
-of the file]] the code block comes from. The OID acts as a /namespace/, so that each
-Org file is free to choose any name it wants for code blocks without fear of
-other Org files that might have a code block with the same name.
-
-We can use [[data:LinkOid]] to encode Noweb links when these links appear inside a
-code block. See [[f:oidReferenceParser]] for to see the expected format of these
-links.
+The [[data:LinkOid]] is made up of the Org ID and the name. This is used pervasively
+as it is the only way to refer to headings (within the same doc or in an
+external Org doc). It is also required for constructing Noweb links that refer
+to code blocks from external documents. See [[f:oidReferenceParser]] to see the
+expected format of these links.
 
 #+name: data:LinkOid
 #+begin_src haskell
@@ -4064,8 +4086,8 @@ data LinkOid = LinkOid
   deriving stock (Eq, Generic, Ord)
 #+end_src
 
-We have a custom =Show= instance so that it's much more concise (especially when
-we're marshaling and unmarshaling from JSON).
+We have a custom ~Show~ instance for [[data:LinkOid]] so that it's much more concise
+(especially when we're marshaling and unmarshaling from JSON).
 
 #+name: instance:Show LinkOid
 #+begin_src haskell
@@ -4075,48 +4097,12 @@ instance Show LinkOid where
     | otherwise = "id:" <> show uuid <> "::" <> T.unpack name
 #+end_src
 
-In summary we support the following link types in an Org document:
-
-  - ~LinkTargetOid~ :: a link to another cell or Org document, also used for Noweb
-    reference inside another code block (because code blocks are just cells).
-    They can be used to also link to figures, which are also cells. [[fig:PNG image][Example]].
-
-    When inside code blocks, these use angle brackets (e.g., ~<<foo>>~). This can
-    reference code blocks in other files by OID, where the syntax is
-    ~<<id:...::foo>>~ where ~...~ is the OID and ~foo~ is the name of the code block
-    at that OID (either using the top-level OID of the document or the OID of
-    the closest enclosing heading). We have to use an OID-to-file map data
-    structure (which is parsed [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][here]]).
-
-    When used outside of code blocks, square brackets are used (e.g., ~[[target]]~
-    or ~[[target][name]]~) where ~target~ is just a plain text string (such as a URL
-    or some other entity in the document), and ~name~ is what is displayed to the
-    user when the link is rendered.
-
-  - ~LinkTargetLineLabel~ :: a link that points to a reference /inside/ a code block. This
-    is useful for referring to different areas inside a code block, without
-    having to break up the code block into multiple separate parts.
-
-  - ~LinkTargetURI~ :: a link that points to a traditional URI; these are the most
-    common types of links on the internet, the most famous example being
-    anything that looks like =https://...= or =http://...=.
-
-  - LinkTargetFilePath :: a link to a file. Although this is arbitrary when
-    using Emacs, it has a limitation on weaving --- only those files that are
-    also being served by the web server that is serving that page will be linked
-    (otherwise the link will be broken).
-
-There are also [[id:8fe81206-f50d-4200-a95e-99278e0ad410][Raw links]] which is prose text that looks like a URL. For example,
-https://www.haskell.org is an example of a raw link. This is a convenience
-facility because ~[[https://www.haskell.org]]~ behaves the same way as
-~https://www.haskell.org~.
-
 ** OIDs and Emacs
 :PROPERTIES:
 :ID:       96f8cbda-abca-48bd-bb89-512aaac61ca8
 :END:
 
-Lilac relies on Org files that are written in Emacs (Emacs is the best
+Lilac relies on Org files that are written in Emacs (as it is the best
 environment for writing Org files). When the ~org-id-locations-file~ and
 ~org-id-track-globally~ variables are set, Emacs remembers which files have which
 Org IDs (where the "ID" is the OID generated by ~org-id-get-create~ and
@@ -4153,7 +4139,9 @@ whenever it encounters Org files.
 ** Standalone link parser
 
 The standalone link parser [[f:linkParser]] can parse links that can be embedded
-inside prose text.
+inside prose text. In practice this is probably the most important link parser
+because it knows how to parse links found in prose text (outside of code
+blocks).
 
 #+name: f:linkParser
 #+begin_src haskell
@@ -4252,11 +4240,11 @@ oidLinkParser = do
 ~linkOid~. This is used for [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4][backlink]] generation.
 
 [[f:linkDisplayNameParser]] just gets the name of the text to display. It is reused
-in [[f:protocolWebLinkParser]]. It uses the ~proseParser'~ helper which is very
-similar to the [[f:proseParser]], except that instead of returning [[data:PToken]]
-values, it returns the finer-grained [[data:StyledText]]. We want to be careful
-about how we treat whitespace (especially across indentation levels), so we
-reuse the same [[f:proseSpaceConsumer]] that [[f:paragraphParser]] uses.
+in [[f:protocolWebLinkParser]]. It uses the ~proseParser'~ [[(proseParser' helper)]]
+helper which is very similar to the [[f:proseParser]], except that instead of
+returning [[data:PToken]] values, it returns the finer-grained [[data:StyledText]]. We
+want to be careful about how we treat whitespace (especially across indentation
+levels), so we reuse the same [[f:proseSpaceConsumer]] that [[f:paragraphParser]] uses.
 
 #+name: f:linkDisplayNameParser
 #+begin_src haskell
@@ -4272,7 +4260,7 @@ linkDisplayNameParser = do
   modify (\s -> s {insideLinkDisplayName = False})
   pure linkDisplayName
   where
-    proseParser' :: OrgParser Text -> OrgParser [StyledText]
+    proseParser' :: OrgParser Text -> OrgParser [StyledText] -- (ref:proseParser' helper)
     proseParser' spaceConsumer = do
       a <- MP.choice baseParsers
       b <- MP.many $ MP.choice (spaceParser : baseParsers)
@@ -4288,6 +4276,109 @@ linkDisplayNameParser = do
         nonEmpty :: StyledText -> Bool
         nonEmpty styledText = not $ T.null styledText.body
 #+end_src
+
+Here are some basic links.
+
+#+name: ti:0006-links
+#+header: :tangle test/Lilac/ParseSpec/0006-links
+#+begin_src org
+foo [[link-target-only]]
+
+,* [[link-target][link-name]]
+
+[[a]] b
+#+end_src
+
+#+name: t:0006-links
+#+begin_src haskell
+shouldParseWithState
+  "0006-links"
+  ( nilOrgDoc
+      [ CParagraph
+          $ Prose
+            [ ptext "foo " [],
+              PTokenLink
+                Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "link-target-only"
+                          },
+                    name = [stext "link-target-only" []]
+                  }
+            ],
+        CHeading
+          Heading
+            { level = 1,
+              section = [1],
+              body =
+                Prose
+                  [ PTokenLink
+                      Link
+                        { target =
+                            LinkTargetOid
+                              LinkOid
+                                { oid = nilOid,
+                                  name = "link-target"
+                                },
+                          name = [stext "link-name" []]
+                        }
+                  ],
+              meta = fromList []
+            },
+        CParagraph
+          $ Prose
+            [ PTokenLink
+                Link
+                  { target =
+                      LinkTargetOid
+                        LinkOid
+                          { oid = nilOid,
+                            name = "a"
+                          },
+                    name = [stext "a" []]
+                  },
+              ptext " b" []
+            ]
+      ]
+      [ PseudoEdge (2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "a"}),
+        PseudoEdge (0, LinkOid {oid = fromWords 0 0, name = "link-target-only"})
+      ]
+  )
+  defaultOrgParserState
+    { headingOidStack = [Nothing],
+      headingLevel = 1,
+      headingSectionNumber = [1]
+    }
+#+end_src
+
+Sometimes we have text that look like links initially but turn out to be
+non-links.
+
+#+name: ti:0006-links-nonlink
+#+header: :tangle test/Lilac/ParseSpec/0006-links-nonlink
+#+begin_src org
+[hi]
+#+end_src
+
+#+name: t:0006-links-nonlink
+#+begin_src haskell
+shouldParseWith
+  "0006-links-nonlink"
+  $ nilOrgDoc
+    [ CParagraph $ Prose [ptext "[hi]" []]
+    ]
+    []
+#+end_src
+
+Bracketed links can be preceded by ~(~ which means [[f:linkParser]] won't be
+able to parse it directly; however, in [[f:textParser]] (specifically ~normalChar~) we
+take care to ensure to stop consuming input if we see a double left bracket ~[[~.
+This way, the input will look like ~[[...~ which will then allow
+[[f:linkParser]] to parse it. See [[ti:0006-links-inside-parentheses]] for an example.
+
+[[ti:0006-links-oids]] has some more complex input.
 
 #+name: ti:0006-links-oids
 #+header: :tangle test/Lilac/ParseSpec/0006-links-oids
@@ -4477,10 +4568,10 @@ shouldParseWith
 #+end_src
 
 If we encounter a link in the middle of a paragraph (where the ~OID~ portion is
-broken up incorrectly such that there is additional white space at the beginning
+broken up incorrectly such that there is additional whitespace at the beginning
 of a line), we should still be able to parse the ~\n ~ as a single space
 character because that's almost always the intent. This situation can happen
-when invoking =fill-paragraph= in Emacs with =org-toggle-link-display=.
+when invoking ~fill-paragraph~ in Emacs with ~org-toggle-link-display~.
 
 So in [[ti:0006-links-oids-lenient-whitespace]], even though the string (if we parse
 it naively) should look like ~with\n newline~, that ~\n ~ will get compressed so
@@ -4516,185 +4607,6 @@ shouldParseWith
       [PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "target name with newline and space is still treated as space"})]
   )
 #+end_src
-
-** Line labels
-:PROPERTIES:
-:ID:       da4aa2a7-3896-4969-aa5e-5e3d842c35db
-:END:
-
-Line labels are embedded inside a block, and can be linked to from outside the
-block. Below is an example; we give two code blocks, the first with the line
-labels disabled and the second with the same content but with line labels
-enabled, so that you can see the full syntax if you're reading this from HTML:
-
-#+header: :line-label off
-#+begin_src emacs-lisp
-(save-excursion              ; (ref:a)
-   (goto-char (point-min))   ; (ref:foo)
-#+end_src
-
-#+begin_src emacs-lisp
-(save-excursion              ; (ref:a)
-   (goto-char (point-min))   ; (ref:foo)
-#+end_src
-
-The ~(ref:a)~ and ~(ref:foo)~ will become targets that can be linked to via ~[[(a)]]~
-and ~[[(foo)]]~. So now you can write [[(a)]] and [[(foo)]] to refer to specific lines in
-the example above.
-
-The line label must start with a ~(ref:~ and end with a closing parenthesis ~)~, as
-[[f:lineLabelParser]] demonstrates:
-
-#+name: f:lineLabelParser
-#+begin_src haskell
-lineLabelParser :: OrgParser LinkTarget
-lineLabelParser = do
-  _ <- string "(ref:"
-  o <- MP.getOffset
-  lineLabel <- lineLabelRefParser
-  _ <- string ")"
-  assertUniqueLineLabel lineLabel o
-  pure $ LinkTargetLineLabel lineLabel
-#+end_src
-
-Valid characters for a line label are handled by [[f:lineLabelRefParser]]. This uses
-[[f:compressedTextParser]] to let the user refer to line labels more freely, without
-having to be exact about whitespace; see the discussion at
-[[f:compressedTextParser]] for more details.
-
-#+name: f:lineLabelRefParser
-#+begin_src haskell
-lineLabelRefParser :: OrgParser Text
-lineLabelRefParser =
-  MP.label "line label" $ compressedTextParser "()[]<>" ">>"
-#+end_src
-
-The line labels must be unique inside a document; otherwise you'll run into a
-parse error, per [[f:assertUniqueLineLabel]]. [[f:assertUniqueLineLabel]] is virtually
-the same as [[f:assertUniqueCellName]].
-
-#+name: f:assertUniqueLineLabel
-#+begin_src haskell
-assertUniqueLineLabel :: Text -> Int -> OrgParser ()
-assertUniqueLineLabel lineLabel offset = do
-  pState <- get
-  when (member lineLabel pState.lineLabels) $ do
-    MP.setOffset offset
-    fail
-      $ "line label "
-      <> show lineLabel
-      <> " is not unique"
-  let num = pState.lineLabelNumber + 1
-  put
-    pState
-      { lineLabels =
-          insert
-            lineLabel
-            num
-            pState.lineLabels,
-        lineLabelNumber = num
-      }
-#+end_src
-
-#+name: ti:0006-unique-line-labels
-#+header: :tangle test/Lilac/ParseSpec/0006-unique-line-labels
-#+header: :line-label off
-#+begin_src org
-,#+begin_src sh
-a (ref:x)
-,#+end_src
-
-,#+begin_src sh
-b (ref:x)
-,#+end_src
-#+end_src
-
-#+name: t:0006-unique-line-labels
-#+begin_src haskell
-shouldFailWithMessage
-  "0006-unique-line-labels"
-  "line label \"x\" is not unique"
-  58
-#+end_src
-
-The [[f:lineLabelParser]] is used in [[f:bTokenParser]], if the block being parsed does
-not have ~#+header: :line-label off~.
-
-The syntax for linking to a line label ~(ref:foo)~ is ~[[(foo)]]~. Note that the
-parentheses surround the line label, to distinguish it from other cells that can
-be named (via ~#+name: ...~, such as other blocks). A cell's name may not begin
-with an opening parenthesis, so that ~[[(foo)]]~ always links to the line label
-named ~foo~, not a cell named ~(foo)~; this prohibition of an opening parenthesis is
-codified in [[f:metaEntryParser]].
-
-Parsing of line label links is handled by [[f:lineLabelLinkParser]].
-
-#+name: f:lineLabelLinkParser
-#+begin_src haskell
-lineLabelLinkParser :: OrgParser Link
-lineLabelLinkParser = do
-  _ <- string "[[("
-  lineLabel <- lineLabelRefParser
-  _ <- string ")]]"
-  modify
-    ( \s ->
-        s
-          { OrgParserState.lineLabelReferences =
-              Set.insert lineLabel s.lineLabelReferences
-          }
-    )
-  pure
-    $ Link
-      { target = LinkTargetLineLabel lineLabel,
-        name = []
-      }
-#+end_src
-
-Unlike other links that use the double bracket syntax, these line label links
-cannot be given a custom name; instead they are always named numerically when
-woven (see [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveLink][f:weaveLink]]). During weaving, the line labels are always numbered
-starting at number ~1~, and increment upwards. Each block resets the counter back
-to ~1~. The ~lineLabels~ and ~lineLabelNumber~ fields in [[data:OrgParserState]] keep
-track of this numbering strategy. And just like for footnotes, we check how
-these line labels are used in [[f:reconcileLineLabels]], which is based heavily off
-of [[f:reconcileFootnotes]].
-
-#+name: f:reconcileLineLabels
-#+begin_src haskell
-reconcileLineLabels :: OrgParser (Map Text Int)
-reconcileLineLabels = do
-  pState <- get
-  let referenced = pState.lineLabelReferences
-      defined = M.keysSet pState.lineLabels
-      brokenLinks = Set.difference referenced defined
-      unusedDefs = Set.difference defined referenced
-      hasBrokenLinks = length brokenLinks /= 0
-      hasUnusedDefs = length unusedDefs /= 0
-      brokenLinksMsg = T.unpack . unwords $ toList brokenLinks
-      unusedDefsMsg = T.unpack . unwords $ toList unusedDefs
-  if
-    | hasBrokenLinks -> fail $ "broken line label links: " <> brokenLinksMsg
-    | hasUnusedDefs -> fail $ "unused line labels: " <> unusedDefsMsg
-    | otherwise -> pure pState.lineLabels
-#+end_src
-
-*** Tangling behavior
-:PROPERTIES:
-:ID:       8a920078-c090-42c4-8894-1b1cacaf0e15
-:END:
-
-By default, line labels are stripped in the tangling process in [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba::f:expandBlock][f:expandBlock]].
-However, sometimes you'd want to tangle these line labels in the source code.
-One such use case is if you are using a linter for the source code, that doesn't
-like trailing comment characters.
-
-You can do that with
-
-#+begin_src org
-,#+header: :line-label tangle
-#+end_src
-
-for the source code block in question. See [[id:2804111e-fa41-4cbe-9480-2666dd4a02e5::nix/release.nix][nix\/release.nix]] for an example.
 
 ** Links to recognized web protocols
 
@@ -4879,88 +4791,6 @@ fileLinkParser = do
       pure fp
 #+end_src
 
-Here are some basic links.
-
-#+name: ti:0006-links
-#+header: :tangle test/Lilac/ParseSpec/0006-links
-#+begin_src org
-foo [[link-target-only]]
-
-,* [[link-target][link-name]]
-
-[[a]] b
-#+end_src
-
-#+name: t:0006-links
-#+begin_src haskell
-shouldParseWithState
-  "0006-links"
-  ( nilOrgDoc
-      [ CParagraph
-          $ Prose
-            [ ptext "foo " [],
-              PTokenLink
-                Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = nilOid,
-                            name = "link-target-only"
-                          },
-                    name = [stext "link-target-only" []]
-                  }
-            ],
-        CHeading
-          Heading
-            { level = 1,
-              section = [1],
-              body =
-                Prose
-                  [ PTokenLink
-                      Link
-                        { target =
-                            LinkTargetOid
-                              LinkOid
-                                { oid = nilOid,
-                                  name = "link-target"
-                                },
-                          name = [stext "link-name" []]
-                        }
-                  ],
-              meta = fromList []
-            },
-        CParagraph
-          $ Prose
-            [ PTokenLink
-                Link
-                  { target =
-                      LinkTargetOid
-                        LinkOid
-                          { oid = nilOid,
-                            name = "a"
-                          },
-                    name = [stext "a" []]
-                  },
-              ptext " b" []
-            ]
-      ]
-      [ PseudoEdge (2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "a"}),
-        PseudoEdge (0, LinkOid {oid = fromWords 0 0, name = "link-target-only"})
-      ]
-  )
-  defaultOrgParserState
-    { headingOidStack = [Nothing],
-      headingLevel = 1,
-      headingSectionNumber = [1]
-    }
-#+end_src
-
-Bracketed links can be preceded by ~(~ which means [[f:linkParser]] won't be
-able to parse it directly; however, in [[f:textParser]] (specifically ~normalChar~) we
-take care to ensure to stop consuming input if we see a double left bracket ~[[~.
-This way, the input will look like ~[[...~ which will then allow
-[[f:linkParser]] to parse it.
-
 #+name: ti:0006-links-inside-parentheses
 #+header: :tangle test/Lilac/ParseSpec/0006-links-inside-parentheses
 #+begin_src org
@@ -4986,31 +4816,16 @@ shouldParseWith
     []
 #+end_src
 
-Sometimes we have text that look like links initially but turn out to be
-non-links.
-
-#+name: ti:0006-links-nonlink
-#+header: :tangle test/Lilac/ParseSpec/0006-links-nonlink
-#+begin_src org
-[hi]
-#+end_src
-
-#+name: t:0006-links-nonlink
-#+begin_src haskell
-shouldParseWith
-  "0006-links-nonlink"
-  $ nilOrgDoc
-    [ CParagraph $ Prose [ptext "[hi]" []]
-    ]
-    []
-#+end_src
-
 ** Raw links
 :PROPERTIES:
 :ID:       8fe81206-f50d-4200-a95e-99278e0ad410
 :END:
 
-The [[f:rawLinkParser]] parses text that look like URLs into ~LinkTargetURI~.
+The [[f:rawLinkParser]] parses text that look like URLs into ~LinkTargetURI~. These
+raw links do /not/ use the double bracket syntax like ~[[ ... ]]~ but instead just
+have the raw URI as is directly in the prose. Generally speaking, you should
+always use the double bracket syntax if you can, and only use raw links if they
+are short enough to fit on a single line.
 
 #+name: f:rawLinkParser
 #+begin_src haskell
@@ -5035,7 +4850,7 @@ rawLinkParser = do
               ]
           }
   where
-    remainderChar :: OrgParser Char
+    remainderChar :: OrgParser Char -- (ref:rawLinkParser-remainderChar)
     remainderChar = do
       c <- MP.satisfy N.isAllowedInURI
       when (isPunctuation c && c /= '/') $ do
@@ -5044,17 +4859,17 @@ rawLinkParser = do
       pure c
 #+end_src
 
-The tricky part is in the =remainderChar=. Essentially, if we see a raw link
-followed by some punctuation, like https://funloop.org, then we want the
-punctuation plus the whitespace immediately after it to be excluded from the
-link. The punctuation may or may not be part of the allowed characters in
-=N.isAllowedInURI=. We fix this problem by running some additional checks if we
-ever encounter punctuation, with [[f:isPunctuation]], where the [[f:isAlphaNumChar]]
-helper is taken from [[https://hackage.haskell.org/package/network-uri][network-uri]].
+The tricky part is in the ~remainderChar~ [[(rawLinkParser-remainderChar)]].
+Essentially, if we see a raw link followed by some punctuation, like
+https://funloop.org, then we want the punctuation plus the whitespace
+immediately after it to be excluded from the link. The punctuation may or may
+not be part of the allowed characters in ~N.isAllowedInURI~. We fix this problem
+by running some additional checks if we ever encounter punctuation, with
+[[f:isPunctuation]], where the [[f:isAlphaNumChar]] helper is taken from [[https://hackage.haskell.org/package/network-uri][network-uri]].
 
 However, the above rule about excluding punctuation doesn't apply for the ~/~
 (slash) character because sometimes a URL may end with a slash. In such cases,
-we would still want to include the slash it as part of the URL.
+we would still want to include the slash as part of the URL.
 
 The [[f:isPunctuation]] parser (and its parts) are generic and useful enough that we
 expose them as top-level functions.
@@ -5209,17 +5024,17 @@ shouldParseWith
 :ID:       81e1c841-5de8-4111-9b18-f33bea904122
 :END:
 
-=LinkOid= links to Noweb references. We've been using Noweb references already
-in this document, but here's an isolated example.
+Noweb links, or references, are ~LinkOid~ links to other code blocks. We've been
+using Noweb references already in this document, but here's an isolated example.
 
 #+begin_src sh
-echo <<LinkOid example>>
+echo <<some message>>
 #+end_src
 
-The block above refers to a Noweb reference named =LinkOid example=. We define
+The block above refers to a Noweb reference named ~some message~. We define
 it below:
 
-#+name: LinkOid example
+#+name: some message
 #+begin_src sh
 hello world
 #+end_src
@@ -5232,11 +5047,200 @@ Noweb links are powered by [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkO
 current Org file or any other Org file (as long as those other Org files are
 [[id:c80fd6a6-7eb2-4672-99cc-a5a10c1fda69][compiled]] and [[id:75173d6f-c210-46a0-8acf-689deeacd250][archived]] together).
 
-The ability for Noweb links to reference other files is not part of Orgmode and
-is Lilac's own extension. This allows source code blocks to be defined across
-multiple Org files if needed. One simple example is version information that
-we might want to define only in a single place, but which might be referenced
-in other places, across multiple Org files.
+The ability for Noweb links to reference blocks in other files is not part of
+Orgmode and is Lilac's own extension. This allows source code blocks to be
+defined across multiple Org files if needed. One simple example is version
+information that we might want to define /once/ in a single place, but which might
+be referenced in other places, across multiple Org files. This is exactly what
+we do ourselves with [[id:6fe8f5c2-bf13-4ebe-9fdb-6bda59a919a8::GHC version][GHC version]], which is referenced in [[id:65e5513b-2167-44d6-bd3a-50fdd9ee020e::nix:ghcVersion][nix:ghcVersion]] for
+example.
+
+** Line labels
+:PROPERTIES:
+:ID:       da4aa2a7-3896-4969-aa5e-5e3d842c35db
+:END:
+
+Line labels are embedded inside a block, and can be linked to from outside the
+block. Below is an example; we give two code blocks, the first with the line
+labels disabled and the second with the same content but with line labels
+enabled, so that you can see the full syntax if you're reading this from HTML:
+
+#+header: :line-label off
+#+begin_src emacs-lisp
+(save-excursion              ; (ref:a)
+   (goto-char (point-min))   ; (ref:foo)
+#+end_src
+
+#+begin_src emacs-lisp
+(save-excursion              ; (ref:a)
+   (goto-char (point-min))   ; (ref:foo)
+#+end_src
+
+The ~(ref:a)~ and ~(ref:foo)~ will become targets that can be linked to via ~[[(a)]]~
+and ~[[(foo)]]~. So now you can write [[(a)]] and [[(foo)]] to refer to specific lines in
+the example above.
+
+*** Parsing of labels inside code blocks
+
+The line label must start with a ~(ref:~ and end with a closing parenthesis ~)~;
+this is the syntax that Orgmode uses, and which we also adopt in
+[[f:lineLabelParser]]:
+
+#+name: f:lineLabelParser
+#+begin_src haskell
+lineLabelParser :: OrgParser LinkTarget
+lineLabelParser = do
+  _ <- string "(ref:"
+  o <- MP.getOffset
+  lineLabel <- lineLabelRefParser
+  _ <- string ")"
+  assertUniqueLineLabel lineLabel o
+  pure $ LinkTargetLineLabel lineLabel
+#+end_src
+
+Valid characters for a line label are handled by [[f:lineLabelRefParser]]. This uses
+[[f:compressedTextParser]] to let the user refer to line labels more freely, without
+having to be exact about whitespace; see the discussion at
+[[f:compressedTextParser]] for more details.
+
+#+name: f:lineLabelRefParser
+#+begin_src haskell
+lineLabelRefParser :: OrgParser Text
+lineLabelRefParser = do
+  let disallowedChars = "()[]<>" :: [Char]
+      ending = ">>" :: [Char]
+  MP.label "line label" $ compressedTextParser disallowedChars ending
+#+end_src
+
+The line labels must be unique inside a document; otherwise you'll run into a
+parse error, per [[f:assertUniqueLineLabel]]. [[f:assertUniqueLineLabel]] is virtually
+the same as [[f:assertUniqueCellName]].
+
+#+name: f:assertUniqueLineLabel
+#+begin_src haskell
+assertUniqueLineLabel :: Text -> Int -> OrgParser ()
+assertUniqueLineLabel lineLabel offset = do
+  pState <- get
+  when (member lineLabel pState.lineLabels) $ do
+    MP.setOffset offset
+    fail
+      $ "line label "
+      <> show lineLabel
+      <> " is not unique"
+  let num = pState.lineLabelNumber + 1
+  put
+    pState
+      { lineLabels =
+          insert
+            lineLabel
+            num
+            pState.lineLabels,
+        lineLabelNumber = num
+      }
+#+end_src
+
+#+name: ti:0006-unique-line-labels
+#+header: :tangle test/Lilac/ParseSpec/0006-unique-line-labels
+#+header: :line-label off
+#+begin_src org
+,#+begin_src sh
+a (ref:x)
+,#+end_src
+
+,#+begin_src sh
+b (ref:x)
+,#+end_src
+#+end_src
+
+#+name: t:0006-unique-line-labels
+#+begin_src haskell
+shouldFailWithMessage
+  "0006-unique-line-labels"
+  "line label \"x\" is not unique"
+  58
+#+end_src
+
+The [[f:lineLabelParser]] is used in [[f:bTokenParser]], if the block being parsed does
+not have ~#+header: :line-label off~.
+
+*** Parsing of links to line labels
+
+The syntax for linking to a line label ~(ref:foo)~ is ~[[(foo)]]~. Note the
+parentheses surround the line label, to distinguish it from other cells that can
+be named (via ~#+name: ...~, such as other blocks). A cell's name may not begin
+with an opening parenthesis, so that ~[[(foo)]]~ always links to the line label
+named ~foo~, not a cell named ~(foo)~; this prohibition of an opening parenthesis is
+codified in [[f:metaEntryParser]] at [[(non-line-label name)]].
+
+Parsing of line label links is handled by [[f:lineLabelLinkParser]].
+
+#+name: f:lineLabelLinkParser
+#+begin_src haskell
+lineLabelLinkParser :: OrgParser Link
+lineLabelLinkParser = do
+  _ <- string "[[("
+  lineLabel <- lineLabelRefParser
+  _ <- string ")]]"
+  modify
+    ( \s ->
+        s
+          { OrgParserState.lineLabelReferences =
+              Set.insert lineLabel s.lineLabelReferences
+          }
+    )
+  pure
+    $ Link
+      { target = LinkTargetLineLabel lineLabel,
+        name = []
+      }
+#+end_src
+
+Unlike other links that use the double bracket syntax, these line label links
+cannot be given a custom name for how they are displayed inside code blocks;
+instead they are always named numerically when woven (see [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveLink][f:weaveLink]]). During
+weaving, the line labels within each block are always numbered starting at
+number ~1~, and increment upwards. Each block resets the counter back to ~1~. The
+~lineLabels~ and ~lineLabelNumber~ fields in [[data:OrgParserState]] keep track of this
+numbering strategy. And just like for footnotes, we check how these line labels
+are used in [[f:reconcileLineLabels]], which is based heavily off of
+[[f:reconcileFootnotes]].
+
+#+name: f:reconcileLineLabels
+#+begin_src haskell
+reconcileLineLabels :: OrgParser (Map Text Int)
+reconcileLineLabels = do
+  pState <- get
+  let referenced = pState.lineLabelReferences
+      defined = M.keysSet pState.lineLabels
+      brokenLinks = Set.difference referenced defined
+      unusedDefs = Set.difference defined referenced
+      hasBrokenLinks = length brokenLinks /= 0
+      hasUnusedDefs = length unusedDefs /= 0
+      brokenLinksMsg = T.unpack . unwords $ toList brokenLinks
+      unusedDefsMsg = T.unpack . unwords $ toList unusedDefs
+  if
+    | hasBrokenLinks -> fail $ "broken line label links: " <> brokenLinksMsg
+    | hasUnusedDefs -> fail $ "unused line labels: " <> unusedDefsMsg
+    | otherwise -> pure pState.lineLabels
+#+end_src
+
+*** Tangling behavior
+:PROPERTIES:
+:ID:       8a920078-c090-42c4-8894-1b1cacaf0e15
+:END:
+
+By default, line labels are stripped in the tangling process in [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba::f:expandBlock][f:expandBlock]].
+However, sometimes you'd want to tangle these line labels in the source code.
+One such use case is if you are using a linter for the source code, that doesn't
+like trailing comment characters.
+
+You can do that with
+
+#+begin_src org
+,#+header: :line-label tangle
+#+end_src
+
+for the source code block in question. See [[id:2804111e-fa41-4cbe-9480-2666dd4a02e5::nix/release.nix][nix\/release.nix]] for an example.
 
 ** Footnotes
 :PROPERTIES:
@@ -5256,9 +5260,11 @@ Hello world [fn:foo].
 #+end_src
 
 So a footnote is made up of both the link to the footnote from the main text,
-and a definition of the footnote at the bottom. Both the link and the definition
-share the same footnote reference, which is parsed with the
-[[f:footnoteReferenceParser]].
+and a definition of the footnote at the bottom. This requirement of needing to
+define them somewhere in the document is akin to [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]].
+
+Both the link and the definition share the same footnote reference, which is
+parsed with the [[f:footnoteReferenceParser]].
 
 #+name: f:footnoteReferenceParser
 #+begin_src haskell
@@ -5270,8 +5276,8 @@ footnoteReferenceParser = do
   pure name
 #+end_src
 
-When parsing the link to a footnote, we parse it with the
-~LinkTargetFootnote~ constructor to distinguish it from ~LinkTargetOid~ which are
+When parsing the link to a footnote, we parse it with the ~LinkTargetFootnote~
+constructor for [[data:LinkTarget]] to distinguish it from ~LinkTargetOid~ which are
 generic links to any other named cell. Then at weaving time, we know how to
 style it (with a numeric superscript).
 
@@ -5308,9 +5314,7 @@ footnoteLinkParser = do
 
 As for the footnote definitions, they are expected to be placed on their own, as
 separate paragraphs. The definition may only be made up of 1 paragraph, because
-good footnotes are short and to the point. For purposes of parsing, it doesn't
-actually matter where these definitions are placed, because the order of when
-they are defined does not affect how they are presented when woven.
+good footnotes are short and to the point.
 
 #+name: data:Footnote
 #+begin_src haskell
@@ -5325,28 +5329,29 @@ data Footnote = Footnote
 
 Parsing footnote definitions is a little different than other cells, because the
 order in which the footnotes are defined may not necessarily be the order in
-which the footnotes are referenced from the rest of the document (this can
-happen, for example, if you move around the footnote definitions).
+which the footnotes are referenced from the rest of the document.
 
 For simplicity, Lilac doesn't care about the order in which footnote definitions
 appear. However, it does expect two conditions:
 
   1) Footnote definitions must appear together, just once, in the entire
-     document. That is, you may not define footnotes in multiple places.
+     document. That is, you may not define footnotes in multiple places
+     [[(single-footnote-group)]]. For example, see
+     [[ti:0013-footnotes-multiple-groups]].
 
   2) Inline footnotes (where footnotes are defined in the same area where they
      are referenced) are not allowed.
 
 During weaving, the footnote definitions are sorted according to the order in
-which they are referenced (via footnote links).
+which they are referenced (via footnote links). See [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] for details.
 
 The footnotes are not turned into cells; instead they are used to build up the
-~footnoteDefinitions~ map in [[data:OrgParserState]], which are then dumped into
-[[data:OrgDoc]]. This is because there is no point in preserving information about
-the order in which these footnote definitions are defined; in other words, it's
-useless to store footnote definitions as individual cells in the order they're
-defined, if during weave time we are going to sort them anyway in a (possibly)
-different order.
+~footnoteDefinitions~ map [[(field-ops-footnoteDefinitions)]] in [[data:OrgParserState]],
+which are then dumped into [[data:OrgDoc]]. This is because there is no point in
+preserving information about the order in which these footnote definitions are
+defined; in other words, it's useless to store footnote definitions as
+individual cells in the order they're defined, if during weave time we are going
+to sort them anyway in a (possibly) different order.
 
 #+name: f:footnoteDefinitionParser
 #+begin_src haskell
@@ -5364,7 +5369,7 @@ footnoteDefinitionParser = do
     )
     $ do
       MP.setOffset o
-      fail "cannot have more than one group of footnote definitions"
+      fail "cannot have more than one group of footnote definitions" -- (ref:single-footnote-group)
   modify
     ( \s ->
         s
@@ -5375,10 +5380,6 @@ footnoteDefinitionParser = do
     )
   pure $ CFootnote Footnote {name = name, body = prose}
 #+end_src
-
-The document is expected to have only one contiguous group of footnote
-definitions; if footnote definitions have anything substantive in-between,
-that's a parse error.
 
 When we have finished parsing the document, it's expected that all footnote
 links and definitions line up with each other (that there is an exact 1:1

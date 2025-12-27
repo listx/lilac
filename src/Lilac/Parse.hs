@@ -1071,7 +1071,7 @@ linkDisplayNameParser = do
   modify (\s -> s {insideLinkDisplayName = False})
   pure linkDisplayName
   where
-    proseParser' :: OrgParser Text -> OrgParser [StyledText]
+    proseParser' :: OrgParser Text -> OrgParser [StyledText] --
     proseParser' spaceConsumer = do
       a <- MP.choice baseParsers
       b <- MP.many $ MP.choice (spaceParser : baseParsers)
@@ -1189,7 +1189,7 @@ rawLinkParser = do
               ]
           }
   where
-    remainderChar :: OrgParser Char
+    remainderChar :: OrgParser Char --
     remainderChar = do
       c <- MP.satisfy N.isAllowedInURI
       when (isPunctuation c && c /= '/') $ do
@@ -1414,8 +1414,10 @@ lineLabelParser = do
   pure $ LinkTargetLineLabel lineLabel
 
 lineLabelRefParser :: OrgParser Text
-lineLabelRefParser =
-  MP.label "line label" $ compressedTextParser "()[]<>" ">>"
+lineLabelRefParser = do
+  let disallowedChars = "()[]<>" :: [Char]
+      ending = ">>" :: [Char]
+  MP.label "line label" $ compressedTextParser disallowedChars ending
 
 lineLabelLinkParser :: OrgParser Link
 lineLabelLinkParser = do
@@ -2124,7 +2126,7 @@ footnoteDefinitionParser = do
     )
     $ do
       MP.setOffset o
-      fail "cannot have more than one group of footnote definitions"
+      fail "cannot have more than one group of footnote definitions" --
   modify
     ( \s ->
         s
