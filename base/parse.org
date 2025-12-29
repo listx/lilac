@@ -893,6 +893,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:newlineAndIndentParser>>
 <<f:cellBoundary>>
 <<f:blockMetaEntryParser>>
+<<f:metaNameParser>>
 <<f:assertUniqueTanglePath>>
 <<f:blockParser>>
 <<f:firstParentOid>>
@@ -3186,7 +3187,7 @@ oidLinkParser :: OrgParser Link
 oidLinkParser = do
   _ <- string "[["
   avoidParsingKnownProtocols
-  (oid, name) <- oidReferenceParser "[]" "]]"
+  (oid, name) <- oidReferenceParser "[]" "]]" -- (ref:f:oidLinkParser-oidReferenceParser)
   pState <- get
   let mask = pState.styleMask
       implicitName
@@ -3202,14 +3203,14 @@ oidLinkParser = do
   displayName <-
     MP.choice
       [ MP.try $ string "]" >> pure [implicitNameStyledText],
-        MP.try linkDisplayNameParser
+        MP.try linkDisplayNameParser -- (ref:f:oidLinkParser-linkDisplayNameParser)
       ]
   let linkOid =
         LinkOid
           { oid = oid,
             name = name
           }
-      edge = PseudoEdge (pState.cellNumber, linkOid)
+      edge = PseudoEdge (pState.cellNumber, linkOid) -- (ref:f:oidLinkParser-PseudoEdge)
   modify (\s -> s {OrgParserState.pseudoEdges = edge : s.pseudoEdges})
   pure
     $ Link
@@ -3226,8 +3227,190 @@ oidLinkParser = do
         <> protocolsEmacs
 #+end_src
 
-[[f:oidLinkParser]] creates a "pseudo" edge, from the current ~cellNumber~ to the
-~linkOid~. This is used for [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4][backlink]] generation.
+There are three main pieces involved here:
+
+  1) [[f:oidReferenceParser]] [[(f:oidLinkParser-oidReferenceParser)]] for parsing the
+     location of the linked item (anything that can be named, such as a code
+     block, figure, or table);
+
+  2) [[f:linkDisplayNameParser]] [[(f:oidLinkParser-linkDisplayNameParser)]] for parsing
+     the display name of the link (if any); and
+
+  3) so-called "pseudo" edges [[(f:oidLinkParser-PseudoEdge)]].
+
+Pseudo-edges are needed for [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4][backlink]] generation. Now let's look at the first two
+pieces in more detail.
+
+*** OID references
+:PROPERTIES:
+:ID:       80637e01-1065-40b0-932c-8ffa2376c863
+:END:
+
+The OID reference uniquely identifies the linked item. Below are some examples:
+
+#+begin_src txt
+[[foo]]
+
+[[id:62a7d69a-7aa7-4607-b93e-7ed382a5f256][link display name]]
+
+[[id:62a7d69a-7aa7-4607-b93e-7ed382a5f256::name of target item][link display name]]
+#+end_src
+
+The first one, ~[[foo]]~, is called an /implicit/ link; it links to some other cell
+(block, table, figure, etc) within the /current/ document, without (explicitly)
+specifying the OID of the current document. All documents must have an OID, and
+it is parsed in [[f:docMetaParser]]. Implicit links only specify the target (in this
+example, ~foo~.
+
+The second one, ~[[id:62a7d69a-7aa7-4607-b93e-7ed382a5f256][link display name]]~,
+refers to an OID explicitly. The OID could be either a document itself (the
+[[(field-oid)]]) or the OID of a heading (the latter is much more common in
+practice). Note that these OIDs can be any OID, not just from the current
+document. This example also has a ~link display name~ as the text to display to
+the user when we weave this to HTML. These link display names are parsed
+separately in [[f:linkDisplayNameParser]] ([[id:4ae6e928-44be-47a0-baf4-8b3893a7a8fb][Link display names]]).
+
+The third example has a ~name of target item~ in it, which we call a /target name/.
+This name may or may not have newlines in it.
+
+For all three examples, the part in the first set of brackets (~foo~,
+~id:62a7d69a-7aa7-4607-b93e-7ed382a5f256~, and
+~id:62a7d69a-7aa7-4607-b93e-7ed382a5f256::name of target item~) are all parsed by
+[[f:oidReferenceParser]].
+
+#+name: f:oidReferenceParser
+#+begin_src haskell
+oidReferenceParser :: [Char] -> [Char] -> OrgParser (OID, Text)
+oidReferenceParser disallowedChars ending =
+  MP.choice
+    [ MP.try explicitOIDandTargetName,
+      MP.try explicitOID,
+      MP.try implicitOIDandExplicitTargetName
+    ]
+  where
+    implicitOIDandExplicitTargetName :: OrgParser (OID, Text)
+    implicitOIDandExplicitTargetName = do
+      pState <- get
+      name <- targetName
+      pure (pState.docOid, name) -- (ref:f:oidReferenceParser-docOid)
+    explicitOID = do
+      _ <- string "id:" -- (ref:f:oidReferenceParser-explicit-oid)
+      oidText <-
+        MP.some $ do
+          _ <- MP.notFollowedBy . string $ T.pack ending
+          MP.noneOf $ ':' : disallowedChars
+      oid <- validateOidText $ T.pack oidText
+      pure (oid, "")
+    explicitOIDandTargetName = do
+      (oid, _) <- explicitOID
+      _ <- string "::"
+      name <- targetName
+      pure (oid, name)
+    targetName :: OrgParser Text
+    targetName = compressedTextParser disallowedChars ending -- (ref:f:oidReferenceParser-target-name)
+#+end_src
+
+The implicit OID links get their OID assigned for the current document through
+the ~pState.docOid~ [[(f:oidReferenceParser-docOid)]], and use ~targetName~
+[[(f:oidReferenceParser-target-name)]] to parse the name of the target.
+
+For links with an explicit OID, the OID is prefixed with ~id:~
+[[(f:oidReferenceParser-explicit-oid)]].
+
+The parsing of the target name is a little bit tricky, because sometimes the
+user may want to break long lines with whitespace. This is why
+[[f:compressedTextParser]] is more lenient about how whitespace is interpreted, so
+that if the user wants to refer to a target that has spaces in it, they can
+write that target over multiple lines. That is, a user may refer to a target
+name like ~foo bar baz~ in the following ways:
+
+#+begin_src org
+[[foo bar
+baz]]
+
+[[foo
+bar
+baz]]
+
+[[foo
+bar baz]]
+#+end_src
+
+All of the above links refer to the same ~foo bar baz~ named target in the current
+document, even though they are written slightly differently.
+
+#+name: f:compressedTextParser
+#+begin_src haskell
+compressedTextParser :: [Char] -> [Char] -> OrgParser Text
+compressedTextParser disallowedChars ending = do
+  pState <- get
+  tn <-
+    proseParser'
+      $ proseSpaceConsumer'
+        pState.insideCodeBlock
+  pure $ compressWhitespace tn
+  where
+    compressWhitespace = T.unwords . T.words
+    proseSpaceConsumer' :: Bool -> OrgParser Text -- (ref:proseSpaceConsumer')
+    proseSpaceConsumer' insideCodeBlock
+      | insideCodeBlock = onlySpaces
+      | otherwise =
+          MP.choice
+            [ string "\n",
+              onlySpaces
+            ]
+    proseParser' :: OrgParser Text -> OrgParser Text
+    proseParser' spaceConsumer = do
+      a <- MP.choice baseParsers
+      b <- MP.many $ MP.choice (spaceParser : baseParsers)
+      pure . T.concat $ a : b
+      where
+        spaceParser = whitespaceCompressor spaceConsumer
+        baseParsers =
+          [ textParser'
+          ]
+    textParser' :: OrgParser Text
+    textParser' = do
+      ws <-
+        MP.some
+          $ MP.choice
+            [ MP.label "normal characters" normalChars
+            ]
+      pure $ T.concat ws
+      where
+        normalChars :: OrgParser Text
+        normalChars = do
+          cs <- MP.some $ normalChar
+          pure $ T.pack cs
+        normalChar :: OrgParser Char
+        normalChar = do
+          _ <- MP.notFollowedBy . string $ T.pack ending
+          MP.satisfy isNormalChar
+        isNormalChar c =
+          notElem c disallowedChars
+            && (not $ isSpace c)
+#+end_src
+
+Unlike [[f:proseSpaceConsumer]], the ~proseSpaceConsumer'~ [[(proseSpaceConsumer')]] does
+*not* check for the correctness of the indentation following a newline (it does
+not take an ~expectedIndentLen~ parameter). This is because we want to be more
+generous for the case where OID links are found in prose, because sometimes
+indentation can get silently added when using ~fill-paragraph~ in Emacs (if the
+OID link target gets unlucky and ends up getting hard wrapped by
+~fill-paragraph~). Otherwise, this parser will fail, which would then make the OID
+link become wrongly parsed.
+
+Now we could punish the user for having erroneous indentation, but because
+~org-toggle-link-display~ can hide this error caused by ~fill-paragraph~ (and
+because the link target contents will be hidden), we take the approach of being
+a bit lenient here. We still disallow newlines inside the link target inside
+code blocks, which is why ~insideCodeBlock~ is still a parameter for
+~proseSpaceConsumer'~. See [[ti:0006-links-oids-lenient-whitespace]].
+
+*** Link display names
+:PROPERTIES:
+:ID:       4ae6e928-44be-47a0-baf4-8b3893a7a8fb
+:END:
 
 [[f:linkDisplayNameParser]] just gets the name of the text to display. It is reused
 in [[f:protocolWebLinkParser]]. It uses the ~proseParser'~ [[(proseParser' helper)]]
@@ -3266,6 +3449,8 @@ linkDisplayNameParser = do
         nonEmpty :: StyledText -> Bool
         nonEmpty styledText = not $ T.null styledText.body
 #+end_src
+
+*** Tests
 
 Here are some basic links.
 
@@ -4090,8 +4275,7 @@ lineLabelParser = do
 
 Valid characters for a line label are handled by [[f:lineLabelRefParser]]. This uses
 [[f:compressedTextParser]] to let the user refer to line labels more freely, without
-having to be exact about whitespace; see the discussion at
-[[f:compressedTextParser]] for more details.
+having to be exact about whitespace.
 
 #+name: f:lineLabelRefParser
 #+begin_src haskell
@@ -7947,27 +8131,59 @@ shouldParseWithState
 :ID:       cae993e5-02bd-4f89-a6d3-20b41adaff8f
 :END:
 
-/Blocks/ are regions of text that start with =#+begin<...>= and end with =#+end<...>=.
+/Blocks/ are regions of text that start with ~#+begin<...>~ and end with ~#+end<...>~.
 They are used to delineate source code (such as those used for Noweb
-references), examples, quotes, and others. Some examples are =src= or =example= (as
-in =#+begin_src= and =#+begin_example=), although technically Org allows for any
+references), examples, quotes, and others. Some examples are ~src~ or ~example~ (as
+in ~#+begin_src~ and ~#+begin_example~), although technically Org allows for any
 arbitrary keyword here.
-
-** =Block= type
 
 #+name: data:Block
 #+begin_src haskell
 type Block :: Type
 data Block = Block
-  { parentOid :: OID,
-    meta :: Map Text Text,
-    body :: [BToken]
+  { parentOid :: OID, -- (ref:data:Block-parentOid)
+    meta :: Map Text Text, -- (ref:data:Block-meta)
+    body :: [BToken] -- (ref:data:Block-body)
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-Below are some examples of valid (empty) code blocks.
+The type of block (such as ~src~ or ~example~ as discussed above) is stored in the
+metadata map ~meta~ [[(data:Block-meta)]], with the ~__block_type~ key. See [[Expected
+blocks for 0007-blocks-empty]] for examples, as well as the [[id:dc13dd01-13c4-42a6-910e-4b6d66be428b][Metadata]] section for
+more a more detailed discussion.
+
+The ~parentOid~ [[(data:Block-parentOid)]] is the closest heading which has a ~:ID:~
+property (aka OID), or the [[newtype:OID][OID of the document]] if none of the headings have an
+OID (or if there are simply no headings preceding the block). Using Emacs
+functions like ~org-id-store-link~ will generate the OID automatically for the
+parent heading (creating a property drawer, adding the ~:ID:~ key, etc) if it
+doesn't already have an ~:ID:~.
+
+We need to store the ~parentOid~ here because ultimately, we need to build up a
+hashmap of symbols in [[id:01da95fe-ba23-4481-9833-428423392f5f::f:mkSymbols][f:mkSymbols]], which uses the ~parentOid~ as a building block.
+Once we have all the symbols (using ~parentOid~ fields) defined such that we know
+what they point to, we are able to look at a [[data:LinkOid]] and are able to
+determine what that link actually points to (whether it's a block, table,
+figure, etc). This allows us to know how to weave these links (specifically,
+this information about symbols lets us know how to weave the destination,
+because different cells have different link anchors --- see [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveLinkTarget][f:weaveLinkTarget]]
+for details). All cells that can be named (not just blocks, such as tables and
+figures as stated above) have an equivalent ~parentOid~ field to assist with this,
+for this same reason.
+
+Lastly, the ~body~ field [[(data:Block-body)]] stores the actual contents of the code
+block. Briefly, the body can have either text or links to other code blocks ---
+also known as Noweb references. See [[id:e3400781-57e7-409d-a65c-7c3d66847587][Body]] for details.
+
+** Metadata
+:PROPERTIES:
+:ID:       dc13dd01-13c4-42a6-910e-4b6d66be428b
+:END:
+
+Blocks can have associated metadata, as we can see from the test case below
+which has some examples of valid (empty) code blocks.
 
 #+name: ti:0007-blocks-empty
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-empty
@@ -8048,17 +8264,11 @@ shouldParseWithState
 ]
 #+end_src
 
-** Metadata
-
-Blocks can have associated metadata, as we can see from the test case above. The
-metadata is made up of any number of special key/value pairs that are written
-in the form of =#+header: :key value= lines. The special line =#+name: foo= gives
-the block a unique name (if it's not globally unique, we'll complain about it
-[[f:assertUniqueCellName]]), which can be the target of an internal link.
-
-Vanilla Org allows you to place these key/value pairs on the same line as the
-=#+begin_...= line, but we don't allow this. This enforces a cleaner style and
-also simplifies the parser.
+The metadata is made up of any number of special key/value pairs that are
+written in the form of ~#+header: :key value~ lines. Vanilla Org allows you to
+place these key/value pairs on the same line as the ~#+begin_...~ line, but we
+don't allow this. This enforces a cleaner (albeit verbose) style and also
+simplifies the parser.
 
 #+name: f:blockMetaEntryParser
 #+begin_src haskell
@@ -8070,21 +8280,20 @@ blockMetaEntryParser = do
   o <- MP.getOffset
   value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
   _ <- char '\n'
-  assertUniqueTanglePath key value o
+  assertUniqueTanglePath key value o -- (ref:blockMetaEntryParser-assertUniqueTanglePath)
   pure (key, value)
   where
-    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')]
-
-metaNameParser :: OrgParser (Text, Text)
-metaNameParser = do
-  _ <- string "#+name: "
-  name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
-  assertUniqueCellName name
-  pure ("name", name)
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')] -- (ref:blockMetaEntryParser-isKeywordLetter)
 #+end_src
 
-The [[f:assertUniqueTanglePath]] function checks that all tangle paths are unique;
-that is, no two code blocks may share the same tangle path.
+The keyword (~isKeywordLetter~ [[(blockMetaEntryParser-isKeywordLetter)]]) cannot have
+underscores in them. This way, it is impossible to conflict with the keywords
+used internally by Lilac such as ~__block_type~, ~__src_language~, and so forth as
+seen in [[Expected blocks for 0007-blocks-empty]].
+
+The [[f:assertUniqueTanglePath]] function
+[[(blockMetaEntryParser-assertUniqueTanglePath)]] checks that all tangle paths are
+unique; that is, no two code blocks may share the same tangle path.
 
 #+name: f:assertUniqueTanglePath
 #+begin_src haskell
@@ -8101,6 +8310,11 @@ assertUniqueTanglePath "tangle" path offset = do
       }
 assertUniqueTanglePath _ _ _ = pure ()
 #+end_src
+
+The tangle path is important for literate programming because it's the way in
+which code blocks actually get written to disk. Forcing tangle paths to be
+unique guarantees that there are no clashes (one block may not overwrite
+another).
 
 #+name: ti:0007-blocks-duplicate-tangle-paths
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-duplicate-tangle-paths
@@ -8127,9 +8341,30 @@ shouldFailWithMessage
   101
 #+end_src
 
-The [[f:assertUniqueCellName]] function keeps track of all the named cells we've
-seen so far. This is used to detect whether we've seen a cell name more than
-once, which is not allowed.
+When we want to name a block, we don't use the ~#+header: :...~ syntax; instead
+the special line ~#+name: ...~ gives the block a unique name (if it's not globally
+unique, we'll complain about it [[f:assertUniqueCellName]]), which can be the target
+of an internal link. We also treat this as metadata just like in
+[[f:blockMetaEntryParser]], and store it in the same ~meta~ field for [[data:Block]]. This
+is used in [[f:blockStartParser]].
+
+#+name: f:metaNameParser
+#+begin_src haskell
+metaNameParser :: OrgParser (Text, Text)
+metaNameParser = do
+  _ <- string "#+name: "
+  name <-
+    T.pack
+      <$> MP.someTill
+        (MP.label "name of block" MP.anySingle)
+        (char '\n')
+  assertUniqueCellName name -- (ref:metaNameParser-assertUniqueCellName)
+  pure ("name", name)
+#+end_src
+
+The [[f:assertUniqueCellName]] function [[(metaNameParser-assertUniqueCellName)]] keeps
+track of all the named cells we've seen so far. This is used to detect whether
+we've seen a cell name more than once, which is not allowed.
 
 #+name: f:assertUniqueCellName
 #+begin_src haskell
@@ -8171,13 +8406,16 @@ shouldFailWithMessage
 #+end_src
 
 ** Body
+:PROPERTIES:
+:ID:       e3400781-57e7-409d-a65c-7c3d66847587
+:END:
 
-The contents or ~body~ of a [[data:Block]] is list of =BToken= values, which are quite
-similar to =Prose= (a list of =PToken= types). A =BToken= can be either some raw piece
-of text, or a link. The link is only for the case of Noweb references. For
-example, if a block contains a Noweb reference, then it needs to be a link such
-that the Noweb reference can be dereferenced, and its contents replaced with the
-source of the referenced code block during tangling.
+The contents or ~body~ of a [[data:Block]] is list of [[data:BToken]] values, which are
+quite similar to [[newtype:Prose]] (a list of [[data:PToken]] types). A ~BToken~ can be
+either some raw piece of text, or a link. The link is only for the case of Noweb
+references. For example, if a block contains a Noweb reference, then it needs to
+be a link such that the Noweb reference can be dereferenced, and its contents
+replaced with the source of the referenced code block during tangling.
 
 #+name: data:BToken
 #+begin_src haskell
@@ -8190,9 +8428,8 @@ data BToken
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-** Overall parser
-
-Let's see how we parse the block itself with =blockParser=.
+[[f:blockParser]] parses the ~body~ as a list of ~BToken~ values (~bTokens~)
+[[(f:blockParser-bTokens)]].
 
 #+name: f:blockParser
 #+begin_src haskell
@@ -8201,27 +8438,27 @@ blockParser = do
   pState <- get
   (blockName, metaKVs, blockType, srcLang) <- blockStartParser
   let nowebOff =
-        (== Just "off")
+        (== Just "off") -- (ref:f:blockParser-nowebOff)
           $ lookup "noweb" metaKVs
       lineLabelOff =
         (== Just "off")
           $ lookup "line-label" metaKVs
   modify (\s -> s {insideCodeBlock = True})
-  bTokens <-
-    MP.choice
+  bTokens <- -- (ref:f:blockParser-bTokens)
+    MP.choice -- (ref:f:blockParser-bTokens-choice)
       [ zeroBTokensParser blockType,
         someBTokensParser blockType (not nowebOff) (not lineLabelOff)
       ]
   let newAnonBlockNumber = case blockName of
         Just _ -> pState.anonBlockNumber
         Nothing -> pState.anonBlockNumber + 1
-      anonBlockMeta = case blockName of
+      anonBlockMeta = case blockName of -- (ref:f:blockParser-anonBlockMeta)
         Just _ -> Nothing
         Nothing -> Just ("__anon_block_number", T.show newAnonBlockNumber)
       block =
         Block
           { parentOid =
-              firstParentOid pState.docOid pState.headingOidStack,
+              firstParentOid pState.docOid pState.headingOidStack, -- (ref:f:blockParser-firstParentOid)
             meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
@@ -8230,7 +8467,7 @@ blockParser = do
             body =
               ignoreSpecialCommas
                 . compressBTokens
-                $ padConsecutiveNowebLinks bTokens
+                $ padConsecutiveNowebLinks bTokens -- (ref:f:blockParser-bTokens-transforms)
           }
   modify
     ( \s ->
@@ -8243,16 +8480,58 @@ blockParser = do
   pure $ CBlock block
 #+end_src
 
-The first thing is to get the start of the block with [[f:blockStartParser]].
-The ~nowebOff~ bit controls how we perceive text that looks like ~<<foo>>~; see the
-discussion for [[ti:0007-blocks-noweb]] and [[ti:0007-blocks-noweb-off]].
+Before we discuss how we parse ~BToken~ values in detail, let's discuss some of
+the other bits first.
+
+[[f:blockStartParser]] identifies the beginning of a block.
+
+#+name: f:blockStartParser
+#+begin_src haskell
+blockStartParser ::
+  OrgParser
+    ( Maybe (Text, Text),
+      Map Text Text,
+      Text,
+      Maybe (Text, Text)
+    )
+blockStartParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
+  blockName <- MP.optional metaNameParser
+  metaKVs <- fromList <$> (many $ lexeme blockMetaEntryParser)
+  _ <- string "#+begin_"
+  blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
+  srcLang <- MP.optional $ do
+    _ <- MP.skipSome $ char ' '
+    src <- MP.takeWhile1P (Just "src language") isSrcLanguageChar
+    pure ("__src_language", src)
+  when (blockType == "src" && srcLang == Nothing)
+    $ fail "block type src requires a language specifier" -- (ref:f:blockStartParser-require-lang)
+  _ <- char '\n' -- (ref:f:blockStartParser-newline)
+  pure (blockName, metaKVs, blockType, srcLang)
+  where
+    isSrcLanguageChar c = isAsciiLower c || c == '-'
+#+end_src
+
+We first have to use the same try/lookAhead trick we use in [[f:figureParser]] at
+the beginning, because otherwise our parser thinks that as soon as we parse a
+~#+name~, that it will be a block. This is not true because other things (like
+figures) can have a ~#+name~ associated with them. We fail the parse if we detect
+a ~#+begin_src~ block without an accompanying language
+[[(f:blockStartParser-require-lang)]]; see [[ti:0007-block-src-without-lang]] for an
+example.
+
+Back to [[f:blockParser]]. The ~nowebOff~ bit [[(f:blockParser-nowebOff)]] controls how we
+perceive text that looks like ~<<foo>>~; if we've disabled Noweb references, then
+~<<foo>>~ is not given any special treatment. See the discussion for
+[[ti:0007-blocks-noweb]] and [[ti:0007-blocks-noweb-off]] at [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77][Noweb reference]].
 
 Blocks that don't have a name are assigned a ~__anon_block_number~ metadata
-property, so that we can use this information to generate a link anchor for it
-during weaving.
+property [[(f:blockParser-anonBlockMeta)]], so that we can use this information to
+generate a link anchor for it during weaving.
 
-The call to [[f:firstParentOid]] gets the first available [[newtype:OID]] we can find,
-going up the ~headingOidStack~ in [[data:OrgParserState]].
+The call to [[f:firstParentOid]] [[(f:blockParser-firstParentOid)]] gets the first
+available [[newtype:OID]] we can find, going up the ~headingOidStack~ in
+[[data:OrgParserState]].
 
 #+name: f:firstParentOid
 #+begin_src haskell
@@ -8262,19 +8541,19 @@ firstParentOid docOid maybeOids = case catMaybes maybeOids of
   [] -> docOid
 #+end_src
 
-The tricky part of [[f:blockParser]] is finding out the end of the block. We cannot use a single
-parser and must parse the two cases of whether there is or isn't any content
-inside the block separately, via =zeroBTokensParser= and =someBTokensParser=. We
-need this distinction because we require blocks to end with ="\n#+end_..."= (that
-is, the =#+end_...= must occur at the beginning of a line). This means that for
-empty blocks, this newline character just preceding the =#+end_...= will come from
-the newline at the end of the =#+begin_...= part. This then interferes with the
-=char '\n'= parser we already have in [[f:blockStartParser]] just before we start
-parsing for =bTokens=.
+OK, back to ~BToken~ values. The tricky part is finding out the /end/ of the block.
+We must parse the two cases of whether there is or isn't any content inside the
+block separately, via [[f:zeroBTokensParser]] and [[f:someBTokensParser]]. We need this
+distinction because we require blocks to end with ~"\n#+end_..."~ (that is, the
+~#+end_...~ must occur at the beginning of a line). This means that for empty
+blocks, this newline character just preceding the ~#+end_...~ will come from the
+newline at the end of the ~#+begin_...~ part. This then interferes with the ~char
+'\n'~ parser [[(f:blockStartParser-newline)]] we already have in [[f:blockStartParser]]
+just before we start parsing for ~bTokens~.
 
 In other words, there is no easy way to tell Megaparsec to ensure that we are at
 the beginning of a line. To work around this, we check whether the block is
-empty with =zeroBTokensParser=.
+empty with [[f:zeroBTokensParser]].
 
 #+name: f:zeroBTokensParser
 #+begin_src haskell
@@ -8287,8 +8566,9 @@ zeroBTokensParser blockType = do
     blankLine = string $ T.concat ["\n#+end_", blockType, "\n"]
 #+end_src
 
-If =zeroBTokensParser= fails, then =someBTokensParser= must succeed (hence the use
-of ~MP.choice~ in [[f:blockParser]]).
+If ~zeroBTokensParser~ fails, then that means there /is/ some content inside the
+block, and therefore [[f:someBTokensParser]] must succeed (hence the use
+of ~MP.choice~ [[(f:blockParser-bTokens-choice)]] in [[f:blockParser]]).
 
 #+name: f:someBTokensParser
 #+begin_src haskell
@@ -8296,50 +8576,91 @@ someBTokensParser :: Text -> Bool -> Bool -> OrgParser [BToken]
 someBTokensParser blockType nowebOn lineLabelOn =
   MP.someTill
     (bTokenParser (blockType == "src") nowebOn lineLabelOn)
-    (string $ T.concat ["\n#+end_", blockType, "\n"])
+    ( string
+        $ T.concat
+          [ "\n#+end_", -- (ref:f:someBTokensParser-leading-newline)
+            blockType,
+            "\n"
+          ]
+    )
 #+end_src
 
 See [[ti:0007-blocks-ending]] which checks the various edge cases around making sure
-we can detect the ="\n#+end_..."= bit.
+we can detect the ~"\n#+end_..."~ bit.
 
-Note that because we treat the trailing newline as a part of the =#+end_...=
-marker, we leave it out of the parsed contents. This actually helps us when we
-have to tangle blocks in [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba::f:expandBlock][f:expandBlock]]. If we parsed in the trailing newlines,
-these newlines would build up every time we nested into a block (e.g.,
-[[id:c78d3f21-b295-4f19-b720-ab50dedb3252::t:0101-block-expansion-deeply-nested][t:0101-block-expansion-deeply-nested]]).
+Because we treat the newline that immediately precedes the ~#+end_...~ bit as part
+of the ending marker, we leave it out of the parsed contents. This actually
+helps us when we have to tangle blocks in [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba::f:expandBlock][f:expandBlock]]. If we parsed in the
+trailing newlines as ~BToken~ values, these newlines would build up every time we
+nested into a block (e.g., [[id:c78d3f21-b295-4f19-b720-ab50dedb3252::t:0101-block-expansion-deeply-nested][t:0101-block-expansion-deeply-nested]]).
 
-Going back to [[f:blockParser]], there are three transformations we do for the
-parsed ~bTokens~ --- [[f:ignoreSpecialCommas]], [[f:compressBTokens]], and
-[[f:padConsecutiveNowebLinks]].
+[[f:someBTokensParser]] relies on [[f:bTokenParser]] to do the actual parsing of ~BToken~
+values, which form the contents of the code block. These ~BToken~ values can be
+either text (~BTokenString~) or a Noweb link (~BTokenLinkTarget~). Essentially all
+of the complexity around [[f:bTokenParser]] is due to the need to detect Noweb
+references in a robust way.
 
-The [[f:compressBTokens]] function is similar to [[f:compressProse]], but it's simpler
-because it doesn't have to deal with styled text. Instead it only deals with raw
-=Text= values directly. We need to use =compressBTokens= because otherwise we'll
-end up with many separate =BToken= values (because [[f:bTokenParser]] uses multiple
-separate parsers that all use the same =BTokenString= constructor for parsing text
-tokens).
-
-#+name: f:compressBTokens
+#+name: f:bTokenParser
 #+begin_src haskell
-compressBTokens :: [BToken] -> [BToken]
-compressBTokens = reverse . foldl' f []
+bTokenParser :: Bool -> Bool -> Bool -> OrgParser BToken
+bTokenParser isSrcBlock nowebOn lineLabelOn = MP.choice parsers
   where
-    f :: [BToken] -> BToken -> [BToken]
-    f [] token = token : []
-    f ((BTokenString text1) : rest) (BTokenString text2) =
-      (BTokenString $ T.append text1 text2) : rest
-    f acc token = token : acc
+    baseParsers :: [OrgParser BToken]
+    baseParsers =
+      -- (ref:f:bTokenParser-baseParsers)
+      [ BTokenString
+          <$> ( MP.takeWhile1P
+                  (Just "block token")
+                  (`notElem` ['\n', ' ', '<'])
+              ),
+        BTokenString
+          . T.singleton
+          <$> (MP.label "left angle bracket" $ MP.satisfy (== '<')), -- (ref:f:bTokenParser-left-angle-bracket)
+        BTokenString
+          . T.singleton
+          <$> (MP.label "space inside block" $ MP.satisfy isSpace)
+      ]
+    parsers = [p | (b, p) <- extraParsers, b] <> baseParsers
+    extraParsers =
+      [ ( isSrcBlock && nowebOn,
+          BTokenLinkTarget <$> MP.try nowebLinkTargetParser -- (ref:f:bTokenParser-nowebLinkTargetParser)
+        ),
+        (lineLabelOn, BTokenLinkTarget <$> lineLabelParser)
+      ]
 #+end_src
+
+The need to detect Noweb references is why ~baseParsers~
+[[(f:bTokenParser-baseParsers)]] has individual (separate) parsers; having these
+smaller separate parsers breaks up the parsing of block tokens into multiple
+separate steps. That way, no single parser is too greedy and we can handle the
+edge cases such as in [[ti:0007-blocks-noweb-intraline]].
+
+Along the same vein, it's important that the space parser (~MP.satisfy isSpace~)
+in ~baseParsers~ in [[f:bTokenParser]] does /not/ use ~MP.takeWhile1P~. Otherwise, it'll
+greedily consume all spaces including newlines, robbing it from the ending
+condition (where we expect a newline before ~#+end_~
+[[(f:someBTokensParser-leading-newline)]]) in [[f:someBTokensParser]]. The parser for
+the ~left angle bracket~ [[(f:bTokenParser-left-angle-bracket)]] is there to take care
+of an edge case where a Noweb reference is immediately preceded by another left
+angle bracket ~<~; see [[t:0007-blocks-noweb-intraline]] for details.
+
+Going back to [[f:blockParser]], there are three transformations
+[[(f:blockParser-bTokens-transforms)]] we do for the parsed ~bTokens~ ---
+[[f:ignoreSpecialCommas]], [[f:compressBTokens]], and [[f:padConsecutiveNowebLinks]]. Let's
+look at these in detail.
+
+*** Ignore special commas
 
 The [[f:ignoreSpecialCommas]] function ignores commas at the beginning of a line
 (with or without indentation), when they are used to escape asterisks (~*~) and
-hash signs followed by a plus character (~#+~). This is because the =org-mode= major
+hash signs followed by a plus character (~#+~). This is because the ~org-mode~ major
 mode in Emacs is unable to cope with these special characters, and requires
-users to put in leading commas to help the parser in that mode. Our Haskell
-implementation does not need such help; however we teach our parser about this
-behavior here so that we can remain compatible with =org-mode= (otherwise when
-users tangle their Org file using Lilac, they might get confused why we don't
-escape such leading commas).
+users to put in leading commas to help the (Elisp-based) parser in that mode.
+Our Megaparsec-based implementation does not need such help; however we teach
+our parser about this behavior here so that we can remain compatible with
+~org-mode~ (otherwise when users tangle their Org file using Lilac, they might get
+confused why we don't escape such leading commas --- not to mention the likely
+breakage of Emacs's syntax highlighting for these areas).
 
 #+name: f:ignoreSpecialCommas
 #+begin_src haskell
@@ -8370,11 +8691,6 @@ ignoreSpecialCommas = reverse . foldl' f []
        in indent <> T.drop 1 commas
 #+end_src
 
-See [[file:../test/Lilac/ParseSpec/0007-blocks-special-commas]] for the raw text;
-seeing the escaped version here (where we have to put an extra comma ourselves
-so that we can tangle the right number of leading commas) may make things a bit
-confusing.
-
 #+name: ti:0007-blocks-special-commas
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-special-commas
 #+begin_src org
@@ -8392,6 +8708,12 @@ Non-special commas stay put:
 , x
 ,#+end_src
 #+end_src
+
+If you are reading this (and the above code block) from Emacs Orgmode, realise
+that we have to do escaping ourselves here, which can be a bit confusing. See
+[[file:../test/Lilac/ParseSpec/0007-blocks-special-commas]] for the raw text to see
+what it really looks like. The woven HTML version agrees with the raw text, so
+it should be less tricky to understand.
 
 #+name: t:0007-blocks-special-commas
 #+begin_src haskell
@@ -8438,100 +8760,52 @@ shouldParseWithState
 ]
 #+end_src
 
-The [[f:padConsecutiveNowebLinks]] function is discussed in [[id:51f2edd8-5f8e-4c63-841f-da6c5c41680a][inserting padding
-between consecutive Noweb links]]. That's the overall overview of [[f:blockParser]].
-Now let's look at how [[f:blockStartParser]] works in detail.
+*** Compress ~BToken~ values
 
-#+name: f:blockStartParser
+The [[f:compressBTokens]] function is similar to [[f:compressProse]], but it's simpler
+because it doesn't have to deal with ~StyledText~. Instead it only deals with raw
+~Text~ values directly. We need to use ~compressBTokens~ because otherwise we'll
+end up with many separate ~BToken~ values (because [[f:bTokenParser]] uses multiple
+separate parsers that all use the same ~BTokenString~ constructor for parsing text
+tokens).
+
+#+name: f:compressBTokens
 #+begin_src haskell
-blockStartParser ::
-  OrgParser
-    ( Maybe (Text, Text),
-      Map Text Text,
-      Text,
-      Maybe (Text, Text)
-    )
-blockStartParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
-  blockName <- MP.optional metaNameParser
-  metaKVs <- fromList <$> (many $ lexeme blockMetaEntryParser)
-  _ <- string "#+begin_"
-  blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
-  srcLang <- MP.optional $ do
-    _ <- MP.skipSome $ char ' '
-    src <- MP.takeWhile1P (Just "src language") isSrcLanguageChar
-    pure ("__src_language", src)
-  when (blockType == "src" && srcLang == Nothing)
-    $ fail "block type src requires a language specifier"
-  _ <- char '\n'
-  pure (blockName, metaKVs, blockType, srcLang)
+compressBTokens :: [BToken] -> [BToken]
+compressBTokens = reverse . foldl' f []
   where
-    isSrcLanguageChar c = isAsciiLower c || c == '-'
+    f :: [BToken] -> BToken -> [BToken]
+    f [] token = token : []
+    f ((BTokenString text1) : rest) (BTokenString text2) =
+      (BTokenString $ T.append text1 text2) : rest
+    f acc token = token : acc
 #+end_src
 
-We first have to use the same try/lookAhead trick we use in [[f:figureParser]] at
-the beginning, because otherwise our parser thinks that as soon as we parse a
-=#+name=, that it will be a block. This is not true because other things (like
-figures) can have a =#+name= associated with them.
-
-We fail the parse if we detect a ~#+begin_src~ block without an accompanying
-language; see [[ti:0007-block-src-without-lang]].
-
-** =bTokenParser= (code block contents)
-
-Now let's dig into the actual block tokens (~[BToken]~) which form the contents of
-the code block. These ~BToken~ values can be either text (~BTokenString~) or a Noweb
-link (~BTokenLinkTarget~). Essentially all of the complexity around [[f:bTokenParser]]
-is due to the need to detect Noweb references in a robust way.
-
-#+name: f:bTokenParser
-#+begin_src haskell
-bTokenParser :: Bool -> Bool -> Bool -> OrgParser BToken
-bTokenParser isSrcBlock nowebOn lineLabelOn = MP.choice parsers
-  where
-    baseParsers :: [OrgParser BToken]
-    baseParsers =
-      [ BTokenString
-          <$> (MP.takeWhile1P (Just "block token") (`notElem` ['\n', ' ', '<'])),
-        BTokenString
-          . T.singleton
-          <$> (MP.label "left angle bracket" $ MP.satisfy (== '<')),
-        BTokenString
-          . T.singleton
-          <$> (MP.label "space inside block" $ MP.satisfy isSpace)
-      ]
-    parsers = [p | (b, p) <- extraParsers, b] <> baseParsers
-    extraParsers =
-      [ (isSrcBlock && nowebOn, BTokenLinkTarget <$> MP.try nowebLinkTargetParser),
-        (lineLabelOn, BTokenLinkTarget <$> lineLabelParser)
-      ]
-#+end_src
-
-The need to detect Noweb references is why ~baseParsers~ has individual (separate)
-parsers; having these smaller separate parsers breaks up the parsing of block
-tokens into multiple separate steps. That way, no single parser is too greedy
-and we can handle the edge cases such as in [[ti:0007-blocks-noweb-intraline]].
-
-Along the same vein, it's important that the space parser (~MP.satisfy isSpace~)
-in ~baseParsers~ in [[f:bTokenParser]] does /not/ use ~MP.takeWhile1P~. Otherwise, it'll
-greedily consume all spaces including newlines, robbing it from the ending
-condition in ~someBTokensParser~ (where we expect a newline before ~#+end_~). The
-parser for the ~left angle bracket~ is there to take care of an edge case where a
-Noweb reference is immediately preceded by another left angle bracket ~<~; see
-[[t:0007-blocks-noweb-intraline]] for details.
-
-** Noweb reference
+*** Noweb references
 :PROPERTIES:
 :ID:       d9b8b9d6-0334-4d9a-9146-d6bd158f0d77
 :END:
 
-The last piece is the business of parsing Noweb references. A Noweb reference is
-surrounded by the double-angle-bracket delimiters =<<= and =>>=. The name itself can
-be anything other than a newline. We wrap this with =MP.try= in
-[[f:bTokenParser]], because we need to backtrack if we fail (after parsing, and
-consuming, the initial =<<= bit). Backtracking allows the other parsers in
-=baseParsers= to parse the remaining text that failed to be parsed as a valid
-Noweb link.
+To understand [[f:padConsecutiveNowebLinks]] [[(f:blockParser-bTokens-transforms)]] in
+[[f:blockParser]], we have to first look at how we parse Noweb references, aka
+links. We use the term /reference/ and /link/ somewhat interchangeably here, because
+the only way to refer to another code block is with a Noweb /reference/, which
+automatically becomes a /link/ upon weaving.
+
+A Noweb reference is a reference to another block of code. During tangling, the
+reference will be replaced with the contents of that other block of code, which
+we call block /expansion/. That other block can itself have Noweb references.
+Cyclic references are (obviously) forbidden, because they will result in
+infinite expansions. See [[id:ff5876bf-a144-4a08-bba4-15638e3590d5][Cycle detection for Noweb links]] and also [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba::f:expandBlock][f:expandBlock]]
+for how Noweb references are expanded.
+
+To write a Noweb reference, you have to surround it with double-angle-bracket
+delimiters ~<<~ and ~>>~. The name itself can be anything other than a newline.
+Parsing Noweb references is handled by [[f:nowebLinkTargetParser]]. We wrap this
+with ~MP.try~ [[(f:bTokenParser-nowebLinkTargetParser)]] in [[f:bTokenParser]], because we
+need to backtrack if we fail (after parsing, and consuming, the initial ~<<~ bit).
+Backtracking allows the other parsers in ~baseParsers~ to parse the remaining text
+that failed to be parsed as a valid Noweb link.
 
 #+name: f:nowebLinkTargetParser
 #+begin_src haskell
@@ -8539,11 +8813,11 @@ nowebLinkTargetParser :: OrgParser LinkTarget
 nowebLinkTargetParser = do
   _ <- string "<<"
   _ <- MP.notFollowedBy $ string "<" -- (ref:open-angle-bracket-check)
-  (oid, linkName) <- oidReferenceParser "" ">>"
+  (oid, linkName) <- oidReferenceParser "" ">>" -- (ref:f:nowebLinkTargetParser-oidReferenceParser)
   _ <- string ">>"
   pure
     $ LinkTargetOid
-      LinkOid
+      LinkOid -- (ref:f:nowebLinkTargetParser-LinkOid)
         { oid = oid,
           name = linkName
         }
@@ -8553,141 +8827,25 @@ nowebLinkTargetParser = do
 of ~ok~. If we didn't have this, we would treat the initial ~<<~ as starting the
 Noweb link and end up with ~<ok~ instead. See [[ti:0007-blocks-noweb-intraline]].
 
-The [[f:oidReferenceParser]] parses information about the origin of the
-block being referenced, which we call the block origin signature. For now the
-origin can have an optional OID, along with the name of the code block itself.
+The [[f:oidReferenceParser]] [[(f:nowebLinkTargetParser-oidReferenceParser)]] parses
+information about the block being referenced, which we encode as a [[data:LinkOid]]
+[[(f:nowebLinkTargetParser-LinkOid)]]. This is the same parser used for parsing OID
+references in prose text, as seen in [[id:80637e01-1065-40b0-932c-8ffa2376c863][OID references]]. The only difference is that
+we use double angle brackets instead of square brackets.
 
-The OID is prefixed with ~id:~. If it is there (explicitly), we use it after
-running some validation checks. Otherwise we assign the OID that was parsed at
-the beginning of the document in [[f:docMetaParser]], because although the link may
-refer to a block that has a parent heading which has its own OID, we don't have
-that information at hand.
-
-#+name: f:oidReferenceParser
-#+begin_src haskell
-oidReferenceParser :: [Char] -> [Char] -> OrgParser (OID, Text)
-oidReferenceParser disallowedChars ending =
-  MP.choice
-    [ MP.try explicitFQCN,
-      MP.try explicitOID,
-      MP.try implicit
-    ]
-  where
-    explicitOID :: OrgParser (OID, Text)
-    explicitOID = do
-      _ <- string "id:"
-      oidText <-
-        MP.some $ do
-          _ <- MP.notFollowedBy . string $ T.pack ending
-          MP.noneOf $ ':' : disallowedChars
-      oid <- validateOidText $ T.pack oidText
-      pure (oid, "")
-    explicitFQCN = do
-      (oid, _) <- explicitOID
-      _ <- string "::"
-      name <- targetName
-      pure (oid, name)
-    implicit = do
-      pState <- get
-      name <- targetName
-      pure (pState.docOid, name)
-    targetName :: OrgParser Text
-    targetName = compressedTextParser disallowedChars ending
-#+end_src
-
-The [[f:compressedTextParser]] is more lenient about how whitespace is interpreted,
-so that if the user wants to refer to a target that has spaces in it, they can
-write that target over multiple lines. That is, a user may refer to a target
-name like ~foo bar baz~ in the following ways:
-
-#+begin_src org
-[[foo bar
-baz]]
-
-[[foo
-bar
-baz]]
-
-[[foo
-bar baz]]
-#+end_src
-
-All of the above implicit OID links refer to the same ~foo bar baz~ target, even
-though they are written slightly differently.
-
-#+name: f:compressedTextParser
-#+begin_src haskell
-compressedTextParser :: [Char] -> [Char] -> OrgParser Text
-compressedTextParser disallowedChars ending = do
-  pState <- get
-  tn <-
-    proseParser'
-      $ proseSpaceConsumer'
-        pState.insideCodeBlock
-  pure $ compressWhitespace tn
-  where
-    compressWhitespace = T.unwords . T.words
-    proseSpaceConsumer' :: Bool -> OrgParser Text -- (ref:proseSpaceConsumer')
-    proseSpaceConsumer' insideCodeBlock
-      | insideCodeBlock = onlySpaces
-      | otherwise =
-          MP.choice
-            [ string "\n",
-              onlySpaces
-            ]
-    proseParser' :: OrgParser Text -> OrgParser Text
-    proseParser' spaceConsumer = do
-      a <- MP.choice baseParsers
-      b <- MP.many $ MP.choice (spaceParser : baseParsers)
-      pure . T.concat $ a : b
-      where
-        spaceParser = whitespaceCompressor spaceConsumer
-        baseParsers =
-          [ textParser'
-          ]
-    textParser' :: OrgParser Text
-    textParser' = do
-      ws <-
-        MP.some
-          $ MP.choice
-            [ MP.label "normal characters" normalChars
-            ]
-      pure $ T.concat ws
-      where
-        normalChars :: OrgParser Text
-        normalChars = do
-          cs <- MP.some $ normalChar
-          pure $ T.pack cs
-        normalChar :: OrgParser Char
-        normalChar = do
-          _ <- MP.notFollowedBy . string $ T.pack ending
-          MP.satisfy isNormalChar
-        isNormalChar c =
-          notElem c disallowedChars
-            && (not $ isSpace c)
-#+end_src
-
-Unlike [[f:proseSpaceConsumer]], the ~proseSpaceConsumer'~ [[(proseSpaceConsumer')]] does
-*not* check for the correctness of the indentation following a newline (it does
-not take an ~expectedIndentLen~ parameter). This is because we want to be more
-generous for the case where OID links are found in prose, because sometimes
-indentation can get silently added when using =fill-paragraph= in Emacs (if the
-OID link target gets unlucky and ends up getting hard wrapped by
-=fill-paragraph=). Otherwise, this parser will fail, which would then make the OID
-link become wrongly parsed.
-
-Now we could punish the user for having erroneous indentation, but because
-=org-toggle-link-display= can hide this error caused by =fill-paragraph= (and
-because the link target contents will be hidden), we take the approach of being
-a bit lenient here. We still disallow newlines inside the link target inside
-code blocks, which is why ~insideCodeBlock~ is still a parameter for
-~proseSpaceConsumer'~. See [[ti:0006-links-oids-lenient-whitespace]].
+The use of [[f:oidReferenceParser]] means that we only need to specify an explicit
+OID if we're referring to blocks from other Org documents. If we are referring
+to blocks inside the current document, you can omit the ~id:...~ part for
+simplicity. Indeed, it is preferable to not use an explicit OID for blocks in
+the current document, because it becomes easier to tell at a glance (when
+reading the raw Org file) which blocks are from the current document and which
+ones are coming from elsewhere.
 
 Below we check a typical case with some Noweb references in it. Note that we
-have to set =#+header: :noweb off= here because otherwise Orgmode will think
-=<<foo>>= and =<<bar>>= are Noweb references that exist in this doc (=lilac.org=), and
-because they don't exist, will just result in those strings not being inserted
-into [[file:../test/Lilac/ParseSpec/0007-blocks-noweb]].
+have to set ~#+header: :noweb off~ here because otherwise Orgmode will think
+~<<foo>>~ and ~<<bar>>~ are Noweb references that exist in this doc, and because
+they don't exist, Lilac will treat it as broken links and abort tangling
+altogether.
 
 #+name: ti:0007-blocks-noweb
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-noweb
@@ -8737,7 +8895,7 @@ shouldParseWithState
                   { oid = nilOid,
                     name = "foo"
                   },
-            BTokenString "\n\n<<quux\n>>\necho ",
+            BTokenString "\n\n<<quux\n>>\necho ", -- (ref:Expected blocks for 0007-blocks-noweb:newline)
             BTokenLinkTarget
               $ LinkTargetOid
                 LinkOid
@@ -8750,13 +8908,13 @@ shouldParseWithState
 ]
 #+end_src
 
-We have to set =#+header: :noweb off= in [[Expected blocks for 0007-blocks-noweb]] as
-well, to avoid the ~<<quux\n>>~ bit from becoming interpreted as a Noweb
-reference.
+We have to set ~#+header: :noweb off~ in [[Expected blocks for 0007-blocks-noweb]] as
+well, to avoid the ~<<quux\n>>~ bit [[(Expected blocks for
+0007-blocks-noweb:newline)]] from becoming interpreted as a Noweb reference.
 
 The test below checks the ~nowebOff~ boolean behavior from [[f:blockParser]]. That is,
-if Lilac sees =#+header: :noweb off=, it should not treat text that look like
-=<<foo>>= as a Noweb link, but as a literal =<<foo>>= string.
+if Lilac sees ~#+header: :noweb off~, it should not treat text that look like
+~<<foo>>~ as a Noweb link, but as a literal ~<<foo>>~ string.
 
 #+name: ti:0007-blocks-noweb-off
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-noweb-off
@@ -8805,8 +8963,8 @@ shouldParseWithState
 ]
 #+end_src
 
-Because Lilac relies heavily on Noweb references (links), it will be turned on
-by default. So the only way to disable them would be to set =#+header: :noweb off=
+Because Lilac relies heavily on Noweb references, it will be turned on by
+default. So the only way to disable them would be to set ~#+header: :noweb off~
 for each block where you'd want it disabled.
 
 Sometimes we'll have Noweb references surrounded by punctuation. For example,
@@ -8882,15 +9040,16 @@ shouldParseWithState
 ]
 #+end_src
 
-** Add padding between consecutive Noweb links
+*** Pad consecutive Noweb links
 :PROPERTIES:
 :ID:       51f2edd8-5f8e-4c63-841f-da6c5c41680a
 :END:
 
 When we eventually tangle blocks, we want to inject some padding (a newline)
-between Noweb links because each Noweb block is its own "unit" and it makes
-sense to add some separation between consecutive Noweb blocks, to get some
-visual separation in the final output.
+between Noweb links (assuming there are multiple consecutive Noweb links, one on
+each line) because each Noweb block is its own "unit" and it makes sense to add
+some separation between consecutive Noweb blocks. This way we get some visual
+separation in the final output.
 
 We only want to add this padding for cases where there are /consecutive/ Noweb
 links. For example, in
@@ -8933,9 +9092,9 @@ This allows us to write in a bit more compact manner in the Org source document,
 while still giving each Noweb link (and associated block) some separation from
 the other blocks in the tangled output.
 
-The way we do this automatic padding is by injecting newlines into the parsed
-block's body ~BToken~ values, as ~BTokenString "\n"~. This is what we do by calling
-[[f:padConsecutiveNowebLinks]] in [[f:blockParser]].
+The way we do this automatic padding is by injecting newlines (padding) into the
+parsed block's body ~BToken~ values, as ~BTokenPadding~. This is what we do by
+calling [[f:padConsecutiveNowebLinks]] in [[f:blockParser]].
 
 The high-level algorithm is as follows:
 
@@ -8951,19 +9110,19 @@ The high-level algorithm is as follows:
 
   4) Within each group, only mark the links at the end of the line (because
      there may be more than one link in a line) as needing a newline. By marking
-     links as needing (or not needing) a newline, we can easily inject newlines
+     links as needing (or not needing) a newline, we can easily inject padding
      at the right spots in the next step.
 
-     We can't add a newline for the very last line in the group though, because
+     We can't add padding for the very last line in the group though, because
      that would be superfluous (we want to add newlines *between* consecutive
      blocks, not after every consecutive block).
 
   5) Using the information from the previous step, iterate through all ~BToken~
-     values and whenever we see a ~BTokenLinkTarget~, inject the newline (if the
+     values and whenever we see a ~BTokenLinkTarget~, inject the padding (if the
      link was marked as needing a newline).
 
 The markers are just simple boolean values (one for each Noweb link found in the
-block).
+block), which denote whether or not the Noweb link needs padding.
 
 Now let's look at the implementation in detail. Step 1 is done in
 [[f:getBlockContents]].
@@ -8995,30 +9154,32 @@ Steps 2, 3, and 4 are all done inside [[f:getLinkPaddingBools]]. This function
 returns a list of booleans that correspond to each of the Noweb links found. If
 ~True~, this means the link needs a trailing newline (padding) added to it.
 
-The line ~map (reverse . (zip $ False : repeat True) . reverse)~ says to only pad
-the lines except for the last one, and ~distributeBools~ only pads the very last
-link found in the line.
-
 #+name: f:getLinkPaddingBools
 #+begin_src haskell
 getLinkPaddingBools :: [BToken] -> [Bool]
 getLinkPaddingBools blockBody =
-  concatMap (concatMap distributeBools)
-    . map (reverse . (zip $ False : repeat True) . reverse)
+  concatMap (concatMap padLastLinkOnThisLine)
+    . map (reverse . (zip $ False : repeat True) . reverse) -- (ref:f:getLinkPaddingBools-pad-except-last)
     . groupBy consecutiveNowebLines
     . T.lines
     $ getBlockContents blockBody
   where
     consecutiveNowebLines :: Text -> Text -> Bool
     consecutiveNowebLines a b = (countLinks a > 0) && (countLinks b > 0)
-    distributeBools (False, line) =
+    padLastLinkOnThisLine (False, line) =
       replicate (countLinks line) False
-    distributeBools (True, line) =
+    padLastLinkOnThisLine (True, line) =
       case countLinks line of
         1 -> [True]
-        n -> reverse $ True : replicate (n - 1) False
+        n -> reverse $ True : replicate (n - 1) False -- (ref:f:getLinkPaddingBools-padLastLinkOnThisLine)
     countLinks = T.count <<link-marker>>
 #+end_src
+
+The line ~map (reverse . (zip $ False : repeat True) . reverse)~
+[[(f:getLinkPaddingBools-pad-except-last)]] says to only pad the lines except for
+the last one, and ~padLastLinkOnThisLine~
+[[(f:getLinkPaddingBools-padLastLinkOnThisLine)]] only pads the very last link found
+in the line.
 
 Now that we have a list of booleans to mark whether a link needs a newline
 appended to it, all we have to do is go through all of the links in the block,
@@ -9047,7 +9208,7 @@ behavior.
 
 ** Additional tests
 
-A =#+begin_src= without an accompanying language should trigger an error.
+A ~#+begin_src~ without an accompanying language should trigger an error.
 
 #+name: ti:0007-block-src-without-lang
 #+header: :tangle test/Lilac/ParseSpec/0007-block-src-without-lang

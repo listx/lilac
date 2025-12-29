@@ -145,9 +145,9 @@ data BToken
 
 type Block :: Type
 data Block = Block
-  { parentOid :: OID,
-    meta :: Map Text Text,
-    body :: [BToken]
+  { parentOid :: OID, --
+    meta :: Map Text Text, --
+    body :: [BToken] --
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

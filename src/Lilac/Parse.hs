@@ -1260,16 +1260,20 @@ blockMetaEntryParser = do
   o <- MP.getOffset
   value <- MP.takeWhile1P (Just "value letter") (\c -> c /= '\n')
   _ <- char '\n'
-  assertUniqueTanglePath key value o
+  assertUniqueTanglePath key value o --
   pure (key, value)
   where
-    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')]
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')] --
 
 metaNameParser :: OrgParser (Text, Text)
 metaNameParser = do
   _ <- string "#+name: "
-  name <- T.pack <$> MP.someTill (MP.label "name of block" MP.anySingle) (char '\n')
-  assertUniqueCellName name
+  name <-
+    T.pack
+      <$> MP.someTill
+        (MP.label "name of block" MP.anySingle)
+        (char '\n')
+  assertUniqueCellName name --
   pure ("name", name)
 
 assertUniqueTanglePath :: Text -> Text -> Int -> OrgParser ()
@@ -1290,27 +1294,27 @@ blockParser = do
   pState <- get
   (blockName, metaKVs, blockType, srcLang) <- blockStartParser
   let nowebOff =
-        (== Just "off")
+        (== Just "off") --
           $ lookup "noweb" metaKVs
       lineLabelOff =
         (== Just "off")
           $ lookup "line-label" metaKVs
   modify (\s -> s {insideCodeBlock = True})
-  bTokens <-
-    MP.choice
+  bTokens <- --
+    MP.choice --
       [ zeroBTokensParser blockType,
         someBTokensParser blockType (not nowebOff) (not lineLabelOff)
       ]
   let newAnonBlockNumber = case blockName of
         Just _ -> pState.anonBlockNumber
         Nothing -> pState.anonBlockNumber + 1
-      anonBlockMeta = case blockName of
+      anonBlockMeta = case blockName of --
         Just _ -> Nothing
         Nothing -> Just ("__anon_block_number", T.show newAnonBlockNumber)
       block =
         Block
           { parentOid =
-              firstParentOid pState.docOid pState.headingOidStack,
+              firstParentOid pState.docOid pState.headingOidStack, --
             meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
@@ -1319,7 +1323,7 @@ blockParser = do
             body =
               ignoreSpecialCommas
                 . compressBTokens
-                $ padConsecutiveNowebLinks bTokens
+                $ padConsecutiveNowebLinks bTokens --
           }
   modify
     ( \s ->
@@ -1354,8 +1358,8 @@ blockStartParser = do
     src <- MP.takeWhile1P (Just "src language") isSrcLanguageChar
     pure ("__src_language", src)
   when (blockType == "src" && srcLang == Nothing)
-    $ fail "block type src requires a language specifier"
-  _ <- char '\n'
+    $ fail "block type src requires a language specifier" --
+  _ <- char '\n' --
   pure (blockName, metaKVs, blockType, srcLang)
   where
     isSrcLanguageChar c = isAsciiLower c || c == '-'
@@ -1365,18 +1369,24 @@ bTokenParser isSrcBlock nowebOn lineLabelOn = MP.choice parsers
   where
     baseParsers :: [OrgParser BToken]
     baseParsers =
+      --
       [ BTokenString
-          <$> (MP.takeWhile1P (Just "block token") (`notElem` ['\n', ' ', '<'])),
+          <$> ( MP.takeWhile1P
+                  (Just "block token")
+                  (`notElem` ['\n', ' ', '<'])
+              ),
         BTokenString
           . T.singleton
-          <$> (MP.label "left angle bracket" $ MP.satisfy (== '<')),
+          <$> (MP.label "left angle bracket" $ MP.satisfy (== '<')), --
         BTokenString
           . T.singleton
           <$> (MP.label "space inside block" $ MP.satisfy isSpace)
       ]
     parsers = [p | (b, p) <- extraParsers, b] <> baseParsers
     extraParsers =
-      [ (isSrcBlock && nowebOn, BTokenLinkTarget <$> MP.try nowebLinkTargetParser),
+      [ ( isSrcBlock && nowebOn,
+          BTokenLinkTarget <$> MP.try nowebLinkTargetParser --
+        ),
         (lineLabelOn, BTokenLinkTarget <$> lineLabelParser)
       ]
 
@@ -1392,17 +1402,23 @@ someBTokensParser :: Text -> Bool -> Bool -> OrgParser [BToken]
 someBTokensParser blockType nowebOn lineLabelOn =
   MP.someTill
     (bTokenParser (blockType == "src") nowebOn lineLabelOn)
-    (string $ T.concat ["\n#+end_", blockType, "\n"])
+    ( string
+        $ T.concat
+          [ "\n#+end_", --
+            blockType,
+            "\n"
+          ]
+    )
 
 nowebLinkTargetParser :: OrgParser LinkTarget
 nowebLinkTargetParser = do
   _ <- string "<<"
   _ <- MP.notFollowedBy $ string "<" --
-  (oid, linkName) <- oidReferenceParser "" ">>"
+  (oid, linkName) <- oidReferenceParser "" ">>" --
   _ <- string ">>"
   pure
     $ LinkTargetOid
-      LinkOid
+      LinkOid --
         { oid = oid,
           name = linkName
         }
@@ -1444,7 +1460,7 @@ oidLinkParser :: OrgParser Link
 oidLinkParser = do
   _ <- string "[["
   avoidParsingKnownProtocols
-  (oid, name) <- oidReferenceParser "[]" "]]"
+  (oid, name) <- oidReferenceParser "[]" "]]" --
   pState <- get
   let mask = pState.styleMask
       implicitName
@@ -1460,14 +1476,14 @@ oidLinkParser = do
   displayName <-
     MP.choice
       [ MP.try $ string "]" >> pure [implicitNameStyledText],
-        MP.try linkDisplayNameParser
+        MP.try linkDisplayNameParser --
       ]
   let linkOid =
         LinkOid
           { oid = oid,
             name = name
           }
-      edge = PseudoEdge (pState.cellNumber, linkOid)
+      edge = PseudoEdge (pState.cellNumber, linkOid) --
   modify (\s -> s {OrgParserState.pseudoEdges = edge : s.pseudoEdges})
   pure
     $ Link
@@ -1486,31 +1502,31 @@ oidLinkParser = do
 oidReferenceParser :: [Char] -> [Char] -> OrgParser (OID, Text)
 oidReferenceParser disallowedChars ending =
   MP.choice
-    [ MP.try explicitFQCN,
+    [ MP.try explicitOIDandTargetName,
       MP.try explicitOID,
-      MP.try implicit
+      MP.try implicitOIDandExplicitTargetName
     ]
   where
-    explicitOID :: OrgParser (OID, Text)
+    implicitOIDandExplicitTargetName :: OrgParser (OID, Text)
+    implicitOIDandExplicitTargetName = do
+      pState <- get
+      name <- targetName
+      pure (pState.docOid, name) --
     explicitOID = do
-      _ <- string "id:"
+      _ <- string "id:" --
       oidText <-
         MP.some $ do
           _ <- MP.notFollowedBy . string $ T.pack ending
           MP.noneOf $ ':' : disallowedChars
       oid <- validateOidText $ T.pack oidText
       pure (oid, "")
-    explicitFQCN = do
+    explicitOIDandTargetName = do
       (oid, _) <- explicitOID
       _ <- string "::"
       name <- targetName
       pure (oid, name)
-    implicit = do
-      pState <- get
-      name <- targetName
-      pure (pState.docOid, name)
     targetName :: OrgParser Text
-    targetName = compressedTextParser disallowedChars ending
+    targetName = compressedTextParser disallowedChars ending --
 
 compressedTextParser :: [Char] -> [Char] -> OrgParser Text
 compressedTextParser disallowedChars ending = do
@@ -1613,20 +1629,20 @@ padConsecutiveNowebLinks blockBody =
 
 getLinkPaddingBools :: [BToken] -> [Bool]
 getLinkPaddingBools blockBody =
-  concatMap (concatMap distributeBools)
-    . map (reverse . (zip $ False : repeat True) . reverse)
+  concatMap (concatMap padLastLinkOnThisLine)
+    . map (reverse . (zip $ False : repeat True) . reverse) --
     . groupBy consecutiveNowebLines
     . T.lines
     $ getBlockContents blockBody
   where
     consecutiveNowebLines :: Text -> Text -> Bool
     consecutiveNowebLines a b = (countLinks a > 0) && (countLinks b > 0)
-    distributeBools (False, line) =
+    padLastLinkOnThisLine (False, line) =
       replicate (countLinks line) False
-    distributeBools (True, line) =
+    padLastLinkOnThisLine (True, line) =
       case countLinks line of
         1 -> [True]
-        n -> reverse $ True : replicate (n - 1) False
+        n -> reverse $ True : replicate (n - 1) False --
     countLinks = T.count "\NUL_link"
 
 getBlockContents :: [BToken] -> Text

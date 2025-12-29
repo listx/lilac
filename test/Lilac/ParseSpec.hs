@@ -1449,7 +1449,7 @@ parseSpec = do
                           { oid = nilOid,
                             name = "foo"
                           },
-                    BTokenString "\n\n<<quux\n>>\necho ",
+                    BTokenString "\n\n<<quux\n>>\necho ", --
                     BTokenLinkTarget
                       $ LinkTargetOid
                         LinkOid
