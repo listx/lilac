@@ -7137,7 +7137,10 @@ paragraphParser :: OrgParser Cell
 paragraphParser = do
   pState <- get
   modify (\s -> s {insideParagraph = True, glossaryTermOffset = 0})
-  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer pState.continuationIndent
+  prose <-
+    proseParser
+      . whitespaceCompressor
+      $ proseSpaceConsumer pState.continuationIndent -- (ref:paragraphParser-proseSpaceConsumer)
   failIfLeftoverActiveStyles
   pState' <- get
   modify (\s -> s {insideParagraph = False})
@@ -7149,9 +7152,10 @@ paragraphParser = do
 The check at [[(check-for-glossaryTerm)]] is for seeing if the current paragraph
 qualifies as a [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][glossary term]]. If not, we parse it as a normal paragraph.
 
-The [[f:proseSpaceConsumer]] knows how to parse spaces across lines (while taking
-into account the existing level of indentation in the current line, if any).
-This is a top-level function because we reuse it in [[f:linkDisplayNameParser]].
+The [[f:proseSpaceConsumer]] [[(paragraphParser-proseSpaceConsumer)]] knows how to parse
+spaces across lines (while taking into account the existing level of indentation
+in the current line, if any). This is a top-level function because we reuse it
+in [[f:linkDisplayNameParser]].
 
 #+name: f:proseSpaceConsumer
 #+begin_src haskell
@@ -7185,17 +7189,18 @@ whitespace, only after which we parse the ~citeId~. This is why ~beLessGreedy~ t
 to abort the parser if it detects a cite key like ~@foo~ just after the whitespace
 (which will be parsed by ~spaceConsumer~).
 
-The second tricky bit is with ~spaceConsumer~. It chooses between either a newline
+The second tricky part is with ~spaceConsumer~. It chooses either a newline
 followed by an indent of length ~expectedIndentLen~ (in [[f:newlineAndIndentParser]]),
-or just ~spaces~ which we define to be one or more space characters.
+or just spaces. The [[f:newlineAndIndentParser]] is what ensures we have consistent
+indentation for lines of a paragraph.
 
 #+name: f:newlineAndIndentParser
 #+begin_src haskell
 newlineAndIndentParser :: Int -> OrgParser Text
 newlineAndIndentParser expectedIndentLen = do
-  MP.notFollowedBy cellBoundary
+  MP.notFollowedBy cellBoundary -- (ref:newlineAndIndentParser-cell-boundary)
   _ <- string "\n"
-  maybeIndent
+  maybeIndent -- (ref:newlineAndIndentParser-maybeIndent)
   pure " "
   where
     maybeIndent =
@@ -7214,12 +7219,12 @@ newlineAndIndentParser expectedIndentLen = do
       pure ()
 #+end_src
 
-The ~MP.notFollowedBy cellBoundary~ bit is required to stay clear of cell
-boundaries (paragraph cells are separated from each other by a blank line, or in
-other words a sequence of two consecutive newlines). If we don't do this, our
-parser will see a newline and immediately think that there should follow some
-spaces for the indent portion, which may not be true if the newline was part of
-a cell boundary.
+The ~MP.notFollowedBy cellBoundary~ bit [[(newlineAndIndentParser-cell-boundary)]] is
+required to stay clear of cell boundaries (paragraph cells are separated from
+each other by a blank line, or in other words a sequence of two consecutive
+newlines). If we don't do this, our parser will see a newline and immediately
+think that there should follow some spaces for the indent portion, which may not
+be true if the newline was part of a cell boundary.
 
 #+name: f:cellBoundary
 #+begin_src haskell
@@ -7227,11 +7232,11 @@ cellBoundary :: OrgParser Text
 cellBoundary = string "\n\n"
 #+end_src
 
-The ~maybeIndent~ handles the case where there is no indentation (with ~nonSpace~),
-or where there is indentation (with ~MP.eof <|> exactIndent~). The first case does
-not need ~MP.eof <|>~ because it's redundant --- ~MP.notFollowedBy (char ' ')~ will
-succeed for ~MP.eof~ as well, as [[t:0005-notFollowedBy-behavior-for-empty-input]]
-demonstrates.
+The ~maybeIndent~ [[(newlineAndIndentParser-maybeIndent)]] handles the case where
+there is no indentation (with ~nonSpace~), or where there is indentation (with
+~MP.eof <|> exactIndent~). The first case does not need ~MP.eof <|>~ because it's
+redundant --- ~MP.notFollowedBy (char ' ')~ will succeed for ~MP.eof~ as well, as
+[[t:0005-notFollowedBy-behavior-for-empty-input]] demonstrates.
 
 #+name: t:0005-notFollowedBy-behavior-for-empty-input
 #+begin_src haskell
@@ -7301,8 +7306,8 @@ shouldFailWithMessage
 #+end_src
 
 For tests involving paragraphs and lists, see those prefixed with
-=0005-paragraph-indentation-*=, such as
-[[t:0005-paragraph-indentation-mismatch-over]].
+~0005-paragraph-indentation-*~, such as
+[[ti:0005-paragraph-indentation-mismatch-over]].
 
 * Headings
 :PROPERTIES:

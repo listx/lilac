@@ -1216,7 +1216,10 @@ paragraphParser :: OrgParser Cell
 paragraphParser = do
   pState <- get
   modify (\s -> s {insideParagraph = True, glossaryTermOffset = 0})
-  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer pState.continuationIndent
+  prose <-
+    proseParser
+      . whitespaceCompressor
+      $ proseSpaceConsumer pState.continuationIndent --
   failIfLeftoverActiveStyles
   pState' <- get
   modify (\s -> s {insideParagraph = False})
@@ -1226,9 +1229,9 @@ paragraphParser = do
 
 newlineAndIndentParser :: Int -> OrgParser Text
 newlineAndIndentParser expectedIndentLen = do
-  MP.notFollowedBy cellBoundary
+  MP.notFollowedBy cellBoundary --
   _ <- string "\n"
-  maybeIndent
+  maybeIndent --
   pure " "
   where
     maybeIndent =
