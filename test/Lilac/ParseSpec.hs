@@ -529,14 +529,16 @@ parseSpec = do
                 body = Prose [ptext "foo" []],
                 meta =
                   fromList
-                    [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                    [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6"),
+                      ("FOO", "BAR")
                     ]
               }
         ]
         []
     )
     defaultOrgParserState
-      { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
+      { headingOidStack =
+          [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
         headingLevel = 1,
         headingSectionNumber = [1]
       }
@@ -558,7 +560,8 @@ parseSpec = do
         []
     )
     defaultOrgParserState
-      { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
+      { headingOidStack =
+          [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
         headingLevel = 1,
         headingSectionNumber = [1]
       }

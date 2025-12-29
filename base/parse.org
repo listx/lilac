@@ -7757,7 +7757,7 @@ shouldFailWithMessage
 :ID:       ca12051e-cd17-4d8d-996a-767695441d48
 :END:
 
-In vanilla Orgmode, drawers look like
+In vanilla Orgmode, drawers look like this:
 
 #+begin_example
 :DRAWER_NAME:
@@ -7765,9 +7765,11 @@ In vanilla Orgmode, drawers look like
 :END:
 #+end_example
 
-and the contents may be anything but another [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][heading]] or another (nested) drawer.
-In Lilac, we only parse the =:PROPERTIES:= drawer, which is a special drawer that
-can contain key/value pairs that Org recognizes. One of these is the =:ID:= key,
+And Orgmode allows the contents to be anything except [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][headings]] or other (nested)
+drawers.
+
+In Lilac, we only parse the ~:PROPERTIES:~ drawer, which is a special drawer that
+can contain key/value pairs that Org recognizes. One of these is the ~:ID:~ key,
 which can have an OID as the value, and which can be used as a link target from
 elsewhere in the document (in Orgmode this can be done with ~org-id-store-link~).
 
@@ -7777,7 +7779,7 @@ propertiesDrawerParser :: OrgParser (Map Text Text)
 propertiesDrawerParser = propertiesParser <|> (pure $ fromList [])
 #+end_src
 
-The [[f:propertiesDrawerParser]] tries to parse a =:PROPERTIES:= drawer with
+The [[f:propertiesDrawerParser]] tries to parse a ~:PROPERTIES:~ drawer with
 [[f:propertiesParser]], but if it fails it returns an empty ~Map~.
 
 #+name: f:propertiesParser
@@ -7818,11 +7820,11 @@ propertiesEntryParser = do
 #+end_src
 
 The main tricky bit is ~MP.notFollowedBy $ string ":END:"~; we need this because
-otherwise we will think that the string ~:END:~ is just another key.
+otherwise we will think that the string ~:END:~ is just another property key.
 
 ** Tests
 
-The =:PROPERTIES:= drawer may be empty.
+The ~:PROPERTIES:~ drawer may be empty.
 
 #+name: ti:0004-properties-drawer-empty
 #+header: :tangle test/Lilac/ParseSpec/0004-properties-drawer-empty
@@ -7854,7 +7856,7 @@ shouldParseWithState
     }
 #+end_src
 
-Check we can pick up keys and value from the =:PROPERTIES:= drawer.
+Check we can pick up keys and values from the ~:PROPERTIES:~ drawer.
 
 #+name: ti:0004-properties-drawer-not-empty
 #+header: :tangle test/Lilac/ParseSpec/0004-properties-drawer-not-empty
@@ -7862,6 +7864,7 @@ Check we can pick up keys and value from the =:PROPERTIES:= drawer.
 ,* foo
 :PROPERTIES:
 :ID:       b949ea2e-e6d1-453d-9352-5e85a82cd4e6
+:FOO:      BAR
 :END:
 #+end_src
 
@@ -7877,14 +7880,16 @@ shouldParseWithState
               body = Prose [ptext "foo" []],
               meta =
                 fromList
-                  [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                  [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6"),
+                    ("FOO", "BAR")
                   ]
             }
       ]
       []
   )
   defaultOrgParserState
-    { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
+    { headingOidStack =
+        [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
       headingLevel = 1,
       headingSectionNumber = [1]
     }
@@ -7930,7 +7935,8 @@ shouldParseWithState
       []
   )
   defaultOrgParserState
-    { headingOidStack = [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
+    { headingOidStack =
+        [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
       headingLevel = 1,
       headingSectionNumber = [1]
     }
