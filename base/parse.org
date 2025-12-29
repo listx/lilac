@@ -7107,32 +7107,6 @@ shouldFailWithMessage
   32
 #+end_src
 
-* Inline math fragments
-:PROPERTIES:
-:ID:       216e94b7-e037-4f3e-856a-2040d0d0a75a
-:END:
-
-Inline math fragments are delimited by =\(= and =\)=. Just like [[f:linkParser]], we
-fail the parser if we detect that verbatim or code styles are active.
-
-#+name: f:mathFragmentInlineParser
-#+begin_src haskell
-mathFragmentInlineParser :: OrgParser MathFragment
-mathFragmentInlineParser = do
-  failIfVerbatimOrCode
-
-  pState <- get
-  _ <- string "\\("
-  latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
-  pure
-    MathFragment
-      { parentOid =
-          firstParentOid pState.docOid pState.headingOidStack,
-        meta = fromList [],
-        body = T.pack latex
-      }
-#+end_src
-
 * Paragraphs
 :PROPERTIES:
 :ID:       272567ab-4077-4a47-ae78-dfe77243ccc0
@@ -10943,7 +10917,34 @@ shouldParseWithState
   defaultOrgParserState
 #+end_src
 
-* Standalone math fragments
+* Mathematical expressions
+** Inline math fragments
+:PROPERTIES:
+:ID:       216e94b7-e037-4f3e-856a-2040d0d0a75a
+:END:
+
+Inline math fragments are delimited by ~\(~ and ~\)~. Just like [[f:linkParser]], we
+fail the parser if we detect that verbatim or code styles are active.
+
+#+name: f:mathFragmentInlineParser
+#+begin_src haskell
+mathFragmentInlineParser :: OrgParser MathFragment
+mathFragmentInlineParser = do
+  failIfVerbatimOrCode
+
+  pState <- get
+  _ <- string "\\("
+  latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
+  pure
+    MathFragment
+      { parentOid =
+          firstParentOid pState.docOid pState.headingOidStack,
+        meta = fromList [],
+        body = T.pack latex
+      }
+#+end_src
+
+** Standalone math fragments
 :PROPERTIES:
 :ID:       d1064535-5c98-4c80-a901-5cdc1fd5297f
 :END:
