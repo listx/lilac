@@ -2245,7 +2245,10 @@ validateCslPath :: (MonadFail m) => Text -> m (Maybe FilePath)
 validateCslPath maybeCslPath
   | T.isPrefixOf cslPrefix maybeCslPath =
       pure $ T.unpack <$> T.stripPrefix cslPrefix maybeCslPath
-  | otherwise = fail $ show cslPrefix <> " prefix required for specifying CSL file"
+  | otherwise =
+      fail
+        $ show cslPrefix
+        <> " prefix required for specifying CSL file"
   where
     cslPrefix :: Text
     cslPrefix = "csl "
@@ -2266,9 +2269,13 @@ bibliographyLocationParser = do
   _ <- string "#+print_bibliography:"
   pState <- get
   when (pState.cslPath == Nothing)
-    $ fail "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
+    . fail
+    $ "cannot print bibliography without '#+cite_export: csl <style>.csl' "
+    <> "in top-level document metadata"
   when (pState.bibPaths == [])
-    $ fail "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
+    . fail
+    $ "cannot print bibliography without '#+bibliography: "
+    <> "<bib_entries>.json' in top-level document metadata"
   pure $ CCommand PrintBibliography
 
 instance CiteprocOutput Prose where
@@ -2615,9 +2622,13 @@ citationParser = do
   pState <- get
   _ <- string "[cite"
   when (pState.cslPath == Nothing)
-    $ fail "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
+    . fail
+    $ "cannot parse citations without '#+cite_export: csl <style>.csl'"
+    <> " in top-level document metadata"
   when (pState.bibPaths == [])
-    $ fail "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
+    . fail
+    $ "cannot parse citations without '#+bibliography: <bib_entries>.json'"
+    <> " in top-level document metadata"
   modify (\s -> s {insideCitation = True})
   sv1 <- MP.optional $ char '/' >> MP.label "style variation 1" svParser
   sv2 <- MP.optional $ char '/' >> MP.label "style variation 2" svParser
@@ -2657,10 +2668,10 @@ citationParser = do
     ( \s ->
         s
           { insideCitation = False,
-            citations = c : s.citations
+            citations = c : s.citations --
           }
     )
-  pure $ length pState.citations
+  pure $ length pState.citations --
   where
     svParser :: OrgParser [Char]
     svParser =
@@ -2702,13 +2713,17 @@ failIfUnbalancedBrackets = do
 
 citeParser :: OrgParser Cite
 citeParser = do
-  _ <- MP.try . MP.lookAhead $ MP.optional citePrefixParser >> citeIdParser
+  _ <-
+    MP.try
+      . MP.lookAhead --
+      $ MP.optional citePrefixParser
+      >> citeIdParser
   citePrefix <- MP.optional citePrefixParser
   citeId <- citeIdParser
   citeLocator <-
     MP.optional . MP.try $ do
       _ <- intraCellWhitespaceParser
-      citeLocatorParser
+      citeLocatorParser --
   citeSuffix <-
     MP.optional $ do
       _ <- intraCellWhitespaceParser
@@ -2859,10 +2874,13 @@ citeAffixParser :: Bool -> OrgParser Prose
 citeAffixParser isPrefix = do
   modify (\s -> s {insideCitePrefix = isPrefix})
   pState <- get
-  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer pState.continuationIndent
+  prose <-
+    proseParser
+      . whitespaceCompressor
+      $ proseSpaceConsumer pState.continuationIndent
   modify (\s -> s {insideCitePrefix = False})
   failIfLeftoverActiveStyles
-  failIfUnbalancedBrackets
+  failIfUnbalancedBrackets --
   pure $ compressProse prose
 
 isNumericText :: Text -> Bool

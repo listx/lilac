@@ -5619,6 +5619,9 @@ shouldFailWithMessage
 :ID:       a54a7762-a861-42b1-b2c8-2b760281052c
 :END:
 
+Citations are special kinds of links, but due to their complexity, we discuss
+them separately here in their own dedicated section.
+
 The [[https://docs.citationstyles.org/en/stable/specification.html#terminology][CSL specification]] says "citations consist of one or more cites to individual
 items". A /cite/ is a single (unique) pointer to a bibliographical work. The
 description of the bibliographical work itself is defined separately from a
@@ -5660,9 +5663,10 @@ The following sections take a closer look at each of these areas.
 :ID:       15706715-c648-4866-b757-ea4a1aad0570
 :END:
 
-The CSL file (an XML file specifying various styling properties for rendering
-citations) can be specified as part of the top-level document metadata in
-[[f:docMetaParser]], which uses [[f:validateCslPath]].
+The CSL file is an XML file specifying various styling properties for rendering
+both the citations themselves and also the bibliography. This file can be
+specified as part of the top-level document metadata in [[f:docMetaParser]] with the
+~#+cite_export~ key, whose value is checked by [[f:validateCslPath]].
 
 #+name: f:validateCslPath
 #+begin_src haskell
@@ -5670,11 +5674,17 @@ validateCslPath :: (MonadFail m) => Text -> m (Maybe FilePath)
 validateCslPath maybeCslPath
   | T.isPrefixOf cslPrefix maybeCslPath =
       pure $ T.unpack <$> T.stripPrefix cslPrefix maybeCslPath
-  | otherwise = fail $ show cslPrefix <> " prefix required for specifying CSL file"
+  | otherwise =
+      fail
+        $ show cslPrefix
+        <> " prefix required for specifying CSL file"
   where
     cslPrefix :: Text
     cslPrefix = "csl "
 #+end_src
+
+The value must be prefixed with ~csl ~. This is just Org convention that we've
+carried over into Lilac.
 
 #+name: ti:0014-citations-csl-path
 #+header: :tangle test/Lilac/ParseSpec/0014-citations-csl-path
@@ -5708,6 +5718,9 @@ shouldParseWithState
 :PROPERTIES:
 :ID:       909c5265-065a-412c-9305-2cff398ad233
 :END:
+
+The CSL JSON defines a list of bibliographical works. An Org document can refer
+to one of these, and may cite one or more of the works therein.
 
 A document may refer to multiple CSL JSON files. All are consulted during
 weaving in order to generate bibliographies. The tricky part here is that you
@@ -5775,7 +5788,7 @@ somewhat meaningless). This is done by having a line that just says
 ~#+print_bibliography:~ (note the trailing colon ~:~).
 
 Orgmode supports passing in additional options here to the CSL citation export
-processor, but we do not, for simplicity.
+processor, but for simplicity Lilac doesn't support any additional options here.
 
 #+name: f:bibliographyLocationParser
 #+begin_src haskell
@@ -5784,9 +5797,13 @@ bibliographyLocationParser = do
   _ <- string "#+print_bibliography:"
   pState <- get
   when (pState.cslPath == Nothing)
-    $ fail "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
+    . fail
+    $ "cannot print bibliography without '#+cite_export: csl <style>.csl' "
+    <> "in top-level document metadata"
   when (pState.bibPaths == [])
-    $ fail "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
+    . fail
+    $ "cannot print bibliography without '#+bibliography: "
+    <> "<bib_entries>.json' in top-level document metadata"
   pure $ CCommand PrintBibliography
 #+end_src
 
@@ -5881,6 +5898,9 @@ data Citation = Citation
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
+If you just want to see what citations /look like/ in practice, skip to the [[id:6b021d10-3339-46b7-b5dc-a10c7b8aef03][Tests]]
+below.
+
 The [[data:Citation]] also specifies the style to be used for rendering the key in
 [[data:Cite]], via the ~styleVariation~. This is just an additional way of tweaking
 the style to use on top of the overall CSL style in [[id:15706715-c648-4866-b757-ea4a1aad0570][CSL file]].
@@ -5889,7 +5909,7 @@ the style to use on top of the overall CSL style in [[id:15706715-c648-4866-b757
 #+begin_src haskell
 type Cite :: Type
 data Cite = Cite
-  { id :: Text,
+  { id :: Text, -- (ref:cite-id)
     locator :: Maybe (Text, Text),
     prefix :: Prose,
     suffix :: Prose
@@ -5899,13 +5919,15 @@ data Cite = Cite
 #+end_src
 
 Each [[data:Cite]] also has its own ~prefix~ and ~suffix~ for describing things using
-regular prose.
+regular prose. Contrast this with the ~prefix~ and ~suffix~ at the [[data:Citation]]
+level, which are for the entire citation.
 
-The most important field for [[data:Cite]] is the ~id~, which refers to a unique
-bibliographical work. It's expected that this ID is found in one of the [[id:909c5265-065a-412c-9305-2cff398ad233][CSL JSON]]
-files. Orgmode calls this the [[https://orgmode.org/manual/Citations.html][key]], but we prefer ~id~ because "key" conflicts with
-the notion of keys and values of map (aka dictionary, or hashmap) data
-structures.
+The most important field for [[data:Cite]] is the ~id~ [[(cite-id)]], which refers to a
+unique bibliographical work. It's expected that this ID is found in one of the
+[[id:909c5265-065a-412c-9305-2cff398ad233][CSL JSON]] files. Orgmode calls this the [[https://orgmode.org/manual/Citations.html][key]], but we prefer ~id~ because there is no
+immediate hashmap data structure here where we use it as a key.
+
+The [[f:citationParser]] parses citations in the text.
 
 #+name: f:citationParser
 #+begin_src haskell
@@ -5915,9 +5937,13 @@ citationParser = do
   pState <- get
   _ <- string "[cite"
   when (pState.cslPath == Nothing)
-    $ fail "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
+    . fail
+    $ "cannot parse citations without '#+cite_export: csl <style>.csl'"
+    <> " in top-level document metadata"
   when (pState.bibPaths == [])
-    $ fail "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
+    . fail
+    $ "cannot parse citations without '#+bibliography: <bib_entries>.json'"
+    <> " in top-level document metadata"
   modify (\s -> s {insideCitation = True})
   sv1 <- MP.optional $ char '/' >> MP.label "style variation 1" svParser
   sv2 <- MP.optional $ char '/' >> MP.label "style variation 2" svParser
@@ -5957,10 +5983,10 @@ citationParser = do
     ( \s ->
         s
           { insideCitation = False,
-            citations = c : s.citations
+            citations = c : s.citations -- (ref:citationsParser-citations-list)
           }
     )
-  pure $ length pState.citations
+  pure $ length pState.citations -- (ref:citationsParser-integer-return)
   where
     svParser :: OrgParser [Char]
     svParser =
@@ -5977,7 +6003,8 @@ citationParser = do
 #+end_src
 
 The [[f:intraCellWhitespaceParser]] parses spaces and newlines, but does not cross
-cell boundaries (no double newlines).
+cell boundaries (no double newlines). In other words, a citation may not have a
+double newline in it.
 
 #+name: f:intraCellWhitespaceParser
 #+begin_src haskell
@@ -5993,16 +6020,12 @@ intraCellWhitespaceParser =
       ]
 #+end_src
 
-We collect all citations into a list in [[f:collectCitations]]. This is used in
-[[f:orgDocParser]] to get the list of all citations used in the document. We have to
-reverse the order because during parsing we just prepend to it.
-
-We have to get a single list of all citations, because when we call
-~Citeproc.citeproc~, we have to provide all citations used in the document; this
-is the only way to get numbering correct with a style like IEEE. For example, if
-we were to call ~Citeproc.citeproc~ once for every citation on its own, those
-citations would all get numbered as ~[1]~ because ~Citeproc~ will only see a single
-citation at a time.
+Anyway, the big picture is that every citation looks like ~[cite...]~, and that
+the cites within the citation are parsed separately with [[f:citeParser]]. Also,
+note that we return just a single integer [[(citationsParser-integer-return)]]. This
+is simply the index of the list of citations we build up in
+[[(citationsParser-citations-list)]]. This list is finalized in [[f:collectCitations]],
+which is used by [[f:orgDocParser]].
 
 #+name: f:collectCitations
 #+begin_src haskell
@@ -6011,6 +6034,15 @@ collectCitations = do
   pState <- get
   pure $ reverse pState.citations
 #+end_src
+
+We have to build up a single list of all citations because when we call
+~Citeproc.citeproc~, we have to provide all citations used in the document; this
+is the only way to get numbering correct with a style like IEEE. For example, if
+we were to call ~Citeproc.citeproc~ once for every citation on its own, those
+citations would all get numbered as ~[1]~ because ~Citeproc~ will only see a single
+citation at a time.
+
+*** Parsing a single cite
 
 The [[f:citeParser]] parses a single [[data:Cite]]. A cite is composed of four pieces:
 
@@ -6029,13 +6061,17 @@ The [[f:citeParser]] parses a single [[data:Cite]]. A cite is composed of four p
 #+begin_src haskell
 citeParser :: OrgParser Cite
 citeParser = do
-  _ <- MP.try . MP.lookAhead $ MP.optional citePrefixParser >> citeIdParser
+  _ <-
+    MP.try
+      . MP.lookAhead -- (ref:citeParser-lookAhead)
+      $ MP.optional citePrefixParser
+      >> citeIdParser
   citePrefix <- MP.optional citePrefixParser
   citeId <- citeIdParser
   citeLocator <-
     MP.optional . MP.try $ do
       _ <- intraCellWhitespaceParser
-      citeLocatorParser
+      citeLocatorParser -- (ref:citeParser-citeLocatorParser)
   citeSuffix <-
     MP.optional $ do
       _ <- intraCellWhitespaceParser
@@ -6054,9 +6090,9 @@ citeParser = do
       pure p
 #+end_src
 
-We have to use ~MP.lookAhead~ in [[f:citeParser]] because otherwise there is no way to
-tell apart a cite prefix (which precedes a cite id like "@foo") from a citation
-prefix.
+We have to use ~MP.lookAhead~ [[(citeParser-lookAhead)]] because otherwise there is no
+way to tell apart a cite prefix (which precedes a cite id like ~@foo~) from a
+citation prefix.
 
 The [[https://orgmode.org/worg/org-syntax.html#Citation_References][Orgmode syntax description]] says this about the allowed characters for a cite
 key (what we call an ~id~):
@@ -6080,15 +6116,16 @@ citeIdParser = do
   pure citeId
 #+end_src
 
-The [[f:citeLocatorParser]] parses the locator, which is made up of two parts. The
-first part is the /term/, which describes the location inside the work, such as
-"chapter" or "page". See [[f:citeLocatorTermParser]] for all supported terms. If
-omitted, this defaults to "page".
+The [[f:citeLocatorParser]] [[(citeParser-citeLocatorParser)]] parses the locator, which
+is made up of two parts. The first part is the /term/, which describes the
+location inside the work, such as "chapter" or "page". See
+[[f:citeLocatorTermParser]] for all supported terms. If omitted, this defaults to
+"page".
 
 The second part is a CSV of /coordinates/, which can be a number (e.g., 35), a
 section (e.g., 1.2.3), or a range of numbers (e.g., 35-50) or sections (e.g.,
-1.2-4). We don't bother with roman numerals, balanced parentheses, etc. See
-[[t:0014-citations-locators]] for more examples.
+1.2-4). We don't bother with roman numerals. See [[t:0014-citations-locators]] for
+more examples.
 
 #+name: f:citeLocatorParser
 #+begin_src haskell
@@ -6111,8 +6148,9 @@ citeLocatorParser =
       pure ("page", coords)
 #+end_src
 
-These terms are mostly lifted from ~org-cite-csl--label-alist~ from [[https://github.com/bzg/org-mode/blob/c356e1c9b750740a9066ebddb53be055531fa076/lisp/oc-csl.el#L370][Orgmode]].
-Unlike Orgmode, we do not allow special characters like ~¶~ or ~§~.
+The terms in [[f:citeLocatorTermParser]] are mostly lifted from
+~org-cite-csl--label-alist~ from [[https://github.com/bzg/org-mode/blob/c356e1c9b750740a9066ebddb53be055531fa076/lisp/oc-csl.el#L370][Orgmode]]. Unlike Orgmode, we do not allow special
+characters like ~¶~ or ~§~.
 
 #+name: f:citeLocatorTermParser
 #+begin_src haskell
@@ -6247,15 +6285,19 @@ citeAffixParser :: Bool -> OrgParser Prose
 citeAffixParser isPrefix = do
   modify (\s -> s {insideCitePrefix = isPrefix})
   pState <- get
-  prose <- proseParser . whitespaceCompressor $ proseSpaceConsumer pState.continuationIndent
+  prose <-
+    proseParser
+      . whitespaceCompressor
+      $ proseSpaceConsumer pState.continuationIndent
   modify (\s -> s {insideCitePrefix = False})
   failIfLeftoverActiveStyles
-  failIfUnbalancedBrackets
+  failIfUnbalancedBrackets -- (ref:citeAffixParser-failIfUnbalancedBrackets)
   pure $ compressProse prose
 #+end_src
 
-The [[f:failIfUnbalancedBrackets]] helper fails if it detects if square brackets
-have not been balanced by the end of the citation.
+The [[f:failIfUnbalancedBrackets]] helper [[(citeAffixParser-failIfUnbalancedBrackets)]]
+fails if it detects if square brackets have not been balanced by the end of the
+citation.
 
 #+name: f:failIfUnbalancedBrackets
 #+begin_src haskell
@@ -6267,6 +6309,9 @@ failIfUnbalancedBrackets = do
 #+end_src
 
 *** Tests
+:PROPERTIES:
+:ID:       6b021d10-3339-46b7-b5dc-a10c7b8aef03
+:END:
 
 Simple citation, without any locators or affixes.
 

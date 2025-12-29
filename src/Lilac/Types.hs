@@ -534,7 +534,7 @@ data Citation = Citation
 
 type Cite :: Type
 data Cite = Cite
-  { id :: Text,
+  { id :: Text, --
     locator :: Maybe (Text, Text),
     prefix :: Prose,
     suffix :: Prose
