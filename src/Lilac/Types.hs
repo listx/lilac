@@ -189,7 +189,7 @@ data Heading = Heading
   { level :: Int,
     section :: [Int],
     body :: Prose,
-    meta :: Map Text Text
+    meta :: Map Text Text --
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

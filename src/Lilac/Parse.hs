@@ -624,7 +624,7 @@ genSectionNumber level prevSection
         $ drop (length prevSection - level) prevSection
   | otherwise =
       let levelDiff = (level - length prevSection - 1)
-       in (1 : (take levelDiff $ repeat 0)) <> prevSection
+       in (1 : (take levelDiff $ repeat 0)) <> prevSection --
   where
     bumpDeepestSection :: [Int] -> [Int]
     bumpDeepestSection [] = []
