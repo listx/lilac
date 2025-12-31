@@ -1191,7 +1191,7 @@ rawLinkParser = do
   where
     remainderChar :: OrgParser Char --
     remainderChar = do
-      c <- MP.satisfy N.isAllowedInURI
+      c <- MP.satisfy (\c -> N.isAllowedInURI c && c `notElem` [')'])
       when (isPunctuation c && c /= '/') $ do
         MP.notFollowedBy (char ' ')
         MP.notFollowedBy (char '\n')
