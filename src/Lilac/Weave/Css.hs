@@ -651,7 +651,7 @@ defaultCss = do
         textDecoration none
   div # ".glossary-term" ? do
     border (px 1) solid colorBg
-    ev padding (px 5)
+    yx padding (px 0) (px 5)
     ".active" & do
       border (px 1) solid colorActiveBorder
       backgroundColor colorActiveBg
