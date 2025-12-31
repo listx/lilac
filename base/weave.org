@@ -4351,6 +4351,7 @@ import Clay
     dl,
     dt,
     em,
+    empty,
     figcaption,
     figure,
     fitContent,
@@ -4431,6 +4432,7 @@ import Clay
     thead,
     top,
     tr,
+    ul,
     underline,
     vAlignSub,
     vAlignSuper,
@@ -4562,6 +4564,7 @@ defaultCss = do
   <<css:StyledTextStyles>>
   <<css:Misc styles>>
   <<css:Links>>
+  <<css:List items>>
   <<css:Code blocks>>
   <<css:Figures>>
   <<css:Tables>>
@@ -4666,6 +4669,9 @@ span # ".breadcrumb-separator" ? do
 #+end_src
 
 ** Table of contents (TOC)
+:PROPERTIES:
+:ID:       c316d545-5f6c-4fea-8342-e6925be83dfe
+:END:
 
 The TOC is sticky and scrolls independently of the main content; it does this
 with [[css:Column under navbar]].
@@ -4737,6 +4743,9 @@ main_ ? do
 #+end_src
 
 ** Sidebar
+:PROPERTIES:
+:ID:       6db7e0d7-67e1-45c1-9908-a8fb055ec535
+:END:
 
 The sidebar should be similar to the TOC, in that it remains sticky in a fixed
 position, while still being independently scrollable from the main content. This
@@ -5008,6 +5017,79 @@ roundedRectangleLink = do
     ":hover" & do
       border (px 1) solid colorNowebLinkVisitedFg
       textDecoration none
+#+end_src
+
+** List items
+
+#+name: css:List items
+#+begin_src haskell
+<<css:Ordered list items>>
+<<css:List item indentation>>
+<<css:List item minimum height>>
+#+end_src
+
+*** Ordered list items
+
+Ordered list items get a right parenthesis, just like what we require when they
+are written in the Org file (search for "parenthesis" in [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][Detailed rules]]).
+
+#+name: css:Ordered list items
+#+begin_src haskell
+main_ ? do
+  ol ? do
+    "list-style" -: "none" -- (ref:css:Ordered list items-disable-default-counter)
+    "counter-reset" -: "custom-list-counter" -- (ref:css:Ordered list items-custom-list-counter)
+  ol |> li ? do
+    "counter-increment" -: "custom-list-counter" -- (ref:css:Ordered list items-custom-list-counter-increment)
+    position relative
+    before & do
+      "content" -: "counter(custom-list-counter) \")\"" -- (ref:css:Ordered list items-parenthesis)
+      position absolute
+      left (rem (-2.4))
+      width (rem 2)
+      textAlign $ alignSide sideRight
+#+end_src
+
+We disable the default counter style for ordered lists at [[(css:Ordered list
+items-disable-default-counter)]], and create a new custom counter at [[(css:Ordered
+list items-custom-list-counter)]]. The ~custom-list-counter~ is scoped to each level
+of ordered lists automatically by the browser. This counter is incremented upon
+encountering each list item [[(css:Ordered list
+items-custom-list-counter-increment)]]. The right parenthesis is used as the style
+of the custom counter at [[(css:Ordered list items-parenthesis)]]. The rest of the
+CSS is for positioning the custom counter.
+
+We only use this custom style for ordered lists in the main content part of the
+viewport. Ordered lists in other parts of the viewport (namely the [[id:c316d545-5f6c-4fea-8342-e6925be83dfe][Table of
+contents (TOC)]] and [[id:6db7e0d7-67e1-45c1-9908-a8fb055ec535][Sidebar]]) are unaffected. This is purely for aesthetic reasons
+(they look good enough as is).
+
+*** List item indentation
+
+The default list item indentation is a bit too aggressive (deep), so make it a
+bit shallower.
+
+#+name: css:List item indentation
+#+begin_src haskell
+main_ ? do
+  ol ? do
+    paddingLeft (rem 1.3)
+  ul ? do
+    paddingLeft (rem 1)
+#+end_src
+
+*** Empty list items
+
+If a list item is empty (has no content), the browser will collapse them onto a
+single line. To prevent this, we set a minimum height for empty list items.
+
+#+name: css:List item minimum height
+#+begin_src haskell
+main_ ? do
+  ol ? do
+    li ? do
+      empty & do
+        minHeight (rem 2.2)
 #+end_src
 
 ** Code blocks

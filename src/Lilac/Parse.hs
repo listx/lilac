@@ -1670,19 +1670,20 @@ someIndent = do
   indentFound <- T.length <$> onlySpaces
   let levelsToDropPerIndentationIncrement :: [(Int, Int)]
       levelsToDropPerIndentationIncrement =
-        zip [0 ..]
+        zip [0 ..] --
           . map getContinuationIndentForLevel
-          $ pState.listLevels
+          $ pState.listLevels --
       matchingIndent =
         find
           (\(_, continuationIndent) -> indentFound == continuationIndent)
           levelsToDropPerIndentationIncrement
   case matchingIndent of
     Nothing -> fail "indentation does not fit into existing levels"
-    Just x -> pure x
+    Just x@(_levelsToDrop, _continuationIndent) -> pure x
 
 getContinuationIndentForLevel :: Level -> Int
-getContinuationIndentForLevel level = level.indent + maybeNum + punctuation + space
+getContinuationIndentForLevel level =
+  level.indent + maybeNum + punctuation + space
   where
     punctuation :: Int
     punctuation = 1
@@ -1702,10 +1703,11 @@ listItemsEndParser = do
     fail "not at beginning of line"
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
   let markers = getEndingListMarkers levelsToDrop pState.listLevels
+      markersToDrop = levelsToDrop * 2 --
   put
     pState
       { listLevels = drop levelsToDrop pState.listLevels,
-        listMarkers = drop (levelsToDrop * 2) pState.listMarkers,
+        listMarkers = drop markersToDrop pState.listMarkers,
         continuationIndent = continuationIndent
       }
   pure $ CListItem markers
@@ -1720,7 +1722,7 @@ getEndingListMarkers levelsToDrop = concatMap f . take levelsToDrop
 
 listHeadIndentLevelParser :: OrgParser Level
 listHeadIndentLevelParser = do
-  minimalIndentation
+  minimalIndentation --
   spaces <- onlySpaces
   listHead <- unorderedHeadParser <|> orderedHeadParser
   let level =
@@ -1738,7 +1740,7 @@ listHeadIndentLevelParser = do
         . MP.lookAhead
         . MP.label "minimal indentation"
         $ MP.count 2 (char ' ')
-    afterListHead :: Level -> OrgParser ()
+    afterListHead :: Level -> OrgParser () --
     afterListHead level =
       void
         $ MP.choice
@@ -1764,21 +1766,21 @@ orderedHeadParser = do
 unorderedHeadParser :: OrgParser (Maybe Int)
 unorderedHeadParser = do
   _ <- char '-'
-  pure Nothing
+  pure Nothing --
 
 listItemStartParser :: OrgParser Cell
 listItemStartParser = do
-  _ <- MP.try $ MP.lookAhead listHeadIndentLevelParser
+  _ <- MP.try $ MP.lookAhead listHeadIndentLevelParser --
   pState <- get
   let levels = pState.listLevels
-  level <- listHeadIndentLevelParser
+  level <- listHeadIndentLevelParser --
   listMarkers <-
     if nestsBeyond levels level
       then listItemNester level levels
       else listItemFitter level levels
   pure $ CListItem listMarkers
   where
-    nestsBeyond :: [Level] -> Level -> Bool
+    nestsBeyond :: [Level] -> Level -> Bool --
     nestsBeyond [] _ = True
     nestsBeyond (deepestLevel : _) level =
       getContinuationIndentForLevel deepestLevel == level.indent
@@ -1786,9 +1788,8 @@ listItemStartParser = do
 listItemNester :: Level -> [Level] -> OrgParser [ListMarker]
 listItemNester level levels = do
   case level.number of
-    Just 0 -> pure ()
     Just 1 -> pure ()
-    Just n -> fail $ "starting list head number must be 0 or 1; got " <> show n
+    Just n -> fail $ "starting list head number must be 1; got " <> show n
     Nothing -> pure ()
   pState <- get
   let newMarker = case level.number of
@@ -1801,7 +1802,7 @@ listItemNester level levels = do
       <> show opc.maxListLevel
       <> " levels of list items"
   put
-    pState
+    pState --
       { listLevels = level : levels,
         listMarkers = LItemStart : newMarker : pState.listMarkers
       }
@@ -1832,7 +1833,7 @@ listItemFitter level levels =
       let markers = getEndingListMarkers levelsToDrop pState.listLevels
       put
         pState
-          { listLevels = level : drop (levelsToDrop + 1) pState.listLevels,
+          { listLevels = level : drop (levelsToDrop + 1) pState.listLevels, --
             listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
       pure $ markers <> [LItemEnd, LItemStart]

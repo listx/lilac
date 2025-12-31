@@ -1774,9 +1774,9 @@ parseSpec = do
     13
 
   shouldFailWithMessage
-    "0009-ordered-lists-start-from-0-or-1"
-    "starting list head number must be 0 or 1; got 20"
-    25
+    "0009-ordered-lists-start-from-1"
+    "starting list head number must be 1; got 20"
+    17
 
   shouldFailWithError
     "0009-ordered-list-head-needs-parenthesis"

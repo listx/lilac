@@ -9360,9 +9360,17 @@ shouldParseWithState
 :ID:       58f69993-599d-4389-ba47-3056b1bb2350
 :END:
 
-A /list item/ is made up of a /list head/ and /list body/. Consider the following
-list:
+Lists are similar to [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][headings]], because they give you a way to structure your
+paragraphs.
 
+Lists are made up of list items. A /list item/ is made up of a /list head/ and /list
+body/. List heads encode the structure of cells that sit in the list bodies. So
+list items encode both structure (with list heads) and content (with list
+bodies). However unlike headings, a list item can have multiple other cells
+(typically paragraphs) in its body, whereas a heading can only have a single
+line of prose. Consider the following list:
+
+#+begin_src org
   1) a
 
      b
@@ -9372,23 +9380,16 @@ list:
      d
 
   2) e
+#+end_src
 
-Here the =1)= and =2)= are list heads for an /ordered/ list. The single dash =-= before
-"c" is also a list head, but for an /unordered/ list. The list body for =1)=
-includes the paragraphs =a=, =b=, the nested list item =c=, and the paragraph =d=. There
-are two list items for the top-level ordered list =1)= and =2)=.
-
-List heads encode the structure of cells that sit in the list bodies. So list
-items encode both structure and content. In this manner they are similar to
-[[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][headings]]. However unlike headings, a list item can have multiple other cells
-(paragraphs, tables, or even code blocks) in its body, whereas a heading can
-only have a single line of prose.
-
-Another difference is that a list item can have content for it /after/ backing out
-of a nested list item. For example in the list shown above the ~d~ paragraph is
-part of the ordered list item ~1)~ even though the nested item ~c~ is just above it;
-this sort of structure is now allowed for headings. For example, in the
-following situation
+Here the ~1)~ and ~2)~ are list heads for an /ordered/ list. The single dash ~-~ before
+"c" is also a list head, but for an /unordered/ list. The list body for ~1)~
+includes the paragraphs ~a~, ~b~, the nested list item ~c~, /and the paragraph/ ~d~. This
+is another difference versus headings. That is, a list item can have content for
+it /after/ backing out of a nested list item. To reiterate, in the list shown above
+the ~d~ paragraph is part of the ordered list item ~1)~ even though the nested item
+~c~ is just above it; this sort of structure is now allowed for headings. For
+example, in the following situation
 
 #+begin_src org
 ,* a
@@ -9396,35 +9397,70 @@ following situation
 #+end_src
 
 anything that comes after ~** b~ will be part of the ~** b~ heading; there is no way
-to make it belong to ~* a~ (any such content must be placed /before/ ~** b~).
+to make it belong to ~* a~ (any such content must be placed /before/ ~** b~). List
+items are not restricted like this, because they always have meaningful
+indentation (a list head must be preceded by indentation), and this meaning of
+each indentation level is tracked during the parse.
+
+List bodies may have cells of the following type:
+
+  - [[id:272567ab-4077-4a47-ae78-dfe77243ccc0][Paragraphs]]
+
+    Example paragraph.
+
+  - [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][Tables]]
+
+    | Example | Table |
+    |---------+-------|
+    |       1 |     2 |
+
+  - [[id:d1064535-5c98-4c80-a901-5cdc1fd5297f][Standalone math fragments]]
+
+    \begin{equation}
+    2 + 2 = 4
+    \end{equation}
+
+  - and of course, more list items (nesting)
+
+    - Example nested item.
+
+Vanilla Org allows more cell types like code blocks inside list bodies, but
+Lilac does not. List items should be simple, and things like code blocks just
+makes list items more complicated. The fact that we support tables and
+standalone math fragments in list bodies is an accident, not a product of
+design. Indeed, for typical use cases, you shouldn't need anything more than
+paragraphs and other list items inside a list.
 
 Below we have a look at some more detailed rules around how lists may be written
-in an Org file.
+in an Org file. They are somewhat numerous because of all the edge cases we have
+to account for.
 
-** Detailed rules
+** Ordered list items
 :PROPERTIES:
 :ID:       32d34523-2148-4f2f-b2f3-2a2543a7d57c
 :END:
 
 Below are some detailed rules around /ordered/ list items, themselves expressed as
-ordered list items, which are important for parsing:
+ordered list items with links to test cases as examples. The discussions around
+space characters and indentation only make sense when viewed in the raw Org
+file, not the woven HTML format.
 
   1) List items start out with 2-space indentation. This makes them easier to
      read from the raw Org file. The amount of additional indentation (in order
      to have nested list items) depends on where the text began in the parent
-     item. See items "5)" and "10)" below for examples.
+     item.
 
      - [[ti:0009-list-indentation-no-indent]]
 
      - [[ti:0009-list-indentation-proper-indent]]
 
-  2) List items must be separate from each other with a blank line. This makes
-     them easier to read when reading the Org file in plain text.
+  2) List items must be separated from each other with an empty blank line. This
+     makes them easier to read when reading the Org file in plain text.
 
      - [[ti:0009-list-items-need-blank-line-separator]]
 
   3) Additional hard-wrapped lines for a list item must be aligned with the text
-     of the first line. This list item is an example of such a line.
+     of the first line.
 
      - [[ti:0005-paragraph-indentation-mismatch-over-list-body]]
 
@@ -9438,8 +9474,8 @@ ordered list items, which are important for parsing:
 
   4) List items can have more than one paragraph associated with them.
 
-     This is an example of another paragraph which is still part of the "4)"
-     list item, and has 5 spaces of indentation.
+     This is an example of another paragraph which is still part of same list
+     item, and has 5 spaces of indentation.
 
      - [[ti:0009-list-content-simple]]
 
@@ -9459,27 +9495,26 @@ ordered list items, which are important for parsing:
      - [[ti:0009-paragraph-can-close-deeper-levels]]
 
   6) Unlike Markdown, the numbers of the list item must increase by one if there
-     are additional items at the same level. The first number of a level may
-     start from any non-negative number; for example, 0, 1, 5, 12 are all valid
-     starting numbers.
+     are additional items at the same level. And the first number of a level
+     must start from 1.
 
      - [[ti:0009-ordered-lists-require-increment]]
 
-     - [[ti:0009-ordered-lists-start-from-0-or-1]]
+     - [[ti:0009-ordered-lists-start-from-1]]
 
   7) The format for ordered list items requires a closing parenthesis
-     immediately after the number. So =1)= is valid, but =1.= is invalid.
+     immediately after the number. So ~1)~ is valid, but ~1.~ is invalid.
 
      - [[ti:0009-ordered-list-head-needs-parenthesis]]
 
   8) Only numbers may be used to denote item position. You cannot use letters or
-     Roman numerals.
+     Roman numerals like ~a)~ or ~i)~.
 
      - [[ti:0009-ordered-list-head-cannot-use-letters]]
 
   9) There is no limit to the number of consecutive list items at the same
-     level (technically, we use an =Int= type to encode the number, so it will
-     eventually max out, but you'd need millions of items to hit this limit).
+     level (technically, we use an ~Int~ type to encode the number, so it will
+     eventually max out, but you'd need billions of items to hit this limit).
 
   10) The indentation of text changes slightly depending on the number of the
       item. For example, this line has 6 spaces of indentation, unlike the
@@ -9493,7 +9528,7 @@ ordered list items, which are important for parsing:
 
       - [[ti:0009-lists-require-precise-indentation]]
 
-  11) There can only be up to 5 additional levels of nesting (for a total of 6
+  11) There can only be up to 2 additional levels of nesting (for a total of 3
       levels of items). This is because excessive nesting is an anti-pattern.
       See the ~lilac_maxListLevel~ [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extension]] for customizing this behavior.
 
@@ -9503,9 +9538,8 @@ ordered list items, which are important for parsing:
 
       - [[ti:0009-lists-prohibited]]
 
-  12) Ordered list items may have unordered list items (discussed next) as
-      children, and vice versa. However you may not mix the two types of items
-      at the same level.
+  12) Ordered list items may have unordered list items as children, and vice
+      versa. However you may not mix the two types of items at the same level.
 
       - [[ti:0009-paragraph-can-separate-mixed-lists]]
 
@@ -9547,10 +9581,13 @@ ordered list items, which are important for parsing:
 
       - [[ti:0009-list-indentation-nested]]
 
-Unordered list items use a single dash character =-=, and always use 2-space
+** Unordered list items
+
+Unordered list items use a single dash character ~-~, and always use 2-space
 indentation (if you are only using unordered list items for nesting). Below is
 an example:
 
+#+begin_src org
   - one
 
   - two
@@ -9560,9 +9597,11 @@ an example:
     - bar
 
   - three
+#+end_src
 
 Here's an example of mixing ordered and unordered lists:
 
+#+begin_src org
   - foo
 
   - bar
@@ -9581,11 +9620,13 @@ Here's an example of mixing ordered and unordered lists:
     3) three
 
   - dog
+#+end_src
 
 You may mix ordered and unordered lists at the same indentation level, as long
 as they are not consecutive (you need some intervening cells, such as the "quux"
 paragraph below):
 
+#+begin_src org
   - foo
 
     1) one
@@ -9597,13 +9638,14 @@ paragraph below):
     - a
 
     - b
+#+end_src
 
-** Indentation and =ListMarker=
+** Indentation and ~ListMarker~
 
 Parsing list items is tricky because of meaningful indentation (whitespace).
 Keeping track of the current level of indentation requires additional state
-during parsing, which we encode with =Level= (used by =listLevels= in
-[[data:OrgParserState]]).
+during parsing, which we encode with ~Level~ (used by ~listLevels~
+[[(field-ops-listLevels)]] in [[data:OrgParserState]]).
 
 #+name: data:Level
 #+begin_src haskell
@@ -9615,18 +9657,18 @@ data Level = Level
   deriving stock (Eq, Show)
 #+end_src
 
-This keeps track of the indentations and the last seen number of each (nested)
-level of indentation thus far during parsing. Whenever we see a list head like
-=1)= or ~-~, we record the number used as well as the indentations we expect for the
-list head and list body. The main point of =listLevels= is to ensure that the
-input is correctly formatted, as well as to detect whenever we start nesting an
-additional level, or if we back out (finish) one or more levels of nesting (when
-we see dedented text).
+This keeps track of the indentations and the last seen number (only for ordered
+lists) of each (nested) level of indentation thus far during parsing. Whenever
+we see a list head like ~1)~ or ~-~, we record the number used as well as the
+indentations we expect for the list head and list body. The main point of
+~listLevels~ is to ensure that the input is correctly formatted, as well as to
+detect whenever we start nesting an additional level, or if we back out (finish)
+one or more levels of nesting (when we see dedented text).
 
-As we observe how these =listLevels= change during parsing, we create "start" and
+As we observe how these ~listLevels~ change during parsing, we create "start" and
 "end" markers for list items at a particular level, which are the values of the
-[[data:ListMarker]] type. The =ListMarker= objects are parsed as their own cell as a
-=CListItem= (see [[data:Cell]]).
+[[data:ListMarker]] type. The ~ListMarker~ objects are parsed as their own cell as a
+~CListItem~ (see [[data:Cell]]).
 
 #+name: data:ListMarker
 #+begin_src haskell
@@ -9642,9 +9684,9 @@ data ListMarker
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-We take this model from HTML, which uses =<ol>= and =</ol>= to encode the start and
-end of ordered lists (=<ul>= and =</ul>= for unordered lists), and =<li>= and =</li>= to
-mark the start and en of a single list item.
+We take this model from HTML, which uses ~<ol>~ and ~</ol>~ to encode the start and
+end of ordered lists (~<ul>~ and ~</ul>~ for unordered lists), and ~<li>~ and ~</li>~ to
+mark the start and end of a single list item.
 
 #+name: tbl:List markers
 #+caption: ~ListMarker~ values and their HTML equivalents.
@@ -9657,10 +9699,10 @@ mark the start and en of a single list item.
 | ~LItemStart~      | ~<li>~            |
 | ~LItemEnd~        | ~</li>~           |
 
-In summary when we parse a list item, we parse it as a combination of =CListItem=
+In summary when we parse a list item, we parse it as a combination of ~CListItem~
 and other cell types for the list structure and content, respectively. This lets
 us parse things into a single global list of cells in [[f:cellParser]], without a
-need to nest them inside a recursive data structure (as shown in
+need to nest them inside a recursive data structure (such as in
 https://markkarpov.com/tutorial/megaparsec.html#nested-indented-list).
 
 ** Parsing initial indentation to close list items
@@ -9669,36 +9711,38 @@ https://markkarpov.com/tutorial/megaparsec.html#nested-indented-list).
 :END:
 
 Before getting into parsing the list items and taking into account all of the
-[[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][detailed rules]], let's first consider case where we just want to /close off/ the
+[[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][rules]], let's first consider case where we just want to /close off/ the
 list items, as this is simpler than creating list items. We want to do this
 every time we parse initial indentation where there is no list head. For
 example, in the following
 
+#+begin_src org
   1) a
 
      - b
 
      c
+#+end_src
 
-the indentation for paragraph =c= should by itself close off the preceding
+the indentation for paragraph ~c~ should by itself close off the preceding
 unordered list item (~- b~). We can close off existing list items depending on the
-amount of indentation:
+amount of indentation.
 
-  1) if there is no indentation, we close off /all/ list items;
+  1) If there is no indentation, we close off /all/ list items.
 
-  2) if there is maximum (already-seen) indentation (to line up with the
+  2) If there is maximum (already-seen) indentation (to line up with the
      most-nested list item), we don't close off any list items because we're
-     just continuing the most-nested list item;
+     just continuing the most-nested list item.
 
-  3) otherwise, we have some amount of indentation and we only want to close off
+  3) Otherwise, we have some amount of indentation and we only want to close off
      some list levels, depending on how much indentation we detect.
 
 If there is more indentation than the maximum, then we are nesting another level
 and don't need to close off anything. That's why this situation is not listed
 above.
 
-Point 1 is captured by =zeroIndent= in [[f:listItemsEndParser]]. Points 2 and 3 are
-captured by =someIndent= in the same function.
+Point 1 is captured by ~zeroIndent~ in [[f:listItemsEndParser]]. Points 2 and 3 are
+captured by ~someIndent~ in the same function.
 
 #+name: f:zeroIndent
 #+begin_src haskell
@@ -9721,8 +9765,8 @@ because there is no indentation, and any subsequent lines belonging to the same
 cell should /not/ have any indentation (it is considered invalid input if we see
 surprise indentation; see [[t:0005-paragraph-indentation-mismatch-over]]).
 
-For =someIndent=, we just try to line up the amount of indentation found with the
-existing list levels we have and how much indentation they expect.
+For [[f:someIndent]], we just try to line up the amount of indentation found with
+the existing list levels we have and how much indentation they expect.
 
 #+name: f:someIndent
 #+begin_src haskell
@@ -9732,26 +9776,26 @@ someIndent = do
   indentFound <- T.length <$> onlySpaces
   let levelsToDropPerIndentationIncrement :: [(Int, Int)]
       levelsToDropPerIndentationIncrement =
-        zip [0 ..]
+        zip [0 ..] -- (ref:f:someIndent-zip0)
           . map getContinuationIndentForLevel
-          $ pState.listLevels
+          $ pState.listLevels -- (ref:f:someIndent-pState.listLevels)
       matchingIndent =
         find
           (\(_, continuationIndent) -> indentFound == continuationIndent)
           levelsToDropPerIndentationIncrement
   case matchingIndent of
     Nothing -> fail "indentation does not fit into existing levels"
-    Just x -> pure x
+    Just x@(_levelsToDrop, _continuationIndent) -> pure x
 #+end_src
 
-It should be noted that the ~pState.listLevels~ is grown by prepending to
+The ~pState.listLevels~ [[(f:someIndent-pState.listLevels)]] is grown by prepending to
 the list in [[f:listItemNester]]. So the most-deeply-nested level will be at the
-head of the list in ~pState.listLevels~. That's why we use ~zip [0 ..]~ ---
-we want to drop 0 levels if we see indentation matching the most deeply-nested
-list item.
+head of the list in ~pState.listLevels~. That's why we use ~zip [0 ..]~
+[[(f:someIndent-zip0)]] --- we want to drop 0 levels if we see indentation matching
+the most deeply-nested list item.
 
-The [[f:getContinuationIndentForLevel]] just computes the total indentation for a
-list level. For example, in
+The [[f:getContinuationIndentForLevel]] computes the total indentation for a list
+level. For example, in
 
 #+begin_src org
   1) foo
@@ -9766,7 +9810,8 @@ a constant.
 #+name: f:getContinuationIndentForLevel
 #+begin_src haskell
 getContinuationIndentForLevel :: Level -> Int
-getContinuationIndentForLevel level = level.indent + maybeNum + punctuation + space
+getContinuationIndentForLevel level =
+  level.indent + maybeNum + punctuation + space
   where
     punctuation :: Int
     punctuation = 1
@@ -9780,7 +9825,7 @@ getContinuationIndentForLevel level = level.indent + maybeNum + punctuation + sp
 
 Once we determine the amount of levels we need to close off (by parsing
 [[f:zeroIndent]] or [[f:someIndent]]), we just go through the list markers we've already
-seen in =listMarkers= and close them off via [[f:getEndingListMarkers]]. This is what
+seen in ~listMarkers~ and close them off via [[f:getEndingListMarkers]]. This is what
 we do in [[f:listItemsEndParser]].
 
 #+name: f:listItemsEndParser
@@ -9794,33 +9839,35 @@ listItemsEndParser = do
     fail "not at beginning of line"
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
   let markers = getEndingListMarkers levelsToDrop pState.listLevels
+      markersToDrop = levelsToDrop * 2 -- (ref:f:listItemsEndParser-markersToDrop)
   put
     pState
       { listLevels = drop levelsToDrop pState.listLevels,
-        listMarkers = drop (levelsToDrop * 2) pState.listMarkers,
+        listMarkers = drop markersToDrop pState.listMarkers,
         continuationIndent = continuationIndent
       }
   pure $ CListItem markers
 #+end_src
 
-In [[f:listItemsEndParser]], note that we initially fail the parser if there are no
-pending =ListMarker= objects (no list levels to close off), or if we're not at the
+In [[f:listItemsEndParser]], we initially fail the parser if there are no pending
+~ListMarker~ objects (no list levels to close off), or if we're not at the
 beginning of the line (because otherwise we cannot measure indentation
-accurately), by checking =pState.continuationIndent=. This check of
-=pState.continuationIndent= is required because there is no easy way to
-check for the just-parsed token (or character) in Megaparsec --- all parsers
-only see what's in front of it. So then it's up to other parsers to set this to
-some value greater than =1= (we do this in [[f:listHeadIndentLevelParser]] which is
-part of [[f:listItemStartParser]])
+accurately), by checking ~pState.continuationIndent~. This check of
+~pState.continuationIndent~ is required because there is no easy way to check for
+the just-parsed token (or character) in Megaparsec --- all parsers only see
+what's in front of it. So then it's up to other parsers to set this to some
+value greater than ~1~ (we do this in [[f:listHeadIndentLevelParser]] which is part of
+[[f:listItemStartParser]])
 
-The =markersToDrop= is always twice the number of =levelsToDrop= because we always
-add 2 for each level (see [[f:listItemNester]]).
+The ~markersToDrop~ [[(f:listItemsEndParser-markersToDrop)]] is always twice the
+number of ~levelsToDrop~ because we always add 2 (~LItemStart~ plus either
+~LOrderedStart~ or ~LUnorderedStart~) for each level (see [[f:listItemNester]]).
 
 If we detect the maximum allowed indentation, then there are no levels to drop,
-and hence, we'll end up returning =CListItem []= which doesn't hold any meaning.
+and hence, we'll end up returning ~CListItem []~ which doesn't hold any meaning.
 Avoiding this is a bit difficult; if we just fail the parser outright, then the
 amount of parsed indentation will have to be parsed by another downstream parser
-(this can get messy). So instead we just return =CListItem []= and then filter
+(this can get messy). So instead we just return ~CListItem []~ and then filter
 these out in [[f:orgDocParser]]. This way we decide once and for all how to deal
 with leading indentation (and how this closes off existing list items) in
 [[f:listItemsEndParser]].
@@ -9848,14 +9895,15 @@ how to create list items (list levels). This means we have to deal with all of
 the possible values of [[data:ListMarker]] here.
 
 Parsing the list head (and therefore the [[data:Level]] of a list item) is
-straightforward. For unordered lists we just want to see a dash.
+straightforward. For unordered lists we just want to see a dash, returning
+~Nothing~ [[(f:unorderedHeadParser-no-number)]] because there is no list number.
 
 #+name: f:unorderedHeadParser
 #+begin_src haskell
 unorderedHeadParser :: OrgParser (Maybe Int)
 unorderedHeadParser = do
   _ <- char '-'
-  pure Nothing
+  pure Nothing -- (ref:f:unorderedHeadParser-no-number)
 #+end_src
 
 For ordered lists we want to see the number and closing parenthesis.
@@ -9872,17 +9920,17 @@ orderedHeadParser = do
   pure n
 #+end_src
 
-We check if the number looks like an =Int= with =readMaybe=.
+We check if the number looks like an ~Int~ with ~readMaybe~.
 
 For both cases we also parse leading indentation and also an additional space at
-the end to separate the list head from the body. These considerations are
-encoded in =listHeadIndentLevelParser= below.
+the end to separate the list head from the body. This is what
+[[f:listHeadIndentLevelParser]] does.
 
 #+name: f:listHeadIndentLevelParser
 #+begin_src haskell
 listHeadIndentLevelParser :: OrgParser Level
 listHeadIndentLevelParser = do
-  minimalIndentation
+  minimalIndentation -- (ref:f:listHeadIndentLevelParser-minimalIndentation)
   spaces <- onlySpaces
   listHead <- unorderedHeadParser <|> orderedHeadParser
   let level =
@@ -9900,7 +9948,7 @@ listHeadIndentLevelParser = do
         . MP.lookAhead
         . MP.label "minimal indentation"
         $ MP.count 2 (char ' ')
-    afterListHead :: Level -> OrgParser ()
+    afterListHead :: Level -> OrgParser () -- (ref:f:listHeadIndentLevelParser-afterListHead)
     afterListHead level =
       void
         $ MP.choice
@@ -9915,20 +9963,22 @@ listHeadIndentLevelParser = do
       modify (\s -> s {continuationIndent = getContinuationIndentForLevel level})
 #+end_src
 
-The ~minimalIndentation~ expects there to be at least 2 spaces preceding a list
-item. This follows Rule 1 from [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][Detailed rules]].
+The ~minimalIndentation~ [[(f:listHeadIndentLevelParser-minimalIndentation)]] expects
+there to be at least 2 spaces preceding a list item. This follows Rule 1 from
+[[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][Ordered list items]].
 
-The =afterListHead= parser preemptively checks what's in the input /after/ parsing
-the list head. In the case where it sees some other non-empty content, it
-expects some other parser to continue parsing. So inside
-=seeingContentAfterListHead= we set the =continuationIndent= attribute to
-indentation of the current level, because we expect another parser to help us
-finish parsing the line. Then at the [[f:cellParser]] level, we set this back to =0=
-for any parser that is expected to consume content and end with a newline. This
-lets [[f:listItemsEndParser]] know whether it is looking at EOF or at the beginning
-of a line when it inspects =continuationIndent=. If Megaparsec can let us easily
-check the previous character that was parsed, this scheme of using a stateful
-=continuationIndent= field wouldn't be necessary.
+The ~afterListHead~ parser [[(f:listHeadIndentLevelParser-afterListHead)]]
+preemptively checks what's in the input /after/ parsing the list head. In the case
+where it sees some other non-empty content, it expects some other parser to
+continue parsing. So inside ~seeingContentAfterListHead~ we set the
+~continuationIndent~ attribute to indentation of the current level, because we
+expect another parser to help us finish parsing the line. Then at the
+[[f:cellParser]] level, we set this back to ~0~ for any parser that is expected to
+consume content and end with a newline. This lets [[f:listItemsEndParser]] know
+whether it is looking at EOF or at the beginning of a line when it inspects
+~continuationIndent~. If Megaparsec can let us easily check the previous character
+that was parsed, this scheme of using a stateful ~continuationIndent~ field
+wouldn't be necessary.
 
 Note, however, that [[f:listHeadIndentLevelParser]] only checks for textual
 correctness. It doesn't check whether what's parsed is semantically correct. For
@@ -9937,61 +9987,62 @@ example, we wouldn't want to blindly parse the number of spaces in the indent
 list items). Similarly we would want to check whether the list head number (for
 ordered lists) is the expected (incremented) number from the previously-seen
 list head number, if any (or if there is no previous number, that this number is
-0 or 1).
+1).
 
 We have to perform these additional checks by comparing the output of
-=listHeadIndentLevelParser= against the existing [[data:OrgParserState]] (=listLevels=).
-This is what we do in =listItemStartParser= below.
+[[f:listHeadIndentLevelParser]] against the existing [[data:OrgParserState]]
+(~listLevels~). This is what we do in [[f:listItemStartParser]] below, which wraps
+around [[f:listHeadIndentLevelParser]]
+[[(f:listItemStartParser-listHeadIndentLevelParser)]].
 
 #+name: f:listItemStartParser
 #+begin_src haskell
 listItemStartParser :: OrgParser Cell
 listItemStartParser = do
-  _ <- MP.try $ MP.lookAhead listHeadIndentLevelParser
+  _ <- MP.try $ MP.lookAhead listHeadIndentLevelParser -- (ref:f:listItemStartParser-lookAhead)
   pState <- get
   let levels = pState.listLevels
-  level <- listHeadIndentLevelParser
+  level <- listHeadIndentLevelParser -- (ref:f:listItemStartParser-listHeadIndentLevelParser)
   listMarkers <-
     if nestsBeyond levels level
       then listItemNester level levels
       else listItemFitter level levels
   pure $ CListItem listMarkers
   where
-    nestsBeyond :: [Level] -> Level -> Bool
+    nestsBeyond :: [Level] -> Level -> Bool -- (ref:f:listItemStartParser-nestsBeyond)
     nestsBeyond [] _ = True
     nestsBeyond (deepestLevel : _) level =
       getContinuationIndentForLevel deepestLevel == level.indent
 #+end_src
 
-The first line ~_ <- MP.try $ MP.lookAhead listHeadIndentLevelParser~ is needed
-because otherwise as soon as Megaparsec sees any indentation (as part of
-invoking [[f:listHeadIndentLevelParser]]) it will expect to see a list head;
-obviously this is not always the case as not all indentation leads to a list
-head. This is why we have to perform this look-ahead preemptively.
+The use of ~MP.lookAhead~ [[(f:listItemStartParser-lookAhead)]] is needed because
+otherwise as soon as Megaparsec sees any indentation (as part of invoking
+[[f:listHeadIndentLevelParser]]) it will expect to see a list head; obviously this
+is not always the case as not all indentation leads to a list head. This is why
+we have to perform this look-ahead preemptively.
 
-The ~nestsBeyond~ function just checks whether the indentation we found in the
-(just-parsed) level is the same as the continuation indent of the
-most-deeply-nested level we have so far. This is how we nest one level deeper
-than the current level. If this is the case, we delegate to [[f:listItemNester]].
-
-Otherwise the list item is merely continuing some existing list, for which we
-delegate to [[f:listItemFitter]].
+The ~nestsBeyond~ function [[(f:listItemStartParser-nestsBeyond)]] just checks whether
+the indentation we found in the (just-parsed) level is the same as the
+continuation indent of the most-deeply-nested level we have so far. This is how
+we nest one level deeper than the current level. If this is the case, we
+delegate to [[f:listItemNester]]. Otherwise the list item is merely continuing some
+existing list, for which we delegate to [[f:listItemFitter]].
 
 ** Nesting the list item beyond the current level
 
-=listItemNester= appends starting markers to =listMarkers=. We use this information
-in other places when we want to know how to un-nest an item (close it off),
-such as in [[f:listItemsEndParser]] where we add corresponding closing markers with
-=getEndingMarker=. The other place we use =listMarkers= is in [[f:listItemFitter]].
+[[f:listItemNester]] prepends starting markers to ~listMarkers~. We use this
+information in other places when we want to know how to un-nest an item (close
+it off), such as in [[f:listItemsEndParser]] where we add corresponding closing
+markers with [[f:getEndingListMarkers]]. The other place we use ~listMarkers~ is in
+[[f:listItemFitter]].
 
 #+name: f:listItemNester
 #+begin_src haskell
 listItemNester :: Level -> [Level] -> OrgParser [ListMarker]
 listItemNester level levels = do
   case level.number of
-    Just 0 -> pure ()
     Just 1 -> pure ()
-    Just n -> fail $ "starting list head number must be 0 or 1; got " <> show n
+    Just n -> fail $ "starting list head number must be 1; got " <> show n
     Nothing -> pure ()
   pState <- get
   let newMarker = case level.number of
@@ -10004,7 +10055,7 @@ listItemNester level levels = do
       <> show opc.maxListLevel
       <> " levels of list items"
   put
-    pState
+    pState -- (ref:f:listItemNester-update-pState)
       { listLevels = level : levels,
         listMarkers = LItemStart : newMarker : pState.listMarkers
       }
@@ -10012,10 +10063,10 @@ listItemNester level levels = do
 #+end_src
 
 We enforce some additional rules here, such as forcing the nesting list head to
-start off with either 0 or 1 (see [[t:0009-ordered-lists-start-from-0-or-1]]). The
-rest of the function just updates the ~pState~ to have the additional
-~level~ as the new most-deeply-nested level, and also grows the ~listMarkers~
-accordingly.
+start off with 1 (see [[t:0009-ordered-lists-start-from-1]]) if it is an ordered
+list. The rest of the function just updates the ~pState~ to have the additional
+~level~ and also grows the ~listMarkers~ accordingly
+[[(f:listItemNester-update-pState)]].
 
 ** Fitting the list item into an existing level
 
@@ -10025,14 +10076,15 @@ The goal of [[f:listItemFitter]] is twofold:
 
   2) close off (finish) pending levels which are still open.
 
-The first task is easy --- we just append =[LItemEnd, LItemStart]= to signal that
-we are closing off the existing list item (at the same level), and starting a
-new list item (also at the same level).
+The first task is easy --- we just append ~[LItemEnd, LItemStart]~ to signal that
+we are closing off the existing list item (at the same level) to start a new
+list item (also at the same level).
 
 The second task is a bit more involved. We have to "close" any existing levels
 that are more deeply nested, just like in [[f:listItemsEndParser]]. For example, in
 the following list
 
+#+begin_src org
   1) foo
 
      - bar
@@ -10040,14 +10092,13 @@ the following list
        1) baz
 
   2) quux
+#+end_src
 
-when we hit "quux" we have to close off the list environments for "baz", then
-"bar". However, unlike [[f:listItemsEndParser]], we have to /continue/ the list level
-that we fit into. For ordered list items, this means keeping the latest
-incremented ordered list item at the current level. This is why we have to drop
-an extra level in ~listLevels~ in the ~fitter~ function, and then replace it with
-the current level; if we don't do this then our ordered list items will never
-get incremented.
+when we hit ~quux~ we have to close off the list environments for ~baz~, then ~bar~.
+However, unlike [[f:listItemsEndParser]], we have to /continue/ the existing list
+level that we fit into. For ordered list items, we have to drop an extra level
+in ~listLevels~ in the ~fitter~ function [[(f:listItemFitter-extra-level-drop)]], and
+then replace it with the (incremented) level to continue it.
 
 #+name: f:listItemFitter
 #+begin_src haskell
@@ -10076,20 +10127,20 @@ listItemFitter level levels =
       let markers = getEndingListMarkers levelsToDrop pState.listLevels
       put
         pState
-          { listLevels = level : drop (levelsToDrop + 1) pState.listLevels,
+          { listLevels = level : drop (levelsToDrop + 1) pState.listLevels, -- (ref:f:listItemFitter-extra-level-drop)
             listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
       pure $ markers <> [LItemEnd, LItemStart]
 #+end_src
 
-We use [[f:listItemStartParser]] and [[f:listItemsEndParser]] inside
-[[f:cellParser]]; the former identifies and the beginnings of list items, while
-the latter recognizes their (complete) end when there is no more indentation.
+We use [[f:listItemStartParser]] and [[f:listItemsEndParser]] inside [[f:cellParser]]; the
+former identifies the beginnings of list items, while the latter recognizes
+their (complete) end when there is no more indentation.
 
 ** Tests
 
-There are [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][so many rules]] associated with lists; we try to check a few of them
-here.
+There are [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][so many rules]] associated with ordered lists; we try to check a few of
+them here.
 
 #+name: ti:0009-list-indentation-no-indent
 #+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-no-indent
@@ -10246,7 +10297,7 @@ shouldParseWith
     []
 #+end_src
 
-Nesting is limited to 5 levels, for a total of 6 levels by default.
+Nesting is limited to 2 additional levels, for a total of 3 levels by default.
 
 #+name: ti:0009-list-nesting-max
 #+header: :tangle test/Lilac/ParseSpec/0009-list-nesting-max
@@ -10268,8 +10319,8 @@ shouldFailWithMessage
   37
 #+end_src
 
-You can change this behavior with the ~lilac_maxListLevel~ [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extension]]. In the
-test below we increase the nesting level slightly.
+You can change the maximum nesting behavior with ~lilac_maxListLevel~ [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac
+extension]]. In the test below we increase the total list level to 9.
 
 #+name: ti:0009-list-nesting-max-8
 #+header: :tangle test/Lilac/ParseSpec/0009-list-nesting-max-8
@@ -10302,6 +10353,9 @@ shouldFailWithMessage
   156
 #+end_src
 
+Notice how the parser failed only after parsing the last level which exceeded
+the 8 levels allowed.
+
 We can prohibit list items entirely, much like how we can prohibit them in
 [[t:0004-headings-prohibited]].
 
@@ -10320,7 +10374,8 @@ shouldFailWithMessage
   29
 #+end_src
 
-Now we test whether list items can also hold content (other cells) inside it.
+Now we test whether list items can also hold content (other cells) inside it, in
+this case paragraph cells.
 
 #+name: ti:0009-list-content-simple
 #+header: :tangle test/Lilac/ParseSpec/0009-list-content-simple
@@ -10359,7 +10414,7 @@ shouldParseWith
 
 Here's a more involved example using paragraph text for list items, following
 the pattern from [[ti:0009-list-indentation-nested]]. Note how the parsed list
-structure is still there, except now we have =CParagraph= cells interspersed in
+structure is still there, except now we have ~CParagraph~ cells interspersed in
 between them.
 
 #+name: ti:0009-list-indentation-nested-with-text
@@ -10511,7 +10566,7 @@ there is non-zero indentation.
   1) Foo
      bar.
 
- Invalid.
+ Invalid indentation (this paragraph).
 #+end_src
 
 #+name: t:0005-paragraph-indentation-mismatch-initial-indent-invalid
@@ -10530,7 +10585,7 @@ shouldFailWithMessage
 
      - Baz.
 
-   Invalid.
+   Invalid indentation (this paragraph).
 #+end_src
 
 #+name: t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels
@@ -10542,7 +10597,7 @@ shouldFailWithMessage
 #+end_src
 
 Paragraphs should be able to close list environments, depending on their
-indentation. For example, in the test below the paragraph "Three" should be able
+indentation. For example, in the test below the paragraph ~Three~ should be able
 to close off the unordered list items.
 
 #+name: ti:0009-paragraph-can-close-deeper-levels
@@ -10603,8 +10658,8 @@ shouldParseWith
 
 Paragraphs can close off list items, so we can mix ordered and unordered list
 items at the same level, as long as the differing list type is closed off by a
-paragraph. In the test below, the "Two" closes off the unordered list, so we're
-allowed to start a new ordered list with =1) a=.
+paragraph. In the test below, the ~Two~ closes off the unordered list, so we're
+allowed to start a new ordered list with ~1) a~.
 
 #+name: ti:0009-paragraph-can-separate-mixed-lists
 #+header: :tangle test/Lilac/ParseSpec/0009-paragraph-can-separate-mixed-lists
@@ -10678,7 +10733,7 @@ shouldParseWith
 #+end_src
 
 It's an error if there is no separation between list types (if we suddenly try
-to change list types at the same level). In the test below, the =1) c= is
+to change list types at the same level). In the test below, the ~1) c~ is
 unexpected because the unordered list has not been closed off yet.
 
 #+name: ti:0009-lists-cannot-be-mixed-on-their-own
@@ -10721,8 +10776,8 @@ shouldFailWithMessage
 #+end_src
 
 List items have to be precisely indented; otherwise they'll hit an indentation
-error. In the test below, the "1)" for the "b" item has only 4 spaces of
-indentation instead of 5 (to line up with the "a" above it), so that should
+error. In the test below, the ~1)~ for the ~b~ item has only 4 spaces of
+indentation instead of 5 (to line up with the ~a~ above it), so that should
 trigger an indentation error.
 
 #+name: ti:0009-lists-require-precise-indentation
@@ -10742,8 +10797,8 @@ shouldFailWithMessage
 #+end_src
 
 List items must be separated by at least one blank line. In the test case below,
-there is not enough space so the "1) b" gets interpreted as regular paragraph
-text, as part of the "a" above it.
+there is not enough space so the ~1) b~ gets interpreted as regular paragraph
+text, as part of the ~a~ above it.
 
 #+name: ti:0009-list-items-need-blank-line-separator
 #+header: :tangle test/Lilac/ParseSpec/0009-list-items-need-blank-line-separator
@@ -10770,9 +10825,8 @@ shouldParseWith
     []
 #+end_src
 
-Ordered list items at the same level must increment by one each time. In the
-test case below, the "1) b" will fail to parse because it should be "2) b"
-instead.
+Ordered list items at the same level must increment by 1 each time. In the test
+case below, the ~1) b~ will fail to parse because it should be ~2) b~ instead.
 
 #+name: ti:0009-ordered-lists-require-increment
 #+header: :tangle test/Lilac/ParseSpec/0009-ordered-lists-require-increment
@@ -10790,24 +10844,22 @@ shouldFailWithMessage
   13
 #+end_src
 
-Ordered list items must start from either 0 or 1.
+Ordered list items must start from 1.
 
-#+name: ti:0009-ordered-lists-start-from-0-or-1
-#+header: :tangle test/Lilac/ParseSpec/0009-ordered-lists-start-from-0-or-1
+#+name: ti:0009-ordered-lists-start-from-1
+#+header: :tangle test/Lilac/ParseSpec/0009-ordered-lists-start-from-1
 #+begin_src org
-  0) a
+  1) a
 
-  1) b
-
-     20) c
+     20) b
 #+end_src
 
-#+name: t:0009-ordered-lists-start-from-0-or-1
+#+name: t:0009-ordered-lists-start-from-1
 #+begin_src haskell
 shouldFailWithMessage
-  "0009-ordered-lists-start-from-0-or-1"
-  "starting list head number must be 0 or 1; got 20"
-  25
+  "0009-ordered-lists-start-from-1"
+  "starting list head number must be 1; got 20"
+  17
 #+end_src
 
 * Description lists, aka glossary terms
@@ -12928,7 +12980,7 @@ parseSpec = do
   <<t:0009-lists-cannot-be-mixed-on-their-own>>
   <<t:0009-lists-require-precise-indentation>>
   <<t:0009-ordered-lists-require-increment>>
-  <<t:0009-ordered-lists-start-from-0-or-1>>
+  <<t:0009-ordered-lists-start-from-1>>
   <<t:0009-ordered-list-head-needs-parenthesis>>
   <<t:0009-ordered-list-head-cannot-use-letters>>
   <<t:0009-paragraph-can-close-deeper-levels>>
