@@ -296,7 +296,7 @@ defaultCss = do
     display flex
     flexDirection column
     ol ? do
-      paddingLeft $ rem 1.5
+      paddingLeft $ rem 1
       marginTop $ px 0
       fontSize (rem 0.9)
 
