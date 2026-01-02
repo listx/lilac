@@ -11132,430 +11132,6 @@ shouldParseWithState
   defaultOrgParserState
 #+end_src
 
-* Mathematical expressions
-
-There are two ways to write math expressions, which we call math /fragments/:
-/inline fragments/ (inside prose text), or on their own as /standalone fragments/.
-Let's look at standalone math fragments first.
-
-** Standalone math fragments
-:PROPERTIES:
-:ID:       d1064535-5c98-4c80-a901-5cdc1fd5297f
-:END:
-
-In vanilla Org, Latex fragments begin with ~\begin{<ENVIRONMENT>}~ and
-~\end{<ENVIRONMENT>}~, where ~<ENVIRONMENT>~ can be anything. Presumably you could
-inject images and illustrations; however those other non-mathematical facilities
-are already supported by other Org features such as external links, so we don't
-support them here.
-
-Instead Lilac only supports Latex fragments for typesetting math. Because we
-only support math, we call them /math/ fragments.
-
-#+name: data:MathFragment
-#+begin_src haskell
-type MathFragment :: Type
-data MathFragment = MathFragment
-  { parentOid :: OID,
-    meta :: Map Text Text,
-    body :: Text
-  }
-  deriving stock (Eq, Generic, Ord, Show)
-  deriving anyclass (FromJSON, ToJSON)
-#+end_src
-
-There are three ways to write math fragments: using ~\begin{equation}~ and
-~\end{equation}~, ~\[ ... \]~, or ~\( ... \)~. The first two ways requires them to
-start at the beginning of the line, while the third way allows them to be
-embedded inside prose text (and displayed inside the paragraph). The third way
-has is discussed in [[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][Inline math fragments]].
-
-We limit our discussion here to parsing the first two ways, which are /standalone/
-math fragments. They are called standalone because they are their own [[data:Cell][cells]] (as
-~CMathFragment~ in [[f:mathFragmentStandaloneParser]]) and don't need to be part of
-another cell.
-
-Use the first form for a standalone equation like this
-
-# Note: these code blocks for the math bits are needed for HTML audiences,
-# because otherwise the markers like "\begin{equation}" and "\[" get removed by
-# MathJax. That is, without these code blocks, HTML audiences will only see the
-# rendered 2 + 2 = 4 output and not what goes into the inputs to generate them.
-
-#+begin_src latex
-\begin{equation}
-2 + 2 = 4
-\end{equation}
-#+end_src
-
-to get
-
-\begin{equation}
-2 + 2 = 4
-\end{equation}
-
-where the equation will get numbered and centered on its own. Use
-
-#+begin_src latex
-\[2 + 2 = 4\]
-#+end_src
-
-to get
-
-\[2 + 2 = 4\]
-
-to achieve the same effect, but without numbering.
-
-When using the standalone form, you can assign a ~#+name~ keyword to it to refer
-to the equation using a human-friendly name, like this:
-
-#+begin_src org
-,#+name: eq:Pythagorean Theorem
-\begin{equation}
-a^2 + b^2 = c^2
-\end{equation}
-#+end_src
-
-which becomes
-
-#+name: eq:Pythagorean Theorem
-\begin{equation}
-a^2 + b^2 = c^2
-\end{equation}
-
-and you can link back to it using an internal link like [[eq:Pythagorean Theorem]].
-
-Let's first see how to parse ~\begin{equation}~ in [[f:mathFragmentNumberedParser]].
-
-#+name: f:mathFragmentNumberedParser
-#+begin_src haskell
-mathFragmentNumberedParser :: OrgParser MathFragment
-mathFragmentNumberedParser = do
-  pState <- get
-  let number = pState.equationNumber + 1
-
-  metaKVs <- metaParser
-  _ <- lexeme $ string "\\begin{equation}"
-  latexBody <-
-    MP.someTill
-      (MP.label "LaTeX standalone numbered math input" MP.anySingle)
-      (string "\\end{equation}")
-
-  modify (\s -> s {equationNumber = number})
-  pure
-    MathFragment
-      { parentOid =
-          firstParentOid pState.docOid pState.headingOidStack,
-        meta =
-          insert "__equation_number" (T.pack $ show number) metaKVs,
-        body = trimTrailingWhitespace $ T.pack latexBody -- (ref:f:mathFragmentNumberedParser-trimTrailingWhitespace)
-      }
-#+end_src
-
-The call to [[f:trimTrailingWhitespace]]
-[[(f:mathFragmentNumberedParser-trimTrailingWhitespace)]] cleans up any trailing
-whitespace we parsed into ~latexBody~.
-
-#+name: f:trimTrailingWhitespace
-#+begin_src haskell
-trimTrailingWhitespace :: Text -> Text
-trimTrailingWhitespace = T.dropWhileEnd (\c -> T.elem c " \n\r\t")
-#+end_src
-
-Parsing unnumbered equations with [[f:mathFragmentUnnumberedParser]] is almost the
-same as [[f:mathFragmentNumberedParser]].
-
-#+name: f:mathFragmentUnnumberedParser
-#+begin_src haskell
-mathFragmentUnnumberedParser :: OrgParser MathFragment
-mathFragmentUnnumberedParser = do
-  pState <- get
-  metaKVs <- metaParser
-  _ <- lexeme $ string "\\["
-  latex <-
-    MP.someTill
-      (MP.label "LaTeX standalone unnumbered math input" MP.anySingle)
-      (string "\\]")
-  anonNumber <- case lookup "name" metaKVs of
-    Just _ -> pure Nothing
-    Nothing -> do
-      let n = pState.anonEquationNumber + 1
-      modify (\s -> s {anonEquationNumber = n})
-      pure $ Just n
-  pure
-    MathFragment
-      { parentOid =
-          firstParentOid pState.docOid pState.headingOidStack,
-        meta = case anonNumber of
-          Just n ->
-            insert "__equation_anon_number" (T.pack $ show n) metaKVs
-          Nothing -> metaKVs,
-        body = trimTrailingWhitespace $ T.pack latex
-      }
-#+end_src
-
-These numbered and unnumbered parsers are combined together in the top-level
-[[f:mathFragmentStandaloneParser]].
-
-#+name: f:mathFragmentStandaloneParser
-#+begin_src haskell
-mathFragmentStandaloneParser :: OrgParser Cell
-mathFragmentStandaloneParser =
-  CMathFragment
-    <$> (MP.try mathFragmentNumberedParser <|> mathFragmentUnnumberedParser)
-#+end_src
-
-Unlike [[f:tableLineParser]] and [[f:tableRowParser]], we don't use
-~pState.continuationIndent~ to check which lines are part of the math
-fragment; we simply parse everything up until the end marker (~\end{equation}~ or
-~\]~). This simplifies the parsing implementation. The downside is that we may
-accept input where the indentation across multiple math lines looks messy, but
-this is something the user should take care of anyway.
-
-Let's check that we can parse multiple math fragments. We discard any trailing
-whitespace after the initial opening ~\begin{equation}~ or ~\[~, as well as trailing
-whitespace for the contents inside (just before the ~\end{equation}~ marker).
-
-#+name: ti:0010-standalone-math-fragments
-#+header: :tangle test/Lilac/ParseSpec/0010-standalone-math-fragments
-#+begin_src org
-\begin{equation}
-1 + 1 = 2
-\end{equation}
-
-\begin{equation}
-
-
-
-1 + 1 = 2
-
-
-
-\end{equation}
-
-\[
-2 + 2 = 4
-\]
-
-,#+name: eq:x
-\[
-
-
-2 + 2 = 4
-\]
-
-,#+name: eq:y
-\begin{equation}
-1 + 1 = 2
-\end{equation}
-#+end_src
-
-#+name: t:0010-standalone-math-fragments
-#+begin_src haskell
-shouldParseWithState
-  "0010-standalone-math-fragments"
-  ( nilOrgDoc
-      [ CMathFragment
-          MathFragment
-            { parentOid = nilOid,
-              meta =
-                fromList
-                  [ ("__equation_number", "1")
-                  ],
-              body = "1 + 1 = 2"
-            },
-        CMathFragment
-          MathFragment
-            { parentOid = nilOid,
-              meta =
-                fromList
-                  [ ("__equation_number", "2")
-                  ],
-              body = "1 + 1 = 2"
-            },
-        CMathFragment
-          MathFragment
-            { parentOid = nilOid,
-              meta =
-                fromList
-                  [ ("__equation_anon_number", "1")
-                  ],
-              body = "2 + 2 = 4"
-            },
-        CMathFragment
-          MathFragment
-            { parentOid = nilOid,
-              meta =
-                fromList
-                  [ ("name", "eq:x")
-                  ],
-              body = "2 + 2 = 4"
-            },
-        CMathFragment
-          MathFragment
-            { parentOid = nilOid,
-              meta =
-                fromList
-                  [ ("__equation_number", "3"),
-                    ("name", "eq:y")
-                  ],
-              body = "1 + 1 = 2"
-            }
-      ]
-      []
-  )
-  defaultOrgParserState
-    { equationNumber = 3,
-      anonEquationNumber = 1,
-      cellNames =
-        Set.fromList
-          [ "eq:x",
-            "eq:y"
-          ]
-    }
-#+end_src
-
-Standalone math fragments may be included as part of a list item.
-
-#+name: ti:0010-standalone-math-inside-lists
-#+header: :tangle test/Lilac/ParseSpec/0010-standalone-math-inside-lists
-#+begin_src org
-  1) foo
-
-     ,#+name: eq:x
-     \[
-     2 + 2 = 4
-     \]
-
-     ,#+name: eq:y
-     \begin{equation}
-     1 + 1 = 2
-     \end{equation}
-#+end_src
-
-#+name: t:0010-standalone-math-inside-lists
-#+begin_src haskell
-shouldParseWithState
-  "0010-standalone-math-inside-lists"
-  ( nilOrgDoc
-      [ CListItem
-          [ LOrderedStart,
-            LItemStart
-          ],
-        CParagraph $ Prose [ptext "foo" []],
-        CMathFragment
-          MathFragment
-            { parentOid = nilOid,
-              meta =
-                fromList
-                  [ ("name", "eq:x")
-                  ],
-              body = "2 + 2 = 4"
-            },
-        CMathFragment
-          MathFragment
-            { parentOid = nilOid,
-              meta =
-                fromList
-                  [ ("__equation_number", "1"),
-                    ("name", "eq:y")
-                  ],
-              body = "1 + 1 = 2"
-            },
-        CListItem
-          [ LItemEnd,
-            LOrderedEnd
-          ]
-      ]
-      []
-  )
-  defaultOrgParserState
-    { equationNumber = 1,
-      cellNames =
-        Set.fromList
-          [ "eq:x",
-            "eq:y"
-          ]
-    }
-#+end_src
-
-** Inline math fragments
-:PROPERTIES:
-:ID:       216e94b7-e037-4f3e-856a-2040d0d0a75a
-:END:
-
-Inline math fragments are delimited by ~\(~ and ~\)~, such as in ~\(1 - 1 = 0\)~ which
-can be placed inside prose text (and displayed inside the paragraph) as in \(1 -
-1 = 0\) .
-
-#+name: f:mathFragmentInlineParser
-#+begin_src haskell
-mathFragmentInlineParser :: OrgParser MathFragment
-mathFragmentInlineParser = do
-  failIfVerbatimOrCode
-
-  pState <- get
-  _ <- string "\\("
-  latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
-  pure
-    MathFragment
-      { parentOid =
-          firstParentOid pState.docOid pState.headingOidStack,
-        meta = fromList [], -- (ref:f:mathFragmentInlineParser-meta)
-        body = T.pack latex
-      }
-#+end_src
-
-Just like [[f:linkParser]], we fail the parser if we detect that verbatim or code
-styles are active.
-
-We delegate the typesetting of the math to [[id:8cce5e4b-93b0-4b7c-9cd7-c6d6c1cf8bd4][MathJax]], which expects math input
-based on [[https://en.wikipedia.org/wiki/LaTeX][LaTeX]] syntax. So there's no additional work required here during the
-parsing stage. The reason why it still needs a ~meta~ value
-[[(f:mathFragmentInlineParser-meta)]] is because we use the same [[data:MathFragment]]
-type.
-
-#+name: ti:0010-inline-math
-#+header: :tangle test/Lilac/ParseSpec/0010-inline-math
-#+begin_src org
-\(1 + 1\) is the same as \(2\), better known as \(1 + 1 = 2\).
-#+end_src
-
-#+name: t:0010-inline-math
-#+begin_src haskell
-shouldParseWithState
-  "0010-inline-math"
-  ( nilOrgDoc
-      [ CParagraph
-          $ Prose
-            [ PTokenMathFragment
-                MathFragment
-                  { parentOid = nilOid,
-                    meta = fromList [],
-                    body = "1 + 1"
-                  },
-              ptext " is the same as " [],
-              PTokenMathFragment
-                MathFragment
-                  { parentOid = nilOid,
-                    meta = fromList [],
-                    body = "2"
-                  },
-              ptext ", better known as " [],
-              PTokenMathFragment
-                MathFragment
-                  { parentOid = nilOid,
-                    meta = fromList [],
-                    body = "1 + 1 = 2"
-                  },
-              ptext "." []
-            ]
-      ]
-      []
-  )
-  defaultOrgParserState
-#+end_src
-
 * Figures
 :PROPERTIES:
 :ID:       a090bf9c-0e52-422b-b0f0-51e3b1bf1698
@@ -12561,6 +12137,430 @@ shouldParseWithState
       LOrderedEnd
     ]
 ]
+#+end_src
+
+* Mathematical expressions
+
+There are two ways to write math expressions, which we call math /fragments/:
+/inline fragments/ (inside prose text), or on their own as /standalone fragments/.
+Let's look at standalone math fragments first.
+
+** Standalone math fragments
+:PROPERTIES:
+:ID:       d1064535-5c98-4c80-a901-5cdc1fd5297f
+:END:
+
+In vanilla Org, Latex fragments begin with ~\begin{<ENVIRONMENT>}~ and
+~\end{<ENVIRONMENT>}~, where ~<ENVIRONMENT>~ can be anything. Presumably you could
+inject images and illustrations; however those other non-mathematical facilities
+are already supported by other Org features such as external links, so we don't
+support them here.
+
+Instead Lilac only supports Latex fragments for typesetting math. Because we
+only support math, we call them /math/ fragments.
+
+#+name: data:MathFragment
+#+begin_src haskell
+type MathFragment :: Type
+data MathFragment = MathFragment
+  { parentOid :: OID,
+    meta :: Map Text Text,
+    body :: Text
+  }
+  deriving stock (Eq, Generic, Ord, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+There are three ways to write math fragments: using ~\begin{equation}~ and
+~\end{equation}~, ~\[ ... \]~, or ~\( ... \)~. The first two ways requires them to
+start at the beginning of the line, while the third way allows them to be
+embedded inside prose text (and displayed inside the paragraph). The third way
+has is discussed in [[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][Inline math fragments]].
+
+We limit our discussion here to parsing the first two ways, which are /standalone/
+math fragments. They are called standalone because they are their own [[data:Cell][cells]] (as
+~CMathFragment~ in [[f:mathFragmentStandaloneParser]]) and don't need to be part of
+another cell.
+
+Use the first form for a standalone equation like this
+
+# Note: these code blocks for the math bits are needed for HTML audiences,
+# because otherwise the markers like "\begin{equation}" and "\[" get removed by
+# MathJax. That is, without these code blocks, HTML audiences will only see the
+# rendered 2 + 2 = 4 output and not what goes into the inputs to generate them.
+
+#+begin_src latex
+\begin{equation}
+2 + 2 = 4
+\end{equation}
+#+end_src
+
+to get
+
+\begin{equation}
+2 + 2 = 4
+\end{equation}
+
+where the equation will get numbered and centered on its own. Use
+
+#+begin_src latex
+\[2 + 2 = 4\]
+#+end_src
+
+to get
+
+\[2 + 2 = 4\]
+
+to achieve the same effect, but without numbering.
+
+When using the standalone form, you can assign a ~#+name~ keyword to it to refer
+to the equation using a human-friendly name, like this:
+
+#+begin_src org
+,#+name: eq:Pythagorean Theorem
+\begin{equation}
+a^2 + b^2 = c^2
+\end{equation}
+#+end_src
+
+which becomes
+
+#+name: eq:Pythagorean Theorem
+\begin{equation}
+a^2 + b^2 = c^2
+\end{equation}
+
+and you can link back to it using an internal link like [[eq:Pythagorean Theorem]].
+
+Let's first see how to parse ~\begin{equation}~ in [[f:mathFragmentNumberedParser]].
+
+#+name: f:mathFragmentNumberedParser
+#+begin_src haskell
+mathFragmentNumberedParser :: OrgParser MathFragment
+mathFragmentNumberedParser = do
+  pState <- get
+  let number = pState.equationNumber + 1
+
+  metaKVs <- metaParser
+  _ <- lexeme $ string "\\begin{equation}"
+  latexBody <-
+    MP.someTill
+      (MP.label "LaTeX standalone numbered math input" MP.anySingle)
+      (string "\\end{equation}")
+
+  modify (\s -> s {equationNumber = number})
+  pure
+    MathFragment
+      { parentOid =
+          firstParentOid pState.docOid pState.headingOidStack,
+        meta =
+          insert "__equation_number" (T.pack $ show number) metaKVs,
+        body = trimTrailingWhitespace $ T.pack latexBody -- (ref:f:mathFragmentNumberedParser-trimTrailingWhitespace)
+      }
+#+end_src
+
+The call to [[f:trimTrailingWhitespace]]
+[[(f:mathFragmentNumberedParser-trimTrailingWhitespace)]] cleans up any trailing
+whitespace we parsed into ~latexBody~.
+
+#+name: f:trimTrailingWhitespace
+#+begin_src haskell
+trimTrailingWhitespace :: Text -> Text
+trimTrailingWhitespace = T.dropWhileEnd (\c -> T.elem c " \n\r\t")
+#+end_src
+
+Parsing unnumbered equations with [[f:mathFragmentUnnumberedParser]] is almost the
+same as [[f:mathFragmentNumberedParser]].
+
+#+name: f:mathFragmentUnnumberedParser
+#+begin_src haskell
+mathFragmentUnnumberedParser :: OrgParser MathFragment
+mathFragmentUnnumberedParser = do
+  pState <- get
+  metaKVs <- metaParser
+  _ <- lexeme $ string "\\["
+  latex <-
+    MP.someTill
+      (MP.label "LaTeX standalone unnumbered math input" MP.anySingle)
+      (string "\\]")
+  anonNumber <- case lookup "name" metaKVs of
+    Just _ -> pure Nothing
+    Nothing -> do
+      let n = pState.anonEquationNumber + 1
+      modify (\s -> s {anonEquationNumber = n})
+      pure $ Just n
+  pure
+    MathFragment
+      { parentOid =
+          firstParentOid pState.docOid pState.headingOidStack,
+        meta = case anonNumber of
+          Just n ->
+            insert "__equation_anon_number" (T.pack $ show n) metaKVs
+          Nothing -> metaKVs,
+        body = trimTrailingWhitespace $ T.pack latex
+      }
+#+end_src
+
+These numbered and unnumbered parsers are combined together in the top-level
+[[f:mathFragmentStandaloneParser]].
+
+#+name: f:mathFragmentStandaloneParser
+#+begin_src haskell
+mathFragmentStandaloneParser :: OrgParser Cell
+mathFragmentStandaloneParser =
+  CMathFragment
+    <$> (MP.try mathFragmentNumberedParser <|> mathFragmentUnnumberedParser)
+#+end_src
+
+Unlike [[f:tableLineParser]] and [[f:tableRowParser]], we don't use
+~pState.continuationIndent~ to check which lines are part of the math
+fragment; we simply parse everything up until the end marker (~\end{equation}~ or
+~\]~). This simplifies the parsing implementation. The downside is that we may
+accept input where the indentation across multiple math lines looks messy, but
+this is something the user should take care of anyway.
+
+Let's check that we can parse multiple math fragments. We discard any trailing
+whitespace after the initial opening ~\begin{equation}~ or ~\[~, as well as trailing
+whitespace for the contents inside (just before the ~\end{equation}~ marker).
+
+#+name: ti:0010-standalone-math-fragments
+#+header: :tangle test/Lilac/ParseSpec/0010-standalone-math-fragments
+#+begin_src org
+\begin{equation}
+1 + 1 = 2
+\end{equation}
+
+\begin{equation}
+
+
+
+1 + 1 = 2
+
+
+
+\end{equation}
+
+\[
+2 + 2 = 4
+\]
+
+,#+name: eq:x
+\[
+
+
+2 + 2 = 4
+\]
+
+,#+name: eq:y
+\begin{equation}
+1 + 1 = 2
+\end{equation}
+#+end_src
+
+#+name: t:0010-standalone-math-fragments
+#+begin_src haskell
+shouldParseWithState
+  "0010-standalone-math-fragments"
+  ( nilOrgDoc
+      [ CMathFragment
+          MathFragment
+            { parentOid = nilOid,
+              meta =
+                fromList
+                  [ ("__equation_number", "1")
+                  ],
+              body = "1 + 1 = 2"
+            },
+        CMathFragment
+          MathFragment
+            { parentOid = nilOid,
+              meta =
+                fromList
+                  [ ("__equation_number", "2")
+                  ],
+              body = "1 + 1 = 2"
+            },
+        CMathFragment
+          MathFragment
+            { parentOid = nilOid,
+              meta =
+                fromList
+                  [ ("__equation_anon_number", "1")
+                  ],
+              body = "2 + 2 = 4"
+            },
+        CMathFragment
+          MathFragment
+            { parentOid = nilOid,
+              meta =
+                fromList
+                  [ ("name", "eq:x")
+                  ],
+              body = "2 + 2 = 4"
+            },
+        CMathFragment
+          MathFragment
+            { parentOid = nilOid,
+              meta =
+                fromList
+                  [ ("__equation_number", "3"),
+                    ("name", "eq:y")
+                  ],
+              body = "1 + 1 = 2"
+            }
+      ]
+      []
+  )
+  defaultOrgParserState
+    { equationNumber = 3,
+      anonEquationNumber = 1,
+      cellNames =
+        Set.fromList
+          [ "eq:x",
+            "eq:y"
+          ]
+    }
+#+end_src
+
+Standalone math fragments may be included as part of a list item.
+
+#+name: ti:0010-standalone-math-inside-lists
+#+header: :tangle test/Lilac/ParseSpec/0010-standalone-math-inside-lists
+#+begin_src org
+  1) foo
+
+     ,#+name: eq:x
+     \[
+     2 + 2 = 4
+     \]
+
+     ,#+name: eq:y
+     \begin{equation}
+     1 + 1 = 2
+     \end{equation}
+#+end_src
+
+#+name: t:0010-standalone-math-inside-lists
+#+begin_src haskell
+shouldParseWithState
+  "0010-standalone-math-inside-lists"
+  ( nilOrgDoc
+      [ CListItem
+          [ LOrderedStart,
+            LItemStart
+          ],
+        CParagraph $ Prose [ptext "foo" []],
+        CMathFragment
+          MathFragment
+            { parentOid = nilOid,
+              meta =
+                fromList
+                  [ ("name", "eq:x")
+                  ],
+              body = "2 + 2 = 4"
+            },
+        CMathFragment
+          MathFragment
+            { parentOid = nilOid,
+              meta =
+                fromList
+                  [ ("__equation_number", "1"),
+                    ("name", "eq:y")
+                  ],
+              body = "1 + 1 = 2"
+            },
+        CListItem
+          [ LItemEnd,
+            LOrderedEnd
+          ]
+      ]
+      []
+  )
+  defaultOrgParserState
+    { equationNumber = 1,
+      cellNames =
+        Set.fromList
+          [ "eq:x",
+            "eq:y"
+          ]
+    }
+#+end_src
+
+** Inline math fragments
+:PROPERTIES:
+:ID:       216e94b7-e037-4f3e-856a-2040d0d0a75a
+:END:
+
+Inline math fragments are delimited by ~\(~ and ~\)~, such as in ~\(1 - 1 = 0\)~ which
+can be placed inside prose text (and displayed inside the paragraph) as in \(1 -
+1 = 0\) .
+
+#+name: f:mathFragmentInlineParser
+#+begin_src haskell
+mathFragmentInlineParser :: OrgParser MathFragment
+mathFragmentInlineParser = do
+  failIfVerbatimOrCode
+
+  pState <- get
+  _ <- string "\\("
+  latex <- MP.someTill (MP.label "LaTeX math input" MP.anySingle) (string "\\)")
+  pure
+    MathFragment
+      { parentOid =
+          firstParentOid pState.docOid pState.headingOidStack,
+        meta = fromList [], -- (ref:f:mathFragmentInlineParser-meta)
+        body = T.pack latex
+      }
+#+end_src
+
+Just like [[f:linkParser]], we fail the parser if we detect that verbatim or code
+styles are active.
+
+We delegate the typesetting of the math to [[id:8cce5e4b-93b0-4b7c-9cd7-c6d6c1cf8bd4][MathJax]], which expects math input
+based on [[https://en.wikipedia.org/wiki/LaTeX][LaTeX]] syntax. So there's no additional work required here during the
+parsing stage. The reason why it still needs a ~meta~ value
+[[(f:mathFragmentInlineParser-meta)]] is because we use the same [[data:MathFragment]]
+type.
+
+#+name: ti:0010-inline-math
+#+header: :tangle test/Lilac/ParseSpec/0010-inline-math
+#+begin_src org
+\(1 + 1\) is the same as \(2\), better known as \(1 + 1 = 2\).
+#+end_src
+
+#+name: t:0010-inline-math
+#+begin_src haskell
+shouldParseWithState
+  "0010-inline-math"
+  ( nilOrgDoc
+      [ CParagraph
+          $ Prose
+            [ PTokenMathFragment
+                MathFragment
+                  { parentOid = nilOid,
+                    meta = fromList [],
+                    body = "1 + 1"
+                  },
+              ptext " is the same as " [],
+              PTokenMathFragment
+                MathFragment
+                  { parentOid = nilOid,
+                    meta = fromList [],
+                    body = "2"
+                  },
+              ptext ", better known as " [],
+              PTokenMathFragment
+                MathFragment
+                  { parentOid = nilOid,
+                    meta = fromList [],
+                    body = "1 + 1 = 2"
+                  },
+              ptext "." []
+            ]
+      ]
+      []
+  )
+  defaultOrgParserState
 #+end_src
 
 * Testing framework
