@@ -893,7 +893,6 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:newlineAndIndentParser>>
 <<f:cellBoundary>>
 <<f:blockMetaEntryParser>>
-<<f:metaNameParser>>
 <<f:assertUniqueTanglePath>>
 <<f:blockParser>>
 <<f:firstParentOid>>
@@ -8182,8 +8181,20 @@ also known as Noweb references. See [[id:e3400781-57e7-409d-a65c-7c3d66847587][B
 :ID:       dc13dd01-13c4-42a6-910e-4b6d66be428b
 :END:
 
-Blocks can have associated metadata, as we can see from the test case below
-which has some examples of valid (empty) code blocks.
+There are two kinds of metadata formats that blocks accept:
+
+  1) The ~#+key: value~ format. The most common (and probably important) one is
+     the ~#+name: ...~ metadata, as it allows blocks to be referenced by other
+     blacks by its name. The generic [[f:metaParser]] is used to parse these values
+     (not just for blocks but also for [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][Figures]]).
+
+  2) The ~#+header: :key value~ format. The most common ones here is
+     ~#+header: :tangle ...~ which specifies the tangle path of the code block.
+     [[f:blockMetaEntryParser]] is used to parse these ones.
+
+The reason why blocks have two separate formats like this is because that's what
+Orgmode uses as well. The test case below has some examples of valid (empty)
+code blocks with some typical metadata.
 
 #+name: ti:0007-blocks-empty
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-empty
@@ -8198,6 +8209,7 @@ which has some examples of valid (empty) code blocks.
 ,#+begin_quote
 ,#+end_quote
 
+,#+header: :tangle foo.hs
 ,#+begin_src haskell
 
 ,#+end_src
@@ -8213,7 +8225,8 @@ shouldParseWithState
   )
   defaultOrgParserState
     { cellNames = Set.fromList ["foo"],
-      anonBlockNumber = 3
+      anonBlockNumber = 3,
+      tanglePaths = fromList ["foo.hs"]
     }
 #+end_src
 
@@ -8257,18 +8270,165 @@ shouldParseWithState
           fromList
             [ ("__anon_block_number", "3"),
               ("__block_type", "src"),
-              ("__src_language", "haskell")
+              ("__src_language", "haskell"),
+              ("tangle", "foo.hs")
             ],
         body = []
       }
 ]
 #+end_src
 
-The metadata is made up of any number of special key/value pairs that are
-written in the form of ~#+header: :key value~ lines. Vanilla Org allows you to
-place these key/value pairs on the same line as the ~#+begin_...~ line, but we
-don't allow this. This enforces a cleaner (albeit verbose) style and also
-simplifies the parser.
+The subsections below discuss each of the different types of metadata parsers.
+
+*** Generic metadata
+
+The generic [[f:metaParser]] is used in [[f:blockStartParser]]
+[[(f:blockStartParser-lookAhead)]] so that we can check for certain requirements
+for metadata syntax across multiple cell types that use metadata. For example,
+the ~#+name:~ value cannot start with an open parenthesis.
+
+The metadata is parsed with [[f:metaParser]] which relies on [[f:metaEntryParser]]. We
+make sure that the name given to the cell is unique inside the document being
+parsed, because ultimately these cell names determine how we generate HTML IDs
+for each cell (although we could give machine-generated ID names, we prefer to
+use the name if one exists because they are usually much more human-friendly).
+
+#+name: f:metaParser
+#+begin_src haskell
+metaParser :: OrgParser (Map Text Text)
+metaParser = do
+  metaKVs <- many $ lexeme metaEntryParser
+  let metaKVsMap = fromList metaKVs
+  case lookup "name" metaKVsMap of
+    Just cellName -> assertUniqueCellName cellName
+    Nothing -> pure ()
+  pure metaKVsMap
+#+end_src
+
+The [[f:assertUniqueCellName]] function keeps track of all the named cells we've
+seen so far. This is used to detect whether we've seen a cell name more than
+once, which is not allowed.
+
+#+name: f:assertUniqueCellName
+#+begin_src haskell
+assertUniqueCellName :: Text -> OrgParser ()
+assertUniqueCellName cellName = do
+  pState <- get
+  when (Set.member cellName pState.cellNames)
+    . fail
+    $ "cell name "
+    <> show cellName
+    <> " is not unique"
+  put
+    pState
+      { cellNames = Set.insert cellName pState.cellNames
+      }
+#+end_src
+
+#+name: ti:0007-blocks-duplicate-names
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-duplicate-names
+#+header: :noweb off
+#+begin_src org
+,#+name: foo
+,#+begin_src sh
+a
+,#+end_src
+
+,#+name: foo
+,#+begin_src sh
+b
+,#+end_src
+#+end_src
+
+#+name: t:0007-blocks-duplicate-names
+#+begin_src haskell
+shouldFailWithMessage
+  "0007-blocks-duplicate-names"
+  "cell name \"foo\" is not unique"
+  52
+#+end_src
+
+The [[f:metaEntryParser]] is similar to [[f:docMetaEntryParser]]. In the latter, we use
+~avoidParsingBlockMetadata~ [[(avoidParsingBlockMetadata)]] to avoid touching on the
+toes of [[f:blockMetaEntryParser]], and similarly we have to check that each
+metadata line does not start with ~#+begin_~
+[[(f:metaEntryParser-avoid-certain-prefixes)]] because otherwise this will be too
+greedy and rob [[f:blockStartParser]] the chance to see the ~#+begin_~ string to
+denote the start of the block.
+
+#+name: f:metaEntryParser
+#+begin_src haskell
+metaEntryParser :: OrgParser (Text, Text)
+metaEntryParser = do
+  mapM_
+    MP.notFollowedBy
+    $ map
+      string
+      [ "#+begin_", -- (ref:f:metaEntryParser-avoid-certain-prefixes)
+        "#+header:",
+        "#+print_bibliography:",
+        "#+print_glossary:"
+      ]
+  _ <- string "#+"
+  o <- MP.getOffset
+  key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
+  _ <- MP.label "(meta) separator" $ string ": "
+  _ <- many $ char ' '
+  value <-
+    if key == "name"
+      then do
+        first <- MP.satisfy (\c -> c /= '(' && isValueLetter c) -- (ref:non-line-label name)
+        rest <- MP.takeWhileP (Just "(meta) value letter") isValueLetter
+        pure $ T.cons first rest
+      else MP.takeWhile1P (Just "(meta) value letter") isValueLetter
+  when (T.isPrefixOf "__" key) -- (ref:fail-if-double-underscore)
+    $ do
+      MP.setOffset o
+      fail
+        $ "cannot use leading double underscores for metadata key: "
+        <> show key
+  pure (key, value)
+  where
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+    isValueLetter c = c /= '\n'
+#+end_src
+
+For the ~#+name~ key, we prohibit the use of the opening parenthesis as the first
+character of the name at [[(non-line-label name)]], because then that would make
+~[[(foo)]]~ ambiguous (it could refer to either something named ~(foo)~, or it could
+refer to a [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][line label]] ~(ref:foo)~.
+
+#+name: ti:0007-blocks-no-name-with-opening-parenthesis
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-no-name-with-opening-parenthesis
+#+header: :line-label off
+#+begin_src org
+,#+name: (a)
+,#+begin_src sh
+a
+,#+end_src
+#+end_src
+
+#+name: t:0007-blocks-no-name-with-opening-parenthesis
+#+begin_src haskell
+shouldFailWithError
+  "0007-blocks-no-name-with-opening-parenthesis"
+  (utoks "(" <> etoks " ")
+  8
+#+end_src
+
+*** ~#+header: ...~ metadata
+
+Vanilla Org allows you to place these ~#+header: ...~ key/value pairs on the same
+line as the ~#+begin_...~ line, like this:
+
+#+begin_src org
+,#+begin_src haskell :tangle foo
+,#+end_src
+#+end_src
+
+However for Lilac, we don't allow this. The ~:tangle foo~ must be written on its
+own line as ~#+header: :tangle foo~. This enforces a cleaner (albeit verbose)
+style and also simplifies the parser.
 
 #+name: f:blockMetaEntryParser
 #+begin_src haskell
@@ -8339,70 +8499,6 @@ shouldFailWithMessage
   "0007-blocks-duplicate-tangle-paths"
   "tangle path \"some/path.sh\" is not unique"
   101
-#+end_src
-
-When we want to name a block, we don't use the ~#+header: :...~ syntax; instead
-the special line ~#+name: ...~ gives the block a unique name (if it's not globally
-unique, we'll complain about it [[f:assertUniqueCellName]]), which can be the target
-of an internal link. We also treat this as metadata just like in
-[[f:blockMetaEntryParser]], and store it in the same ~meta~ field for [[data:Block]]. This
-is used in [[f:blockStartParser]].
-
-#+name: f:metaNameParser
-#+begin_src haskell
-metaNameParser :: OrgParser (Text, Text)
-metaNameParser = do
-  _ <- string "#+name: "
-  name <-
-    T.pack
-      <$> MP.someTill
-        (MP.label "name of block" MP.anySingle)
-        (char '\n')
-  assertUniqueCellName name -- (ref:metaNameParser-assertUniqueCellName)
-  pure ("name", name)
-#+end_src
-
-The [[f:assertUniqueCellName]] function [[(metaNameParser-assertUniqueCellName)]] keeps
-track of all the named cells we've seen so far. This is used to detect whether
-we've seen a cell name more than once, which is not allowed.
-
-#+name: f:assertUniqueCellName
-#+begin_src haskell
-assertUniqueCellName :: Text -> OrgParser ()
-assertUniqueCellName cellName = do
-  pState <- get
-  when (Set.member cellName pState.cellNames)
-    . fail
-    $ "cell name "
-    <> show cellName
-    <> " is not unique"
-  put
-    pState
-      { cellNames = Set.insert cellName pState.cellNames
-      }
-#+end_src
-
-#+name: ti:0007-blocks-duplicate-names
-#+header: :tangle test/Lilac/ParseSpec/0007-blocks-duplicate-names
-#+header: :noweb off
-#+begin_src org
-,#+name: foo
-,#+begin_src sh
-a
-,#+end_src
-
-,#+name: foo
-,#+begin_src sh
-b
-,#+end_src
-#+end_src
-
-#+name: t:0007-blocks-duplicate-names
-#+begin_src haskell
-shouldFailWithMessage
-  "0007-blocks-duplicate-names"
-  "cell name \"foo\" is not unique"
-  52
 #+end_src
 
 ** Body
@@ -8495,9 +8591,19 @@ blockStartParser ::
       Maybe (Text, Text)
     )
 blockStartParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
-  blockName <- MP.optional metaNameParser
-  metaKVs <- fromList <$> (many $ lexeme blockMetaEntryParser)
+  let blockMetaParser = many $ lexeme blockMetaEntryParser
+  _ <-
+    MP.try
+      . MP.lookAhead
+      $ do
+        _ <- metaParser
+        _ <- blockMetaParser
+        string "#+begin_" -- (ref:f:blockStartParser-lookAhead)
+  metaKVs <- metaParser
+  let blockName = case lookup "name" metaKVs of
+        Just name -> Just ("name", name)
+        Nothing -> Nothing
+  blockMetaKVs <- fromList <$> blockMetaParser
   _ <- string "#+begin_"
   blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
   srcLang <- MP.optional $ do
@@ -8507,18 +8613,18 @@ blockStartParser = do
   when (blockType == "src" && srcLang == Nothing)
     $ fail "block type src requires a language specifier" -- (ref:f:blockStartParser-require-lang)
   _ <- char '\n' -- (ref:f:blockStartParser-newline)
-  pure (blockName, metaKVs, blockType, srcLang)
+  pure (blockName, blockMetaKVs, blockType, srcLang)
   where
     isSrcLanguageChar c = isAsciiLower c || c == '-'
 #+end_src
 
 We first have to use the same try/lookAhead trick we use in [[f:figureParser]] at
-the beginning, because otherwise our parser thinks that as soon as we parse a
-~#+name~, that it will be a block. This is not true because other things (like
-figures) can have a ~#+name~ associated with them. We fail the parse if we detect
-a ~#+begin_src~ block without an accompanying language
-[[(f:blockStartParser-require-lang)]]; see [[ti:0007-block-src-without-lang]] for an
-example.
+the beginning [[(f:blockStartParser-lookAhead)]], because otherwise our parser
+thinks that as soon as we parse a ~#+name~, that it will be a block. This is not
+true because other things (like figures) can have a ~#+name~ associated with them.
+We fail the parse if we detect a ~#+begin_src~ block without an accompanying
+language [[(f:blockStartParser-require-lang)]]; see [[ti:0007-block-src-without-lang]]
+for an example.
 
 Back to [[f:blockParser]]. The ~nowebOff~ bit [[(f:blockParser-nowebOff)]] controls how we
 perceive text that looks like ~<<foo>>~; if we've disabled Noweb references, then
@@ -11143,18 +11249,18 @@ A [[data:Figure][Figure]] is just a link to an image file, preceded by some meta
 #+begin_src haskell
 type Figure :: Type
 data Figure = Figure
-  { parentOid :: OID,
-    meta :: Map Text Text,
-    caption :: Prose,
-    link :: Link
+  { parentOid :: OID, -- (ref:data:Figure-field-parentOid)
+    meta :: Map Text Text, -- (ref:data:Figure-field-meta)
+    caption :: Prose, -- (ref:data:Figure-field-caption)
+    link :: Link -- (ref:data:Figure-field-link)
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-The ~parentOid~ is just like the one in [[data:Block]].
+The ~parentOid~ [[(data:Figure-field-parentOid)]] is just like the one in [[data:Block]].
 
-The metadata (~meta~) recognizes certain reserved keys:
+The metadata (~meta~ [[(data:Figure-field-meta)]]) recognizes certain reserved keys:
 
   - type :: (Required) Used to force there to be at least 1 key/value pair in
     the metadata. Otherwise when the parser comes across a link to an image on
@@ -11167,7 +11273,7 @@ The metadata (~meta~) recognizes certain reserved keys:
 
   - caption :: (Optional) Displayed as the caption for the image. If there is no
     caption, on weaving the only name of the figure will be just the figure
-    number, like "Figure 1" or "Figure 12". You can use styled text (*bold*, etc),
+    number, like ~Figure 1~ or ~Figure 12~. You can use styled text (*bold*, etc),
     links, and inline math, just like regular paragraphs (the only caveat is
     that you are not allowed to have newlines).
 
@@ -11176,6 +11282,10 @@ The metadata (~meta~) recognizes certain reserved keys:
 
   - height :: (Optional) Height of the image (as a percentage of page width or
     pixel count), for HTML weaving.
+
+The caption (taken from the metadata) is saved into the ~caption~ field
+[[(data:Figure-field-caption)]]. Finally the ~link~ [[(data:Figure-field-link)]] is the
+link to the image which will be displayed in the woven HTML.
 
 Below is an example of a figure:
 
@@ -11186,8 +11296,8 @@ Below is an example of a figure:
 #+height: 40
 [[file:image/PNG-Gradient.png]]
 
-Below is the same, but the figure does not have a ~name~ in the metadata, nor a
-~caption~. This is still valid.
+Below is another example, but the figure does not have a ~name~ in the metadata,
+nor a ~caption~. This is still valid.
 
 #+type: figure
 #+width: 50%
@@ -11197,14 +11307,7 @@ Below is the same, but the figure does not have a ~name~ in the metadata, nor a
 The only practical difference is that the unnamed figure is not able to be
 referenced using a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] by this or other Org files.
 
-** Figure parser
-
-First we have to parse for the metadata, and then the link. We don't allow
-figures inside list items, because that's just weird (how are you going to have
-metadata for that list item?).
-
-For the link target itself, just check that it's pointing to a file (instead of
-accepting any link).
+[[f:figureParser]] is responsible for parsing figures.
 
 #+name: f:figureParser
 #+begin_src haskell
@@ -11213,23 +11316,30 @@ figureParser = do
   pState <- get
   when (pState.listLevels /= [])
     $ fail "figures are not allowed inside list items"
-  _ <- MP.try $ MP.lookAhead (metaParser >> fileLinkParser >> endOfCell)
-  metaKVs <- metaParser
+  _ <-
+    MP.try
+      $ MP.lookAhead
+        ( metaParser
+            >> fileLinkParser
+            >> endOfCell -- (ref:f:figureParser-endOfCell)
+        )
+  metaKVs <- metaParser -- (ref:f:figureParser-metadata)
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
-  caption <- case lookup "caption" metaKVs of
+  caption <- case lookup "caption" metaKVs of -- (ref:f:figureParser-caption)
     Nothing -> pure $ Prose []
     Just s -> case MP.runParser (runStateT captionParser pState) "" s of
       Left err -> fail $ MP.errorBundlePretty err
       Right (prose, _pState) -> pure prose
-  link <- fileLinkParser
+  link <- fileLinkParser -- (ref:f:figureParser-link)
   let newFigureNumber = pState.figureNumber + 1
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetOid {}
     LinkTargetLineLabel {}
     LinkTargetURI {}
-    LinkTargetFootnote {} -> fail "'file:...' required for link to figures"
+    LinkTargetFootnote {} ->
+        fail "'file:...' required for link to figures" -- (ref:f:figureParser-file-link-requirement)
     LinkTargetFilePath _ -> do
       modify (\s -> s {figureNumber = newFigureNumber})
       pure
@@ -11246,7 +11356,7 @@ figureParser = do
             link = link
           }
   where
-    endOfCell :: OrgParser ()
+    endOfCell :: OrgParser () -- (ref:f:figureParser-endOfCell-definition)
     endOfCell =
       MP.choice
         [ void . MP.try $ string "\n\n",
@@ -11254,97 +11364,15 @@ figureParser = do
         ]
 #+end_src
 
-It's important that we expect the end of the cell (double newline or newline and
-~MP.eof~), because otherwise we'll end up parsing the link at the start of a
-paragraph cell as a figure. This parser can be even more strict with the input
-(as it should be the case anyway for figures), but for now we keep things
-simple with this ~endOfCell~ rule.
+First we have to parse for the metadata [[(f:figureParser-metadata)]], then the
+optional caption [[(f:figureParser-caption)]], and then the link to the image
+[[(f:figureParser-link)]]. For simplicity, we don't allow figures inside list items.
+For the link target itself, we check that it's pointing to a file (instead of
+accepting just any link) [[(f:figureParser-file-link-requirement)]].
 
-The metadata is parsed with =metaParser= which relies on =metaEntryParser=. We make
-sure that the name given to the cell is unique inside the document being parsed,
-because ultimately these cell names determine how we generate HTML IDs for each
-cell (although we could give machine-generated ID names, we prefer to use the
-name if one exists because they are usually much more human-friendly).
-
-#+name: f:metaParser
-#+begin_src haskell
-metaParser :: OrgParser (Map Text Text)
-metaParser = do
-  metaKVs <- many $ lexeme metaEntryParser
-  let metaKVsMap = fromList metaKVs
-  case lookup "name" metaKVsMap of
-    Just cellName -> assertUniqueCellName cellName
-    Nothing -> pure ()
-  pure metaKVsMap
-#+end_src
-
-The [[f:metaEntryParser]] is similar to [[f:docMetaEntryParser]]. In the latter, we use
-=avoidParsingBlockMetadata= to avoid touching on the toes of =blockMetaEntryParser=,
-but here we don't need to do that because we use =lookAhead= in [[f:figureParser]] to
-look for a link that follows metadata --- so we are guaranteed (after we parse
-some metadata) that it will only be for a link (figure), not a [[data:Block]] or
-some other type.
-
-We still have to check that each metadata line does not start with =#+begin_=
-because otherwise this will also succeed for blocks (even inside the =lookAhead=
-in [[f:figureParser]]).
-
-#+name: f:metaEntryParser
-#+begin_src haskell
-metaEntryParser :: OrgParser (Text, Text)
-metaEntryParser = do
-  mapM_
-    MP.notFollowedBy
-    $ map
-      string
-      [ "#+begin_",
-        "#+print_bibliography:",
-        "#+print_glossary:"
-      ]
-  _ <- string "#+"
-  o <- MP.getOffset
-  key <- MP.takeWhile1P (Just "(meta) keyword letter") isKeywordLetter
-  _ <- MP.label "(meta) separator" $ string ": "
-  _ <- many $ char ' '
-  value <-
-    if key == "name"
-      then do
-        first <- MP.satisfy (\c -> c /= '(' && isValueLetter c) -- (ref:non-line-label name)
-        rest <- MP.takeWhileP (Just "(meta) value letter") isValueLetter
-        pure $ T.cons first rest
-      else MP.takeWhile1P (Just "(meta) value letter") isValueLetter
-  when (T.isPrefixOf "__" key) -- (ref:fail-if-double-underscore)
-    $ do
-      MP.setOffset o
-      fail ("cannot use leading double underscores for metadata key: " <> show key)
-  pure (key, value)
-  where
-    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
-    isValueLetter c = c /= '\n'
-#+end_src
-
-For the ~#+name~ key, we prohibit the use of the opening parenthesis as the first
-character of the name at [[(non-line-label name)]], because then that would make
-~[[(foo)]]~ ambiguous (it could refer to either something named ~(foo)~, or it could
-refer to a [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][line label]] ~(ref:foo)~.
-
-#+name: ti:0007-blocks-no-name-with-opening-parenthesis
-#+header: :tangle test/Lilac/ParseSpec/0007-blocks-no-name-with-opening-parenthesis
-#+header: :line-label off
-#+begin_src org
-,#+name: (a)
-,#+begin_src sh
-a
-,#+end_src
-#+end_src
-
-#+name: t:0007-blocks-no-name-with-opening-parenthesis
-#+begin_src haskell
-shouldFailWithError
-  "0007-blocks-no-name-with-opening-parenthesis"
-  (utoks "(" <> etoks " ")
-  8
-#+end_src
+It's important that we expect the end of the cell [[(f:figureParser-endOfCell)]]
+[[(f:figureParser-endOfCell-definition)]], because otherwise we'll end up parsing
+the link at the start of a paragraph cell as a figure.
 
 ** Tests
 
@@ -12672,7 +12700,8 @@ import Lilac.Types
         lineLabels,
         orgParserConf,
         prevCellIsFootnote,
-        tableNumber
+        tableNumber,
+        tanglePaths
       ),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose (Prose),

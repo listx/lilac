@@ -74,7 +74,8 @@ import Lilac.Types
         lineLabels,
         orgParserConf,
         prevCellIsFootnote,
-        tableNumber
+        tableNumber,
+        tanglePaths
       ),
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose (Prose),
@@ -1310,7 +1311,8 @@ parseSpec = do
                   fromList
                     [ ("__anon_block_number", "3"),
                       ("__block_type", "src"),
-                      ("__src_language", "haskell")
+                      ("__src_language", "haskell"),
+                      ("tangle", "foo.hs")
                     ],
                 body = []
               }
@@ -1319,7 +1321,8 @@ parseSpec = do
     )
     defaultOrgParserState
       { cellNames = Set.fromList ["foo"],
-        anonBlockNumber = 3
+        anonBlockNumber = 3,
+        tanglePaths = fromList ["foo.hs"]
       }
 
   shouldParseWithState

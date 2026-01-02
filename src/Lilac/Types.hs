@@ -176,10 +176,10 @@ data Command
 
 type Figure :: Type
 data Figure = Figure
-  { parentOid :: OID,
-    meta :: Map Text Text,
-    caption :: Prose,
-    link :: Link
+  { parentOid :: OID, --
+    meta :: Map Text Text, --
+    caption :: Prose, --
+    link :: Link --
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

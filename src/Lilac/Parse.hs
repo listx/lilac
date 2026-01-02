@@ -1265,17 +1265,6 @@ blockMetaEntryParser = do
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')] --
 
-metaNameParser :: OrgParser (Text, Text)
-metaNameParser = do
-  _ <- string "#+name: "
-  name <-
-    T.pack
-      <$> MP.someTill
-        (MP.label "name of block" MP.anySingle)
-        (char '\n')
-  assertUniqueCellName name --
-  pure ("name", name)
-
 assertUniqueTanglePath :: Text -> Text -> Int -> OrgParser ()
 assertUniqueTanglePath "tangle" path offset = do
   pState <- get
@@ -1348,9 +1337,19 @@ blockStartParser ::
       Maybe (Text, Text)
     )
 blockStartParser = do
-  _ <- MP.try $ MP.lookAhead (metaParser >> string "#+begin_")
-  blockName <- MP.optional metaNameParser
-  metaKVs <- fromList <$> (many $ lexeme blockMetaEntryParser)
+  let blockMetaParser = many $ lexeme blockMetaEntryParser
+  _ <-
+    MP.try
+      . MP.lookAhead
+      $ do
+        _ <- metaParser
+        _ <- blockMetaParser
+        string "#+begin_" --
+  metaKVs <- metaParser
+  let blockName = case lookup "name" metaKVs of
+        Just name -> Just ("name", name)
+        Nothing -> Nothing
+  blockMetaKVs <- fromList <$> blockMetaParser
   _ <- string "#+begin_"
   blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
   srcLang <- MP.optional $ do
@@ -1360,7 +1359,7 @@ blockStartParser = do
   when (blockType == "src" && srcLang == Nothing)
     $ fail "block type src requires a language specifier" --
   _ <- char '\n' --
-  pure (blockName, metaKVs, blockType, srcLang)
+  pure (blockName, blockMetaKVs, blockType, srcLang)
   where
     isSrcLanguageChar c = isAsciiLower c || c == '-'
 
@@ -1899,23 +1898,30 @@ figureParser = do
   pState <- get
   when (pState.listLevels /= [])
     $ fail "figures are not allowed inside list items"
-  _ <- MP.try $ MP.lookAhead (metaParser >> fileLinkParser >> endOfCell)
-  metaKVs <- metaParser
+  _ <-
+    MP.try
+      $ MP.lookAhead
+        ( metaParser
+            >> fileLinkParser
+            >> endOfCell --
+        )
+  metaKVs <- metaParser --
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
-  caption <- case lookup "caption" metaKVs of
+  caption <- case lookup "caption" metaKVs of --
     Nothing -> pure $ Prose []
     Just s -> case MP.runParser (runStateT captionParser pState) "" s of
       Left err -> fail $ MP.errorBundlePretty err
       Right (prose, _pState) -> pure prose
-  link <- fileLinkParser
+  link <- fileLinkParser --
   let newFigureNumber = pState.figureNumber + 1
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetOid {}
     LinkTargetLineLabel {}
     LinkTargetURI {}
-    LinkTargetFootnote {} -> fail "'file:...' required for link to figures"
+    LinkTargetFootnote {} ->
+        fail "'file:...' required for link to figures" --
     LinkTargetFilePath _ -> do
       modify (\s -> s {figureNumber = newFigureNumber})
       pure
@@ -1932,7 +1938,7 @@ figureParser = do
             link = link
           }
   where
-    endOfCell :: OrgParser ()
+    endOfCell :: OrgParser () --
     endOfCell =
       MP.choice
         [ void . MP.try $ string "\n\n",
@@ -1954,7 +1960,8 @@ metaEntryParser = do
     MP.notFollowedBy
     $ map
       string
-      [ "#+begin_",
+      [ "#+begin_", --
+        "#+header:",
         "#+print_bibliography:",
         "#+print_glossary:"
       ]
@@ -1973,7 +1980,9 @@ metaEntryParser = do
   when (T.isPrefixOf "__" key) --
     $ do
       MP.setOffset o
-      fail ("cannot use leading double underscores for metadata key: " <> show key)
+      fail
+        $ "cannot use leading double underscores for metadata key: "
+        <> show key
   pure (key, value)
   where
     isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
