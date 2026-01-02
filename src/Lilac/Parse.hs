@@ -1208,7 +1208,7 @@ mathFragmentInlineParser = do
     MathFragment
       { parentOid =
           firstParentOid pState.docOid pState.headingOidStack,
-        meta = fromList [],
+        meta = fromList [], --
         body = T.pack latex
       }
 
@@ -1845,7 +1845,7 @@ mathFragmentNumberedParser = do
 
   metaKVs <- metaParser
   _ <- lexeme $ string "\\begin{equation}"
-  latex <-
+  latexBody <-
     MP.someTill
       (MP.label "LaTeX standalone numbered math input" MP.anySingle)
       (string "\\end{equation}")
@@ -1857,7 +1857,7 @@ mathFragmentNumberedParser = do
           firstParentOid pState.docOid pState.headingOidStack,
         meta =
           insert "__equation_number" (T.pack $ show number) metaKVs,
-        body = trimTrailingWhitespace $ T.pack latex
+        body = trimTrailingWhitespace $ T.pack latexBody --
       }
 
 trimTrailingWhitespace :: Text -> Text

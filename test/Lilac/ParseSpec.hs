@@ -1976,6 +1976,38 @@ parseSpec = do
       }
 
   shouldParseWithState
+    "0010-inline-math"
+    ( nilOrgDoc
+        [ CParagraph
+            $ Prose
+              [ PTokenMathFragment
+                  MathFragment
+                    { parentOid = nilOid,
+                      meta = fromList [],
+                      body = "1 + 1"
+                    },
+                ptext " is the same as " [],
+                PTokenMathFragment
+                  MathFragment
+                    { parentOid = nilOid,
+                      meta = fromList [],
+                      body = "2"
+                    },
+                ptext ", better known as " [],
+                PTokenMathFragment
+                  MathFragment
+                    { parentOid = nilOid,
+                      meta = fromList [],
+                      body = "1 + 1 = 2"
+                    },
+                ptext "." []
+              ]
+        ]
+        []
+    )
+    defaultOrgParserState
+
+  shouldParseWithState
     "0011-figures-and-blocks"
     ( nilOrgDoc
         [ CBlock
