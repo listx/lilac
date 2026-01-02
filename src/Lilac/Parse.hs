@@ -2196,7 +2196,7 @@ convertToGlossaryTerm prose offset =
   where
     f (termPTokens, term'@(Prose finalTermPTokens), def) pToken
       | finalTermPTokens == [] =
-          if isGlossaryTermDelimiter pToken
+          if isGlossaryTermDelimiter pToken --
             then
               ( termPTokens,
                 Prose . reverse $ dropWhitespacePToken termPTokens,
@@ -2214,7 +2214,7 @@ convertToGlossaryTerm prose offset =
     toGlossaryTerm :: ([PToken], Prose, [PToken]) -> OrgParser Cell
     toGlossaryTerm (_, term', def) = do
       let proseDefinition = compressProse . Prose $ reverse def
-      assertUniqueGlossaryTerm (toText term') offset
+      assertUniqueGlossaryTerm (toText term') offset --
       pure
         $ CGlossaryTerm
           GlossaryTerm

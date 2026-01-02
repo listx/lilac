@@ -10899,29 +10899,24 @@ There are three differences worth noting for Lilac:
 
    1) Only one term and one description is allowed. If multiple terms mean the
       same thing, there should be multiple entries and all but one should
-      redirect (with a link) to the entry that has the full definition. Multiple
-      definitions for a single term are not allowed. Instead, you should use
-      terms like ~foo (1) :: ...~ and ~foo (2) :: ...~ to define two different
-      definitions for the same term.
+      redirect the user to look up the canonical entry that has the full
+      definition. Multiple definitions for a single term are not allowed.
+      Instead, you should use terms like ~foo (1) :: ...~ and ~foo (2) :: ...~ to
+      define two different definitions for the same term.
 
    2) We don't call these description lists because that language is
       too close to the implementation detail. Instead we call them "glossary
       terms" (or simply "terms") because that's what they are used for most of
       the time.
 
-      The other use case is for describing multiple key-value pairs,
-      where all the pairs describe the same bigger concept. For example, the
-      keys /Name/, /Birth date/, /City of birth/, etc could be used for describing a
-      person. However Lilac does not support this use case.
+   3) Lilac treats each key-value pair as a single [[data:Cell]], so you can write
+      them anywhere a cell is expected. So whereas Orgmode only allows glossary
+      terms them inside unordered lists, in Lilac you can write them as their
+      own independent paragraphs, or in ordered lists, etc.
 
-   3) Lilac treats each key-value pair as a single [[data:Cell]]. And so, you can
-      write them anywhere a cell is expected. So whereas Orgmode only allows
-      them inside unordered lists, in Lilac you can write them as their own
-      independent paragraphs, or in ordered lists, etc.
-
-      This way Lilac can mix and match description list items with other items
-      (it does not need the [[https://emacs.stackexchange.com/questions/17244/org-mode-list-with-a-mix-of-unordered-and-description-list-items][Orgmode workarounds described here]]). See
-      [[id:eee95795-b51b-4de5-b39d-8dda436da451][how glossary terms are woven]] to see how this plays out during HTML export.
+      This way Lilac can mix and match glossary terms with other items (it does
+      not need the [[https://emacs.stackexchange.com/questions/17244/org-mode-list-with-a-mix-of-unordered-and-description-list-items][Orgmode workarounds described here]]). See [[id:eee95795-b51b-4de5-b39d-8dda436da451][how glossary terms
+      are woven]] to see how this plays out during HTML export.
 
 With those things out of the way, let's look at [[data:GlossaryTerm]], our take on
 definition list entries:
@@ -10950,7 +10945,7 @@ convertToGlossaryTerm prose offset =
   where
     f (termPTokens, term'@(Prose finalTermPTokens), def) pToken
       | finalTermPTokens == [] =
-          if isGlossaryTermDelimiter pToken
+          if isGlossaryTermDelimiter pToken -- (ref:f:convertToGlossaryTerm-isGlossaryTermDelimiter)
             then
               ( termPTokens,
                 Prose . reverse $ dropWhitespacePToken termPTokens,
@@ -10968,7 +10963,7 @@ convertToGlossaryTerm prose offset =
     toGlossaryTerm :: ([PToken], Prose, [PToken]) -> OrgParser Cell
     toGlossaryTerm (_, term', def) = do
       let proseDefinition = compressProse . Prose $ reverse def
-      assertUniqueGlossaryTerm (toText term') offset
+      assertUniqueGlossaryTerm (toText term') offset -- (ref:f:convertToGlossaryTerm-assertUniqueGlossaryTerm)
       pure
         $ CGlossaryTerm
           GlossaryTerm
@@ -10982,7 +10977,10 @@ delimiter. This is needed because otherwise the ~term~ string will end with
 trailing whitespace.
 
 [[f:convertToGlossaryTerm]] just checks each ~PToken~ in ~prose~ if it looks like a
-glossary term delimiter, via [[f:isGlossaryTermDelimiter]].
+glossary term delimiter via [[f:isGlossaryTermDelimiter]]
+[[(f:convertToGlossaryTerm-isGlossaryTermDelimiter)]]. We have to check each ~PToken~
+because we cannot tell what the term looks like; for example it could be that
+the term is 15 words long before we finally see the ~::~ delimiter.
 
 #+name: f:isGlossaryTermDelimiter
 #+begin_src haskell
@@ -11000,13 +10998,10 @@ encountering the string ~::~. This way, we don't interpret strings like
 Foo ~a::b~ bar.
 #+end_src
 
-as a glossary term because the ~::~ will be inside the code (=~=) delimiters.
+as a glossary term because the ~::~ will be inside the code (~\~~) delimiters.
 
-You may be thinking why we don't just use a raw string for the term (why do we
-check each ~PToken~ individually in [[f:convertToGlossaryTerm]]?). The reasons is because
-otherwise, a string like ~foo =a::b=~ will be interpreted as a glossary term of
-~foo =a~ and a definition of ~b=~. So the search for the delimiter /must/ take into
-account style markers, and the only way to do that is with ~PToken~ values.
+We require all glossary terms to be unique within the document in
+[[f:assertUniqueGlossaryTerm]] [[(f:convertToGlossaryTerm-assertUniqueGlossaryTerm)]].
 
 #+name: f:assertUniqueGlossaryTerm
 #+begin_src haskell
@@ -11064,8 +11059,9 @@ Similar to [[id:e24de101-bf1d-418b-a18f-b1a98fea9696][Printing bibliographies]],
 collection of all glossary terms found in the document (with links back to where
 the term was originally defined --- for added context). We use the line
 ~#+print_glossary: local~ for this. The ~local~ just means printing the glossary
-terms found in the current document. In the future we will allow this to be
-~global~ to print all glossary terms found in the entire [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]].
+terms found in the current document. You can change this to be ~global~ to print
+all glossary terms found in the entire [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] (e.g., see [[id:a84a785d-5910-473a-8995-1fbfa5ea05d0][Glossary
+(Global)]]).
 
 #+name: f:glossaryLocationParser
 #+begin_src haskell
