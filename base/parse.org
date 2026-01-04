@@ -11269,7 +11269,8 @@ The metadata (~meta~ [[(data:Figure-field-meta)]]) recognizes certain reserved k
 
   - name :: (Optional) Used to name the cell uniquely in the surrounding Org
     file. Other cells can refer to this figure by this name (or as part of a
-    global [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]).
+    global [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]). The name is optional because all figures, named or
+    not, are always assigned a number like ~Figure 1~ or ~Figure 12~.
 
   - caption :: (Optional) Displayed as the caption for the image. If there is no
     caption, on weaving the only name of the figure will be just the figure
@@ -11568,27 +11569,40 @@ shouldFailWithMessage
 Tables are like [[data:Figure][figures]] in that they have some metadata. Unlike a figure which
 is just a link, a table has a two-dimensional grid with some information in each
 row/column. The requirement is that the first non-whitespace character starts
-with a vertical bar (=|=), also known as the pipe character in UNIX.
+with a vertical bar ~|~, also known as the pipe character (for piping shell
+commands together in UNIX).
 
-All tables are numbered. A table can also have a caption (just like a
-[[data:Figure]]) using metadata.
+Like figures, all tables are numbered. A table can also have a caption
+[[(data:Table-caption)]] (just like a [[data:Figure]]).
 
 #+name: data:Table
 #+begin_src haskell
 type Table :: Type
 data Table = Table
-  { parentOid :: OID,
+  { parentOid :: OID, -- (ref:data:Table-parentOid)
     meta :: Map Text Text,
-    caption :: Prose,
-    grid :: Map (Int, Int) Prose
+    caption :: Prose, -- (ref:data:Table-caption)
+    grid :: Map (Int, Int) Prose -- (ref:data:Table-grid)
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-The ~parentOid~ is just like the one in [[data:Block]].
+The ~parentOid~ [[(data:Table-parentOid)]] is just like the one in [[data:Block]].
 
 Below is an example of a table:
+
+#+begin_src org
+,#+name: tbl:Programming languages
+,#+caption: Programming languages and typing disciplines.
+| Language | Typing          |
+|----------+-----------------|
+| LISP     | dynamic, strong |
+| C        | static, weak    |
+| Haskell  | static, strong  |
+#+end_src
+
+which is rendered in HTML as
 
 #+name: tbl:Programming languages
 #+caption: Programming languages and typing disciplines.
@@ -11599,11 +11613,9 @@ Below is an example of a table:
 | Haskell  | static, strong  |
 
 Because we named the above with a ~#+name~ keyword, we can refer to it as
-[[tbl:Programming languages]].
+~[[tbl:Programming languages]]~ ([[tbl:Programming languages]]).
 
-The very first line of the table determines the number of expected columns. Org
-syntax allows for horizontal lines inside the table like ~|---+-----|~, but these
-are ignored.
+The [[f:tableParser]] parses tables.
 
 #+name: f:tableParser
 #+begin_src haskell
@@ -11614,11 +11626,11 @@ tableParser = do
   metaKVs <- metaParser
   caption <- case lookup "caption" metaKVs of
     Nothing -> pure $ Prose []
-    Just s -> case MP.runParser (runStateT captionParser pState) "" s of
+    Just s -> case MP.runParser (runStateT captionParser pState) "" s of -- (ref:f:tableParser-MP.runParser)
       Left err -> fail $ MP.errorBundlePretty err
       Right (prose, _pState) -> pure prose
   rows <- MP.some $ tableLineParser <|> tableRowParser
-  _ <- MP.optional tableFormulaParser
+  _ <- MP.optional tableFormulaParser -- (ref:f:tableParser-tableFormulaParser)
   let newTableNumber = pState.tableNumber + 1
   modify (\s -> s {tableNumber = newTableNumber})
   pure
@@ -11628,15 +11640,16 @@ tableParser = do
           firstParentOid pState.docOid pState.headingOidStack,
         meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         caption = caption,
-        grid = fromList $ rowsToTuples rows
+        grid = fromList $ rowsToTuples rows -- (ref:f:tableParser-rowsToTuples)
       }
 #+end_src
 
-The caption parser parses the caption text from a ~#+caption: ...~ into prose.
+The [[f:captionParser]] parses the caption text from a ~#+caption: ...~ into prose.
 This way the caption can support other text styles, links, and even math
-fragments. We parse twice (by invoking ~MP.runParser~), because it's easy to
-implement; if we wanted a smoother experience for the user, we would have to
-enrich the [[f:metaParser]] to hold values that can be either raw text or prose.
+fragments. We parse the text again by invoking ~MP.runParser~
+[[(f:tableParser-MP.runParser)]], because it's easy to implement; a fancier
+alternative would be to enrich the [[f:metaParser]] to hold values that can be
+either raw text or prose.
 
 #+name: f:captionParser
 #+begin_src haskell
@@ -11647,27 +11660,11 @@ captionParser = do
   pure caption
 #+end_src
 
-The [[f:tableFormulaParser]] checks for a table formula line, which is neither
-useful for tangling or weaving. These table formulas always come *after* a table,
-not before it. We need to be able to parse it in order to ignore it (otherwise
-we will think that the ~#+tblfm: ...~ is part of another Org cell's metadata).
-
-#+name: f:tableFormulaParser
-#+begin_src haskell
-tableFormulaParser :: OrgParser ()
-tableFormulaParser = do
-  _ <- string "#+"
-  _ <- string "tblfm: " <|> string "TBLFM: "
-  _ <- MP.takeWhile1P (Just "table formula") (/= '\n')
-  _ <- char '\n'
-  pure ()
-#+end_src
-
-The [[f:tableLineParser]] skips over horizontal rules that typically separate the
-table heading (column names) from the rest of the rows that hold the actual
-data. It also skips over any leading indentation in the subsequent line, based
-on the ~continuationIndent~ which is set by [[f:listHeadIndentLevelParser]]. This way,
-we can parse tables inside list items.
+The [[f:tableLineParser]] skips over horizontal rules (like ~|---+-----|~) that
+typically separate the table heading (column names) from the rest of the rows
+that hold the actual data. It also skips over any leading indentation in the
+subsequent line, based on the ~continuationIndent~ which is set by
+[[f:listHeadIndentLevelParser]]. This way, we can parse tables inside list items.
 
 #+name: f:tableLineParser
 #+begin_src haskell
@@ -11685,8 +11682,10 @@ tableLineParser = do
     isTableLineChar c = c == '-' || c == '+' || c == '|'
 #+end_src
 
-The [[f:tableHorizontalLine]] is a special value to signify a horizontal line, which
-can basically only be generated internally because of the trailing NULL byte.
+The [[f:tableHorizontalLine]] is a special value to signify a horizontal line with
+the trailing ~\NUL~ byte in ~horizontal-line\NUL~. This use of the ~\NUL~ is the only
+way we can guarantee that the user won't accidentally put in a value that looks
+like this in the table.
 
 #+name: f:tableHorizontalLine
 #+begin_src haskell
@@ -11699,10 +11698,11 @@ tableHorizontalLine =
 #+end_src
 
 The [[f:tableRowParser]] parses rows with data in them. It also skips over
-indentation found in the subsequent line (if any). Unlike ~tableLineParser~, we
-wrap this indentation parsing with ~MP.optional~ because we cannot tell if there
-are more table rows after this or not. Contrast this with the ~tableLineParser~,
-which is never expected to be the last line of a table.
+indentation found in the subsequent line (if any). Unlike [[f:tableLineParser]], we
+wrap this indentation parsing with ~MP.optional~ [[(f:tableRowParser-MP.optional)]]
+because we cannot tell if there are more table rows after this or not. This is
+unlike the ~tableLineParser~, which is never expected to be the last line of a
+table.
 
 #+name: f:tableRowParser
 #+begin_src haskell
@@ -11714,46 +11714,49 @@ tableRowParser = do
   _ <- char '\n'
   pState <- get
   _ <-
-    MP.optional
+    MP.optional -- (ref:f:tableRowParser-MP.optional)
       . MP.label "indentation for next table line"
       $ MP.count pState.continuationIndent (char ' ')
   pure tableCells
   where
-    emptyTableCellParser :: OrgParser Prose
+    emptyTableCellParser :: OrgParser Prose -- (ref:f:tableRowParser-emptyTableCellParser)
     emptyTableCellParser = do
       _ <- char '|'
       _ <- MP.optional onlySpaces
       pure $ Prose []
 #+end_src
 
-The ~emptyTableCellParser~ parses an empty table cell (because [[f:proseParser]]
-requires non-empty text). We need this in order to parse (essentially skip over)
-empty table cells, while still recording their existence. See how empty table
-cells are parsed in [[t:0012-tables-and-prose]].
+The ~emptyTableCellParser~ [[(f:tableRowParser-emptyTableCellParser)]] parses an empty
+table cell (because [[f:proseParser]] requires non-empty text). We need this in
+order to parse (essentially skip over) empty table cells, while still recording
+their existence. See how empty table cells are parsed in
+[[t:0012-tables-and-prose]].
 
-The [[f:tableCellParser]] just parses text inside a single row and column
-combination --- which we call a "table cell". The main idea is that we parse
-each table cell, which may not contain pipe characters in it (otherwise it
-confuses =org-mode= in Emacs, which results in the table becoming formatted with
-extra columns that we don't want).
+The [[f:tableCellParser]] parses prose text inside a single row and column
+combination --- which we call a /table cell/. The main idea is that we parse each
+table cell, which may not contain pipe characters in it (otherwise it confuses
+Orgmode in Emacs when we press ~TAB~, which results in the table becoming
+formatted with extra columns that we don't want).
 
 #+name: f:tableCellParser
 #+begin_src haskell
 tableCellParser :: OrgParser Prose
 tableCellParser = do
-  prose <- onlyMarkingCharacterParser <|> (proseParser $ whitespaceCompressor spacesInsideProse)
+  prose <-
+    onlyMarkingCharacterParser
+      <|> (proseParser $ whitespaceCompressor spacesInsideProse)
   _ <- MP.optional onlySpaces
   _ <- char '|'
   _ <- MP.optional onlySpaces
   pure $ compressProse prose
   where
-    spacesInsideProse :: OrgParser Text
+    spacesInsideProse :: OrgParser Text -- (ref:f:tableCellParser-spacesInsideProse)
     spacesInsideProse = do
       _ <- MP.try $ MP.lookAhead (onlySpaces >> tableCellContent)
       onlySpaces
     tableCellContent :: OrgParser ()
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
-    onlyMarkingCharacterParser :: OrgParser Prose
+    onlyMarkingCharacterParser :: OrgParser Prose -- (ref:f:tableCellParser-onlyMarkingCharacterParser)
     onlyMarkingCharacterParser = do
       c <- MP.satisfy (`elem` markingChars)
       _ <- MP.try . MP.lookAhead $ do
@@ -11767,21 +11770,22 @@ tableCellParser = do
           ]
 #+end_src
 
-The ~spacesInsideProse~ is a special space consumer inside table cells, where
-newlines and pipe characters are prohibited. This way, when [[f:proseParser]] uses
-it to find some contiguous amount of text, it will know to stop when it sees the
-pipe character (as that function does not treat pipe characters differently than
-any other non-space character).
+The ~spacesInsideProse~ [[(f:tableCellParser-spacesInsideProse)]] is a special space
+consumer inside table cells, where newlines and pipe characters are prohibited.
+This way, when [[f:proseParser]] uses it to find some contiguous amount of text, it
+will know to stop when it sees the pipe character.
 
-The ~onlyMarkingCharacterParser~ is there to parse [[id:3b072b1b-c63e-4fca-ab56-9388d11aa3c0::f:markingChars][f:markingChars]] which share the
-same syntax as the characters used for styling prose, especially ~_~, ~*~, and ~/~.
-These characters will break things if we let [[f:proseParser]] naively look at it,
-because that parser has no concept of table cell boundaries. The
-~onlyMarkingCharacterParser~ parses one of these marking characters, and creates
-the corresponding [[newtype:Prose]] value.
+The ~onlyMarkingCharacterParser~ [[(f:tableCellParser-onlyMarkingCharacterParser)]] is
+there to parse [[id:3b072b1b-c63e-4fca-ab56-9388d11aa3c0::f:markingChars][f:markingChars]] which are special (optional) characters used only
+inside tables, but which share the same syntax as the characters used for
+styling prose, especially ~_~, ~*~, and ~/~. These characters will break things if we
+let [[f:proseParser]] naively look at it, because that parser has no concept of
+table cell boundaries. The ~onlyMarkingCharacterParser~ parses one of these
+marking characters, and creates the corresponding [[newtype:Prose]] value. See [[https://orgmode.org/manual/Advanced-features.html][this
+page]] for more information about marking characters.
 
-After the rows are parsed, we need to convert them to a =grid= (as part of
-[[data:Table]]. We do this with [[f:rowsToTuples]].
+After the rows are parsed, we need to convert them to a ~grid~ [[(data:Table-grid)]].
+We do this with [[f:rowsToTuples]] [[(f:tableParser-rowsToTuples)]].
 
 #+name: f:rowsToTuples
 #+begin_src haskell
@@ -11793,7 +11797,7 @@ We assign each row its row index with ~zip [1 ..]~, then delegate most of the wo
 to [[f:rowToTuples]] where each row's table cells are given its column index to form
 a completed table cell. These are simply accumulated and returned as a list. The
 order of accumulation (consing) does not matter because this is ultimately fed
-into a =Map= type, an unordered container.
+into a ~Map~ type (where the keys are not guaranteed to be ordered).
 
 #+name: f:rowToTuples
 #+begin_src haskell
@@ -11809,11 +11813,28 @@ rowToTuples (rowIndex, row)
       )
 #+end_src
 
-** Check for numeric table cell
+The [[f:tableFormulaParser]] [[(f:tableParser-tableFormulaParser)]] checks for a table
+[[https://orgmode.org/manual/Editing-and-debugging-formulas.html][formula]] line (~#+TBLFM: ...~), which is neither useful for tangling nor weaving.
+These table formulas always come *after* a table, not before it. We need to be
+able to parse it in order to ignore it (otherwise we will think that the
+~#+TBLFM: ...~ is part of another Org cell's metadata).
+
+#+name: f:tableFormulaParser
+#+begin_src haskell
+tableFormulaParser :: OrgParser ()
+tableFormulaParser = do
+  _ <- string "#+"
+  _ <- string "tblfm: " <|> string "TBLFM: "
+  _ <- MP.takeWhile1P (Just "table formula") (/= '\n')
+  _ <- char '\n'
+  pure ()
+#+end_src
+
+** Numeric table cells
 
 It's useful to know if a table cell contains mostly numeric content, at the time
-of weaving (see [[id:6c10afe2-2714-4e85-9121-e96a36d27ba4::f:weaveTable][f:weaveTable]]). This way, we can right-align the contents of that
-table cell, just like popular spreadsheet programs.
+of weaving (see ~isNumericText~ in [[id:6c10afe2-2714-4e85-9121-e96a36d27ba4::f:weaveTable][f:weaveTable]]). This way, we can right-align the
+contents of that table cell, just like popular spreadsheet programs.
 
 [[f:isNumericText]] parses the input through [[f:isNumericTextParser]].
 
@@ -11858,8 +11879,8 @@ The test below checks if we can parse a table with all 3 types of prose text
 #+name: ti:0012-tables-and-prose
 #+header: :tangle test/Lilac/ParseSpec/0012-tables-and-prose
 #+begin_src org
-,#+name: tbl:famous-equations
-,#+caption: *Bold*. [[tbl:famous-equations][A self-link]]. \(E = mc^2\)
+,#+name: tbl:famous-eqs
+,#+caption: *Bold*. [[tbl:famous-eqs][A self-link]]. \(E = mc^2\)
 | Name            | Equation            | Link |
 |-----------------+---------------------+------|
 | Pythagoras \vert{} Foo | \(a^2 + b^2 = c^2\) | [[https://wiki/x][Wiki]] |
@@ -11880,7 +11901,7 @@ shouldParseWithState
   defaultOrgParserState
     { cellNames =
         Set.fromList
-          [ "tbl:famous-equations"
+          [ "tbl:famous-eqs"
           ],
       tableNumber = 1
     }
@@ -11893,8 +11914,10 @@ shouldParseWithState
       { parentOid = nilOid,
         meta =
           fromList
-            [ ("name", "tbl:famous-equations"),
-              ("caption", "*Bold*. [[tbl:famous-equations][A self-link]]. \\(E = mc^2\\)"),
+            [ ("name", "tbl:famous-eqs"),
+              ( "caption",
+                "*Bold*. [[tbl:famous-eqs][A self-link]]. \\(E = mc^2\\)"
+              ),
               ("__table_number", "1")
             ],
         caption =
@@ -11911,12 +11934,16 @@ shouldParseWithState
                       ],
                     target =
                       LinkTargetOid
-                        LinkOid {oid = nilOid, name = "tbl:famous-equations"}
+                        LinkOid {oid = nilOid, name = "tbl:famous-eqs"}
                   },
               ptext "." [],
               ptext " " [],
               PTokenMathFragment
-                MathFragment {parentOid = nilOid, meta = fromList [], body = "E = mc^2"}
+                MathFragment
+                  { parentOid = nilOid,
+                    meta = fromList [],
+                    body = "E = mc^2"
+                  }
             ],
         grid =
           fromList

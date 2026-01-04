@@ -1995,11 +1995,11 @@ tableParser = do
   metaKVs <- metaParser
   caption <- case lookup "caption" metaKVs of
     Nothing -> pure $ Prose []
-    Just s -> case MP.runParser (runStateT captionParser pState) "" s of
+    Just s -> case MP.runParser (runStateT captionParser pState) "" s of --
       Left err -> fail $ MP.errorBundlePretty err
       Right (prose, _pState) -> pure prose
   rows <- MP.some $ tableLineParser <|> tableRowParser
-  _ <- MP.optional tableFormulaParser
+  _ <- MP.optional tableFormulaParser --
   let newTableNumber = pState.tableNumber + 1
   modify (\s -> s {tableNumber = newTableNumber})
   pure
@@ -2009,7 +2009,7 @@ tableParser = do
           firstParentOid pState.docOid pState.headingOidStack,
         meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         caption = caption,
-        grid = fromList $ rowsToTuples rows
+        grid = fromList $ rowsToTuples rows --
       }
 
 tableFormulaParser :: OrgParser ()
@@ -2054,12 +2054,12 @@ tableRowParser = do
   _ <- char '\n'
   pState <- get
   _ <-
-    MP.optional
+    MP.optional --
       . MP.label "indentation for next table line"
       $ MP.count pState.continuationIndent (char ' ')
   pure tableCells
   where
-    emptyTableCellParser :: OrgParser Prose
+    emptyTableCellParser :: OrgParser Prose --
     emptyTableCellParser = do
       _ <- char '|'
       _ <- MP.optional onlySpaces
@@ -2067,19 +2067,21 @@ tableRowParser = do
 
 tableCellParser :: OrgParser Prose
 tableCellParser = do
-  prose <- onlyMarkingCharacterParser <|> (proseParser $ whitespaceCompressor spacesInsideProse)
+  prose <-
+    onlyMarkingCharacterParser
+      <|> (proseParser $ whitespaceCompressor spacesInsideProse)
   _ <- MP.optional onlySpaces
   _ <- char '|'
   _ <- MP.optional onlySpaces
   pure $ compressProse prose
   where
-    spacesInsideProse :: OrgParser Text
+    spacesInsideProse :: OrgParser Text --
     spacesInsideProse = do
       _ <- MP.try $ MP.lookAhead (onlySpaces >> tableCellContent)
       onlySpaces
     tableCellContent :: OrgParser ()
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
-    onlyMarkingCharacterParser :: OrgParser Prose
+    onlyMarkingCharacterParser :: OrgParser Prose --
     onlyMarkingCharacterParser = do
       c <- MP.satisfy (`elem` markingChars)
       _ <- MP.try . MP.lookAhead $ do

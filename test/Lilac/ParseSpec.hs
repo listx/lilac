@@ -2143,8 +2143,10 @@ parseSpec = do
               { parentOid = nilOid,
                 meta =
                   fromList
-                    [ ("name", "tbl:famous-equations"),
-                      ("caption", "*Bold*. [[tbl:famous-equations][A self-link]]. \\(E = mc^2\\)"),
+                    [ ("name", "tbl:famous-eqs"),
+                      ( "caption",
+                        "*Bold*. [[tbl:famous-eqs][A self-link]]. \\(E = mc^2\\)"
+                      ),
                       ("__table_number", "1")
                     ],
                 caption =
@@ -2161,12 +2163,16 @@ parseSpec = do
                               ],
                             target =
                               LinkTargetOid
-                                LinkOid {oid = nilOid, name = "tbl:famous-equations"}
+                                LinkOid {oid = nilOid, name = "tbl:famous-eqs"}
                           },
                       ptext "." [],
                       ptext " " [],
                       PTokenMathFragment
-                        MathFragment {parentOid = nilOid, meta = fromList [], body = "E = mc^2"}
+                        MathFragment
+                          { parentOid = nilOid,
+                            meta = fromList [],
+                            body = "E = mc^2"
+                          }
                     ],
                 grid =
                   fromList
@@ -2271,7 +2277,7 @@ parseSpec = do
     defaultOrgParserState
       { cellNames =
           Set.fromList
-            [ "tbl:famous-equations"
+            [ "tbl:famous-eqs"
             ],
         tableNumber = 1
       }

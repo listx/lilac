@@ -471,10 +471,10 @@ ptext body styles = PTokenStyledText $ stext body styles
 
 type Table :: Type
 data Table = Table
-  { parentOid :: OID,
+  { parentOid :: OID, --
     meta :: Map Text Text,
-    caption :: Prose,
-    grid :: Map (Int, Int) Prose
+    caption :: Prose, --
+    grid :: Map (Int, Int) Prose --
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
