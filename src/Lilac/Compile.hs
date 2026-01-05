@@ -76,15 +76,14 @@ import Lilac.Types
     Prose (Prose, unProse),
     PseudoEdge (PseudoEdge),
     Style (Verbatim),
-    StyledText (StyledText, body, style),
     Table (grid, meta, parentOid),
     cellIdxToObjCell,
     decodeGPath,
     encodeGPath,
     getProseContents,
     getSectionNumber,
+    ptext,
     stripLinks,
-    styleMaskFrom,
   )
 import Lilac.Util qualified as LU
 import Relude
@@ -113,6 +112,7 @@ import Relude
     map,
     mapAccumL,
     mapM,
+    mapMaybe,
     maybeToList,
     mempty,
     otherwise,
@@ -138,20 +138,23 @@ import Relude.Extra.Map (elems, insert, insertWith, lookup, member)
 import System.Exit (die)
 import System.OsPath qualified as P
 
-mkObject :: OrgDoc -> IO Object
-mkObject orgDoc = do
-  pure
-    Object
-      { orgDoc = orgDoc,
-        symbols = mkSymbols orgDoc,
-        externalOids = findExternalOids orgDoc
-      }
+mkObject :: OrgDoc -> Object
+mkObject orgDoc =
+  Object
+    { orgDoc = orgDoc,
+      symbols = mkSymbols orgDoc, --
+      externalOids = findExternalOids orgDoc --
+    }
 
 mkSymbols :: OrgDoc -> Map LinkOid Int
-mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
+mkSymbols orgDoc =
+  fromList
+    . concatMap f
+    $ zip
+      [0 ..] --
+      orgDoc.cells
   where
-    f (localCellIdx, cell) = case cell of
-      CBlock block -> getSymbols block.parentOid block.meta localCellIdx
+    f (localCellIdx, cell) = case cell of --
       CHeading heading
         | Just oidText <- lookup "ID" heading.meta,
           Just oid <- LP.validateOidText oidText ->
@@ -163,50 +166,72 @@ mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
               )
             ]
         | otherwise -> []
-      CFigure figure -> getSymbols figure.parentOid figure.meta localCellIdx
-      CMathFragment mathFragment -> getSymbols mathFragment.parentOid mathFragment.meta localCellIdx
-      CTable table -> getSymbols table.parentOid table.meta localCellIdx
+      CBlock block ->
+        getSymbols
+          orgDoc.oid
+          block.parentOid
+          block.meta
+          localCellIdx
+      CFigure figure ->
+        getSymbols
+          orgDoc.oid
+          figure.parentOid
+          figure.meta
+          localCellIdx
+      CMathFragment mathFragment ->
+        getSymbols
+          orgDoc.oid
+          mathFragment.parentOid
+          mathFragment.meta
+          localCellIdx
+      CTable table ->
+        getSymbols
+          orgDoc.oid
+          table.parentOid
+          table.meta
+          localCellIdx
       CFootnote {}
       CListItem {}
       CParagraph {}
       CGlossaryTerm {}
-      CCommand {} -> []
-    getSymbols :: OID -> Map Text Text -> Int -> [(LinkOid, Int)]
-    getSymbols parentOid cellMeta localCellIdx =
-      let oids =
-            if parentOid /= orgDoc.oid
-              then [parentOid, orgDoc.oid]
-              else [orgDoc.oid]
-       in concatMap requireName oids
-      where
-        requireName oid
-          | Just name <- lookup "name" cellMeta =
-              [ ( LinkOid
-                    { oid = oid,
-                      name = name
-                    },
-                  localCellIdx
-                )
-              ]
-          | Just tanglePath <- lookup "tangle" cellMeta --
-            =
-              [ ( LinkOid
-                    { oid = oid,
-                      name = tanglePath <> "\NUL"
-                    },
-                  localCellIdx
-                )
-              ]
-          | Just anonBlockNumber <- lookup "__anon_block_number" cellMeta --
-            =
-              [ ( LinkOid
-                    { oid = oid,
-                      name = anonBlockNumber <> "\NUL__anon_block_number"
-                    },
-                  localCellIdx
-                )
-              ]
-          | otherwise = []
+      CCommand {} -> [] --
+
+getSymbols :: OID -> OID -> Map Text Text -> Int -> [(LinkOid, Int)]
+getSymbols docOid parentOid cellMeta localCellIdx =
+  let oids =
+        if parentOid /= docOid --
+          then [parentOid, docOid]
+          else [docOid]
+   in mapMaybe extractName oids
+  where
+    extractName oid --
+      | Just name <- lookup "name" cellMeta =
+          Just
+            ( LinkOid
+                { oid = oid,
+                  name = name
+                },
+              localCellIdx
+            )
+      | Just tanglePath <- lookup "tangle" cellMeta --
+        =
+          Just
+            ( LinkOid
+                { oid = oid,
+                  name = tanglePath <> "\NUL"
+                },
+              localCellIdx
+            )
+      | Just anonBlockNumber <- lookup "__anon_block_number" cellMeta --
+        =
+          Just
+            ( LinkOid
+                { oid = oid,
+                  name = anonBlockNumber <> "\NUL__anon_block_number"
+                },
+              localCellIdx
+            )
+      | otherwise = Nothing
 
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
@@ -219,10 +244,17 @@ mkArchive pathObjs = do
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
     concat
-      <$> mapM (\(gp, o) -> makeRelativeToObjectPath gp o.orgDoc.bibPaths) pathObjs
+      <$> mapM
+        (\(gp, o) -> makeRelativeToObjectPath gp o.orgDoc.bibPaths)
+        pathObjs
   allCslPaths <-
     concat
-      <$> mapM (\(gp, o) -> makeRelativeToObjectPath gp $ maybeToList o.orgDoc.cslPath) pathObjs
+      <$> mapM
+        ( \(gp, o) ->
+            makeRelativeToObjectPath gp
+              $ maybeToList o.orgDoc.cslPath
+        )
+        pathObjs
   bibs <- getBibliographies allBibPaths
   cslRawXMLs <- map fst <$> getCitationStyles allCslPaths
   let csls = zip allCslPaths cslRawXMLs
@@ -347,9 +379,8 @@ readObjectsFrom parentDir = foldlM f []
       case LP.parseOrgDoc input of
         Left errTxt -> die $ T.unpack errTxt
         Right od -> do
-          obj <- mkObject od
           relPath' <- encodeGPath =<< P.decodeUtf relPath
-          pure $ (relPath', obj) : acc
+          pure $ (relPath', mkObject od) : acc
 
 buildGraph ::
   [Block] ->
@@ -471,31 +502,37 @@ findExternalOids orgDoc =
   sort
     . Set.toList
     . fromList
-    $ concatMap f orgDoc.cells
+    $ concatMap searchInsideProse orgDoc.cells
   where
-    f cell = case cell of
-      CBlock block -> foldl' g [] block.body
-      CHeading heading -> foldl' h [] heading.body.unProse
-      CParagraph prose -> foldl' h [] prose.unProse
-      CGlossaryTerm glossaryTerm -> foldl' h [] glossaryTerm.definition.unProse
-      CTable table -> foldl' (\acc prose -> foldl' h acc prose.unProse) [] table.grid
+    searchInsideProse cell = case cell of --
+      CBlock block -> foldl' getLinkFromBToken [] block.body
+      CHeading heading -> foldl' getLinkFromPToken [] heading.body.unProse
+      CParagraph prose -> foldl' getLinkFromPToken [] prose.unProse
+      CGlossaryTerm glossaryTerm ->
+        foldl' getLinkFromPToken [] glossaryTerm.definition.unProse
+      CTable table ->
+        foldl'
+          (\acc prose -> foldl' getLinkFromPToken acc prose.unProse)
+          []
+          table.grid
       CFigure {}
       CFootnote {}
       CListItem {}
       CMathFragment {}
       CCommand {} -> []
-    g acc = \case
-      BTokenLinkTarget linkTarget -> getExternal acc linkTarget
+    getLinkFromBToken acc bToken = case bToken of --
+      BTokenLinkTarget linkTarget -> keepIfExternal acc linkTarget
       BTokenString {}
       BTokenPadding -> acc
-    h acc = \case
-      PTokenLink link -> getExternal' acc link
+    getLinkFromPToken acc pToken = case pToken of --
+      PTokenLink link -> keepIfExternal acc link.target
       PTokenStyledText {}
       PTokenCitation {}
       PTokenMathFragment {}
       PTokenDivStart {}
       PTokenDivEnd {} -> acc
-    getExternal acc linkTarget = case linkTarget of
+    symbols = mkSymbols orgDoc --
+    keepIfExternal acc linkTarget = case linkTarget of --
       LinkTargetOid linkOid ->
         if member linkOid symbols
           then acc
@@ -504,8 +541,6 @@ findExternalOids orgDoc =
       LinkTargetFootnote {}
       LinkTargetFilePath {}
       LinkTargetURI {} -> acc
-    getExternal' acc link = getExternal acc link.target
-    symbols = mkSymbols orgDoc
 
 getCitationStyles :: [FilePath] -> IO [(Text, CP.Style (CslJson Text))]
 getCitationStyles filePaths = mapM getCitationStyle filePaths
@@ -525,7 +560,9 @@ parseCitationStyle input = do
     Left citeprocError -> Left $ show citeprocError
     Right style -> Right style
 
-getBibliographies :: [FilePath] -> IO [(FilePath, [CP.Reference (CslJson Text)])]
+getBibliographies ::
+  [FilePath] ->
+  IO [(FilePath, [CP.Reference (CslJson Text)])]
 getBibliographies filePaths = do
   bibs <- mapM getBibliography filePaths
   pure $ zip filePaths bibs
@@ -559,19 +596,21 @@ cellIdxToName archive offset globalCellIdx
   | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
       case cell of
         CHeading heading ->
-          plain $ "§ " <> (getSectionNumber heading) <> " " <> (getProseContents heading.body)
+          plain
+            $ "§ "
+            <> (getSectionNumber heading)
+            <> " "
+            <> (getProseContents heading.body)
         CParagraph _ ->
           Just
             $ Prose
-              [ PTokenStyledText $ StyledText {body = "¶ (", style = styleMaskFrom []},
-                PTokenStyledText $ StyledText {body = cellRef, style = styleMaskFrom [Verbatim]},
-                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+              [ ptext "¶ (" [],
+                ptext cellRef [Verbatim],
+                ptext ")" []
               ]
         CGlossaryTerm glossaryTerm ->
           Just
-            $ Prose
-              [ PTokenStyledText $ StyledText {body = "✿ ", style = styleMaskFrom []}
-              ]
+            $ Prose [ptext "✿ " []]
             <> stripLinks glossaryTerm.term --
         CFigure figure
           | Just name <- lookup "name" figure.meta -> verbatim name
@@ -586,9 +625,9 @@ cellIdxToName archive offset globalCellIdx
         CFootnote footnote ->
           Just
             $ Prose
-              [ PTokenStyledText $ StyledText {body = "Footnote (", style = styleMaskFrom []},
-                PTokenStyledText $ StyledText {body = "fn:" <> footnote.name, style = styleMaskFrom [Verbatim]},
-                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+              [ ptext "Footnote (" [],
+                ptext ("fn:" <> footnote.name) [Verbatim],
+                ptext ")" []
               ]
         CBlock block
           | Just name <- lookup "name" block.meta ->
@@ -607,5 +646,5 @@ cellIdxToName archive offset globalCellIdx
   | otherwise = Nothing
   where
     cellRef = "Cell " <> (T.show $ globalCellIdx - offset)
-    plain body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom []}]
-    verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
+    plain body = Just $ Prose [ptext body []]
+    verbatim body = Just $ Prose [ptext body [Verbatim]]

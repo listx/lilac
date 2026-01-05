@@ -99,7 +99,7 @@ getWovenPrettyFromPath path = do
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      object <- LC.mkObject orgDoc
+      let object = LC.mkObject orgDoc
       maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
       case maybeArchive of
         Left errMsg -> pure $ Left errMsg
@@ -175,7 +175,7 @@ getCiteprocResultFromPath path = do
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
-      object <- LC.mkObject orgDoc
+      let object = LC.mkObject orgDoc
       maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
       case maybeArchive of
         Left errMsg -> pure $ Left errMsg

@@ -374,7 +374,7 @@ lilacCompile _globalOpts compileOpts = do
         Left errBundle -> do
           die $ MP.errorBundlePretty errBundle
         Right (orgDoc, _) -> do
-          obj <- LC.mkObject orgDoc --
+          let obj = LC.mkObject orgDoc --
           pure (obj, inputPath)
     writeObjToPath :: (ToJSON a) => (a, OsPath) -> IO ()
     writeObjToPath (obj, inputPath) = do

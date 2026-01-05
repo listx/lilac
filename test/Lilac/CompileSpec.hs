@@ -201,7 +201,10 @@ compileSpec = do
                     [ Node
                         { rootLabel =
                             LinkOid
-                              { oid = fromWords 0x0000000000000000 0x000000000000e005,
+                              { oid =
+                                  fromWords
+                                    0x0000000000000000
+                                    0x000000000000e005,
                                 name = "f:c"
                               },
                           subForest = []
@@ -231,7 +234,10 @@ compileSpec = do
                     [ Node
                         { rootLabel =
                             LinkOid
-                              { oid = fromWords 0x0000000000000000 0x000000000000e006,
+                              { oid =
+                                  fromWords
+                                    0x0000000000000000
+                                    0x000000000000e006,
                                 name = "f:c"
                               },
                           subForest = []
@@ -239,7 +245,10 @@ compileSpec = do
                       Node
                         { rootLabel =
                             LinkOid
-                              { oid = fromWords 0x0000000000000000 0x000000000000e006,
+                              { oid =
+                                  fromWords
+                                    0x0000000000000000
+                                    0x000000000000e006,
                                 name = "f:d"
                               },
                           subForest = []
@@ -303,7 +312,10 @@ compileSpec = do
                     [ Node
                         { rootLabel =
                             LinkOid
-                              { oid = fromWords 0x0000000000000000 0x000000000000f008,
+                              { oid =
+                                  fromWords
+                                    0x0000000000000000
+                                    0x000000000000f008,
                                 name = "c"
                               },
                           subForest = []

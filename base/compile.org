@@ -6,16 +6,24 @@
 #+bibliography: bib.json
 #+cite_export: csl csl-styles/ieee.csl
 
-Compilation is the intermediate step we perform on Org files, such that they can
-be tangled or woven. In order to tangle or weave, we require an /archive/, which
-is made up of /objects/.
+* Overview
 
-  - object :: An even more machine-friendly representation of a single Org
-    document.
+Compilation is the intermediate step we perform on Org files, such that they can
+be tangled or woven. Org documents cannot be tangled or woven directly; instead
+they must first be compiled into /objects/, and then collected into an /archive/.
+We perform additional checks during each step so that we can tangle and weave
+reliably.
+
+  - object :: An even more machine-friendly representation of a single
+    Org document. Uses file extension ~*.lobj~, and is encoded as JSON.
 
   - archive :: A self-contained collection of objects. All objects inside an
     archive can link to each other (headings, code blocks, etc) without any
-    issues.
+    issues. Uses file extension ~*.larc~, and is encoded as JSON.
+
+We use JSON as the underlying format because it's easy to debug and is widely
+supported. In the future we could use another format for scalability or
+performance reasons, but JSON is good enough for now.
 
 * =Lilac.Compile= module
 
@@ -100,15 +108,14 @@ import Lilac.Types
     Prose (Prose, unProse),
     PseudoEdge (PseudoEdge),
     Style (Verbatim),
-    StyledText (StyledText, body, style),
     Table (grid, meta, parentOid),
     cellIdxToObjCell,
     decodeGPath,
     encodeGPath,
     getProseContents,
     getSectionNumber,
+    ptext,
     stripLinks,
-    styleMaskFrom,
   )
 import Lilac.Util qualified as LU
 import Relude
@@ -137,6 +144,7 @@ import Relude
     map,
     mapAccumL,
     mapM,
+    mapMaybe,
     maybeToList,
     mempty,
     otherwise,
@@ -164,6 +172,7 @@ import System.OsPath qualified as P
 
 <<f:mkObject>>
 <<f:mkSymbols>>
+<<f:getSymbols>>
 <<f:mkArchive>>
 <<f:finalizeEdges>>
 <<f:mkBacklinks>>
@@ -185,32 +194,35 @@ import System.OsPath qualified as P
 <<f:cellIdxToName>>
 #+end_src
 
-* Object generation
+* Objects
 :PROPERTIES:
 :ID:       01da95fe-ba23-4481-9833-428423392f5f
 :END:
 
-The [[data:Object]] encodes information which we want to reuse when building up
-either the "block universe" for tangling, or "cell universe" when weaving. Both
-of these concepts are essentially the same thing (the "block universe" is a
-special case of the "cell universe", such that all cells are code blocks).
+The [[data:Object]] augments the [[id:5df15f17-c630-4ddf-bade-66084c430a07::data:OrgDoc][data:OrgDoc]] with some additional metadata (derived
+from the ~OrgDoc~).
 
 #+name: data:Object
 #+begin_src haskell
 type Object :: Type
 data Object = Object
   { orgDoc :: OrgDoc,
-    symbols :: Map LinkOid Int,
-    externalOids :: [LinkOid]
+    symbols :: Map LinkOid Int, -- (ref:data:Object-symbols)
+    externalOids :: [LinkOid] -- (ref:data:Object-externalOids)
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-The ~symbols~ houses all links that point to cells inside the current ~OrgDoc~. We
-have to use [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] as a key, and for this we need to define at least a
-~ToJSONKey~ instance and ~FromJSONKey~ instance. Otherwise, =Data.Aeson= can give an
-unrelated error message like
+The ~externalOids~ [[(data:Object-externalOids)]] lists all OID link targets which
+cannot be resolved by the ~symbols~ in this document. The expectation is that
+these external OIDs will be found in the [[data:Archive]] from other objects that
+have them.
+
+The ~symbols~ [[(data:Object-symbols)]] houses all links that point to cells inside
+the current ~OrgDoc~. We use [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] as a key for convenience, and for this
+we need to define at least a ~ToJSONKey~ instance and ~FromJSONKey~ instance.
+Otherwise, ~Data.Aeson~ can give an unrelated error message like
 
 #+begin_quote
 Error in $.symbols: parsing Map failed, expected Array, but encountered Object
@@ -219,11 +231,13 @@ Error in $.symbols: parsing Map failed, expected Array, but encountered Object
 when trying to parse the JSON for symbols (~"symbols":{}~), such that ~"symbols":[]~
 won't give an error (strange!).
 
+** JSON conversion
+
 Marshaling to JSON is straightforward, because we can just reuse the [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::instance:Show
  LinkOid][instance:Show LinkOid]], which already knows how to convert a ~LinkOid~ to a ~String~
 value.
 
-Unmarshaling is tricky because we have to inform =Data.Aeson= how to convert a
+Unmarshaling is tricky because we have to inform ~Data.Aeson~ how to convert a
 ~Text~ to ~LinkOid~. This is what we do in [[f:parseJSONLinkOid]].
 
 #+name: f:parseJSONLinkOid
@@ -256,9 +270,9 @@ instance ToJSON LinkOid where
 #+end_src
 
 The [[instance:ToJSONKey LinkOid]] is simpler, because it just expects a type that
-can be a key. The use of ~toJSONKeyText~ is important because it results in
-encoding the surrounding map as a JSON object ~{...}~ instead of an array of
-key-value pairs ~[...]~ (see the [[https://hackage.haskell.org/package/aeson-2.2.3.0/docs/Data-Aeson-Types.html#t:ToJSONKeyFunction][upstream docs here]]).
+can be a key. The use of ~toJSONKeyText~ (from ~Data.Aeson.Types~) is important
+because it results in encoding the surrounding map as a JSON object ~{...}~
+instead of an array of key-value pairs ~[...]~ (see the [[https://hackage.haskell.org/package/aeson-2.2.3.0/docs/Data-Aeson-Types.html#t:ToJSONKeyFunction][upstream docs here]]).
 
 #+name: instance:ToJSONKey LinkOid
 #+begin_src haskell
@@ -281,33 +295,42 @@ instance FromJSONKey LinkOid where
   fromJSONKey = FromJSONKeyTextParser parseJSONLinkOid
 #+end_src
 
-In [[f:mkObject]], the ~externalOids~ captures all links that point to some other cell
-in another Org file. A consistent "cell universe" can be constructed when all
-external links are resolved, by getting all other =Object= values for other Org
-files we depend on.
+** Construction
+
+[[f:mkObject]] creates an object out of a single [[id:5df15f17-c630-4ddf-bade-66084c430a07::data:OrgDoc][data:OrgDoc]].
 
 #+name: f:mkObject
 #+begin_src haskell
-mkObject :: OrgDoc -> IO Object
-mkObject orgDoc = do
-  pure
-    Object
-      { orgDoc = orgDoc,
-        symbols = mkSymbols orgDoc,
-        externalOids = findExternalOids orgDoc
-      }
+mkObject :: OrgDoc -> Object
+mkObject orgDoc =
+  Object
+    { orgDoc = orgDoc,
+      symbols = mkSymbols orgDoc, -- (ref:f:mkObject-mkSymbols)
+      externalOids = findExternalOids orgDoc -- (ref:f:mkObject-findExternalOids)
+    }
 #+end_src
 
-[[f:mkSymbols]] generates a mapping of all OIDs to their cells (via the cell index),
-and also any OID and name combinations to their cells.
+[[f:mkSymbols]] [[(f:mkObject-mkSymbols)]] and [[f:findExternalOids]]
+[[(f:mkObject-findExternalOids)]] are discussed separately below.
+
+*** Symbols
+
+[[f:mkSymbols]] [[(f:mkObject-mkSymbols)]] generates a mapping of all [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] keys
+to their /cell index/ values (where the cell index is the numeric index
+[[(f:mkSymbols-cell-index)]] into the flat list of cells as noted in [[id:5df15f17-c630-4ddf-bade-66084c430a07][~OrgDoc~ data
+structure]]).
 
 #+name: f:mkSymbols
 #+begin_src haskell
 mkSymbols :: OrgDoc -> Map LinkOid Int
-mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
+mkSymbols orgDoc =
+  fromList
+    . concatMap f
+    $ zip
+      [0 ..] -- (ref:f:mkSymbols-cell-index)
+      orgDoc.cells
   where
-    f (localCellIdx, cell) = case cell of
-      CBlock block -> getSymbols block.parentOid block.meta localCellIdx
+    f (localCellIdx, cell) = case cell of -- (ref:f:mkSymbols-localCellIdx)
       CHeading heading
         | Just oidText <- lookup "ID" heading.meta,
           Just oid <- LP.validateOidText oidText ->
@@ -319,158 +342,113 @@ mkSymbols orgDoc = fromList . concatMap f $ zip [0 ..] orgDoc.cells
               )
             ]
         | otherwise -> []
-      CFigure figure -> getSymbols figure.parentOid figure.meta localCellIdx
-      CMathFragment mathFragment -> getSymbols mathFragment.parentOid mathFragment.meta localCellIdx
-      CTable table -> getSymbols table.parentOid table.meta localCellIdx
+      CBlock block ->
+        getSymbols
+          orgDoc.oid
+          block.parentOid
+          block.meta
+          localCellIdx
+      CFigure figure ->
+        getSymbols
+          orgDoc.oid
+          figure.parentOid
+          figure.meta
+          localCellIdx
+      CMathFragment mathFragment ->
+        getSymbols
+          orgDoc.oid
+          mathFragment.parentOid
+          mathFragment.meta
+          localCellIdx
+      CTable table ->
+        getSymbols
+          orgDoc.oid
+          table.parentOid
+          table.meta
+          localCellIdx
       CFootnote {}
       CListItem {}
       CParagraph {}
       CGlossaryTerm {}
-      CCommand {} -> []
-    getSymbols :: OID -> Map Text Text -> Int -> [(LinkOid, Int)]
-    getSymbols parentOid cellMeta localCellIdx =
-      let oids =
-            if parentOid /= orgDoc.oid
-              then [parentOid, orgDoc.oid]
-              else [orgDoc.oid]
-       in concatMap requireName oids
-      where
-        requireName oid
-          | Just name <- lookup "name" cellMeta =
-              [ ( LinkOid
-                    { oid = oid,
-                      name = name
-                    },
-                  localCellIdx
-                )
-              ]
-          | Just tanglePath <- lookup "tangle" cellMeta -- (ref:symbols-tangle-meta)
-            =
-              [ ( LinkOid
-                    { oid = oid,
-                      name = tanglePath <> "\NUL"
-                    },
-                  localCellIdx
-                )
-              ]
-          | Just anonBlockNumber <- lookup "__anon_block_number" cellMeta -- (ref:symbols-anonymous-blocks)
-            =
-              [ ( LinkOid
-                    { oid = oid,
-                      name = anonBlockNumber <> "\NUL__anon_block_number"
-                    },
-                  localCellIdx
-                )
-              ]
-          | otherwise = []
+      CCommand {} -> [] -- (ref:f:mkSymbols-ignored-cells)
 #+end_src
 
-The ~(name, cell)~ tuple is important, because otherwise Org links that
-look like ~[[foo bar]]~ will be returned from [[f:findExternalOids]]. Links
-like ~[[foo bar]]~ shouldn't be considered external, because they refer to cells
-that have been named like ~foo bar~ inside the current Org file, not an external
-Org file.
+Only headings, blocks, figures, math fragments, and tables can be linked to
+using a ~LinkOid~. The other cell types are ignored [[(f:mkSymbols-ignored-cells)]].
 
-[[(symbols-tangle-meta)]] and [[(symbols-anonymous-blocks)]] add anonymous blocks to the
-symbols table (the former have metadata about the tangle path, whereas the
-latter lack even this information). We need [[(symbols-tangle-meta)]] because some
+We call the cell index the ~localCellIdx~ [[(f:mkSymbols-localCellIdx)]] to
+differentiate it against the /global/ cell index, which is used when handling
+archives, such as in [[f:cellIdxToObjCell]].
+
+The [[f:getSymbols]] helper generates either one or two symbols for the same cell;
+these correspond to whether we use one OID (document OID) or two OIDs (document
+OID or the closest parent heading's OID) [[(f:getSymbols-has-parent-oid)]].
+
+#+name: f:getSymbols
+#+begin_src haskell
+getSymbols :: OID -> OID -> Map Text Text -> Int -> [(LinkOid, Int)]
+getSymbols docOid parentOid cellMeta localCellIdx =
+  let oids =
+        if parentOid /= docOid -- (ref:f:getSymbols-has-parent-oid)
+          then [parentOid, docOid]
+          else [docOid]
+   in mapMaybe extractName oids
+  where
+    extractName oid -- (ref:f:getSymbols-extractName)
+      | Just name <- lookup "name" cellMeta =
+          Just
+            ( LinkOid
+                { oid = oid,
+                  name = name
+                },
+              localCellIdx
+            )
+      | Just tanglePath <- lookup "tangle" cellMeta -- (ref:symbols-tangle-meta)
+        =
+          Just
+            ( LinkOid
+                { oid = oid,
+                  name = tanglePath <> "\NUL"
+                },
+              localCellIdx
+            )
+      | Just anonBlockNumber <- lookup "__anon_block_number" cellMeta -- (ref:symbols-anonymous-blocks)
+        =
+          Just
+            ( LinkOid
+                { oid = oid,
+                  name = anonBlockNumber <> "\NUL__anon_block_number"
+                },
+              localCellIdx
+            )
+      | otherwise = Nothing
+#+end_src
+
+The ~extractName~ function [[(f:getSymbols-extractName)]] tries to get some semblance
+of a name from the cell. Other than the ~name~ metadata, the ~tangle~ path
+[[(symbols-tangle-meta)]] and the internal names of anonymous blocks
+[[(symbols-anonymous-blocks)]] are used. We need [[(symbols-tangle-meta)]] because some
 root blocks (that need to be tangled in [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba::f:expandRootBlocks][f:expandRootBlocks]]) may be anonymous.
 Unless we include anonymous blocks as a symbol for these cases, they will be
-skipped over. We need [[(symbols-anonymous-blocks)]] because we need them for
+skipped over. And we need [[(symbols-anonymous-blocks)]] because we need them for
 navigating a block's ancestry; specifically, a block may have an anonymous
 parent, and we still want to include such parents in [[id:ff5876bf-a144-4a08-bba4-15638e3590d5::f:getBlockIdxsFromArchive][f:getBlockIdxsFromArchive]],
 which powers [[id:ff5876bf-a144-4a08-bba4-15638e3590d5::f:mkBlockAncestry][f:mkBlockAncestry]].
 
 Note that [[f:mkSymbols]] needs to return a ~Map LinkOid Int~. Because both
 [[(symbols-tangle-meta)]] and [[(symbols-anonymous-blocks)]] deal with anonymous blocks,
-their ~LinkOid~s are constructed artificially. For both of them we inject a ~\NUL~
-character so as to make it impossible to clash with a user-defined ~LinkOid~ (no
-sane user or text editor will let users mix in ~\NUL~ characters with other text).
-Avoiding clashes is important because the keys of a ~Map~ must be unique to avoid
-overwriting each other's values.
+their ~LinkOid~ values are constructed artificially. For both of them we inject a
+~\NUL~ character so as to make it impossible to clash with a user-defined ~LinkOid~
+(no sane user or text editor will let users mix in ~\NUL~ characters with other
+text). Avoiding clashes is important because the keys of a ~Map~ must be unique to
+avoid overwriting each other's values.
 
-** Citation dependencies
-:PROPERTIES:
-:ID:       4194fc81-a28d-451f-b4bd-f2f522b5a750
-:END:
+*** External OIDs
 
-[[f:getCitationStyles]] returns both the raw XML content as well as the parsed
-content. We need the raw XML because we want to store it in [[f:mkArchive]], because
-there is no ~ToJSON~ instance for the ~CP.Style~ type.
-
-#+name: f:getCitationStyles
-#+begin_src haskell
-getCitationStyles :: [FilePath] -> IO [(Text, CP.Style (CslJson Text))]
-getCitationStyles filePaths = mapM getCitationStyle filePaths
-#+end_src
-
-For parsing the CSL style file (XML), we read a given path, then defer to [[f:parseCitationStyle]].
-
-#+name: f:getCitationStyle
-#+begin_src haskell
-getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))
-getCitationStyle filePath = do
-  p <- P.encodeUtf filePath
-  input <- LU.readFileRobustly p
-  case parseCitationStyle input of
-    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
-    Right style -> pure (input, style)
-#+end_src
-
-[[f:parseCitationStyle]] just delegates most of the work to ~parseStyle~ from
-~Citeproc.Style~. We expect the contents to be in ~CslJson Text~ format.
-
-#+name: f:parseCitationStyle
-#+begin_src haskell
-parseCitationStyle :: Text -> Either String (CP.Style (CslJson Text))
-parseCitationStyle input = do
-  result <- CP.parseStyle (\_ -> pure mempty) input
-  case result of
-    Left citeprocError -> Left $ show citeprocError
-    Right style -> Right style
-#+end_src
-
-The [[f:getBibliographies]] reads multiple JSON files that have bibliographical
-entries in them.
-
-#+name: f:getBibliographies
-#+begin_src haskell
-getBibliographies :: [FilePath] -> IO [(FilePath, [CP.Reference (CslJson Text)])]
-getBibliographies filePaths = do
-  bibs <- mapM getBibliography filePaths
-  pure $ zip filePaths bibs
-#+end_src
-
-The [[f:getBibliography]] parses a single JSON file which has a list of references
-inside it.
-
-#+name: f:getBibliography
-#+begin_src haskell
-getBibliography :: FilePath -> IO [CP.Reference (CslJson Text)]
-getBibliography filePath = do
-  p <- P.encodeUtf filePath
-  input <- LU.readFileRobustly p
-  case parseBibliography input of
-    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
-    Right references -> pure references
-#+end_src
-
-[[f:parseBibliography]] just delegates to ~eitherDecodeStrictText~ from ~Data.Aeson~.
-This is possible because the ~Reference~ type (from ~Citeproc.Types~) has a ~FromJSON~
-instance.
-
-#+name: f:parseBibliography
-#+begin_src haskell
-parseBibliography :: Text -> Either String [CP.Reference (CslJson Text)]
-parseBibliography = eitherDecodeStrictText
-#+end_src
-
-* External symbol (OID) detection
-
-[[f:findExternalOids]] looks for ~LinkTargetOid~ links that point to cells that are
-not inside the current Org file. We just look at all
-links and see if any of them point to an OID that is not accounted for in the
-=symbols= (symbols that are local to the current [[id:5df15f17-c630-4ddf-bade-66084c430a07::data:OrgDoc][data:OrgDoc]]).
+[[f:findExternalOids]] [[(f:mkObject-findExternalOids)]] looks for ~LinkTargetOid~ links
+that point to cells that are not inside the current Org file. We just look at
+all links and see if any of them point to an OID that is not accounted for in
+the ~symbols~ [[(f:findExternalOids-symbols)]].
 
 #+name: f:findExternalOids
 #+begin_src haskell
@@ -479,31 +457,37 @@ findExternalOids orgDoc =
   sort
     . Set.toList
     . fromList
-    $ concatMap f orgDoc.cells
+    $ concatMap searchInsideProse orgDoc.cells
   where
-    f cell = case cell of
-      CBlock block -> foldl' g [] block.body
-      CHeading heading -> foldl' h [] heading.body.unProse
-      CParagraph prose -> foldl' h [] prose.unProse
-      CGlossaryTerm glossaryTerm -> foldl' h [] glossaryTerm.definition.unProse
-      CTable table -> foldl' (\acc prose -> foldl' h acc prose.unProse) [] table.grid
+    searchInsideProse cell = case cell of -- (ref:f:findExternalOids-searchInsideProse)
+      CBlock block -> foldl' getLinkFromBToken [] block.body
+      CHeading heading -> foldl' getLinkFromPToken [] heading.body.unProse
+      CParagraph prose -> foldl' getLinkFromPToken [] prose.unProse
+      CGlossaryTerm glossaryTerm ->
+        foldl' getLinkFromPToken [] glossaryTerm.definition.unProse
+      CTable table ->
+        foldl'
+          (\acc prose -> foldl' getLinkFromPToken acc prose.unProse)
+          []
+          table.grid
       CFigure {}
       CFootnote {}
       CListItem {}
       CMathFragment {}
       CCommand {} -> []
-    g acc = \case
-      BTokenLinkTarget linkTarget -> getExternal acc linkTarget
+    getLinkFromBToken acc bToken = case bToken of -- (ref:f:findExternalOids-getLinkFromBToken)
+      BTokenLinkTarget linkTarget -> keepIfExternal acc linkTarget
       BTokenString {}
       BTokenPadding -> acc
-    h acc = \case
-      PTokenLink link -> getExternal' acc link
+    getLinkFromPToken acc pToken = case pToken of -- (ref:f:findExternalOids-getLinkFromPToken)
+      PTokenLink link -> keepIfExternal acc link.target
       PTokenStyledText {}
       PTokenCitation {}
       PTokenMathFragment {}
       PTokenDivStart {}
       PTokenDivEnd {} -> acc
-    getExternal acc linkTarget = case linkTarget of
+    symbols = mkSymbols orgDoc -- (ref:f:findExternalOids-symbols)
+    keepIfExternal acc linkTarget = case linkTarget of -- (ref:f:findExternalOids-keepIfExternal)
       LinkTargetOid linkOid ->
         if member linkOid symbols
           then acc
@@ -512,11 +496,16 @@ findExternalOids orgDoc =
       LinkTargetFootnote {}
       LinkTargetFilePath {}
       LinkTargetURI {} -> acc
-    getExternal' acc link = getExternal acc link.target
-    symbols = mkSymbols orgDoc
 #+end_src
 
-** Tests
+First we have to look at all areas where prose text can occur
+[[(f:findExternalOids-searchInsideProse)]]. The prose-like containers fall into two
+categories: [[id:e3400781-57e7-409d-a65c-7c3d66847587::data:BToken][data:BToken]] and [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]]; these are handled by ~getLinkFromBToken~
+[[(f:findExternalOids-getLinkFromBToken)]] and ~getLinkFromPToken~
+[[(f:findExternalOids-getLinkFromPToken)]] respectively, which harvest the links out
+of them. Then we check if the link's target is external or not, only keeping it
+if it is external [[(f:findExternalOids-keepIfExternal)]] (i.e., not found in
+~symbols~ [[(f:findExternalOids-symbols)]]).
 
 Links to code blocks within the same document, whether explicitly defined with
 an OID or not, shouldn't result in external links.
@@ -620,7 +609,8 @@ checkExternalOids
   ]
 #+end_src
 
-Here's a more complicated external link.
+Here's a more complicated example with external links that break over multiple
+lines.
 
 #+name: ti:0400-external-symbols-newlines
 #+header: :tangle test/Lilac/CompileSpec/0400-external-symbols-newlines
@@ -655,6 +645,68 @@ checkExternalOids
 :ID:       25827c17-2015-434b-b686-db3d72b2ee4d
 :END:
 
+A [[data:Archive]] is a collection of [[data:Object]] values. The ~objects~ field
+[[(data:Archive-objects)]] holds this collection, where the [[id:2d98229c-e318-434b-916b-364c04021306::newtype:GPath][newtype:GPath]] is the key
+of where that object was found. We have to use ~GPath~ because there is no
+~ToJSONKey~ instance for ~P.OsPath~ (which would otherwise have been our first
+choice).
+
+#+name: data:Archive
+#+begin_src haskell
+type Archive :: Type
+data Archive = Archive
+  { objects :: Map GPath Object, -- (ref:data:Archive-objects)
+    symbols :: Map LinkOid Int,
+    ancestry :: Map Int [Int],
+    glossary :: Map (Text, GPath) Int,
+    backlinks :: Map GPath (Map GPath [G.Edge]),
+    offsets :: IntMap GPath,
+    csls :: Map FilePath Text,
+    bibs :: Map FilePath [CP.Reference (CslJson Text)]
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+The other fields in [[data:Archive]] are based on the ~objects~:
+
+  - ~symbols~ :: A table for finding the cell (from one of the objects in the
+    archive) based on a given [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]. It contains a /globally/ unique index
+    of the cell, which can be used to find the actual cell we are interested in.
+
+    Now it could be the case that the user decides to link to the top-level UUID
+    of the document. These require special treatment because they do not
+    correspond to any given cell. So instead, we use negative numbers so as not
+    to collide with the regular cell index numbers. The negative numbers encode
+    which object we are referring to, and require special treatment.
+
+  - ~backlinks~ :: A map where the keys are the paths (of objects) and the
+    values are the backlinks to that object. The backlinks are themselves a map
+    because we want to organize all of the backlinks by the document they are
+    starting out from. The actual backlinks are just edges between cells
+    (vertices) where the edges are created by a reference (via [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]])
+    from one cell to another. They are based on [[id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5::newtype:PseudoEdge][newtype:PseudoEdge]] which are
+    constructed in [[id:dabccd5e-930e-4571-899f-1bfbdeab3d5e::f:oidLinkParser][f:oidLinkParser]]. See [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]] for how they are used
+    during weaving.
+
+  - ~offsets~ :: The offset of each object's cells, in relation to the global
+    (flattened) list of all cells in the archive. For example, if the object is
+    the first one in the list, the offset is 0. The offset grows depending on
+    how many cells each object has. So if the first object has 100 cells, the
+    offset for the second object in the list is 100.
+
+  - ~ancestry~ :: A map of global cell indices of blocks to their parents (a block
+    can have multiple parents because more than one block can refer to the same
+    child block). This is created by [[f:mkBlockAncestry]] and later used by
+    [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveBlockAncestry][f:weaveBlockAncestry]] for making each block link back to its parents, if any.
+
+  - ~glossary~ :: This is the combined set of all glossary terms found in all
+    objects. The main difference is that the key includes not just the term
+    itself (~Text~) but also the path of the object to identify which object has
+    this term. The values are local cell indices, so in order to get the
+    concrete value, you have to use the ~offsets~ in order to convert the local
+    cell index into a global one.
+
 When dealing with multiple [[data:Object]] files at a time, we have to answer the
 question, "is this collection of objects able to resolve all internal
 [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] values"? Essentially this is the same question as asking if there
@@ -670,58 +722,8 @@ to do:
      tangling purposes.
 
   2) For weaving, we care about any broken link ([[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) to a cell,
-     because otherwise we will not be able to generate the correct HTML link tag
-     (~href=...~ attribute) for it.
-
-#+name: data:Archive
-#+begin_src haskell
-type Archive :: Type
-data Archive = Archive
-  { objects :: Map GPath Object,
-    symbols :: Map LinkOid Int,
-    ancestry :: Map Int [Int],
-    glossary :: Map (Text, GPath) Int,
-    backlinks :: Map GPath (Map GPath [G.Edge]),
-    offsets :: IntMap GPath,
-    csls :: Map FilePath Text,
-    bibs :: Map FilePath [CP.Reference (CslJson Text)]
-  }
-  deriving stock (Eq, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
-#+end_src
-
-A [[data:Archive]] is just a collection of [[data:Object]] values. The ~objects~ field
-holds this collection, where the [[id:2d98229c-e318-434b-916b-364c04021306::newtype:GPath][newtype:GPath]] is the key of where that object
-was found. We have to use ~GPath~ because there is no ~ToJSONKey~ instance for
-~P.OsPath~ (which would otherwise have been our first choice).
-
-The other fields in [[data:Archive]] are based on the ~objects~:
-
-  - The ~symbols~ is a table for finding the cell (in one of the objects found in
-    the archive) that corresponds to a [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]. It contains a globally
-    unique index of the cell, which can be used with ~offsets~ to find the actual
-    cell we are interested in.
-
-    Now it could be the case that the user decides to link to the top-level UUID
-    of the document. These require special treatment because they do not
-    correspond to any given cell. So instead, we use negative numbers so as not
-    to collide with the regular cell index numbers. The negative numbers encode
-    which object we are referring to, and require special handling.
-
-  - The ~backlinks~ is a map where the keys are the paths (of objects) and the
-    values are the backlinks to that object. The backlinks are themselves a map
-    because we want to organize all of the backlinks by the document they are
-    starting out from. The actual backlinks are just edges between cells
-    (vertices) where the edges are created by a reference (via [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]])
-    from one cell to another. They are based on [[id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5::newtype:PseudoEdge][newtype:PseudoEdge]] which are
-    constructed in [[id:dabccd5e-930e-4571-899f-1bfbdeab3d5e::f:oidLinkParser][f:oidLinkParser]]. See [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]] for how they are used
-    during weaving.
-
-  - The ~offsets~ is the offset of each object's cells, in relation to the global
-    (flattened) list of all cells in the archive. For example, if the object is
-    the first one in the list, the offset is 0. The offset grows depending on
-    how many cells each object has. So if the first object has 100 cells, the
-    offset for the second object in the list is 100.
+     because otherwise we will not be able to generate the HTML link tag (~<a>~)
+     with the correct ~href=...~ attribute for it.
 
 To construct the archive, [[f:mkArchive]] reads a list of paths and the objects that
 are found on those paths. The main check that is performed is to see that there
@@ -750,10 +752,17 @@ mkArchive pathObjs = do
       brokenLinks = findBrokenLinks objects symbols
   allBibPaths <-
     concat
-      <$> mapM (\(gp, o) -> makeRelativeToObjectPath gp o.orgDoc.bibPaths) pathObjs
+      <$> mapM
+        (\(gp, o) -> makeRelativeToObjectPath gp o.orgDoc.bibPaths)
+        pathObjs
   allCslPaths <-
     concat
-      <$> mapM (\(gp, o) -> makeRelativeToObjectPath gp $ maybeToList o.orgDoc.cslPath) pathObjs
+      <$> mapM
+        ( \(gp, o) ->
+            makeRelativeToObjectPath gp
+              $ maybeToList o.orgDoc.cslPath
+        )
+        pathObjs
   bibs <- getBibliographies allBibPaths
   cslRawXMLs <- map fst <$> getCitationStyles allCslPaths
   let csls = zip allCslPaths cslRawXMLs
@@ -950,19 +959,21 @@ cellIdxToName archive offset globalCellIdx
   | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
       case cell of
         CHeading heading ->
-          plain $ "§ " <> (getSectionNumber heading) <> " " <> (getProseContents heading.body)
+          plain
+            $ "§ "
+            <> (getSectionNumber heading)
+            <> " "
+            <> (getProseContents heading.body)
         CParagraph _ ->
           Just
             $ Prose
-              [ PTokenStyledText $ StyledText {body = "¶ (", style = styleMaskFrom []},
-                PTokenStyledText $ StyledText {body = cellRef, style = styleMaskFrom [Verbatim]},
-                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+              [ ptext "¶ (" [],
+                ptext cellRef [Verbatim],
+                ptext ")" []
               ]
         CGlossaryTerm glossaryTerm ->
           Just
-            $ Prose
-              [ PTokenStyledText $ StyledText {body = "✿ ", style = styleMaskFrom []}
-              ]
+            $ Prose [ptext "✿ " []]
             <> stripLinks glossaryTerm.term -- (ref:stripLinks)
         CFigure figure
           | Just name <- lookup "name" figure.meta -> verbatim name
@@ -977,9 +988,9 @@ cellIdxToName archive offset globalCellIdx
         CFootnote footnote ->
           Just
             $ Prose
-              [ PTokenStyledText $ StyledText {body = "Footnote (", style = styleMaskFrom []},
-                PTokenStyledText $ StyledText {body = "fn:" <> footnote.name, style = styleMaskFrom [Verbatim]},
-                PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+              [ ptext "Footnote (" [],
+                ptext ("fn:" <> footnote.name) [Verbatim],
+                ptext ")" []
               ]
         CBlock block
           | Just name <- lookup "name" block.meta ->
@@ -998,8 +1009,8 @@ cellIdxToName archive offset globalCellIdx
   | otherwise = Nothing
   where
     cellRef = "Cell " <> (T.show $ globalCellIdx - offset)
-    plain body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom []}]
-    verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
+    plain body = Just $ Prose [ptext body []]
+    verbatim body = Just $ Prose [ptext body [Verbatim]]
 #+end_src
 
 We have to convert links (~PTokenLink~) into styled text (~PTokenStyledText~) at
@@ -1030,7 +1041,7 @@ stripStyles (Prose pTokens) = Prose (concatMap stripStyle pTokens)
   where
     stripStyle :: PToken -> [PToken]
     stripStyle = \case
-      PTokenStyledText styledText -> [PTokenStyledText $ StyledText {body = styledText.body, style = styleMaskFrom []}]
+      PTokenStyledText styledText -> [ptext styledText.body []]
       pToken -> [pToken]
 #+end_src
 
@@ -1051,9 +1062,9 @@ getCellName = \case
   CFootnote footnote ->
     Just
       $ Prose
-        [ PTokenStyledText $ StyledText {body = "Footnote (", style = styleMaskFrom []},
-          PTokenStyledText $ StyledText {body = "fn:" <> footnote.name, style = styleMaskFrom [Verbatim]},
-          PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+        [ ptext "Footnote (" [],
+          ptext ("fn:" <> footnote.name) [Verbatim],
+          ptext ")" []
         ]
   CBlock block
     | Just name <- lookup "name" block.meta ->
@@ -1069,7 +1080,7 @@ getCellName = \case
   CListItem {}
   CCommand {} -> Nothing
   where
-    verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
+    verbatim body = Just $ Prose [ptext body [Verbatim]]
 #+end_src
 
 [[f:readObjectsFrom]] reads files from a given parent directory, and converts them
@@ -1089,9 +1100,8 @@ readObjectsFrom parentDir = foldlM f []
       case LP.parseOrgDoc input of
         Left errTxt -> die $ T.unpack errTxt
         Right od -> do
-          obj <- mkObject od
           relPath' <- encodeGPath =<< P.decodeUtf relPath
-          pure $ (relPath', obj) : acc
+          pure $ (relPath', mkObject od) : acc
 #+end_src
 
 [[f:makeRelativeToObjectPath]] gets a ~[FilePath]~ and makes them relative to the
@@ -1113,6 +1123,84 @@ makeRelativeToObjectPath objGPath fps = do
       p <- P.encodeUtf fp
       let relPath = P.combine objDir p
       P.decodeUtf relPath
+#+end_src
+
+** Citation dependencies
+:PROPERTIES:
+:ID:       4194fc81-a28d-451f-b4bd-f2f522b5a750
+:END:
+
+[[f:getCitationStyles]] returns both the raw XML content as well as the parsed
+content. We need the raw XML because we want to store it in [[f:mkArchive]], because
+there is no ~ToJSON~ instance for the ~CP.Style~ type.
+
+#+name: f:getCitationStyles
+#+begin_src haskell
+getCitationStyles :: [FilePath] -> IO [(Text, CP.Style (CslJson Text))]
+getCitationStyles filePaths = mapM getCitationStyle filePaths
+#+end_src
+
+For parsing the CSL style file (XML), we read a given path, then defer to [[f:parseCitationStyle]].
+
+#+name: f:getCitationStyle
+#+begin_src haskell
+getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))
+getCitationStyle filePath = do
+  p <- P.encodeUtf filePath
+  input <- LU.readFileRobustly p
+  case parseCitationStyle input of
+    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
+    Right style -> pure (input, style)
+#+end_src
+
+[[f:parseCitationStyle]] just delegates most of the work to ~parseStyle~ from
+~Citeproc.Style~. We expect the contents to be in ~CslJson Text~ format.
+
+#+name: f:parseCitationStyle
+#+begin_src haskell
+parseCitationStyle :: Text -> Either String (CP.Style (CslJson Text))
+parseCitationStyle input = do
+  result <- CP.parseStyle (\_ -> pure mempty) input
+  case result of
+    Left citeprocError -> Left $ show citeprocError
+    Right style -> Right style
+#+end_src
+
+The [[f:getBibliographies]] reads multiple JSON files that have bibliographical
+entries in them.
+
+#+name: f:getBibliographies
+#+begin_src haskell
+getBibliographies ::
+  [FilePath] ->
+  IO [(FilePath, [CP.Reference (CslJson Text)])]
+getBibliographies filePaths = do
+  bibs <- mapM getBibliography filePaths
+  pure $ zip filePaths bibs
+#+end_src
+
+The [[f:getBibliography]] parses a single JSON file which has a list of references
+inside it.
+
+#+name: f:getBibliography
+#+begin_src haskell
+getBibliography :: FilePath -> IO [CP.Reference (CslJson Text)]
+getBibliography filePath = do
+  p <- P.encodeUtf filePath
+  input <- LU.readFileRobustly p
+  case parseBibliography input of
+    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
+    Right references -> pure references
+#+end_src
+
+[[f:parseBibliography]] just delegates to ~eitherDecodeStrictText~ from ~Data.Aeson~.
+This is possible because the ~Reference~ type (from ~Citeproc.Types~) has a ~FromJSON~
+instance.
+
+#+name: f:parseBibliography
+#+begin_src haskell
+parseBibliography :: Text -> Either String [CP.Reference (CslJson Text)]
+parseBibliography = eitherDecodeStrictText
 #+end_src
 
 ** Tests
@@ -1311,7 +1399,7 @@ expectArchiveOk
   ]
 #+end_src
 
-* Cycle detection for Noweb links
+** Cycle detection for Noweb links
 :PROPERTIES:
 :ID:       ff5876bf-a144-4a08-bba4-15638e3590d5
 :END:
@@ -1519,7 +1607,7 @@ mkBlockAncestry archive blockIdxs = foldl' f mempty blockIdxs
       BTokenString {} -> Nothing
 #+end_src
 
-** Tests
+*** Tests
 
 We use the [[f:checkCycles]] helper (powered by [[f:findCycles]] underneath) to detect
 cycles (or lack thereof).
@@ -1733,7 +1821,10 @@ checkCycles
                   [ Node
                       { rootLabel =
                           LinkOid
-                            { oid = fromWords 0x0000000000000000 0x000000000000e005,
+                            { oid =
+                                fromWords
+                                  0x0000000000000000
+                                  0x000000000000e005,
                               name = "f:c"
                             },
                         subForest = []
@@ -1811,7 +1902,10 @@ checkCycles
                   [ Node
                       { rootLabel =
                           LinkOid
-                            { oid = fromWords 0x0000000000000000 0x000000000000e006,
+                            { oid =
+                                fromWords
+                                  0x0000000000000000
+                                  0x000000000000e006,
                               name = "f:c"
                             },
                         subForest = []
@@ -1819,7 +1913,10 @@ checkCycles
                     Node
                       { rootLabel =
                           LinkOid
-                            { oid = fromWords 0x0000000000000000 0x000000000000e006,
+                            { oid =
+                                fromWords
+                                  0x0000000000000000
+                                  0x000000000000e006,
                               name = "f:d"
                             },
                         subForest = []
@@ -1966,7 +2063,10 @@ checkCycles
                   [ Node
                       { rootLabel =
                           LinkOid
-                            { oid = fromWords 0x0000000000000000 0x000000000000f008,
+                            { oid =
+                                fromWords
+                                  0x0000000000000000
+                                  0x000000000000f008,
                               name = "c"
                             },
                         subForest = []

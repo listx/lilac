@@ -635,15 +635,15 @@ data WeaveConf = WeaveConf
 type Object :: Type
 data Object = Object
   { orgDoc :: OrgDoc,
-    symbols :: Map LinkOid Int,
-    externalOids :: [LinkOid]
+    symbols :: Map LinkOid Int, --
+    externalOids :: [LinkOid] --
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 type Archive :: Type
 data Archive = Archive
-  { objects :: Map GPath Object,
+  { objects :: Map GPath Object, --
     symbols :: Map LinkOid Int,
     ancestry :: Map Int [Int],
     glossary :: Map (Text, GPath) Int,
@@ -676,7 +676,7 @@ stripStyles (Prose pTokens) = Prose (concatMap stripStyle pTokens)
   where
     stripStyle :: PToken -> [PToken]
     stripStyle = \case
-      PTokenStyledText styledText -> [PTokenStyledText $ StyledText {body = styledText.body, style = styleMaskFrom []}]
+      PTokenStyledText styledText -> [ptext styledText.body []]
       pToken -> [pToken]
 
 getCellName :: Cell -> Maybe Prose
@@ -690,9 +690,9 @@ getCellName = \case
   CFootnote footnote ->
     Just
       $ Prose
-        [ PTokenStyledText $ StyledText {body = "Footnote (", style = styleMaskFrom []},
-          PTokenStyledText $ StyledText {body = "fn:" <> footnote.name, style = styleMaskFrom [Verbatim]},
-          PTokenStyledText $ StyledText {body = ")", style = styleMaskFrom []}
+        [ ptext "Footnote (" [],
+          ptext ("fn:" <> footnote.name) [Verbatim],
+          ptext ")" []
         ]
   CBlock block
     | Just name <- lookup "name" block.meta ->
@@ -708,7 +708,7 @@ getCellName = \case
   CListItem {}
   CCommand {} -> Nothing
   where
-    verbatim body = Just $ Prose [PTokenStyledText $ StyledText {body = body, style = styleMaskFrom [Verbatim]}]
+    verbatim body = Just $ Prose [ptext body [Verbatim]]
 
 type ProjectConf :: Type
 data ProjectConf = ProjectConf
