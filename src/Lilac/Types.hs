@@ -46,7 +46,7 @@ module Lilac.Types
     markingChars,
     markingCharsInvisible,
     nilOid,
-    nilOidOrgDoc,
+    nilOidOrgDocPrefix,
     protocolsEmacs,
     protocolsWeb,
     ptext,
@@ -553,8 +553,8 @@ instance Show OID where
 nilOid :: OID
 nilOid = fromWords 0 0
 
-nilOidOrgDoc :: Text
-nilOidOrgDoc =
+nilOidOrgDocPrefix :: Text
+nilOidOrgDocPrefix =
   """
   :PROPERTIES:
   :ID:       00000000-0000-0000-0000-000000000000

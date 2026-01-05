@@ -86,7 +86,7 @@ import Lilac.Types
     defaultOrgParserState,
     fromWords,
     nilOid,
-    nilOidOrgDoc,
+    nilOidOrgDocPrefix,
     ptext,
     stext,
     styleMaskFrom,
@@ -96,6 +96,7 @@ import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     FilePath,
+    IO,
     Identity,
     Int,
     Maybe (Just, Nothing),
@@ -104,7 +105,6 @@ import Relude
     Type,
     forM_,
     fromList,
-    otherwise,
     repeat,
     runStateT,
     show,
@@ -132,138 +132,13 @@ import Test.Hspec.Megaparsec
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char)
 
-spec :: Spec
-spec = parseSpec
-
-type Parser :: Type -> Type
-type Parser = MP.ParsecT Void Text Identity
-
-shouldParseWith :: FilePath -> OrgDoc -> Spec
-shouldParseWith path expected = do
-  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path check
-  where
-    check input
-      | expected.oid == nilOid =
-          action nilOidOrgDoc input defaultOrgParserState
-      | otherwise = action "" input defaultOrgParserState
-    action inputPrefix input expectedState =
-      MP.runParser
-        (runStateT L.orgDocParser defaultOrgParserState)
-        path
-        (inputPrefix <> input)
-        `shouldParse` (expected, expectedState)
-
-shouldParseWithState :: FilePath -> OrgDoc -> OrgParserState -> Spec
-shouldParseWithState path expected expectedState = do
-  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path check
-  where
-    check input
-      | expected.oid == nilOid =
-          action nilOidOrgDoc input expectedState
-      | otherwise = action "" input expectedState
-    action inputPrefix input expectedState' =
-      MP.runParser
-        (runStateT L.orgDocParser defaultOrgParserState)
-        path
-        (inputPrefix <> input)
-        `shouldParse` (expected, expectedState')
-
-shouldFailWithMessage :: FilePath -> String -> Int -> Spec
-shouldFailWithMessage path errMsg pos = do
-  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path $ \input -> do
-      MP.runParser
-        (runStateT L.orgDocParser defaultOrgParserState)
-        path
-        (inputPrefix <> input)
-        `shouldFailWith` (errFancy newPos . fancy $ MP.ErrorFail errMsg)
-  where
-    inputPrefix = nilOidOrgDoc
-    newPos = pos + T.length inputPrefix
-
-shouldFailWithError :: FilePath -> ET Text -> Int -> Spec
-shouldFailWithError path errorTrivial pos = do
-  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path $ \input -> do
-      MP.runParser
-        (runStateT L.orgDocParser defaultOrgParserState)
-        path
-        (inputPrefix <> input)
-        `shouldFailWith` (err newPos errorTrivial)
-  where
-    inputPrefix = nilOidOrgDoc
-    newPos = pos + T.length inputPrefix
-
-shouldFail :: FilePath -> Spec
-shouldFail path = do
-  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path $ \input -> do
-      MP.runParser
-        (runStateT L.orgDocParser defaultOrgParserState)
-        path
-        `shouldFailOn` (inputPrefix <> input)
-  where
-    inputPrefix = nilOidOrgDoc
-
-plainParagraph :: Text -> Cell
-plainParagraph body =
-  CParagraph
-    $ Prose
-      [ PTokenStyledText
-          StyledText
-            { body = body,
-              style = styleMaskFrom []
-            }
-      ]
-
-plainHeading :: Int -> [Int] -> Cell
-plainHeading level section =
-  CHeading
-    Heading
-      { level = level,
-        section = section,
-        body =
-          Prose
-            [ PTokenStyledText
-                StyledText
-                  { body = T.pack $ show level,
-                    style = styleMaskFrom []
-                  }
-            ],
-        meta = fromList []
-      }
-
-nilOrgDoc :: [Cell] -> [PseudoEdge] -> OrgDoc
-nilOrgDoc cells pseudoEdges =
-  OrgDoc
-    { oid = nilOid,
-      cells = cells,
-      pseudoEdges = pseudoEdges,
-      footnoteRefs = M.empty,
-      glossary = M.empty,
-      lineLabels = M.empty,
-      cslPath = Nothing,
-      bibPaths = [],
-      citations = [],
-      meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
-    }
-
-checkTextToProseRoundTrip :: String -> [(Text, Prose)] -> Spec
-checkTextToProseRoundTrip msg testCases = do
-  it msg $ do
-    forM_ testCases $ \(text, prose) -> do
-      CP.fromText text `shouldBe` prose
-      CP.toText prose `shouldBe` text
-
-parseSpec :: Spec
-parseSpec = do
+spec :: Spec --
+spec = do
   it "empty input" $ do
     MP.runParser
       (runStateT L.orgDocParser defaultOrgParserState)
       "empty input"
-      nilOidOrgDoc
+      nilOidOrgDocPrefix
       `shouldParse` (L.defaultOrgDoc nilOid [], defaultOrgParserState)
 
   before (LU.readFrom "" "base/lilac.org") $ do
@@ -568,7 +443,7 @@ parseSpec = do
       }
 
   shouldFailWithMessage
-    "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
+    "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels"
     "indentation does not fit into existing levels"
     36
 
@@ -3417,3 +3292,124 @@ parseSpec = do
     "0016-metadata-reserved-underscores"
     "cannot use leading double underscores for metadata key: \"__block_type\""
     2
+
+type Parser :: Type -> Type
+type Parser = MP.ParsecT Void Text Identity --
+
+shouldParseWith :: FilePath -> OrgDoc -> Spec
+shouldParseWith path expectedOrgDoc = do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> parseAs input path expected --
+  where
+    expected = (expectedOrgDoc, defaultOrgParserState)
+
+shouldParseWithState :: FilePath -> OrgDoc -> OrgParserState -> Spec
+shouldParseWithState path expectedOrgDoc expectedState = do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> parseAs input path expected
+  where
+    expected = (expectedOrgDoc, expectedState)
+
+parseAs ::
+  Text ->
+  FilePath ->
+  (OrgDoc, OrgParserState) ->
+  IO ()
+parseAs input path expected@(doc, _) =
+  MP.runParser
+    (runStateT L.orgDocParser defaultOrgParserState)
+    path
+    input'
+    `shouldParse` expected
+  where
+    input' =
+      if doc.oid == nilOid
+        then nilOidOrgDocPrefix <> input
+        else input
+
+shouldFailWithMessage :: FilePath -> String -> Int -> Spec
+shouldFailWithMessage path errMsg pos = do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser defaultOrgParserState)
+        path
+        (inputPrefix <> input)
+        `shouldFailWith` (errFancy newPos . fancy $ MP.ErrorFail errMsg) --
+  where
+    inputPrefix = nilOidOrgDocPrefix
+    newPos = pos + T.length inputPrefix
+
+shouldFailWithError :: FilePath -> ET Text -> Int -> Spec
+shouldFailWithError path errorTrivial pos = do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser defaultOrgParserState)
+        path
+        (inputPrefix <> input)
+        `shouldFailWith` (err newPos errorTrivial)
+  where
+    inputPrefix = nilOidOrgDocPrefix
+    newPos = pos + T.length inputPrefix
+
+shouldFail :: FilePath -> Spec
+shouldFail path = do
+  before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
+    it path $ \input -> do
+      MP.runParser
+        (runStateT L.orgDocParser defaultOrgParserState)
+        path
+        `shouldFailOn` (inputPrefix <> input)
+  where
+    inputPrefix = nilOidOrgDocPrefix
+
+plainParagraph :: Text -> Cell
+plainParagraph body =
+  CParagraph
+    $ Prose
+      [ PTokenStyledText
+          StyledText
+            { body = body,
+              style = styleMaskFrom []
+            }
+      ]
+
+plainHeading :: Int -> [Int] -> Cell
+plainHeading level section =
+  CHeading
+    Heading
+      { level = level,
+        section = section,
+        body =
+          Prose
+            [ PTokenStyledText
+                StyledText
+                  { body = T.pack $ show level,
+                    style = styleMaskFrom []
+                  }
+            ],
+        meta = fromList []
+      }
+
+nilOrgDoc :: [Cell] -> [PseudoEdge] -> OrgDoc
+nilOrgDoc cells pseudoEdges =
+  OrgDoc
+    { oid = nilOid,
+      cells = cells,
+      pseudoEdges = pseudoEdges,
+      footnoteRefs = M.empty,
+      glossary = M.empty,
+      lineLabels = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      citations = [],
+      meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+    }
+
+checkTextToProseRoundTrip :: String -> [(Text, Prose)] -> Spec
+checkTextToProseRoundTrip msg testCases = do
+  it msg $ do
+    forM_ testCases $ \(text, prose) -> do
+      CP.fromText text `shouldBe` prose
+      CP.toText prose `shouldBe` text

@@ -3995,8 +3995,8 @@ test cases, we search for the presence of certain substrings within the HTML.
 *** Test module and helpers
 
 The test module here mirrors what we've already seen in [[id:3990627d-69f5-4c30-b3d7-abb3edaa0d13::TangleSpec helpers][TangleSpec helpers]] and
-[[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::ParseSpec
-helpers][ParseSpec helpers]]. We have the usual bits for setting up automatic test
+[[id:979c2b7d-e448-4419-8d59-f92ebbd71cd6::ParseSpec
+ helpers][ParseSpec helpers]]. We have the usual bits for setting up automatic test
 discovery in [[weaveSpec discovery]], as well as some test helpers in [[WeaveSpec
 helpers]] to take care of some boilerplate.
 
@@ -4043,7 +4043,7 @@ import Lilac.Types
     defaultOrgParserState,
     encodeGPath,
     nilOid,
-    nilOidOrgDoc,
+    nilOidOrgDocPrefix,
     ptext,
     stext,
   )
@@ -4135,7 +4135,7 @@ getWovenPrettyFromPath path = do
         MP.runParser
           (runStateT LP.orgDocParser defaultOrgParserState)
           path
-          (nilOidOrgDoc <> inputOrgFile)
+          (nilOidOrgDocPrefix <> inputOrgFile)
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
@@ -4233,7 +4233,7 @@ getCiteprocResultFromPath path = do
         MP.runParser
           (runStateT LP.orgDocParser defaultOrgParserState)
           path
-          (nilOidOrgDoc <> inputOrgFile)
+          (nilOidOrgDocPrefix <> inputOrgFile)
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do

@@ -1579,7 +1579,7 @@ it "empty input" $ do
   MP.runParser
     (runStateT L.orgDocParser defaultOrgParserState)
     "empty input"
-    nilOidOrgDoc
+    nilOidOrgDocPrefix
     `shouldParse` (L.defaultOrgDoc nilOid [], defaultOrgParserState)
 #+end_src
 
@@ -9578,7 +9578,7 @@ file, not the woven HTML format.
 
      - [[ti:0005-paragraph-indentation-mismatch-initial-indent-invalid]]
 
-     - [[ti:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels]]
+     - [[ti:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels]]
 
   4) List items can have more than one paragraph associated with them.
 
@@ -10685,8 +10685,8 @@ shouldFailWithMessage
   21
 #+end_src
 
-#+name: ti:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels
-#+header: :tangle test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels
+#+name: ti:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels
+#+header: :tangle test/Lilac/ParseSpec/0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels
 #+begin_src org
   1) Foo
      bar.
@@ -10696,10 +10696,10 @@ shouldFailWithMessage
    Invalid indentation (this paragraph).
 #+end_src
 
-#+name: t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels
+#+name: t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels
 #+begin_src haskell
 shouldFailWithMessage
-  "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels"
+  "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels"
   "indentation does not fit into existing levels"
   36
 #+end_src
@@ -12621,15 +12621,22 @@ shouldParseWithState
 :ID:       ebf0d269-79d3-408a-a6e7-baf720d73837
 :END:
 
-The tests here are all designed to read from Org source documents. There are
-some benefits of writing tests this way:
+The tests here are all designed to read from mostly fully-fledged Org source
+documents. (We say "mostly fully-fledged" because many of the test inputs don't
+have the required document OID in it (because it is redundant and largely
+meaningless for test cases that don't are about the document OID); these tests
+rely on [[f:nilOidOrgDocPrefix]] to be prefixed to the input.)
+
+Anyway, there are some benefits of writing test inputs as self-contained Org
+documents this way:
 
   1) The raw input file (on disk) for test cases can be looked at if necessary.
      This is especially useful if the input has any special Org characters in it
      we have to escape. See [[ti:0007-blocks-ending]] and
-     [[ti:0004-properties-drawer-empty]] where we need to escape some parts of the input with a
-     leading comma (so as to distinguish between the Org syntax of this document
-     vs the nested Org syntax of the input file we are defining).
+     [[ti:0004-properties-drawer-empty]] where we need to escape some parts of the
+     input with a leading comma (so as to distinguish between the Org syntax of
+     this document versus the nested Org syntax of the input file we are
+     defining).
 
   2) We can organize the input files in a systematic way. We use a
      ~NNNN-<description>~ naming scheme for the inputs, which all live under
@@ -12641,7 +12648,7 @@ The downside is that we have to perform lots of small read operations (IO) to
 run the unit tests. But this cost is small enough that we can ignore it (we
 spend far more time compiling the tests themselves).
 
-** Test module and helpers
+** Test module
 :PROPERTIES:
 :ID:       906bcb25-4380-4e41-a941-e57cbcf7d2a1
 :END:
@@ -12737,7 +12744,7 @@ import Lilac.Types
     defaultOrgParserState,
     fromWords,
     nilOid,
-    nilOidOrgDoc,
+    nilOidOrgDocPrefix,
     ptext,
     stext,
     styleMaskFrom,
@@ -12747,6 +12754,7 @@ import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     FilePath,
+    IO,
     Identity,
     Int,
     Maybe (Just, Nothing),
@@ -12755,7 +12763,6 @@ import Relude
     Type,
     forM_,
     fromList,
-    otherwise,
     repeat,
     runStateT,
     show,
@@ -12783,21 +12790,20 @@ import Test.Hspec.Megaparsec
 import Text.Megaparsec qualified as MP
 import Text.Megaparsec.Char (char)
 
-<<parseSpec discovery>>
+spec :: Spec -- (ref:module:Lilac.ParseSpec-spec)
+spec = do
+  <<All test cases>>
 
 <<ParseSpec helpers>>
-
-<<f:parseSpec>>
 #+end_src
 
-We have to export a function named ~spec~ for discovery of test cases to happen
-automatically, so we define it in [[parseSpec discovery]].
+We have to export a function named ~spec~ [[(module:Lilac.ParseSpec-spec)]] for
+discovery of test cases to happen automatically.
 
-#+name: parseSpec discovery
-#+begin_src haskell
-spec :: Spec
-spec = parseSpec
-#+end_src
+** Test helpers
+:PROPERTIES:
+:ID:       979c2b7d-e448-4419-8d59-f92ebbd71cd6
+:END:
 
 Most of the test helpers are concerned about reading a raw input file from disk,
 and then running the [[f:orgDocParser]] against it.
@@ -12805,10 +12811,11 @@ and then running the [[f:orgDocParser]] against it.
 #+name: ParseSpec helpers
 #+begin_src haskell
 type Parser :: Type -> Type
-type Parser = <<Concrete type for Megaparsec>>
+type Parser = <<Concrete type for Megaparsec>> -- (ref:ParseSpec helpers:Parser type synonym)
 
 <<f:shouldParseWith>>
 <<f:shouldParseWithState>>
+<<f:parseAs>>
 <<f:shouldFailWithMessage>>
 <<f:shouldFailWithError>>
 <<f:shouldFail>>
@@ -12818,42 +12825,56 @@ type Parser = <<Concrete type for Megaparsec>>
 <<f:checkTextToProseRoundTrip>>
 #+end_src
 
-The ~Parser~ type synonym uses the same [[Concrete type for Megaparsec][concrete types]] as we do for
-[[type:OrgParser]]. The ~Parser~ type synonym is used in tests such as
+The ~Parser~ type synonym [[(ParseSpec helpers:Parser type synonym)]] uses the same [[Concrete type for
+ Megaparsec][concrete type]] as we do for [[type:OrgParser]]. It is used in tests such as
 [[t:0005-notFollowedBy-behavior-for-empty-input]].
 
-We need a helper function around =parseOrgDoc=, which will read in a file from a
-given path (to feed to =parseOrgDoc=). We name this helper [[f:shouldParseWith]].
+We need a helper function around ~parseOrgDoc~, specifically to read in a file
+from a given path. We name this helper [[f:shouldParseWith]].
 
 #+name: f:shouldParseWith
 #+begin_src haskell
 shouldParseWith :: FilePath -> OrgDoc -> Spec
-shouldParseWith path expected = do
+shouldParseWith path expectedOrgDoc = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path check
+    it path $ \input -> parseAs input path expected -- (ref:f:shouldParseWith-parseAs)
   where
-    check input
-      | expected.oid == nilOid =
-          action nilOidOrgDoc input defaultOrgParserState
-      | otherwise = action "" input defaultOrgParserState
-    action inputPrefix input expectedState =
-      MP.runParser
-        (runStateT L.orgDocParser defaultOrgParserState)
-        path
-        (inputPrefix <> input)
-        `shouldParse` (expected, expectedState)
+    expected = (expectedOrgDoc, defaultOrgParserState)
 #+end_src
 
-For convenience though, [[f:shouldParseWith]] prefixes the file with a required Org
-ID, with the help of [[f:nilOidOrgDoc]]. This way the majority of test cases don't
-have to worry about this detail. The ones that do have to check the behavior of
-the top-level properties drawer have to do it manually, such as in
+This helper in turn relies on [[f:parseAs]] [[(f:shouldParseWith-parseAs)]]. Notice that
+we prefix the input with [[f:nilOidOrgDocPrefix]] if the test case isn't concerned
+about the document OID. The test cases that do care about this have to check the
+behavior of the top-level properties drawer manually, such as in
 [[t:0002-doc-metadata-properties-drawer-clash]].
 
-#+name: f:nilOidOrgDoc
+#+name: f:parseAs
 #+begin_src haskell
-nilOidOrgDoc :: Text
-nilOidOrgDoc =
+parseAs ::
+  Text ->
+  FilePath ->
+  (OrgDoc, OrgParserState) ->
+  IO ()
+parseAs input path expected@(doc, _) =
+  MP.runParser
+    (runStateT L.orgDocParser defaultOrgParserState)
+    path
+    input'
+    `shouldParse` expected
+  where
+    input' =
+      if doc.oid == nilOid
+        then nilOidOrgDocPrefix <> input
+        else input
+#+end_src
+
+The [[f:nilOidOrgDocPrefix]] is technically valid enough to be its own complete Org
+document, as seen in [[t:empty-input]].
+
+#+name: f:nilOidOrgDocPrefix
+#+begin_src haskell
+nilOidOrgDocPrefix :: Text
+nilOidOrgDocPrefix =
   """
   :PROPERTIES:
   :ID:       00000000-0000-0000-0000-000000000000
@@ -12861,6 +12882,9 @@ nilOidOrgDoc =
 
   """
 #+end_src
+
+The [[f:nilOrgDoc]] helper is a basic "empty" Org document, used in many test cases
+as a nice starting point for the expected (parsed) output.
 
 #+name: f:nilOrgDoc
 #+begin_src haskell
@@ -12881,25 +12905,18 @@ nilOrgDoc cells pseudoEdges =
 #+end_src
 
 If we want to check the state (the parsing operation is stateful), we need to
-check the expected end state as well. We do this with [[f:shouldParseWithState]].
+check the expected end state as well. We do this with [[f:shouldParseWithState]],
+which is basically the same as [[f:shouldParseWith]] but with the addition of the
+~OrgParserState~ parameter.
 
 #+name: f:shouldParseWithState
 #+begin_src haskell
 shouldParseWithState :: FilePath -> OrgDoc -> OrgParserState -> Spec
-shouldParseWithState path expected expectedState = do
+shouldParseWithState path expectedOrgDoc expectedState = do
   before (LU.readFrom "test/Lilac/ParseSpec/" path) $ do
-    it path check
+    it path $ \input -> parseAs input path expected
   where
-    check input
-      | expected.oid == nilOid =
-          action nilOidOrgDoc input expectedState
-      | otherwise = action "" input expectedState
-    action inputPrefix input expectedState' =
-      MP.runParser
-        (runStateT L.orgDocParser defaultOrgParserState)
-        path
-        (inputPrefix <> input)
-        `shouldParse` (expected, expectedState')
+    expected = (expectedOrgDoc, expectedState)
 #+end_src
 
 Sometimes we want to test that a file will fail to parse. We do this with
@@ -12915,20 +12932,20 @@ shouldFailWithMessage path errMsg pos = do
         (runStateT L.orgDocParser defaultOrgParserState)
         path
         (inputPrefix <> input)
-        `shouldFailWith` (errFancy newPos . fancy $ MP.ErrorFail errMsg)
+        `shouldFailWith` (errFancy newPos . fancy $ MP.ErrorFail errMsg) -- (ref:f:shouldFailWithMessage-MP.ErrorFail)
   where
-    inputPrefix = nilOidOrgDoc
+    inputPrefix = nilOidOrgDocPrefix
     newPos = pos + T.length inputPrefix
 #+end_src
 
-Note that we use the =MP.ErrorFail= constructor because that's the only way we can
-check for failures in parsers where we manually return an error with
-=Control.Monad.fail= (as opposed to Megaparsec itself throwing the error because
-of a failure of the given parser combinators to account for the shape of the
-input text).
+We use the ~MP.ErrorFail~ constructor [[(f:shouldFailWithMessage-MP.ErrorFail)]]
+because that's the only way we can check for failures in parsers where we
+manually return an error with ~Control.Monad.fail~ (as opposed to Megaparsec
+itself throwing the error because of a failure of the given parser combinators
+to account for the shape of the input text).
 
 The [[f:shouldFailWithError]] helper checks for failures thrown by Megaparsec (the
-ones that [[f:shouldFailWithMessage]] do not check for). The =ET= likely stands for
+ones that [[f:shouldFailWithMessage]] do not check for). The ~ET~ likely stands for
 "trivial errors" or (error "trivial"), because it is documented in upstream as
 "Auxiliary type for construction of trivial parse errors.".
 
@@ -12944,7 +12961,7 @@ shouldFailWithError path errorTrivial pos = do
         (inputPrefix <> input)
         `shouldFailWith` (err newPos errorTrivial)
   where
-    inputPrefix = nilOidOrgDoc
+    inputPrefix = nilOidOrgDocPrefix
     newPos = pos + T.length inputPrefix
 #+end_src
 
@@ -12962,10 +12979,10 @@ shouldFail path = do
         path
         `shouldFailOn` (inputPrefix <> input)
   where
-    inputPrefix = nilOidOrgDoc
+    inputPrefix = nilOidOrgDocPrefix
 #+end_src
 
-The function =plainParagraph= helps to cut down on some of the repetition.
+The [[f:plainParagraph]] function helps to cut down on some of the repetition.
 
 #+name: f:plainParagraph
 #+begin_src haskell
@@ -12981,7 +12998,7 @@ plainParagraph body =
       ]
 #+end_src
 
-The same goes for function ~plainHeading~.
+The same goes for function [[f:plainHeading]].
 
 #+name: f:plainHeading
 #+begin_src haskell
@@ -13007,128 +13024,126 @@ plainHeading level section =
 
 Below are all of the individual test cases.
 
-#+name: f:parseSpec
+#+name: All test cases
 #+begin_src haskell
-parseSpec :: Spec
-parseSpec = do
-  <<t:empty-input>>
-  <<t:self-parse>>
-  <<t:0001-blankline>>
-  <<t:0001-comments-only>>
-  <<t:0002-doc-metadata-properties-drawer-empty>>
-  <<t:0002-doc-metadata-missing-value>>
-  <<t:0002-doc-metadata-whitespace-before-value>>
-  <<t:0002-doc-metadata:basic>>
-  <<t:0003-doc-metadata-with-comments>>
-  <<t:0002-doc-metadata-properties-drawer>>
-  <<t:0002-doc-metadata-properties-drawer-combine>>
-  <<t:0002-doc-metadata-properties-drawer-clash>>
-  <<t:0004-headings>>
-  <<t:0004-headings-20>>
-  <<t:0004-headings-unlimited>>
-  <<t:0004-headings-limited>>
-  <<t:0004-headings-prohibited>>
-  <<t:0004-headings-cannot-skip-level>>
-  <<t:Generate headings>>
-  <<t:Generate Org ID stack>>
-  <<t:0004-properties-drawer-empty>>
-  <<t:0004-properties-drawer-not-empty>>
-  <<t:0004-properties-drawer-not-empty-with-comments>>
-  <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-indent-levels>>
-  <<t:0005-paragraph-indentation-mismatch-initial-indent-invalid>>
-  <<t:0005-paragraph-indentation-mismatch-over-list-body>>
-  <<t:0005-paragraph-indentation-mismatch-over>>
-  <<t:0005-paragraph-indentation-mismatch-under-list-body>>
-  <<t:0005-prose-paragraphs>>
-  <<t:0005-notFollowedBy-behavior-for-empty-input>>
-  <<t:0005-styled-strings-bold>>
-  <<t:0005-styled-strings-complex-punctuation>>
-  <<t:0005-styled-strings-slash-separated-words>>
-  <<t:0005-styled-strings-complex>>
-  <<t:0005-styled-strings-compression>>
-  <<t:0005-styled-strings-escape-marker>>
-  <<t:0005-styled-strings-leftover-active-styles>>
-  <<t:0005-styled-strings-messy-boundaries>>
-  <<t:0005-styled-strings-no-style>>
-  <<t:0005-styled-strings-verbatim-code-ignore-immediate-bold>>
-  <<t:0005-styled-strings-verbatim-precedence>>
-  <<t:0005-styled-strings-verbatim>>
-  <<t:0005-styled-strings-escaping>>
-  <<t:0006-links-inside-parentheses>>
-  <<t:0006-links-nonlink>>
-  <<t:0006-links-raw>>
-  <<t:0006-links>>
-  <<t:0006-links-web-protocols>>
-  <<t:0006-links-oids>>
-  <<t:0006-links-oids-lenient-whitespace>>
-  <<t:0006-unique-line-labels>>
-  <<t:0007-block-src-without-lang>>
-  <<t:0007-blocks-empty>>
-  <<t:0007-blocks-ending>>
-  <<t:0007-blocks-noweb-off>>
-  <<t:0007-blocks-noweb>>
-  <<t:0007-blocks-noweb-intraline>>
-  <<t:0007-blocks-duplicate-names>>
-  <<t:0007-blocks-duplicate-tangle-paths>>
-  <<t:0007-blocks-special-commas>>
-  <<t:0007-blocks-no-name-with-opening-parenthesis>>
-  <<t:0008-indentation-comment>>
-  <<t:0008-indentation-headings>>
-  <<t:0008-indentation-paragraph>>
-  <<t:0009-list-content-simple>>
-  <<t:0009-list-indentation-nested-with-text>>
-  <<t:0009-list-indentation-nested>>
-  <<t:0009-list-nesting-max>>
-  <<t:0009-list-nesting-max-8>>
-  <<t:0009-list-indentation-no-indent>>
-  <<t:0009-list-indentation-proper-indent>>
-  <<t:0009-list-items-need-blank-line-separator>>
-  <<t:0009-lists-cannot-be-mixed-on-their-own-ordered>>
-  <<t:0009-lists-cannot-be-mixed-on-their-own>>
-  <<t:0009-lists-require-precise-indentation>>
-  <<t:0009-ordered-lists-require-increment>>
-  <<t:0009-ordered-lists-start-from-1>>
-  <<t:0009-ordered-list-head-needs-parenthesis>>
-  <<t:0009-ordered-list-head-cannot-use-letters>>
-  <<t:0009-paragraph-can-close-deeper-levels>>
-  <<t:0009-paragraph-can-separate-mixed-lists>>
-  <<t:0010-standalone-math-fragments>>
-  <<t:0010-standalone-math-inside-lists>>
-  <<t:0010-inline-math>>
-  <<t:0011-figures-and-blocks>>
-  <<t:0012-tables-and-prose>>
-  <<t:0012-tables-inside-lists>>
-  <<t:0013-footnotes-broken-link>>
-  <<t:0013-footnotes-unused-def>>
-  <<t:0013-footnotes-simple>>
-  <<t:0013-footnotes-complex>>
-  <<t:0013-footnotes-multiple-groups>>
-  <<t:0014-citations-csl-path>>
-  <<t:0014-citations-csl-json-paths>>
-  <<t:0014-citations-bibliography-location>>
-  <<t:0014-citations-print-biblio-missing-csl-style>>
-  <<t:0014-citations-print-biblio-missing-bib-entries>>
-  <<t:0014-citations-single-cite>>
-  <<t:0014-citations-locators>>
-  <<t:0014-citations-locators-affixes>>
-  <<t:0014-citations-worg>>
-  <<t:0014-citations-unbalanced-brackets-prefix-opening>>
-  <<t:0014-citations-unbalanced-brackets-prefix-closing>>
-  <<t:0014-citations-unbalanced-brackets-suffix-opening>>
-  <<t:0014-citations-unbalanced-brackets-suffix-closing>>
-  <<t:0014-citations-extra-semicolons-basic>>
-  <<t:0014-citations-extra-semicolons-consecutive>>
-  <<t:0014-citations-nested>>
-  <<t:0014-citations-forbidden-in-verbatim-code>>
-  <<t:0014-citations-forbidden-in-headings>>
-  <<t:0014-citations-missing-csl-style>>
-  <<t:0014-citations-missing-bib-entries>>
-  <<Text to Prose round trip>>
-  <<Drop text chars from Prose>>
-  <<t:0015-glossary-duplicate-term>>
-  <<t:0015-glossary-location>>
-  <<t:0015-glossary-location-global>>
-  <<t:0016-metadata-reserved-underscores>>
+<<t:empty-input>>
+<<t:self-parse>>
+<<t:0001-blankline>>
+<<t:0001-comments-only>>
+<<t:0002-doc-metadata-properties-drawer-empty>>
+<<t:0002-doc-metadata-missing-value>>
+<<t:0002-doc-metadata-whitespace-before-value>>
+<<t:0002-doc-metadata:basic>>
+<<t:0003-doc-metadata-with-comments>>
+<<t:0002-doc-metadata-properties-drawer>>
+<<t:0002-doc-metadata-properties-drawer-combine>>
+<<t:0002-doc-metadata-properties-drawer-clash>>
+<<t:0004-headings>>
+<<t:0004-headings-20>>
+<<t:0004-headings-unlimited>>
+<<t:0004-headings-limited>>
+<<t:0004-headings-prohibited>>
+<<t:0004-headings-cannot-skip-level>>
+<<t:Generate headings>>
+<<t:Generate Org ID stack>>
+<<t:0004-properties-drawer-empty>>
+<<t:0004-properties-drawer-not-empty>>
+<<t:0004-properties-drawer-not-empty-with-comments>>
+<<t:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels>>
+<<t:0005-paragraph-indentation-mismatch-initial-indent-invalid>>
+<<t:0005-paragraph-indentation-mismatch-over-list-body>>
+<<t:0005-paragraph-indentation-mismatch-over>>
+<<t:0005-paragraph-indentation-mismatch-under-list-body>>
+<<t:0005-prose-paragraphs>>
+<<t:0005-notFollowedBy-behavior-for-empty-input>>
+<<t:0005-styled-strings-bold>>
+<<t:0005-styled-strings-complex-punctuation>>
+<<t:0005-styled-strings-slash-separated-words>>
+<<t:0005-styled-strings-complex>>
+<<t:0005-styled-strings-compression>>
+<<t:0005-styled-strings-escape-marker>>
+<<t:0005-styled-strings-leftover-active-styles>>
+<<t:0005-styled-strings-messy-boundaries>>
+<<t:0005-styled-strings-no-style>>
+<<t:0005-styled-strings-verbatim-code-ignore-immediate-bold>>
+<<t:0005-styled-strings-verbatim-precedence>>
+<<t:0005-styled-strings-verbatim>>
+<<t:0005-styled-strings-escaping>>
+<<t:0006-links-inside-parentheses>>
+<<t:0006-links-nonlink>>
+<<t:0006-links-raw>>
+<<t:0006-links>>
+<<t:0006-links-web-protocols>>
+<<t:0006-links-oids>>
+<<t:0006-links-oids-lenient-whitespace>>
+<<t:0006-unique-line-labels>>
+<<t:0007-block-src-without-lang>>
+<<t:0007-blocks-empty>>
+<<t:0007-blocks-ending>>
+<<t:0007-blocks-noweb-off>>
+<<t:0007-blocks-noweb>>
+<<t:0007-blocks-noweb-intraline>>
+<<t:0007-blocks-duplicate-names>>
+<<t:0007-blocks-duplicate-tangle-paths>>
+<<t:0007-blocks-special-commas>>
+<<t:0007-blocks-no-name-with-opening-parenthesis>>
+<<t:0008-indentation-comment>>
+<<t:0008-indentation-headings>>
+<<t:0008-indentation-paragraph>>
+<<t:0009-list-content-simple>>
+<<t:0009-list-indentation-nested-with-text>>
+<<t:0009-list-indentation-nested>>
+<<t:0009-list-nesting-max>>
+<<t:0009-list-nesting-max-8>>
+<<t:0009-list-indentation-no-indent>>
+<<t:0009-list-indentation-proper-indent>>
+<<t:0009-list-items-need-blank-line-separator>>
+<<t:0009-lists-cannot-be-mixed-on-their-own-ordered>>
+<<t:0009-lists-cannot-be-mixed-on-their-own>>
+<<t:0009-lists-require-precise-indentation>>
+<<t:0009-ordered-lists-require-increment>>
+<<t:0009-ordered-lists-start-from-1>>
+<<t:0009-ordered-list-head-needs-parenthesis>>
+<<t:0009-ordered-list-head-cannot-use-letters>>
+<<t:0009-paragraph-can-close-deeper-levels>>
+<<t:0009-paragraph-can-separate-mixed-lists>>
+<<t:0010-standalone-math-fragments>>
+<<t:0010-standalone-math-inside-lists>>
+<<t:0010-inline-math>>
+<<t:0011-figures-and-blocks>>
+<<t:0012-tables-and-prose>>
+<<t:0012-tables-inside-lists>>
+<<t:0013-footnotes-broken-link>>
+<<t:0013-footnotes-unused-def>>
+<<t:0013-footnotes-simple>>
+<<t:0013-footnotes-complex>>
+<<t:0013-footnotes-multiple-groups>>
+<<t:0014-citations-csl-path>>
+<<t:0014-citations-csl-json-paths>>
+<<t:0014-citations-bibliography-location>>
+<<t:0014-citations-print-biblio-missing-csl-style>>
+<<t:0014-citations-print-biblio-missing-bib-entries>>
+<<t:0014-citations-single-cite>>
+<<t:0014-citations-locators>>
+<<t:0014-citations-locators-affixes>>
+<<t:0014-citations-worg>>
+<<t:0014-citations-unbalanced-brackets-prefix-opening>>
+<<t:0014-citations-unbalanced-brackets-prefix-closing>>
+<<t:0014-citations-unbalanced-brackets-suffix-opening>>
+<<t:0014-citations-unbalanced-brackets-suffix-closing>>
+<<t:0014-citations-extra-semicolons-basic>>
+<<t:0014-citations-extra-semicolons-consecutive>>
+<<t:0014-citations-nested>>
+<<t:0014-citations-forbidden-in-verbatim-code>>
+<<t:0014-citations-forbidden-in-headings>>
+<<t:0014-citations-missing-csl-style>>
+<<t:0014-citations-missing-bib-entries>>
+<<Text to Prose round trip>>
+<<Drop text chars from Prose>>
+<<t:0015-glossary-duplicate-term>>
+<<t:0015-glossary-location>>
+<<t:0015-glossary-location-global>>
+<<t:0016-metadata-reserved-underscores>>
 #+end_src
 
 * Glossary

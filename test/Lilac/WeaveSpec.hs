@@ -38,7 +38,7 @@ import Lilac.Types
     defaultOrgParserState,
     encodeGPath,
     nilOid,
-    nilOidOrgDoc,
+    nilOidOrgDocPrefix,
     ptext,
     stext,
   )
@@ -95,7 +95,7 @@ getWovenPrettyFromPath path = do
         MP.runParser
           (runStateT LP.orgDocParser defaultOrgParserState)
           path
-          (nilOidOrgDoc <> inputOrgFile)
+          (nilOidOrgDocPrefix <> inputOrgFile)
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
@@ -171,7 +171,7 @@ getCiteprocResultFromPath path = do
         MP.runParser
           (runStateT LP.orgDocParser defaultOrgParserState)
           path
-          (nilOidOrgDoc <> inputOrgFile)
+          (nilOidOrgDocPrefix <> inputOrgFile)
   case parseResult of
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
