@@ -236,16 +236,25 @@ import Prelude qualified (show)
 <<f:markingCharsInvisible>>
 #+end_src
 
-* Org ID (OID)
+* Miscellaneous helpers
+
+** Org ID (OID)
 :PROPERTIES:
 :ID:       5908cefc-0e82-41a5-84ac-1c8c826f5e62
 :END:
+
+Org IDs (see [[id:5df15f17-c630-4ddf-bade-66084c430a07::newtype:OID][newtype:OID]], [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][Links]], and [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) are UUIDs underneath. The
+functions here manipulate this type.
+
+[[f:fromWords]] constructs an ~OID~ from two 64-bit words.
 
 #+name: f:fromWords
 #+begin_src haskell
 fromWords :: Word64 -> Word64 -> OID
 fromWords w1 w2 = OID $ fromWords64 w1 w2
 #+end_src
+
+[[f:fromText]] constructs a ~Maybe OID~ from text.
 
 #+name: f:fromText
 #+begin_src haskell
@@ -255,11 +264,17 @@ fromText t = case Data.UUID.Types.fromText t of
   Nothing -> Nothing
 #+end_src
 
+[[instance:Show OID]] avoids printing the ~OID~ text because it's simpler to just have
+the raw UUID by itself.
+
 #+name: instance:Show OID
 #+begin_src haskell
 instance Show OID where
   show (OID uuid) = Prelude.show uuid
 #+end_src
+
+The [[f:nilOid]] is a special zero-value ~OID~. We use it for things like the
+[[id:6cf4d5a5-ec4a-426e-8549-0a899ad77729::f:defaultOrgParserState][f:defaultOrgParserState]] and also in many of the [[id:409c6e54-59b9-4aa3-bd72-7ac3dd42ed66::All test cases][test cases]] for parsing.
 
 #+name: f:nilOid
 #+begin_src haskell
@@ -267,7 +282,7 @@ nilOid :: OID
 nilOid = fromWords 0 0
 #+end_src
 
-* ~GPath~, an ~OsPath~ wrapper
+** ~GPath~, an ~OsPath~ wrapper
 :PROPERTIES:
 :ID:       2d98229c-e318-434b-916b-364c04021306
 :END:
@@ -285,7 +300,7 @@ newtype GPath = GPath FilePath
 #+end_src
 
 Similar to [[id:01da95fe-ba23-4481-9833-428423392f5f::instance:ToJSONKey LinkOid][instance:ToJSONKey LinkOid]], we want to encode and decode ~GPath~ values
-in a succinct way. Because this is a ~newtype~ wrapper, by default =Data.Aeson= will
+in a succinct way. Because this is a ~newtype~ wrapper, by default ~Data.Aeson~ will
 try to write it as ~"GPath" \"...\""~ in JSON, which is ugly. To simplify this we
 have custom ~ToJSONKey~ and ~FromJSONKey~ instances.
 
@@ -337,7 +352,7 @@ decodeGPath :: GPath -> FilePath
 decodeGPath (GPath fp) = fp
 #+end_src
 
-* Protocols
+** Protocols
 
 The [[f:protocolsWeb]] are the typical protocols found in links on the
 internet.
@@ -370,12 +385,14 @@ protocolsEmacs =
     ]
 #+end_src
 
-* Marking characters
+** Marking characters
 :PROPERTIES:
 :ID:       3b072b1b-c63e-4fca-ab56-9388d11aa3c0
 :END:
 
-These come from [[https://orgmode.org/manual/Advanced-features.html][here]].
+Marking characters are used in [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][Tables]] as special characters (see [[https://orgmode.org/manual/Advanced-features.html][this page]] for
+more information). See [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb::f:tableCellParser][f:tableCellParser]] and [[id:6c10afe2-2714-4e85-9121-e96a36d27ba4::f:weaveTable][f:weaveTable]] for how Lilac deals
+with them.
 
 #+name: f:markingChars
 #+begin_src haskell
