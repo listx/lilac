@@ -9301,6 +9301,8 @@ padConsecutiveNowebLinks blockBody =
   where
     f (acc, bools) text@(BTokenString _) = (text : acc, bools)
     f (acc, bools) BTokenPadding = (acc, bools)
+    f (acc, bools) link@(BTokenLinkTarget (LinkTargetLineLabel _)) =
+      (link : acc, bools)
     f (acc, bools) linkTarget@(BTokenLinkTarget _) =
       case bools of
         (padLink : rest)
