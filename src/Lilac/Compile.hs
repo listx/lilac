@@ -283,7 +283,7 @@ mkArchive pathObjs = do
             ancestry = mkBlockAncestry archive $ getBlockGCIsFromArchive archive
          in pure $ Right archive {ancestry = ancestry}
   where
-    topLevelUUIDs :: Map LinkOid GCI
+    topLevelUUIDs :: Map LinkOid GCI --
     topLevelUUIDs =
       let topLevelLinkOids =
             fromList

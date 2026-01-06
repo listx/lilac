@@ -318,9 +318,8 @@ mkObject orgDoc =
 *** Symbols
 
 [[f:mkSymbols]] [[(f:mkObject-mkSymbols)]] generates a mapping of all [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] keys
-to their /cell index/ values (where the cell index is the numeric index
-[[(f:mkSymbols-cell-index)]] into the flat list of cells as noted in [[id:5df15f17-c630-4ddf-bade-66084c430a07][~OrgDoc~ data
-structure]]).
+to their /local cell index/ values [[(f:mkSymbols-cell-index)]] (also known as the
+[[id:5df15f17-c630-4ddf-bade-66084c430a07::newtype:LCI][newtype:LCI]] values).
 
 #+name: f:mkSymbols
 #+begin_src haskell
@@ -670,8 +669,10 @@ data Archive = Archive
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-Archives use a /global cell index/ with [[newtype:GCI]] to distinguish these against
-a /local cell index/ ([[id:5df15f17-c630-4ddf-bade-66084c430a07::newtype:LCI][newtype:LCI]]).
+Archives use a /global cell index/ with [[newtype:GCI]] to distinguish these against a
+/local cell index/ ([[id:5df15f17-c630-4ddf-bade-66084c430a07::newtype:LCI][newtype:LCI]]). This is required because there are multiple
+objects each with their own LCI, and we have to tell these apart from each
+other.
 
 #+name: newtype:GCI
 #+begin_src haskell
@@ -683,7 +684,20 @@ newtype GCI = GCI
   deriving anyclass (FromJSON, FromJSONKey, Hashable, ToJSON, ToJSONKey)
 #+end_src
 
-The other fields in [[data:Archive]] are based on the ~objects~:
+The way it works is like this: we line up all of the object's cells. So
+if object A has 10 cells and object B has 10 cells, then their local indices
+would both be 0-9. But with global indices, we add and /offset/ of 10 (object A's
+cell count) to all of B, so that its local cell indices are 10-19. That way
+there's no clash. The generation of offsets is done in [[f:cumulativeOffsets]],
+which is called by [[f:mkArchive]].
+
+The ~topLevelUUIDs~ [[(f:mkArchive-topLevelUUIDs)]] are negative indices which share
+the same ~GCI~ type, which allow us to uniquely identify all objects by negative
+numbers. The order in which the objects are sorted inside the archive is
+determined by their path (the paths are sorted), and this ordering dictates both
+the positive ~GCI~ values as well as the negative ones.
+
+The other fields in [[data:Archive]] are based on the ~objects~ inside it:
 
   - ~symbols~ :: A table for finding the cell (from one of the objects in the
     archive) based on a given [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]. It contains a /globally/ unique index
@@ -804,7 +818,7 @@ mkArchive pathObjs = do
             ancestry = mkBlockAncestry archive $ getBlockGCIsFromArchive archive
          in pure $ Right archive {ancestry = ancestry}
   where
-    topLevelUUIDs :: Map LinkOid GCI
+    topLevelUUIDs :: Map LinkOid GCI -- (ref:f:mkArchive-topLevelUUIDs)
     topLevelUUIDs =
       let topLevelLinkOids =
             fromList
