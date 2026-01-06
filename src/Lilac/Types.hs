@@ -35,13 +35,13 @@ module Lilac.Types
     StyledText (..),
     Table (..),
     WeaveConf (..),
-    cellIdxToObjCell,
     decodeGPath,
     defaultOrgParserConf,
     defaultOrgParserState,
     encodeGPath,
     Lilac.Types.fromText,
     fromWords,
+    gciToObjCell,
     getCellName,
     getProseContents,
     getSectionNumber,
@@ -671,8 +671,8 @@ newtype GCI = GCI
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, FromJSONKey, Hashable, ToJSON, ToJSONKey)
 
-cellIdxToObjCell :: Archive -> GCI -> Maybe (Object, Cell)
-cellIdxToObjCell archive gci
+gciToObjCell :: Archive -> GCI -> Maybe (Object, Cell)
+gciToObjCell archive gci
   | Just (offset, path) <- IntMap.lookupLE gci.unGCI archive.offsets,
     Just obj <- lookup path archive.objects,
     Just cell <- obj.orgDoc.cells !!? (gci.unGCI - offset) =

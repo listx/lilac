@@ -43,7 +43,7 @@ import Lilac.Types
     LinkTarget (LinkTargetLineLabel, LinkTargetOid),
     Object (orgDoc, symbols),
     OrgDoc (cells),
-    cellIdxToObjCell,
+    gciToObjCell,
   )
 import Relude
   ( Bool (False, True),
@@ -172,8 +172,8 @@ expandBlock archive block existingPrefix =
     expand (acc, _) (BTokenString text) =
       (acc <> prependExistingPrefix text, getPrefix text)
     expand (acc, prefix) (BTokenLinkTarget (LinkTargetOid linkOid))
-      | Just globalCellIdx <- lookup linkOid archive.symbols,
-        Just (_, (CBlock targetBlock)) <- cellIdxToObjCell archive globalCellIdx =
+      | Just gci <- lookup linkOid archive.symbols,
+        Just (_, (CBlock targetBlock)) <- gciToObjCell archive gci =
           ( acc <> (expandBlock archive targetBlock $ existingPrefix <> prefix),
             prefix
           )

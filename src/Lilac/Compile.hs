@@ -1,8 +1,8 @@
 module Lilac.Compile
-  ( cellIdxToName,
-    cumulativeOffsets,
+  ( cumulativeOffsets,
     findCycles,
     findExternalOids,
+    gciToName,
     makeRelativeToObjectPath,
     mkObject,
     mkArchive,
@@ -79,9 +79,9 @@ import Lilac.Types
     PseudoEdge (PseudoEdge),
     Style (Verbatim),
     Table (grid, meta, parentOid),
-    cellIdxToObjCell,
     decodeGPath,
     encodeGPath,
+    gciToObjCell,
     getProseContents,
     getSectionNumber,
     ptext,
@@ -153,10 +153,10 @@ mkSymbols orgDoc =
   fromList
     . concatMap f
     $ zip
-      [0 ..] --
+      (map LCI [0 ..]) --
       orgDoc.cells
   where
-    f (localCellIdx, cell) = case cell of --
+    f (lci, cell) = case cell of --
       CHeading heading
         | Just oidText <- lookup "ID" heading.meta,
           Just oid <- LP.validateOidText oidText ->
@@ -164,7 +164,7 @@ mkSymbols orgDoc =
                   { oid = oid,
                     name = T.empty
                   },
-                LCI $ localCellIdx
+                lci
               )
             ]
         | otherwise -> []
@@ -173,33 +173,33 @@ mkSymbols orgDoc =
           orgDoc.oid
           block.parentOid
           block.meta
-          localCellIdx
+          lci
       CFigure figure ->
         getSymbols
           orgDoc.oid
           figure.parentOid
           figure.meta
-          localCellIdx
+          lci
       CMathFragment mathFragment ->
         getSymbols
           orgDoc.oid
           mathFragment.parentOid
           mathFragment.meta
-          localCellIdx
+          lci
       CTable table ->
         getSymbols
           orgDoc.oid
           table.parentOid
           table.meta
-          localCellIdx
+          lci
       CFootnote {}
       CListItem {}
       CParagraph {}
       CGlossaryTerm {}
       CCommand {} -> [] --
 
-getSymbols :: OID -> OID -> Map Text Text -> Int -> [(LinkOid, LCI)]
-getSymbols docOid parentOid cellMeta localCellIdx =
+getSymbols :: OID -> OID -> Map Text Text -> LCI -> [(LinkOid, LCI)]
+getSymbols docOid parentOid cellMeta lci =
   let oids =
         if parentOid /= docOid --
           then [parentOid, docOid]
@@ -213,7 +213,7 @@ getSymbols docOid parentOid cellMeta localCellIdx =
                 { oid = oid,
                   name = name
                 },
-              LCI localCellIdx
+              lci
             )
       | Just tanglePath <- lookup "tangle" cellMeta --
         =
@@ -222,7 +222,7 @@ getSymbols docOid parentOid cellMeta localCellIdx =
                 { oid = oid,
                   name = tanglePath <> "\NUL"
                 },
-              LCI localCellIdx
+              lci
             )
       | Just anonBlockNumber <- lookup "__anon_block_number" cellMeta --
         =
@@ -231,7 +231,7 @@ getSymbols docOid parentOid cellMeta localCellIdx =
                 { oid = oid,
                   name = anonBlockNumber <> "\NUL__anon_block_number"
                 },
-              LCI localCellIdx
+              lci
             )
       | otherwise = Nothing
 
@@ -280,7 +280,7 @@ mkArchive pathObjs = do
                   csls = fromList csls,
                   bibs = fromList bibs
                 }
-            ancestry = mkBlockAncestry archive $ getBlockIdxsFromArchive archive
+            ancestry = mkBlockAncestry archive $ getBlockGCIsFromArchive archive
          in pure $ Right archive {ancestry = ancestry}
   where
     topLevelUUIDs :: Map LinkOid GCI
@@ -347,7 +347,7 @@ finalizeEdges ::
 finalizeEdges syms acc (offset, (_, obj)) =
   let f (PseudoEdge (lci, linkOid)) = case lookup linkOid syms of
         Nothing -> Nothing
-        Just targetCellIdx -> Just (GCI $ lci.unLCI + offset, targetCellIdx)
+        Just targetGCI -> Just (GCI $ lci.unLCI + offset, targetGCI)
    in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
 
 mkBacklinks ::
@@ -414,7 +414,7 @@ getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
   where
     f :: [Block] -> GCI -> [Block]
     f acc gci
-      | Just (_, cell) <- cellIdxToObjCell archive gci =
+      | Just (_, cell) <- gciToObjCell archive gci =
           case cell of
             CBlock b -> b : acc
             CHeading {}
@@ -428,12 +428,12 @@ getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
             CCommand {} -> acc
       | otherwise = acc
 
-getBlockIdxsFromArchive :: Archive -> [GCI]
-getBlockIdxsFromArchive archive = foldl' f [] $ elems archive.symbols
+getBlockGCIsFromArchive :: Archive -> [GCI]
+getBlockGCIsFromArchive archive = foldl' f [] $ elems archive.symbols
   where
     f :: [GCI] -> GCI -> [GCI]
     f acc gci
-      | Just (_, cell) <- cellIdxToObjCell archive gci =
+      | Just (_, cell) <- gciToObjCell archive gci =
           case cell of
             CBlock {} -> gci : acc
             CHeading {}
@@ -448,20 +448,20 @@ getBlockIdxsFromArchive archive = foldl' f [] $ elems archive.symbols
       | otherwise = acc
 
 mkBlockAncestry :: Archive -> [GCI] -> Map GCI [GCI]
-mkBlockAncestry archive blockIdxs = foldl' f mempty blockIdxs
+mkBlockAncestry archive blockGCIs = foldl' f mempty blockGCIs
   where
     f :: Map GCI [GCI] -> GCI -> Map GCI [GCI]
-    f acc blockIdx
-      | Just (_, CBlock block) <- cellIdxToObjCell archive blockIdx =
+    f acc blockGCI
+      | Just (_, CBlock block) <- gciToObjCell archive blockGCI =
           ( \childLinks ->
               foldl'
                 ( \acc' childLink ->
                     case lookup childLink archive.symbols of
-                      Just childIdx ->
+                      Just childGCI ->
                         insertWith
                           (\old new -> hashNub (old <> new))
-                          childIdx
-                          [blockIdx]
+                          childGCI
+                          [blockGCI]
                           acc'
                       Nothing -> acc'
                 )
@@ -593,9 +593,9 @@ makeRelativeToObjectPath objGPath fps = do
       let relPath = P.combine objDir p
       P.decodeUtf relPath
 
-cellIdxToName :: Archive -> Int -> GCI -> Maybe Prose
-cellIdxToName archive offset gci
-  | Just (_, cell) <- cellIdxToObjCell archive gci =
+gciToName :: Archive -> Int -> GCI -> Maybe Prose
+gciToName archive offset gci
+  | Just (_, cell) <- gciToObjCell archive gci =
       case cell of
         CHeading heading ->
           plain

@@ -43,7 +43,7 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding qualified as TLE
-import Lilac.Compile (cellIdxToName, makeRelativeToObjectPath, parseCitationStyle)
+import Lilac.Compile (gciToName, makeRelativeToObjectPath, parseCitationStyle)
 import Lilac.Parse
   ( compressProse,
     compressStyledText,
@@ -148,8 +148,8 @@ import Lilac.Types
         outDir,
         projectConf
       ),
-    cellIdxToObjCell,
     decodeGPath,
+    gciToObjCell,
     getCellName,
     getProseContents,
     getSectionNumber,
@@ -370,16 +370,16 @@ weaveObject object = do
     body_ $ do
       weaveNavbar
       weaveToc object.orgDoc.cells
-      let cellsWithIdx = zip (map LCI [0 :: Int ..]) object.orgDoc.cells
+      let lciCellPairs = zip (map LCI [0 :: Int ..]) object.orgDoc.cells
           rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
-          beforeFootnotes = takeWhile (not . isFootnote) cellsWithIdx
+          beforeFootnotes = takeWhile (not . isFootnote) lciCellPairs
           afterFootnotes =
             dropWhile isFootnote
-              $ dropWhile (not . isFootnote) cellsWithIdx
+              $ dropWhile (not . isFootnote) lciCellPairs
           sortedFootnotes =
             sortOn (\(_, cell) -> getSortingKey cell)
               $ takeWhile isFootnote
-              $ dropWhile (not . isFootnote) cellsWithIdx
+              $ dropWhile (not . isFootnote) lciCellPairs
           getSortingKey cell
             | (CFootnote footnote) <- cell,
               Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
@@ -547,17 +547,17 @@ getLinkAnchor maybeLCI = \case
     Nothing -> ""
   CCommand {} -> ""
 
-cellIdxAttrs :: LCI -> [Attributes]
-cellIdxAttrs lci = [id_ ("c-" <> T.show lci.unLCI), class_ "cell-idx"]
+lciAttrs :: LCI -> [Attributes]
+lciAttrs lci = [id_ ("c-" <> T.show lci.unLCI), class_ "cell-idx"]
 
 wrapWith :: LCI -> HtmlWeaver () -> HtmlWeaver ()
 wrapWith lci wrapMe = do
-  span_ (cellIdxAttrs lci) $ do
+  span_ (lciAttrs lci) $ do
     wrapMe
 
 wrapWithDiv :: LCI -> HtmlWeaver () -> HtmlWeaver ()
 wrapWithDiv lci wrapMe = do
-  div_ (cellIdxAttrs lci) $ do
+  div_ (lciAttrs lci) $ do
     wrapMe
 
 weaveProse :: Prose -> HtmlWeaver ()
@@ -702,22 +702,22 @@ weaveBlockAncestry block = case lookup "name" block.meta of
     weaveConf <- ask
     let archive = weaveConf.archive
         selfLinkOid = LinkOid block.parentOid name
-        parentIdxs = do
-          selfIdx <- lookup selfLinkOid archive.symbols
-          lookup selfIdx archive.ancestry
-        parents = mapMaybe f $ fromMaybe [] parentIdxs
+        parentGCIs = do
+          selfGCI <- lookup selfLinkOid archive.symbols
+          lookup selfGCI archive.ancestry
+        parents = mapMaybe f $ fromMaybe [] parentGCIs
         f :: GCI -> Maybe (GCI, [GCI], GPath, Block, Prose)
-        f parentIdx = do
-          grandParentIdxs <-
-            pure . fromMaybe [] $ lookup parentIdx archive.ancestry
-          (_, cell) <- cellIdxToObjCell archive parentIdx
+        f parentGCI = do
+          grandParentGCIs <-
+            pure . fromMaybe [] $ lookup parentGCI archive.ancestry
+          (_, cell) <- gciToObjCell archive parentGCI
           parentBlock <-
             case cell of
               CBlock b -> Just b
               _ -> Nothing
-          (offset, path) <- IntMap.lookupLE parentIdx.unGCI archive.offsets
-          prose <- cellIdxToName archive offset parentIdx
-          pure (parentIdx, grandParentIdxs, path, parentBlock, prose)
+          (offset, path) <- IntMap.lookupLE parentGCI.unGCI archive.offsets
+          prose <- gciToName archive offset parentGCI
+          pure (parentGCI, grandParentGCIs, path, parentBlock, prose)
         (roots, nonRoots) =
           partition (\(_, ancestors, _, _, _) -> null ancestors) parents
         getName :: (GCI, [GCI], GPath, Block, Prose) -> Text
@@ -733,7 +733,7 @@ weaveParentBlock ::
   HtmlWeaver ()
 weaveParentBlock (gci, ancestors, objPath, _, _) = do
   weaveConf <- ask
-  case getLinkToCellIdx weaveConf gci of
+  case getLinkToGCI weaveConf gci of
     Nothing -> pure ()
     Just (_externalOrgDocName, linkAnchor, _) ->
       if objPath == weaveConf.originObjectPath
@@ -748,12 +748,12 @@ weaveParentBlock (gci, ancestors, objPath, _, _) = do
               then toHtml @Text " ⇪"
               else toHtml @Text " ⇧"
 
-getLinkToCellIdx :: WeaveConf -> GCI -> Maybe (Text, Text, Prose)
-getLinkToCellIdx weaveConf gci
+getLinkToGCI :: WeaveConf -> GCI -> Maybe (Text, Text, Prose)
+getLinkToGCI weaveConf gci
   | Just (offset, gpath) <-
       IntMap.lookupLE gci.unGCI weaveConf.archive.offsets,
-    Just (_, cell) <- cellIdxToObjCell weaveConf.archive gci,
-    Just cellName <- cellIdxToName weaveConf.archive offset gci =
+    Just (_, cell) <- gciToObjCell weaveConf.archive gci,
+    Just cellName <- gciToName weaveConf.archive offset gci =
       let lci = LCI $ gci.unGCI - offset
        in if gpath == weaveConf.originObjectPath
             then do
@@ -855,8 +855,8 @@ weaveLinkTarget linkTarget = do
             $ if objPath == weaveConf.originObjectPath
               then "#top"
               else getExternalRelPath objPath weaveConf.originObjectPath
-      | Just globalCellIdx <- lookup linkOid weaveConf.archive.symbols,
-        Just (docName, linkAnchor, _) <- getLinkToCellIdx weaveConf globalCellIdx ->
+      | Just gci <- lookup linkOid weaveConf.archive.symbols,
+        Just (docName, linkAnchor, _) <- getLinkToGCI weaveConf gci ->
           if docName == "" --
             then pure $ "#" <> linkAnchor
             else pure linkAnchor
@@ -1116,12 +1116,12 @@ weaveFootnote lci footnote = do
   weaveConf <- ask
   if
     | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just (footnoteNumber, referrerCellIdx) <- lookup footnote.name originObj.orgDoc.footnoteRefs -> do
+      Just (footnoteNumber, referrerLCI) <- lookup footnote.name originObj.orgDoc.footnoteRefs -> do
         p_ [class_ "footnote-definition", id_ ("footnote-" <> footnote.name)] $ do
           wrapWith lci $ do
             span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
             weaveProse footnote.body
-            weaveFootnoteBacklink referrerCellIdx --
+            weaveFootnoteBacklink referrerLCI --
     | otherwise -> pure ()
 
 weaveFootnoteBacklink :: LCI -> HtmlWeaver ()
@@ -1134,7 +1134,7 @@ weaveFootnoteBacklink lci = do
           . map swap
           $ IntMap.toList weaveConf.archive.offsets,
       Just (_, linkAnchor, name) <-
-        getLinkToCellIdx weaveConf (GCI $ lci.unLCI + offset) -> do
+        getLinkToGCI weaveConf (GCI $ lci.unLCI + offset) -> do
         toHtml @Text " "
         a_ [href_ $ "#" <> linkAnchor, class_ "footnote-backlink"] $ do
           toHtml @Text "↑ "
@@ -1148,14 +1148,14 @@ weaveGlossaryTerm lci glossaryTerm = do
       dlStart = toHtmlRaw @Text "<dl>"
       dlEnd :: HtmlWeaver ()
       dlEnd = toHtmlRaw @Text "</dl>"
-      isGlossaryTerm idx --
+      isGlossaryTerm lci' --
         | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-          Just internalCell <- originObj.orgDoc.cells !!? idx,
+          Just internalCell <- originObj.orgDoc.cells !!? lci'.unLCI,
           CGlossaryTerm _ <- internalCell =
             True
         | otherwise = False
-      isFirstGlossaryTerm = not . isGlossaryTerm $ lci.unLCI - 1
-      isLastGlossaryTerm = not . isGlossaryTerm $ lci.unLCI + 1
+      isFirstGlossaryTerm = not . isGlossaryTerm . LCI $ lci.unLCI - 1
+      isLastGlossaryTerm = not . isGlossaryTerm . LCI $ lci.unLCI + 1
   when (isFirstGlossaryTerm) dlStart --
   wrapWithDiv lci $ do
     div_ [id_ linkAnchor, class_ "glossary-term"] $ do
@@ -1769,7 +1769,7 @@ weaveBacklinks = do
                   linkToExternalCell False externalGCI
           linkToExternalCell :: Bool -> GCI -> HtmlWeaver ()
           linkToExternalCell asListItem gci =
-            case getLinkToCellIdx weaveConf gci of
+            case getLinkToGCI weaveConf gci of
               Nothing -> pure ()
               Just (_, externalLinkAnchor, externalCellName) -> do
                 let externalLink =
@@ -1779,12 +1779,12 @@ weaveBacklinks = do
                   then li_ [] $ externalLink
                   else externalLink
           getInternalLinkAnchor gci
-            | Just (_, internalCell) <- cellIdxToObjCell weaveConf.archive gci =
+            | Just (_, internalCell) <- gciToObjCell weaveConf.archive gci =
                 "#" <> (getLinkAnchor Nothing internalCell)
             | gci.unGCI < 0 = "#top"
             | otherwise = "#LINK_ERROR"
           getInternalName gci
-            | Just name <- cellIdxToName weaveConf.archive 0 gci =
+            | Just name <- gciToName weaveConf.archive 0 gci =
                 name
             | gci.unGCI < 0 = Prose [PTokenStyledText $ StyledText {body = "^ Top", style = styleMaskFrom []}]
             | otherwise = noName
@@ -1797,7 +1797,7 @@ weaveBacklinks = do
                   [(reverse $ map fst group, target)]
              in sortBy
                   ( comparing (negate . length . fst)
-                      <> comparing (cellIdxToName weaveConf.archive 0 . snd)
+                      <> comparing (gciToName weaveConf.archive 0 . snd)
                   )
                   . concatMap coalesce
                   . groupBy ((==) `on` snd)

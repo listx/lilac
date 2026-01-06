@@ -31,10 +31,10 @@ performance reasons, but JSON is good enough for now.
 #+header: :tangle src/Lilac/Compile.hs
 #+begin_src haskell
 module Lilac.Compile
-  ( cellIdxToName,
-    cumulativeOffsets,
+  ( cumulativeOffsets,
     findCycles,
     findExternalOids,
+    gciToName,
     makeRelativeToObjectPath,
     mkObject,
     mkArchive,
@@ -111,9 +111,9 @@ import Lilac.Types
     PseudoEdge (PseudoEdge),
     Style (Verbatim),
     Table (grid, meta, parentOid),
-    cellIdxToObjCell,
     decodeGPath,
     encodeGPath,
+    gciToObjCell,
     getProseContents,
     getSectionNumber,
     ptext,
@@ -181,7 +181,7 @@ import System.OsPath qualified as P
 <<f:readObjectsFrom>>
 <<f:buildGraph>>
 <<f:getBlocksFromArchive>>
-<<f:getBlockIdxsFromArchive>>
+<<f:getBlockGCIsFromArchive>>
 <<f:mkBlockAncestry>>
 <<f:findCycles>>
 <<f:cumulativeOffsets>>
@@ -193,7 +193,7 @@ import System.OsPath qualified as P
 <<f:getBibliography>>
 <<f:parseBibliography>>
 <<f:makeRelativeToObjectPath>>
-<<f:cellIdxToName>>
+<<f:gciToName>>
 #+end_src
 
 * Objects
@@ -329,10 +329,10 @@ mkSymbols orgDoc =
   fromList
     . concatMap f
     $ zip
-      [0 ..] -- (ref:f:mkSymbols-cell-index)
+      (map LCI [0 ..]) -- (ref:f:mkSymbols-cell-index)
       orgDoc.cells
   where
-    f (localCellIdx, cell) = case cell of -- (ref:f:mkSymbols-localCellIdx)
+    f (lci, cell) = case cell of -- (ref:f:mkSymbols-lci)
       CHeading heading
         | Just oidText <- lookup "ID" heading.meta,
           Just oid <- LP.validateOidText oidText ->
@@ -340,7 +340,7 @@ mkSymbols orgDoc =
                   { oid = oid,
                     name = T.empty
                   },
-                LCI $ localCellIdx
+                lci
               )
             ]
         | otherwise -> []
@@ -349,25 +349,25 @@ mkSymbols orgDoc =
           orgDoc.oid
           block.parentOid
           block.meta
-          localCellIdx
+          lci
       CFigure figure ->
         getSymbols
           orgDoc.oid
           figure.parentOid
           figure.meta
-          localCellIdx
+          lci
       CMathFragment mathFragment ->
         getSymbols
           orgDoc.oid
           mathFragment.parentOid
           mathFragment.meta
-          localCellIdx
+          lci
       CTable table ->
         getSymbols
           orgDoc.oid
           table.parentOid
           table.meta
-          localCellIdx
+          lci
       CFootnote {}
       CListItem {}
       CParagraph {}
@@ -378,9 +378,9 @@ mkSymbols orgDoc =
 Only headings, blocks, figures, math fragments, and tables can be linked to
 using a ~LinkOid~. The other cell types are ignored [[(f:mkSymbols-ignored-cells)]].
 
-We call the cell index the ~localCellIdx~ [[(f:mkSymbols-localCellIdx)]] to
+We call the cell index the ~lci~ [[(f:mkSymbols-lci)]] for /local/ cell index to
 differentiate it against the /global/ cell index, which is used when handling
-archives, such as in [[f:cellIdxToObjCell]].
+archives, such as in [[f:gciToObjCell]].
 
 The [[f:getSymbols]] helper generates either one or two symbols for the same cell;
 these correspond to whether we use one OID (document OID) or two OIDs (document
@@ -388,8 +388,8 @@ OID or the closest parent heading's OID) [[(f:getSymbols-has-parent-oid)]].
 
 #+name: f:getSymbols
 #+begin_src haskell
-getSymbols :: OID -> OID -> Map Text Text -> Int -> [(LinkOid, LCI)]
-getSymbols docOid parentOid cellMeta localCellIdx =
+getSymbols :: OID -> OID -> Map Text Text -> LCI -> [(LinkOid, LCI)]
+getSymbols docOid parentOid cellMeta lci =
   let oids =
         if parentOid /= docOid -- (ref:f:getSymbols-has-parent-oid)
           then [parentOid, docOid]
@@ -403,7 +403,7 @@ getSymbols docOid parentOid cellMeta localCellIdx =
                 { oid = oid,
                   name = name
                 },
-              LCI localCellIdx
+              lci
             )
       | Just tanglePath <- lookup "tangle" cellMeta -- (ref:symbols-tangle-meta)
         =
@@ -412,7 +412,7 @@ getSymbols docOid parentOid cellMeta localCellIdx =
                 { oid = oid,
                   name = tanglePath <> "\NUL"
                 },
-              LCI localCellIdx
+              lci
             )
       | Just anonBlockNumber <- lookup "__anon_block_number" cellMeta -- (ref:symbols-anonymous-blocks)
         =
@@ -421,7 +421,7 @@ getSymbols docOid parentOid cellMeta localCellIdx =
                 { oid = oid,
                   name = anonBlockNumber <> "\NUL__anon_block_number"
                 },
-              LCI localCellIdx
+              lci
             )
       | otherwise = Nothing
 #+end_src
@@ -434,7 +434,7 @@ root blocks (that need to be tangled in [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7b
 Unless we include anonymous blocks as a symbol for these cases, they will be
 skipped over. And we need [[(symbols-anonymous-blocks)]] because we need them for
 navigating a block's ancestry; specifically, a block may have an anonymous
-parent, and we still want to include such parents in [[id:ff5876bf-a144-4a08-bba4-15638e3590d5::f:getBlockIdxsFromArchive][f:getBlockIdxsFromArchive]],
+parent, and we still want to include such parents in [[id:ff5876bf-a144-4a08-bba4-15638e3590d5::f:getBlockGCIsFromArchive][f:getBlockGCIsFromArchive]],
 which powers [[id:ff5876bf-a144-4a08-bba4-15638e3590d5::f:mkBlockAncestry][f:mkBlockAncestry]].
 
 Note that [[f:mkSymbols]] needs to return a ~Map LinkOid Int~. Because both
@@ -801,7 +801,7 @@ mkArchive pathObjs = do
                   csls = fromList csls,
                   bibs = fromList bibs
                 }
-            ancestry = mkBlockAncestry archive $ getBlockIdxsFromArchive archive
+            ancestry = mkBlockAncestry archive $ getBlockGCIsFromArchive archive
          in pure $ Right archive {ancestry = ancestry}
   where
     topLevelUUIDs :: Map LinkOid GCI
@@ -880,18 +880,18 @@ finalizeEdges ::
 finalizeEdges syms acc (offset, (_, obj)) =
   let f (PseudoEdge (lci, linkOid)) = case lookup linkOid syms of
         Nothing -> Nothing
-        Just targetCellIdx -> Just (GCI $ lci.unLCI + offset, targetCellIdx)
+        Just targetGCI -> Just (GCI $ lci.unLCI + offset, targetGCI)
    in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
 #+end_src
 
 [[f:mkBacklinks]] takes the edges which contain global cell index information for
 both the starting and ending vertices, and then transforms them into the final
-shape ~Map GPath (Map GPath [G.Edge])~:
+shape ~Map GPath (Map GPath [(GCI, GCI)])~:
 
 #+begin_src txt
-Map GPath (Map GPath [G.Edge])
+Map GPath (Map GPath [(GCI, GCI)])
       |          |       |
-      |          |       `---> List of edges (source cell idx, target cell idx)
+      |          |       `---> List of edges (source GCI, target GCI)
       |          `---> Source object path
       `----> Target object path
 #+end_src
@@ -945,13 +945,13 @@ describe "cumulativeOffsets sanity check" $ do
     LC.cumulativeOffsets input `shouldBe` output
 #+end_src
 
-[[f:cellIdxToObjCell]] takes a global cell index and converts it to the right cell
+[[f:gciToObjCell]] takes a global cell index and converts it to the right cell
 and the object (Org doc) that contains it, as a tuple.
 
-#+name: f:cellIdxToObjCell
+#+name: f:gciToObjCell
 #+begin_src haskell
-cellIdxToObjCell :: Archive -> GCI -> Maybe (Object, Cell)
-cellIdxToObjCell archive gci
+gciToObjCell :: Archive -> GCI -> Maybe (Object, Cell)
+gciToObjCell archive gci
   | Just (offset, path) <- IntMap.lookupLE gci.unGCI archive.offsets,
     Just obj <- lookup path archive.objects,
     Just cell <- obj.orgDoc.cells !!? (gci.unGCI - offset) =
@@ -959,7 +959,7 @@ cellIdxToObjCell archive gci
   | otherwise = Nothing
 #+end_src
 
-[[f:cellIdxToName]] gives a human-friendly name of the cell. Much of it is
+[[f:gciToName]] gives a human-friendly name of the cell. Much of it is
 patterned after [[id:7ddbd51b-fbac-4bf7-a14e-982ab753c879::f:getLinkAnchor][f:getLinkAnchor]], which gives a semi-human-friendly (and
 definitely machine-friendly) name for a given cell. We use the pilcrow (¶) and
 section symbol (§) directly for paragraphs and headings because
@@ -967,11 +967,11 @@ section symbol (§) directly for paragraphs and headings because
 that if we do ~&para;~ the ~&~ will get escaped to ~&amp;~, which would result in
 ~&amp;para;~ and therefore not what we want.
 
-#+name: f:cellIdxToName
+#+name: f:gciToName
 #+begin_src haskell
-cellIdxToName :: Archive -> Int -> GCI -> Maybe Prose
-cellIdxToName archive offset gci
-  | Just (_, cell) <- cellIdxToObjCell archive gci =
+gciToName :: Archive -> Int -> GCI -> Maybe Prose
+gciToName archive offset gci
+  | Just (_, cell) <- gciToObjCell archive gci =
       case cell of
         CHeading heading ->
           plain
@@ -1060,7 +1060,7 @@ stripStyles (Prose pTokens) = Prose (concatMap stripStyle pTokens)
       pToken -> [pToken]
 #+end_src
 
-[[f:getCellName]] is similar to [[f:cellIdxToName]], but it only returns a
+[[f:getCellName]] is similar to [[f:gciToName]], but it only returns a
 ~Just~ value if the cell is a block, figure, table, footnote, or math fragment
 that has a ~#+name: ...~.
 
@@ -1529,7 +1529,7 @@ getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
   where
     f :: [Block] -> GCI -> [Block]
     f acc gci
-      | Just (_, cell) <- cellIdxToObjCell archive gci =
+      | Just (_, cell) <- gciToObjCell archive gci =
           case cell of
             CBlock b -> b : acc
             CHeading {}
@@ -1544,16 +1544,17 @@ getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
       | otherwise = acc
 #+end_src
 
-[[f:getBlockIdxsFromArchive]] gets all code blocks from the archive.
+[[f:getBlockGCIsFromArchive]] gets all code blocks (by their [[newtype:GCI]]) from the
+archive.
 
-#+name: f:getBlockIdxsFromArchive
+#+name: f:getBlockGCIsFromArchive
 #+begin_src haskell
-getBlockIdxsFromArchive :: Archive -> [GCI]
-getBlockIdxsFromArchive archive = foldl' f [] $ elems archive.symbols
+getBlockGCIsFromArchive :: Archive -> [GCI]
+getBlockGCIsFromArchive archive = foldl' f [] $ elems archive.symbols
   where
     f :: [GCI] -> GCI -> [GCI]
     f acc gci
-      | Just (_, cell) <- cellIdxToObjCell archive gci =
+      | Just (_, cell) <- gciToObjCell archive gci =
           case cell of
             CBlock {} -> gci : acc
             CHeading {}
@@ -1592,20 +1593,20 @@ information.
 #+name: f:mkBlockAncestry
 #+begin_src haskell
 mkBlockAncestry :: Archive -> [GCI] -> Map GCI [GCI]
-mkBlockAncestry archive blockIdxs = foldl' f mempty blockIdxs
+mkBlockAncestry archive blockGCIs = foldl' f mempty blockGCIs
   where
     f :: Map GCI [GCI] -> GCI -> Map GCI [GCI]
-    f acc blockIdx
-      | Just (_, CBlock block) <- cellIdxToObjCell archive blockIdx =
+    f acc blockGCI
+      | Just (_, CBlock block) <- gciToObjCell archive blockGCI =
           ( \childLinks ->
               foldl'
                 ( \acc' childLink ->
                     case lookup childLink archive.symbols of
-                      Just childIdx ->
+                      Just childGCI ->
                         insertWith
                           (\old new -> hashNub (old <> new))
-                          childIdx
-                          [blockIdx]
+                          childGCI
+                          [blockGCI]
                           acc'
                       Nothing -> acc'
                 )
