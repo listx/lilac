@@ -51,6 +51,21 @@ GCI).
 
   - [ ] [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][Frontend]]
 
+*** TODO add widget for higher-level table of contents
+
+We need a way to let users understand that a single document is part of some
+other one. Otherwise it can be tricky to navigate across the related documents
+together.
+
+What we need is a way to specify a higher-level Table of Contents (HLTOC) once
+(as part of a configuration file), and then have it refer to OIDs in a tree
+structure. And then when we weave a document, we need to look it up in the
+HLTOC, and if it exists in a HLTOC, also render that HLTOC in the doc in the
+sidebar somewhere. The HLTOC could have an "intro" page to explain everything in
+the HLTOC. And then /that/ page could be part of yet another HLTOC (and so we can
+nest arbitrarily deep). We could potentially make a rule which says that a
+document can only be mentioned in one HLTOC (no overlap).
+
 *** TODO write manpage
 
 The manpage should have some minimal examples of how to use Lilac. It should be
