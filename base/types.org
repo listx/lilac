@@ -30,9 +30,11 @@ module Lilac.Types
     Command (..),
     Figure (..),
     Footnote (..),
+    GCI (..),
     GPath,
     GlossaryTerm (..),
     Heading (..),
+    LCI (..),
     Level (..),
     Link (..),
     LinkOid (..),
@@ -100,7 +102,6 @@ import Data.Aeson.Types
   )
 import Data.Bits (setBit)
 import Data.Bits.Bitwise (toListLE)
-import Data.Graph qualified as G
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
@@ -115,6 +116,7 @@ import Relude
     Enum,
     Eq,
     FilePath,
+    Hashable,
     Identity,
     Int,
     Map,
@@ -178,6 +180,7 @@ import Prelude qualified (show)
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:ListMarker>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:MathFragment>>
 <<id:5df15f17-c630-4ddf-bade-66084c430a07::data:OrgDoc>>
+<<id:5df15f17-c630-4ddf-bade-66084c430a07::newtype:LCI>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:OrgParserConf>>
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::f:defaultOrgParserConf>>
 <<id:6cf4d5a5-ec4a-426e-8549-0a899ad77729::data:OrgParserState>>
@@ -224,6 +227,7 @@ import Prelude qualified (show)
 
 <<id:01da95fe-ba23-4481-9833-428423392f5f::data:Object>>
 <<id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive>>
+<<id:25827c17-2015-434b-b686-db3d72b2ee4d::newtype:GCI>>
 <<id:25827c17-2015-434b-b686-db3d72b2ee4d::f:cellIdxToObjCell>>
 <<id:25827c17-2015-434b-b686-db3d72b2ee4d::f:stripLinks>>
 <<id:25827c17-2015-434b-b686-db3d72b2ee4d::f:stripStyles>>

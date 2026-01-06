@@ -114,6 +114,7 @@ import Lilac.Types
     Footnote (Footnote, body, name),
     GlossaryTerm (GlossaryTerm, definition, term),
     Heading (Heading, body, level, meta, section),
+    LCI (LCI, unLCI),
     Level (Level, indent, number),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
@@ -376,7 +377,7 @@ orgDocParser = do
         CFootnote {}
         CCommand {} -> True
   let meaningfulCells = filter meaningfulCell cells --
-  when (pState.cellNumber /= length meaningfulCells)
+  when (pState.cellNumber.unLCI /= length meaningfulCells)
     $ fail
       ( "mismatch: cellNumber: "
           <> show pState.cellNumber
@@ -529,7 +530,7 @@ cellParser = do
         ]
   modify (\s -> s {bracketBalance = 0})
   when (cell /= CListItem [])
-    $ modify (\s -> s {cellNumber = s.cellNumber + 1})
+    $ modify (\s -> s {cellNumber = LCI $ s.cellNumber.unLCI + 1})
   pure cell
   where
     resetContinuationIndent :: OrgParser a -> OrgParser a
@@ -2170,7 +2171,7 @@ footnoteDefinitionParser = do
     )
   pure $ CFootnote Footnote {name = name, body = prose}
 
-reconcileFootnotes :: OrgParser (Map Text (Int, Int))
+reconcileFootnotes :: OrgParser (Map Text (Int, LCI))
 reconcileFootnotes = do
   pState <- get
   let referenced = M.keysSet pState.footnoteRefs
@@ -2731,7 +2732,7 @@ resetState =
       { OrgParserState.bibPaths = [],
         OrgParserState.citations = [],
         OrgParserState.cslPath = Nothing,
-        OrgParserState.cellNumber = 0,
+        OrgParserState.cellNumber = LCI 0,
         OrgParserState.pseudoEdges = []
       }
 

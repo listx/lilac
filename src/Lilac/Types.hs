@@ -8,9 +8,11 @@ module Lilac.Types
     Command (..),
     Figure (..),
     Footnote (..),
+    GCI (..),
     GPath,
     GlossaryTerm (..),
     Heading (..),
+    LCI (..),
     Level (..),
     Link (..),
     LinkOid (..),
@@ -78,7 +80,6 @@ import Data.Aeson.Types
   )
 import Data.Bits (setBit)
 import Data.Bits.Bitwise (toListLE)
-import Data.Graph qualified as G
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
@@ -93,6 +94,7 @@ import Relude
     Enum,
     Eq,
     FilePath,
+    Hashable,
     Identity,
     Int,
     Map,
@@ -308,8 +310,8 @@ data OrgDoc = OrgDoc
     meta :: Map Text Text, --
     cells :: [Cell], --
     pseudoEdges :: [PseudoEdge], --
-    footnoteRefs :: Map Text (Int, Int), --
-    glossary :: Map Text Int, --
+    footnoteRefs :: Map Text (Int, LCI), --
+    glossary :: Map Text LCI, --
     lineLabels :: Map Text Int, --
     cslPath :: Maybe FilePath, --
     bibPaths :: [FilePath], --
@@ -317,6 +319,13 @@ data OrgDoc = OrgDoc
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON) --
+
+type LCI :: Type
+newtype LCI = LCI
+  { unLCI :: Int
+  }
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
 
 type OrgParserConf :: Type
 data OrgParserConf = OrgParserConf
@@ -340,7 +349,7 @@ data OrgParserState = OrgParserState
     headingSectionNumber :: [Int], --
     insideHeading :: Bool, --
     cellNames :: Set Text, --
-    cellNumber :: Int, --
+    cellNumber :: LCI, --
     pseudoEdges :: [PseudoEdge], --
     tanglePaths :: Set Text, --
     insideCodeBlock :: Bool, --
@@ -355,11 +364,11 @@ data OrgParserState = OrgParserState
     listMarkers :: [ListMarker], --
     continuationIndent :: Int, --
     footnoteNumber :: Int, --
-    footnoteRefs :: Map Text (Int, Int), --
+    footnoteRefs :: Map Text (Int, LCI), --
     footnoteDefinitions :: Map Text Prose, --
     insideFootnoteDefinition :: Maybe Text, --
     prevCellIsFootnote :: Bool, --
-    glossary :: Map Text Int, --
+    glossary :: Map Text LCI, --
     glossaryTermOffset :: Int, --
     cslPath :: Maybe FilePath, --
     bibPaths :: [FilePath], --
@@ -384,7 +393,7 @@ defaultOrgParserState =
       headingSectionNumber = [],
       insideHeading = False,
       cellNames = Set.empty,
-      cellNumber = 0,
+      cellNumber = LCI 0,
       pseudoEdges = [],
       tanglePaths = Set.empty,
       insideCodeBlock = False,
@@ -571,7 +580,7 @@ fromText t = case Data.UUID.Types.fromText t of
   Nothing -> Nothing
 
 type PseudoEdge :: Type
-newtype PseudoEdge = PseudoEdge (Int, LinkOid)
+newtype PseudoEdge = PseudoEdge (LCI, LinkOid)
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
@@ -635,7 +644,7 @@ data WeaveConf = WeaveConf
 type Object :: Type
 data Object = Object
   { orgDoc :: OrgDoc,
-    symbols :: Map LinkOid Int, --
+    symbols :: Map LinkOid LCI, --
     externalOids :: [LinkOid] --
   }
   deriving stock (Eq, Ord, Generic, Show)
@@ -644,10 +653,10 @@ data Object = Object
 type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object, --
-    symbols :: Map LinkOid Int,
-    ancestry :: Map Int [Int],
-    glossary :: Map (Text, GPath) Int,
-    backlinks :: Map GPath (Map GPath [G.Edge]),
+    symbols :: Map LinkOid GCI,
+    ancestry :: Map GCI [GCI],
+    glossary :: Map (Text, GPath) LCI,
+    backlinks :: Map GPath (Map GPath [(GCI, GCI)]),
     offsets :: IntMap GPath,
     csls :: Map FilePath Text,
     bibs :: Map FilePath [CP.Reference (CslJson Text)]
@@ -655,11 +664,18 @@ data Archive = Archive
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
-cellIdxToObjCell :: Archive -> Int -> Maybe (Object, Cell)
-cellIdxToObjCell archive globalCellIdx
-  | Just (offset, path) <- IntMap.lookupLE globalCellIdx archive.offsets,
+type GCI :: Type
+newtype GCI = GCI
+  { unGCI :: Int
+  }
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, FromJSONKey, Hashable, ToJSON, ToJSONKey)
+
+cellIdxToObjCell :: Archive -> GCI -> Maybe (Object, Cell)
+cellIdxToObjCell archive gci
+  | Just (offset, path) <- IntMap.lookupLE gci.unGCI archive.offsets,
     Just obj <- lookup path archive.objects,
-    Just cell <- obj.orgDoc.cells !!? (globalCellIdx - offset) =
+    Just cell <- obj.orgDoc.cells !!? (gci.unGCI - offset) =
       Just (obj, cell)
   | otherwise = Nothing
 

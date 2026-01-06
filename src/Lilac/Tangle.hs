@@ -17,6 +17,7 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
+    LCI (unLCI),
     LinkTarget (LinkTargetLineLabel, LinkTargetOid),
     Object (orgDoc, symbols),
     OrgDoc (cells),
@@ -54,8 +55,8 @@ expandRootBlocks archive outDir = map expandRootBlock rootBlocks
       [[(OsPath, Block)]]
     getRootBlocksFromObject acc object =
       foldl' (getRootBlock object.orgDoc.cells) [] object.symbols : acc
-    getRootBlock cells acc localCellIdx
-      | Just cell <- cells !!? localCellIdx =
+    getRootBlock cells acc lci
+      | Just cell <- cells !!? lci.unLCI =
           case cell of
             CBlock b
               | Just tPath <- lookup "tangle" b.meta,

@@ -49,9 +49,11 @@ import Lilac.Types
       ),
     Figure (meta, parentOid),
     Footnote (name),
+    GCI (GCI, unGCI),
     GPath,
     GlossaryTerm (definition, term),
     Heading (body, meta),
+    LCI (LCI, unLCI),
     Link (target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
@@ -106,7 +108,7 @@ import Relude
     foldlM,
     fromList,
     fst,
-    intNub,
+    hashNub,
     intercalate,
     length,
     map,
@@ -146,7 +148,7 @@ mkObject orgDoc =
       externalOids = findExternalOids orgDoc --
     }
 
-mkSymbols :: OrgDoc -> Map LinkOid Int
+mkSymbols :: OrgDoc -> Map LinkOid LCI
 mkSymbols orgDoc =
   fromList
     . concatMap f
@@ -162,7 +164,7 @@ mkSymbols orgDoc =
                   { oid = oid,
                     name = T.empty
                   },
-                localCellIdx
+                LCI $ localCellIdx
               )
             ]
         | otherwise -> []
@@ -196,7 +198,7 @@ mkSymbols orgDoc =
       CGlossaryTerm {}
       CCommand {} -> [] --
 
-getSymbols :: OID -> OID -> Map Text Text -> Int -> [(LinkOid, Int)]
+getSymbols :: OID -> OID -> Map Text Text -> Int -> [(LinkOid, LCI)]
 getSymbols docOid parentOid cellMeta localCellIdx =
   let oids =
         if parentOid /= docOid --
@@ -211,7 +213,7 @@ getSymbols docOid parentOid cellMeta localCellIdx =
                 { oid = oid,
                   name = name
                 },
-              localCellIdx
+              LCI localCellIdx
             )
       | Just tanglePath <- lookup "tangle" cellMeta --
         =
@@ -220,7 +222,7 @@ getSymbols docOid parentOid cellMeta localCellIdx =
                 { oid = oid,
                   name = tanglePath <> "\NUL"
                 },
-              localCellIdx
+              LCI localCellIdx
             )
       | Just anonBlockNumber <- lookup "__anon_block_number" cellMeta --
         =
@@ -229,7 +231,7 @@ getSymbols docOid parentOid cellMeta localCellIdx =
                 { oid = oid,
                   name = anonBlockNumber <> "\NUL__anon_block_number"
                 },
-              localCellIdx
+              LCI localCellIdx
             )
       | otherwise = Nothing
 
@@ -281,11 +283,11 @@ mkArchive pathObjs = do
             ancestry = mkBlockAncestry archive $ getBlockIdxsFromArchive archive
          in pure $ Right archive {ancestry = ancestry}
   where
-    topLevelUUIDs :: Map LinkOid Int
+    topLevelUUIDs :: Map LinkOid GCI
     topLevelUUIDs =
       let topLevelLinkOids =
             fromList
-              $ zip (map (mkLinkOid . snd) $ sort pathObjs) [-1, -2 ..]
+              $ zip (map (mkLinkOid . snd) $ sort pathObjs) (map GCI [-1, -2 ..])
           mkLinkOid :: Object -> LinkOid
           mkLinkOid obj =
             LinkOid
@@ -304,23 +306,23 @@ mkArchive pathObjs = do
         . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
         $ sort pathObjs
     concatObjs ::
-      (Map GPath Object, Map LinkOid Int, Map (Text, GPath) Int) ->
+      (Map GPath Object, Map LinkOid GCI, Map (Text, GPath) LCI) ->
       (Int, (GPath, Object)) ->
-      (Map GPath Object, Map LinkOid Int, Map (Text, GPath) Int)
+      (Map GPath Object, Map LinkOid GCI, Map (Text, GPath) LCI)
     concatObjs (accObjs, accSyms, accGloss) (offset, (path, obj)) =
       ( insert path obj accObjs,
-        (M.map (+ offset) obj.symbols) <> accSyms,
+        (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) <> accSyms,
         (M.mapKeys (\term -> (term, path)) obj.orgDoc.glossary) <> accGloss
       )
     findBrokenLinks ::
       Map GPath Object ->
-      Map LinkOid Int ->
+      Map LinkOid GCI ->
       [(GPath, LinkOid)]
     findBrokenLinks objs syms =
       foldl' (getBrokenLink syms) []
         $ allExternalOids objs
     getBrokenLink ::
-      Map LinkOid Int ->
+      Map LinkOid GCI ->
       [(GPath, LinkOid)] ->
       (GPath, LinkOid) ->
       [(GPath, LinkOid)]
@@ -338,30 +340,30 @@ mkArchive pathObjs = do
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
 
 finalizeEdges ::
-  Map LinkOid Int ->
-  [G.Edge] ->
+  Map LinkOid GCI ->
+  [(GCI, GCI)] ->
   (Int, (GPath, Object)) ->
-  [G.Edge]
+  [(GCI, GCI)]
 finalizeEdges syms acc (offset, (_, obj)) =
-  let f (PseudoEdge (localCellIdx, linkOid)) = case lookup linkOid syms of
+  let f (PseudoEdge (lci, linkOid)) = case lookup linkOid syms of
         Nothing -> Nothing
-        Just targetCellIdx -> Just (localCellIdx + offset, targetCellIdx)
+        Just targetCellIdx -> Just (GCI $ lci.unLCI + offset, targetCellIdx)
    in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
 
 mkBacklinks ::
   [(GPath, Object)] ->
   IntMap GPath ->
-  [G.Edge] ->
-  Map GPath (Map GPath [G.Edge])
+  [(GCI, GCI)] ->
+  Map GPath (Map GPath [(GCI, GCI)])
 mkBacklinks pathObjs offsets symbolEdges =
   let f acc (from, to)
-        | Just (_, fromPath) <- IntMap.lookupLE from offsets,
-          Just (_, toPath) <- IntMap.lookupLE to offsets,
+        | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
+          Just (_, toPath) <- IntMap.lookupLE to.unGCI offsets,
           fromPath /= toPath =
             M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-        | Just (_, fromPath) <- IntMap.lookupLE from offsets,
-          to < 0,
-          Just toPath <- (sort $ map fst pathObjs) !!? (abs to - 1),
+        | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
+          to.unGCI < 0,
+          Just toPath <- (sort $ map fst pathObjs) !!? (abs to.unGCI - 1),
           fromPath /= toPath =
             M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
         | otherwise = acc
@@ -410,9 +412,9 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
 getBlocksFromArchive :: Archive -> [Block]
 getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
   where
-    f :: [Block] -> Int -> [Block]
-    f acc globalCellIdx
-      | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
+    f :: [Block] -> GCI -> [Block]
+    f acc gci
+      | Just (_, cell) <- cellIdxToObjCell archive gci =
           case cell of
             CBlock b -> b : acc
             CHeading {}
@@ -426,14 +428,14 @@ getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
             CCommand {} -> acc
       | otherwise = acc
 
-getBlockIdxsFromArchive :: Archive -> [Int]
+getBlockIdxsFromArchive :: Archive -> [GCI]
 getBlockIdxsFromArchive archive = foldl' f [] $ elems archive.symbols
   where
-    f :: [Int] -> Int -> [Int]
-    f acc globalCellIdx
-      | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
+    f :: [GCI] -> GCI -> [GCI]
+    f acc gci
+      | Just (_, cell) <- cellIdxToObjCell archive gci =
           case cell of
-            CBlock {} -> globalCellIdx : acc
+            CBlock {} -> gci : acc
             CHeading {}
             CListItem {}
             CParagraph {}
@@ -445,10 +447,10 @@ getBlockIdxsFromArchive archive = foldl' f [] $ elems archive.symbols
             CCommand {} -> acc
       | otherwise = acc
 
-mkBlockAncestry :: Archive -> [Int] -> Map Int [Int]
+mkBlockAncestry :: Archive -> [GCI] -> Map GCI [GCI]
 mkBlockAncestry archive blockIdxs = foldl' f mempty blockIdxs
   where
-    f :: Map Int [Int] -> Int -> Map Int [Int]
+    f :: Map GCI [GCI] -> GCI -> Map GCI [GCI]
     f acc blockIdx
       | Just (_, CBlock block) <- cellIdxToObjCell archive blockIdx =
           ( \childLinks ->
@@ -457,7 +459,7 @@ mkBlockAncestry archive blockIdxs = foldl' f mempty blockIdxs
                     case lookup childLink archive.symbols of
                       Just childIdx ->
                         insertWith
-                          (\old new -> intNub (old <> new))
+                          (\old new -> hashNub (old <> new))
                           childIdx
                           [blockIdx]
                           acc'
@@ -591,9 +593,9 @@ makeRelativeToObjectPath objGPath fps = do
       let relPath = P.combine objDir p
       P.decodeUtf relPath
 
-cellIdxToName :: Archive -> Int -> Int -> Maybe Prose
-cellIdxToName archive offset globalCellIdx
-  | Just (_, cell) <- cellIdxToObjCell archive globalCellIdx =
+cellIdxToName :: Archive -> Int -> GCI -> Maybe Prose
+cellIdxToName archive offset gci
+  | Just (_, cell) <- cellIdxToObjCell archive gci =
       case cell of
         CHeading heading ->
           plain
@@ -645,6 +647,6 @@ cellIdxToName archive offset globalCellIdx
         CCommand {} -> Nothing
   | otherwise = Nothing
   where
-    cellRef = "Cell " <> (T.show $ globalCellIdx - offset)
+    cellRef = "Cell " <> (T.show $ gci.unGCI - offset)
     plain body = Just $ Prose [ptext body []]
     verbatim body = Just $ Prose [ptext body [Verbatim]]
