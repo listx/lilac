@@ -341,7 +341,7 @@ spec = do
         1
         [Just $ fromWords 0x7777777777777777 0x7777777777777777]
         `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
-    it "adds a new head if the heading nests (and this heading has an ID)" $ do
+    it "adds a new head if heading nests (new heading has an ID)" $ do
       L.genHeadingOidStack
         (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         2
@@ -349,7 +349,7 @@ spec = do
         `shouldBe` [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                      Nothing
                    ]
-    it "adds a new head if the heading nests (and this heading does not have an ID)" $ do
+    it "adds a new head if heading nests (new heading does not have an ID)" $ do
       L.genHeadingOidStack
         Nothing
         2

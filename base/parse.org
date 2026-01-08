@@ -1467,11 +1467,12 @@ data Cell
 #+end_src
 
 All of the different cell types describe some sort of content, except for one,
-=CListItem=. The =CListItem= is purely structural because it only describes itself
+~CListItem~. The ~CListItem~ is purely structural because it only describes itself
 and relies on /other cells/ for displaying any useful information. See
 [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]] to see how this is used.
 
-The [[data:Command]] encodes information about /generated/ content, such as [[id:e24de101-bf1d-418b-a18f-b1a98fea9696][Printing bibliographies]].
+The [[data:Command]] encodes information about /generated/ content, such as [[id:e24de101-bf1d-418b-a18f-b1a98fea9696][Printing
+bibliographies]].
 
 #+name: data:Command
 #+begin_src haskell
@@ -1483,7 +1484,7 @@ data Command
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
-The =cellParser= is responsible for parsing these different recognized values of
+The [[f:cellParser]] is responsible for parsing these different recognized values of
 [[data:Cell]].
 
 #+name: f:cellParser
@@ -1495,24 +1496,24 @@ cellParser = do
       $ MP.choice
         [ toggleFootnote False $ listItemStartParser,
           toggleFootnote False $ listItemsEndParser,
-          toggleFootnote False $ resetContinuationIndent headingParser,
-          toggleFootnote False $ resetContinuationIndent blockParser,
-          toggleFootnote False $ resetContinuationIndent figureParser,
-          toggleFootnote False $ resetContinuationIndent tableParser,
-          toggleFootnote False $ resetContinuationIndent mathFragmentStandaloneParser,
-          toggleFootnote True $ resetContinuationIndent footnoteDefinitionParser,
-          toggleFootnote False $ resetContinuationIndent bibliographyLocationParser,
-          toggleFootnote False $ resetContinuationIndent glossaryLocationParser,
-          toggleFootnote False $ resetContinuationIndent paragraphParser,
+          toggleFootnote False $ resetIndent headingParser,
+          toggleFootnote False $ resetIndent blockParser,
+          toggleFootnote False $ resetIndent figureParser,
+          toggleFootnote False $ resetIndent tableParser,
+          toggleFootnote False $ resetIndent mathFragmentStandaloneParser,
+          toggleFootnote True $ resetIndent footnoteDefinitionParser,
+          toggleFootnote False $ resetIndent bibliographyLocationParser,
+          toggleFootnote False $ resetIndent glossaryLocationParser,
+          toggleFootnote False $ resetIndent paragraphParser,
           detectInvalidIndentation
         ]
-  modify (\s -> s {bracketBalance = 0})
+  modify (\s -> s {bracketBalance = 0}) -- (ref:f:cellParser-bracketBalance-reset)
   when (cell /= CListItem [])
     $ modify (\s -> s {cellNumber = LCI $ s.cellNumber.unLCI + 1})
   pure cell
   where
-    resetContinuationIndent :: OrgParser a -> OrgParser a
-    resetContinuationIndent p = do
+    resetIndent :: OrgParser a -> OrgParser a -- (ref:f:cellParser-resetIndent)
+    resetIndent p = do
       a <- p
       modify (\s -> s {continuationIndent = 0})
       pure a
@@ -1523,10 +1524,10 @@ cellParser = do
       pure a
 #+end_src
 
-The =resetContinuationIndent= wrapper sets the =continuationIndent= attribute in the
-[[data:OrgParserState]] back to =0=; this information is useful for parsers that need
-to understand indentation precisely. See [[f:listItemsEndParser]] for how it's used
-by that function.
+The ~resetIndent~ wrapper [[(f:cellParser-resetIndent)]] resets the ~continuationIndent~
+attribute [[(field-ops-continuationIndent)]] in the [[data:OrgParserState]] back to 0;
+this information is useful for parsers that need to understand indentation
+precisely. See [[f:listItemsEndParser]] for how it's used by that function.
 
 The [[f:listItemStartParser]] and [[f:listItemsEndParser]] are the only parsers that can
 consume leading indentation! The [[f:paragraphParser]] can consume leading
@@ -1534,18 +1535,20 @@ indentation, but /only/ on lines except the first one (so that it can ensure tha
 paragraphs that are part of a list item can have all of its lines line up
 together). For example, the following paragraph is inside a list item
 
+#+begin_src org
   - Hello
     world.
+#+end_src
 
 and will be parsed as a string ~Hello world~ and not as ~Hello    world~ (the
 leading indent for ~world~ will be ignored).
 
-Any other indentation should be detected as invalid. To enforce this, we put in
-a =detectInvalidIndentation= parser which technically isn't a parser but which
-will throw an error if it is able to successfully parse indentation. The idea is
-that if none of the other parsers in the list are able to consume indentation,
-then this will allow =detectInvalidIndentation= to see such indentation and fail
-the overall parser.
+Any other indentation should be treated as being invalid. To enforce this, we
+put in a [[f:detectInvalidIndentation]] parser which technically isn't a parser but
+which will throw an error if it is able to successfully parse indentation. The
+idea is that if none of the other parsers in the list of parsers in [[f:cellParser]]
+are able to consume indentation, then this will allow ~detectInvalidIndentation~
+to see such indentation and fail the overall parser.
 
 #+name: f:detectInvalidIndentation
 #+begin_src haskell
@@ -1553,31 +1556,34 @@ detectInvalidIndentation :: OrgParser Cell
 detectInvalidIndentation = do
   _ <- MP.hidden $ onlySpaces
   void
-    $ MP.fancyFailure
+    $ MP.fancyFailure -- (ref:f:detectInvalidIndentation-MP.fancyFailure)
     . Set.singleton
     . MP.ErrorFail
-    $ "invalid indentation"
-  pure $ CListItem []
+    $ "invalid indentation" -- (ref:f:detectInvalidIndentation-errorMsg)
+  pure $ CListItem [] -- (ref:f:detectInvalidIndentation-CListItem)
 #+end_src
 
 #+name: f:onlySpaces
 #+begin_src haskell
 onlySpaces :: OrgParser Text
-onlySpaces = MP.takeWhile1P (Just "space") (== ' ')
+onlySpaces = MP.takeWhile1P (Just "space") (== ' ') -- (ref:f:detectInvalidIndentation-MP.takeWhile1P)
 #+end_src
 
-We signal the error with ~invalid ...~ so as to not shadow the typical ~unexpected
-...~ language from Megaparsec's usual parse failures. Note also that the last
-line in the function above (~pure $ CListItem []~) is only there to satisfy the
-type checker --- we will always fail if the =takeWhile1P= succeeds (the
-=MP.fancyFailure= will not be executed if =takeWhile1P= fails).
+We signal the error with ~invalid ...~ [[(f:detectInvalidIndentation-errorMsg)]] so as
+to not shadow the typical ~unexpected ...~ language from Megaparsec's usual parse
+failures. Note also that the ~pure $ CListItem []~
+[[(f:detectInvalidIndentation-CListItem)]] is only there to satisfy the type checker
+--- we will always fail if the ~takeWhile1P~
+[[(f:detectInvalidIndentation-MP.takeWhile1P)]] succeeds (the ~MP.fancyFailure~
+[[(f:detectInvalidIndentation-MP.fancyFailure)]] will not be executed if ~takeWhile1P~
+fails).
 
-The ~bracketBalance~ is set to 0 in [[f:cellParser]] after a cell is parsed, because
-we're not interested in cross-cell issues about unbalanced brackets. See
-[[f:failIfUnbalancedBrackets]].
+The ~bracketBalance~ is set to 0 [[(f:cellParser-bracketBalance-reset)]] in
+[[f:cellParser]] after a cell is parsed, because we're not interested in cross-cell
+issues about unbalanced brackets. See [[f:failIfUnbalancedBrackets]].
 
-The rest of this document is mainly concerned with describing all of the
-different building blocks used for constructing cells.
+The rest of the top-level headings this document is mainly concerned with
+describing all of the different building blocks used for constructing cells.
 
 ** Tests
 :PROPERTIES:
@@ -1710,8 +1716,8 @@ shouldParseWith
 #+end_src
 
 Note that we currently don't do any intelligent processing of the metadata
-fields. For example, the value of the =property= key above is a mess because it
-itself contains a key and value (=:noweb= and =no-export=).
+fields. For example, the value of the ~property~ key above is a mess because it
+itself contains a key and value (~:noweb~ and ~no-export~).
 
 Below is the same as the test above, but with some whitespace and comments
 sprinkled in between.
@@ -3267,7 +3273,7 @@ The OID reference uniquely identifies the linked item. Below are some examples:
 
 [[id:62a7d69a-7aa7-4607-b93e-7ed382a5f256][link display name]]
 
-[[id:62a7d69a-7aa7-4607-b93e-7ed382a5f256::name of target item][link display name]]
+[[id:62a7d69a-7aa7-4607-b93e-7ed382a5f256::target name][link display name]]
 #+end_src
 
 The first one, ~[[foo]]~, is called an /implicit/ link; it links to some other cell
@@ -3284,8 +3290,8 @@ document. This example also has a ~link display name~ as the text to display to
 the user when we weave this to HTML. These link display names are parsed
 separately in [[f:linkDisplayNameParser]] ([[id:4ae6e928-44be-47a0-baf4-8b3893a7a8fb][Link display names]]).
 
-The third example has a ~name of target item~ in it, which we call a /target name/.
-This name may or may not have newlines in it.
+The third example has a ~target name~ in it. This name may or may not have
+newlines in it.
 
 For all three examples, the part in the first set of brackets (~foo~,
 ~id:62a7d69a-7aa7-4607-b93e-7ed382a5f256~, and
@@ -3827,7 +3833,8 @@ protocolWebLinkParser = do
         MP.try linkDisplayNameParser
       ]
   case N.parseURI (T.unpack maybeUri) of
-    Nothing -> fail $ "(protocol web link) not a valid URI: " <> (T.unpack maybeUri)
+    Nothing ->
+      fail $ "(protocol web link) not a valid URI: " <> (T.unpack maybeUri)
     Just uri ->
       pure
         $ Link
@@ -7734,7 +7741,7 @@ describe "genHeadingOidStack" $ do
       1
       [Just $ fromWords 0x7777777777777777 0x7777777777777777]
       `shouldBe` [Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa]
-  it "adds a new head if the heading nests (and this heading has an ID)" $ do
+  it "adds a new head if heading nests (new heading has an ID)" $ do
     L.genHeadingOidStack
       (Just "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
       2
@@ -7742,7 +7749,7 @@ describe "genHeadingOidStack" $ do
       `shouldBe` [ Just $ fromWords 0xaaaaaaaaaaaaaaaa 0xaaaaaaaaaaaaaaaa,
                    Nothing
                  ]
-  it "adds a new head if the heading nests (and this heading does not have an ID)" $ do
+  it "adds a new head if heading nests (new heading does not have an ID)" $ do
     L.genHeadingOidStack
       Nothing
       2
@@ -10082,7 +10089,8 @@ listHeadIndentLevelParser = do
     seeingContentAfterListHead level = do
       _ <- char ' '
       MP.notFollowedBy (char ' ')
-      modify (\s -> s {continuationIndent = getContinuationIndentForLevel level})
+      modify
+        (\s -> s {continuationIndent = getContinuationIndentForLevel level})
 #+end_src
 
 The ~minimalIndentation~ [[(f:listHeadIndentLevelParser-minimalIndentation)]] expects
@@ -10249,7 +10257,8 @@ listItemFitter level levels =
       let markers = getEndingListMarkers levelsToDrop pState.listLevels
       put
         pState
-          { listLevels = level : drop (levelsToDrop + 1) pState.listLevels, -- (ref:f:listItemFitter-extra-level-drop)
+          { listLevels =
+              level : drop (levelsToDrop + 1) pState.listLevels, -- (ref:f:listItemFitter-extra-level-drop)
             listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
       pure $ markers <> [LItemEnd, LItemStart]

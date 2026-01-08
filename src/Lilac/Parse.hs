@@ -517,24 +517,24 @@ cellParser = do
       $ MP.choice
         [ toggleFootnote False $ listItemStartParser,
           toggleFootnote False $ listItemsEndParser,
-          toggleFootnote False $ resetContinuationIndent headingParser,
-          toggleFootnote False $ resetContinuationIndent blockParser,
-          toggleFootnote False $ resetContinuationIndent figureParser,
-          toggleFootnote False $ resetContinuationIndent tableParser,
-          toggleFootnote False $ resetContinuationIndent mathFragmentStandaloneParser,
-          toggleFootnote True $ resetContinuationIndent footnoteDefinitionParser,
-          toggleFootnote False $ resetContinuationIndent bibliographyLocationParser,
-          toggleFootnote False $ resetContinuationIndent glossaryLocationParser,
-          toggleFootnote False $ resetContinuationIndent paragraphParser,
+          toggleFootnote False $ resetIndent headingParser,
+          toggleFootnote False $ resetIndent blockParser,
+          toggleFootnote False $ resetIndent figureParser,
+          toggleFootnote False $ resetIndent tableParser,
+          toggleFootnote False $ resetIndent mathFragmentStandaloneParser,
+          toggleFootnote True $ resetIndent footnoteDefinitionParser,
+          toggleFootnote False $ resetIndent bibliographyLocationParser,
+          toggleFootnote False $ resetIndent glossaryLocationParser,
+          toggleFootnote False $ resetIndent paragraphParser,
           detectInvalidIndentation
         ]
-  modify (\s -> s {bracketBalance = 0})
+  modify (\s -> s {bracketBalance = 0}) --
   when (cell /= CListItem [])
     $ modify (\s -> s {cellNumber = LCI $ s.cellNumber.unLCI + 1})
   pure cell
   where
-    resetContinuationIndent :: OrgParser a -> OrgParser a
-    resetContinuationIndent p = do
+    resetIndent :: OrgParser a -> OrgParser a --
+    resetIndent p = do
       a <- p
       modify (\s -> s {continuationIndent = 0})
       pure a
@@ -548,11 +548,11 @@ detectInvalidIndentation :: OrgParser Cell
 detectInvalidIndentation = do
   _ <- MP.hidden $ onlySpaces
   void
-    $ MP.fancyFailure
+    $ MP.fancyFailure --
     . Set.singleton
     . MP.ErrorFail
-    $ "invalid indentation"
-  pure $ CListItem []
+    $ "invalid indentation" --
+  pure $ CListItem [] --
 
 headingParser :: OrgParser Cell
 headingParser = do
@@ -739,7 +739,7 @@ whitespaceCompressor spaceConsumer = do
       ]
 
 onlySpaces :: OrgParser Text
-onlySpaces = MP.takeWhile1P (Just "space") (== ' ')
+onlySpaces = MP.takeWhile1P (Just "space") (== ' ') --
 
 styleMarkers :: Map Char Style
 styleMarkers =
@@ -1117,7 +1117,8 @@ protocolWebLinkParser = do
         MP.try linkDisplayNameParser
       ]
   case N.parseURI (T.unpack maybeUri) of
-    Nothing -> fail $ "(protocol web link) not a valid URI: " <> (T.unpack maybeUri)
+    Nothing ->
+      fail $ "(protocol web link) not a valid URI: " <> (T.unpack maybeUri)
     Just uri ->
       pure
         $ Link
@@ -1319,8 +1320,7 @@ blockParser = do
     ( \s ->
         s
           { anonBlockNumber = newAnonBlockNumber,
-            insideCodeBlock = False,
-            lineLabelNumber = 0
+            insideCodeBlock = False
           }
     )
   pure $ CBlock block
@@ -1754,7 +1754,8 @@ listHeadIndentLevelParser = do
     seeingContentAfterListHead level = do
       _ <- char ' '
       MP.notFollowedBy (char ' ')
-      modify (\s -> s {continuationIndent = getContinuationIndentForLevel level})
+      modify
+        (\s -> s {continuationIndent = getContinuationIndentForLevel level})
 
 orderedHeadParser :: OrgParser (Maybe Int)
 orderedHeadParser = do
@@ -1835,7 +1836,8 @@ listItemFitter level levels =
       let markers = getEndingListMarkers levelsToDrop pState.listLevels
       put
         pState
-          { listLevels = level : drop (levelsToDrop + 1) pState.listLevels, --
+          { listLevels =
+              level : drop (levelsToDrop + 1) pState.listLevels, --
             listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
       pure $ markers <> [LItemEnd, LItemStart]
