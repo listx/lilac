@@ -26,6 +26,7 @@ import Lilac.Types
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
     Heading (Heading, body, level, meta, section),
+    LCI (LCI),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
@@ -656,7 +657,7 @@ spec = do
             [ ptext "[[bar]]" [Code]
             ]
       ]
-      [PseudoEdge (1, LinkOid {oid = fromWords 0 0, name = "hello"})]
+      [PseudoEdge (LCI 1, LinkOid {oid = fromWords 0 0, name = "hello"})]
 
   shouldParseWith
     "0005-styled-strings-verbatim"
@@ -873,8 +874,8 @@ spec = do
                 ptext " b" []
               ]
         ]
-        [ PseudoEdge (2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "a"}),
-          PseudoEdge (0, LinkOid {oid = fromWords 0 0, name = "link-target-only"})
+        [ PseudoEdge (LCI 2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "a"}),
+          PseudoEdge (LCI 0, LinkOid {oid = fromWords 0 0, name = "link-target-only"})
         ]
     )
     defaultOrgParserState
@@ -1102,15 +1103,15 @@ spec = do
               LUnorderedEnd
             ]
         ]
-        [ PseudoEdge (6, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "a b c"}),
-          PseudoEdge (4, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo bar baz"}),
-          PseudoEdge (2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo"}),
-          PseudoEdge (0, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo"}),
-          PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "foo"}),
-          PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
-          PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
-          PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
-          PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""})
+        [ PseudoEdge (LCI 6, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "a b c"}),
+          PseudoEdge (LCI 4, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo bar baz"}),
+          PseudoEdge (LCI 2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo"}),
+          PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "foo"}),
+          PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "foo"}),
+          PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
+          PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
+          PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""}),
+          PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = ""})
         ]
     )
 
@@ -1132,7 +1133,7 @@ spec = do
                     }
               ]
         ]
-        [PseudoEdge (0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "target name with newline and space is still treated as space"})]
+        [PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "target name with newline and space is still treated as space"})]
     )
 
   shouldFailWithMessage
@@ -1998,7 +1999,7 @@ spec = do
                     }
               }
         ]
-        [PseudoEdge (8, LinkOid {oid = fromWords 0 0, name = "not a figure"})]
+        [PseudoEdge (LCI 8, LinkOid {oid = fromWords 0 0, name = "not a figure"})]
     )
     defaultOrgParserState
       { cellNames =
@@ -2315,7 +2316,7 @@ spec = do
         pseudoEdges = [],
         footnoteRefs =
           fromList
-            [ ("hello", (1, 0))
+            [ ("hello", (1, LCI 0))
             ],
         glossary = M.empty,
         lineLabels = M.empty,
@@ -2328,7 +2329,7 @@ spec = do
       { footnoteNumber = 1,
         footnoteRefs =
           fromList
-            [ ("hello", (1, 0))
+            [ ("hello", (1, LCI 0))
             ],
         footnoteDefinitions =
           fromList
@@ -2375,8 +2376,8 @@ spec = do
         pseudoEdges = [],
         footnoteRefs =
           fromList
-            [ ("a", (1, 0)),
-              ("b", (2, 0))
+            [ ("a", (1, LCI 0)),
+              ("b", (2, LCI 0))
             ],
         glossary = M.empty,
         lineLabels = M.empty,
@@ -2389,8 +2390,8 @@ spec = do
       { footnoteNumber = 2,
         footnoteRefs =
           fromList
-            [ ("a", (1, 0)),
-              ("b", (2, 0))
+            [ ("a", (1, LCI 0)),
+              ("b", (2, LCI 0))
             ],
         footnoteDefinitions =
           fromList
