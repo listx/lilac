@@ -1463,19 +1463,19 @@ oidLinkParser = do
   (oid, name) <- oidReferenceParser "[]" "]]" --
   pState <- get
   let mask = pState.styleMask
-      implicitName
+      implicitDisplayName
         | T.null name = "id:" <> T.show oid
         | otherwise = name
-      implicitNameStyledText =
+      implicitDisplayNameStyledText =
         StyledText
-          { body = implicitName,
+          { body = implicitDisplayName,
             style = mask
           }
 
   _ <- string "]"
   displayName <-
     MP.choice
-      [ MP.try $ string "]" >> pure [implicitNameStyledText],
+      [ MP.try $ string "]" >> pure [implicitDisplayNameStyledText],
         MP.try linkDisplayNameParser --
       ]
   let linkOid =
