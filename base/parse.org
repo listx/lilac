@@ -296,7 +296,6 @@ data OrgParserState = OrgParserState
     anonBlockNumber :: Int, -- (ref:field-ops-anonBlockNumber)
     lineLabelNumber :: Int, -- (ref:field-ops-lineLabelNumber)
     lineLabels :: Map Text Int, -- (ref:field-ops-lineLabels)
-    lineLabelReferences :: Set Text, -- (ref:field-ops-lineLabelReferences)
     styleMask :: StyleMask, -- (ref:field-ops-styleMask)
     insideLinkDisplayName :: Bool, -- (ref:field-ops-insideLinkDisplayName)
     insideParagraph :: Bool, -- (ref:field-ops-insideParagraph)
@@ -346,7 +345,6 @@ defaultOrgParserState =
       anonBlockNumber = 0,
       lineLabelNumber = 0,
       lineLabels = M.empty,
-      lineLabelReferences = Set.empty,
       styleMask = styleMaskFrom [],
       insideLinkDisplayName = False,
       insideParagraph = False,
@@ -452,11 +450,6 @@ labels]] which is reset at every code block.
 
 The ~lineLabels~ map [[(field-ops-lineLabels)]] associates the label with the label
 number, and this number is used to display the link in the text (source) as well as the code block (destination).
-
-The ~lineLabelReferences~ [[(field-ops-lineLabelReferences)]] is used to make sure
-that a line label discussed in the prose text (source) outside of a code block
-has a matching label in a code block (destination) somewhere else in the same
-Org document.
 
 *** Fields for prose text
 
@@ -747,7 +740,6 @@ import Lilac.Types as OrgParserState
         insideLinkDisplayName,
         insideParagraph,
         lineLabelNumber,
-        lineLabelReferences,
         lineLabels,
         listLevels,
         listMarkers,
@@ -917,8 +909,6 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:someBTokensParser>>
 <<f:nowebLinkTargetParser>>
 <<f:lineLabelParser>>
-<<f:lineLabelRefParser>>
-<<f:lineLabelLinkParser>>
 <<f:oidLinkParser>>
 <<f:oidReferenceParser>>
 <<f:compressedTextParser>>
@@ -958,7 +948,6 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:footnoteReferenceParser>>
 <<f:footnoteDefinitionParser>>
 <<f:reconcileFootnotes>>
-<<f:reconcileLineLabels>>
 <<f:convertToGlossaryTerm>>
 <<f:assertUniqueGlossaryTerm>>
 <<f:isGlossaryTermDelimiter>>
@@ -1016,7 +1005,6 @@ orgDocParser = do
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
-  lineLabels <- reconcileLineLabels
   footnoteRefs <- reconcileFootnotes
   citations <- collectCitations
   pState <- get
@@ -1049,7 +1037,7 @@ orgDocParser = do
         pseudoEdges = pState.pseudoEdges,
         footnoteRefs = footnoteRefs,
         glossary = pState.glossary,
-        lineLabels = lineLabels,
+        lineLabels = pState.lineLabels,
         cslPath = cslPath,
         bibPaths = bibPaths,
         citations = citations,
@@ -3073,7 +3061,7 @@ facility because ~[[https://www.haskell.org]]~ behaves the same way as
 type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
-  | LinkTargetLineLabel Text
+  | LinkTargetLineLabel LinkOid
   | LinkTargetFootnote Text
   | LinkTargetURI N.URI
   | LinkTargetFilePath FilePath
@@ -3092,7 +3080,7 @@ expected format of these links.
 type LinkOid :: Type
 data LinkOid = LinkOid
   { oid :: OID,
-    name :: Text
+    name :: Text -- (ref:data:LinkOid-name)
   }
   deriving stock (Eq, Generic, Ord)
 #+end_src
@@ -3161,8 +3149,7 @@ linkParser = do
   failIfVerbatimOrCode
 
   MP.choice
-    [ MP.try lineLabelLinkParser,
-      MP.try oidLinkParser,
+    [ MP.try oidLinkParser,
       MP.try protocolWebLinkParser,
       MP.try fileLinkParser,
       MP.try footnoteLinkParser,
@@ -3228,13 +3215,20 @@ oidLinkParser = do
   let linkOid =
         LinkOid
           { oid = oid,
-            name = name
+            name =
+              if isLineLabel name
+                then T.drop 1 $ T.dropEnd 1 name -- (ref:f:oidLinkParser-line-label-drop-parentheses)
+                else name
           }
+      linkTargetConstructor =
+        if isLineLabel name
+          then LinkTargetLineLabel -- (ref:f:oidLinkParser-line-label-constructor)
+          else LinkTargetOid
       edge = PseudoEdge (pState.cellNumber, linkOid) -- (ref:f:oidLinkParser-PseudoEdge)
   modify (\s -> s {OrgParserState.pseudoEdges = edge : s.pseudoEdges})
   pure
     $ Link
-      { target = LinkTargetOid linkOid,
+      { target = linkTargetConstructor linkOid,
         name = displayName
       }
   where
@@ -3245,18 +3239,28 @@ oidLinkParser = do
         . map (MP.try . string)
         $ protocolsWeb
         <> protocolsEmacs
+    isLineLabel :: Text -> Bool -- (ref:f:oidLinkParser-isLineLabel)
+    isLineLabel s = T.take 1 s == "(" && T.takeEnd 1 s == ")"
 #+end_src
 
 There are three main pieces involved here:
 
   1) [[f:oidReferenceParser]] [[(f:oidLinkParser-oidReferenceParser)]] for parsing the
      location of the linked item (anything that can be named, such as a code
-     block, figure, or table);
+     block, line label [[(f:oidLinkParser-isLineLabel)]], figure, or table);
 
   2) [[f:linkDisplayNameParser]] [[(f:oidLinkParser-linkDisplayNameParser)]] for parsing
      the display name of the link (if any); and
 
   3) so-called "pseudo" edges [[(f:oidLinkParser-PseudoEdge)]].
+
+We drop the opening and closing parentheses from the name of a line label
+[[(f:oidLinkParser-line-label-drop-parentheses)]] because whether the name refers to
+a line label or not is already captured in the ~LinkTargetLineLabel~ value
+constructor at [[(f:oidLinkParser-line-label-constructor)]]. So in practice we can
+just pattern match on this constructor to know whether the [[data:LinkOid]]
+contained within it is a line label or not, without having to inspect the name
+at all.
 
 Pseudo-edges are needed for [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4][backlink]] generation. Now let's look at the first two
 pieces in more detail.
@@ -4288,24 +4292,23 @@ lineLabelParser :: OrgParser LinkTarget
 lineLabelParser = do
   _ <- string "(ref:"
   o <- MP.getOffset
-  lineLabel <- lineLabelRefParser
+  lineLabel <- do
+    let disallowedChars = "()[]<>" :: [Char]
+        ending = ">>" :: [Char]
+    MP.label "line label" $ compressedTextParser disallowedChars ending
   _ <- string ")"
   assertUniqueLineLabel lineLabel o
-  pure $ LinkTargetLineLabel lineLabel
+  pState <- get
+  pure
+    $ LinkTargetLineLabel
+      LinkOid
+        { oid = pState.docOid,
+          name = lineLabel
+        }
 #+end_src
 
-Valid characters for a line label are handled by [[f:lineLabelRefParser]]. This uses
-[[f:compressedTextParser]] to let the user refer to line labels more freely, without
-having to be exact about whitespace.
-
-#+name: f:lineLabelRefParser
-#+begin_src haskell
-lineLabelRefParser :: OrgParser Text
-lineLabelRefParser = do
-  let disallowedChars = "()[]<>" :: [Char]
-      ending = ">>" :: [Char]
-  MP.label "line label" $ compressedTextParser disallowedChars ending
-#+end_src
+This uses [[f:compressedTextParser]] to let the user refer to line labels more
+freely, without having to be exact about whitespace.
 
 The line labels must be unique inside a document; otherwise you'll run into a
 parse error, per [[f:assertUniqueLineLabel]]. [[f:assertUniqueLineLabel]] is virtually
@@ -4367,38 +4370,18 @@ with an opening parenthesis, so that ~[[(foo)]]~ always links to the line label
 named ~foo~, not a cell named ~(foo)~; this prohibition of an opening parenthesis is
 codified in [[f:metaEntryParser]] at [[(non-line-label name)]].
 
-Parsing of line label links is handled by [[f:lineLabelLinkParser]].
-
-#+name: f:lineLabelLinkParser
-#+begin_src haskell
-lineLabelLinkParser :: OrgParser Link
-lineLabelLinkParser = do
-  _ <- string "[[("
-  lineLabel <- lineLabelRefParser
-  _ <- string ")]]"
-  modify
-    ( \s ->
-        s
-          { OrgParserState.lineLabelReferences =
-              Set.insert lineLabel s.lineLabelReferences
-          }
-    )
-  pure
-    $ Link
-      { target = LinkTargetLineLabel lineLabel,
-        name = []
-      }
-#+end_src
+Parsing of line label links is handled by [[f:oidLinkParser]].
 
 Unlike other links that use the double bracket syntax, these line label links
 cannot be given a custom name for how they are displayed inside code blocks;
-instead they are always named numerically when woven (see [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveLink][f:weaveLink]]). During
-weaving, the line labels within each block are always numbered starting at
-number ~1~, and increment upwards. Each block resets the counter back to ~1~. The
-~lineLabels~ and ~lineLabelNumber~ fields in [[data:OrgParserState]] keep track of this
-numbering strategy. And just like for footnotes, we check how these line labels
-are used in [[f:reconcileLineLabels]], which is based heavily off of
-[[f:reconcileFootnotes]].
+instead they are always named numerically when woven (see [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveLink][f:weaveLink]]), although
+when referring to a line label in an /external/ document we also include the name
+of the code block for additional context
+[[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::(f:weaveLink-name-of-code-block)]].
+
+During weaving, line labels are numbered starting at ~1~, and
+increment upwards. The ~lineLabels~ and ~lineLabelNumber~ fields in
+[[data:OrgParserState]] keep track of this numbering.
 
 #+name: f:reconcileLineLabels
 #+begin_src haskell
@@ -6059,7 +6042,6 @@ shouldFailWithError
   "0014-citations-unbalanced-brackets-prefix-closing"
   ( utoks "]"
       <> etoks "[["
-      <> etoks "[[("
       <> etoks "[fn:"
       <> etoks "\\("
       <> etoks "@"
@@ -6100,7 +6082,6 @@ shouldFailWithError
   "0014-citations-unbalanced-brackets-suffix-closing"
   ( utoks "]]\n"
       <> etoks "[["
-      <> etoks "[[("
       <> etoks "[fn:"
       <> etoks "\\("
       <> etoks "\\"
@@ -6688,12 +6669,8 @@ spelling it out).
 #+begin_src haskell
 unparseLink :: Link -> Text
 unparseLink link = case link.target of
-  LinkTargetOid linkOid ->
-    let linkTargetText = show linkOid
-     in if linkTargetText == displayName
-          then "[[" <> linkTargetText <> "]]"
-          else "[[" <> linkTargetText <> "][" <> displayName <> "]]"
-  LinkTargetLineLabel name -> "[[(" <> name <> ")]]"
+  LinkTargetOid linkOid -> unparseLinkOid linkOid
+  LinkTargetLineLabel linkOid -> unparseLinkOid linkOid
   LinkTargetFootnote name -> "[fn:" <> name <> "]"
   LinkTargetURI uri ->
     let linkTargetText = T.pack $ N.uriToString id uri ""
@@ -6713,6 +6690,11 @@ unparseLink link = case link.target of
     hasNoStyle = null . foldl' f []
     f :: [Style] -> StyledText -> [Style]
     f acc s = acc <> maskToStyles s.style
+    unparseLinkOid linkOid =
+      let linkTargetText = show linkOid
+       in if linkTargetText == displayName
+            then "[[" <> linkTargetText <> "]]"
+            else "[[" <> linkTargetText <> "][" <> displayName <> "]]"
 #+end_src
 
 For [[data:MathFragment]], we have to disambiguate the three different kinds of
@@ -8183,7 +8165,7 @@ parent heading (creating a property drawer, adding the ~:ID:~ key, etc) if it
 doesn't already have an ~:ID:~.
 
 We need to store the ~parentOid~ here because ultimately, we need to build up a
-hashmap of symbols in [[id:01da95fe-ba23-4481-9833-428423392f5f::f:mkSymbols][f:mkSymbols]], which uses the ~parentOid~ as a building block.
+hashmap of symbols in [[id:91613519-f745-4cd8-9e88-125786ff0d33::f:mkSymbols][f:mkSymbols]], which uses the ~parentOid~ as a building block.
 Once we have all the symbols (using ~parentOid~ fields) defined such that we know
 what they point to, we are able to look at a [[data:LinkOid]] and are able to
 determine what that link actually points to (whether it's a block, table,

@@ -169,11 +169,13 @@ mkSymbols orgDoc =
             ]
         | otherwise -> []
       CBlock block ->
-        getSymbols
-          orgDoc.oid
-          block.parentOid
-          block.meta
-          lci
+        ( getSymbols
+            orgDoc.oid
+            block.parentOid
+            block.meta
+            lci
+        )
+          <> (getLineLabels orgDoc.oid block.parentOid lci block) --
       CFigure figure ->
         getSymbols
           orgDoc.oid
@@ -197,6 +199,16 @@ mkSymbols orgDoc =
       CParagraph {}
       CGlossaryTerm {}
       CCommand {} -> [] --
+
+getLineLabels :: OID -> OID -> LCI -> Block -> [(LinkOid, LCI)]
+getLineLabels docOid parentOid lci block = foldl' f [] block.body
+  where
+    f acc bToken = case bToken of
+      (BTokenLinkTarget (LinkTargetLineLabel linkOid)) ->
+        (LinkOid docOid linkOid.name, lci)
+          : (LinkOid parentOid linkOid.name, lci)
+          : acc
+      _ -> acc
 
 getSymbols :: OID -> OID -> Map Text Text -> LCI -> [(LinkOid, LCI)]
 getSymbols docOid parentOid cellMeta lci =
@@ -539,7 +551,10 @@ findExternalOids orgDoc =
         if member linkOid symbols
           then acc
           else linkOid : acc
-      LinkTargetLineLabel {}
+      LinkTargetLineLabel linkOid ->
+        if member linkOid symbols
+          then acc
+          else linkOid : acc
       LinkTargetFootnote {}
       LinkTargetFilePath {}
       LinkTargetURI {} -> acc

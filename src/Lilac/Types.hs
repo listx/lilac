@@ -49,6 +49,8 @@ module Lilac.Types
     markingCharsInvisible,
     nilOid,
     nilOidOrgDocPrefix,
+    oidToObj,
+    onlyOid,
     protocolsEmacs,
     protocolsWeb,
     ptext,
@@ -111,6 +113,7 @@ import Relude
     Void,
     Word64,
     Word8,
+    abs,
     catMaybes,
     concatMap,
     fail,
@@ -123,16 +126,18 @@ import Relude
     pure,
     reverse,
     show,
+    sort,
     toEnum,
     zip,
     (!!?),
     ($),
     (-),
     (.),
+    (<),
     (<>),
     (>),
   )
-import Relude.Extra.Map (lookup)
+import Relude.Extra.Map (keys, lookup)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Prelude qualified (show)
@@ -240,7 +245,7 @@ data Link = Link
 type LinkOid :: Type
 data LinkOid = LinkOid
   { oid :: OID,
-    name :: Text
+    name :: Text --
   }
   deriving stock (Eq, Generic, Ord)
 
@@ -277,7 +282,7 @@ parseJSONLinkOid t = do
 type LinkTarget :: Type
 data LinkTarget
   = LinkTargetOid LinkOid
-  | LinkTargetLineLabel Text
+  | LinkTargetLineLabel LinkOid
   | LinkTargetFootnote Text
   | LinkTargetURI N.URI
   | LinkTargetFilePath FilePath
@@ -356,7 +361,6 @@ data OrgParserState = OrgParserState
     anonBlockNumber :: Int, --
     lineLabelNumber :: Int, --
     lineLabels :: Map Text Int, --
-    lineLabelReferences :: Set Text, --
     styleMask :: StyleMask, --
     insideLinkDisplayName :: Bool, --
     insideParagraph :: Bool, --
@@ -400,7 +404,6 @@ defaultOrgParserState =
       anonBlockNumber = 0,
       lineLabelNumber = 0,
       lineLabels = M.empty,
-      lineLabelReferences = Set.empty,
       styleMask = styleMaskFrom [],
       insideLinkDisplayName = False,
       insideParagraph = False,
@@ -578,6 +581,22 @@ fromText :: Text -> Maybe OID
 fromText t = case Data.UUID.Types.fromText t of
   Just uuid -> Just $ OID uuid
   Nothing -> Nothing
+
+onlyOid :: LinkOid -> LinkOid
+onlyOid linkOid =
+  LinkOid
+    { oid = linkOid.oid,
+      name = ""
+    }
+
+oidToObj :: Archive -> OID -> Maybe Object
+oidToObj archive oid
+  | Just gci <- lookup (LinkOid oid "") archive.symbols,
+    gci.unGCI < 0,
+    Just objPath <-
+      (sort $ keys archive.objects) !!? (abs gci.unGCI - 1) =
+      lookup objPath archive.objects
+  | otherwise = Nothing
 
 type PseudoEdge :: Type
 newtype PseudoEdge = PseudoEdge (LCI, LinkOid)

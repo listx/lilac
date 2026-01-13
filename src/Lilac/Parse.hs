@@ -212,7 +212,6 @@ import Lilac.Types as OrgParserState
         insideLinkDisplayName,
         insideParagraph,
         lineLabelNumber,
-        lineLabelReferences,
         lineLabels,
         listLevels,
         listMarkers,
@@ -358,7 +357,6 @@ orgDocParser = do
   _ <- lilacExtensionsParser
   cells <- many cellParser
   MP.eof
-  lineLabels <- reconcileLineLabels
   footnoteRefs <- reconcileFootnotes
   citations <- collectCitations
   pState <- get
@@ -391,7 +389,7 @@ orgDocParser = do
         pseudoEdges = pState.pseudoEdges,
         footnoteRefs = footnoteRefs,
         glossary = pState.glossary,
-        lineLabels = lineLabels,
+        lineLabels = pState.lineLabels,
         cslPath = cslPath,
         bibPaths = bibPaths,
         citations = citations,
@@ -1052,8 +1050,7 @@ linkParser = do
   failIfVerbatimOrCode
 
   MP.choice
-    [ MP.try lineLabelLinkParser,
-      MP.try oidLinkParser,
+    [ MP.try oidLinkParser,
       MP.try protocolWebLinkParser,
       MP.try fileLinkParser,
       MP.try footnoteLinkParser,
@@ -1427,34 +1424,19 @@ lineLabelParser :: OrgParser LinkTarget
 lineLabelParser = do
   _ <- string "(ref:"
   o <- MP.getOffset
-  lineLabel <- lineLabelRefParser
+  lineLabel <- do
+    let disallowedChars = "()[]<>" :: [Char]
+        ending = ">>" :: [Char]
+    MP.label "line label" $ compressedTextParser disallowedChars ending
   _ <- string ")"
   assertUniqueLineLabel lineLabel o
-  pure $ LinkTargetLineLabel lineLabel
-
-lineLabelRefParser :: OrgParser Text
-lineLabelRefParser = do
-  let disallowedChars = "()[]<>" :: [Char]
-      ending = ">>" :: [Char]
-  MP.label "line label" $ compressedTextParser disallowedChars ending
-
-lineLabelLinkParser :: OrgParser Link
-lineLabelLinkParser = do
-  _ <- string "[[("
-  lineLabel <- lineLabelRefParser
-  _ <- string ")]]"
-  modify
-    ( \s ->
-        s
-          { OrgParserState.lineLabelReferences =
-              Set.insert lineLabel s.lineLabelReferences
-          }
-    )
+  pState <- get
   pure
-    $ Link
-      { target = LinkTargetLineLabel lineLabel,
-        name = []
-      }
+    $ LinkTargetLineLabel
+      LinkOid
+        { oid = pState.docOid,
+          name = lineLabel
+        }
 
 oidLinkParser :: OrgParser Link
 oidLinkParser = do
@@ -1481,13 +1463,20 @@ oidLinkParser = do
   let linkOid =
         LinkOid
           { oid = oid,
-            name = name
+            name =
+              if isLineLabel name
+                then T.drop 1 $ T.dropEnd 1 name --
+                else name
           }
+      linkTargetConstructor =
+        if isLineLabel name
+          then LinkTargetLineLabel --
+          else LinkTargetOid
       edge = PseudoEdge (pState.cellNumber, linkOid) --
   modify (\s -> s {OrgParserState.pseudoEdges = edge : s.pseudoEdges})
   pure
     $ Link
-      { target = LinkTargetOid linkOid,
+      { target = linkTargetConstructor linkOid,
         name = displayName
       }
   where
@@ -1498,6 +1487,8 @@ oidLinkParser = do
         . map (MP.try . string)
         $ protocolsWeb
         <> protocolsEmacs
+    isLineLabel :: Text -> Bool --
+    isLineLabel s = T.take 1 s == "(" && T.takeEnd 1 s == ")"
 
 oidReferenceParser :: [Char] -> [Char] -> OrgParser (OID, Text)
 oidReferenceParser disallowedChars ending =
@@ -2189,22 +2180,6 @@ reconcileFootnotes = do
     | hasUnusedDefs -> fail $ "unused footnote definitions: " <> unusedDefsMsg
     | otherwise -> pure pState.footnoteRefs
 
-reconcileLineLabels :: OrgParser (Map Text Int)
-reconcileLineLabels = do
-  pState <- get
-  let referenced = pState.lineLabelReferences
-      defined = M.keysSet pState.lineLabels
-      brokenLinks = Set.difference referenced defined
-      unusedDefs = Set.difference defined referenced
-      hasBrokenLinks = length brokenLinks /= 0
-      hasUnusedDefs = length unusedDefs /= 0
-      brokenLinksMsg = T.unpack . unwords $ toList brokenLinks
-      unusedDefsMsg = T.unpack . unwords $ toList unusedDefs
-  if
-    | hasBrokenLinks -> fail $ "broken line label links: " <> brokenLinksMsg
-    | hasUnusedDefs -> fail $ "unused line labels: " <> unusedDefsMsg
-    | otherwise -> pure pState.lineLabels
-
 convertToGlossaryTerm :: Prose -> Int -> OrgParser Cell
 convertToGlossaryTerm prose offset =
   toGlossaryTerm
@@ -2584,12 +2559,8 @@ unparseStyledText styledText =
 
 unparseLink :: Link -> Text
 unparseLink link = case link.target of
-  LinkTargetOid linkOid ->
-    let linkTargetText = show linkOid
-     in if linkTargetText == displayName
-          then "[[" <> linkTargetText <> "]]"
-          else "[[" <> linkTargetText <> "][" <> displayName <> "]]"
-  LinkTargetLineLabel name -> "[[(" <> name <> ")]]"
+  LinkTargetOid linkOid -> unparseLinkOid linkOid
+  LinkTargetLineLabel linkOid -> unparseLinkOid linkOid
   LinkTargetFootnote name -> "[fn:" <> name <> "]"
   LinkTargetURI uri ->
     let linkTargetText = T.pack $ N.uriToString id uri ""
@@ -2609,6 +2580,11 @@ unparseLink link = case link.target of
     hasNoStyle = null . foldl' f []
     f :: [Style] -> StyledText -> [Style]
     f acc s = acc <> maskToStyles s.style
+    unparseLinkOid linkOid =
+      let linkTargetText = show linkOid
+       in if linkTargetText == displayName
+            then "[[" <> linkTargetText <> "]]"
+            else "[[" <> linkTargetText <> "][" <> displayName <> "]]"
 
 unparseMathFragment :: MathFragment -> Text
 unparseMathFragment mathFragment = mathStart <> mathFragment.body <> mathEnd

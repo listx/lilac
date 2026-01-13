@@ -71,6 +71,8 @@ module Lilac.Types
     markingCharsInvisible,
     nilOid,
     nilOidOrgDocPrefix,
+    oidToObj,
+    onlyOid,
     protocolsEmacs,
     protocolsWeb,
     ptext,
@@ -133,6 +135,7 @@ import Relude
     Void,
     Word64,
     Word8,
+    abs,
     catMaybes,
     concatMap,
     fail,
@@ -145,16 +148,18 @@ import Relude
     pure,
     reverse,
     show,
+    sort,
     toEnum,
     zip,
     (!!?),
     ($),
     (-),
     (.),
+    (<),
     (<>),
     (>),
   )
-import Relude.Extra.Map (lookup)
+import Relude.Extra.Map (keys, lookup)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Prelude qualified (show)
@@ -208,6 +213,8 @@ import Prelude qualified (show)
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::f:nilOidOrgDocPrefix>>
 <<f:fromWords>>
 <<f:fromText>>
+<<id:25827c17-2015-434b-b686-db3d72b2ee4d::f:onlyOid>>
+<<id:25827c17-2015-434b-b686-db3d72b2ee4d::f:oidToObj>>
 
 <<id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5::newtype:PseudoEdge>>
 

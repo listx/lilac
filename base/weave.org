@@ -248,7 +248,7 @@ import Lilac.Types
     Heading (body, level, section),
     LCI (LCI, unLCI),
     Link (Link, name, target),
-    LinkOid (LinkOid),
+    LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
         LinkTargetFootnote,
@@ -274,7 +274,8 @@ import Lilac.Types
         footnoteRefs,
         glossary,
         lineLabels,
-        meta
+        meta,
+        oid
       ),
     PToken
       ( PTokenCitation,
@@ -313,6 +314,9 @@ import Lilac.Types
     getSectionNumber,
     markingChars,
     markingCharsInvisible,
+    oidToObj,
+    onlyOid,
+    stext,
     stripLinks,
     stripStyles,
   )
@@ -499,6 +503,9 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:spliceLinks>>
 <<f:weaveLink>>
 <<f:weaveLinkTarget>>
+<<f:weaveLinkTargetLinkOid>>
+<<f:getExternalRelPath>>
+<<f:showBrokenLink>>
 <<f:weaveFigure>>
 <<f:weaveMathFragmentStandalone>>
 <<f:weaveMathFragmentInline>>
@@ -1352,7 +1359,7 @@ weaveBlock lci block = do
                   BTokenLinkTarget lt ->
                     let body' = case lt of
                           LinkTargetOid (LinkOid _oid n) -> n
-                          LinkTargetLineLabel n -> n
+                          LinkTargetLineLabel (LinkOid _oid n) -> n
                           _ -> "weaveBlock error"
                         name' =
                           StyledText
@@ -1558,31 +1565,41 @@ will not have access to the current window.
 weaveLink :: Bool -> Link -> HtmlWeaver ()
 weaveLink insideBlock link = do
   weaveConf <- ask
-  wovenLinkTarget <- weaveLinkTarget link.target
+  wovenLinkTarget <- weaveLinkTarget insideBlock link.target
   let attrs =
         [href_ wovenLinkTarget]
           <> linkCategory wovenLinkTarget
           <> lineLabelAttr
       lineLabelAttr =
         case link.target of
-          LinkTargetLineLabel name ->
+          LinkTargetLineLabel lineLabel ->
             if insideBlock
-              then [id_ ("ib-" <> toSafeHtmlId name)] -- (ref:line label self-link)
+              then [id_ ("ib-" <> toSafeHtmlId lineLabel.name)] -- (ref:line label self-link)
               else []
           _ -> []
-      linkName =
+      linkDisplayName =
         case link.target of
-          LinkTargetLineLabel name
-            | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-              Just num <- lookup name originObj.orgDoc.lineLabels ->
-                [StyledText {body = T.show num, style = styleMaskFrom [Bold]}]
+          LinkTargetLineLabel lineLabel
+            | Just obj <- oidToObj weaveConf.archive lineLabel.oid,
+              Just num <- lookup lineLabel.name obj.orgDoc.lineLabels ->
+                if
+                  | Just originObj <-
+                      lookup weaveConf.originObjectPath weaveConf.archive.objects,
+                    originObj /= obj,
+                    Just gci <- lookup lineLabel weaveConf.archive.symbols,
+                    Just (offset, _) <- IntMap.lookupLE gci.unGCI weaveConf.archive.offsets,
+                    Just prose <- gciToName weaveConf.archive offset gci ->
+                      (extractStyledText prose) -- (ref:f:weaveLink-name-of-code-block)
+                        <> [stext " → " [], stext (T.show num) [Bold]]
+                  | otherwise ->
+                      [stext (T.show num) [Bold]]
             | otherwise ->
-                [StyledText {body = "weaveLink error", style = styleMaskFrom []}]
+                [stext "weaveLink error (line label display name)" []]
           _ -> link.name
   a_
     attrs
     $ sequence_
-    $ map weaveStyledText linkName
+    $ map weaveStyledText linkDisplayName
   where
     linkCategory target
       | isExternalLink link.target =
@@ -1592,6 +1609,10 @@ weaveLink insideBlock link = do
           ]
       | "#ref-" `T.isPrefixOf` target = []
       | otherwise = [class_ "internal-link"]
+    extractStyledText :: Prose -> [StyledText]
+    extractStyledText prose = reverse $ foldl' f [] prose.unProse
+    f acc (PTokenStyledText styledText) = styledText : acc
+    f acc _ = acc
 #+end_src
 
 Links to bibliographical entries (those starting with ~#ref-~ are not given an
@@ -1609,39 +1630,101 @@ the current document.
 
 #+name: f:weaveLinkTarget
 #+begin_src haskell
-weaveLinkTarget :: LinkTarget -> HtmlWeaver T.Text
-weaveLinkTarget linkTarget = do
+weaveLinkTarget :: Bool -> LinkTarget -> HtmlWeaver T.Text
+weaveLinkTarget insideBlock linkTarget = do
   weaveConf <- ask
   case linkTarget of
-    LinkTargetOid linkOid
-      | Just gci <- lookup linkOid weaveConf.archive.symbols,
+    LinkTargetOid linkOid -> weaveLinkTargetLinkOid linkOid
+    LinkTargetLineLabel linkOid
+      | insideBlock -> pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-self-link)
+      | Just originObj <-
+          lookup weaveConf.originObjectPath weaveConf.archive.objects,
+        originObj.orgDoc.oid == linkOid.oid ->
+          pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-internal)
+      | Just gci <- lookup (onlyOid linkOid) weaveConf.archive.symbols,
         gci.unGCI < 0,
-        Just objPath <- (sort $ keys weaveConf.archive.objects) !!? (abs gci.unGCI - 1) ->
+        Just objPath <-
+          (sort $ keys weaveConf.archive.objects) !!? (abs gci.unGCI - 1) ->
           pure
-            $ if objPath == weaveConf.originObjectPath
-              then "#top"
-              else getExternalRelPath objPath weaveConf.originObjectPath
-      | Just gci <- lookup linkOid weaveConf.archive.symbols,
-        Just (docName, linkAnchor, _) <- getLinkToGCI weaveConf gci ->
-          if docName == "" -- (ref:link-target-is-internal-cell)
-            then pure $ "#" <> linkAnchor
-            else pure linkAnchor
-      | otherwise -> pure showBrokenLink
+            $ getExternalRelPath linkOid objPath weaveConf.originObjectPath
+            <> internalLineLabelTarget -- (ref:f:weaveLinkTarget-external)
+      | otherwise -> pure $ showBrokenLink linkOid
       where
-        showBrokenLink = "#LILAC_BROKEN_LINK-" <> show linkOid
-        htmlExt = P.unsafeEncodeUtf "html"
-        getExternalRelPath extPath intPath
-          | Just toObjPath <- P.encodeUtf $ decodeGPath extPath,
-            Just fromObjPath <- P.encodeUtf $ decodeGPath intPath,
-            Right str <-
-              P.decodeWith utf8 utf8
-                $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt =
-              T.pack str
-          | otherwise = showBrokenLink
-    LinkTargetLineLabel name -> pure $ (T.pack "#ib-") <> toSafeHtmlId name
+        internalLineLabelTarget =
+          (T.pack "#ib-") -- (ref:f:weaveLinkTarget-line-label-prefix)
+            <> toSafeHtmlId linkOid.name
     LinkTargetFootnote name -> pure $ (T.pack "#footnote-") <> name
     LinkTargetFilePath path -> pure . T.pack $ N.escapeURIString N.isUnescapedInURI path
     LinkTargetURI uri -> pure . T.pack $ N.uriToString id uri ""
+#+end_src
+
+For weaving the target to [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]], there are three cases:
+
+  1) The actual labels themselves. This is where they are defined /inside/ a code
+     block, where we have to make them link to themselves
+     [[(f:weaveLinkTarget-self-link)]] (similar to how headings and code blocks can
+     link to themselves for the user to easily save the link to it).
+
+  2) Internal line labels [[(f:weaveLinkTarget-internal)]]. This is simple because
+     we know that all line labels inside a document are unique, so we can just
+     weave with the name of the label (modulo an ~ib-~ prefix to mean "inside
+     block") [[(f:weaveLinkTarget-line-label-prefix)]].
+
+  3) External line labels [[(f:weaveLinkTarget-external)]]. We can't use
+     [[f:weaveLinkTargetLinkOid]] because it will try to do a coarse cell-level
+     lookup. Line labels are finer-grained than cells. We need to get the
+     external relative path, and then skip cell-wise operations and just slap on
+     the name of the line label (modulo the ~ib-~ prefix) to the external path.
+
+     It's important that we use [[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:onlyOid][f:onlyOid]] here; otherwise we'll end up with the
+     GCI of the containing code block which is a positive number, because of
+     [[id:91613519-f745-4cd8-9e88-125786ff0d33::f:getLineLabels][f:getLineLabels]].
+
+[[f:weaveLinkTargetLinkOid]] is a little bit complicated because it needs to be able
+to handle links that point to things inside the doc, or to another doc somewhere
+else (in the archive).
+
+#+name: f:weaveLinkTargetLinkOid
+#+begin_src haskell
+weaveLinkTargetLinkOid :: LinkOid -> HtmlWeaver T.Text
+weaveLinkTargetLinkOid linkOid = do
+  weaveConf <- ask
+  if
+    | Just gci <- lookup linkOid weaveConf.archive.symbols,
+      gci.unGCI < 0,
+      Just objPath <-
+        (sort $ keys weaveConf.archive.objects) !!? (abs gci.unGCI - 1) ->
+        pure
+          $ if objPath == weaveConf.originObjectPath
+            then "#top"
+            else getExternalRelPath linkOid objPath weaveConf.originObjectPath
+    | Just gci <- lookup linkOid weaveConf.archive.symbols,
+      Just (docName, linkAnchor, _) <- getLinkToGCI weaveConf gci ->
+        if docName == "" -- (ref:link-target-is-internal-cell)
+          then pure $ "#" <> linkAnchor
+          else pure linkAnchor
+    | otherwise -> pure $ showBrokenLink linkOid
+#+end_src
+
+#+name: f:getExternalRelPath
+#+begin_src haskell
+getExternalRelPath :: LinkOid -> GPath -> GPath -> Text
+getExternalRelPath linkOid extPath intPath
+  | Just toObjPath <- P.encodeUtf $ decodeGPath extPath,
+    Just fromObjPath <- P.encodeUtf $ decodeGPath intPath,
+    Right str <-
+      P.decodeWith utf8 utf8
+        $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt =
+      T.pack str
+  | otherwise = showBrokenLink linkOid
+  where
+    htmlExt = P.unsafeEncodeUtf "html"
+#+end_src
+
+#+name: f:showBrokenLink
+#+begin_src haskell
+showBrokenLink :: LinkOid -> Text
+showBrokenLink linkOid = "#LILAC_BROKEN_LINK-" <> show linkOid
 #+end_src
 
 [[f:getRelativePathWithoutSymlinks]] takes two file paths. It tries to answer the
@@ -1793,7 +1876,7 @@ also display any associated metadata.
 #+begin_src haskell
 weaveFigure :: LCI -> Figure -> HtmlWeaver ()
 weaveFigure lci figure = do
-  wovenLinkTarget <- weaveLinkTarget figure.link.target
+  wovenLinkTarget <- weaveLinkTarget False figure.link.target
   let captionPrefix =
         "Figure "
           <> lookupDefault "figure-number-error" "__figure_number" figure.meta

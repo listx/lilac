@@ -18,6 +18,7 @@ import Lilac.Types
         CTable
       ),
     LCI (unLCI),
+    LinkOid (name),
     LinkTarget (LinkTargetLineLabel, LinkTargetOid),
     Object (orgDoc, symbols),
     OrgDoc (cells),
@@ -110,7 +111,7 @@ expandBlock archive block existingPrefix =
       | otherwise = (acc, prefix)
     expand (acc, prefix) (BTokenLinkTarget (LinkTargetLineLabel lineLabel))
       | Just "tangle" <- lookup "line-label" block.meta =
-          (acc <> "(ref:" <> lineLabel <> ")", prefix)
+          (acc <> "(ref:" <> lineLabel.name <> ")", prefix)
       | otherwise = (acc, prefix)
     expand (acc, prefix) _ = (acc, prefix)
     getPrefix text = T.takeWhileEnd (/= '\n') text

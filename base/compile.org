@@ -174,6 +174,7 @@ import System.OsPath qualified as P
 
 <<f:mkObject>>
 <<f:mkSymbols>>
+<<f:getLineLabels>>
 <<f:getSymbols>>
 <<f:mkArchive>>
 <<f:finalizeEdges>>
@@ -316,10 +317,14 @@ mkObject orgDoc =
 [[(f:mkObject-findExternalOids)]] are discussed separately below.
 
 *** Symbols
+:PROPERTIES:
+:ID:       91613519-f745-4cd8-9e88-125786ff0d33
+:END:
 
 [[f:mkSymbols]] [[(f:mkObject-mkSymbols)]] generates a mapping of all [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] keys
 to their /local cell index/ values [[(f:mkSymbols-cell-index)]] (also known as the
-[[id:5df15f17-c630-4ddf-bade-66084c430a07::newtype:LCI][newtype:LCI]] values).
+[[id:5df15f17-c630-4ddf-bade-66084c430a07::newtype:LCI][newtype:LCI]] values). This represents the locations (cell indices) of where these
+symbols can be found.
 
 #+name: f:mkSymbols
 #+begin_src haskell
@@ -344,11 +349,13 @@ mkSymbols orgDoc =
             ]
         | otherwise -> []
       CBlock block ->
-        getSymbols
-          orgDoc.oid
-          block.parentOid
-          block.meta
-          lci
+        ( getSymbols
+            orgDoc.oid
+            block.parentOid
+            block.meta
+            lci
+        )
+          <> (getLineLabels orgDoc.oid block.parentOid lci block) -- (ref:f:mkSymbols-getLineLabels)
       CFigure figure ->
         getSymbols
           orgDoc.oid
@@ -372,6 +379,25 @@ mkSymbols orgDoc =
       CParagraph {}
       CGlossaryTerm {}
       CCommand {} -> [] -- (ref:f:mkSymbols-ignored-cells)
+#+end_src
+
+[[f:getLineLabels]] [[(f:mkSymbols-getLineLabels)]] associates a link to a line label
+with the code block cell that contains that line label. We use this information
+in [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveLink][f:weaveLink]] to look up the containing code block's name when the line label
+is contained in an external doc (because the name of the code block gives
+additional context).
+
+#+name: f:getLineLabels
+#+begin_src haskell
+getLineLabels :: OID -> OID -> LCI -> Block -> [(LinkOid, LCI)]
+getLineLabels docOid parentOid lci block = foldl' f [] block.body
+  where
+    f acc bToken = case bToken of
+      (BTokenLinkTarget (LinkTargetLineLabel linkOid)) ->
+        (LinkOid docOid linkOid.name, lci)
+          : (LinkOid parentOid linkOid.name, lci)
+          : acc
+      _ -> acc
 #+end_src
 
 Only headings, blocks, figures, math fragments, and tables can be linked to
@@ -493,7 +519,10 @@ findExternalOids orgDoc =
         if member linkOid symbols
           then acc
           else linkOid : acc
-      LinkTargetLineLabel {}
+      LinkTargetLineLabel linkOid ->
+        if member linkOid symbols
+          then acc
+          else linkOid : acc
       LinkTargetFootnote {}
       LinkTargetFilePath {}
       LinkTargetURI {} -> acc
@@ -507,6 +536,12 @@ categories: [[id:e3400781-57e7-409d-a65c-7c3d66847587::data:BToken][data:BToken]
 of them. Then we check if the link's target is external or not, only keeping it
 if it is external [[(f:findExternalOids-keepIfExternal)]] (i.e., not found in
 ~symbols~ [[(f:findExternalOids-symbols)]]).
+
+Although we call the helper ~keepIfExternal~, internal links that point to OIDs
+within the document will still get treated as "external" if there is a typo in
+the name [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::(data:LinkOid-name)]] part,
+because there won't be any local symbols for it. And then these links will get
+picked up as broken links in [[f:mkArchive]].
 
 Links to code blocks within the same document, whether explicitly defined with
 an OID or not, shouldn't result in external links.
@@ -971,6 +1006,28 @@ gciToObjCell archive gci
     Just cell <- obj.orgDoc.cells !!? (gci.unGCI - offset) =
       Just (obj, cell)
   | otherwise = Nothing
+#+end_src
+
+#+name: f:oidToObj
+#+begin_src haskell
+oidToObj :: Archive -> OID -> Maybe Object
+oidToObj archive oid
+  | Just gci <- lookup (LinkOid oid "") archive.symbols,
+    gci.unGCI < 0,
+    Just objPath <-
+      (sort $ keys archive.objects) !!? (abs gci.unGCI - 1) =
+      lookup objPath archive.objects
+  | otherwise = Nothing
+#+end_src
+
+#+name: f:onlyOid
+#+begin_src haskell
+onlyOid :: LinkOid -> LinkOid
+onlyOid linkOid =
+  LinkOid
+    { oid = linkOid.oid,
+      name = ""
+    }
 #+end_src
 
 [[f:gciToName]] gives a human-friendly name of the cell. Much of it is

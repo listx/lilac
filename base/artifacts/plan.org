@@ -46,22 +46,6 @@ or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 
   - [ ] [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][Frontend]]
 
-*** TODO allow using line labels from external docs, like for the global glossary
-
-We have to make line labels store both the originating object as well, so that
-we can link to it --- somewhat like OID links. We could just use OID links
-([[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) for this; for the name we simply use the label, as labels are
-guaranteed already to be unique inside the doc. And then we would know that it's
-a line label during weaving because the name starts and ends with parentheses.
-During parsing we would allow these parentheses only for line labels. We really
-need this because we want to use line labels inside glossary items.
-
-If we take this one step further, basically we want to allow external docs to
-refer to line labels, not just cell names. Thankfully Orgmode already supports
-this! E.g.,
-~[[id:eee95795-b51b-4de5-b39d-8dda436da451::(isGlossaryTerm)][isGlossaryTerm]]~ is
-a valid link.
-
 *** TODO add widget for higher-level table of contents
 
 We need a way to let users understand that a single document is part of some
