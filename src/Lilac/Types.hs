@@ -672,11 +672,11 @@ data Object = Object
 type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object, --
-    symbols :: Map LinkOid GCI,
-    ancestry :: Map GCI [GCI],
-    glossary :: Map (Text, GPath) LCI,
-    backlinks :: Map GPath (Map GPath [(GCI, GCI)]),
-    offsets :: IntMap GPath,
+    symbols :: Map LinkOid GCI, --
+    ancestry :: Map GCI [GCI], --
+    glossary :: Map (Text, GPath) LCI, --
+    backlinks :: Map GPath (Map GPath [(GCI, GCI)]), --
+    offsets :: IntMap GPath, --
     csls :: Map FilePath Text,
     bibs :: Map FilePath [CP.Reference (CslJson Text)]
   }

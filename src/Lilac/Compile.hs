@@ -136,7 +136,7 @@ import Relude
     (=<<),
     (>),
   )
-import Relude.Extra.Map (elems, insert, insertWith, lookup, member)
+import Relude.Extra.Map (elems, insertWith, lookup, member)
 import System.Exit (die)
 import System.OsPath qualified as P
 
@@ -249,13 +249,15 @@ getSymbols docOid parentOid cellMeta lci =
 
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
-  let (objects, symbolsWithoutTopLevelUUIDs, glossary) =
-        foldl' concatObjs (mempty, mempty, mempty) offsetsFull
-      symbols = topLevelUUIDs <> symbolsWithoutTopLevelUUIDs
+  let (symbolsWithoutTopLevelUUIDs, glossary) = concatObjects pathObjs
+      symbols = docOidsToSymbols pathObjs <> symbolsWithoutTopLevelUUIDs
+      offsets = mkOffsets pathObjs
+      sortedPaths = sort $ map fst pathObjs
       backlinks =
-        mkBacklinks pathObjs offsets
-          $ foldl' (finalizeEdges symbols) [] offsetsFull
-      brokenLinks = findBrokenLinks objects symbols
+        mkBacklinks sortedPaths offsets
+          . foldl' (finalizeEdges symbols) []
+          $ offsetsFull pathObjs
+      brokenLinks = findBrokenLinks pathObjs symbols
   allBibPaths <-
     concat
       <$> mapM
@@ -283,7 +285,7 @@ mkArchive pathObjs = do
     | otherwise ->
         let archive =
               Archive
-                { objects = objects,
+                { objects = fromList pathObjs,
                   symbols = symbols,
                   ancestry = mempty,
                   glossary = glossary,
@@ -295,61 +297,71 @@ mkArchive pathObjs = do
             ancestry = mkBlockAncestry archive $ getBlockGCIsFromArchive archive
          in pure $ Right archive {ancestry = ancestry}
   where
-    topLevelUUIDs :: Map LinkOid GCI --
-    topLevelUUIDs =
-      let topLevelLinkOids =
-            fromList
-              $ zip (map (mkLinkOid . snd) $ sort pathObjs) (map GCI [-1, -2 ..])
-          mkLinkOid :: Object -> LinkOid
-          mkLinkOid obj =
-            LinkOid
-              { oid = obj.orgDoc.oid,
-                name = ""
-              }
-       in topLevelLinkOids
-    offsets :: IntMap GPath
-    offsets =
-      IntMap.fromList
-        $ map (\(offset, (path, _obj)) -> (offset, path)) offsetsFull
-    offsetsFull :: [(Int, (GPath, Object))]
-    offsetsFull =
-      cumulativeOffsets
-        . filter (\(numCells, _) -> numCells > 0)
-        . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
-        $ sort pathObjs
-    concatObjs ::
-      (Map GPath Object, Map LinkOid GCI, Map (Text, GPath) LCI) ->
-      (Int, (GPath, Object)) ->
-      (Map GPath Object, Map LinkOid GCI, Map (Text, GPath) LCI)
-    concatObjs (accObjs, accSyms, accGloss) (offset, (path, obj)) =
-      ( insert path obj accObjs,
-        (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) <> accSyms,
-        (M.mapKeys (\term -> (term, path)) obj.orgDoc.glossary) <> accGloss
-      )
-    findBrokenLinks ::
-      Map GPath Object ->
-      Map LinkOid GCI ->
-      [(GPath, LinkOid)]
-    findBrokenLinks objs syms =
-      foldl' (getBrokenLink syms) []
-        $ allExternalOids objs
-    getBrokenLink ::
-      Map LinkOid GCI ->
-      [(GPath, LinkOid)] ->
-      (GPath, LinkOid) ->
-      [(GPath, LinkOid)]
-    getBrokenLink syms acc (gPath, linkOid) = case lookup linkOid syms of
-      Just _ -> acc
-      Nothing -> (gPath, linkOid) : acc
-    allExternalOids :: Map GPath Object -> [(GPath, LinkOid)]
-    allExternalOids objs =
-      M.foldlWithKey'
-        (\acc gPath obj -> (zip (repeat gPath) obj.externalOids) <> acc)
-        []
-        objs
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
+
+concatObjects :: [(GPath, Object)] -> (Map LinkOid GCI, Map (Text, GPath) LCI)
+concatObjects pathObjs =
+  foldl' f (mempty, mempty) $ offsetsFull pathObjs
+  where
+    f ::
+      (Map LinkOid GCI, Map (Text, GPath) LCI) ->
+      (Int, (GPath, Object)) ->
+      (Map LinkOid GCI, Map (Text, GPath) LCI)
+    f (accSyms, accGloss) (offset, (path, obj)) =
+      ( (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) <> accSyms,
+        (M.mapKeys (\term -> (term, path)) obj.orgDoc.glossary) <> accGloss
+      )
+
+docOidsToSymbols :: [(GPath, Object)] -> Map LinkOid GCI
+docOidsToSymbols pathObjs =
+  let topLevelLinkOids =
+        fromList
+          $ zip
+            (map (objToLinkOid . snd) $ sort pathObjs)
+            (map GCI [-1, -2 ..])
+      objToLinkOid :: Object -> LinkOid
+      objToLinkOid obj =
+        LinkOid
+          { oid = obj.orgDoc.oid,
+            name = ""
+          }
+   in topLevelLinkOids
+
+mkOffsets :: [(GPath, Object)] -> IntMap GPath
+mkOffsets pathObjs =
+  IntMap.fromList
+    . map (\(offset, (path, _obj)) -> (offset, path))
+    $ offsetsFull pathObjs
+
+offsetsFull :: [(GPath, Object)] -> [(Int, (GPath, Object))]
+offsetsFull pathObjs =
+  cumulativeOffsets
+    . filter (\(numCells, _) -> numCells > 0)
+    . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
+    $ sort pathObjs
+
+findBrokenLinks ::
+  [(GPath, Object)] ->
+  Map LinkOid GCI ->
+  [(GPath, LinkOid)]
+findBrokenLinks pathObjs symbols =
+  foldl' getBrokenLink [] allExternalOids
+  where
+    getBrokenLink ::
+      [(GPath, LinkOid)] ->
+      (GPath, LinkOid) ->
+      [(GPath, LinkOid)]
+    getBrokenLink acc (gPath, linkOid) = case lookup linkOid symbols of
+      Just _ -> acc
+      Nothing -> (gPath, linkOid) : acc
+    allExternalOids :: [(GPath, LinkOid)]
+    allExternalOids =
+      foldl'
+        (\acc (gPath, obj) -> (zip (repeat gPath) obj.externalOids) <> acc)
+        []
+        pathObjs
 
 finalizeEdges ::
   Map LinkOid GCI ->
@@ -363,11 +375,11 @@ finalizeEdges syms acc (offset, (_, obj)) =
    in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
 
 mkBacklinks ::
-  [(GPath, Object)] ->
+  [GPath] ->
   IntMap GPath ->
   [(GCI, GCI)] ->
   Map GPath (Map GPath [(GCI, GCI)])
-mkBacklinks pathObjs offsets symbolEdges =
+mkBacklinks sortedPaths offsets symbolEdges =
   let f acc (from, to)
         | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
           Just (_, toPath) <- IntMap.lookupLE to.unGCI offsets,
@@ -375,7 +387,7 @@ mkBacklinks pathObjs offsets symbolEdges =
             M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
         | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
           to.unGCI < 0,
-          Just toPath <- (sort $ map fst pathObjs) !!? (abs to.unGCI - 1),
+          Just toPath <- sortedPaths !!? (abs to.unGCI - 1),
           fromPath /= toPath =
             M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
         | otherwise = acc

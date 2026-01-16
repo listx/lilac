@@ -12,7 +12,7 @@
 We use [[https://github.com/mrkkrp/megaparsec][Megaparsec]] to parse an Org document. The parsing requires us to read in
 everything in a single Org file.
 
-We use a flat *list of /cells/* [fn:cell] [[(field-cells)]] for parsing, where each
+We use a flat *list of /cells/* [fn:cell] [[(data:OrgDoc-cells)]] for parsing, where each
 cell can be a
 
   - [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][heading]] (aka [[https://orgmode.org/manual/Headlines.html][headlines]]),
@@ -43,8 +43,8 @@ purposes of weaving the Org input into HTML (or any other format). Hence our
 preference for arranging the cells as a list instead of a tree.
 
 In summary an Org document is made up of cells, as well as some metadata
-[[(field-meta)]] (such as the title, author name, etc). The doc also has an OID
-[[(field-oid)]], which allows other Org files to refer to it (even if the Org file
+[[(data:OrgDoc-meta)]] (such as the title, author name, etc). The doc also has an OID
+[[(data:OrgDoc-oid)]], which allows other Org files to refer to it (even if the Org file
 does not have any headings, which are the only other things that can have OIDs).
 
 ** ~OrgDoc~ data structure
@@ -59,22 +59,22 @@ parsing a raw Org file.
 #+begin_src haskell
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
-  { oid :: OID, -- (ref:field-oid)
-    meta :: Map Text Text, -- (ref:field-meta)
-    cells :: [Cell], -- (ref:field-cells)
-    pseudoEdges :: [PseudoEdge], -- (ref:field-pseudoEdges)
-    footnoteRefs :: Map Text (Int, LCI), -- (ref:field-footnoteRefs)
-    glossary :: Map Text LCI, -- (ref:field-glossary)
-    lineLabels :: Map Text Int, -- (ref:field-lineLabels)
-    cslPath :: Maybe FilePath, -- (ref:field-cslPath)
-    bibPaths :: [FilePath], -- (ref:field-bibPaths)
-    citations :: [Citation] -- (ref:field-citations)
+  { oid :: OID, -- (ref:data:OrgDoc-oid)
+    meta :: Map Text Text, -- (ref:data:OrgDoc-meta)
+    cells :: [Cell], -- (ref:data:OrgDoc-cells)
+    pseudoEdges :: [PseudoEdge], -- (ref:data:OrgDoc-pseudoEdges)
+    footnoteRefs :: Map Text (Int, LCI), -- (ref:data:OrgDoc-footnoteRefs)
+    glossary :: Map Text LCI, -- (ref:data:OrgDoc-glossary)
+    lineLabels :: Map Text Int, -- (ref:data:OrgDoc-lineLabels)
+    cslPath :: Maybe FilePath, -- (ref:data:OrgDoc-cslPath)
+    bibPaths :: [FilePath], -- (ref:data:OrgDoc-bibPaths)
+    citations :: [Citation] -- (ref:data:OrgDoc-citations)
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON) -- (ref:deriving-anyclass)
 #+end_src
 
-As stated earlier, we use a list of cells [[(field-cells)]] to represent most of the
+As stated earlier, we use a list of cells [[(data:OrgDoc-cells)]] to represent most of the
 document content. The ~Int~ value we use to index into this list of cells is given
 its own type [[newtype:LCI]] to avoid using the ~Int~ primitive (using ~Int~ everywhere
 can get confusing).
@@ -89,7 +89,7 @@ newtype LCI = LCI
   deriving anyclass (FromJSON, FromJSONKey, ToJSON)
 #+end_src
 
-The ~oid~ [[(field-oid)]] is a unique identifier for the document. Every Org file we
+The ~oid~ [[(data:OrgDoc-oid)]] is a unique identifier for the document. Every Org file we
 parse is required to have a
 
 #+begin_src txt
@@ -114,7 +114,7 @@ There are some helpers in [[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62][Org ID (OID
 Lilac because OIDs are also used for headings; OIDs for documents and headings
 form the building block of Org links between them.
 
-The ~meta~ field [[(field-meta)]] captures all document metadata, in a simple
+The ~meta~ field [[(data:OrgDoc-meta)]] captures all document metadata, in a simple
 key/value map. One example is ~#+title: ...~ used to specify the human-friendly
 title of the document.
 
@@ -149,7 +149,7 @@ auxiliary bits encode information about relationships /between/ certain cells.
 :ID:       3dcdfd21-5e2e-45bf-90bd-3a6a919724c5
 :END:
 
-The ~pseudoEdges~ [[(field-pseudoEdges)]] are edges that are ultimately used to create
+The ~pseudoEdges~ [[(data:OrgDoc-pseudoEdges)]] are edges that are ultimately used to create
 a graph representation of links between cells (and ultimately they are finalized
 in [[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:finalizeEdges][f:finalizeEdges]] and used to generate backlinks at [[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:mkBacklinks][f:mkBacklinks]]). In that
 final representation, we want to use global cell index numbers to represent the
@@ -178,7 +178,7 @@ available).
 *** ~footnoteRefs~
 
 Footnotes get their own separate data structure called ~footnoteRefs~
-[[(field-footnoteRefs)]], because we have to remember the order of when these
+[[(data:OrgDoc-footnoteRefs)]], because we have to remember the order of when these
 footnotes are referenced from other cells (anywhere we could have prose, such as
 paragraphs, headings, etc). This ordering is needed to determine which number to
 display as a superscript when creating the link to the footnote definition. This
@@ -189,13 +189,13 @@ the order of parsing them (cell-by-cell) is preserved during weaving.
 
 *** ~glossary~
 
-For the ~glossary~ [[(field-glossary)]], see [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Description lists, aka glossary terms]]. We
+For the ~glossary~ [[(data:OrgDoc-glossary)]], see [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Description lists, aka glossary terms]]. We
 save all glossary terms we find for this document, so that we can print them out
 later, much like citations.
 
 *** ~lineLabels~
 
-The ~lineLabels~ [[(field-lineLabels)]] are for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]] (named positions /inside/ a
+The ~lineLabels~ [[(data:OrgDoc-lineLabels)]] are for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]] (named positions /inside/ a
 code block, which you can link to from the prose text). We reset the numbering
 of these back to 1 every time we see a new code block, so we keep track of the
 assigned numbers here with a map.
@@ -205,16 +205,16 @@ assigned numbers here with a map.
 :ID:       a72a7d6a-a127-4233-b67a-3800961ef766
 :END:
 
-The ~cslPath~ [[(field-cslPath)]] is the path to the citation style file we want to
+The ~cslPath~ [[(data:OrgDoc-cslPath)]] is the path to the citation style file we want to
 use for generating citations (for all of the citations used in the ~OrgDoc~).
 
-The ~bibPaths~ [[(field-bibPaths)]] is the list of files that each have a list of
+The ~bibPaths~ [[(data:OrgDoc-bibPaths)]] is the list of files that each have a list of
 bibliographical works that we want to cite. This is a list of files, and not
 just a single list, because we want to allow users to be able to use multiple
 files in case they want to reference a work already captured in a separate file
 somewhere else (essentially amounting to file reuse).
 
-Finally the ~citations~ [[(field-citations)]] are the stylized citations used by the
+Finally the ~citations~ [[(data:OrgDoc-citations)]] are the stylized citations used by the
 ~OrgDoc~. See [[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]] for details.
 
 ** Top-level parser ~parseOrgDoc~
@@ -283,43 +283,43 @@ mutable variable which we keep updating as we make progress during parsing.
 #+begin_src haskell
 type OrgParserState :: Type
 data OrgParserState = OrgParserState
-  { docOid :: OID, -- (ref:field-ops-docOid)
-    headingOidStack :: [Maybe OID], -- (ref:field-ops-headingOidStack)
-    headingLevel :: Int, -- (ref:field-ops-headingLevel)
-    headingSectionNumber :: [Int], -- (ref:field-ops-headingSectionNumber)
-    insideHeading :: Bool, -- (ref:field-ops-insideHeading)
-    cellNames :: Set Text, -- (ref:field-ops-cellNames)
-    cellNumber :: LCI, -- (ref:field-ops-cellNumber)
-    pseudoEdges :: [PseudoEdge], -- (ref:field-ops-pseudoEdges)
-    tanglePaths :: Set Text, -- (ref:field-ops-tanglePaths)
-    insideCodeBlock :: Bool, -- (ref:field-ops-insideCodeBlock)
-    anonBlockNumber :: Int, -- (ref:field-ops-anonBlockNumber)
-    lineLabelNumber :: Int, -- (ref:field-ops-lineLabelNumber)
-    lineLabels :: Map Text Int, -- (ref:field-ops-lineLabels)
-    styleMask :: StyleMask, -- (ref:field-ops-styleMask)
-    insideLinkDisplayName :: Bool, -- (ref:field-ops-insideLinkDisplayName)
-    insideParagraph :: Bool, -- (ref:field-ops-insideParagraph)
-    listLevels :: [Level], -- (ref:field-ops-listLevels)
-    listMarkers :: [ListMarker], -- (ref:field-ops-listMarkers)
-    continuationIndent :: Int, -- (ref:field-ops-continuationIndent)
-    footnoteNumber :: Int, -- (ref:field-ops-footnoteNumber)
-    footnoteRefs :: Map Text (Int, LCI), -- (ref:field-ops-footnoteRefs)
-    footnoteDefinitions :: Map Text Prose, -- (ref:field-ops-footnoteDefinitions)
-    insideFootnoteDefinition :: Maybe Text, -- (ref:field-ops-insideFootnoteDefinition)
-    prevCellIsFootnote :: Bool, -- (ref:field-ops-prevCellIsFootnote)
-    glossary :: Map Text LCI, -- (ref:field-ops-glossary)
-    glossaryTermOffset :: Int, -- (ref:field-ops-glossaryTermOffset)
-    cslPath :: Maybe FilePath, -- (ref:field-ops-cslPath)
-    bibPaths :: [FilePath], -- (ref:field-ops-bibPaths)
-    insideCitation :: Bool, -- (ref:field-ops-insideCitation)
-    insideCitePrefix :: Bool, -- (ref:field-ops-insideCitePrefix)
-    bracketBalance :: Int, -- (ref:field-ops-bracketBalance)
-    citations :: [Citation], -- (ref:field-ops-citations)
-    equationNumber :: Int, -- (ref:field-ops-equationNumber)
-    anonEquationNumber :: Int, -- (ref:field-ops-anonEquationNumber)
-    figureNumber :: Int, -- (ref:field-ops-figureNumber)
-    tableNumber :: Int, -- (ref:field-ops-tableNumber)
-    orgParserConf :: OrgParserConf -- (ref:field-ops-orgParserConf)
+  { docOid :: OID, -- (ref:data:OrgParserState-docOid)
+    headingOidStack :: [Maybe OID], -- (ref:data:OrgParserState-headingOidStack)
+    headingLevel :: Int, -- (ref:data:OrgParserState-headingLevel)
+    headingSectionNumber :: [Int], -- (ref:data:OrgParserState-headingSectionNumber)
+    insideHeading :: Bool, -- (ref:data:OrgParserState-insideHeading)
+    cellNames :: Set Text, -- (ref:data:OrgParserState-cellNames)
+    cellNumber :: LCI, -- (ref:data:OrgParserState-cellNumber)
+    pseudoEdges :: [PseudoEdge], -- (ref:data:OrgParserState-pseudoEdges)
+    tanglePaths :: Set Text, -- (ref:data:OrgParserState-tanglePaths)
+    insideCodeBlock :: Bool, -- (ref:data:OrgParserState-insideCodeBlock)
+    anonBlockNumber :: Int, -- (ref:data:OrgParserState-anonBlockNumber)
+    lineLabelNumber :: Int, -- (ref:data:OrgParserState-lineLabelNumber)
+    lineLabels :: Map Text Int, -- (ref:data:OrgParserState-lineLabels)
+    styleMask :: StyleMask, -- (ref:data:OrgParserState-styleMask)
+    insideLinkDisplayName :: Bool, -- (ref:data:OrgParserState-insideLinkDisplayName)
+    insideParagraph :: Bool, -- (ref:data:OrgParserState-insideParagraph)
+    listLevels :: [Level], -- (ref:data:OrgParserState-listLevels)
+    listMarkers :: [ListMarker], -- (ref:data:OrgParserState-listMarkers)
+    continuationIndent :: Int, -- (ref:data:OrgParserState-continuationIndent)
+    footnoteNumber :: Int, -- (ref:data:OrgParserState-footnoteNumber)
+    footnoteRefs :: Map Text (Int, LCI), -- (ref:data:OrgParserState-footnoteRefs)
+    footnoteDefinitions :: Map Text Prose, -- (ref:data:OrgParserState-footnoteDefinitions)
+    insideFootnoteDefinition :: Maybe Text, -- (ref:data:OrgParserState-insideFootnoteDefinition)
+    prevCellIsFootnote :: Bool, -- (ref:data:OrgParserState-prevCellIsFootnote)
+    glossary :: Map Text LCI, -- (ref:data:OrgParserState-glossary)
+    glossaryTermOffset :: Int, -- (ref:data:OrgParserState-glossaryTermOffset)
+    cslPath :: Maybe FilePath, -- (ref:data:OrgParserState-cslPath)
+    bibPaths :: [FilePath], -- (ref:data:OrgParserState-bibPaths)
+    insideCitation :: Bool, -- (ref:data:OrgParserState-insideCitation)
+    insideCitePrefix :: Bool, -- (ref:data:OrgParserState-insideCitePrefix)
+    bracketBalance :: Int, -- (ref:data:OrgParserState-bracketBalance)
+    citations :: [Citation], -- (ref:data:OrgParserState-citations)
+    equationNumber :: Int, -- (ref:data:OrgParserState-equationNumber)
+    anonEquationNumber :: Int, -- (ref:data:OrgParserState-anonEquationNumber)
+    figureNumber :: Int, -- (ref:data:OrgParserState-figureNumber)
+    tableNumber :: Int, -- (ref:data:OrgParserState-tableNumber)
+    orgParserConf :: OrgParserConf -- (ref:data:OrgParserState-orgParserConf)
   }
   deriving stock (Eq, Show)
 #+end_src
@@ -392,12 +392,12 @@ There are a couple things to keep track of for [[id:16a68a74-d4cc-41a4-ac77-cbca
 
 The fields below mostly deal with one of these two concerns.
 
-The ~docOid~ [[(field-ops-docOid)]] is what becomes the ~oid~ [[(field-oid)]] of
+The ~docOid~ [[(data:OrgParserState-docOid)]] is what becomes the ~oid~ [[(data:OrgDoc-oid)]] of
 [[data:OrgDoc]]. If there are no headings, then this ~docOid~ is what is used as a
 unique prefix to identify named cells (any cell with a ~#+name: ...~, such as a
 code block) from other Org files.
 
-The ~headingOidStack~ [[(field-ops-headingOidStack)]] is a stack of OIDs, with the
+The ~headingOidStack~ [[(data:OrgParserState-headingOidStack)]] is a stack of OIDs, with the
 first one being the ~docOid~ and later ones being OIDs of headings encountered at
 deeper levels. This is used to keep track of the current OID to use for named
 cells; if we are at a deeply nested heading with its own OID, but then move out
@@ -405,16 +405,16 @@ of it, we need to know which OID to use. Using ~headingOidStack~, we just pop of
 those ones we don't need any more and refer to the OID of the closest heading up
 the hierarchy (ending at the ~docOid~ if needed as a fallback).
 
-The ~headingLevel~ [[(field-ops-headingLevel)]] is the last-seen heading level we
+The ~headingLevel~ [[(data:OrgParserState-headingLevel)]] is the last-seen heading level we
 parsed. See [[t:0004-headings-cannot-skip-level]] for how we use it. This is used
 for determining how many levels to pop off the ~headingOidStack~ when we exit a
 nested level. It's also used to calculate the ~headingSectionNumber~.
 
-The ~headingSectionNumber~ [[(field-ops-headingSectionNumber)]] is the last-generated
+The ~headingSectionNumber~ [[(data:OrgParserState-headingSectionNumber)]] is the last-generated
 heading section number. This is what we use to assign each new heading its
 section number (by incrementing the correct part of it).
 
-The ~insideHeading~ [[(field-ops-insideHeading)]] boolean is used to keep track of
+The ~insideHeading~ [[(data:OrgParserState-insideHeading)]] boolean is used to keep track of
 whether we are currently parsing things from inside a heading or not. This is
 used, for example, to disable parsing of citations from inside headings; i.e.,
 citations are not recognized when they are placed inside headings (see
@@ -423,21 +423,21 @@ citations are not recognized when they are placed inside headings (see
 *** Fields for cells
 
 Cell names must be unique inside a single Org file, and this is tracked with
-~cellNames~ [[(field-ops-cellNames)]].
+~cellNames~ [[(data:OrgParserState-cellNames)]].
 
 All cells, even if they are not named, are sequentially numbered in ~cellNumber~
-[[(field-ops-cellNumber)]]. This is used to encode the starting vertex of each edge
-in ~pseudoEdges~ [[(field-ops-pseudoEdges)]] (see [[id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5][~pseudoEdges~]]).
+[[(data:OrgParserState-cellNumber)]]. This is used to encode the starting vertex of each edge
+in ~pseudoEdges~ [[(data:OrgParserState-pseudoEdges)]] (see [[id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5][~pseudoEdges~]]).
 
 *** Fields for code blocks
 
-The ~tanglePaths~ [[(field-ops-tanglePaths)]] is used in [[f:assertUniqueTanglePath]] to
+The ~tanglePaths~ [[(data:OrgParserState-tanglePaths)]] is used in [[f:assertUniqueTanglePath]] to
 check that no two blocks tangle to the same filesystem path.
 
-The ~insideCodeBlock~ boolean [[(field-ops-insideCodeBlock)]] tracks whether we're
+The ~insideCodeBlock~ boolean [[(data:OrgParserState-insideCodeBlock)]] tracks whether we're
 inside a code block; see [[f:compressedTextParser]] for how this is used.
 
-The ~anonBlockNumber~ [[(field-ops-anonBlockNumber)]] is used to keep track of all
+The ~anonBlockNumber~ [[(data:OrgParserState-anonBlockNumber)]] is used to keep track of all
 anonymous blocks. Anonymous blocks can link out to other named blocks, and for
 such links we have to refer back to the anonymous block. As these blocks are
 anonymous we have to give them an artificial name, which is the anonymous block
@@ -445,73 +445,73 @@ number (a sequential counter). See [[f:blockParser]] for details.
 
 *** Fields for line labels
 
-The ~lineLabelNumber~ [[(field-ops-lineLabelNumber)]] is a sequential counter for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line
+The ~lineLabelNumber~ [[(data:OrgParserState-lineLabelNumber)]] is a sequential counter for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line
 labels]] which is reset at every code block.
 
-The ~lineLabels~ map [[(field-ops-lineLabels)]] associates the label with the label
+The ~lineLabels~ map [[(data:OrgParserState-lineLabels)]] associates the label with the label
 number, and this number is used to display the link in the text (source) as well as the code block (destination).
 
 *** Fields for prose text
 
-The ~styleMask~ [[(field-ops-styleMask)]] is discussed in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][the section on parsing
+The ~styleMask~ [[(data:OrgParserState-styleMask)]] is discussed in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b][the section on parsing
 styled strings]], which are one of the main building blocks of [[id:c8616126-215d-49be-8874-c2aca7d93a54][Prose]].
 
-The ~insideLinkDisplayName~ [[(field-ops-insideLinkDisplayName)]] and ~insideParagraph~
-[[(field-ops-insideParagraph)]] booleans are both used in [[f:textParser]].
+The ~insideLinkDisplayName~ [[(data:OrgParserState-insideLinkDisplayName)]] and ~insideParagraph~
+[[(data:OrgParserState-insideParagraph)]] booleans are both used in [[f:textParser]].
 
 *** Fields for list items
 
-The ~listLevels~ [[(field-ops-listLevels)]] and ~listMarkers~ [[(field-ops-listMarkers)]]
+The ~listLevels~ [[(data:OrgParserState-listLevels)]] and ~listMarkers~ [[(data:OrgParserState-listMarkers)]]
 are discussed in [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]].
 
 Indentation is very important for knowing which things belong under which list
-items, and the ~continuationIndent~ [[(field-ops-continuationIndent)]] is used to keep
+items, and the ~continuationIndent~ [[(data:OrgParserState-continuationIndent)]] is used to keep
 track of how much indentation to expect inside a single (contiguous) piece of
 content; see [[f:paragraphParser]] and [[f:listHeadIndentLevelParser]] for a usage
 example.
 
 *** Fields for footnotes
 
-[[id:4127feee-755d-430e-8fef-192e95143790][Footnotes]] are numbered (~footnoteNumber~ [[(field-ops-footnoteNumber)]]), and also
-have an association with cell numbers (~footnoteRefs~ [[(field-ops-footnoteRefs)]]).
+[[id:4127feee-755d-430e-8fef-192e95143790][Footnotes]] are numbered (~footnoteNumber~ [[(data:OrgParserState-footnoteNumber)]]), and also
+have an association with cell numbers (~footnoteRefs~ [[(data:OrgParserState-footnoteRefs)]]).
 The footnote definitions are kept in a single map (~footnoteDefinitions~
-[[(field-ops-footnoteDefinitions)]]).
+[[(data:OrgParserState-footnoteDefinitions)]]).
 
 Like other booleans that tweak the behavior of the parser, footnotes also need
-to do this via ~insideFootnoteDefinition~ [[(field-ops-insideFootnoteDefinition)]].
+to do this via ~insideFootnoteDefinition~ [[(data:OrgParserState-insideFootnoteDefinition)]].
 
 Footnote definitions must be kept in a single group of contiguous cells, and
-this is checked with ~prevCellIsFootnote~ [[(field-ops-prevCellIsFootnote)]] (also see
+this is checked with ~prevCellIsFootnote~ [[(data:OrgParserState-prevCellIsFootnote)]] (also see
 [[f:footnoteDefinitionParser]]).
 
 *** Fields for the glossary
 
 [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Description lists, aka glossary terms]] are tracked with the ~glossary~
-[[(field-ops-glossary)]]. The ~glossaryTermOffset~ [[(field-ops-glossaryTermOffset)]] is
+[[(data:OrgParserState-glossary)]]. The ~glossaryTermOffset~ [[(data:OrgParserState-glossaryTermOffset)]] is
 used to improve error messages (see [[t:0015-glossary-duplicate-term]]).kj
 
 *** Fields for citations
 
-[[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]] require a number of fields. The ~cslPath~ [[(field-ops-cslPath)]],
-~bibPaths~ [[(field-ops-bibPaths)]], and ~citations~ [[(field-ops-citations)]] fields are the same in purpose as the ones discussed at [[id:a72a7d6a-a127-4233-b67a-3800961ef766][Citations]] up above.
+[[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]] require a number of fields. The ~cslPath~ [[(data:OrgParserState-cslPath)]],
+~bibPaths~ [[(data:OrgParserState-bibPaths)]], and ~citations~ [[(data:OrgParserState-citations)]] fields are the same in purpose as the ones discussed at [[id:a72a7d6a-a127-4233-b67a-3800961ef766][Citations]] up above.
 
-The ~insideCitation~ [[(field-ops-insideCitation)]], ~insideCitePrefix~
-[[(field-ops-insideCitePrefix)]], and ~bracketBalance~ [[(field-ops-bracketBalance)]]
+The ~insideCitation~ [[(data:OrgParserState-insideCitation)]], ~insideCitePrefix~
+[[(data:OrgParserState-insideCitePrefix)]], and ~bracketBalance~ [[(data:OrgParserState-bracketBalance)]]
 fields all deal with the lower level details of parsing these citations
 correctly (being strict about what we accept).
 
 *** Fields for miscellaneous sequential counters
 
 Mathematical equations, figures, and tables all need to get numbered. These are
-handled by ~equationNumber~ [[(field-ops-equationNumber)]], ~anonEquationNumber~
-[[(field-ops-anonEquationNumber)]], ~figureNumber~ [[(field-ops-figureNumber)]], and
-~tableNumber~ [[(field-ops-tableNumber)]].
+handled by ~equationNumber~ [[(data:OrgParserState-equationNumber)]], ~anonEquationNumber~
+[[(data:OrgParserState-anonEquationNumber)]], ~figureNumber~ [[(data:OrgParserState-figureNumber)]], and
+~tableNumber~ [[(data:OrgParserState-tableNumber)]].
 
 *** Fields for Lilac extensions
 
 [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extensions]] can alter the behavior of the parser. These are encapsulated in
 the [[data:OrgParserConf]], which we capture in ~orgParserConf~
-[[(field-ops-orgParserConf)]].
+[[(data:OrgParserState-orgParserConf)]].
 
 * =Lilac.Parse= module
 :PROPERTIES:
@@ -1513,7 +1513,7 @@ cellParser = do
 #+end_src
 
 The ~resetIndent~ wrapper [[(f:cellParser-resetIndent)]] resets the ~continuationIndent~
-attribute [[(field-ops-continuationIndent)]] in the [[data:OrgParserState]] back to 0;
+attribute [[(data:OrgParserState-continuationIndent)]] in the [[data:OrgParserState]] back to 0;
 this information is useful for parsers that need to understand indentation
 precisely. See [[f:listItemsEndParser]] for how it's used by that function.
 
@@ -3288,7 +3288,7 @@ example, ~foo~.
 
 The second one, ~[[id:62a7d69a-7aa7-4607-b93e-7ed382a5f256][link display name]]~,
 refers to an OID explicitly. The OID could be either a document itself (the
-[[(field-oid)]]) or the OID of a heading (the latter is much more common in
+[[(data:OrgDoc-oid)]]) or the OID of a heading (the latter is much more common in
 practice). Note that these OIDs can be any OID, not just from the current
 document. This example also has a ~link display name~ as the text to display to
 the user when we weave this to HTML. These link display names are parsed
@@ -4524,7 +4524,7 @@ During weaving, the footnote definitions are sorted according to the order in
 which they are referenced (via footnote links). See [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] for details.
 
 The footnotes are not turned into cells; instead they are used to build up the
-~footnoteDefinitions~ map [[(field-ops-footnoteDefinitions)]] in [[data:OrgParserState]],
+~footnoteDefinitions~ map [[(data:OrgParserState-footnoteDefinitions)]] in [[data:OrgParserState]],
 which are then dumped into [[data:OrgDoc]]. This is because there is no point in
 preserving information about the order in which these footnote definitions are
 defined; in other words, it's useless to store footnote definitions as
@@ -9756,7 +9756,7 @@ paragraph below):
 Parsing list items is tricky because of meaningful indentation (whitespace).
 Keeping track of the current level of indentation requires additional state
 during parsing, which we encode with ~Level~ (used by ~listLevels~
-[[(field-ops-listLevels)]] in [[data:OrgParserState]]).
+[[(data:OrgParserState-listLevels)]] in [[data:OrgParserState]]).
 
 #+name: data:Level
 #+begin_src haskell

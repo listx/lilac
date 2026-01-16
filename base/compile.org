@@ -168,7 +168,7 @@ import Relude
     (=<<),
     (>),
   )
-import Relude.Extra.Map (elems, insert, insertWith, lookup, member)
+import Relude.Extra.Map (elems, insertWith, lookup, member)
 import System.Exit (die)
 import System.OsPath qualified as P
 
@@ -177,6 +177,11 @@ import System.OsPath qualified as P
 <<f:getLineLabels>>
 <<f:getSymbols>>
 <<f:mkArchive>>
+<<f:concatObjects>>
+<<f:docOidsToSymbols>>
+<<f:mkOffsets>>
+<<f:offsetsFull>>
+<<f:findBrokenLinks>>
 <<f:finalizeEdges>>
 <<f:mkBacklinks>>
 <<f:readObjectsFrom>>
@@ -692,11 +697,11 @@ choice).
 type Archive :: Type
 data Archive = Archive
   { objects :: Map GPath Object, -- (ref:data:Archive-objects)
-    symbols :: Map LinkOid GCI,
-    ancestry :: Map GCI [GCI],
-    glossary :: Map (Text, GPath) LCI,
-    backlinks :: Map GPath (Map GPath [(GCI, GCI)]),
-    offsets :: IntMap GPath,
+    symbols :: Map LinkOid GCI, -- (ref:data:Archive-symbols)
+    ancestry :: Map GCI [GCI], -- (ref:data:Archive-ancestry)
+    glossary :: Map (Text, GPath) LCI, -- (ref:data:Archive-glossary)
+    backlinks :: Map GPath (Map GPath [(GCI, GCI)]), -- (ref:data:Archive-backlinks)
+    offsets :: IntMap GPath, -- (ref:data:Archive-offsets)
     csls :: Map FilePath Text,
     bibs :: Map FilePath [CP.Reference (CslJson Text)]
   }
@@ -719,57 +724,50 @@ newtype GCI = GCI
   deriving anyclass (FromJSON, FromJSONKey, Hashable, ToJSON, ToJSONKey)
 #+end_src
 
-The way it works is like this: we line up all of the object's cells. So
-if object A has 10 cells and object B has 10 cells, then their local indices
-would both be 0-9. But with global indices, we add and /offset/ of 10 (object A's
-cell count) to all of B, so that its local cell indices are 10-19. That way
-there's no clash. The generation of offsets is done in [[f:cumulativeOffsets]],
-which is called by [[f:mkArchive]].
+The other fields in [[data:Archive]] are based on the ~objects~ [[(data:Archive-objects)]]
+inside it:
 
-The ~topLevelUUIDs~ [[(f:mkArchive-topLevelUUIDs)]] are negative indices which share
-the same ~GCI~ type, which allow us to uniquely identify all objects by negative
-numbers. The order in which the objects are sorted inside the archive is
-determined by their path (the paths are sorted), and this ordering dictates both
-the positive ~GCI~ values as well as the negative ones.
+  - ~offsets~ :: [[(data:Archive-offsets)]] The offset of each object's cells, in
+    relation to the global (flattened) list of all cells in the archive. This is
+    used to convert a GCI back into an LCI (so that we can look up the actual
+    cell at this index inside the object).
 
-The other fields in [[data:Archive]] are based on the ~objects~ inside it:
+    For example, if the object is the first one in the list, the offset is 0 for
+    its cells. The offset grows depending on how many cells each object has. So
+    if the first object has 100 cells, the offset for the second object in the
+    list is 100. See [[f:cumulativeOffsets]].
 
-  - ~symbols~ :: A table for finding the cell (from one of the objects in the
-    archive) based on a given [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]. It contains a /globally/ unique index
-    of the cell, which can be used to find the actual cell we are interested in.
+  - ~symbols~ :: [[(data:Archive-symbols)]] A table for finding the cell (its GCI)
+    based on a given [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]].
 
     Now it could be the case that the user decides to link to the top-level UUID
-    of the document. These require special treatment because they do not
-    correspond to any given cell. So instead, we use negative numbers so as not
-    to collide with the regular cell index numbers. The negative numbers encode
-    which object we are referring to, and require special treatment.
+    of the document [[id:5df15f17-c630-4ddf-bade-66084c430a07::(data:OrgDoc-oid)]].
+    This presents a problem because documents are not cells (they contain cells)
+    so using a GCI doesn't really make sense. So instead, we use negative
+    numbers so as not to collide with the regular cell index numbers. See
+    [[f:docOidsToSymbols]].
 
-  - ~backlinks~ :: A map where the keys are the paths (of objects) and the
-    values are the backlinks to that object. The backlinks are themselves a map
-    because we want to organize all of the backlinks by the document they are
-    starting out from. The actual backlinks are just edges between cells
-    (vertices) where the edges are created by a reference (via [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]])
-    from one cell to another. They are based on [[id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5::newtype:PseudoEdge][newtype:PseudoEdge]] which are
-    constructed in [[id:dabccd5e-930e-4571-899f-1bfbdeab3d5e::f:oidLinkParser][f:oidLinkParser]]. See [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]] for how they are used
-    during weaving.
+  - ~backlinks~ :: [[(data:Archive-backlinks)]] A map where the keys are the paths (of
+    objects) and the values are the backlinks to that object. The backlinks are
+    themselves a map because we want to organize all of the backlinks by the
+    document they are starting out from. The actual backlinks are just edges
+    between cells (vertices) where the edges are created by a reference (via
+    [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) from one cell to another. They are based on [[id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5::newtype:PseudoEdge][newtype:PseudoEdge]]
+    which are constructed in [[id:dabccd5e-930e-4571-899f-1bfbdeab3d5e::f:oidLinkParser][f:oidLinkParser]]. See [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]] for how they
+    are used during weaving.
 
-  - ~offsets~ :: The offset of each object's cells, in relation to the global
-    (flattened) list of all cells in the archive. For example, if the object is
-    the first one in the list, the offset is 0. The offset grows depending on
-    how many cells each object has. So if the first object has 100 cells, the
-    offset for the second object in the list is 100.
+  - ~ancestry~ :: [[(data:Archive-ancestry)]] A map of global cell indices of blocks
+    to their parents (a block can have multiple parents because more than one
+    block can refer to the same child block). This is created by
+    [[f:mkBlockAncestry]] and later used by [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveBlockAncestry][f:weaveBlockAncestry]] for making each
+    block link back to its parents, if any.
 
-  - ~ancestry~ :: A map of global cell indices of blocks to their parents (a block
-    can have multiple parents because more than one block can refer to the same
-    child block). This is created by [[f:mkBlockAncestry]] and later used by
-    [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveBlockAncestry][f:weaveBlockAncestry]] for making each block link back to its parents, if any.
-
-  - ~glossary~ :: This is the combined set of all glossary terms found in all
-    objects. The main difference is that the key includes not just the term
-    itself (~Text~) but also the path of the object to identify which object has
-    this term. The values are local cell indices, so in order to get the
-    concrete value, you have to use the ~offsets~ in order to convert the local
-    cell index into a global one.
+  - ~glossary~ :: [[(data:Archive-glossary)]] This is the combined set of all glossary
+    terms found in all objects. The main difference is that the key includes not
+    just the term itself (~Text~) but also the path of the object to identify
+    which object has this term. The values are local cell indices, so in order
+    to get the concrete value, you have to use the ~offsets~ in order to convert
+    the local cell index into a global one.
 
 When dealing with multiple [[data:Object]] files at a time, we have to answer the
 question, "is this collection of objects able to resolve all internal
@@ -807,13 +805,15 @@ the information as a ~Text~ value, because there is no ~ToJSON~ instance for the
 #+begin_src haskell
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
-  let (objects, symbolsWithoutTopLevelUUIDs, glossary) =
-        foldl' concatObjs (mempty, mempty, mempty) offsetsFull
-      symbols = topLevelUUIDs <> symbolsWithoutTopLevelUUIDs
+  let (symbolsWithoutTopLevelUUIDs, glossary) = concatObjects pathObjs
+      symbols = docOidsToSymbols pathObjs <> symbolsWithoutTopLevelUUIDs
+      offsets = mkOffsets pathObjs
+      sortedPaths = sort $ map fst pathObjs
       backlinks =
-        mkBacklinks pathObjs offsets
-          $ foldl' (finalizeEdges symbols) [] offsetsFull
-      brokenLinks = findBrokenLinks objects symbols
+        mkBacklinks sortedPaths offsets
+          . foldl' (finalizeEdges symbols) []
+          $ offsetsFull pathObjs
+      brokenLinks = findBrokenLinks pathObjs symbols
   allBibPaths <-
     concat
       <$> mapM
@@ -841,7 +841,7 @@ mkArchive pathObjs = do
     | otherwise ->
         let archive =
               Archive
-                { objects = objects,
+                { objects = fromList pathObjs,
                   symbols = symbols,
                   ancestry = mempty,
                   glossary = glossary,
@@ -853,61 +853,90 @@ mkArchive pathObjs = do
             ancestry = mkBlockAncestry archive $ getBlockGCIsFromArchive archive
          in pure $ Right archive {ancestry = ancestry}
   where
-    topLevelUUIDs :: Map LinkOid GCI -- (ref:f:mkArchive-topLevelUUIDs)
-    topLevelUUIDs =
-      let topLevelLinkOids =
-            fromList
-              $ zip (map (mkLinkOid . snd) $ sort pathObjs) (map GCI [-1, -2 ..])
-          mkLinkOid :: Object -> LinkOid
-          mkLinkOid obj =
-            LinkOid
-              { oid = obj.orgDoc.oid,
-                name = ""
-              }
-       in topLevelLinkOids
-    offsets :: IntMap GPath
-    offsets =
-      IntMap.fromList
-        $ map (\(offset, (path, _obj)) -> (offset, path)) offsetsFull
-    offsetsFull :: [(Int, (GPath, Object))]
-    offsetsFull =
-      cumulativeOffsets
-        . filter (\(numCells, _) -> numCells > 0)
-        . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
-        $ sort pathObjs
-    concatObjs ::
-      (Map GPath Object, Map LinkOid GCI, Map (Text, GPath) LCI) ->
-      (Int, (GPath, Object)) ->
-      (Map GPath Object, Map LinkOid GCI, Map (Text, GPath) LCI)
-    concatObjs (accObjs, accSyms, accGloss) (offset, (path, obj)) =
-      ( insert path obj accObjs,
-        (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) <> accSyms,
-        (M.mapKeys (\term -> (term, path)) obj.orgDoc.glossary) <> accGloss
-      )
-    findBrokenLinks ::
-      Map GPath Object ->
-      Map LinkOid GCI ->
-      [(GPath, LinkOid)]
-    findBrokenLinks objs syms =
-      foldl' (getBrokenLink syms) []
-        $ allExternalOids objs
-    getBrokenLink ::
-      Map LinkOid GCI ->
-      [(GPath, LinkOid)] ->
-      (GPath, LinkOid) ->
-      [(GPath, LinkOid)]
-    getBrokenLink syms acc (gPath, linkOid) = case lookup linkOid syms of
-      Just _ -> acc
-      Nothing -> (gPath, linkOid) : acc
-    allExternalOids :: Map GPath Object -> [(GPath, LinkOid)]
-    allExternalOids objs =
-      M.foldlWithKey'
-        (\acc gPath obj -> (zip (repeat gPath) obj.externalOids) <> acc)
-        []
-        objs
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
+#+end_src
+
+The order in which the objects are sorted inside the archive is
+determined by their path, and this ordering is what lets us deterministically
+assign negative numbers.
+
+#+name: f:docOidsToSymbols
+#+begin_src haskell
+docOidsToSymbols :: [(GPath, Object)] -> Map LinkOid GCI
+docOidsToSymbols pathObjs =
+  let topLevelLinkOids =
+        fromList
+          $ zip
+            (map (objToLinkOid . snd) $ sort pathObjs)
+            (map GCI [-1, -2 ..])
+      objToLinkOid :: Object -> LinkOid
+      objToLinkOid obj =
+        LinkOid
+          { oid = obj.orgDoc.oid,
+            name = ""
+          }
+   in topLevelLinkOids
+#+end_src
+
+#+name: f:findBrokenLinks
+#+begin_src haskell
+findBrokenLinks ::
+  [(GPath, Object)] ->
+  Map LinkOid GCI ->
+  [(GPath, LinkOid)]
+findBrokenLinks pathObjs symbols =
+  foldl' getBrokenLink [] allExternalOids
+  where
+    getBrokenLink ::
+      [(GPath, LinkOid)] ->
+      (GPath, LinkOid) ->
+      [(GPath, LinkOid)]
+    getBrokenLink acc (gPath, linkOid) = case lookup linkOid symbols of
+      Just _ -> acc
+      Nothing -> (gPath, linkOid) : acc
+    allExternalOids :: [(GPath, LinkOid)]
+    allExternalOids =
+      foldl'
+        (\acc (gPath, obj) -> (zip (repeat gPath) obj.externalOids) <> acc)
+        []
+        pathObjs
+#+end_src
+
+#+name: f:concatObjects
+#+begin_src haskell
+concatObjects :: [(GPath, Object)] -> (Map LinkOid GCI, Map (Text, GPath) LCI)
+concatObjects pathObjs =
+  foldl' f (mempty, mempty) $ offsetsFull pathObjs
+  where
+    f ::
+      (Map LinkOid GCI, Map (Text, GPath) LCI) ->
+      (Int, (GPath, Object)) ->
+      (Map LinkOid GCI, Map (Text, GPath) LCI)
+    f (accSyms, accGloss) (offset, (path, obj)) =
+      ( (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) <> accSyms,
+        (M.mapKeys (\term -> (term, path)) obj.orgDoc.glossary) <> accGloss
+      )
+#+end_src
+
+#+name: f:mkOffsets
+#+begin_src haskell
+mkOffsets :: [(GPath, Object)] -> IntMap GPath
+mkOffsets pathObjs =
+  IntMap.fromList
+    . map (\(offset, (path, _obj)) -> (offset, path))
+    $ offsetsFull pathObjs
+#+end_src
+
+#+name: f:offsetsFull
+#+begin_src haskell
+offsetsFull :: [(GPath, Object)] -> [(Int, (GPath, Object))]
+offsetsFull pathObjs =
+  cumulativeOffsets
+    . filter (\(numCells, _) -> numCells > 0)
+    . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
+    $ sort pathObjs
 #+end_src
 
 [[f:finalizeEdges]] looks at each object's ~pseudoEdges~ into edges using symbols (~Map
@@ -948,11 +977,11 @@ Map GPath (Map GPath [(GCI, GCI)])
 #+name: f:mkBacklinks
 #+begin_src haskell
 mkBacklinks ::
-  [(GPath, Object)] ->
+  [GPath] ->
   IntMap GPath ->
   [(GCI, GCI)] ->
   Map GPath (Map GPath [(GCI, GCI)])
-mkBacklinks pathObjs offsets symbolEdges =
+mkBacklinks sortedPaths offsets symbolEdges =
   let f acc (from, to)
         | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
           Just (_, toPath) <- IntMap.lookupLE to.unGCI offsets,
@@ -960,7 +989,7 @@ mkBacklinks pathObjs offsets symbolEdges =
             M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
         | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
           to.unGCI < 0,
-          Just toPath <- (sort $ map fst pathObjs) !!? (abs to.unGCI - 1),
+          Just toPath <- sortedPaths !!? (abs to.unGCI - 1),
           fromPath /= toPath =
             M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
         | otherwise = acc
