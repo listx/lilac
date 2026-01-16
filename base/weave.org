@@ -2252,7 +2252,7 @@ for links, it means only using the display name, not the target of the link
 which may have a long (random) UUID. This means using a custom comparing
 function for the prose at [[(glossary-term-compare-visible)]], to remove all links
 so that we only use the display text of links. We can do this with
-[[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:stripLinks][f:stripLinks]], just like we did for [[f:getLinkAnchor]], in [[f:toNormalizedText]].
+[[id:730ad104-52c9-49df-bbb9-66d92363bfc1::f:stripLinks][f:stripLinks]], just like we did for [[f:getLinkAnchor]], in [[f:toNormalizedText]].
 
 #+name: f:toNormalizedText
 #+begin_src haskell
@@ -2266,7 +2266,7 @@ toNormalizedText prose =
 
 [[f:toNormalizedText]] also puts everything in lowercase, because otherwise capital
 letters take precedence over lowercase ones, which can be confusing. It also
-calls [[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:stripStyles][f:stripStyles]] because otherwise those (useless) style characters like ~*~
+calls [[id:730ad104-52c9-49df-bbb9-66d92363bfc1::f:stripStyles][f:stripStyles]] because otherwise those (useless) style characters like ~*~
 and ~/~ will interfere with the sorting.
 
 In [[f:weaveCollectedGlossaryTerm]], because we only have the cell index, we first

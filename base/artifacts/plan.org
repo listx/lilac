@@ -46,6 +46,18 @@ or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 
   - [ ] [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][Frontend]]
 
+*** TODO fix a bug where we confuse a link to a line label as a link to a cell of the same name
+
+If we have a line label link like ~[[foo]]~, but NO line label ~(ref:foo)~ in any of
+the code blocks, it will still pass the broken link check if there is a cell
+named ~foo~. This is a bug and should never happen, as line labels and cell names
+are two separate namespaces.
+
+We began treating these two the same (as one namespace) with the use of
+~LinkOid~ in both instances to capture the target of the link for both named cells
+and line labels. We have to add additional type information so that we can
+distinguish between the two when checking for broken links.
+
 *** TODO add widget for higher-level table of contents
 
 We need a way to let users understand that a single document is part of some

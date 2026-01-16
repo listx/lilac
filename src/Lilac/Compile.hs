@@ -249,31 +249,13 @@ getSymbols docOid parentOid cellMeta lci =
 
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
-  let (symbolsWithoutTopLevelUUIDs, glossary) = concatObjects pathObjs
-      symbols = docOidsToSymbols pathObjs <> symbolsWithoutTopLevelUUIDs
-      offsets = mkOffsets pathObjs
-      sortedPaths = sort $ map fst pathObjs
-      backlinks =
-        mkBacklinks sortedPaths offsets
-          . foldl' (finalizeEdges symbols) []
-          $ offsetsFull pathObjs
-      brokenLinks = findBrokenLinks pathObjs symbols
-  allBibPaths <-
-    concat
-      <$> mapM
-        (\(gp, o) -> makeRelativeToObjectPath gp o.orgDoc.bibPaths)
-        pathObjs
-  allCslPaths <-
-    concat
-      <$> mapM
-        ( \(gp, o) ->
-            makeRelativeToObjectPath gp
-              $ maybeToList o.orgDoc.cslPath
-        )
-        pathObjs
-  bibs <- getBibliographies allBibPaths
-  cslRawXMLs <- map fst <$> getCitationStyles allCslPaths
-  let csls = zip allCslPaths cslRawXMLs
+  let pathObjsNonEmpty =
+        filter (\(_, obj) -> length obj.orgDoc.cells > 0) pathObjs --
+      (symbols, glossary) = combineSymbolsAndGlossary pathObjsNonEmpty
+      offsets = mkOffsets pathObjsNonEmpty
+      backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
+      brokenLinks = findBrokenLinks pathObjsNonEmpty symbols --
+  (csls, bibs) <- getCitationDeps pathObjsNonEmpty
   if
     | brokenLinks /= [] ->
         pure
@@ -285,14 +267,14 @@ mkArchive pathObjs = do
     | otherwise ->
         let archive =
               Archive
-                { objects = fromList pathObjs,
+                { objects = fromList pathObjsNonEmpty,
                   symbols = symbols,
                   ancestry = mempty,
                   glossary = glossary,
                   backlinks = backlinks,
                   offsets = offsets,
-                  csls = fromList csls,
-                  bibs = fromList bibs
+                  csls = csls,
+                  bibs = bibs
                 }
             ancestry = mkBlockAncestry archive $ getBlockGCIsFromArchive archive
          in pure $ Right archive {ancestry = ancestry}
@@ -301,16 +283,19 @@ mkArchive pathObjs = do
     showBrokenLink (gPath, link) =
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
 
-concatObjects :: [(GPath, Object)] -> (Map LinkOid GCI, Map (Text, GPath) LCI)
-concatObjects pathObjs =
-  foldl' f (mempty, mempty) $ offsetsFull pathObjs
+combineSymbolsAndGlossary ::
+  [(GPath, Object)] ->
+  (Map LinkOid GCI, Map (Text, GPath) LCI)
+combineSymbolsAndGlossary pathObjs =
+  foldl' f (docOidsToSymbols pathObjs, mempty) $ prependOffsets pathObjs
   where
     f ::
       (Map LinkOid GCI, Map (Text, GPath) LCI) ->
       (Int, (GPath, Object)) ->
       (Map LinkOid GCI, Map (Text, GPath) LCI)
     f (accSyms, accGloss) (offset, (path, obj)) =
-      ( (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) <> accSyms,
+      ( (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) --
+          <> accSyms,
         (M.mapKeys (\term -> (term, path)) obj.orgDoc.glossary) <> accGloss
       )
 
@@ -333,12 +318,11 @@ mkOffsets :: [(GPath, Object)] -> IntMap GPath
 mkOffsets pathObjs =
   IntMap.fromList
     . map (\(offset, (path, _obj)) -> (offset, path))
-    $ offsetsFull pathObjs
+    $ prependOffsets pathObjs
 
-offsetsFull :: [(GPath, Object)] -> [(Int, (GPath, Object))]
-offsetsFull pathObjs =
+prependOffsets :: [(GPath, Object)] -> [(Int, (GPath, Object))]
+prependOffsets pathObjs =
   cumulativeOffsets
-    . filter (\(numCells, _) -> numCells > 0)
     . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
     $ sort pathObjs
 
@@ -355,7 +339,7 @@ findBrokenLinks pathObjs symbols =
       [(GPath, LinkOid)]
     getBrokenLink acc (gPath, linkOid) = case lookup linkOid symbols of
       Just _ -> acc
-      Nothing -> (gPath, linkOid) : acc
+      Nothing -> (gPath, linkOid) : acc --
     allExternalOids :: [(GPath, LinkOid)]
     allExternalOids =
       foldl'
@@ -363,35 +347,52 @@ findBrokenLinks pathObjs symbols =
         []
         pathObjs
 
+getCitationDeps ::
+  [(GPath, Object)] ->
+  IO (Map FilePath Text, Map FilePath [CP.Reference (CslJson Text)])
+getCitationDeps pathObjs = do
+  csls <- getCitationStyles pathObjs
+  bibs <- getBibliographies pathObjs
+  pure (csls, bibs)
+
 finalizeEdges ::
   Map LinkOid GCI ->
   [(GCI, GCI)] ->
   (Int, (GPath, Object)) ->
   [(GCI, GCI)]
-finalizeEdges syms acc (offset, (_, obj)) =
-  let f (PseudoEdge (lci, linkOid)) = case lookup linkOid syms of
+finalizeEdges symbols acc (offset, (_, obj)) =
+  let f (PseudoEdge (lci, linkOid)) = case lookup linkOid symbols of --
         Nothing -> Nothing
-        Just targetGCI -> Just (GCI $ lci.unLCI + offset, targetGCI)
+        Just targetGCI -> Just (GCI $ lci.unLCI + offset, targetGCI) --
    in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
 
 mkBacklinks ::
-  [GPath] ->
+  [(GPath, Object)] ->
+  Map LinkOid GCI ->
   IntMap GPath ->
-  [(GCI, GCI)] ->
   Map GPath (Map GPath [(GCI, GCI)])
-mkBacklinks sortedPaths offsets symbolEdges =
-  let f acc (from, to)
-        | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
-          Just (_, toPath) <- IntMap.lookupLE to.unGCI offsets,
-          fromPath /= toPath =
-            M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-        | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
-          to.unGCI < 0,
-          Just toPath <- sortedPaths !!? (abs to.unGCI - 1),
-          fromPath /= toPath =
-            M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-        | otherwise = acc
-   in M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
+mkBacklinks pathObjs symbols offsets =
+  M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
+  where
+    symbolEdges :: [(GCI, GCI)]
+    symbolEdges =
+      foldl'
+        (finalizeEdges symbols) --
+        []
+        $ prependOffsets pathObjs
+    sortedPaths :: [GPath]
+    sortedPaths = sort $ map fst pathObjs
+    f acc (from, to)
+      | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
+        Just (_, toPath) <- IntMap.lookupLE to.unGCI offsets,
+        fromPath /= toPath =
+          M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+      | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
+        to.unGCI < 0,
+        Just toPath <- sortedPaths !!? (abs to.unGCI - 1),
+        fromPath /= toPath =
+          M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+      | otherwise = acc
 
 readObjectsFrom :: FilePath -> [FilePath] -> IO [(GPath, Object)]
 readObjectsFrom parentDir = foldlM f []
@@ -571,8 +572,18 @@ findExternalOids orgDoc =
       LinkTargetFilePath {}
       LinkTargetURI {} -> acc
 
-getCitationStyles :: [FilePath] -> IO [(Text, CP.Style (CslJson Text))]
-getCitationStyles filePaths = mapM getCitationStyle filePaths
+getCitationStyles :: [(GPath, Object)] -> IO (Map FilePath Text)
+getCitationStyles pathObjs = do
+  allCslPaths <-
+    concat
+      <$> mapM
+        ( \(gPath, obj) ->
+            makeRelativeToObjectPath gPath
+              $ maybeToList obj.orgDoc.cslPath
+        )
+        pathObjs
+  cslRawXMLs <- map fst <$> mapM getCitationStyle allCslPaths
+  pure . fromList $ zip allCslPaths cslRawXMLs
 
 getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))
 getCitationStyle filePath = do
@@ -590,11 +601,16 @@ parseCitationStyle input = do
     Right style -> Right style
 
 getBibliographies ::
-  [FilePath] ->
-  IO [(FilePath, [CP.Reference (CslJson Text)])]
-getBibliographies filePaths = do
-  bibs <- mapM getBibliography filePaths
-  pure $ zip filePaths bibs
+  [(GPath, Object)] ->
+  IO (Map FilePath [CP.Reference (CslJson Text)])
+getBibliographies pathObjs = do
+  allBibPaths <-
+    concat
+      <$> mapM
+        (\(gPath, obj) -> makeRelativeToObjectPath gPath obj.orgDoc.bibPaths)
+        pathObjs
+  bibs <- mapM getBibliography allBibPaths
+  pure . fromList $ zip allBibPaths bibs
 
 getBibliography :: FilePath -> IO [CP.Reference (CslJson Text)]
 getBibliography filePath = do

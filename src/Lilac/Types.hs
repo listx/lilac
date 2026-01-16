@@ -660,8 +660,8 @@ data Archive = Archive
     glossary :: Map (Text, GPath) LCI, --
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), --
     offsets :: IntMap GPath, --
-    csls :: Map FilePath Text,
-    bibs :: Map FilePath [CP.Reference (CslJson Text)]
+    csls :: Map FilePath Text, --
+    bibs :: Map FilePath [CP.Reference (CslJson Text)] --
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

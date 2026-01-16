@@ -177,11 +177,12 @@ import System.OsPath qualified as P
 <<f:getLineLabels>>
 <<f:getSymbols>>
 <<f:mkArchive>>
-<<f:concatObjects>>
+<<f:combineSymbolsAndGlossary>>
 <<f:docOidsToSymbols>>
 <<f:mkOffsets>>
-<<f:offsetsFull>>
+<<f:prependOffsets>>
 <<f:findBrokenLinks>>
+<<f:getCitationDeps>>
 <<f:finalizeEdges>>
 <<f:mkBacklinks>>
 <<f:readObjectsFrom>>
@@ -467,7 +468,7 @@ navigating a block's ancestry; specifically, a block may have an anonymous
 parent, and we still want to include such parents in [[id:ff5876bf-a144-4a08-bba4-15638e3590d5::f:getBlockGCIsFromArchive][f:getBlockGCIsFromArchive]],
 which powers [[id:ff5876bf-a144-4a08-bba4-15638e3590d5::f:mkBlockAncestry][f:mkBlockAncestry]].
 
-Note that [[f:mkSymbols]] needs to return a ~Map LinkOid Int~. Because both
+Note that [[f:mkSymbols]] needs to return a ~Map LinkOid LCI~. Because both
 [[(symbols-tangle-meta)]] and [[(symbols-anonymous-blocks)]] deal with anonymous blocks,
 their ~LinkOid~ values are constructed artificially. For both of them we inject a
 ~\NUL~ character so as to make it impossible to clash with a user-defined ~LinkOid~
@@ -702,8 +703,8 @@ data Archive = Archive
     glossary :: Map (Text, GPath) LCI, -- (ref:data:Archive-glossary)
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), -- (ref:data:Archive-backlinks)
     offsets :: IntMap GPath, -- (ref:data:Archive-offsets)
-    csls :: Map FilePath Text,
-    bibs :: Map FilePath [CP.Reference (CslJson Text)]
+    csls :: Map FilePath Text, -- (ref:data:Archive-csls)
+    bibs :: Map FilePath [CP.Reference (CslJson Text)] -- (ref:data:Archive-bibs)
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -737,24 +738,22 @@ inside it:
     if the first object has 100 cells, the offset for the second object in the
     list is 100. See [[f:cumulativeOffsets]].
 
-  - ~symbols~ :: [[(data:Archive-symbols)]] A table for finding the cell (its GCI)
-    based on a given [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]].
-
-    Now it could be the case that the user decides to link to the top-level UUID
-    of the document [[id:5df15f17-c630-4ddf-bade-66084c430a07::(data:OrgDoc-oid)]].
-    This presents a problem because documents are not cells (they contain cells)
-    so using a GCI doesn't really make sense. So instead, we use negative
-    numbers so as not to collide with the regular cell index numbers. See
-    [[f:docOidsToSymbols]].
+  - ~symbols~ :: [[(data:Archive-symbols)]] A table for finding the cell by its GCI
+    based on a given [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]. It could be the case that the user decides to
+    link to the top-level UUID of the document
+    [[id:5df15f17-c630-4ddf-bade-66084c430a07::(data:OrgDoc-oid)]]. This presents a
+    problem because documents are not cells (they contain cells) so using a GCI
+    doesn't really make sense. So instead we use negative numbers so as not to
+    collide with the regular cell index numbers. See [[f:docOidsToSymbols]].
 
   - ~backlinks~ :: [[(data:Archive-backlinks)]] A map where the keys are the paths (of
-    objects) and the values are the backlinks to that object. The backlinks are
-    themselves a map because we want to organize all of the backlinks by the
-    document they are starting out from. The actual backlinks are just edges
-    between cells (vertices) where the edges are created by a reference (via
-    [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) from one cell to another. They are based on [[id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5::newtype:PseudoEdge][newtype:PseudoEdge]]
-    which are constructed in [[id:dabccd5e-930e-4571-899f-1bfbdeab3d5e::f:oidLinkParser][f:oidLinkParser]]. See [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]] for how they
-    are used during weaving.
+    objects) and the values are the backlinks to that object. We use a map
+    because we want to organize all of the backlinks by the document they are
+    starting out from. The actual backlinks are just edges between cells
+    (vertices), where the edges are created by a reference (via [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]])
+    from one cell to another. They are based on [[id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5::newtype:PseudoEdge][newtype:PseudoEdge]] which are
+    constructed in [[id:dabccd5e-930e-4571-899f-1bfbdeab3d5e::f:oidLinkParser][f:oidLinkParser]]. See [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]] for how they are used
+    during weaving.
 
   - ~ancestry~ :: [[(data:Archive-ancestry)]] A map of global cell indices of blocks
     to their parents (a block can have multiple parents because more than one
@@ -765,71 +764,45 @@ inside it:
   - ~glossary~ :: [[(data:Archive-glossary)]] This is the combined set of all glossary
     terms found in all objects. The main difference is that the key includes not
     just the term itself (~Text~) but also the path of the object to identify
-    which object has this term. The values are local cell indices, so in order
-    to get the concrete value, you have to use the ~offsets~ in order to convert
-    the local cell index into a global one.
+    which object has this term. This also avoids clashes because two documents
+    could very well define the same glossary term (in different ways).
 
-When dealing with multiple [[data:Object]] files at a time, we have to answer the
-question, "is this collection of objects able to resolve all internal
-[[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] values"? Essentially this is the same question as asking if there
-are any broken links, as far as [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] targets are concerned.
+  - ~csls~ :: [[(data:Archive-csls)]] Collection of CSL paths and their raw XML values
+    (see [[id:15706715-c648-4866-b757-ea4a1aad0570][CSL style file (XML)]]). We have to store the information as a ~Text~
+    value, because there is no ~ToJSON~ instance for the ~Citeproc.Types.Style~
+    type. Typically ~csls~ will have at most a handful of entries, because most
+    (if not all) documents inside an archive will all use the same CSL style.
+    Needed for processing [[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]] and [[id:e24de101-bf1d-418b-a18f-b1a98fea9696][printing bibliographies]]. See [[id:4194fc81-a28d-451f-b4bd-f2f522b5a750][Citation
+    dependencies]].
 
-The above question also has two different "flavors", depending on what we want
-to do:
+  - ~bibs~ :: [[(data:Archive-bibs)]] Collection of all bibliography files used by
+    documents. See [[id:909c5265-065a-412c-9305-2cff398ad233][CSL JSON (bibliographical entries)]]. Needed for processing
+    [[id:a54a7762-a861-42b1-b2c8-2b760281052c][Citations]] and [[id:e24de101-bf1d-418b-a18f-b1a98fea9696][printing bibliographies]]. See [[id:4194fc81-a28d-451f-b4bd-f2f522b5a750][Citation dependencies]].
 
-  1) For tangling, we only care about broken Noweb links for those code blocks
-     that have the ~:tangle~ metadata key set (aka "root" blocks). That is, if a
-     code block depends on another block but is not itself something that a root
-     block depends on, we don't care because such blocks are ignored for
-     tangling purposes.
+** Construction
+:PROPERTIES:
+:ID:       fb503792-b075-4bd2-a215-8e64b9ee6cb4
+:END:
 
-  2) For weaving, we care about any broken link ([[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) to a cell,
-     because otherwise we will not be able to generate the HTML link tag (~<a>~)
-     with the correct ~href=...~ attribute for it.
-
-To construct the archive, [[f:mkArchive]] reads a list of paths and the objects that
-are found on those paths. The main check that is performed is to see that there
-are no broken links within this collection of objects. The term "broken" here
-mainly means any internal link (to a cell) that cannot be resolved; we do not go
-over the network to check for broken HTTP links.
-
-[[f:mkArchive]] also reads in any [[id:15706715-c648-4866-b757-ea4a1aad0570][CSL style file (XML)]] and also corresponding [[id:909c5265-065a-412c-9305-2cff398ad233][CSL
-JSON (bibliographical entries)]] files, as these are needed for processing
-citations and [[id:e24de101-bf1d-418b-a18f-b1a98fea9696][printing bibliographies]]. If there is any problem with parsing
-these inputs, we return an error. This area around citations is discussed
-separately in [[id:4194fc81-a28d-451f-b4bd-f2f522b5a750][Citation dependencies]]. For the CSL style file, we have to store
-the information as a ~Text~ value, because there is no ~ToJSON~ instance for the
-~Citeproc.Types.Style~ type.
+To construct the archive, [[f:mkArchive]] reads a list of path and object pairs and
+performs some processing on them to produce a [[data:Archive]] value. We need the
+path information mainly because ultimately when we weave these objects, we need
+to be able to understand the relative file path relationship between them in
+order to construct a relative HTML link, because the file structure layout of
+these objects will be preserved in the HTML file locations (by contrast,
+tangling does not involve tangling to relative paths).
 
 #+name: f:mkArchive
 #+begin_src haskell
 mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
 mkArchive pathObjs = do
-  let (symbolsWithoutTopLevelUUIDs, glossary) = concatObjects pathObjs
-      symbols = docOidsToSymbols pathObjs <> symbolsWithoutTopLevelUUIDs
-      offsets = mkOffsets pathObjs
-      sortedPaths = sort $ map fst pathObjs
-      backlinks =
-        mkBacklinks sortedPaths offsets
-          . foldl' (finalizeEdges symbols) []
-          $ offsetsFull pathObjs
-      brokenLinks = findBrokenLinks pathObjs symbols
-  allBibPaths <-
-    concat
-      <$> mapM
-        (\(gp, o) -> makeRelativeToObjectPath gp o.orgDoc.bibPaths)
-        pathObjs
-  allCslPaths <-
-    concat
-      <$> mapM
-        ( \(gp, o) ->
-            makeRelativeToObjectPath gp
-              $ maybeToList o.orgDoc.cslPath
-        )
-        pathObjs
-  bibs <- getBibliographies allBibPaths
-  cslRawXMLs <- map fst <$> getCitationStyles allCslPaths
-  let csls = zip allCslPaths cslRawXMLs
+  let pathObjsNonEmpty =
+        filter (\(_, obj) -> length obj.orgDoc.cells > 0) pathObjs -- (ref:f:mkArchive-remove-empty-objects)
+      (symbols, glossary) = combineSymbolsAndGlossary pathObjsNonEmpty
+      offsets = mkOffsets pathObjsNonEmpty
+      backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
+      brokenLinks = findBrokenLinks pathObjsNonEmpty symbols -- (ref:f:mkArchive-brokenLinks)
+  (csls, bibs) <- getCitationDeps pathObjsNonEmpty
   if
     | brokenLinks /= [] ->
         pure
@@ -841,14 +814,14 @@ mkArchive pathObjs = do
     | otherwise ->
         let archive =
               Archive
-                { objects = fromList pathObjs,
+                { objects = fromList pathObjsNonEmpty,
                   symbols = symbols,
                   ancestry = mempty,
                   glossary = glossary,
                   backlinks = backlinks,
                   offsets = offsets,
-                  csls = fromList csls,
-                  bibs = fromList bibs
+                  csls = csls,
+                  bibs = bibs
                 }
             ancestry = mkBlockAncestry archive $ getBlockGCIsFromArchive archive
          in pure $ Right archive {ancestry = ancestry}
@@ -858,9 +831,51 @@ mkArchive pathObjs = do
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
 #+end_src
 
-The order in which the objects are sorted inside the archive is
-determined by their path, and this ordering is what lets us deterministically
-assign negative numbers.
+The first thing we do is remove any empty objects that don't have any content
+[[(f:mkArchive-remove-empty-objects)]], because they're meaningless and also
+probably introduce bugs into offset calculation in [[f:mkOffsets]]. Then the main
+thing is to see that there are no broken links within this collection of objects
+[[(f:mkArchive-brokenLinks)]]; see [[id:a9bad6d4-5b1c-48de-8f09-178724859381][Broken link detection]] and [[f:findBrokenLinks]].
+
+Other than the checks, the other concern is to combine the different parts of an
+object together with other objects. Some parts of an object can be simply
+combined together with the same parts in another object (there's not much more
+processing to do). These are the object's symbols [[(data:Object-symbols)]] and
+glossary [[id:5df15f17-c630-4ddf-bade-66084c430a07::(data:OrgDoc-glossary)]]. This
+is done in [[f:combineSymbolsAndGlossary]].
+
+#+name: f:combineSymbolsAndGlossary
+#+begin_src haskell
+combineSymbolsAndGlossary ::
+  [(GPath, Object)] ->
+  (Map LinkOid GCI, Map (Text, GPath) LCI)
+combineSymbolsAndGlossary pathObjs =
+  foldl' f (docOidsToSymbols pathObjs, mempty) $ prependOffsets pathObjs
+  where
+    f ::
+      (Map LinkOid GCI, Map (Text, GPath) LCI) ->
+      (Int, (GPath, Object)) ->
+      (Map LinkOid GCI, Map (Text, GPath) LCI)
+    f (accSyms, accGloss) (offset, (path, obj)) =
+      ( (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) -- (ref:f:combineSymbolsAndGlossary-gci-creation)
+          <> accSyms,
+        (M.mapKeys (\term -> (term, path)) obj.orgDoc.glossary) <> accGloss
+      )
+#+end_src
+
+~LCI~ values of symbols are converted into ~GCI~ ones at
+[[(f:combineSymbolsAndGlossary-gci-creation)]], using offsets. These symbols come
+from cells (see [[f:mkSymbols]]).
+
+We also generate (deterministically of course) a separate set of non-cell-based
+symbols for representing the documents (i.e., links to an Org document as a
+whole, not to any one of its constituent cells) in [[f:docOidsToSymbols]]. This can
+only be done at the archiving stage because an object by itself has no
+understanding of how many other objects there are in the archive, and hence,
+which index position it has relative to those other objects. These index
+positions are determined by sorting the objects by their path and using negative
+numbers so as not to clash with the positive ~GCI~ numbers from symbols targeting
+typical cell indices.
 
 #+name: f:docOidsToSymbols
 #+begin_src haskell
@@ -880,124 +895,25 @@ docOidsToSymbols pathObjs =
    in topLevelLinkOids
 #+end_src
 
-#+name: f:findBrokenLinks
-#+begin_src haskell
-findBrokenLinks ::
-  [(GPath, Object)] ->
-  Map LinkOid GCI ->
-  [(GPath, LinkOid)]
-findBrokenLinks pathObjs symbols =
-  foldl' getBrokenLink [] allExternalOids
-  where
-    getBrokenLink ::
-      [(GPath, LinkOid)] ->
-      (GPath, LinkOid) ->
-      [(GPath, LinkOid)]
-    getBrokenLink acc (gPath, linkOid) = case lookup linkOid symbols of
-      Just _ -> acc
-      Nothing -> (gPath, linkOid) : acc
-    allExternalOids :: [(GPath, LinkOid)]
-    allExternalOids =
-      foldl'
-        (\acc (gPath, obj) -> (zip (repeat gPath) obj.externalOids) <> acc)
-        []
-        pathObjs
-#+end_src
+Several functions like [[f:combineSymbolsAndGlossary]] and [[f:mkBacklinks]] use
+[[f:prependOffsets]] to calculate offsets. This offset information is saved in
+compact form in [[f:mkOffsets]]. Let's first look at [[f:prependOffsets]].
 
-#+name: f:concatObjects
+#+name: f:prependOffsets
 #+begin_src haskell
-concatObjects :: [(GPath, Object)] -> (Map LinkOid GCI, Map (Text, GPath) LCI)
-concatObjects pathObjs =
-  foldl' f (mempty, mempty) $ offsetsFull pathObjs
-  where
-    f ::
-      (Map LinkOid GCI, Map (Text, GPath) LCI) ->
-      (Int, (GPath, Object)) ->
-      (Map LinkOid GCI, Map (Text, GPath) LCI)
-    f (accSyms, accGloss) (offset, (path, obj)) =
-      ( (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) <> accSyms,
-        (M.mapKeys (\term -> (term, path)) obj.orgDoc.glossary) <> accGloss
-      )
-#+end_src
-
-#+name: f:mkOffsets
-#+begin_src haskell
-mkOffsets :: [(GPath, Object)] -> IntMap GPath
-mkOffsets pathObjs =
-  IntMap.fromList
-    . map (\(offset, (path, _obj)) -> (offset, path))
-    $ offsetsFull pathObjs
-#+end_src
-
-#+name: f:offsetsFull
-#+begin_src haskell
-offsetsFull :: [(GPath, Object)] -> [(Int, (GPath, Object))]
-offsetsFull pathObjs =
+prependOffsets :: [(GPath, Object)] -> [(Int, (GPath, Object))]
+prependOffsets pathObjs =
   cumulativeOffsets
-    . filter (\(numCells, _) -> numCells > 0)
     . map (\(path, obj) -> (length obj.orgDoc.cells, (path, obj)))
     $ sort pathObjs
 #+end_src
 
-[[f:finalizeEdges]] looks at each object's ~pseudoEdges~ into edges using symbols (~Map
-LinkOid Int~) and offsets. Each ~PseudoEdge~ links from the object's local cell
-index (without any offsets) into a ~LinkOid~ target. We need to perform two transformations:
-
-  1) Convert the local index into a global one, by adding the offset to it.
-
-  2) Convert the ~LinkOid~ target into a global cell index, by looking it up in
-     the global symbols (~Map LinkOid Int~).
-
-#+name: f:finalizeEdges
-#+begin_src haskell
-finalizeEdges ::
-  Map LinkOid GCI ->
-  [(GCI, GCI)] ->
-  (Int, (GPath, Object)) ->
-  [(GCI, GCI)]
-finalizeEdges syms acc (offset, (_, obj)) =
-  let f (PseudoEdge (lci, linkOid)) = case lookup linkOid syms of
-        Nothing -> Nothing
-        Just targetGCI -> Just (GCI $ lci.unLCI + offset, targetGCI)
-   in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
-#+end_src
-
-[[f:mkBacklinks]] takes the edges which contain global cell index information for
-both the starting and ending vertices, and then transforms them into the final
-shape ~Map GPath (Map GPath [(GCI, GCI)])~:
-
-#+begin_src txt
-Map GPath (Map GPath [(GCI, GCI)])
-      |          |       |
-      |          |       `---> List of edges (source GCI, target GCI)
-      |          `---> Source object path
-      `----> Target object path
-#+end_src
-
-#+name: f:mkBacklinks
-#+begin_src haskell
-mkBacklinks ::
-  [GPath] ->
-  IntMap GPath ->
-  [(GCI, GCI)] ->
-  Map GPath (Map GPath [(GCI, GCI)])
-mkBacklinks sortedPaths offsets symbolEdges =
-  let f acc (from, to)
-        | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
-          Just (_, toPath) <- IntMap.lookupLE to.unGCI offsets,
-          fromPath /= toPath =
-            M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-        | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
-          to.unGCI < 0,
-          Just toPath <- sortedPaths !!? (abs to.unGCI - 1),
-          fromPath /= toPath =
-            M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-        | otherwise = acc
-   in M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
-#+end_src
-
-The [[f:cumulativeOffsets]] takes a list of offsets (each offset inside a tuple),
-and converts them so that the offsets are cumulative (building on each other).
+This just sums up the number of cells for each object, and then builds up
+cumulative sums. After this cumulative step in [[f:cumulativeOffsets]], you can
+think of each offset as like a step in a staircase --- each offset is higher
+than the previous one. Indeed, [[f:cumulativeOffsets]] takes a list of offsets (each
+offset inside a tuple), and converts them so that the offsets are cumulative
+(building on each other).
 
 #+name: f:cumulativeOffsets
 #+begin_src haskell
@@ -1023,189 +939,180 @@ describe "cumulativeOffsets sanity check" $ do
     LC.cumulativeOffsets input `shouldBe` output
 #+end_src
 
-[[f:gciToObjCell]] takes a global cell index and converts it to the right cell
-and the object (Org doc) that contains it, as a tuple.
+[[f:mkOffsets]] just converts these cumulative offsets into a more compact ~IntMap~
+form, so that we can make use of the very convenient ~IntMap.lookupLE~ function
+(such as in [[f:gciToObjCell]]).
 
-#+name: f:gciToObjCell
+#+name: f:mkOffsets
 #+begin_src haskell
-gciToObjCell :: Archive -> GCI -> Maybe (Object, Cell)
-gciToObjCell archive gci
-  | Just (offset, path) <- IntMap.lookupLE gci.unGCI archive.offsets,
-    Just obj <- lookup path archive.objects,
-    Just cell <- obj.orgDoc.cells !!? (gci.unGCI - offset) =
-      Just (obj, cell)
-  | otherwise = Nothing
+mkOffsets :: [(GPath, Object)] -> IntMap GPath
+mkOffsets pathObjs =
+  IntMap.fromList
+    . map (\(offset, (path, _obj)) -> (offset, path))
+    $ prependOffsets pathObjs
 #+end_src
 
-#+name: f:gciToObjPath
-#+begin_src haskell
-gciToObjPath :: Archive -> GCI -> Maybe GPath
-gciToObjPath archive gci
-  | gci.unGCI < 0 =
-      (sort $ keys archive.objects) !!? (abs gci.unGCI - 1)
-  | Just (_, path) <- IntMap.lookupLE gci.unGCI archive.offsets =
-      Just path
-  | otherwise = Nothing
-#+end_src
+** Broken link detection
+:PROPERTIES:
+:ID:       a9bad6d4-5b1c-48de-8f09-178724859381
+:END:
 
-[[f:gciToName]] gives a human-friendly name of the cell. Much of it is
-patterned after [[id:7ddbd51b-fbac-4bf7-a14e-982ab753c879::f:getLinkAnchor][f:getLinkAnchor]], which gives a semi-human-friendly (and
-definitely machine-friendly) name for a given cell. We use the pilcrow (¶) and
-section symbol (§) directly for paragraphs and headings because
-[[id:d6abea81-d620-4ede-9c2c-68f7ea07f847::f:weaveStyledText][f:weaveStyledText]] will escape non-HTML-safe characters with HTML entities, such
-that if we do ~&para;~ the ~&~ will get escaped to ~&amp;~, which would result in
-~&amp;para;~ and therefore not what we want.
+When dealing with multiple [[data:Object]] files at a time, we have to answer the
+question, "is this collection of objects able to resolve all internal
+[[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] values"? Essentially this is the same question as asking if there
+are any broken links, as far as [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] targets are concerned.
 
-#+name: f:gciToName
+The above question also has two different "flavors", depending on what we want
+to do:
+
+  1) For tangling, we care about broken links because block expansion in
+     [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba::f:expandBlock][f:expandBlock]] depends on expanding all Noweb links with the contents of the
+     code blocks they link to.
+
+  2) For weaving, we care about any broken link ([[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) to a cell,
+     because otherwise we will not be able to generate the HTML link tag (~<a>~)
+     with the correct ~href=...~ attribute for it.
+
+In both cases, we obviously do not want any broken links, which we check with
+[[f:findBrokenLinks]].
+
+#+name: f:findBrokenLinks
 #+begin_src haskell
-gciToName :: Archive -> Int -> GCI -> Maybe Prose
-gciToName archive offset gci
-  | Just (_, cell) <- gciToObjCell archive gci =
-      case cell of
-        CHeading heading ->
-          plain
-            $ "§ "
-            <> (getSectionNumber heading)
-            <> " "
-            <> (getProseContents heading.body)
-        CParagraph _ ->
-          Just
-            $ Prose
-              [ ptext "¶ (" [],
-                ptext cellRef [Verbatim],
-                ptext ")" []
-              ]
-        CGlossaryTerm glossaryTerm ->
-          Just
-            $ Prose [ptext "✿ " []]
-            <> stripLinks glossaryTerm.term -- (ref:stripLinks)
-        CFigure figure
-          | Just name <- lookup "name" figure.meta -> verbatim name
-          | Just figureNum <- lookup "__figure_number" figure.meta ->
-              plain $ "Figure " <> figureNum
-          | otherwise -> plain "Figure"
-        CTable table
-          | Just name <- lookup "name" table.meta -> verbatim name
-          | Just tableNum <- lookup "__table_number" table.meta ->
-              plain $ "Table " <> tableNum
-          | otherwise -> plain "Table"
-        CFootnote footnote ->
-          Just
-            $ Prose
-              [ ptext "Footnote (" [],
-                ptext ("fn:" <> footnote.name) [Verbatim],
-                ptext ")" []
-              ]
-        CBlock block
-          | Just name <- lookup "name" block.meta ->
-              verbatim name
-          | otherwise -> plain $ "Anonymous Block" <> cellRef
-        CMathFragment mathFragment
-          | Just name <- lookup "name" mathFragment.meta ->
-              verbatim name
-          | Just eqNum <- lookup "__equation_number" mathFragment.meta ->
-              plain $ "Equation " <> eqNum
-          | Just eqNum <- lookup "__equation_anon_number" mathFragment.meta ->
-              plain $ "Anonymous Equation " <> eqNum
-          | otherwise -> plain "Math Fragment"
-        CListItem {}
-        CCommand {} -> Nothing
-  | otherwise = Nothing
+findBrokenLinks ::
+  [(GPath, Object)] ->
+  Map LinkOid GCI ->
+  [(GPath, LinkOid)]
+findBrokenLinks pathObjs symbols =
+  foldl' getBrokenLink [] allExternalOids
   where
-    cellRef = "Cell " <> (T.show $ gci.unGCI - offset)
-    plain body = Just $ Prose [ptext body []]
-    verbatim body = Just $ Prose [ptext body [Verbatim]]
+    getBrokenLink ::
+      [(GPath, LinkOid)] ->
+      (GPath, LinkOid) ->
+      [(GPath, LinkOid)]
+    getBrokenLink acc (gPath, linkOid) = case lookup linkOid symbols of
+      Just _ -> acc
+      Nothing -> (gPath, linkOid) : acc -- (ref:f:findBrokenLinks-add-broken-link)
+    allExternalOids :: [(GPath, LinkOid)]
+    allExternalOids =
+      foldl'
+        (\acc (gPath, obj) -> (zip (repeat gPath) obj.externalOids) <> acc)
+        []
+        pathObjs
 #+end_src
 
-We have to convert links (~PTokenLink~) into styled text (~PTokenStyledText~) at
-[[(stripLinks)]] because otherwise when we create backlinks at [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]], we
-can potentially end up with nested ~<a>~ tags (because backlink generation means
-always wrapping the name of a backlink with a link (~<a>~ tag) to that backlink),
-which would be illegal HTML (HTML does not allow nesting of ~<a>~ tags).
-[[f:stripLinks]] just takes the display name of any link and turns that into styled
-text.
+The key is to see if any of the links cannot be resolved by looking it up in the
+symbols map. If it's not there, then we mark it as broken
+[[(f:findBrokenLinks-add-broken-link)]].
 
-#+name: f:stripLinks
-#+begin_src haskell
-stripLinks :: Prose -> Prose
-stripLinks (Prose pTokens) = Prose (concatMap stripLink pTokens)
-  where
-    stripLink :: PToken -> [PToken]
-    stripLink = \case
-      PTokenLink link -> map (PTokenStyledText $) link.name
-      pToken -> [pToken]
+** Backlinks
+
+[[f:mkBacklinks]] takes the edges which contain global cell index information for
+both the starting and ending vertices, and then transforms them into the final
+shape ~Map GPath (Map GPath [(GCI, GCI)])~:
+
+#+begin_src txt
+Map GPath (Map GPath [(GCI, GCI)])
+      |          |       |
+      |          |       `---> List of edges (source GCI, target GCI)
+      |          `---> Source object path
+      `----> Target object path
 #+end_src
 
-[[f:stripStyles]] removes all styling masks.
+This shape is largely driven by the needs of [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]].
 
-#+name: f:stripStyles
+#+name: f:mkBacklinks
 #+begin_src haskell
-stripStyles :: Prose -> Prose
-stripStyles (Prose pTokens) = Prose (concatMap stripStyle pTokens)
+mkBacklinks ::
+  [(GPath, Object)] ->
+  Map LinkOid GCI ->
+  IntMap GPath ->
+  Map GPath (Map GPath [(GCI, GCI)])
+mkBacklinks pathObjs symbols offsets =
+  M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
   where
-    stripStyle :: PToken -> [PToken]
-    stripStyle = \case
-      PTokenStyledText styledText -> [ptext styledText.body []]
-      pToken -> [pToken]
+    symbolEdges :: [(GCI, GCI)]
+    symbolEdges =
+      foldl'
+        (finalizeEdges symbols) -- (ref:f:mkBacklinks-finalizeEdges)
+        []
+        $ prependOffsets pathObjs
+    sortedPaths :: [GPath]
+    sortedPaths = sort $ map fst pathObjs
+    f acc (from, to)
+      | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
+        Just (_, toPath) <- IntMap.lookupLE to.unGCI offsets,
+        fromPath /= toPath =
+          M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+      | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
+        to.unGCI < 0,
+        Just toPath <- sortedPaths !!? (abs to.unGCI - 1),
+        fromPath /= toPath =
+          M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+      | otherwise = acc
 #+end_src
 
-[[f:getCellName]] is similar to [[f:gciToName]], but it only returns a
-~Just~ value if the cell is a block, figure, table, footnote, or math fragment
-that has a ~#+name: ...~.
+[[f:finalizeEdges]] [[(f:mkBacklinks-finalizeEdges)]] looks at each object's ~pseudoEdges~
+and converts them into real edges (using ~GCI~ as the vertex type) using the
+global symbols map (~Map LinkOid GCI~) and offsets. Each ~PseudoEdge~ links from the
+object's ~LCI~ (without any offsets) into a ~LinkOid~ target, so we need to perform
+two transformations:
 
-#+name: f:getCellName
+  1) Convert the ~LinkOid~ target into a global cell index, by looking it up in
+     the global symbols (~Map LinkOid GCI~) [[(f:finalizeEdges-symbol-lookup)]].
+
+  2) Convert the ~LCI~ into a ~GCI~, by adding the offset to it
+     [[(f:finalizeEdges-lci-gci-conversion)]].
+
+#+name: f:finalizeEdges
 #+begin_src haskell
-getCellName :: Cell -> Maybe Prose
-getCellName = \case
-  CFigure figure
-    | Just name <- lookup "name" figure.meta -> verbatim name
-    | otherwise -> Nothing
-  CTable table
-    | Just name <- lookup "name" table.meta -> verbatim name
-    | otherwise -> Nothing
-  CFootnote footnote ->
-    Just
-      $ Prose
-        [ ptext "Footnote (" [],
-          ptext ("fn:" <> footnote.name) [Verbatim],
-          ptext ")" []
-        ]
-  CBlock block
-    | Just name <- lookup "name" block.meta ->
-        verbatim name
-    | otherwise -> Nothing
-  CMathFragment mathFragment
-    | Just name <- lookup "name" mathFragment.meta ->
-        verbatim name
-    | otherwise -> Nothing
-  CHeading {}
-  CParagraph {}
-  CGlossaryTerm {}
-  CListItem {}
-  CCommand {} -> Nothing
-  where
-    verbatim body = Just $ Prose [ptext body [Verbatim]]
+finalizeEdges ::
+  Map LinkOid GCI ->
+  [(GCI, GCI)] ->
+  (Int, (GPath, Object)) ->
+  [(GCI, GCI)]
+finalizeEdges symbols acc (offset, (_, obj)) =
+  let f (PseudoEdge (lci, linkOid)) = case lookup linkOid symbols of -- (ref:f:finalizeEdges-symbol-lookup)
+        Nothing -> Nothing
+        Just targetGCI -> Just (GCI $ lci.unLCI + offset, targetGCI) -- (ref:f:finalizeEdges-lci-gci-conversion)
+   in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
 #+end_src
 
-[[f:readObjectsFrom]] reads files from a given parent directory, and converts them
-into [[data:Object]] values. This is used in tests where we want to read multiple objects for a test case.
+** Citation dependencies
+:PROPERTIES:
+:ID:       4194fc81-a28d-451f-b4bd-f2f522b5a750
+:END:
 
-#+name: f:readObjectsFrom
+[[f:getCitationDeps]] reads CSL files and also bibliographies (JSON files).
+
+#+name: f:getCitationDeps
 #+begin_src haskell
-readObjectsFrom :: FilePath -> [FilePath] -> IO [(GPath, Object)]
-readObjectsFrom parentDir = foldlM f []
-  where
-    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
-    f acc path = do
-      parentDirEncoded <- P.encodeUtf parentDir
-      p <- P.encodeUtf path
-      let relPath = P.combine parentDirEncoded p
-      input <- LU.readFileRobustly relPath
-      case LP.parseOrgDoc input of
-        Left errTxt -> die $ T.unpack errTxt
-        Right od -> do
-          relPath' <- encodeGPath =<< P.decodeUtf relPath
-          pure $ (relPath', mkObject od) : acc
+getCitationDeps ::
+  [(GPath, Object)] ->
+  IO (Map FilePath Text, Map FilePath [CP.Reference (CslJson Text)])
+getCitationDeps pathObjs = do
+  csls <- getCitationStyles pathObjs
+  bibs <- getBibliographies pathObjs
+  pure (csls, bibs)
+#+end_src
+
+[[f:getCitationStyles]] returns both the raw XML content as well as the parsed
+content. We need the raw XML because we want to store it in [[f:mkArchive]], because
+there is no ~ToJSON~ instance for the ~CP.Style~ type.
+
+#+name: f:getCitationStyles
+#+begin_src haskell
+getCitationStyles :: [(GPath, Object)] -> IO (Map FilePath Text)
+getCitationStyles pathObjs = do
+  allCslPaths <-
+    concat
+      <$> mapM
+        ( \(gPath, obj) ->
+            makeRelativeToObjectPath gPath
+              $ maybeToList obj.orgDoc.cslPath
+        )
+        pathObjs
+  cslRawXMLs <- map fst <$> mapM getCitationStyle allCslPaths
+  pure . fromList $ zip allCslPaths cslRawXMLs
 #+end_src
 
 [[f:makeRelativeToObjectPath]] gets a ~[FilePath]~ and makes them relative to the
@@ -1227,21 +1134,6 @@ makeRelativeToObjectPath objGPath fps = do
       p <- P.encodeUtf fp
       let relPath = P.combine objDir p
       P.decodeUtf relPath
-#+end_src
-
-** Citation dependencies
-:PROPERTIES:
-:ID:       4194fc81-a28d-451f-b4bd-f2f522b5a750
-:END:
-
-[[f:getCitationStyles]] returns both the raw XML content as well as the parsed
-content. We need the raw XML because we want to store it in [[f:mkArchive]], because
-there is no ~ToJSON~ instance for the ~CP.Style~ type.
-
-#+name: f:getCitationStyles
-#+begin_src haskell
-getCitationStyles :: [FilePath] -> IO [(Text, CP.Style (CslJson Text))]
-getCitationStyles filePaths = mapM getCitationStyle filePaths
 #+end_src
 
 For parsing the CSL style file (XML), we read a given path, then defer to [[f:parseCitationStyle]].
@@ -1276,11 +1168,16 @@ entries in them.
 #+name: f:getBibliographies
 #+begin_src haskell
 getBibliographies ::
-  [FilePath] ->
-  IO [(FilePath, [CP.Reference (CslJson Text)])]
-getBibliographies filePaths = do
-  bibs <- mapM getBibliography filePaths
-  pure $ zip filePaths bibs
+  [(GPath, Object)] ->
+  IO (Map FilePath [CP.Reference (CslJson Text)])
+getBibliographies pathObjs = do
+  allBibPaths <-
+    concat
+      <$> mapM
+        (\(gPath, obj) -> makeRelativeToObjectPath gPath obj.orgDoc.bibPaths)
+        pathObjs
+  bibs <- mapM getBibliography allBibPaths
+  pure . fromList $ zip allBibPaths bibs
 #+end_src
 
 The [[f:getBibliography]] parses a single JSON file which has a list of references
@@ -2183,6 +2080,177 @@ checkCycles
   ]
 #+end_src
 
+* Utility functions
+:PROPERTIES:
+:ID:       730ad104-52c9-49df-bbb9-66d92363bfc1
+:END:
+
+[[f:gciToName]] gives a human-friendly name of the cell. Much of it is
+patterned after [[id:7ddbd51b-fbac-4bf7-a14e-982ab753c879::f:getLinkAnchor][f:getLinkAnchor]], which gives a semi-human-friendly (and
+definitely machine-friendly) name for a given cell. We use the pilcrow (¶) and
+section symbol (§) directly for paragraphs and headings because
+[[id:d6abea81-d620-4ede-9c2c-68f7ea07f847::f:weaveStyledText][f:weaveStyledText]] will escape non-HTML-safe characters with HTML entities, such
+that if we do ~&para;~ the ~&~ will get escaped to ~&amp;~, which would result in
+~&amp;para;~ and therefore not what we want.
+
+#+name: f:gciToName
+#+begin_src haskell
+gciToName :: Archive -> Int -> GCI -> Maybe Prose
+gciToName archive offset gci
+  | Just (_, cell) <- gciToObjCell archive gci =
+      case cell of
+        CHeading heading ->
+          plain
+            $ "§ "
+            <> (getSectionNumber heading)
+            <> " "
+            <> (getProseContents heading.body)
+        CParagraph _ ->
+          Just
+            $ Prose
+              [ ptext "¶ (" [],
+                ptext cellRef [Verbatim],
+                ptext ")" []
+              ]
+        CGlossaryTerm glossaryTerm ->
+          Just
+            $ Prose [ptext "✿ " []]
+            <> stripLinks glossaryTerm.term -- (ref:stripLinks)
+        CFigure figure
+          | Just name <- lookup "name" figure.meta -> verbatim name
+          | Just figureNum <- lookup "__figure_number" figure.meta ->
+              plain $ "Figure " <> figureNum
+          | otherwise -> plain "Figure"
+        CTable table
+          | Just name <- lookup "name" table.meta -> verbatim name
+          | Just tableNum <- lookup "__table_number" table.meta ->
+              plain $ "Table " <> tableNum
+          | otherwise -> plain "Table"
+        CFootnote footnote ->
+          Just
+            $ Prose
+              [ ptext "Footnote (" [],
+                ptext ("fn:" <> footnote.name) [Verbatim],
+                ptext ")" []
+              ]
+        CBlock block
+          | Just name <- lookup "name" block.meta ->
+              verbatim name
+          | otherwise -> plain $ "Anonymous Block" <> cellRef
+        CMathFragment mathFragment
+          | Just name <- lookup "name" mathFragment.meta ->
+              verbatim name
+          | Just eqNum <- lookup "__equation_number" mathFragment.meta ->
+              plain $ "Equation " <> eqNum
+          | Just eqNum <- lookup "__equation_anon_number" mathFragment.meta ->
+              plain $ "Anonymous Equation " <> eqNum
+          | otherwise -> plain "Math Fragment"
+        CListItem {}
+        CCommand {} -> Nothing
+  | otherwise = Nothing
+  where
+    cellRef = "Cell " <> (T.show $ gci.unGCI - offset)
+    plain body = Just $ Prose [ptext body []]
+    verbatim body = Just $ Prose [ptext body [Verbatim]]
+#+end_src
+
+[[f:gciToObjCell]] takes a global cell index and converts it to the right cell
+and the object (Org doc) that contains it, as a tuple.
+
+#+name: f:gciToObjCell
+#+begin_src haskell
+gciToObjCell :: Archive -> GCI -> Maybe (Object, Cell)
+gciToObjCell archive gci
+  | Just (offset, path) <- IntMap.lookupLE gci.unGCI archive.offsets,
+    Just obj <- lookup path archive.objects,
+    Just cell <- obj.orgDoc.cells !!? (gci.unGCI - offset) =
+      Just (obj, cell)
+  | otherwise = Nothing
+#+end_src
+
+[[f:gciToObjPath]] gets the path of the object by the negative GCI index; it is in
+this sense the opposite of [[f:docOidsToSymbols]].
+
+#+name: f:gciToObjPath
+#+begin_src haskell
+gciToObjPath :: Archive -> GCI -> Maybe GPath
+gciToObjPath archive gci
+  | gci.unGCI < 0 =
+      (sort $ keys archive.objects) !!? (abs gci.unGCI - 1)
+  | Just (_, path) <- IntMap.lookupLE gci.unGCI archive.offsets =
+      Just path
+  | otherwise = Nothing
+#+end_src
+
+We have to convert links (~PTokenLink~) into styled text (~PTokenStyledText~) at
+[[(stripLinks)]] because otherwise when we create backlinks at [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]], we
+can potentially end up with nested ~<a>~ tags (because backlink generation means
+always wrapping the name of a backlink with a link (~<a>~ tag) to that backlink),
+which would be illegal HTML (HTML does not allow nesting of ~<a>~ tags).
+[[f:stripLinks]] just takes the display name of any link and turns that into styled
+text.
+
+#+name: f:stripLinks
+#+begin_src haskell
+stripLinks :: Prose -> Prose
+stripLinks (Prose pTokens) = Prose (concatMap stripLink pTokens)
+  where
+    stripLink :: PToken -> [PToken]
+    stripLink = \case
+      PTokenLink link -> map (PTokenStyledText $) link.name
+      pToken -> [pToken]
+#+end_src
+
+[[f:stripStyles]] removes all styling masks.
+
+#+name: f:stripStyles
+#+begin_src haskell
+stripStyles :: Prose -> Prose
+stripStyles (Prose pTokens) = Prose (concatMap stripStyle pTokens)
+  where
+    stripStyle :: PToken -> [PToken]
+    stripStyle = \case
+      PTokenStyledText styledText -> [ptext styledText.body []]
+      pToken -> [pToken]
+#+end_src
+
+[[f:getCellName]] is similar to [[f:gciToName]], but it only returns a
+~Just~ value if the cell is a block, figure, table, footnote, or math fragment
+that has a ~#+name: ...~.
+
+#+name: f:getCellName
+#+begin_src haskell
+getCellName :: Cell -> Maybe Prose
+getCellName = \case
+  CFigure figure
+    | Just name <- lookup "name" figure.meta -> verbatim name
+    | otherwise -> Nothing
+  CTable table
+    | Just name <- lookup "name" table.meta -> verbatim name
+    | otherwise -> Nothing
+  CFootnote footnote ->
+    Just
+      $ Prose
+        [ ptext "Footnote (" [],
+          ptext ("fn:" <> footnote.name) [Verbatim],
+          ptext ")" []
+        ]
+  CBlock block
+    | Just name <- lookup "name" block.meta ->
+        verbatim name
+    | otherwise -> Nothing
+  CMathFragment mathFragment
+    | Just name <- lookup "name" mathFragment.meta ->
+        verbatim name
+    | otherwise -> Nothing
+  CHeading {}
+  CParagraph {}
+  CGlossaryTerm {}
+  CListItem {}
+  CCommand {} -> Nothing
+  where
+    verbatim body = Just $ Prose [ptext body [Verbatim]]
+#+end_src
 
 * Testing framework
 
@@ -2280,6 +2348,27 @@ checkExternalOids path expectedExternalOids = do
     read = do
       input <- LU.readFrom "test/Lilac/CompileSpec/" path
       pure $ LP.parseOrgDoc input
+#+end_src
+
+[[f:readObjectsFrom]] reads files from a given parent directory, and converts them
+into [[data:Object]] values. This is used in tests where we want to read multiple objects for a test case.
+
+#+name: f:readObjectsFrom
+#+begin_src haskell
+readObjectsFrom :: FilePath -> [FilePath] -> IO [(GPath, Object)]
+readObjectsFrom parentDir = foldlM f []
+  where
+    f :: [(GPath, Object)] -> FilePath -> IO [(GPath, Object)]
+    f acc path = do
+      parentDirEncoded <- P.encodeUtf parentDir
+      p <- P.encodeUtf path
+      let relPath = P.combine parentDirEncoded p
+      input <- LU.readFileRobustly relPath
+      case LP.parseOrgDoc input of
+        Left errTxt -> die $ T.unpack errTxt
+        Right od -> do
+          relPath' <- encodeGPath =<< P.decodeUtf relPath
+          pure $ (relPath', mkObject od) : acc
 #+end_src
 
 We want to check broken links for [[data:Archive]] values as well. For this we
