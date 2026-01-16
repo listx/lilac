@@ -151,13 +151,12 @@ import Lilac.Types
       ),
     decodeGPath,
     gciToObjCell,
+    gciToObjPath,
     getCellName,
     getProseContents,
     getSectionNumber,
     markingChars,
     markingCharsInvisible,
-    oidToObj,
-    onlyOid,
     stext,
     stripLinks,
     stripStyles,
@@ -827,13 +826,13 @@ weaveLink insideBlock link = do
       linkDisplayName =
         case link.target of
           LinkTargetLineLabel lineLabel
-            | Just obj <- oidToObj weaveConf.archive lineLabel.oid,
+            | Just gci <- lookup lineLabel weaveConf.archive.symbols,
+              Just (obj, _) <- gciToObjCell weaveConf.archive gci,
               Just num <- lookup lineLabel.name obj.orgDoc.lineLabels ->
                 if
                   | Just originObj <-
                       lookup weaveConf.originObjectPath weaveConf.archive.objects,
                     originObj /= obj,
-                    Just gci <- lookup lineLabel weaveConf.archive.symbols,
                     Just (offset, _) <- IntMap.lookupLE gci.unGCI weaveConf.archive.offsets,
                     Just prose <- gciToName weaveConf.archive offset gci ->
                       (extractStyledText prose) --
@@ -872,10 +871,8 @@ weaveLinkTarget insideBlock linkTarget = do
           lookup weaveConf.originObjectPath weaveConf.archive.objects,
         originObj.orgDoc.oid == linkOid.oid ->
           pure internalLineLabelTarget --
-      | Just gci <- lookup (onlyOid linkOid) weaveConf.archive.symbols,
-        gci.unGCI < 0,
-        Just objPath <-
-          (sort $ keys weaveConf.archive.objects) !!? (abs gci.unGCI - 1) ->
+      | Just gci <- lookup linkOid weaveConf.archive.symbols,
+        Just objPath <- gciToObjPath weaveConf.archive gci ->
           pure
             $ getExternalRelPath linkOid objPath weaveConf.originObjectPath
             <> internalLineLabelTarget --

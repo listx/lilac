@@ -42,6 +42,7 @@ module Lilac.Types
     Lilac.Types.fromText,
     fromWords,
     gciToObjCell,
+    gciToObjPath,
     getCellName,
     getProseContents,
     getSectionNumber,
@@ -49,8 +50,6 @@ module Lilac.Types
     markingCharsInvisible,
     nilOid,
     nilOidOrgDocPrefix,
-    oidToObj,
-    onlyOid,
     protocolsEmacs,
     protocolsWeb,
     ptext,
@@ -582,22 +581,6 @@ fromText t = case Data.UUID.Types.fromText t of
   Just uuid -> Just $ OID uuid
   Nothing -> Nothing
 
-onlyOid :: LinkOid -> LinkOid
-onlyOid linkOid =
-  LinkOid
-    { oid = linkOid.oid,
-      name = ""
-    }
-
-oidToObj :: Archive -> OID -> Maybe Object
-oidToObj archive oid
-  | Just gci <- lookup (LinkOid oid "") archive.symbols,
-    gci.unGCI < 0,
-    Just objPath <-
-      (sort $ keys archive.objects) !!? (abs gci.unGCI - 1) =
-      lookup objPath archive.objects
-  | otherwise = Nothing
-
 type PseudoEdge :: Type
 newtype PseudoEdge = PseudoEdge (LCI, LinkOid)
   deriving stock (Eq, Ord, Generic, Show)
@@ -696,6 +679,14 @@ gciToObjCell archive gci
     Just obj <- lookup path archive.objects,
     Just cell <- obj.orgDoc.cells !!? (gci.unGCI - offset) =
       Just (obj, cell)
+  | otherwise = Nothing
+
+gciToObjPath :: Archive -> GCI -> Maybe GPath
+gciToObjPath archive gci
+  | gci.unGCI < 0 =
+      (sort $ keys archive.objects) !!? (abs gci.unGCI - 1)
+  | Just (_, path) <- IntMap.lookupLE gci.unGCI archive.offsets =
+      Just path
   | otherwise = Nothing
 
 stripLinks :: Prose -> Prose

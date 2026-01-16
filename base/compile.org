@@ -1037,26 +1037,15 @@ gciToObjCell archive gci
   | otherwise = Nothing
 #+end_src
 
-#+name: f:oidToObj
+#+name: f:gciToObjPath
 #+begin_src haskell
-oidToObj :: Archive -> OID -> Maybe Object
-oidToObj archive oid
-  | Just gci <- lookup (LinkOid oid "") archive.symbols,
-    gci.unGCI < 0,
-    Just objPath <-
-      (sort $ keys archive.objects) !!? (abs gci.unGCI - 1) =
-      lookup objPath archive.objects
+gciToObjPath :: Archive -> GCI -> Maybe GPath
+gciToObjPath archive gci
+  | gci.unGCI < 0 =
+      (sort $ keys archive.objects) !!? (abs gci.unGCI - 1)
+  | Just (_, path) <- IntMap.lookupLE gci.unGCI archive.offsets =
+      Just path
   | otherwise = Nothing
-#+end_src
-
-#+name: f:onlyOid
-#+begin_src haskell
-onlyOid :: LinkOid -> LinkOid
-onlyOid linkOid =
-  LinkOid
-    { oid = linkOid.oid,
-      name = ""
-    }
 #+end_src
 
 [[f:gciToName]] gives a human-friendly name of the cell. Much of it is

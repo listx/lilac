@@ -309,13 +309,12 @@ import Lilac.Types
       ),
     decodeGPath,
     gciToObjCell,
+    gciToObjPath,
     getCellName,
     getProseContents,
     getSectionNumber,
     markingChars,
     markingCharsInvisible,
-    oidToObj,
-    onlyOid,
     stext,
     stripLinks,
     stripStyles,
@@ -1580,13 +1579,13 @@ weaveLink insideBlock link = do
       linkDisplayName =
         case link.target of
           LinkTargetLineLabel lineLabel
-            | Just obj <- oidToObj weaveConf.archive lineLabel.oid,
+            | Just gci <- lookup lineLabel weaveConf.archive.symbols,
+              Just (obj, _) <- gciToObjCell weaveConf.archive gci,
               Just num <- lookup lineLabel.name obj.orgDoc.lineLabels ->
                 if
                   | Just originObj <-
                       lookup weaveConf.originObjectPath weaveConf.archive.objects,
                     originObj /= obj,
-                    Just gci <- lookup lineLabel weaveConf.archive.symbols,
                     Just (offset, _) <- IntMap.lookupLE gci.unGCI weaveConf.archive.offsets,
                     Just prose <- gciToName weaveConf.archive offset gci ->
                       (extractStyledText prose) -- (ref:f:weaveLink-name-of-code-block)
@@ -1641,10 +1640,8 @@ weaveLinkTarget insideBlock linkTarget = do
           lookup weaveConf.originObjectPath weaveConf.archive.objects,
         originObj.orgDoc.oid == linkOid.oid ->
           pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-internal)
-      | Just gci <- lookup (onlyOid linkOid) weaveConf.archive.symbols,
-        gci.unGCI < 0,
-        Just objPath <-
-          (sort $ keys weaveConf.archive.objects) !!? (abs gci.unGCI - 1) ->
+      | Just gci <- lookup linkOid weaveConf.archive.symbols,
+        Just objPath <- gciToObjPath weaveConf.archive gci ->
           pure
             $ getExternalRelPath linkOid objPath weaveConf.originObjectPath
             <> internalLineLabelTarget -- (ref:f:weaveLinkTarget-external)
@@ -1675,10 +1672,6 @@ For weaving the target to [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels
      lookup. Line labels are finer-grained than cells. We need to get the
      external relative path, and then skip cell-wise operations and just slap on
      the name of the line label (modulo the ~ib-~ prefix) to the external path.
-
-     It's important that we use [[id:25827c17-2015-434b-b686-db3d72b2ee4d::f:onlyOid][f:onlyOid]] here; otherwise we'll end up with the
-     GCI of the containing code block which is a positive number, because of
-     [[id:91613519-f745-4cd8-9e88-125786ff0d33::f:getLineLabels][f:getLineLabels]].
 
 [[f:weaveLinkTargetLinkOid]] is a little bit complicated because it needs to be able
 to handle links that point to things inside the doc, or to another doc somewhere
