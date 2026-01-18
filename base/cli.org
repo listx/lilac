@@ -95,11 +95,14 @@ import Relude
     concat,
     fail,
     foldlM,
+    intercalate,
     length,
+    map,
     mapM,
     mapM_,
     mempty,
     not,
+    null,
     otherwise,
     pure,
     putStr,
@@ -507,6 +510,13 @@ lilacArchive archiveOpts = do
   case maybeArchive of
     Left errMsg -> die errMsg
     Right archive -> do
+      let cycles = LC.findCycles archive
+      when (not $ null cycles) $ do
+        die
+          $ "Found cycles: "
+          <> intercalate
+            "\n"
+            (map show cycles)
       outPath <- do
         let base =
               P.replaceExtension archiveOpts.outFile
