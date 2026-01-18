@@ -149,6 +149,26 @@ compileSpec = do
     ]
 
   checkCycles
+    ["0100-dag-self-loop-heading"]
+    [ Node
+        { rootLabel =
+            LinkOid
+              { oid = fromWords 0x0000000000000000 0x000000000000e001,
+                name = "f:a"
+              },
+          subForest = []
+        },
+      Node
+        { rootLabel =
+            LinkOid
+              { oid = fromWords 0x0000000000000000 0x000000000000e001,
+                name = "f:a"
+              },
+          subForest = []
+        }
+    ]
+
+  checkCycles
     ["0100-dag-self-loops"]
     [ Node
         { rootLabel =
@@ -170,6 +190,27 @@ compileSpec = do
 
   checkCycles
     ["0100-dag-2-node-loop"]
+    [ Node
+        { rootLabel =
+            LinkOid
+              { oid = fromWords 0x0000000000000000 0x000000000000e004,
+                name = "f:a"
+              },
+          subForest =
+            [ Node
+                { rootLabel =
+                    LinkOid
+                      { oid = fromWords 0x0000000000000000 0x000000000000e004,
+                        name = "f:b"
+                      },
+                  subForest = []
+                }
+            ]
+        }
+    ]
+
+  checkCycles
+    ["0100-dag-2-node-loop-heading"]
     [ Node
         { rootLabel =
             LinkOid
@@ -276,6 +317,29 @@ compileSpec = do
 
   checkCycles
     [ "0100-dag-2-node-loop-2-files-parent",
+      "0100-dag-2-node-loop-2-files-child"
+    ]
+    [ Node
+        { rootLabel =
+            LinkOid
+              { oid = fromWords 0x0000000000000000 0x000000000000f004,
+                name = "a"
+              },
+          subForest =
+            [ Node
+                { rootLabel =
+                    LinkOid
+                      { oid = fromWords 0x0000000000000000 0x000000000000f005,
+                        name = "b"
+                      },
+                  subForest = []
+                }
+            ]
+        }
+    ]
+
+  checkCycles
+    [ "0100-dag-2-node-loop-2-files-parent-heading",
       "0100-dag-2-node-loop-2-files-child"
     ]
     [ Node

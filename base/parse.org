@@ -3339,7 +3339,13 @@ oidReferenceParser disallowedChars ending =
 
 The implicit OID links get their OID assigned for the current document through
 the ~pState.docOid~ [[(f:oidReferenceParser-docOid)]], and use ~targetName~
-[[(f:oidReferenceParser-target-name)]] to parse the name of the target.
+[[(f:oidReferenceParser-target-name)]] to parse the name of the target. We cannot
+use the OID of the closest heading (like ~block.parentOid~ for blocks
+[[(f:blockParser-firstParentOid)]]) here, because for an internal Noweb link we
+would almost always be referring to /another different/ heading in the doc which
+would most likely have a different OID than the ~parentOid~. So the best one to
+use is ~docOid~. See [[id:ff5876bf-a144-4a08-bba4-15638e3590d5::f:buildGraph][f:buildGraph]] for how the ~docOid~ (aka document's OID) is used
+for generating a graph for cycle detection.
 
 For links with an explicit OID, the OID is prefixed with ~id:~
 [[(f:oidReferenceParser-explicit-oid)]].

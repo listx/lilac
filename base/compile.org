@@ -166,6 +166,7 @@ import Relude
     (<$>),
     (<>),
     (=<<),
+    (==),
     (>),
   )
 import Relude.Extra.Map (elems, insertWith, lookup, member)
@@ -1289,23 +1290,29 @@ inside the body as the other vertices.
 #+name: f:buildGraph
 #+begin_src haskell
 buildGraph ::
-  [Block] ->
+  [(OID, Block)] -> -- (ref:f:buildGraph-oid-block-pair)
   ( G.Graph,
     G.Vertex -> (Block, LinkOid, [LinkOid]),
     LinkOid -> Maybe G.Vertex
   )
-buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
+buildGraph = G.graphFromEdges . foldl' f []
   where
     f ::
       [(Block, LinkOid, [LinkOid])] ->
-      Block ->
+      (OID, Block) ->
       [(Block, LinkOid, [LinkOid])]
-    f acc block
+    f acc (docOid, block)
       | Just name <- lookup "name" block.meta =
-          let selfLink = LinkOid block.parentOid name
-           in (\outLinks -> (block, selfLink, outLinks) : acc)
-                . catMaybes
-                $ map getOutLinks block.body
+          let selfLinkByParentOid = LinkOid block.parentOid name
+              selfLinkByDocOid = LinkOid docOid name
+              addVertices outLinks =
+                if block.parentOid == docOid
+                  then (block, selfLinkByDocOid, outLinks) : acc
+                  else
+                    (block, selfLinkByParentOid, outLinks) -- (ref:f:buildGraph-add-parent-oid)
+                      : (block, selfLinkByDocOid, outLinks)
+                      : acc
+           in addVertices . catMaybes $ map getOutLinks block.body
       | otherwise = acc
     getOutLinks = \case
       BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
@@ -1313,6 +1320,21 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
       BTokenPadding {}
       BTokenString {} -> Nothing
 #+end_src
+
+The input blocks are paired with the document OID that contains them
+[[(f:buildGraph-oid-block-pair)]]. This is because we have to add two vertices for
+the starting block if its ~block.parentOid~ is different than the document's OID
+[[(f:buildGraph-add-parent-oid)]]; that is, we add one vertex for the
+[[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f::(data:Block-parentOid)]] and another for
+the [[id:5df15f17-c630-4ddf-bade-66084c430a07::(data:OrgDoc-oid)]]. This is because
+of the problem of implicit Noweb links (Noweb links inside blocks that do not
+define an OID explicitly). When such links are parsed in [[id:80637e01-1065-40b0-932c-8ffa2376c863::f:oidReferenceParser][f:oidReferenceParser]],
+we treat them as using the document's OID
+[[id:80637e01-1065-40b0-932c-8ffa2376c863::(f:oidReferenceParser-docOid)]]. So we
+obviously need to consider the document's OID here. However, we still also need
+to consider the block's parent OID when another block refers to this one
+explicitly by its parent OID. So in summary we have to consider both the
+implicit and explicit cases.
 
 The [[f:findCycles]] function takes the output of [[f:buildGraph]] and uses that to run
 the =scc= function to get the strongly connected components, which we filter to
@@ -1327,7 +1349,7 @@ findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
     toLinkOid vertex =
       let (_, selfLink, _) = vertexToNode vertex
        in selfLink
-    f acc tree@(G.Node vertex _)
+    f acc tree@(G.Node vertex _) -- (ref:f:findCycles-cycle-counter)
       | length tree > 1 = tree : acc
       | (_, selfLink, outLinks) <- vertexToNode vertex,
         elem selfLink outLinks =
@@ -1336,19 +1358,23 @@ findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
 #+end_src
 
 Checking for back edges means just seeing whether there is more than one vertex,
-or if there are any self-loops; these concerns are encoded in the ~f~ helper
-function.
+or if there are any self-loops [[(f:findCycles-cycle-counter)]].
+
+Lastly we have [[f:getBlocksFromArchive]]. Note that we pair up each block with the
+OID of the containing document; this OID is used in [[f:buildGraph]] when adding
+vertices. [[f:getBlocksFromArchive]] also saves the document OID with each block to
+keep track of which document that block came from.
 
 #+name: f:getBlocksFromArchive
 #+begin_src haskell
-getBlocksFromArchive :: Archive -> [Block]
+getBlocksFromArchive :: Archive -> [(OID, Block)]
 getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
   where
-    f :: [Block] -> GCI -> [Block]
+    f :: [(OID, Block)] -> GCI -> [(OID, Block)]
     f acc gci
-      | Just (_, cell) <- gciToObjCell archive gci =
+      | Just (obj, cell) <- gciToObjCell archive gci =
           case cell of
-            CBlock b -> b : acc
+            CBlock b -> (obj.orgDoc.oid, b) : acc
             CHeading {}
             CListItem {}
             CParagraph {}
@@ -1509,6 +1535,60 @@ checkCycles
   ]
 #+end_src
 
+Below is the same, but for the case where there is an intervening heading.
+
+#+name: ti:0100-dag-self-loop-heading
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-self-loop-heading
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e001
+:END:
+
+,* heading
+:PROPERTIES:
+:ID:       11111111-1111-1111-1111-111111111111
+:END:
+
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-self-loop-heading
+#+begin_src haskell
+checkCycles
+  ["0100-dag-self-loop-heading"]
+  [ Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000e001,
+              name = "f:a"
+            },
+        subForest = []
+      },
+    Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000e001,
+              name = "f:a"
+            },
+        subForest = []
+      }
+  ]
+#+end_src
+
+We get two nodes (vertices) in [[t:0100-dag-self-loop-heading]] instead of just one
+in [[ti:0100-dag-self-loop]] because when we add the two vertices for this case in
+[[f:buildGraph]], both vertices will link out to the same document OID (implicitly)
+as an out link when they are parsed in at
+id:80637e01-1065-40b0-932c-8ffa2376c863::(f:oidReferenceParser-docOid). So from
+the cycle detection algorithm it's as if we linked from the code block (vertex)
+in the test to another code block that sits above the heading, which them links
+to itself forming a 2-block cycle.
+
 Check whether we can detect two independent self-loops.
 
 #+name: ti:0100-dag-self-loops
@@ -1583,6 +1663,58 @@ f = 1 + 1
 #+begin_src haskell
 checkCycles
   ["0100-dag-2-node-loop"]
+  [ Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000e004,
+              name = "f:a"
+            },
+        subForest =
+          [ Node
+              { rootLabel =
+                  LinkOid
+                    { oid = fromWords 0x0000000000000000 0x000000000000e004,
+                      name = "f:b"
+                    },
+                subForest = []
+              }
+          ]
+      }
+  ]
+#+end_src
+
+The test below is like [[ti:0100-dag-2-node-loop]] but with an intervening heading.
+
+#+name: ti:0100-dag-2-node-loop-heading
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-heading
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e004
+:END:
+
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1
+<<f:b>>
+,#+end_src
+
+,* heading
+:PROPERTIES:
+:ID:       11111111-1111-1111-1111-111111111111
+:END:
+
+,#+name: f:b
+,#+begin_src haskell
+f = 1 + 1
+<<f:a>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-2-node-loop-heading
+#+begin_src haskell
+checkCycles
+  ["0100-dag-2-node-loop-heading"]
   [ Node
       { rootLabel =
           LinkOid
@@ -1826,6 +1958,57 @@ checkCycles
       }
   ]
 #+end_src
+
+Below is the same test, but involving an intervening heading (only for the
+parent).
+
+#+name: ti:0100-dag-2-node-loop-2-files-parent-heading
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-2-files-parent-heading
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f004
+:END:
+
+,* heading
+:PROPERTIES:
+:ID:       11111111-1111-1111-1111-111111111111
+:END:
+
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+hello from a
+<<id:00000000-0000-0000-0000-00000000f005::b>>
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-2-node-loop-2-files-heading
+#+begin_src haskell
+checkCycles
+  [ "0100-dag-2-node-loop-2-files-parent-heading",
+    "0100-dag-2-node-loop-2-files-child"
+  ]
+  [ Node
+      { rootLabel =
+          LinkOid
+            { oid = fromWords 0x0000000000000000 0x000000000000f004,
+              name = "a"
+            },
+        subForest =
+          [ Node
+              { rootLabel =
+                  LinkOid
+                    { oid = fromWords 0x0000000000000000 0x000000000000f005,
+                      name = "b"
+                    },
+                subForest = []
+              }
+          ]
+      }
+  ]
+#+end_src
+
 
 If three files form a cycle, that should also be detected.
 
@@ -2476,11 +2659,14 @@ compileSpec = do
   <<t:0401-broken-links-multi-ok-alternates>>
   <<t:0100-dag-no-loops>>
   <<t:0100-dag-self-loop>>
+  <<t:0100-dag-self-loop-heading>>
   <<t:0100-dag-self-loops>>
   <<t:0100-dag-2-node-loop>>
+  <<t:0100-dag-2-node-loop-heading>>
   <<t:0100-dag-3-node-loop>>
   <<t:0100-dag-complex-loops>>
   <<t:0100-dag-2-node-loop-2-files>>
+  <<t:0100-dag-2-node-loop-2-files-heading>>
   <<t:0100-dag-2-node-loop-3-files>>
   <<t:0500-cumulativeOffsets-sanity>>
 #+end_src

@@ -134,6 +134,7 @@ import Relude
     (<$>),
     (<>),
     (=<<),
+    (==),
     (>),
   )
 import Relude.Extra.Map (elems, insertWith, lookup, member)
@@ -410,23 +411,29 @@ readObjectsFrom parentDir = foldlM f []
           pure $ (relPath', mkObject od) : acc
 
 buildGraph ::
-  [Block] ->
+  [(OID, Block)] -> --
   ( G.Graph,
     G.Vertex -> (Block, LinkOid, [LinkOid]),
     LinkOid -> Maybe G.Vertex
   )
-buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
+buildGraph = G.graphFromEdges . foldl' f []
   where
     f ::
       [(Block, LinkOid, [LinkOid])] ->
-      Block ->
+      (OID, Block) ->
       [(Block, LinkOid, [LinkOid])]
-    f acc block
+    f acc (docOid, block)
       | Just name <- lookup "name" block.meta =
-          let selfLink = LinkOid block.parentOid name
-           in (\outLinks -> (block, selfLink, outLinks) : acc)
-                . catMaybes
-                $ map getOutLinks block.body
+          let selfLinkByParentOid = LinkOid block.parentOid name
+              selfLinkByDocOid = LinkOid docOid name
+              addVertices outLinks =
+                if block.parentOid == docOid
+                  then (block, selfLinkByDocOid, outLinks) : acc
+                  else
+                    (block, selfLinkByParentOid, outLinks) --
+                      : (block, selfLinkByDocOid, outLinks)
+                      : acc
+           in addVertices . catMaybes $ map getOutLinks block.body
       | otherwise = acc
     getOutLinks = \case
       BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
@@ -434,14 +441,14 @@ buildGraph blocks = G.graphFromEdges $ foldl' f [] blocks
       BTokenPadding {}
       BTokenString {} -> Nothing
 
-getBlocksFromArchive :: Archive -> [Block]
+getBlocksFromArchive :: Archive -> [(OID, Block)]
 getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
   where
-    f :: [Block] -> GCI -> [Block]
+    f :: [(OID, Block)] -> GCI -> [(OID, Block)]
     f acc gci
-      | Just (_, cell) <- gciToObjCell archive gci =
+      | Just (obj, cell) <- gciToObjCell archive gci =
           case cell of
-            CBlock b -> b : acc
+            CBlock b -> (obj.orgDoc.oid, b) : acc
             CHeading {}
             CListItem {}
             CParagraph {}
@@ -509,7 +516,7 @@ findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
     toLinkOid vertex =
       let (_, selfLink, _) = vertexToNode vertex
        in selfLink
-    f acc tree@(G.Node vertex _)
+    f acc tree@(G.Node vertex _) --
       | length tree > 1 = tree : acc
       | (_, selfLink, outLinks) <- vertexToNode vertex,
         elem selfLink outLinks =
