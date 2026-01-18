@@ -1581,7 +1581,7 @@ weaveLink insideBlock link = do
           LinkTargetLineLabel lineLabel
             | Just gci <- lookup lineLabel weaveConf.archive.symbols,
               Just (obj, _) <- gciToObjCell weaveConf.archive gci,
-              Just num <- lookup lineLabel.name obj.orgDoc.lineLabels ->
+              Just num <- lookup (T.drop 1 $ T.dropEnd 1 lineLabel.name) obj.orgDoc.lineLabels ->
                 if
                   | Just originObj <-
                       lookup weaveConf.originObjectPath weaveConf.archive.objects,

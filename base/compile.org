@@ -1205,6 +1205,9 @@ parseBibliography = eitherDecodeStrictText
 #+end_src
 
 ** Tests
+:PROPERTIES:
+:ID:       72f268f8-5703-4f3f-b821-62713149da64
+:END:
 
 Detect broken Noweb links.
 
@@ -1295,6 +1298,34 @@ Hello
 #+begin_src haskell
 expectArchiveOk
   ["0401-broken-links-paragraph-ok"]
+#+end_src
+
+Referring to a non-existent line label of the same name (modulo parentheses) as
+a named cell should result in an error.
+
+#+name: ti:0401-broken-links-line-label
+#+header: :tangle test/Lilac/CompileSpec/0401-broken-links-line-label
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d004
+:END:
+
+,#+name: foo
+,#+begin_src c
+,#+end_src
+
+[[(foo)]]
+#+end_src
+
+#+name: t:0401-broken-links-line-label
+#+begin_src haskell
+expectArchiveError
+  ["0401-broken-links-line-label"]
+  """
+  Found broken links:
+    id:00000000-0000-0000-0000-00000000d004::(foo) (test/Lilac/CompileSpec/0401-broken-links-line-label)
+  """
 #+end_src
 
 Below is similar to [[t:0401-broken-links-noweb]], but the broken links have been
@@ -2427,6 +2458,7 @@ compileSpec = do
   <<t:0401-broken-links-noweb>>
   <<t:0401-broken-links-paragraph>>
   <<t:0401-broken-links-paragraph-ok>>
+  <<t:0401-broken-links-line-label>>
   <<t:0401-broken-links-multi-ok>>
   <<t:0401-broken-links-multi-ok-alternates>>
   <<t:0100-dag-no-loops>>

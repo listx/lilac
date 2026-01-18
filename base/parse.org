@@ -3215,10 +3215,7 @@ oidLinkParser = do
   let linkOid =
         LinkOid
           { oid = oid,
-            name =
-              if isLineLabel name
-                then T.drop 1 $ T.dropEnd 1 name -- (ref:f:oidLinkParser-line-label-drop-parentheses)
-                else name
+            name = name
           }
       linkTargetConstructor =
         if isLineLabel name
@@ -3254,13 +3251,19 @@ There are three main pieces involved here:
 
   3) so-called "pseudo" edges [[(f:oidLinkParser-PseudoEdge)]].
 
-We drop the opening and closing parentheses from the name of a line label
-[[(f:oidLinkParser-line-label-drop-parentheses)]] because whether the name refers to
-a line label or not is already captured in the ~LinkTargetLineLabel~ value
-constructor at [[(f:oidLinkParser-line-label-constructor)]]. So in practice we can
-just pattern match on this constructor to know whether the [[data:LinkOid]]
-contained within it is a line label or not, without having to inspect the name
-at all.
+We keep the opening and closing parentheses from the name of a line label
+because even though the ~LinkTargetLineLabel~ value constructor at
+[[(f:oidLinkParser-line-label-constructor)]] captures whether the outer ~LinkOid~
+belongs to a line label, it's still useful to differentiate it against another
+~LinkOid~ with an identical name. For example, if a document has a cell named ~foo~
+and a line label like ~(ref:foo)~, we would like to store these as ~LinkOid~ names
+~foo~ and ~(foo)~ respectively. See [[id:72f268f8-5703-4f3f-b821-62713149da64::ti:0401-broken-links-line-label][ti:0401-broken-links-line-label]] for a case where
+we have a line label link, but no corresponding line label reference in a code
+block.
+
+So in practice although we can just pattern match on this constructor to know
+whether the [[data:LinkOid]] contained within it is a line label or not, we still
+have to inspect the name if we're only dealing with the inner ~LinkOid~ type.
 
 Pseudo-edges are needed for [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4][backlink]] generation. Now let's look at the first two
 pieces in more detail.
@@ -4303,7 +4306,7 @@ lineLabelParser = do
     $ LinkTargetLineLabel
       LinkOid
         { oid = pState.docOid,
-          name = lineLabel
+          name = "(" <> lineLabel <> ")"
         }
 #+end_src
 

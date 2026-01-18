@@ -1435,7 +1435,7 @@ lineLabelParser = do
     $ LinkTargetLineLabel
       LinkOid
         { oid = pState.docOid,
-          name = lineLabel
+          name = "(" <> lineLabel <> ")"
         }
 
 oidLinkParser :: OrgParser Link
@@ -1463,10 +1463,7 @@ oidLinkParser = do
   let linkOid =
         LinkOid
           { oid = oid,
-            name =
-              if isLineLabel name
-                then T.drop 1 $ T.dropEnd 1 name --
-                else name
+            name = name
           }
       linkTargetConstructor =
         if isLineLabel name

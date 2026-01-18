@@ -115,6 +115,13 @@ compileSpec = do
   expectArchiveOk
     ["0401-broken-links-paragraph-ok"]
 
+  expectArchiveError
+    ["0401-broken-links-line-label"]
+    """
+    Found broken links:
+      id:00000000-0000-0000-0000-00000000d004::(foo) (test/Lilac/CompileSpec/0401-broken-links-line-label)
+    """
+
   expectArchiveOk
     [ "0401-broken-links-multi-ok",
       "0401-broken-links-multi-ok-dependency"
