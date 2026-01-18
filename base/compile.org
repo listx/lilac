@@ -466,8 +466,8 @@ root blocks (that need to be tangled in [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7b
 Unless we include anonymous blocks as a symbol for these cases, they will be
 skipped over. And we need [[(symbols-anonymous-blocks)]] because we need them for
 navigating a block's ancestry; specifically, a block may have an anonymous
-parent, and we still want to include such parents in [[id:ff5876bf-a144-4a08-bba4-15638e3590d5::f:getBlockGCIsFromArchive][f:getBlockGCIsFromArchive]],
-which powers [[id:ff5876bf-a144-4a08-bba4-15638e3590d5::f:mkBlockAncestry][f:mkBlockAncestry]].
+parent, and we still want to include such parents in [[f:getBlockGCIsFromArchive]],
+which powers [[f:mkBlockAncestry]].
 
 Note that [[f:mkSymbols]] needs to return a ~Map LinkOid LCI~. Because both
 [[(symbols-tangle-meta)]] and [[(symbols-anonymous-blocks)]] deal with anonymous blocks,
@@ -824,7 +824,9 @@ mkArchive pathObjs = do
                   csls = csls,
                   bibs = bibs
                 }
-            ancestry = mkBlockAncestry archive $ getBlockGCIsFromArchive archive
+            ancestry =
+              mkBlockAncestry archive
+                $ getBlockGCIsFromArchive archive -- (ref:f:mkArchive-ancestry)
          in pure $ Right archive {ancestry = ancestry}
   where
     showBrokenLink :: (GPath, LinkOid) -> String
@@ -1385,85 +1387,6 @@ getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
             CFootnote {}
             CCommand {} -> acc
       | otherwise = acc
-#+end_src
-
-[[f:getBlockGCIsFromArchive]] gets all code blocks (by their [[newtype:GCI]]) from the
-archive.
-
-#+name: f:getBlockGCIsFromArchive
-#+begin_src haskell
-getBlockGCIsFromArchive :: Archive -> [GCI]
-getBlockGCIsFromArchive archive = foldl' f [] $ elems archive.symbols
-  where
-    f :: [GCI] -> GCI -> [GCI]
-    f acc gci
-      | Just (_, cell) <- gciToObjCell archive gci =
-          case cell of
-            CBlock {} -> gci : acc
-            CHeading {}
-            CListItem {}
-            CParagraph {}
-            CGlossaryTerm {}
-            CMathFragment {}
-            CFigure {}
-            CTable {}
-            CFootnote {}
-            CCommand {} -> acc
-      | otherwise = acc
-#+end_src
-
-The line ~elems archive.symbols~ just gets all code blocks from the ~symbols~
-field of the [[data:Archive]] (perhaps ~elems~ is a poor name and should have been
-called ~values~ instead, but that's another matter).
-
-[[f:mkBlockAncestry]] builds a "graph" similar to the one used in [[f:findCycles]], but
-with a few differences:
-
-  - The graph's edges are reversed, so that each block points to its parent(s)
-    instead of pointing to its children.
-
-  - It uses a ~Map~ instead of a ~Graph~, because we don't care about relationships
-    between more than 2 vertices at a time (and also there's no need to check
-    for cycles, like we already did in [[f:findCycles]]).
-
-  - It uses global cell indices instead of [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] values, because an
-    anonymous block can refer to a named block (that is, it is impossible to
-    create a ~LinkOid~ for an anonymous block).
-
-This information is used in [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveBlockAncestry][f:weaveBlockAncestry]] to generate ancestry
-information.
-
-#+name: f:mkBlockAncestry
-#+begin_src haskell
-mkBlockAncestry :: Archive -> [GCI] -> Map GCI [GCI]
-mkBlockAncestry archive blockGCIs = foldl' f mempty blockGCIs
-  where
-    f :: Map GCI [GCI] -> GCI -> Map GCI [GCI]
-    f acc blockGCI
-      | Just (_, CBlock block) <- gciToObjCell archive blockGCI =
-          ( \childLinks ->
-              foldl'
-                ( \acc' childLink ->
-                    case lookup childLink archive.symbols of
-                      Just childGCI ->
-                        insertWith
-                          (\old new -> hashNub (old <> new))
-                          childGCI
-                          [blockGCI]
-                          acc'
-                      Nothing -> acc'
-                )
-                acc
-                childLinks
-          )
-            . catMaybes
-            $ map getChildLinks block.body
-      | otherwise = acc
-    getChildLinks = \case
-      BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
-      BTokenLinkTarget {}
-      BTokenPadding {}
-      BTokenString {} -> Nothing
 #+end_src
 
 *** Tests
@@ -2093,6 +2016,90 @@ checkCycles
       }
   ]
 #+end_src
+
+** Block ancestry
+
+[[f:mkBlockAncestry]] builds a "graph" similar to the one used in [[f:findCycles]], but
+with a few differences:
+
+  - The graph's edges are reversed, so that each block points to its parent(s)
+    instead of pointing to its children.
+
+  - It uses a ~Map~ instead of a ~Graph~, because we don't care about relationships
+    between more than 2 vertices at a time (and also there's no need to check
+    for cycles, like we already did in [[f:findCycles]]).
+
+  - It uses global cell indices instead of [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] values, because an
+    anonymous block can refer to a named block (that is, it is impossible to
+    create a ~LinkOid~ for an anonymous block so we cannot use ~LinkOid~ values
+    here).
+
+This information is used in [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::f:weaveBlockAncestry][f:weaveBlockAncestry]] to generate ancestry
+information. This can be helpful to know where exactly a block is referenced by
+a Noweb link.
+
+#+name: f:mkBlockAncestry
+#+begin_src haskell
+mkBlockAncestry :: Archive -> [GCI] -> Map GCI [GCI]
+mkBlockAncestry archive blockGCIs = foldl' f mempty blockGCIs
+  where
+    f :: Map GCI [GCI] -> GCI -> Map GCI [GCI]
+    f acc blockGCI
+      | Just (_, CBlock block) <- gciToObjCell archive blockGCI =
+          ( \childLinks ->
+              foldl'
+                ( \acc' childLink ->
+                    case lookup childLink archive.symbols of
+                      Just childGCI ->
+                        insertWith
+                          (\old new -> hashNub (old <> new))
+                          childGCI
+                          [blockGCI]
+                          acc'
+                      Nothing -> acc'
+                )
+                acc
+                childLinks
+          )
+            . catMaybes
+            $ map getChildLinks block.body
+      | otherwise = acc
+    getChildLinks = \case
+      BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
+      BTokenLinkTarget {}
+      BTokenPadding {}
+      BTokenString {} -> Nothing
+#+end_src
+
+[[f:getBlockGCIsFromArchive]] gets all code blocks (by their [[newtype:GCI]]) from the
+archive. This is used for calling [[f:mkBlockAncestry]] [[(f:mkArchive-ancestry)]].
+
+#+name: f:getBlockGCIsFromArchive
+#+begin_src haskell
+getBlockGCIsFromArchive :: Archive -> [GCI]
+getBlockGCIsFromArchive archive = foldl' f [] $ elems archive.symbols
+  where
+    f :: [GCI] -> GCI -> [GCI]
+    f acc gci
+      | Just (_, cell) <- gciToObjCell archive gci =
+          case cell of
+            CBlock {} -> gci : acc
+            CHeading {}
+            CListItem {}
+            CParagraph {}
+            CGlossaryTerm {}
+            CMathFragment {}
+            CFigure {}
+            CTable {}
+            CFootnote {}
+            CCommand {} -> acc
+      | otherwise = acc
+#+end_src
+
+The line ~elems archive.symbols~ just gets all code blocks from the ~symbols~ field
+of the [[data:Archive]] (perhaps ~elems~ is a poor name and should have been called
+~values~ instead, but that's probably because "values" from "keys and values"
+shadows the "values" in "types vs values").
 
 ** Backlinks
 

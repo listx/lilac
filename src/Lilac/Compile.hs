@@ -277,7 +277,9 @@ mkArchive pathObjs = do
                   csls = csls,
                   bibs = bibs
                 }
-            ancestry = mkBlockAncestry archive $ getBlockGCIsFromArchive archive
+            ancestry =
+              mkBlockAncestry archive
+                $ getBlockGCIsFromArchive archive --
          in pure $ Right archive {ancestry = ancestry}
   where
     showBrokenLink :: (GPath, LinkOid) -> String
