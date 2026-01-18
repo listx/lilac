@@ -578,11 +578,11 @@ getCitationStyles pathObjs = do
     concat
       <$> mapM
         ( \(gPath, obj) ->
-            makeRelativeToObjectPath gPath
+            makeRelativeToObjectPath gPath --
               $ maybeToList obj.orgDoc.cslPath
         )
         pathObjs
-  cslRawXMLs <- map fst <$> mapM getCitationStyle allCslPaths
+  cslRawXMLs <- map fst <$> mapM getCitationStyle allCslPaths --
   pure . fromList $ zip allCslPaths cslRawXMLs
 
 getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))

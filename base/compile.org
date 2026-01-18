@@ -1004,207 +1004,7 @@ The key is to see if any of the links cannot be resolved by looking it up in the
 symbols map. If it's not there, then we mark it as broken
 [[(f:findBrokenLinks-add-broken-link)]].
 
-** Backlinks
-
-[[f:mkBacklinks]] takes the edges which contain global cell index information for
-both the starting and ending vertices, and then transforms them into the final
-shape ~Map GPath (Map GPath [(GCI, GCI)])~:
-
-#+begin_src txt
-Map GPath (Map GPath [(GCI, GCI)])
-      |          |       |
-      |          |       `---> List of edges (source GCI, target GCI)
-      |          `---> Source object path
-      `----> Target object path
-#+end_src
-
-This shape is largely driven by the needs of [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]].
-
-#+name: f:mkBacklinks
-#+begin_src haskell
-mkBacklinks ::
-  [(GPath, Object)] ->
-  Map LinkOid GCI ->
-  IntMap GPath ->
-  Map GPath (Map GPath [(GCI, GCI)])
-mkBacklinks pathObjs symbols offsets =
-  M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
-  where
-    symbolEdges :: [(GCI, GCI)]
-    symbolEdges =
-      foldl'
-        (finalizeEdges symbols) -- (ref:f:mkBacklinks-finalizeEdges)
-        []
-        $ prependOffsets pathObjs
-    sortedPaths :: [GPath]
-    sortedPaths = sort $ map fst pathObjs
-    f acc (from, to)
-      | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
-        Just (_, toPath) <- IntMap.lookupLE to.unGCI offsets,
-        fromPath /= toPath =
-          M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-      | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
-        to.unGCI < 0,
-        Just toPath <- sortedPaths !!? (abs to.unGCI - 1),
-        fromPath /= toPath =
-          M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
-      | otherwise = acc
-#+end_src
-
-[[f:finalizeEdges]] [[(f:mkBacklinks-finalizeEdges)]] looks at each object's ~pseudoEdges~
-and converts them into real edges (using ~GCI~ as the vertex type) using the
-global symbols map (~Map LinkOid GCI~) and offsets. Each ~PseudoEdge~ links from the
-object's ~LCI~ (without any offsets) into a ~LinkOid~ target, so we need to perform
-two transformations:
-
-  1) Convert the ~LinkOid~ target into a global cell index, by looking it up in
-     the global symbols (~Map LinkOid GCI~) [[(f:finalizeEdges-symbol-lookup)]].
-
-  2) Convert the ~LCI~ into a ~GCI~, by adding the offset to it
-     [[(f:finalizeEdges-lci-gci-conversion)]].
-
-#+name: f:finalizeEdges
-#+begin_src haskell
-finalizeEdges ::
-  Map LinkOid GCI ->
-  [(GCI, GCI)] ->
-  (Int, (GPath, Object)) ->
-  [(GCI, GCI)]
-finalizeEdges symbols acc (offset, (_, obj)) =
-  let f (PseudoEdge (lci, linkOid)) = case lookup linkOid symbols of -- (ref:f:finalizeEdges-symbol-lookup)
-        Nothing -> Nothing
-        Just targetGCI -> Just (GCI $ lci.unLCI + offset, targetGCI) -- (ref:f:finalizeEdges-lci-gci-conversion)
-   in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
-#+end_src
-
-** Citation dependencies
-:PROPERTIES:
-:ID:       4194fc81-a28d-451f-b4bd-f2f522b5a750
-:END:
-
-[[f:getCitationDeps]] reads CSL files and also bibliographies (JSON files).
-
-#+name: f:getCitationDeps
-#+begin_src haskell
-getCitationDeps ::
-  [(GPath, Object)] ->
-  IO (Map FilePath Text, Map FilePath [CP.Reference (CslJson Text)])
-getCitationDeps pathObjs = do
-  csls <- getCitationStyles pathObjs
-  bibs <- getBibliographies pathObjs
-  pure (csls, bibs)
-#+end_src
-
-[[f:getCitationStyles]] returns both the raw XML content as well as the parsed
-content. We need the raw XML because we want to store it in [[f:mkArchive]], because
-there is no ~ToJSON~ instance for the ~CP.Style~ type.
-
-#+name: f:getCitationStyles
-#+begin_src haskell
-getCitationStyles :: [(GPath, Object)] -> IO (Map FilePath Text)
-getCitationStyles pathObjs = do
-  allCslPaths <-
-    concat
-      <$> mapM
-        ( \(gPath, obj) ->
-            makeRelativeToObjectPath gPath
-              $ maybeToList obj.orgDoc.cslPath
-        )
-        pathObjs
-  cslRawXMLs <- map fst <$> mapM getCitationStyle allCslPaths
-  pure . fromList $ zip allCslPaths cslRawXMLs
-#+end_src
-
-[[f:makeRelativeToObjectPath]] gets a ~[FilePath]~ and makes them relative to the
-given ~GPath~. This is useful for getting paths defined inside an Org doc (such as
-the path to a CSL style or bibliography JSON) to be relative to where the Org
-doc is located.
-
-#+name: f:makeRelativeToObjectPath
-#+begin_src haskell
-makeRelativeToObjectPath :: GPath -> [FilePath] -> IO [FilePath]
-makeRelativeToObjectPath objGPath fps = do
-  let objPath = decodeGPath objGPath
-  objOsp <- P.encodeUtf objPath
-  let objDir = P.takeDirectory objOsp
-  mapM (f objDir) fps
-  where
-    f :: P.OsPath -> FilePath -> IO FilePath
-    f objDir fp = do
-      p <- P.encodeUtf fp
-      let relPath = P.combine objDir p
-      P.decodeUtf relPath
-#+end_src
-
-For parsing the CSL style file (XML), we read a given path, then defer to [[f:parseCitationStyle]].
-
-#+name: f:getCitationStyle
-#+begin_src haskell
-getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))
-getCitationStyle filePath = do
-  p <- P.encodeUtf filePath
-  input <- LU.readFileRobustly p
-  case parseCitationStyle input of
-    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
-    Right style -> pure (input, style)
-#+end_src
-
-[[f:parseCitationStyle]] just delegates most of the work to ~parseStyle~ from
-~Citeproc.Style~. We expect the contents to be in ~CslJson Text~ format.
-
-#+name: f:parseCitationStyle
-#+begin_src haskell
-parseCitationStyle :: Text -> Either String (CP.Style (CslJson Text))
-parseCitationStyle input = do
-  result <- CP.parseStyle (\_ -> pure mempty) input
-  case result of
-    Left citeprocError -> Left $ show citeprocError
-    Right style -> Right style
-#+end_src
-
-The [[f:getBibliographies]] reads multiple JSON files that have bibliographical
-entries in them.
-
-#+name: f:getBibliographies
-#+begin_src haskell
-getBibliographies ::
-  [(GPath, Object)] ->
-  IO (Map FilePath [CP.Reference (CslJson Text)])
-getBibliographies pathObjs = do
-  allBibPaths <-
-    concat
-      <$> mapM
-        (\(gPath, obj) -> makeRelativeToObjectPath gPath obj.orgDoc.bibPaths)
-        pathObjs
-  bibs <- mapM getBibliography allBibPaths
-  pure . fromList $ zip allBibPaths bibs
-#+end_src
-
-The [[f:getBibliography]] parses a single JSON file which has a list of references
-inside it.
-
-#+name: f:getBibliography
-#+begin_src haskell
-getBibliography :: FilePath -> IO [CP.Reference (CslJson Text)]
-getBibliography filePath = do
-  p <- P.encodeUtf filePath
-  input <- LU.readFileRobustly p
-  case parseBibliography input of
-    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
-    Right references -> pure references
-#+end_src
-
-[[f:parseBibliography]] just delegates to ~eitherDecodeStrictText~ from ~Data.Aeson~.
-This is possible because the ~Reference~ type (from ~Citeproc.Types~) has a ~FromJSON~
-instance.
-
-#+name: f:parseBibliography
-#+begin_src haskell
-parseBibliography :: Text -> Either String [CP.Reference (CslJson Text)]
-parseBibliography = eitherDecodeStrictText
-#+end_src
-
-** Tests
+*** Tests
 :PROPERTIES:
 :ID:       72f268f8-5703-4f3f-b821-62713149da64
 :END:
@@ -2109,6 +1909,219 @@ checkCycles
           ]
       }
   ]
+#+end_src
+
+** Backlinks
+
+[[f:mkBacklinks]] takes the edges which contain global cell index information for
+both the starting and ending vertices, and then transforms them into the final
+shape ~Map GPath (Map GPath [(GCI, GCI)])~:
+
+#+begin_src txt
+Map GPath (Map GPath [(GCI, GCI)])
+      |          |       |
+      |          |       `---> List of edges (source GCI, target GCI)
+      |          `---> Source object path
+      `----> Target object path
+#+end_src
+
+This shape is largely driven by the needs of [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]].
+
+#+name: f:mkBacklinks
+#+begin_src haskell
+mkBacklinks ::
+  [(GPath, Object)] ->
+  Map LinkOid GCI ->
+  IntMap GPath ->
+  Map GPath (Map GPath [(GCI, GCI)])
+mkBacklinks pathObjs symbols offsets =
+  M.map (M.fromListWith (<>)) $ foldl' f mempty symbolEdges
+  where
+    symbolEdges :: [(GCI, GCI)]
+    symbolEdges =
+      foldl'
+        (finalizeEdges symbols) -- (ref:f:mkBacklinks-finalizeEdges)
+        []
+        $ prependOffsets pathObjs
+    sortedPaths :: [GPath]
+    sortedPaths = sort $ map fst pathObjs
+    f acc (from, to)
+      | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
+        Just (_, toPath) <- IntMap.lookupLE to.unGCI offsets,
+        fromPath /= toPath =
+          M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+      | Just (_, fromPath) <- IntMap.lookupLE from.unGCI offsets,
+        to.unGCI < 0,
+        Just toPath <- sortedPaths !!? (abs to.unGCI - 1),
+        fromPath /= toPath =
+          M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
+      | otherwise = acc
+#+end_src
+
+[[f:finalizeEdges]] [[(f:mkBacklinks-finalizeEdges)]] looks at each object's ~pseudoEdges~
+and converts them into real edges (using ~GCI~ as the vertex type) using the
+global symbols map (~Map LinkOid GCI~) and offsets. Each ~PseudoEdge~ links from the
+object's ~LCI~ (without any offsets) into a ~LinkOid~ target, so we need to perform
+two transformations:
+
+  1) Convert the ~LinkOid~ target into a global cell index, by looking it up in
+     the global symbols (~Map LinkOid GCI~) [[(f:finalizeEdges-symbol-lookup)]].
+
+  2) Convert the ~LCI~ into a ~GCI~, by adding the offset to it
+     [[(f:finalizeEdges-lci-gci-conversion)]].
+
+#+name: f:finalizeEdges
+#+begin_src haskell
+finalizeEdges ::
+  Map LinkOid GCI ->
+  [(GCI, GCI)] ->
+  (Int, (GPath, Object)) ->
+  [(GCI, GCI)]
+finalizeEdges symbols acc (offset, (_, obj)) =
+  let f (PseudoEdge (lci, linkOid)) = case lookup linkOid symbols of -- (ref:f:finalizeEdges-symbol-lookup)
+        Nothing -> Nothing
+        Just targetGCI -> Just (GCI $ lci.unLCI + offset, targetGCI) -- (ref:f:finalizeEdges-lci-gci-conversion)
+   in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
+#+end_src
+
+** Citation dependencies
+:PROPERTIES:
+:ID:       4194fc81-a28d-451f-b4bd-f2f522b5a750
+:END:
+
+[[f:getCitationDeps]] reads CSL files and also bibliographies (JSON files). This is
+the main workhorse, as the other functions in this section are just helpers to
+[[f:getCitationDeps]].
+
+#+name: f:getCitationDeps
+#+begin_src haskell
+getCitationDeps ::
+  [(GPath, Object)] ->
+  IO (Map FilePath Text, Map FilePath [CP.Reference (CslJson Text)])
+getCitationDeps pathObjs = do
+  csls <- getCitationStyles pathObjs
+  bibs <- getBibliographies pathObjs
+  pure (csls, bibs)
+#+end_src
+
+We'll first look at citations, and then bibliographies.
+
+*** Read citation style (XML) files
+
+[[f:getCitationStyles]] relies on [[f:getCitationStyle]] which returns both the raw XML
+content as well as the parsed content. We discard the latter with a ~map fst~
+[[(f:getCitationStyles-discard-parsed-content)]]. We can only keep the raw XML (as a
+~Text~) because we want to store it in [[f:mkArchive]], and there is no ~ToJSON~
+instance for the ~CP.Style~ type.
+
+#+name: f:getCitationStyles
+#+begin_src haskell
+getCitationStyles :: [(GPath, Object)] -> IO (Map FilePath Text)
+getCitationStyles pathObjs = do
+  allCslPaths <-
+    concat
+      <$> mapM
+        ( \(gPath, obj) ->
+            makeRelativeToObjectPath gPath -- (ref:f:getCitationStyles-makeRelativeToObjectPath)
+              $ maybeToList obj.orgDoc.cslPath
+        )
+        pathObjs
+  cslRawXMLs <- map fst <$> mapM getCitationStyle allCslPaths -- (ref:f:getCitationStyles-discard-parsed-content)
+  pure . fromList $ zip allCslPaths cslRawXMLs
+#+end_src
+
+[[f:makeRelativeToObjectPath]] [[(f:getCitationStyles-makeRelativeToObjectPath)]] gets a
+~[FilePath]~ and makes them relative to the given ~GPath~. This is useful for
+getting paths defined inside an Org doc (such as the path to a CSL style or
+bibliography JSON) to be relative to where the Org doc is located.
+
+#+name: f:makeRelativeToObjectPath
+#+begin_src haskell
+makeRelativeToObjectPath :: GPath -> [FilePath] -> IO [FilePath]
+makeRelativeToObjectPath objGPath fps = do
+  let objPath = decodeGPath objGPath
+  objOsp <- P.encodeUtf objPath
+  let objDir = P.takeDirectory objOsp
+  mapM (f objDir) fps
+  where
+    f :: P.OsPath -> FilePath -> IO FilePath
+    f objDir fp = do
+      p <- P.encodeUtf fp
+      let relPath = P.combine objDir p
+      P.decodeUtf relPath
+#+end_src
+
+For parsing the CSL style file (XML), we read a given path, then defer to
+[[f:parseCitationStyle]]. Even though we discard this parsed content in
+[[f:getCitationStyles]], we still want to parse it here because it's important
+validation (to know that the underlying XML is valid).
+
+#+name: f:getCitationStyle
+#+begin_src haskell
+getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))
+getCitationStyle filePath = do
+  p <- P.encodeUtf filePath
+  input <- LU.readFileRobustly p
+  case parseCitationStyle input of
+    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
+    Right style -> pure (input, style)
+#+end_src
+
+[[f:parseCitationStyle]] just delegates most of the work to ~parseStyle~ from
+~Citeproc.Style~. We expect the contents to be in ~CslJson Text~ format.
+
+#+name: f:parseCitationStyle
+#+begin_src haskell
+parseCitationStyle :: Text -> Either String (CP.Style (CslJson Text))
+parseCitationStyle input = do
+  result <- CP.parseStyle (\_ -> pure mempty) input
+  case result of
+    Left citeprocError -> Left $ show citeprocError
+    Right style -> Right style
+#+end_src
+
+*** Read bibliography (JSON) files
+
+The [[f:getBibliographies]] reads multiple JSON files that have bibliographical
+entries in them.
+
+#+name: f:getBibliographies
+#+begin_src haskell
+getBibliographies ::
+  [(GPath, Object)] ->
+  IO (Map FilePath [CP.Reference (CslJson Text)])
+getBibliographies pathObjs = do
+  allBibPaths <-
+    concat
+      <$> mapM
+        (\(gPath, obj) -> makeRelativeToObjectPath gPath obj.orgDoc.bibPaths)
+        pathObjs
+  bibs <- mapM getBibliography allBibPaths
+  pure . fromList $ zip allBibPaths bibs
+#+end_src
+
+The [[f:getBibliography]] parses a single JSON file which has a list of references
+inside it.
+
+#+name: f:getBibliography
+#+begin_src haskell
+getBibliography :: FilePath -> IO [CP.Reference (CslJson Text)]
+getBibliography filePath = do
+  p <- P.encodeUtf filePath
+  input <- LU.readFileRobustly p
+  case parseBibliography input of
+    Left errMsg -> die $ "while parsing " <> filePath <> ":" <> errMsg
+    Right references -> pure references
+#+end_src
+
+[[f:parseBibliography]] just delegates to ~eitherDecodeStrictText~ from ~Data.Aeson~.
+This is possible because the ~Reference~ type (from ~Citeproc.Types~) has a ~FromJSON~
+instance.
+
+#+name: f:parseBibliography
+#+begin_src haskell
+parseBibliography :: Text -> Either String [CP.Reference (CslJson Text)]
+parseBibliography = eitherDecodeStrictText
 #+end_src
 
 * Utility functions
