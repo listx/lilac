@@ -32,52 +32,16 @@ import Test.Hspec
   )
 
 spec :: Spec
-spec = compileSpec
-
-checkExternalOids :: FilePath -> [LinkOid] -> Spec
-checkExternalOids path expectedExternalOids = do
-  it path $ do
-    (Right od) <- read
-    LC.findExternalOids od `shouldBe` expectedExternalOids
-  where
-    read = do
-      input <- LU.readFrom "test/Lilac/CompileSpec/" path
-      pure $ LP.parseOrgDoc input
-
-expectArchiveError :: [FilePath] -> String -> Spec
-expectArchiveError paths expected = do
-  it (show paths) $ do
-    pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-    maybeArchive <- LC.mkArchive pathObjs
-    maybeArchive `shouldBe` (Left expected)
-
-expectArchiveOk :: [FilePath] -> Spec
-expectArchiveOk paths = do
-  it (show paths) $ do
-    pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-    maybeArchive <- LC.mkArchive pathObjs
-    maybeArchive `shouldSatisfy` isRight
-
-checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
-checkCycles paths expectedCycles = do
-  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-  maybeArchive <- runIO $ LC.mkArchive pathObjs
-  case maybeArchive of
-    Left errMsg -> it "programmer error" $ expectationFailure errMsg
-    Right archive -> it (show paths) $ do
-      (LC.findCycles archive) `shouldBe` expectedCycles
-
-compileSpec :: Spec
-compileSpec = do
-  checkExternalOids
+spec = do
+  checkExternalLinkOids
     "0400-no-external-symbols-code-blocks"
     []
 
-  checkExternalOids
+  checkExternalLinkOids
     "0400-no-external-symbols-complex"
     []
 
-  checkExternalOids
+  checkExternalLinkOids
     "0400-external-symbols"
     [ LinkOid
         { oid = fromWords 0xffffffff00000000 0x000000000000d001,
@@ -85,7 +49,7 @@ compileSpec = do
         }
     ]
 
-  checkExternalOids
+  checkExternalLinkOids
     "0400-external-symbols-newlines"
     [ LinkOid
         { oid = fromWords 0xffffffff00000000 0x000000000000d001,
@@ -406,3 +370,36 @@ compileSpec = do
       let input = [(3, "a"), (9, "b"), (1, "c"), (2, "d")] :: [(Int, String)]
           output = [(0, "a"), (3, "b"), (12, "c"), (13, "d")] :: [(Int, String)]
       LC.cumulativeOffsets input `shouldBe` output
+
+checkExternalLinkOids :: FilePath -> [LinkOid] -> Spec
+checkExternalLinkOids path expectedExternalOids = do
+  it path $ do
+    (Right od) <- read
+    LC.findExternalOids od `shouldBe` expectedExternalOids
+  where
+    read = do
+      input <- LU.readFrom "test/Lilac/CompileSpec/" path
+      pure $ LP.parseOrgDoc input
+
+expectArchiveError :: [FilePath] -> String -> Spec
+expectArchiveError paths expected = do
+  it (show paths) $ do
+    pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
+    maybeArchive <- LC.mkArchive pathObjs
+    maybeArchive `shouldBe` (Left expected)
+
+expectArchiveOk :: [FilePath] -> Spec
+expectArchiveOk paths = do
+  it (show paths) $ do
+    pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
+    maybeArchive <- LC.mkArchive pathObjs
+    maybeArchive `shouldSatisfy` isRight
+
+checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
+checkCycles paths expectedCycles = do
+  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
+  maybeArchive <- runIO $ LC.mkArchive pathObjs
+  case maybeArchive of
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    Right archive -> it (show paths) $ do
+      (LC.findCycles archive) `shouldBe` expectedCycles

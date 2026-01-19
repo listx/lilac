@@ -585,7 +585,7 @@ b3
 
 #+name: t:0400-no-external-symbols-code-blocks
 #+begin_src haskell
-checkExternalOids
+checkExternalLinkOids
   "0400-no-external-symbols-code-blocks"
   []
 #+end_src
@@ -623,7 +623,7 @@ foo
 
 #+name: t:0400-no-external-symbols-complex
 #+begin_src haskell
-checkExternalOids
+checkExternalLinkOids
   "0400-no-external-symbols-complex"
   []
 #+end_src
@@ -643,7 +643,7 @@ Hello [[id:ffffffff-0000-0000-0000-00000000d001::a]]
 
 #+name: t:0400-external-symbols
 #+begin_src haskell
-checkExternalOids
+checkExternalLinkOids
   "0400-external-symbols"
   [ LinkOid
       { oid = fromWords 0xffffffff00000000 0x000000000000d001,
@@ -670,7 +670,7 @@ d e][a b c d e]].
 
 #+name: t:0400-external-symbols-newlines
 #+begin_src haskell
-checkExternalOids
+checkExternalLinkOids
   "0400-external-symbols-newlines"
   [ LinkOid
       { oid = fromWords 0xffffffff00000000 0x000000000000d001,
@@ -1252,11 +1252,20 @@ You may think we could avoid using graphs entirely, and just use an algorithm
 like "keep expanding all Noweb links recursively; if we see a Noweb link being
 used more than once, error out" to detect cycles. However this won't work
 because you can technically reference the same block multiple times at different
-points in the tree.
+points in the tree. For example, the following code is valid:
 
-Specifically, we want to build a /directed/ graph where we treat all blocks as
-nodes (vertices) and the dependency of Noweb links as edges. So if a block =x=
-depends on a Noweb link =y=, then =x= would point to =y=.
+#+header: :noweb off
+#+begin_src org
+,#+begin_src txt
+<<bar>>
+foo
+<<bar>>
+,#+end_src
+#+end_src
+
+We want to build a /directed/ graph where we treat all blocks as
+nodes (vertices) and the dependency of Noweb links as edges. So if a block ~x~
+depends on a Noweb link ~y~, then ~x~ would point to ~y~.
 
 From [cite:@clrs_2009 ch. 22] (p. 614) we can find a more formal definition of
 cycles in a directed graph:
@@ -1279,10 +1288,11 @@ a self-loop. Whether an edge points back to an ancestor can be determined by
 finding strongly connected components with more than one vertex. And we can
 check for self-loops by just seeing if a block links to itself.
 
-Checking for strongly connected components can be done with the =scc= function
-provided by the =Data.Graph= library. This library also lets us create a /single/
+Checking for strongly connected components can be done with the ~scc~ function
+provided by the ~Data.Graph~ library. This library also lets us create a /single/
 graph with all of the blocks in it because the library doesn't care whether the
-edges we feed into it are connected.
+edges we feed into it are connected (i.e., you can have as many disconnected
+"islands" of nodes as you want in the same graph).
 
 The [[f:buildGraph]] function looks at all code blocks and generates the necessary
 edges to build up a directed graph. It does this by constructing edges that have
@@ -1339,7 +1349,7 @@ explicitly by its parent OID. So in summary we have to consider both the
 implicit and explicit cases.
 
 The [[f:findCycles]] function takes the output of [[f:buildGraph]] and uses that to run
-the =scc= function to get the strongly connected components, which we filter to
+the ~scc~ function to get the strongly connected components, which we filter to
 only keep the ones that have cycles in them.
 
 #+name: f:findCycles
@@ -1395,9 +1405,9 @@ We use the [[f:checkCycles]] helper (powered by [[f:findCycles]] underneath) to 
 cycles (or lack thereof).
 
 First let's check for the happy path where there are no cycles. Note the use of
-~:noweb off~ so as to preserve the Noweb link declaration (see
-[[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::f:nowebLinkTargetParser][f:nowebLinkTargetParser]] and [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::t:0007-blocks-noweb][t:0007-blocks-noweb]] for more sample usage of ~:noweb
-off~).
+~:noweb off~ in the block's metadata so as to preserve the Noweb link declaration
+(see [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::f:nowebLinkTargetParser][f:nowebLinkTargetParser]] and [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77::t:0007-blocks-noweb][t:0007-blocks-noweb]] for more sample usage of
+~:noweb off~).
 
 #+name: ti:0100-dag-no-loops
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-no-loops
@@ -1507,7 +1517,7 @@ We get two nodes (vertices) in [[t:0100-dag-self-loop-heading]] instead of just 
 in [[ti:0100-dag-self-loop]] because when we add the two vertices for this case in
 [[f:buildGraph]], both vertices will link out to the same document OID (implicitly)
 as an out link when they are parsed in at
-id:80637e01-1065-40b0-932c-8ffa2376c863::(f:oidReferenceParser-docOid). So from
+[[id:80637e01-1065-40b0-932c-8ffa2376c863::(f:oidReferenceParser-docOid)]]. So from
 the cycle detection algorithm it's as if we linked from the code block (vertex)
 in the test to another code block that sits above the heading, which them links
 to itself forming a 2-block cycle.
@@ -1558,8 +1568,8 @@ checkCycles
   ]
 #+end_src
 
-Check whether we can detect a back edge to an ancestor. In
-[[t:0100-dag-2-node-loop]] we have a cycle involving 2 nodes.
+[[t:0100-dag-2-node-loop]] checks whether we can detect a back edge to an ancestor
+by a cycle involving 2 nodes.
 
 #+name: ti:0100-dag-2-node-loop
 #+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop
@@ -2325,7 +2335,7 @@ definitely machine-friendly) name for a given cell. We use the pilcrow (¶) and
 section symbol (§) directly for paragraphs and headings because
 [[id:d6abea81-d620-4ede-9c2c-68f7ea07f847::f:weaveStyledText][f:weaveStyledText]] will escape non-HTML-safe characters with HTML entities, such
 that if we do ~&para;~ the ~&~ will get escaped to ~&amp;~, which would result in
-~&amp;para;~ and therefore not what we want.
+the broken ~&amp;para;~.
 
 #+name: f:gciToName
 #+begin_src haskell
@@ -2386,34 +2396,6 @@ gciToName archive offset gci
     cellRef = "Cell " <> (T.show $ gci.unGCI - offset)
     plain body = Just $ Prose [ptext body []]
     verbatim body = Just $ Prose [ptext body [Verbatim]]
-#+end_src
-
-[[f:gciToObjCell]] takes a global cell index and converts it to the right cell
-and the object (Org doc) that contains it, as a tuple.
-
-#+name: f:gciToObjCell
-#+begin_src haskell
-gciToObjCell :: Archive -> GCI -> Maybe (Object, Cell)
-gciToObjCell archive gci
-  | Just (offset, path) <- IntMap.lookupLE gci.unGCI archive.offsets,
-    Just obj <- lookup path archive.objects,
-    Just cell <- obj.orgDoc.cells !!? (gci.unGCI - offset) =
-      Just (obj, cell)
-  | otherwise = Nothing
-#+end_src
-
-[[f:gciToObjPath]] gets the path of the object by the negative GCI index; it is in
-this sense the opposite of [[f:docOidsToSymbols]].
-
-#+name: f:gciToObjPath
-#+begin_src haskell
-gciToObjPath :: Archive -> GCI -> Maybe GPath
-gciToObjPath archive gci
-  | gci.unGCI < 0 =
-      (sort $ keys archive.objects) !!? (abs gci.unGCI - 1)
-  | Just (_, path) <- IntMap.lookupLE gci.unGCI archive.offsets =
-      Just path
-  | otherwise = Nothing
 #+end_src
 
 We have to convert links (~PTokenLink~) into styled text (~PTokenStyledText~) at
@@ -2486,6 +2468,34 @@ getCellName = \case
     verbatim body = Just $ Prose [ptext body [Verbatim]]
 #+end_src
 
+[[f:gciToObjCell]] takes a global cell index and converts it to the right cell
+and the object (Org doc) that contains it, as a tuple.
+
+#+name: f:gciToObjCell
+#+begin_src haskell
+gciToObjCell :: Archive -> GCI -> Maybe (Object, Cell)
+gciToObjCell archive gci
+  | Just (offset, path) <- IntMap.lookupLE gci.unGCI archive.offsets,
+    Just obj <- lookup path archive.objects,
+    Just cell <- obj.orgDoc.cells !!? (gci.unGCI - offset) =
+      Just (obj, cell)
+  | otherwise = Nothing
+#+end_src
+
+[[f:gciToObjPath]] gets the path of the object by the negative GCI index; it is in
+this sense the opposite of [[f:docOidsToSymbols]].
+
+#+name: f:gciToObjPath
+#+begin_src haskell
+gciToObjPath :: Archive -> GCI -> Maybe GPath
+gciToObjPath archive gci
+  | gci.unGCI < 0 =
+      (sort $ keys archive.objects) !!? (abs gci.unGCI - 1)
+  | Just (_, path) <- IntMap.lookupLE gci.unGCI archive.offsets =
+      Just path
+  | otherwise = Nothing
+#+end_src
+
 * Testing framework
 
 The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]].
@@ -2531,50 +2541,35 @@ import Test.Hspec
     shouldSatisfy,
   )
 
-<<compileSpec discovery>>
+spec :: Spec
+spec = do
+  <<All test cases>>
 
 <<CompileSpec helpers>>
-
-<<f:compileSpec>>
 #+end_src
 
-Just like [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]], we define a ~spec~ function for automatic
-discovery (and running) of the test cases here (in ~compileSpec~) in
-[[compileSpec discovery]].
-
-#+name: compileSpec discovery
-#+begin_src haskell
-spec :: Spec
-spec = compileSpec
-#+end_src
-
-On to the helpers. The test cases in [[f:compileSpec]] will be defined with these
+The test cases in [[All test cases]] will be defined with the following test
 helpers.
 
 #+name: CompileSpec helpers
 #+begin_src haskell
-<<f:checkExternalOids>>
+<<f:checkExternalLinkOids>>
 <<f:expectArchiveError>>
 <<f:expectArchiveOk>>
 <<f:checkCycles>>
 #+end_src
 
-There are two major areas of concern for the compilation process:
-
-  1) generation of expected ~symbols~ and ~externalOids~ as specified in the
-     [[data:Object]], and
-
-  2) detection of cycles when resolving symbols that cannot be resolved within
-     the current object (when we require multiple objects).
-
 Note that the helpers use the more convenient ~FilePath~ type instead of ~P.OsPath~,
 mainly because using the ~QuasiQuoter~ for ~P.OsPath~ slows down the compilation
 process and because [[data:Archive]] uses ~GPath~ anyway (and not ~P.OsPath~).
 
-#+name: f:checkExternalOids
+[[f:checkExternalLinkOids]] checks if we can detect which symbols (named by their
+~LinkOid~) cannot be accounted for in the current object, and are hence external.
+
+#+name: f:checkExternalLinkOids
 #+begin_src haskell
-checkExternalOids :: FilePath -> [LinkOid] -> Spec
-checkExternalOids path expectedExternalOids = do
+checkExternalLinkOids :: FilePath -> [LinkOid] -> Spec
+checkExternalLinkOids path expectedExternalOids = do
   it path $ do
     (Right od) <- read
     LC.findExternalOids od `shouldBe` expectedExternalOids
@@ -2650,32 +2645,30 @@ checkCycles paths expectedCycles = do
 
 Below are all of the individual test cases.
 
-#+name: f:compileSpec
+#+name: All test cases
 #+begin_src haskell
-compileSpec :: Spec
-compileSpec = do
-  <<t:0400-no-external-symbols-code-blocks>>
-  <<t:0400-no-external-symbols-complex>>
-  <<t:0400-external-symbols>>
-  <<t:0400-external-symbols-newlines>>
-  <<t:0401-broken-links-noweb>>
-  <<t:0401-broken-links-paragraph>>
-  <<t:0401-broken-links-paragraph-ok>>
-  <<t:0401-broken-links-line-label>>
-  <<t:0401-broken-links-multi-ok>>
-  <<t:0401-broken-links-multi-ok-alternates>>
-  <<t:0100-dag-no-loops>>
-  <<t:0100-dag-self-loop>>
-  <<t:0100-dag-self-loop-heading>>
-  <<t:0100-dag-self-loops>>
-  <<t:0100-dag-2-node-loop>>
-  <<t:0100-dag-2-node-loop-heading>>
-  <<t:0100-dag-3-node-loop>>
-  <<t:0100-dag-complex-loops>>
-  <<t:0100-dag-2-node-loop-2-files>>
-  <<t:0100-dag-2-node-loop-2-files-heading>>
-  <<t:0100-dag-2-node-loop-3-files>>
-  <<t:0500-cumulativeOffsets-sanity>>
+<<t:0400-no-external-symbols-code-blocks>>
+<<t:0400-no-external-symbols-complex>>
+<<t:0400-external-symbols>>
+<<t:0400-external-symbols-newlines>>
+<<t:0401-broken-links-noweb>>
+<<t:0401-broken-links-paragraph>>
+<<t:0401-broken-links-paragraph-ok>>
+<<t:0401-broken-links-line-label>>
+<<t:0401-broken-links-multi-ok>>
+<<t:0401-broken-links-multi-ok-alternates>>
+<<t:0100-dag-no-loops>>
+<<t:0100-dag-self-loop>>
+<<t:0100-dag-self-loop-heading>>
+<<t:0100-dag-self-loops>>
+<<t:0100-dag-2-node-loop>>
+<<t:0100-dag-2-node-loop-heading>>
+<<t:0100-dag-3-node-loop>>
+<<t:0100-dag-complex-loops>>
+<<t:0100-dag-2-node-loop-2-files>>
+<<t:0100-dag-2-node-loop-2-files-heading>>
+<<t:0100-dag-2-node-loop-3-files>>
+<<t:0500-cumulativeOffsets-sanity>>
 #+end_src
 
 * Glossary
