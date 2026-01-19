@@ -84,123 +84,7 @@ import Test.Hspec
 import Text.Megaparsec qualified as MP
 
 spec :: Spec
-spec = weaveSpec
-
-getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
-getWovenPrettyFromPath path = do
-  inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
-  inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
-  outDir <- encodeGPath "test/Lilac/WeaveSpec/"
-  let parseResult =
-        MP.runParser
-          (runStateT LP.orgDocParser defaultOrgParserState)
-          path
-          (nilOidOrgDocPrefix <> inputOrgFile)
-  case parseResult of
-    Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
-    Right (orgDoc, _) -> do
-      let object = LC.mkObject orgDoc
-      maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
-      case maybeArchive of
-        Left errMsg -> pure $ Left errMsg
-        Right archive -> do
-          result <- LW.prepareCitations inputOrgFileGPath object archive
-          let projectConf =
-                ProjectConf
-                  { name = "Test Project",
-                    homepage = Nothing,
-                    repo = Nothing,
-                    version = Nothing
-                  }
-              weaveConf =
-                WeaveConf
-                  { projectConf = projectConf,
-                    archive = archive,
-                    originObjectPath = inputOrgFileGPath,
-                    outDir = outDir,
-                    citeprocResult = result
-                  }
-          pure
-            . Right
-            . LW.renderAsText weaveConf
-            $ LW.weaveObject object
-
-searchOrderedNeedles :: Text -> [Text] -> (String, [Expectation])
-searchOrderedNeedles haystackRaw needles =
-  (\expectations -> ("sees needles", expectations))
-    . reverse
-    . fst
-    $ foldl' f ([], haystackRaw) needles
-  where
-    f ::
-      ([Expectation], Text) ->
-      Text ->
-      ([Expectation], Text)
-    f (testCases, haystack) needle =
-      let (discardMe, foundAndRest) = T.breakOn needle haystack
-          discardLen = T.length discardMe
-          needleStr = T.unpack needle
-          foundAndRestStr = T.unpack foundAndRest
-          expectation = foundAndRestStr `shouldStartWith` needleStr
-          expectationF =
-            expectationFailure
-              $ "could not find "
-              <> (show $ needleStr)
-              <> " in haystack:\n"
-              <> (T.unpack haystack)
-          remainingHaystack = T.drop discardLen haystack
-       in if foundAndRest == T.empty
-            then (expectationF : testCases, remainingHaystack)
-            else (expectation : testCases, remainingHaystack)
-
-weaveExpect :: FilePath -> [Text] -> Spec
-weaveExpect path needles = do
-  result <- runIO $ getWovenPrettyFromPath path
-  describe path $ do
-    case result of
-      Right haystack -> do
-        let (name, expectations) = searchOrderedNeedles haystack needles
-        it name $ sequence_ expectations
-      Left errMsg -> it "programmer error" $ expectationFailure errMsg
-
-getCiteprocResultFromPath :: FilePath -> IO (Either String (CP.Result Prose))
-getCiteprocResultFromPath path = do
-  inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
-  inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
-  let parseResult =
-        MP.runParser
-          (runStateT LP.orgDocParser defaultOrgParserState)
-          path
-          (nilOidOrgDocPrefix <> inputOrgFile)
-  case parseResult of
-    Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
-    Right (orgDoc, _) -> do
-      let object = LC.mkObject orgDoc
-      maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
-      case maybeArchive of
-        Left errMsg -> pure $ Left errMsg
-        Right archive ->
-          Right <$> LW.prepareCitations inputOrgFileGPath object archive
-
-expectCiteprocResult :: FilePath -> Either String (CP.Result Prose) -> Spec
-expectCiteprocResult path expected = do
-  result <- runIO $ getCiteprocResultFromPath path
-  describe path $ do
-    if
-      | Right got <- result,
-        Right expectedResult <- expected ->
-          it "matches expected result" $ do
-            got `shouldBe` expectedResult
-      | Left errMsg <- result,
-        Left expectedErrorSubstring <- expected ->
-          it "has error substring" $ do
-            errMsg `shouldContain` expectedErrorSubstring
-      | otherwise ->
-          it "unexpected type mismatch" $ do
-            result `shouldBe` expected
-
-weaveSpec :: Spec
-weaveSpec = do
+spec = do
   weaveExpect
     "0300-weave-styled-text"
     [ "<p><span id=\"c-0\" class=\"cell-idx\">regular ",
@@ -849,3 +733,116 @@ weaveSpec = do
             ],
           resultWarnings = []
         }
+
+getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
+getWovenPrettyFromPath path = do
+  inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
+  inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
+  outDir <- encodeGPath "test/Lilac/WeaveSpec/"
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser defaultOrgParserState)
+          path
+          (nilOidOrgDocPrefix <> inputOrgFile)
+  case parseResult of
+    Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) -> do
+      let object = LC.mkObject orgDoc
+      maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
+      case maybeArchive of
+        Left errMsg -> pure $ Left errMsg
+        Right archive -> do
+          result <- LW.prepareCitations inputOrgFileGPath object archive
+          let projectConf =
+                ProjectConf
+                  { name = "Test Project",
+                    homepage = Nothing,
+                    repo = Nothing,
+                    version = Nothing
+                  }
+              weaveConf =
+                WeaveConf
+                  { projectConf = projectConf,
+                    archive = archive,
+                    originObjectPath = inputOrgFileGPath,
+                    outDir = outDir,
+                    citeprocResult = result
+                  }
+          pure
+            . Right
+            . LW.renderAsText weaveConf
+            $ LW.weaveObject object
+
+searchOrderedNeedles :: Text -> [Text] -> (String, [Expectation])
+searchOrderedNeedles haystackRaw needles =
+  (\expectations -> ("sees needles", expectations))
+    . reverse
+    . fst
+    $ foldl' f ([], haystackRaw) needles
+  where
+    f ::
+      ([Expectation], Text) ->
+      Text ->
+      ([Expectation], Text)
+    f (testCases, haystack) needle =
+      let (discardMe, foundAndRest) = T.breakOn needle haystack
+          discardLen = T.length discardMe
+          needleStr = T.unpack needle
+          foundAndRestStr = T.unpack foundAndRest
+          expectation = foundAndRestStr `shouldStartWith` needleStr
+          expectationF =
+            expectationFailure
+              $ "could not find "
+              <> (show $ needleStr)
+              <> " in haystack:\n"
+              <> (T.unpack haystack)
+          remainingHaystack = T.drop discardLen haystack
+       in if foundAndRest == T.empty
+            then (expectationF : testCases, remainingHaystack)
+            else (expectation : testCases, remainingHaystack)
+
+weaveExpect :: FilePath -> [Text] -> Spec
+weaveExpect path needles = do
+  result <- runIO $ getWovenPrettyFromPath path
+  describe path $ do
+    case result of
+      Right haystack -> do
+        let (name, expectations) = searchOrderedNeedles haystack needles
+        it name $ sequence_ expectations
+      Left errMsg -> it "programmer error" $ expectationFailure errMsg
+
+getCiteprocResultFromPath :: FilePath -> IO (Either String (CP.Result Prose))
+getCiteprocResultFromPath path = do
+  inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
+  inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
+  let parseResult =
+        MP.runParser
+          (runStateT LP.orgDocParser defaultOrgParserState)
+          path
+          (nilOidOrgDocPrefix <> inputOrgFile)
+  case parseResult of
+    Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
+    Right (orgDoc, _) -> do
+      let object = LC.mkObject orgDoc
+      maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
+      case maybeArchive of
+        Left errMsg -> pure $ Left errMsg
+        Right archive ->
+          Right <$> LW.prepareCitations inputOrgFileGPath object archive
+
+expectCiteprocResult :: FilePath -> Either String (CP.Result Prose) -> Spec
+expectCiteprocResult path expected = do
+  result <- runIO $ getCiteprocResultFromPath path
+  describe path $ do
+    if
+      | Right got <- result,
+        Right expectedResult <- expected ->
+          it "matches expected result" $ do
+            got `shouldBe` expectedResult
+      | Left errMsg <- result,
+        Left expectedErrorSubstring <- expected ->
+          it "has error substring" $ do
+            errMsg `shouldContain` expectedErrorSubstring
+      | otherwise ->
+          it "unexpected type mismatch" $ do
+            result `shouldBe` expected

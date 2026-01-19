@@ -5,18 +5,7 @@ import Lilac.Types
   ( Archive (objects, symbols),
     BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (body, meta),
-    Cell
-      ( CBlock,
-        CCommand,
-        CFigure,
-        CFootnote,
-        CGlossaryTerm,
-        CHeading,
-        CListItem,
-        CMathFragment,
-        CParagraph,
-        CTable
-      ),
+    Cell (CBlock),
     LCI (unLCI),
     LinkOid (name),
     LinkTarget (LinkTargetLineLabel, LinkTargetOid),
@@ -46,7 +35,8 @@ import System.OsPath (OsPath)
 import System.OsPath qualified as P
 
 expandRootBlocks :: Archive -> OsPath -> [(OsPath, Text)]
-expandRootBlocks archive outDir = map expandRootBlock rootBlocks
+expandRootBlocks archive outDir =
+  map (expandRootBlock archive outDir) rootBlocks
   where
     rootBlocks =
       concat $ foldl' getRootBlocksFromObject [] archive.objects
@@ -56,39 +46,29 @@ expandRootBlocks archive outDir = map expandRootBlock rootBlocks
       [[(OsPath, Block)]]
     getRootBlocksFromObject acc object =
       foldl' (getRootBlock object.orgDoc.cells) [] object.symbols : acc
-    getRootBlock cells acc lci
-      | Just cell <- cells !!? lci.unLCI =
-          case cell of
-            CBlock b
-              | Just tPath <- lookup "tangle" b.meta,
-                Just tOsPath <- P.encodeUtf $ T.unpack tPath ->
-                  (P.combine outDir tOsPath, b) : acc
-              | otherwise -> acc
-            CHeading {}
-            CListItem {}
-            CParagraph {}
-            CMathFragment {}
-            CFigure {}
-            CTable {}
-            CFootnote {}
-            CGlossaryTerm {}
-            CCommand {} -> acc
+    getRootBlock cells acc lci --
+      | Just (CBlock b) <- cells !!? lci.unLCI,
+        Just tPath <- lookup "tangle" b.meta,
+        Just tOsPath <- P.encodeUtf $ T.unpack tPath =
+          (P.combine outDir tOsPath, b) : acc
       | otherwise = acc
-    expandRootBlock :: (OsPath, Block) -> (OsPath, Text)
-    expandRootBlock (p, rootBlock) =
-      ( P.combine outDir p,
-        maybeAddShebang rootBlock
-          . trimTrailingSpaces
-          $ expandBlock archive rootBlock ""
-      )
+
+expandRootBlock :: Archive -> OsPath -> (OsPath, Block) -> (OsPath, Text)
+expandRootBlock archive outDir (tanglePath, rootBlock) =
+  ( P.combine outDir tanglePath,
+    maybeAddShebang rootBlock --
+      . trimTrailingSpaces --
+      $ expandBlock archive rootBlock ""
+  )
+  where
     trimTrailingSpaces :: Text -> Text
     trimTrailingSpaces text =
       T.unlines
         . map (T.dropWhileEnd (== ' '))
         $ T.lines text
     maybeAddShebang :: Block -> Text -> Text
-    maybeAddShebang rootBlock text
-      | Just shebang <- lookup "shebang" rootBlock.meta =
+    maybeAddShebang block text
+      | Just shebang <- lookup "shebang" block.meta =
           shebang <> "\n" <> text
       | otherwise = text
 
@@ -101,8 +81,8 @@ expandBlock archive block existingPrefix =
     expand (acc, _) BTokenPadding =
       (acc <> "\n", "")
     expand (acc, _) (BTokenString text) =
-      (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLinkTarget (LinkTargetOid linkOid))
+      (acc <> prependExistingPrefix existingPrefix text, getPrefix text) --
+    expand (acc, prefix) (BTokenLinkTarget (LinkTargetOid linkOid)) --
       | Just gci <- lookup linkOid archive.symbols,
         Just (_, (CBlock targetBlock)) <- gciToObjCell archive gci =
           ( acc <> (expandBlock archive targetBlock $ existingPrefix <> prefix),
@@ -111,16 +91,24 @@ expandBlock archive block existingPrefix =
       | otherwise = (acc, prefix)
     expand (acc, prefix) (BTokenLinkTarget (LinkTargetLineLabel lineLabel))
       | Just "tangle" <- lookup "line-label" block.meta =
-          (acc <> "(ref:" <> (T.drop 1 $ T.dropEnd 1 lineLabel.name) <> ")", prefix)
+          ( acc <> "(ref:" <> (T.drop 1 $ T.dropEnd 1 lineLabel.name) <> ")",
+            prefix
+          )
       | otherwise = (acc, prefix)
     expand (acc, prefix) _ = (acc, prefix)
-    getPrefix text = T.takeWhileEnd (/= '\n') text
-    prependExistingPrefix text =
-      T.intercalate "\n"
-        . reverse
-        . fst
-        . foldl' prefixTailLines ([], True)
-        $ T.split (== '\n') text
-    prefixTailLines (acc, isFirstLine) line
-      | isFirstLine = (line : acc, False)
-      | otherwise = (T.append existingPrefix line : acc, False)
+
+getPrefix :: Text -> Text
+getPrefix text = T.takeWhileEnd (/= '\n') text
+
+prependExistingPrefix :: Text -> Text -> Text
+prependExistingPrefix existingPrefix text =
+  T.intercalate "\n"
+    . reverse
+    . fst
+    . foldl' (prefixTailLines existingPrefix) ([], True)
+    $ T.split (== '\n') text
+
+prefixTailLines :: Text -> ([Text], Bool) -> Text -> ([Text], Bool)
+prefixTailLines existingPrefix (acc, isFirstLine) line
+  | isFirstLine = (line : acc, False)
+  | otherwise = (T.append existingPrefix line : acc, False)

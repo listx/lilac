@@ -3,19 +3,20 @@
 :END:
 #+title: Tangle
 
-* Tangling
+* Overview
 :PROPERTIES:
 :ID:       b449a097-d702-4fd6-98de-cb81f7e49177
 :END:
 
-In Literate Programming, /tangling/ is the act of extracting the source code out
-of a literate document. It is the opposite of documentation generation found in
-many programming language environments, such as =javadoc=, where documentation is
+In Literate Programming, /tangling/ is the act of extracting just the source code
+out of a document. It is the opposite of documentation generation found in many
+programming language environments, such as ~javadoc~, where documentation is
 extracted from source code.
 
 * =Lilac.Tangle= module
 
-Tangling concerns are captured in [[file:../src/Lilac/Tangle.hs]].
+This module is quite short, because much of the hard work around validation (no
+broken links, no cycles) are handled in [[id:b9c034c1-5499-44e6-855c-6c16e1693cb8][Compile]].
 
 #+name: module:Lilac.Tangle
 #+header: :tangle src/Lilac/Tangle.hs
@@ -27,18 +28,7 @@ import Lilac.Types
   ( Archive (objects, symbols),
     BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
     Block (body, meta),
-    Cell
-      ( CBlock,
-        CCommand,
-        CFigure,
-        CFootnote,
-        CGlossaryTerm,
-        CHeading,
-        CListItem,
-        CMathFragment,
-        CParagraph,
-        CTable
-      ),
+    Cell (CBlock),
     LCI (unLCI),
     LinkOid (name),
     LinkTarget (LinkTargetLineLabel, LinkTargetOid),
@@ -68,15 +58,22 @@ import System.OsPath (OsPath)
 import System.OsPath qualified as P
 
 <<f:expandRootBlocks>>
+<<f:expandRootBlock>>
 <<f:expandBlock>>
+<<f:getPrefix>>
+<<f:prependExistingPrefix>>
+<<f:prefixTailLines>>
 #+end_src
 
-* Tangling overview
+* Tangling algorithm
+:PROPERTIES:
+:ID:       ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba
+:END:
 
 Tangling essentially boils down to the following:
 
-  1) find all code blocks that need to get tangled (they have ~#+header: :tangle
-     ...~ in their metadata), and
+  1) find all code blocks that need to get tangled (they have
+     ~#+header: :tangle ...~ in their metadata), which we call /root blocks/, and
 
   2) for each of these code blocks expand any Noweb references in them until
      none are left, and finally
@@ -85,33 +82,23 @@ Tangling essentially boils down to the following:
      what we already have on disk).
 
 The first two steps are the bare minimum required in order to feed source code
-to the computer for interpretation by it, while the third is a way to avoid
-unnecessarily busting the modification timestamp cache for Makefiles (because
-they use file modification timestamps to see whether we need to rerun a rule).
+to the computer for interpretation by it. The third step only writes files if
+they're different than what's on the disk, because otherwise the modification
+timestamps will change; this is not good if we are using a Makefile (because
+they use those timestamps to determine whether a rule needs to be run again).
 
-* Block expansion for tangling
-:PROPERTIES:
-:ID:       ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba
-:END:
+** Block expansion
 
-We examine the given [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] for all of the root blocks (blocks which
-specify the ~:tangle~ header, and thus require writing to the file system) in it,
-and expand each one in turn in [[f:expandRootBlocks]]. The output is a list of
-tuples, where each tuple encodes the filesystem path where we want to write some
-text (as a result of tangling), and the contents of the text itself which we
-want to write there --- hence the type is ~(OsPath, Text)~.
-
-The call to ~maybeAddShebang~ adds a special shebang line at the beginning of the
-file, if one was specified using the ~:shebang~ header. See [[id:caa38bf7-52ae-4246-8be0-8b2c9e58ccc2::unit-test.sh][unit-test.sh]] for an
-example.
-
-We also trim lines with only spaces in them (in ~trimTrailingSpaces~), because
-these can happen from the ~prependExistingPrefix~ function in [[f:expandBlock]].
+We examine the given [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] for all of the root blocks in it, and expand
+each one in [[f:expandRootBlocks]]. The output is a list of tuples, where each tuple
+encodes the filesystem path where we want to write content (text), and the
+contents themselves --- hence the type is ~(OsPath, Text)~.
 
 #+name: f:expandRootBlocks
 #+begin_src haskell
 expandRootBlocks :: Archive -> OsPath -> [(OsPath, Text)]
-expandRootBlocks archive outDir = map expandRootBlock rootBlocks
+expandRootBlocks archive outDir =
+  map (expandRootBlock archive outDir) rootBlocks
   where
     rootBlocks =
       concat $ foldl' getRootBlocksFromObject [] archive.objects
@@ -121,44 +108,52 @@ expandRootBlocks archive outDir = map expandRootBlock rootBlocks
       [[(OsPath, Block)]]
     getRootBlocksFromObject acc object =
       foldl' (getRootBlock object.orgDoc.cells) [] object.symbols : acc
-    getRootBlock cells acc lci
-      | Just cell <- cells !!? lci.unLCI =
-          case cell of
-            CBlock b
-              | Just tPath <- lookup "tangle" b.meta,
-                Just tOsPath <- P.encodeUtf $ T.unpack tPath ->
-                  (P.combine outDir tOsPath, b) : acc
-              | otherwise -> acc
-            CHeading {}
-            CListItem {}
-            CParagraph {}
-            CMathFragment {}
-            CFigure {}
-            CTable {}
-            CFootnote {}
-            CGlossaryTerm {}
-            CCommand {} -> acc
+    getRootBlock cells acc lci -- (ref:f:expandRootBlocks-getRootBlock)
+      | Just (CBlock b) <- cells !!? lci.unLCI,
+        Just tPath <- lookup "tangle" b.meta,
+        Just tOsPath <- P.encodeUtf $ T.unpack tPath =
+          (P.combine outDir tOsPath, b) : acc
       | otherwise = acc
-    expandRootBlock :: (OsPath, Block) -> (OsPath, Text)
-    expandRootBlock (p, rootBlock) =
-      ( P.combine outDir p,
-        maybeAddShebang rootBlock
-          . trimTrailingSpaces
-          $ expandBlock archive rootBlock ""
-      )
+#+end_src
+
+[[f:expandRootBlocks]] is mainly concerned with collecting all of the root blocks
+first [[(f:expandRootBlocks-getRootBlock)]] before handing them off to
+[[f:expandRootBlock]] for the actual block expansions (where "expansion" just means
+converting any Noweb links we find with the actual contents of that linked code
+block).
+
+#+name: f:expandRootBlock
+#+begin_src haskell
+expandRootBlock :: Archive -> OsPath -> (OsPath, Block) -> (OsPath, Text)
+expandRootBlock archive outDir (tanglePath, rootBlock) =
+  ( P.combine outDir tanglePath,
+    maybeAddShebang rootBlock -- (ref:f:expandRootBlock-maybeAddShebang)
+      . trimTrailingSpaces -- (ref:f:expandRootBlock-trimTrailingSpaces)
+      $ expandBlock archive rootBlock ""
+  )
+  where
     trimTrailingSpaces :: Text -> Text
     trimTrailingSpaces text =
       T.unlines
         . map (T.dropWhileEnd (== ' '))
         $ T.lines text
     maybeAddShebang :: Block -> Text -> Text
-    maybeAddShebang rootBlock text
-      | Just shebang <- lookup "shebang" rootBlock.meta =
+    maybeAddShebang block text
+      | Just shebang <- lookup "shebang" block.meta =
           shebang <> "\n" <> text
       | otherwise = text
 #+end_src
 
-In [[f:expandBlock]], we recursively expand all Noweb links until there are none.
+We add a special shebang line at the beginning of the file
+[[(f:expandRootBlock-maybeAddShebang)]], if one was specified using the ~:shebang~
+header. See [[id:caa38bf7-52ae-4246-8be0-8b2c9e58ccc2::unit-test.sh][unit-test.sh]] for an example.
+
+We also trim lines with only spaces in them
+[[(f:expandRootBlock-trimTrailingSpaces)]], because these can happen from the
+~prependExistingPrefix~ function in [[f:expandBlock]].
+
+Finally in [[f:expandBlock]], we recursively expand all Noweb links (~linkOid~) until
+there are none [[(f:expandBlock-recursion)]].
 
 #+name: f:expandBlock
 #+begin_src haskell
@@ -171,8 +166,8 @@ expandBlock archive block existingPrefix =
     expand (acc, _) BTokenPadding =
       (acc <> "\n", "")
     expand (acc, _) (BTokenString text) =
-      (acc <> prependExistingPrefix text, getPrefix text)
-    expand (acc, prefix) (BTokenLinkTarget (LinkTargetOid linkOid))
+      (acc <> prependExistingPrefix existingPrefix text, getPrefix text) -- (ref:f:expandBlock-getPrefix)
+    expand (acc, prefix) (BTokenLinkTarget (LinkTargetOid linkOid)) -- (ref:f:expandBlock-recursion)
       | Just gci <- lookup linkOid archive.symbols,
         Just (_, (CBlock targetBlock)) <- gciToObjCell archive gci =
           ( acc <> (expandBlock archive targetBlock $ existingPrefix <> prefix),
@@ -181,36 +176,56 @@ expandBlock archive block existingPrefix =
       | otherwise = (acc, prefix)
     expand (acc, prefix) (BTokenLinkTarget (LinkTargetLineLabel lineLabel))
       | Just "tangle" <- lookup "line-label" block.meta =
-          (acc <> "(ref:" <> (T.drop 1 $ T.dropEnd 1 lineLabel.name) <> ")", prefix)
+          ( acc <> "(ref:" <> (T.drop 1 $ T.dropEnd 1 lineLabel.name) <> ")",
+            prefix
+          )
       | otherwise = (acc, prefix)
     expand (acc, prefix) _ = (acc, prefix)
-    getPrefix text = T.takeWhileEnd (/= '\n') text
-    prependExistingPrefix text =
-      T.intercalate "\n"
-        . reverse
-        . fst
-        . foldl' prefixTailLines ([], True)
-        $ T.split (== '\n') text
-    prefixTailLines (acc, isFirstLine) line
-      | isFirstLine = (line : acc, False)
-      | otherwise = (T.append existingPrefix line : acc, False)
 #+end_src
 
-The ~expand~ function recursively calls ~expandBlock~ if it detects a ~LinkOid~ type
-link. Otherwise, for ~BTokenString~ tokens it searches for an indentation prefix
-with ~getPrefix~. We need the prefix because we want to indent entire blocks if
-the name of the link referring to it is indented. See
+The other main concern of [[f:expandBlock]] is the business around prefixes.
+Essentially, whenever we expand a Noweb link, we want to treat any preceding
+text on the same line as the link as a special prefix that we use for all
+expanded lines. For example, in the following block
+
+#+header: :noweb off
+#+begin_src txt
+    <<foo>>
+#+end_src
+
+all of the lines inside the ~<<foo>>~ block should inherit the 4-space
+indentation, which we call a /prefix/ here because it can also take into account
+non-space characters.
+
+#+name: f:getPrefix
+#+begin_src haskell
+getPrefix :: Text -> Text
+getPrefix text = T.takeWhileEnd (/= '\n') text
+#+end_src
+
+When we encounter a ~BTokenString~ token in [[f:expandBlock]]
+[[(f:expandBlock-getPrefix)]] we search for a prefix with [[f:getPrefix]]. See
 [[ti:0101-block-expansion-prefix]] and [[ti:0101-block-expansion-prefix-nested]] for
-examples.
-
-The ~getPrefix~ function is simple and uses any characters it finds, not just
-spaces, looking backwards and stopping at a newline. See
+examples using indentation as prefixes, and
 [[ti:0101-block-expansion-prefix-nonspace]] and
-[[ti:0101-block-expansion-prefix-nonspace-nested]] for examples.
+[[ti:0101-block-expansion-prefix-nonspace-nested]] for examples of non-space-based
+prefixes.
 
-The ~prependExistingPrefix~ function splits up the given text, and injects the
-prefix on every line in the text except the very first line. This is because
-given the text
+[[f:prependExistingPrefix]] splits up the given text, and injects the
+prefix on every line in the text except the very first line.
+
+#+name: f:prependExistingPrefix
+#+begin_src haskell
+prependExistingPrefix :: Text -> Text -> Text
+prependExistingPrefix existingPrefix text =
+  T.intercalate "\n"
+    . reverse
+    . fst
+    . foldl' (prefixTailLines existingPrefix) ([], True)
+    $ T.split (== '\n') text
+#+end_src
+
+We need this function because given the text
 
 #+header: :noweb off
 #+begin_src txt
@@ -220,13 +235,22 @@ xx<<a>>
 where ~xx~ is the prefix, we only want to give this prefix to the lines in ~<<a>>~
 except the first line (because the first line of ~<<a>>~ is already prefixed (from
 the outer block) with ~xx~); so only the lines after the first line in ~<<a>>~ need
-the ~xx~ prefix. This is what we do in ~prefixTailLines~, where we avoid adding the
-prefix to the "head", and instead only add it to the "tail."
+the ~xx~ prefix. This is what we do in [[f:prefixTailLines]], where we avoid adding
+the prefix to the "head", and instead only add it to the "tail."
 
-We use ~T.intercalate~ and ~T.split~ in ~prependExistingPrefix~ to avoid losing any
-information about the exact locations of newlines. If we used ~T.lines~ we would
-lose information about whether the last line actually had a trailing newline,
-because ~T.lines "a\nb"~ and ~T.lines "a\nb\n"~ both give ~["a", "b"]~.
+#+name: f:prefixTailLines
+#+begin_src haskell
+prefixTailLines :: Text -> ([Text], Bool) -> Text -> ([Text], Bool)
+prefixTailLines existingPrefix (acc, isFirstLine) line
+  | isFirstLine = (line : acc, False)
+  | otherwise = (T.append existingPrefix line : acc, False)
+#+end_src
+
+Going back to [[f:prependExistingPrefix]], we use ~T.intercalate~ and ~T.split~, to
+avoid losing any information about the exact locations of newlines. If we used
+~T.lines~ we would lose information about whether the last line actually had a
+trailing newline, because ~T.lines "a\nb"~ and ~T.lines "a\nb\n"~ both give ~["a",
+"b"]~. For a demonstration of this lossy behavior, see the test case below.
 
 #+name: t:lines-unlines-info-loss
 #+begin_src haskell
@@ -519,7 +543,7 @@ checkExpansion
   ]
 #+end_src
 
-Complex expansions.
+The following test case has some complex expansions.
 
 #+name: ti:0101-block-expansion-complex
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion-complex
@@ -982,27 +1006,10 @@ import Relude
 import System.OsPath qualified as P
 import Test.Hspec (Spec, expectationFailure, it, runIO, shouldBe)
 
-<<tangleSpec discovery>>
-
-<<TangleSpec helpers>>
-
-<<f:tangleSpec>>
-#+end_src
-
-Just like [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]], we define a ~spec~ function for automatic
-discovery (and running) of the test cases here (in ~tangleSpec~) in [[tangleSpec discovery]].
-
-#+name: tangleSpec discovery
-#+begin_src haskell
 spec :: Spec
-spec = tangleSpec
-#+end_src
+spec = do
+  <<All test cases>>
 
-On to the helpers. The test cases in [[f:tangleSpec]] will be defined with these
-helpers.
-
-#+name: TangleSpec helpers
-#+begin_src haskell
 <<f:checkExpansion>>
 #+end_src
 
@@ -1027,22 +1034,20 @@ checkExpansion paths expectedExpansions = do
 
 Below are all of the individual test cases.
 
-#+name: f:tangleSpec
+#+name: All test cases
 #+begin_src haskell
-tangleSpec :: Spec
-tangleSpec = do
-  <<t:0101-block-expansion>>
-  <<t:0101-block-expansion-deeply-nested>>
-  <<t:0101-block-expansion-prefix>>
-  <<t:0101-block-expansion-prefix-nested>>
-  <<t:0101-block-expansion-prefix-nonspace>>
-  <<t:0101-block-expansion-prefix-nonspace-nested>>
-  <<t:0101-block-expansion-complex>>
-  <<t:0101-block-expansion-external>>
-  <<t:0101-block-expansion-external-headingchild>>
-  <<t:0101-block-expansion-external-2-hops>>
-  <<t:0101-block-expansion-external-mutual>>
-  <<t:lines-unlines-info-loss>>
-  <<t:0102-pad-between-consecutive-links>>
-  <<t:0103-shebang>>
+<<t:0101-block-expansion>>
+<<t:0101-block-expansion-deeply-nested>>
+<<t:0101-block-expansion-prefix>>
+<<t:0101-block-expansion-prefix-nested>>
+<<t:0101-block-expansion-prefix-nonspace>>
+<<t:0101-block-expansion-prefix-nonspace-nested>>
+<<t:0101-block-expansion-complex>>
+<<t:0101-block-expansion-external>>
+<<t:0101-block-expansion-external-headingchild>>
+<<t:0101-block-expansion-external-2-hops>>
+<<t:0101-block-expansion-external-mutual>>
+<<t:lines-unlines-info-loss>>
+<<t:0102-pad-between-consecutive-links>>
+<<t:0103-shebang>>
 #+end_src

@@ -17,20 +17,7 @@ import System.OsPath qualified as P
 import Test.Hspec (Spec, expectationFailure, it, runIO, shouldBe)
 
 spec :: Spec
-spec = tangleSpec
-
-checkExpansion :: [FilePath] -> [(FilePath, Text)] -> Spec
-checkExpansion paths expectedExpansions = do
-  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/TangleSpec/" paths
-  maybeArchive <- runIO $ LC.mkArchive pathObjs
-  case maybeArchive of
-    Left errMsg -> it "programmer error" $ expectationFailure errMsg
-    Right archive -> it (show paths) $ do
-      (LT.expandRootBlocks archive mempty)
-        `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)
-
-tangleSpec :: Spec
-tangleSpec = do
+spec = do
   checkExpansion
     ["0101-block-expansion"]
     [ ( "equations.txt",
@@ -241,3 +228,13 @@ tangleSpec = do
           ]
       )
     ]
+
+checkExpansion :: [FilePath] -> [(FilePath, Text)] -> Spec
+checkExpansion paths expectedExpansions = do
+  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/TangleSpec/" paths
+  maybeArchive <- runIO $ LC.mkArchive pathObjs
+  case maybeArchive of
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    Right archive -> it (show paths) $ do
+      (LT.expandRootBlocks archive mempty)
+        `shouldBe` (fmap (first P.unsafeEncodeUtf) expectedExpansions)

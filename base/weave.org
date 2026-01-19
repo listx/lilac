@@ -4070,11 +4070,8 @@ test cases, we search for the presence of certain substrings within the HTML.
 
 *** Test module and helpers
 
-The test module here mirrors what we've already seen in [[id:3990627d-69f5-4c30-b3d7-abb3edaa0d13::TangleSpec helpers][TangleSpec helpers]] and
-[[id:979c2b7d-e448-4419-8d59-f92ebbd71cd6::ParseSpec
- helpers][ParseSpec helpers]]. We have the usual bits for setting up automatic test
-discovery in [[weaveSpec discovery]], as well as some test helpers in [[WeaveSpec
-helpers]] to take care of some boilerplate.
+The test module here mirrors what we've already seen in [[id:979c2b7d-e448-4419-8d59-f92ebbd71cd6::ParseSpec helpers][ParseSpec helpers]].
+Namely we have some test helpers and some test cases using those helpers.
 
 #+name: module:Lilac.WeaveSpec
 #+header: :tangle test/Lilac/WeaveSpec.hs
@@ -4164,29 +4161,10 @@ import Test.Hspec
   )
 import Text.Megaparsec qualified as MP
 
-<<weaveSpec discovery>>
-
-<<WeaveSpec helpers>>
-
-<<f:weaveSpec>>
-#+end_src
-
-For the exported =spec= function, we delegate to [[f:weaveSpec]]. Naming it this way
-is not required (we could just avoid the indirection and put the contents of
-[[f:weaveSpec]] directly in =spec=), but it does signify that what we manually define
-is in [[f:weaveSpec]], and that =spec= is something the library expects to be defined.
-Think of it as the private and public interface, respectively.
-
-#+name: weaveSpec discovery
-#+begin_src haskell
 spec :: Spec
-spec = weaveSpec
-#+end_src
+spec = do
+  <<All test cases>>
 
-These helpers let us be a bit more concise when writing individual test cases.
-
-#+name: WeaveSpec helpers
-#+begin_src haskell
 <<f:getWovenPrettyFromPath>>
 <<f:searchOrderedNeedles>>
 <<f:weaveExpect>>
@@ -4348,23 +4326,21 @@ expectCiteprocResult path expected = do
 
 *** All test cases
 
-#+name: f:weaveSpec
+#+name: All test cases
 #+begin_src haskell
-weaveSpec :: Spec
-weaveSpec = do
-  <<t:0300-weave-styled-text>>
-  <<t:0300-weave-lists>>
-  <<t:0301-weave-external-links-common-prefix>>
-  <<t:0301-weave-external-links>>
-  <<t:0400-citeproc-basic>>
-  <<t:0400-citeproc-superscript>>
-  <<t:0400-citeproc-smallcaps>>
-  <<t:0400-citeproc-multiline>>
-  <<t:0400-citeproc-multiline-complex>>
-  <<t:0400-citeproc-multiline-complex-list-item>>
-  <<t:0400-citeproc-multiline-cell-boundary>>
-  <<t:0400-citeproc-multiline-cell-boundary-list-item>>
-  <<t:0400-citeproc-style-variations>>
+<<t:0300-weave-styled-text>>
+<<t:0300-weave-lists>>
+<<t:0301-weave-external-links-common-prefix>>
+<<t:0301-weave-external-links>>
+<<t:0400-citeproc-basic>>
+<<t:0400-citeproc-superscript>>
+<<t:0400-citeproc-smallcaps>>
+<<t:0400-citeproc-multiline>>
+<<t:0400-citeproc-multiline-complex>>
+<<t:0400-citeproc-multiline-complex-list-item>>
+<<t:0400-citeproc-multiline-cell-boundary>>
+<<t:0400-citeproc-multiline-cell-boundary-list-item>>
+<<t:0400-citeproc-style-variations>>
 #+end_src
 
 * Generate CSS
