@@ -734,7 +734,7 @@ colorFrom input = case MP.parseMaybe isHexColorParser input of
   Nothing -> rgbHex 0xff0000
   Just color' -> color'
 
-isHexColorParser :: Parser Color
+isHexColorParser :: ColorParser Color
 isHexColorParser = do
   _ <- char '#'
   n <- hexadecimal
@@ -785,8 +785,8 @@ colorActiveBg = colorFrom "#f1ffef"
 colorActiveBorder :: Color
 colorActiveBorder = colorFrom "#008000"
 
-type Parser :: Type -> Type
-type Parser = MP.Parsec Void Text
+type ColorParser :: Type -> Type
+type ColorParser = MP.Parsec Void Text
 
 fontSerif :: Css
 fontSerif = do

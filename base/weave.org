@@ -3,21 +3,41 @@
 :END:
 #+title: Weave
 
-* Weaving
+* Overview
 
 In most Literate Programming systems, /weaving/ is the act of generating a
 human-readable document. This usually means writing a PDF or an HTML page.
 
-For now, Lilac's main goal is to generate HTML pages. There are several
+For now, Lilac's main goal is to generate *HTML pages*. There are several
 reasons:
 
   1) HTML is easier to consume on the web than PDFs.
 
   2) PDFs are obsessed with page numbers because they are designed to be printed
-     on real physical paper; we don't care about those things.
+     on real physical paper; we don't care about page numbers at all because you
+     don't have to print web content in order to consume it.
 
-  3) We want to eventually make our HTML pages interactive, and interactivity is
-     easier in HTML.
+  3) We want to make our HTML pages somewhat interactive, and interactivity is
+     easier to accomplish in HTML.
+
+Because we generate HTML, we also have to decorate it with CSS. Both concerns
+are addressed in this doc. There is also a sprinkling of JavaScript (via
+[[https://clojurescript.org/][ClojureScript]]) in [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][Frontend]] for some interactivity.
+
+The architecture for weaving looks like this:
+
+  1) Convert the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] (found inside a [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]], which is just a JSON
+     file) into HTML.
+
+  2) Generate CSS separately.
+
+  3) Add some JS for interactivity.
+
+One main advantage of this model is that other "viewers" can be created, as long
+as they understand the same JSON. While we would prefer to use something more
+"typed" like [[https://protobuf.dev/][Protobufs]], [[https://github.com/cognitect/transit-clj][Transit]], or [[https://github.com/edn-format/edn][EDN]], we choose JSON for its universality.
+Also, none of these alternative formats support both Haskell and ClojureScript
+well.
 
 ** Project configuration
 :PROPERTIES:
@@ -124,34 +144,10 @@ We define the project configuration for Lilac itself in here, as a JSON file.
 }
 #+end_src
 
-** Architecture
-:PROPERTIES:
-:ID:       8f5752c0-6162-4de6-9ceb-f78ba584722c
-:END:
-
-Generating HTML ultimately means having three components: HTML elements,
-CSS, and JavaScript (JS). HTML and CSS alone can be used to create a static
-document, but JS is necessary for making things dynamic.
-
-At this stage, the architecture we have in mind for weaving is the following:
-
-  1) Convert the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] (found inside a [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]) into HTML.
-
-  2) Generate CSS separately.
-
-  3) Sprinkle in some JS for interactivity.
-
-Step 3 will be done with [[https://clojurescript.org/][ClojureScript]], which compiles to JS.
-
-One main advantage of this model is that other "viewers" can be created, as long
-as they understand the same JSON. While we would prefer to use something more
-"typed" like [[https://protobuf.dev/][Protobufs]], [[https://github.com/cognitect/transit-clj][Transit]], or [[https://github.com/edn-format/edn][EDN]], we choose JSON for its universality.
-Also, none of these alternative formats support both Haskell and ClojureScript
-well.
-
+* HTML foundations
 ** =Lilac.Weave= module
 
-Weaving concerns are captured in [[file:../src/Lilac/Weave.hs]].
+This module is responsible for generating the HTML from a [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]].
 
 #+name: module:Lilac.Weave
 #+header: :tangle src/Lilac/Weave.hs
@@ -545,15 +541,10 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveNamedCellsIndex>>
 #+end_src
 
-* Generate HTML
-:PROPERTIES:
-:ID:       3592f24a-dc14-4ae6-8c06-5680ee7eb9aa
-:END:
-
-Weaving mainly means converting the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] into HTML, as part of "Step 1"
-in [[id:8f5752c0-6162-4de6-9ceb-f78ba584722c][Architecture]].
-
 ** =HtmlWeaver= monad
+:PROPERTIES:
+:ID:       300d21e2-000b-4d65-971a-7a1452725d27
+:END:
 
 During the weaving process, we want to access various other settings that may
 not be apparent at the [[id:ed81c307-9172-4436-8672-583ea8ecb1f9::data:Cell][data:Cell]] level. To capture these values in one place, we
@@ -618,6 +609,423 @@ monad is a ~ReaderT~). So in this case the inner monad is ~ReaderT WeaveConf
 Identity~, and running ~runReaderT~ will result in ~Identity ()~ (where ~()~ is the ~a~
 in the type signature for [[f:renderAsText]]). So then the call to ~hoistHtmlT~ gives
 us ~HtmlT Identity a~, which is what Lucid's ~renderText~ expects.
+
+* CSS foundations
+
+We use the [[https://hackage.haskell.org/package/clay][Clay]] CSS preprocessor to generate CSS.
+
+Conceptually, [[id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa][weaving HTML]] depends on CSS. That is, the content of whatever Org
+file we are weaving is *not* an input into CSS generation. So that's why we call
+it "generating CSS" instead of "weaving CSS".
+
+** =Lilac.Weave.Css= module
+
+#+name: module:Lilac.Weave.Css
+#+header: :tangle src/Lilac/Weave/Css.hs
+#+begin_src haskell
+module Lilac.Weave.Css (genCss) where
+
+import Clay
+  ( Color,
+    Css,
+    Size,
+    a,
+    absolute,
+    alignSide,
+    aside,
+    auto,
+    backgroundColor,
+    before,
+    block,
+    body,
+    bold,
+    border,
+    borderBottom,
+    borderBottomLeftRadius,
+    borderBottomRightRadius,
+    borderBottomWidth,
+    borderBox,
+    borderCollapse,
+    borderLeft,
+    borderRadius,
+    borderRight,
+    borderStyle,
+    borderTop,
+    borderTopLeftRadius,
+    borderTopRightRadius,
+    bottom,
+    boxSizing,
+    button,
+    center,
+    code,
+    collapse,
+    color,
+    column,
+    content,
+    dd,
+    display,
+    displayNone,
+    displayTable,
+    div,
+    dl,
+    dt,
+    em,
+    empty,
+    figcaption,
+    figure,
+    fitContent,
+    flex,
+    flexDirection,
+    float,
+    floatLeft,
+    fontFamily,
+    fontSize,
+    fontStyle,
+    fontVariant,
+    fontWeight,
+    footer,
+    fr,
+    grid,
+    gridTemplateColumns,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    height,
+    hidden,
+    hover,
+    hr,
+    html,
+    inline,
+    inlineBlock,
+    italic,
+    left,
+    li,
+    listStyleType,
+    main_,
+    margin,
+    marginBottom,
+    marginLeft,
+    marginRight,
+    marginTop,
+    maxWidth,
+    minHeight,
+    monospace,
+    nav,
+    none,
+    normal,
+    ol,
+    opacity,
+    overflowX,
+    overflowY,
+    p,
+    padding,
+    paddingLeft,
+    paddingRight,
+    pct,
+    position,
+    pre,
+    pretty,
+    pt,
+    px,
+    relative,
+    rem,
+    renderWith,
+    rgb,
+    sansSerif,
+    serif,
+    sideRight,
+    smallCaps,
+    solid,
+    span,
+    stringContent,
+    sup,
+    table,
+    tbody,
+    td,
+    textAlign,
+    textDecoration,
+    th,
+    thead,
+    top,
+    tr,
+    ul,
+    underline,
+    vAlignSub,
+    vAlignSuper,
+    verticalAlign,
+    vh,
+    visibility,
+    visible,
+    whiteSpace,
+    width,
+    (#),
+    (&),
+    (**),
+    (-:),
+    (?),
+    (|>),
+  )
+import Clay.Text qualified as ClayText
+import Data.Bits
+  ( shiftR,
+    (.&.),
+  )
+import Data.Text qualified as T
+import Data.Text.Lazy qualified as TL
+import Relude
+  ( Bool (True),
+    Int,
+    Maybe (Just, Nothing),
+    String,
+    Text,
+    Type,
+    Void,
+    concatMap,
+    forM_,
+    fromIntegral,
+    otherwise,
+    pure,
+    when,
+    zip,
+    ($),
+    (.),
+    (<),
+    (<>),
+    (>),
+  )
+import Relude.Extra.Map (insert)
+import Skylighting qualified as Sky
+import Text.Megaparsec qualified as MP
+import Text.Megaparsec.Char (char)
+import Text.Megaparsec.Char.Lexer (hexadecimal)
+
+<<f:genCss>>
+<<f:kateLilac>>
+<<f:defaultCss>>
+<<f:roundedRectangleLink>>
+<<f:noMargin>>
+<<f:yx>>
+<<f:ev>>
+<<f:rgbHex>>
+<<f:colorFrom>>
+<<f:isHexColorParser>>
+<<Colors>>
+<<type:ColorParser>>
+<<f:fontSerif>>
+<<f:fontSans>>
+<<f:fontMono>>
+<<f:prependSymbol>>
+#+end_src
+
+** Overview
+:PROPERTIES:
+:ID:       7147b743-084d-4abc-8561-5417c7fe10b3
+:END:
+
+There are two main parts to the CSS. One is the syntax highlighting theme which
+uses a modified variation of the =kate= theme from =Skylighting= (see [[f:kateLilac]]),
+and the other is the rest of Lilac ([[f:defaultCss]]). These two parts are
+concatenated together in [[f:genCss]].
+
+#+name: f:genCss
+#+begin_src haskell
+genCss :: Text
+genCss =
+  T.unlines
+    [ T.pack $ Sky.styleToCss kateLilac,
+      TL.toStrict $ renderWith pretty [] defaultCss
+    ]
+#+end_src
+
+** Design philosophy
+
+The main source of inspiration comes from the design of [[https://en.wikipedia.org/wiki/Main_Page][Wikipedia]], which has a
+simple and intuitive interface.
+
+** Sizing
+
+We prefer to use ~rem~ (root element) over ~em~ (element), because ~rem~ doesn't
+compound over nested elements like ~em~ does.
+
+** Generic helpers
+
+[[f:noMargin]] removes all margins.
+
+#+name: f:noMargin
+#+begin_src haskell
+noMargin :: Css
+noMargin = ev margin $ px 0
+#+end_src
+
+[[f:yx]] is a horizontal/vertical size helper. It accepts a function and two sizes
+for the horizontal and vertical parts. E.g., instead of calling
+
+#+begin_src haskell
+padding (px 6) (px 10) (px 6) (px 10)
+#+end_src
+
+you can do
+
+#+begin_src haskell
+yx padding (px 6) (px 10)
+#+end_src
+
+to save some keystrokes and decrease the chance of typos.
+
+#+name: f:yx
+#+begin_src haskell
+yx :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Size sz -> Css
+yx f x y = f x y x y
+#+end_src
+
+[[f:ev]] is like [[f:yx]], but uses the same size for *everything*.
+
+#+name: f:ev
+#+begin_src haskell
+ev :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Css
+ev f x = f x x x x
+#+end_src
+
+[[f:rgbHex]] converts a hex number into a CSS ~Color~ value. While this can be used
+directly as in [[css:Headings]], its is used more often indirectly via [[f:colorFrom]]
+which relies depends on this helper.
+
+#+name: f:rgbHex
+#+begin_src haskell
+rgbHex :: Int -> Color
+rgbHex rgb'
+  | rgb' > 0xffffff = rgbHex 0xffffff
+  | rgb' < 0 = rgbHex 0
+  | otherwise = rgb rr gg bb
+  where
+    rr = fromIntegral $ shiftR rgb' 16 .&. 0xFF
+    gg = fromIntegral $ shiftR rgb' 8 .&. 0xFF
+    bb = fromIntegral $ rgb' .&. 0xFF
+#+end_src
+
+** Fonts
+
+We use fonts from the open source "Source" family by Adobe: [[https://github.com/adobe-fonts/source-serif][Source Serif]], [[https://github.com/adobe-fonts/source-sans][Source
+Sans]], and [[https://github.com/adobe-fonts/source-code-pro][Source Code Pro]].
+
+#+name: f:fontSerif
+#+begin_src haskell
+fontSerif :: Css
+fontSerif = do
+  fontFamily ["Source Serif 4"] [serif]
+#+end_src
+
+#+name: f:fontSans
+#+begin_src haskell
+fontSans :: Css
+fontSans = do
+  fontFamily ["Source Sans 3"] [sansSerif]
+#+end_src
+
+#+name: f:fontMono
+#+begin_src haskell
+fontMono :: Css
+fontMono = do
+  fontFamily ["Source Code Pro"] [monospace]
+#+end_src
+
+** Colors
+
+[[https://hackage.haskell.org/package/clay][Clay]] uses its own internal ~Color~ type, which can only be constructed from
+integer values. However we want to talk about colors using strings because using
+something like "#22ffff" can allow Emacs to colorize it in the buffer, aiding
+visualization.
+
+[[f:colorFrom]] converts a ~Text~ into a ~Color~, defaulting to "#ff0000" if parsing
+fails.
+
+#+name: f:colorFrom
+#+begin_src haskell
+colorFrom :: Text -> Color
+colorFrom input = case MP.parseMaybe isHexColorParser input of
+  Nothing -> rgbHex 0xff0000
+  Just color' -> color'
+#+end_src
+
+This depends on [[f:isHexColorParser]] which is mostly a wrapper around
+~Text.Megaparsec.Char.Lexer.hexadecimal~.
+
+#+name: f:isHexColorParser
+#+begin_src haskell
+isHexColorParser :: ColorParser Color
+isHexColorParser = do
+  _ <- char '#'
+  n <- hexadecimal
+  pure $ rgbHex n
+#+end_src
+
+The ~ColorParser~ is a type synonym for a "standard" Megaparsec type defined in
+the [[https://hackage.haskell.org/package/megaparsec-9.7.0/docs/Text-Megaparsec.html][documentation]].
+
+#+name: type:ColorParser
+#+begin_src haskell
+type ColorParser :: Type -> Type
+type ColorParser = MP.Parsec Void Text
+#+end_src
+
+Now for the actual colors. Currently there is only a light theme.
+
+#+name: Colors
+#+begin_src haskell
+colorBg :: Color
+colorBg = colorFrom "#ffffff"
+
+colorText :: Color
+colorText = colorFrom "#000000"
+
+colorCodeFg :: Color
+colorCodeFg = colorFrom "#1f1c1b"
+
+colorCodeBg :: Color
+colorCodeBg = colorFrom "#f7f7f7"
+
+colorCodeBorder :: Color
+colorCodeBorder = colorFrom "#cccccc"
+
+colorBreadcrumbSeparator :: Color
+colorBreadcrumbSeparator = colorFrom "#888888"
+
+colorNowebLinkFg :: Color
+colorNowebLinkFg = colorFrom "#2161ac"
+
+colorNowebLinkFgTxt :: Text
+colorNowebLinkFgTxt = "#2161ac"
+
+colorNowebLinkBg :: Color
+colorNowebLinkBg = colorFrom "#d8f6ff"
+
+colorNowebLinkVisitedFg :: Color
+colorNowebLinkVisitedFg = colorFrom "#7d3c98"
+
+colorNowebLinkVisitedBg :: Color
+colorNowebLinkVisitedBg = colorFrom "#f8e9ff"
+
+colorTocActive :: Color
+colorTocActive = colorFrom "#eafaff"
+
+colorTocActiveAncestor :: Color
+colorTocActiveAncestor = colorFrom "#ededed"
+
+colorActiveBg :: Color
+colorActiveBg = colorFrom "#f1ffef"
+
+colorActiveBorder :: Color
+colorActiveBorder = colorFrom "#008000"
+#+end_src
+
+
+* Generate HTML
+:PROPERTIES:
+:ID:       3592f24a-dc14-4ae6-8c06-5680ee7eb9aa
+:END:
 
 ** Top-level (Object) weaver
 :PROPERTIES:
@@ -4348,244 +4756,6 @@ expectCiteprocResult path expected = do
 :ID:       8017befd-7628-46cf-a090-72fdbb00fb5a
 :END:
 
-We use the [[https://hackage.haskell.org/package/clay][Clay]] CSS preprocessor to generate CSS.
-
-Conceptually, [[id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa][weaving HTML]] depends on CSS. That is, the content of whatever Org
-file we are weaving is *not* an input into CSS generation. So that's why we call
-it "generating CSS" instead of "weaving CSS".
-
-** =Lilac.Weave.Css= module
-
-#+name: module:Lilac.Weave.Css
-#+header: :tangle src/Lilac/Weave/Css.hs
-#+begin_src haskell
-module Lilac.Weave.Css (genCss) where
-
-import Clay
-  ( Color,
-    Css,
-    Size,
-    a,
-    absolute,
-    alignSide,
-    aside,
-    auto,
-    backgroundColor,
-    before,
-    block,
-    body,
-    bold,
-    border,
-    borderBottom,
-    borderBottomLeftRadius,
-    borderBottomRightRadius,
-    borderBottomWidth,
-    borderBox,
-    borderCollapse,
-    borderLeft,
-    borderRadius,
-    borderRight,
-    borderStyle,
-    borderTop,
-    borderTopLeftRadius,
-    borderTopRightRadius,
-    bottom,
-    boxSizing,
-    button,
-    center,
-    code,
-    collapse,
-    color,
-    column,
-    content,
-    dd,
-    display,
-    displayNone,
-    displayTable,
-    div,
-    dl,
-    dt,
-    em,
-    empty,
-    figcaption,
-    figure,
-    fitContent,
-    flex,
-    flexDirection,
-    float,
-    floatLeft,
-    fontFamily,
-    fontSize,
-    fontStyle,
-    fontVariant,
-    fontWeight,
-    footer,
-    fr,
-    grid,
-    gridTemplateColumns,
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6,
-    height,
-    hidden,
-    hover,
-    hr,
-    html,
-    inline,
-    inlineBlock,
-    italic,
-    left,
-    li,
-    listStyleType,
-    main_,
-    margin,
-    marginBottom,
-    marginLeft,
-    marginRight,
-    marginTop,
-    maxWidth,
-    minHeight,
-    monospace,
-    nav,
-    none,
-    normal,
-    ol,
-    opacity,
-    overflowX,
-    overflowY,
-    p,
-    padding,
-    paddingLeft,
-    paddingRight,
-    pct,
-    position,
-    pre,
-    pretty,
-    pt,
-    px,
-    relative,
-    rem,
-    renderWith,
-    rgb,
-    sansSerif,
-    serif,
-    sideRight,
-    smallCaps,
-    solid,
-    span,
-    stringContent,
-    sup,
-    table,
-    tbody,
-    td,
-    textAlign,
-    textDecoration,
-    th,
-    thead,
-    top,
-    tr,
-    ul,
-    underline,
-    vAlignSub,
-    vAlignSuper,
-    verticalAlign,
-    vh,
-    visibility,
-    visible,
-    whiteSpace,
-    width,
-    (#),
-    (&),
-    (**),
-    (-:),
-    (?),
-    (|>),
-  )
-import Clay.Text qualified as ClayText
-import Data.Bits
-  ( shiftR,
-    (.&.),
-  )
-import Data.Text qualified as T
-import Data.Text.Lazy qualified as TL
-import Relude
-  ( Bool (True),
-    Int,
-    Maybe (Just, Nothing),
-    String,
-    Text,
-    Type,
-    Void,
-    concatMap,
-    forM_,
-    fromIntegral,
-    otherwise,
-    pure,
-    when,
-    zip,
-    ($),
-    (.),
-    (<),
-    (<>),
-    (>),
-  )
-import Relude.Extra.Map (insert)
-import Skylighting qualified as Sky
-import Text.Megaparsec qualified as MP
-import Text.Megaparsec.Char (char)
-import Text.Megaparsec.Char.Lexer (hexadecimal)
-
-<<f:genCss>>
-<<f:kateLilac>>
-<<f:defaultCss>>
-<<f:roundedRectangleLink>>
-<<f:noMargin>>
-<<f:yx>>
-<<f:ev>>
-<<f:rgbHex>>
-<<f:colorFrom>>
-<<f:isHexColorParser>>
-<<Colors>>
-<<type:Parser>>
-<<f:fontSerif>>
-<<f:fontSans>>
-<<f:fontMono>>
-<<f:prependSymbol>>
-#+end_src
-
-** Overview
-:PROPERTIES:
-:ID:       7147b743-084d-4abc-8561-5417c7fe10b3
-:END:
-
-There are two main parts to the CSS. One is the syntax highlighting theme which
-uses a modified variation of the =kate= theme from =Skylighting= (see [[f:kateLilac]]),
-and the other is the rest of Lilac ([[f:defaultCss]]). These two parts are
-concatenated together in [[f:genCss]].
-
-#+name: f:genCss
-#+begin_src haskell
-genCss :: Text
-genCss =
-  T.unlines
-    [ T.pack $ Sky.styleToCss kateLilac,
-      TL.toStrict $ renderWith pretty [] defaultCss
-    ]
-#+end_src
-
-*** Design philosophy
-
-The main source of inspiration comes from the design of [[https://en.wikipedia.org/wiki/Main_Page][Wikipedia]], which has a
-simple and intuitive interface.
-
-*** Sizing
-
-We prefer to use ~rem~ (root element) over ~em~ (element), because ~rem~ doesn't
-compound over nested elements like ~em~ does.
-
 ** =Skylighting= (Kate-based syntax highlighting)
 
 We make a small tweak to =kate= to make some colors easier on the eyes. The
@@ -5494,181 +5664,6 @@ for the bibliographical entries when using ~#+print_bibliography:~.
   fontStyle italic
   ev margin (px 2)
 #+end_src
-
-** Generic helpers
-
-[[f:noMargin]] removes all margins.
-
-#+name: f:noMargin
-#+begin_src haskell
-noMargin :: Css
-noMargin = ev margin $ px 0
-#+end_src
-
-[[f:yx]] is a horizontal/vertical size helper. It accepts a function and two sizes
-for the horizontal and vertical parts. E.g., instead of calling
-
-#+begin_src haskell
-padding (px 6) (px 10) (px 6) (px 10)
-#+end_src
-
-you can do
-
-#+begin_src haskell
-yx padding (px 6) (px 10)
-#+end_src
-
-to save some keystrokes and decrease the chance of typos.
-
-#+name: f:yx
-#+begin_src haskell
-yx :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Size sz -> Css
-yx f x y = f x y x y
-#+end_src
-
-[[f:ev]] is like [[f:yx]], but uses the same size for *everything*.
-
-#+name: f:ev
-#+begin_src haskell
-ev :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Css
-ev f x = f x x x x
-#+end_src
-
-[[f:rgbHex]] converts a hex number into a CSS ~Color~ value. While this can be used
-directly as in [[css:Headings]], its is used more often indirectly via [[f:colorFrom]]
-which relies depends on this helper.
-
-#+name: f:rgbHex
-#+begin_src haskell
-rgbHex :: Int -> Color
-rgbHex rgb'
-  | rgb' > 0xffffff = rgbHex 0xffffff
-  | rgb' < 0 = rgbHex 0
-  | otherwise = rgb rr gg bb
-  where
-    rr = fromIntegral $ shiftR rgb' 16 .&. 0xFF
-    gg = fromIntegral $ shiftR rgb' 8 .&. 0xFF
-    bb = fromIntegral $ rgb' .&. 0xFF
-#+end_src
-
-** Fonts
-
-We use fonts from the open source "Source" family by Adobe: [[https://github.com/adobe-fonts/source-serif][Source Serif]], [[https://github.com/adobe-fonts/source-sans][Source
-Sans]], and [[https://github.com/adobe-fonts/source-code-pro][Source Code Pro]].
-
-#+name: f:fontSerif
-#+begin_src haskell
-fontSerif :: Css
-fontSerif = do
-  fontFamily ["Source Serif 4"] [serif]
-#+end_src
-
-#+name: f:fontSans
-#+begin_src haskell
-fontSans :: Css
-fontSans = do
-  fontFamily ["Source Sans 3"] [sansSerif]
-#+end_src
-
-#+name: f:fontMono
-#+begin_src haskell
-fontMono :: Css
-fontMono = do
-  fontFamily ["Source Code Pro"] [monospace]
-#+end_src
-
-** Colors
-
-[[https://hackage.haskell.org/package/clay][Clay]] uses its own internal ~Color~ type, which can only be constructed from
-integer values. However we want to talk about colors using strings because using
-something like "#22ffff" can allow Emacs to colorize it in the buffer, aiding
-visualization.
-
-[[f:colorFrom]] converts a ~Text~ into a ~Color~, defaulting to "#ff0000" if parsing
-fails.
-
-#+name: f:colorFrom
-#+begin_src haskell
-colorFrom :: Text -> Color
-colorFrom input = case MP.parseMaybe isHexColorParser input of
-  Nothing -> rgbHex 0xff0000
-  Just color' -> color'
-#+end_src
-
-This depends on [[f:isHexColorParser]] which is mostly a wrapper around
-~Text.Megaparsec.Char.Lexer.hexadecimal~.
-
-#+name: f:isHexColorParser
-#+begin_src haskell
-isHexColorParser :: Parser Color
-isHexColorParser = do
-  _ <- char '#'
-  n <- hexadecimal
-  pure $ rgbHex n
-#+end_src
-
-The ~Parser~ is a type synonym for a "standard" Megaparsec type defined in the
-[[https://hackage.haskell.org/package/megaparsec-9.7.0/docs/Text-Megaparsec.html][documentation]].
-
-#+name: type:Parser
-#+begin_src haskell
-type Parser :: Type -> Type
-type Parser = MP.Parsec Void Text
-#+end_src
-
-Now for the actual colors. Currently there is only a light theme.
-
-#+name: Colors
-#+begin_src haskell
-colorBg :: Color
-colorBg = colorFrom "#ffffff"
-
-colorText :: Color
-colorText = colorFrom "#000000"
-
-colorCodeFg :: Color
-colorCodeFg = colorFrom "#1f1c1b"
-
-colorCodeBg :: Color
-colorCodeBg = colorFrom "#f7f7f7"
-
-colorCodeBorder :: Color
-colorCodeBorder = colorFrom "#cccccc"
-
-colorBreadcrumbSeparator :: Color
-colorBreadcrumbSeparator = colorFrom "#888888"
-
-colorNowebLinkFg :: Color
-colorNowebLinkFg = colorFrom "#2161ac"
-
-colorNowebLinkFgTxt :: Text
-colorNowebLinkFgTxt = "#2161ac"
-
-colorNowebLinkBg :: Color
-colorNowebLinkBg = colorFrom "#d8f6ff"
-
-colorNowebLinkVisitedFg :: Color
-colorNowebLinkVisitedFg = colorFrom "#7d3c98"
-
-colorNowebLinkVisitedBg :: Color
-colorNowebLinkVisitedBg = colorFrom "#f8e9ff"
-
-colorTocActive :: Color
-colorTocActive = colorFrom "#eafaff"
-
-colorTocActiveAncestor :: Color
-colorTocActiveAncestor = colorFrom "#ededed"
-
-colorActiveBg :: Color
-colorActiveBg = colorFrom "#f1ffef"
-
-colorActiveBorder :: Color
-colorActiveBorder = colorFrom "#008000"
-#+end_src
-
-* ClojureScript frontend
-
-The ClojureScript frontend is developed in [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][=fe.org=]].
 
 * Glossary
 
