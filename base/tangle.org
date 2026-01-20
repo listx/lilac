@@ -734,6 +734,59 @@ checkExpansion
   ]
 #+end_src
 
+Sometimes we want to use Noweb links on the same line as existing code,
+surrounded by other text. In these cases we shouldn't do any padding, because
+adding padding makes sense only when the link is at the very end (otherwise, we
+could end up introducing a newline right in the middle of a line). In the test
+case below the links to ~<<b1>>~ and ~<<b2>>~ have a trailing comma, so it doesn't
+make sense to add a newline between the link and the comma.
+
+#+name: ti:0102-pad-between-consecutive-links-except-embedded
+#+header: :tangle test/Lilac/TangleSpec/0102-pad-between-consecutive-links-except-embedded
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e00e
+:END:
+
+,#+name: a
+,#+header: :tangle equations.txt
+,#+begin_src haskell
+a1 <<b1>>,
+a2 <<b2>>,
+a3 <<b3>>
+,#+end_src
+
+,#+name: b1
+,#+begin_src haskell
+b1
+,#+end_src
+
+,#+name: b2
+,#+begin_src haskell
+b2
+,#+end_src
+
+,#+name: b3
+,#+begin_src haskell
+b3
+,#+end_src
+#+end_src
+
+#+name: t:0102-pad-between-consecutive-links-except-embedded
+#+begin_src haskell
+checkExpansion
+  ["0102-pad-between-consecutive-links-except-embedded"]
+  [ ( "equations.txt",
+      T.unlines
+        [ "a1 b1,",
+          "a2 b2,",
+          "a3 b3"
+        ]
+    )
+  ]
+#+end_src
+
 Insert shebang lines if the user specifies them with the ~:shebang~ header.
 
 #+name: ti:0103-shebang
@@ -1049,5 +1102,6 @@ Below are all of the individual test cases.
 <<t:0101-block-expansion-external-mutual>>
 <<t:lines-unlines-info-loss>>
 <<t:0102-pad-between-consecutive-links>>
+<<t:0102-pad-between-consecutive-links-except-embedded>>
 <<t:0103-shebang>>
 #+end_src

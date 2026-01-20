@@ -916,6 +916,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:compressBTokens>>
 <<f:padConsecutiveNowebLinks>>
 <<f:getLinkPaddingBools>>
+<<f:nowebLinkAtEndOfLine>>
 <<f:getBlockContents>>
 <<f:zeroIndent>>
 <<f:someIndent>>
@@ -9226,6 +9227,13 @@ The high-level algorithm is as follows:
   3) Group together the lines that have Noweb links. In other words, consecutive
      lines that have Noweb links are grouped together.
 
+     For a line to be considered for this group, it must end with a Noweb link;
+     if that link is followed by any text, we leave it alone. This is because we
+     only ever want to add newline padding to the end of a Noweb link, and if
+     there is some other text immediately following a Noweb link, we'll end up
+     introducing a newline in the middle of the line, which is almost never
+     desirable.
+
   4) Within each group, only mark the links at the end of the line (because
      there may be more than one link in a line) as needing a newline. By marking
      links as needing (or not needing) a newline, we can easily inject padding
@@ -9254,8 +9262,8 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
-      BTokenLinkTarget (LinkTargetOid linkOid) ->
-        <<link-marker>> <> (T.show linkOid)
+      BTokenLinkTarget (LinkTargetOid _) ->
+        <<link-marker>>
       BTokenLinkTarget {} -> ""
 #+end_src
 
@@ -9277,31 +9285,50 @@ returns a list of booleans that correspond to each of the Noweb links found. If
 getLinkPaddingBools :: [BToken] -> [Bool]
 getLinkPaddingBools blockBody =
   concatMap (concatMap padLastLinkOnThisLine)
-    . map (reverse . (zip $ False : repeat True) . reverse) -- (ref:f:getLinkPaddingBools-pad-except-last)
+    . map padLinesExceptLast -- (ref:f:getLinkPaddingBools-pad-lines-except-last)
     . groupBy consecutiveNowebLines
     . T.lines
     $ getBlockContents blockBody
   where
     consecutiveNowebLines :: Text -> Text -> Bool
-    consecutiveNowebLines a b = (countLinks a > 0) && (countLinks b > 0)
-    padLastLinkOnThisLine (False, line) =
-      replicate (countLinks line) False
-    padLastLinkOnThisLine (True, line) =
-      case countLinks line of
-        1 -> [True]
-        n -> reverse $ True : replicate (n - 1) False -- (ref:f:getLinkPaddingBools-padLastLinkOnThisLine)
+    consecutiveNowebLines a b =
+      (nowebLinkAtEndOfLine a)
+        && (nowebLinkAtEndOfLine b) -- (ref:f:getLinkPaddingBools-nowebLinkAtEndOfLine)
+        && (countLinks a > 0)
+        && (countLinks b > 0)
+    padLinesExceptLast :: [Text] -> [(Bool, Text)]
+    padLinesExceptLast lines =
+      reverse
+        . (zip $ False : repeat True)
+        $ reverse lines
+    padLastLinkOnThisLine :: (Bool, Text) -> [Bool]
+    padLastLinkOnThisLine (padLinksInThisLine, line)
+      | padLinksInThisLine = case countLinks line of
+          1 -> [True]
+          n -> reverse $ True : replicate (n - 1) False -- (ref:f:getLinkPaddingBools-padLastLinkOnThisLine)
+      | otherwise = replicate (countLinks line) False
     countLinks = T.count <<link-marker>>
 #+end_src
 
-The line ~map (reverse . (zip $ False : repeat True) . reverse)~
-[[(f:getLinkPaddingBools-pad-except-last)]] says to only pad the lines except for
-the last one, and ~padLastLinkOnThisLine~
+We only pad the lines except for the last one
+[[(f:getLinkPaddingBools-pad-lines-except-last)]], and ~padLastLinkOnThisLine~
 [[(f:getLinkPaddingBools-padLastLinkOnThisLine)]] only pads the very last link found
-in the line.
+in the line. The call to [[f:nowebLinkAtEndOfLine]]
+[[(f:getLinkPaddingBools-nowebLinkAtEndOfLine)]] limits this padding to Noweb links
+that are at the end of the line; Noweb links that are followed by non-newline
+text is called an "embedded" link. See
+[[id:c78d3f21-b295-4f19-b720-ab50dedb3252::ti:0102-pad-between-consecutive-links-except-embedded][ti:0102-pad-between-consecutive-links-except-embedded]] for an example of the
+expected behavior here.
 
-Now that we have a list of booleans to mark whether a link needs a newline
-appended to it, all we have to do is go through all of the links in the block,
-adding a ~BTokenPaddding~ every time we see a ~True~ boolean (~padLink~).
+#+name: f:nowebLinkAtEndOfLine
+#+begin_src haskell
+nowebLinkAtEndOfLine :: Text -> Bool
+nowebLinkAtEndOfLine line = <<link-marker>> `T.isSuffixOf` line
+#+end_src
+
+For the list of booleans we get from [[f:getLinkPaddingBools]], all we have to do is
+go through all of the links in the block, adding a ~BTokenPaddding~ every time we
+see a ~True~ boolean (~padLink~).
 
 #+name: f:padConsecutiveNowebLinks
 #+begin_src haskell
@@ -9323,8 +9350,11 @@ padConsecutiveNowebLinks blockBody =
         [] -> (linkTarget : acc, [])
 #+end_src
 
-See [[id:c78d3f21-b295-4f19-b720-ab50dedb3252::t:0102-pad-between-consecutive-links][t:0102-pad-between-consecutive-links]] for an example of this padding
-behavior.
+See the test case inputs below for examples of this padding behavior.
+
+  - [[id:c78d3f21-b295-4f19-b720-ab50dedb3252::ti:0102-pad-between-consecutive-links][ti:0102-pad-between-consecutive-links]]
+
+  - [[id:c78d3f21-b295-4f19-b720-ab50dedb3252::ti:0102-pad-between-consecutive-links-except-embedded][ti:0102-pad-between-consecutive-links-except-embedded]]
 
 ** Additional tests
 

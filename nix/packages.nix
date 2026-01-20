@@ -198,7 +198,6 @@ in {
       ${pre-commit-check.shellHook}
       logo
     '';
-  };
-  # (ref:devShell drv)
+  }; # (ref:devShell drv)
   lilac = ourHaskell.lilac; # (ref:lilac drv)
 }

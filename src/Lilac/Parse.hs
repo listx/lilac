@@ -1620,20 +1620,32 @@ padConsecutiveNowebLinks blockBody =
 getLinkPaddingBools :: [BToken] -> [Bool]
 getLinkPaddingBools blockBody =
   concatMap (concatMap padLastLinkOnThisLine)
-    . map (reverse . (zip $ False : repeat True) . reverse) --
+    . map padLinesExceptLast --
     . groupBy consecutiveNowebLines
     . T.lines
     $ getBlockContents blockBody
   where
     consecutiveNowebLines :: Text -> Text -> Bool
-    consecutiveNowebLines a b = (countLinks a > 0) && (countLinks b > 0)
-    padLastLinkOnThisLine (False, line) =
-      replicate (countLinks line) False
-    padLastLinkOnThisLine (True, line) =
-      case countLinks line of
-        1 -> [True]
-        n -> reverse $ True : replicate (n - 1) False --
+    consecutiveNowebLines a b =
+      (nowebLinkAtEndOfLine a)
+        && (nowebLinkAtEndOfLine b) --
+        && (countLinks a > 0)
+        && (countLinks b > 0)
+    padLinesExceptLast :: [Text] -> [(Bool, Text)]
+    padLinesExceptLast lines =
+      reverse
+        . (zip $ False : repeat True)
+        $ reverse lines
+    padLastLinkOnThisLine :: (Bool, Text) -> [Bool]
+    padLastLinkOnThisLine (padLinksInThisLine, line)
+      | padLinksInThisLine = case countLinks line of
+          1 -> [True]
+          n -> reverse $ True : replicate (n - 1) False --
+      | otherwise = replicate (countLinks line) False
     countLinks = T.count "\NUL_link"
+
+nowebLinkAtEndOfLine :: Text -> Bool
+nowebLinkAtEndOfLine line = "\NUL_link" `T.isSuffixOf` line
 
 getBlockContents :: [BToken] -> Text
 getBlockContents blockBody = T.concat $ map bTokenToText blockBody
@@ -1642,8 +1654,8 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
     bTokenToText = \case
       BTokenString text -> text
       BTokenPadding -> ""
-      BTokenLinkTarget (LinkTargetOid linkOid) ->
-        "\NUL_link" <> (T.show linkOid)
+      BTokenLinkTarget (LinkTargetOid _) ->
+        "\NUL_link"
       BTokenLinkTarget {} -> ""
 
 zeroIndent :: OrgParser (Int, Int)

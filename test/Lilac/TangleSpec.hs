@@ -220,6 +220,17 @@ spec = do
     ]
 
   checkExpansion
+    ["0102-pad-between-consecutive-links-except-embedded"]
+    [ ( "equations.txt",
+        T.unlines
+          [ "a1 b1,",
+            "a2 b2,",
+            "a3 b3"
+          ]
+      )
+    ]
+
+  checkExpansion
     ["0103-shebang"]
     [ ( "a.sh",
         T.unlines
