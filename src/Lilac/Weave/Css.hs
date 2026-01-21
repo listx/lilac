@@ -201,7 +201,7 @@ kateLilac =
 defaultCss :: Css
 defaultCss = do
   html ? do
-    noMargin
+    ev margin $ px 0
     ev padding $ px 0
     backgroundColor colorBg
     color colorText
@@ -312,7 +312,7 @@ defaultCss = do
       fontSize $ rem 0.9
       marginBottom (px 10)
   div ? do
-    noMargin
+    ev margin $ px 0
   p # ".widget-title" ? do
     fontWeight bold
     marginBottom $ px 0
@@ -540,15 +540,15 @@ defaultCss = do
     borderBottomWidth 0
 
   pre ? do
-    noMargin
+    ev margin $ px 0
   code ? do
-    noMargin
+    ev margin $ px 0
     a ? do
       roundedRectangleLink
       span ? do
         color colorNowebLinkFg
   ".sourceCode" & do
-    noMargin
+    ev margin $ px 0
   ".code-block-body" & do
     overflowX auto
     fontMono
@@ -710,10 +710,11 @@ roundedRectangleLink = do
       border (px 1) solid colorNowebLinkVisitedFg
       textDecoration none
 
-noMargin :: Css
-noMargin = ev margin $ px 0
-
-yx :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Size sz -> Css
+yx ::
+  (Size sz -> Size sz -> Size sz -> Size sz -> Css) ->
+  Size sz ->
+  Size sz ->
+  Css
 yx f x y = f x y x y
 
 ev :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Css

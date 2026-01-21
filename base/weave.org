@@ -616,13 +616,6 @@ in the type signature for [[f:renderAsText]]). So then the call to ~hoistHtmlT~ 
 us ~HtmlT Identity a~, which is what Lucid's ~renderText~ expects.
 
 * CSS foundations
-
-We use the [[https://hackage.haskell.org/package/clay][Clay]] CSS preprocessor to generate CSS.
-
-Conceptually, [[id:3592f24a-dc14-4ae6-8c06-5680ee7eb9aa][weaving HTML]] depends on CSS. That is, the content of whatever Org
-file we are weaving is *not* an input into CSS generation. So that's why we call
-it "generating CSS" instead of "weaving CSS".
-
 ** =Lilac.Weave.Css= module
 
 #+name: module:Lilac.Weave.Css
@@ -811,7 +804,6 @@ import Text.Megaparsec.Char.Lexer (hexadecimal)
 <<f:kateLilac>>
 <<f:defaultCss>>
 <<f:roundedRectangleLink>>
-<<f:noMargin>>
 <<f:yx>>
 <<f:ev>>
 <<f:rgbHex>>
@@ -825,15 +817,17 @@ import Text.Megaparsec.Char.Lexer (hexadecimal)
 <<f:prependSymbol>>
 #+end_src
 
-** Overview
+** CSS generator
 :PROPERTIES:
 :ID:       7147b743-084d-4abc-8561-5417c7fe10b3
 :END:
 
-There are two main parts to the CSS. One is the syntax highlighting theme which
-uses a modified variation of the =kate= theme from =Skylighting= (see [[f:kateLilac]]),
-and the other is the rest of Lilac ([[f:defaultCss]]). These two parts are
-concatenated together in [[f:genCss]].
+[[f:genCss]] is the main top-level function which generates the CSS. There are two
+main parts: one is the syntax highlighting theme which uses a modified variation
+of the ~kate~ theme from [[https://hackage.haskell.org/package/skylighting][=Skylighting=]] (see [[f:kateLilac]]), and the other is the
+rest of Lilac ([[f:defaultCss]]) which uses the [[https://hackage.haskell.org/package/clay][Clay]] CSS preprocessor. These two
+parts are concatenated together in [[f:genCss]], so that Lilac's settings take
+precedence if there are any conflicts with the =Skylighting= parts.
 
 #+name: f:genCss
 #+begin_src haskell
@@ -845,25 +839,12 @@ genCss =
     ]
 #+end_src
 
-** Design philosophy
-
-The main source of inspiration comes from the design of [[https://en.wikipedia.org/wiki/Main_Page][Wikipedia]], which has a
-simple and intuitive interface.
-
 ** Sizing
 
 We prefer to use ~rem~ (root element) over ~em~ (element), because ~rem~ doesn't
 compound over nested elements like ~em~ does.
 
-** Generic helpers
-
-[[f:noMargin]] removes all margins.
-
-#+name: f:noMargin
-#+begin_src haskell
-noMargin :: Css
-noMargin = ev margin $ px 0
-#+end_src
+*** Helpers
 
 [[f:yx]] is a horizontal/vertical size helper. It accepts a function and two sizes
 for the horizontal and vertical parts. E.g., instead of calling
@@ -882,7 +863,11 @@ to save some keystrokes and decrease the chance of typos.
 
 #+name: f:yx
 #+begin_src haskell
-yx :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Size sz -> Css
+yx ::
+  (Size sz -> Size sz -> Size sz -> Size sz -> Css) ->
+  Size sz ->
+  Size sz ->
+  Css
 yx f x y = f x y x y
 #+end_src
 
@@ -892,23 +877,6 @@ yx f x y = f x y x y
 #+begin_src haskell
 ev :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Css
 ev f x = f x x x x
-#+end_src
-
-[[f:rgbHex]] converts a hex number into a CSS ~Color~ value. While this can be used
-directly as in [[css:Headings]], its is used more often indirectly via [[f:colorFrom]]
-which relies depends on this helper.
-
-#+name: f:rgbHex
-#+begin_src haskell
-rgbHex :: Int -> Color
-rgbHex rgb'
-  | rgb' > 0xffffff = rgbHex 0xffffff
-  | rgb' < 0 = rgbHex 0
-  | otherwise = rgb rr gg bb
-  where
-    rr = fromIntegral $ shiftR rgb' 16 .&. 0xFF
-    gg = fromIntegral $ shiftR rgb' 8 .&. 0xFF
-    bb = fromIntegral $ rgb' .&. 0xFF
 #+end_src
 
 ** Fonts
@@ -941,10 +909,10 @@ fontMono = do
 
 [[https://hackage.haskell.org/package/clay][Clay]] uses its own internal ~Color~ type, which can only be constructed from
 integer values. However we want to talk about colors using strings because using
-something like "#22ffff" can allow Emacs to colorize it in the buffer, aiding
+something like ~#22ffff~ can allow Emacs to colorize it in the buffer, aiding
 visualization.
 
-[[f:colorFrom]] converts a ~Text~ into a ~Color~, defaulting to "#ff0000" if parsing
+[[f:colorFrom]] converts a ~Text~ into a ~Color~, defaulting to ~#ff0000~ (red) if parsing
 fails.
 
 #+name: f:colorFrom
@@ -965,6 +933,21 @@ isHexColorParser = do
   _ <- char '#'
   n <- hexadecimal
   pure $ rgbHex n
+#+end_src
+
+[[f:rgbHex]] converts a hex number into a CSS ~Color~ value.
+
+#+name: f:rgbHex
+#+begin_src haskell
+rgbHex :: Int -> Color
+rgbHex rgb'
+  | rgb' > 0xffffff = rgbHex 0xffffff
+  | rgb' < 0 = rgbHex 0
+  | otherwise = rgb rr gg bb
+  where
+    rr = fromIntegral $ shiftR rgb' 16 .&. 0xFF
+    gg = fromIntegral $ shiftR rgb' 8 .&. 0xFF
+    bb = fromIntegral $ rgb' .&. 0xFF
 #+end_src
 
 The ~ColorParser~ is a type synonym for a "standard" Megaparsec type defined in
@@ -1025,7 +1008,6 @@ colorActiveBg = colorFrom "#f1ffef"
 colorActiveBorder :: Color
 colorActiveBorder = colorFrom "#008000"
 #+end_src
-
 
 * Generate HTML
 :PROPERTIES:
@@ -4815,7 +4797,7 @@ Here we style the major parts of the page. The main piece is the top-level
 #+name: css:Layout
 #+begin_src haskell
 html ? do
-  noMargin
+  ev margin $ px 0
   ev padding $ px 0
   backgroundColor colorBg
   color colorText
@@ -4838,7 +4820,7 @@ body ? do
 <<css:Sidebar>>
 <<css:Footer>>
 div ? do
-  noMargin
+  ev margin $ px 0
 p # ".widget-title" ? do
   fontWeight bold
   marginBottom $ px 0
@@ -5445,15 +5427,15 @@ div # ".code-block-meta-raw" ? do
 #+name: css:Block body
 #+begin_src haskell
 pre ? do
-  noMargin
+  ev margin $ px 0
 code ? do
-  noMargin
+  ev margin $ px 0
   a ? do
     roundedRectangleLink
     span ? do
       color colorNowebLinkFg
 ".sourceCode" & do
-  noMargin
+  ev margin $ px 0
 ".code-block-body" & do
   overflowX auto
   fontMono
