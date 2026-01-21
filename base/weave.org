@@ -563,20 +563,21 @@ type WeaveConf :: Type
 data WeaveConf = WeaveConf
   { projectConf :: ProjectConf,
     archive :: Archive,
-    originObjectPath :: GPath,
+    originObjectPath :: GPath, -- (ref:data:WeaveConf-originObjectPath)
     outDir :: GPath,
     citeprocResult :: CP.Result Prose
   }
 #+end_src
 
-The ~originObjectPath~ is used to check whether a given [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] refers to a
-cell that exists in the current object being woven in [[f:weaveObject]] (so we know
-whether to refer to the cell with just ~#...~ as the HTML =id= attribute, or whether
-as ~path/to/external/object.html#...~ because the cell belongs to another object).
+The ~originObjectPath~ [[(data:WeaveConf-originObjectPath)]] is used to check whether
+a given [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] refers to a cell that exists in the current object being
+woven in [[f:weaveObject]] (so we know whether to refer to the cell with just ~#...~
+as the HTML ~id~ attribute, or whether as ~path/to/external/object.html#...~ because
+the cell belongs to another object).
 
-The [[type:HtmlWeaver]] is a monad that can compute any ~a~ value. We stack ~ReaderT~ on
-top of Lucid's ~HtmlT~ to create the monadic environment where we can read from
-[[data:WeaveConf]] whenever we want.
+The [[type:HtmlWeaver]] is a monad. We stack ~ReaderT~ on top of Lucid's ~HtmlT~ to
+create the monadic environment where we can read from [[data:WeaveConf]] whenever we
+want.
 
 #+name: type:HtmlWeaver
 #+begin_src haskell
@@ -587,7 +588,7 @@ type HtmlWeaver a = HtmlT (ReaderT WeaveConf Identity) a
 Note that the inner monad is the ~ReaderT~. This way we don't have to call ~lift~
 every single time we want to use a Lucid combinator like ~head_~ or ~body_~.
 
-Now we just need our starting point for using ~HtmlWeaver~. In our case, the final
+Now we just need a starting point for using ~HtmlWeaver~. For weaving, the final
 thing we want to generate is a ~Text~ value. Lucid gives us ~renderTextT~, which can
 run inside a monad. This means we can use that to generate ~Text~ from
 [[type:HtmlWeaver]]; this is what [[f:renderAsText]] does.

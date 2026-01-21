@@ -638,7 +638,7 @@ type WeaveConf :: Type
 data WeaveConf = WeaveConf
   { projectConf :: ProjectConf,
     archive :: Archive,
-    originObjectPath :: GPath,
+    originObjectPath :: GPath, --
     outDir :: GPath,
     citeprocResult :: CP.Result Prose
   }
