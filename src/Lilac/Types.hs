@@ -738,10 +738,10 @@ getCellName = \case
 
 type ProjectConf :: Type
 data ProjectConf = ProjectConf
-  { name :: Text,
-    homepage :: Maybe N.URI,
-    repo :: Maybe N.URI,
-    version :: Maybe Text
+  { name :: Text, --
+    homepage :: Maybe N.URI, --
+    repo :: Maybe N.URI, --
+    version :: Maybe Text --
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)

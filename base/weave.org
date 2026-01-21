@@ -53,10 +53,10 @@ values. Project configuration is encoded in [[data:ProjectConf]].
 #+begin_src haskell
 type ProjectConf :: Type
 data ProjectConf = ProjectConf
-  { name :: Text,
-    homepage :: Maybe N.URI,
-    repo :: Maybe N.URI,
-    version :: Maybe Text
+  { name :: Text, -- (ref:data:ProjectConf-name)
+    homepage :: Maybe N.URI, -- (ref:data:ProjectConf-homepage)
+    repo :: Maybe N.URI, -- (ref:data:ProjectConf-repo)
+    version :: Maybe Text -- (ref:data:ProjectConf-version)
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -64,20 +64,20 @@ data ProjectConf = ProjectConf
 
 The fields are:
 
-  - name :: Name of the project. This is used in the [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]].
+  - name :: [[(data:ProjectConf-name)]] Name of the project. This is used in the
+    [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]].
 
-  - homepage :: URL of the homepage. This is used as the link target to describe
-    the ~name~ in the navbar. It could very well be the case that this target
-    merely points to one of the other woven object files.
+  - homepage :: [[(data:ProjectConf-homepage)]] URL of the homepage. This is used as
+    the link target to describe the ~name~ in the navbar. It could very well be
+    the case that this target merely points to one of the other woven object
+    files.
 
-  - repo :: URL of the source code repository (the assumption being that the Org
-    docs and tangled files are all open source and belonging to the same Gt
-    repo).
+  - repo :: [[(data:ProjectConf-repo)]] URL of the source code repository (the
+    assumption being that the Org docs and tangled files are all open source and
+    belonging to the same Git repo).
 
-  - version :: Human-friendly version information. This is used to describe the
-    version of the Org source code used for weaving; if possible, the ~repo~ field
-    should also reference the same version. If this is ~Nothing~, version
-    information is omitted from the woven output.
+  - version :: [[(data:ProjectConf-version)]] Human-friendly version information.
+    This is used in the [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]].
 
 Project configuration isn't part of [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] because it may be the case in
 the future that a single project could be used for multiple archive files.
@@ -88,9 +88,10 @@ the future that a single project could be used for multiple archive files.
 :END:
 
 The [[data:ProjectConf]] would be very difficult to use if we expect users to write
-the JSON version of it manually, because it is a precise type. So instead we let
-users write a simplified version of it in JSON (as [[data:RawProjectConf]]). During
-weaving we parse this and convert it to [[data:ProjectConf]].
+the JSON version of it manually, because it is a precise type (e.g., writing the
+value of a ~URI~ can be painful). So instead we let users write a simplified
+version of it in JSON (as [[data:RawProjectConf]]), using plain ~Text~ values for the
+fields. During weaving we parse this and convert it to [[data:ProjectConf]].
 
 #+name: data:RawProjectConf
 #+begin_src haskell
@@ -110,6 +111,9 @@ data RawProjectConf = RawProjectConf
 parseRawProjectConf :: Text -> Either String RawProjectConf
 parseRawProjectConf = eitherDecodeStrictText
 #+end_src
+
+[[f:parseProjectConf]] relies on [[f:parseRawProjectConf]] for the initial parse, and
+some additional helpers like ~N.parseURI~.
 
 #+name: f:parseProjectConf
 #+begin_src haskell
