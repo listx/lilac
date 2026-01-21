@@ -776,14 +776,14 @@ import Data.Text.Lazy qualified as TL
 import Relude
   ( Bool (True),
     Int,
-    Maybe (Just, Nothing),
+    Maybe (Just),
     String,
     Text,
     Type,
     Void,
     concatMap,
     forM_,
-    fromIntegral,
+    fromMaybe,
     otherwise,
     pure,
     when,
@@ -806,9 +806,8 @@ import Text.Megaparsec.Char.Lexer (hexadecimal)
 <<f:roundedRectangleLink>>
 <<f:yx>>
 <<f:ev>>
-<<f:rgbHex>>
 <<f:colorFrom>>
-<<f:isHexColorParser>>
+<<f:hexColorParser>>
 <<Colors>>
 <<type:ColorParser>>
 <<f:fontSerif>>
@@ -918,36 +917,28 @@ fails.
 #+name: f:colorFrom
 #+begin_src haskell
 colorFrom :: Text -> Color
-colorFrom input = case MP.parseMaybe isHexColorParser input of
-  Nothing -> rgbHex 0xff0000
-  Just color' -> color'
+colorFrom input = fromMaybe (rgb 255 0 0) $ MP.parseMaybe hexColorParser input
 #+end_src
 
-This depends on [[f:isHexColorParser]] which is mostly a wrapper around
-~Text.Megaparsec.Char.Lexer.hexadecimal~.
+This depends on [[f:hexColorParser]] which uses
+~Text.Megaparsec.Char.Lexer.hexadecimal~ and checks the numeric bounds before
+retrieving the red, green, and blue values from the number using bit masks.
 
-#+name: f:isHexColorParser
+#+name: f:hexColorParser
 #+begin_src haskell
-isHexColorParser :: ColorParser Color
-isHexColorParser = do
+hexColorParser :: ColorParser Color
+hexColorParser = do
   _ <- char '#'
   n <- hexadecimal
-  pure $ rgbHex n
-#+end_src
-
-[[f:rgbHex]] converts a hex number into a CSS ~Color~ value.
-
-#+name: f:rgbHex
-#+begin_src haskell
-rgbHex :: Int -> Color
-rgbHex rgb'
-  | rgb' > 0xffffff = rgbHex 0xffffff
-  | rgb' < 0 = rgbHex 0
-  | otherwise = rgb rr gg bb
-  where
-    rr = fromIntegral $ shiftR rgb' 16 .&. 0xFF
-    gg = fromIntegral $ shiftR rgb' 8 .&. 0xFF
-    bb = fromIntegral $ rgb' .&. 0xFF
+  let c
+        | n > 0xffffff = rgb 255 255 255
+        | n < 0 = rgb 0 0 0
+        | otherwise = rgb rr gg bb
+        where
+          rr = 0xff .&. shiftR n 16
+          gg = 0xff .&. shiftR n 8
+          bb = 0xff .&. n
+  pure c
 #+end_src
 
 The ~ColorParser~ is a type synonym for a "standard" Megaparsec type defined in
@@ -5029,7 +5020,7 @@ forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) $ \(n, hN) -> do
     marginTop (px 0)
     when (n > 1) $ marginBottom (px 0)
     a ? do
-      color $ rgbHex 0
+      color $ colorFrom "#000000"
       ":visited" & do
         color colorText
     border (px 1) solid colorBg
@@ -5562,7 +5553,7 @@ sup ? do
       yx margin (px 0) 0
       fontStyle normal
       ".internal-link" & do
-        backgroundColor $ rgbHex 0xffffff
+        backgroundColor $ colorFrom "#ffffff"
         ":hover" & do
           borderStyle none
           textDecoration underline

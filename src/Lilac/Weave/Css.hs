@@ -153,14 +153,14 @@ import Data.Text.Lazy qualified as TL
 import Relude
   ( Bool (True),
     Int,
-    Maybe (Just, Nothing),
+    Maybe (Just),
     String,
     Text,
     Type,
     Void,
     concatMap,
     forM_,
-    fromIntegral,
+    fromMaybe,
     otherwise,
     pure,
     when,
@@ -346,7 +346,7 @@ defaultCss = do
       marginTop (px 0)
       when (n > 1) $ marginBottom (px 0)
       a ? do
-        color $ rgbHex 0
+        color $ colorFrom "#000000"
         ":visited" & do
           color colorText
       border (px 1) solid colorBg
@@ -639,7 +639,7 @@ defaultCss = do
         yx margin (px 0) 0
         fontStyle normal
         ".internal-link" & do
-          backgroundColor $ rgbHex 0xffffff
+          backgroundColor $ colorFrom "#ffffff"
           ":hover" & do
             borderStyle none
             textDecoration underline
@@ -720,26 +720,22 @@ yx f x y = f x y x y
 ev :: (Size sz -> Size sz -> Size sz -> Size sz -> Css) -> Size sz -> Css
 ev f x = f x x x x
 
-rgbHex :: Int -> Color
-rgbHex rgb'
-  | rgb' > 0xffffff = rgbHex 0xffffff
-  | rgb' < 0 = rgbHex 0
-  | otherwise = rgb rr gg bb
-  where
-    rr = fromIntegral $ shiftR rgb' 16 .&. 0xFF
-    gg = fromIntegral $ shiftR rgb' 8 .&. 0xFF
-    bb = fromIntegral $ rgb' .&. 0xFF
-
 colorFrom :: Text -> Color
-colorFrom input = case MP.parseMaybe isHexColorParser input of
-  Nothing -> rgbHex 0xff0000
-  Just color' -> color'
+colorFrom input = fromMaybe (rgb 255 0 0) $ MP.parseMaybe hexColorParser input
 
-isHexColorParser :: ColorParser Color
-isHexColorParser = do
+hexColorParser :: ColorParser Color
+hexColorParser = do
   _ <- char '#'
   n <- hexadecimal
-  pure $ rgbHex n
+  let c
+        | n > 0xffffff = rgb 255 255 255
+        | n < 0 = rgb 0 0 0
+        | otherwise = rgb rr gg bb
+        where
+          rr = 0xff .&. shiftR n 16
+          gg = 0xff .&. shiftR n 8
+          bb = 0xff .&. n
+  pure c
 
 colorBg :: Color
 colorBg = colorFrom "#ffffff"
