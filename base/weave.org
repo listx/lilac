@@ -838,6 +838,49 @@ genCss =
     ]
 #+end_src
 
+We make a small tweak to =kate= to make some colors easier on the eyes. The
+~ExtensionTok~ by default is too bright, so we darken it a bit here
+[[(f:kateLilac-ExtensionTok)]].
+
+#+name: f:kateLilac
+#+begin_src haskell
+kateLilac :: Sky.Style
+kateLilac =
+  Sky.kate
+    { Sky.tokenStyles =
+        insert
+          Sky.ExtensionTok -- (ref:f:kateLilac-ExtensionTok)
+          ( Sky.defStyle
+              { Sky.tokenColor = Just (Sky.RGB 0 0x60 0xa4),
+                Sky.tokenBold = True
+              }
+          )
+          Sky.kate.tokenStyles
+    }
+#+end_src
+
+[[f:defaultCss]] is the central place where we specify all of the rest of the CSS
+rules.
+
+#+name: f:defaultCss
+#+begin_src haskell
+defaultCss :: Css
+defaultCss = do
+  <<css:Layout>>
+  <<css:Headings>>
+  <<css:StyledTextStyles>>
+  <<css:Misc styles>>
+  <<css:Links>>
+  <<css:List items>>
+  <<css:Code blocks>>
+  <<css:Figures>>
+  <<css:Tables>>
+  <<css:Citations>>
+  <<css:Footnotes>>
+  <<css:Glossary terms>>
+  <<css:Document metadata>>
+#+end_src
+
 ** Sizing
 
 We prefer to use ~rem~ (root element) over ~em~ (element), because ~rem~ doesn't
@@ -4728,49 +4771,6 @@ expectCiteprocResult path expected = do
 :PROPERTIES:
 :ID:       8017befd-7628-46cf-a090-72fdbb00fb5a
 :END:
-
-** =Skylighting= (Kate-based syntax highlighting)
-
-We make a small tweak to =kate= to make some colors easier on the eyes. The
-~ExtensionTok~ by default is too bright, so we darken it a bit here.
-
-#+name: f:kateLilac
-#+begin_src haskell
-kateLilac :: Sky.Style
-kateLilac =
-  Sky.kate
-    { Sky.tokenStyles =
-        insert
-          Sky.ExtensionTok
-          ( Sky.defStyle
-              { Sky.tokenColor = Just (Sky.RGB 0 0x60 0xa4),
-                Sky.tokenBold = True
-              }
-          )
-          Sky.kate.tokenStyles
-    }
-#+end_src
-
-** Default CSS
-
-#+name: f:defaultCss
-#+begin_src haskell
-defaultCss :: Css
-defaultCss = do
-  <<css:Layout>>
-  <<css:Headings>>
-  <<css:StyledTextStyles>>
-  <<css:Misc styles>>
-  <<css:Links>>
-  <<css:List items>>
-  <<css:Code blocks>>
-  <<css:Figures>>
-  <<css:Tables>>
-  <<css:Citations>>
-  <<css:Footnotes>>
-  <<css:Glossary terms>>
-  <<css:Document metadata>>
-#+end_src
 
 ** Page layout
 :PROPERTIES:

@@ -189,7 +189,7 @@ kateLilac =
   Sky.kate
     { Sky.tokenStyles =
         insert
-          Sky.ExtensionTok
+          Sky.ExtensionTok --
           ( Sky.defStyle
               { Sky.tokenColor = Just (Sky.RGB 0 0x60 0xa4),
                 Sky.tokenBold = True
