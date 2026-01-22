@@ -1000,12 +1000,7 @@ colorActiveBorder :: Color
 colorActiveBorder = colorFrom "#008000"
 #+end_src
 
-* Generate HTML
-:PROPERTIES:
-:ID:       3592f24a-dc14-4ae6-8c06-5680ee7eb9aa
-:END:
-
-** Top-level (Object) weaver
+* Top-level (Object) weaver
 :PROPERTIES:
 :ID:       891f2674-2be9-4e63-b0f8-7ca43f1354fb
 :END:
@@ -1121,7 +1116,7 @@ head_ $ do
   <<MathJax script>>
 #+end_src
 
-*** CSS styles and fonts
+** CSS styles and fonts
 
 The [[Styles and fonts]] are just some top-level CSS we need for the document,
 including the default CSS we [[id:8017befd-7628-46cf-a090-72fdbb00fb5a][generate]] and some default fonts we want to load
@@ -1169,7 +1164,7 @@ getRelativeCssPath = do
   pure . T.pack $ fromMaybe "css/default.css" result
 #+end_src
 
-*** MathJax
+** MathJax
 :PROPERTIES:
 :ID:       8cce5e4b-93b0-4b7c-9cd7-c6d6c1cf8bd4
 :END:
@@ -1233,7 +1228,7 @@ options: {
 }
 #+end_src
 
-*** ClojureScript frontend
+** ClojureScript frontend
 :PROPERTIES:
 :ID:       da789584-7748-4258-a2ff-36567bbedbc8
 :END:
@@ -1273,7 +1268,7 @@ getRelativeJsPath = do
   pure . T.pack $ fromMaybe "lilac.js" result
 #+end_src
 
-** Unique names
+* Unique names
 :PROPERTIES:
 :ID:       7ddbd51b-fbac-4bf7-a14e-982ab753c879
 :END:
@@ -1397,7 +1392,7 @@ getSectionNumber heading =
     $ heading.section
 #+end_src
 
-*** Unique cell IDs
+** Unique cell IDs
 
 Every cell has a local cell index. We can use this information to give every
 cell a unique ID. This ID is not human friendly, but it's good for assigning
@@ -1442,7 +1437,7 @@ lciAttrs :: LCI -> [Attributes]
 lciAttrs lci = [id_ ("c-" <> T.show lci.unLCI), class_ "cell-idx"]
 #+end_src
 
-** Main content
+* Main content
 :PROPERTIES:
 :ID:       ccad6989-83ec-405f-876f-9bfb5c6ae357
 :END:
@@ -1464,7 +1459,7 @@ weaveMain docMeta rearrangedCells = do
 The closing ~</div>~ tag is for closing up any heading container ~<div>~ elements
 that were created in [[f:weaveHeading]].
 
-** Document metadata
+* Document metadata
 
 Weave document metadata such as the title, author, and date.
 
@@ -1485,7 +1480,7 @@ weaveDocMeta m = do
       Just x -> element $ toHtml x
 #+end_src
 
-** Headings
+* Headings
 :PROPERTIES:
 :ID:       c036cf17-0f61-4f07-bf76-bbe8b4eeb12e
 :END:
@@ -1584,7 +1579,7 @@ weavePToken = \case
   PTokenDivEnd -> toHtmlRaw ("</div>" :: Text)
 #+end_src
 
-** Styled text
+* Styled text
 :PROPERTIES:
 :ID:       d6abea81-d620-4ede-9c2c-68f7ea07f847
 :END:
@@ -1633,7 +1628,7 @@ weaveExpect
   ]
 #+end_src
 
-** List markers
+* List markers
 
 The =blaze-html= library we use expects to take care of the starting and closing
 tags for us automatically when we use its HTML tag functions. However, for
@@ -1707,7 +1702,7 @@ weaveExpect
     ]
 #+end_src
 
-** Code blocks
+* Code blocks
 :PROPERTIES:
 :ID:       4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1
 :END:
@@ -2231,7 +2226,7 @@ isExternalLink = \case
     | otherwise -> True
 #+end_src
 
-*** Link anchor
+** Link anchor
 
 The link anchor is necessary because some blocks will be anonymous and will not
 be linkable if we only try to link the block's name.
@@ -2243,7 +2238,7 @@ The link anchor uses the link symbol "🔗" with Unicode code point ~U+1F517~.
 "&#x1F517;"
 #+end_src
 
-** Figures
+* Figures
 :PROPERTIES:
 :ID:       4eea4449-2418-42c5-86e4-af63c3b742e3
 :END:
@@ -2286,7 +2281,7 @@ weaveFigure lci figure = do
     linkAnchor = getLinkAnchor Nothing $ CFigure figure
 #+end_src
 
-** Math fragments
+* Math fragments
 
 Math fragments come in two types, standalone and inline. Standalone fragments
 get linked to themselves, much like how we weave headings in [[id:c036cf17-0f61-4f07-bf76-bbe8b4eeb12e::f:weaveHeading][f:weaveHeading]].
@@ -2316,7 +2311,7 @@ weaveMathFragmentInline :: MathFragment -> HtmlWeaver ()
 weaveMathFragmentInline mathFragment = "\\(" <> toHtml mathFragment.body <> "\\)"
 #+end_src
 
-** Tables
+* Tables
 :PROPERTIES:
 :ID:       6c10afe2-2714-4e85-9121-e96a36d27ba4
 :END:
@@ -2481,7 +2476,7 @@ This demonstrates some of the complexities around ~markingCharacters~.
 |---+----------+----------+----------|
 |   |          |          | foo      |
 
-** Footnotes
+* Footnotes
 :PROPERTIES:
 :ID:       c3562660-a9ff-499d-9b10-c69bcba7f105
 :END:
@@ -2529,7 +2524,7 @@ weaveFootnoteBacklink lci = do
     | otherwise -> pure ()
 #+end_src
 
-** Glossary terms
+* Glossary terms
 :PROPERTIES:
 :ID:       eee95795-b51b-4de5-b39d-8dda436da451
 :END:
@@ -2597,7 +2592,7 @@ c :: x
 
 d :: y
 
-*** Weaving all glossary terms
+** Weaving all glossary terms
 :PROPERTIES:
 :ID:       587b019b-74c0-4af1-8144-29fcb920cd56
 :END:
@@ -2789,7 +2784,7 @@ getLinkToGCI weaveConf gci
   | otherwise = Nothing
 #+end_src
 
-** Citations
+* Citations
 :PROPERTIES:
 :ID:       7874b9c5-ceac-4820-8804-7732e29f5c60
 :END:
@@ -3108,7 +3103,7 @@ The ~#ref-...~ style is based on what =Citeproc= uses; for now we choose to use 
 as is. If we wanted to modify it, we would need to tweak how we handle the
 ~CslLink~ constructor in inside [[f:cslJsonTextToProse]].
 
-*** Tests
+** Tests
 :PROPERTIES:
 :ID:       82a9d21b-3779-492a-af39-bd3ea4ea875d
 :END:
@@ -3952,7 +3947,7 @@ expectCiteprocResult
   $ Left "unexpected newline"
 #+end_src
 
-** Table of Contents (TOC)
+* Table of Contents (TOC)
 :PROPERTIES:
 :ID:       e38fb4d1-72e1-40e0-905e-95bc8be2bf0b
 :END:
@@ -4039,7 +4034,7 @@ heading level with ~closeHeadingLevels lastHeadingLevel~.
 The ~closeHeadingLevels~ helper is called again inside the ~action~ helper to close
 off heading levels when we jump from a nested heading to a less nested one.
 
-*** Heading ancestry
+** Heading ancestry
 :PROPERTIES:
 :ID:       4651cdd2-5f79-46e0-af4a-5344d71c7ea6
 :END:
@@ -4132,7 +4127,7 @@ weaveHeadingAncestry rearrangedCells = do
     toHtmlRaw . TLE.decodeUtf8 $ encode headingAncestry
 #+end_src
 
-** Navigation bar
+* Navigation bar
 
 The navigation bar is at the top of the page as a horizontal bar.
 
@@ -4231,7 +4226,7 @@ The reliance on ~originObjectPath~ assumes that the archive has object paths tha
 are relative to the repository root. It could be that this is not true, but we
 don't bother to handle that edge case here.
 
-** Sidebar
+* Sidebar
 
 The sidebar shows additional information about the current document.
 
@@ -4246,7 +4241,7 @@ weaveSidebar blocks = do
     weaveFooter
 #+end_src
 
-*** Tangled files list
+** Tangled files list
 
 To better support Literate Programming, we list all files that are tangled from
 here in [[f:weaveTangledBlocksList]]. This goes through all code blocks that
@@ -4279,7 +4274,7 @@ weaveTangledBlocksList blocks = do
       | otherwise = Nothing
 #+end_src
 
-*** Backlinks
+** Backlinks
 :PROPERTIES:
 :ID:       b1057136-48d5-402e-8e55-5a7e6a08efe4
 :END:
@@ -4399,7 +4394,7 @@ For ~getInternalLinkAnchor~, it's OK to have ~Nothing~ as the first argument for
 it's impossible to link to paragraphs and so we'll never end up with an internal
 cell which is a paragraph cell.
 
-*** Named cells index
+** Named cells index
 
 Display a list of all named cells used in the current document.
 
@@ -4426,7 +4421,7 @@ weaveNamedCellsIndex = do
               weaveProse prose
 #+end_src
 
-** Footer
+* Footer
 
 The footer is the element at the very bottom of the page. This is not to be
 confused with [[id:c3562660-a9ff-499d-9b10-c69bcba7f105][Footnotes]], which are a user-controlled thing (a page may or may
@@ -4449,12 +4444,12 @@ weaveFooter = do
           toHtml @Text "Lilac"
 #+end_src
 
-** Testing framework
+* Testing framework
 
 The tests here use Org files as input. The output are HTML documents. For the
 test cases, we search for the presence of certain substrings within the HTML.
 
-*** Test module and helpers
+** Test module and helpers
 
 The test module here mirrors what we've already seen in [[id:979c2b7d-e448-4419-8d59-f92ebbd71cd6::ParseSpec helpers][ParseSpec helpers]].
 Namely we have some test helpers and some test cases using those helpers.
@@ -4710,7 +4705,7 @@ expectCiteprocResult path expected = do
             result `shouldBe` expected
 #+end_src
 
-*** All test cases
+** All test cases
 
 #+name: All test cases
 #+begin_src haskell
