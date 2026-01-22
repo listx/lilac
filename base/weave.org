@@ -480,6 +480,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<type:HtmlWeaver>>
 
 <<f:weaveObject>>
+<<f:sortFootnoteDefinitionCells>>
 <<f:weaveCell>>
 <<f:toSafeHtmlId>>
 <<f:weaveDocMeta>>
@@ -1061,34 +1062,46 @@ weaveObject object = doctypehtml_ $ do
   <<HTML head>>
   body_ $ do
     weaveNavbar
+    let cells = sortFootnoteDefinitionCells object
     weaveToc object.orgDoc.cells
-    let lciCellPairs = zip (map LCI [0 :: Int ..]) object.orgDoc.cells
-        rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
-        beforeFootnotes = takeWhile (not . isFootnote) lciCellPairs
-        afterFootnotes =
-          dropWhile isFootnote
-            $ dropWhile (not . isFootnote) lciCellPairs
-        sortedFootnotes =
-          sortOn (\(_, cell) -> getSortingKey cell)
-            $ takeWhile isFootnote
-            $ dropWhile (not . isFootnote) lciCellPairs
-        getSortingKey cell
-          | (CFootnote footnote) <- cell,
-            Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
-              n
-          | otherwise = maxBound :: Int
-        isFootnote :: (LCI, Cell) -> Bool
-        isFootnote (_, cell) = case cell of
-          CFootnote {} -> True
-          _ -> False
-    weaveMain object.orgDoc.meta rearrangedCells
+    weaveMain object.orgDoc.meta cells
     weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
-    weaveHeadingAncestry rearrangedCells
+    weaveHeadingAncestry cells
     <<ClojureScript frontend script>>
   where
     getBlock = \case
       CBlock block -> Just block
       _ -> Nothing
+#+end_src
+
+[[f:sortFootnoteDefinitionCells]] sorts footnote definition cells by their name.
+
+#+name: f:sortFootnoteDefinitionCells
+#+begin_src haskell
+sortFootnoteDefinitionCells :: Object -> [(LCI, Cell)]
+sortFootnoteDefinitionCells object =
+  beforeFootnotes
+    <> sortedFootnotes
+    <> afterFootnotes
+  where
+    lciCellPairs = zip (map LCI [0 :: Int ..]) object.orgDoc.cells
+    beforeFootnotes = takeWhile (not . isFootnote) lciCellPairs
+    afterFootnotes =
+      dropWhile isFootnote
+        $ dropWhile (not . isFootnote) lciCellPairs
+    sortedFootnotes =
+      sortOn (\(_, cell) -> getSortingKey cell)
+        $ takeWhile isFootnote
+        $ dropWhile (not . isFootnote) lciCellPairs
+    getSortingKey cell
+      | (CFootnote footnote) <- cell,
+        Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
+          n
+      | otherwise = maxBound :: Int
+    isFootnote :: (LCI, Cell) -> Bool
+    isFootnote (_, cell) = case cell of
+      CFootnote {} -> True
+      _ -> False
 #+end_src
 
 The use of ~toHtml~ is to help Haskell infer the correct type. This is because

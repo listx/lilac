@@ -371,29 +371,11 @@ weaveObject object = doctypehtml_ $ do
       ("" :: Text)
   body_ $ do
     weaveNavbar
+    let cells = sortFootnoteDefinitionCells object
     weaveToc object.orgDoc.cells
-    let lciCellPairs = zip (map LCI [0 :: Int ..]) object.orgDoc.cells
-        rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
-        beforeFootnotes = takeWhile (not . isFootnote) lciCellPairs
-        afterFootnotes =
-          dropWhile isFootnote
-            $ dropWhile (not . isFootnote) lciCellPairs
-        sortedFootnotes =
-          sortOn (\(_, cell) -> getSortingKey cell)
-            $ takeWhile isFootnote
-            $ dropWhile (not . isFootnote) lciCellPairs
-        getSortingKey cell
-          | (CFootnote footnote) <- cell,
-            Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
-              n
-          | otherwise = maxBound :: Int
-        isFootnote :: (LCI, Cell) -> Bool
-        isFootnote (_, cell) = case cell of
-          CFootnote {} -> True
-          _ -> False
-    weaveMain object.orgDoc.meta rearrangedCells
+    weaveMain object.orgDoc.meta cells
     weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
-    weaveHeadingAncestry rearrangedCells
+    weaveHeadingAncestry cells
     relativeJsPath <- getRelativeJsPath
     script_
       [ id_ "lilac-fe-script",
@@ -404,6 +386,31 @@ weaveObject object = doctypehtml_ $ do
     getBlock = \case
       CBlock block -> Just block
       _ -> Nothing
+
+sortFootnoteDefinitionCells :: Object -> [(LCI, Cell)]
+sortFootnoteDefinitionCells object =
+  beforeFootnotes
+    <> sortedFootnotes
+    <> afterFootnotes
+  where
+    lciCellPairs = zip (map LCI [0 :: Int ..]) object.orgDoc.cells
+    beforeFootnotes = takeWhile (not . isFootnote) lciCellPairs
+    afterFootnotes =
+      dropWhile isFootnote
+        $ dropWhile (not . isFootnote) lciCellPairs
+    sortedFootnotes =
+      sortOn (\(_, cell) -> getSortingKey cell)
+        $ takeWhile isFootnote
+        $ dropWhile (not . isFootnote) lciCellPairs
+    getSortingKey cell
+      | (CFootnote footnote) <- cell,
+        Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
+          n
+      | otherwise = maxBound :: Int
+    isFootnote :: (LCI, Cell) -> Bool
+    isFootnote (_, cell) = case cell of
+      CFootnote {} -> True
+      _ -> False
 
 weaveCell :: (LCI, Cell) -> HtmlWeaver ()
 weaveCell (lci, cell) = case cell of
