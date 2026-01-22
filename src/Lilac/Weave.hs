@@ -323,104 +323,87 @@ type HtmlWeaver :: Type -> Type
 type HtmlWeaver a = HtmlT (ReaderT WeaveConf Identity) a
 
 weaveObject :: Object -> HtmlWeaver ()
-weaveObject object = do
-  let title' = toHtml $ case lookup "title" object.orgDoc.meta of
-        Just title -> title
-        Nothing -> "Untitled"
-  doctypehtml_ $ do
-    head_ $ do
-      meta_ [charset_ "utf-8"]
-      title_ title'
-      relativeCssPath <- getRelativeCssPath
-      link_ [rel_ "stylesheet", href_ relativeCssPath]
-      link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
-      link_
-        [ rel_ "preconnect",
-          href_ "https://fonts.gstatic.com",
-          crossorigin_ "anonymous"
-        ]
-      let fontsLink =
-            T.intercalate
-              ""
-              [ "https://fonts.googleapis.com/css2?display=swap",
-                "&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900",
-                "&family=Source+Sans+3:ital,wght@0,200..900;1,200..900",
-                "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
-              ]
-      link_ [rel_ "stylesheet", href_ fontsLink]
+weaveObject object = doctypehtml_ $ do
+  head_ $ do
+    meta_ [charset_ "utf-8"]
+    title_
+      . toHtml
+      . fromMaybe "Untitled"
+      $ lookup "title" object.orgDoc.meta
+    relativeCssPath <- getRelativeCssPath
+    link_ [rel_ "stylesheet", href_ relativeCssPath]
+    link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
+    link_
+      [ rel_ "preconnect",
+        href_ "https://fonts.gstatic.com",
+        crossorigin_ "anonymous"
+      ]
+    let fontsLink =
+          T.intercalate
+            ""
+            [ "https://fonts.googleapis.com/css2?display=swap",
+              "&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900",
+              "&family=Source+Sans+3:ital,wght@0,200..900;1,200..900",
+              "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
+            ]
+    link_ [rel_ "stylesheet", href_ fontsLink]
 
-      let s :: Text
-          s =
-            """
-            window.MathJax = {
-              tex: {
-                  tags: 'ams'
-              },
+    let s :: Text
+        s =
+          """
+          window.MathJax = {
+            tex: {
+                tags: 'ams'
+            },
 
-              options: {
-                  ignoreHtmlClass: 'verbatim|code'
-              }
-            };
-            """
-      script_ [] s
+            options: {
+                ignoreHtmlClass: 'verbatim|code'
+            }
+          };
+          """
+    script_ [] s
 
-      script_
-        [ id_ "MathJax-script",
-          async_ "",
-          src_ "https://cdn.jsdelivr.net/npm/mathjax@3.0.1/es5/tex-mml-chtml.js"
-        ]
-        ("" :: Text)
-    body_ $ do
-      weaveNavbar
-      weaveToc object.orgDoc.cells
-      let lciCellPairs = zip (map LCI [0 :: Int ..]) object.orgDoc.cells
-          rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
-          beforeFootnotes = takeWhile (not . isFootnote) lciCellPairs
-          afterFootnotes =
-            dropWhile isFootnote
-              $ dropWhile (not . isFootnote) lciCellPairs
-          sortedFootnotes =
-            sortOn (\(_, cell) -> getSortingKey cell)
-              $ takeWhile isFootnote
-              $ dropWhile (not . isFootnote) lciCellPairs
-          getSortingKey cell
-            | (CFootnote footnote) <- cell,
-              Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
-                n
-            | otherwise = maxBound :: Int
-          isFootnote :: (LCI, Cell) -> Bool
-          isFootnote (_, cell) = case cell of
-            CFootnote {} -> True
-            CBlock {}
-            CFigure {}
-            CHeading {}
-            CListItem {}
-            CMathFragment {}
-            CParagraph {}
-            CGlossaryTerm {}
-            CTable {}
-            CCommand {} -> False
-      weaveMain object.orgDoc.meta rearrangedCells
-      weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
-      weaveHeadingAncestry rearrangedCells
-      relativeJsPath <- getRelativeJsPath
-      script_
-        [ id_ "lilac-fe-script",
-          src_ relativeJsPath
-        ]
-        ("" :: Text)
+    script_
+      [ id_ "MathJax-script",
+        async_ "",
+        src_ "https://cdn.jsdelivr.net/npm/mathjax@3.0.1/es5/tex-mml-chtml.js"
+      ]
+      ("" :: Text)
+  body_ $ do
+    weaveNavbar
+    weaveToc object.orgDoc.cells
+    let lciCellPairs = zip (map LCI [0 :: Int ..]) object.orgDoc.cells
+        rearrangedCells = beforeFootnotes <> sortedFootnotes <> afterFootnotes
+        beforeFootnotes = takeWhile (not . isFootnote) lciCellPairs
+        afterFootnotes =
+          dropWhile isFootnote
+            $ dropWhile (not . isFootnote) lciCellPairs
+        sortedFootnotes =
+          sortOn (\(_, cell) -> getSortingKey cell)
+            $ takeWhile isFootnote
+            $ dropWhile (not . isFootnote) lciCellPairs
+        getSortingKey cell
+          | (CFootnote footnote) <- cell,
+            Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
+              n
+          | otherwise = maxBound :: Int
+        isFootnote :: (LCI, Cell) -> Bool
+        isFootnote (_, cell) = case cell of
+          CFootnote {} -> True
+          _ -> False
+    weaveMain object.orgDoc.meta rearrangedCells
+    weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
+    weaveHeadingAncestry rearrangedCells
+    relativeJsPath <- getRelativeJsPath
+    script_
+      [ id_ "lilac-fe-script",
+        src_ relativeJsPath
+      ]
+      ("" :: Text)
   where
     getBlock = \case
       CBlock block -> Just block
-      CHeading {}
-      CListItem {}
-      CParagraph {}
-      CGlossaryTerm {}
-      CMathFragment {}
-      CFigure {}
-      CTable {}
-      CFootnote {}
-      CCommand {} -> Nothing
+      _ -> Nothing
 
 weaveCell :: (LCI, Cell) -> HtmlWeaver ()
 weaveCell (lci, cell) = case cell of
