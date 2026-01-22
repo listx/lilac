@@ -370,7 +370,7 @@ weaveObject object = doctypehtml_ $ do
       ]
       ("" :: Text)
   body_ $ do
-    let lciCellPairs = sortFootnoteDefinitionCells object
+    let lciCellPairs = sortFootnoteCells object
     weaveNavbar
     weaveToc $ map snd lciCellPairs
     weaveMain object.orgDoc.meta lciCellPairs
@@ -387,8 +387,8 @@ weaveObject object = doctypehtml_ $ do
       CBlock block -> Just block
       _ -> Nothing
 
-sortFootnoteDefinitionCells :: Object -> [(LCI, Cell)]
-sortFootnoteDefinitionCells object =
+sortFootnoteCells :: Object -> [(LCI, Cell)]
+sortFootnoteCells object =
   beforeFootnotes
     <> sortedFootnotes
     <> afterFootnotes
