@@ -370,12 +370,12 @@ weaveObject object = doctypehtml_ $ do
       ]
       ("" :: Text)
   body_ $ do
+    let lciCellPairs = sortFootnoteDefinitionCells object
     weaveNavbar
-    let cells = sortFootnoteDefinitionCells object
-    weaveToc object.orgDoc.cells
-    weaveMain object.orgDoc.meta cells
-    weaveSidebar . catMaybes $ map getBlock object.orgDoc.cells
-    weaveHeadingAncestry cells
+    weaveToc $ map snd lciCellPairs
+    weaveMain object.orgDoc.meta lciCellPairs
+    weaveSidebar . catMaybes $ map (getBlock . snd) lciCellPairs
+    weaveHeadingAncestry lciCellPairs
     relativeJsPath <- getRelativeJsPath
     script_
       [ id_ "lilac-fe-script",
