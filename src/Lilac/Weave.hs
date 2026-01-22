@@ -399,10 +399,10 @@ sortFootnoteCells object =
       dropWhile isFootnote
         $ dropWhile (not . isFootnote) lciCellPairs
     sortedFootnotes =
-      sortOn (\(_, cell) -> getSortingKey cell)
+      sortOn (\(_, cell) -> getFootnoteNumber cell)
         $ takeWhile isFootnote
         $ dropWhile (not . isFootnote) lciCellPairs
-    getSortingKey cell
+    getFootnoteNumber cell --
       | (CFootnote footnote) <- cell,
         Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
           n

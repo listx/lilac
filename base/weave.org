@@ -1074,7 +1074,8 @@ weaveObject object = doctypehtml_ $ do
       _ -> Nothing
 #+end_src
 
-[[f:sortFootnoteCells]] sorts footnote definition cells by their name.
+[[f:sortFootnoteCells]] sorts footnote definition cells by the order in which they
+are referenced [[(f:sortFootnoteCells-getFootnoteNumber)]].
 
 #+name: f:sortFootnoteCells
 #+begin_src haskell
@@ -1090,10 +1091,10 @@ sortFootnoteCells object =
       dropWhile isFootnote
         $ dropWhile (not . isFootnote) lciCellPairs
     sortedFootnotes =
-      sortOn (\(_, cell) -> getSortingKey cell)
+      sortOn (\(_, cell) -> getFootnoteNumber cell)
         $ takeWhile isFootnote
         $ dropWhile (not . isFootnote) lciCellPairs
-    getSortingKey cell
+    getFootnoteNumber cell -- (ref:f:sortFootnoteCells-getFootnoteNumber)
       | (CFootnote footnote) <- cell,
         Just (n, _) <- lookup footnote.name object.orgDoc.footnoteRefs =
           n
