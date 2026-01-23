@@ -327,7 +327,7 @@ weaveObject object = doctypehtml_ $ do
   head_ $ do
     meta_ [charset_ "utf-8"]
     title_
-      . toHtml
+      . toHtml --
       . fromMaybe "Untitled"
       $ lookup "title" object.orgDoc.meta
     relativeCssPath <- getRelativeCssPath

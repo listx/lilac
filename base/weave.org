@@ -1110,12 +1110,6 @@ sortFootnoteCells object =
       _ -> False
 #+end_src
 
-The use of ~toHtml~ is to help Haskell infer the correct type. This is because
-Lucid will think that regular strings are of type ~Html ()~ (this is how Lucid
-automatically escapes strings to be HTML-safe). The ~title_~ function expects a
-~Html ()~ type, so we have to manually convert the ~Text~ we get out of ~lookup~
-with ~toHtml~.
-
 Weaving cells just means delegating to each of the weavers that know how to
 handle each cell type.
 
@@ -1144,13 +1138,19 @@ The [[HTML head]] has some "imports" for the HTML page, including CSS and JS.
 head_ $ do
   meta_ [charset_ "utf-8"]
   title_
-    . toHtml
+    . toHtml -- (ref:HTML head-toHtml)
     . fromMaybe "Untitled"
     $ lookup "title" object.orgDoc.meta
   <<Styles and fonts>>
   <<MathJax customization>>
   <<MathJax script>>
 #+end_src
+
+The use of ~toHtml~ [[(HTML head-toHtml)]] is to help Haskell infer the correct type.
+This is because Lucid will think that regular strings are of type ~Html ()~ (this
+is how Lucid automatically escapes strings to be HTML-safe). The ~title_~ function
+expects a ~Html ()~ type, so we have to manually convert the ~Text~ we get out of
+~lookup~ with ~toHtml~.
 
 ** CSS styles and fonts
 
