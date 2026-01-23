@@ -658,6 +658,9 @@ scenarios) is fine because it will most likely result in the comparison
 ~contentToWrite~ is not empty), resulting in the file being marked for tangling.
 
 * Weaving
+:PROPERTIES:
+:ID:       21ccfaf6-cd49-46b6-9075-4952f3eea207
+:END:
 
 The ~weave~ subcommand is similar to ~tangle~ in that it takes a list of archives to
 process. There are a few more options here though, because weaving is a more
@@ -753,7 +756,7 @@ lilacWeave weaveOpts = do
     writeCssFile = do
       cssPath <- do
         cssDir <- P.encodeUtf "css"
-        css <- P.encodeUtf "default.css"
+        css <- P.encodeUtf "default.css" -- (ref:f:lilacWeave-write-css)
         pure $ P.joinPath [weaveOpts.outDir, cssDir, css]
       LU.writeFileRobustly cssPath $ LWC.genCss
     writeJsFile = do

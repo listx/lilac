@@ -481,7 +481,7 @@ lilacWeave weaveOpts = do
     writeCssFile = do
       cssPath <- do
         cssDir <- P.encodeUtf "css"
-        css <- P.encodeUtf "default.css"
+        css <- P.encodeUtf "default.css" --
         pure $ P.joinPath [weaveOpts.outDir, cssDir, css]
       LU.writeFileRobustly cssPath $ LWC.genCss
     writeJsFile = do

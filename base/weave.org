@@ -948,6 +948,8 @@ fontMono = do
   fontFamily ["Source Code Pro"] [monospace]
 #+end_src
 
+These fonts are loaded into the HTML page by [[Google Fonts]].
+
 ** Colors
 
 [[https://hackage.haskell.org/package/clay][Clay]] uses its own internal ~Color~ type, which can only be constructed from
@@ -1078,9 +1080,7 @@ weaveObject object = doctypehtml_ $ do
 are referenced [[(f:sortFootnoteCells-getFootnoteNumber)]]. This way, users don't
 have to keep them in order in the doc (users can freely change which ones are
 referenced first, without having to manually reorder the footnote definitions).
-In Orgmode users can already press ENTER on a footnote reference and Orgmode
-will jump to the definition, so manual ordering doesn't matter much even in that
-case.
+The ordering matters because that's the order the cells are woven.
 
 #+name: f:sortFootnoteCells
 #+begin_src haskell
@@ -1111,7 +1111,7 @@ sortFootnoteCells object =
 #+end_src
 
 Weaving cells just means delegating to each of the weavers that know how to
-handle each cell type.
+handle each cell type. That's what [[f:weaveCell]] does.
 
 #+name: f:weaveCell
 #+begin_src haskell
@@ -1131,17 +1131,21 @@ weaveCell (lci, cell) = case cell of
     PrintGlossary isGlobal -> weaveGlossary isGlobal
 #+end_src
 
-The [[HTML head]] has some "imports" for the HTML page, including CSS and JS.
+** HTML head
+
+The [[HTML head]] (~<head>~) has some "imports" for the HTML page, including CSS and
+JS. It also sets the title of the page [[(HTML head-title)]].
 
 #+name: HTML head
 #+begin_src haskell
 head_ $ do
   meta_ [charset_ "utf-8"]
-  title_
+  title_ -- (ref:HTML head-title)
     . toHtml -- (ref:HTML head-toHtml)
     . fromMaybe "Untitled"
     $ lookup "title" object.orgDoc.meta
-  <<Styles and fonts>>
+  <<Load CSS>>
+  <<Google Fonts>>
   <<MathJax customization>>
   <<MathJax script>>
 #+end_src
@@ -1149,38 +1153,23 @@ head_ $ do
 The use of ~toHtml~ [[(HTML head-toHtml)]] is to help Haskell infer the correct type.
 This is because Lucid will think that regular strings are of type ~Html ()~ (this
 is how Lucid automatically escapes strings to be HTML-safe). The ~title_~ function
-expects a ~Html ()~ type, so we have to manually convert the ~Text~ we get out of
+expects an ~Html ()~ type, so we have to manually convert the ~Text~ we get out of
 ~lookup~ with ~toHtml~.
 
-** CSS styles and fonts
+*** CSS styles
 
-The [[Styles and fonts]] are just some top-level CSS we need for the document,
-including the default CSS we [[id:8017befd-7628-46cf-a090-72fdbb00fb5a][generate]] and some default fonts we want to load
-from Google Fonts.
+[[Load CSS]] loads the top-level CSS we need,
+including the default CSS that we generate
+[[id:21ccfaf6-cd49-46b6-9075-4952f3eea207::(f:lilacWeave-write-css)]].
 
-#+name: Styles and fonts
+#+name: Load CSS
 #+begin_src haskell
-relativeCssPath <- getRelativeCssPath
+relativeCssPath <- getRelativeCssPath -- (ref:Styles and fonts-relative-css-path)
 link_ [rel_ "stylesheet", href_ relativeCssPath]
-link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
-link_
-  [ rel_ "preconnect",
-    href_ "https://fonts.gstatic.com",
-    crossorigin_ "anonymous"
-  ]
-let fontsLink =
-      T.intercalate
-        ""
-        [ "https://fonts.googleapis.com/css2?display=swap",
-          "&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900",
-          "&family=Source+Sans+3:ital,wght@0,200..900;1,200..900",
-          "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
-        ]
-link_ [rel_ "stylesheet", href_ fontsLink]
 #+end_src
 
-[[f:getRelativeCssPath]] gets the relative path to the CSS file (relative from the
-current document location).
+[[f:getRelativeCssPath]] [[(Styles and fonts-relative-css-path)]] gets the relative path
+to the CSS file (relative from the current document location).
 
 #+name: f:getRelativeCssPath
 #+begin_src haskell
@@ -1200,14 +1189,43 @@ getRelativeCssPath = do
   pure . T.pack $ fromMaybe "css/default.css" result
 #+end_src
 
-** MathJax
+*** Fonts
+
+#+name: Google Fonts
+#+begin_src haskell
+link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
+link_
+  [ rel_ "preconnect",
+    href_ "https://fonts.gstatic.com",
+    crossorigin_ "anonymous"
+  ]
+let fontsLink =
+      T.intercalate
+        ""
+        $ ["https://fonts.googleapis.com/css2?display=swap"]
+        <> map (\(name, weights) -> name <> weights) fonts
+    fonts :: [(Text, Text)]
+    fonts =
+      [ ( "&family=Source+Code+Pro:ital",
+          ",wght@0,200..900;1,200..900"
+        ),
+        ( "&family=Source+Sans+3:ital",
+          ",wght@0,200..900;1,200..900"
+        ),
+        ( "&family=Source+Serif+4:ital,opsz",
+          ",wght@0,8..60,200..900;1,8..60,200..900"
+        )
+      ]
+link_ [rel_ "stylesheet", href_ fontsLink]
+#+end_src
+
+*** MathJax
 :PROPERTIES:
 :ID:       8cce5e4b-93b0-4b7c-9cd7-c6d6c1cf8bd4
 :END:
 
 We use [[https://www.mathjax.org][MathJax]] to render mathematical expressions (what we encode as the
-[[id:d1064535-5c98-4c80-a901-5cdc1fd5297f::data:MathFragment][data:MathFragment]]). The MathJax JS import is a Lucid port of the [[https://www.mathjax.org/#gettingstarted][official
-instructions]].
+[[id:d1064535-5c98-4c80-a901-5cdc1fd5297f::data:MathFragment][data:MathFragment]]). The MathJax JS import is based on the [[https://www.mathjax.org/#gettingstarted][official instructions]].
 
 #+name: MathJax script
 #+begin_src haskell
@@ -1219,7 +1237,7 @@ script_
   ("" :: Text)
 #+end_src
 
-MathJax is configurable.
+MathJax is configurable, so we customize it in [[MathJax customization]].
 
 #+name: MathJax customization
 #+begin_src haskell
@@ -1227,21 +1245,18 @@ let s :: Text
     s =
       """
       window.MathJax = {
-        <<Automatic equation numbering>>
-        <<Ignore certain HTML element classes>>
+        tex: {
+            tags: 'ams' -- (ref:MathJax customization-numbering)
+        },
+        options: {
+            ignoreHtmlClass: 'verbatim|code' -- (ref:MathJax customization-ignoreHtmlClass)
+        }
       };
       """
 script_ [] s
 #+end_src
 
-To turn on numbering, we have to run a script with a special ~'ams'~ parameter.
-
-#+name: Automatic equation numbering
-#+begin_src javascript
-tex: {
-    tags: 'ams'
-},
-#+end_src
+[[(MathJax customization-numbering)]] turns on equation numbering.
 
 It may sound a bit surprising to let MathJax perform the numbering when we
 already have this numbering information on hand from the
@@ -1254,23 +1269,16 @@ way MathJax numbers equations is the same. In other words, we can let MathJax
 number equations for us and those automatically generated equation numbers
 should line up with what we have.
 
-We can prohibit MathJax from acting on certain HTML element classes. This is
-necessary for making it ignore verbatim and code styles from [[id:d6abea81-d620-4ede-9c2c-68f7ea07f847::f:weaveStyledText][f:weaveStyledText]].
-
-#+name: Ignore certain HTML element classes
-#+begin_src javascript
-options: {
-    ignoreHtmlClass: 'verbatim|code'
-}
-#+end_src
+[[(MathJax customization-ignoreHtmlClass)]] prohibits MathJax from acting on certain
+HTML element classes, namely verbatim and code styles from [[id:d6abea81-d620-4ede-9c2c-68f7ea07f847::f:weaveStyledText][f:weaveStyledText]].
 
 ** ClojureScript frontend
 :PROPERTIES:
 :ID:       da789584-7748-4258-a2ff-36567bbedbc8
 :END:
 
-The [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][ClojureScript frontend]] generates a single JS file called ~lilac.js~. We have
-to import this into every page.
+The [[id:6d407e24-fb34-460a-83bd-7b39cf7a56bb][ClojureScript frontend]] generates a single JS file called ~lilac.js~ (see
+[[id:7e6758c8-a642-4cfa-9e03-498163d6ce68][Optimized production build]]), which we import into our HTML page in [[ClojureScript frontend script]].
 
 #+name: ClojureScript frontend script
 #+begin_src haskell
@@ -1283,7 +1291,7 @@ script_
 #+end_src
 
 [[f:getRelativeJsPath]] gets the path to the JS script we compile (from [[id:783de6bf-e36b-4c9e-a405-2a86d0897795][Build
-configuration file]]), relative to the object being woven; also see
+configuration file]]) relative to the object being woven; also see
 [[f:getRelativeCssPath]] which this function is based on (and quite similar to).
 
 #+name: f:getRelativeJsPath

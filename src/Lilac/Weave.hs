@@ -326,12 +326,13 @@ weaveObject :: Object -> HtmlWeaver ()
 weaveObject object = doctypehtml_ $ do
   head_ $ do
     meta_ [charset_ "utf-8"]
-    title_
+    title_ --
       . toHtml --
       . fromMaybe "Untitled"
       $ lookup "title" object.orgDoc.meta
-    relativeCssPath <- getRelativeCssPath
+    relativeCssPath <- getRelativeCssPath --
     link_ [rel_ "stylesheet", href_ relativeCssPath]
+
     link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
     link_
       [ rel_ "preconnect",
@@ -341,11 +342,20 @@ weaveObject object = doctypehtml_ $ do
     let fontsLink =
           T.intercalate
             ""
-            [ "https://fonts.googleapis.com/css2?display=swap",
-              "&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900",
-              "&family=Source+Sans+3:ital,wght@0,200..900;1,200..900",
-              "&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900"
-            ]
+            $ ["https://fonts.googleapis.com/css2?display=swap"]
+            <> map (\(name, weights) -> name <> weights) fonts
+        fonts :: [(Text, Text)]
+        fonts =
+          [ ( "&family=Source+Code+Pro:ital",
+              ",wght@0,200..900;1,200..900"
+            ),
+            ( "&family=Source+Sans+3:ital",
+              ",wght@0,200..900;1,200..900"
+            ),
+            ( "&family=Source+Serif+4:ital,opsz",
+              ",wght@0,8..60,200..900;1,8..60,200..900"
+            )
+          ]
     link_ [rel_ "stylesheet", href_ fontsLink]
 
     let s :: Text
@@ -353,11 +363,10 @@ weaveObject object = doctypehtml_ $ do
           """
           window.MathJax = {
             tex: {
-                tags: 'ams'
+                tags: 'ams' --
             },
-
             options: {
-                ignoreHtmlClass: 'verbatim|code'
+                ignoreHtmlClass: 'verbatim|code' --
             }
           };
           """
