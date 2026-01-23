@@ -486,12 +486,12 @@ getLinkAnchor maybeLCI = \case
     T.intercalate
       "-"
       [ "h",
-        getSectionNumber heading,
-        toSafeHtmlId $ getProseContents heading.body
+        getSectionNumber heading, --
+        toSafeHtmlId $ getProseContents heading.body --
       ]
   CListItem {} -> ""
   CParagraph {} -> case maybeLCI of
-    Just lci -> "c-" <> T.show lci.unLCI
+    Just lci -> "c-" <> T.show lci.unLCI --
     Nothing -> ""
   CBlock block ->
     let ref

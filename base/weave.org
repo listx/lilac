@@ -1351,16 +1351,23 @@ getRelativeJsPath = do
   pure . T.pack $ fromMaybe "lilac.js" result
 #+end_src
 
-* Unique names
+* Identifying cells in HTML
+
+Unlike the world of parsing, tangling, and compiling, we cannot use a
+[[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] to identify cells in HTML. Instead we have to use the familiar hash
+syntax like ~#foo~ to refer to HTML elements (where ~#foo~ refers to an element with
+an ~id~ of ~foo~). There are two types of ~id~ values we assign to cells to identify
+them in HTML: [[id:7ddbd51b-fbac-4bf7-a14e-982ab753c879][Cell link anchors]] and [[id:bfed523b-034d-425f-b195-e81d76e99fb7][Numeric cell indexes]].
+
+** Cell link anchors
 :PROPERTIES:
 :ID:       7ddbd51b-fbac-4bf7-a14e-982ab753c879
 :END:
 
 Generating a unique name suitable for being used as the ~id~ attribute value
 requires us to convert some arbitrary text into a DOM ID-friendly name. For this
-purpose we have [[f:toSafeHtmlId]].
-
-[[https://www.w3.org/TR/html4/types.html][This page]] says:
+purpose we have [[f:toSafeHtmlId]], which follows the guidelines from [[https://www.w3.org/TR/html4/types.html][this page]],
+which says:
 
 #+begin_quote
 ID and NAME tokens must begin with a letter ([A-Za-z]) and may be followed by
@@ -1381,7 +1388,9 @@ toSafeHtmlId = T.map onlyKeepSomeChars
 #+end_src
 
 The [[f:getLinkAnchor]] function generates the unique, human-friendly ID of a
-[[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Cell][data:Cell]].
+[[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Cell][data:Cell]]. It uses the cell's metadata where appropriate it can. For paragraphs,
+because they cannot have metadata we just use the local cell index
+[[(f:getLinkAnchor-paragraph-lci)]].
 
 #+name: f:getLinkAnchor
 #+begin_src haskell
@@ -1391,12 +1400,12 @@ getLinkAnchor maybeLCI = \case
     T.intercalate
       "-"
       [ "h",
-        getSectionNumber heading,
-        toSafeHtmlId $ getProseContents heading.body
+        getSectionNumber heading, -- (ref:f:getLinkAnchor-heading-section-number)
+        toSafeHtmlId $ getProseContents heading.body -- (ref:f:getLinkAnchor-heading-body)
       ]
   CListItem {} -> ""
   CParagraph {} -> case maybeLCI of
-    Just lci -> "c-" <> T.show lci.unLCI
+    Just lci -> "c-" <> T.show lci.unLCI -- (ref:f:getLinkAnchor-paragraph-lci)
     Nothing -> ""
   CBlock block ->
     let ref
@@ -1455,15 +1464,10 @@ getLinkAnchor maybeLCI = \case
   CCommand {} -> ""
 #+end_src
 
-We don't generate link anchors for footnote cells (~CFootnote~) because the cell
-does not have information about its number. This is because unlike things like
-figures or tables, the order of appearance (of this footnote definition) may not
-be the same as the order of usage (when the footnote definition is referenced).
-This discrepancy makes automatic numbering slightly more difficult, and we
-choose to not go through that exercise for the [[id:4127feee-755d-430e-8fef-192e95143790::data:Footnote][data:Footnote]] type, for ease of parsing.
-
-The [[f:getSectionNumber]] function just retrieves the numeric heading section number,
-as a ~Text~ value.
+Headings use both the section number [[(f:getLinkAnchor-heading-section-number)]]
+and the contents of its body [[(f:getLinkAnchor-heading-body)]] for the link anchor.
+The [[f:getSectionNumber]] function just retrieves the numeric heading section
+number (e.g., as ~Text~ values like ~"1.2"~ or ~"7.3.5"~).
 
 #+name: f:getSectionNumber
 #+begin_src haskell
@@ -1475,7 +1479,10 @@ getSectionNumber heading =
     $ heading.section
 #+end_src
 
-** Unique cell IDs
+** Numeric cell indexes
+:PROPERTIES:
+:ID:       bfed523b-034d-425f-b195-e81d76e99fb7
+:END:
 
 Every cell has a local cell index. We can use this information to give every
 cell a unique ID. This ID is not human friendly, but it's good for assigning
@@ -1483,15 +1490,27 @@ every cell a numeric ID so that we can refer to them easily from code (we also
 assign all of these a class of ~cell-idx~ so that we can select them all at once;
 see [[f:lciAttrs]]).
 
-Originally we added this code to be used for [[f:genHeadingAncestry]], but then
-realized that we actually don't need it there. To clarify, we don't need to
-attach a unique ID to every cell and then add observers to all of them; instead
-we can just group non-heading cells underneath each heading together into a
-~<div>~ to check for the intersection of that overall ~<div>~ with the viewport.
+Originally we added [[f:lciAttrs]] (with the unique cell index as the ~id~) to be used
+for [[f:genHeadingAncestry]] for detecting when certain cells are visible in the
+viewport, but then realized that we actually don't need it there. To clarify, we
+don't need to attach a unique ID to every cell and then add observers to all of
+them; instead we can just group non-heading cells underneath each heading
+together into a ~<div>~ to check for the intersection of that overall ~<div>~ with
+the viewport.
 
-This code is still here though because eventually we want to add keyboard-driven
-navigation, and for that we'll need to highlight the "current" cell, identified
-by its unique ID.
+#+name: f:lciAttrs
+#+begin_src haskell
+lciAttrs :: LCI -> [Attributes]
+lciAttrs lci = [id_ ("c-" <> T.show lci.unLCI), class_ "cell-idx"]
+#+end_src
+
+Although these cell index based ~id~ attributes are not used, we still encode it
+in [[f:lciAttrs]] because eventually we want to add keyboard-driven navigation, and
+for that we'll need to highlight the "current" cell, identified by its unique
+ID.
+
+Both [[f:wrapWith]] and [[f:wrapWithDiv]] wrap some other HTML content with [[f:lciAttrs]]
+assigned to either a ~<span>~ or ~<div>~, respectively.
 
 #+name: f:wrapWith
 #+begin_src haskell
@@ -1509,15 +1528,6 @@ wrapWithDiv :: LCI -> HtmlWeaver () -> HtmlWeaver ()
 wrapWithDiv lci wrapMe = do
   div_ (lciAttrs lci) $ do
     wrapMe
-#+end_src
-
-Both [[f:wrapWith]] and [[f:wrapWithDiv]] make use of [[f:lciAttrs]], which is the
-standardized way in which we encode the unique cell index information.
-
-#+name: f:lciAttrs
-#+begin_src haskell
-lciAttrs :: LCI -> [Attributes]
-lciAttrs lci = [id_ ("c-" <> T.show lci.unLCI), class_ "cell-idx"]
 #+end_src
 
 * Headings
