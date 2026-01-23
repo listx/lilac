@@ -1618,8 +1618,8 @@ genHeadingAncestry = snd . foldl' f ([], mempty)
       | otherwise = dropWhile (\a' -> leafHeading.level <= a'.level) ancestry
 
 weaveHeadingAncestry :: [(LCI, Cell)] -> HtmlWeaver ()
-weaveHeadingAncestry rearrangedCells = do
-  let headingAncestry = genHeadingAncestry $ map snd rearrangedCells
+weaveHeadingAncestry lciCellPairs = do
+  let headingAncestry = genHeadingAncestry $ map snd lciCellPairs
   script_ [id_ "heading-ancestry", type_ "application/json"] $ do
     toHtmlRaw . TLE.decodeUtf8 $ encode headingAncestry
 
@@ -1716,15 +1716,15 @@ weaveFooter = do
           toHtml @Text "Lilac"
 
 weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
-weaveMain docMeta rearrangedCells = do
+weaveMain docMeta lciCellPairs = do
   main_ $ do
     weaveDocMeta docMeta
-    forM_ rearrangedCells weaveCell
+    forM_ lciCellPairs weaveCell
     p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
     let isHeading = \case
           CHeading {} -> True
           _ -> False
-    when (any isHeading $ map snd rearrangedCells) $ toHtmlRaw @Text "</div>"
+    when (any isHeading $ map snd lciCellPairs) $ toHtmlRaw @Text "</div>"
 
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
