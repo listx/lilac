@@ -1075,7 +1075,12 @@ weaveObject object = doctypehtml_ $ do
 #+end_src
 
 [[f:sortFootnoteCells]] sorts footnote definition cells by the order in which they
-are referenced [[(f:sortFootnoteCells-getFootnoteNumber)]].
+are referenced [[(f:sortFootnoteCells-getFootnoteNumber)]]. This way, users don't
+have to keep them in order in the doc (users can freely change which ones are
+referenced first, without having to manually reorder the footnote definitions).
+In Orgmode users can already press ENTER on a footnote reference and Orgmode
+will jump to the definition, so manual ordering doesn't matter much even in that
+case.
 
 #+name: f:sortFootnoteCells
 #+begin_src haskell
@@ -1110,13 +1115,6 @@ Lucid will think that regular strings are of type ~Html ()~ (this is how Lucid
 automatically escapes strings to be HTML-safe). The ~title_~ function expects a
 ~Html ()~ type, so we have to manually convert the ~Text~ we get out of ~lookup~
 with ~toHtml~.
-
-The cells are rearranged (for footnotes) in ~rearrangedCells~. This way, users
-don't have to keep them in order in the doc (users can freely change which ones
-are referenced first, without having to manually reorder the footnote
-definitions). In Orgmode users can already press ENTER on a footnote reference
-and Orgmode will jump to the definition, so manual ordering doesn't matter much
-even in that case.
 
 Weaving cells just means delegating to each of the weavers that know how to
 handle each cell type.
