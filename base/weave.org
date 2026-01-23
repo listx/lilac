@@ -1110,6 +1110,45 @@ sortFootnoteCells object =
       _ -> False
 #+end_src
 
+The most important helper for [[f:weaveObject]] is probably [[f:weaveMain]] because it
+then calls [[f:weaveCell]] to weave all of the cells.
+
+#+name: f:weaveMain
+#+begin_src haskell
+weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
+weaveMain docMeta lciCellPairs = do
+  main_ $ do
+    weaveDocMeta docMeta
+    forM_ lciCellPairs weaveCell
+    p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
+    let isHeading = \case
+          CHeading {} -> True
+          _ -> False
+    when (any isHeading $ map snd lciCellPairs) $ toHtmlRaw @Text "</div>"
+#+end_src
+
+The closing ~</div>~ tag is for closing up any heading container ~<div>~ elements
+that were created in [[f:weaveHeading]].
+
+[[f:weaveDocMeta]] weaves document metadata such as the title, author, and date.
+
+#+name: f:weaveDocMeta
+#+begin_src haskell
+weaveDocMeta :: M.Map Text Text -> HtmlWeaver ()
+weaveDocMeta m = do
+  case lookup "title" m of
+    Nothing -> pure ()
+    Just title -> do
+      h1_ [id_ "top"] $ toHtml title
+      hr_ [class_ "title-underline"]
+  f "author" $ p_ [class_ "doc-meta-author"]
+  f "date" $ p_ [class_ "doc-meta-date"]
+  where
+    f k element = case lookup k m of
+      Nothing -> pure ()
+      Just x -> element $ toHtml x
+#+end_src
+
 Weaving cells just means delegating to each of the weavers that know how to
 handle each cell type. That's what [[f:weaveCell]] does.
 
@@ -1479,49 +1518,6 @@ standardized way in which we encode the unique cell index information.
 #+begin_src haskell
 lciAttrs :: LCI -> [Attributes]
 lciAttrs lci = [id_ ("c-" <> T.show lci.unLCI), class_ "cell-idx"]
-#+end_src
-
-* Main content
-:PROPERTIES:
-:ID:       ccad6989-83ec-405f-876f-9bfb5c6ae357
-:END:
-
-#+name: f:weaveMain
-#+begin_src haskell
-weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
-weaveMain docMeta lciCellPairs = do
-  main_ $ do
-    weaveDocMeta docMeta
-    forM_ lciCellPairs weaveCell
-    p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
-    let isHeading = \case
-          CHeading {} -> True
-          _ -> False
-    when (any isHeading $ map snd lciCellPairs) $ toHtmlRaw @Text "</div>"
-#+end_src
-
-The closing ~</div>~ tag is for closing up any heading container ~<div>~ elements
-that were created in [[f:weaveHeading]].
-
-* Document metadata
-
-Weave document metadata such as the title, author, and date.
-
-#+name: f:weaveDocMeta
-#+begin_src haskell
-weaveDocMeta :: M.Map Text Text -> HtmlWeaver ()
-weaveDocMeta m = do
-  case lookup "title" m of
-    Nothing -> pure ()
-    Just title -> do
-      h1_ [id_ "top"] $ toHtml title
-      hr_ [class_ "title-underline"]
-  f "author" $ p_ [class_ "doc-meta-author"]
-  f "date" $ p_ [class_ "doc-meta-date"]
-  where
-    f k element = case lookup k m of
-      Nothing -> pure ()
-      Just x -> element $ toHtml x
 #+end_src
 
 * Headings
