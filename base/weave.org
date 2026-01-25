@@ -787,7 +787,6 @@ import Relude
     fromMaybe,
     otherwise,
     pure,
-    when,
     zip,
     ($),
     (.),
@@ -868,7 +867,7 @@ rules.
 defaultCss :: Css
 defaultCss = do
   <<css:Layout>>
-  <<css:Page title>>
+  <<css:h1 (title) underline>>
   <<css:Headings>>
   <<css:StyledTextStyles>>
   <<css:Misc styles>>
@@ -1133,19 +1132,8 @@ weaveDocMeta m = do
 #+end_src
 
 For CSS, the title gets a special black circle ~U+25cf~ symbol to make it stand
-out [[(css:Page title-symbol)]], and an underline [[css:h1 (title) underline]].
-
-#+name: css:Page title
-#+begin_src haskell
-h1 ? do
-  fontSize (pt 36)
-  marginTop (px 0)
-  marginBottom (px 0)
-  prependSymbol "●" (rem $ -2.4) -- (ref:css:Page title-symbol)
-<<css:h1 (title) underline>>
-#+end_src
-
-The [[css:h1 (title) underline]] changes the horizontal rule to look a bit subdued
+out [[(css:Page title-symbol)]], and an underline [[css:h1 (title) underline]]. The
+[[css:h1 (title) underline]] changes the horizontal rule to look a bit subdued
 (without the default black color).
 
 #+name: css:h1 (title) underline
@@ -1694,25 +1682,30 @@ The headings are set to all use sans-serif font ([[f:fontSans]]).
 
 #+name: css:Headings
 #+begin_src haskell
-h2 ? do
-  fontSize (pt 26)
-  prependSymbol "<<symbol:h2>>" (rem $ -2.15) -- (ref:css:Headings-h2-symbol)
-h3 ? do
-  fontSize (pt 22)
-  prependSymbol "<<symbol:h3>>" (rem $ -2.03) -- (ref:css:Headings-h3-symbol)
-h4 ? do
-  fontSize (pt 18)
-h5 ? do
-  fontSize (pt 16)
-h6 ? do
-  fontSize (pt 14)
 forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) -- (ref:css:Headings-loop)
   $ \(n, hN) -> do
     hN ? do
+      case n of
+        1 -> do
+          fontSize (pt 36)
+          prependSymbol "●" (rem $ -2.4) -- (ref:css:Page title-symbol)
+        2 -> do
+          fontSize (pt 26)
+          prependSymbol "<<symbol:h2>>" (rem $ -2.15) -- (ref:css:Headings-h2-symbol)
+        3 -> do
+          fontSize (pt 22)
+          prependSymbol "<<symbol:h3>>" (rem $ -2.03) -- (ref:css:Headings-h3-symbol)
+        4 -> do
+          fontSize (pt 18)
+        5 -> do
+          fontSize (pt 16)
+        6 -> do
+          fontSize (pt 14)
+        _ -> pure ()
       position relative
       fontSans
       marginTop (px 0)
-      when (n > 1) $ marginBottom (px 0)
+      marginBottom (px 0)
       a ? do
         color $ colorFrom "#000000"
         ":visited" & do
