@@ -1370,6 +1370,50 @@ getRelativeJsPath = do
   pure . T.pack $ fromMaybe "lilac.js" result
 #+end_src
 
+** Page layout
+:PROPERTIES:
+:ID:       eda7626d-42fd-45d3-b0f8-940710413295
+:END:
+
+Here we style the major parts of the object as a single HTML page. The main
+pieces are the top-level ~<html>~ and ~<body>~ bits.
+
+#+name: css:Layout
+#+begin_src haskell
+html ? do
+  ev margin $ px 0
+  ev padding $ px 0
+  backgroundColor colorBg
+  color colorText
+  fontSerif
+body ? do
+  minHeight (vh 100)
+  display grid
+  gridTemplateColumns [px 300, px 810, fr 1]
+  "grid-template-rows" -: "auto 1fr"
+  "grid-template-areas"
+    -: """
+       "navbar navbar navbar"
+       "toc    main   sidebar"
+       """
+  yx margin (px 0) auto
+  overflowY hidden
+div ? do
+  ev margin $ px 0
+<<css:navbar>>
+<<css:toc>>
+<<css:Main content>>
+<<css:Sidebar>>
+<<css:Footer>>
+p # ".widget-title" ? do
+  fontWeight bold
+  marginBottom $ px 0
+#+end_src
+
+The ~<body>~ uses a CSS grid layout to create two columns, one for the table of
+contents on the left (250 pixels wide), and the second column for the main
+content (800 pixels).
+
 * Identifying cells in HTML
 
 Unlike the world of parsing, tangling, and compiling, we cannot use a
@@ -4912,50 +4956,6 @@ expectCiteprocResult path expected = do
 :PROPERTIES:
 :ID:       8017befd-7628-46cf-a090-72fdbb00fb5a
 :END:
-
-** Page layout
-:PROPERTIES:
-:ID:       eda7626d-42fd-45d3-b0f8-940710413295
-:END:
-
-Here we style the major parts of the page. The main piece is the top-level
-~<html>~ and ~<body>~ bits.
-
-#+name: css:Layout
-#+begin_src haskell
-html ? do
-  ev margin $ px 0
-  ev padding $ px 0
-  backgroundColor colorBg
-  color colorText
-  fontSerif
-body ? do
-  minHeight (vh 100)
-  display grid
-  gridTemplateColumns [px 300, px 810, fr 1]
-  "grid-template-rows" -: "auto 1fr"
-  "grid-template-areas"
-    -: """
-       "navbar navbar navbar"
-       "toc    main   sidebar"
-       """
-  yx margin (px 0) auto
-  overflowY hidden
-<<css:navbar>>
-<<css:toc>>
-<<css:Main content>>
-<<css:Sidebar>>
-<<css:Footer>>
-div ? do
-  ev margin $ px 0
-p # ".widget-title" ? do
-  fontWeight bold
-  marginBottom $ px 0
-#+end_src
-
-The ~<body>~ uses a CSS grid layout to create two columns, one for the table of
-contents on the left (250 pixels wide), and the second column for the main
-content (800 pixels).
 
 ** Navigation bar
 :PROPERTIES:

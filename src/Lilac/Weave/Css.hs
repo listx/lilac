@@ -217,6 +217,8 @@ defaultCss = do
          """
     yx margin (px 0) auto
     overflowY hidden
+  div ? do
+    ev margin $ px 0
   div # ".navbar" ? do
     "grid-area" -: "navbar"
     height $ rem 4
@@ -310,8 +312,6 @@ defaultCss = do
       fontSans
       fontSize $ rem 0.9
       marginBottom (px 10)
-  div ? do
-    ev margin $ px 0
   p # ".widget-title" ? do
     fontWeight bold
     marginBottom $ px 0
