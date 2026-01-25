@@ -1124,11 +1124,12 @@ weaveMain docMeta lciCellPairs = do
     let isHeading = \case
           CHeading {} -> True
           _ -> False
-    when (any isHeading $ map snd lciCellPairs) $ toHtmlRaw @Text "</div>"
+    when (any isHeading $ map snd lciCellPairs)
+      $ toHtmlRaw @Text "</div>" -- (ref:f:weaveMain-heading-container)
 #+end_src
 
 The closing ~</div>~ tag is for closing up any heading container ~<div>~ elements
-that were created in [[f:weaveHeading]].
+that are created in [[(f:weaveHeading-heading-container)]].
 
 [[f:weaveDocMeta]] weaves document metadata such as the title, author, and date.
 
@@ -1139,7 +1140,7 @@ weaveDocMeta m = do
   case lookup "title" m of
     Nothing -> pure ()
     Just title -> do
-      h1_ [id_ "top"] $ toHtml title
+      h1_ [id_ "top"] $ toHtml title -- (ref:f:weaveDocMeta-title)
       hr_ [class_ "title-underline"]
   f "author" $ p_ [class_ "doc-meta-author"]
   f "date" $ p_ [class_ "doc-meta-date"]
@@ -1464,21 +1465,6 @@ getLinkAnchor maybeLCI = \case
   CCommand {} -> ""
 #+end_src
 
-Headings use both the section number [[(f:getLinkAnchor-heading-section-number)]]
-and the contents of its body [[(f:getLinkAnchor-heading-body)]] for the link anchor.
-The [[f:getSectionNumber]] function just retrieves the numeric heading section
-number (e.g., as ~Text~ values like ~"1.2"~ or ~"7.3.5"~).
-
-#+name: f:getSectionNumber
-#+begin_src haskell
-getSectionNumber :: Heading -> Text
-getSectionNumber heading =
-  T.intercalate "."
-    . map T.show
-    . reverse
-    $ heading.section
-#+end_src
-
 ** Numeric cell indexes
 :PROPERTIES:
 :ID:       bfed523b-034d-425f-b195-e81d76e99fb7
@@ -1535,47 +1521,81 @@ wrapWithDiv lci wrapMe = do
 :ID:       c036cf17-0f61-4f07-bf76-bbe8b4eeb12e
 :END:
 
-Headings might sound simple, but because they are made up of arbitrary text,
-it's fairly involved. The body of a heading is made up of a list of [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]]
-values. So, we have to weave each type of token separately.
-
-The heading creates and closes a ~heading-container-...~ ~<div>~ element, to
-essentially group all non-heading cells up to the next heading together. This is
-needed for [[id:c4c13ce7-23d9-49d9-8d3f-6faecf839afa][Active headings TOC indicator]]. Specifically, grouping up cells like
-this lets us easily track which parts are being viewed (and we only have to keep
-track of these ~<div>~ elements, instead of tracking each cell individually).
+Headings might sound simple to weave, but because they are made up of arbitrary
+text, it's fairly involved. There's also the business of creating unique link
+anchors for each heading.
 
 #+name: f:weaveHeading
 #+begin_src haskell
 weaveHeading :: LCI -> Heading -> HtmlWeaver ()
 weaveHeading lci heading = do
-  when (heading.section /= [1]) $ toHtmlRaw @Text "</div>"
+  when (heading.section /= [1]) $ toHtmlRaw @Text "</div>" -- (ref:f:weaveHeading-heading-container-close-previous)
   let containerId = "heading-container-" <> linkAnchor
-  toHtmlRaw $ "<div id=\"" <> containerId <> "\" class=\"heading-container\">"
+  toHtmlRaw
+    $ "<div id=\""
+    <> containerId
+    <> "\" class=\"heading-container\">" -- (ref:f:weaveHeading-heading-container)
   hN [id_ linkAnchor] $ do
     wrapWith lci $ do
       a_ [href_ $ "#" <> linkAnchor] $ do
-        toHtml sectionText
+        toHtml $ getSectionNumber heading -- (ref:f:weaveHeading-render-section-text)
         toHtmlRaw ("&emsp;&thinsp;" :: Text)
-        weaveProse heading.body
+        weaveProse heading.body -- (ref:f:weaveHeading-render-body)
   where
     hN = case heading.level of
-      1 -> h2_
+      1 -> h2_ -- (ref:f:weaveHeading-h2)
       2 -> h3_
       3 -> h4_
       4 -> h5_
       _ -> h6_
-    sectionText = getSectionNumber heading
     linkAnchor = getLinkAnchor Nothing $ CHeading heading
 #+end_src
 
-A well-formed document should only have one ~<h1>~ HTML element (for the title of
-the document). We use ~h1_~ when weaving the title of the document (if any). This
-is why we start from ~h2_~ for headings.
+** Containers
 
-The ~sectionText~ already makes the heading unique amongst the other ones in the
-Org file, but for human-friendliness we also extract the textual part of it with
-[[f:getProseContents]] (which is fed through [[f:toSafeHtmlId]] for safety).
+The heading creates and closes a ~heading-container-...~ ~<div>~ element, to
+essentially group all non-heading cells (up to the next heading) together as one
+entity. This is needed for [[id:c4c13ce7-23d9-49d9-8d3f-6faecf839afa][Active headings TOC indicator]]. Specifically, grouping
+up cells like this lets us easily track which parts are being viewed (and we
+only have to keep track of these ~<div>~ elements, instead of tracking each cell
+individually). [[(f:weaveHeading-heading-container-close-previous)]] closes the
+~<div>~ elements opened up by [[(f:weaveHeading-heading-container)]] from previously
+woven headings; for the very last heading, we close it from
+[[(f:weaveMain-heading-container)]].
+
+** HTML elements start at ~<h2>~
+
+A well-formed document should only have one ~<h1>~ HTML element (for the title of
+the document). We use ~h1_~ when weaving the title of the document (if any), at
+[[(f:weaveDocMeta-title)]]. This is why we start from ~h2_~ for headings
+[[(f:weaveHeading-h2)]].
+
+** Unique link anchor
+:PROPERTIES:
+:ID:       9e28ea19-8a4d-4a92-bfd0-da70dc96b1ea
+:END:
+
+For generating the unique link anchor, we use [[f:getLinkAnchor]] which uses both
+the section number [[(f:getLinkAnchor-heading-section-number)]] and the contents of
+its body [[(f:getLinkAnchor-heading-body)]]. The [[f:getSectionNumber]] function just
+retrieves the numeric heading section number (e.g., as ~Text~ values like ~"1.2"~ or
+~"7.3.5"~). While the heading section number alone is enough to make it unique
+(and hence technically sufficient for creating a unique link anchor), including
+the contents of the body make it more human-friendly when looking at just the
+raw link anchor as part of a URL.
+
+#+name: f:getSectionNumber
+#+begin_src haskell
+getSectionNumber :: Heading -> Text
+getSectionNumber heading =
+  T.intercalate "."
+    . map T.show
+    . reverse
+    $ heading.section
+#+end_src
+
+For the heading body, [[f:getLinkAnchor]] relies on [[f:getProseContents]]
+[[(f:getLinkAnchor-heading-body)]].
 
 #+name: f:getProseContents
 #+begin_src haskell
@@ -1599,8 +1619,17 @@ getProseContents prose = join $ foldl' f [] prose.unProse
       PTokenDivEnd {} -> acc
 #+end_src
 
-For weaving the [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]], [[f:weaveProse]] delegates most of the work to
-[[f:weavePToken]].
+** Rendered text
+
+As for rendering the heading for the user to read, we again use the section
+number [[(f:weaveHeading-render-section-text)]] and body
+[[(f:weaveHeading-render-body)]]. The section number is the same as when generation
+the link anchor, by relying on [[f:getSectionNumber]]. The body part is different
+because we can do much better than just grabbing the text alone; instead we can
+weave each of the [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] values in the body, with all of the rich
+information encoded within those values. The main workhorse for this is
+[[f:weaveProse]] which can weave a [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] value; this in turn delegates most
+of the work to [[f:weavePToken]].
 
 #+name: f:weaveProse
 #+begin_src haskell
@@ -1608,7 +1637,7 @@ weaveProse :: Prose -> HtmlWeaver ()
 weaveProse prose = sequence_ $ map weavePToken prose.unProse
 #+end_src
 
-Each [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] value has its own weaver.
+Each [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] value has its own weaver in [[f:weavePToken]].
 
 #+name: f:weavePToken
 #+begin_src haskell

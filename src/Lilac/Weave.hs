@@ -450,7 +450,7 @@ weaveDocMeta m = do
   case lookup "title" m of
     Nothing -> pure ()
     Just title -> do
-      h1_ [id_ "top"] $ toHtml title
+      h1_ [id_ "top"] $ toHtml title --
       hr_ [class_ "title-underline"]
   f "author" $ p_ [class_ "doc-meta-author"]
   f "date" $ p_ [class_ "doc-meta-date"]
@@ -461,23 +461,25 @@ weaveDocMeta m = do
 
 weaveHeading :: LCI -> Heading -> HtmlWeaver ()
 weaveHeading lci heading = do
-  when (heading.section /= [1]) $ toHtmlRaw @Text "</div>"
+  when (heading.section /= [1]) $ toHtmlRaw @Text "</div>" --
   let containerId = "heading-container-" <> linkAnchor
-  toHtmlRaw $ "<div id=\"" <> containerId <> "\" class=\"heading-container\">"
+  toHtmlRaw
+    $ "<div id=\""
+    <> containerId
+    <> "\" class=\"heading-container\">" --
   hN [id_ linkAnchor] $ do
     wrapWith lci $ do
       a_ [href_ $ "#" <> linkAnchor] $ do
-        toHtml sectionText
+        toHtml $ getSectionNumber heading --
         toHtmlRaw ("&emsp;&thinsp;" :: Text)
-        weaveProse heading.body
+        weaveProse heading.body --
   where
     hN = case heading.level of
-      1 -> h2_
+      1 -> h2_ --
       2 -> h3_
       3 -> h4_
       4 -> h5_
       _ -> h6_
-    sectionText = getSectionNumber heading
     linkAnchor = getLinkAnchor Nothing $ CHeading heading
 
 getLinkAnchor :: Maybe LCI -> Cell -> Text
@@ -1733,7 +1735,8 @@ weaveMain docMeta lciCellPairs = do
     let isHeading = \case
           CHeading {} -> True
           _ -> False
-    when (any isHeading $ map snd lciCellPairs) $ toHtmlRaw @Text "</div>"
+    when (any isHeading $ map snd lciCellPairs)
+      $ toHtmlRaw @Text "</div>" --
 
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
