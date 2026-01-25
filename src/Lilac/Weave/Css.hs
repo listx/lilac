@@ -321,42 +321,44 @@ defaultCss = do
     fontSize (pt 36)
     marginTop (px 0)
     marginBottom (px 0)
-    prependSymbol "●" (rem $ -2.4)
+    prependSymbol "●" (rem $ -2.4) --
   hr ? do
     border (px 0) solid colorCodeBorder
     borderBottom (px 1) solid colorCodeBorder
     ".title-underline" & do
       marginBottom (rem 1)
+
   h2 ? do
     fontSize (pt 26)
-    prependSymbol "■" (rem $ -2.15)
+    prependSymbol "■" (rem $ -2.15) --
   h3 ? do
     fontSize (pt 22)
-    prependSymbol "○" (rem $ -2.03)
+    prependSymbol "○" (rem $ -2.03) --
   h4 ? do
     fontSize (pt 18)
   h5 ? do
     fontSize (pt 16)
   h6 ? do
     fontSize (pt 14)
-  forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) $ \(n, hN) -> do
-    hN ? do
-      position relative
-      fontSans
-      marginTop (px 0)
-      when (n > 1) $ marginBottom (px 0)
-      a ? do
-        color $ colorFrom "#000000"
-        ":visited" & do
-          color colorText
-      border (px 1) solid colorBg
-      yx padding 0 (px 5)
-      marginLeft (px (-7))
-      maxWidth fitContent
-      ".active" & do
-        border (px 1) solid colorActiveBorder
-        backgroundColor colorActiveBg
-        ev borderRadius (px 5)
+  forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) --
+    $ \(n, hN) -> do
+      hN ? do
+        position relative
+        fontSans
+        marginTop (px 0)
+        when (n > 1) $ marginBottom (px 0)
+        a ? do
+          color $ colorFrom "#000000"
+          ":visited" & do
+            color colorText
+        border (px 1) solid colorBg
+        yx padding 0 (px 5)
+        marginLeft (px (-7))
+        maxWidth fitContent
+        ".active" & do
+          border (px 1) solid colorActiveBorder
+          backgroundColor colorActiveBg
+          ev borderRadius (px 5)
 
   ".bold" & do
     fontWeight bold

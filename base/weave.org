@@ -868,6 +868,7 @@ rules.
 defaultCss :: Css
 defaultCss = do
   <<css:Layout>>
+  <<css:Page title>>
   <<css:Headings>>
   <<css:StyledTextStyles>>
   <<css:Misc styles>>
@@ -1110,6 +1111,54 @@ sortFootnoteCells object =
       _ -> False
 #+end_src
 
+** Document metadata
+
+[[f:weaveDocMeta]] weaves document metadata such as the title, author, and date.
+
+#+name: f:weaveDocMeta
+#+begin_src haskell
+weaveDocMeta :: M.Map Text Text -> HtmlWeaver ()
+weaveDocMeta m = do
+  case lookup "title" m of
+    Nothing -> pure ()
+    Just title -> do
+      h1_ [id_ "top"] $ toHtml title -- (ref:f:weaveDocMeta-title)
+      hr_ [class_ "title-underline"]
+  f "author" $ p_ [class_ "doc-meta-author"]
+  f "date" $ p_ [class_ "doc-meta-date"]
+  where
+    f k element = case lookup k m of
+      Nothing -> pure ()
+      Just x -> element $ toHtml x
+#+end_src
+
+For CSS, the title gets a special black circle ~U+25cf~ symbol to make it stand
+out [[(css:Page title-symbol)]], and an underline [[css:h1 (title) underline]].
+
+#+name: css:Page title
+#+begin_src haskell
+h1 ? do
+  fontSize (pt 36)
+  marginTop (px 0)
+  marginBottom (px 0)
+  prependSymbol "●" (rem $ -2.4) -- (ref:css:Page title-symbol)
+<<css:h1 (title) underline>>
+#+end_src
+
+The [[css:h1 (title) underline]] changes the horizontal rule to look a bit subdued
+(without the default black color).
+
+#+name: css:h1 (title) underline
+#+begin_src haskell
+hr ? do
+  border (px 0) solid colorCodeBorder
+  borderBottom (px 1) solid colorCodeBorder
+  ".title-underline" & do
+    marginBottom (rem 1)
+#+end_src
+
+** Main content and cells
+
 The most important helper for [[f:weaveObject]] is probably [[f:weaveMain]] because it
 then calls [[f:weaveCell]] to weave all of the cells.
 
@@ -1130,25 +1179,6 @@ weaveMain docMeta lciCellPairs = do
 
 The closing ~</div>~ tag is for closing up any heading container ~<div>~ elements
 that are created in [[(f:weaveHeading-heading-container)]].
-
-[[f:weaveDocMeta]] weaves document metadata such as the title, author, and date.
-
-#+name: f:weaveDocMeta
-#+begin_src haskell
-weaveDocMeta :: M.Map Text Text -> HtmlWeaver ()
-weaveDocMeta m = do
-  case lookup "title" m of
-    Nothing -> pure ()
-    Just title -> do
-      h1_ [id_ "top"] $ toHtml title -- (ref:f:weaveDocMeta-title)
-      hr_ [class_ "title-underline"]
-  f "author" $ p_ [class_ "doc-meta-author"]
-  f "date" $ p_ [class_ "doc-meta-date"]
-  where
-    f k element = case lookup k m of
-      Nothing -> pure ()
-      Just x -> element $ toHtml x
-#+end_src
 
 Weaving cells just means delegating to each of the weavers that know how to
 handle each cell type. That's what [[f:weaveCell]] does.
@@ -1657,6 +1687,80 @@ weavePToken = \case
   PTokenDivStart t -> toHtmlRaw ("<div class=\"csl-" <> t <> "\">" :: Text)
   PTokenDivEnd -> toHtmlRaw ("</div>" :: Text)
 #+end_src
+
+** CSS
+
+The headings are set to all use sans-serif font ([[f:fontSans]]).
+
+#+name: css:Headings
+#+begin_src haskell
+h2 ? do
+  fontSize (pt 26)
+  prependSymbol "<<symbol:h2>>" (rem $ -2.15) -- (ref:css:Headings-h2-symbol)
+h3 ? do
+  fontSize (pt 22)
+  prependSymbol "<<symbol:h3>>" (rem $ -2.03) -- (ref:css:Headings-h3-symbol)
+h4 ? do
+  fontSize (pt 18)
+h5 ? do
+  fontSize (pt 16)
+h6 ? do
+  fontSize (pt 14)
+forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) -- (ref:css:Headings-loop)
+  $ \(n, hN) -> do
+    hN ? do
+      position relative
+      fontSans
+      marginTop (px 0)
+      when (n > 1) $ marginBottom (px 0)
+      a ? do
+        color $ colorFrom "#000000"
+        ":visited" & do
+          color colorText
+      border (px 1) solid colorBg
+      yx padding 0 (px 5)
+      marginLeft (px (-7))
+      maxWidth fitContent
+      ".active" & do
+        border (px 1) solid colorActiveBorder
+        backgroundColor colorActiveBg
+        ev borderRadius (px 5)
+#+end_src
+
+We use [[f:prependSymbol]] to prepend some symbols to the ~h2~
+[[(css:Headings-h2-symbol)]] and ~h3~ [[(css:Headings-h3-symbol)]] headings (black square
+~U+25a0~ (■) and white circle ~U+25cb~ (○), respectively). This prepended text is
+not selectable (via text selection) by the user in the browser, so it's purely
+for decorative visual cues.
+
+#+name: symbol:h2
+#+begin_src txt
+■
+#+end_src
+
+#+name: symbol:h3
+#+begin_src txt
+○
+#+end_src
+
+#+name: f:prependSymbol
+#+begin_src haskell
+prependSymbol :: Text -> Size sz -> Css
+prependSymbol prefix spacing =
+  before & do
+    content $ stringContent prefix
+    marginLeft spacing
+    position absolute
+    top (px 0)
+    left (px 0)
+#+end_src
+
+The same symbols are used again in [[css:toc]], to make it easier to
+quickly scan the TOC for the top-level headings.
+
+Thanks to Haskell we can define some repetitive things in [[css:Headings]] via a
+~forM_~ loop [[(css:Headings-loop)]], instead of copy-pasting the same configuration
+across all headings.
 
 * Styled text
 :PROPERTIES:
@@ -4924,14 +5028,14 @@ nav # ".toc" ? do
     li # ".toc-level-1" ? do
       position relative
       before & do
-        content $ stringContent "■"
+        content $ stringContent "<<symbol:h2>>"
         marginLeft (rem $ -1)
         position absolute
         left (px 0)
     li # ".toc-level-2" ? do
       position relative
       before & do
-        content $ stringContent "○"
+        content $ stringContent "<<symbol:h3>>"
         marginLeft (rem $ -1)
         position absolute
         left (px 0)
@@ -5019,85 +5123,6 @@ footer ? do
 #+begin_src txt
 4rem
 #+end_src
-
-** Headings
-
-The headings are set to all use sans-serif font ([[f:fontSans]]).
-
-#+name: css:Headings
-#+begin_src haskell
-h1 ? do
-  fontSize (pt 36)
-  marginTop (px 0)
-  marginBottom (px 0)
-  prependSymbol "●" (rem $ -2.4)
-<<css:h1 (title) underline>>
-h2 ? do
-  fontSize (pt 26)
-  prependSymbol "■" (rem $ -2.15)
-h3 ? do
-  fontSize (pt 22)
-  prependSymbol "○" (rem $ -2.03)
-h4 ? do
-  fontSize (pt 18)
-h5 ? do
-  fontSize (pt 16)
-h6 ? do
-  fontSize (pt 14)
-forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) $ \(n, hN) -> do
-  hN ? do
-    position relative
-    fontSans
-    marginTop (px 0)
-    when (n > 1) $ marginBottom (px 0)
-    a ? do
-      color $ colorFrom "#000000"
-      ":visited" & do
-        color colorText
-    border (px 1) solid colorBg
-    yx padding 0 (px 5)
-    marginLeft (px (-7))
-    maxWidth fitContent
-    ".active" & do
-      border (px 1) solid colorActiveBorder
-      backgroundColor colorActiveBg
-      ev borderRadius (px 5)
-#+end_src
-
-We use [[f:prependSymbol]] to prepend some text (the black square symbol ~U+25A0~ (■))
-to the ~h2~ heading. This prepended text is not selectable (via text selection) by
-the user in the browser, so it's purely for decorative visual cues.
-
-#+name: f:prependSymbol
-#+begin_src haskell
-prependSymbol :: Text -> Size sz -> Css
-prependSymbol prefix spacing =
-  before & do
-    content $ stringContent prefix
-    marginLeft spacing
-    position absolute
-    top (px 0)
-    left (px 0)
-#+end_src
-
-The same black square symbol is invoked again in [[css:toc]], to make it easier to
-quickly scan the TOC for the top-level headings.
-
-Thanks to Haskell we can define some repetitive things in [[css:Headings]] via a
-~forM_~ loop, instead of copy-pasting the same configuration across all headings.
-
-#+name: css:h1 (title) underline
-#+begin_src haskell
-hr ? do
-  border (px 0) solid colorCodeBorder
-  borderBottom (px 1) solid colorCodeBorder
-  ".title-underline" & do
-    marginBottom (rem 1)
-#+end_src
-
-The [[css:h1 (title) underline]] changes the horizontal rule to look a bit subdued
-(without the default black color). A horizontal rule is also used in
-[[f:weaveFooter]], which ends up inheriting the style used here.
 
 ** Styled text
 
