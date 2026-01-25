@@ -813,7 +813,7 @@ import Text.Megaparsec.Char.Lexer (hexadecimal)
 <<f:fontSerif>>
 <<f:fontSans>>
 <<f:fontMono>>
-<<f:prependSymbol>>
+<<f:headingPrefix>>
 #+end_src
 
 ** CSS generator
@@ -1678,7 +1678,13 @@ weavePToken = \case
 
 ** CSS
 
-The headings are set to all use sans-serif font ([[f:fontSans]]).
+The main differentiation points between heading elements are their font sizes,
+and any usage of decorative symbols with [[f:headingPrefix]]. Stylistically, the
+main visual elements of headings are their use of sans-serif font ([[f:fontSans]]).
+
+Thanks to Haskell we can define some repetitive things in [[css:Headings]] via a
+~forM_~ loop [[(css:Headings-loop)]], instead of copy-pasting the same configuration
+across all headings.
 
 #+name: css:Headings
 #+begin_src haskell
@@ -1688,13 +1694,13 @@ forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) -- (ref:css:Headings-loop)
       case n of
         1 -> do
           fontSize (pt 36)
-          prependSymbol "●" (rem $ -2.4) -- (ref:css:Page title-symbol)
+          headingPrefix "●" (rem $ -2.4) -- (ref:css:Page title-symbol)
         2 -> do
           fontSize (pt 26)
-          prependSymbol "<<symbol:h2>>" (rem $ -2.15) -- (ref:css:Headings-h2-symbol)
+          headingPrefix "<<symbol:h2>>" (rem $ -2.15) -- (ref:css:Headings-h2-symbol)
         3 -> do
           fontSize (pt 22)
-          prependSymbol "<<symbol:h3>>" (rem $ -2.03) -- (ref:css:Headings-h3-symbol)
+          headingPrefix "<<symbol:h3>>" (rem $ -2.03) -- (ref:css:Headings-h3-symbol)
         4 -> do
           fontSize (pt 18)
         5 -> do
@@ -1720,11 +1726,20 @@ forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) -- (ref:css:Headings-loop)
         ev borderRadius (px 5)
 #+end_src
 
-We use [[f:prependSymbol]] to prepend some symbols to the ~h2~
-[[(css:Headings-h2-symbol)]] and ~h3~ [[(css:Headings-h3-symbol)]] headings (black square
-~U+25a0~ (■) and white circle ~U+25cb~ (○), respectively). This prepended text is
-not selectable (via text selection) by the user in the browser, so it's purely
-for decorative visual cues.
+We use [[f:headingPrefix]] as shown in the table below.
+
+#+caption: Heading prefixes.
+| HTML element      | Heading prefix | Prefix name  | Unicode codepoint |
+|-------------------+----------------+--------------+-------------------|
+| ~<h1>~ (Page title) | ●              | BLACK CIRCLE | ~U+25cf~            |
+| ~<h2>~              | ■              | BLACK SQUARE | ~U+25a0~            |
+| ~<h3>~              | ○              | WHITE CIRCLE | ~U+25cb~            |
+
+This prefixed text is not selectable (via text selection) by the user in the
+browser, so it's purely for decorative visual cues. We use separately named code
+blocks for the ~<h2>~ and ~<h3>~ symbols because they're also reused in [[css:toc]]
+[[(css:toc-h2)]] [[(css:toc-h3)]]. This makes it easier to quickly scan the TOC for the
+top-level headings.
 
 #+name: symbol:h2
 #+begin_src txt
@@ -1736,10 +1751,10 @@ for decorative visual cues.
 ○
 #+end_src
 
-#+name: f:prependSymbol
+#+name: f:headingPrefix
 #+begin_src haskell
-prependSymbol :: Text -> Size sz -> Css
-prependSymbol prefix spacing =
+headingPrefix :: Text -> Size sz -> Css
+headingPrefix prefix spacing =
   before & do
     content $ stringContent prefix
     marginLeft spacing
@@ -1747,13 +1762,6 @@ prependSymbol prefix spacing =
     top (px 0)
     left (px 0)
 #+end_src
-
-The same symbols are used again in [[css:toc]], to make it easier to
-quickly scan the TOC for the top-level headings.
-
-Thanks to Haskell we can define some repetitive things in [[css:Headings]] via a
-~forM_~ loop [[(css:Headings-loop)]], instead of copy-pasting the same configuration
-across all headings.
 
 * Styled text
 :PROPERTIES:
@@ -5021,14 +5029,14 @@ nav # ".toc" ? do
     li # ".toc-level-1" ? do
       position relative
       before & do
-        content $ stringContent "<<symbol:h2>>"
+        content $ stringContent "<<symbol:h2>>" -- (ref:css:toc-h2)
         marginLeft (rem $ -1)
         position absolute
         left (px 0)
     li # ".toc-level-2" ? do
       position relative
       before & do
-        content $ stringContent "<<symbol:h3>>"
+        content $ stringContent "<<symbol:h3>>" -- (ref:css:toc-h3)
         marginLeft (rem $ -1)
         position absolute
         left (px 0)

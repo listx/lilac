@@ -246,14 +246,14 @@ defaultCss = do
       li # ".toc-level-1" ? do
         position relative
         before & do
-          content $ stringContent "■"
+          content $ stringContent "■" --
           marginLeft (rem $ -1)
           position absolute
           left (px 0)
       li # ".toc-level-2" ? do
         position relative
         before & do
-          content $ stringContent "○"
+          content $ stringContent "○" --
           marginLeft (rem $ -1)
           position absolute
           left (px 0)
@@ -328,13 +328,13 @@ defaultCss = do
         case n of
           1 -> do
             fontSize (pt 36)
-            prependSymbol "●" (rem $ -2.4) --
+            headingPrefix "●" (rem $ -2.4) --
           2 -> do
             fontSize (pt 26)
-            prependSymbol "■" (rem $ -2.15) --
+            headingPrefix "■" (rem $ -2.15) --
           3 -> do
             fontSize (pt 22)
-            prependSymbol "○" (rem $ -2.03) --
+            headingPrefix "○" (rem $ -2.03) --
           4 -> do
             fontSize (pt 18)
           5 -> do
@@ -798,8 +798,8 @@ fontMono :: Css
 fontMono = do
   fontFamily ["Source Code Pro"] [monospace]
 
-prependSymbol :: Text -> Size sz -> Css
-prependSymbol prefix spacing =
+headingPrefix :: Text -> Size sz -> Css
+headingPrefix prefix spacing =
   before & do
     content $ stringContent prefix
     marginLeft spacing
