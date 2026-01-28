@@ -1370,13 +1370,12 @@ getRelativeJsPath = do
   pure . T.pack $ fromMaybe "lilac.js" result
 #+end_src
 
-** Page layout
+** CSS page layout
 :PROPERTIES:
 :ID:       eda7626d-42fd-45d3-b0f8-940710413295
 :END:
 
-Here we style the major parts of the object as a single HTML page. The main
-pieces are the top-level ~<html>~ and ~<body>~ bits.
+[[css:Layout]] styles the major parts of the object as a single HTML page.
 
 #+name: css:Layout
 #+begin_src haskell
@@ -1398,21 +1397,48 @@ body ? do
        """
   yx margin (px 0) auto
   overflowY hidden
-div ? do
-  ev margin $ px 0
 <<css:navbar>>
 <<css:toc>>
 <<css:Main content>>
 <<css:Sidebar>>
-<<css:Footer>>
-p # ".widget-title" ? do
-  fontWeight bold
-  marginBottom $ px 0
+<<css:Footer>> -- (ref:css:Layout-footer)
+p # ".widget-title" -- (ref:css:Layout-widget-title)
+  ? do
+    fontWeight bold
+    marginBottom $ px 0
+div ? do
+  ev margin $ px 0 -- (ref:css:Layout-reset-div)
 #+end_src
 
-The ~<body>~ uses a CSS grid layout to create two columns, one for the table of
-contents on the left (250 pixels wide), and the second column for the main
-content (800 pixels).
+The ~<body>~ uses a CSS grid layout to create four distinct areas:
+
+  1) Navbar :: Contains the filesystem path of the object, as well as a link to
+     the homepage of the project [[(data:ProjectConf-homepage)]].
+
+  2) Table of Contents (TOC) :: Summarizes all of the major headings (first two
+     levels) in the document.
+
+  3) Main :: Holds all of the content of the document. The list of cells in the
+     document are rendered one after another in here, top to bottom.
+
+  4) Sidebar :: Holds various /widgets/ which aid in navigation. The widgets are:
+
+     1) Tangled files :: List of tangled files in the document.
+
+     2) Backlinks :: List of backlinks to any named cell in the current document.
+
+     3) Named cells :: List of named cells in the current document.
+
+     The sidebar also holds a footer [[(css:Layout-footer)]]. See [[f:weaveFooter]] and
+     [[css:Footer]].
+
+Widgets are small and require a much smaller heading; therefore they use a ~<p>~
+element instead of something like ~<h6>~. These widget titles are configured at
+[[(css:Layout-widget-title)]].
+
+The ~<div>~ element is used in many places to section off areas of content; to
+avoid repetition, we reset its margins to be 0 [[(css:Layout-reset-div)]] here for
+all ~<div>~ elements.
 
 * Identifying cells in HTML
 
@@ -4651,7 +4677,7 @@ weaveNamedCellsIndex = do
 
 * Footer
 
-The footer is the element at the very bottom of the page. This is not to be
+The footer is the element at the very bottom of the sidebar. This is not to be
 confused with [[id:c3562660-a9ff-499d-9b10-c69bcba7f105][Footnotes]], which are a user-controlled thing (a page may or may
 not have footnotes, depending on usage).
 
