@@ -2231,6 +2231,116 @@ The link anchor uses the link symbol "🔗" with Unicode code point ~U+1F517~.
 "&#x1F517;"
 #+end_src
 
+** CSS
+
+By default, browsers underline all links. We only underline them when the mouse
+hovers over them.
+
+#+name: css:Links
+#+begin_src haskell
+a ? do
+  color colorNowebLinkFg
+  textDecoration none
+  ":hover" & do
+    textDecoration underline
+  ":visited" & do
+    color colorNowebLinkVisitedFg
+    backgroundColor colorNowebLinkVisitedBg
+    textDecoration none
+    ":hover" & do
+      textDecoration underline
+      border (px 1) solid colorNowebLinkVisitedFg
+  ".self-link" & do
+    color colorText
+    ":visited" & do
+      color colorText
+  ".internal-link" & do
+    fontMono
+    roundedRectangleLink
+  <<css:Links (external)>>
+#+end_src
+
+*** External links
+
+External links get a special superscript-like icon with an arrow sticking out of
+a box. This just visually indicates that the user will be leaving the current
+site. Whether a link is external or not is determined in [[f:isExternalLink]] during
+HTML generation.
+
+#+name: css:Links (external)
+#+begin_src haskell
+".external-link" & do
+  color colorNowebLinkFg
+  ":visited" & do
+    color colorNowebLinkVisitedFg
+  "::after" & do
+    let rawSvg :: String
+        rawSvg =
+          """
+          <<external-link-svg>>
+          """
+        basicEncoder = \case
+          '"' -> "%22"
+          '\n' -> " "
+          c -> [c]
+        inlineSvg =
+          T.intercalate
+            (T.append "%23" $ T.drop 1 colorNowebLinkFgTxt)
+            . T.splitOn
+              "COLOR"
+            . T.pack
+            $ concatMap basicEncoder rawSvg
+        cssProp =
+          "url('data:image/svg+xml;charset=UTF-8,"
+            <> inlineSvg
+            <> "')"
+    "content" -: cssProp
+    display inlineBlock
+    width (rem 1)
+    height (rem 1)
+    margin 0 (rem (-0.2)) 0 0
+#+end_src
+
+The raw SVG code for the external link is taken mostly from [[https://www.unicode.org/L2/L2018/18303-external-link.pdf][here]]. That document
+had a typo though, where it has ~viewbox~ instead of ~viewBox~ (which is why we use
+the latter here).
+
+#+name: external-link-svg
+#+begin_src xml
+<svg xmlns="http://www.w3.org/2000/svg" class="external-link" viewBox="0 0 60 60">
+<path fill="COLOR" d="M36 24c-1.2 0-2 0.8-2 2v12c0 1.2-0.8 2-2 2h-22c-1.2
+0-2-0.8-2-2v-22c0-1.2 0.8-2 2-2h12c1.2 0 2-0.8 2-2s-0.8-2-2-2h-12c-3.4 0-6 2.6-6
+6v22c0 3.4 2.6 6 6 6h22c3.4 0 6-2.6 6-6v-12c0-1.2-0.8-2-2-2z"></path>
+<path fill="COLOR" d="M43.8
+5.2c-0.2-0.4-0.6-0.8-1-1-0.2-0.2-0.6-0.2-0.8-0.2h-12c-1.2 0-2 0.8-2 2s0.8 2 2
+2h7.2l-18.6 18.6c-0.8 0.8-0.8 2 0 2.8 0.4 0.4 0.8 0.6 1.4 0.6s1-0.2
+1.4-0.6l18.6-18.6v7.2c0 1.2 0.8 2 2 2s2-0.8 2-2v-12c0-0.2
+0-0.6-0.2-0.8z"></path>
+</svg>
+#+end_src
+
+*** Links styled as rounded rectangles
+
+#+name: f:roundedRectangleLink
+#+begin_src haskell
+roundedRectangleLink :: Css
+roundedRectangleLink = do
+  fontSize (rem 0.9)
+  color colorNowebLinkFg
+  backgroundColor colorNowebLinkBg
+  ev borderRadius (px 5)
+  yx padding (px 1) (px 3)
+  border (px 1) solid colorCodeBorder
+  ":hover" & do
+    border (px 1) solid colorNowebLinkFg
+    textDecoration none
+  ":visited" & do
+    ":hover" & do
+      border (px 1) solid colorNowebLinkVisitedFg
+      textDecoration none
+#+end_src
+
+
 * List markers
 
 The =blaze-html= library we use expects to take care of the starting and closing
@@ -5194,115 +5304,6 @@ footer ? do
 #+name: css:Footer height
 #+begin_src txt
 4rem
-#+end_src
-
-** Links
-
-By default, browsers underline all links. We only underline them when the mouse
-hovers over them.
-
-#+name: css:Links
-#+begin_src haskell
-a ? do
-  color colorNowebLinkFg
-  textDecoration none
-  ":hover" & do
-    textDecoration underline
-  ":visited" & do
-    color colorNowebLinkVisitedFg
-    backgroundColor colorNowebLinkVisitedBg
-    textDecoration none
-    ":hover" & do
-      textDecoration underline
-      border (px 1) solid colorNowebLinkVisitedFg
-  ".self-link" & do
-    color colorText
-    ":visited" & do
-      color colorText
-  ".internal-link" & do
-    fontMono
-    roundedRectangleLink
-  <<css:Links (external)>>
-#+end_src
-
-*** External links
-
-External links get a special superscript-like icon with an arrow sticking out of
-a box. This just visually indicates that the user will be leaving the current
-site. Whether a link is external or not is determined in [[f:isExternalLink]] during
-HTML generation.
-
-#+name: css:Links (external)
-#+begin_src haskell
-".external-link" & do
-  color colorNowebLinkFg
-  ":visited" & do
-    color colorNowebLinkVisitedFg
-  "::after" & do
-    let rawSvg :: String
-        rawSvg =
-          """
-          <<external-link-svg>>
-          """
-        basicEncoder = \case
-          '"' -> "%22"
-          '\n' -> " "
-          c -> [c]
-        inlineSvg =
-          T.intercalate
-            (T.append "%23" $ T.drop 1 colorNowebLinkFgTxt)
-            . T.splitOn
-              "COLOR"
-            . T.pack
-            $ concatMap basicEncoder rawSvg
-        cssProp =
-          "url('data:image/svg+xml;charset=UTF-8,"
-            <> inlineSvg
-            <> "')"
-    "content" -: cssProp
-    display inlineBlock
-    width (rem 1)
-    height (rem 1)
-    margin 0 (rem (-0.2)) 0 0
-#+end_src
-
-The raw SVG code for the external link is taken mostly from [[https://www.unicode.org/L2/L2018/18303-external-link.pdf][here]]. That document
-had a typo though, where it has ~viewbox~ instead of ~viewBox~ (which is why we use
-the latter here).
-
-#+name: external-link-svg
-#+begin_src xml
-<svg xmlns="http://www.w3.org/2000/svg" class="external-link" viewBox="0 0 60 60">
-<path fill="COLOR" d="M36 24c-1.2 0-2 0.8-2 2v12c0 1.2-0.8 2-2 2h-22c-1.2
-0-2-0.8-2-2v-22c0-1.2 0.8-2 2-2h12c1.2 0 2-0.8 2-2s-0.8-2-2-2h-12c-3.4 0-6 2.6-6
-6v22c0 3.4 2.6 6 6 6h22c3.4 0 6-2.6 6-6v-12c0-1.2-0.8-2-2-2z"></path>
-<path fill="COLOR" d="M43.8
-5.2c-0.2-0.4-0.6-0.8-1-1-0.2-0.2-0.6-0.2-0.8-0.2h-12c-1.2 0-2 0.8-2 2s0.8 2 2
-2h7.2l-18.6 18.6c-0.8 0.8-0.8 2 0 2.8 0.4 0.4 0.8 0.6 1.4 0.6s1-0.2
-1.4-0.6l18.6-18.6v7.2c0 1.2 0.8 2 2 2s2-0.8 2-2v-12c0-0.2
-0-0.6-0.2-0.8z"></path>
-</svg>
-#+end_src
-
-*** Links styled as rounded rectangles
-
-#+name: f:roundedRectangleLink
-#+begin_src haskell
-roundedRectangleLink :: Css
-roundedRectangleLink = do
-  fontSize (rem 0.9)
-  color colorNowebLinkFg
-  backgroundColor colorNowebLinkBg
-  ev borderRadius (px 5)
-  yx padding (px 1) (px 3)
-  border (px 1) solid colorCodeBorder
-  ":hover" & do
-    border (px 1) solid colorNowebLinkFg
-    textDecoration none
-  ":visited" & do
-    ":hover" & do
-      border (px 1) solid colorNowebLinkVisitedFg
-      textDecoration none
 #+end_src
 
 ** List items
