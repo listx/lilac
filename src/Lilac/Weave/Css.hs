@@ -314,7 +314,8 @@ defaultCss = do
       fontWeight bold
       marginBottom $ px 0
   div ? do
-    ev margin $ px 0 --
+    --
+    ev margin $ px 0
 
   hr ? do
     border (px 0) solid colorCodeBorder
