@@ -385,9 +385,6 @@ defaultCss = do
   ".superscript" & do
     verticalAlign vAlignSuper
 
-  ".align-right" & do
-    textAlign $ alignSide sideRight
-
   a ? do
     color colorNowebLinkFg
     textDecoration none
