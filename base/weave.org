@@ -1919,6 +1919,318 @@ The ~verbatim~ and ~code~ classes use a smaller 0.9 em font size, because otherw
 they look too big (because typically monospaced font tends to look bigger than
 non-monospaced font).
 
+* Links
+:PROPERTIES:
+:ID:       a63d2021-2596-4c43-81e3-d08e90077f75
+:END:
+
+Links are probably most common inside prose and cell blocks (for Noweb links and
+also line labels).
+
+[[f:weaveLink]] handles how links are woven. For external links, we set the ~target~
+attribute to ~_blank~ to make the browser open them in a new tab. The ~noopener
+noreferrer~ bit is a security measure to sever connections from the new tab and
+the current window. This way, even if those external links get hijacked, they
+will not have access to the current window.
+
+#+name: f:weaveLink
+#+begin_src haskell
+weaveLink :: Bool -> Link -> HtmlWeaver ()
+weaveLink insideBlock link = do
+  weaveConf <- ask
+  wovenLinkTarget <- weaveLinkTarget insideBlock link.target
+  let attrs =
+        [href_ wovenLinkTarget]
+          <> linkCategory wovenLinkTarget
+          <> lineLabelAttr
+      lineLabelAttr =
+        case link.target of
+          LinkTargetLineLabel lineLabel ->
+            if insideBlock
+              then [id_ ("ib-" <> toSafeHtmlId lineLabel.name)] -- (ref:line label self-link)
+              else []
+          _ -> []
+      linkDisplayName =
+        case link.target of
+          LinkTargetLineLabel lineLabel
+            | Just gci <- lookup lineLabel weaveConf.archive.symbols,
+              Just (obj, _) <- gciToObjCell weaveConf.archive gci,
+              Just num <- lookup (T.drop 1 $ T.dropEnd 1 lineLabel.name) obj.orgDoc.lineLabels ->
+                if
+                  | Just originObj <-
+                      lookup weaveConf.originObjectPath weaveConf.archive.objects,
+                    originObj /= obj,
+                    Just (offset, _) <- IntMap.lookupLE gci.unGCI weaveConf.archive.offsets,
+                    Just prose <- gciToName weaveConf.archive offset gci ->
+                      (extractStyledText prose) -- (ref:f:weaveLink-name-of-code-block)
+                        <> [stext " → " [], stext (T.show num) [Bold]]
+                  | otherwise ->
+                      [stext (T.show num) [Bold]]
+            | otherwise ->
+                [stext "weaveLink error (line label display name)" []]
+          _ -> link.name
+  a_
+    attrs
+    $ sequence_
+    $ map weaveStyledText linkDisplayName
+  where
+    linkCategory target
+      | isExternalLink link.target =
+          [ class_ "external-link",
+            target_ "_blank",
+            rel_ "noopener noreferrer"
+          ]
+      | "#ref-" `T.isPrefixOf` target = []
+      | otherwise = [class_ "internal-link"]
+    extractStyledText :: Prose -> [StyledText]
+    extractStyledText prose = reverse $ foldl' f [] prose.unProse
+    f acc (PTokenStyledText styledText) = styledText : acc
+    f acc _ = acc
+#+end_src
+
+Links to bibliographical entries (those starting with ~#ref-~ are not given an
+~internal-link~ class, because we want these links to be simple without any extra
+decorations.
+
+Unlike Noweb links, line label links inside blocks point to themselves. That's
+why [[(line label self-link)]] uses the ~id~ HTML attribute.
+
+The part we need to put in the ~href="..."~ part is generated separately in
+[[f:weaveLinkTarget]]. The ~docName == ""~ part at [[(link-target-is-internal-cell)]] is needed
+to check that the ~linkOid~ exists in the current object's list of local symbols;
+this is the only way we can ensure that the ~linkOid~ is a local one internal to
+the current document.
+
+#+name: f:weaveLinkTarget
+#+begin_src haskell
+weaveLinkTarget :: Bool -> LinkTarget -> HtmlWeaver T.Text
+weaveLinkTarget insideBlock linkTarget = do
+  weaveConf <- ask
+  case linkTarget of
+    LinkTargetOid linkOid -> weaveLinkTargetLinkOid linkOid
+    LinkTargetLineLabel linkOid
+      | insideBlock -> pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-self-link)
+      | Just originObj <-
+          lookup weaveConf.originObjectPath weaveConf.archive.objects,
+        originObj.orgDoc.oid == linkOid.oid ->
+          pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-internal)
+      | Just gci <- lookup linkOid weaveConf.archive.symbols,
+        Just objPath <- gciToObjPath weaveConf.archive gci ->
+          pure
+            $ getExternalRelPath linkOid objPath weaveConf.originObjectPath
+            <> internalLineLabelTarget -- (ref:f:weaveLinkTarget-external)
+      | otherwise -> pure $ showBrokenLink linkOid
+      where
+        internalLineLabelTarget =
+          (T.pack "#ib-") -- (ref:f:weaveLinkTarget-line-label-prefix)
+            <> toSafeHtmlId linkOid.name
+    LinkTargetFootnote name -> pure $ (T.pack "#footnote-") <> name
+    LinkTargetFilePath path -> pure . T.pack $ N.escapeURIString N.isUnescapedInURI path
+    LinkTargetURI uri -> pure . T.pack $ N.uriToString id uri ""
+#+end_src
+
+For weaving the target to [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]], there are three cases:
+
+  1) The actual labels themselves. This is where they are defined /inside/ a code
+     block, where we have to make them link to themselves
+     [[(f:weaveLinkTarget-self-link)]] (similar to how headings and code blocks can
+     link to themselves for the user to easily save the link to it).
+
+  2) Internal line labels [[(f:weaveLinkTarget-internal)]]. This is simple because
+     we know that all line labels inside a document are unique, so we can just
+     weave with the name of the label (modulo an ~ib-~ prefix to mean "inside
+     block") [[(f:weaveLinkTarget-line-label-prefix)]].
+
+  3) External line labels [[(f:weaveLinkTarget-external)]]. We can't use
+     [[f:weaveLinkTargetLinkOid]] because it will try to do a coarse cell-level
+     lookup. Line labels are finer-grained than cells. We need to get the
+     external relative path, and then skip cell-wise operations and just slap on
+     the name of the line label (modulo the ~ib-~ prefix) to the external path.
+
+[[f:weaveLinkTargetLinkOid]] is a little bit complicated because it needs to be able
+to handle links that point to things inside the doc, or to another doc somewhere
+else (in the archive).
+
+#+name: f:weaveLinkTargetLinkOid
+#+begin_src haskell
+weaveLinkTargetLinkOid :: LinkOid -> HtmlWeaver T.Text
+weaveLinkTargetLinkOid linkOid = do
+  weaveConf <- ask
+  if
+    | Just gci <- lookup linkOid weaveConf.archive.symbols,
+      gci.unGCI < 0,
+      Just objPath <-
+        (sort $ keys weaveConf.archive.objects) !!? (abs gci.unGCI - 1) ->
+        pure
+          $ if objPath == weaveConf.originObjectPath
+            then "#top"
+            else getExternalRelPath linkOid objPath weaveConf.originObjectPath
+    | Just gci <- lookup linkOid weaveConf.archive.symbols,
+      Just (docName, linkAnchor, _) <- getLinkToGCI weaveConf gci ->
+        if docName == "" -- (ref:link-target-is-internal-cell)
+          then pure $ "#" <> linkAnchor
+          else pure linkAnchor
+    | otherwise -> pure $ showBrokenLink linkOid
+#+end_src
+
+#+name: f:getExternalRelPath
+#+begin_src haskell
+getExternalRelPath :: LinkOid -> GPath -> GPath -> Text
+getExternalRelPath linkOid extPath intPath
+  | Just toObjPath <- P.encodeUtf $ decodeGPath extPath,
+    Just fromObjPath <- P.encodeUtf $ decodeGPath intPath,
+    Right str <-
+      P.decodeWith utf8 utf8
+        $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt =
+      T.pack str
+  | otherwise = showBrokenLink linkOid
+  where
+    htmlExt = P.unsafeEncodeUtf "html"
+#+end_src
+
+#+name: f:showBrokenLink
+#+begin_src haskell
+showBrokenLink :: LinkOid -> Text
+showBrokenLink linkOid = "#LILAC_BROKEN_LINK-" <> show linkOid
+#+end_src
+
+[[f:getRelativePathWithoutSymlinks]] takes two file paths. It tries to answer the
+question "assuming I am in the directory in the first file, how can I go to the
+directory containing the second file?" This assumes that the given paths have no
+symlinks (to avoid the pitfall described at [[https://hackage.haskell.org/package/filepath-1.5.4.0/docs/System-OsPath.html#v:makeRelative][System.OsPath.makeRelative]] and [[https://neilmitchell.blogspot.com/2015/10/filepaths-are-subtle-symlinks-are-hard.html][this
+blog post]]).
+
+We use the following algorithm:
+
+  1) If we're in the same directory, or if the destination is a child of the
+     source directory, then drop the common prefix of the
+     destination. ~a/b/c/src~ to ~a/b/c/dest~ is ~dest~. ~a/b/c/src~ to ~a/b/c/d/e/dest~
+     is ~d/e/dest~.
+
+  2) If we're not in the same directory, we have to go up N directories up until
+     we get to the common prefix.
+
+     - No common prefix: go up all the way to the root, then go to the
+       destination. ~a/b/c/src~ to ~d/dest~ is ~../../../d/dest~.
+
+     - Some common prefix: go up to the common prefix. ~a/b/c/dest~ to ~a/x/y/dest~
+       is ~../../x/y/dest~ because ~a~ is the common prefix. ~a/b/c/d/e/src~ to ~a/dest~
+       is ~../../../../dest~.
+
+#+name: f:getRelativePathWithoutSymlinks
+#+begin_src haskell
+getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
+getRelativePathWithoutSymlinks src dest
+  | dirsSrc == dirsDest || isDestChildOfSrc =
+      P.joinPath $ remainingDest <> destFile
+  | null commonPathPrefix =
+      P.joinPath $ replicate (length dirsSrc) goUp <> destFile
+  | otherwise =
+      P.joinPath
+        $ replicate (length dirsSrc - length commonPathPrefix) goUp
+        <> drop (length commonPathPrefix) dirsDest
+        <> destFile
+  where
+    goUp = P.unsafeEncodeUtf ".."
+    destFile = [P.takeFileName dest]
+    dirSrc = P.takeDirectory src
+    dirDest = P.takeDirectory dest
+    dirsSrc = P.splitDirectories dirSrc
+    dirsDest = P.splitDirectories dirDest
+    commonPathPrefix = commonPrefix dirsSrc dirsDest
+    isDestChildOfSrc = dirsSrc == commonPathPrefix
+    remainingDest = drop (length commonPathPrefix) dirsDest
+#+end_src
+
+The [[f:commonPrefix]] helper returns the common prefix found in two lists.
+
+#+name: f:commonPrefix
+#+begin_src haskell
+commonPrefix :: (Eq a) => [a] -> [a] -> [a]
+commonPrefix xs ys = map fst . takeWhile (\(x, y) -> (x == y)) $ zip xs ys
+#+end_src
+
+#+name: t:0301-weave-external-links-common-prefix
+#+begin_src haskell
+it "0301-weave-external-links-common-prefix" $ do
+  mapM_
+    ( \(a, b, c) ->
+        ( P.joinPath
+            $ LW.commonPrefix
+              (P.splitDirectories $ P.unsafeEncodeUtf a)
+              (P.splitDirectories $ P.unsafeEncodeUtf b)
+        )
+          `shouldBe` (P.unsafeEncodeUtf c)
+    )
+    [ ("from.html", "to.html1", ""),
+      ("base/from.html", "base/to.html2", "base"),
+      ("1base/a/b/from.html", "1base/a/b/to.html3", "1base/a/b"),
+      ("2base/a/b/from.html", "2base/a/b/c/to.html4", "2base/a/b"),
+      ("3base/a/b/from.html", "3base/a/b/c/d/to.html5", "3base/a/b"),
+      ("a/b/c", "x/y/z", "")
+    ]
+#+end_src
+
+We use HTML file path examples in [[t:0301-weave-external-links-common-prefix]] to
+reflect the use case of [[f:getRelativePathWithoutSymlinks]] (to find the relative
+path to the external object's woven HTML file). The test cases in
+[[t:0301-weave-external-links]] check for some typical situations of such relative
+paths.
+
+#+name: t:0301-weave-external-links
+#+begin_src haskell
+it "0301-weave-external-links" $ do
+  mapM_
+    ( \(a, b, c) ->
+        LW.getRelativePathWithoutSymlinks
+          (P.unsafeEncodeUtf a)
+          (P.unsafeEncodeUtf b)
+          `shouldBe` (P.unsafeEncodeUtf c)
+    )
+    [ ("from.html", "to.html1", "to.html1"),
+      ("base/from.html", "base/to.html2", "to.html2"),
+      ("base/a/b/from.html", "base/a/b/to.html3", "to.html3"),
+      ("base/a/b/from.html", "base/a/b/c/to.html4", "c/to.html4"),
+      ("base/a/b/from.html", "base/a/b/c/d/to.html5", "c/d/to.html5"),
+      ("base/a/b/from.html", "to.html6", "../../../to.html6"),
+      ("base/a/b/from.html", "base/a/c/to.html7", "../c/to.html7"),
+      ("base/a/b/c/d/from.html", "base/a/x/y/to.html8", "../../../x/y/to.html8")
+    ]
+#+end_src
+
+[[f:isExternalLink]] checks if a given link target is external to the
+would-be-generated HTML file (of the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] being woven). It considers any
+non-OID link to be external. This encourages users to always use the
+[[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]], which is a good thing.
+
+#+name: f:isExternalLink
+#+begin_src haskell
+isExternalLink :: LinkTarget -> Bool
+isExternalLink = \case
+  LinkTargetOid {}
+  LinkTargetLineLabel {}
+  LinkTargetFootnote {} -> False
+  LinkTargetFilePath {} -> True
+  LinkTargetURI uri
+    | "" <- uri.uriScheme,
+      Nothing <- uri.uriAuthority,
+      "#ref-" `isPrefixOf` uri.uriPath ->
+        False
+    | otherwise -> True
+#+end_src
+
+** Link anchor
+
+The link anchor is necessary because some blocks will be anonymous and will not
+be linkable if we only try to link the block's name.
+
+The link anchor uses the link symbol "🔗" with Unicode code point ~U+1F517~.
+
+#+name: HTML link symbol
+#+begin_src haskell
+"&#x1F517;"
+#+end_src
+
 * List markers
 
 The =blaze-html= library we use expects to take care of the starting and closing
@@ -2223,310 +2535,6 @@ spliceLinks colorized links = do
     . fst
     . foldl' f (take 1 colorizedStrs, links)
     $ drop 1 colorizedStrs
-#+end_src
-
-Weaving links is fairly straightforward. For external links, we set the ~target~
-attribute to ~_blank~ to make the browser open them in a new tab. The ~noopener
-noreferrer~ bit is a security measure to sever connections from the new tab and
-the current window. This way, even if those external links get hijacked, they
-will not have access to the current window.
-
-#+name: f:weaveLink
-#+begin_src haskell
-weaveLink :: Bool -> Link -> HtmlWeaver ()
-weaveLink insideBlock link = do
-  weaveConf <- ask
-  wovenLinkTarget <- weaveLinkTarget insideBlock link.target
-  let attrs =
-        [href_ wovenLinkTarget]
-          <> linkCategory wovenLinkTarget
-          <> lineLabelAttr
-      lineLabelAttr =
-        case link.target of
-          LinkTargetLineLabel lineLabel ->
-            if insideBlock
-              then [id_ ("ib-" <> toSafeHtmlId lineLabel.name)] -- (ref:line label self-link)
-              else []
-          _ -> []
-      linkDisplayName =
-        case link.target of
-          LinkTargetLineLabel lineLabel
-            | Just gci <- lookup lineLabel weaveConf.archive.symbols,
-              Just (obj, _) <- gciToObjCell weaveConf.archive gci,
-              Just num <- lookup (T.drop 1 $ T.dropEnd 1 lineLabel.name) obj.orgDoc.lineLabels ->
-                if
-                  | Just originObj <-
-                      lookup weaveConf.originObjectPath weaveConf.archive.objects,
-                    originObj /= obj,
-                    Just (offset, _) <- IntMap.lookupLE gci.unGCI weaveConf.archive.offsets,
-                    Just prose <- gciToName weaveConf.archive offset gci ->
-                      (extractStyledText prose) -- (ref:f:weaveLink-name-of-code-block)
-                        <> [stext " → " [], stext (T.show num) [Bold]]
-                  | otherwise ->
-                      [stext (T.show num) [Bold]]
-            | otherwise ->
-                [stext "weaveLink error (line label display name)" []]
-          _ -> link.name
-  a_
-    attrs
-    $ sequence_
-    $ map weaveStyledText linkDisplayName
-  where
-    linkCategory target
-      | isExternalLink link.target =
-          [ class_ "external-link",
-            target_ "_blank",
-            rel_ "noopener noreferrer"
-          ]
-      | "#ref-" `T.isPrefixOf` target = []
-      | otherwise = [class_ "internal-link"]
-    extractStyledText :: Prose -> [StyledText]
-    extractStyledText prose = reverse $ foldl' f [] prose.unProse
-    f acc (PTokenStyledText styledText) = styledText : acc
-    f acc _ = acc
-#+end_src
-
-Links to bibliographical entries (those starting with ~#ref-~ are not given an
-~internal-link~ class, because we want these links to be simple without any extra
-decorations.
-
-Unlike Noweb links, line label links inside blocks point to themselves. That's
-why [[(line label self-link)]] uses the ~id~ HTML attribute.
-
-The part we need to put in the ~href="..."~ part is generated separately in
-[[f:weaveLinkTarget]]. The ~docName == ""~ part at [[(link-target-is-internal-cell)]] is needed
-to check that the ~linkOid~ exists in the current object's list of local symbols;
-this is the only way we can ensure that the ~linkOid~ is a local one internal to
-the current document.
-
-#+name: f:weaveLinkTarget
-#+begin_src haskell
-weaveLinkTarget :: Bool -> LinkTarget -> HtmlWeaver T.Text
-weaveLinkTarget insideBlock linkTarget = do
-  weaveConf <- ask
-  case linkTarget of
-    LinkTargetOid linkOid -> weaveLinkTargetLinkOid linkOid
-    LinkTargetLineLabel linkOid
-      | insideBlock -> pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-self-link)
-      | Just originObj <-
-          lookup weaveConf.originObjectPath weaveConf.archive.objects,
-        originObj.orgDoc.oid == linkOid.oid ->
-          pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-internal)
-      | Just gci <- lookup linkOid weaveConf.archive.symbols,
-        Just objPath <- gciToObjPath weaveConf.archive gci ->
-          pure
-            $ getExternalRelPath linkOid objPath weaveConf.originObjectPath
-            <> internalLineLabelTarget -- (ref:f:weaveLinkTarget-external)
-      | otherwise -> pure $ showBrokenLink linkOid
-      where
-        internalLineLabelTarget =
-          (T.pack "#ib-") -- (ref:f:weaveLinkTarget-line-label-prefix)
-            <> toSafeHtmlId linkOid.name
-    LinkTargetFootnote name -> pure $ (T.pack "#footnote-") <> name
-    LinkTargetFilePath path -> pure . T.pack $ N.escapeURIString N.isUnescapedInURI path
-    LinkTargetURI uri -> pure . T.pack $ N.uriToString id uri ""
-#+end_src
-
-For weaving the target to [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]], there are three cases:
-
-  1) The actual labels themselves. This is where they are defined /inside/ a code
-     block, where we have to make them link to themselves
-     [[(f:weaveLinkTarget-self-link)]] (similar to how headings and code blocks can
-     link to themselves for the user to easily save the link to it).
-
-  2) Internal line labels [[(f:weaveLinkTarget-internal)]]. This is simple because
-     we know that all line labels inside a document are unique, so we can just
-     weave with the name of the label (modulo an ~ib-~ prefix to mean "inside
-     block") [[(f:weaveLinkTarget-line-label-prefix)]].
-
-  3) External line labels [[(f:weaveLinkTarget-external)]]. We can't use
-     [[f:weaveLinkTargetLinkOid]] because it will try to do a coarse cell-level
-     lookup. Line labels are finer-grained than cells. We need to get the
-     external relative path, and then skip cell-wise operations and just slap on
-     the name of the line label (modulo the ~ib-~ prefix) to the external path.
-
-[[f:weaveLinkTargetLinkOid]] is a little bit complicated because it needs to be able
-to handle links that point to things inside the doc, or to another doc somewhere
-else (in the archive).
-
-#+name: f:weaveLinkTargetLinkOid
-#+begin_src haskell
-weaveLinkTargetLinkOid :: LinkOid -> HtmlWeaver T.Text
-weaveLinkTargetLinkOid linkOid = do
-  weaveConf <- ask
-  if
-    | Just gci <- lookup linkOid weaveConf.archive.symbols,
-      gci.unGCI < 0,
-      Just objPath <-
-        (sort $ keys weaveConf.archive.objects) !!? (abs gci.unGCI - 1) ->
-        pure
-          $ if objPath == weaveConf.originObjectPath
-            then "#top"
-            else getExternalRelPath linkOid objPath weaveConf.originObjectPath
-    | Just gci <- lookup linkOid weaveConf.archive.symbols,
-      Just (docName, linkAnchor, _) <- getLinkToGCI weaveConf gci ->
-        if docName == "" -- (ref:link-target-is-internal-cell)
-          then pure $ "#" <> linkAnchor
-          else pure linkAnchor
-    | otherwise -> pure $ showBrokenLink linkOid
-#+end_src
-
-#+name: f:getExternalRelPath
-#+begin_src haskell
-getExternalRelPath :: LinkOid -> GPath -> GPath -> Text
-getExternalRelPath linkOid extPath intPath
-  | Just toObjPath <- P.encodeUtf $ decodeGPath extPath,
-    Just fromObjPath <- P.encodeUtf $ decodeGPath intPath,
-    Right str <-
-      P.decodeWith utf8 utf8
-        $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt =
-      T.pack str
-  | otherwise = showBrokenLink linkOid
-  where
-    htmlExt = P.unsafeEncodeUtf "html"
-#+end_src
-
-#+name: f:showBrokenLink
-#+begin_src haskell
-showBrokenLink :: LinkOid -> Text
-showBrokenLink linkOid = "#LILAC_BROKEN_LINK-" <> show linkOid
-#+end_src
-
-[[f:getRelativePathWithoutSymlinks]] takes two file paths. It tries to answer the
-question "assuming I am in the directory in the first file, how can I go to the
-directory containing the second file?" This assumes that the given paths have no
-symlinks (to avoid the pitfall described at [[https://hackage.haskell.org/package/filepath-1.5.4.0/docs/System-OsPath.html#v:makeRelative][System.OsPath.makeRelative]] and [[https://neilmitchell.blogspot.com/2015/10/filepaths-are-subtle-symlinks-are-hard.html][this
-blog post]]).
-
-We use the following algorithm:
-
-  1) If we're in the same directory, or if the destination is a child of the
-     source directory, then drop the common prefix of the
-     destination. ~a/b/c/src~ to ~a/b/c/dest~ is ~dest~. ~a/b/c/src~ to ~a/b/c/d/e/dest~
-     is ~d/e/dest~.
-
-  2) If we're not in the same directory, we have to go up N directories up until
-     we get to the common prefix.
-
-     - No common prefix: go up all the way to the root, then go to the
-       destination. ~a/b/c/src~ to ~d/dest~ is ~../../../d/dest~.
-
-     - Some common prefix: go up to the common prefix. ~a/b/c/dest~ to ~a/x/y/dest~
-       is ~../../x/y/dest~ because ~a~ is the common prefix. ~a/b/c/d/e/src~ to ~a/dest~
-       is ~../../../../dest~.
-
-#+name: f:getRelativePathWithoutSymlinks
-#+begin_src haskell
-getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
-getRelativePathWithoutSymlinks src dest
-  | dirsSrc == dirsDest || isDestChildOfSrc =
-      P.joinPath $ remainingDest <> destFile
-  | null commonPathPrefix =
-      P.joinPath $ replicate (length dirsSrc) goUp <> destFile
-  | otherwise =
-      P.joinPath
-        $ replicate (length dirsSrc - length commonPathPrefix) goUp
-        <> drop (length commonPathPrefix) dirsDest
-        <> destFile
-  where
-    goUp = P.unsafeEncodeUtf ".."
-    destFile = [P.takeFileName dest]
-    dirSrc = P.takeDirectory src
-    dirDest = P.takeDirectory dest
-    dirsSrc = P.splitDirectories dirSrc
-    dirsDest = P.splitDirectories dirDest
-    commonPathPrefix = commonPrefix dirsSrc dirsDest
-    isDestChildOfSrc = dirsSrc == commonPathPrefix
-    remainingDest = drop (length commonPathPrefix) dirsDest
-#+end_src
-
-The [[f:commonPrefix]] helper returns the common prefix found in two lists.
-
-#+name: f:commonPrefix
-#+begin_src haskell
-commonPrefix :: (Eq a) => [a] -> [a] -> [a]
-commonPrefix xs ys = map fst . takeWhile (\(x, y) -> (x == y)) $ zip xs ys
-#+end_src
-
-#+name: t:0301-weave-external-links-common-prefix
-#+begin_src haskell
-it "0301-weave-external-links-common-prefix" $ do
-  mapM_
-    ( \(a, b, c) ->
-        ( P.joinPath
-            $ LW.commonPrefix
-              (P.splitDirectories $ P.unsafeEncodeUtf a)
-              (P.splitDirectories $ P.unsafeEncodeUtf b)
-        )
-          `shouldBe` (P.unsafeEncodeUtf c)
-    )
-    [ ("from.html", "to.html1", ""),
-      ("base/from.html", "base/to.html2", "base"),
-      ("1base/a/b/from.html", "1base/a/b/to.html3", "1base/a/b"),
-      ("2base/a/b/from.html", "2base/a/b/c/to.html4", "2base/a/b"),
-      ("3base/a/b/from.html", "3base/a/b/c/d/to.html5", "3base/a/b"),
-      ("a/b/c", "x/y/z", "")
-    ]
-#+end_src
-
-We use HTML file path examples in [[t:0301-weave-external-links-common-prefix]] to
-reflect the use case of [[f:getRelativePathWithoutSymlinks]] (to find the relative
-path to the external object's woven HTML file). The test cases in
-[[t:0301-weave-external-links]] check for some typical situations of such relative
-paths.
-
-#+name: t:0301-weave-external-links
-#+begin_src haskell
-it "0301-weave-external-links" $ do
-  mapM_
-    ( \(a, b, c) ->
-        LW.getRelativePathWithoutSymlinks
-          (P.unsafeEncodeUtf a)
-          (P.unsafeEncodeUtf b)
-          `shouldBe` (P.unsafeEncodeUtf c)
-    )
-    [ ("from.html", "to.html1", "to.html1"),
-      ("base/from.html", "base/to.html2", "to.html2"),
-      ("base/a/b/from.html", "base/a/b/to.html3", "to.html3"),
-      ("base/a/b/from.html", "base/a/b/c/to.html4", "c/to.html4"),
-      ("base/a/b/from.html", "base/a/b/c/d/to.html5", "c/d/to.html5"),
-      ("base/a/b/from.html", "to.html6", "../../../to.html6"),
-      ("base/a/b/from.html", "base/a/c/to.html7", "../c/to.html7"),
-      ("base/a/b/c/d/from.html", "base/a/x/y/to.html8", "../../../x/y/to.html8")
-    ]
-#+end_src
-
-[[f:isExternalLink]] checks if a given link target is external to the
-would-be-generated HTML file (of the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] being woven). It considers any
-non-OID link to be external. This encourages users to always use the
-[[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]], which is a good thing.
-
-#+name: f:isExternalLink
-#+begin_src haskell
-isExternalLink :: LinkTarget -> Bool
-isExternalLink = \case
-  LinkTargetOid {}
-  LinkTargetLineLabel {}
-  LinkTargetFootnote {} -> False
-  LinkTargetFilePath {} -> True
-  LinkTargetURI uri
-    | "" <- uri.uriScheme,
-      Nothing <- uri.uriAuthority,
-      "#ref-" `isPrefixOf` uri.uriPath ->
-        False
-    | otherwise -> True
-#+end_src
-
-** Link anchor
-
-The link anchor is necessary because some blocks will be anonymous and will not
-be linkable if we only try to link the block's name.
-
-The link anchor uses the link symbol "🔗" with Unicode code point ~U+1F517~.
-
-#+name: HTML link symbol
-#+begin_src haskell
-"&#x1F517;"
 #+end_src
 
 * Figures
