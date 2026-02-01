@@ -471,7 +471,7 @@ weaveHeading lci heading = do
     wrapWith lci $ do
       a_ [href_ $ "#" <> linkAnchor] $ do
         toHtml $ getSectionNumber heading --
-        toHtmlRaw ("&emsp;&thinsp;" :: Text)
+        toHtmlRaw ("&ensp;" :: Text)
         weaveProse heading.body --
   where
     hN = case heading.level of

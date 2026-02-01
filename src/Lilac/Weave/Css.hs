@@ -247,14 +247,14 @@ defaultCss = do
         position relative
         before & do
           content $ stringContent "■" --
-          marginLeft (rem $ -1)
+          marginLeft (rem $ -1.3)
           position absolute
           left (px 0)
       li # ".toc-level-2" ? do
         position relative
         before & do
           content $ stringContent "○" --
-          marginLeft (rem $ -1)
+          marginLeft (rem $ -1.3)
           position absolute
           left (px 0)
       div ? do
@@ -329,13 +329,13 @@ defaultCss = do
         case n of
           1 -> do
             fontSize (pt 36)
-            headingPrefix "●" (rem $ -2.4) --
+            headingPrefix "●" (rem $ -2.8) --
           2 -> do
             fontSize (pt 26)
-            headingPrefix "■" (rem $ -2.15) --
+            headingPrefix "■" (rem $ -2.5) --
           3 -> do
             fontSize (pt 22)
-            headingPrefix "○" (rem $ -2.03) --
+            headingPrefix "○" (rem $ -2.25) --
           4 -> do
             fontSize (pt 18)
           5 -> do

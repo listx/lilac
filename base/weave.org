@@ -1627,7 +1627,7 @@ weaveHeading lci heading = do
     wrapWith lci $ do
       a_ [href_ $ "#" <> linkAnchor] $ do
         toHtml $ getSectionNumber heading -- (ref:f:weaveHeading-render-section-text)
-        toHtmlRaw ("&emsp;&thinsp;" :: Text)
+        toHtmlRaw ("&ensp;" :: Text)
         weaveProse heading.body -- (ref:f:weaveHeading-render-body)
   where
     hN = case heading.level of
@@ -1764,13 +1764,13 @@ forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) -- (ref:css:Headings-loop)
       case n of
         1 -> do
           fontSize (pt 36)
-          headingPrefix "●" (rem $ -2.4) -- (ref:css:Page title-symbol)
+          headingPrefix "●" (rem $ -2.8) -- (ref:css:Page title-symbol)
         2 -> do
           fontSize (pt 26)
-          headingPrefix "<<symbol:h2>>" (rem $ -2.15) -- (ref:css:Headings-h2-symbol)
+          headingPrefix "<<symbol:h2>>" (rem $ -2.5) -- (ref:css:Headings-h2-symbol)
         3 -> do
           fontSize (pt 22)
-          headingPrefix "<<symbol:h3>>" (rem $ -2.03) -- (ref:css:Headings-h3-symbol)
+          headingPrefix "<<symbol:h3>>" (rem $ -2.25) -- (ref:css:Headings-h3-symbol)
         4 -> do
           fontSize (pt 18)
         5 -> do
@@ -5211,14 +5211,14 @@ nav # ".toc" ? do
       position relative
       before & do
         content $ stringContent "<<symbol:h2>>" -- (ref:css:toc-h2)
-        marginLeft (rem $ -1)
+        marginLeft (rem $ -1.3)
         position absolute
         left (px 0)
     li # ".toc-level-2" ? do
       position relative
       before & do
         content $ stringContent "<<symbol:h3>>" -- (ref:css:toc-h3)
-        marginLeft (rem $ -1)
+        marginLeft (rem $ -1.3)
         position absolute
         left (px 0)
     div ? do
