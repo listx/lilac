@@ -1786,7 +1786,7 @@ listItemStartParser = do
     nestsBeyond :: [Level] -> Level -> Bool --
     nestsBeyond [] _ = True
     nestsBeyond (deepestLevel : _) level =
-      getContinuationIndentForLevel deepestLevel == level.indent
+      getContinuationIndentForLevel deepestLevel + 2 == level.indent
 
 listItemNester :: Level -> [Level] -> OrgParser [ListMarker]
 listItemNester level levels = do

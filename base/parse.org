@@ -10165,7 +10165,7 @@ listItemStartParser = do
     nestsBeyond :: [Level] -> Level -> Bool -- (ref:f:listItemStartParser-nestsBeyond)
     nestsBeyond [] _ = True
     nestsBeyond (deepestLevel : _) level =
-      getContinuationIndentForLevel deepestLevel == level.indent
+      getContinuationIndentForLevel deepestLevel + 2 == level.indent
 #+end_src
 
 The use of ~MP.lookAhead~ [[(f:listItemStartParser-lookAhead)]] is needed because
@@ -10176,10 +10176,13 @@ we have to perform this look-ahead preemptively.
 
 The ~nestsBeyond~ function [[(f:listItemStartParser-nestsBeyond)]] just checks whether
 the indentation we found in the (just-parsed) level is the same as the
-continuation indent of the most-deeply-nested level we have so far. This is how
-we nest one level deeper than the current level. If this is the case, we
-delegate to [[f:listItemNester]]. Otherwise the list item is merely continuing some
-existing list, for which we delegate to [[f:listItemFitter]].
+continuation indent of the most-deeply-nested level we have so far, plus 2 extra
+spaces. This is how we nest one level deeper than the current level. If this is
+the case, we delegate to [[f:listItemNester]]. Otherwise the list item is merely
+continuing some existing list, for which we delegate to [[f:listItemFitter]].
+
+The use of 2 extra spaces is necessary because a list item must always be
+indented 2 spaces relative to the just-preceding paragraph.
 
 ** Nesting the list item beyond the current level
 
@@ -10391,15 +10394,15 @@ Here's a nested example.
 #+begin_src org
   1)
 
-     -
+       -
 
-     -
+       -
 
   2)
 
-     1)
+       1)
 
-        -
+            -
 
   3)
 #+end_src
@@ -10458,11 +10461,11 @@ Nesting is limited to 2 additional levels, for a total of 3 levels by default.
 #+begin_src org
   - 1
 
-    - 2
+      - 2
 
-      - 3
+          - 3
 
-        - 4
+              - 4
 #+end_src
 
 #+name: t:0009-list-nesting-max
@@ -10470,7 +10473,7 @@ Nesting is limited to 2 additional levels, for a total of 3 levels by default.
 shouldFailWithMessage
   "0009-list-nesting-max"
   "max nesting depth exceeded: cannot have more than 3 levels of list items"
-  37
+  49
 #+end_src
 
 You can change the maximum nesting behavior with ~lilac_maxListLevel~ [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac
@@ -10482,21 +10485,21 @@ extension]]. In the test below we increase the total list level to 9.
 ,#+lilac_maxListLevel: 8
   - 1
 
-    - 2
+      - 2
 
-      - 3
+          - 3
 
-        - 4
+              - 4
 
-          - 5
+                  - 5
 
-            - 6
+                      - 6
 
-              - 7
+                          - 7
 
-                - 8
+                              - 8
 
-                  - 9
+                                  - 9
 #+end_src
 
 #+name: t:0009-list-nesting-max-8
@@ -10504,7 +10507,7 @@ extension]]. In the test below we increase the total list level to 9.
 shouldFailWithMessage
   "0009-list-nesting-max-8"
   "max nesting depth exceeded: cannot have more than 8 levels of list items"
-  156
+  228
 #+end_src
 
 Notice how the parser failed only after parsing the last level which exceeded
@@ -10578,17 +10581,17 @@ Foo.
 
   1) one
 
-     - a
+       - a
 
-     - b
+       - b
 
   2) two
 
-     1) two-point-one
+       1) two-point-one
 
-        hello
+          hello
 
-        - X
+            - X
 
   3) three
 
@@ -10737,7 +10740,7 @@ shouldFailWithMessage
   1) Foo
      bar.
 
-     - Baz.
+       - Baz.
 
    Invalid indentation (this paragraph).
 #+end_src
@@ -10747,7 +10750,7 @@ shouldFailWithMessage
 shouldFailWithMessage
   "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels"
   "indentation does not fit into existing levels"
-  36
+  38
 #+end_src
 
 Paragraphs should be able to close list environments, depending on their
@@ -10762,9 +10765,9 @@ to close off the unordered list items.
      Two
      x
 
-     - Bar
+       - Bar
 
-       - Baz
+           - Baz
 
      Three
      a b
@@ -10820,15 +10823,15 @@ allowed to start a new ordered list with ~1) a~.
 #+begin_src org
   1) One
 
-     - Bar
+       - Bar
 
-       - Baz
+           - Baz
 
      Two
 
-     1) a
+       1) a
 
-     2) b
+       2) b
 
      Three
 
@@ -10895,7 +10898,7 @@ unexpected because the unordered list has not been closed off yet.
 #+begin_src org
   - a
 
-    - b
+      - b
 
   1) c
 #+end_src
@@ -10905,7 +10908,7 @@ unexpected because the unordered list has not been closed off yet.
 shouldFailWithMessage
   "0009-lists-cannot-be-mixed-on-their-own"
   "expected UNORDERED list item at this level"
-  21
+  23
 #+end_src
 
 The same applies for going the other way (trying to fit an unordered list into
@@ -10916,7 +10919,7 @@ an ordered one at the same level).
 #+begin_src org
   1) a
 
-     1) b
+       1) b
 
   - c
 #+end_src
@@ -10926,7 +10929,7 @@ an ordered one at the same level).
 shouldFailWithMessage
   "0009-lists-cannot-be-mixed-on-their-own-ordered"
   "expected ORDERED list item at this level"
-  23
+  25
 #+end_src
 
 List items have to be precisely indented; otherwise they'll hit an indentation
@@ -11005,7 +11008,7 @@ Ordered list items must start from 1.
 #+begin_src org
   1) a
 
-     20) b
+       20) b
 #+end_src
 
 #+name: t:0009-ordered-lists-start-from-1
@@ -11013,7 +11016,7 @@ Ordered list items must start from 1.
 shouldFailWithMessage
   "0009-ordered-lists-start-from-1"
   "starting list head number must be 1; got 20"
-  17
+  19
 #+end_src
 
 * Description lists, aka glossary terms

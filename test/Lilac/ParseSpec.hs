@@ -446,7 +446,7 @@ spec = do
   shouldFailWithMessage
     "0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels"
     "indentation does not fit into existing levels"
-    36
+    38
 
   shouldFailWithMessage
     "0005-paragraph-indentation-mismatch-initial-indent-invalid"
@@ -1584,12 +1584,12 @@ spec = do
   shouldFailWithMessage
     "0009-list-nesting-max"
     "max nesting depth exceeded: cannot have more than 3 levels of list items"
-    37
+    49
 
   shouldFailWithMessage
     "0009-list-nesting-max-8"
     "max nesting depth exceeded: cannot have more than 8 levels of list items"
-    156
+    228
 
   shouldParseWith
     "0009-list-indentation-no-indent"
@@ -1635,12 +1635,12 @@ spec = do
   shouldFailWithMessage
     "0009-lists-cannot-be-mixed-on-their-own-ordered"
     "expected ORDERED list item at this level"
-    23
+    25
 
   shouldFailWithMessage
     "0009-lists-cannot-be-mixed-on-their-own"
     "expected UNORDERED list item at this level"
-    21
+    23
 
   shouldFailWithMessage
     "0009-lists-require-precise-indentation"
@@ -1655,7 +1655,7 @@ spec = do
   shouldFailWithMessage
     "0009-ordered-lists-start-from-1"
     "starting list head number must be 1; got 20"
-    17
+    19
 
   shouldFailWithError
     "0009-ordered-list-head-needs-parenthesis"
