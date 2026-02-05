@@ -126,7 +126,6 @@ import Clay
     thead,
     top,
     tr,
-    ul,
     underline,
     vAlignSub,
     vAlignSuper,
@@ -457,12 +456,6 @@ defaultCss = do
         left (rem (-2.4))
         width (rem 2)
         textAlign $ alignSide sideRight
-
-  main_ ? do
-    ol ? do
-      paddingLeft (rem 1.3)
-    ul ? do
-      paddingLeft (rem 1)
 
   main_ ? do
     ol ? do

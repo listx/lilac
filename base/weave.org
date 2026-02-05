@@ -750,7 +750,6 @@ import Clay
     thead,
     top,
     tr,
-    ul,
     underline,
     vAlignSub,
     vAlignSuper,
@@ -5311,7 +5310,6 @@ footer ? do
 #+name: css:List items
 #+begin_src haskell
 <<css:Ordered list items>>
-<<css:List item indentation>>
 <<css:List item minimum height>>
 #+end_src
 
@@ -5353,17 +5351,11 @@ contents (TOC)]] and [[id:6db7e0d7-67e1-45c1-9908-a8fb055ec535][Sidebar]]) are u
 
 *** List item indentation
 
-The default list item indentation is a bit too aggressive (deep), so make it a
-bit shallower.
-
-#+name: css:List item indentation
-#+begin_src haskell
-main_ ? do
-  ol ? do
-    paddingLeft (rem 1.3)
-  ul ? do
-    paddingLeft (rem 1)
-#+end_src
+We want to make indentation match (roughly) what we see in the raw Org syntax.
+Thankfully, there isn't really anything to do here; the defaults from the
+browser (at least in Firefox) line up with the indentation style in the raw Org
+syntax already --- namely, the list item is always indented more than the
+preceding paragraph.
 
 *** Empty list items
 
