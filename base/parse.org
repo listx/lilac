@@ -239,15 +239,15 @@ hierarchy of the main parsers look like this:
 
   - [[f:parseOrgDoc]]
 
-    - [[f:orgDocParser]]
+      - [[f:orgDocParser]]
 
-      - [[f:cellParser]]
+          - [[f:cellParser]]
 
-        - [[f:headingParser]]
+              - [[f:headingParser]]
 
-        - [[f:paragraphParser]]
+              - [[f:paragraphParser]]
 
-        - ... /etc/
+              - ... /etc/
 
 All of these parsers live inside the [[type:OrgParser]] monadic type, which is
 defined as a state monad transformer (~StateT~) with [[data:OrgParserState]], which
@@ -9574,7 +9574,7 @@ List bodies may have cells of the following type:
 
   - and of course, more list items (nesting)
 
-    - Example nested item.
+      - Example nested item.
 
 Vanilla Org allows more cell types like code blocks inside list bodies, but
 Lilac does not. List items should be simple, and things like code blocks just
@@ -9602,67 +9602,67 @@ file, not the woven HTML format.
      to have nested list items) depends on where the text began in the parent
      item.
 
-     - [[ti:0009-list-indentation-no-indent]]
+       - [[ti:0009-list-indentation-no-indent]]
 
-     - [[ti:0009-list-indentation-proper-indent]]
+       - [[ti:0009-list-indentation-proper-indent]]
 
   2) List items must be separated from each other with an empty blank line. This
      makes them easier to read when reading the Org file in plain text.
 
-     - [[ti:0009-list-items-need-blank-line-separator]]
+       - [[ti:0009-list-items-need-blank-line-separator]]
 
   3) Additional hard-wrapped lines for a list item must be aligned with the text
      of the first line.
 
-     - [[ti:0005-paragraph-indentation-mismatch-over-list-body]]
+       - [[ti:0005-paragraph-indentation-mismatch-over-list-body]]
 
-     - [[ti:0005-paragraph-indentation-mismatch-over]]
+       - [[ti:0005-paragraph-indentation-mismatch-over]]
 
-     - [[ti:0005-paragraph-indentation-mismatch-under-list-body]]
+       - [[ti:0005-paragraph-indentation-mismatch-under-list-body]]
 
-     - [[ti:0005-paragraph-indentation-mismatch-initial-indent-invalid]]
+       - [[ti:0005-paragraph-indentation-mismatch-initial-indent-invalid]]
 
-     - [[ti:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels]]
+       - [[ti:0005-paragraph-indentation-mismatch-initial-indent-invalid-between-levels]]
 
   4) List items can have more than one paragraph associated with them.
 
      This is an example of another paragraph which is still part of same list
      item, and has 5 spaces of indentation.
 
-     - [[ti:0009-list-content-simple]]
+       - [[ti:0009-list-content-simple]]
 
   5) List items can be nested.
 
-     1) This is a nested item, underneath "5)". It has 5 spaces of initial
-        indentation, where the "1" in "1)" lines up with the column where the
-        "L" in "5) List" in the parent item. Subsequent lines of this paragraph
-        have 8 spaces of indentation to line up with the text above it.
+       1) This is a nested item, underneath "5)". It has 5 spaces of initial
+          indentation, where the "1" in "1)" lines up with the column where the
+          "L" in "5) List" in the parent item. Subsequent lines of this paragraph
+          have 8 spaces of indentation to line up with the text above it.
 
      See:
 
-     - [[ti:0009-list-indentation-nested]]
+       - [[ti:0009-list-indentation-nested]]
 
-     - [[ti:0009-list-indentation-nested-with-text]]
+       - [[ti:0009-list-indentation-nested-with-text]]
 
-     - [[ti:0009-paragraph-can-close-deeper-levels]]
+       - [[ti:0009-paragraph-can-close-deeper-levels]]
 
   6) Unlike Markdown, the numbers of the list item must increase by one if there
      are additional items at the same level. And the first number of a level
      must start from 1.
 
-     - [[ti:0009-ordered-lists-require-increment]]
+       - [[ti:0009-ordered-lists-require-increment]]
 
-     - [[ti:0009-ordered-lists-start-from-1]]
+       - [[ti:0009-ordered-lists-start-from-1]]
 
   7) The format for ordered list items requires a closing parenthesis
      immediately after the number. So ~1)~ is valid, but ~1.~ is invalid.
 
-     - [[ti:0009-ordered-list-head-needs-parenthesis]]
+       - [[ti:0009-ordered-list-head-needs-parenthesis]]
 
   8) Only numbers may be used to denote item position. You cannot use letters or
      Roman numerals like ~a)~ or ~i)~.
 
-     - [[ti:0009-ordered-list-head-cannot-use-letters]]
+       - [[ti:0009-ordered-list-head-cannot-use-letters]]
 
   9) There is no limit to the number of consecutive list items at the same
      level (technically, we use an ~Int~ type to encode the number, so it will
@@ -9672,32 +9672,32 @@ file, not the woven HTML format.
       item. For example, this line has 6 spaces of indentation, unlike the
       paragraphs in item "4)" above, which uses 5 spaces.
 
-      1) Similarly, this child item has text which has 9 spaces of indentation,
-         unlike the 8 spaces of indentation in the ordered child item under item
-         "5)" above.
+        1) Similarly, this child item has text which has 9 spaces of indentation,
+           unlike the 8 spaces of indentation in the ordered child item under item
+           "5)" above.
 
       See:
 
-      - [[ti:0009-lists-require-precise-indentation]]
+        - [[ti:0009-lists-require-precise-indentation]]
 
   11) There can only be up to 2 additional levels of nesting (for a total of 3
       levels of items). This is because excessive nesting is an anti-pattern.
       See the ~lilac_maxListLevel~ [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extension]] for customizing this behavior.
 
-      - [[ti:0009-list-nesting-max]]
+        - [[ti:0009-list-nesting-max]]
 
-      - [[ti:0009-list-nesting-max-8]]
+        - [[ti:0009-list-nesting-max-8]]
 
-      - [[ti:0009-lists-prohibited]]
+        - [[ti:0009-lists-prohibited]]
 
   12) Ordered list items may have unordered list items as children, and vice
       versa. However you may not mix the two types of items at the same level.
 
-      - [[ti:0009-paragraph-can-separate-mixed-lists]]
+        - [[ti:0009-paragraph-can-separate-mixed-lists]]
 
-      - [[ti:0009-lists-cannot-be-mixed-on-their-own]]
+        - [[ti:0009-lists-cannot-be-mixed-on-their-own]]
 
-      - [[ti:0009-lists-cannot-be-mixed-on-their-own-ordered]]
+        - [[ti:0009-lists-cannot-be-mixed-on-their-own-ordered]]
 
   13) A list item may include a table. However the table cannot be on the same
       line as the list item head. Below is an example of such a table:
@@ -9706,7 +9706,7 @@ file, not the woven HTML format.
       |-----+-----|
       | x   | y   |
 
-      - [[ti:0012-tables-inside-lists]]
+        - [[ti:0012-tables-inside-lists]]
 
   14) Similarly, a list item may include mathematical equations. However, such
       an equation must be on a separate line from the list item head, just like
@@ -9718,20 +9718,20 @@ file, not the woven HTML format.
 
       The equation above (and this paragraph) are still part of Rule 14.
 
-      - [[ti:0010-standalone-math-inside-lists]]
+        - [[ti:0010-standalone-math-inside-lists]]
 
   15) Lists may be empty. For example, the following child list is valid even
       though it does not have any content:
 
-      1)
+        1)
 
-      2)
+        2)
 
-      3)
+        3)
 
       See:
 
-      - [[ti:0009-list-indentation-nested]]
+        - [[ti:0009-list-indentation-nested]]
 
 ** Unordered list items
 
@@ -9744,9 +9744,9 @@ an example:
 
   - two
 
-    - foo
+      - foo
 
-    - bar
+      - bar
 
   - three
 #+end_src
@@ -9758,18 +9758,18 @@ Here's an example of mixing ordered and unordered lists:
 
   - bar
 
-    1) one
+      1) one
 
-    2) two
+      2) two
 
-       - baz
+           - baz
 
-       - quux
+           - quux
 
-       Note how this paragraph is under item "2", because it is indented the
-       same way as "two", not "quux", above.
+         Note how this paragraph is under item "2", because it is indented the
+         same way as "two", not "quux", above.
 
-    3) three
+      3) three
 
   - dog
 #+end_src
@@ -9781,15 +9781,15 @@ paragraph below):
 #+begin_src org
   - foo
 
-    1) one
+      1) one
 
-    2) two
+      2) two
 
     quux
 
-    - a
+      - a
 
-    - b
+      - b
 #+end_src
 
 ** Indentation and ~ListMarker~
@@ -9871,7 +9871,7 @@ example, in the following
 #+begin_src org
   1) a
 
-     - b
+       - b
 
      c
 #+end_src

@@ -1423,11 +1423,11 @@ The ~<body>~ uses a CSS grid layout to create four distinct areas:
 
   4) Sidebar :: Holds various /widgets/ which aid in navigation. The widgets are:
 
-     1) Tangled files :: List of tangled files in the document.
+       1) Tangled files :: List of tangled files in the document.
 
-     2) Backlinks :: List of backlinks to any named cell in the current document.
+       2) Backlinks :: List of backlinks to any named cell in the current document.
 
-     3) Named cells :: List of named cells in the current document.
+       3) Named cells :: List of named cells in the current document.
 
      The sidebar also holds a footer [[(css:Layout-footer)]]. See [[f:weaveFooter]] and
      [[css:Footer]].
@@ -2110,12 +2110,12 @@ We use the following algorithm:
   2) If we're not in the same directory, we have to go up N directories up until
      we get to the common prefix.
 
-     - No common prefix: go up all the way to the root, then go to the
-       destination. ~a/b/c/src~ to ~d/dest~ is ~../../../d/dest~.
+       - No common prefix: go up all the way to the root, then go to the
+         destination. ~a/b/c/src~ to ~d/dest~ is ~../../../d/dest~.
 
-     - Some common prefix: go up to the common prefix. ~a/b/c/dest~ to ~a/x/y/dest~
-       is ~../../x/y/dest~ because ~a~ is the common prefix. ~a/b/c/d/e/src~ to ~a/dest~
-       is ~../../../../dest~.
+       - Some common prefix: go up to the common prefix. ~a/b/c/dest~ to ~a/x/y/dest~
+         is ~../../x/y/dest~ because ~a~ is the common prefix. ~a/b/c/d/e/src~ to ~a/dest~
+         is ~../../../../dest~.
 
 #+name: f:getRelativePathWithoutSymlinks
 #+begin_src haskell
@@ -2374,7 +2374,7 @@ doesn't hurt.
 #+begin_src org
   1) a
 
-     - b
+       - b
 
   2) c
 #+end_src
@@ -4477,12 +4477,12 @@ Se update the heading ancestry as follows:
   2) Otherwise, compare current heading level with heading level of the first
      element (most nested) of the list:
 
-     - If current one is higher, pop off elements until we see one that's even
-       higher and push this one.
+       - If current one is higher, pop off elements until we see one that's even
+         higher and push this one.
 
-     - If they're equal, then pop off one element and push this one.
+       - If they're equal, then pop off one element and push this one.
 
-     - If current one is lower, then just push into the list (no popping).
+       - If current one is lower, then just push into the list (no popping).
 
 #+name: f:genHeadingAncestry
 #+begin_src haskell
