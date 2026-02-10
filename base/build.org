@@ -731,6 +731,7 @@ outputs. See [[id:b649d761-1103-47be-86e4-56a7362a5ecc][Sentinels]] for a discus
 #+name: Makefile
 #+header: :tangle Makefile
 #+begin_src makefile
+<<make:Project setup>>
 <<make:Org files>>
 <<make:Run tests>>
 <<make:Run linters>>
@@ -773,6 +774,17 @@ the listed dependencies.
 <<gitignore:Makefile sentinel:build-release>>
 <<gitignore:Makefile sentinel:tangle>>
 <<gitignore:Makefile sentinel:weave>>
+#+end_src
+
+** Project setup
+
+Make Git order the diffs according to [[git-orderfile]].
+
+#+name: make:Project setup
+#+begin_src makefile
+gitconfig:
+	git config diff.orderfile .git-orderfile
+.PHONY: gitconfig
 #+end_src
 
 ** Org files
@@ -2348,3 +2360,53 @@ test/*
 We can't put these inside [[id:ae7b1a31-970d-41e4-b15a-8d7f383e1502::.gitignore][.gitignore]] because doing so will remove these files
 from bundling it into a Nix package in [[nix:lilacSource]] (we actually want the
 tangled content because they are required for the build).
+
+* Ordering Git diffs
+
+By default, Git orders diffs alphabetically by the filename (presumably to
+guarantee determinism when running ~git diff~). However, you can change this
+behavior to sort the diffs in a different way, by using /orderfiles/ (see ~man
+git-diff~). Below is our orderfile:
+
+#+name: git-orderfile
+#+header: :tangle .git-orderfile
+#+begin_src txt
+# Org files
+base/artifacts/plan.org
+base/artifacts/*.org
+base/lilac.org
+base/build.org
+base/types.org
+base/parse.org
+base/compile.org
+base/tangle.org
+base/weave.org
+base/fe.org
+base/cli.org
+,*.org
+
+# Infrastructure
+,*.nix
+,*.json
+,*.sh
+,*.yml
+.*
+
+# Haskell
+cabal.project
+,*.cabal
+,*.hs
+
+# ClojureScript
+,*.edn
+,*.cljs
+
+# Tests
+test*
+#+end_src
+
+The most important files are the Org files, because they serve as the source of
+truth for Literate Programming in this project. So they appear first. The rest
+of the groupings are not strictly necessary, because the diffs there will be
+redundant with the diffs in the Org files; nevertheless we categorize them here
+for completeness.

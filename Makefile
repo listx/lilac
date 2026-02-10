@@ -1,3 +1,7 @@
+gitconfig:
+	git config diff.orderfile .git-orderfile
+.PHONY: gitconfig
+
 org_files = \
 	base/lilac.org \
 	base/cli.org \
