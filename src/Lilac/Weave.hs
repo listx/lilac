@@ -829,12 +829,20 @@ weaveLink insideBlock link = do
           LinkTargetLineLabel lineLabel
             | Just gci <- lookup lineLabel weaveConf.archive.symbols,
               Just (obj, _) <- gciToObjCell weaveConf.archive gci,
-              Just num <- lookup (T.drop 1 $ T.dropEnd 1 lineLabel.name) obj.orgDoc.lineLabels ->
+              Just num <-
+                lookup
+                  (T.drop 1 $ T.dropEnd 1 lineLabel.name)
+                  obj.orgDoc.lineLabels ->
                 if
                   | Just originObj <-
-                      lookup weaveConf.originObjectPath weaveConf.archive.objects,
+                      lookup
+                        weaveConf.originObjectPath
+                        weaveConf.archive.objects,
                     originObj /= obj,
-                    Just (offset, _) <- IntMap.lookupLE gci.unGCI weaveConf.archive.offsets,
+                    Just (offset, _) <-
+                      IntMap.lookupLE
+                        gci.unGCI
+                        weaveConf.archive.offsets,
                     Just prose <- gciToName weaveConf.archive offset gci ->
                       (extractStyledText prose) --
                         <> [stext " → " [], stext (T.show num) [Bold]]
@@ -883,7 +891,8 @@ weaveLinkTarget insideBlock linkTarget = do
           (T.pack "#ib-") --
             <> toSafeHtmlId linkOid.name
     LinkTargetFootnote name -> pure $ (T.pack "#footnote-") <> name
-    LinkTargetFilePath path -> pure . T.pack $ N.escapeURIString N.isUnescapedInURI path
+    LinkTargetFilePath path ->
+      pure . T.pack $ N.escapeURIString N.isUnescapedInURI path
     LinkTargetURI uri -> pure . T.pack $ N.uriToString id uri ""
 
 weaveLinkTargetLinkOid :: LinkOid -> HtmlWeaver T.Text
@@ -911,7 +920,9 @@ getExternalRelPath linkOid extPath intPath
     Just fromObjPath <- P.encodeUtf $ decodeGPath intPath,
     Right str <-
       P.decodeWith utf8 utf8
-        $ P.replaceExtension (getRelativePathWithoutSymlinks fromObjPath toObjPath) htmlExt =
+        $ P.replaceExtension
+          (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+          htmlExt =
       T.pack str
   | otherwise = showBrokenLink linkOid
   where

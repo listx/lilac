@@ -411,15 +411,20 @@ defaultCss = do
         let rawSvg :: String
             rawSvg =
               """
-              <svg xmlns="http://www.w3.org/2000/svg" class="external-link" viewBox="0 0 60 60">
+              <svg xmlns="http://www.w3.org/2000/svg"
+                   class="external-link"
+                   viewBox="0 0 60 60">
+
               <path fill="COLOR" d="M36 24c-1.2 0-2 0.8-2 2v12c0 1.2-0.8 2-2 2h-22c-1.2
               0-2-0.8-2-2v-22c0-1.2 0.8-2 2-2h12c1.2 0 2-0.8 2-2s-0.8-2-2-2h-12c-3.4 0-6 2.6-6
               6v22c0 3.4 2.6 6 6 6h22c3.4 0 6-2.6 6-6v-12c0-1.2-0.8-2-2-2z"></path>
+
               <path fill="COLOR" d="M43.8
               5.2c-0.2-0.4-0.6-0.8-1-1-0.2-0.2-0.6-0.2-0.8-0.2h-12c-1.2 0-2 0.8-2 2s0.8 2 2
               2h7.2l-18.6 18.6c-0.8 0.8-0.8 2 0 2.8 0.4 0.4 0.8 0.6 1.4 0.6s1-0.2
               1.4-0.6l18.6-18.6v7.2c0 1.2 0.8 2 2 2s2-0.8 2-2v-12c0-0.2
               0-0.6-0.2-0.8z"></path>
+
               </svg>
               """
             basicEncoder = \case
