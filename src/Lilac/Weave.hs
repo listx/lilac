@@ -811,8 +811,8 @@ spliceLinks colorized links = do
 
 weaveLink :: Bool -> Link -> HtmlWeaver ()
 weaveLink insideBlock link = do
-  weaveConf <- ask
   wovenLinkTarget <- weaveLinkTarget insideBlock link.target
+  linkDisplayName <- weaveLinkDisplayName link
   let attrs =
         [href_ wovenLinkTarget]
           <> linkCategory wovenLinkTarget
@@ -821,36 +821,9 @@ weaveLink insideBlock link = do
         case link.target of
           LinkTargetLineLabel lineLabel ->
             if insideBlock
-              then [id_ ("ib-" <> toSafeHtmlId lineLabel.name)] --
+              then [id_ ("ll-" <> toSafeHtmlId lineLabel.name)] --
               else []
           _ -> []
-      linkDisplayName =
-        case link.target of
-          LinkTargetLineLabel lineLabel
-            | Just gci <- lookup lineLabel weaveConf.archive.symbols,
-              Just (obj, _) <- gciToObjCell weaveConf.archive gci,
-              Just num <-
-                lookup
-                  (T.drop 1 $ T.dropEnd 1 lineLabel.name)
-                  obj.orgDoc.lineLabels ->
-                if
-                  | Just originObj <-
-                      lookup
-                        weaveConf.originObjectPath
-                        weaveConf.archive.objects,
-                    originObj /= obj,
-                    Just (offset, _) <-
-                      IntMap.lookupLE
-                        gci.unGCI
-                        weaveConf.archive.offsets,
-                    Just prose <- gciToName weaveConf.archive offset gci ->
-                      (extractStyledText prose) --
-                        <> [stext " → " [], stext (T.show num) [Bold]]
-                  | otherwise ->
-                      [stext (T.show num) [Bold]]
-            | otherwise ->
-                [stext "weaveLink error (line label display name)" []]
-          _ -> link.name
   a_
     attrs
     $ sequence_
@@ -858,16 +831,12 @@ weaveLink insideBlock link = do
   where
     linkCategory target
       | isExternalLink link.target =
-          [ class_ "external-link",
+          [ class_ "external-link", --
             target_ "_blank",
             rel_ "noopener noreferrer"
           ]
-      | "#ref-" `T.isPrefixOf` target = []
+      | "#ref-" `T.isPrefixOf` target = [] --
       | otherwise = [class_ "internal-link"]
-    extractStyledText :: Prose -> [StyledText]
-    extractStyledText prose = reverse $ foldl' f [] prose.unProse
-    f acc (PTokenStyledText styledText) = styledText : acc
-    f acc _ = acc
 
 weaveLinkTarget :: Bool -> LinkTarget -> HtmlWeaver T.Text
 weaveLinkTarget insideBlock linkTarget = do
@@ -888,7 +857,7 @@ weaveLinkTarget insideBlock linkTarget = do
       | otherwise -> pure $ showBrokenLink linkOid
       where
         internalLineLabelTarget =
-          (T.pack "#ib-") --
+          (T.pack "#ll-") --
             <> toSafeHtmlId linkOid.name
     LinkTargetFootnote name -> pure $ (T.pack "#footnote-") <> name
     LinkTargetFilePath path ->
@@ -913,6 +882,43 @@ weaveLinkTargetLinkOid linkOid = do
           then pure $ "#" <> linkAnchor
           else pure linkAnchor
     | otherwise -> pure $ showBrokenLink linkOid
+
+weaveLinkDisplayName :: Link -> HtmlWeaver [StyledText]
+weaveLinkDisplayName link = do
+  weaveConf <- ask
+  let displayName =
+        case link.target of
+          LinkTargetLineLabel lineLabel
+            | Just gci <- lookup lineLabel weaveConf.archive.symbols,
+              Just (obj, _) <- gciToObjCell weaveConf.archive gci,
+              Just num <-
+                lookup
+                  (T.drop 1 $ T.dropEnd 1 lineLabel.name)
+                  obj.orgDoc.lineLabels ->
+                if
+                  | Just originObj <-
+                      lookup
+                        weaveConf.originObjectPath
+                        weaveConf.archive.objects,
+                    originObj /= obj,
+                    Just (offset, _) <-
+                      IntMap.lookupLE
+                        gci.unGCI
+                        weaveConf.archive.offsets,
+                    Just prose <- gciToName weaveConf.archive offset gci ->
+                      (extractStyledText prose) --
+                        <> [stext " → " [], stext (T.show num) [Bold]]
+                  | otherwise ->
+                      [stext (T.show num) [Bold]] --
+            | otherwise ->
+                [stext "weaveLink error (line label display name)" []]
+          _ -> link.name --
+      extractStyledText :: Prose -> [StyledText]
+      extractStyledText prose = reverse $ foldl' f [] prose.unProse
+        where
+          f acc (PTokenStyledText styledText) = styledText : acc
+          f acc _ = acc
+  pure displayName
 
 getExternalRelPath :: LinkOid -> GPath -> GPath -> Text
 getExternalRelPath linkOid extPath intPath

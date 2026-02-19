@@ -402,7 +402,7 @@ defaultCss = do
         color colorText
     ".internal-link" & do
       fontMono
-      roundedRectangleLink
+      roundedRectangleLink --
     ".external-link" & do
       color colorNowebLinkFg
       ":visited" & do

@@ -504,6 +504,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveLink>>
 <<f:weaveLinkTarget>>
 <<f:weaveLinkTargetLinkOid>>
+<<f:weaveLinkDisplayName>>
 <<f:getExternalRelPath>>
 <<f:showBrokenLink>>
 <<f:weaveFigure>>
@@ -1923,21 +1924,32 @@ non-monospaced font).
 :ID:       a63d2021-2596-4c43-81e3-d08e90077f75
 :END:
 
-Links are probably most common inside prose and cell blocks (for Noweb links and
-also line labels).
+[[f:weaveLink]] is the main workhorse for links. This is used for prose and also
+code blocks (Noweb links and line labels). Other than the link target address
+(where we want to take the reader, determined by [[f:weaveLinkTarget]]), and the
+name of link shown to them (via [[f:weaveLinkDisplayName]]),
+we also need to keep track of the HTML ID of the link element for line labels
+[[(line label self-link)]] (the targets of line label links inside blocks just point
+to themselves via this HTML ID).
 
-[[f:weaveLink]] handles how links are woven. For external links, we set the ~target~
-attribute to ~_blank~ to make the browser open them in a new tab. The ~noopener
-noreferrer~ bit is a security measure to sever connections from the new tab and
-the current window. This way, even if those external links get hijacked, they
-will not have access to the current window.
+For external links, we set the ~target~ attribute (not to be confused with the
+~href~ attribute for link targets) to ~_blank~ to make the browser open them in a
+new tab [[(f:weaveLink-external-link)]]. The ~noopener noreferrer~ bit is a security
+measure to sever connections from the new tab and the current window. This way,
+even if those external links get hijacked, they will not have access to the
+current window.
+
+Links to bibliographical entries (those starting with ~#ref-~
+[[(f:weaveLink-bib-entries)]]) are not given an ~internal-link~ class, because we want
+these links to be simple without any extra decorations
+[[(css:Links-internal-link)]].
 
 #+name: f:weaveLink
 #+begin_src haskell
 weaveLink :: Bool -> Link -> HtmlWeaver ()
 weaveLink insideBlock link = do
-  weaveConf <- ask
   wovenLinkTarget <- weaveLinkTarget insideBlock link.target
+  linkDisplayName <- weaveLinkDisplayName link
   let attrs =
         [href_ wovenLinkTarget]
           <> linkCategory wovenLinkTarget
@@ -1946,10 +1958,39 @@ weaveLink insideBlock link = do
         case link.target of
           LinkTargetLineLabel lineLabel ->
             if insideBlock
-              then [id_ ("ib-" <> toSafeHtmlId lineLabel.name)] -- (ref:line label self-link)
+              then [id_ ("ll-" <> toSafeHtmlId lineLabel.name)] -- (ref:line label self-link)
               else []
           _ -> []
-      linkDisplayName =
+  a_
+    attrs
+    $ sequence_
+    $ map weaveStyledText linkDisplayName
+  where
+    linkCategory target
+      | isExternalLink link.target =
+          [ class_ "external-link", -- (ref:f:weaveLink-external-link)
+            target_ "_blank",
+            rel_ "noopener noreferrer"
+          ]
+      | "#ref-" `T.isPrefixOf` target = [] -- (ref:f:weaveLink-bib-entries)
+      | otherwise = [class_ "internal-link"]
+#+end_src
+
+Let's look at link display names first before looking at how we get the link
+targets. For the most part, the link display name is just the ~name~ field of a
+link [[(f:weaveLinkDisplayName-link-name)]]. Most of the complications involve line
+labels. For internal line labels (line labels that are in code blocks in the
+current document), we just use the line label number
+[[(f:weaveLinkDisplayName-internal-line-label)]]. But for links to line labels in
+external code blocks, we also weave the name of that external code block
+[[(f:weaveLinkDisplayName-name-of-code-block)]].
+
+#+name: f:weaveLinkDisplayName
+#+begin_src haskell
+weaveLinkDisplayName :: Link -> HtmlWeaver [StyledText]
+weaveLinkDisplayName link = do
+  weaveConf <- ask
+  let displayName =
         case link.target of
           LinkTargetLineLabel lineLabel
             | Just gci <- lookup lineLabel weaveConf.archive.symbols,
@@ -1969,44 +2010,22 @@ weaveLink insideBlock link = do
                         gci.unGCI
                         weaveConf.archive.offsets,
                     Just prose <- gciToName weaveConf.archive offset gci ->
-                      (extractStyledText prose) -- (ref:f:weaveLink-name-of-code-block)
+                      (extractStyledText prose) -- (ref:f:weaveLinkDisplayName-name-of-code-block)
                         <> [stext " → " [], stext (T.show num) [Bold]]
                   | otherwise ->
-                      [stext (T.show num) [Bold]]
+                      [stext (T.show num) [Bold]] -- (ref:f:weaveLinkDisplayName-internal-line-label)
             | otherwise ->
                 [stext "weaveLink error (line label display name)" []]
-          _ -> link.name
-  a_
-    attrs
-    $ sequence_
-    $ map weaveStyledText linkDisplayName
-  where
-    linkCategory target
-      | isExternalLink link.target =
-          [ class_ "external-link",
-            target_ "_blank",
-            rel_ "noopener noreferrer"
-          ]
-      | "#ref-" `T.isPrefixOf` target = []
-      | otherwise = [class_ "internal-link"]
-    extractStyledText :: Prose -> [StyledText]
-    extractStyledText prose = reverse $ foldl' f [] prose.unProse
-    f acc (PTokenStyledText styledText) = styledText : acc
-    f acc _ = acc
+          _ -> link.name -- (ref:f:weaveLinkDisplayName-link-name)
+      extractStyledText :: Prose -> [StyledText]
+      extractStyledText prose = reverse $ foldl' f [] prose.unProse
+        where
+          f acc (PTokenStyledText styledText) = styledText : acc
+          f acc _ = acc
+  pure displayName
 #+end_src
 
-Links to bibliographical entries (those starting with ~#ref-~) are not given an
-~internal-link~ class, because we want these links to be simple without any extra
-decorations.
-
-Unlike Noweb links, line label links inside blocks point to themselves. That's
-why [[(line label self-link)]] uses the ~id~ HTML attribute.
-
-The part we need to put in the ~href="..."~ part is generated separately in
-[[f:weaveLinkTarget]]. The ~docName == ""~ part at [[(link-target-is-internal-cell)]] is needed
-to check that the ~linkOid~ exists in the current object's list of local symbols;
-this is the only way we can ensure that the ~linkOid~ is a local one internal to
-the current document.
+Now let's look at how we get link targets with [[f:weaveLinkTarget]].
 
 #+name: f:weaveLinkTarget
 #+begin_src haskell
@@ -2029,7 +2048,7 @@ weaveLinkTarget insideBlock linkTarget = do
       | otherwise -> pure $ showBrokenLink linkOid
       where
         internalLineLabelTarget =
-          (T.pack "#ib-") -- (ref:f:weaveLinkTarget-line-label-prefix)
+          (T.pack "#ll-") -- (ref:f:weaveLinkTarget-line-label-prefix)
             <> toSafeHtmlId linkOid.name
     LinkTargetFootnote name -> pure $ (T.pack "#footnote-") <> name
     LinkTargetFilePath path ->
@@ -2046,14 +2065,23 @@ For weaving the target to [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels
 
   2) Internal line labels [[(f:weaveLinkTarget-internal)]]. This is simple because
      we know that all line labels inside a document are unique, so we can just
-     weave with the name of the label (modulo an ~ib-~ prefix to mean "inside
-     block") [[(f:weaveLinkTarget-line-label-prefix)]].
+     weave with the name of the label (modulo an ~ll-~ prefix to mean "line
+     label") [[(f:weaveLinkTarget-line-label-prefix)]].
 
   3) External line labels [[(f:weaveLinkTarget-external)]]. We can't use
      [[f:weaveLinkTargetLinkOid]] because it will try to do a coarse cell-level
      lookup. Line labels are finer-grained than cells. We need to get the
      external relative path, and then skip cell-wise operations and just slap on
-     the name of the line label (modulo the ~ib-~ prefix) to the external path.
+     the name of the line label (modulo the ~ll-~ prefix) to the external path.
+
+[[f:showBrokenLink]] just encodes a basic "error message" into the link itself if
+the target cannot be determined.
+
+#+name: f:showBrokenLink
+#+begin_src haskell
+showBrokenLink :: LinkOid -> Text
+showBrokenLink linkOid = "#LILAC_BROKEN_LINK-" <> show linkOid
+#+end_src
 
 [[f:weaveLinkTargetLinkOid]] is a little bit complicated because it needs to be able
 to handle links that point to things inside the doc, or to another doc somewhere
@@ -2081,6 +2109,12 @@ weaveLinkTargetLinkOid linkOid = do
     | otherwise -> pure $ showBrokenLink linkOid
 #+end_src
 
+The ~docName == ""~ part at [[(link-target-is-internal-cell)]] is needed to check that
+the ~linkOid~ exists in the current object's list of local symbols; this is the
+only way we can ensure that the ~linkOid~ is a local one internal to the current
+document. The [[f:getExternalRelPath]] function tells us the relative path of the
+external Org document we have to link to (for external links).
+
 #+name: f:getExternalRelPath
 #+begin_src haskell
 getExternalRelPath :: LinkOid -> GPath -> GPath -> Text
@@ -2096,12 +2130,6 @@ getExternalRelPath linkOid extPath intPath
   | otherwise = showBrokenLink linkOid
   where
     htmlExt = P.unsafeEncodeUtf "html"
-#+end_src
-
-#+name: f:showBrokenLink
-#+begin_src haskell
-showBrokenLink :: LinkOid -> Text
-showBrokenLink linkOid = "#LILAC_BROKEN_LINK-" <> show linkOid
 #+end_src
 
 [[f:getRelativePathWithoutSymlinks]] takes two file paths. It tries to answer the
@@ -2210,8 +2238,7 @@ it "0301-weave-external-links" $ do
 
 [[f:isExternalLink]] checks if a given link target is external to the
 would-be-generated HTML file (of the [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] being woven). It considers any
-non-OID link to be external. This encourages users to always use the
-[[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]], which is a good thing.
+non-OID link to be external.
 
 #+name: f:isExternalLink
 #+begin_src haskell
@@ -2227,18 +2254,6 @@ isExternalLink = \case
       "#ref-" `isPrefixOf` uri.uriPath ->
         False
     | otherwise -> True
-#+end_src
-
-** Link anchor
-
-The link anchor is necessary because some blocks will be anonymous and will not
-be linkable if we only try to link the block's name.
-
-The link anchor uses the link symbol "🔗" with Unicode code point ~U+1F517~.
-
-#+name: HTML link symbol
-#+begin_src haskell
-"&#x1F517;"
 #+end_src
 
 ** CSS
@@ -2266,8 +2281,32 @@ a ? do
       color colorText
   ".internal-link" & do
     fontMono
-    roundedRectangleLink
+    roundedRectangleLink -- (ref:css:Links-internal-link)
   <<css:Links (external)>>
+#+end_src
+
+*** Internal links
+
+Links that point to other cells within the same document get a rounded rectangle
+decoration, per [[f:roundedRectangleLink]].
+
+#+name: f:roundedRectangleLink
+#+begin_src haskell
+roundedRectangleLink :: Css
+roundedRectangleLink = do
+  fontSize (rem 0.9)
+  color colorNowebLinkFg
+  backgroundColor colorNowebLinkBg
+  ev borderRadius (px 5)
+  yx padding (px 1) (px 3)
+  border (px 1) solid colorCodeBorder
+  ":hover" & do
+    border (px 1) solid colorNowebLinkFg
+    textDecoration none
+  ":visited" & do
+    ":hover" & do
+      border (px 1) solid colorNowebLinkVisitedFg
+      textDecoration none
 #+end_src
 
 *** External links
@@ -2333,28 +2372,6 @@ the latter here).
 
 </svg>
 #+end_src
-
-*** Links styled as rounded rectangles
-
-#+name: f:roundedRectangleLink
-#+begin_src haskell
-roundedRectangleLink :: Css
-roundedRectangleLink = do
-  fontSize (rem 0.9)
-  color colorNowebLinkFg
-  backgroundColor colorNowebLinkBg
-  ev borderRadius (px 5)
-  yx padding (px 1) (px 3)
-  border (px 1) solid colorCodeBorder
-  ":hover" & do
-    border (px 1) solid colorNowebLinkFg
-    textDecoration none
-  ":visited" & do
-    ":hover" & do
-      border (px 1) solid colorNowebLinkVisitedFg
-      textDecoration none
-#+end_src
-
 
 * List markers
 
@@ -2519,6 +2536,17 @@ weaveBlock lci block = do
           BTokenLinkTarget (LinkTargetLineLabel _) -> "\NUL"
           BTokenLinkTarget {} -> ""
     linkAnchor = getLinkAnchor Nothing $ CBlock block
+#+end_src
+
+We need a consistent way to show some piece of visible text for every code
+block. We could use the name of the block for this (much like headings where the
+heading itself is a clickable link to itself), however this wouldn't work for
+anonymous blocks (which have no name). This is why we use the link anchor symbol
+"🔗" with Unicode code point ~U+1F517~ for code blocks and glossary terms (see [[f:weaveGlossaryTerm]]).
+
+#+name: HTML link symbol
+#+begin_src haskell
+"&#x1F517;"
 #+end_src
 
 [[f:weaveBlockAncestry]] looks at a block and sees if it's a dependency of any other
