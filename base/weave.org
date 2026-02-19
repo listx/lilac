@@ -945,6 +945,7 @@ fontSans = do
 fontMono :: Css
 fontMono = do
   fontFamily ["Source Code Pro"] [monospace]
+  fontSize (rem 0.9)
 #+end_src
 
 These fonts are loaded into the HTML page by [[Google Fonts]].
@@ -1387,7 +1388,7 @@ html ? do
 body ? do
   minHeight (vh 100)
   display grid
-  gridTemplateColumns [px 300, px 810, fr 1]
+  gridTemplateColumns [px 300, px 800, fr 1]
   "grid-template-rows" -: "auto 1fr"
   "grid-template-areas"
     -: """
@@ -1897,11 +1898,9 @@ defined in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b::data:Style][data:Style]].
   textDecoration underline
 ".verbatim" & do
   fontMono
-  fontSize (em 0.9)
   whiteSpace ClayText.pre
 ".code" & do
   fontMono
-  fontSize (em 0.9)
   whiteSpace ClayText.pre
   backgroundColor colorCodeBg
   border (px 1) solid colorCodeBorder
@@ -2294,7 +2293,6 @@ decoration, per [[f:roundedRectangleLink]].
 #+begin_src haskell
 roundedRectangleLink :: Css
 roundedRectangleLink = do
-  fontSize (rem 0.9)
   color colorNowebLinkFg
   backgroundColor colorNowebLinkBg
   ev borderRadius (px 5)
@@ -5326,7 +5324,6 @@ aside ? do
   ol ? do
     paddingLeft $ rem 1
     marginTop $ px 0
-    fontSize (rem 0.9)
 #+end_src
 
 ** Footer
@@ -5439,7 +5436,6 @@ Code blocks use a 2-column layout, with the first column being the
   position relative
   fontSize (rem 0.9)
   a ? do
-    fontSize (rem 0.9)
     display inlineBlock
     yx margin (px 2) 0
 forM_

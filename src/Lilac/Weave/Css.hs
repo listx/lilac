@@ -207,7 +207,7 @@ defaultCss = do
   body ? do
     minHeight (vh 100)
     display grid
-    gridTemplateColumns [px 300, px 810, fr 1]
+    gridTemplateColumns [px 300, px 800, fr 1]
     "grid-template-rows" -: "auto 1fr"
     "grid-template-areas"
       -: """
@@ -298,7 +298,6 @@ defaultCss = do
     ol ? do
       paddingLeft $ rem 1
       marginTop $ px 0
-      fontSize (rem 0.9)
   footer ? do
     marginLeft (px 20)
     marginRight (px 20)
@@ -367,11 +366,9 @@ defaultCss = do
     textDecoration underline
   ".verbatim" & do
     fontMono
-    fontSize (em 0.9)
     whiteSpace ClayText.pre
   ".code" & do
     fontMono
-    fontSize (em 0.9)
     whiteSpace ClayText.pre
     backgroundColor colorCodeBg
     border (px 1) solid colorCodeBorder
@@ -475,7 +472,6 @@ defaultCss = do
     position relative
     fontSize (rem 0.9)
     a ? do
-      fontSize (rem 0.9)
       display inlineBlock
       yx margin (px 2) 0
   forM_
@@ -693,7 +689,6 @@ defaultCss = do
 
 roundedRectangleLink :: Css
 roundedRectangleLink = do
-  fontSize (rem 0.9)
   color colorNowebLinkFg
   backgroundColor colorNowebLinkBg
   ev borderRadius (px 5)
@@ -793,6 +788,7 @@ fontSans = do
 fontMono :: Css
 fontMono = do
   fontFamily ["Source Code Pro"] [monospace]
+  fontSize (rem 0.9)
 
 headingPrefix :: Text -> Size sz -> Css
 headingPrefix prefix spacing =
