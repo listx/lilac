@@ -622,82 +622,90 @@ weaveListMarker =
 
 weaveBlock :: LCI -> Block -> HtmlWeaver ()
 weaveBlock lci block = do
-  weaveConf <- ask
   wrapWithDiv lci $ do
     div_ [class_ "code-block-container", id_ linkAnchor] $ do
       div_ [class_ "code-block-controls"] $ do
-        button_ [class_ "toggle-code-block-meta-raw"] $ pure ()
+        button_ [class_ "toggle-code-block-meta-raw"] $ pure () --
         a_ [href_ $ "#" <> linkAnchor] $ do
           toHtmlRaw ("&#x1F517;" :: String)
-      maybeWeaveNameAndTanglePath
+      weaveImportantMetadata block --
       let (rawBorder, bodyBorder)
             | Nothing <- lookup "name" block.meta,
               Nothing <- lookup "tangle" block.meta =
-                (" top-rounded", " fully-rounded")
+                (" top-rounded", " fully-rounded") --
             | otherwise = ("", "")
       div_ [class_ $ "code-block-meta-raw hidden" <> rawBorder] $ do
+        --
         sequence_ . map weaveBlockMeta $ M.toList block.meta
-      pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
-        let bodyText = getBlockContentsWithoutLinks block.body
-        case lookup "__src_language" block.meta of
-          Just lang -> do
-            let colorized = renderAsText weaveConf $ colorizeText lang bodyText
-                getLink = \case
-                  BTokenLinkTarget lt ->
-                    let body' = case lt of
-                          LinkTargetOid (LinkOid _oid n) -> n
-                          LinkTargetLineLabel (LinkOid _oid n) -> n
-                          _ -> "weaveBlock error"
-                        name' =
-                          StyledText
-                            { body = body',
-                              style = styleMaskFrom []
-                            }
-                     in Just
-                          $ Link
-                            { target = lt,
-                              name = [name']
-                            }
-                  BTokenString {}
-                  BTokenPadding {} -> Nothing
-                links = catMaybes $ map getLink block.body
-            toHtmlRaw =<< spliceLinks colorized links
-          Nothing -> code_ $ toHtml bodyText
+      weaveBlockBody block bodyBorder
   where
-    maybeWeaveNameAndTanglePath
-      | Nothing <- lookup "name" block.meta,
-        Nothing <- lookup "tangle" block.meta =
-          pure ()
-      | otherwise = do
-          div_ [class_ "code-block-meta"] $ do
-            if
-              | Just name <- lookup "name" block.meta,
-                Just path <- lookup "tangle" block.meta -> do
-                  code_ $ toHtml name
-                  br_ []
-                  code_ $ do
-                    span_ [class_ "bold"] $ do
-                      toHtmlRaw @Text "&#x1F3AF; "
-                      toHtml path
-              | Just name <- lookup "name" block.meta -> do
-                  code_ $ toHtml name
-              | Just path <- lookup "tangle" block.meta -> do
-                  code_ $ do
-                    span_ [class_ "bold"] $ do
-                      toHtmlRaw @Text "&#x1F3AF; "
-                      toHtml path
-            weaveBlockAncestry block
-    getBlockContentsWithoutLinks :: [BToken] -> Text
-    getBlockContentsWithoutLinks = T.concat . map bTokenToText
-      where
-        bTokenToText :: BToken -> Text
-        bTokenToText = \case
-          BTokenString text -> text
-          BTokenPadding -> ""
-          BTokenLinkTarget (LinkTargetOid _) -> "\NUL"
-          BTokenLinkTarget (LinkTargetLineLabel _) -> "\NUL"
-          BTokenLinkTarget {} -> ""
     linkAnchor = getLinkAnchor Nothing $ CBlock block
+
+weaveImportantMetadata :: Block -> HtmlWeaver ()
+weaveImportantMetadata block
+  | Nothing <- lookup "name" block.meta,
+    Nothing <- lookup "tangle" block.meta =
+      pure ()
+  | otherwise = do
+      div_ [class_ "code-block-meta"] $ do
+        if
+          | Just name <- lookup "name" block.meta,
+            Just path <- lookup "tangle" block.meta -> do
+              code_ $ toHtml name
+              br_ []
+              code_ $ do
+                span_ [class_ "bold"] $ do
+                  toHtmlRaw @Text "&#x1F3AF; " --
+                  toHtml path
+          | Just name <- lookup "name" block.meta -> do
+              code_ $ toHtml name
+          | Just path <- lookup "tangle" block.meta -> do
+              code_ $ do
+                span_ [class_ "bold"] $ do
+                  toHtmlRaw @Text "&#x1F3AF; "
+                  toHtml path
+        weaveBlockAncestry block
+
+weaveBlockBody :: Block -> Text -> HtmlWeaver ()
+weaveBlockBody block bodyBorder =
+  pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
+    let bodyText = getBlockContentsWithoutLinks block.body
+    case lookup "__src_language" block.meta of --
+      Just lang -> do
+        weaveConf <- ask
+        let colorizedBody = renderAsText weaveConf $ colorizeText lang bodyText
+            getLink = \case
+              BTokenLinkTarget lt ->
+                let body' = case lt of
+                      LinkTargetOid (LinkOid _oid n) -> n
+                      LinkTargetLineLabel (LinkOid _oid n) -> n
+                      _ -> "weaveBlock error"
+                    name' =
+                      StyledText
+                        { body = body',
+                          style = styleMaskFrom []
+                        }
+                 in Just
+                      $ Link
+                        { target = lt,
+                          name = [name']
+                        }
+              BTokenString {}
+              BTokenPadding {} -> Nothing
+            links = catMaybes $ map getLink block.body
+        toHtmlRaw =<< spliceLinks colorizedBody links
+      Nothing -> code_ $ toHtml bodyText
+
+getBlockContentsWithoutLinks :: [BToken] -> Text
+getBlockContentsWithoutLinks = T.concat . map bTokenToText
+  where
+    bTokenToText :: BToken -> Text
+    bTokenToText = \case
+      BTokenString text -> text
+      BTokenPadding -> "" --
+      BTokenLinkTarget (LinkTargetOid _) -> "\NUL"
+      BTokenLinkTarget (LinkTargetLineLabel _) -> "\NUL"
+      BTokenLinkTarget {} -> ""
 
 weaveBlockAncestry :: Block -> HtmlWeaver ()
 weaveBlockAncestry block = case lookup "name" block.meta of
@@ -782,7 +790,9 @@ weaveBlockMeta (k, v) = do
 colorizeText :: Text -> Text -> HtmlWeaver ()
 colorizeText lang txt
   | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
-    Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
+    Just lines <-
+      foldMap' Just
+        $ Sky.tokenize defaultTokeniserConfig syntax txt =
       toHtmlRaw
         . Text.Blaze.Html.Renderer.Text.renderHtml
         $ Sky.formatHtmlInline Sky.defaultFormatOpts lines

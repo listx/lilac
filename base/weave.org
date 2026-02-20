@@ -495,6 +495,9 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveStyledText>>
 <<f:weaveListMarker>>
 <<f:weaveBlock>>
+<<f:weaveImportantMetadata>>
+<<f:weaveBlockBody>>
+<<f:getBlockContentsWithoutLinks>>
 <<f:weaveBlockAncestry>>
 <<f:weaveParentBlock>>
 <<f:getLinkToGCI>>
@@ -822,41 +825,20 @@ import Text.Megaparsec.Char.Lexer (hexadecimal)
 :END:
 
 [[f:genCss]] is the main top-level function which generates the CSS. There are two
-main parts: one is the syntax highlighting theme which uses a modified variation
-of the ~kate~ theme from [[https://hackage.haskell.org/package/skylighting][=Skylighting=]] (see [[f:kateLilac]]), and the other is the
-rest of Lilac ([[f:defaultCss]]) which uses the [[https://hackage.haskell.org/package/clay][Clay]] CSS preprocessor. These two
-parts are concatenated together in [[f:genCss]], so that Lilac's settings take
-precedence if there are any conflicts with the =Skylighting= parts.
+main parts: one is the [[id:33dc521a-2096-4088-9ccc-e55a2119bbfa][Syntax highlighting theme]] [[(f:genCss-kateLilac)]] used in
+[[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1][Code blocks]], and the other is the rest of Lilac ([[f:defaultCss]]) which uses the
+[[https://hackage.haskell.org/package/clay][Clay]] CSS preprocessor. These two parts are concatenated together in [[f:genCss]], so
+that Lilac's settings take precedence if there are any conflicts with the
+=Skylighting= parts.
 
 #+name: f:genCss
 #+begin_src haskell
 genCss :: Text
 genCss =
   T.unlines
-    [ T.pack $ Sky.styleToCss kateLilac,
+    [ T.pack $ Sky.styleToCss kateLilac, -- (ref:f:genCss-kateLilac)
       TL.toStrict $ renderWith pretty [] defaultCss
     ]
-#+end_src
-
-We make a small tweak to =kate= to make some colors easier on the eyes. The
-~ExtensionTok~ by default is too bright, so we darken it a bit here
-[[(f:kateLilac-ExtensionTok)]].
-
-#+name: f:kateLilac
-#+begin_src haskell
-kateLilac :: Sky.Style
-kateLilac =
-  Sky.kate
-    { Sky.tokenStyles =
-        insert
-          Sky.ExtensionTok -- (ref:f:kateLilac-ExtensionTok)
-          ( Sky.defStyle
-              { Sky.tokenColor = Just (Sky.RGB 0 0x60 0xa4),
-                Sky.tokenBold = True
-              }
-          )
-          Sky.kate.tokenStyles
-    }
 #+end_src
 
 [[f:defaultCss]] is the central place where we specify all of the rest of the CSS
@@ -2449,108 +2431,150 @@ weaveExpect
 :ID:       4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1
 :END:
 
-Weaving code blocks requires us to be able to handle both regular text
-(~BTokenString~) and also links (~BTokenLink~). There is some additional work for
-supporting syntax highlighting (see [[f:colorizeText]]).
+Code blocks (also just called /blocks/) have two major parts: the code (with any
+Noweb links inside them), which we call the /body/, along with any /metadata/ (such
+as the name of the block and the tangle path).
 
 #+name: f:weaveBlock
 #+begin_src haskell
 weaveBlock :: LCI -> Block -> HtmlWeaver ()
 weaveBlock lci block = do
-  weaveConf <- ask
   wrapWithDiv lci $ do
     div_ [class_ "code-block-container", id_ linkAnchor] $ do
       div_ [class_ "code-block-controls"] $ do
-        button_ [class_ "toggle-code-block-meta-raw"] $ pure ()
+        button_ [class_ "toggle-code-block-meta-raw"] $ pure () -- (ref:f:weaveBlock-metadata-button)
         a_ [href_ $ "#" <> linkAnchor] $ do
           toHtmlRaw (<<HTML link symbol>> :: String)
-      maybeWeaveNameAndTanglePath
+      weaveImportantMetadata block -- (ref:f:weaveBlock-weaveImportantMetadata)
       let (rawBorder, bodyBorder)
             | Nothing <- lookup "name" block.meta,
               Nothing <- lookup "tangle" block.meta =
-                (" top-rounded", " fully-rounded")
+                (" top-rounded", " fully-rounded") -- (ref:f:weaveBlock-corners)
             | otherwise = ("", "")
       div_ [class_ $ "code-block-meta-raw hidden" <> rawBorder] $ do
+        -- (ref:f:weaveBlock-full-metadata)
         sequence_ . map weaveBlockMeta $ M.toList block.meta
-      pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
-        let bodyText = getBlockContentsWithoutLinks block.body
-        case lookup "__src_language" block.meta of
-          Just lang -> do
-            let colorized = renderAsText weaveConf $ colorizeText lang bodyText
-                getLink = \case
-                  BTokenLinkTarget lt ->
-                    let body' = case lt of
-                          LinkTargetOid (LinkOid _oid n) -> n
-                          LinkTargetLineLabel (LinkOid _oid n) -> n
-                          _ -> "weaveBlock error"
-                        name' =
-                          StyledText
-                            { body = body',
-                              style = styleMaskFrom []
-                            }
-                     in Just
-                          $ Link
-                            { target = lt,
-                              name = [name']
-                            }
-                  BTokenString {}
-                  BTokenPadding {} -> Nothing
-                links = catMaybes $ map getLink block.body
-            toHtmlRaw =<< spliceLinks colorized links
-          Nothing -> code_ $ toHtml bodyText
+      weaveBlockBody block bodyBorder
   where
-    maybeWeaveNameAndTanglePath
-      | Nothing <- lookup "name" block.meta,
-        Nothing <- lookup "tangle" block.meta =
-          pure ()
-      | otherwise = do
-          div_ [class_ "code-block-meta"] $ do
-            if
-              | Just name <- lookup "name" block.meta,
-                Just path <- lookup "tangle" block.meta -> do
-                  code_ $ toHtml name
-                  br_ []
-                  code_ $ do
-                    span_ [class_ "bold"] $ do
-                      toHtmlRaw @Text "&#x1F3AF; "
-                      toHtml path
-              | Just name <- lookup "name" block.meta -> do
-                  code_ $ toHtml name
-              | Just path <- lookup "tangle" block.meta -> do
-                  code_ $ do
-                    span_ [class_ "bold"] $ do
-                      toHtmlRaw @Text "&#x1F3AF; "
-                      toHtml path
-            weaveBlockAncestry block
-    getBlockContentsWithoutLinks :: [BToken] -> Text
-    getBlockContentsWithoutLinks = T.concat . map bTokenToText
-      where
-        bTokenToText :: BToken -> Text
-        bTokenToText = \case
-          BTokenString text -> text
-          BTokenPadding -> ""
-          BTokenLinkTarget (LinkTargetOid _) -> "\NUL"
-          BTokenLinkTarget (LinkTargetLineLabel _) -> "\NUL"
-          BTokenLinkTarget {} -> ""
     linkAnchor = getLinkAnchor Nothing $ CBlock block
 #+end_src
 
-We need a consistent way to show some piece of visible text for every code
-block. We could use the name of the block for this (much like headings where the
-heading itself is a clickable link to itself), however this wouldn't work for
-anonymous blocks (which have no name). This is why we use the link anchor symbol
-"🔗" with Unicode code point ~U+1F517~ for code blocks and glossary terms (see [[f:weaveGlossaryTerm]]).
+There are several additional things worth mentioning, all having to do with how
+we display each block:
+
+  - ~code-block-controls~ DIV, which has a button [[(f:weaveBlock-metadata-button)]]
+    to reveal all of the raw metadata, as well as a self-link to the block
+    itself. This DIV is only displayed on hover, and also includes the
+    [[id:e2c26658-d4c7-4ebe-ad2e-79eff60a82cf][Self-linked anchor symbol]].
+
+  - [[f:weaveImportantMetadata]] which weaves the name and tangle path (if any).
+    This also weaves the block [[id:5b38fec8-43fb-4b72-8ea1-a86175fe9267][Ancestry]], which is automatically generated
+    (unlike the other metadata which the user must supply for each code block in
+    the underlying Org file).
+
+  - [[id:33dc521a-2096-4088-9ccc-e55a2119bbfa][Syntax highlighting theme]] for the block body. There is some complication
+    around making the highlighting work with links (see [[f:weaveBlockBody]]).
+
+We will cover all of these points in the subsections that follow.
+
+** Self-linked anchor symbol
+:PROPERTIES:
+:ID:       e2c26658-d4c7-4ebe-ad2e-79eff60a82cf
+:END:
+
+We want users to link to code blocks; that is, code blocks should be linkable
+just like [[id:c036cf17-0f61-4f07-bf76-bbe8b4eeb12e][Headings]]. We could use the name of the block for this (much like
+headings where the heading itself is a clickable link to itself), however this
+wouldn't work for anonymous blocks which have no name. This is why we use the
+link anchor symbol "🔗" with Unicode code point ~U+1F517~ for code blocks and
+glossary terms (see [[f:weaveGlossaryTerm]]). We display this link symbol whenever
+the mouse hovers over the block.
 
 #+name: HTML link symbol
 #+begin_src haskell
 "&#x1F517;"
 #+end_src
 
-[[f:weaveBlockAncestry]] looks at a block and sees if it's a dependency of any other
-block, by using the ~ancestry~ field in [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]. If other blocks do depend on
-this block, we link back to those blocks, which we call "parents", with
-[[f:weaveParentBlock]]. If the parent block itself does not have any parents, we
-call it a "root" block.
+** Metadata
+
+To recap, metadata are key/value pairs that describe some characteristics about
+the block, such as the type of block, programming language, and so on. These are
+all metadata defined by the user (in manual fashion in the Org mode file). We
+also have some automatically generated metadata (ancestry).
+
+*** Name and tangle path
+
+Because the /name/ and /tangle path/ are of such importance, they are always
+displayed (if they exist for the block) via [[f:weaveImportantMetadata]]
+[[(f:weaveBlock-weaveImportantMetadata)]].
+
+#+name: f:weaveImportantMetadata
+#+begin_src haskell
+weaveImportantMetadata :: Block -> HtmlWeaver ()
+weaveImportantMetadata block
+  | Nothing <- lookup "name" block.meta,
+    Nothing <- lookup "tangle" block.meta =
+      pure ()
+  | otherwise = do
+      div_ [class_ "code-block-meta"] $ do
+        if
+          | Just name <- lookup "name" block.meta,
+            Just path <- lookup "tangle" block.meta -> do
+              code_ $ toHtml name
+              br_ []
+              code_ $ do
+                span_ [class_ "bold"] $ do
+                  toHtmlRaw @Text "&#x1F3AF; " -- (ref:f:weaveImportantMetadata-target-icon)
+                  toHtml path
+          | Just name <- lookup "name" block.meta -> do
+              code_ $ toHtml name
+          | Just path <- lookup "tangle" block.meta -> do
+              code_ $ do
+                span_ [class_ "bold"] $ do
+                  toHtmlRaw @Text "&#x1F3AF; "
+                  toHtml path
+        weaveBlockAncestry block
+#+end_src
+
+[[f:weaveImportantMetadata]] weaves nothing if both the name and tangle paths are
+missing. [[(f:weaveImportantMetadata-target-icon)]] encodes a "direct hit" or
+"bullseye" emoji (🎯) and is what we use to prefix the tangle path, if any.
+
+*** Hidden (raw) metadata
+
+The user may also be interested in seeing
+/all/ of the metadata, but because this is uncommon, the full metadata
+[[(f:weaveBlock-full-metadata)]] is hidden behind a button press
+[[(f:weaveBlock-metadata-button)]]. See [[id:9c8e1074-edfb-4f89-bedf-07527981835d][Toggle code block metadata]] to see how we
+make the button interactive.
+
+[[f:weaveBlockMeta]] just weaves a single key and value pair of the metadata; it is
+called serially for all such pairs at [[(f:weaveBlock-full-metadata)]].
+
+#+name: f:weaveBlockMeta
+#+begin_src haskell
+weaveBlockMeta :: (Text, Text) -> HtmlWeaver ()
+weaveBlockMeta (k, v) = do
+  div_ [class_ "block-meta-key-value"] $ do
+    span_ [class_ "block-meta-key"] $ do
+      toHtml k
+    span_ [class_ "block-meta-separator"] $ do
+      toHtmlRaw @Text " = "
+    span_ [class_ "block-meta-value"] $ do
+      toHtml v
+#+end_src
+
+*** Ancestry
+:PROPERTIES:
+:ID:       5b38fec8-43fb-4b72-8ea1-a86175fe9267
+:END:
+
+The block ancestry answers the question "what other blocks refer to this
+block?". This is handled by [[f:weaveBlockAncestry]] which looks at a block and sees
+if it's a dependency of any other block, by using the ~ancestry~ field in
+[[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]. If other blocks do depend on this block, we link back to those
+blocks, which we call "parents", with [[f:weaveParentBlock]]. If the parent block
+itself does not have any parents, we call it a "root" block.
 
 #+name: f:weaveBlockAncestry
 #+begin_src haskell
@@ -2588,6 +2612,10 @@ weaveBlockAncestry block = case lookup "name" block.meta of
     forM_ nonRoots' weaveParentBlock
 #+end_src
 
+If a block is anonymous (does not have a name) (at [[(anonymous-orphan)]]), then it
+cannot have any parents because no block would be able to name it (via a [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77][Noweb
+reference]]) as a child.
+
 [[f:weaveParentBlock]] makes two distinctions: whether a block belongs to the
 current document being woven, and whether that block itself has any parents of
 its own.
@@ -2615,41 +2643,93 @@ weaveParentBlock (gci, ancestors, objPath, _, _) = do
               else toHtml @Text " ⇧"
 #+end_src
 
-If a block is anonymous (does not have a name) (at [[(anonymous-orphan)]]), then it
-cannot have any parents because no block would be able to name it (via a [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77][Noweb
-reference]]) as a child.
+** Body
 
-#+name: f:weaveBlockMeta
+Finally we come to weaving the body of the code block. The body requires some
+additional work for supporting syntax highlighting (see [[f:colorizeText]]).
+
+#+name: f:weaveBlockBody
 #+begin_src haskell
-weaveBlockMeta :: (Text, Text) -> HtmlWeaver ()
-weaveBlockMeta (k, v) = do
-  div_ [class_ "block-meta-key-value"] $ do
-    span_ [class_ "block-meta-key"] $ do
-      toHtml k
-    span_ [class_ "block-meta-separator"] $ do
-      toHtmlRaw @Text " = "
-    span_ [class_ "block-meta-value"] $ do
-      toHtml v
+weaveBlockBody :: Block -> Text -> HtmlWeaver ()
+weaveBlockBody block bodyBorder =
+  pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
+    let bodyText = getBlockContentsWithoutLinks block.body
+    case lookup "__src_language" block.meta of -- (ref:f:weaveBlockBody-lang)
+      Just lang -> do
+        weaveConf <- ask
+        let colorizedBody = renderAsText weaveConf $ colorizeText lang bodyText
+            getLink = \case
+              BTokenLinkTarget lt ->
+                let body' = case lt of
+                      LinkTargetOid (LinkOid _oid n) -> n
+                      LinkTargetLineLabel (LinkOid _oid n) -> n
+                      _ -> "weaveBlock error"
+                    name' =
+                      StyledText
+                        { body = body',
+                          style = styleMaskFrom []
+                        }
+                 in Just
+                      $ Link
+                        { target = lt,
+                          name = [name']
+                        }
+              BTokenString {}
+              BTokenPadding {} -> Nothing
+            links = catMaybes $ map getLink block.body
+        toHtmlRaw =<< spliceLinks colorizedBody links
+      Nothing -> code_ $ toHtml bodyText
 #+end_src
 
-The ~"&#x1F3AF;"~ encodes a "direct hit" or "bullseye" emoji (🎯) and is what we
-use to prefix the tangle path, if any.
+Unfortunately the syntax highlighting is not as simple as just feeding the body
+text to a highlighter and displaying the results without modification, because
+we have links embedded inside the body, namely the Noweb links (~LinkTargetOid~)
+and line labels (~LinkTargetLineLabel~). And we want to convert these links into
+HTML links, and so we cannot weave in the links before colorization; we cannot
+put them in naively after colorization because then we'd have to re-parse the
+text we get back and try to see where the links are.
+
+So instead we do some preprocessing of the body text before we feed it to the
+colorization function. First we put the links aside, and replace each place we
+found the link with the NULL byte in [[f:getBlockContentsWithoutLinks]]. Because the
+NULL bytes are invisible to the syntax highlighting process, this works well
+enough. And then when we get back the colorized string from [[f:colorizeText]], we
+go to each NULL byte and splice in the corresponding link (weaving it as
+needed). See [[f:spliceLinks]] for this last bit.
+
+That's the high-level overview; now let's look at the details.
+
+#+name: f:getBlockContentsWithoutLinks
+#+begin_src haskell
+getBlockContentsWithoutLinks :: [BToken] -> Text
+getBlockContentsWithoutLinks = T.concat . map bTokenToText
+  where
+    bTokenToText :: BToken -> Text
+    bTokenToText = \case
+      BTokenString text -> text
+      BTokenPadding -> "" -- (ref:f:getBlockContentsWithoutLinks-BTokenPadding)
+      BTokenLinkTarget (LinkTargetOid _) -> "\NUL"
+      BTokenLinkTarget (LinkTargetLineLabel _) -> "\NUL"
+      BTokenLinkTarget {} -> ""
+#+end_src
 
 The first thing we do is to get the contents of the block with
-~getBlockContentsWithoutLinks~. This function is similar to [[id:51f2edd8-5f8e-4c63-841f-da6c5c41680a::f:getBlockContents][f:getBlockContents]]
-from =Lilac.Parse=, but does not encode the links information directly into the
+[[f:getBlockContentsWithoutLinks]]. This function is similar to [[id:51f2edd8-5f8e-4c63-841f-da6c5c41680a::f:getBlockContents][f:getBlockContents]]
+from =Lilac.Parse=, but does not encode the link information directly into the
 text. Instead, links are replaced with the ~\NUL~ character. This is because the
 text is fed into [[f:colorizeText]], and we don't want the links to be dealt with in
-any special way yet. The ~BTokenPadding~ token is ignored in
-~getBlockContentsWithoutLinks~ because ~BTokenPadding~ is only meant to be used for
-tangling.
+any special way yet. The ~BTokenPadding~ token is ignored at
+[[(f:getBlockContentsWithoutLinks-BTokenPadding)]] because ~BTokenPadding~ is only
+meant to be used for tangling.
 
 #+name: f:colorizeText
 #+begin_src haskell
 colorizeText :: Text -> Text -> HtmlWeaver ()
 colorizeText lang txt
   | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
-    Just lines <- foldMap' Just $ Sky.tokenize defaultTokeniserConfig syntax txt =
+    Just lines <-
+      foldMap' Just
+        $ Sky.tokenize defaultTokeniserConfig syntax txt =
       toHtmlRaw
         . Text.Blaze.Html.Renderer.Text.renderHtml
         $ Sky.formatHtmlInline Sky.defaultFormatOpts lines
@@ -2685,6 +2765,207 @@ spliceLinks colorized links = do
     . fst
     . foldl' f (take 1 colorizedStrs, links)
     $ drop 1 colorizedStrs
+#+end_src
+
+Syntax highlighting is only considered if the block has a source (programming)
+language specified for it [[(f:weaveBlockBody-lang)]].
+
+*** Syntax highlighting theme
+:PROPERTIES:
+:ID:       33dc521a-2096-4088-9ccc-e55a2119bbfa
+:END:
+
+We use a modified variation of the ~kate~ theme from [[https://hackage.haskell.org/package/skylighting][=Skylighting=]] (see
+[[f:colorizeText]]) which we call [[f:kateLilac]] We make some tweaks to make some
+colors easier on the eyes. In particular, the ~ExtensionTok~ by default is too
+bright, so we darken it a bit here [[(f:kateLilac-ExtensionTok)]].
+
+#+name: f:kateLilac
+#+begin_src haskell
+kateLilac :: Sky.Style
+kateLilac =
+  Sky.kate
+    { Sky.tokenStyles =
+        insert
+          Sky.ExtensionTok -- (ref:f:kateLilac-ExtensionTok)
+          ( Sky.defStyle
+              { Sky.tokenColor = Just (Sky.RGB 0 0x60 0xa4),
+                Sky.tokenBold = True
+              }
+          )
+          Sky.kate.tokenStyles
+    }
+#+end_src
+
+** CSS
+
+#+name: css:Code blocks
+#+begin_src haskell
+<<css:Block grid layout>>
+<<css:Block controls>>
+<<css:Block meta>>
+<<css:Block meta raw>>
+<<css:Block body>>
+<<css:Block rounding>>
+#+end_src
+
+Code blocks use a 2-column layout, with the first column being the
+~.code-block-controls~ and the second column being all the rest.
+
+#+name: css:Block grid layout
+#+begin_src haskell
+".code-block-container" & do
+  display grid
+  gridTemplateColumns [px 50, fr 1]
+  margin (px 16) 0 (px 16) (px (-50))
+  position relative
+  fontSize (rem 0.9)
+  a ? do
+    display inlineBlock
+    yx margin (px 2) 0
+forM_
+  [".code-block-meta", ".code-block-meta-raw", ".code-block-body"]
+  $ \child -> do
+    ".code-block-container" |> child ? do
+      "grid-column" -: "2"
+#+end_src
+
+Initially, the ~.code-block-controls~ in the first column are hidden. On hovering
+over it or the overall container we display it.
+
+#+name: css:Block controls
+#+begin_src haskell
+".code-block-controls" & do
+  padding (px 2) (px 5) 0 0
+  width (px 50)
+  textAlign $ alignSide sideRight
+  boxSizing borderBox
+  top (px 0)
+  bottom (px 0)
+  position absolute
+  "grid-column" -: "1"
+  "grid-row" -: "1"
+  visibility hidden -- (ref:css-visibility)
+  opacity 0 -- (ref:css-opacity)
+  <<css:Block controls buttons>>
+(".code-block-container" # hover) |> ".code-block-controls" ? do
+  visibility visible
+  opacity 1
+#+end_src
+
+We need to use both /visibility/ [[(css-visibility)]] and /opacity/ [[(css-opacity)]] to
+hide/unhide the controls. Visibility hides the element without changing the
+layout, while opacity hides it visually.
+
+#+name: css:Block controls buttons
+#+begin_src haskell
+a # hover ? do
+  textDecoration none
+button # ".toggle-code-block-meta-raw" ? do
+  "::before" & do
+    "content" -: "\"M\""
+  marginRight $ px 5
+  "border" -: "0"
+  "cursor" -: "pointer"
+  ev borderRadius (px 2)
+  border (px 1) solid colorCodeBorder
+#+end_src
+
+The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
+
+  1) ~.code-block-meta~ :: The name or tangle path. These attributes are so common
+     (and important) that we always display them where possible.
+
+  2) ~.code-block-meta-raw~ :: Other metadata such as the programming language
+     syntax of the code block. These attributes are typically not as
+     interesting, and so require the user to press a button (labeled ~M~) in the
+     ~.code-block-controls~ container to reveal them.
+
+  3) ~.code-block-body~ :: Main body of the block, which contains the actual code
+     that have been fenced by ~#+begin_...~ and ~#+end_...~.
+
+#+name: css:Block meta
+#+begin_src haskell
+".code-block-meta" & do
+  yx padding 0 (px 8)
+  border (px 1) solid colorCodeBorder
+  borderBottomWidth 0
+  borderTopLeftRadius (px 5) (px 5)
+  borderTopRightRadius (px 5) (px 5)
+  fontSans
+  a ? do
+    ".parent-block-arrow" & do
+      marginLeft (em 0.25)
+".active" ** ".code-block-meta" ? do
+  fontWeight bold
+  border (px 1) solid colorActiveBorder
+  borderBottomWidth 0
+#+end_src
+
+#+name: css:Block meta raw
+#+begin_src haskell
+div # ".code-block-meta-raw" ? do
+  yx padding 0 (px 8)
+  fontMono
+  border (px 1) solid colorCodeBorder
+  borderBottomWidth 0
+  ".hidden" & do
+    display displayNone
+".active" ** ".code-block-meta-raw" ? do
+  border (px 1) solid colorActiveBorder
+  borderBottomWidth 0
+#+end_src
+
+#+name: css:Block body
+#+begin_src haskell
+pre ? do
+  ev margin $ px 0
+code ? do
+  ev margin $ px 0
+  a ? do
+    roundedRectangleLink
+    span ? do
+      color colorNowebLinkFg
+".sourceCode" & do
+  ev margin $ px 0
+".code-block-body" & do
+  overflowX auto
+  fontMono
+  backgroundColor colorCodeBg
+  color colorCodeFg
+  borderBottomLeftRadius (px 5) (px 5)
+  borderBottomRightRadius (px 5) (px 5)
+  border (px 1) solid colorCodeBorder
+  yx padding (px 2) (px 8)
+".active" ** ".code-block-body" ? do
+  border (px 1) solid colorActiveBorder
+  backgroundColor colorActiveBg
+<<css:Block line labels>>
+#+end_src
+
+Active line labels get a special highlight with a [[https://en.wikipedia.org/wiki/Manicule][manicule]] (hand pointing with
+index finger) symbol.
+
+#+name: css:Block line labels
+#+begin_src haskell
+".code-block-body" ** ".sourceCode" ** ".active" ? do
+  border (px 1) solid colorActiveBorder
+  backgroundColor colorActiveBg
+  "::after" & do
+    "content" -: "\" 👈\""
+#+end_src
+
+The [[css:Block rounding]] is to handle cases where we may or may not have a
+~.code-block-meta~, which affects how we will round off the corners of the
+[[css:Block body]] and [[css:Block meta raw]]. See [[(f:weaveBlock-corners)]].
+
+#+name: css:Block rounding
+#+begin_src haskell
+".fully-rounded" & do
+  ev borderRadius (px 5)
+".top-rounded" & do
+  borderTopLeftRadius (px 5) (px 5)
+  borderTopRightRadius (px 5) (px 5)
 #+end_src
 
 * Figures
@@ -5409,177 +5690,6 @@ main_ ? do
     li ? do
       empty & do
         minHeight (rem 2.2)
-#+end_src
-
-** Code blocks
-
-#+name: css:Code blocks
-#+begin_src haskell
-<<css:Block grid layout>>
-<<css:Block controls>>
-<<css:Block meta>>
-<<css:Block meta raw>>
-<<css:Block body>>
-<<css:Block rounding>>
-#+end_src
-
-Code blocks use a 2-column layout, with the first column being the
-~.code-block-controls~ and the second column being all the rest.
-
-#+name: css:Block grid layout
-#+begin_src haskell
-".code-block-container" & do
-  display grid
-  gridTemplateColumns [px 50, fr 1]
-  margin (px 16) 0 (px 16) (px (-50))
-  position relative
-  fontSize (rem 0.9)
-  a ? do
-    display inlineBlock
-    yx margin (px 2) 0
-forM_
-  [".code-block-meta", ".code-block-meta-raw", ".code-block-body"]
-  $ \child -> do
-    ".code-block-container" |> child ? do
-      "grid-column" -: "2"
-#+end_src
-
-Initially, the ~.code-block-controls~ in the first column are hidden. On hovering
-over it or the overall container we display it.
-
-#+name: css:Block controls
-#+begin_src haskell
-".code-block-controls" & do
-  padding (px 2) (px 5) 0 0
-  width (px 50)
-  textAlign $ alignSide sideRight
-  boxSizing borderBox
-  top (px 0)
-  bottom (px 0)
-  position absolute
-  "grid-column" -: "1"
-  "grid-row" -: "1"
-  visibility hidden -- (ref:css-visibility)
-  opacity 0 -- (ref:css-opacity)
-  <<css:Block controls buttons>>
-(".code-block-container" # hover) |> ".code-block-controls" ? do
-  visibility visible
-  opacity 1
-#+end_src
-
-We need to use both /visibility/ [[(css-visibility)]] and /opacity/ [[(css-opacity)]] to
-hide/unhide the controls. Visibility hides the element without changing the
-layout, while opacity hides it visually.
-
-#+name: css:Block controls buttons
-#+begin_src haskell
-a # hover ? do
-  textDecoration none
-button # ".toggle-code-block-meta-raw" ? do
-  "::before" & do
-    "content" -: "\"M\""
-  marginRight $ px 5
-  "border" -: "0"
-  "cursor" -: "pointer"
-  ev borderRadius (px 2)
-  border (px 1) solid colorCodeBorder
-#+end_src
-
-The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
-
-  1) ~.code-block-meta~ :: The name or tangle path. These attributes are so common
-     (and important) that we always display them where possible.
-
-  2) ~.code-block-meta-raw~ :: Other metadata such as the programming language
-     syntax of the code block. These attributes are typically not as
-     interesting, and so require the user to press a button (labeled ~M~) in the
-     ~.code-block-controls~ container to reveal them.
-
-  3) ~.code-block-body~ :: Main body of the block, which contains the actual code
-     that have been fenced by ~#+begin_...~ and ~#+end_...~.
-
-#+name: css:Block meta
-#+begin_src haskell
-".code-block-meta" & do
-  yx padding 0 (px 8)
-  border (px 1) solid colorCodeBorder
-  borderBottomWidth 0
-  borderTopLeftRadius (px 5) (px 5)
-  borderTopRightRadius (px 5) (px 5)
-  fontSans
-  a ? do
-    ".parent-block-arrow" & do
-      marginLeft (em 0.25)
-".active" ** ".code-block-meta" ? do
-  fontWeight bold
-  border (px 1) solid colorActiveBorder
-  borderBottomWidth 0
-#+end_src
-
-#+name: css:Block meta raw
-#+begin_src haskell
-div # ".code-block-meta-raw" ? do
-  yx padding 0 (px 8)
-  fontMono
-  border (px 1) solid colorCodeBorder
-  borderBottomWidth 0
-  ".hidden" & do
-    display displayNone
-".active" ** ".code-block-meta-raw" ? do
-  border (px 1) solid colorActiveBorder
-  borderBottomWidth 0
-#+end_src
-
-#+name: css:Block body
-#+begin_src haskell
-pre ? do
-  ev margin $ px 0
-code ? do
-  ev margin $ px 0
-  a ? do
-    roundedRectangleLink
-    span ? do
-      color colorNowebLinkFg
-".sourceCode" & do
-  ev margin $ px 0
-".code-block-body" & do
-  overflowX auto
-  fontMono
-  backgroundColor colorCodeBg
-  color colorCodeFg
-  borderBottomLeftRadius (px 5) (px 5)
-  borderBottomRightRadius (px 5) (px 5)
-  border (px 1) solid colorCodeBorder
-  yx padding (px 2) (px 8)
-".active" ** ".code-block-body" ? do
-  border (px 1) solid colorActiveBorder
-  backgroundColor colorActiveBg
-<<css:Block line labels>>
-#+end_src
-
-Active line labels get a special highlight with a [[https://en.wikipedia.org/wiki/Manicule][manicule]] (hand pointing with
-index finger) symbol.
-
-#+name: css:Block line labels
-#+begin_src haskell
-".code-block-body" ** ".sourceCode" ** ".active" ? do
-  border (px 1) solid colorActiveBorder
-  backgroundColor colorActiveBg
-  "::after" & do
-    "content" -: "\" 👈\""
-#+end_src
-
-The [[css:Block rounding]] is to handle cases where we may or may not have a
-~.code-block-meta~, which affects how we will round off the corners of the
-[[css:Block body]] and [[css:Block meta raw]].
-
-#+name: css:Block rounding
-#+begin_src haskell
-".fully-rounded" & do
-  ev borderRadius (px 5)
-".top-rounded" & do
-  borderTopLeftRadius (px 5) (px 5)
-  borderTopRightRadius (px 5) (px 5)
 #+end_src
 
 ** Figures

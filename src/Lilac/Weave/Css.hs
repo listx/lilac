@@ -178,7 +178,7 @@ import Text.Megaparsec.Char.Lexer (hexadecimal)
 genCss :: Text
 genCss =
   T.unlines
-    [ T.pack $ Sky.styleToCss kateLilac,
+    [ T.pack $ Sky.styleToCss kateLilac, --
       TL.toStrict $ renderWith pretty [] defaultCss
     ]
 
