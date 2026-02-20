@@ -2381,7 +2381,7 @@ require our existing data structure to be nested as well (like a tree).
 But the cells we have are flat, and so we cannot use those functions. On the
 other hand, we already know exactly where to start and close the various tags,
 so it's actually very easy to insert the tags manually. This is what we do in
-[[f:weaveListMarker]].
+[[f:weaveListMarker]], which is used by [[f:weaveCell]].
 
 #+name: f:weaveListMarker
 #+begin_src haskell
@@ -2396,8 +2396,7 @@ weaveListMarker =
     LItemEnd -> "</li>"
 #+end_src
 
-There isn't much to test here, because these markers are so simple. Still, it
-doesn't hurt.
+There isn't much to test here, because these markers are so simple.
 
 #+name: ti:0300-weave-lists
 #+header: :tangle test/Lilac/WeaveSpec/0300-weave-lists
