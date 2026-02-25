@@ -3687,6 +3687,46 @@ getLinkToGCI weaveConf gci
   | otherwise = Nothing
 #+end_src
 
+** CSS
+
+For glossary terms, we want to place the definition (~<dd>~) on the /same line/ as
+the term (~<dt>~). To do this we place a newline character (the string ~\a~ in CSS)
+after a ~<dd>~ at [[(newline-after-dd)]].
+
+#+name: css:Glossary terms
+#+begin_src haskell
+dl ? do
+  marginTop $ rem 1
+dt ? do
+  display inlineBlock
+  fontWeight bold
+  fontSans
+  ".inner-dt" & do
+    marginTop $ rem 1
+dd ? do
+  display inline
+  marginLeft (rem 0.5)
+  "::after" & do
+    "content" -: "\"\\a\"" -- (ref:newline-after-dd)
+    whiteSpace ClayText.pre
+  a # ".glossary-term-anchor" ? do
+    fontSize (em 0.7)
+    ":hover" & do
+      textDecoration none
+div # ".glossary-term" ? do
+  border (px 1) solid colorBg
+  yx padding (px 0) (px 5)
+  ".active" & do
+    border (px 1) solid colorActiveBorder
+    backgroundColor colorActiveBg
+    ev borderRadius (px 5)
+span # ".glossary-external-source" ? do
+  fontSans
+#+end_src
+
+See [[https://stackoverflow.com/a/66030381/437583][this StackOverflow post]] for more discussion around styling description lists
+this way.
+
 * Citations
 :PROPERTIES:
 :ID:       7874b9c5-ceac-4820-8804-7732e29f5c60
@@ -5798,46 +5838,6 @@ aside ? do
     paddingLeft $ rem 1
     marginTop $ px 0
 #+end_src
-
-** Glossary terms
-
-For glossary terms, we want to place the definition (~<dd>~) on the /same line/ as
-the term (~<dt>~). To do this we place a newline character (the string ~\a~ in CSS)
-after a ~<dd>~ at [[(newline-after-dd)]].
-
-#+name: css:Glossary terms
-#+begin_src haskell
-dl ? do
-  marginTop $ rem 1
-dt ? do
-  display inlineBlock
-  fontWeight bold
-  fontSans
-  ".inner-dt" & do
-    marginTop $ rem 1
-dd ? do
-  display inline
-  marginLeft (rem 0.5)
-  "::after" & do
-    "content" -: "\"\\a\"" -- (ref:newline-after-dd)
-    whiteSpace ClayText.pre
-  a # ".glossary-term-anchor" ? do
-    fontSize (em 0.7)
-    ":hover" & do
-      textDecoration none
-div # ".glossary-term" ? do
-  border (px 1) solid colorBg
-  yx padding (px 0) (px 5)
-  ".active" & do
-    border (px 1) solid colorActiveBorder
-    backgroundColor colorActiveBg
-    ev borderRadius (px 5)
-span # ".glossary-external-source" ? do
-  fontSans
-#+end_src
-
-See [[https://stackoverflow.com/a/66030381/437583][this StackOverflow post]] for more discussion around styling description lists
-this way.
 
 ** Citations
 
