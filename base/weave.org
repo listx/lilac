@@ -4890,6 +4890,23 @@ expectCiteprocResult
   $ Left "unexpected newline"
 #+end_src
 
+** CSS
+
+These CSL classes are used by the Citeproc library. Specifically these are used
+for the bibliographical entries when using ~#+print_bibliography:~.
+
+#+name: css:Citations
+#+begin_src haskell
+".bibliography" & do
+  marginTop (rem 1)
+".bib-ref" & do
+  marginTop (rem 0.5)
+".csl-left-margin" & do
+  float floatLeft
+".csl-right-inline" & do
+  margin 0 0 0 (rem 2)
+#+end_src
+
 * Table of Contents (TOC)
 :PROPERTIES:
 :ID:       e38fb4d1-72e1-40e0-905e-95bc8be2bf0b
@@ -5837,23 +5854,6 @@ aside ? do
   ol ? do
     paddingLeft $ rem 1
     marginTop $ px 0
-#+end_src
-
-** Citations
-
-These CSL classes are used by the Citeproc library. Specifically these are used
-for the bibliographical entries when using ~#+print_bibliography:~.
-
-#+name: css:Citations
-#+begin_src haskell
-".bibliography" & do
-  marginTop (rem 1)
-".bib-ref" & do
-  marginTop (rem 0.5)
-".csl-left-margin" & do
-  float floatLeft
-".csl-right-inline" & do
-  margin 0 0 0 (rem 2)
 #+end_src
 
 ** Document metadata
