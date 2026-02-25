@@ -3390,6 +3390,43 @@ weaveFootnoteBacklink lci = do
     | otherwise -> pure ()
 #+end_src
 
+** CSS
+
+Footnote links are superscript numerals, which is why we use ~sup~ in
+[[css:Footnotes]] below.
+
+#+name: css:Footnotes
+#+begin_src haskell
+sup ? do
+  ".footnote-link" & do
+    a ? do
+      borderStyle none
+      ev borderRadius (px 0)
+      yx padding 0 (px 0)
+      yx margin (px 0) 0
+      fontStyle normal
+      ".internal-link" & do
+        backgroundColor $ colorFrom "#ffffff"
+        ":hover" & do
+          borderStyle none
+          textDecoration underline
+        ":visited" & do
+          ":hover" & do
+            borderStyle none
+            textDecoration underline
+p # ".footnote-definition" ? do
+  border (px 1) solid colorBg
+  ev borderRadius (px 5)
+  marginLeft (px (-7))
+  yx padding 0 (px 5)
+  ".active" & do
+    border (px 1) solid colorActiveBorder
+    backgroundColor colorActiveBg
+    ev borderRadius (px 5)
+  a # ".footnote-backlink" ? do
+    display inlineBlock
+#+end_src
+
 * Glossary terms
 :PROPERTIES:
 :ID:       eee95795-b51b-4de5-b39d-8dda436da451
@@ -5760,43 +5797,6 @@ footer ? do
 #+name: css:Footer height
 #+begin_src txt
 4rem
-#+end_src
-
-** Footnotes
-
-Footnote links are superscript numerals, which is why we use ~sup~ in
-[[css:Footnotes]] below.
-
-#+name: css:Footnotes
-#+begin_src haskell
-sup ? do
-  ".footnote-link" & do
-    a ? do
-      borderStyle none
-      ev borderRadius (px 0)
-      yx padding 0 (px 0)
-      yx margin (px 0) 0
-      fontStyle normal
-      ".internal-link" & do
-        backgroundColor $ colorFrom "#ffffff"
-        ":hover" & do
-          borderStyle none
-          textDecoration underline
-        ":visited" & do
-          ":hover" & do
-            borderStyle none
-            textDecoration underline
-p # ".footnote-definition" ? do
-  border (px 1) solid colorBg
-  ev borderRadius (px 5)
-  marginLeft (px (-7))
-  yx padding 0 (px 5)
-  ".active" & do
-    border (px 1) solid colorActiveBorder
-    backgroundColor colorActiveBg
-    ev borderRadius (px 5)
-  a # ".footnote-backlink" ? do
-    display inlineBlock
 #+end_src
 
 ** Glossary terms
