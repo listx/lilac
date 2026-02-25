@@ -5087,6 +5087,67 @@ weaveHeadingAncestry lciCellPairs = do
     toHtmlRaw . TLE.decodeUtf8 $ encode headingAncestry
 #+end_src
 
+** CSS
+:PROPERTIES:
+:ID:       c316d545-5f6c-4fea-8342-e6925be83dfe
+:END:
+
+The TOC is sticky and scrolls independently of the main content; it does this
+with [[css:Column under navbar]].
+
+#+name: css:toc
+#+begin_src haskell
+nav # ".toc" ? do
+  "grid-area" -: "toc"
+  <<css:Column under navbar>>
+  paddingLeft (px 30)
+  fontSans
+  ol ? do
+    marginTop $ px 0
+    paddingLeft $ rem 0
+    listStyleType none
+    li # ".toc-level-1" ? do
+      position relative
+      before & do
+        content $ stringContent "<<symbol:h2>>" -- (ref:css:toc-h2)
+        marginLeft (rem $ -1.3)
+        position absolute
+        left (px 0)
+    li # ".toc-level-2" ? do
+      position relative
+      before & do
+        content $ stringContent "<<symbol:h3>>" -- (ref:css:toc-h3)
+        marginLeft (rem $ -1.3)
+        position absolute
+        left (px 0)
+    div ? do
+      paddingRight $ px 8
+      paddingLeft $ px 20
+      marginLeft $ px (-20)
+      ".active" & do
+        backgroundColor colorTocActive
+        borderRight (px 4) solid colorNowebLinkFg
+        paddingRight $ px 4
+      ".active-ancestor" & do
+        backgroundColor colorTocActiveAncestor
+  span # ".toc-counter" ? do
+    marginRight $ rem 0.3
+  borderRight (px 1) solid colorCodeBorder
+#+end_src
+
+Columns under the navbar each have their own scrollbars. In order to do this
+they need to have their ~height~ defined.
+
+#+name: css:Column under navbar
+#+begin_src haskell
+"height"
+  -: """
+     calc(100vh - <<css:navbar-height>>)
+     """
+overflowY auto
+padding (px 0) (px 20) (px 0) (px 20)
+#+end_src
+
 * Navigation bar
 
 The navigation bar is at the top of the page as a horizontal bar.
@@ -5757,67 +5818,6 @@ div # ".breadcrumbs" ? do
   margin (px 12) 0 (px 10) (px 20)
 span # ".breadcrumb-separator" ? do
   color colorBreadcrumbSeparator
-#+end_src
-
-** Table of contents (TOC)
-:PROPERTIES:
-:ID:       c316d545-5f6c-4fea-8342-e6925be83dfe
-:END:
-
-The TOC is sticky and scrolls independently of the main content; it does this
-with [[css:Column under navbar]].
-
-#+name: css:toc
-#+begin_src haskell
-nav # ".toc" ? do
-  "grid-area" -: "toc"
-  <<css:Column under navbar>>
-  paddingLeft (px 30)
-  fontSans
-  ol ? do
-    marginTop $ px 0
-    paddingLeft $ rem 0
-    listStyleType none
-    li # ".toc-level-1" ? do
-      position relative
-      before & do
-        content $ stringContent "<<symbol:h2>>" -- (ref:css:toc-h2)
-        marginLeft (rem $ -1.3)
-        position absolute
-        left (px 0)
-    li # ".toc-level-2" ? do
-      position relative
-      before & do
-        content $ stringContent "<<symbol:h3>>" -- (ref:css:toc-h3)
-        marginLeft (rem $ -1.3)
-        position absolute
-        left (px 0)
-    div ? do
-      paddingRight $ px 8
-      paddingLeft $ px 20
-      marginLeft $ px (-20)
-      ".active" & do
-        backgroundColor colorTocActive
-        borderRight (px 4) solid colorNowebLinkFg
-        paddingRight $ px 4
-      ".active-ancestor" & do
-        backgroundColor colorTocActiveAncestor
-  span # ".toc-counter" ? do
-    marginRight $ rem 0.3
-  borderRight (px 1) solid colorCodeBorder
-#+end_src
-
-Columns under the navbar each have their own scrollbars. In order to do this
-they need to have their ~height~ defined.
-
-#+name: css:Column under navbar
-#+begin_src haskell
-"height"
-  -: """
-     calc(100vh - <<css:navbar-height>>)
-     """
-overflowY auto
-padding (px 0) (px 20) (px 0) (px 20)
 #+end_src
 
 ** Main content
