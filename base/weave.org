@@ -1127,6 +1127,19 @@ hr ? do
     marginBottom (rem 1)
 #+end_src
 
+The document author and date also get some styling to set it apart from other
+text in [[css:Document metadata]].
+
+#+name: css:Document metadata
+#+begin_src haskell
+".doc-meta-author" & do
+  fontStyle italic
+  ev margin (px 2)
+".doc-meta-date" & do
+  fontStyle italic
+  ev margin (px 2)
+#+end_src
+
 ** Main content and cells
 
 The most important helper for [[f:weaveObject]] is probably [[f:weaveMain]] because it
@@ -1422,6 +1435,19 @@ element instead of something like ~<h6>~. These widget titles are configured at
 The ~<div>~ element is used in many places to section off areas of content; to
 avoid repetition, we reset its margins to be 0 [[(css:Layout-reset-div)]] here for
 all ~<div>~ elements.
+
+The main content's padding and such is defined in [[css:Main content]].
+
+#+name: css:Main content
+#+begin_src haskell
+main_ ? do
+  "grid-area" -: "main"
+  marginLeft (px 17)
+  <<css:Column under navbar>>
+  paddingLeft (px 50)
+  p # ".main-bottom-spacer" ? do
+    yx margin (px 40) 0
+#+end_src
 
 * Identifying cells in HTML
 
@@ -5836,36 +5862,6 @@ expectCiteprocResult path expected = do
 <<t:0400-citeproc-multiline-cell-boundary>>
 <<t:0400-citeproc-multiline-cell-boundary-list-item>>
 <<t:0400-citeproc-style-variations>>
-#+end_src
-
-* Generate CSS
-:PROPERTIES:
-:ID:       8017befd-7628-46cf-a090-72fdbb00fb5a
-:END:
-
-** Main content
-
-#+name: css:Main content
-#+begin_src haskell
-main_ ? do
-  "grid-area" -: "main"
-  marginLeft (px 17)
-  <<css:Column under navbar>>
-  paddingLeft (px 50)
-  p # ".main-bottom-spacer" ? do
-    yx margin (px 40) 0
-#+end_src
-
-** Document metadata
-
-#+name: css:Document metadata
-#+begin_src haskell
-".doc-meta-author" & do
-  fontStyle italic
-  ev margin (px 2)
-".doc-meta-date" & do
-  fontStyle italic
-  ev margin (px 2)
 #+end_src
 
 * Glossary
