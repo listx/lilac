@@ -232,6 +232,7 @@ import Network.URI
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
+    Char,
     Either (Left, Right),
     Eq,
     FilePath,
@@ -1002,50 +1003,86 @@ weaveMathFragmentInline mathFragment =
 
 weaveTable :: LCI -> Table -> HtmlWeaver ()
 weaveTable lci table = do
-  let captionPrefix =
-        "Table "
-          <> lookupDefault "table-number-error" "__table_number" table.meta
+  --
   figure_ [id_ linkAnchor] $ do
-    figcaption_ [] $ do
-      wrapWith lci $ do
-        a_ [href_ $ "#" <> linkAnchor, class_ "self-link", class_ "caption-prefix"] $ do
-          toHtml captionPrefix
-        toHtml $ case table.caption.unProse of
-          [] -> "." :: Text
-          _ -> ". " :: Text
-        weaveProse table.caption
+    weaveTableCaption lci table linkAnchor
     table_ [] $ do
-      forM_ (zip [1 :: Int ..] getColgroups) $ \(groupIdx, numCols) -> do
-        let colgroupAttrs =
-              if groupIdx > 1
-                then [class_ "table-vertical-line-colgroup"]
-                else []
-        colgroup_ colgroupAttrs $ do
-          forM_ [1 .. numCols] $ \colNum -> do
-            if (colNum > 1)
-              then col_ [class_ "table-vertical-line-col"]
-              else col_ []
-      thead_ [] $ do
-        tr_ [] $ do
-          forM_ columnNames $ \prose -> do
-            th_ [] $ weaveProse prose
-      tbody_ [] $ do
-        forM_ (rows visibleRows) $ \row ->
-          if row == [Prose []]
-            then do
-              tr_ [class_ "table-horizontal-line"] $ do
-                forM_ columnNames $ \_ -> do
-                  td_ [] $ toHtml @Text ""
-            else do
-              tr_ [class_ "table-body-row"] $ do
-                forM_ row $ \prose -> do
-                  let tdAttrs =
-                        if mostlyNumeric prose
-                          then [class_ "table-cell-numeric"]
-                          else []
-                  td_ tdAttrs $ weaveProse prose
+      weaveTableColumnGroups table
+      weaveTableRows table
   where
     linkAnchor = getLinkAnchor Nothing $ CTable table
+
+weaveTableCaption :: LCI -> Table -> Text -> HtmlWeaver ()
+weaveTableCaption lci table linkAnchor = do
+  figcaption_ [] $ do
+    wrapWith lci $ do
+      a_
+        [ href_ $ "#" <> linkAnchor,
+          class_ "self-link",
+          class_ "caption-prefix"
+        ]
+        $ do
+          let captionPrefix =
+                "Table "
+                  <> lookupDefault
+                    "table-number-error"
+                    "__table_number"
+                    table.meta
+          toHtml captionPrefix
+      toHtml $ case table.caption.unProse of
+        [] -> "." :: Text
+        _ -> ". " :: Text
+      weaveProse table.caption
+
+weaveTableColumnGroups :: Table -> HtmlWeaver ()
+weaveTableColumnGroups table = do
+  forM_ (zip [1 :: Int ..] getColgroups) $ \(groupIdx, numCols) -> do
+    colgroup_ [] $ do
+      --
+      forM_ [1 .. numCols] $ \colNum -> do
+        let attrs
+              | colNum == 1 && groupIdx > 1 =
+                  [class_ "table-vertical-thick-line-colgroup"]
+              | colNum > 1 =
+                  [class_ "table-vertical-thin-line-col"]
+              | otherwise = []
+        col_ attrs
+  where
+    getColgroups :: [Int] --
+    getColgroups =
+      maybe
+        [getMaxCol table]
+        ( reverse --
+            . foldl' getColgroupSizes [0]
+            . getTableCellsFromRow table
+        )
+        getColgroupsRow
+    getColgroupsRow = foldl' findSlash Nothing $ getFirstColumnCells table --
+      where
+        findSlash :: Maybe Int -> ((Int, Int), Prose) -> Maybe Int
+        findSlash acc ((row, _col), prose)
+          | isJust acc = acc
+          | proseHasNonExportMarker prose = Just row
+          | otherwise = acc
+        proseHasNonExportMarker :: Prose -> Bool
+        proseHasNonExportMarker = proseHas "/"
+    getColgroupSizes :: [Int] -> Prose -> [Int] --
+    getColgroupSizes ns prose = case ns of
+      [] -> []
+      [0] -> [1] --
+      acc@(latest : rest)
+        | proseHasColgroupStartMarker prose -> 1 : acc
+        | otherwise -> latest + 1 : rest
+      where
+        proseHasColgroupStartMarker :: Prose -> Bool
+        proseHasColgroupStartMarker = proseHas "<" --
+
+getTableCellsFromRow :: Table -> Int -> [Prose]
+getTableCellsFromRow table n =
+  hideMarkingCharInFirstColumn
+    . M.toList
+    $ M.filterWithKey (\(row, _col) _ -> row == n) table.grid
+  where
     hideMarkingCharInFirstColumn :: [((Int, Int), Prose)] -> [Prose]
     hideMarkingCharInFirstColumn = \case
       [] -> []
@@ -1053,86 +1090,99 @@ weaveTable lci table = do
         | prose == tableHorizontalLine -> [Prose []]
         | markingCharExistsInFirstColumn -> map snd cells
         | otherwise -> prose : map snd cells
-    markingCharExistsInFirstColumn = any (not . visibleColumn) firstColumnCells
-    tableCellsFromRow :: Int -> [Prose]
-    tableCellsFromRow n =
-      hideMarkingCharInFirstColumn
-        . M.toList
-        $ M.filterWithKey (\(row, _col) _ -> row == n) table.grid
-    rowMax = foldl' max 0 . map fst $ keys table.grid
-    rows rowNums = map tableCellsFromRow rowNums
-    columnNames = tableCellsFromRow headerRowIndex
-    firstColumnCells =
-      M.toList
-        $ M.filterWithKey (\(_row, col) _ -> col == 1) table.grid
-    headerRowIndex = fromMaybe 1 $ foldl' f Nothing firstColumnCells
-    f acc@(Just _) _ = acc
-    f acc cell@((row, _col), _)
-      | visibleColumn cell = Just row
-      | otherwise = acc
-    visibleColumn :: ((Int, Int), Prose) -> Bool
-    visibleColumn (_, prose) = case prose.unProse of
-      [] -> True
-      [PTokenStyledText styledText] ->
-        notElem styledText.body $ map T.singleton markingChars
-      _ -> True
-    visibleRow :: ((Int, Int), Prose) -> Bool
-    visibleRow (_, prose) = case prose.unProse of
-      [] -> True
-      [PTokenStyledText styledText] ->
-        notElem styledText.body $ map T.singleton markingCharsInvisible
-      _ -> True
-    visibleRows = filter (`notElem` invisibleRows) [(headerRowIndex + 1) .. rowMax]
-    invisibleRows = foldl' g [] firstColumnCells
-    g acc cell@((row, _col), _)
-      | visibleRow cell = acc
-      | otherwise = row : acc
-    getColgroups :: [Int]
-    getColgroups =
-      maybe
-        [rowMax]
-        (reverse . foldl' getColgroupStarts [0] . tableCellsFromRow)
-        getColgroupsRow
-    getColgroupStarts :: [Int] -> Prose -> [Int]
-    getColgroupStarts ns prose = case ns of
-      [] -> []
-      [0] -> [1]
-      acc@(latest : rest)
-        | proseHasColgroupStartMarker prose -> 1 : acc
-        | otherwise -> latest + 1 : rest
-    getColgroupsRow = foldl' h Nothing firstColumnCells
-    h :: Maybe Int -> ((Int, Int), Prose) -> Maybe Int
-    h acc ((row, _col), prose)
-      | isJust acc = acc
-      | proseHasNonExportMarker prose = Just row
-      | otherwise = acc
-    proseHas :: Text -> Prose -> Bool
-    proseHas prefix prose = case prose.unProse of
-      [] -> False
-      (firstPToken : _) -> case firstPToken of
-        PTokenStyledText styledText ->
-          (maskToStyles styledText.style == [])
-            && T.isPrefixOf prefix styledText.body
-        PTokenLink {}
-        PTokenMathFragment {}
-        PTokenCitation {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> False
-    proseHasColgroupStartMarker :: Prose -> Bool
-    proseHasColgroupStartMarker = proseHas "<"
-    proseHasNonExportMarker :: Prose -> Bool
-    proseHasNonExportMarker = proseHas "/"
+    markingCharExistsInFirstColumn =
+      any (not . tableCellLacks markingChars) $ getFirstColumnCells table --
+
+getFirstColumnCells :: Table -> [((Int, Int), Prose)]
+getFirstColumnCells table =
+  M.toList
+    $ M.filterWithKey (\(_row, col) _ -> col == 1) table.grid
+
+tableCellLacks :: [Char] -> ((Int, Int), Prose) -> Bool
+tableCellLacks chars (_, prose) = case prose.unProse of
+  [] -> True
+  [PTokenStyledText styledText] ->
+    notElem styledText.body $ map T.singleton chars
+  _ -> True
+
+getMaxRow :: Table -> Int
+getMaxRow table = foldl' max 0 . map fst $ keys table.grid
+
+getMaxCol :: Table -> Int
+getMaxCol table = foldl' max 0 . map snd $ keys table.grid
+
+proseHas :: Text -> Prose -> Bool
+proseHas prefix prose = case prose.unProse of
+  [] -> False
+  (firstPToken : _) -> case firstPToken of
+    PTokenStyledText styledText ->
+      (maskToStyles styledText.style == [])
+        && T.isPrefixOf prefix styledText.body
+    PTokenLink {}
+    PTokenMathFragment {}
+    PTokenCitation {}
+    PTokenDivStart {}
+    PTokenDivEnd {} -> False
+
+weaveTableRows :: Table -> HtmlWeaver ()
+weaveTableRows table = do
+  let columnNames = getTableCellsFromRow table $ getHeaderRowIndex table
+  weaveTableHead columnNames
+  weaveTableBody table columnNames
+
+weaveTableHead :: [Prose] -> HtmlWeaver ()
+weaveTableHead columnNames = do
+  thead_ [] $ do
+    tr_ [] $ do
+      forM_ columnNames $ \prose -> do
+        th_ [] $ weaveProse prose
+
+weaveTableBody :: Table -> [Prose] -> HtmlWeaver ()
+weaveTableBody table columnNames = do
+  tbody_ [] $ do
+    forM_ (getRows visibleRows) $ \row ->
+      if row == [Prose []] --
+        then do
+          tr_ [class_ "table-horizontal-line"] $ do
+            forM_ columnNames $ \_ -> do
+              td_ [] $ toHtml @Text ""
+        else do
+          tr_ [class_ "table-body-row"] $ do
+            forM_ row $ \prose -> do
+              let tdAttrs =
+                    if mostlyNumeric prose --
+                      then [class_ "table-cell-numeric"]
+                      else []
+              td_ tdAttrs $ weaveProse prose
+  where
+    getRows rowNums = map (getTableCellsFromRow table) rowNums
+    isVisible :: ((Int, Int), Prose) -> Bool --
+    isVisible = tableCellLacks markingCharsInvisible
+    visibleRows =
+      filter
+        (`notElem` invisibleRows)
+        [(getHeaderRowIndex table + 1) .. getMaxRow table]
+    invisibleRows = foldl' f [] $ getFirstColumnCells table
+      where
+        f acc tableCell@((row, _col), _)
+          | isVisible tableCell = acc
+          | otherwise = row : acc
     mostlyNumeric :: Prose -> Bool
     mostlyNumeric prose =
       let rawText = T.concat $ map extractText prose.unProse
+          extractText = \case
+            PTokenStyledText styledText -> styledText.body
+            _ -> ""
        in isNumericText rawText
-    extractText = \case
-      PTokenStyledText styledText -> styledText.body
-      PTokenLink {}
-      PTokenMathFragment {}
-      PTokenCitation {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> ""
+
+getHeaderRowIndex :: Table -> Int
+getHeaderRowIndex table =
+  fromMaybe 1 . foldl' f Nothing $ getFirstColumnCells table
+  where
+    f acc@(Just _) _ = acc
+    f acc tableCell@((row, _col), _)
+      | tableCellLacks markingChars tableCell = Just row
+      | otherwise = acc
 
 getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
 getRelativePathWithoutSymlinks src dest

@@ -390,6 +390,7 @@ import Network.URI
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
+    Char,
     Either (Left, Right),
     Eq,
     FilePath,
@@ -514,6 +515,18 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveMathFragmentStandalone>>
 <<f:weaveMathFragmentInline>>
 <<f:weaveTable>>
+<<f:weaveTableCaption>>
+<<f:weaveTableColumnGroups>>
+<<f:getTableCellsFromRow>>
+<<f:getFirstColumnCells>>
+<<f:tableCellLacks>>
+<<f:getMaxRow>>
+<<f:getMaxCol>>
+<<f:proseHas>>
+<<f:weaveTableRows>>
+<<f:weaveTableHead>>
+<<f:weaveTableBody>>
+<<f:getHeaderRowIndex>>
 <<f:getRelativePathWithoutSymlinks>>
 <<f:getRelativeCssPath>>
 <<f:getRelativeJsPath>>
@@ -3178,56 +3191,180 @@ weaveMathFragmentInline mathFragment =
 :END:
 
 [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][Tables]] are similar to figures, because they have some content (a table instead
-of an image), and also have a caption.
+of an image), and also have a caption. In this sense they are pretty simple. On
+the other hand, tables are necessarily verbose because of several reasons:
+
+  - HTML tables have multiple parts (e.g., the head and body, as well as the
+    caption). See [[f:weaveTableRows]].
+
+  - We want to add thicker lines between certain rows and columns, which means
+    we have to add in some logic to give special meaning to certain parts of the
+    table. This is done in [[f:weaveTableBody]] for the rows and
+    [[f:weaveTableColumnGroups]] for the columns.
+
+  - Org mode allows /marking characters/, which are not to be displayed in the
+    HTML output (they should be invisible). See [[f:weaveTableColumnGroups]]
+    [[(f:weaveTableColumnGroups-proseHasColgroupStartMarker)]].
+
+The starting point is [[f:weaveTable]] where we group together the table with its
+caption inside a ~<figure>~ element [[(f:weaveTable-figure)]]. We also weave the
+column groups ([[f:weaveTableColumnGroups]]) and rows ([[f:weaveTableRows]]).
 
 #+name: f:weaveTable
 #+begin_src haskell
 weaveTable :: LCI -> Table -> HtmlWeaver ()
 weaveTable lci table = do
-  let captionPrefix =
-        "Table "
-          <> lookupDefault "table-number-error" "__table_number" table.meta
+  -- (ref:f:weaveTable-figure)
   figure_ [id_ linkAnchor] $ do
-    figcaption_ [] $ do
-      wrapWith lci $ do
-        a_ [href_ $ "#" <> linkAnchor, class_ "self-link", class_ "caption-prefix"] $ do
-          toHtml captionPrefix
-        toHtml $ case table.caption.unProse of
-          [] -> "." :: Text
-          _ -> ". " :: Text
-        weaveProse table.caption
+    weaveTableCaption lci table linkAnchor
     table_ [] $ do
-      forM_ (zip [1 :: Int ..] getColgroups) $ \(groupIdx, numCols) -> do
-        let colgroupAttrs =
-              if groupIdx > 1
-                then [class_ "table-vertical-line-colgroup"]
-                else []
-        colgroup_ colgroupAttrs $ do
-          forM_ [1 .. numCols] $ \colNum -> do
-            if (colNum > 1)
-              then col_ [class_ "table-vertical-line-col"]
-              else col_ []
-      thead_ [] $ do
-        tr_ [] $ do
-          forM_ columnNames $ \prose -> do
-            th_ [] $ weaveProse prose
-      tbody_ [] $ do
-        forM_ (rows visibleRows) $ \row ->
-          if row == [Prose []]
-            then do
-              tr_ [class_ "table-horizontal-line"] $ do
-                forM_ columnNames $ \_ -> do
-                  td_ [] $ toHtml @Text ""
-            else do
-              tr_ [class_ "table-body-row"] $ do
-                forM_ row $ \prose -> do
-                  let tdAttrs =
-                        if mostlyNumeric prose
-                          then [class_ "table-cell-numeric"]
-                          else []
-                  td_ tdAttrs $ weaveProse prose
+      weaveTableColumnGroups table
+      weaveTableRows table
   where
     linkAnchor = getLinkAnchor Nothing $ CTable table
+#+end_src
+
+** Caption
+
+[[f:weaveTableCaption]] weaves just the caption portion of the table.
+
+#+name: f:weaveTableCaption
+#+begin_src haskell
+weaveTableCaption :: LCI -> Table -> Text -> HtmlWeaver ()
+weaveTableCaption lci table linkAnchor = do
+  figcaption_ [] $ do
+    wrapWith lci $ do
+      a_
+        [ href_ $ "#" <> linkAnchor,
+          class_ "self-link",
+          class_ "caption-prefix"
+        ]
+        $ do
+          let captionPrefix =
+                "Table "
+                  <> lookupDefault
+                    "table-number-error"
+                    "__table_number"
+                    table.meta
+          toHtml captionPrefix
+      toHtml $ case table.caption.unProse of
+        [] -> "." :: Text
+        _ -> ". " :: Text
+      weaveProse table.caption
+#+end_src
+
+** Column groups
+
+In the world of HTML tables, /column groups/ let you apply certain properties to
+entire columns. For us, we use column groups to set vertical line styles, if the
+user specified a ~<~ character to mark the start of a column group. The ~<~
+character is only read from a row containing the "do not export" marking
+character ~/~. See [[tbl:Marking characters]] for an example of how this is used in
+practice.
+
+#+name: f:weaveTableColumnGroups
+#+begin_src haskell
+weaveTableColumnGroups :: Table -> HtmlWeaver ()
+weaveTableColumnGroups table = do
+  forM_ (zip [1 :: Int ..] getColgroups) $ \(groupIdx, numCols) -> do
+    colgroup_ [] $ do
+      -- (ref:f:weaveTableColumnGroups-numCols)
+      forM_ [1 .. numCols] $ \colNum -> do
+        let attrs
+              | colNum == 1 && groupIdx > 1 =
+                  [class_ "table-vertical-thick-line-colgroup"]
+              | colNum > 1 =
+                  [class_ "table-vertical-thin-line-col"]
+              | otherwise = []
+        col_ attrs
+  where
+    getColgroups :: [Int] -- (ref:f:weaveTableColumnGroups-getColgroups)
+    getColgroups =
+      maybe
+        [getMaxCol table]
+        ( reverse -- (ref:f:weaveTableColumnGroups-colgroups-helper)
+            . foldl' getColgroupSizes [0]
+            . getTableCellsFromRow table
+        )
+        getColgroupsRow
+    getColgroupsRow = foldl' findSlash Nothing $ getFirstColumnCells table -- (ref:f:weaveTableColumnGroups-getColgroupsRow)
+      where
+        findSlash :: Maybe Int -> ((Int, Int), Prose) -> Maybe Int
+        findSlash acc ((row, _col), prose)
+          | isJust acc = acc
+          | proseHasNonExportMarker prose = Just row
+          | otherwise = acc
+        proseHasNonExportMarker :: Prose -> Bool
+        proseHasNonExportMarker = proseHas "/"
+    getColgroupSizes :: [Int] -> Prose -> [Int] -- (ref:f:weaveTableColumnGroups-sizes)
+    getColgroupSizes ns prose = case ns of
+      [] -> []
+      [0] -> [1] -- (ref:f:weaveTableColumnGroups-initial-term)
+      acc@(latest : rest)
+        | proseHasColgroupStartMarker prose -> 1 : acc
+        | otherwise -> latest + 1 : rest
+      where
+        proseHasColgroupStartMarker :: Prose -> Bool
+        proseHasColgroupStartMarker = proseHas "<" -- (ref:f:weaveTableColumnGroups-proseHasColgroupStartMarker)
+#+end_src
+
+We start with ~getColgroups~ [[(f:weaveTableColumnGroups-getColgroups)]], which
+ultimately returns a list of column group sizes (each integer being how many
+columns are in that group). By default we assume that we only have 1 column
+group (which encompasses all columns in the table, via [[f:getMaxCol]]). However, if
+we can detect a special row which has a slash (~/~) in the first column and which
+has column group start markers (~<~) then we use that to generate the list of
+column group sizes.
+
+#+name: f:getMaxCol
+#+begin_src haskell
+getMaxCol :: Table -> Int
+getMaxCol table = foldl' max 0 . map snd $ keys table.grid
+#+end_src
+
+[[f:proseHas]] checks whether a table cell's prose has a particular piece of text.
+
+#+name: f:proseHas
+#+begin_src haskell
+proseHas :: Text -> Prose -> Bool
+proseHas prefix prose = case prose.unProse of
+  [] -> False
+  (firstPToken : _) -> case firstPToken of
+    PTokenStyledText styledText ->
+      (maskToStyles styledText.style == [])
+        && T.isPrefixOf prefix styledText.body
+    PTokenLink {}
+    PTokenMathFragment {}
+    PTokenCitation {}
+    PTokenDivStart {}
+    PTokenDivEnd {} -> False
+#+end_src
+
+We get the row with the slash in it via ~getColgroupsRow~
+[[(f:weaveTableColumnGroups-getColgroupsRow)]], which looks at all the cells in the
+very first column with [[f:getFirstColumnCells]].
+
+#+name: f:getFirstColumnCells
+#+begin_src haskell
+getFirstColumnCells :: Table -> [((Int, Int), Prose)]
+getFirstColumnCells table =
+  M.toList
+    $ M.filterWithKey (\(_row, col) _ -> col == 1) table.grid
+#+end_src
+
+This row is then fed into the helper function
+[[(f:weaveTableColumnGroups-colgroups-helper)]] which uses [[f:getTableCellsFromRow]] to
+get the (visible) cells from the row we're interested in (it drops the cell in
+the first column if it has a making character in it).
+
+#+name: f:getTableCellsFromRow
+#+begin_src haskell
+getTableCellsFromRow :: Table -> Int -> [Prose]
+getTableCellsFromRow table n =
+  hideMarkingCharInFirstColumn
+    . M.toList
+    $ M.filterWithKey (\(row, _col) _ -> row == n) table.grid
+  where
     hideMarkingCharInFirstColumn :: [((Int, Int), Prose)] -> [Prose]
     hideMarkingCharInFirstColumn = \case
       [] -> []
@@ -3235,107 +3372,167 @@ weaveTable lci table = do
         | prose == tableHorizontalLine -> [Prose []]
         | markingCharExistsInFirstColumn -> map snd cells
         | otherwise -> prose : map snd cells
-    markingCharExistsInFirstColumn = any (not . visibleColumn) firstColumnCells
-    tableCellsFromRow :: Int -> [Prose]
-    tableCellsFromRow n =
-      hideMarkingCharInFirstColumn
-        . M.toList
-        $ M.filterWithKey (\(row, _col) _ -> row == n) table.grid
-    rowMax = foldl' max 0 . map fst $ keys table.grid
-    rows rowNums = map tableCellsFromRow rowNums
-    columnNames = tableCellsFromRow headerRowIndex
-    firstColumnCells =
-      M.toList
-        $ M.filterWithKey (\(_row, col) _ -> col == 1) table.grid
-    headerRowIndex = fromMaybe 1 $ foldl' f Nothing firstColumnCells
-    f acc@(Just _) _ = acc
-    f acc cell@((row, _col), _)
-      | visibleColumn cell = Just row
-      | otherwise = acc
-    visibleColumn :: ((Int, Int), Prose) -> Bool
-    visibleColumn (_, prose) = case prose.unProse of
-      [] -> True
-      [PTokenStyledText styledText] ->
-        notElem styledText.body $ map T.singleton markingChars
-      _ -> True
-    visibleRow :: ((Int, Int), Prose) -> Bool
-    visibleRow (_, prose) = case prose.unProse of
-      [] -> True
-      [PTokenStyledText styledText] ->
-        notElem styledText.body $ map T.singleton markingCharsInvisible
-      _ -> True
-    visibleRows = filter (`notElem` invisibleRows) [(headerRowIndex + 1) .. rowMax]
-    invisibleRows = foldl' g [] firstColumnCells
-    g acc cell@((row, _col), _)
-      | visibleRow cell = acc
-      | otherwise = row : acc
-    getColgroups :: [Int]
-    getColgroups =
-      maybe
-        [rowMax]
-        (reverse . foldl' getColgroupStarts [0] . tableCellsFromRow)
-        getColgroupsRow
-    getColgroupStarts :: [Int] -> Prose -> [Int]
-    getColgroupStarts ns prose = case ns of
-      [] -> []
-      [0] -> [1]
-      acc@(latest : rest)
-        | proseHasColgroupStartMarker prose -> 1 : acc
-        | otherwise -> latest + 1 : rest
-    getColgroupsRow = foldl' h Nothing firstColumnCells
-    h :: Maybe Int -> ((Int, Int), Prose) -> Maybe Int
-    h acc ((row, _col), prose)
-      | isJust acc = acc
-      | proseHasNonExportMarker prose = Just row
-      | otherwise = acc
-    proseHas :: Text -> Prose -> Bool
-    proseHas prefix prose = case prose.unProse of
-      [] -> False
-      (firstPToken : _) -> case firstPToken of
-        PTokenStyledText styledText ->
-          (maskToStyles styledText.style == [])
-            && T.isPrefixOf prefix styledText.body
-        PTokenLink {}
-        PTokenMathFragment {}
-        PTokenCitation {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> False
-    proseHasColgroupStartMarker :: Prose -> Bool
-    proseHasColgroupStartMarker = proseHas "<"
-    proseHasNonExportMarker :: Prose -> Bool
-    proseHasNonExportMarker = proseHas "/"
+    markingCharExistsInFirstColumn =
+      any (not . tableCellLacks markingChars) $ getFirstColumnCells table -- (ref:f:getTableCellsFromRow-markingCharsExistence)
+#+end_src
+
+[[f:tableCellLacks]] just checks whether the column does not have any of the given
+marking characters. In [[(f:getTableCellsFromRow-markingCharsExistence)]], we use it
+to detect special marking characters like the slash ~/~ or column group start
+marker ~<~.
+
+#+name: f:tableCellLacks
+#+begin_src haskell
+tableCellLacks :: [Char] -> ((Int, Int), Prose) -> Bool
+tableCellLacks chars (_, prose) = case prose.unProse of
+  [] -> True
+  [PTokenStyledText styledText] ->
+    notElem styledText.body $ map T.singleton chars
+  _ -> True
+#+end_src
+
+Back to [[f:weaveTableColumnGroups]], ~getColgroupSizes~
+[[(f:weaveTableColumnGroups-sizes)]] simply looks for the ~<~ character to see if we
+should create a new column group; otherwise it simply increments the column
+group size. We start out with ~[0]~ as the initial term and immediately compute it
+as ~[1]~ [[(f:weaveTableColumnGroups-initial-term)]] so that we can skip the first
+column (because the ~<~ is optional for the very first column group).
+
+We draw both thick and thin vertical lines, depending on the situation. Thin
+lines separate columns, and thick lines separate column groups. We use the
+border on the left of a table cell to color in the vertical line
+[[(css:Tables-border-left-thick)]] [[(css:Tables-border-left-thin)]], which means we'll
+have to color in the first column of a column group to mark it as a thick
+vertical line. We use 1-based indexing because it feels slightly more intuitive
+when we have variables like ~numCols~ [[(f:weaveTableColumnGroups-numCols)]] to encode
+the /total/ number of columns.
+
+** Rows
+
+The first row is the called the table "head" (for ~<thead>~) and the rest are the
+"body" (for ~<tbody>~).
+
+#+name: f:weaveTableRows
+#+begin_src haskell
+weaveTableRows :: Table -> HtmlWeaver ()
+weaveTableRows table = do
+  let columnNames = getTableCellsFromRow table $ getHeaderRowIndex table
+  weaveTableHead columnNames
+  weaveTableBody table columnNames
+#+end_src
+
+The head row contains the names of each column.
+
+#+name: f:weaveTableHead
+#+begin_src haskell
+weaveTableHead :: [Prose] -> HtmlWeaver ()
+weaveTableHead columnNames = do
+  thead_ [] $ do
+    tr_ [] $ do
+      forM_ columnNames $ \prose -> do
+        th_ [] $ weaveProse prose
+#+end_src
+
+The table body is more complicated, because of a few things:
+
+  - checking whether the row is just a horizontal line [[(f:weaveTableBody-hline)]],
+
+  - checking whether the row is visible at all [[(f:weaveTableBody-visibleRow)]]
+    (the marking characters in [[id:3b072b1b-c63e-4fca-ab56-9388d11aa3c0::f:markingCharsInvisible][f:markingCharsInvisible]] render the entire row
+    invisible), and
+
+  - checking whether the table cell is mostly numeric in nature
+    [[(f:weaveTableBody-numeric)]], in which case we add the ~table-cell-numeric~
+    class to make the text inside the cell right-aligned (so that the digits of
+    the same unit (tens, hundreds, etc) line up vertically with other numeric
+    cells in the same column).
+
+#+name: f:weaveTableBody
+#+begin_src haskell
+weaveTableBody :: Table -> [Prose] -> HtmlWeaver ()
+weaveTableBody table columnNames = do
+  tbody_ [] $ do
+    forM_ (getRows visibleRows) $ \row ->
+      if row == [Prose []] -- (ref:f:weaveTableBody-hline)
+        then do
+          tr_ [class_ "table-horizontal-line"] $ do
+            forM_ columnNames $ \_ -> do
+              td_ [] $ toHtml @Text ""
+        else do
+          tr_ [class_ "table-body-row"] $ do
+            forM_ row $ \prose -> do
+              let tdAttrs =
+                    if mostlyNumeric prose -- (ref:f:weaveTableBody-numeric)
+                      then [class_ "table-cell-numeric"]
+                      else []
+              td_ tdAttrs $ weaveProse prose
+  where
+    getRows rowNums = map (getTableCellsFromRow table) rowNums
+    isVisible :: ((Int, Int), Prose) -> Bool -- (ref:f:weaveTableBody-visibleRow)
+    isVisible = tableCellLacks markingCharsInvisible
+    visibleRows =
+      filter
+        (`notElem` invisibleRows)
+        [(getHeaderRowIndex table + 1) .. getMaxRow table]
+    invisibleRows = foldl' f [] $ getFirstColumnCells table
+      where
+        f acc tableCell@((row, _col), _)
+          | isVisible tableCell = acc
+          | otherwise = row : acc
     mostlyNumeric :: Prose -> Bool
     mostlyNumeric prose =
       let rawText = T.concat $ map extractText prose.unProse
+          extractText = \case
+            PTokenStyledText styledText -> styledText.body
+            _ -> ""
        in isNumericText rawText
-    extractText = \case
-      PTokenStyledText styledText -> styledText.body
-      PTokenLink {}
-      PTokenMathFragment {}
-      PTokenCitation {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> ""
 #+end_src
 
-The ~headerRowIndex~ is calculated by examining the table cells in the first
-column, to avoid any cells that look like the special ~markingCharacters~.
+We get all visible rows by looking at all rows (up to the maximum (bottommost)
+row with [[f:getMaxRow]]), and checking with ~isVisible~
+[[(f:weaveTableBody-visibleRow)]].
+
+#+name: f:getMaxRow
+#+begin_src haskell
+getMaxRow :: Table -> Int
+getMaxRow table = foldl' max 0 . map fst $ keys table.grid
+#+end_src
+
+[[f:getHeaderRowIndex]] gets the index of the header row by searching for the first
+row which lacks [[id:3b072b1b-c63e-4fca-ab56-9388d11aa3c0::f:markingChars][f:markingChars]] in the first column; it's not simply 1 (using
+1-based indexing) because there could be invisible rows just above the header.
+
+#+name: f:getHeaderRowIndex
+#+begin_src haskell
+getHeaderRowIndex :: Table -> Int
+getHeaderRowIndex table =
+  fromMaybe 1 . foldl' f Nothing $ getFirstColumnCells table
+  where
+    f acc@(Just _) _ = acc
+    f acc tableCell@((row, _col), _)
+      | tableCellLacks markingChars tableCell = Just row
+      | otherwise = acc
+#+end_src
 
 Below is a table with some special marking characters on the very first column.
 This demonstrates some of the complexities around ~markingCharacters~.
 
 #+name: tbl:Marking characters
 #+caption: Marking characters should be absent if you're reading this from HTML.
-| ! | A        | B        | C        |
-|   | Header A | Header B | Header C |
-|---+----------+----------+----------|
-| ^ | a        | b        | c        |
-| _ | a        | b        | c        |
-| $ | a        | b        | c        |
-| # | a        | b        | c        |
-| * | a        | b        | c        |
-| / | <        | <        |          |
-|---+----------+----------+----------|
-|   |          |          | foo      |
+| ! | A        | B        | C        | D        |
+|   | Header A | Header B | Header C | Header D |
+|---+----------+----------+----------+----------|
+| ^ | a        | b        | c        | d        |
+| _ | a        | b        | c        | d        |
+| $ | a        | b        | c        | d        |
+| # | a        | b        | c        | d        |
+| * | a        | b        | c        | d        |
+| / | <        | <        |          |          |
+|---+----------+----------+----------+----------|
+|   |          |          | foo      |          |
+|   |          |          | bar      |          |
+|---+----------+----------+----------+----------|
+|   |          |          | baz      |          |
 
 ** CSS
 :PROPERTIES:
@@ -3360,16 +3557,17 @@ table ? do
   tbody ? do
     tr ? do
       ".table-horizontal-line" & do
-        borderTop (px 1) solid colorCodeBorder
+        borderTop (px 2) solid colorCodeBorder
         ev padding (px 0)
         td ? do
           backgroundColor colorCodeBorder
           yx padding (px 0) (px 0)
       ".table-body-row" & do
         borderTop (px 1) solid colorCodeBorder
-".table-vertical-line-colgroup" & do
-  borderLeft (px 3) solid colorCodeBorder
-".table-vertical-line-col" & do
+".table-vertical-thick-line-colgroup" & do
+  borderLeft (px 2) solid colorCodeBorder -- (ref:css:Tables-border-left-thick)
+".table-vertical-thin-line-col" & do
+  -- (ref:css:Tables-border-left-thin)
   borderLeft (px 1) solid colorCodeBorder
 #+end_src
 
