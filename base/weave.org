@@ -5492,6 +5492,29 @@ weaveNamedCellsIndex = do
               weaveProse prose
 #+end_src
 
+** CSS
+:PROPERTIES:
+:ID:       6db7e0d7-67e1-45c1-9908-a8fb055ec535
+:END:
+
+The sidebar should be similar to the TOC, in that it remains sticky in a fixed
+position, while still being independently scrollable from the main content. This
+is done by reusing the settings from [[css:Column under navbar]].
+
+#+name: css:Sidebar
+#+begin_src haskell
+aside ? do
+  "grid-area" -: "sidebar"
+  <<css:Column under navbar>>
+  fontSans
+  borderLeft (px 1) solid colorCodeBorder
+  display flex
+  flexDirection column
+  ol ? do
+    paddingLeft $ rem 1
+    marginTop $ px 0
+#+end_src
+
 * Footer
 
 The footer is the element at the very bottom of the sidebar. This is not to be
@@ -5831,29 +5854,6 @@ main_ ? do
   paddingLeft (px 50)
   p # ".main-bottom-spacer" ? do
     yx margin (px 40) 0
-#+end_src
-
-** Sidebar
-:PROPERTIES:
-:ID:       6db7e0d7-67e1-45c1-9908-a8fb055ec535
-:END:
-
-The sidebar should be similar to the TOC, in that it remains sticky in a fixed
-position, while still being independently scrollable from the main content. This
-is done by reusing the settings from [[css:Column under navbar]].
-
-#+name: css:Sidebar
-#+begin_src haskell
-aside ? do
-  "grid-area" -: "sidebar"
-  <<css:Column under navbar>>
-  fontSans
-  borderLeft (px 1) solid colorCodeBorder
-  display flex
-  flexDirection column
-  ol ? do
-    paddingLeft $ rem 1
-    marginTop $ px 0
 #+end_src
 
 ** Document metadata
