@@ -956,8 +956,12 @@ weaveFigure lci figure = do
   figure_ [id_ linkAnchor] $ do
     figcaption_ [] $ do
       wrapWith lci $ do
-        a_ [href_ $ "#" <> linkAnchor, class_ "self-link", class_ "caption-prefix"] $ do
-          toHtml captionPrefix
+        a_
+          [ href_ $ "#" <> linkAnchor,
+            class_ "self-link",
+            class_ "caption-prefix"
+          ]
+          $ toHtml captionPrefix
         toHtml $ case figure.caption.unProse of
           [] -> "." :: Text
           _ -> ". " :: Text
@@ -993,7 +997,8 @@ weaveMathFragmentStandalone lci mathFragment = do
     linkAnchor = getLinkAnchor Nothing $ CMathFragment mathFragment
 
 weaveMathFragmentInline :: MathFragment -> HtmlWeaver ()
-weaveMathFragmentInline mathFragment = "\\(" <> toHtml mathFragment.body <> "\\)"
+weaveMathFragmentInline mathFragment =
+  "\\(" <> toHtml mathFragment.body <> "\\)"
 
 weaveTable :: LCI -> Table -> HtmlWeaver ()
 weaveTable lci table = do

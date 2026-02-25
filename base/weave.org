@@ -3079,8 +3079,12 @@ weaveFigure lci figure = do
   figure_ [id_ linkAnchor] $ do
     figcaption_ [] $ do
       wrapWith lci $ do
-        a_ [href_ $ "#" <> linkAnchor, class_ "self-link", class_ "caption-prefix"] $ do
-          toHtml captionPrefix
+        a_
+          [ href_ $ "#" <> linkAnchor,
+            class_ "self-link",
+            class_ "caption-prefix"
+          ]
+          $ toHtml captionPrefix
         toHtml $ case figure.caption.unProse of
           [] -> "." :: Text
           _ -> ". " :: Text
@@ -3164,7 +3168,8 @@ identified (and hence linkable) by an ~id~ HTML attribute.
 #+name: f:weaveMathFragmentInline
 #+begin_src haskell
 weaveMathFragmentInline :: MathFragment -> HtmlWeaver ()
-weaveMathFragmentInline mathFragment = "\\(" <> toHtml mathFragment.body <> "\\)"
+weaveMathFragmentInline mathFragment =
+  "\\(" <> toHtml mathFragment.body <> "\\)"
 #+end_src
 
 * Tables
