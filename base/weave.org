@@ -5247,6 +5247,56 @@ The reliance on ~originObjectPath~ assumes that the archive has object paths tha
 are relative to the repository root. It could be that this is not true, but we
 don't bother to handle that edge case here.
 
+** CSS
+:PROPERTIES:
+:ID:       35d768c0-3e2f-498a-8437-e4137c4500ba
+:END:
+
+#+name: css:navbar
+#+begin_src haskell
+div # ".navbar" ? do
+  "grid-area" -: "navbar"
+  height $ rem 4
+  borderBottom (px 1) solid colorCodeBorder
+  backgroundColor colorBg
+  <<css:breadcrumbs>>
+#+end_src
+
+The total height of the navbar is \(3em + 1px\) because of the 1-pixel border at
+the bottom.
+
+#+name: css:navbar-height
+#+begin_src txt
+calc(4rem + 1px)
+#+end_src
+
+The navbar causes a problem for links that point to elements inside the page,
+because the browser will normally go to the target element by putting it at the
+top of the page, but the navbar will sit on top of it. So we have to adjust it.
+
+#+name: css:navbar-link-target-adjustment
+#+begin_src txt
+calc(4rem + 1px + 10px)
+#+end_src
+
+*** Breadcrumbs
+:PROPERTIES:
+:ID:       649018db-d088-4a08-920c-0d64a0be27cd
+:END:
+
+The breadcrumbs ([[f:weaveBreadcrumbs]]) should be large and prominent at the top of
+the page.
+
+#+name: css:breadcrumbs
+#+begin_src haskell
+div # ".breadcrumbs" ? do
+  fontSans
+  fontSize $ rem 1.6
+  margin (px 12) 0 (px 10) (px 20)
+span # ".breadcrumb-separator" ? do
+  color colorBreadcrumbSeparator
+#+end_src
+
 * Sidebar
 
 The sidebar shows additional information about the current document.
@@ -5769,56 +5819,6 @@ expectCiteprocResult path expected = do
 :PROPERTIES:
 :ID:       8017befd-7628-46cf-a090-72fdbb00fb5a
 :END:
-
-** Navigation bar
-:PROPERTIES:
-:ID:       35d768c0-3e2f-498a-8437-e4137c4500ba
-:END:
-
-#+name: css:navbar
-#+begin_src haskell
-div # ".navbar" ? do
-  "grid-area" -: "navbar"
-  height $ rem 4
-  borderBottom (px 1) solid colorCodeBorder
-  backgroundColor colorBg
-  <<css:breadcrumbs>>
-#+end_src
-
-The total height of the navbar is \(3em + 1px\) because of the 1-pixel border at
-the bottom.
-
-#+name: css:navbar-height
-#+begin_src txt
-calc(4rem + 1px)
-#+end_src
-
-The navbar causes a problem for links that point to elements inside the page,
-because the browser will normally go to the target element by putting it at the
-top of the page, but the navbar will sit on top of it. So we have to adjust it.
-
-#+name: css:navbar-link-target-adjustment
-#+begin_src txt
-calc(4rem + 1px + 10px)
-#+end_src
-
-*** Breadcrumbs
-:PROPERTIES:
-:ID:       649018db-d088-4a08-920c-0d64a0be27cd
-:END:
-
-The breadcrumbs ([[f:weaveBreadcrumbs]]) should be large and prominent at the top of
-the page.
-
-#+name: css:breadcrumbs
-#+begin_src haskell
-div # ".breadcrumbs" ? do
-  fontSans
-  fontSize $ rem 1.6
-  margin (px 12) 0 (px 10) (px 20)
-span # ".breadcrumb-separator" ? do
-  color colorBreadcrumbSeparator
-#+end_src
 
 ** Main content
 
