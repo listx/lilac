@@ -3306,6 +3306,42 @@ This demonstrates some of the complexities around ~markingCharacters~.
 |---+----------+----------+----------|
 |   |          |          | foo      |
 
+** CSS
+:PROPERTIES:
+:ID:       b7175bc2-b545-4abf-8660-df9e43b3adff
+:END:
+
+#+name: css:Tables
+#+begin_src haskell
+table ? do
+  fontSans
+  borderCollapse collapse
+  border (px 2) solid colorCodeBorder
+  yx margin (px 0) auto
+  th ? do
+    yx padding (px 4) (px 8)
+  td ? do
+    yx padding (px 4) (px 8)
+    ".table-cell-numeric" & do
+      textAlign $ alignSide sideRight
+  thead ? do
+    backgroundColor colorCodeBg
+  tbody ? do
+    tr ? do
+      ".table-horizontal-line" & do
+        borderTop (px 1) solid colorCodeBorder
+        ev padding (px 0)
+        td ? do
+          backgroundColor colorCodeBorder
+          yx padding (px 0) (px 0)
+      ".table-body-row" & do
+        borderTop (px 1) solid colorCodeBorder
+".table-vertical-line-colgroup" & do
+  borderLeft (px 3) solid colorCodeBorder
+".table-vertical-line-col" & do
+  borderLeft (px 1) solid colorCodeBorder
+#+end_src
+
 * Footnotes
 :PROPERTIES:
 :ID:       c3562660-a9ff-499d-9b10-c69bcba7f105
@@ -5724,42 +5760,6 @@ footer ? do
 #+name: css:Footer height
 #+begin_src txt
 4rem
-#+end_src
-
-** Tables
-:PROPERTIES:
-:ID:       b7175bc2-b545-4abf-8660-df9e43b3adff
-:END:
-
-#+name: css:Tables
-#+begin_src haskell
-table ? do
-  fontSans
-  borderCollapse collapse
-  border (px 2) solid colorCodeBorder
-  yx margin (px 0) auto
-  th ? do
-    yx padding (px 4) (px 8)
-  td ? do
-    yx padding (px 4) (px 8)
-    ".table-cell-numeric" & do
-      textAlign $ alignSide sideRight
-  thead ? do
-    backgroundColor colorCodeBg
-  tbody ? do
-    tr ? do
-      ".table-horizontal-line" & do
-        borderTop (px 1) solid colorCodeBorder
-        ev padding (px 0)
-        td ? do
-          backgroundColor colorCodeBorder
-          yx padding (px 0) (px 0)
-      ".table-body-row" & do
-        borderTop (px 1) solid colorCodeBorder
-".table-vertical-line-colgroup" & do
-  borderLeft (px 3) solid colorCodeBorder
-".table-vertical-line-col" & do
-  borderLeft (px 1) solid colorCodeBorder
 #+end_src
 
 ** Footnotes
