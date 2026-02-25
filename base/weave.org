@@ -5347,6 +5347,26 @@ weaveFooter = do
           toHtml @Text "Lilac"
 #+end_src
 
+** CSS
+
+#+name: css:Footer
+#+begin_src haskell
+footer ? do
+  marginLeft (px 20)
+  marginRight (px 20)
+  marginTop auto
+  div # ".lilac-stamp" ? do
+    textAlign $ alignSide sideRight
+    fontSans
+    fontSize $ rem 0.9
+    marginBottom (px 10)
+#+end_src
+
+#+name: css:Footer height
+#+begin_src txt
+4rem
+#+end_src
+
 * Testing framework
 
 The tests here use Org files as input. The output are HTML documents. For the
@@ -5777,26 +5797,6 @@ aside ? do
   ol ? do
     paddingLeft $ rem 1
     marginTop $ px 0
-#+end_src
-
-** Footer
-
-#+name: css:Footer
-#+begin_src haskell
-footer ? do
-  marginLeft (px 20)
-  marginRight (px 20)
-  marginTop auto
-  div # ".lilac-stamp" ? do
-    textAlign $ alignSide sideRight
-    fontSans
-    fontSize $ rem 0.9
-    marginBottom (px 10)
-#+end_src
-
-#+name: css:Footer height
-#+begin_src txt
-4rem
 #+end_src
 
 ** Glossary terms
