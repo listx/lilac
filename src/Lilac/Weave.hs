@@ -1057,7 +1057,8 @@ weaveTableColumnGroups table = do
             . getTableCellsFromRow table
         )
         getColgroupsRow
-    getColgroupsRow = foldl' findSlash Nothing $ getFirstColumnCells table --
+    getColgroupsRow =
+      foldl' findSlash Nothing $ getFirstColumnCells table --
       where
         findSlash :: Maybe Int -> ((Int, Int), Prose) -> Maybe Int
         findSlash acc ((row, _col), prose)
@@ -1240,13 +1241,23 @@ weaveFootnote :: LCI -> Footnote -> HtmlWeaver ()
 weaveFootnote lci footnote = do
   weaveConf <- ask
   if
-    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just (footnoteNumber, referrerLCI) <- lookup footnote.name originObj.orgDoc.footnoteRefs -> do
-        p_ [class_ "footnote-definition", id_ ("footnote-" <> footnote.name)] $ do
-          wrapWith lci $ do
-            span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
-            weaveProse footnote.body
-            weaveFootnoteBacklink referrerLCI --
+    | Just originObj <-
+        lookup weaveConf.originObjectPath weaveConf.archive.objects,
+      Just (footnoteNumber, referrerLCI) <-
+        lookup footnote.name originObj.orgDoc.footnoteRefs -> do
+        p_
+          [ class_ "footnote-definition",
+            id_ ("footnote-" <> footnote.name)
+          ]
+          $ do
+            wrapWith lci $ do
+              span_
+                [class_ "footnote-number"]
+                . toHtml
+                $ T.show footnoteNumber
+                <> ". "
+              weaveProse footnote.body
+              weaveFootnoteBacklink referrerLCI --
     | otherwise -> pure ()
 
 weaveFootnoteBacklink :: LCI -> HtmlWeaver ()

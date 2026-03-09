@@ -3287,7 +3287,8 @@ weaveTableColumnGroups table = do
             . getTableCellsFromRow table
         )
         getColgroupsRow
-    getColgroupsRow = foldl' findSlash Nothing $ getFirstColumnCells table -- (ref:f:weaveTableColumnGroups-getColgroupsRow)
+    getColgroupsRow =
+      foldl' findSlash Nothing $ getFirstColumnCells table -- (ref:f:weaveTableColumnGroups-getColgroupsRow)
       where
         findSlash :: Maybe Int -> ((Int, Int), Prose) -> Maybe Int
         findSlash acc ((row, _col), prose)
@@ -3576,7 +3577,7 @@ table ? do
 :ID:       c3562660-a9ff-499d-9b10-c69bcba7f105
 :END:
 
-Footnote definitions are just paragraphs, with a leading number.
+Footnote definitions ([[id:4127feee-755d-430e-8fef-192e95143790::data:Footnote][data:Footnote]]) are just paragraphs, with a leading number.
 
 #+name: f:weaveFootnote
 #+begin_src haskell
@@ -3584,20 +3585,30 @@ weaveFootnote :: LCI -> Footnote -> HtmlWeaver ()
 weaveFootnote lci footnote = do
   weaveConf <- ask
   if
-    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just (footnoteNumber, referrerLCI) <- lookup footnote.name originObj.orgDoc.footnoteRefs -> do
-        p_ [class_ "footnote-definition", id_ ("footnote-" <> footnote.name)] $ do
-          wrapWith lci $ do
-            span_ [class_ "footnote-number"] . toHtml $ T.show footnoteNumber <> ". "
-            weaveProse footnote.body
-            weaveFootnoteBacklink referrerLCI -- (ref:footnote-backlink)
+    | Just originObj <-
+        lookup weaveConf.originObjectPath weaveConf.archive.objects,
+      Just (footnoteNumber, referrerLCI) <-
+        lookup footnote.name originObj.orgDoc.footnoteRefs -> do
+        p_
+          [ class_ "footnote-definition",
+            id_ ("footnote-" <> footnote.name)
+          ]
+          $ do
+            wrapWith lci $ do
+              span_
+                [class_ "footnote-number"]
+                . toHtml
+                $ T.show footnoteNumber
+                <> ". "
+              weaveProse footnote.body
+              weaveFootnoteBacklink referrerLCI -- (ref:footnote-backlink)
     | otherwise -> pure ()
 #+end_src
 
 At [[(footnote-backlink)]] we try to add a link back to the place (~referrerLCI~)
 where we first made a reference to this footnote definition. The
-[[f:weaveFootnoteBacklink]] function just tries to find the cell index in the
-current document, and if it is found, links to that cell.
+[[f:weaveFootnoteBacklink]] function tries to find the cell index in the current
+document, and if it is found, links to that cell.
 
 #+name: f:weaveFootnoteBacklink
 #+begin_src haskell
