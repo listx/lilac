@@ -3686,7 +3686,8 @@ weaveGlossaryTerm lci glossaryTerm = do
       dlEnd :: HtmlWeaver ()
       dlEnd = toHtmlRaw @Text "</dl>"
       isGlossaryTerm lci' -- (ref:isGlossaryTerm)
-        | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+        | Just originObj <-
+            lookup weaveConf.originObjectPath weaveConf.archive.objects,
           Just internalCell <- originObj.orgDoc.cells !!? lci'.unLCI,
           CGlossaryTerm _ <- internalCell =
             True
@@ -3713,15 +3714,16 @@ weaveGlossaryTerm lci glossaryTerm = do
 We don't wrap everything inside a ~<dl>~ tag because it may be the case that many
 more glossary terms exist after this (current) cell being woven. In that case,
 we want to close off the ~<dl>~ only at the very end. That's what [[(use-dlStart)]]
-and [[(use-dlEnd)]] are for. The ~isGlossaryTerm~ helper at [[(isGlossaryTerm)]] checks if the
-given cell index points to a glossary term cell inside the
-current object being woven.
+and [[(use-dlEnd)]] are for. The ~isGlossaryTerm~ helper [[(isGlossaryTerm)]] checks if
+the given cell index points to a glossary term cell inside the current object
+being woven.
 
 The ~dlStart~ and ~dlEnd~ bits don't really mean much if we have glossary terms
 inside list items, because each list item marker in between each item will break
 up the continuity of glossary terms. So we'll end up with multiple singleton
 description lists (each with just one glossary term in it) instead of just one
-description list tag.
+description list tag with multiple terms. This is not the most elegant result,
+but it is what it is.
 
 For example, look at the HTML for the following:
 
@@ -3749,7 +3751,8 @@ weaveGlossary :: Bool -> HtmlWeaver ()
 weaveGlossary isGlobal = do
   weaveConf <- ask
   if
-    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects -> do
+    | Just originObj <-
+        lookup weaveConf.originObjectPath weaveConf.archive.objects -> do
         let terms :: [(LCI, GPath)]
             terms
               | isGlobal =
@@ -3774,7 +3777,7 @@ weaveGlossary isGlobal = do
 Sorting of glossary terms means sorting what's visible for the human user. So
 for links, it means only using the display name, not the target of the link
 which may have a long (random) UUID. This means using a custom comparing
-function for the prose at [[(glossary-term-compare-visible)]], to remove all links
+function for the prose [[(glossary-term-compare-visible)]], to remove all links
 so that we only use the display text of links. We can do this with
 [[id:730ad104-52c9-49df-bbb9-66d92363bfc1::f:stripLinks][f:stripLinks]], just like we did for [[f:getLinkAnchor]], in [[f:toNormalizedText]].
 
@@ -3854,10 +3857,8 @@ multiple identical terms (these are not allowed within a single document).
 
 In contrast, [[(external-term)]] weaves external terms (terms that are defined in
 /another/ document). These may need disambiguation, so we weave the
-~externalOrgDocName~ at [[(external-doc-name)]]. Getting the ~externalOrgDocName~ (and
+~externalOrgDocName~ [[(external-doc-name)]]. Getting the ~externalOrgDocName~ (and
 the link to it) is handled by [[f:getRelativeOrgDocCellLink]].
-
-FIXME: Proofread this and also the part in [[f:weaveBacklinks]] that uses this.
 
 #+name: f:getRelativeOrgDocCellLink
 #+begin_src haskell
@@ -3930,8 +3931,9 @@ getLinkToGCI weaveConf gci
 ** CSS
 
 For glossary terms, we want to place the definition (~<dd>~) on the /same line/ as
-the term (~<dt>~). To do this we place a newline character (the string ~\a~ in CSS)
-after a ~<dd>~ at [[(newline-after-dd)]].
+the term (~<dt>~). Because this is not the default behavior (by default the two
+are placed each on their own lines) we place a newline character (the string ~\a~
+in CSS) after a ~<dd>~ at [[(newline-after-dd)]].
 
 #+name: css:Glossary terms
 #+begin_src haskell
@@ -5685,6 +5687,7 @@ weaveBacklinks = do
                   . concatMap coalesce
                   . groupBy ((==) `on` snd)
                   . sortOn snd
+      -- (ref:f:weaveBacklinks-getRelativeOrgDocLink)
       case getRelativeOrgDocLink weaveConf externalObjGPath of
         Nothing -> pure ()
         Just (externalOrgDocName, externalOrgDocPath) -> do
@@ -5704,6 +5707,9 @@ For ~getInternalLinkAnchor~, it's OK to have ~Nothing~ as the first argument for
 [[f:getLinkAnchor]] because it's only used for paragraph cells to name them, and
 it's impossible to link to paragraphs and so we'll never end up with an internal
 cell which is a paragraph cell.
+
+[[(f:weaveBacklinks-getRelativeOrgDocLink)]] uses [[f:getRelativeOrgDocLink]], to get
+the correct link back to the external document.
 
 ** Named cells index
 

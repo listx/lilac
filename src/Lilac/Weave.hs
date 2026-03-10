@@ -1285,7 +1285,8 @@ weaveGlossaryTerm lci glossaryTerm = do
       dlEnd :: HtmlWeaver ()
       dlEnd = toHtmlRaw @Text "</dl>"
       isGlossaryTerm lci' --
-        | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects,
+        | Just originObj <-
+            lookup weaveConf.originObjectPath weaveConf.archive.objects,
           Just internalCell <- originObj.orgDoc.cells !!? lci'.unLCI,
           CGlossaryTerm _ <- internalCell =
             True
@@ -1531,7 +1532,8 @@ weaveGlossary :: Bool -> HtmlWeaver ()
 weaveGlossary isGlobal = do
   weaveConf <- ask
   if
-    | Just originObj <- lookup weaveConf.originObjectPath weaveConf.archive.objects -> do
+    | Just originObj <-
+        lookup weaveConf.originObjectPath weaveConf.archive.objects -> do
         let terms :: [(LCI, GPath)]
             terms
               | isGlobal =
@@ -1939,6 +1941,7 @@ weaveBacklinks = do
                   . concatMap coalesce
                   . groupBy ((==) `on` snd)
                   . sortOn snd
+      --
       case getRelativeOrgDocLink weaveConf externalObjGPath of
         Nothing -> pure ()
         Just (externalOrgDocName, externalOrgDocPath) -> do
