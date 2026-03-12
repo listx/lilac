@@ -3988,13 +3988,15 @@ For weaving citations, we use a 4-step process:
   4) Weave the [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] as usual.
 
 We can't simply convert [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] into HTML first before calling
-=Citeproc.citeproc= because then that would result in things like ~<a href=...>~ being
-converted into ~&lt;a href=...&gt;~ (entity conversion of the given text).
+=Citeproc.citeproc= because then that would result in things like ~<a href=...>~
+being converted into ~&lt;a href=...&gt;~ (entity conversion of the given text).
 
 For the first step, we need a function to convert [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] into ~CslJson
-Text~. For that we have [[f:proseToCslJsonText]]. This function abuses the ~CslDiv~
-constructor to encode information that cannot be represented natively in
-~CslJson~.
+Text~. For that we have [[f:proseToCslJsonText]]. Apart from using ~CslLink~ to encode
+links [[(f:proseToCslJsonText-CslLink)]], this function uses the ~CslDiv~ constructor
+to encode information that cannot be represented natively in ~CslJson~ such as
+math fragments [[(f:proseToCslJsonText-mathFragment)]] and certain text styles
+[[(f:proseToCslJsonText-text-styles)]].
 
 #+name: f:proseToCslJsonText
 #+begin_src haskell
@@ -4008,10 +4010,15 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
             body = parseCslJson mempty styledText.body
          in acc <> applyStyles body styles
       PTokenLink link ->
+        -- (ref:f:proseToCslJsonText-CslLink)
         let encoded = CslLink ("LILAC_LINK\NUL" <> unparseLink link) CslEmpty
          in acc <> encoded
       PTokenMathFragment mathFragment ->
-        let encoded = CslDiv ("LILAC_MATH_FRAGMENT\NUL" <> unparseMathFragment mathFragment) CslEmpty
+        let encoded =
+              -- (ref:f:proseToCslJsonText-mathFragment)
+              CslDiv
+                ("LILAC_MATH_FRAGMENT\NUL" <> unparseMathFragment mathFragment)
+                CslEmpty
          in acc <> encoded
       PTokenCitation {}
       PTokenDivStart {}
@@ -4023,6 +4030,7 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
       Bold -> CslBold acc
       Italic -> CslItalic acc
       Underline -> CslUnderline acc
+      -- (ref:f:proseToCslJsonText-text-styles)
       Verbatim -> CslDiv "LILAC_STYLE_VERBATIM\NUL" acc
       Code -> CslDiv "LILAC_STYLE_CODE\NUL" acc
       Smallcaps -> CslSmallCaps acc
@@ -4055,35 +4063,40 @@ citationToCiteprocCitation citation =
       CP.citationNoteNumber = citation.noteNumber,
       CP.citationPrefix = proseToMaybeCslJsonText citation.prefix,
       CP.citationSuffix = proseToMaybeCslJsonText citation.suffix,
-      CP.citationItems = concatMap (citeToCiteprocCitationItems sv) citation.cites
+      CP.citationItems =
+        concatMap (citeToCiteprocCitationItems sv) citation.cites
     }
   where
-    (sv, _) = citation.styleVariation
+    (sv, _) = citation.styleVariation -- (ref:f:citationToCiteprocCitation-sv-tuple)
 #+end_src
 
 The individual [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Cite][data:Cite]] items are converted into Citeproc's ~CitationItem~ type.
 Orgmode has fancy styling capabilities for individual citation items (this is
 ~sv1~ in [[f:citeToCiteprocCitationItems]] below), but we only support the ~t~ and ~na~
 style variants (we don't even look at the second element in the
-~citation.styleVariation~ tuple). This is because we rely on CSL to do nearly all
-of the styling for us. CSL itself [[https://citeproc-js.readthedocs.io/en/latest/csl-json/markup.html#cite-items][allows for just a handful of variations]],
-namely:
+~citation.styleVariation~ tuple [[(f:citationToCiteprocCitation-sv-tuple)]]). This is
+because we rely on CSL to do nearly all of the styling for us. CSL itself [[https://citeproc-js.readthedocs.io/en/latest/csl-json/markup.html#cite-items][allows
+for just a handful of variations]], namely:
 
   - ~suppress-author~: do not show the author name
 
   - ~author-only~: only show the author name
 
-We achieve the semantic meaning of ~t~ (aka ~text~) and ~na~ (aka ~noauthor~) by using
-combinations of the above. The ~na~ maps 1:1 to ~author-only~ so that's an easy one.
-However the ~t~ style needs to inject the author name (as regular text) just
-before the cite. In order to achieve this, we create two citations, using a
-combination of ~suppress-author~ (~CP.SuppressAuthor~) and ~author-only~
-(~CP.AuthorOnly~) to get what we want. Because we end up creating two citations in
-place of one, the result type of [[f:citeToCiteprocCitationItems]] is a list.
+See [[ti:0400-citeproc-style-variations]] for examples. We achieve the semantic
+meaning of ~t~ (aka ~text~) and ~na~ (aka ~noauthor~) by using combinations of the
+above. The ~na~ maps 1:1 to ~author-only~ so that's an easy one. However the ~t~ style
+needs to inject the author name (as regular text) just before the cite. In order
+to achieve this, we create two citations, using a combination of ~suppress-author~
+(~CP.SuppressAuthor~) and ~author-only~ (~CP.AuthorOnly~) to get what we want. Because
+we end up creating two citations in place of one, the result type of
+[[f:citeToCiteprocCitationItems]] is a list.
 
 #+name: f:citeToCiteprocCitationItems
 #+begin_src haskell
-citeToCiteprocCitationItems :: Maybe Text -> Cite -> [CP.CitationItem (CslJson Text)]
+citeToCiteprocCitationItems ::
+  Maybe Text ->
+  Cite ->
+  [CP.CitationItem (CslJson Text)]
 citeToCiteprocCitationItems sv cite =
   let citationItem =
         CP.CitationItem
@@ -4143,7 +4156,7 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
       CslBaseline a -> f (filter (`notElem` [Subscript, Superscript]) s) a
       CslSup a -> f (Superscript : s) a
       CslSub a -> f (Subscript : s) a
-      CslNoCase a -> f s a
+      CslNoCase a -> f s a -- (ref:f:cslJsonTextToProse-CslNoCase)
       CslDiv t a
         | t == "LILAC_STYLE_CODE\NUL" -> f (Code : s) a
         | t == "LILAC_STYLE_VERBATIM\NUL" -> f (Verbatim : s) a
@@ -4181,9 +4194,9 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
       PTokenDivEnd {} -> []
 #+end_src
 
-The ~CslNoCase~ is fine to ignore because it's most likely used by =Citeproc= to
-handle case-changing transformations, and is probably not meant to be used
-directly by consumers.
+The ~CslNoCase~ is fine to ignore [[(f:cslJsonTextToProse-CslNoCase)]] because it's
+most likely used by =Citeproc= to handle case-changing transformations, and is
+probably not meant to be used directly by consumers.
 
 The ~CslDiv~ is used to wrap bibliographical entries inside printed bibliography
 for formatting purposes. We ignore them for now, except for those ~LILAC_STYLE...~
@@ -4202,7 +4215,11 @@ finally converting them to HTML again.
 prepareCitations :: GPath -> Object -> Archive -> IO (CP.Result Prose)
 prepareCitations objGPath object archive = do
   bibPathsRelative <- makeRelativeToObjectPath objGPath object.orgDoc.bibPaths
-  cslPathRelative <- listToMaybe <$> (makeRelativeToObjectPath objGPath $ maybeToList object.orgDoc.cslPath)
+  cslPathRelative <-
+    listToMaybe
+      <$> ( makeRelativeToObjectPath objGPath
+              $ maybeToList object.orgDoc.cslPath
+          )
   let bibRefsFromOrgDoc =
         filter neededByCitations
           . concat
@@ -4213,7 +4230,10 @@ prepareCitations objGPath object archive = do
       resultWithProse =
         CP.Result
           { CP.resultCitations = map cslJsonTextToProse citations,
-            CP.resultBibliography = map (\(k, cslJsonText) -> (k, cslJsonTextToProse cslJsonText)) bibliography,
+            CP.resultBibliography =
+              map
+                (\(k, cslJsonText) -> (k, cslJsonTextToProse cslJsonText))
+                bibliography,
             CP.resultWarnings = warnings
           }
   pure resultWithProse
@@ -4286,7 +4306,7 @@ weaveBibliography lci = do
 
 The ~#ref-...~ style is based on what =Citeproc= uses; for now we choose to use it
 as is. If we wanted to modify it, we would need to tweak how we handle the
-~CslLink~ constructor in inside [[f:cslJsonTextToProse]].
+~CslLink~ constructor in [[f:cslJsonTextToProse]].
 
 ** Tests
 :PROPERTIES:

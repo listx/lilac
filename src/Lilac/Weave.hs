@@ -1328,10 +1328,15 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
             body = parseCslJson mempty styledText.body
          in acc <> applyStyles body styles
       PTokenLink link ->
+        --
         let encoded = CslLink ("LILAC_LINK\NUL" <> unparseLink link) CslEmpty
          in acc <> encoded
       PTokenMathFragment mathFragment ->
-        let encoded = CslDiv ("LILAC_MATH_FRAGMENT\NUL" <> unparseMathFragment mathFragment) CslEmpty
+        let encoded =
+              --
+              CslDiv
+                ("LILAC_MATH_FRAGMENT\NUL" <> unparseMathFragment mathFragment)
+                CslEmpty
          in acc <> encoded
       PTokenCitation {}
       PTokenDivStart {}
@@ -1343,6 +1348,7 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
       Bold -> CslBold acc
       Italic -> CslItalic acc
       Underline -> CslUnderline acc
+      --
       Verbatim -> CslDiv "LILAC_STYLE_VERBATIM\NUL" acc
       Code -> CslDiv "LILAC_STYLE_CODE\NUL" acc
       Smallcaps -> CslSmallCaps acc
@@ -1362,12 +1368,16 @@ citationToCiteprocCitation citation =
       CP.citationNoteNumber = citation.noteNumber,
       CP.citationPrefix = proseToMaybeCslJsonText citation.prefix,
       CP.citationSuffix = proseToMaybeCslJsonText citation.suffix,
-      CP.citationItems = concatMap (citeToCiteprocCitationItems sv) citation.cites
+      CP.citationItems =
+        concatMap (citeToCiteprocCitationItems sv) citation.cites
     }
   where
-    (sv, _) = citation.styleVariation
+    (sv, _) = citation.styleVariation --
 
-citeToCiteprocCitationItems :: Maybe Text -> Cite -> [CP.CitationItem (CslJson Text)]
+citeToCiteprocCitationItems ::
+  Maybe Text ->
+  Cite ->
+  [CP.CitationItem (CslJson Text)]
 citeToCiteprocCitationItems sv cite =
   let citationItem =
         CP.CitationItem
@@ -1421,7 +1431,7 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
       CslBaseline a -> f (filter (`notElem` [Subscript, Superscript]) s) a
       CslSup a -> f (Superscript : s) a
       CslSub a -> f (Subscript : s) a
-      CslNoCase a -> f s a
+      CslNoCase a -> f s a --
       CslDiv t a
         | t == "LILAC_STYLE_CODE\NUL" -> f (Code : s) a
         | t == "LILAC_STYLE_VERBATIM\NUL" -> f (Verbatim : s) a
@@ -1461,7 +1471,11 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
 prepareCitations :: GPath -> Object -> Archive -> IO (CP.Result Prose)
 prepareCitations objGPath object archive = do
   bibPathsRelative <- makeRelativeToObjectPath objGPath object.orgDoc.bibPaths
-  cslPathRelative <- listToMaybe <$> (makeRelativeToObjectPath objGPath $ maybeToList object.orgDoc.cslPath)
+  cslPathRelative <-
+    listToMaybe
+      <$> ( makeRelativeToObjectPath objGPath
+              $ maybeToList object.orgDoc.cslPath
+          )
   let bibRefsFromOrgDoc =
         filter neededByCitations
           . concat
@@ -1472,7 +1486,10 @@ prepareCitations objGPath object archive = do
       resultWithProse =
         CP.Result
           { CP.resultCitations = map cslJsonTextToProse citations,
-            CP.resultBibliography = map (\(k, cslJsonText) -> (k, cslJsonTextToProse cslJsonText)) bibliography,
+            CP.resultBibliography =
+              map
+                (\(k, cslJsonText) -> (k, cslJsonTextToProse cslJsonText))
+                bibliography,
             CP.resultWarnings = warnings
           }
   pure resultWithProse
