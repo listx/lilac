@@ -417,6 +417,7 @@ import Relude
     flip,
     foldMap',
     foldl',
+    foldlM,
     forM_,
     fromMaybe,
     fst,
@@ -549,6 +550,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:getRelativeOrgDocLink>>
 <<f:toNormalizedText>>
 <<f:weaveToc>>
+<<f:weaveTocHeading>>
 <<f:genHeadingAncestry>>
 <<f:weaveHeadingAncestry>>
 <<f:parseRawProjectConf>>
@@ -5178,17 +5180,13 @@ The /Table of Contents/ or TOC is automatically generated and inserted into the
 left sidebar. It serves as a navigation menu of the first three levels of
 headings.
 
-Eventually we want to support collapsible headings inside the TOC. The
-traditional way to do this is to toggle the visibility of child elements when
-clicking to expand/collapse the parent heading. Selecting child elements is
-easiest when there is a hierarchical (nested) structure. The simplest way to do
-this is to use unordered list items.
-
-So what we need to do is convert the flat heading cells into a nested structure.
-The spirit of this is very similar to how we computed the section numbers for
-each heading in [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31::f:headingParser][f:headingParser]]. Every time we enter a nesting level, we'll have
-to create a new ordered list tag (~<ol>~), and every time we leave a level (and
-we may leave more than one level at once), we have to close those unordered list
+We convert the flat heading cells into a nested structure (with bullet points),
+because in the future we may decide to make TOC headings collapsible, and in
+that scenario it would feel much more natural to have a nested structure. The
+spirit of this is very similar to how we computed the section numbers for each
+heading in [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31::f:headingParser][f:headingParser]]. Every time we enter a nesting level, we'll have to
+create a new ordered list tag (~<ol>~), and every time we leave a level (and we
+may leave more than one level at once), we have to close those unordered list
 tags (with ~</ol>~).
 
 #+name: f:weaveToc
@@ -5198,104 +5196,103 @@ weaveToc cells = do
   nav_ [class_ "toc"] $ do
     p_ [class_ "widget-title"] $ do
       toHtml @Text "Contents"
-    let (actions, lastHeadingLevel) = foldl' f ([], 0) cells
-    sequence_ $ reverse actions
-    when (lastHeadingLevel > 0) $ do
-      closeHeadingLevels lastHeadingLevel
+    closeHeadingLevels =<< foldlM f 0 cells -- (ref:f:weaveToc-close-last-levels)
   where
-    f :: ([HtmlWeaver ()], Int) -> Cell -> ([HtmlWeaver ()], Int)
-    f (actions, prevLevel) = \case
-      CHeading heading ->
-        let weaveTocHeading :: HtmlWeaver ()
-            weaveTocHeading = do
-              toHtmlRaw ("<li class=\"toc-level-" <> show heading.level <> "\">" :: Text)
-              div_ [class_ "toc-entry"] $ do
-                span_ [class_ "toc-counter"] $ do
-                  toHtml sectionText
-                a_ [href_ $ "#" <> linkAnchor] $ do
-                  weaveProse heading.body
-            sectionText = getSectionNumber heading
-            linkAnchor = getLinkAnchor Nothing $ CHeading heading
-            action :: HtmlWeaver ()
-            action
-              | prevLevel < heading.level = do
-                  weaveListMarker LOrderedStart
-                  weaveTocHeading
-              | prevLevel > heading.level = do
-                  closeHeadingLevels (prevLevel - heading.level)
-                  weaveListMarker LItemEnd
-                  weaveTocHeading
-              | otherwise = do
-                  weaveListMarker LItemEnd
-                  weaveTocHeading
-         in (action : actions, heading.level)
-      CFootnote {}
-      CBlock {}
-      CFigure {}
-      CListItem {}
-      CMathFragment {}
-      CParagraph {}
-      CGlossaryTerm {}
-      CTable {}
-      CCommand {} -> (actions, prevLevel)
+    f :: Int -> Cell -> HtmlWeaver Int
+    f prevLevel = \case
+      CHeading heading -> do
+        if
+          | prevLevel < heading.level -> weaveListMarker LOrderedStart
+          | prevLevel > heading.level -> do
+              closeHeadingLevels (prevLevel - heading.level) -- (ref:f:weaveToc-close-middle-levels)
+              weaveListMarker LItemEnd
+          | otherwise -> weaveListMarker LItemEnd
+        weaveTocHeading heading
+        pure heading.level
+      _ -> pure prevLevel
     closeHeadingLevels :: Int -> HtmlWeaver ()
-    closeHeadingLevels levelDiff =
-      forM_ [1 .. levelDiff] $ \_ -> do
+    closeHeadingLevels levels =
+      forM_ [1 .. levels] $ \_ -> do
         weaveListMarker LItemEnd
         weaveListMarker LOrderedEnd
 #+end_src
 
 All of the business around using ~LItemEnd~ and ~LOrderedEnd~ is needed because when
 we nest levels, we /cannot/ close the current list item (because nested list items
-are technically children of the current list item). The top-level call to
-~closeHeadingLevels~ is needed because the ~action~ helper only works to close nesting
-levels when we encounter a heading that is less nested than the previous one. So
-this means the last heading will always remain "open". We close off the last
-heading level with ~closeHeadingLevels lastHeadingLevel~.
+are technically children of the current list item). The call to
+~closeHeadingLevels~ [[(f:weaveToc-close-middle-levels)]] is needed because the ~f~
+helper only works to close nesting levels when we encounter a heading that is
+less nested than the previous one. So this means the last heading will always
+remain "open". We close off the last heading level in
+[[(f:weaveToc-close-last-levels)]].
 
-The ~closeHeadingLevels~ helper is called again inside the ~action~ helper to close
-off heading levels when we jump from a nested heading to a less nested one.
+[[f:weaveTocHeading]] weaves the TOC heading as a list item.
+
+#+name: f:weaveTocHeading
+#+begin_src haskell
+weaveTocHeading :: Heading -> HtmlWeaver ()
+weaveTocHeading heading = do
+  toHtmlRaw
+    ( "<li class=\"toc-level-"
+        <> show heading.level
+        <> "\">" ::
+        Text
+    )
+  div_ [class_ "toc-entry"] $ do
+    span_ [class_ "toc-counter"] $ do
+      toHtml sectionText
+    a_ [href_ $ "#" <> linkAnchor] $ do
+      weaveProse heading.body
+  where
+    sectionText = getSectionNumber heading
+    linkAnchor = getLinkAnchor Nothing $ CHeading heading
+#+end_src
 
 ** Heading ancestry
 :PROPERTIES:
 :ID:       4651cdd2-5f79-46e0-af4a-5344d71c7ea6
 :END:
 
-For [[id:c4c13ce7-23d9-49d9-8d3f-6faecf839afa][Active headings TOC indicator]] we want to highlight all visible headings as
-well as all of their parent headings ("ancestor" headings) in the document. We
-need to generate a "heading ancestry" map where the keys are individual
+For the [[id:c4c13ce7-23d9-49d9-8d3f-6faecf839afa][Active headings TOC indicator]] we want to highlight all visible headings
+as well as all of their parent headings ("ancestor" headings) in the document.
+We need to generate a "heading ancestry" map where the keys are individual
 headings, and the values are lists of other headings which are considered its
 ancestors.
 
 To be a bit more precise though, we need ancestry information for all cells, not
 just headings, because it could be the case that the viewport is not showing any
 headings, but only the paragraphs (or other non-heading cells, such as a code
-block or table) that belong to a heading. What we can do is group a heading and
-all of its non-heading children into a single ~<div>~ wrapper. Then we can just
-check for whether this wrapper is visible. So the heading ancestry should be
-available for all heading wrappers in the document, where the keys are the
-headings (and their children that the wrappers have grouped up together) and the
-values are the headings we want to highlight in the TOC as being active.
+block or table) that belong to a heading. In these situations we would still
+want to highlight the most relevant heading (and its ancestors). What we can do
+is group a heading and all of its non-heading children into a single ~<div>~
+wrapper. Then we can just check for whether this wrapper is visible. So the
+heading ancestry should be available for all heading wrappers in the document,
+where the keys are the headings (and their children that the wrappers have
+grouped up together) and the values are the headings we want to highlight in the
+TOC as being active.
 
 In [[f:genHeadingAncestry]] we fold over all cells, but skip over any non-heading
 cell. For headings, we get the unique ID of it by calling [[f:getLinkAnchor]]. This
 is used as the map key. And whenever we detect [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][Headings]] we update the list of
 ancestor headings (also using [[f:getLinkAnchor]] to get the name), and use this as
-the basis of the map value (with a minor tweak via ~ancestorsOf~).
+the basis of the map value (with a minor tweak via ~ancestorsOf~
+[[(f:genHeadingAncestry-ancestorsOf)]]).
 
-Se update the heading ancestry as follows:
+We update the heading ancestry as follows:
 
   1) If the list is empty, push the current heading into the list.
 
   2) Otherwise, compare current heading level with heading level of the first
      element (most nested) of the list:
 
-       - If current one is higher, pop off elements until we see one that's even
-         higher and push this one.
+       - If current one is higher [[(f:genHeadingAncestry-updatedAncestry-higher)]],
+         pop off elements until we see one that's even higher and push this one.
 
-       - If they're equal, then pop off one element and push this one.
+       - If they're equal [[(f:genHeadingAncestry-updatedAncestry-equal)]], then pop
+         off one element and push this one.
 
-       - If current one is lower, then just push into the list (no popping).
+       - If current one is lower [[(f:genHeadingAncestry-updatedAncestry-lower)]],
+         then just push into the list (no popping).
 
 #+name: f:genHeadingAncestry
 #+begin_src haskell
@@ -5313,11 +5310,12 @@ genHeadingAncestry = snd . foldl' f ([], mempty)
        in (updatedAncestry, insert key val m)
     f (ancestry@(a : as), m) cell@(CHeading heading) =
       let updatedAncestry
-            | heading.level < a.level =
+            | heading.level < a.level -- (ref:f:genHeadingAncestry-updatedAncestry-higher)
+              =
                 heading
                   : (dropWhile (\a' -> heading.level <= a'.level) ancestry)
-            | heading.level > a.level = heading : ancestry
-            | otherwise = heading : as
+            | heading.level > a.level = heading : ancestry -- (ref:f:genHeadingAncestry-updatedAncestry-lower)
+            | otherwise = heading : as -- (ref:f:genHeadingAncestry-updatedAncestry-equal)
           key = getLinkAnchor Nothing cell
           val =
             map
@@ -5326,19 +5324,21 @@ genHeadingAncestry = snd . foldl' f ([], mempty)
        in (updatedAncestry, insert key val m)
     f acc _ = acc
     ancestorsOf :: Heading -> [Heading] -> [Heading]
-    ancestorsOf leafHeading ancestry
+    ancestorsOf leafHeading ancestry -- (ref:f:genHeadingAncestry-ancestorsOf)
       | null ancestry = []
       | otherwise = dropWhile (\a' -> leafHeading.level <= a'.level) ancestry
 #+end_src
 
-The ~ancestorsOf~ tweak is needed because we can't use either the existing
-~ancestry~ (from the previous iteration) or the ~updatedAncestry~ as is. This is
-because ~ancestry~ is simply outdated (it may have an elaborate hierarchy that is
-not relevant to a new top-level heading), and ~updatedAncestry~ includes the
-current heading (and the current heading cannot be its own ancestor).
+The ~ancestorsOf~ function [[(f:genHeadingAncestry-ancestorsOf)]] is needed because we
+can't use either the existing ~ancestry~ (from the previous iteration) or the
+~updatedAncestry~ as is. This is because ~ancestry~ is simply outdated (it may have
+an elaborate hierarchy that is not relevant to a new top-level heading), and
+~updatedAncestry~ includes the current heading (and the current heading cannot be
+its own ancestor).
 
 We then convert this map into a JSON object and embed it into the document
-directly, so that the frontend code can parse and reference it.
+directly in [[f:weaveHeadingAncestry]], so that the frontend code can parse and
+reference it.
 
 #+name: f:weaveHeadingAncestry
 #+begin_src haskell

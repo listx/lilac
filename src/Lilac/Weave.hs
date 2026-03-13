@@ -259,6 +259,7 @@ import Relude
     flip,
     foldMap',
     foldl',
+    foldlM,
     forM_,
     fromMaybe,
     fst,
@@ -1663,51 +1664,42 @@ weaveToc cells = do
   nav_ [class_ "toc"] $ do
     p_ [class_ "widget-title"] $ do
       toHtml @Text "Contents"
-    let (actions, lastHeadingLevel) = foldl' f ([], 0) cells
-    sequence_ $ reverse actions
-    when (lastHeadingLevel > 0) $ do
-      closeHeadingLevels lastHeadingLevel
+    closeHeadingLevels =<< foldlM f 0 cells --
   where
-    f :: ([HtmlWeaver ()], Int) -> Cell -> ([HtmlWeaver ()], Int)
-    f (actions, prevLevel) = \case
-      CHeading heading ->
-        let weaveTocHeading :: HtmlWeaver ()
-            weaveTocHeading = do
-              toHtmlRaw ("<li class=\"toc-level-" <> show heading.level <> "\">" :: Text)
-              div_ [class_ "toc-entry"] $ do
-                span_ [class_ "toc-counter"] $ do
-                  toHtml sectionText
-                a_ [href_ $ "#" <> linkAnchor] $ do
-                  weaveProse heading.body
-            sectionText = getSectionNumber heading
-            linkAnchor = getLinkAnchor Nothing $ CHeading heading
-            action :: HtmlWeaver ()
-            action
-              | prevLevel < heading.level = do
-                  weaveListMarker LOrderedStart
-                  weaveTocHeading
-              | prevLevel > heading.level = do
-                  closeHeadingLevels (prevLevel - heading.level)
-                  weaveListMarker LItemEnd
-                  weaveTocHeading
-              | otherwise = do
-                  weaveListMarker LItemEnd
-                  weaveTocHeading
-         in (action : actions, heading.level)
-      CFootnote {}
-      CBlock {}
-      CFigure {}
-      CListItem {}
-      CMathFragment {}
-      CParagraph {}
-      CGlossaryTerm {}
-      CTable {}
-      CCommand {} -> (actions, prevLevel)
+    f :: Int -> Cell -> HtmlWeaver Int
+    f prevLevel = \case
+      CHeading heading -> do
+        if
+          | prevLevel < heading.level -> weaveListMarker LOrderedStart
+          | prevLevel > heading.level -> do
+              closeHeadingLevels (prevLevel - heading.level) --
+              weaveListMarker LItemEnd
+          | otherwise -> weaveListMarker LItemEnd
+        weaveTocHeading heading
+        pure heading.level
+      _ -> pure prevLevel
     closeHeadingLevels :: Int -> HtmlWeaver ()
-    closeHeadingLevels levelDiff =
-      forM_ [1 .. levelDiff] $ \_ -> do
+    closeHeadingLevels levels =
+      forM_ [1 .. levels] $ \_ -> do
         weaveListMarker LItemEnd
         weaveListMarker LOrderedEnd
+
+weaveTocHeading :: Heading -> HtmlWeaver ()
+weaveTocHeading heading = do
+  toHtmlRaw
+    ( "<li class=\"toc-level-"
+        <> show heading.level
+        <> "\">" ::
+        Text
+    )
+  div_ [class_ "toc-entry"] $ do
+    span_ [class_ "toc-counter"] $ do
+      toHtml sectionText
+    a_ [href_ $ "#" <> linkAnchor] $ do
+      weaveProse heading.body
+  where
+    sectionText = getSectionNumber heading
+    linkAnchor = getLinkAnchor Nothing $ CHeading heading
 
 genHeadingAncestry :: [Cell] -> Map Text [Text]
 genHeadingAncestry = snd . foldl' f ([], mempty)
@@ -1723,11 +1715,12 @@ genHeadingAncestry = snd . foldl' f ([], mempty)
        in (updatedAncestry, insert key val m)
     f (ancestry@(a : as), m) cell@(CHeading heading) =
       let updatedAncestry
-            | heading.level < a.level =
+            | heading.level < a.level --
+              =
                 heading
                   : (dropWhile (\a' -> heading.level <= a'.level) ancestry)
-            | heading.level > a.level = heading : ancestry
-            | otherwise = heading : as
+            | heading.level > a.level = heading : ancestry --
+            | otherwise = heading : as --
           key = getLinkAnchor Nothing cell
           val =
             map
@@ -1736,7 +1729,7 @@ genHeadingAncestry = snd . foldl' f ([], mempty)
        in (updatedAncestry, insert key val m)
     f acc _ = acc
     ancestorsOf :: Heading -> [Heading] -> [Heading]
-    ancestorsOf leafHeading ancestry
+    ancestorsOf leafHeading ancestry --
       | null ancestry = []
       | otherwise = dropWhile (\a' -> leafHeading.level <= a'.level) ancestry
 
