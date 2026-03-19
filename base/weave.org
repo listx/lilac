@@ -316,6 +316,7 @@ import Lilac.Types
     getSectionNumber,
     markingChars,
     markingCharsInvisible,
+    ptext,
     stext,
     stripLinks,
     stripStyles,
@@ -564,6 +565,8 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveSidebar>>
 <<f:weaveTangledBlocksList>>
 <<f:weaveBacklinks>>
+<<f:weaveBacklinksForExternalObj>>
+<<f:weaveBacklink>>
 <<f:weaveNamedCellsIndex>>
 #+end_src
 
@@ -5609,7 +5612,16 @@ span # ".breadcrumb-separator" ? do
 
 * Sidebar
 
-The sidebar shows additional information about the current document.
+The sidebar shows additional information about the current document. It sits on
+the far right of the screen (see [[css:Layout]]). It has the following parts:
+
+  1) list of tangled files,
+
+  2) list of backlinks,
+
+  3) list of named cells, and
+
+  4) a footer.
 
 #+name: f:weaveSidebar
 #+begin_src haskell
@@ -5662,20 +5674,7 @@ weaveTangledBlocksList blocks = do
 
 Backlinks are useful because they show additional context around the current
 page. We basically want to know all of the other Org docs that refer to the
-current one. This can be computed as follows:
-
-  1) Filter the archive's edges (~symbolEdges~) so that we're only left with
-     backlinks to the current object's range of cells.
-
-  2) Filter again to only have backlinks from cells that belong to external
-     objects, not the current object.
-
-  3) Discard the target vertex (cell belonging to current object). This just
-     leaves us with cells from other external objects.
-
-  4) Group cells by object. This is ~backlinksByPath~ in [[f:weaveBacklinks]] below.
-
-  5) List each object, sorted by most number of backlinks.
+current one.
 
 #+name: f:weaveBacklinks
 #+begin_src haskell
@@ -5689,99 +5688,138 @@ weaveBacklinks = do
       Nothing -> do
         p_ [] $ do
           toHtml @Text "None"
+      -- (ref:f:weaveBacklinks-backlinksByPath)
       Just backlinksByPath -> do
         ol_ [] $ do
           let sorted =
-                sortOn (\(_, links) -> -(length links))
+                sortOn (\(_, links) -> -(length links)) -- (ref:f:weaveBacklinks-sorted-by-num-links)
                   $ toPairs backlinksByPath
           sequence_ $ map weaveBacklinksForExternalObj sorted
-  where
-    weaveBacklinksForExternalObj :: (GPath, [(GCI, GCI)]) -> HtmlWeaver ()
-    weaveBacklinksForExternalObj (_, []) = toHtmlRaw @Text ""
-    weaveBacklinksForExternalObj (externalObjGPath, edges) = do
-      weaveConf <- ask
-      let weight = T.show $ length edges
-          f :: ([GCI], GCI) -> HtmlWeaver ()
-          f ([], _) = pure ()
-          f (externalGCIs@(externalGCI : _), internalGCI) = do
-            let (internalLinkAnchor, internalName) =
-                  (getInternalLinkAnchor internalGCI, getInternalName internalGCI)
-            li_ [] $ do
-              if (length externalGCIs > 1)
-                then do
-                  a_ [href_ internalLinkAnchor] $ do
-                    weaveProse internalName
-                    toHtml @Text $ " (" <> (T.show $ length externalGCIs) <> ")"
-                  ol_ [] $ do
-                    sequence_ $ map (linkToExternalCell True) externalGCIs
-                else do
-                  a_ [href_ internalLinkAnchor] $ do
-                    weaveProse internalName
-                  span_ [class_ "verbatim"] $ do
-                    toHtmlRaw @Text " &#x2190; "
-                  linkToExternalCell False externalGCI
-          linkToExternalCell :: Bool -> GCI -> HtmlWeaver ()
-          linkToExternalCell asListItem gci =
-            case getLinkToGCI weaveConf gci of
-              Nothing -> pure ()
-              Just (_, externalLinkAnchor, externalCellName) -> do
-                let externalLink =
-                      a_ [href_ externalLinkAnchor] $ do
-                        weaveProse externalCellName
-                if asListItem
-                  then li_ [] $ externalLink
-                  else externalLink
-          getInternalLinkAnchor gci
-            | Just (_, internalCell) <- gciToObjCell weaveConf.archive gci =
-                "#" <> (getLinkAnchor Nothing internalCell)
-            | gci.unGCI < 0 = "#top"
-            | otherwise = "#LINK_ERROR"
-          getInternalName gci
-            | Just name <- gciToName weaveConf.archive 0 gci =
-                name
-            | gci.unGCI < 0 = Prose [PTokenStyledText $ StyledText {body = "^ Top", style = styleMaskFrom []}]
-            | otherwise = noName
-          noName = Prose [PTokenStyledText $ StyledText {body = "???", style = styleMaskFrom []}]
-          groupedByTarget :: [(GCI, GCI)] -> [([GCI], GCI)]
-          groupedByTarget =
-            let coalesce :: [(GCI, GCI)] -> [([GCI], GCI)]
-                coalesce [] = []
-                coalesce group@((_, target) : _) =
-                  [(reverse $ map fst group, target)]
-             in sortBy
-                  ( comparing (negate . length . fst)
-                      <> comparing (gciToName weaveConf.archive 0 . snd)
-                  )
-                  . concatMap coalesce
-                  . groupBy ((==) `on` snd)
-                  . sortOn snd
-      -- (ref:f:weaveBacklinks-getRelativeOrgDocLink)
-      case getRelativeOrgDocLink weaveConf externalObjGPath of
-        Nothing -> pure ()
-        Just (externalOrgDocName, externalOrgDocPath) -> do
-          li_ [] $ do
-            a_ [href_ externalOrgDocPath] $ do
-              toHtml $ externalOrgDocName <> " (" <> weight <> ")"
-            ol_ [] $ do
-              forM_ (groupedByTarget edges) f
 #+end_src
 
-The ~groupedByTarget~ helper groups edges by the target, coalescing edges that
-point to the same target together. So instead of ~[(1, 2), (5, 2), (4, 7)]~ we get
-~[([1, 5], 2), ([4], 7)]~. It uses ~sortBy~ to first sort by the number of external
-indices first, and then by the name of the internal cell being referenced.
+Backlinks can be computed as follows:
 
-For ~getInternalLinkAnchor~, it's OK to have ~Nothing~ as the first argument for
-[[f:getLinkAnchor]] because it's only used for paragraph cells to name them, and
-it's impossible to link to paragraphs and so we'll never end up with an internal
-cell which is a paragraph cell.
+  1) Filter the archive's edges (~symbolEdges~) so that we're only left with
+     backlinks to the current object's range of cells.
+
+  2) Filter again to only have backlinks from cells that belong to external
+     objects, not the current object.
+
+  3) Discard the target vertex (cell belonging to current object). This just
+     leaves us with cells from other external objects.
+
+  4) Group cells by object. This is ~backlinksByPath~
+     [[(f:weaveBacklinks-backlinksByPath)]].
+
+  5) List each object, sorted by most number of backlinks
+     [[(f:weaveBacklinks-sorted-by-num-links)]].
+
+The first three steps are already handled during backlink generation in
+[[id:a1f2c3b3-9d61-4630-a52e-a38d0a4ef1dc][Backlinks]].
+
+#+name: f:weaveBacklinksForExternalObj
+#+begin_src haskell
+weaveBacklinksForExternalObj :: (GPath, [(GCI, GCI)]) -> HtmlWeaver ()
+weaveBacklinksForExternalObj (_, []) = toHtmlRaw @Text ""
+weaveBacklinksForExternalObj (externalObjGPath, edges) = do
+  weaveConf <- ask
+  -- (ref:f:weaveBacklinks-getRelativeOrgDocLink)
+  case getRelativeOrgDocLink weaveConf externalObjGPath of
+    Nothing -> pure ()
+    Just (externalOrgDocName, externalOrgDocPath) -> do
+      li_ [] $ do
+        a_ [href_ externalOrgDocPath] $ do
+          let weight = T.show $ length edges
+          toHtml $ externalOrgDocName <> " (" <> weight <> ")"
+        ol_ [] $ do
+          let archive = weaveConf.archive
+          forM_ (groupedByTarget archive edges) (weaveBacklink archive)
+  where
+    -- (ref:f:weaveBacklinksForExternalObj-groupedByTarget)
+    groupedByTarget :: Archive -> [(GCI, GCI)] -> [([GCI], GCI)]
+    groupedByTarget archive =
+      let coalesce :: [(GCI, GCI)] -> [([GCI], GCI)]
+          coalesce [] = []
+          coalesce group@((_, target) : _) =
+            [(reverse $ map fst group, target)]
+       in sortBy -- (ref:f:weaveBacklinksForExternalObj-sortBy)
+            ( comparing (negate . length . fst)
+                <> comparing (gciToName archive 0 . snd)
+            )
+            . concatMap coalesce
+            . groupBy ((==) `on` snd)
+            . sortOn snd
+#+end_src
+
+The ~groupedByTarget~ helper [[(f:weaveBacklinksForExternalObj-groupedByTarget)]]
+groups edges by the target cell, so that we can see which cells are the most
+popular from external objects. So instead of ~[(1, 2), (5, 2), (4, 7)]~ we get
+~[([1, 5], 2), ([4], 7)]~. It uses ~sortBy~ [[(f:weaveBacklinksForExternalObj-sortBy)]]
+to first sort by the number of external indices first, and then by the name of
+the internal cell being referenced.
 
 [[(f:weaveBacklinks-getRelativeOrgDocLink)]] uses [[f:getRelativeOrgDocLink]], to get
 the correct link back to the external document.
 
+#+name: f:weaveBacklink
+#+begin_src haskell
+weaveBacklink :: Archive -> ([GCI], GCI) -> HtmlWeaver ()
+weaveBacklink _ ([], _) = pure ()
+weaveBacklink archive (externalGCIs@(externalGCI : _), internalGCI) = do
+  let (internalLinkAnchor, internalName) =
+        ( getInternalLinkAnchor internalGCI,
+          getInternalName internalGCI
+        )
+  li_ [] $ do
+    if (length externalGCIs > 1)
+      then do
+        a_ [href_ internalLinkAnchor] $ do
+          weaveProse internalName
+          toHtml @Text $ " (" <> (T.show $ length externalGCIs) <> ")"
+        ol_ [] $ do
+          sequence_ $ map (linkToExternalCell True) externalGCIs
+      else do
+        a_ [href_ internalLinkAnchor] $ do
+          weaveProse internalName
+        span_ [class_ "verbatim"] $ do
+          toHtmlRaw @Text " &#x2190; "
+        linkToExternalCell False externalGCI
+  where
+    getInternalLinkAnchor gci
+      | Just (_, internalCell) <- gciToObjCell archive gci =
+          "#" <> (getLinkAnchor Nothing internalCell) -- (ref:f:weaveBacklinksForExternalObj-Nothing-first-arg)
+      | gci.unGCI < 0 = "#top"
+      | otherwise = "#LINK_ERROR"
+    getInternalName gci
+      | Just name <- gciToName archive 0 gci =
+          name
+      | gci.unGCI < 0 = Prose [ptext "^ Top" []]
+      | otherwise = Prose [ptext "???" []]
+    linkToExternalCell :: Bool -> GCI -> HtmlWeaver ()
+    linkToExternalCell asListItem gci = do
+      weaveConf <- ask
+      case getLinkToGCI weaveConf gci of
+        Nothing -> pure ()
+        Just (_, externalLinkAnchor, externalCellName) -> do
+          let externalLink =
+                a_ [href_ externalLinkAnchor] $ do
+                  weaveProse externalCellName
+          if asListItem
+            then li_ [] $ externalLink
+            else externalLink
+#+end_src
+
+For ~getInternalLinkAnchor~, it's OK to have ~Nothing~ as the first argument
+[[(f:weaveBacklinksForExternalObj-Nothing-first-arg)]] for [[f:getLinkAnchor]] because
+it's only used for paragraph cells to name them, and it's impossible to link to
+paragraphs and so we'll never end up with an internal cell which is a paragraph
+cell.
+
 ** Named cells index
 
-Display a list of all named cells used in the current document.
+The named cells index displays a list of all named cells used in the current
+document, because if a cell was given a name it is probably of some interest to
+the reader.
 
 #+name: f:weaveNamedCellsIndex
 #+begin_src haskell
@@ -5795,7 +5833,10 @@ weaveNamedCellsIndex = do
             pure obj.orgDoc.cells
           namedCells =
             sort
-              $ [(prose, cell) | cell <- (fromMaybe [] cells), Just prose <- [getCellName cell]]
+              $ [ (prose, cell)
+                | cell <- (fromMaybe [] cells),
+                  Just prose <- [getCellName cell]
+                ]
           lenNamedCells = T.show $ length namedCells
       toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
       ol_ [] $ do
@@ -5804,6 +5845,34 @@ weaveNamedCellsIndex = do
             let linkAnchor = "#" <> getLinkAnchor Nothing cell
             a_ [href_ linkAnchor] $ do
               weaveProse prose
+#+end_src
+
+** Footer
+
+The footer is the element at the very bottom of the sidebar. This is not to be
+confused with [[id:c3562660-a9ff-499d-9b10-c69bcba7f105][Footnotes]], which are a user-controlled thing (a page may or may
+not have footnotes, depending on usage).
+
+#+name: f:weaveFooter
+#+begin_src haskell
+weaveFooter :: HtmlWeaver ()
+weaveFooter = do
+  footer_ $ do
+    div_ [class_ "lilac-stamp"] $ do
+      toHtml @Text "Generated by "
+      a_
+        [ href_ "<<id:04ae01eb-2439-469f-aef6-129ff94ad018::lilac-repo-url>>",
+          class_ "external-link",
+          target_ "_blank",
+          rel_ "noopener noreferrer"
+        ]
+        $ do
+          toHtml @Text "Lilac"
+#+end_src
+
+#+name: css:Footer height
+#+begin_src txt
+4rem
 #+end_src
 
 ** CSS
@@ -5829,30 +5898,9 @@ aside ? do
     marginTop $ px 0
 #+end_src
 
-* Footer
-
-The footer is the element at the very bottom of the sidebar. This is not to be
-confused with [[id:c3562660-a9ff-499d-9b10-c69bcba7f105][Footnotes]], which are a user-controlled thing (a page may or may
-not have footnotes, depending on usage).
-
-#+name: f:weaveFooter
-#+begin_src haskell
-weaveFooter :: HtmlWeaver ()
-weaveFooter = do
-  footer_ $ do
-    div_ [class_ "lilac-stamp"] $ do
-      toHtml @Text "Generated by "
-      a_
-        [ href_ "<<id:04ae01eb-2439-469f-aef6-129ff94ad018::lilac-repo-url>>",
-          class_ "external-link",
-          target_ "_blank",
-          rel_ "noopener noreferrer"
-        ]
-        $ do
-          toHtml @Text "Lilac"
-#+end_src
-
-** CSS
+The lists of tangled file, backlinks, etc do not need any additional
+customization because they are ultimately just links. The footer, however, needs
+additional tweaks.
 
 #+name: css:Footer
 #+begin_src haskell
@@ -5865,11 +5913,6 @@ footer ? do
     fontSans
     fontSize $ rem 0.9
     marginBottom (px 10)
-#+end_src
-
-#+name: css:Footer height
-#+begin_src txt
-4rem
 #+end_src
 
 * Testing framework

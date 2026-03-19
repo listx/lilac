@@ -158,6 +158,7 @@ import Lilac.Types
     getSectionNumber,
     markingChars,
     markingCharsInvisible,
+    ptext,
     stext,
     stripLinks,
     stripStyles,
@@ -1889,81 +1890,89 @@ weaveBacklinks = do
       Nothing -> do
         p_ [] $ do
           toHtml @Text "None"
+      --
       Just backlinksByPath -> do
         ol_ [] $ do
           let sorted =
-                sortOn (\(_, links) -> -(length links))
+                sortOn (\(_, links) -> -(length links)) --
                   $ toPairs backlinksByPath
           sequence_ $ map weaveBacklinksForExternalObj sorted
+
+weaveBacklinksForExternalObj :: (GPath, [(GCI, GCI)]) -> HtmlWeaver ()
+weaveBacklinksForExternalObj (_, []) = toHtmlRaw @Text ""
+weaveBacklinksForExternalObj (externalObjGPath, edges) = do
+  weaveConf <- ask
+  --
+  case getRelativeOrgDocLink weaveConf externalObjGPath of
+    Nothing -> pure ()
+    Just (externalOrgDocName, externalOrgDocPath) -> do
+      li_ [] $ do
+        a_ [href_ externalOrgDocPath] $ do
+          let weight = T.show $ length edges
+          toHtml $ externalOrgDocName <> " (" <> weight <> ")"
+        ol_ [] $ do
+          let archive = weaveConf.archive
+          forM_ (groupedByTarget archive edges) (weaveBacklink archive)
   where
-    weaveBacklinksForExternalObj :: (GPath, [(GCI, GCI)]) -> HtmlWeaver ()
-    weaveBacklinksForExternalObj (_, []) = toHtmlRaw @Text ""
-    weaveBacklinksForExternalObj (externalObjGPath, edges) = do
+    --
+    groupedByTarget :: Archive -> [(GCI, GCI)] -> [([GCI], GCI)]
+    groupedByTarget archive =
+      let coalesce :: [(GCI, GCI)] -> [([GCI], GCI)]
+          coalesce [] = []
+          coalesce group@((_, target) : _) =
+            [(reverse $ map fst group, target)]
+       in sortBy --
+            ( comparing (negate . length . fst)
+                <> comparing (gciToName archive 0 . snd)
+            )
+            . concatMap coalesce
+            . groupBy ((==) `on` snd)
+            . sortOn snd
+
+weaveBacklink :: Archive -> ([GCI], GCI) -> HtmlWeaver ()
+weaveBacklink _ ([], _) = pure ()
+weaveBacklink archive (externalGCIs@(externalGCI : _), internalGCI) = do
+  let (internalLinkAnchor, internalName) =
+        ( getInternalLinkAnchor internalGCI,
+          getInternalName internalGCI
+        )
+  li_ [] $ do
+    if (length externalGCIs > 1)
+      then do
+        a_ [href_ internalLinkAnchor] $ do
+          weaveProse internalName
+          toHtml @Text $ " (" <> (T.show $ length externalGCIs) <> ")"
+        ol_ [] $ do
+          sequence_ $ map (linkToExternalCell True) externalGCIs
+      else do
+        a_ [href_ internalLinkAnchor] $ do
+          weaveProse internalName
+        span_ [class_ "verbatim"] $ do
+          toHtmlRaw @Text " &#x2190; "
+        linkToExternalCell False externalGCI
+  where
+    getInternalLinkAnchor gci
+      | Just (_, internalCell) <- gciToObjCell archive gci =
+          "#" <> (getLinkAnchor Nothing internalCell) --
+      | gci.unGCI < 0 = "#top"
+      | otherwise = "#LINK_ERROR"
+    getInternalName gci
+      | Just name <- gciToName archive 0 gci =
+          name
+      | gci.unGCI < 0 = Prose [ptext "^ Top" []]
+      | otherwise = Prose [ptext "???" []]
+    linkToExternalCell :: Bool -> GCI -> HtmlWeaver ()
+    linkToExternalCell asListItem gci = do
       weaveConf <- ask
-      let weight = T.show $ length edges
-          f :: ([GCI], GCI) -> HtmlWeaver ()
-          f ([], _) = pure ()
-          f (externalGCIs@(externalGCI : _), internalGCI) = do
-            let (internalLinkAnchor, internalName) =
-                  (getInternalLinkAnchor internalGCI, getInternalName internalGCI)
-            li_ [] $ do
-              if (length externalGCIs > 1)
-                then do
-                  a_ [href_ internalLinkAnchor] $ do
-                    weaveProse internalName
-                    toHtml @Text $ " (" <> (T.show $ length externalGCIs) <> ")"
-                  ol_ [] $ do
-                    sequence_ $ map (linkToExternalCell True) externalGCIs
-                else do
-                  a_ [href_ internalLinkAnchor] $ do
-                    weaveProse internalName
-                  span_ [class_ "verbatim"] $ do
-                    toHtmlRaw @Text " &#x2190; "
-                  linkToExternalCell False externalGCI
-          linkToExternalCell :: Bool -> GCI -> HtmlWeaver ()
-          linkToExternalCell asListItem gci =
-            case getLinkToGCI weaveConf gci of
-              Nothing -> pure ()
-              Just (_, externalLinkAnchor, externalCellName) -> do
-                let externalLink =
-                      a_ [href_ externalLinkAnchor] $ do
-                        weaveProse externalCellName
-                if asListItem
-                  then li_ [] $ externalLink
-                  else externalLink
-          getInternalLinkAnchor gci
-            | Just (_, internalCell) <- gciToObjCell weaveConf.archive gci =
-                "#" <> (getLinkAnchor Nothing internalCell)
-            | gci.unGCI < 0 = "#top"
-            | otherwise = "#LINK_ERROR"
-          getInternalName gci
-            | Just name <- gciToName weaveConf.archive 0 gci =
-                name
-            | gci.unGCI < 0 = Prose [PTokenStyledText $ StyledText {body = "^ Top", style = styleMaskFrom []}]
-            | otherwise = noName
-          noName = Prose [PTokenStyledText $ StyledText {body = "???", style = styleMaskFrom []}]
-          groupedByTarget :: [(GCI, GCI)] -> [([GCI], GCI)]
-          groupedByTarget =
-            let coalesce :: [(GCI, GCI)] -> [([GCI], GCI)]
-                coalesce [] = []
-                coalesce group@((_, target) : _) =
-                  [(reverse $ map fst group, target)]
-             in sortBy
-                  ( comparing (negate . length . fst)
-                      <> comparing (gciToName weaveConf.archive 0 . snd)
-                  )
-                  . concatMap coalesce
-                  . groupBy ((==) `on` snd)
-                  . sortOn snd
-      --
-      case getRelativeOrgDocLink weaveConf externalObjGPath of
+      case getLinkToGCI weaveConf gci of
         Nothing -> pure ()
-        Just (externalOrgDocName, externalOrgDocPath) -> do
-          li_ [] $ do
-            a_ [href_ externalOrgDocPath] $ do
-              toHtml $ externalOrgDocName <> " (" <> weight <> ")"
-            ol_ [] $ do
-              forM_ (groupedByTarget edges) f
+        Just (_, externalLinkAnchor, externalCellName) -> do
+          let externalLink =
+                a_ [href_ externalLinkAnchor] $ do
+                  weaveProse externalCellName
+          if asListItem
+            then li_ [] $ externalLink
+            else externalLink
 
 weaveNamedCellsIndex :: HtmlWeaver ()
 weaveNamedCellsIndex = do
@@ -1975,7 +1984,10 @@ weaveNamedCellsIndex = do
             pure obj.orgDoc.cells
           namedCells =
             sort
-              $ [(prose, cell) | cell <- (fromMaybe [] cells), Just prose <- [getCellName cell]]
+              $ [ (prose, cell)
+                | cell <- (fromMaybe [] cells),
+                  Just prose <- [getCellName cell]
+                ]
           lenNamedCells = T.show $ length namedCells
       toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
       ol_ [] $ do
