@@ -53,6 +53,7 @@ import Relude
     String,
     Text,
     foldl',
+    forM_,
     fromList,
     fst,
     map,
@@ -165,6 +166,30 @@ spec = do
         ("base/a/b/from.html", "to.html6", "../../../to.html6"),
         ("base/a/b/from.html", "base/a/c/to.html7", "../c/to.html7"),
         ("base/a/b/c/d/from.html", "base/a/x/y/to.html8", "../../../x/y/to.html8")
+      ]
+
+  describe "Object extension to org conversion" $ do
+    checkObjectExtensionConversion
+      "empty case"
+      [ ( [],
+          []
+        ),
+        ( ["foo.lobj"],
+          ["foo.org"]
+        ),
+        ( ["x.lobj", "a"],
+          ["x.org", "a"]
+        ),
+        ( ["1.lobj", "b", "a"],
+          ["1.org", "b", "a"]
+        ),
+        --
+        ( ["x", "b", "a"],
+          [".org", "b", "a"]
+        ),
+        ( ["", "b", "a"],
+          [".org", "b", "a"]
+        )
       ]
 
   expectCiteprocResult
@@ -846,3 +871,9 @@ expectCiteprocResult path expected = do
       | otherwise ->
           it "unexpected type mismatch" $ do
             result `shouldBe` expected
+
+checkObjectExtensionConversion :: String -> [([Text], [Text])] -> Spec
+checkObjectExtensionConversion msg testCases = do
+  it msg $ do
+    forM_ testCases $ \(input, output) -> do
+      LW.convertObjectExtensionToOrg input `shouldBe` output

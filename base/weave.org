@@ -158,6 +158,7 @@ This module is responsible for generating the HTML from a [[id:25827c17-2015-434
 #+begin_src haskell
 module Lilac.Weave
   ( commonPrefix,
+    convertObjectExtensionToOrg,
     getRelativePathWithoutSymlinks,
     parseProjectConf,
     prepareCitations,
@@ -557,6 +558,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:parseProjectConf>>
 <<f:weaveNavbar>>
 <<f:weaveBreadcrumbs>>
+<<f:convertObjectExtensionToOrg>>
 <<f:weaveFooter>>
 <<f:weaveMain>>
 <<f:weaveSidebar>>
@@ -5412,7 +5414,7 @@ padding (px 0) (px 20) (px 0) (px 20)
 
 * Navigation bar
 
-The navigation bar is at the top of the page as a horizontal bar.
+The navigation bar is the horizontal bar at the top of the page.
 
 #+name: f:weaveNavbar
 #+begin_src haskell
@@ -5423,20 +5425,20 @@ weaveNavbar = do
       weaveBreadcrumbs
 #+end_src
 
-One of the things in the navbar is the "breadcrumbs", which is the path that
-points to the current document. This path is constructed by starting with the
-project name, followed by the path to the object currently being woven, which is
-taken from the ~originObjectPath~ field from [[data:WeaveConf]].
+One of the things in the navbar is the "breadcrumbs" area, which is the path
+that points to the current document. This path is constructed by starting with
+the project name, followed by the path to the object currently being woven,
+which is taken from the ~originObjectPath~ field from [[data:WeaveConf]].
 
 The breadcrumbs are made up of four pieces:
 
-  1) project name
+  1) project name [[(f:weaveBreadcrumbs-project-name)]]
 
-  2) (optional) project version
+  2) (optional) project version [[(f:weaveBreadcrumbs-project-version)]]
 
-  3) middle
+  3) middle [[(f:weaveBreadcrumbs-middle)]]
 
-  4) Org document name
+  4) Org document name [[(f:weaveBreadcrumbs-doc-name)]]
 
 The middle part can be any number of intervening directory names (can be empty).
 Only the project name and Org document name are guaranteed to exist. This is
@@ -5450,8 +5452,8 @@ The breadcrumbs are woven in [[f:weaveBreadcrumbs]].
 weaveBreadcrumbs :: HtmlWeaver ()
 weaveBreadcrumbs = do
   weaveConf <- ask
-  weaveProjectName weaveConf.projectConf
-  weaveProjectVersion weaveConf.projectConf
+  weaveProjectName weaveConf.projectConf -- (ref:f:weaveBreadcrumbs-project-name)
+  weaveProjectVersion weaveConf.projectConf -- (ref:f:weaveBreadcrumbs-project-version)
   let breadcrumbsTail =
         map osPathDecoder
           . P.splitDirectories
@@ -5460,9 +5462,11 @@ weaveBreadcrumbs = do
       breadcrumbsMiddle = reverse . drop 1 $ reverse breadcrumbsTail
       breadcrumbLast =
         convertObjectExtensionToOrg . take 1 $ reverse breadcrumbsTail
+  -- (ref:f:weaveBreadcrumbs-middle)
   forM_ breadcrumbsMiddle $ \breadcrumb -> do
     weaveBreadcrumbSeparator
     weaveBreadcrumb breadcrumb
+  -- (ref:f:weaveBreadcrumbs-doc-name)
   forM_ breadcrumbLast $ \breadcrumb -> do
     weaveBreadcrumbSeparator
     a_ [href_ "#top"] $ do
@@ -5493,21 +5497,64 @@ weaveBreadcrumbs = do
       span_ [class_ "breadcrumb-separator"] $ do
         toHtml @Text "/"
       toHtml @Text " "
-    convertObjectExtensionToOrg :: [Text] -> [Text]
-    convertObjectExtensionToOrg [] = []
-    convertObjectExtensionToOrg (objName : rest) =
-      let parts = T.split (== '.') objName
-          withoutObjectExtension = drop 1 $ reverse parts
-          withOrgExtension = ".org" : withoutObjectExtension
-       in (T.concat $ reverse withOrgExtension) : rest
 #+end_src
-
-The ~convertObjectExtensionToOrg~ function converts something like ~foo.lobj~ into
-~foo.org~.
 
 The reliance on ~originObjectPath~ assumes that the archive has object paths that
 are relative to the repository root. It could be that this is not true, but we
 don't bother to handle that edge case here.
+
+The ~convertObjectExtensionToOrg~ function converts something like ~foo.lobj~ into
+~foo.org~. See [[t:0302-object-extension-conversion-to-org]], which shows some happy
+paths as well as some edge cases
+[[(t:0302-object-extension-conversion-to-org-edge-cases)]]. The edge cases don't
+concern us too much because in practice they are extremely unlikely to happen.
+
+#+name: f:convertObjectExtensionToOrg
+#+begin_src haskell
+convertObjectExtensionToOrg :: [Text] -> [Text]
+convertObjectExtensionToOrg [] = []
+convertObjectExtensionToOrg (objName : rest) =
+  let parts = T.split (== '.') objName
+      withoutObjectExtension = drop 1 $ reverse parts
+      withOrgExtension = ".org" : withoutObjectExtension
+   in (T.concat $ reverse withOrgExtension) : rest
+#+end_src
+
+#+name: f:checkObjectExtensionConversion
+#+begin_src haskell
+checkObjectExtensionConversion :: String -> [([Text], [Text])] -> Spec
+checkObjectExtensionConversion msg testCases = do
+  it msg $ do
+    forM_ testCases $ \(input, output) -> do
+      LW.convertObjectExtensionToOrg input `shouldBe` output
+#+end_src
+
+#+name: t:0302-object-extension-conversion-to-org
+#+begin_src haskell
+describe "Object extension to org conversion" $ do
+  checkObjectExtensionConversion
+    "empty case"
+    [ ( [],
+        []
+      ),
+      ( ["foo.lobj"],
+        ["foo.org"]
+      ),
+      ( ["x.lobj", "a"],
+        ["x.org", "a"]
+      ),
+      ( ["1.lobj", "b", "a"],
+        ["1.org", "b", "a"]
+      ),
+      -- (ref:t:0302-object-extension-conversion-to-org-edge-cases)
+      ( ["x", "b", "a"],
+        [".org", "b", "a"]
+      ),
+      ( ["", "b", "a"],
+        [".org", "b", "a"]
+      )
+    ]
+#+end_src
 
 ** CSS
 :PROPERTIES:
@@ -5519,13 +5566,13 @@ don't bother to handle that edge case here.
 div # ".navbar" ? do
   "grid-area" -: "navbar"
   height $ rem 4
-  borderBottom (px 1) solid colorCodeBorder
+  borderBottom (px 1) solid colorCodeBorder -- (ref:css:navbar-1px)
   backgroundColor colorBg
   <<css:breadcrumbs>>
 #+end_src
 
-The total height of the navbar is \(3em + 1px\) because of the 1-pixel border at
-the bottom.
+The total height of the navbar is \(4\mathrm{em} + 1\mathrm{px}\) (and not just
+4em) because of the 1-pixel border at the bottom [[(css:navbar-1px)]].
 
 #+name: css:navbar-height
 #+begin_src txt
@@ -5534,7 +5581,8 @@ calc(4rem + 1px)
 
 The navbar causes a problem for links that point to elements inside the page,
 because the browser will normally go to the target element by putting it at the
-top of the page, but the navbar will sit on top of it. So we have to adjust it.
+top of the page, but the navbar will sit on top of it. So we have to adjust it
+so that the navbar never hides something underneath it.
 
 #+name: css:navbar-link-target-adjustment
 #+begin_src txt
@@ -5892,6 +5940,7 @@ import Relude
     String,
     Text,
     foldl',
+    forM_,
     fromList,
     fst,
     map,
@@ -5931,6 +5980,7 @@ spec = do
 <<f:weaveExpect>>
 <<f:getCiteprocResultFromPath>>
 <<f:expectCiteprocResult>>
+<<f:checkObjectExtensionConversion>>
 #+end_src
 
 [[f:getWovenPrettyFromPath]] weaves the given Org file to a =Text=, by first compiling
@@ -6093,6 +6143,7 @@ expectCiteprocResult path expected = do
 <<t:0300-weave-lists>>
 <<t:0301-weave-external-links-common-prefix>>
 <<t:0301-weave-external-links>>
+<<t:0302-object-extension-conversion-to-org>>
 <<t:0400-citeproc-basic>>
 <<t:0400-citeproc-superscript>>
 <<t:0400-citeproc-smallcaps>>

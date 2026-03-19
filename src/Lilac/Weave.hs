@@ -1,5 +1,6 @@
 module Lilac.Weave
   ( commonPrefix,
+    convertObjectExtensionToOrg,
     getRelativePathWithoutSymlinks,
     parseProjectConf,
     prepareCitations,
@@ -1766,8 +1767,8 @@ weaveNavbar = do
 weaveBreadcrumbs :: HtmlWeaver ()
 weaveBreadcrumbs = do
   weaveConf <- ask
-  weaveProjectName weaveConf.projectConf
-  weaveProjectVersion weaveConf.projectConf
+  weaveProjectName weaveConf.projectConf --
+  weaveProjectVersion weaveConf.projectConf --
   let breadcrumbsTail =
         map osPathDecoder
           . P.splitDirectories
@@ -1776,9 +1777,11 @@ weaveBreadcrumbs = do
       breadcrumbsMiddle = reverse . drop 1 $ reverse breadcrumbsTail
       breadcrumbLast =
         convertObjectExtensionToOrg . take 1 $ reverse breadcrumbsTail
+  --
   forM_ breadcrumbsMiddle $ \breadcrumb -> do
     weaveBreadcrumbSeparator
     weaveBreadcrumb breadcrumb
+  --
   forM_ breadcrumbLast $ \breadcrumb -> do
     weaveBreadcrumbSeparator
     a_ [href_ "#top"] $ do
@@ -1809,13 +1812,14 @@ weaveBreadcrumbs = do
       span_ [class_ "breadcrumb-separator"] $ do
         toHtml @Text "/"
       toHtml @Text " "
-    convertObjectExtensionToOrg :: [Text] -> [Text]
-    convertObjectExtensionToOrg [] = []
-    convertObjectExtensionToOrg (objName : rest) =
-      let parts = T.split (== '.') objName
-          withoutObjectExtension = drop 1 $ reverse parts
-          withOrgExtension = ".org" : withoutObjectExtension
-       in (T.concat $ reverse withOrgExtension) : rest
+
+convertObjectExtensionToOrg :: [Text] -> [Text]
+convertObjectExtensionToOrg [] = []
+convertObjectExtensionToOrg (objName : rest) =
+  let parts = T.split (== '.') objName
+      withoutObjectExtension = drop 1 $ reverse parts
+      withOrgExtension = ".org" : withoutObjectExtension
+   in (T.concat $ reverse withOrgExtension) : rest
 
 weaveFooter :: HtmlWeaver ()
 weaveFooter = do

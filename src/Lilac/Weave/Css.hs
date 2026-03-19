@@ -219,7 +219,7 @@ defaultCss = do
   div # ".navbar" ? do
     "grid-area" -: "navbar"
     height $ rem 4
-    borderBottom (px 1) solid colorCodeBorder
+    borderBottom (px 1) solid colorCodeBorder --
     backgroundColor colorBg
     div # ".breadcrumbs" ? do
       fontSans
