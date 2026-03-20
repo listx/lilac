@@ -545,6 +545,7 @@ defaultCss = do
   ".code-block-body" & do
     overflowX auto
     fontMono
+    fontSize (rem 0.9)
     backgroundColor colorCodeBg
     color colorCodeFg
     borderBottomLeftRadius (px 5) (px 5)
@@ -789,7 +790,7 @@ fontSans = do
 fontMono :: Css
 fontMono = do
   fontFamily ["Source Code Pro"] [monospace]
-  fontSize (rem 0.9)
+  fontSize (em 0.9)
 
 headingPrefix :: Text -> Size sz -> Css
 headingPrefix prefix spacing =

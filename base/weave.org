@@ -947,8 +947,12 @@ fontSans = do
 fontMono :: Css
 fontMono = do
   fontFamily ["Source Code Pro"] [monospace]
-  fontSize (rem 0.9)
+  fontSize (em 0.9)
 #+end_src
+
+The ~verbatim~ and ~code~ classes use a smaller 0.9 em font size, because otherwise
+they look too big (because typically monospaced font tends to look bigger than
+non-monospaced font).
 
 These fonts are loaded into the HTML page by [[Google Fonts]].
 
@@ -1941,10 +1945,6 @@ defined in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b::data:Style][data:Style]].
 ".superscript" & do
   verticalAlign vAlignSuper
 #+end_src
-
-The ~verbatim~ and ~code~ classes use a smaller 0.9 em font size, because otherwise
-they look too big (because typically monospaced font tends to look bigger than
-non-monospaced font).
 
 * Links
 :PROPERTIES:
@@ -3043,6 +3043,7 @@ code ? do
 ".code-block-body" & do
   overflowX auto
   fontMono
+  fontSize (rem 0.9)
   backgroundColor colorCodeBg
   color colorCodeFg
   borderBottomLeftRadius (px 5) (px 5)
