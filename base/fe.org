@@ -8,8 +8,8 @@
 :ID:       3c0adfb2-3d51-4cf0-a2f7-6c66f372c2f1
 :END:
 
-We write [[https://clojure.org/][Clojure]] instead of [[https://en.wikipedia.org/wiki/JavaScript][JavaScript]] (JS) to add interactivity to the woven
-HTML documents. For clarity, here are some definitions:
+We write [[https://clojure.org/][Clojure]] instead of [[https://en.wikipedia.org/wiki/JavaScript][JavaScript]] (JS) to add some interactivity to the
+woven HTML documents. Here are some definitions:
 
   - Clojure :: Lisp dialect which traditionally targets the JVM (Java runtime).
 
@@ -42,7 +42,7 @@ There are three major CLJS tech stacks:
 
 We choose to use Figwheel because it's a smaller library with fewer moving
 parts. Eventually when we feel the need to leverage NPM libraries (such as
-[[https://react.dev/][React]]), we could make the move to =shadow-cljs=.
+[[https://react.dev/][React]]), we could make the move to ~shadow-cljs~.
 
 ** Dependencies
 :PROPERTIES:
@@ -51,7 +51,7 @@ parts. Eventually when we feel the need to leverage NPM libraries (such as
 
 Because of the relative immaturity of the Nix package manager's integration with
 Clojure [fn:nix-clojure], we don't bother trying to set up a fully reproducible
-environment with it. Instead we just install the =clojure= binary and let it
+environment with it. Instead we just install the ~clojure~ binary and let it
 do the work of fetching all dependencies.
 
 #+name: nix:tools-fe
@@ -89,15 +89,15 @@ work properly. Otherwise we'll see an error like
 :ID:       783de6bf-e36b-4c9e-a405-2a86d0897795
 :END:
 
-The build configuration file is the main way of configuring a particular ~build~.
-These are essentially compiler options (because CLJS to JS compilation is the
-main part of the build process).
+The build configuration file ~lilac.cljs.edn~ is the main way of configuring a
+particular ~build~. These are essentially compiler options for the CLJS to JS
+compilation process.
 
 #+name: cfg:lilac-fe-build
 #+header: :tangle lilac.cljs.edn
 #+begin_src clojure
 {:main lilac.core
- :optimizations :none
+ :optimizations :none ; (ref:cfg:lilac-fe-build-none)
  :output-to "base/js/lilac.js"
  :output-dir "base/js/cljs-dev"
  :asset-path "js/cljs-dev"}
@@ -112,17 +112,17 @@ clojure -M -m figwheel.main --build lilac --repl
 
 This will create a REPL that can evaluate CLJS and run it as JS in the browser
 tab at http://localhost:8080/base/lilac.html per the ~:open-url~ setting in
-[[cfg:figwheel-main.edn]]. The ~lilac~ in ~--build lilac~ comes from the ~lilac~ string
-in ~lilac.cljs.edn~ (this is a Figwheel convention).
+[[cfg:figwheel-main.edn]]. The ~lilac~ in ~--build lilac~ comes from the ~lilac~ substring
+in the ~lilac.cljs.edn~ configuration file (this is a Figwheel convention).
 
-The ~:optimizations~ option is set to ~:none~ in [[cfg:lilac-fe-build]] because
+The ~:optimizations~ option is set to ~:none~ [[(cfg:lilac-fe-build-none)]] because
 that's required for the REPL to work. Actually it is already the default value,
 but we specify it here for explicitness.
 
 The traditional way to invoke [[sh:invoke-dev-build-watcher]] without typing
 everything out is to save it as an ~:aliases~ entry inside ~deps.edn~. However we
-have a unified Makefile interface already at [[id:5bbaf57a-217d-4e45-88bf-021c4c67b591][=Makefile=]], and so we comply with
-that instead for consistency.
+have a unified Makefile interface already at [[id:5bbaf57a-217d-4e45-88bf-021c4c67b591][=Makefile=]], and so we just use that
+instead.
 
 #+name: make:Start frontend development environment (CLJS REPL)
 #+begin_src makefile
@@ -133,7 +133,7 @@ dev-cljs:
 
 *** Known limitations
 
-We cannot load the development-mode JS in [[cfg:lilac-fe-build]] in this documents
+We cannot load the development-mode JS in [[cfg:lilac-fe-build]] in documents
 outside of the ~base~ directory, such as ~base/artifacts/plan.org~ ([[id:48e76342-2498-44c5-9ed9-830cb80995fd][Plan]]) because
 although we can correctly see ~lilac.js~ in the upper directory via
 [[id:da789584-7748-4258-a2ff-36567bbedbc8::f:getRelativeJsPath][f:getRelativeJsPath]], that script itself sources folders that are in the wrong
@@ -162,14 +162,16 @@ directory of ~js/cljs-dev/...~. This only works for HTML documents that sit unde
 the ~base~ directory.
 
 This is not a problem for the [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68][Optimized production build]], because that build
-uses a self-contained, single JS file.
+uses a self-contained, single JS file (and thus does not need to import other
+files like in development mode).
 
 *** Optimized production build
 :PROPERTIES:
 :ID:       7e6758c8-a642-4cfa-9e03-498163d6ce68
 :END:
 
-We have to run this in order to get a single minified JS file.
+We have to use the following configuration file to get a single minified JS
+file.
 
 #+name: cfg:lilac-fe-build-prod
 #+header: :tangle lilac-prod.cljs.edn
@@ -199,28 +201,31 @@ prod-cljs:
 .PHONY: prod-cljs
 #+end_src
 
-[[sh:update-injectable]] simply overwrites the path ~base/js/lilac.js.injectme~ with
-what's in ~base/js/lilac.js~. We cannot simply inject ~base/js/lilac.js~ directly
-because it's shared with the development environment by [[cfg:lilac-fe-build]].
-
-#+name: sh:update-injectable
-#+begin_src sh
-cp -f base/js/lilac.js base/js/lilac.js.injectme
-#+end_src
-
 If we are readying Lilac for a production release, it will need to have the
 contents of the single JavaScript file (at ~base/js/lilac.js~) injected into the
 CLI binary. To perform this injection, we have to
 
   1) Run ~make prod-cljs~ to ensure we have the latest ~base/js/lilac.js~ file. This
-     also creates a ~base/js/lilac.js.injectme~ which is a copy of the just-created
-     (production) ~base/js/lilac.js~ file.
+     also creates a ~base/js/lilac.js.injectme~ which is a copy of the
+     just-created (production) ~base/js/lilac.js~ file, per [[sh:update-injectable]].
 
   2) Recompile the CLI. This can be done with ~make tangle~ because tangling
      itself relies on the locally compiled version of the ~lilac~ CLI. Because we
      use the [[https://hackage.haskell.org/package/file-embed][file-embed]] library to inject the JavaScript file into the CLI in
      [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]], Cabal will automatically detect whether the
      JavaScript file has changed and recompile the CLI if needed.
+
+[[sh:update-injectable]] just overwrites the path ~base/js/lilac.js.injectme~ with
+what's in ~base/js/lilac.js~.
+
+#+name: sh:update-injectable
+#+begin_src sh
+cp -f base/js/lilac.js base/js/lilac.js.injectme
+#+end_src
+
+We cannot simply inject ~base/js/lilac.js~ directly because the development
+environment also uses the same file path in [[cfg:lilac-fe-build]] (and the
+development version of this file path does /not/ have a self-contained JS file).
 
 ** Figwheel configuration
 :PROPERTIES:
@@ -279,23 +284,24 @@ this, we have to write our own Ring handler.
 <<middleware:wrap-autorefresh>>
 
 (def development-app
-  (-> <<exp:404-fallback>>
-      <<exp:serve-files-from-project-root>>
+  (-> <<exp:404-fallback>> ; (ref:ns:lilac.handler-fallback)
+      <<exp:serve-files-from-project-root>> ; (ref:ns:lilac.handler-serve-from-project-root)
       (wrap-content-type) ; (ref:wrap-content-type)
       (wrap-not-modified) ; (ref:wrap-not-modified)
       (wrap-autorefresh)))
 #+end_src
 
-We start out with the fallback code, because this creates a default response if
-the request cannot be handled otherwise by any of the other middleware.
+We start out with the fallback [[(ns:lilac.handler-fallback)]], because this creates
+a default response if the request cannot be handled otherwise by any of the
+other middleware.
 
 #+name: exp:404-fallback
 #+begin_src clojure
 (constantly {:status 404 :headers {} :body "Not Found"})
 #+end_src
 
-This is the crucial bit. It lets us serve all files starting from the project
-root.
+[[exp:serve-files-from-project-root]] [[(ns:lilac.handler-serve-from-project-root)]]
+lets us serve all files starting from the project root.
 
 #+name: exp:serve-files-from-project-root
 #+begin_src clojure
@@ -345,7 +351,7 @@ Now we get to the script which refreshes the page. We want to first load the
 scroll positions (that were saved from the previous invocation, if any), then
 save the current scroll positions (to local storage), and then finally do a hard
 refresh. The one other thing we do is avoid performing the hard refresh if
-either the page has been recently scrolled (if the user is interacting withe the
+either the page has been recently scrolled (if the user is interacting with the
 page by scrolling), or if the user has decided to cancel pausing by setting a
 separate ~dev-pause-refresh~ key to ~true~.
 
@@ -382,7 +388,7 @@ separate ~dev-pause-refresh~ key to ~true~.
     setTimeout(() => {
       setScrollPositions(prevScrollPositions); // (ref:restore-scroll-pos)
       localStorage.removeItem(storageKey);
-    }, 100); // (ref:page-render-delay)
+    }, 200); // (ref:page-render-delay)
   }
 
   function refreshPage() {
@@ -411,7 +417,7 @@ described in [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb][Object]] and [[id:eda762
 how recently the user scrolled anything on the page at [[(recentlyScrolled)]].
 
 Restoration of any previously saved scroll positions is handled at
-[[(restore-scroll-pos)]]. The 100 millisecond delay at [[(page-render-delay)]] gives the
+[[(restore-scroll-pos)]]. The 200 millisecond delay at [[(page-render-delay)]] gives the
 browser time to finish rendering the page before we attempt to restore the
 scroll positions (otherwise, the DOM may not have been parsed yet for the
 JavaScript to look at and manipulate).
@@ -446,12 +452,13 @@ loop.
     (if (= new-val "true") :PAUSED :ACTIVE)))
 #+end_src
 
-* =lilac.core= module
+* =lilac.core= namespace
 :PROPERTIES:
 :ID:       48d6dc87-f5fc-4a36-bef4-85b9d4207f05
 :END:
 
-This is the main top-level module where we load all of our custom JS behavior.
+This is the main top-level Clojure namespace where we load all of our custom JS
+behavior.
 
 #+name: ns:lilac.core
 #+header: :tangle src/fe/lilac/core.cljs
@@ -471,14 +478,13 @@ This is the main top-level module where we load all of our custom JS behavior.
 (js/console.log "Lilac loaded successfully.")
 #+end_src
 
-The following can start the REPL but also automatically load the given
-namespace, so that saving that file automatically reloads it.
+The following can start the REPL but also automatically load the given Clojure
+namespace (in this case ~lilac.core~), so that saving that file automatically
+reloads it.
 
 #+begin_src sh
 clojure -M -m figwheel.main --compile lilac.core --repl
 #+end_src
-
-However, it's easier to put these and other options into a [[id:783de6bf-e36b-4c9e-a405-2a86d0897795][Build configuration file]] and use that instead.
 
 ** Anchor link history
 :PROPERTIES:
@@ -490,11 +496,11 @@ current page (aka /anchor links/) as navigable history items. So after clicking 
 a bunch of anchor links, if you press the back button on your mouse you'd only
 see the URL bar change, but the window won't change locations.
 
-In [[ns:lilac.popstate-history]] we make the browser treat anchor links as worthy
-of being included in the history, so that the back button works to move around
-(to previously visited locations) in the current page. It works by creating an
-event listener which fires for every ~popstate~ event, is the equivalent of the
-back button.
+In [[ns:lilac.popstate-history]] we make the browser treat anchor links as worthy of
+being included in the history, so that the back button works to move around (to
+previously visited locations) in the current page. It works by creating an event
+listener which fires for every ~popstate~ event, and is the equivalent of the back
+button.
 
 #+name: ns:lilac.popstate-history
 #+header: :tangle src/fe/lilac/popstate_history.cljs
@@ -521,41 +527,17 @@ back button.
 :ID:       c4c13ce7-23d9-49d9-8d3f-6faecf839afa
 :END:
 
-This works by checking which heading container ~<div>~ elements are visible in the
-viewport. Heading containers are created in [[id:c036cf17-0f61-4f07-bf76-bbe8b4eeb12e::f:weaveHeading][f:weaveHeading]]. Every time
-visibility changes, we update the ~visible-headings~ atom, which is a set of visible
-heading IDs. We also update the ~active~ and ~active-ancestor~ classes of
-the items in the [[id:e38fb4d1-72e1-40e0-905e-95bc8be2bf0b][Table of Contents (TOC)]]. We highlight the active heading from
-the visible heading containers, and also all of their ancestor headings by
-reading in the [[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6][Heading ancestry]] information, which is woven in as a JSON object
-in the HTML inside [[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6::f:weaveHeadingAncestry][f:weaveHeadingAncestry]].
+We want the TOC to highlight the headings we are currently looking at, so that
+we can easily see where we are overall in the document. This works by checking
+which heading container ~<div>~ elements are visible in the viewport.
 
-The ~init~ function has four parts:
-
-  1) Read in the heading ancestry JSON (as a native Clojure map), via
-     [[f:get-heading-ancestry]] at [[(read-ancestry)]].
-
-  2) Assign [[f:update-toc-highlights]] as a callback to fire whenever the
-     ~visible-headings~ atom changes at [[(toc-callback)]].
-
-  3) Use the browser's [[https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API][Intersection Observer API]] to watch all heading containers
-     at [[(watch-heading-containers)]]. Make the ~update-visible-headings~ function
-     get called (as another kind of callback) any time a heading container
-     becomes (or no longer becomes) visible in the viewport. The
-     ~update-visible-headings~ modifies the ~visible-headings~ atom.
-
-  4) Assign click handlers to TOC entry links, so that if a user clicks on a
-     link from the TOC, we trigger a reset of the ~visible-headings~ atom at
-     [[(reset-headings-on-click)]]. This is so that the Intersection Observer API
-     can populate that atom again in its callback. This way, we cleanly separate
-     what the user does in the main viewport (scrolling it to trigger the
-     Intersection Observer API), and what the user does in the TOC by clicking
-     on links. If we don't have these click handlers in the TOC, then clicking
-     on the TOC can potentially end up with weird snapping behavior.
-
-     Note that the reset of the atom is only done if the heading that is clicked
-     on is not already active (that is, we don't do anything if the heading is
-     already visible).
+Heading containers are created in [[id:c036cf17-0f61-4f07-bf76-bbe8b4eeb12e::f:weaveHeading][f:weaveHeading]]. Every time visibility changes,
+we update the ~visible-headings~ atom, which is a set of visible heading IDs. We
+also update the ~active~ and ~active-ancestor~ classes of the items in the [[id:e38fb4d1-72e1-40e0-905e-95bc8be2bf0b][Table of
+Contents (TOC)]]. We highlight the active heading from the visible heading
+containers, and also all of their ancestor headings by reading in the [[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6][Heading
+ancestry]] information, which is woven in as a JSON object in the HTML inside
+[[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6::f:weaveHeadingAncestry][f:weaveHeadingAncestry]].
 
 #+name: ns:lilac.toc-active-entries
 #+header: :tangle src/fe/lilac/toc_active_entries.cljs
@@ -571,35 +553,64 @@ The ~init~ function has four parts:
 <<f:update-toc-highlights>>
 <<f:maybe-scroll-toc>>
 
-(defn init []
+(defn init [] ; (ref:ns:lilac.toc-active-entries-init)
   (let [heading-ancestry (get-heading-ancestry)] ; (ref:read-ancestry)
 
     (add-watch visible-headings :lilac-toc-updater
       (fn [_key atom _old-state _new-state]
         (update-toc-highlights heading-ancestry @atom) ; (ref:toc-callback)
-        (maybe-scroll-toc @atom)))
+        (maybe-scroll-toc @atom))) ; (ref:ns:lilac.toc-active-entries-maybe-scroll-toc)
 
-    (let [options #js {:rootMargin "0px 0px 0px 0px" :threshold 0}
+    (let [options #js {:rootMargin "0px 0px 0px 0px" :threshold 0} ; (ref:ns:lilac.toc-active-entries-rootMargin)
           heading-containers
             (.querySelectorAll js/document ".heading-container")
           observer
-            (new js/IntersectionObserver update-visible-headings options)]
+            (new js/IntersectionObserver update-visible-headings options)] ; (ref:ns:lilac.toc-active-entries-update-visible-headings)
       (doseq [heading-container heading-containers]
         (.observe observer heading-container))) ; (ref:watch-heading-containers)
 
     (let [toc-entry-links (.querySelectorAll js/document ".toc-entry a")]
       (doseq [link toc-entry-links]
         (.addEventListener
-           link "click"
+           link "click" ; (ref:ns:lilac.toc-active-entries-click-handlers)
            (fn [event]
              (let [clicked-link (.-currentTarget event)]
-               (when-not (.contains (.-classList clicked-link) "active")
+               (when-not (.contains (.-classList clicked-link) "active") ; (ref:ns:lilac.toc-active-entries-reset-atom)
                  #(reset! visible-headings #{}))))))))) ; (ref:reset-headings-on-click)
 #+end_src
 
-The ~:rootMargin "0px 0px 0px 0px"~ bit just makes the viewport the thing to check
-intersections against, and the ~:threshold 0~ makes the observer sensitive to even
-just 1 pixel of intersection.
+The ~init~ function [[(ns:lilac.toc-active-entries-init)]] has four parts:
+
+  1) Read in the heading ancestry JSON (as a native Clojure map), via
+     [[f:get-heading-ancestry]] at [[(read-ancestry)]].
+
+  2) Assign [[f:update-toc-highlights]] as a callback to fire whenever the
+     ~visible-headings~ atom changes at [[(toc-callback)]].
+
+  3) Use the browser's [[https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API][Intersection Observer API]] to watch all heading containers
+     at [[(watch-heading-containers)]]. Make [[f:update-visible-headings]] get called
+     (as another kind of callback) any time a heading container becomes (or no
+     longer becomes) visible in the viewport
+     [[(ns:lilac.toc-active-entries-update-visible-headings)]].
+     [[f:update-visible-headings]] modifies the ~visible-headings~ atom.
+
+  4) Assign click handlers to TOC entry links
+     [[(ns:lilac.toc-active-entries-click-handlers)]], so that if a user clicks on a
+     link from the TOC, we trigger a reset of the ~visible-headings~ atom at
+     [[(reset-headings-on-click)]]. This is so that the Intersection Observer API
+     can populate that atom again in its callback. This way, we cleanly separate
+     what the user does in the main viewport (scrolling it to trigger the
+     Intersection Observer API), and what the user does in the TOC by clicking
+     on links. If we don't have these click handlers in the TOC, then clicking
+     on the TOC can potentially end up with weird snapping behavior.
+
+     Note that the reset of the atom is only done if the heading that is clicked
+     on is not already active [[(ns:lilac.toc-active-entries-reset-atom)]] (that is,
+     we don't do anything if the heading is already visible).
+
+The ~:rootMargin "0px 0px 0px 0px"~ [[(ns:lilac.toc-active-entries-rootMargin)]] just
+makes the entire viewport the thing to check intersections against, and the
+~:threshold 0~ makes the observer sensitive to even just 1 pixel of intersection.
 
 Now let's look at how we get the heading ancestry from the JSON. Recall that it
 is woven into the document by [[id:4651cdd2-5f79-46e0-af4a-5344d71c7ea6::f:weaveHeadingAncestry][f:weaveHeadingAncestry]] ([[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] calls it).
@@ -614,7 +625,8 @@ element from the DOM.
           js-object (.parse js/JSON json-string)]
       (keywordize-keys (js->clj js-object)))
     (do
-      (.error js/console "Warning: Heading ancestry data not found; using empty map.")
+      (.error js/console
+              "Warning: Heading ancestry data not found; using empty map.")
       {})))
 #+end_src
 
@@ -662,9 +674,10 @@ of the ~entry~ object.
 | Property access | ~(.-prop obj)~         | ~obj.prop~         |
 | Method call     | ~(.method obj args)~   | ~obj.method(args)~ |
 
-[[f:update-toc-highlights]] calculates ~visible-headings-with-ancestors~, which is the
-set of relevant ancestor headings for the current set of ~visible-headings~, and
-uses this to check each TOC entry. It highlights the active headings (and their
+[[f:update-toc-highlights]] calculates ~visible-headings-with-ancestors~
+[[(f:update-toc-highlights-visible-headings-with-ancestors)]], which is the set of
+relevant ancestor headings for the current set of ~visible-headings~, and uses
+this to check each TOC entry. It highlights the active headings (and their
 ancestors).
 
 #+name: f:update-toc-highlights
@@ -672,7 +685,7 @@ ancestors).
 (defn update-toc-highlights [ancestry visible-headings]
   (let [toc-entries (.querySelectorAll js/document ".toc-entry")
         toc-container (.querySelector js/document ".toc")
-        visible-headings-with-ancestors
+        visible-headings-with-ancestors ; (ref:f:update-toc-highlights-visible-headings-with-ancestors)
           (reduce (fn [acc id]
                       (let [ancestors (set (get ancestry (keyword id) []))]
                         (clojure.set/union acc ancestors)))
@@ -681,7 +694,7 @@ ancestors).
 
     (doseq [toc-entry toc-entries]
       (when-let [toc-entry-link (.querySelector toc-entry "a")]
-        (let [heading (subs (.-hash toc-entry-link) 1)
+        (let [heading (subs (.-hash toc-entry-link) 1) ; (ref:f:update-toc-highlights-remove-initial-hash)
               class-list (.-classList toc-entry)]
           (cond
             (contains? visible-headings heading)
@@ -700,14 +713,16 @@ ancestors).
               (.remove class-list "active-ancestor"))))))))
 #+end_src
 
-The ~heading (subs (.-hash toc-entry-link) 1)~ bit is for removing the initial ~#~
-part of the ID (so ~foo~ instead of ~#foo~).
+The ~heading (subs (.-hash toc-entry-link) 1)~
+[[(f:update-toc-highlights-remove-initial-hash)]] is for removing the initial ~#~ part
+of the ID (so ~foo~ instead of ~#foo~).
 
 [[f:maybe-scroll-toc]] (potentially) scrolls the TOC so that it shows the active
-heading. We scroll up or down, depending on the relative position of the TOC
-entry and where the TOC container is located. And within each case, we scroll
-all the way to the top or all the way to the bottom if the active heading is the
-first or last TOC entry.
+heading. It is called in [[(ns:lilac.toc-active-entries-maybe-scroll-toc)]]. We
+scroll up or down, depending on the relative position of the TOC entry and where
+the TOC container is located. And within each case, we scroll all the way to the
+top or all the way to the bottom if the active heading is the first or last TOC
+entry.
 
 #+name: f:maybe-scroll-toc
 #+begin_src clojure
@@ -717,7 +732,9 @@ first or last TOC entry.
         all-active-entries
           (filter (fn [toc-entry]
                     (when-let [toc-entry-link (.querySelector toc-entry "a")]
-                      (contains? visible-headings (subs (.-hash toc-entry-link) 1))))
+                      (contains?
+                        visible-headings
+                        (subs (.-hash toc-entry-link) 1))))
                   toc-entries)
 
         first-active (first all-active-entries)
@@ -730,16 +747,17 @@ first or last TOC entry.
 
         (cond
           (< (.-top first-active-rect) (.-top toc-rect))
-          (if (= first-active (first toc-entries))
-            (.scrollTo toc-container #js
+          (if (= first-active (first toc-entries)) ; (ref:f:maybe-scroll-toc-scroll-up)
+            (.scrollTo toc-container #js ; (ref:f:maybe-scroll-toc-js-reader-macro)
                        {:top 0 :behavior "instant"})
             (.scrollIntoView first-active #js
                              {:behavior "instant" :block "start"}))
 
           (> (.-bottom last-active-rect) (.-bottom toc-rect))
-          (if (= last-active (last toc-entries))
+          (if (= last-active (last toc-entries)) ; (ref:f:maybe-scroll-toc-scroll-down)
             (.scrollTo toc-container #js
-                       {:top (.-scrollHeight toc-container) :behavior "instant"})
+                       {:top (.-scrollHeight toc-container)
+                        :behavior "instant"})
             (.scrollIntoView last-active #js
                              {:behavior "instant" :block "end"}))
 
@@ -747,15 +765,16 @@ first or last TOC entry.
 #+end_src
 
 We scroll up if we see that the /first/ active TOC entry is above the TOC
-container. This way we show /all/ active headings, not just the first or last one.
-For example, if we need to scroll up but only scroll to the last active TOC
-entry (and there are other entries above it), we will still leave some of these
-other active entries out of view. We do the equivalent thing for scrolling down
-(where we check for the bounding box of the /last/ active TOC entry).
+container [[(f:maybe-scroll-toc-scroll-up)]]. This way we show /all/ active headings,
+not just the first or last one. For example, if we need to scroll up but only
+scroll to the last active TOC entry (and there are other entries above it), we
+will still leave some of these other active entries out of view. We do the
+equivalent thing for scrolling down (where we check for the bounding box of the
+/last/ active TOC entry) [[(f:maybe-scroll-toc-scroll-down)]].
 
-When ClojureScript encounters ~#js~, it converts the Clojure data structure that
-follows it into its nearest JavaScript equivalent. So for Clojure maps, it
-creates a JSON object.
+When ClojureScript encounters ~#js~ [[(f:maybe-scroll-toc-js-reader-macro)]], it
+converts the Clojure data structure that follows it into its nearest JavaScript
+equivalent. So for Clojure maps, it creates a JSON object.
 
 ** Lazy scroll
 
@@ -793,15 +812,13 @@ The [[(lazy-scroll/init)]] is the entrypoint. It is concerned with three types o
 
   3) initial page load [[(lazy-scroll/page-load)]]
 
-The last two are handled directly in [[(lazy-scroll/init)]], and both rely on
-[[f:maybe-scroll-by-hash]].
-
 When we're clicking the forward and back (history) buttons on a mouse, we call
-[[f:maybe-scroll-by-hash]] (which tries to scroll to the element in the current
-history (URL)) because pressing these mouse buttons are not associated with
-click events (otherwise, just [[f:weaken-anchor-links]] will suffice).
+[[f:maybe-scroll-by-hash]] [[(lazy-scroll/weaken-anchor-links)]] (which tries to scroll
+to the element in the current history (URL)) because pressing these mouse
+buttons are not associated with click events (otherwise, just
+[[f:weaken-anchor-links]] will suffice).
 
-The initial page load [[(lazy-scroll/page-load)]], is an edge case where there is no
+The initial page load [[(lazy-scroll/page-load)]] is an edge case where there is no
 associated event (no mouse click or history manipulation is involved), but where
 the URL could still end with an anchor at the end.
 
@@ -855,13 +872,13 @@ starts with a hash like ~#foo~ in ~href=#foo~), and then:
 #+begin_src clojure
 (defn- maybe-scroll-by-hash [_popstate-event]
   (let [href (.-hash (.-location js/window))
-        id (href->id href)]
+        id (href->id href)] ; (ref:f:maybe-scroll-by-hash-get-anchor)
     (when-let [target-element (-> js/document (.getElementById id))]
       (activate target-element) ; (ref:activate)
       (maybe-scroll target-element)))) ; (ref:call-maybe-scroll)
 #+end_src
 
-[[f:href->id]] just retrieves the anchor.
+[[f:href->id]] [[(f:maybe-scroll-by-hash-get-anchor)]] just retrieves the anchor.
 
 #+name: f:href->id
 #+begin_src clojure
@@ -899,9 +916,9 @@ The visibility check is done inside [[f:visible?]].
 
 At [[(element-position)]] we calculate the bounding box of the target element, and
 perform a "is it visible" check at [[(element-visibility)]]. The [[id:649018db-d088-4a08-920c-0d64a0be27cd::css:breadcrumbs][css:breadcrumbs]]
-element hides whatever is underneath it from the human user, but for purposes of
-the viewport (and ~.getBoundingClientRect~) it is ignored. So we have to
-compensate for it with [[f:get-breadcrumbs-height]].
+element (in the navigation bar) hides whatever is underneath it from the human
+user, but for purposes of the viewport (and ~.getBoundingClientRect~) it is
+ignored. So we have to compensate for it with [[f:get-breadcrumbs-height]].
 
 #+name: f:get-breadcrumbs-height
 #+begin_src clojure
@@ -980,8 +997,14 @@ classes.
 :ID:       9c8e1074-edfb-4f89-bedf-07527981835d
 :END:
 
-We want to toggle the display of a code block's metadata, so that the user can
-see things like the underlying language.
+Code blocks have metadata, but we don't display all of the metadata because it
+can be overly verbose (see [[id:55af9189-9fb5-4ed9-bbf6-eed970a2e0a5][Hidden (raw) metadata]]). Still, we allow the user to
+see all of the metadata details if the wish (such as when the user wants to see
+things like the underlying language of the code block).
+
+We let the user toggle the display of a code block's metadata by clicking on the
+metadata button
+[[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::(f:weaveBlock-metadata-button)]].
 
 #+name: ns:lilac.toggle-block-metadata
 #+header: :tangle src/fe/lilac/toggle_block_metadata.cljs
@@ -993,6 +1016,8 @@ see things like the underlying language.
 (defn init []
   (init-toggle-buttons))
 #+end_src
+
+[[f:init-toggle-buttons]] adds a click event listener to the metadata button.
 
 #+name: f:init-toggle-buttons
 #+begin_src clojure

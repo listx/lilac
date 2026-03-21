@@ -44,7 +44,7 @@
                     setTimeout(() => {
                       setScrollPositions(prevScrollPositions); //
                       localStorage.removeItem(storageKey);
-                    }, 100); //
+                    }, 200); //
                   }
 
                   function refreshPage() {
@@ -74,9 +74,8 @@
         response))))
 
 (def development-app
-  (-> (constantly {:status 404 :headers {} :body "Not Found"})
-
-      (wrap-file ".")
+  (-> (constantly {:status 404 :headers {} :body "Not Found"}) ;
+      (wrap-file ".") ;
       (wrap-content-type) ;
       (wrap-not-modified) ;
       (wrap-autorefresh)))

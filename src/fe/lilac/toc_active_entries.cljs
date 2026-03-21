@@ -10,7 +10,8 @@
           js-object (.parse js/JSON json-string)]
       (keywordize-keys (js->clj js-object)))
     (do
-      (.error js/console "Warning: Heading ancestry data not found; using empty map.")
+      (.error js/console
+              "Warning: Heading ancestry data not found; using empty map.")
       {})))
 
 (defn update-visible-headings [entries]
@@ -24,7 +25,7 @@
 (defn update-toc-highlights [ancestry visible-headings]
   (let [toc-entries (.querySelectorAll js/document ".toc-entry")
         toc-container (.querySelector js/document ".toc")
-        visible-headings-with-ancestors
+        visible-headings-with-ancestors ;
           (reduce (fn [acc id]
                       (let [ancestors (set (get ancestry (keyword id) []))]
                         (clojure.set/union acc ancestors)))
@@ -33,7 +34,7 @@
 
     (doseq [toc-entry toc-entries]
       (when-let [toc-entry-link (.querySelector toc-entry "a")]
-        (let [heading (subs (.-hash toc-entry-link) 1)
+        (let [heading (subs (.-hash toc-entry-link) 1) ;
               class-list (.-classList toc-entry)]
           (cond
             (contains? visible-headings heading)
@@ -57,7 +58,9 @@
         all-active-entries
           (filter (fn [toc-entry]
                     (when-let [toc-entry-link (.querySelector toc-entry "a")]
-                      (contains? visible-headings (subs (.-hash toc-entry-link) 1))))
+                      (contains?
+                        visible-headings
+                        (subs (.-hash toc-entry-link) 1))))
                   toc-entries)
 
         first-active (first all-active-entries)
@@ -70,42 +73,43 @@
 
         (cond
           (< (.-top first-active-rect) (.-top toc-rect))
-          (if (= first-active (first toc-entries))
-            (.scrollTo toc-container #js
+          (if (= first-active (first toc-entries)) ;
+            (.scrollTo toc-container #js ;
                        {:top 0 :behavior "instant"})
             (.scrollIntoView first-active #js
                              {:behavior "instant" :block "start"}))
 
           (> (.-bottom last-active-rect) (.-bottom toc-rect))
-          (if (= last-active (last toc-entries))
+          (if (= last-active (last toc-entries)) ;
             (.scrollTo toc-container #js
-                       {:top (.-scrollHeight toc-container) :behavior "instant"})
+                       {:top (.-scrollHeight toc-container)
+                        :behavior "instant"})
             (.scrollIntoView last-active #js
                              {:behavior "instant" :block "end"}))
 
           :else nil)))))
 
-(defn init []
+(defn init [] ;
   (let [heading-ancestry (get-heading-ancestry)] ;
 
     (add-watch visible-headings :lilac-toc-updater
       (fn [_key atom _old-state _new-state]
         (update-toc-highlights heading-ancestry @atom) ;
-        (maybe-scroll-toc @atom)))
+        (maybe-scroll-toc @atom))) ;
 
-    (let [options #js {:rootMargin "0px 0px 0px 0px" :threshold 0}
+    (let [options #js {:rootMargin "0px 0px 0px 0px" :threshold 0} ;
           heading-containers
             (.querySelectorAll js/document ".heading-container")
           observer
-            (new js/IntersectionObserver update-visible-headings options)]
+            (new js/IntersectionObserver update-visible-headings options)] ;
       (doseq [heading-container heading-containers]
         (.observe observer heading-container))) ;
 
     (let [toc-entry-links (.querySelectorAll js/document ".toc-entry a")]
       (doseq [link toc-entry-links]
         (.addEventListener
-           link "click"
+           link "click" ;
            (fn [event]
              (let [clicked-link (.-currentTarget event)]
-               (when-not (.contains (.-classList clicked-link) "active")
+               (when-not (.contains (.-classList clicked-link) "active") ;
                  #(reset! visible-headings #{}))))))))) ;

@@ -31,7 +31,7 @@
 
 (defn- maybe-scroll-by-hash [_popstate-event]
   (let [href (.-hash (.-location js/window))
-        id (href->id href)]
+        id (href->id href)] ;
     (when-let [target-element (-> js/document (.getElementById id))]
       (activate target-element) ;
       (maybe-scroll target-element)))) ;
