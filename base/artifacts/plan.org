@@ -18,14 +18,16 @@ This document explains planned work (what's on the roadmap, etc).
 New TODOs start out in the [[id:b27d3e53-ada2-4f9e-9f38-18e9252b8229][Backlog]] and then end up in either [[id:f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4][Release blockers]]
 or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 
-* Release blockers
+* Release ~0.9.0.0~ blockers
 :PROPERTIES:
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
-** For release ~0.9.0.0~
+** TODO migrate to SourceHut (CI as well)
 
-*** TODO add widget for higher-level table of contents
+We have to port [[id:0cf535d6-f852-4b97-8ef8-9d566ad32e51][GitHub Actions]] to it, and also deprecate [[id:8c1c0f55-5f6a-4cc7-8c36-c34044d538c7][Dependabot]].
+
+** TODO add widget for higher-level table of contents
 
 We need a way to let users understand that a single document is part of some
 other one. Otherwise it can be tricky to navigate across the related documents
@@ -40,18 +42,13 @@ the HLTOC. And then /that/ page could be part of yet another HLTOC (and so we ca
 nest arbitrarily deep). We could potentially make a rule which says that a
 document can only be mentioned in one HLTOC (no overlap).
 
-*** TODO write manpage
-
-The manpage should have some minimal examples of how to use Lilac. It should be
-a condensed version of the larger (complete) user guide.
-
-*** IN-PROGRESS write user guide
+** IN-PROGRESS write user guide
 
 The problem with most of the existing docs are that they are geared toward
 programmers. We need something for regular Orgmode users who may not be
 programmers, and who don't really care about how Lilac is implemented.
 
-**** TODO explain project motivation, and differences with vanilla Org
+*** TODO explain project motivation, and differences with vanilla Org
 
 #+begin_quote
 The other problem with Org is that the syntax highlighting of code blocks
@@ -70,22 +67,18 @@ benefits of using Org interactively for day-to-day writing.
 Compare features against the table in the README of
 https://github.com/tecosaur/Org.jl.
 
-*** TODO add diagram of strongly-connected-components and self-loops
-See CLRS page 616 which shows a graph that has a self loop and
-strongly-connected-components.
-
-*** TODO create release-notes.org
+** TODO create release-notes.org
 
 We have to have a simple document which summarizes the changes going into a
 release. We should get into the habit of writing out entries for this ahead of a
 release (so that we don't do it all at once, but piecemeal as each thing is finished).
 
-**** TODO define versioning semantics
+*** TODO define versioning semantics
 
 Maybe just copy what Linux does and create a new major version once the minor
 version gets too big (20s or 30s).
 
-**** TODO codify rules about weaving and releasing
+*** TODO codify rules about weaving and releasing
 
 We should probably co-locate woven HTML with the rest of the code, for
 simplicity during hosting (that way the HTML can link to raw tangled code, and
@@ -97,21 +90,6 @@ will avoid conflicts that will arise in the HTML which auto-numbers things
 sequentially, for example). This implies some sort of structured release process
 like in the Git project (~main~ should only be advanced to catch up to ~next~, for example).
 
-*** TODO change git version injection logic to use ~sed~
-
-This is cleaner as it sidesteps GHC and TH entirely if there have been no
-meaningful code changes. See [[https://www.reddit.com/r/haskell/comments/1lzjl6r/comment/n36q05j/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button][this guide]].
-
-*** TODO migrate to SourceHut (CI as well)
-
-We have to port [[id:0cf535d6-f852-4b97-8ef8-9d566ad32e51][GitHub Actions]] to it, and also deprecate [[id:8c1c0f55-5f6a-4cc7-8c36-c34044d538c7][Dependabot]].
-
-*** TODO use [[id:a7de905c-03c8-4d4b-911c-b1f4435aea85::data:RawProjectConf][data:RawProjectConf]] to weave links to file: paths
-
-The discussions at [[id:74ae3eda-4656-4e07-ba5a-77fbbb704f31][Nix]] involve many links to raw files on the filesystem. They
-work well in Emacs, but not in HTML. Use the project config to link to the
-SourceHut repo (use that as the base URL).
-
 * Backlog
 :PROPERTIES:
 :ID:       b27d3e53-ada2-4f9e-9f38-18e9252b8229
@@ -120,6 +98,27 @@ SourceHut repo (use that as the base URL).
 Ideally the backlog would use something like a Story Map to encode both time and
 priority as two separate dimensions. However we just have a flat list of items
 for now because we don't have a good way of representing story maps.
+
+** TODO change git version injection logic to use ~sed~
+
+This is cleaner as it sidesteps GHC and TH entirely if there have been no
+meaningful code changes. See [[https://www.reddit.com/r/haskell/comments/1lzjl6r/comment/n36q05j/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button][this guide]].
+
+** TODO add diagram of strongly-connected-components and self-loops
+
+See CLRS page 616 which shows a graph that has a self loop and
+strongly-connected-components.
+
+** TODO use [[id:a7de905c-03c8-4d4b-911c-b1f4435aea85::data:RawProjectConf][data:RawProjectConf]] to weave links to file: paths
+
+The discussions at [[id:74ae3eda-4656-4e07-ba5a-77fbbb704f31][Nix]] involve many links to raw files on the filesystem. They
+work well in Emacs, but not in HTML. Use the project config to link to the
+SourceHut repo (use that as the base URL).
+
+** TODO write manpage
+
+The manpage should have some minimal examples of how to use Lilac. It should be
+a condensed version of the larger (complete) user guide.
 
 ** TODO teach lilac CLI to push HTML page refresh to the client based on file changes
 
