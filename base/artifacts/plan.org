@@ -25,15 +25,6 @@ or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 
 ** For release ~0.9.0.0~
 
-*** TODO convert automatic page refresh into ClojureScript
-
-This way we don't have to inject it as middleware.
-
-*** TODO make automatic page refresh debounce if no recent changes
-
-In development mode, make the page aware of the timestamp of the corresponding
-HTML file, and ignore the refresh if the timestamp hasn't changed.
-
 *** TODO add widget for higher-level table of contents
 
 We need a way to let users understand that a single document is part of some
@@ -129,6 +120,12 @@ SourceHut repo (use that as the base URL).
 Ideally the backlog would use something like a Story Map to encode both time and
 priority as two separate dimensions. However we just have a flat list of items
 for now because we don't have a good way of representing story maps.
+
+** TODO teach lilac CLI to push HTML page refresh to the client based on file changes
+
+*** TODO teach lilac to serve the HTML pages it generates (~lilac serve~)
+
+*** TODO add middleware into lilac which injects the auto refresh (client) JS script if ~--watch~ flag is provided to ~lilac serve~
 
 ** TODO make table heading sticky (stay put if scrolling, like Wikipedia's tables)
 
