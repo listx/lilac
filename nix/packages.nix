@@ -38,8 +38,25 @@ let
   ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.12.2";
   ghcVersion = "ghc" + ghcVersionWithoutDots;
 
-  haskellOverlays =
-    [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+  haskellOverlays = [
+    jailbreaks
+    injectExternalPackages
+    injectLilac
+    tweakLilacBuild
+    buildDepsFast
+  ];
+
+  # (ref:nix:Haskell overlays-buildDepsFast)
+  buildDepsFast = final: prev: {
+    mkDerivation = args:
+      prev.mkDerivation (args // {
+        enableLibraryProfiling = false;
+        enableExecutableProfiling = false;
+        doBenchmark = false;
+        doCheck = false;
+        doHaddock = false;
+      });
+  };
 
   jailbreaks = final: prev: {
     skylighting-core = pkgs.haskell.lib.doJailbreak (prev.skylighting-core);

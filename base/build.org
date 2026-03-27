@@ -323,13 +323,31 @@ Going back to ~ourHaskell~, the ~haskellOverlays~ are straightforward enough. Th
 first overlay ~injectLilac~ adds a new Haskell package called ~lilac~. The other one
 is ~tweakLilacBuild~ which adjusts the build process so that the [[id:3c576a02-418b-431b-ab96-e4936e977fb7][Template
 Haskell code]] can use the ~LILAC_GIT_VERSION~ environment variable to use as the
-output for the ~--version~ flag.
+output for the ~--version~ flag. [[(nix:Haskell overlays-buildDepsFast)]] disables a
+number of options so that we only build the minimum necessary things for our dependencies.
 
 #+name: nix:Haskell overlays
 #+header: :line-label tangle
 #+begin_src nix
-haskellOverlays =
-  [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+haskellOverlays = [
+  jailbreaks
+  injectExternalPackages
+  injectLilac
+  tweakLilacBuild
+  buildDepsFast
+];
+
+# (ref:nix:Haskell overlays-buildDepsFast)
+buildDepsFast = final: prev: {
+  mkDerivation = args:
+    prev.mkDerivation (args // {
+      enableLibraryProfiling = false;
+      enableExecutableProfiling = false;
+      doBenchmark = false;
+      doCheck = false;
+      doHaddock = false;
+    });
+};
 
 jailbreaks = final: prev: {
   <<jailbreaks:skylighting-core>>
