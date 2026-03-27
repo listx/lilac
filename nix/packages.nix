@@ -13,7 +13,8 @@ let
     pkgs.niv
 
     pkgs.cabal-install
-
+    #
+    ourHaskell.hspec-discover
     pkgs.editorconfig-checker
 
     pkgs.shellcheck
