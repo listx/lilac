@@ -63,7 +63,7 @@ build-release: $(org_files) lilac.cabal
 
 update-nix:
 	niv init
-	niv update nixpkgs --branch nixos-25.05
+	niv update nixpkgs --branch nixos-25.11
 
 clean:
 	rm -rf \
