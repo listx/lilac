@@ -332,20 +332,14 @@ output for the ~--version~ flag.
 #+name: nix:Haskell overlays
 #+header: :line-label tangle
 #+begin_src nix
-haskellOverlays = [
-  jailbreaks
-  injectExternalPackages
-  injectLilac
-  tweakLilacBuild
-];
+haskellOverlays =
+  [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
 
 jailbreaks = final: prev: {
-  <<jailbreaks:skylighting-core>>
   <<jailbreaks:unicode-data>>
 };
 
 injectExternalPackages = final: prev: {
-  <<injectExternalPackage:xml-conduit>>
   <<injectExternalPackage:citeproc>>
 };
 
@@ -573,41 +567,6 @@ unnecessarily strict version bounds.
 * Known issues and workarounds
 
 Here we document various breakages and our workarounds for them.
-
-** =skylighting= and GHC 9.12
-
-The =skylighting-core= package depends on =xml-conduit=, but =xml-conduit= breaks on
-GHC 9.12 on versions 1.9.1.4 and 1.10.0.0. So we have to bring in the version on
-GitHub which has a fix for GHC 9.12:
-
-#+name: injectExternalPackage:xml-conduit
-#+begin_src nix
-xml-conduit = configureHaskellPkg (prev.callCabal2nix "xml-conduit"
-  (let
-    repo = fetchFromGitHub {
-      owner = "snoyberg";
-      repo = "xml";
-      rev = "73ce67029c61decaa6525536377a15581325fd9e";
-      sha256 = "sha256-Biu18KM+doPvVX1L+WYB/zgJmVUsSdcyDUfFaZza78E=";
-      sparseCheckout = [ "xml-conduit" ];
-    };
-  in "${repo}/xml-conduit") { });
-#+end_src
-
-Although the above works to build =xml-conduit= on GHC 9.12+, =skylighting-core=
-0.14.5 then breaks because of a version bound error:
-
-#+begin_quote
-      > Encountered missing or private dependencies:
-      >     xml-conduit >=1.9.1.3 && <1.10
-#+end_quote
-
-Make =skylighting-core= ignore the above constraint by allowing it to "jailbreak":
-
-#+name: jailbreaks:skylighting-core
-#+begin_src nix
-skylighting-core = pkgs.haskell.lib.doJailbreak (prev.skylighting-core);
-#+end_src
 
 ** =citeproc=
 
