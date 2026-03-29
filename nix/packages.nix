@@ -44,20 +44,7 @@ let
     injectExternalPackages
     injectLilac
     tweakLilacBuild
-    buildDepsFast
   ];
-
-  # (ref:nix:Haskell overlays-buildDepsFast)
-  buildDepsFast = final: prev: {
-    mkDerivation = args:
-      prev.mkDerivation (args // {
-        enableLibraryProfiling = false;
-        enableExecutableProfiling = false;
-        doBenchmark = false;
-        doCheck = false;
-        doHaddock = false;
-      });
-  };
 
   jailbreaks = final: prev: {
     skylighting-core = pkgs.haskell.lib.doJailbreak (prev.skylighting-core);
@@ -66,7 +53,7 @@ let
   };
 
   injectExternalPackages = final: prev: {
-    xml-conduit = pkgs.haskell.lib.dontCheck (prev.callCabal2nix "xml-conduit"
+    xml-conduit = configureHaskellPkg (prev.callCabal2nix "xml-conduit"
       (let
         repo = fetchFromGitHub {
           owner = "snoyberg";
@@ -77,7 +64,7 @@ let
         };
       in "${repo}/xml-conduit") { });
 
-    citeproc = pkgs.haskell.lib.dontCheck (prev.callCabal2nix "citeproc" (let
+    citeproc = configureHaskellPkg (prev.callCabal2nix "citeproc" (let
       repo = fetchFromGitHub {
         owner = "jgm";
         repo = "citeproc";
@@ -132,6 +119,8 @@ let
         hlib.dontHaddock
         hlib.disableExecutableProfiling
         hlib.disableLibraryProfiling
+        hlib.dontCheck
+        hlib.dontBenchmark
       ];
 
     in lib.pipe haskellPkg confFns;
