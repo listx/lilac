@@ -51,8 +51,8 @@ let
       repo = fetchFromGitHub {
         owner = "jgm";
         repo = "citeproc";
-        rev = "e9474a4fb31e2b2969375bd7829727eb242f240c";
-        sha256 = "sha256-dArLwH9cvVa5Nv3kEDpWKQSUfA8YCd/4P/dTlCjV1co=";
+        rev = "e5f22f0b0f7662524ff52883582d883316f4c113";
+        sha256 = "sha256-xdwUdmmiTwHn0o0BeX949FPQFftHiTUmzieijpLxruc=";
       };
     in "${repo}") { });
   };

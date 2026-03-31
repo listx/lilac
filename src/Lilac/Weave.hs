@@ -1372,7 +1372,8 @@ citationToCiteprocCitation citation =
       CP.citationPrefix = proseToMaybeCslJsonText citation.prefix,
       CP.citationSuffix = proseToMaybeCslJsonText citation.suffix,
       CP.citationItems =
-        concatMap (citeToCiteprocCitationItems sv) citation.cites
+        concatMap (citeToCiteprocCitationItems sv) citation.cites,
+      CP.citationResetPosition = False
     }
   where
     (sv, _) = citation.styleVariation --
