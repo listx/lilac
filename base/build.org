@@ -315,6 +315,8 @@ few overlays to tweak it a bit.
 #+name: nix:ourHaskell
 #+begin_src nix
 lib = pkgs.lib;
+
+# (ref:nix:ourHaskell-ourHaskell)
 ourHaskell = pkgs.haskell.packages.${ghcVersion}.extend
   (lib.composeManyExtensions haskellOverlays);
 #+end_src
@@ -497,14 +499,19 @@ buildFaster = haskellPkg:
   in lib.pipe haskellPkg confFns;
 #+end_src
 
+The general idea is to speed up the build by opting out of some things. We want
+to optimise the build for speed when developing locally, because we want to
+build Lilac as quickly as possible to tighten the feedback loop when working
+with [[tangle-loop.sh]].
+
 You may want to consult the GHC documentation to make sense out of some of these
 flags. For example, see [[https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html][runtime system (RTS) options]] for the RTS flags.
 
 ** =lilac= attribute
 
 Recall that the [[nix:Haskell overlays]] added the Lilac package to the top-level
-Nixpkgs set of packages, which we named ~ourHaskell~. We expose it now as just
-~lilac~.
+Nixpkgs set of packages, which we named ~ourHaskell~ [[(nix:ourHaskell-ourHaskell)]].
+We expose it now as just ~lilac~.
 
 #+name: nix:Lilac derivation
 #+begin_src nix

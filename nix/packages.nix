@@ -33,6 +33,8 @@ let
     (_: hlib.getHaskellBuildInputs ourHaskell.lilac);
 
   lib = pkgs.lib;
+
+  #
   ourHaskell = pkgs.haskell.packages.${ghcVersion}.extend
     (lib.composeManyExtensions haskellOverlays);
 
