@@ -102,7 +102,6 @@ let
         hlib.dontHaddock
         hlib.disableExecutableProfiling
         hlib.disableLibraryProfiling
-        hlib.dontCheck
         hlib.dontBenchmark
       ];
 
