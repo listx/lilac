@@ -181,6 +181,12 @@ in {
   devShell = pkgs.mkShell {
     buildInputs = [ devShellEnv ]; # (ref:devShellEnv)
     shellHook = ''
+      # Create a local cabal config that points to Nix store. This prevents
+      # cabal from downloading and instead uses the GHC package DB.
+      export CABAL_CONFIG="$PWD/cabal.config.nix"
+      echo "package-db: $(ghc --print-libdir)/package.conf.d" > cabal.config.nix
+      echo "with-compiler: $(which ghc)" >> cabal.config.nix
+
       export LD_LIBRARY_PATH=${devShellEnv}/lib:$LD_LIBRARY_PATH
       # Used when building with cabal.
       export LILAC_PROJECT_ROOT=$PWD
