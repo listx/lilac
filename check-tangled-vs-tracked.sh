@@ -28,7 +28,7 @@ known_not_tangled=(
 tangled_files()
 {
 	unset GIT_LITERAL_PATHSPECS
-	git -C "${SCRIPT_ROOT}" grep -P '^#\+header: :tangle' -- '*.org' \
+	git -C "${SCRIPT_ROOT}" grep -E '^#\+header: :tangle' -- '*.org' \
 		| awk '{print $3}' \
 		| sort -u
 }

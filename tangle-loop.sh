@@ -5,7 +5,7 @@ SCRIPT_ROOT="$(dirname "$(realpath "$0")")"
 
 get_tangled_program_files()
 {
-	git -C "${SCRIPT_ROOT}" grep -P '^#\+header: :tangle' -- '*.org' \
+	git -C "${SCRIPT_ROOT}" grep -E '^#\+header: :tangle' -- '*.org' \
 		| awk '{print $3}' \
 		| grep '\.\(cabal\|hs\|nix\|sh\)$'
 }
