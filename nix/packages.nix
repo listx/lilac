@@ -42,7 +42,21 @@ let
   ghcVersion = "ghc" + ghcVersionWithoutDots;
 
   haskellOverlays =
-    [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+    [ heavyDeps jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+
+  heavyDeps = final: prev:
+    let
+      heavyPackages = [
+        "skylighting"
+        "skylighting-core"
+        "skylighting-format-ansi"
+        "skylighting-format-blaze-html"
+        "skylighting-format-latex"
+        "unicode-collation"
+        "unicode-transforms"
+        "pandoc-types"
+      ];
+    in lib.genAttrs heavyPackages (name: buildForCI prev.${name});
 
   jailbreaks = final: prev: {
     unicode-data = pkgs.haskell.lib.dontCheck prev.unicode-data;
@@ -95,6 +109,19 @@ let
       };
     in path: type: filterFunc path type;
   };
+
+  buildForCI = haskellPkg:
+    let
+      confFns = [
+        hlib.dontHyperlinkSource
+        hlib.dontCoverage
+        hlib.dontHaddock
+        hlib.disableExecutableProfiling
+        hlib.dontCheck
+        hlib.dontBenchmark
+      ];
+
+    in lib.pipe haskellPkg confFns;
 
   buildFaster = haskellPkg:
     let

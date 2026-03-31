@@ -195,6 +195,7 @@ let
   <<nix:Haskell overlays>>
   <<nix:projectRoot>>
   <<nix:lilacSource>>
+  <<nix:buildForCI>>
   <<nix:buildFaster>>
   <<nix:pre-commit-checks>>
 in {
@@ -341,7 +342,21 @@ output for the ~--version~ flag.
 #+header: :line-label tangle
 #+begin_src nix
 haskellOverlays =
-  [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+  [ heavyDeps jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+
+heavyDeps = final: prev:
+  let
+    heavyPackages = [
+      "skylighting"
+      "skylighting-core"
+      "skylighting-format-ansi"
+      "skylighting-format-blaze-html"
+      "skylighting-format-latex"
+      "unicode-collation"
+      "unicode-transforms"
+      "pandoc-types"
+    ];
+  in lib.genAttrs heavyPackages (name: buildForCI prev.${name});
 
 jailbreaks = final: prev: {
   <<jailbreaks:unicode-data>>
@@ -478,7 +493,9 @@ This memoizes the expensive part of the computation. If we don't do this, it
 will re-parse the ~.gitignore~ files it finds (recursively, from the project root)
 all over again each time it is called.
 
-** =buildFaster= function
+** Optimized Haskell packages
+
+*** ~buildFaster~ function
 
 The ~buildFaster~ function customizes the first argument ~haskellPkg~ which
 is a Haskell package, which should be the output of calling ~callCabal2nix~.
@@ -506,6 +523,29 @@ with [[tangle-loop.sh]].
 
 You may want to consult the GHC documentation to make sense out of some of these
 flags. For example, see [[https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html][runtime system (RTS) options]] for the RTS flags.
+
+*** ~buildForCI~ function
+
+This is similar to [[nix:buildFaster]], but is slightly different. It was created
+because SourceHut CI kept failing with OOM errors (Haddock being the main
+culprit). We had to /enable/ library profiling because some packages failed to
+build without it.
+
+#+name: nix:buildForCI
+#+begin_src nix
+buildForCI = haskellPkg:
+  let
+    confFns = [
+      hlib.dontHyperlinkSource
+      hlib.dontCoverage
+      hlib.dontHaddock
+      hlib.disableExecutableProfiling
+      hlib.dontCheck
+      hlib.dontBenchmark
+    ];
+
+  in lib.pipe haskellPkg confFns;
+#+end_src
 
 ** =lilac= attribute
 
@@ -1849,6 +1889,7 @@ sandbox
 sandboxing
 scrollable
 scrollbars
+SourceHut
 src
 srcweave
 subcommand
