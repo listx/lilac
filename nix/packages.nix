@@ -47,7 +47,7 @@ let
   };
 
   injectExternalPackages = final: prev: {
-    citeproc = configureHaskellPkg (prev.callCabal2nix "citeproc" (let
+    citeproc = buildFaster (prev.callCabal2nix "citeproc" (let
       repo = fetchFromGitHub {
         owner = "jgm";
         repo = "citeproc";
@@ -58,7 +58,7 @@ let
   };
 
   injectLilac = final: prev: { # (ref:injectLilac)
-    lilac = configureHaskellPkg (prev.callCabal2nix "lilac" lilacSource { });
+    lilac = buildFaster (prev.callCabal2nix "lilac" lilacSource { });
   };
 
   tweakLilacBuild = final: prev: {
@@ -94,7 +94,7 @@ let
     in path: type: filterFunc path type;
   };
 
-  configureHaskellPkg = haskellPkg:
+  buildFaster = haskellPkg:
     let
       confFns = [
         hlib.dontHyperlinkSource

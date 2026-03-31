@@ -195,7 +195,7 @@ let
   <<nix:Haskell overlays>>
   <<nix:projectRoot>>
   <<nix:lilacSource>>
-  <<nix:configureHaskellPkg>>
+  <<nix:buildFaster>>
   <<nix:pre-commit-checks>>
 in {
   <<nix:devShell derivation>> # (ref:devShell drv)
@@ -350,7 +350,7 @@ injectExternalPackages = final: prev: {
 };
 
 injectLilac = final: prev: { # (ref:injectLilac)
-  lilac = configureHaskellPkg (prev.callCabal2nix "lilac" lilacSource { });
+  lilac = buildFaster (prev.callCabal2nix "lilac" lilacSource { });
 };
 
 tweakLilacBuild = final: prev: {
@@ -364,7 +364,7 @@ tweakLilacBuild = final: prev: {
 #+end_src
 
 The ~lilacSource~ at [[(injectLilac)]] is the source code needed to build Lilac, and
-~configureHaskellPkg~ is some Haskell build configuration options we pass in to
+~buildFaster~ is some Haskell build configuration options we pass in to
 configure the Lilac build process.
 
 ** =lilacSource=
@@ -476,14 +476,14 @@ This memoizes the expensive part of the computation. If we don't do this, it
 will re-parse the ~.gitignore~ files it finds (recursively, from the project root)
 all over again each time it is called.
 
-** =configureHaskellPkg= function
+** =buildFaster= function
 
-The ~configureHaskellPkg~ function customizes the first argument ~haskellPkg~ which
+The ~buildFaster~ function customizes the first argument ~haskellPkg~ which
 is a Haskell package, which should be the output of calling ~callCabal2nix~.
 
-#+name: nix:configureHaskellPkg
+#+name: nix:buildFaster
 #+begin_src nix
-configureHaskellPkg = haskellPkg:
+buildFaster = haskellPkg:
   let
     confFns = [
       hlib.dontHyperlinkSource
@@ -581,7 +581,7 @@ in a newer one.
 
 #+name: injectExternalPackage:citeproc
 #+begin_src nix
-citeproc = configureHaskellPkg (prev.callCabal2nix "citeproc" (let
+citeproc = buildFaster (prev.callCabal2nix "citeproc" (let
   repo = fetchFromGitHub {
     owner = "jgm";
     repo = "citeproc";
