@@ -227,6 +227,18 @@ We cannot simply inject ~base/js/lilac.js~ directly because the development
 environment also uses the same file path in [[cfg:lilac-fe-build]] (and the
 development version of this file path does /not/ have a self-contained JS file).
 
+We track the ~base/js/lilac.js.injectme~ file in Git [[id:ae7b1a31-970d-41e4-b15a-8d7f383e1502::(.gitignore-js-injectme)][.gitignore]], because it's
+needed for compiling the Lilac CLI in [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]]. But don't want to
+see this file treated as regular text file (because it cannot be sensibly
+merged, and it doesn't make sense to show textual diffs of it between revisions
+as it is minified JS). For this reason we treat it as a binary file for Git.
+
+#+name: .gitattributes
+#+header: :tangle .gitattributes
+#+begin_src gitattributes
+base/js/lilac.js.injectme binary
+#+end_src
+
 ** Figwheel configuration
 :PROPERTIES:
 :ID:       90d66ea1-a994-4fdb-b969-c28cec04352d

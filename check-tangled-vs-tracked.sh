@@ -16,6 +16,9 @@ known_not_tangled=(
 	# Images.
 	base/image/PNG-Gradient.png
 
+	# Generated JS.
+	base/js/lilac.js.injectme
+
 	# Bibliographical references (CSL JSON format).
 	base/bib.json
 

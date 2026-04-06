@@ -450,7 +450,9 @@ of the project.
 .hie
 .rebel_readline_history
 <<Generated pre-commit config>>
-base/js
+base/js/*
+# (ref:.gitignore-js-injectme)
+!base/js/lilac.js.injectme
 cabal.config.nix
 cabal.project.local
 dist-newstyle
@@ -462,6 +464,7 @@ result*
 ,*.larc
 ,*.lobj
 ,**/.*
+!**/.gitattributes
 !**/.gitkeep
 
 <<gitignore:Makefile sentinels>>
@@ -1463,6 +1466,12 @@ trim_trailing_whitespace = true
 [*.{sh},Makefile]
 indent_style = tab
 tab_width = 8
+
+[base/js/lilac.js.injectme] # (ref:.editorconfig-injectme-binary)
+insert_final_newline = false
+trim_trailing_whitespace = false
+end_of_line = unset
+charset = unset
 #+end_src
 
 The ~root = true~ is required because the EditorConfig specification is
@@ -1471,6 +1480,9 @@ repository root. When EditorConfig plugins check whether a file complies with
 EditorConfig configuration, it simply searches for the current or any parent
 folders for the ~.editorconfig~ file. Setting the ~root = true~ tells the plugin to
 stop searching upwards beyond the current file.
+
+[[(.editorconfig-injectme-binary)]] prevents EditorConfig from trying to interpret
+the ~lilac.js.injectme~ file (see [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::.gitattributes][.gitattributes]]) as a text file.
 
 #+name: hook-editorconfig-checker
 #+begin_src nix
@@ -1591,6 +1603,9 @@ known_not_tangled=(
 
 	# Images.
 	base/image/PNG-Gradient.png
+
+	# Generated JS.
+	base/js/lilac.js.injectme
 
 	# Bibliographical references (CSL JSON format).
 	base/bib.json
@@ -2072,6 +2087,8 @@ version:        <<id:ee7a98ad-6b13-4489-9a04-58a7c80899e7::Lilac version>>
 license:        GPL-2.0-only
 license-file:   LICENSE
 build-type:     Simple
+extra-source-files:
+  base/js/lilac.js.injectme
 
 library
   other-modules:
