@@ -1,0 +1,18 @@
+image: nixos/latest
+secrets:
+  - 5de45cde-db04-468b-94dd-7ef3a53eeace
+sources:
+  # TODO: Use this once published: https://git.sr.ht/~listx/lilac
+  - git@git.sr.ht:~listx/lilac
+tasks:
+  - lint: |
+      cd lilac
+      nix-shell --run "make lint"
+  - build: |
+      cd lilac
+      nix-shell --run "make build-release"
+  - test: |
+      cd lilac
+      nix-shell --run "make test" #
+  - print_lilac_version: |
+      lilac/result/bin/lilac --version

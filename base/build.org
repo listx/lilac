@@ -469,6 +469,7 @@ result*
 ,**/.*
 !**/.gitattributes
 !**/.gitkeep
+!.build.yml
 
 <<gitignore:Makefile sentinels>>
 #+end_src
@@ -1950,103 +1951,39 @@ sort-file-contents = {
 };
 #+end_src
 
-* GitHub Actions
+* SourceHut CI builds
 :PROPERTIES:
 :ID:       0cf535d6-f852-4b97-8ef8-9d566ad32e51
 :END:
 
-** CI to run =nix-build=
+The CI runs the linter, builds the production binary, and also runs tests.
 
-We only have one action so far for this, which runs the build with =nix-build=, on
-both Linux and Mac.
-
-#+name: .github/workflows/nix.yml
-#+header: :tangle .github/workflows/nix.yml
+#+name: .build.yml
+#+header: :tangle .build.yml
 #+begin_src yaml
-name: CI
-
-on:
-  push:
-    branches:
-      - next
-  pull_request_target:
-  workflow_dispatch:
-
-jobs:
-  nix:
-    name: ${{ matrix.os }} / ghc ${{ matrix.ghc }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - macOS-latest
-        ghc:
-          - "<<GHC version>>"
-
-    steps:
-      # https://github.com/dependabot/dependabot-core/issues/3253#issuecomment-799466911
-      - uses: actions/checkout@v4
-        if: ${{ github.event_name == 'pull_request_target' }}
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/checkout@v4
-        if: ${{ github.event_name != 'pull_request_target' }}
-
-      - name: Free disk space (Ubuntu only)
-        if: runner.os == 'Linux'
-        uses: jlumbroso/free-disk-space@main
-
-      - name: Set nix path
-        id: nix-path
-        run: |
-          echo "nixpkgs=$(jq -r .nixpkgs.url ./nix/sources.json)" >> $GITHUB_OUTPUT
-
-      - uses: cachix/install-nix-action@v30
-        with:
-          nix_path: nixpkgs=${{ steps.nix-path.outputs.nixpkgs }}
-          extra_nix_config: |
-            log-lines = 1000
-
-      - name: Print nixpkgs version
-        run: |
-          nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
-
-      - name: Check code formatting
-        # For linting, we don't need to run it on Mac (just once on Linux is
-        # enough).
-        if: ${{runner.os == 'Linux'}}
-        run: |
-          nix-shell --run "make lint"
-
-      - name: Build
-        run: |
-          make build-release
-
-      - name: Run
-        run: |
-          result/bin/lilac
+image: nixos/latest
+secrets:
+  - 5de45cde-db04-468b-94dd-7ef3a53eeace
+sources:
+  # TODO: Use this once published: https://git.sr.ht/~listx/lilac
+  - git@git.sr.ht:~listx/lilac
+tasks:
+  - lint: |
+      cd lilac
+      nix-shell --run "make lint"
+  - build: |
+      cd lilac
+      nix-shell --run "make build-release"
+  - test: |
+      cd lilac
+      nix-shell --run "make test" # (ref:.build.yml-test)
+  - print_lilac_version: |
+      lilac/result/bin/lilac --version
 #+end_src
 
-** Dependabot
-:PROPERTIES:
-:ID:       8c1c0f55-5f6a-4cc7-8c36-c34044d538c7
-:END:
-
-Invoke Dependabot weekly to check for library updates.
-
-#+name: .github/dependabot.yml
-#+header: :tangle .github/dependabot.yml
-#+begin_src yaml
-version: 2
-
-updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-#+end_src
+Because the build-release rule involves building and running the test suite, the
+test task [[(.build.yml-test)]] results in a NOP. However we still keep it here just
+in case the behaviour of [[id:d8a6d891-5e3c-44cc-ac43-38d8090ebfbd::make:Build lilac with Nix][make:Build lilac with Nix]] changes.
 
 * Cabal configuration
 :PROPERTIES:
