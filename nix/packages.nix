@@ -102,8 +102,8 @@ let
           *.nix
           *.sh
           *.toml
+          base/image
           Makefile
-          image
           nix
         '';
       };
