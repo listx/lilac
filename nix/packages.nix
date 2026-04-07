@@ -96,6 +96,7 @@ let
     filter = let # (ref:gnf-memoization)
       filterFunc = gnf.gitignoreFilterWith {
         basePath = projectRoot;
+        # (ref:nix:lilacSource-extraRules)
         extraRules = ''
           .*
           *.html

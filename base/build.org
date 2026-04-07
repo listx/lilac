@@ -409,7 +409,9 @@ files in the project root. We have to pare it down to only those bits that
 actually matter for ~cabal~.
 
 We use the [[https://github.com/hercules-ci/gitignore.nix/blob/637db329424fd7e46cf4185293b9cc8c88c95394/docs/gitignoreFilter.md][gitignoreFilterWith]] function to filter out all paths that are already
-defined inside the existing [[file:../.gitignore]].
+defined inside the existing [[file:../.gitignore]]. We also filter out additional
+files that are not needed for building Lilac, such as the woven HTML files in
+[[(nix:lilacSource-extraRules)]].
 
 #+name: nix:lilacSource
 #+header: :line-label tangle
@@ -422,6 +424,7 @@ lilacSource = lib.cleanSourceWith {
   filter = let # (ref:gnf-memoization)
     filterFunc = gnf.gitignoreFilterWith {
       basePath = projectRoot;
+      # (ref:nix:lilacSource-extraRules)
       extraRules = ''
         .*
         ,*.html
