@@ -23,20 +23,70 @@ or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
-** TODO add widget for higher-level table of contents
+** IN-PROGRESS add widget for archive table of contents (ATOC) (index.org support)
 
 We need a way to let users understand that a single document is part of some
 other one. Otherwise it can be tricky to navigate across the related documents
 together.
 
-What we need is a way to specify a higher-level Table of Contents (HLTOC) once
-(as part of a configuration file), and then have it refer to OIDs in a tree
-structure. And then when we weave a document, we need to look it up in the
-HLTOC, and if it exists in a HLTOC, also render that HLTOC in the doc in the
-sidebar somewhere. The HLTOC could have an "intro" page to explain everything in
-the HLTOC. And then /that/ page could be part of yet another HLTOC (and so we can
-nest arbitrarily deep). We could potentially make a rule which says that a
-document can only be mentioned in one HLTOC (no overlap).
+The "Objects" list in the Archive already has all objects (and the paths they
+reside in). It also knows which objects are "sister" objects (sharing the same
+directory path). We just need a way to encode each object so that it is ordered
+somehow relative to the other objects in the archive.
+
+We could have a single "index.org" at the very top which is expected to
+have this information in various code blocks within it. We could have Lilac look
+in the "index.org" file for specially-designated code blocks which encode
+this information.
+
+#+name: index
+#+begin_src txt
+foo.org # the .org extension indicates that this is an object
+some-subdir # ordering of this directory (because it lacks a .org extension)
+bar.org
+#+end_src
+
+This should be enough to know how to order objects within each subdirectory.
+
+WRT subdirectories, what we need is a way to "promote" each subdirectory into
+its own woven page, as if it were an object. We can do this by looking for an
+object file named "index.org" inside the subdirectory, which would have the
+objects within that folder listed in a special "index" code block, using the
+same rules. IOW this is recursive.
+
+So basically, "index.org" files are now required at each level of the objects.
+And inside the "index.org" file we REQUIRE a code block named "index". Then once
+we parse all of these index.org files, we have all of the info we need to build
+up an ATOC data bundle which we can embed into every woven object.
+
+The index.org doesn't need to have all of the objects in the directory listed;
+anything that's not listed is "hidden" and won't show up in the ATOC widget.
+This is a good way to have draft pages get "merged" early, without "promoting"
+them to be featured in the ATOC.
+
+As for the happy path, for objects that are listed in an index.org file, they
+will get a separate "ATOC" widget somewhere near the bottom of the page. Sort of
+like how this page has a "Table of contents":
+https://docs.kernel.org/dev-tools/index.html. The ATOC will have all top-level
+items rendered, plus an "exploded" view of all ancestor directories above itself
+and the current directory. We could generate the ATOC once, and then reference
+it as needed for each object.
+
+Aside: Using index.org is good because this will result in the weaving of
+index.html, which is what browsers expect to fetch anyway when fetching a
+directory path in a URL.
+
+*** TODO construct a partial ATOC from an index.org Object (compilation)
+
+This needs to be done recursively for all folders where Objects reside.
+
+*** TODO construct complete ATOC for an Archive (compilation)
+
+When an object is named ~**/index.org~, look for ATOC fragments in there.
+
+*** TODO weave "up/prev/next" links for all objects
+
+*** TODO weave truncated ATOC in all objects
 
 ** IN-PROGRESS write user guide
 
