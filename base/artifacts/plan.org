@@ -34,10 +34,10 @@ reside in). It also knows which objects are "sister" objects (sharing the same
 directory path). We just need a way to encode each object so that it is ordered
 somehow relative to the other objects in the archive.
 
-We could have a single "index.org" at the very top which is expected to
-have this information in various code blocks within it. We could have Lilac look
-in the "index.org" file for specially-designated code blocks which encode
-this information.
+We could have a single "index.org" at the very top which is expected to have
+this information. It could have a special block named "index" which could lay
+out the order of all files (and subdirectories) at the top level. In this way
+the files could be ordered arbitrarily.
 
 #+name: index
 #+begin_src txt
@@ -46,13 +46,8 @@ some-subdir # ordering of this directory (because it lacks a .org extension)
 bar.org
 #+end_src
 
-This should be enough to know how to order objects within each subdirectory.
-
-WRT subdirectories, what we need is a way to "promote" each subdirectory into
-its own woven page, as if it were an object. We can do this by looking for an
-object file named "index.org" inside the subdirectory, which would have the
-objects within that folder listed in a special "index" code block, using the
-same rules. IOW this is recursive.
+If we do this recursively, it should be enough to know how to order objects
+within each subdirectory as well.
 
 So basically, "index.org" files are now required at each level of the objects.
 And inside the "index.org" file we REQUIRE a code block named "index". Then once
@@ -70,23 +65,35 @@ like how this page has a "Table of contents":
 https://docs.kernel.org/dev-tools/index.html. The ATOC will have all top-level
 items rendered, plus an "exploded" view of all ancestor directories above itself
 and the current directory. We could generate the ATOC once, and then reference
-it as needed for each object.
+it as needed for each object (instead of reconstructing it every time we needed
+to weave an object inside the Archive).
 
 Aside: Using index.org is good because this will result in the weaving of
 index.html, which is what browsers expect to fetch anyway when fetching a
 directory path in a URL.
 
-*** TODO construct a partial ATOC from an index.org Object (compilation)
+*** TODO compile index.org as regular Objects
 
-This needs to be done recursively for all folders where Objects reside.
+This should just ensure that the index.org has a "index" code block inside it.
 
 *** TODO construct complete ATOC for an Archive (compilation)
 
 When an object is named ~**/index.org~, look for ATOC fragments in there.
 
-*** TODO weave "up/prev/next" links for all objects
+If an index.org is missing for a path, we would treat it as an error. That is,
+there should be an index.org at every folder where Org files (objects) reside.
+
+We should emit a warning if there is a typo (if the index code block refers to a
+path that does not exist).
 
 *** TODO weave truncated ATOC in all objects
+
+This is the actual TOC-like widget we need to weave into the bottom of the page.
+
+*** TODO weave "next/previous/up" links for all objects
+
+Every object should refer to the ATOC in the Archive, and determine who its
+neighbors are.
 
 ** IN-PROGRESS write user guide
 
