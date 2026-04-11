@@ -111,7 +111,7 @@ clojure -M -m figwheel.main --build lilac --repl
 #+end_src
 
 This will create a REPL that can evaluate CLJS and run it as JS in the browser
-tab at http://localhost:8080/base/lilac.html per the ~:open-url~ setting in
+tab at http://localhost:8080/base/index.html per the ~:open-url~ setting in
 [[cfg:figwheel-main.edn]]. The ~lilac~ in ~--build lilac~ comes from the ~lilac~ substring
 in the ~lilac.cljs.edn~ configuration file (this is a Figwheel convention).
 
@@ -254,7 +254,7 @@ across all build files.
  :css-dirs ["base/css"]
  :ring-server-options {:host "localhost" :port 8080 :join? false}
  :ring-handler lilac.handler/development-app
- :open-url "http://localhost:8080/base/lilac.html"
+ :open-url "http://localhost:8080/base/index.html"
  :target-dir "base/js"
  :clean-outputs true}
 #+end_src

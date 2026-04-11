@@ -3,7 +3,7 @@ gitconfig:
 .PHONY: gitconfig
 
 org_files = \
-	base/lilac.org \
+	base/index.org \
 	base/cli.org \
 	base/build.org \
 	base/compile.org \
@@ -12,6 +12,7 @@ org_files = \
 	base/types.org \
 	base/weave.org \
 	base/fe.org \
+	base/artifacts/index.org \
 	base/artifacts/user-manual.org \
 	base/artifacts/plan.org
 backend_org_files = $(filter-out base/fe.org,$(org_files))

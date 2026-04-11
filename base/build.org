@@ -826,7 +826,7 @@ now.
 #+name: make:Org files
 #+begin_src makefile
 org_files = \
-	base/lilac.org \
+	base/index.org \
 	base/cli.org \
 	base/build.org \
 	base/compile.org \
@@ -835,6 +835,7 @@ org_files = \
 	base/types.org \
 	base/weave.org \
 	base/fe.org \
+	base/artifacts/index.org \
 	base/artifacts/user-manual.org \
 	base/artifacts/plan.org
 backend_org_files = $(filter-out base/fe.org,$(org_files))
@@ -1051,11 +1052,11 @@ on being able to run the tangling function automatically on save, which we
 historically did with [[https://github.com/yilkalargaw/org-auto-tangle][org-auto-tangle]] by having ~#+auto_tangle: t~ in our Org
 file.
 
-So we need another way of tangling every time this file (=lilac.org=) is changed.
+So we need another way of tangling every time this file (=build.org=) is changed.
 We can do that with [[https://facebook.github.io/watchman/][Watchman]], but that would be unnecessarily heavy-handed
 because we don't need to watch a directory or multiple files. Instead we can
 just have a script which sleeps one second and checks the timestamp of
-=lilac.org= (and other files we care about), and if it's different than before,
+=build.org= (and other files we care about), and if it's different than before,
 tangle it (and also run tests and weave and lint as needed). That's what we do
 in [[tangle-loop.sh]].
 
@@ -1172,7 +1173,7 @@ loop, which is not desirable).
 
 The initial call to ~run_all_checks()~ in the ~watch()~ function (outside of the
 ~while~ loop) at [[(initial-call-tangle)]] is there for convenience, just in case
-we've modified the =lilac.org= file outside of a =tangle-loop.sh= session.
+we've modified the =build.org= file outside of a =tangle-loop.sh= session.
 
 #+name: f:tangle-loop:tangle
 #+begin_src bash
@@ -1222,7 +1223,7 @@ checkout~ on tangled files at [[(git-checkout)]] if there are any errors. So if 
 turns out we edited Lilac's own sources and broke the build, we want to undo the
 broken (tangled) changes, which we can do by simply resetting the Haskell source
 code back to the checked-in state with ~git checkout~. This is safe because the
-changes we want to try out are always stored in the Org files (=lilac.org=, etc),
+changes we want to try out are always stored in the Org files (=build.org=, etc),
 because we use Literate Programming. If we didn't use Literate Programming we
 would be very cautious of resetting any source code files, but we don't have
 that worry here.
@@ -2369,7 +2370,7 @@ git-diff~). Below is our orderfile:
 # Org files
 base/artifacts/plan.org
 base/artifacts/*.org
-base/lilac.org
+base/index.org
 base/build.org
 base/types.org
 base/parse.org
