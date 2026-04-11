@@ -23,7 +23,7 @@ or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
-** IN-PROGRESS add widget for archive table of contents (ATOC) (index.org support)
+** IN-PROGRESS add widget for global table of contents (GTOC) (index.org support)
 
 We need a way to let users understand that a single document is part of some
 other one. Otherwise it can be tricky to navigate across the related documents
@@ -52,19 +52,19 @@ within each subdirectory as well.
 So basically, "index.org" files are now required at each level of the objects.
 And inside the "index.org" file we REQUIRE a code block named "index". Then once
 we parse all of these index.org files, we have all of the info we need to build
-up an ATOC data bundle which we can embed into every woven object.
+up an GTOC data bundle which we can embed into every woven object.
 
 The index.org doesn't need to have all of the objects in the directory listed;
-anything that's not listed is "hidden" and won't show up in the ATOC widget.
+anything that's not listed is "hidden" and won't show up in the GTOC widget.
 This is a good way to have draft pages get "merged" early, without "promoting"
-them to be featured in the ATOC.
+them to be featured in the GTOC.
 
 As for the happy path, for objects that are listed in an index.org file, they
-will get a separate "ATOC" widget somewhere near the bottom of the page. Sort of
+will get a separate "GTOC" widget somewhere near the bottom of the page. Sort of
 like how this page has a "Table of contents":
-https://docs.kernel.org/dev-tools/index.html. The ATOC will have all top-level
+https://docs.kernel.org/dev-tools/index.html. The GTOC will have all top-level
 items rendered, plus an "exploded" view of all ancestor directories above itself
-and the current directory. We could generate the ATOC once, and then reference
+and the current directory. We could generate the GTOC once, and then reference
 it as needed for each object (instead of reconstructing it every time we needed
 to weave an object inside the Archive).
 
@@ -77,26 +77,58 @@ CLOSED: [2026-04-11 Sat 23:59]
 
 This should just ensure that the index.org has a "index" code block inside it.
 
-*** TODO construct complete ATOC for an Archive (compilation)
+*** DONE construct complete GTOC for an Archive (compilation)
+CLOSED: [2026-04-25 Sat 23:59]
 
-When an object is named ~**/index.org~, look for ATOC fragments in there.
+When an object is named ~**/index.org~, look for GTOC fragments in there.
 
-If an index.org is missing for a path, we would treat it as an error. That is,
-there should be an index.org at every folder where Org files (objects) reside.
+**** DONE throw error for non-existant child paths
+CLOSED: [2026-04-25 Sat 23:59]
 
-We should emit a warning if there is a typo (if the index code block refers to a
-path that does not exist).
+Use a state monad instead of a reader monad for unfoldTreeM, and collect all
+child paths that do not exist. Then from mkGTOC we can raise an error of all
+paths that don't exist.
 
-*** TODO weave truncated ATOC in all objects
+***** DONE add test case for missing child paths
+CLOSED: [2026-04-25 Sat 23:59]
+
+*** TODO weave truncated GTOC in all objects
 
 This is the actual TOC-like widget we need to weave into the bottom of the page.
+
+"Truncated" means not displaying the full GTOC, but instead just the ancestors
+and any siblings in the current level.
 
 *** TODO breadcrumbs: allow clicking on directory names to navigate to the index.org page
 
 *** TODO weave "next/previous/up" links for all objects
 
-Every object should refer to the ATOC in the Archive, and determine who its
+Every object should refer to the GTOC in the Archive, and determine who its
 neighbors are.
+
+** TODO GTOC: optionally treat missing index.org files as an error
+
+We can just add GTOC generation preferences into the [[id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf][data:ProjectConf]], which can
+let the user choose different "flavors" of GTOC:
+
+  - full GTOC (expect index.org at every folder, not finding one in a folder is
+    an error). That is, there should be an index.org at every folder where Org
+    files (objects) reside.
+
+  - root GTOC only (only expect root index.org, any others are optional)
+
+  - no GTOC (skip all GTOC generation --- this is the default)
+
+By default we expect no GTOC at all (this makes sense because this whole concept
+is not a native Orgmode thing). This is good, but needs to be done *after*
+implementing GTOC, because we have to also move the [[id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf][data:ProjectConf]] to the
+compilation step (a bit more "upstream" than weaving, which is arguably at the
+very end).
+
+We need to read the project configuration during compilation, so that we can
+affect archive generation.
+
+*** TODO add test case for missing index.org files (given the relevant project config)
 
 ** IN-PROGRESS write user guide
 

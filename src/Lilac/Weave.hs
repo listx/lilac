@@ -44,6 +44,7 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding qualified as TLE
+import Data.Tree qualified as Tree
 import Lilac.Compile (gciToName, makeRelativeToObjectPath, parseCitationStyle)
 import Lilac.Parse
   ( compressProse,
@@ -62,6 +63,7 @@ import Lilac.Types
         bibs,
         csls,
         glossary,
+        gtoc,
         objects,
         offsets,
         symbols
@@ -87,6 +89,7 @@ import Lilac.Types
     Footnote (body, name),
     GCI (GCI, unGCI),
     GPath,
+    GTOC (unGTOC),
     GlossaryTerm (definition, term),
     Heading (body, level, section),
     LCI (LCI, unLCI),
@@ -259,6 +262,7 @@ import Relude
     elem,
     filter,
     flip,
+    fmap,
     foldMap',
     foldl',
     foldlM,
@@ -1839,6 +1843,7 @@ weaveFooter = do
 
 weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
 weaveMain docMeta lciCellPairs = do
+  weaveConf <- ask
   main_ $ do
     weaveDocMeta docMeta
     forM_ lciCellPairs weaveCell
@@ -1848,6 +1853,14 @@ weaveMain docMeta lciCellPairs = do
           _ -> False
     when (any isHeading $ map snd lciCellPairs)
       $ toHtmlRaw @Text "</div>" --
+    case weaveConf.archive.gtoc.unGTOC of
+      (Tree.Node _ []) -> pure ()
+      tree ->
+        pre_ []
+          $ toHtml @Text
+          $ T.pack
+          $ Tree.drawTree
+          $ fmap decodeGPath tree
 
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do

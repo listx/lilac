@@ -10,6 +10,7 @@ module Lilac.Types
     Footnote (..),
     GCI (..),
     GPath,
+    GTOC (..),
     GlossaryTerm (..),
     Heading (..),
     LCI (..),
@@ -38,6 +39,7 @@ module Lilac.Types
     decodeGPath,
     defaultOrgParserConf,
     defaultOrgParserState,
+    emptyGPath,
     encodeGPath,
     Lilac.Types.fromText,
     fromWords,
@@ -86,8 +88,10 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.Tree (Tree)
 import Data.UUID.Types (UUID, fromText, fromWords64)
 import GHC.Generics (Generic)
+import Lilac.Types.Internal (GPath (GPath))
 import Network.URI qualified as N
 import Relude
   ( Bool (False),
@@ -589,22 +593,6 @@ newtype PseudoEdge = PseudoEdge (LCI, LinkOid)
 type OrgParser :: Type -> Type
 type OrgParser = StateT OrgParserState (MP.ParsecT Void Text Identity)
 
-type GPath :: Type
-newtype GPath = GPath FilePath
-  deriving stock (Eq, Ord, Generic, Show)
-  deriving anyclass (ToJSON)
-
-instance ToJSONKey GPath where
-  toJSONKey = toJSONKeyText $ \(GPath p) -> T.pack p
-
-instance FromJSON GPath where
-  parseJSON = withText "GPath" $ \t -> do
-    pure . GPath $ T.unpack t
-
-instance FromJSONKey GPath where
-  fromJSONKey = FromJSONKeyTextParser $ \t -> do
-    pure . GPath $ T.unpack t
-
 encodeGPath :: (MonadFail m) => FilePath -> m GPath
 encodeGPath fp
   | Just osp <- P.encodeUtf fp,
@@ -614,6 +602,9 @@ encodeGPath fp
 
 decodeGPath :: GPath -> FilePath
 decodeGPath (GPath fp) = fp
+
+emptyGPath :: GPath
+emptyGPath = GPath ""
 
 protocolsEmacs :: [Text]
 protocolsEmacs =
@@ -660,6 +651,7 @@ data Archive = Archive
     glossary :: Map (Text, GPath) LCI, --
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), --
     offsets :: IntMap GPath, --
+    gtoc :: GTOC, --
     csls :: Map FilePath Text, --
     bibs :: Map FilePath [CP.Reference (CslJson Text)] --
   }
@@ -735,6 +727,13 @@ getCellName = \case
   CCommand {} -> Nothing
   where
     verbatim body = Just $ Prose [ptext body [Verbatim]]
+
+type GTOC :: Type
+newtype GTOC = GTOC
+  { unGTOC :: Tree GPath
+  }
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, FromJSONKey, Hashable, ToJSON, ToJSONKey)
 
 type ProjectConf :: Type
 data ProjectConf = ProjectConf

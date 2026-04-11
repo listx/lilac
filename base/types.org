@@ -32,6 +32,7 @@ module Lilac.Types
     Footnote (..),
     GCI (..),
     GPath,
+    GTOC (..),
     GlossaryTerm (..),
     Heading (..),
     LCI (..),
@@ -60,6 +61,7 @@ module Lilac.Types
     decodeGPath,
     defaultOrgParserConf,
     defaultOrgParserState,
+    emptyGPath,
     encodeGPath,
     Lilac.Types.fromText,
     fromWords,
@@ -108,8 +110,10 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.Tree (Tree)
 import Data.UUID.Types (UUID, fromText, fromWords64)
 import GHC.Generics (Generic)
+import Lilac.Types.Internal (GPath (GPath))
 import Network.URI qualified as N
 import Relude
   ( Bool (False),
@@ -217,12 +221,9 @@ import Prelude qualified (show)
 
 <<id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::type:OrgParser>>
 
-<<newtype:GPath>>
-<<instance:ToJSONKey GPath>>
-<<instance:FromJSON GPath>>
-<<instance:FromJSONKey GPath>>
 <<f:encodeGPath>>
 <<f:decodeGPath>>
+<<f:emptyGPath>>
 
 <<f:protocolsEmacs>>
 <<f:protocolsWeb>>
@@ -237,12 +238,57 @@ import Prelude qualified (show)
 <<id:730ad104-52c9-49df-bbb9-66d92363bfc1::f:stripLinks>>
 <<id:730ad104-52c9-49df-bbb9-66d92363bfc1::f:stripStyles>>
 <<id:730ad104-52c9-49df-bbb9-66d92363bfc1::f:getCellName>>
+<<id:25827c17-2015-434b-b686-db3d72b2ee4d::newtype:GTOC>>
 
 <<id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf>>
 <<id:a7de905c-03c8-4d4b-911c-b1f4435aea85::data:RawProjectConf>>
 
 <<f:markingChars>>
 <<f:markingCharsInvisible>>
+#+end_src
+
+** =Lilac.Types.Internal= module
+
+#+name: module:Lilac.Types.Internal
+#+header: :tangle src-internal/Lilac/Types/Internal.hs
+#+begin_src haskell
+module Lilac.Types.Internal
+  ( GPath (..),
+  )
+where
+
+import Data.Aeson
+  ( FromJSON,
+    FromJSONKey,
+    FromJSONKeyFunction (FromJSONKeyTextParser),
+    ToJSON,
+    ToJSONKey,
+    fromJSONKey,
+    parseJSON,
+    toJSONKey,
+  )
+import Data.Aeson.Types
+  ( toJSONKeyText,
+    withText,
+  )
+import Data.Text qualified as T
+import GHC.Generics (Generic)
+import Relude
+  ( Eq,
+    FilePath,
+    Hashable,
+    Ord,
+    Show,
+    Type,
+    pure,
+    ($),
+    (.),
+  )
+
+<<newtype:GPath>>
+<<instance:ToJSONKey GPath>>
+<<instance:FromJSON GPath>>
+<<instance:FromJSONKey GPath>>
 #+end_src
 
 * Miscellaneous helpers
@@ -306,6 +352,7 @@ type GPath :: Type
 newtype GPath = GPath FilePath
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (ToJSON)
+  deriving newtype (Hashable)
 #+end_src
 
 Similar to [[id:01da95fe-ba23-4481-9833-428423392f5f::instance:ToJSONKey LinkOid][instance:ToJSONKey LinkOid]], we want to encode and decode ~GPath~ values
@@ -360,6 +407,20 @@ based on.
 decodeGPath :: GPath -> FilePath
 decodeGPath (GPath fp) = fp
 #+end_src
+
+[[f:emptyGPath]] is an empty ~GPath~.
+
+#+name: f:emptyGPath
+#+begin_src haskell
+emptyGPath :: GPath
+emptyGPath = GPath ""
+#+end_src
+
+*** Succinct construction
+
+In tests and other scenarios, we want to be able to succinctly construct ~GPath~
+values without being encumbered by the monadic type of [[f:encodeGPath]]. For this
+purpose we have a separate internal-only module which exposes the ~GPath~ constructor.
 
 ** Protocols
 

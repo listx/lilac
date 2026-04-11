@@ -1,25 +1,38 @@
 module Lilac.CompileSpec (spec) where
 
 import Data.Graph qualified as G
+import Data.Text qualified as T
 import Data.Tree
   ( Tree (Node, rootLabel, subForest),
   )
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( LinkOid (LinkOid, name, oid),
+  ( GTOC (GTOC),
+    LinkOid (LinkOid, name, oid),
+    Object,
+    decodeGPath,
+    encodeGPath,
     fromWords,
   )
+import Lilac.Types.Internal (GPath (GPath))
 import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
     FilePath,
     Int,
+    Maybe (Just, Nothing),
+    MonadFail,
     String,
+    fail,
     isRight,
+    map,
     pure,
     show,
+    traverse,
     ($),
+    (.),
+    (<>),
   )
 import Test.Hspec
   ( Spec,
@@ -361,6 +374,42 @@ spec = do
         }
     ]
 
+  expectGTOC
+    ["0105/foo.org"]
+    (Left "root index.lobj not found")
+
+  expectGTOC
+    [ "0105/foo.org",
+      "0105/index.org"
+    ]
+    (Right . GTOC $ Node (GPath "test/Lilac/CompileSpec/0105/index.lobj") [])
+
+  expectGTOC
+    [ "0105/basic/foo.org",
+      "0105/basic/bar.org",
+      "0105/basic/index.org"
+    ]
+    ( Right
+        . GTOC
+        $ Node
+          (GPath "test/Lilac/CompileSpec/0105/basic/index.lobj")
+          [ Node (GPath "test/Lilac/CompileSpec/0105/basic/foo.lobj") [],
+            Node (GPath "test/Lilac/CompileSpec/0105/basic/bar.lobj") []
+          ]
+    )
+
+  expectGTOC
+    [ "0105/invalid-paths/index.org"
+    ]
+    ( Left
+        """
+        Invalid GTOC object paths:
+          test/Lilac/CompileSpec/0105/invalid-paths/README.lobj
+          test/Lilac/CompileSpec/0105/invalid-paths/dir1/index.lobj
+
+        """
+    )
+
   describe "cumulativeOffsets sanity check" $ do
     it "works for empty case" $ do
       let input = [] :: [(Int, String)]
@@ -403,3 +452,38 @@ checkCycles paths expectedCycles = do
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do
       (LC.findCycles archive) `shouldBe` expectedCycles
+
+expectGTOC :: [FilePath] -> Either String GTOC -> Spec
+expectGTOC paths expected = do
+  it (show paths) $ do
+    pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
+    pathObjs' <- orgToLobj pathObjs
+    LC.mkGTOC pathObjs' `shouldBe` expected
+  where
+    orgToLobj ::
+      (MonadFail m) =>
+      [(GPath, Object)] ->
+      m [(GPath, Object)]
+    orgToLobj pairs = do
+      traverse reencode transformed
+      where
+        transformed :: [(T.Text, Object)]
+        transformed = map transformPath pairs
+
+        transformPath :: (GPath, Object) -> (T.Text, Object)
+        transformPath (gp, obj) =
+          let path = T.pack $ decodeGPath gp
+              newPath =
+                if ".org" `T.isSuffixOf` path
+                  then (T.dropEnd 4 path) <> ".lobj"
+                  else path
+           in (newPath, obj)
+
+        reencode :: (MonadFail m) => (T.Text, Object) -> m (GPath, Object)
+        reencode (t, obj) =
+          case encodeGPath (T.unpack t) of
+            Just newGp -> pure (newGp, obj)
+            Nothing ->
+              fail
+                $ "Failed to re-encode path: "
+                <> T.unpack t

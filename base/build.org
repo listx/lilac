@@ -2030,6 +2030,22 @@ build-type:     Simple
 extra-source-files:
   base/js/lilac.js.injectme
 
+library lilac-internal
+  exposed-modules:
+      Lilac.Types.Internal
+  hs-source-dirs:
+      src-internal
+  default-extensions:
+      <<Default GHC extensions>>
+  ghc-options:
+      <<GHC warning flags>>
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , relude
+    , text
+  default-language: <<Language edition>>
+
 library
   other-modules:
       Paths_lilac
@@ -2059,6 +2075,7 @@ library
     , directory
     , filepath
     , file-io
+    , lilac-internal
     , lucid2
     , megaparsec
     , network-uri
@@ -2124,6 +2141,7 @@ test-suite spec
     , hspec
     , hspec-megaparsec
     , lilac
+    , lilac-internal
     , megaparsec
     , network-uri
     , relude

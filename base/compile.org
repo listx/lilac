@@ -36,8 +36,9 @@ module Lilac.Compile
     findExternalOids,
     gciToName,
     makeRelativeToObjectPath,
-    mkObject,
     mkArchive,
+    mkGTOC,
+    mkObject,
     parseCitationStyle,
     readObjectsFrom,
   )
@@ -52,6 +53,10 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.Tree
+  ( Tree (Node),
+    unfoldTreeM,
+  )
 import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Archive
@@ -61,6 +66,7 @@ import Lilac.Types
         bibs,
         csls,
         glossary,
+        gtoc,
         objects,
         offsets,
         symbols
@@ -83,6 +89,7 @@ import Lilac.Types
     Footnote (name),
     GCI (GCI, unGCI),
     GPath,
+    GTOC (GTOC),
     GlossaryTerm (definition, term),
     Heading (body, meta),
     LCI (LCI, unLCI),
@@ -112,6 +119,7 @@ import Lilac.Types
     Style (Verbatim),
     Table (grid, meta, parentOid),
     decodeGPath,
+    emptyGPath,
     encodeGPath,
     gciToObjCell,
     getProseContents,
@@ -121,14 +129,17 @@ import Lilac.Types
   )
 import Lilac.Util qualified as LU
 import Relude
-  ( Either (Left, Right),
+  ( Bool,
+    Either (Left, Right),
     FilePath,
     IO,
     Int,
     Map,
     Maybe (Just, Nothing),
+    State,
     String,
     Text,
+    Type,
     abs,
     catMaybes,
     concat,
@@ -140,6 +151,7 @@ import Relude
     foldlM,
     fromList,
     fst,
+    get,
     hashNub,
     intercalate,
     length,
@@ -149,12 +161,17 @@ import Relude
     mapMaybe,
     maybeToList,
     mempty,
+    modify,
+    null,
     otherwise,
     pure,
+    putStrLn,
     repeat,
+    runState,
     show,
     snd,
     sort,
+    unlines,
     zip,
     (!!?),
     ($),
@@ -171,6 +188,7 @@ import Relude
   )
 import Relude.Extra.Map (elems, insertWith, lookup, member)
 import System.Exit (die)
+import System.FilePath (splitDirectories)
 import System.OsPath qualified as P
 
 <<f:mkObject>>
@@ -194,6 +212,11 @@ import System.OsPath qualified as P
 <<f:findCycles>>
 <<f:cumulativeOffsets>>
 <<f:findExternalOids>>
+<<data:PathState>>
+<<f:mkGTOC>>
+<<f:findRootIndex>>
+<<f:isIndexObjPath>>
+<<f:getChildPaths>>
 <<f:getCitationStyles>>
 <<f:getCitationStyle>>
 <<f:parseCitationStyle>>
@@ -704,6 +727,7 @@ data Archive = Archive
     glossary :: Map (Text, GPath) LCI, -- (ref:data:Archive-glossary)
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), -- (ref:data:Archive-backlinks)
     offsets :: IntMap GPath, -- (ref:data:Archive-offsets)
+    gtoc :: GTOC, -- (ref:data:Archive-gtoc)
     csls :: Map FilePath Text, -- (ref:data:Archive-csls)
     bibs :: Map FilePath [CP.Reference (CslJson Text)] -- (ref:data:Archive-bibs)
   }
@@ -721,6 +745,27 @@ other.
 type GCI :: Type
 newtype GCI = GCI
   { unGCI :: Int
+  }
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, FromJSONKey, Hashable, ToJSON, ToJSONKey)
+#+end_src
+
+Archives also keep track of a global table of contents, called ~GTOC~ (for
+Archive-wide Table of Contents) at [[(data:Archive-gtoc)]]. This is the global table
+of contents which puts every object found in the archive into a single
+hierarchy. So whereas a normal [[id:e38fb4d1-72e1-40e0-905e-95bc8be2bf0b][Table of Contents (TOC)]] has entries that are
+headings in the current object, the GTOC has entries which are objects in the
+archive. So in a sense, the GTOC is basically the "sitemap" of all navigable
+HTML pages.
+
+It uses a tree data structure to encode the name of an object, or
+the fact that there is a directory (with objects presumably inside it).
+
+#+name: newtype:GTOC
+#+begin_src haskell
+type GTOC :: Type
+newtype GTOC = GTOC
+  { unGTOC :: Tree GPath
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, FromJSONKey, Hashable, ToJSON, ToJSONKey)
@@ -812,7 +857,13 @@ mkArchive pathObjs = do
           <> intercalate
             "\n"
             (map showBrokenLink brokenLinks)
-    | otherwise ->
+    | otherwise -> do
+        gtoc <- case mkGTOC pathObjsNonEmpty of
+          Left err -> do
+            -- TODO: Probably only print this in verbose mode...?
+            putStrLn $ err
+            pure . GTOC $ Node emptyGPath []
+          Right gtoc -> pure gtoc
         let archive =
               Archive
                 { objects = fromList pathObjsNonEmpty,
@@ -821,13 +872,14 @@ mkArchive pathObjs = do
                   glossary = glossary,
                   backlinks = backlinks,
                   offsets = offsets,
+                  gtoc = gtoc,
                   csls = csls,
                   bibs = bibs
                 }
             ancestry =
               mkBlockAncestry archive
                 $ getBlockGCIsFromArchive archive -- (ref:f:mkArchive-ancestry)
-         in pure $ Right archive {ancestry = ancestry}
+        pure $ Right archive {ancestry = ancestry}
   where
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
@@ -2327,6 +2379,316 @@ parseBibliography :: Text -> Either String [CP.Reference (CslJson Text)]
 parseBibliography = eitherDecodeStrictText
 #+end_src
 
+** GTOC
+:PROPERTIES:
+:ID:       de5d3c6a-e133-4bb5-88d8-c78297b312a6
+:END:
+
+GTOC construction needs to find all ~index.org~ objects, and the special ~index~
+code block inside each one. We have to then construct a single large tree out of
+this, where the values in the leaf nodes are ~GPath~ strings of objects in the
+archive.
+
+Below are some type signatures with some small modifications to better
+understand where we want to go.
+
+#+begin_src haskell
+unfoldTree :: (b -> (a, [b])) -> b -> Tree a -- (ref:unfoldTree-terse)
+unfoldTree :: (seed -> (final_val, [seed])) -> seed -> Tree final_val -- (ref:unfoldTree-descriptive)
+unfoldTreeM :: generator -> (GPath, Object) -> m Tree GPath -- (ref:unfoldTreeM-final)
+#+end_src
+
+~unfoldTree~ [[(unfoldTree-terse)]] is the basic function which knows how to grow a
+tree, starting from a seed value ~b~ and a generator function which can grow the
+next level of a tree. [[(unfoldTree-descriptive)]] is the same signature but with
+more descriptive type names. Finally [[(unfoldTreeM-final)]] shows the signature
+with the types we'll be using, with ~m~ representing a monadic context; we use the
+~State~ monad at [[(f:mkGTOC-f:mkGTOC-unfoldTreeM)]] so that we can record invalid
+paths as we start building up the tree. Invalid paths are stored in
+[[data:PathState]].
+
+#+name: data:PathState
+#+begin_src haskell
+type PathState :: Type
+data PathState = PathState
+  { objMap :: Map GPath Object, -- (ref:data:PathState-data:PathState-objMap)
+    invalidPaths :: [GPath] -- (ref:data:PathState-data:PathState-invalidPaths)
+  }
+#+end_src
+
+As for the details around growing the tree itself, it is as follows:
+
+  1) Find the root ~index.org~ object (along with its ~GPath~).
+
+  2) Find the ~index~ code block and get a list of all paths.
+
+  3) Convert each path in the list with a new (synthetic) ~GPath~.
+
+  4) Replace each ~GPath~ by its object, by doing a lookup in the map of all
+     objects. The map is visible from the State monad so that we can read from
+     it at any time without having to pass it along to every child call.
+
+     If the path does not exist in the ~objMap~
+     [[(data:PathState-data:PathState-objMap)]], then record it inside
+     [[(data:PathState-data:PathState-invalidPaths)]].
+
+The first step is done in [[f:findRootIndex]], which is called by [[f:mkGTOC]]. The
+remaining steps are carried out in [[f:getChildPaths]].
+
+#+name: f:mkGTOC
+#+begin_src haskell
+mkGTOC :: [(GPath, Object)] -> Either String GTOC
+mkGTOC pathObjsNonEmpty
+  | Just pathObj <- findRootIndex pathObjsNonEmpty =
+      let objMap = fromList pathObjsNonEmpty
+          invalidPaths = [] :: [GPath]
+          initialState = PathState objMap invalidPaths
+          (gtoc, finalState) = runState (f pathObj) initialState
+       in if null finalState.invalidPaths
+            then Right gtoc
+            else
+              Left
+                $ "Invalid GTOC object paths:\n"
+                <> (T.unpack (unlines (map (("  " <>) . T.pack . decodeGPath) finalState.invalidPaths)))
+  | otherwise = Left "root index.lobj not found"
+  where
+    f :: (GPath, Object) -> State PathState GTOC
+    f pathObj = GTOC <$> unfoldTreeM generator pathObj -- (ref:f:mkGTOC-f:mkGTOC-unfoldTreeM)
+    generator ::
+      (GPath, Object) ->
+      State PathState (GPath, [(GPath, Object)])
+    generator (path, obj)
+      | isIndexObjPath path = do
+          childPaths <- getChildPaths (path, obj)
+          pure (path, childPaths)
+      | otherwise = pure (path, [])
+#+end_src
+
+[[f:isIndexObjPath]] just checks if the file ends in a ~index.lobj~ file path.
+
+#+name: f:isIndexObjPath
+#+begin_src haskell
+isIndexObjPath :: GPath -> Bool
+isIndexObjPath gpath = "index.lobj" `T.isSuffixOf` (T.pack $ decodeGPath gpath)
+#+end_src
+
+[[f:findRootIndex]] retrieves the root ~index.org~ object, if there is one. It finds
+the ~index.org~ path which has the fewest number of leading parent directories.
+This assumes that there is only one ~index.org~ file inside any directory.
+
+#+name: f:findRootIndex
+#+begin_src haskell
+findRootIndex :: [(GPath, Object)] -> Maybe (GPath, Object)
+findRootIndex pathObjs =
+  let result = foldl' f Nothing pathObjs
+   in snd <$> result
+  where
+    f ::
+      Maybe (Int, (GPath, Object)) ->
+      (GPath, Object) ->
+      Maybe (Int, (GPath, Object))
+    f acc (curGPath, obj) =
+      let pathStr = decodeGPath curGPath
+       in if isIndexObjPath curGPath
+            then
+              let curDepth = length $ splitDirectories pathStr
+               in case acc of
+                    Nothing -> Just (curDepth, (curGPath, obj))
+                    Just (shallowestDepth, _)
+                      | curDepth < shallowestDepth ->
+                          Just (curDepth, (curGPath, obj))
+                      | otherwise -> acc
+            else acc
+#+end_src
+
+[[f:getChildPaths]] gets all the paths inside an ~index~ code block. These paths are
+"incomplete" in a way, because they only hold the name of the directory or file
+at the current level. So we have to complete the path by merging it with the
+path information of the parent object.
+
+#+name: f:getChildPaths
+#+begin_src haskell
+getChildPaths :: (GPath, Object) -> State PathState [(GPath, Object)]
+getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
+  where
+    f :: [(GPath, Object)] -> Cell -> State PathState [(GPath, Object)]
+    f acc = \case
+      CBlock b
+        | Just "index" <- lookup "name" b.meta -> do
+            let rawText = T.concat $ map extractBTokenStringOnly b.body
+                indexPath = T.pack $ decodeGPath path -- base/index.lobj
+                startingPath = T.dropEnd 10 indexPath -- base/
+                paths = mapMaybe (toGPath startingPath) $ T.lines rawText
+            results <- mapM lookupSingle paths
+            pure $ acc <> catMaybes results
+      _ -> pure acc
+    toGPath :: Text -> Text -> Maybe GPath
+    toGPath startingPath textPath =
+      let joinedPath = startingPath <> textPath -- base/foo.org
+          constructedPath =
+            if ".org" `T.isSuffixOf` joinedPath
+              then (T.dropEnd 3 joinedPath) <> "lobj"
+              else joinedPath <> "/index.lobj"
+       in encodeGPath $ T.unpack constructedPath
+    lookupSingle :: GPath -> State PathState (Maybe (GPath, Object))
+    lookupSingle p = do
+      st <- get
+      case lookup p st.objMap of
+        Just o -> pure $ Just (p, o)
+        Nothing -> do
+          modify $ \s -> s {invalidPaths = p : s.invalidPaths}
+          pure Nothing
+    extractBTokenStringOnly :: BToken -> Text
+    extractBTokenStringOnly = \case
+      BTokenString text -> text
+      _ -> ""
+#+end_src
+
+#+begin_src txt
+"base/index.lobj" -> drop the last 10 chars to get the parent dir
+"base/" -> add the textPath here
+"base/foo.org" -> if ending in ".org", replace with ".lobj". otherwise this is a directory, so add it and then also add a trailing "/index.lobj" to it.
+#+end_src
+
+*** Tests
+
+Detect if a root ~index.lobj~ is missing.
+
+#+name: ti:0105-gtoc-no-root-index
+#+header: :tangle test/Lilac/CompileSpec/0105/foo.org
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f010
+:END:
+
+foo
+#+end_src
+
+#+name: t:0105-gtoc-no-root-index
+#+begin_src haskell
+expectGTOC
+  ["0105/foo.org"]
+  (Left "root index.lobj not found")
+#+end_src
+
+Root ~index.lobj~ exists, but without an ~index~ code block.
+
+#+name: ti:0105-gtoc-root-index-without-index-block
+#+header: :tangle test/Lilac/CompileSpec/0105/index.org
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f011
+:END:
+
+This is an index file.
+#+end_src
+
+#+name: t:0105-gtoc-root-index-without-index-block
+#+begin_src haskell
+expectGTOC
+  [ "0105/foo.org",
+    "0105/index.org"
+  ]
+  (Right . GTOC $ Node (GPath "test/Lilac/CompileSpec/0105/index.lobj") [])
+#+end_src
+
+Root ~index.lobj~ exists, with a basic ~index~ code block.
+
+#+name: ti:0105-gtoc-basic-foo
+#+header: :tangle test/Lilac/CompileSpec/0105/basic/foo.org
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f012
+:END:
+
+foo
+#+end_src
+
+#+name: ti:0105-gtoc-basic-bar
+#+header: :tangle test/Lilac/CompileSpec/0105/basic/bar.org
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f013
+:END:
+
+foo
+#+end_src
+
+#+name: ti:0105-gtoc-basic-index
+#+header: :tangle test/Lilac/CompileSpec/0105/basic/index.org
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f014
+:END:
+
+This is an index file.
+
+,#+name: index
+,#+begin_src txt
+foo.org
+bar.org
+,#+end_src
+#+end_src
+
+#+name: t:0105-gtoc-basic
+#+begin_src haskell
+expectGTOC
+  [ "0105/basic/foo.org",
+    "0105/basic/bar.org",
+    "0105/basic/index.org"
+  ]
+  ( Right
+      . GTOC
+      $ Node
+        (GPath "test/Lilac/CompileSpec/0105/basic/index.lobj")
+        [ Node (GPath "test/Lilac/CompileSpec/0105/basic/foo.lobj") [],
+          Node (GPath "test/Lilac/CompileSpec/0105/basic/bar.lobj") []
+        ]
+  )
+#+end_src
+
+Invalid paths specified in the ~index~ code block, but which do not exist in the
+Archive's list of object paths should show up as an error. In the code block, we
+specify a directory named ~dir1~ and an Org file ~README.org~, but neither are
+present in the given list of paths.
+
+#+name: ti:0105-gtoc-invalid-paths
+#+header: :tangle test/Lilac/CompileSpec/0105/invalid-paths/index.org
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f014
+:END:
+
+This is an index file.
+
+,#+name: index
+,#+begin_src txt
+dir1
+README.org
+,#+end_src
+#+end_src
+
+#+name: t:0105-gtoc-invalid-paths
+#+begin_src haskell
+expectGTOC
+  [ "0105/invalid-paths/index.org"
+  ]
+  ( Left
+      """
+      Invalid GTOC object paths:
+        test/Lilac/CompileSpec/0105/invalid-paths/README.lobj
+        test/Lilac/CompileSpec/0105/invalid-paths/dir1/index.lobj
+
+      """
+  )
+#+end_src
+
 * Utility functions
 :PROPERTIES:
 :ID:       730ad104-52c9-49df-bbb9-66d92363bfc1
@@ -2514,25 +2876,38 @@ The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941
 module Lilac.CompileSpec (spec) where
 
 import Data.Graph qualified as G
+import Data.Text qualified as T
 import Data.Tree
   ( Tree (Node, rootLabel, subForest),
   )
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( LinkOid (LinkOid, name, oid),
+  ( GTOC (GTOC),
+    LinkOid (LinkOid, name, oid),
+    Object,
+    decodeGPath,
+    encodeGPath,
     fromWords,
   )
+import Lilac.Types.Internal (GPath (GPath))
 import Lilac.Util qualified as LU
 import Relude
   ( Either (Left, Right),
     FilePath,
     Int,
+    Maybe (Just, Nothing),
+    MonadFail,
     String,
+    fail,
     isRight,
+    map,
     pure,
     show,
+    traverse,
     ($),
+    (.),
+    (<>),
   )
 import Test.Hspec
   ( Spec,
@@ -2560,6 +2935,7 @@ helpers.
 <<f:expectArchiveError>>
 <<f:expectArchiveOk>>
 <<f:checkCycles>>
+<<f:expectGTOC>>
 #+end_src
 
 Note that the helpers use the more convenient ~FilePath~ type instead of ~P.OsPath~,
@@ -2644,6 +3020,53 @@ checkCycles paths expectedCycles = do
       (LC.findCycles archive) `shouldBe` expectedCycles
 #+end_src
 
+[[f:expectGTOC]] looks at file paths and checks the result of running [[f:mkGTOC]]
+against them.
+
+Normally, Lilac users would compile the Org files into objects, then feed those
+objects into [[f:mkArchive]] which would result in the ~.lobj~ filename extensions.
+However for testing purposes we take a shortcut and perform this ~.lobj~
+conversion by simply replacing ~.org~ with ~.lobj~. This business with extensions
+matters because [[f:mkGTOC]] expects file paths to end in ~.lobj~.
+
+#+name: f:expectGTOC
+#+begin_src haskell
+expectGTOC :: [FilePath] -> Either String GTOC -> Spec
+expectGTOC paths expected = do
+  it (show paths) $ do
+    pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
+    pathObjs' <- orgToLobj pathObjs
+    LC.mkGTOC pathObjs' `shouldBe` expected
+  where
+    orgToLobj ::
+      (MonadFail m) =>
+      [(GPath, Object)] ->
+      m [(GPath, Object)]
+    orgToLobj pairs = do
+      traverse reencode transformed
+      where
+        transformed :: [(T.Text, Object)]
+        transformed = map transformPath pairs
+
+        transformPath :: (GPath, Object) -> (T.Text, Object)
+        transformPath (gp, obj) =
+          let path = T.pack $ decodeGPath gp
+              newPath =
+                if ".org" `T.isSuffixOf` path
+                  then (T.dropEnd 4 path) <> ".lobj"
+                  else path
+           in (newPath, obj)
+
+        reencode :: (MonadFail m) => (T.Text, Object) -> m (GPath, Object)
+        reencode (t, obj) =
+          case encodeGPath (T.unpack t) of
+            Just newGp -> pure (newGp, obj)
+            Nothing ->
+              fail
+                $ "Failed to re-encode path: "
+                <> T.unpack t
+#+end_src
+
 ** All test cases
 
 Below are all of the individual test cases.
@@ -2671,6 +3094,10 @@ Below are all of the individual test cases.
 <<t:0100-dag-2-node-loop-2-files>>
 <<t:0100-dag-2-node-loop-2-files-heading>>
 <<t:0100-dag-2-node-loop-3-files>>
+<<t:0105-gtoc-no-root-index>>
+<<t:0105-gtoc-root-index-without-index-block>>
+<<t:0105-gtoc-basic>>
+<<t:0105-gtoc-invalid-paths>>
 <<t:0500-cumulativeOffsets-sanity>>
 #+end_src
 

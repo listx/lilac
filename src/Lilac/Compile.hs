@@ -4,8 +4,9 @@ module Lilac.Compile
     findExternalOids,
     gciToName,
     makeRelativeToObjectPath,
-    mkObject,
     mkArchive,
+    mkGTOC,
+    mkObject,
     parseCitationStyle,
     readObjectsFrom,
   )
@@ -20,6 +21,10 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import Data.Tree
+  ( Tree (Node),
+    unfoldTreeM,
+  )
 import Lilac.Parse qualified as LP
 import Lilac.Types
   ( Archive
@@ -29,6 +34,7 @@ import Lilac.Types
         bibs,
         csls,
         glossary,
+        gtoc,
         objects,
         offsets,
         symbols
@@ -51,6 +57,7 @@ import Lilac.Types
     Footnote (name),
     GCI (GCI, unGCI),
     GPath,
+    GTOC (GTOC),
     GlossaryTerm (definition, term),
     Heading (body, meta),
     LCI (LCI, unLCI),
@@ -80,6 +87,7 @@ import Lilac.Types
     Style (Verbatim),
     Table (grid, meta, parentOid),
     decodeGPath,
+    emptyGPath,
     encodeGPath,
     gciToObjCell,
     getProseContents,
@@ -89,14 +97,17 @@ import Lilac.Types
   )
 import Lilac.Util qualified as LU
 import Relude
-  ( Either (Left, Right),
+  ( Bool,
+    Either (Left, Right),
     FilePath,
     IO,
     Int,
     Map,
     Maybe (Just, Nothing),
+    State,
     String,
     Text,
+    Type,
     abs,
     catMaybes,
     concat,
@@ -108,6 +119,7 @@ import Relude
     foldlM,
     fromList,
     fst,
+    get,
     hashNub,
     intercalate,
     length,
@@ -117,12 +129,17 @@ import Relude
     mapMaybe,
     maybeToList,
     mempty,
+    modify,
+    null,
     otherwise,
     pure,
+    putStrLn,
     repeat,
+    runState,
     show,
     snd,
     sort,
+    unlines,
     zip,
     (!!?),
     ($),
@@ -139,6 +156,7 @@ import Relude
   )
 import Relude.Extra.Map (elems, insertWith, lookup, member)
 import System.Exit (die)
+import System.FilePath (splitDirectories)
 import System.OsPath qualified as P
 
 mkObject :: OrgDoc -> Object
@@ -265,7 +283,13 @@ mkArchive pathObjs = do
           <> intercalate
             "\n"
             (map showBrokenLink brokenLinks)
-    | otherwise ->
+    | otherwise -> do
+        gtoc <- case mkGTOC pathObjsNonEmpty of
+          Left err -> do
+            -- TODO: Probably only print this in verbose mode...?
+            putStrLn $ err
+            pure . GTOC $ Node emptyGPath []
+          Right gtoc -> pure gtoc
         let archive =
               Archive
                 { objects = fromList pathObjsNonEmpty,
@@ -274,13 +298,14 @@ mkArchive pathObjs = do
                   glossary = glossary,
                   backlinks = backlinks,
                   offsets = offsets,
+                  gtoc = gtoc,
                   csls = csls,
                   bibs = bibs
                 }
             ancestry =
               mkBlockAncestry archive
                 $ getBlockGCIsFromArchive archive --
-         in pure $ Right archive {ancestry = ancestry}
+        pure $ Right archive {ancestry = ancestry}
   where
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
@@ -580,6 +605,98 @@ findExternalOids orgDoc =
       LinkTargetFootnote {}
       LinkTargetFilePath {}
       LinkTargetURI {} -> acc
+
+type PathState :: Type
+data PathState = PathState
+  { objMap :: Map GPath Object, --
+    invalidPaths :: [GPath] --
+  }
+
+mkGTOC :: [(GPath, Object)] -> Either String GTOC
+mkGTOC pathObjsNonEmpty
+  | Just pathObj <- findRootIndex pathObjsNonEmpty =
+      let objMap = fromList pathObjsNonEmpty
+          invalidPaths = [] :: [GPath]
+          initialState = PathState objMap invalidPaths
+          (gtoc, finalState) = runState (f pathObj) initialState
+       in if null finalState.invalidPaths
+            then Right gtoc
+            else
+              Left
+                $ "Invalid GTOC object paths:\n"
+                <> (T.unpack (unlines (map (("  " <>) . T.pack . decodeGPath) finalState.invalidPaths)))
+  | otherwise = Left "root index.lobj not found"
+  where
+    f :: (GPath, Object) -> State PathState GTOC
+    f pathObj = GTOC <$> unfoldTreeM generator pathObj --
+    generator ::
+      (GPath, Object) ->
+      State PathState (GPath, [(GPath, Object)])
+    generator (path, obj)
+      | isIndexObjPath path = do
+          childPaths <- getChildPaths (path, obj)
+          pure (path, childPaths)
+      | otherwise = pure (path, [])
+
+findRootIndex :: [(GPath, Object)] -> Maybe (GPath, Object)
+findRootIndex pathObjs =
+  let result = foldl' f Nothing pathObjs
+   in snd <$> result
+  where
+    f ::
+      Maybe (Int, (GPath, Object)) ->
+      (GPath, Object) ->
+      Maybe (Int, (GPath, Object))
+    f acc (curGPath, obj) =
+      let pathStr = decodeGPath curGPath
+       in if isIndexObjPath curGPath
+            then
+              let curDepth = length $ splitDirectories pathStr
+               in case acc of
+                    Nothing -> Just (curDepth, (curGPath, obj))
+                    Just (shallowestDepth, _)
+                      | curDepth < shallowestDepth ->
+                          Just (curDepth, (curGPath, obj))
+                      | otherwise -> acc
+            else acc
+
+isIndexObjPath :: GPath -> Bool
+isIndexObjPath gpath = "index.lobj" `T.isSuffixOf` (T.pack $ decodeGPath gpath)
+
+getChildPaths :: (GPath, Object) -> State PathState [(GPath, Object)]
+getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
+  where
+    f :: [(GPath, Object)] -> Cell -> State PathState [(GPath, Object)]
+    f acc = \case
+      CBlock b
+        | Just "index" <- lookup "name" b.meta -> do
+            let rawText = T.concat $ map extractBTokenStringOnly b.body
+                indexPath = T.pack $ decodeGPath path -- base/index.lobj
+                startingPath = T.dropEnd 10 indexPath -- base/
+                paths = mapMaybe (toGPath startingPath) $ T.lines rawText
+            results <- mapM lookupSingle paths
+            pure $ acc <> catMaybes results
+      _ -> pure acc
+    toGPath :: Text -> Text -> Maybe GPath
+    toGPath startingPath textPath =
+      let joinedPath = startingPath <> textPath -- base/foo.org
+          constructedPath =
+            if ".org" `T.isSuffixOf` joinedPath
+              then (T.dropEnd 3 joinedPath) <> "lobj"
+              else joinedPath <> "/index.lobj"
+       in encodeGPath $ T.unpack constructedPath
+    lookupSingle :: GPath -> State PathState (Maybe (GPath, Object))
+    lookupSingle p = do
+      st <- get
+      case lookup p st.objMap of
+        Just o -> pure $ Just (p, o)
+        Nothing -> do
+          modify $ \s -> s {invalidPaths = p : s.invalidPaths}
+          pure Nothing
+    extractBTokenStringOnly :: BToken -> Text
+    extractBTokenStringOnly = \case
+      BTokenString text -> text
+      _ -> ""
 
 getCitationStyles :: [(GPath, Object)] -> IO (Map FilePath Text)
 getCitationStyles pathObjs = do

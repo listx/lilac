@@ -8,6 +8,71 @@ build-type:     Simple
 extra-source-files:
   base/js/lilac.js.injectme
 
+library lilac-internal
+  exposed-modules:
+      Lilac.Types.Internal
+  hs-source-dirs:
+      src-internal
+  default-extensions:
+      BangPatterns
+      BinaryLiterals
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveAnyClass
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveTraversable
+      DerivingStrategies
+      DerivingVia
+      DuplicateRecordFields
+      EmptyCase
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      MultilineStrings
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      NoFieldSelectors
+      NoImplicitPrelude
+      NumDecimals
+      NumericUnderscores
+      LambdaCase
+      OrPatterns
+      OverloadedLabels
+      OverloadedRecordDot
+      OverloadedStrings
+      PatternSynonyms
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      StandaloneKindSignatures
+      TupleSections
+      TypeApplications
+      TypeOperators
+      ViewPatterns
+  ghc-options:
+      -Weverything
+
+      -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode
+
+      -Wno-missed-specialisations
+      -Wno-all-missed-specialisations
+
+      -Wno-missed-extra-shared-lib
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , relude
+    , text
+  default-language: GHC2024
+
 library
   other-modules:
       Paths_lilac
@@ -86,6 +151,7 @@ library
     , directory
     , filepath
     , file-io
+    , lilac-internal
     , lucid2
     , megaparsec
     , network-uri
@@ -255,6 +321,7 @@ test-suite spec
     , hspec
     , hspec-megaparsec
     , lilac
+    , lilac-internal
     , megaparsec
     , network-uri
     , relude
