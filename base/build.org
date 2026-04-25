@@ -1636,14 +1636,21 @@ tangled_files()
 }
 #+end_src
 
-The tracked files are found easily enough by querying Git.
+The tracked files are found easily enough by querying Git. The ~:(exclude,top)~
+lines exclude some results because although these are tracked, these files are
+not tangled from anywhere else, so there's no point in comparing them against
+the list of tangled files. The magic words ~exclude~ and ~top~ are documented under
+[[https://git-scm.com/docs/gitglossary#Documentation/gitglossary.txt-pathspec][=gitglossary=]].
 
 #+name: tracked_files
 #+begin_src bash
 tracked_files()
 {
 	git -C "${SCRIPT_ROOT}" ls-files \
-		| grep -v '\.\(html\|org\)$' \
+		-- . \
+		':(exclude,top)README.org' \
+		':(exclude,top)base/*.html' \
+		':(exclude,top)base/*.org' \
 		| sort -u
 }
 #+end_src

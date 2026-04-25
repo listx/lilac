@@ -39,7 +39,10 @@ tangled_files()
 tracked_files()
 {
 	git -C "${SCRIPT_ROOT}" ls-files \
-		| grep -v '\.\(html\|org\)$' \
+		-- . \
+		':(exclude,top)README.org' \
+		':(exclude,top)base/*.html' \
+		':(exclude,top)base/*.org' \
 		| sort -u
 }
 
