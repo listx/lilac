@@ -2,6 +2,7 @@ module Lilac.Weave
   ( commonPrefix,
     convertObjectExtensionToOrg,
     getRelativePathWithoutSymlinks,
+    isGtocAncestor,
     parseProjectConf,
     prepareCitations,
     renderAsText,
@@ -44,7 +45,10 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding qualified as TLE
-import Data.Tree qualified as Tree
+import Data.Tree
+  ( Forest,
+    Tree (Node),
+  )
 import Lilac.Compile (gciToName, makeRelativeToObjectPath, parseCitationStyle)
 import Lilac.Parse
   ( compressProse,
@@ -226,6 +230,7 @@ import Lucid
     toHtmlRaw,
     tr_,
     type_,
+    ul_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -262,7 +267,6 @@ import Relude
     elem,
     filter,
     flip,
-    fmap,
     foldMap',
     foldl',
     foldlM,
@@ -434,7 +438,9 @@ weaveCell (lci, cell) = case cell of
   CHeading heading -> weaveHeading lci heading
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> p_ [] $ wrapWith lci $ weaveProse prose
-  CBlock block -> weaveBlock lci block
+  CBlock block
+    | Just "index" <- lookup "name" block.meta -> pure () --
+    | otherwise -> weaveBlock lci block
   CMathFragment mathFragment -> weaveMathFragmentStandalone lci mathFragment
   CFigure figure -> weaveFigure lci figure
   CTable table -> weaveTable lci table
@@ -1708,6 +1714,59 @@ weaveTocHeading heading = do
     sectionText = getSectionNumber heading
     linkAnchor = getLinkAnchor Nothing $ CHeading heading
 
+weaveGtoc :: GTOC -> HtmlWeaver ()
+weaveGtoc gtoc = do
+  nav_ [class_ "gtoc"] $ do
+    p_ [class_ "widget-title"] $ do
+      toHtml @Text "Site Contents" --
+    let (Node rootNode forest) = gtoc.unGTOC
+    ul_ [] $ do
+      weaveGtocForest (Node rootNode [] : forest) --
+
+weaveGtocTree :: Tree GPath -> HtmlWeaver ()
+weaveGtocTree (Node path children) = do
+  weaveConf <- ask
+  li_ [] $ do
+    let (docName, docPath) =
+          case getRelativeOrgDocLink weaveConf path of
+            Nothing ->
+              ( "LILAC_ERROR_DOC_NAME_NOT_FOUND",
+                "LILAC_ERROR_DOC_LINK_NOT_FOUND"
+              )
+            Just res -> res
+        docLabel
+          | Just obj <- lookup path weaveConf.archive.objects,
+            Just title <- lookup "title" obj.orgDoc.meta =
+              title
+          | otherwise = docName
+        boldAttr =
+          if path == weaveConf.originObjectPath
+            then [class_ "bold"]
+            else []
+    a_ ([href_ docPath] <> boldAttr) $ do
+      toHtml @Text docLabel
+    let isAncestor = path `isGtocAncestor` weaveConf.originObjectPath
+    when (isAncestor && (not $ null children)) $ do
+      ul_ [] $ weaveGtocForest children --
+
+weaveGtocForest :: Forest GPath -> HtmlWeaver ()
+weaveGtocForest nodes = forM_ nodes weaveGtocTree
+
+isGtocAncestor :: GPath -> GPath -> Bool
+isGtocAncestor path originObjectPath =
+  let pathDirOsp =
+        reverse
+          . drop 1
+          . reverse
+          . P.splitPath
+          . P.unsafeEncodeUtf
+          $ decodeGPath path
+      originOsp =
+        P.splitPath
+          . P.unsafeEncodeUtf
+          $ decodeGPath originObjectPath
+   in pathDirOsp `isPrefixOf` originOsp
+
 genHeadingAncestry :: [Cell] -> Map Text [Text]
 genHeadingAncestry = snd . foldl' f ([], mempty)
   where
@@ -1843,7 +1902,6 @@ weaveFooter = do
 
 weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
 weaveMain docMeta lciCellPairs = do
-  weaveConf <- ask
   main_ $ do
     weaveDocMeta docMeta
     forM_ lciCellPairs weaveCell
@@ -1853,18 +1911,12 @@ weaveMain docMeta lciCellPairs = do
           _ -> False
     when (any isHeading $ map snd lciCellPairs)
       $ toHtmlRaw @Text "</div>" --
-    case weaveConf.archive.gtoc.unGTOC of
-      (Tree.Node _ []) -> pure ()
-      tree ->
-        pre_ []
-          $ toHtml @Text
-          $ T.pack
-          $ Tree.drawTree
-          $ fmap decodeGPath tree
 
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
+  weaveConf <- ask
   aside_ [class_ "sidebar"] $ do
+    weaveGtoc weaveConf.archive.gtoc
     weaveTangledBlocksList blocks
     weaveBacklinks
     weaveNamedCellsIndex

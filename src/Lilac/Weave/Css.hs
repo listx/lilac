@@ -126,6 +126,7 @@ import Clay
     thead,
     top,
     tr,
+    ul,
     underline,
     vAlignSub,
     vAlignSuper,
@@ -269,6 +270,12 @@ defaultCss = do
     span # ".toc-counter" ? do
       marginRight $ rem 0.3
     borderRight (px 1) solid colorCodeBorder
+
+  nav # ".gtoc" ? do
+    fontSans
+    ul ? do
+      marginTop $ px 0
+      paddingLeft $ rem 1
 
   main_ ? do
     "grid-area" -: "main"

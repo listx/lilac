@@ -42,11 +42,13 @@ import Lilac.Types
     ptext,
     stext,
   )
+import Lilac.Types.Internal (GPath (GPath))
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
 import Network.URI qualified as N
 import Relude
-  ( Either (Left, Right),
+  ( Bool (False, True),
+    Either (Left, Right),
     FilePath,
     IO,
     Maybe (Just, Nothing),
@@ -190,6 +192,20 @@ spec = do
         ( ["", "b", "a"],
           [".org", "b", "a"]
         )
+      ]
+
+  it "0305-gtoc-ancestor" $ do
+    mapM_
+      ( \(path, originObjectPath, expectation) ->
+          (LW.isGtocAncestor (GPath path) (GPath originObjectPath))
+            `shouldBe` expectation
+      )
+      [ ("a/index.lobj", "a/foo.lobj", True),
+        ("a/b/index.lobj", "a/b/foo.lobj", True),
+        ("a/index.lobj", "a/b/foo.lobj", True),
+        ("a/index.lobj", "a/b/c/foo.lobj", True),
+        ("a/b/c/index.lobj", "a/b/foo.lobj", False),
+        ("a/m/index.lobj", "a/b/c/foo.lobj", False) --
       ]
 
   expectCiteprocResult

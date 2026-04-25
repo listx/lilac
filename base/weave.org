@@ -160,6 +160,7 @@ module Lilac.Weave
   ( commonPrefix,
     convertObjectExtensionToOrg,
     getRelativePathWithoutSymlinks,
+    isGtocAncestor,
     parseProjectConf,
     prepareCitations,
     renderAsText,
@@ -202,7 +203,10 @@ import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding qualified as TLE
-import Data.Tree qualified as Tree
+import Data.Tree
+  ( Forest,
+    Tree (Node),
+  )
 import Lilac.Compile (gciToName, makeRelativeToObjectPath, parseCitationStyle)
 import Lilac.Parse
   ( compressProse,
@@ -384,6 +388,7 @@ import Lucid
     toHtmlRaw,
     tr_,
     type_,
+    ul_,
     width_,
   )
 import Lucid.Base (hoistHtmlT)
@@ -420,7 +425,6 @@ import Relude
     elem,
     filter,
     flip,
-    fmap,
     foldMap',
     foldl',
     foldlM,
@@ -557,6 +561,10 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:toNormalizedText>>
 <<f:weaveToc>>
 <<f:weaveTocHeading>>
+<<f:weaveGtoc>>
+<<f:weaveGtocTree>>
+<<f:weaveGtocForest>>
+<<f:isGtocAncestor>>
 <<f:genHeadingAncestry>>
 <<f:weaveHeadingAncestry>>
 <<f:parseRawProjectConf>>
@@ -778,6 +786,7 @@ import Clay
     thead,
     top,
     tr,
+    ul,
     underline,
     vAlignSub,
     vAlignSuper,
@@ -1177,7 +1186,6 @@ then calls [[f:weaveCell]] to weave all of the cells.
 #+begin_src haskell
 weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
 weaveMain docMeta lciCellPairs = do
-  weaveConf <- ask
   main_ $ do
     weaveDocMeta docMeta
     forM_ lciCellPairs weaveCell
@@ -1187,14 +1195,6 @@ weaveMain docMeta lciCellPairs = do
           _ -> False
     when (any isHeading $ map snd lciCellPairs)
       $ toHtmlRaw @Text "</div>" -- (ref:f:weaveMain-heading-container)
-    case weaveConf.archive.gtoc.unGTOC of
-      (Tree.Node _ []) -> pure ()
-      tree ->
-        pre_ []
-          $ toHtml @Text
-          $ T.pack
-          $ Tree.drawTree
-          $ fmap decodeGPath tree
 #+end_src
 
 The closing ~</div>~ tag is for closing up any heading container ~<div>~ elements
@@ -1210,7 +1210,9 @@ weaveCell (lci, cell) = case cell of
   CHeading heading -> weaveHeading lci heading
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> p_ [] $ wrapWith lci $ weaveProse prose
-  CBlock block -> weaveBlock lci block
+  CBlock block
+    | Just "index" <- lookup "name" block.meta -> pure () -- (ref:f:weaveCell-f:weaveCell-hide-index-block)
+    | otherwise -> weaveBlock lci block
   CMathFragment mathFragment -> weaveMathFragmentStandalone lci mathFragment
   CFigure figure -> weaveFigure lci figure
   CTable table -> weaveTable lci table
@@ -1220,6 +1222,11 @@ weaveCell (lci, cell) = case cell of
     PrintBibliography -> weaveBibliography lci
     PrintGlossary isGlobal -> weaveGlossary isGlobal
 #+end_src
+
+[[(f:weaveCell-f:weaveCell-hide-index-block)]] does nothing if the code block is a
+magic "index" block, because this is low-level information which is already
+widely apparent by looking at the "Site Contents" in the sidebar
+[[(f:weaveGtoc-f:weaveGtoc-site-contents)]].
 
 ** HTML head
 
@@ -1431,6 +1438,7 @@ body ? do
   overflowY hidden
 <<css:navbar>>
 <<css:toc>>
+<<css:gtoc>>
 <<css:Main content>>
 <<css:Sidebar>>
 <<css:Footer>> -- (ref:css:Layout-footer)
@@ -5433,6 +5441,153 @@ overflowY auto
 padding (px 0) (px 20) (px 0) (px 20)
 #+end_src
 
+* Global Table of Contents (GTOC)
+
+The GTOC is at the bottom of the page, but we discuss it here just after the
+[[id:e38fb4d1-72e1-40e0-905e-95bc8be2bf0b][Table of Contents (TOC)]] because of the similarity to the user. The main
+difference between the two is that a GTOC uses a tree data structure, whereas
+the TOC uses a flat list of cells.
+
+The entrypoint is [[f:weaveGtoc]], which uses [[f:weaveGtocForest]] to recursively weave
+the tree into a nested structure of unordered list items (~<ul>...</ul>~).
+
+We could feed the entire tree to [[f:weaveGtocTree]] as is, but we first make the
+root ~index.org~ node a sibling to its children
+[[(f:weaveGtoc-f:weaveGtoc-root-node)]]. This way, we avoid showing the root node on
+its own level (always by itself, without siblings, taking up valuable
+indentation space). That is, instead of
+
+#+begin_src txt
+- Root node
+  - Topic A
+  - Topic B
+  - ...
+#+end_src
+
+we will render it as
+
+#+begin_src txt
+- Root node
+- Topic A
+- Topic B
+- ...
+#+end_src
+
+The root node gets rendered separately on its own, much like
+an "Introduction" chapter in a book. For this reason the root index should
+typically be titled as "Introduction".
+
+#+name: f:weaveGtoc
+#+begin_src haskell
+weaveGtoc :: GTOC -> HtmlWeaver ()
+weaveGtoc gtoc = do
+  nav_ [class_ "gtoc"] $ do
+    p_ [class_ "widget-title"] $ do
+      toHtml @Text "Site Contents" -- (ref:f:weaveGtoc-f:weaveGtoc-site-contents)
+    let (Node rootNode forest) = gtoc.unGTOC
+    ul_ [] $ do
+      weaveGtocForest (Node rootNode [] : forest) -- (ref:f:weaveGtoc-f:weaveGtoc-root-node)
+#+end_src
+
+[[f:weaveGtocForest]] just delegates to [[f:weaveGtocTree]].
+
+#+name: f:weaveGtocForest
+#+begin_src haskell
+weaveGtocForest :: Forest GPath -> HtmlWeaver ()
+weaveGtocForest nodes = forM_ nodes weaveGtocTree
+#+end_src
+
+[[f:weaveGtocTree]] renders a single object's document title or file name, before
+calling [[f:weaveGtocForest]] for all of its child nodes
+[[(f:weaveGtocTree-f:weaveGtocTree-children)]].
+
+#+name: f:weaveGtocTree
+#+begin_src haskell
+weaveGtocTree :: Tree GPath -> HtmlWeaver ()
+weaveGtocTree (Node path children) = do
+  weaveConf <- ask
+  li_ [] $ do
+    let (docName, docPath) =
+          case getRelativeOrgDocLink weaveConf path of
+            Nothing ->
+              ( "LILAC_ERROR_DOC_NAME_NOT_FOUND",
+                "LILAC_ERROR_DOC_LINK_NOT_FOUND"
+              )
+            Just res -> res
+        docLabel
+          | Just obj <- lookup path weaveConf.archive.objects,
+            Just title <- lookup "title" obj.orgDoc.meta =
+              title
+          | otherwise = docName
+        boldAttr =
+          if path == weaveConf.originObjectPath
+            then [class_ "bold"]
+            else []
+    a_ ([href_ docPath] <> boldAttr) $ do
+      toHtml @Text docLabel
+    let isAncestor = path `isGtocAncestor` weaveConf.originObjectPath
+    when (isAncestor && (not $ null children)) $ do
+      ul_ [] $ weaveGtocForest children -- (ref:f:weaveGtocTree-f:weaveGtocTree-children)
+#+end_src
+
+[[f:isGtocAncestor]] checks if the first path is an "ancestor" of the current object
+being woven. We use this to make sure we only render the part of the ~GTOC~ we
+care about, because we don't want to weave the entire ~GTOC~ tree because it may
+be too big.
+
+#+name: f:isGtocAncestor
+#+begin_src haskell
+isGtocAncestor :: GPath -> GPath -> Bool
+isGtocAncestor path originObjectPath =
+  let pathDirOsp =
+        reverse
+          . drop 1
+          . reverse
+          . P.splitPath
+          . P.unsafeEncodeUtf
+          $ decodeGPath path
+      originOsp =
+        P.splitPath
+          . P.unsafeEncodeUtf
+          $ decodeGPath originObjectPath
+   in pathDirOsp `isPrefixOf` originOsp
+#+end_src
+
+[[t:0305-gtoc-ancestor]] encodes some expected behavior of [[f:isGtocAncestor]]. Perhaps
+the most interesting input is
+[[(t:0305-gtoc-ancestor-t:0305-gtoc-ancestor-nonparent)]] where the given ~path~
+deviates from the ~originObjectPath~; this is the condition which will make sure
+we "prune" the tree so that we don't render the entire ~GTOC~ tree in
+[[f:weaveGtocTree]].
+
+#+name: t:0305-gtoc-ancestor
+#+begin_src haskell
+it "0305-gtoc-ancestor" $ do
+  mapM_
+    ( \(path, originObjectPath, expectation) ->
+        (LW.isGtocAncestor (GPath path) (GPath originObjectPath))
+          `shouldBe` expectation
+    )
+    [ ("a/index.lobj", "a/foo.lobj", True),
+      ("a/b/index.lobj", "a/b/foo.lobj", True),
+      ("a/index.lobj", "a/b/foo.lobj", True),
+      ("a/index.lobj", "a/b/c/foo.lobj", True),
+      ("a/b/c/index.lobj", "a/b/foo.lobj", False),
+      ("a/m/index.lobj", "a/b/c/foo.lobj", False) -- (ref:t:0305-gtoc-ancestor-t:0305-gtoc-ancestor-nonparent)
+    ]
+#+end_src
+
+** CSS
+
+#+name: css:gtoc
+#+begin_src haskell
+nav # ".gtoc" ? do
+  fontSans
+  ul ? do
+    marginTop $ px 0
+    paddingLeft $ rem 1
+#+end_src
+
 * Navigation bar
 
 The navigation bar is the horizontal bar at the top of the page.
@@ -5645,7 +5800,9 @@ the far right of the screen (see [[css:Layout]]). It has the following parts:
 #+begin_src haskell
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
+  weaveConf <- ask
   aside_ [class_ "sidebar"] $ do
+    weaveGtoc weaveConf.archive.gtoc
     weaveTangledBlocksList blocks
     weaveBacklinks
     weaveNamedCellsIndex
@@ -5990,11 +6147,13 @@ import Lilac.Types
     ptext,
     stext,
   )
+import Lilac.Types.Internal (GPath (GPath))
 import Lilac.Util qualified as LU
 import Lilac.Weave qualified as LW
 import Network.URI qualified as N
 import Relude
-  ( Either (Left, Right),
+  ( Bool (False, True),
+    Either (Left, Right),
     FilePath,
     IO,
     Maybe (Just, Nothing),
@@ -6205,6 +6364,7 @@ expectCiteprocResult path expected = do
 <<t:0301-weave-external-links-common-prefix>>
 <<t:0301-weave-external-links>>
 <<t:0302-object-extension-conversion-to-org>>
+<<t:0305-gtoc-ancestor>>
 <<t:0400-citeproc-basic>>
 <<t:0400-citeproc-superscript>>
 <<t:0400-citeproc-smallcaps>>
