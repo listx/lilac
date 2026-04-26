@@ -169,32 +169,6 @@ spec = do
         ("base/a/b/c/d/from.html", "base/a/x/y/to.html8", "../../../x/y/to.html8")
       ]
 
-  it "Object extension to org conversion" $ do
-    mapM_
-      ( \(input, output) ->
-          LW.convertObjectExtensionToOrg input `shouldBe` output
-      )
-      [ ( [],
-          []
-        ),
-        ( ["foo.lobj"],
-          ["foo.org"]
-        ),
-        ( ["x.lobj", "a"],
-          ["x.org", "a"]
-        ),
-        ( ["1.lobj", "b", "a"],
-          ["1.org", "b", "a"]
-        ),
-        --
-        ( ["x", "b", "a"],
-          [".org", "b", "a"]
-        ),
-        ( ["", "b", "a"],
-          [".org", "b", "a"]
-        )
-      ]
-
   it "0305-gtoc-ancestor" $ do
     mapM_
       ( \(path, originObjectPath, expectation) ->

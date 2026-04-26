@@ -1,6 +1,5 @@
 module Lilac.Weave
   ( commonPrefix,
-    convertObjectExtensionToOrg,
     getRelativePathWithoutSymlinks,
     isGtocAncestor,
     parseProjectConf,
@@ -158,6 +157,8 @@ import Lilac.Types
         projectConf
       ),
     decodeGPath,
+    emptyGPath,
+    encodeGPath,
     gciToObjCell,
     gciToObjPath,
     getCellName,
@@ -274,6 +275,7 @@ import Relude
     fromMaybe,
     fst,
     id,
+    inits,
     isJust,
     isPrefixOf,
     length,
@@ -1834,23 +1836,46 @@ weaveBreadcrumbs = do
   weaveConf <- ask
   weaveProjectName weaveConf.projectConf --
   weaveProjectVersion weaveConf.projectConf --
-  let breadcrumbsTail =
-        map osPathDecoder
+  let breadcrumbsMiddle =
+        (\parts -> take (length parts - 2) (drop 1 parts)) --
+          . inits --
           . P.splitDirectories
           . P.unsafeEncodeUtf
           $ decodeGPath weaveConf.originObjectPath
-      breadcrumbsMiddle = reverse . drop 1 $ reverse breadcrumbsTail
       breadcrumbLast =
-        convertObjectExtensionToOrg . take 1 $ reverse breadcrumbsTail
+        osPathDecoder
+          . flip P.replaceExtensions (P.unsafeEncodeUtf "org")
+          . P.takeFileName
+          . P.unsafeEncodeUtf
+          $ decodeGPath weaveConf.originObjectPath
   --
-  forM_ breadcrumbsMiddle $ \breadcrumb -> do
+  forM_ breadcrumbsMiddle $ \dirs -> do
+    let dirName =
+          osPathDecoder
+            . fromMaybe (P.unsafeEncodeUtf "LILAC_ERROR_EMPTY_OSPATH_DIR")
+            . listToMaybe
+            . take 1
+            $ reverse dirs
+        indexPath =
+          fromMaybe emptyGPath
+            . encodeGPath
+            . T.unpack
+            . osPathDecoder
+            $ P.combine (P.joinPath dirs) (P.unsafeEncodeUtf "index.lobj") --
     weaveBreadcrumbSeparator
-    weaveBreadcrumb breadcrumb
+    if
+      --
+      | Just _ <- lookup indexPath weaveConf.archive.objects -> do
+          let (_, docPath) =
+                fromMaybe ("", "LILAC_ERROR_RELATIVE_LINK_ERROR")
+                  $ getRelativeOrgDocLink weaveConf indexPath
+          a_ [href_ docPath] $ do
+            weaveBreadcrumb dirName
+      | otherwise -> weaveBreadcrumb dirName
   --
-  forM_ breadcrumbLast $ \breadcrumb -> do
-    weaveBreadcrumbSeparator
-    a_ [href_ "#top"] $ do
-      weaveBreadcrumb breadcrumb
+  weaveBreadcrumbSeparator
+  a_ [href_ "#top"] $ do
+    weaveBreadcrumb breadcrumbLast
   where
     osPathDecoder osp = case P.decodeUtf osp :: Maybe FilePath of
       Nothing -> "LILAC_ERROR_INVALID_OSPATH"
@@ -1877,14 +1902,6 @@ weaveBreadcrumbs = do
       span_ [class_ "breadcrumb-separator"] $ do
         toHtml @Text "/"
       toHtml @Text " "
-
-convertObjectExtensionToOrg :: [Text] -> [Text]
-convertObjectExtensionToOrg [] = []
-convertObjectExtensionToOrg (objName : rest) =
-  let parts = T.split (== '.') objName
-      withoutObjectExtension = drop 1 $ reverse parts
-      withOrgExtension = ".org" : withoutObjectExtension
-   in (T.concat $ reverse withOrgExtension) : rest
 
 weaveFooter :: HtmlWeaver ()
 weaveFooter = do

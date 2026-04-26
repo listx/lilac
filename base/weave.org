@@ -158,7 +158,6 @@ This module is responsible for generating the HTML from a [[id:25827c17-2015-434
 #+begin_src haskell
 module Lilac.Weave
   ( commonPrefix,
-    convertObjectExtensionToOrg,
     getRelativePathWithoutSymlinks,
     isGtocAncestor,
     parseProjectConf,
@@ -316,6 +315,8 @@ import Lilac.Types
         projectConf
       ),
     decodeGPath,
+    emptyGPath,
+    encodeGPath,
     gciToObjCell,
     gciToObjPath,
     getCellName,
@@ -432,6 +433,7 @@ import Relude
     fromMaybe,
     fst,
     id,
+    inits,
     isJust,
     isPrefixOf,
     length,
@@ -571,7 +573,6 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:parseProjectConf>>
 <<f:weaveNavbar>>
 <<f:weaveBreadcrumbs>>
-<<f:convertObjectExtensionToOrg>>
 <<f:weaveFooter>>
 <<f:weaveMain>>
 <<f:weaveSidebar>>
@@ -5616,10 +5617,9 @@ The breadcrumbs are made up of four pieces:
 
   4) Org document name [[(f:weaveBreadcrumbs-doc-name)]]
 
-The middle part can be any number of intervening directory names (can be empty).
-Only the project name and Org document name are guaranteed to exist. This is
-because the project name comes from [[data:ProjectConf]], and the Org document name
-comes from the ~originObjectPath~ from [[data:WeaveConf]].
+The middle part can be any number of intervening directory names. The project
+name comes from [[data:ProjectConf]], and the Org document name comes from the
+~originObjectPath~ from [[data:WeaveConf]].
 
 The breadcrumbs are woven in [[f:weaveBreadcrumbs]].
 
@@ -5630,23 +5630,46 @@ weaveBreadcrumbs = do
   weaveConf <- ask
   weaveProjectName weaveConf.projectConf -- (ref:f:weaveBreadcrumbs-project-name)
   weaveProjectVersion weaveConf.projectConf -- (ref:f:weaveBreadcrumbs-project-version)
-  let breadcrumbsTail =
-        map osPathDecoder
+  let breadcrumbsMiddle =
+        (\parts -> take (length parts - 2) (drop 1 parts)) -- (ref:f:weaveBreadcrumbs-inits-cleanup)
+          . inits -- (ref:f:weaveBreadcrumbs-middle-inits)
           . P.splitDirectories
           . P.unsafeEncodeUtf
           $ decodeGPath weaveConf.originObjectPath
-      breadcrumbsMiddle = reverse . drop 1 $ reverse breadcrumbsTail
       breadcrumbLast =
-        convertObjectExtensionToOrg . take 1 $ reverse breadcrumbsTail
+        osPathDecoder
+          . flip P.replaceExtensions (P.unsafeEncodeUtf "org")
+          . P.takeFileName
+          . P.unsafeEncodeUtf
+          $ decodeGPath weaveConf.originObjectPath
   -- (ref:f:weaveBreadcrumbs-middle)
-  forM_ breadcrumbsMiddle $ \breadcrumb -> do
+  forM_ breadcrumbsMiddle $ \dirs -> do
+    let dirName =
+          osPathDecoder
+            . fromMaybe (P.unsafeEncodeUtf "LILAC_ERROR_EMPTY_OSPATH_DIR")
+            . listToMaybe
+            . take 1
+            $ reverse dirs
+        indexPath =
+          fromMaybe emptyGPath
+            . encodeGPath
+            . T.unpack
+            . osPathDecoder
+            $ P.combine (P.joinPath dirs) (P.unsafeEncodeUtf "index.lobj") -- (ref:f:weaveBreadcrumbs-index.lobj-suffix)
     weaveBreadcrumbSeparator
-    weaveBreadcrumb breadcrumb
+    if
+      -- (ref:f:weaveBreadcrumbs-object-lookup)
+      | Just _ <- lookup indexPath weaveConf.archive.objects -> do
+          let (_, docPath) =
+                fromMaybe ("", "LILAC_ERROR_RELATIVE_LINK_ERROR")
+                  $ getRelativeOrgDocLink weaveConf indexPath
+          a_ [href_ docPath] $ do
+            weaveBreadcrumb dirName
+      | otherwise -> weaveBreadcrumb dirName
   -- (ref:f:weaveBreadcrumbs-doc-name)
-  forM_ breadcrumbLast $ \breadcrumb -> do
-    weaveBreadcrumbSeparator
-    a_ [href_ "#top"] $ do
-      weaveBreadcrumb breadcrumb
+  weaveBreadcrumbSeparator
+  a_ [href_ "#top"] $ do
+    weaveBreadcrumb breadcrumbLast
   where
     osPathDecoder osp = case P.decodeUtf osp :: Maybe FilePath of
       Nothing -> "LILAC_ERROR_INVALID_OSPATH"
@@ -5675,55 +5698,28 @@ weaveBreadcrumbs = do
       toHtml @Text " "
 #+end_src
 
+The middle breadcrumbs [[(f:weaveBreadcrumbs-middle)]] are perhaps the most
+interesting. We get a list of all parent objects, which are all ~index.org~
+objects in parent directories (including the root). We can get this list of
+parent ~index.org~ objects by getting all leading paths (with ~inits~
+[[(f:weaveBreadcrumbs-middle-inits)]]) like
+
+#+begin_src txt
+a
+a/b
+a/b/c
+#+end_src
+
+for an origin object at path ~a/b/c/foo.lobj~. [[(f:weaveBreadcrumbs-inits-cleanup)]]
+is just for dropping the first and last elements, because they are not needed.
+Then we just make each of those leading substrings end with ~/index.lobj~
+[[(f:weaveBreadcrumbs-index.lobj-suffix)]], and then do lookups into the object map
+[[(f:weaveBreadcrumbs-object-lookup)]]. If the path exists, then we render a link to
+it. If not, we leave it as a plaintext string.
+
 The reliance on ~originObjectPath~ assumes that the archive has object paths that
 are relative to the repository root. It could be that this is not true, but we
 don't bother to handle that edge case here.
-
-[[f:convertObjectExtensionToOrg]] converts something like ~foo.lobj~ into
-~foo.org~. See [[t:0302-object-extension-conversion-to-org]], which shows some happy
-paths as well as some edge cases
-[[(t:0302-object-extension-conversion-to-org-edge-cases)]]. The edge cases don't
-concern us too much because in practice they are extremely unlikely to happen.
-
-#+name: f:convertObjectExtensionToOrg
-#+begin_src haskell
-convertObjectExtensionToOrg :: [Text] -> [Text]
-convertObjectExtensionToOrg [] = []
-convertObjectExtensionToOrg (objName : rest) =
-  let parts = T.split (== '.') objName
-      withoutObjectExtension = drop 1 $ reverse parts
-      withOrgExtension = ".org" : withoutObjectExtension
-   in (T.concat $ reverse withOrgExtension) : rest
-#+end_src
-
-#+name: t:0302-object-extension-conversion-to-org
-#+begin_src haskell
-it "Object extension to org conversion" $ do
-  mapM_
-    ( \(input, output) ->
-        LW.convertObjectExtensionToOrg input `shouldBe` output
-    )
-    [ ( [],
-        []
-      ),
-      ( ["foo.lobj"],
-        ["foo.org"]
-      ),
-      ( ["x.lobj", "a"],
-        ["x.org", "a"]
-      ),
-      ( ["1.lobj", "b", "a"],
-        ["1.org", "b", "a"]
-      ),
-      -- (ref:t:0302-object-extension-conversion-to-org-edge-cases)
-      ( ["x", "b", "a"],
-        [".org", "b", "a"]
-      ),
-      ( ["", "b", "a"],
-        [".org", "b", "a"]
-      )
-    ]
-#+end_src
 
 ** CSS
 :PROPERTIES:
@@ -6354,7 +6350,6 @@ expectCiteprocResult path expected = do
 <<t:0300-weave-lists>>
 <<t:0301-weave-external-links-common-prefix>>
 <<t:0301-weave-external-links>>
-<<t:0302-object-extension-conversion-to-org>>
 <<t:0305-gtoc-ancestor>>
 <<t:0400-citeproc-basic>>
 <<t:0400-citeproc-superscript>>
