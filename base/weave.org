@@ -5679,7 +5679,7 @@ The reliance on ~originObjectPath~ assumes that the archive has object paths tha
 are relative to the repository root. It could be that this is not true, but we
 don't bother to handle that edge case here.
 
-The ~convertObjectExtensionToOrg~ function converts something like ~foo.lobj~ into
+[[f:convertObjectExtensionToOrg]] converts something like ~foo.lobj~ into
 ~foo.org~. See [[t:0302-object-extension-conversion-to-org]], which shows some happy
 paths as well as some edge cases
 [[(t:0302-object-extension-conversion-to-org-edge-cases)]]. The edge cases don't
@@ -5696,20 +5696,13 @@ convertObjectExtensionToOrg (objName : rest) =
    in (T.concat $ reverse withOrgExtension) : rest
 #+end_src
 
-#+name: f:checkObjectExtensionConversion
-#+begin_src haskell
-checkObjectExtensionConversion :: String -> [([Text], [Text])] -> Spec
-checkObjectExtensionConversion msg testCases = do
-  it msg $ do
-    forM_ testCases $ \(input, output) -> do
-      LW.convertObjectExtensionToOrg input `shouldBe` output
-#+end_src
-
 #+name: t:0302-object-extension-conversion-to-org
 #+begin_src haskell
-describe "Object extension to org conversion" $ do
-  checkObjectExtensionConversion
-    "empty case"
+it "Object extension to org conversion" $ do
+  mapM_
+    ( \(input, output) ->
+        LW.convertObjectExtensionToOrg input `shouldBe` output
+    )
     [ ( [],
         []
       ),
@@ -6160,7 +6153,6 @@ import Relude
     String,
     Text,
     foldl',
-    forM_,
     fromList,
     fst,
     map,
@@ -6200,7 +6192,6 @@ spec = do
 <<f:weaveExpect>>
 <<f:getCiteprocResultFromPath>>
 <<f:expectCiteprocResult>>
-<<f:checkObjectExtensionConversion>>
 #+end_src
 
 [[f:getWovenPrettyFromPath]] weaves the given Org file to a =Text=, by first compiling
