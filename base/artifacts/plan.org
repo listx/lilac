@@ -23,30 +23,6 @@ or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
-** TODO GTOC: optionally treat missing index.org files as an error
-
-We can just add GTOC generation preferences into the [[id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf][data:ProjectConf]], which can
-let the user choose different "flavors" of GTOC:
-
-  - full GTOC (expect index.org at every folder, not finding one in a folder is
-    an error). That is, there should be an index.org at every folder where Org
-    files (objects) reside.
-
-  - root GTOC only (only expect root index.org, any others are optional)
-
-  - no GTOC (skip all GTOC generation --- this is the default)
-
-By default we expect no GTOC at all (this makes sense because this whole concept
-is not a native Orgmode thing). This is good, but needs to be done *after*
-implementing GTOC, because we have to also move the [[id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf][data:ProjectConf]] to the
-compilation step (a bit more "upstream" than weaving, which is arguably at the
-very end).
-
-We need to read the project configuration during compilation, so that we can
-affect archive generation.
-
-*** TODO add test case for missing index.org files (given the relevant project config)
-
 ** IN-PROGRESS write user guide
 
 The problem with most of the existing docs are that they are geared toward
@@ -103,6 +79,30 @@ like in the Git project (~main~ should only be advanced to catch up to ~next~, f
 Ideally the backlog would use something like a Story Map to encode both time and
 priority as two separate dimensions. However we just have a flat list of items
 for now because we don't have a good way of representing story maps.
+
+** TODO GTOC: optionally treat missing index.org files as an error
+
+We can just add GTOC generation preferences into the [[id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf][data:ProjectConf]], which can
+let the user choose different "flavors" of GTOC:
+
+  - full GTOC (expect index.org at every folder, not finding one in a folder is
+    an error). That is, there should be an index.org at every folder where Org
+    files (objects) reside.
+
+  - root GTOC only (only expect root index.org, any others are optional)
+
+  - no GTOC (skip all GTOC generation --- this is the default)
+
+By default we expect no GTOC at all (this makes sense because this whole concept
+is not a native Orgmode thing). This is good, but needs to be done *after*
+implementing GTOC, because we have to also move the [[id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf][data:ProjectConf]] to the
+compilation step (a bit more "upstream" than weaving, which is arguably at the
+very end).
+
+We need to read the project configuration during compilation, so that we can
+affect archive generation.
+
+*** TODO add test case for missing index.org files (given the relevant project config)
 
 ** TODO build: change clone path to use HTTPS
 

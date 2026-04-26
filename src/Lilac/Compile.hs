@@ -133,7 +133,6 @@ import Relude
     null,
     otherwise,
     pure,
-    putStrLn,
     repeat,
     runState,
     show,
@@ -285,9 +284,7 @@ mkArchive pathObjs = do
             (map showBrokenLink brokenLinks)
     | otherwise -> do
         gtoc <- case mkGTOC pathObjsNonEmpty of
-          Left err -> do
-            -- TODO: Probably only print this in verbose mode...?
-            putStrLn $ err
+          Left _ -> do
             pure . GTOC $ Node emptyGPath []
           Right gtoc -> pure gtoc
         let archive =
