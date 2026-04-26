@@ -61,7 +61,7 @@ By the same token, all documents require a UUID, so that even if you don't have
 a heading, other documents can still reference a named code block in your doc
 via the top-level document UUID.
 
-** No implicit concatenation of multiple blocks sharing the same name
+** No implicit concatenation of multiple blocks sharing the same name when tangling
 
 Orgmode allows multiple code blocks all sharing the same ~#+header: :noweb-ref
 bar~ metadata, where during tangling these code blocks will be concatenated
@@ -81,14 +81,23 @@ this style for the following reasons:*
      top-to-bottom (by naming the children and choosing how to order the
      exposition of these child blocks).
 
-* Full listing of supported features
+** Other unsupported Org features
 
-#+caption: Org feature parity.
-| Name        | Supported? |
-|-------------+------------|
-| Radio links | No         |
-| Headings    | Yes        |
-| Citations   | Yes        |
+The features below are not supported (and are not planned to be supported).
+
+  - [[https://orgmode.org/manual/Radio-Targets.html][Radio links]]
+
+  - Links to other Org documents by filename. Lilac only supports linking to
+    other Org documents by their ID (see [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5][Links]]).
+
+  - TeX export. Lilac only supports HTML export.
+
+  - Strike-through formatting. Lilac does not support +strike-through+ formatting
+    (the ~+~ signs are ignored).
+
+  - Syntax highlighting of code blocks based on the Emacs theme being used (if
+    one were to export an Org file to HTML from Emacs). Lilac uses a variation
+    of the ~kate~ theme (see [[id:33dc521a-2096-4088-9ccc-e55a2119bbfa][Syntax highlighting theme]]).
 
 * Comparison with other LP tools
 
@@ -104,6 +113,31 @@ this style for the following reasons:*
 | [[https://github.com/nrnrnr/noweb][Noweb]]         | C, Awk, Icon | Yes                                     | Noweb [fn:web-markup]           | Any                   |
 | [[https://github.com/zyedidia/Literate][Literate]]      | D            | Yes                                     | Markdown                        | Any                   |
 | [[https://github.com/ascherer/cweb][CWEB]]          | C            | Yes                                     | TeX [fn:web-markup]             | C, C++                |
+
+* Basic initial setup
+
+Perhaps the biggest requirement is that you must author Org files. Emacs is
+perhaps the most popular application for authoring Org files, so using Emacs is
+highly recommended.
+
+Clone this repo. Install Nix and Cabal. Run ~cabal install~ to install the ~lilac~
+binary to disk.
+
+Need to create a file to tangle housekeeping stuff, like some basic Git and
+other config stuff.
+
+Create a Lilac configuration file in your project root, named ~.lilac.json~.
+
+At the root of your project, create a folder which will house all Org files. For
+the Lilac project, we named this folder ~base~ but it can be anything else.
+
+When tangling code blocks, note that the tangle path is always interpreted to be
+relative to the project root, not where the Org file is located. This makes it
+much easier to move around code blocks across Org files (without having to
+update the relative path).
+
+Write a ~Makefile~ and put in some rules about tangling and weaving from your
+~*.org~ files.
 
 * Footnotes
 
