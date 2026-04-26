@@ -2403,7 +2403,7 @@ tree, starting from a seed value ~b~ and a generator function which can grow the
 next level of a tree. [[(unfoldTree-descriptive)]] is the same signature but with
 more descriptive type names. Finally [[(unfoldTreeM-final)]] shows the signature
 with the types we'll be using, with ~m~ representing a monadic context; we use the
-~State~ monad at [[(f:mkGTOC-f:mkGTOC-unfoldTreeM)]] so that we can record invalid
+~State~ monad at [[(f:mkGTOC-unfoldTreeM)]] so that we can record invalid
 paths as we start building up the tree. Invalid paths are stored in
 [[data:PathState]].
 
@@ -2411,8 +2411,8 @@ paths as we start building up the tree. Invalid paths are stored in
 #+begin_src haskell
 type PathState :: Type
 data PathState = PathState
-  { objMap :: Map GPath Object, -- (ref:data:PathState-data:PathState-objMap)
-    invalidPaths :: [GPath] -- (ref:data:PathState-data:PathState-invalidPaths)
+  { objMap :: Map GPath Object, -- (ref:data:PathState-objMap)
+    invalidPaths :: [GPath] -- (ref:data:PathState-invalidPaths)
   }
 #+end_src
 
@@ -2429,8 +2429,8 @@ As for the details around growing the tree itself, it is as follows:
      it at any time without having to pass it along to every child call.
 
      If the path does not exist in the ~objMap~
-     [[(data:PathState-data:PathState-objMap)]], then record it inside
-     [[(data:PathState-data:PathState-invalidPaths)]].
+     [[(data:PathState-objMap)]], then record it inside
+     [[(data:PathState-invalidPaths)]].
 
 The first step is done in [[f:findRootIndex]], which is called by [[f:mkGTOC]]. The
 remaining steps are carried out in [[f:getChildPaths]].
@@ -2453,7 +2453,7 @@ mkGTOC pathObjsNonEmpty
   | otherwise = Left "root index.lobj not found"
   where
     f :: (GPath, Object) -> State PathState GTOC
-    f pathObj = GTOC <$> unfoldTreeM generator pathObj -- (ref:f:mkGTOC-f:mkGTOC-unfoldTreeM)
+    f pathObj = GTOC <$> unfoldTreeM generator pathObj -- (ref:f:mkGTOC-unfoldTreeM)
     generator ::
       (GPath, Object) ->
       State PathState (GPath, [(GPath, Object)])

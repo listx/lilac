@@ -1212,7 +1212,7 @@ weaveCell (lci, cell) = case cell of
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> p_ [] $ wrapWith lci $ weaveProse prose
   CBlock block
-    | Just "index" <- lookup "name" block.meta -> pure () -- (ref:f:weaveCell-f:weaveCell-hide-index-block)
+    | Just "index" <- lookup "name" block.meta -> pure () -- (ref:f:weaveCell-hide-index-block)
     | otherwise -> weaveBlock lci block
   CMathFragment mathFragment -> weaveMathFragmentStandalone lci mathFragment
   CFigure figure -> weaveFigure lci figure
@@ -1224,10 +1224,10 @@ weaveCell (lci, cell) = case cell of
     PrintGlossary isGlobal -> weaveGlossary isGlobal
 #+end_src
 
-[[(f:weaveCell-f:weaveCell-hide-index-block)]] does nothing if the code block is a
+[[(f:weaveCell-hide-index-block)]] does nothing if the code block is a
 magic "index" block, because this is low-level information which is already
 widely apparent by looking at the "Site Contents" in the sidebar
-[[(f:weaveGtoc-f:weaveGtoc-site-contents)]].
+[[(f:weaveGtoc-site-contents)]].
 
 ** HTML head
 
@@ -5454,7 +5454,7 @@ the tree into a nested structure of unordered list items (~<ul>...</ul>~).
 
 We could feed the entire tree to [[f:weaveGtocTree]] as is, but we first make the
 root ~index.org~ node a sibling to its children
-[[(f:weaveGtoc-f:weaveGtoc-root-node)]]. This way, we avoid showing the root node on
+[[(f:weaveGtoc-root-node)]]. This way, we avoid showing the root node on
 its own level (always by itself, without siblings, taking up valuable
 indentation space). That is, instead of
 
@@ -5484,10 +5484,10 @@ weaveGtoc :: GTOC -> HtmlWeaver ()
 weaveGtoc gtoc = do
   nav_ [class_ "gtoc"] $ do
     p_ [class_ "widget-title"] $ do
-      toHtml @Text "Site Contents" -- (ref:f:weaveGtoc-f:weaveGtoc-site-contents)
+      toHtml @Text "Site Contents" -- (ref:f:weaveGtoc-site-contents)
     let (Node rootNode forest) = gtoc.unGTOC
     ul_ [] $ do
-      weaveGtocForest (Node rootNode [] : forest) -- (ref:f:weaveGtoc-f:weaveGtoc-root-node)
+      weaveGtocForest (Node rootNode [] : forest) -- (ref:f:weaveGtoc-root-node)
 #+end_src
 
 [[f:weaveGtocForest]] just delegates to [[f:weaveGtocTree]].
@@ -5500,7 +5500,7 @@ weaveGtocForest nodes = forM_ nodes weaveGtocTree
 
 [[f:weaveGtocTree]] renders a single object's document title or file name, before
 calling [[f:weaveGtocForest]] for all of its child nodes
-[[(f:weaveGtocTree-f:weaveGtocTree-children)]].
+[[(f:weaveGtocTree-children)]].
 
 #+name: f:weaveGtocTree
 #+begin_src haskell
@@ -5528,7 +5528,7 @@ weaveGtocTree (Node path children) = do
       toHtml @Text docLabel
     let isAncestor = path `isGtocAncestor` weaveConf.originObjectPath
     when (isAncestor && (not $ null children)) $ do
-      ul_ [] $ weaveGtocForest children -- (ref:f:weaveGtocTree-f:weaveGtocTree-children)
+      ul_ [] $ weaveGtocForest children -- (ref:f:weaveGtocTree-children)
 #+end_src
 
 [[f:isGtocAncestor]] checks if the first path is an "ancestor" of the current object
@@ -5556,7 +5556,7 @@ isGtocAncestor path originObjectPath =
 
 [[t:0305-gtoc-ancestor]] encodes some expected behavior of [[f:isGtocAncestor]]. Perhaps
 the most interesting input is
-[[(t:0305-gtoc-ancestor-t:0305-gtoc-ancestor-nonparent)]] where the given ~path~
+[[(t:0305-gtoc-ancestor-nonparent)]] where the given ~path~
 deviates from the ~originObjectPath~; this is the condition which will make sure
 we "prune" the tree so that we don't render the entire ~GTOC~ tree in
 [[f:weaveGtocTree]].
@@ -5574,7 +5574,7 @@ it "0305-gtoc-ancestor" $ do
       ("a/index.lobj", "a/b/foo.lobj", True),
       ("a/index.lobj", "a/b/c/foo.lobj", True),
       ("a/b/c/index.lobj", "a/b/foo.lobj", False),
-      ("a/m/index.lobj", "a/b/c/foo.lobj", False) -- (ref:t:0305-gtoc-ancestor-t:0305-gtoc-ancestor-nonparent)
+      ("a/m/index.lobj", "a/b/c/foo.lobj", False) -- (ref:t:0305-gtoc-ancestor-nonparent)
     ]
 #+end_src
 
