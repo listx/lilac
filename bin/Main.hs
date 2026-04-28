@@ -3,6 +3,7 @@ module Main (main) where
 import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
 import Data.FileEmbed (embedFile)
 import Data.Map.Strict qualified as M
+import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
@@ -12,7 +13,8 @@ import Lilac.Types
   ( Archive (objects),
     GPath,
     Object,
-    ProjectConf,
+    ProjectConf (ProjectConf, homepage, name, repo, version),
+    RawProjectConf (homepage, name, repo, version),
     WeaveConf
       ( WeaveConf,
         archive,
@@ -29,6 +31,7 @@ import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
 import Lilac.Weave qualified as LW
 import Lilac.Weave.Css qualified as LWC
+import Network.URI qualified as N
 import Options.Applicative
   ( Parser,
     ReadM,
@@ -64,7 +67,7 @@ import Relude
     FilePath,
     IO,
     Int,
-    Maybe (Just),
+    Maybe (Just, Nothing),
     MonadFail,
     String,
     Text,
@@ -124,6 +127,7 @@ readGPath = encodeGPath =<< str
 type GlobalOpts :: Type
 data GlobalOpts = GlobalOpts
   { subcommand :: Subcommand,
+    projectConf :: OsPath,
     color :: Bool,
     verbose :: Bool
   }
@@ -145,7 +149,6 @@ type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [OsPath],
     outDir :: OsPath,
-    projectConf :: OsPath,
     writeCss :: Bool,
     writeJs :: Bool
   }
@@ -168,6 +171,18 @@ globalOptionsHandler :: OptionHandler GlobalOpts
 globalOptionsHandler =
   GlobalOpts
     <$> subcommandHandler
+    <*> ( option
+            readOsPath
+            ( long "project-conf"
+                <> metavar "PROJECT_CONF"
+                <> value (P.unsafeEncodeUtf ".lilac.json")
+                <> showDefault
+                <> help
+                  """
+                  Project configuration file.
+                  """
+            )
+        )
     <*> ( flag
             True
             False
@@ -261,18 +276,6 @@ weaveOptsHandler =
                   """
             )
         )
-    <*> ( option
-            readOsPath
-            ( long "project-conf"
-                <> metavar "PROJECT_CONF"
-                <> value (P.unsafeEncodeUtf ".lilac.json")
-                <> showDefault
-                <> help
-                  """
-                  Project configuration file.
-                  """
-            )
-        )
     <*> ( flag
             False
             True
@@ -359,7 +362,25 @@ lilac globalOpts = case globalOpts.subcommand of
   Archive archiveOpts -> lilacArchive archiveOpts
   Compile compileOpts -> lilacCompile globalOpts compileOpts
   Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
-  Weave weaveOpts -> lilacWeave weaveOpts
+  Weave weaveOpts -> lilacWeave globalOpts weaveOpts
+
+parseProjectConf :: Text -> Either String ProjectConf
+parseProjectConf input = case parseRawProjectConf input of
+  Left errMsg -> Left errMsg
+  Right rawProjectConf ->
+    Right
+      ProjectConf
+        { name = rawProjectConf.name,
+          homepage = N.parseURI $ T.unpack rawProjectConf.homepage,
+          repo = N.parseURI $ T.unpack rawProjectConf.repo,
+          version =
+            if T.null rawProjectConf.version
+              then Nothing
+              else Just rawProjectConf.version
+        }
+
+parseRawProjectConf :: Text -> Either String RawProjectConf
+parseRawProjectConf = eitherDecodeStrictText
 
 lilacCompile :: GlobalOpts -> CompileOpts -> IO ()
 lilacCompile _globalOpts compileOpts = do
@@ -466,16 +487,16 @@ tangle globalOpts tangleOpts archive = do
         then putStrLnColor boldWhite
         else putStrLn
 
-lilacWeave :: WeaveOpts -> IO ()
-lilacWeave weaveOpts = do
+lilacWeave :: GlobalOpts -> WeaveOpts -> IO ()
+lilacWeave globalOpts weaveOpts = do
   projectConf <- readProjectConf
   when weaveOpts.writeCss writeCssFile
   when weaveOpts.writeJs writeJsFile
   mapM_ (weaveArchiveFile projectConf weaveOpts.outDir) $ weaveOpts.inputs
   where
     readProjectConf = do
-      input <- LU.readFileRobustly weaveOpts.projectConf
-      case LW.parseProjectConf input of
+      input <- LU.readFileRobustly globalOpts.projectConf
+      case parseProjectConf input of
         Left errMsg -> die errMsg
         Right projectConf -> pure projectConf
     writeCssFile = do

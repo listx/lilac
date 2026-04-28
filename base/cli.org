@@ -26,6 +26,7 @@ module Main (main) where
 import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
 import Data.FileEmbed (embedFile)
 import Data.Map.Strict qualified as M
+import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
@@ -35,7 +36,8 @@ import Lilac.Types
   ( Archive (objects),
     GPath,
     Object,
-    ProjectConf,
+    ProjectConf (ProjectConf, homepage, name, repo, version),
+    RawProjectConf (homepage, name, repo, version),
     WeaveConf
       ( WeaveConf,
         archive,
@@ -52,6 +54,7 @@ import Lilac.Util qualified as LU
 import Lilac.Version (lilacVersion)
 import Lilac.Weave qualified as LW
 import Lilac.Weave.Css qualified as LWC
+import Network.URI qualified as N
 import Options.Applicative
   ( Parser,
     ReadM,
@@ -87,7 +90,7 @@ import Relude
     FilePath,
     IO,
     Int,
-    Maybe (Just),
+    Maybe (Just, Nothing),
     MonadFail,
     String,
     Text,
@@ -136,6 +139,8 @@ import Text.Megaparsec qualified as MP
 
 <<f:lilac-main>>
 <<f:lilac>>
+<<f:parseProjectConf>>
+<<f:parseRawProjectConf>>
 <<f:lilacCompile>>
 <<f:lilacArchive>>
 <<f:lilacTangle>>
@@ -190,7 +195,7 @@ lilac globalOpts = case globalOpts.subcommand of
   Archive archiveOpts -> lilacArchive archiveOpts
   Compile compileOpts -> lilacCompile globalOpts compileOpts
   Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
-  Weave weaveOpts -> lilacWeave weaveOpts
+  Weave weaveOpts -> lilacWeave globalOpts weaveOpts
 #+end_src
 
 Before we can ~tangle~ or ~weave~, we have to first compile Org files into object
@@ -253,6 +258,100 @@ Notice that the option handling boilerplate does not describe error handling
 (what to do when a required option is missing, etc), because all of that is
 given to us for free by =Options.Applicative=.
 
+** Project configuration
+:PROPERTIES:
+:ID:       df128041-ada8-4d77-a373-111416002dae
+:END:
+
+The starting point of the CLI is the concept of /project configuration/. Project
+configuration defines some global settings that apply to some Lilac subcommands.
+For example, when weaving these settings apply to the weavable artifacts
+found in a [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]], which itself is composed of a collection of [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]]
+values. Project configuration is encoded in [[data:ProjectConf]].
+
+#+name: data:ProjectConf
+#+begin_src haskell
+type ProjectConf :: Type
+data ProjectConf = ProjectConf
+  { name :: Text, -- (ref:data:ProjectConf-name)
+    homepage :: Maybe N.URI, -- (ref:data:ProjectConf-homepage)
+    repo :: Maybe N.URI, -- (ref:data:ProjectConf-repo)
+    version :: Maybe Text -- (ref:data:ProjectConf-version)
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+The fields are:
+
+  - ~name~ :: [[(data:ProjectConf-name)]] Name of the project. This is used in the
+    [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]].
+
+  - ~homepage~ :: [[(data:ProjectConf-homepage)]] URL of the homepage. This is used as
+    the link target to describe the ~name~ in the navbar. It could very well be
+    the case that this target merely points to one of the other woven object
+    files.
+
+  - ~repo~ :: [[(data:ProjectConf-repo)]] URL of the source code repository (the
+    assumption being that the Org docs and tangled files are all open source and
+    belonging to the same Git repo).
+
+  - ~version~ :: [[(data:ProjectConf-version)]] Human-friendly version information.
+    This is used in the [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]].
+
+Project configuration isn't part of [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] because it may be the case in
+the future that a single project could be used for multiple archive files.
+
+*** Simple project configuration
+:PROPERTIES:
+:ID:       a7de905c-03c8-4d4b-911c-b1f4435aea85
+:END:
+
+The [[data:ProjectConf]] would be very difficult to use if we expect users to write
+the JSON version of it manually, because it is a precise type (e.g., writing the
+value of a ~URI~ can be painful). So instead we let users write a simplified
+version of it in JSON (as [[data:RawProjectConf]]), using plain ~Text~ values for the
+fields. During weaving we parse this and convert it to [[data:ProjectConf]].
+
+#+name: data:RawProjectConf
+#+begin_src haskell
+type RawProjectConf :: Type
+data RawProjectConf = RawProjectConf
+  { name :: Text,
+    homepage :: Text,
+    repo :: Text,
+    version :: Text
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+#+name: f:parseRawProjectConf
+#+begin_src haskell
+parseRawProjectConf :: Text -> Either String RawProjectConf
+parseRawProjectConf = eitherDecodeStrictText
+#+end_src
+
+[[f:parseProjectConf]] relies on [[f:parseRawProjectConf]] for the initial parse, and
+some additional helpers like ~N.parseURI~.
+
+#+name: f:parseProjectConf
+#+begin_src haskell
+parseProjectConf :: Text -> Either String ProjectConf
+parseProjectConf input = case parseRawProjectConf input of
+  Left errMsg -> Left errMsg
+  Right rawProjectConf ->
+    Right
+      ProjectConf
+        { name = rawProjectConf.name,
+          homepage = N.parseURI $ T.unpack rawProjectConf.homepage,
+          repo = N.parseURI $ T.unpack rawProjectConf.repo,
+          version =
+            if T.null rawProjectConf.version
+              then Nothing
+              else Just rawProjectConf.version
+        }
+#+end_src
 ** Global and subcommand options
 
 The [[data:GlobalOpts]] are options that can affect more than one subcommand
@@ -263,6 +362,7 @@ The [[data:GlobalOpts]] are options that can affect more than one subcommand
 type GlobalOpts :: Type
 data GlobalOpts = GlobalOpts
   { subcommand :: Subcommand,
+    projectConf :: OsPath,
     color :: Bool,
     verbose :: Bool
   }
@@ -307,6 +407,18 @@ globalOptionsHandler :: OptionHandler GlobalOpts
 globalOptionsHandler =
   GlobalOpts
     <$> subcommandHandler
+    <*> ( option
+            readOsPath
+            ( long "project-conf"
+                <> metavar "PROJECT_CONF"
+                <> value (P.unsafeEncodeUtf ".lilac.json")
+                <> showDefault
+                <> help
+                  """
+                  Project configuration file.
+                  """
+            )
+        )
     <*> ( flag
             True
             False
@@ -672,7 +784,6 @@ type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [OsPath],
     outDir :: OsPath,
-    projectConf :: OsPath,
     writeCss :: Bool,
     writeJs :: Bool
   }
@@ -699,18 +810,6 @@ weaveOptsHandler =
                 <> help
                   """
                   Directory for saving the HTML files.
-                  """
-            )
-        )
-    <*> ( option
-            readOsPath
-            ( long "project-conf"
-                <> metavar "PROJECT_CONF"
-                <> value (P.unsafeEncodeUtf ".lilac.json")
-                <> showDefault
-                <> help
-                  """
-                  Project configuration file.
                   """
             )
         )
@@ -741,16 +840,16 @@ archive to HTML.
 
 #+name: f:lilacWeave
 #+begin_src haskell
-lilacWeave :: WeaveOpts -> IO ()
-lilacWeave weaveOpts = do
+lilacWeave :: GlobalOpts -> WeaveOpts -> IO ()
+lilacWeave globalOpts weaveOpts = do
   projectConf <- readProjectConf
   when weaveOpts.writeCss writeCssFile
   when weaveOpts.writeJs writeJsFile
   mapM_ (weaveArchiveFile projectConf weaveOpts.outDir) $ weaveOpts.inputs
   where
     readProjectConf = do
-      input <- LU.readFileRobustly weaveOpts.projectConf
-      case LW.parseProjectConf input of
+      input <- LU.readFileRobustly globalOpts.projectConf
+      case parseProjectConf input of
         Left errMsg -> die errMsg
         Right projectConf -> pure projectConf
     writeCssFile = do

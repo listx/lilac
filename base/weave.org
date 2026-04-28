@@ -39,115 +39,6 @@ as they understand the same JSON. While we would prefer to use something more
 Also, none of these alternative formats support both Haskell and ClojureScript
 well.
 
-** Project configuration
-:PROPERTIES:
-:ID:       df128041-ada8-4d77-a373-111416002dae
-:END:
-
-The starting point of weaving is the concept of /project configuration/. Project
-configuration defines some global settings that apply to all weavable artifacts
-found in a [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]], which itself is composed of a collection of [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]]
-values. Project configuration is encoded in [[data:ProjectConf]].
-
-#+name: data:ProjectConf
-#+begin_src haskell
-type ProjectConf :: Type
-data ProjectConf = ProjectConf
-  { name :: Text, -- (ref:data:ProjectConf-name)
-    homepage :: Maybe N.URI, -- (ref:data:ProjectConf-homepage)
-    repo :: Maybe N.URI, -- (ref:data:ProjectConf-repo)
-    version :: Maybe Text -- (ref:data:ProjectConf-version)
-  }
-  deriving stock (Eq, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
-#+end_src
-
-The fields are:
-
-  - name :: [[(data:ProjectConf-name)]] Name of the project. This is used in the
-    [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]].
-
-  - homepage :: [[(data:ProjectConf-homepage)]] URL of the homepage. This is used as
-    the link target to describe the ~name~ in the navbar. It could very well be
-    the case that this target merely points to one of the other woven object
-    files.
-
-  - repo :: [[(data:ProjectConf-repo)]] URL of the source code repository (the
-    assumption being that the Org docs and tangled files are all open source and
-    belonging to the same Git repo).
-
-  - version :: [[(data:ProjectConf-version)]] Human-friendly version information.
-    This is used in the [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]].
-
-Project configuration isn't part of [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] because it may be the case in
-the future that a single project could be used for multiple archive files.
-
-*** Simple project configuration
-:PROPERTIES:
-:ID:       a7de905c-03c8-4d4b-911c-b1f4435aea85
-:END:
-
-The [[data:ProjectConf]] would be very difficult to use if we expect users to write
-the JSON version of it manually, because it is a precise type (e.g., writing the
-value of a ~URI~ can be painful). So instead we let users write a simplified
-version of it in JSON (as [[data:RawProjectConf]]), using plain ~Text~ values for the
-fields. During weaving we parse this and convert it to [[data:ProjectConf]].
-
-#+name: data:RawProjectConf
-#+begin_src haskell
-type RawProjectConf :: Type
-data RawProjectConf = RawProjectConf
-  { name :: Text,
-    homepage :: Text,
-    repo :: Text,
-    version :: Text
-  }
-  deriving stock (Eq, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
-#+end_src
-
-#+name: f:parseRawProjectConf
-#+begin_src haskell
-parseRawProjectConf :: Text -> Either String RawProjectConf
-parseRawProjectConf = eitherDecodeStrictText
-#+end_src
-
-[[f:parseProjectConf]] relies on [[f:parseRawProjectConf]] for the initial parse, and
-some additional helpers like ~N.parseURI~.
-
-#+name: f:parseProjectConf
-#+begin_src haskell
-parseProjectConf :: Text -> Either String ProjectConf
-parseProjectConf input = case parseRawProjectConf input of
-  Left errMsg -> Left errMsg
-  Right rawProjectConf ->
-    Right
-      ProjectConf
-        { name = rawProjectConf.name,
-          homepage = N.parseURI $ T.unpack rawProjectConf.homepage,
-          repo = N.parseURI $ T.unpack rawProjectConf.repo,
-          version =
-            if T.null rawProjectConf.version
-              then Nothing
-              else Just rawProjectConf.version
-        }
-#+end_src
-
-*** Project configuration for Lilac
-
-We define the project configuration for Lilac itself in here, as a JSON file.
-
-#+name: json:RawProjectConfig for Lilac
-#+header: :tangle .lilac.json
-#+begin_src json
-{
-    "name": "Lilac",
-    "homepage": "<<id:04ae01eb-2439-469f-aef6-129ff94ad018::lilac-repo-url>>",
-    "repo": "<<id:04ae01eb-2439-469f-aef6-129ff94ad018::lilac-repo-url>>",
-    "version": "<<id:ee7a98ad-6b13-4489-9a04-58a7c80899e7::Lilac version>>"
-}
-#+end_src
-
 * HTML foundations
 ** =Lilac.Weave= module
 
@@ -160,7 +51,6 @@ module Lilac.Weave
   ( commonPrefix,
     getRelativePathWithoutSymlinks,
     isGtocAncestor,
-    parseProjectConf,
     prepareCitations,
     renderAsText,
     weaveObject,
@@ -194,7 +84,7 @@ import Citeproc.CslJson
       ),
     parseCslJson,
   )
-import Data.Aeson (eitherDecodeStrictText, encode)
+import Data.Aeson (encode)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List (groupBy, partition)
@@ -292,9 +182,8 @@ import Lilac.Types
         PTokenMathFragment,
         PTokenStyledText
       ),
-    ProjectConf (ProjectConf, homepage, name, repo, version),
+    ProjectConf (homepage, name, version),
     Prose (Prose, unProse),
-    RawProjectConf (homepage, name, repo, version),
     Style
       ( Bold,
         Code,
@@ -402,7 +291,7 @@ import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Char,
-    Either (Left, Right),
+    Either (Right),
     Eq,
     FilePath,
     IO,
@@ -569,8 +458,6 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:isGtocAncestor>>
 <<f:genHeadingAncestry>>
 <<f:weaveHeadingAncestry>>
-<<f:parseRawProjectConf>>
-<<f:parseProjectConf>>
 <<f:weaveNavbar>>
 <<f:weaveBreadcrumbs>>
 <<f:weaveFooter>>
@@ -1455,7 +1342,8 @@ div ? do
 The ~<body>~ uses a CSS grid layout to create four distinct areas:
 
   1) Navbar :: Contains the filesystem path of the object, as well as a link to
-     the homepage of the project [[(data:ProjectConf-homepage)]].
+     the homepage of the project
+     [[id:df128041-ada8-4d77-a373-111416002dae::(data:ProjectConf-homepage)]].
 
   2) Table of Contents (TOC) :: Summarizes all of the major headings (first two
      levels) in the document.
@@ -5618,7 +5506,7 @@ The breadcrumbs are made up of four pieces:
   4) Org document name [[(f:weaveBreadcrumbs-doc-name)]]
 
 The middle part can be any number of intervening directory names. The project
-name comes from [[data:ProjectConf]], and the Org document name comes from the
+name comes from [[id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf][data:ProjectConf]], and the Org document name comes from the
 ~originObjectPath~ from [[data:WeaveConf]].
 
 The breadcrumbs are woven in [[f:weaveBreadcrumbs]].

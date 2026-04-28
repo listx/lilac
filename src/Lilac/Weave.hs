@@ -2,7 +2,6 @@ module Lilac.Weave
   ( commonPrefix,
     getRelativePathWithoutSymlinks,
     isGtocAncestor,
-    parseProjectConf,
     prepareCitations,
     renderAsText,
     weaveObject,
@@ -36,7 +35,7 @@ import Citeproc.CslJson
       ),
     parseCslJson,
   )
-import Data.Aeson (eitherDecodeStrictText, encode)
+import Data.Aeson (encode)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List (groupBy, partition)
@@ -134,9 +133,8 @@ import Lilac.Types
         PTokenMathFragment,
         PTokenStyledText
       ),
-    ProjectConf (ProjectConf, homepage, name, repo, version),
+    ProjectConf (homepage, name, version),
     Prose (Prose, unProse),
-    RawProjectConf (homepage, name, repo, version),
     Style
       ( Bold,
         Code,
@@ -244,7 +242,7 @@ import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
     Char,
-    Either (Left, Right),
+    Either (Right),
     Eq,
     FilePath,
     IO,
@@ -1806,24 +1804,6 @@ weaveHeadingAncestry lciCellPairs = do
   let headingAncestry = genHeadingAncestry $ map snd lciCellPairs
   script_ [id_ "heading-ancestry", type_ "application/json"] $ do
     toHtmlRaw . TLE.decodeUtf8 $ encode headingAncestry
-
-parseRawProjectConf :: Text -> Either String RawProjectConf
-parseRawProjectConf = eitherDecodeStrictText
-
-parseProjectConf :: Text -> Either String ProjectConf
-parseProjectConf input = case parseRawProjectConf input of
-  Left errMsg -> Left errMsg
-  Right rawProjectConf ->
-    Right
-      ProjectConf
-        { name = rawProjectConf.name,
-          homepage = N.parseURI $ T.unpack rawProjectConf.homepage,
-          repo = N.parseURI $ T.unpack rawProjectConf.repo,
-          version =
-            if T.null rawProjectConf.version
-              then Nothing
-              else Just rawProjectConf.version
-        }
 
 weaveNavbar :: HtmlWeaver ()
 weaveNavbar = do
