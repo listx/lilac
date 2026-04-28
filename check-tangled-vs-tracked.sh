@@ -16,7 +16,6 @@ tracked_files()
 	git -C "${SCRIPT_ROOT}" ls-files \
 		-- . \
 		':(exclude,top).gitmodules' \
-		':(exclude,top).vale/styles/.gitkeep' \
 		':(exclude,top)README.org' \
 		':(exclude,top)LICENSE' \
 		':(exclude,top)base/*.html' \
