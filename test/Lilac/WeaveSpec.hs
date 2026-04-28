@@ -23,7 +23,14 @@ import Lilac.Types
         PTokenLink,
         PTokenMathFragment
       ),
-    ProjectConf (ProjectConf, homepage, name, repo, version),
+    ProjectConf
+      ( ProjectConf,
+        homepage,
+        name,
+        nonTangledPathspecs,
+        repo,
+        version
+      ),
     Prose (Prose, unProse),
     Style (Bold, Code, Italic, Smallcaps, Superscript, Verbatim),
     StyledText (StyledText, body, style),
@@ -774,7 +781,8 @@ getWovenPrettyFromPath path = do
                   { name = "Test Project",
                     homepage = Nothing,
                     repo = Nothing,
-                    version = Nothing
+                    version = Nothing,
+                    nonTangledPathspecs = []
                   }
               weaveConf =
                 WeaveConf

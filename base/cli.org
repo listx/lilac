@@ -24,6 +24,7 @@ The boilerplate involves [[id:ce9af5ef-6559-4ffb-82c1-a439214eda6d][option handl
 module Main (main) where
 
 import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
+import Data.ByteString.Lazy.Char8 qualified as LBS
 import Data.FileEmbed (embedFile)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
@@ -34,10 +35,20 @@ import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Types
   ( Archive (objects),
+    Block (meta),
+    Cell (CBlock),
     GPath,
-    Object,
-    ProjectConf (ProjectConf, homepage, name, repo, version),
-    RawProjectConf (homepage, name, repo, version),
+    Object (orgDoc),
+    OrgDoc (cells),
+    ProjectConf
+      ( ProjectConf,
+        homepage,
+        name,
+        nonTangledPathspecs,
+        repo,
+        version
+      ),
+    RawProjectConf (homepage, name, nonTangledPathspecs, repo, version),
     WeaveConf
       ( WeaveConf,
         archive,
@@ -90,19 +101,23 @@ import Relude
     FilePath,
     IO,
     Int,
+    LByteString,
     Maybe (Just, Nothing),
     MonadFail,
     String,
     Text,
     Type,
     concat,
+    concatMap,
     fail,
     foldlM,
+    forM_,
     intercalate,
     length,
     map,
     mapM,
     mapM_,
+    mapMaybe,
     mempty,
     not,
     null,
@@ -110,6 +125,7 @@ import Relude
     pure,
     putStr,
     putStrLn,
+    putTextLn,
     reverse,
     runStateT,
     sequence_,
@@ -121,17 +137,21 @@ import Relude
     (+),
     (.),
     (/=),
+    (<),
     (<$>),
     (<>),
     (=<<),
+    (==),
     (>),
     (||),
   )
+import Relude.Extra.Map (lookup)
 import System.Console.ANSI qualified as C
 import System.Directory.OsPath qualified as D
-import System.Exit (die)
+import System.Exit (die, exitFailure)
 import System.OsPath (OsPath)
 import System.OsPath qualified as P
+import System.Process.Typed (proc, readProcessStdout_)
 import Text.Megaparsec qualified as MP
 
 <<Option handling>>
@@ -139,6 +159,7 @@ import Text.Megaparsec qualified as MP
 
 <<f:lilac-main>>
 <<f:lilac>>
+<<f:readProjectConf>>
 <<f:parseProjectConf>>
 <<f:parseRawProjectConf>>
 <<f:lilacCompile>>
@@ -148,6 +169,9 @@ import Text.Megaparsec qualified as MP
 <<f:lilacWeave>>
 <<f:weaveToDisk>>
 <<f:lilacJs>>
+<<f:lilacLint>>
+<<f:gitLsFiles>>
+<<f:diffSorted>>
 <<f:putStrColor>>
 <<f:putStrLnColor>>
 #+end_src
@@ -196,6 +220,7 @@ lilac globalOpts = case globalOpts.subcommand of
   Compile compileOpts -> lilacCompile globalOpts compileOpts
   Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
   Weave weaveOpts -> lilacWeave globalOpts weaveOpts
+  Lint lintOpts -> lilacLint globalOpts lintOpts
 #+end_src
 
 Before we can ~tangle~ or ~weave~, we have to first compile Org files into object
@@ -219,6 +244,7 @@ options, and the functions that operate on them.
 <<data:WeaveOpts>>
 <<data:CompileOpts>>
 <<data:ArchiveOpts>>
+<<data:LintOpts>>
 <<data:OptionHandler>>
 <<f:globalOptionsHandler>>
 <<f:subcommandHandler>>
@@ -226,6 +252,7 @@ options, and the functions that operate on them.
 <<f:weaveOptsHandler>>
 <<f:compileOptsHandler>>
 <<f:archiveOptsHandler>>
+<<f:lintOptsHandler>>
 #+end_src
 
 One useful helper we have to write ourselves is a parser that can understand how
@@ -276,7 +303,8 @@ data ProjectConf = ProjectConf
   { name :: Text, -- (ref:data:ProjectConf-name)
     homepage :: Maybe N.URI, -- (ref:data:ProjectConf-homepage)
     repo :: Maybe N.URI, -- (ref:data:ProjectConf-repo)
-    version :: Maybe Text -- (ref:data:ProjectConf-version)
+    version :: Maybe Text, -- (ref:data:ProjectConf-version)
+    nonTangledPathspecs :: [Text] -- (ref:data:ProjectConf-nonTangledPathspecs)
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -299,6 +327,10 @@ The fields are:
   - ~version~ :: [[(data:ProjectConf-version)]] Human-friendly version information.
     This is used in the [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]].
 
+  - ~nonTangledPathspecs~ :: [[(data:ProjectConf-nonTangledPathspecs)]] A list of
+    pathpecs to be sent to the ~git-ls-files~ command. This output is compared
+    against all tangle paths in the Archive, and is used for linting.
+
 Project configuration isn't part of [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] because it may be the case in
 the future that a single project could be used for multiple archive files.
 
@@ -320,7 +352,8 @@ data RawProjectConf = RawProjectConf
   { name :: Text,
     homepage :: Text,
     repo :: Text,
-    version :: Text
+    version :: Text,
+    nonTangledPathspecs :: [Text]
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -349,7 +382,8 @@ parseProjectConf input = case parseRawProjectConf input of
           version =
             if T.null rawProjectConf.version
               then Nothing
-              else Just rawProjectConf.version
+              else Just rawProjectConf.version,
+          nonTangledPathspecs = rawProjectConf.nonTangledPathspecs
         }
 #+end_src
 ** Global and subcommand options
@@ -379,6 +413,7 @@ data Subcommand
   | Archive ArchiveOpts
   | Tangle TangleOpts
   | Weave WeaveOpts
+  | Lint LintOpts
 #+end_src
 
 Each of these ~<...>Opts~ data types require their own option /handler/, so that
@@ -462,6 +497,7 @@ subcommandHandler =
     <> cmdArchive
     <> cmdTangle
     <> cmdWeave
+    <> cmdLint
   where
     cmdCompile =
       command
@@ -487,6 +523,12 @@ subcommandHandler =
         $ info
           (Weave <$> weaveOptsHandler)
           (progDesc "Generate HTML documentation from archives.")
+    cmdLint =
+      command
+        "lint"
+        $ info
+          (Lint <$> lintOptsHandler)
+          (progDesc "Look for tracked files that are not tangled by Lilac.")
 #+end_src
 
 This just delegates to ~hsubparser~ [[(hsubparser)]], which combines a group of
@@ -769,6 +811,131 @@ scenarios) is fine because it will most likely result in the comparison
 ~existingContent /= contentToWrite~ in [[f:tangle]] failing (assuming the
 ~contentToWrite~ is not empty), resulting in the file being marked for tangling.
 
+** Linting tangled paths
+:PROPERTIES:
+:ID:       a0b8abe5-5b1c-4dc4-b482-5dbd4b233471
+:END:
+
+In Literate Programming (LP), it's an anti-pattern to write code directly
+without explaining it in detail. In other words, most of the files in a
+repository using LP should be able to be traced back to code block in a larger
+literate document. We can check for this by comparing all tangled paths against
+what's tracked in version control by Git (listed by ~git-ls-files~). The two
+should be mostly equivalent.
+
+We say "mostly equivalent" because some files will be generated by tools other
+than Lilac (e.g., ~.gitmodules~ if you are using Git submodules). We need to
+exclude these files from the output of ~git-ls-files~ (see
+[[id:4375ba0d-b917-4d32-92f4-884be63659fe::(json:RawProjectConfig-nonTangledPathspecs)]]
+to see how these excluded pathspecs are defined).
+
+#+name: data:LintOpts
+#+begin_src haskell
+type LintOpts :: Type
+data LintOpts = LintOpts
+  { inputs :: [OsPath] -- (ref:data:LintOpts-inputs)
+  }
+#+end_src
+
+The ~inputs~ [[(data:LintOpts-inputs)]] are paths to archive files.
+
+#+name: f:lintOptsHandler
+#+begin_src haskell
+lintOptsHandler :: OptionHandler LintOpts
+lintOptsHandler =
+  LintOpts
+    <$> (some $ argument readOsPath (metavar "ARCHIVES..."))
+#+end_src
+
+[[f:lilacLint]] just reads all tangled paths in code blocks across all cells in all
+objects in all archives, as ~tangledFiles~ [[(f:lilacLint-tangledFiles)]]. It compares
+this to the list of tracked files, which are obtained by asking Git via
+[[f:gitLsFiles]]. The final diff is displayed with [[f:diffSorted]].
+
+#+name: f:lilacLint
+#+begin_src haskell
+lilacLint :: GlobalOpts -> LintOpts -> IO ()
+lilacLint globalOpts lintOpts = do
+  projectConf <- readProjectConf globalOpts.projectConf
+  rawOutput <- gitLsFiles projectConf.nonTangledPathspecs
+  let trackedFiles =
+        sort
+          . map (TE.decodeUtf8Lenient . LBS.toStrict)
+          $ LBS.lines rawOutput
+  lintArchives lintOpts.inputs trackedFiles
+  where
+    lintArchives :: [OsPath] -> [Text] -> IO ()
+    lintArchives inputPaths trackedFiles = do
+      -- (ref:f:lilacLint-tangledFiles)
+      tangledFiles <-
+        sort . concat <$> mapM getTangledPathsFromArchive inputPaths
+      let diff = diffSorted tangledFiles trackedFiles
+      when (not $ null diff) $ do
+        putStrLn "Tangled files and tracked files do not match."
+        putStrLn "---------------------------------------------"
+        forM_ diff $ \(b, path) -> do
+          let prefix =
+                if b
+                  then "tracked but not tangled: "
+                  else "tangled but not tracked: "
+          putTextLn $ prefix <> path
+        exitFailure
+    getTangledPathsFromArchive :: OsPath -> IO [Text]
+    getTangledPathsFromArchive inputPath = do
+      text <- LU.readFileRobustly inputPath
+      case eitherDecodeStrictText text :: Either String Archive of
+        Left errMsg -> die errMsg
+        Right archive -> do
+          let getTangledPaths :: Object -> [Text]
+              getTangledPaths obj = mapMaybe getTangledPath obj.orgDoc.cells
+          pure $ concatMap getTangledPaths archive.objects
+    getTangledPath :: Cell -> Maybe Text
+    getTangledPath = \case
+      CBlock b -> lookup "tangle" b.meta
+      _ -> Nothing
+#+end_src
+
+[[f:readProjectConf]] reads the project configuration, which houses (among other
+things) the list of non-tangled pathspecs
+[[id:4375ba0d-b917-4d32-92f4-884be63659fe::(json:RawProjectConfig-nonTangledPathspecs)]]
+
+#+name: f:readProjectConf
+#+begin_src haskell
+readProjectConf :: OsPath -> IO ProjectConf
+readProjectConf path = do
+  input <- LU.readFileRobustly path
+  case parseProjectConf input of
+    Left errMsg -> die errMsg
+    Right projectConf -> pure projectConf
+#+end_src
+
+[[f:gitLsFiles]] passes the pathspec arguments from
+[[id:4375ba0d-b917-4d32-92f4-884be63659fe::(json:RawProjectConfig-nonTangledPathspecs)]].
+
+#+name: f:gitLsFiles
+#+begin_src haskell
+gitLsFiles :: [Text] -> IO LByteString
+gitLsFiles pathspecs = do
+  let args = ["ls-files", "--", "."] <> (map T.unpack pathspecs)
+      config = proc "git" args
+  readProcessStdout_ config
+#+end_src
+
+[[f:diffSorted]] Takes two sorted lists and returns a list of differences. ~False~
+means tangled, but not tracked. ~True~ means tracked, but not tangled.
+
+#+name: f:diffSorted
+#+begin_src haskell
+diffSorted :: [Text] -> [Text] -> [(Bool, Text)]
+diffSorted [] [] = []
+diffSorted xs [] = map (False,) xs
+diffSorted [] ys = map (True,) ys
+diffSorted (x : xs) (y : ys)
+  | x == y = diffSorted xs ys
+  | x < y = (False, x) : diffSorted xs (y : ys)
+  | otherwise = (True, y) : diffSorted (x : xs) ys
+#+end_src
+
 * Weaving
 :PROPERTIES:
 :ID:       21ccfaf6-cd49-46b6-9075-4952f3eea207
@@ -842,16 +1009,11 @@ archive to HTML.
 #+begin_src haskell
 lilacWeave :: GlobalOpts -> WeaveOpts -> IO ()
 lilacWeave globalOpts weaveOpts = do
-  projectConf <- readProjectConf
+  projectConf <- readProjectConf globalOpts.projectConf
   when weaveOpts.writeCss writeCssFile
   when weaveOpts.writeJs writeJsFile
   mapM_ (weaveArchiveFile projectConf weaveOpts.outDir) $ weaveOpts.inputs
   where
-    readProjectConf = do
-      input <- LU.readFileRobustly globalOpts.projectConf
-      case parseProjectConf input of
-        Left errMsg -> die errMsg
-        Right projectConf -> pure projectConf
     writeCssFile = do
       cssPath <- do
         cssDir <- P.encodeUtf "css"

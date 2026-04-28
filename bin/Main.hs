@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
+import Data.ByteString.Lazy.Char8 qualified as LBS
 import Data.FileEmbed (embedFile)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
@@ -11,10 +12,20 @@ import Lilac.Parse qualified as LP
 import Lilac.Tangle qualified as LT
 import Lilac.Types
   ( Archive (objects),
+    Block (meta),
+    Cell (CBlock),
     GPath,
-    Object,
-    ProjectConf (ProjectConf, homepage, name, repo, version),
-    RawProjectConf (homepage, name, repo, version),
+    Object (orgDoc),
+    OrgDoc (cells),
+    ProjectConf
+      ( ProjectConf,
+        homepage,
+        name,
+        nonTangledPathspecs,
+        repo,
+        version
+      ),
+    RawProjectConf (homepage, name, nonTangledPathspecs, repo, version),
     WeaveConf
       ( WeaveConf,
         archive,
@@ -67,19 +78,23 @@ import Relude
     FilePath,
     IO,
     Int,
+    LByteString,
     Maybe (Just, Nothing),
     MonadFail,
     String,
     Text,
     Type,
     concat,
+    concatMap,
     fail,
     foldlM,
+    forM_,
     intercalate,
     length,
     map,
     mapM,
     mapM_,
+    mapMaybe,
     mempty,
     not,
     null,
@@ -87,6 +102,7 @@ import Relude
     pure,
     putStr,
     putStrLn,
+    putTextLn,
     reverse,
     runStateT,
     sequence_,
@@ -98,17 +114,21 @@ import Relude
     (+),
     (.),
     (/=),
+    (<),
     (<$>),
     (<>),
     (=<<),
+    (==),
     (>),
     (||),
   )
+import Relude.Extra.Map (lookup)
 import System.Console.ANSI qualified as C
 import System.Directory.OsPath qualified as D
-import System.Exit (die)
+import System.Exit (die, exitFailure)
 import System.OsPath (OsPath)
 import System.OsPath qualified as P
+import System.Process.Typed (proc, readProcessStdout_)
 import Text.Megaparsec qualified as MP
 
 readOsPath :: ReadM OsPath
@@ -138,6 +158,7 @@ data Subcommand
   | Archive ArchiveOpts
   | Tangle TangleOpts
   | Weave WeaveOpts
+  | Lint LintOpts
 
 type TangleOpts :: Type
 data TangleOpts = TangleOpts
@@ -162,6 +183,11 @@ type ArchiveOpts :: Type
 data ArchiveOpts = ArchiveOpts
   { inputs :: [GPath],
     outFile :: OsPath
+  }
+
+type LintOpts :: Type
+data LintOpts = LintOpts
+  { inputs :: [OsPath] --
   }
 
 type OptionHandler :: Type -> Type
@@ -212,6 +238,7 @@ subcommandHandler =
     <> cmdArchive
     <> cmdTangle
     <> cmdWeave
+    <> cmdLint
   where
     cmdCompile =
       command
@@ -237,6 +264,12 @@ subcommandHandler =
         $ info
           (Weave <$> weaveOptsHandler)
           (progDesc "Generate HTML documentation from archives.")
+    cmdLint =
+      command
+        "lint"
+        $ info
+          (Lint <$> lintOptsHandler)
+          (progDesc "Look for tracked files that are not tangled by Lilac.")
 
 tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
@@ -328,6 +361,11 @@ archiveOptsHandler =
             )
         )
 
+lintOptsHandler :: OptionHandler LintOpts
+lintOptsHandler =
+  LintOpts
+    <$> (some $ argument readOsPath (metavar "ARCHIVES..."))
+
 boldWhite :: [C.SGR]
 boldWhite =
   [ C.SetColor C.Foreground C.Vivid C.White,
@@ -363,6 +401,14 @@ lilac globalOpts = case globalOpts.subcommand of
   Compile compileOpts -> lilacCompile globalOpts compileOpts
   Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
   Weave weaveOpts -> lilacWeave globalOpts weaveOpts
+  Lint lintOpts -> lilacLint globalOpts lintOpts
+
+readProjectConf :: OsPath -> IO ProjectConf
+readProjectConf path = do
+  input <- LU.readFileRobustly path
+  case parseProjectConf input of
+    Left errMsg -> die errMsg
+    Right projectConf -> pure projectConf
 
 parseProjectConf :: Text -> Either String ProjectConf
 parseProjectConf input = case parseRawProjectConf input of
@@ -376,7 +422,8 @@ parseProjectConf input = case parseRawProjectConf input of
           version =
             if T.null rawProjectConf.version
               then Nothing
-              else Just rawProjectConf.version
+              else Just rawProjectConf.version,
+          nonTangledPathspecs = rawProjectConf.nonTangledPathspecs
         }
 
 parseRawProjectConf :: Text -> Either String RawProjectConf
@@ -489,16 +536,11 @@ tangle globalOpts tangleOpts archive = do
 
 lilacWeave :: GlobalOpts -> WeaveOpts -> IO ()
 lilacWeave globalOpts weaveOpts = do
-  projectConf <- readProjectConf
+  projectConf <- readProjectConf globalOpts.projectConf
   when weaveOpts.writeCss writeCssFile
   when weaveOpts.writeJs writeJsFile
   mapM_ (weaveArchiveFile projectConf weaveOpts.outDir) $ weaveOpts.inputs
   where
-    readProjectConf = do
-      input <- LU.readFileRobustly globalOpts.projectConf
-      case parseProjectConf input of
-        Left errMsg -> die errMsg
-        Right projectConf -> pure projectConf
     writeCssFile = do
       cssPath <- do
         cssDir <- P.encodeUtf "css"
@@ -555,6 +597,61 @@ weaveToDisk projectConf outDir archive acc objPath obj =
 
 lilacJs :: Text
 lilacJs = TE.decodeUtf8 $(embedFile "base/js/lilac.js.injectme")
+
+lilacLint :: GlobalOpts -> LintOpts -> IO ()
+lilacLint globalOpts lintOpts = do
+  projectConf <- readProjectConf globalOpts.projectConf
+  rawOutput <- gitLsFiles projectConf.nonTangledPathspecs
+  let trackedFiles =
+        sort
+          . map (TE.decodeUtf8Lenient . LBS.toStrict)
+          $ LBS.lines rawOutput
+  lintArchives lintOpts.inputs trackedFiles
+  where
+    lintArchives :: [OsPath] -> [Text] -> IO ()
+    lintArchives inputPaths trackedFiles = do
+      --
+      tangledFiles <-
+        sort . concat <$> mapM getTangledPathsFromArchive inputPaths
+      let diff = diffSorted tangledFiles trackedFiles
+      when (not $ null diff) $ do
+        putStrLn "Tangled files and tracked files do not match."
+        putStrLn "---------------------------------------------"
+        forM_ diff $ \(b, path) -> do
+          let prefix =
+                if b
+                  then "tracked but not tangled: "
+                  else "tangled but not tracked: "
+          putTextLn $ prefix <> path
+        exitFailure
+    getTangledPathsFromArchive :: OsPath -> IO [Text]
+    getTangledPathsFromArchive inputPath = do
+      text <- LU.readFileRobustly inputPath
+      case eitherDecodeStrictText text :: Either String Archive of
+        Left errMsg -> die errMsg
+        Right archive -> do
+          let getTangledPaths :: Object -> [Text]
+              getTangledPaths obj = mapMaybe getTangledPath obj.orgDoc.cells
+          pure $ concatMap getTangledPaths archive.objects
+    getTangledPath :: Cell -> Maybe Text
+    getTangledPath = \case
+      CBlock b -> lookup "tangle" b.meta
+      _ -> Nothing
+
+gitLsFiles :: [Text] -> IO LByteString
+gitLsFiles pathspecs = do
+  let args = ["ls-files", "--", "."] <> (map T.unpack pathspecs)
+      config = proc "git" args
+  readProcessStdout_ config
+
+diffSorted :: [Text] -> [Text] -> [(Bool, Text)]
+diffSorted [] [] = []
+diffSorted xs [] = map (False,) xs
+diffSorted [] ys = map (True,) ys
+diffSorted (x : xs) (y : ys)
+  | x == y = diffSorted xs ys
+  | x < y = (False, x) : diffSorted xs (y : ys)
+  | otherwise = (True, y) : diffSorted (x : xs) ys
 
 putStrColor :: [C.SGR] -> String -> IO ()
 putStrColor sgrs s = do

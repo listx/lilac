@@ -175,11 +175,11 @@ let
         package = devShellEnv;
       };
 
-      check-tangled-vs-tracked = {
-        name = "check-tangled-vs-tracked.sh";
+      lilac-lint = {
+        name = "lilac-lint";
         enable = true;
         always_run = true;
-        entry = "./check-tangled-vs-tracked.sh";
+        entry = "lilac lint base/lilac.larc";
         pass_filenames = false;
       };
 

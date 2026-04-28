@@ -740,7 +740,8 @@ data ProjectConf = ProjectConf
   { name :: Text, --
     homepage :: Maybe N.URI, --
     repo :: Maybe N.URI, --
-    version :: Maybe Text --
+    version :: Maybe Text, --
+    nonTangledPathspecs :: [Text] --
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -750,7 +751,8 @@ data RawProjectConf = RawProjectConf
   { name :: Text,
     homepage :: Text,
     repo :: Text,
-    version :: Text
+    version :: Text,
+    nonTangledPathspecs :: [Text]
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
