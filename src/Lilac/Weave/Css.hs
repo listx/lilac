@@ -93,6 +93,7 @@ import Clay
     normal,
     ol,
     opacity,
+    other,
     overflowX,
     overflowY,
     p,
@@ -208,7 +209,7 @@ defaultCss = do
   body ? do
     minHeight (vh 100)
     display grid
-    gridTemplateColumns [px 300, px 800, fr 1]
+    gridTemplateColumns [px 300, px 800, other "minmax(300px, 1fr)"]
     "grid-template-rows" -: "auto 1fr"
     "grid-template-areas"
       -: """
