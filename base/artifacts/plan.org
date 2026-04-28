@@ -23,6 +23,14 @@ or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
+** TODO add a "tangled vs tracked file linter"
+
+Deprecate [[id:bbdbcad0-7fb3-447d-a393-d840fc1df9b1::check-tangled-vs-tracked.sh][check-tangled-vs-tracked.sh]] and put the logic as a native lilac
+subcommand. The only thing we need is a way to specify the list of excluded
+paths to send to ~git-ls-files~. We could probably do this in a special file
+~.lilac-non-tangled-paths~ where each line is treated as an argument to
+~git-ls-files~.
+
 ** IN-PROGRESS write user guide
 
 The problem with most of the existing docs are that they are geared toward
