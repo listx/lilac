@@ -335,13 +335,13 @@ defaultCss = do
         case n of
           1 -> do
             fontSize (pt 36)
-            headingPrefix "●" (rem $ -2.8) --
+            headingPrefix "●" (rem $ -2.8) (px $ -3) --
           2 -> do
             fontSize (pt 26)
-            headingPrefix "■" (rem $ -2.5) --
+            headingPrefix "■" (rem $ -2.5) (px $ -3) --
           3 -> do
             fontSize (pt 22)
-            headingPrefix "○" (rem $ -2.25) --
+            headingPrefix "○" (rem $ -2.25) (px $ -1) --
           4 -> do
             fontSize (pt 18)
           5 -> do
@@ -800,11 +800,11 @@ fontMono = do
   fontFamily ["Source Code Pro"] [monospace]
   fontSize (em 0.9)
 
-headingPrefix :: Text -> Size sz -> Css
-headingPrefix prefix spacing =
+headingPrefix :: Text -> Size sz -> Size sz -> Css
+headingPrefix prefix spacing fromTop =
   before & do
     content $ stringContent prefix
     marginLeft spacing
     position absolute
-    top (px 0)
+    top fromTop
     left (px 0)

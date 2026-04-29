@@ -1708,13 +1708,13 @@ forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) -- (ref:css:Headings-loop)
       case n of
         1 -> do
           fontSize (pt 36)
-          headingPrefix "●" (rem $ -2.8) -- (ref:css:Page title-symbol)
+          headingPrefix "●" (rem $ -2.8) (px $ -3) -- (ref:css:Page title-symbol)
         2 -> do
           fontSize (pt 26)
-          headingPrefix "<<symbol:h2>>" (rem $ -2.5) -- (ref:css:Headings-h2-symbol)
+          headingPrefix "<<symbol:h2>>" (rem $ -2.5) (px $ -3) -- (ref:css:Headings-h2-symbol)
         3 -> do
           fontSize (pt 22)
-          headingPrefix "<<symbol:h3>>" (rem $ -2.25) -- (ref:css:Headings-h3-symbol)
+          headingPrefix "<<symbol:h3>>" (rem $ -2.25) (px $ -1) -- (ref:css:Headings-h3-symbol)
         4 -> do
           fontSize (pt 18)
         5 -> do
@@ -1767,13 +1767,13 @@ top-level headings.
 
 #+name: f:headingPrefix
 #+begin_src haskell
-headingPrefix :: Text -> Size sz -> Css
-headingPrefix prefix spacing =
+headingPrefix :: Text -> Size sz -> Size sz -> Css
+headingPrefix prefix spacing fromTop =
   before & do
     content $ stringContent prefix
     marginLeft spacing
     position absolute
-    top (px 0)
+    top fromTop
     left (px 0)
 #+end_src
 
