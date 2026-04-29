@@ -2513,15 +2513,15 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
       CBlock b
         | Just "index" <- lookup "name" b.meta -> do
             let rawText = T.concat $ map extractBTokenStringOnly b.body
-                indexPath = T.pack $ decodeGPath path -- base/index.lobj
-                startingPath = T.dropEnd 10 indexPath -- base/
+                indexPath = T.pack $ decodeGPath path -- doc/index.lobj
+                startingPath = T.dropEnd 10 indexPath -- doc/
                 paths = mapMaybe (toGPath startingPath) $ T.lines rawText
             results <- mapM lookupSingle paths
             pure $ acc <> catMaybes results
       _ -> pure acc
     toGPath :: Text -> Text -> Maybe GPath
     toGPath startingPath textPath =
-      let joinedPath = startingPath <> textPath -- base/foo.org
+      let joinedPath = startingPath <> textPath -- doc/foo.org
           constructedPath =
             if ".org" `T.isSuffixOf` joinedPath
               then (T.dropEnd 3 joinedPath) <> "lobj"
@@ -2542,9 +2542,9 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
 #+end_src
 
 #+begin_src txt
-"base/index.lobj" -> drop the last 10 chars to get the parent dir
-"base/" -> add the textPath here
-"base/foo.org" -> if ending in ".org", replace with ".lobj". otherwise this is a directory, so add it and then also add a trailing "/index.lobj" to it.
+"doc/index.lobj" -> drop the last 10 chars to get the parent dir
+"doc/" -> add the textPath here
+"doc/foo.org" -> if ending in ".org", replace with ".lobj". otherwise this is a directory, so add it and then also add a trailing "/index.lobj" to it.
 #+end_src
 
 *** Tests

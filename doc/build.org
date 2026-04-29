@@ -431,7 +431,7 @@ lilacSource = lib.cleanSourceWith {
         ,*.nix
         ,*.sh
         ,*.toml
-        base/image
+        doc/image
         Makefile
         nix
       '';
@@ -453,9 +453,9 @@ of the project.
 .hie
 .rebel_readline_history
 <<Generated pre-commit config>>
-base/js/*
+doc/js/*
 # (ref:.gitignore-js-injectme)
-!base/js/lilac.js.injectme
+!doc/js/lilac.js.injectme
 cabal.config.nix
 cabal.project.local
 dist-newstyle
@@ -826,19 +826,19 @@ now.
 #+name: make:Org files
 #+begin_src makefile
 org_files = \
-	base/index.org \
-	base/cli.org \
-	base/build.org \
-	base/compile.org \
-	base/parse.org \
-	base/tangle.org \
-	base/types.org \
-	base/weave.org \
-	base/fe.org \
-	base/artifacts/index.org \
-	base/artifacts/user-manual.org \
-	base/artifacts/plan.org
-backend_org_files = $(filter-out base/fe.org,$(org_files))
+	doc/index.org \
+	doc/cli.org \
+	doc/build.org \
+	doc/compile.org \
+	doc/parse.org \
+	doc/tangle.org \
+	doc/types.org \
+	doc/weave.org \
+	doc/fe.org \
+	doc/artifacts/index.org \
+	doc/artifacts/user-manual.org \
+	doc/artifacts/plan.org
+backend_org_files = $(filter-out doc/fe.org,$(org_files))
 #+end_src
 
 Because we tangle Lilac with itself, we want to separate out just the tangling
@@ -998,12 +998,12 @@ object files are missing or newer than ~lilac.larc~.
 
 #+name: make:Build archive
 #+begin_src makefile
-base/lilac.larc: $(obj_files)
+doc/lilac.larc: $(obj_files)
 	lilac archive $^ --out-file $@
 #+end_src
 
 In order to create the ~lilac.larc~ archive file of the entire Lilac project, for
-example, do ~make base/lilac.larc~.
+example, do ~make doc/lilac.larc~.
 
 *** Cleanup
 
@@ -1013,7 +1013,7 @@ The ~clean~ rule cleans up compilation artifacts, for debugging.
 #+begin_src makefile
 clean:
 	rm -rf \
-		base/lilac.larc \
+		doc/lilac.larc \
 		$(obj_files) \
 		site/*
 .PHONY: clean
@@ -1030,8 +1030,8 @@ We can tangle Lilac with itself.
 
 #+name: make:Tangle sources
 #+begin_src makefile
-tangle: base/lilac.larc
-	lilac tangle base/lilac.larc --out-dir .
+tangle: doc/lilac.larc
+	lilac tangle doc/lilac.larc --out-dir .
 	touch tangle
 #+end_src
 
@@ -1084,7 +1084,7 @@ main()
 	fi
 	__ok_to_lint=1
 
-	readarray -t org_files < <(find base -type f -regex '.+\.org$')
+	readarray -t org_files < <(find doc -type f -regex '.+\.org$')
 	watch "${org_files[@]}"
 }
 
@@ -1274,22 +1274,22 @@ clean_build_files()
 :ID:       6edfd979-a0d1-4f87-bfa7-129db7a3025b
 :END:
 
-For weaving, we use the ~base~ directory.
+For weaving, we use the ~doc~ directory.
 
 #+name: make:Weave
 #+begin_src makefile
-weave: base/lilac.larc
-	lilac weave $< --out-dir base --write-css # (ref:weave-write-css)
+weave: doc/lilac.larc
+	lilac weave $< --out-dir doc --write-css # (ref:weave-write-css)
 	touch weave
 #+end_src
 
 Because [[id:21ccfaf6-cd49-46b6-9075-4952f3eea207::f:lilacWeave][f:lilacWeave]] writes CSS to the ~css~ subdirectory, the CSS ends up getting
-written to ~base/css/default.css~. This ~css~ directory will not exist in CI (when
+written to ~doc/css/default.css~. This ~css~ directory will not exist in CI (when
 Lilac is cloned and built on a fresh machine), so we have to create it.
 Otherwise, the [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::make:Build prod JS][make:Build prod JS]] rule will fail because the
-[[id:90d66ea1-a994-4fdb-b969-c28cec04352d::cfg:figwheel-main.edn][cfg:figwheel-main.edn]] expects the ~base/css~ directory to exist.
+[[id:90d66ea1-a994-4fdb-b969-c28cec04352d::cfg:figwheel-main.edn][cfg:figwheel-main.edn]] expects the ~doc/css~ directory to exist.
 
-#+header: :tangle base/css/.gitkeep
+#+header: :tangle doc/css/.gitkeep
 #+begin_src txt
 #+end_src
 
@@ -1303,7 +1303,7 @@ weave
 We add the ~--write-css~ flag at [[(weave-write-css)]] because we want to regenerate
 (every time) the CSS file from Haskell sources in [[id:7147b743-084d-4abc-8561-5417c7fe10b3::f:genCss][f:genCss]], in case anything in
 there changed. However we don't do the same for JavaScript (we don't supply
-~--write-js~), because we don't want to overwrite the same ~base/js/lilac.js~ path
+~--write-js~), because we don't want to overwrite the same ~doc/js/lilac.js~ path
 used by [[id:783de6bf-e36b-4c9e-a405-2a86d0897795::make:Start frontend development environment (CLJS REPL)][make:Start frontend development environment (CLJS REPL)]].
 
 To clarify, there are 2 flavors of JavaScript artifacts, development and
@@ -1311,7 +1311,7 @@ production. The development version is not a single JavaScript file and is not
 optimized; this allows us to get a ClojureScript REPL where we can play around
 with a direct connection to a browser. The production flavor is a single,
 optimized JavaScript file and does not have ClojureScript REPL support. The
-production flavor is copied out to another file ~base/js/lilac.js.injectme~ by
+production flavor is copied out to another file ~doc/js/lilac.js.injectme~ by
 [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::sh:update-injectable][sh:update-injectable]]. It is this separate file which is injected into Haskell in
 [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7::f:lilacJs][f:lilacJs]], so that Lilac is able to generate this file on its own.
 
@@ -1319,7 +1319,7 @@ When we're developing Lilac with Lilac, we generally want to only look at the
 development version of the JavaScript because this allows REPL interaction. This
 means we cannot use the ~--write-js~ flag to Lilac in [[make:Weave]], because doing so
 would make Lilac overwrite the development file (which shares the same
-~base/js/lilac.js~ target path that Lilac targets with the ~--write-js~ flag) with
+~doc/js/lilac.js~ target path that Lilac targets with the ~--write-js~ flag) with
 its own (pre-baked) JS file.
 
 For serving the woven (development) HTML pages through a server (instead of
@@ -1472,7 +1472,7 @@ trim_trailing_whitespace = true
 indent_style = tab
 tab_width = 8
 
-[base/js/lilac.js.injectme] # (ref:.editorconfig-injectme-binary)
+[doc/js/lilac.js.injectme] # (ref:.editorconfig-injectme-binary)
 insert_final_newline = false
 trim_trailing_whitespace = false
 end_of_line = unset
@@ -1607,7 +1607,7 @@ lilac-lint = {
   name = "lilac-lint";
   enable = true;
   always_run = true;
-  entry = "lilac lint base/lilac.larc";
+  entry = "lilac lint doc/lilac.larc";
   pass_filenames = false;
 };
 #+end_src
@@ -1942,7 +1942,7 @@ license:        GPL-2.0-only
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
-  base/js/lilac.js.injectme
+  doc/js/lilac.js.injectme
 
 library lilac-internal
   exposed-modules:
@@ -2284,7 +2284,7 @@ To make =rg= behave as we want, we have to provide it a separate =.rgignore= fil
 ,*.nix
 ,*.lobj
 ,*.sh
-base/csl-styles
+doc/csl-styles
 test/*
 #+end_src
 
@@ -2303,17 +2303,17 @@ git-diff~). Below is our orderfile:
 #+header: :tangle .git-orderfile
 #+begin_src txt
 # Org files
-base/artifacts/plan.org
-base/artifacts/*.org
-base/index.org
-base/build.org
-base/types.org
-base/parse.org
-base/compile.org
-base/tangle.org
-base/weave.org
-base/fe.org
-base/cli.org
+doc/artifacts/plan.org
+doc/artifacts/*.org
+doc/index.org
+doc/build.org
+doc/types.org
+doc/parse.org
+doc/compile.org
+doc/tangle.org
+doc/weave.org
+doc/fe.org
+doc/cli.org
 ,*.org
 
 # Infrastructure

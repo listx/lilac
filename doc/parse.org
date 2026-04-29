@@ -1669,11 +1669,11 @@ At the other end of the spectrum, Lilac should be able to parse itself.
 
 #+name: t:self-parse
 #+begin_src haskell
-before (LU.readFrom "" "base/index.org") $ do
+before (LU.readFrom "" "doc/index.org") $ do
   it "self-parse" $ \input -> do
     MP.runParser
       (runStateT L.orgDocParser defaultOrgParserState)
-      "base/index.org"
+      "doc/index.org"
       `shouldSucceedOn` input
 #+end_src
 
