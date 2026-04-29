@@ -44,6 +44,8 @@ The current Lilac version is
 0.1.0.0
 #+end_src
 
+We follow the [[https://pvp.haskell.org/][Haskell Package Versioning Policy]].
+
 ** Repository homepage
 :PROPERTIES:
 :ID:       04ae01eb-2439-469f-aef6-129ff94ad018
@@ -158,6 +160,9 @@ surrounding the Lilac project, not just how it's implemented.
 
   - [[id:48e76342-2498-44c5-9ed9-830cb80995fd][=base/artifacts/plan.org=]] :: Explains where we're headed as a project.
 
+  - [[id:1b7255d6-5d8a-4082-8d84-4852f66333dc][=base/artifacts/release-notes.org=]] :: Records noteworthy changes between
+    releases.
+
 *** Literate programming and Noweb
 
 This is a literate document, so prose explanations are mixed in with code.
@@ -221,6 +226,44 @@ Haskell programming language.
 | ~sh~            | Shell script                | [[id:783de6bf-e36b-4c9e-a405-2a86d0897795::sh:invoke-dev-build-watcher][sh:invoke-dev-build-watcher]] |
 
 # vale on
+
+* Release strategy
+
+The ~next~ branch is where development happens. Time to time, ~main~ is brought up
+to match ~next~. The process is:
+
+  1) (On ~next~) [[id:1b7255d6-5d8a-4082-8d84-4852f66333dc][Release Notes]] are updated for the as-yet unreleased version.
+
+  2) (On ~next~) The [[Lilac version]] is bumped, and a commit is created. A Git
+     tag is created to point to the above commit. See [[id:1fe40405-2fc3-4cf8-8352-974e5cfee33b][Release commit and
+     tagging]].
+
+  3) ~main~ is fast-forwarded to HEAD of ~next~.
+
+  4) (On ~next~) Some things are moved from the [[id:b27d3e53-ada2-4f9e-9f38-18e9252b8229][Backlog]] into [[id:f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4][Prioritised TODOs]], to
+     be worked on for the next release cycle.
+
+~next~ is expected to be unstable (force-pushes will be the norm).
+
+** Release commit and tagging
+:PROPERTIES:
+:ID:       1fe40405-2fc3-4cf8-8352-974e5cfee33b
+:END:
+
+[[stamp-new-version.sh]] takes the Lilac version by searching for it from this Org file, and creates a commit.
+
+#+name: stamp-new-version.sh
+#+header: :tangle stamp-new-version.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src bash
+set -euo pipefail
+
+version="$(awk \
+	'/^#\+name: Lilac version$/{getline; getline; print}' doc/index.org)"
+
+git commit -am "Lilac ${version}"
+git tag -a "v${version}" -m "Lilac ${version}"
+#+end_src
 
 * Glossary (Global)
 :PROPERTIES:

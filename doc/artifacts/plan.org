@@ -18,33 +18,10 @@ This document explains planned work (what's on the roadmap, etc).
 New TODOs start out in the [[id:b27d3e53-ada2-4f9e-9f38-18e9252b8229][Backlog]] and then end up in either [[id:f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4][Release blockers]]
 or the [[id:dcfbeff2-5a2e-4a84-bdb7-dae80e867838][Icebox]].
 
-* Release ~0.9.0.0~ blockers
+* Prioritised TODOs
 :PROPERTIES:
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
-
-** TODO create release-notes.org
-
-We have to have a simple document which summarizes the changes going into a
-release. We should get into the habit of writing out entries for this ahead of a
-release (so that we don't do it all at once, but piecemeal as each thing is finished).
-
-*** TODO define versioning semantics
-
-Maybe just copy what Linux does and create a new major version once the minor
-version gets too big (20s or 30s).
-
-*** TODO codify rules about weaving and releasing
-
-We should probably co-locate woven HTML with the rest of the code, for
-simplicity during hosting (that way the HTML can link to raw tangled code, and
-those links will automatically just work).
-
-We should only generate docs as part of a release version. This way we avoid
-churn while we mess around with merges and such of Org files (in particular we
-will avoid conflicts that will arise in the HTML which auto-numbers things
-sequentially, for example). This implies some sort of structured release process
-like in the Git project (~main~ should only be advanced to catch up to ~next~, for example).
 
 * Backlog
 :PROPERTIES:
@@ -54,6 +31,10 @@ like in the Git project (~main~ should only be advanced to catch up to ~next~, f
 Ideally the backlog would use something like a Story Map to encode both time and
 priority as two separate dimensions. However we just have a flat list of items
 for now because we don't have a good way of representing story maps.
+
+** TODO explain development/contribution process
+
+Explain SourceHut and the mailing list process.
 
 ** TODO create ~init~ subcommand
 
@@ -107,6 +88,14 @@ strongly-connected-components.
 The discussions at [[id:74ae3eda-4656-4e07-ba5a-77fbbb704f31][Nix]] involve many links to raw files on the filesystem. They
 work well in Emacs, but not in HTML. Use the project config to link to the
 SourceHut repo (use that as the base URL).
+
+** TODO add to Nixpkgs
+:PROPERTIES:
+:ID:       ebd96c64-9143-4a18-b1a1-9d67f7550459
+:END:
+
+This way, Nix users can just install it with Nix without having to clone the
+source repo.
 
 ** TODO write manpage
 
