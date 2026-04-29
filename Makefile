@@ -14,7 +14,9 @@ org_files = \
 	doc/fe.org \
 	doc/artifacts/index.org \
 	doc/artifacts/user-manual.org \
-	doc/artifacts/plan.org
+	doc/artifacts/plan.org \
+	doc/artifacts/hello-world/index.org \
+	doc/artifacts/hello-world/doc/index.org
 backend_org_files = $(filter-out doc/fe.org,$(org_files))
 
 test: $(org_files)

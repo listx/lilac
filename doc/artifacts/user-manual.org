@@ -116,28 +116,24 @@ The features below are not supported (and are not planned to be supported).
 
 * Basic initial setup
 
-Perhaps the biggest requirement is that you must author Org files. Emacs is
-perhaps the most popular application for authoring Org files, so using Emacs is
-highly recommended.
+The main requirement is that you must author Org files, because that's what
+Lilac understands. Emacs is perhaps the most popular application for authoring
+Org files, so using Emacs is highly recommended.
 
-Clone this repo. Install Nix and Cabal. Run ~cabal install~ to install the ~lilac~
-binary to disk.
+Clone this repo. Install Nix and Cabal. Run ~cabal install
+--overwrite-policy=always --enable-optimization=2~ to install the ~lilac~ binary to
+disk.
 
-Need to create a file to tangle housekeeping stuff, like some basic Git and
-other config stuff.
+Go to your repo's documentation folder. We'll assume it is named ~doc~ at the
+repo root. Create an ~index.org~ file there.
 
-Create a Lilac configuration file in your project root, named ~.lilac.json~.
+#+begin_src sh
+cd doc
+touch index.org
+#+end_src
 
-At the root of your project, create a folder which will house all Org files. For
-the Lilac project, we named this folder ~base~ but it can be anything else.
-
-When tangling code blocks, note that the tangle path is always interpreted to be
-relative to the project root, not where the Org file is located. This makes it
-much easier to move around code blocks across Org files (without having to
-update the relative path).
-
-Write a ~Makefile~ and put in some rules about tangling and weaving from your
-~*.org~ files.
+Head on to the [[id:bf0da06e-1356-4a68-8b48-ae0e48756ae0][Hello World]] example to start with a basic starter ~index.org~ file,
+along with a Makefile to start tangling and weaving from the ~index.org~ file.
 
 * Footnotes
 
