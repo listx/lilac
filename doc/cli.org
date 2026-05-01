@@ -23,6 +23,12 @@ The boilerplate involves [[id:ce9af5ef-6559-4ffb-82c1-a439214eda6d][option handl
 #+begin_src haskell
 module Main (main) where
 
+import Control.Concurrent (forkIO)
+import Control.Concurrent.STM
+  ( newBroadcastTChanIO,
+    newTVarIO,
+  )
+import Control.Exception (finally)
 import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
 import Data.ByteString.Lazy.Char8 qualified as LBS
 import Data.FileEmbed (embedFile)
@@ -32,12 +38,23 @@ import Data.Text.Encoding qualified as TE
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
+import Lilac.Serve (fsWatcher, liveReloadMiddleware)
 import Lilac.Tangle qualified as LT
 import Lilac.Types
   ( Archive (objects),
+    ArchiveOpts (ArchiveOpts, inputs, outFile),
     Block (meta),
     Cell (CBlock),
+    CompileOpts (CompileOpts, inputs),
     GPath,
+    GlobalOpts
+      ( GlobalOpts,
+        color,
+        projectConf,
+        subcommand,
+        verbose
+      ),
+    LintOpts (LintOpts, inputs),
     Object (orgDoc),
     OrgDoc (cells),
     ProjectConf
@@ -49,6 +66,16 @@ import Lilac.Types
         version
       ),
     RawProjectConf (homepage, name, nonTangledPathspecs, repo, version),
+    ServeOpts (ServeOpts, dir, port),
+    Subcommand
+      ( ComArchive,
+        ComCompile,
+        ComLint,
+        ComServe,
+        ComTangle,
+        ComWeave
+      ),
+    TangleOpts (TangleOpts, inputs, outDir),
     WeaveConf
       ( WeaveConf,
         archive,
@@ -56,6 +83,13 @@ import Lilac.Types
         originObjectPath,
         outDir,
         projectConf
+      ),
+    WeaveOpts
+      ( WeaveOpts,
+        inputs,
+        outDir,
+        writeCss,
+        writeJs
       ),
     decodeGPath,
     defaultOrgParserState,
@@ -66,12 +100,19 @@ import Lilac.Version (lilacVersion)
 import Lilac.Weave qualified as LW
 import Lilac.Weave.Css qualified as LWC
 import Network.URI qualified as N
+import Network.Wai.Application.Static (defaultFileServerSettings, staticApp)
+import Network.Wai.Handler.Warp
+  ( defaultSettings,
+    runSettings,
+    setPort,
+  )
 import Options.Applicative
   ( Parser,
     ReadM,
     argument,
     command,
     customExecParser,
+    eitherReader,
     flag,
     fullDesc,
     header,
@@ -119,18 +160,22 @@ import Relude
     mapM_,
     mapMaybe,
     mempty,
+    newEmptyMVar,
     not,
     null,
     otherwise,
     pure,
+    putMVar,
     putStr,
     putStrLn,
     putTextLn,
+    readMaybe,
     reverse,
     runStateT,
     sequence_,
     show,
     sort,
+    takeMVar,
     when,
     ($),
     (&&),
@@ -169,6 +214,7 @@ import Text.Megaparsec qualified as MP
 <<f:lilacWeave>>
 <<f:weaveToDisk>>
 <<f:lilacJs>>
+<<f:lilacServe>>
 <<f:lilacLint>>
 <<f:gitLsFiles>>
 <<f:diffSorted>>
@@ -216,11 +262,12 @@ out into various subcommands.
 #+begin_src haskell
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
-  Archive archiveOpts -> lilacArchive archiveOpts
-  Compile compileOpts -> lilacCompile globalOpts compileOpts
-  Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
-  Weave weaveOpts -> lilacWeave globalOpts weaveOpts
-  Lint lintOpts -> lilacLint globalOpts lintOpts
+  ComArchive archiveOpts -> lilacArchive archiveOpts
+  ComCompile compileOpts -> lilacCompile globalOpts compileOpts
+  ComTangle tangleOpts -> lilacTangle globalOpts tangleOpts
+  ComWeave weaveOpts -> lilacWeave globalOpts weaveOpts
+  ComLint lintOpts -> lilacLint globalOpts lintOpts
+  ComServe serveOpts -> lilacServe globalOpts serveOpts
 #+end_src
 
 Before we can ~tangle~ or ~weave~, we have to first compile Org files into object
@@ -238,13 +285,6 @@ options, and the functions that operate on them.
 #+begin_src haskell
 <<f:readOsPath>>
 <<f:readGPath>>
-<<data:GlobalOpts>>
-<<data:Subcommand>>
-<<data:TangleOpts>>
-<<data:WeaveOpts>>
-<<data:CompileOpts>>
-<<data:ArchiveOpts>>
-<<data:LintOpts>>
 <<data:OptionHandler>>
 <<f:globalOptionsHandler>>
 <<f:subcommandHandler>>
@@ -253,6 +293,7 @@ options, and the functions that operate on them.
 <<f:compileOptsHandler>>
 <<f:archiveOptsHandler>>
 <<f:lintOptsHandler>>
+<<f:serveOptsHandler>>
 #+end_src
 
 One useful helper we have to write ourselves is a parser that can understand how
@@ -387,6 +428,9 @@ parseProjectConf input = case parseRawProjectConf input of
         }
 #+end_src
 ** Global and subcommand options
+:PROPERTIES:
+:ID:       f1ee45a1-10a7-4409-a7a4-78778476cb07
+:END:
 
 The [[data:GlobalOpts]] are options that can affect more than one subcommand
 (thought not all subcommands currently use them).
@@ -409,11 +453,12 @@ which subcommand the user chose --- ~compile~, ~archive~, ~tangle~, or ~weave~.
 #+begin_src haskell
 type Subcommand :: Type
 data Subcommand
-  = Compile CompileOpts
-  | Archive ArchiveOpts
-  | Tangle TangleOpts
-  | Weave WeaveOpts
-  | Lint LintOpts
+  = ComCompile CompileOpts
+  | ComArchive ArchiveOpts
+  | ComTangle TangleOpts
+  | ComWeave WeaveOpts
+  | ComLint LintOpts
+  | ComServe ServeOpts
 #+end_src
 
 Each of these ~<...>Opts~ data types require their own option /handler/, so that
@@ -497,37 +542,44 @@ subcommandHandler =
     <> cmdArchive
     <> cmdTangle
     <> cmdWeave
+    <> cmdServe
     <> cmdLint
   where
     cmdCompile =
       command
         "compile"
         $ info
-          (Compile <$> compileOptsHandler)
+          (ComCompile <$> compileOptsHandler)
           (progDesc "Compile Org files into objects.")
     cmdArchive =
       command
         "archive"
         $ info
-          (Archive <$> archiveOptsHandler)
+          (ComArchive <$> archiveOptsHandler)
           (progDesc "Combine objects into a single archive.")
     cmdTangle =
       command
         "tangle"
         $ info
-          (Tangle <$> tangleOptsHandler)
+          (ComTangle <$> tangleOptsHandler)
           (progDesc "Extract source code from archives.")
     cmdWeave =
       command
         "weave"
         $ info
-          (Weave <$> weaveOptsHandler)
+          (ComWeave <$> weaveOptsHandler)
           (progDesc "Generate HTML documentation from archives.")
+    cmdServe =
+      command
+        "serve"
+        $ info
+          (ComServe <$> serveOptsHandler)
+          (progDesc "Serve a directory of HTML files.")
     cmdLint =
       command
         "lint"
         $ info
-          (Lint <$> lintOptsHandler)
+          (ComLint <$> lintOptsHandler)
           (progDesc "Look for tracked files that are not tangled by Lilac.")
 #+end_src
 
@@ -1101,6 +1153,99 @@ We use the [[https://hackage.haskell.org/package/file-embed][file-embed]] librar
 #+begin_src haskell
 lilacJs :: Text
 lilacJs = TE.decodeUtf8 $(embedFile "doc/js/lilac.js.injectme")
+#+end_src
+
+* Serving
+:PROPERTIES:
+:ID:       b0033603-7251-449b-ba7d-be4a1a118fd0
+:END:
+
+The ~serve~ subcommand is useful for serving a directory of HTML files, while also
+watching for any changes to those HTML files (and reloading the file as needed).
+See [[f:lilacServe]] to see the entrypoint, and [[id:06715aa0-a6f2-4a1f-8079-b25079a34d4f][Serve]] for more details.
+
+#+name: data:ServeOpts
+#+begin_src haskell
+type ServeOpts :: Type
+data ServeOpts = ServeOpts
+  { dir :: OsPath,
+    port :: Int
+  }
+#+end_src
+
+[[f:serveOptsHandler]] performs some additional validation on the provided options.
+
+#+name: f:serveOptsHandler
+#+begin_src haskell
+serveOptsHandler :: OptionHandler ServeOpts
+serveOptsHandler =
+  ServeOpts
+    <$> (argument readOsPath (metavar "DIR"))
+    <*> ( option
+            portReader
+            ( long "port"
+                <> metavar "PORT"
+                <> value 8080
+                <> showDefault
+                <> help
+                  """
+                  Port to serve over.
+                  """
+            )
+        )
+  where
+    portReader :: ReadM Int
+    portReader = eitherReader $ \s ->
+      case readMaybe s of
+        Just n | n > 0 && n < 65536 -> Right n
+        Just _ -> Left "Port must be between 1 and 65535"
+        Nothing -> Left "Must be a valid integer"
+#+end_src
+
+[[f:lilacServe]] creates a new thread to watch for filesystem changes
+[[(f:lilacServe-fsWatcher)]], before starting the Warp HTTP server
+[[(f:lilacServe-server)]]. There's some extra work done to shut down the ~fsWatcher~
+thread [[(f:lilacServe-fsWatcher)]] gracefully at the end, as part of teardown
+[[(f:lilacServe-teardown)]].
+
+#+name: f:lilacServe
+#+begin_src haskell
+lilacServe :: GlobalOpts -> ServeOpts -> IO ()
+lilacServe globalOpts serveOpts = do
+  targetDir <- P.decodeUtf =<< D.makeAbsolute serveOpts.dir
+  fsChan <- newBroadcastTChanIO
+  activePaths <- newTVarIO mempty
+  shutdownSignal <- newEmptyMVar
+  fsWatcherDone <- newEmptyMVar
+
+  _ <-
+    forkIO
+      $ fsWatcher -- (ref:f:lilacServe-fsWatcher)
+        targetDir
+        fsChan
+        activePaths
+        shutdownSignal
+        fsWatcherDone
+        globalOpts.verbose
+
+  putTextLn $ "Serving Lilac at http://localhost:" <> show serveOpts.port
+  putTextLn "Press Ctrl-C to shut down."
+
+  let settings = setPort serveOpts.port defaultSettings
+      server =
+        liveReloadMiddleware
+          targetDir
+          fsChan
+          globalOpts.verbose
+          $ staticApp (defaultFileServerSettings targetDir)
+      teardown = do
+        putTextLn "\nLilac server has stopped."
+        putMVar shutdownSignal ()
+        takeMVar fsWatcherDone
+        putTextLn "Bye!"
+
+  runSettings settings server -- (ref:f:lilacServe-server)
+    `finally` teardown -- (ref:f:lilacServe-teardown)
 #+end_src
 
 * Git version injection

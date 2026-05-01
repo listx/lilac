@@ -1,0 +1,623 @@
+:PROPERTIES:
+:ID:       06715aa0-a6f2-4a1f-8079-b25079a34d4f
+:END:
+
+#+title: Serve
+
+* Overview
+
+The functionality provided by this library basically replaces the need to use
+something like
+
+#+begin_src bash
+python -m http.server 8010
+#+end_src
+
+to view the woven HTML in a browser. Instead you could just run
+
+#+begin_src bash
+lilac serve --port 8010 .
+#+end_src
+
+for the same effect. See [[id:b0033603-7251-449b-ba7d-be4a1a118fd0::f:lilacServe][f:lilacServe]] for the entrypoint.
+
+* ~Lilac.Serve~ module
+
+#+name: module:Lilac.Serve
+#+header: :tangle src/Lilac/Serve.hs
+#+begin_src haskell
+module Lilac.Serve
+  ( fsWatcher,
+    liveReloadMiddleware,
+  )
+where
+
+import Control.Concurrent (forkIO, killThread, myThreadId, threadDelay)
+import Control.Concurrent.STM
+  ( TChan,
+    TVar,
+    dupTChan,
+    isEmptyTChan,
+    modifyTVar',
+    readTChan,
+    readTVar,
+    writeTChan,
+    writeTVar,
+  )
+import Control.Exception (catch, finally)
+import Data.ByteString qualified as BS
+import Data.ByteString.Lazy qualified as LBS
+import Data.Map.Strict (findWithDefault)
+import Data.Text qualified as T
+import Data.Text.IO qualified as T
+import Data.Time (defaultTimeLocale, formatTime, getCurrentTime)
+import Network.HTTP.Types (status200)
+import Network.Wai (Middleware, pathInfo, responseLBS)
+import Network.Wai.Handler.WebSockets (websocketsOr)
+import Network.WebSockets qualified as WS
+import Relude
+  ( Bool (False, True),
+    FilePath,
+    IO,
+    Int,
+    LByteString,
+    MVar,
+    Map,
+    Maybe (Just),
+    STM,
+    Text,
+    Type,
+    atomically,
+    not,
+    null,
+    otherwise,
+    pure,
+    putMVar,
+    putTextLn,
+    readMVar,
+    show,
+    void,
+    when,
+    ($),
+    (+),
+    (.),
+    (<$>),
+    (<>),
+    (==),
+  )
+import Relude.Extra.Map (delete, insert, lookup)
+import System.Directory (doesFileExist)
+import System.FSNotify
+  ( Event (Added, Modified),
+    eventPath,
+    watchTree,
+    withManager,
+  )
+import System.FilePath
+  ( dropTrailingPathSeparator,
+    makeRelative,
+    takeExtension,
+    (</>),
+  )
+import System.IO (stderr)
+
+<<type:GenMap>>
+<<f:liveReloadMiddleware>>
+<<f:fsWatcher>>
+<<f:debouncePerPath>>
+<<f:wsHandler>>
+<<f:drainChannel>>
+<<f:handleClientConnection>>
+<<f:waitForMatch>>
+<<f:getTimestamp>>
+<<f:logVerbose>>
+<<f:logVerboseLn>>
+#+end_src
+
+* Architecture
+
+The user is expected to run
+
+#+begin_example
+lilac serve .
+#+end_example
+
+to start serving all HTML files (ending with ~*.html~) in the current directory.
+And then in another terminal window, they can run
+
+#+begin_src bash
+watch -n 0.1 make
+#+end_src
+
+and assuming that their Makefile knows how to weave Org files into HTML (such as
+in the sample [[id:c395c828-9422-47f0-a560-36aaf5b6c1f7::Makefile][Makefile]]), the newly woven HTML files will get picked up by the
+server and any browser tabs pointing to these HTML files will get refreshed.
+This way, the user doesn't have to manually refresh the page to pick up the new
+changes in the just-woven HTML page.
+
+There are three main parts to make the above work, in order of increasing complexity:
+
+  1) [[id:d1ad2493-3782-4db3-b334-8a165ec298c0][Client JavaScript injection]]. We don't want to weave the WebSocket
+     JavaScript to every woven HTML file, because ~lilac serve~ is meant for
+     development purposes, when the user is authoring an Org file they want to
+     weave into HTML. So instead, we inject it into the HTML via middleware.
+
+  2) [[id:efb164da-7681-4c10-b832-450bad0d387c][Filesystem watcher]]. This is how the server knows when an HTML file has
+     changed on disk, and thus when to reload its HTML page.
+
+  3) [[id:49458b50-f5ef-4585-92cb-9fb516a6b7e2][WebSockets]]. This is used to tell the client (browser) to reload the page.
+     It is also used by the client (on initial page load) to let the server know
+     that it has loaded that particular page. This information from the client
+     is important, because the server needs to know /which/ client to send the
+     reload command to (it needs to pick the one that's looking at a stale HTML
+     file).
+
+* Client JavaScript injection
+:PROPERTIES:
+:ID:       d1ad2493-3782-4db3-b334-8a165ec298c0
+:END:
+
+If [[f:liveReloadMiddleware]] detect that we're serving an HTML page, we inject it
+with [[js:live-reload]].
+
+#+name: f:liveReloadMiddleware
+#+begin_src haskell
+liveReloadMiddleware :: FilePath -> TChan FilePath -> Bool -> Middleware
+liveReloadMiddleware root fsChan verbose baseApp req respond =
+  websocketsOr
+    WS.defaultConnectionOptions
+    (wsHandler fsChan verbose)
+    backupApp
+    req
+    respond
+  where
+    backupApp req' resp' = do
+      let pieces = pathInfo req'
+          relPath =
+            if null pieces
+              then "index.html"
+              else T.unpack (T.intercalate "/" pieces)
+          fullPath = dropTrailingPathSeparator root </> relPath
+      isHtmlFile <-
+        if takeExtension fullPath == ".html"
+          then doesFileExist fullPath
+          else pure False
+      if isHtmlFile
+        then do
+          content <- LBS.readFile fullPath
+          resp'
+            $ responseLBS
+              status200
+              [("Content-Type", "text/html")]
+              (injectScript content)
+        else baseApp req' resp'
+    injectScript body =
+      let (before, after) = BS.breakSubstring "</body>" (LBS.toStrict body)
+          script :: LByteString
+          script =
+            """
+            <script>
+            <<js:live-reload>>
+            </script></body>
+            """
+       in if BS.null after then body else LBS.fromStrict before <> script
+#+end_src
+
+[[js:live-reload]] is the one that initiates the creation of the WebSocket with the
+server. We do several things over the WebSocket:
+
+  1) Initially, we tell the server about the path (specific HTML page) we're
+     looking at [[(js:live-reload-send-path)]].
+
+  2) Every 30 seconds, we send the server a heartbeat message
+     [[(js:live-reload-heartbeat)]]. This is so that the server knows not to kill
+     the WebSocket connection due to inactivity.
+
+  3) When the WebSocket is deliberately closed (due to network issues and
+     whatnot), we attempt to open it again instead of reloading the whole page
+     [[(js:live-reload-reconnect)]].
+
+  4) When there's an error with the WebSocket itself, we close it ourselves
+     [[(js:live-reload-close)]].
+
+#+name: js:live-reload
+#+begin_src js
+(function() {
+    let reloading = false;
+    const path = window.location.pathname;
+    const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://')
+                  + window.location.host
+                  + '/lilac-ws';
+
+    function connectWebSocket() {
+        const ws = new WebSocket(wsUrl); // (ref:js:live-reload-create-websocket)
+
+        const trigger = () => {
+            if (!reloading) {
+                reloading = true;
+                console.log("Lilac: Initiating reload...");
+                window.location.reload();
+            }
+        };
+
+        ws.onopen = () => {
+            console.log("Lilac: WebSocket connected. Monitoring path:", path);
+            ws.send(path); // (ref:js:live-reload-send-path)
+
+            // (ref:js:live-reload-heartbeat)
+            const heartbeat = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send('LILAC_WS_HEARTBEAT_FROM_JS_CLIENT');
+                } else {
+                    clearInterval(heartbeat);
+                }
+            }, 30000);
+        };
+
+        ws.onmessage = (msg) => {
+            if (msg.data === 'reload') {
+                console.log("Lilac: Reload signal received."); // (ref:js:live-reload-handle-reload-request)
+                trigger();
+            }
+        };
+
+        ws.onclose = (e) => {
+            if (!reloading) {
+                console.log("Lilac: WebSocket closed (Code " + e.code + ").");
+                console.log("Lilac: Reconnecting in 2s...");
+                setTimeout(connectWebSocket, 2000); // (ref:js:live-reload-reconnect)
+            }
+        };
+
+        ws.onerror = (err) => {
+            console.error("Lilac: WebSocket error observed:", err);
+            ws.close(); // (ref:js:live-reload-close)
+        };
+    }
+
+    connectWebSocket();
+})();
+#+end_src
+
+* Filesystem watcher
+:PROPERTIES:
+:ID:       efb164da-7681-4c10-b832-450bad0d387c
+:END:
+
+The filesystem watcher listens to filesystem events, which is simple enough --
+we just delegate this work to ~System.FSNotify.watchTree~ [[(f:fsWatcher-watchTree)]]
+from [[f:fsWatcher]]. Then we receive all filesystem events, where each event gets
+its own separate thread of execution.
+
+#+name: f:fsWatcher
+#+begin_src haskell
+fsWatcher ::
+  FilePath ->
+  TChan FilePath ->
+  TVar GenMap ->
+  MVar () ->
+  MVar () ->
+  Bool ->
+  IO ()
+fsWatcher dir fsChan activePaths shutdownMVar fsWatcherDone verbose = do
+  let signalThreadExit = do
+        logVerboseLn verbose "done."
+        putMVar fsWatcherDone ()
+  fsAction `finally` signalThreadExit
+  where
+    fsAction =
+      withManager $ \mgr -> do
+        let normalizedDir = dropTrailingPathSeparator dir
+        void
+          $ watchTree -- (ref:f:fsWatcher-watchTree)
+            mgr
+            normalizedDir
+            isHtmlFsEvent
+            (debouncePerPath activePaths (signalFsEvent normalizedDir fsChan)) -- (ref:f:fsWatcher-debounced-events)
+        logVerboseLn
+          verbose
+          $ "[fsWatcher] Listening to "
+          <> T.pack dir
+          <> "..."
+        readMVar shutdownMVar -- (ref:f:fsWatcher-block-until-shutdown)
+        logVerboseLn verbose "[fsWatcher] Received shutdown signal."
+        logVerbose verbose "[fsWatcher] Cleaning up resources... "
+    -- (ref:f:fsWatcher-isHtmlFsEvent)
+    isHtmlFsEvent e = case e of
+      Added {}
+      Modified {} -> takeExtension (eventPath e) == ".html"
+      _ -> False
+    signalFsEvent :: FilePath -> TChan FilePath -> Event -> IO ()
+    signalFsEvent watchedDir chan event = do
+      let relPath = makeRelative watchedDir $ eventPath event
+      logVerboseLn verbose
+        $ "[fsWatcher] Detected event: "
+        <> T.pack relPath
+        <> " ("
+        <> show event
+        <> ")"
+      atomically $ writeTChan chan relPath -- (ref:f:fsWatcher-writeTChan)
+#+end_src
+
+We only look for HTML file modification (or creation) events in ~isHtmlFsEvent~
+[[(f:fsWatcher-isHtmlFsEvent)]]. If this event is detected, we write the relative
+path of that HTML file to the shared ~TChan~ channel in ~signalFsEvent~
+[[(f:fsWatcher-writeTChan)]], and then other threads can listen to this event
+[[(f:waitForMatch-readTChan)]] to issue a reload request to the client over the
+WebSocket [[(f:waitForMatch-send-reload-request)]].
+
+It's important to block the thread inside ~withManager~, because if the thread
+finishes, the file watching will terminate. Because we want the file watcher to
+run for the duration of the server's running time, we block until shutdown
+[[(f:fsWatcher-block-until-shutdown)]].
+
+Some complexity arises from the need to debounce (filter out) bursts of events,
+because if we sent a reload command for every event, there is a risk of sending
+too many reload commands (and the client attempting a page reload when the HTML
+file is blank or partially written to by the OS). Such is the danger of I/O.
+
+The debouncing is done in [[f:debouncePerPath]]. We use [[type:GenMap]] to assign an
+incrementing counter (generation number) to each file path we see from the
+filesystem event.
+
+#+name: type:GenMap
+#+begin_src haskell
+type GenMap :: Type
+type GenMap = Map FilePath Int
+#+end_src
+
+[[f:debouncePerPath]] checks the generation number, starting with 0 or incrementing
+it by 1 [[(f:debouncePerPath-genNum)]]. After waiting for 500ms
+[[(f:debouncePerPath-wait)]], it looks up the generation number
+[[(f:debouncePerPath-genNum-lookup)]]. If no other thread has incremented it in that
+span of time, then the thread knows that it's safe to run the action. Otherwise,
+the thread is one of several that are all handling a burst of filesystem events
+for the same path and is stale because another thread has a higher generation
+number for this path, in which case it does nothing
+[[(f:debouncePerPath-stale-thread)]].
+
+#+name: f:debouncePerPath
+#+begin_src haskell
+debouncePerPath :: TVar GenMap -> (Event -> IO ()) -> Event -> IO ()
+debouncePerPath genMap action e = do
+  let path = eventPath e
+  currentGen <- atomically $ do
+    m <- readTVar genMap
+    let nextGen = findWithDefault 0 path m + 1 -- (ref:f:debouncePerPath-genNum)
+    writeTVar genMap $ insert path nextGen m
+    pure nextGen
+
+  void . forkIO $ do
+    threadDelay 500_000 -- (ref:f:debouncePerPath-wait)
+    shouldFire <- atomically $ do
+      m <- readTVar genMap
+      case lookup path m of -- (ref:f:debouncePerPath-genNum-lookup)
+        Just latestGen | latestGen == currentGen -> do
+          modifyTVar' genMap $ delete path
+          pure True
+        _ -> pure False -- (ref:f:debouncePerPath-stale-thread)
+    when shouldFire $ action e
+#+end_src
+
+* WebSockets
+:PROPERTIES:
+:ID:       49458b50-f5ef-4585-92cb-9fb516a6b7e2
+:END:
+
+A WebSocket connection allows us to have a two-way communication channel between
+the browser tab and the server. It is what let's us associate browser
+connections to file system events. Below is a description of the typical
+happy path scenario:
+
+  1) When the server starts up, it creates a filesystem watcher
+     [[id:b0033603-7251-449b-ba7d-be4a1a118fd0::(f:lilacServe-fsWatcher)]] thread on
+     the given directory to respond to any filesystem events going on inside
+     there.
+
+  2) When the client starts up (when a browser tab loads an HTML page which
+     falls under the watched directory), the server sends the HTML page, but
+     modifies it by injecting client-side JavaScript ([[js:live-reload]]) into the
+     page. Then when that page loads, the injected JavaScript creates a new
+     WebSocket connection [[(js:live-reload-create-websocket)]].
+
+  3) At this point, the job of the client is to listen to any reload requests
+     from the server [[(js:live-reload-handle-reload-request)]]. To this end the
+     client sends heartbeats to keep the WebSocket connection alive while it
+     waits for the server to send those reload requests
+     [[(js:live-reload-heartbeat)]].
+
+  4) From the server's point of view, it needs to handle the WebSocket
+     connection and associate it with one of those filesystem path events,
+     ultimately deciding when to send the reload request.
+
+[[f:wsHandler]] handles all incoming WebSocket data from the client. It knows how to
+handle a single WebSocket connection ~conn~ [[(f:wsHandler-ws-conn)]].
+
+#+name: f:wsHandler
+#+begin_src haskell
+wsHandler :: TChan FilePath -> Bool -> WS.ServerApp
+wsHandler fsChan verbose pending = do
+  conn <- WS.acceptRequest pending -- (ref:f:wsHandler-ws-conn)
+  msg <- WS.receiveData conn :: IO Text -- (ref:f:wsHandler-read-first-msg)
+  if msg == "LILAC_WS_HEARTBEAT_FROM_JS_CLIENT"
+    then do
+      logVerboseLn verbose $ "[wsHandler] Ignored heartbeat (ON INIT): " <> msg
+      WS.sendClose conn ("Path expected" :: Text) -- (ref:f:wsHandler-close-ws-conn)
+    else handleClientConnection conn fsChan msg verbose
+#+end_src
+
+Most of the work falls to [[f:handleClientConnection]], which creates a separate
+thread for keeping the WebSocket alive (by processing the heartbeats sent by the
+client). As for the main thread, it just for filesystem events through [[f:waitForMatch]].
+
+#+name: f:handleClientConnection
+#+begin_src haskell
+handleClientConnection ::
+  WS.Connection ->
+  TChan FilePath ->
+  Text ->
+  Bool ->
+  IO ()
+handleClientConnection conn fsChan msg verbose = do
+  let browserLocation
+        | T.null cleaned = "index.html"
+        | otherwise = cleaned
+        where
+          cleaned = T.dropAround (== '/') msg
+  logVerboseLn
+    verbose
+    $ "[wsHandler] Browser connected: "
+    <> browserLocation
+
+  fsPathChan <- atomically $ do
+    chan <- dupTChan fsChan -- (ref:f:handleClientConnection-subscribe-fsChan)
+    drainChannel chan
+    pure chan
+  fsListenerThread <- myThreadId
+
+  -- (ref:f:handleClientConnection-heartbeatHandlerThread)
+  heartbeatHandlerThread <- forkIO $ do
+    let heartbeatHandler = do
+          heartbeat <- WS.receiveData conn :: IO Text
+          logVerboseLn
+            verbose
+            $ "[wsHandler] Ignored heartbeat: "
+            <> heartbeat
+          heartbeatHandler -- (ref:f:handleClientConnection-heartbeatHandler)
+
+    -- (ref:f:handleClientConnection-browser-disconnect)
+    heartbeatHandler `catch` \(e :: WS.ConnectionException) -> do
+      logVerboseLn verbose
+        $ "[wsHandler] Browser disconnected: "
+        <> browserLocation
+        <> " (Reason: "
+        <> T.pack (show e)
+        <> ")"
+      killThread fsListenerThread -- (ref:f:handleClientConnection-fsListenerThread)
+  waitForMatch conn fsPathChan browserLocation -- (ref:f:handleClientConnection-waitForMatch)
+    `finally` killThread heartbeatHandlerThread
+#+end_src
+
+The first thing to do is read the very first message from the client
+[[(f:wsHandler-read-first-msg)]], which we expect to be a file path. The happy path
+looks like this:
+
+  1) Client connects [[(js:live-reload-create-websocket)]]
+
+  2) Server accepts ([[f:wsHandler]])
+
+  3) Client sends path [[(js:live-reload-send-path)]]
+
+  4) Server enters [[f:waitForMatch]] [[(f:handleClientConnection-waitForMatch)]]
+
+If the first message is not a path (because of some weird timing edge case), we
+manually close the WebSocket connection [[(f:wsHandler-close-ws-conn)]] to make the
+client re-establish the WebSocket in the normal "happy path" order
+[[(js:live-reload-reconnect)]]. Thus the sequence of events looks like this:
+
+  1) Client connects [[(js:live-reload-create-websocket)]]
+
+  2) Server accepts ([[f:wsHandler]])
+
+  3) Client sends heartbeat [[(js:live-reload-heartbeat)]]
+
+  4) Server closes [[(f:wsHandler-close-ws-conn)]]
+
+  5) Client waits 2s and reconnects [[(js:live-reload-reconnect)]]
+
+  6) Client sends path [[(js:live-reload-send-path)]]
+
+  7) Server enters [[f:waitForMatch]] [[(f:handleClientConnection-waitForMatch)]]
+
+[[f:wsHandler]] also reads heartbeat messages from the client to keep the connection
+alive [[(f:handleClientConnection-heartbeatHandler)]] (otherwise, Warp may kill the
+connection on its own due to a timeout). It does this repeatedly in a long-lived
+~heartbeatHandlerThread~ [[(f:handleClientConnection-heartbeatHandlerThread)]] until
+the browser tab is closed (whereupon we'll get a ~WS.ConnectionException~) and
+kill the ~fsListenerThread~ [[(f:handleClientConnection-fsListenerThread)]].
+
+The ~fsListenerThread~ is the main thread which listens to debounced filesystem
+events coming from [[(f:fsWatcher-debounced-events)]]. Its job is to react to
+filesystem events on the same path that the client sent, by subscribing to the
+filesystem channel with ~dupTChan~ [[(f:handleClientConnection-subscribe-fsChan)]]. It then goes
+into an infinite loop with [[f:waitForMatch]].
+
+The call to [[f:drainChannel]] is there to get rid of filesystem events that have
+been queued up /before/ the WebSocket connection has been established; this can
+happen if the HTML file is modified multiple times after the server has spawned,
+but before a browser tab is opened to load the same HTML file.
+
+#+name: f:drainChannel
+#+begin_src haskell
+drainChannel :: TChan a -> STM ()
+drainChannel chan = do
+  isEmpty <- isEmptyTChan chan
+  when (not isEmpty) $ do
+    _ <- readTChan chan
+    drainChannel chan
+#+end_src
+
+It's also worth noting that if the browser disconnects
+[[(f:handleClientConnection-browser-disconnect)]], this would make the heartbeat
+handling thread catch a ~WS.ConnectionException~ and kill the filesystem listener
+thread. Conversely, if the filesystem thread dies because it sent a reload
+request to the client [[(f:waitForMatch-send-reload-request)]], it will kill the
+heartbeat handling thread [[(f:handleClientConnection-waitForMatch)]]. This way
+these threads are not leaked over the life of the server process.
+
+[[f:waitForMatch]] reads from the subscribed filesystem events channel
+[[(f:waitForMatch-readTChan)]], and only sends the ~reload~ command to the client
+[[(f:waitForMatch-send-reload-request)]] if the path from the filesystem event
+matches the path sent by the client. Otherwise it loops by calling itself again
+[[(f:waitForMatch-loop)]].
+
+#+name: f:waitForMatch
+#+begin_src haskell
+waitForMatch :: WS.Connection -> TChan FilePath -> Text -> IO ()
+waitForMatch conn fsPathChan browserLocation = do
+  modifiedFile <- T.pack <$> atomically (readTChan fsPathChan) -- (ref:f:waitForMatch-readTChan)
+  if (browserLocation == modifiedFile)
+    then do
+      t <- getTimestamp
+      let time = "[" <> t <> "]"
+          announcement =
+            time
+              <> " FS event detected ("
+              <> browserLocation
+              <> "), reloading."
+      putTextLn announcement
+      WS.sendTextData conn ("reload" :: Text) -- (ref:f:waitForMatch-send-reload-request)
+    else
+      waitForMatch conn fsPathChan browserLocation -- (ref:f:waitForMatch-loop)
+#+end_src
+
+* Logging
+
+Below are some helper functions to help with logging.
+
+#+name: f:logVerbose
+#+begin_src haskell
+logVerbose :: Bool -> Text -> IO ()
+logVerbose verbose msg = do
+  t <- getTimestamp
+  when verbose $ do
+    T.hPutStr stderr $ "[" <> t <> "] " <> msg
+#+end_src
+
+#+name: f:logVerboseLn
+#+begin_src haskell
+logVerboseLn :: Bool -> Text -> IO ()
+logVerboseLn verbose msg = do
+  t <- getTimestamp
+  when verbose $ do
+    T.hPutStrLn stderr $ "[" <> t <> "] " <> msg
+#+end_src
+
+#+name: f:getTimestamp
+#+begin_src haskell
+getTimestamp :: IO Text
+getTimestamp = do
+  now <- getCurrentTime
+  let timeStr = formatTime defaultTimeLocale "%H:%M:%S" now
+  pure $ T.pack timeStr
+#+end_src

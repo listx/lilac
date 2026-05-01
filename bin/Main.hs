@@ -1,5 +1,11 @@
 module Main (main) where
 
+import Control.Concurrent (forkIO)
+import Control.Concurrent.STM
+  ( newBroadcastTChanIO,
+    newTVarIO,
+  )
+import Control.Exception (finally)
 import Data.Aeson (ToJSON, eitherDecodeStrictText, encodeFile)
 import Data.ByteString.Lazy.Char8 qualified as LBS
 import Data.FileEmbed (embedFile)
@@ -9,12 +15,23 @@ import Data.Text.Encoding qualified as TE
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
+import Lilac.Serve (fsWatcher, liveReloadMiddleware)
 import Lilac.Tangle qualified as LT
 import Lilac.Types
   ( Archive (objects),
+    ArchiveOpts (ArchiveOpts, inputs, outFile),
     Block (meta),
     Cell (CBlock),
+    CompileOpts (CompileOpts, inputs),
     GPath,
+    GlobalOpts
+      ( GlobalOpts,
+        color,
+        projectConf,
+        subcommand,
+        verbose
+      ),
+    LintOpts (LintOpts, inputs),
     Object (orgDoc),
     OrgDoc (cells),
     ProjectConf
@@ -26,6 +43,16 @@ import Lilac.Types
         version
       ),
     RawProjectConf (homepage, name, nonTangledPathspecs, repo, version),
+    ServeOpts (ServeOpts, dir, port),
+    Subcommand
+      ( ComArchive,
+        ComCompile,
+        ComLint,
+        ComServe,
+        ComTangle,
+        ComWeave
+      ),
+    TangleOpts (TangleOpts, inputs, outDir),
     WeaveConf
       ( WeaveConf,
         archive,
@@ -33,6 +60,13 @@ import Lilac.Types
         originObjectPath,
         outDir,
         projectConf
+      ),
+    WeaveOpts
+      ( WeaveOpts,
+        inputs,
+        outDir,
+        writeCss,
+        writeJs
       ),
     decodeGPath,
     defaultOrgParserState,
@@ -43,12 +77,19 @@ import Lilac.Version (lilacVersion)
 import Lilac.Weave qualified as LW
 import Lilac.Weave.Css qualified as LWC
 import Network.URI qualified as N
+import Network.Wai.Application.Static (defaultFileServerSettings, staticApp)
+import Network.Wai.Handler.Warp
+  ( defaultSettings,
+    runSettings,
+    setPort,
+  )
 import Options.Applicative
   ( Parser,
     ReadM,
     argument,
     command,
     customExecParser,
+    eitherReader,
     flag,
     fullDesc,
     header,
@@ -96,18 +137,22 @@ import Relude
     mapM_,
     mapMaybe,
     mempty,
+    newEmptyMVar,
     not,
     null,
     otherwise,
     pure,
+    putMVar,
     putStr,
     putStrLn,
     putTextLn,
+    readMaybe,
     reverse,
     runStateT,
     sequence_,
     show,
     sort,
+    takeMVar,
     when,
     ($),
     (&&),
@@ -143,52 +188,6 @@ readOsPath = f =<< str
 
 readGPath :: ReadM GPath
 readGPath = encodeGPath =<< str
-
-type GlobalOpts :: Type
-data GlobalOpts = GlobalOpts
-  { subcommand :: Subcommand,
-    projectConf :: OsPath,
-    color :: Bool,
-    verbose :: Bool
-  }
-
-type Subcommand :: Type
-data Subcommand
-  = Compile CompileOpts
-  | Archive ArchiveOpts
-  | Tangle TangleOpts
-  | Weave WeaveOpts
-  | Lint LintOpts
-
-type TangleOpts :: Type
-data TangleOpts = TangleOpts
-  { inputs :: [GPath],
-    outDir :: OsPath
-  }
-
-type WeaveOpts :: Type
-data WeaveOpts = WeaveOpts
-  { inputs :: [OsPath],
-    outDir :: OsPath,
-    writeCss :: Bool,
-    writeJs :: Bool
-  }
-
-type CompileOpts :: Type
-data CompileOpts = CompileOpts
-  { inputs :: [OsPath]
-  }
-
-type ArchiveOpts :: Type
-data ArchiveOpts = ArchiveOpts
-  { inputs :: [GPath],
-    outFile :: OsPath
-  }
-
-type LintOpts :: Type
-data LintOpts = LintOpts
-  { inputs :: [OsPath] --
-  }
 
 type OptionHandler :: Type -> Type
 type OptionHandler = Options.Applicative.Parser
@@ -238,37 +237,44 @@ subcommandHandler =
     <> cmdArchive
     <> cmdTangle
     <> cmdWeave
+    <> cmdServe
     <> cmdLint
   where
     cmdCompile =
       command
         "compile"
         $ info
-          (Compile <$> compileOptsHandler)
+          (ComCompile <$> compileOptsHandler)
           (progDesc "Compile Org files into objects.")
     cmdArchive =
       command
         "archive"
         $ info
-          (Archive <$> archiveOptsHandler)
+          (ComArchive <$> archiveOptsHandler)
           (progDesc "Combine objects into a single archive.")
     cmdTangle =
       command
         "tangle"
         $ info
-          (Tangle <$> tangleOptsHandler)
+          (ComTangle <$> tangleOptsHandler)
           (progDesc "Extract source code from archives.")
     cmdWeave =
       command
         "weave"
         $ info
-          (Weave <$> weaveOptsHandler)
+          (ComWeave <$> weaveOptsHandler)
           (progDesc "Generate HTML documentation from archives.")
+    cmdServe =
+      command
+        "serve"
+        $ info
+          (ComServe <$> serveOptsHandler)
+          (progDesc "Serve a directory of HTML files.")
     cmdLint =
       command
         "lint"
         $ info
-          (Lint <$> lintOptsHandler)
+          (ComLint <$> lintOptsHandler)
           (progDesc "Look for tracked files that are not tangled by Lilac.")
 
 tangleOptsHandler :: OptionHandler TangleOpts
@@ -366,6 +372,30 @@ lintOptsHandler =
   LintOpts
     <$> (some $ argument readOsPath (metavar "ARCHIVES..."))
 
+serveOptsHandler :: OptionHandler ServeOpts
+serveOptsHandler =
+  ServeOpts
+    <$> (argument readOsPath (metavar "DIR"))
+    <*> ( option
+            portReader
+            ( long "port"
+                <> metavar "PORT"
+                <> value 8080
+                <> showDefault
+                <> help
+                  """
+                  Port to serve over.
+                  """
+            )
+        )
+  where
+    portReader :: ReadM Int
+    portReader = eitherReader $ \s ->
+      case readMaybe s of
+        Just n | n > 0 && n < 65536 -> Right n
+        Just _ -> Left "Port must be between 1 and 65535"
+        Nothing -> Left "Must be a valid integer"
+
 boldWhite :: [C.SGR]
 boldWhite =
   [ C.SetColor C.Foreground C.Vivid C.White,
@@ -397,11 +427,12 @@ main = do
 
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
-  Archive archiveOpts -> lilacArchive archiveOpts
-  Compile compileOpts -> lilacCompile globalOpts compileOpts
-  Tangle tangleOpts -> lilacTangle globalOpts tangleOpts
-  Weave weaveOpts -> lilacWeave globalOpts weaveOpts
-  Lint lintOpts -> lilacLint globalOpts lintOpts
+  ComArchive archiveOpts -> lilacArchive archiveOpts
+  ComCompile compileOpts -> lilacCompile globalOpts compileOpts
+  ComTangle tangleOpts -> lilacTangle globalOpts tangleOpts
+  ComWeave weaveOpts -> lilacWeave globalOpts weaveOpts
+  ComLint lintOpts -> lilacLint globalOpts lintOpts
+  ComServe serveOpts -> lilacServe globalOpts serveOpts
 
 readProjectConf :: OsPath -> IO ProjectConf
 readProjectConf path = do
@@ -597,6 +628,43 @@ weaveToDisk projectConf outDir archive acc objPath obj =
 
 lilacJs :: Text
 lilacJs = TE.decodeUtf8 $(embedFile "doc/js/lilac.js.injectme")
+
+lilacServe :: GlobalOpts -> ServeOpts -> IO ()
+lilacServe globalOpts serveOpts = do
+  targetDir <- P.decodeUtf =<< D.makeAbsolute serveOpts.dir
+  fsChan <- newBroadcastTChanIO
+  activePaths <- newTVarIO mempty
+  shutdownSignal <- newEmptyMVar
+  fsWatcherDone <- newEmptyMVar
+
+  _ <-
+    forkIO
+      $ fsWatcher --
+        targetDir
+        fsChan
+        activePaths
+        shutdownSignal
+        fsWatcherDone
+        globalOpts.verbose
+
+  putTextLn $ "Serving Lilac at http://localhost:" <> show serveOpts.port
+  putTextLn "Press Ctrl-C to shut down."
+
+  let settings = setPort serveOpts.port defaultSettings
+      server =
+        liveReloadMiddleware
+          targetDir
+          fsChan
+          globalOpts.verbose
+          $ staticApp (defaultFileServerSettings targetDir)
+      teardown = do
+        putTextLn "\nLilac server has stopped."
+        putMVar shutdownSignal ()
+        takeMVar fsWatcherDone
+        putTextLn "Bye!"
+
+  runSettings settings server --
+    `finally` teardown --
 
 lilacLint :: GlobalOpts -> LintOpts -> IO ()
 lilacLint globalOpts lintOpts = do

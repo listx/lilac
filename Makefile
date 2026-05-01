@@ -11,6 +11,7 @@ org_files = \
 	doc/tangle.org \
 	doc/types.org \
 	doc/weave.org \
+	doc/serve.org \
 	doc/fe.org \
 	doc/artifacts/index.org \
 	doc/artifacts/user-manual.org \

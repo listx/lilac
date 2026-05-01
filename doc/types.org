@@ -22,15 +22,18 @@ existence in the system). For this reason, many of the code blocks are defined
 #+begin_src haskell
 module Lilac.Types
   ( Archive (..),
+    ArchiveOpts (..),
     Block (..),
     BToken (..),
     Cell (..),
     Citation (..),
     Cite (..),
     Command (..),
+    CompileOpts (..),
     Figure (..),
     Footnote (..),
     GCI (..),
+    GlobalOpts (..),
     GPath,
     GTOC (..),
     GlossaryTerm (..),
@@ -40,6 +43,7 @@ module Lilac.Types
     Link (..),
     LinkOid (..),
     LinkTarget (..),
+    LintOpts (..),
     ListMarker (..),
     MathFragment (..),
     Object (..),
@@ -53,11 +57,15 @@ module Lilac.Types
     PseudoEdge (..),
     RawProjectConf (..),
     Prose (..),
+    ServeOpts (..),
+    Subcommand (..),
     Style (..),
     StyleMask (..),
     StyledText (..),
     Table (..),
+    TangleOpts (..),
     WeaveConf (..),
+    WeaveOpts (..),
     decodeGPath,
     defaultOrgParserConf,
     defaultOrgParserState,
@@ -163,6 +171,7 @@ import Relude
     (>),
   )
 import Relude.Extra.Map (keys, lookup)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Prelude qualified (show)
@@ -242,6 +251,14 @@ import Prelude qualified (show)
 
 <<id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf>>
 <<id:a7de905c-03c8-4d4b-911c-b1f4435aea85::data:RawProjectConf>>
+<<id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:GlobalOpts>>
+<<id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:Subcommand>>
+<<id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:ArchiveOpts>>
+<<id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:CompileOpts>>
+<<id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:LintOpts>>
+<<id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:ServeOpts>>
+<<id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:TangleOpts>>
+<<id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:WeaveOpts>>
 
 <<f:markingChars>>
 <<f:markingCharsInvisible>>

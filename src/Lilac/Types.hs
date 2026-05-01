@@ -1,14 +1,17 @@
 module Lilac.Types
   ( Archive (..),
+    ArchiveOpts (..),
     Block (..),
     BToken (..),
     Cell (..),
     Citation (..),
     Cite (..),
     Command (..),
+    CompileOpts (..),
     Figure (..),
     Footnote (..),
     GCI (..),
+    GlobalOpts (..),
     GPath,
     GTOC (..),
     GlossaryTerm (..),
@@ -18,6 +21,7 @@ module Lilac.Types
     Link (..),
     LinkOid (..),
     LinkTarget (..),
+    LintOpts (..),
     ListMarker (..),
     MathFragment (..),
     Object (..),
@@ -31,11 +35,15 @@ module Lilac.Types
     PseudoEdge (..),
     RawProjectConf (..),
     Prose (..),
+    ServeOpts (..),
+    Subcommand (..),
     Style (..),
     StyleMask (..),
     StyledText (..),
     Table (..),
+    TangleOpts (..),
     WeaveConf (..),
+    WeaveOpts (..),
     decodeGPath,
     defaultOrgParserConf,
     defaultOrgParserState,
@@ -141,6 +149,7 @@ import Relude
     (>),
   )
 import Relude.Extra.Map (keys, lookup)
+import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
 import Prelude qualified (show)
@@ -756,6 +765,59 @@ data RawProjectConf = RawProjectConf
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
+
+type GlobalOpts :: Type
+data GlobalOpts = GlobalOpts
+  { subcommand :: Subcommand,
+    projectConf :: OsPath,
+    color :: Bool,
+    verbose :: Bool
+  }
+
+type Subcommand :: Type
+data Subcommand
+  = ComCompile CompileOpts
+  | ComArchive ArchiveOpts
+  | ComTangle TangleOpts
+  | ComWeave WeaveOpts
+  | ComLint LintOpts
+  | ComServe ServeOpts
+
+type ArchiveOpts :: Type
+data ArchiveOpts = ArchiveOpts
+  { inputs :: [GPath],
+    outFile :: OsPath
+  }
+
+type CompileOpts :: Type
+data CompileOpts = CompileOpts
+  { inputs :: [OsPath]
+  }
+
+type LintOpts :: Type
+data LintOpts = LintOpts
+  { inputs :: [OsPath] --
+  }
+
+type ServeOpts :: Type
+data ServeOpts = ServeOpts
+  { dir :: OsPath,
+    port :: Int
+  }
+
+type TangleOpts :: Type
+data TangleOpts = TangleOpts
+  { inputs :: [GPath],
+    outDir :: OsPath
+  }
+
+type WeaveOpts :: Type
+data WeaveOpts = WeaveOpts
+  { inputs :: [OsPath],
+    outDir :: OsPath,
+    writeCss :: Bool,
+    writeJs :: Bool
+  }
 
 markingChars :: [Char]
 markingChars = "#*" <> markingCharsInvisible
