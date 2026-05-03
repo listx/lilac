@@ -8,7 +8,7 @@ let
   '';
   lilac = pkgs.writeShellScriptBin "lilac" ''
     set -euo pipefail
-    cabal run lilac -v0 -- "$@"
+    cabal run lilac -v0 -j -- +RTS -N -RTS "$@"
   '';
   lilac-nix = pkgs.writeShellScriptBin "lilac-nix" ''
     set -euo pipefail

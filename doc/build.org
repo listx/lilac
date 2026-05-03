@@ -725,7 +725,7 @@ let
   '';
   lilac = pkgs.writeShellScriptBin "lilac" ''
     set -euo pipefail
-    cabal run lilac -v0 -- "$@"
+    <<cabal-run-invocation>>
   '';
   lilac-nix = pkgs.writeShellScriptBin "lilac-nix" ''
     set -euo pipefail
@@ -1355,7 +1355,21 @@ them to be handled by =lilac=).
 
 The above ceremony with =cabal run= might be a little bit annoying during
 development. This is why [[nix/scripts.nix]] includes ~lilac~ which acts as a shell
-wrapper around those various ~cabal~-centric options for us.
+wrapper around those various ~cabal~-centric options for us. Specifically, the
+[[cabal-run-invocation]] uses some default flags:
+
+  - ~-j~ to use all available CPU cores for ~cabal~
+
+  - ~+RTS~ to mark the start of runtime system options
+
+  - ~-N~ to use all available CPU cores for ~lilac~
+
+  - ~-RTS~ to mark the end of runtime system options
+
+#+name: cabal-run-invocation
+#+begin_src bash
+cabal run lilac -v0 -j -- +RTS -N -RTS "$@" (ref:nix/scripts.nix-cabal-run-flags)
+#+end_src
 
 We have to ignore the =build= file because it's just a [[id:b649d761-1103-47be-86e4-56a7362a5ecc][sentinel file]].
 
