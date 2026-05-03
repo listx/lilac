@@ -134,7 +134,7 @@ dev-cljs:
 *** Known limitations
 
 We cannot load the development-mode JS in [[cfg:lilac-fe-build]] in documents
-outside of the ~base~ directory, such as ~doc/artifacts/plan.org~ ([[id:48e76342-2498-44c5-9ed9-830cb80995fd][Plan]]) because
+outside of the ~doc~ directory, such as ~doc/artifacts/plan.org~ ([[id:48e76342-2498-44c5-9ed9-830cb80995fd][Plan]]) because
 although we can correctly see ~lilac.js~ in the upper directory via
 [[id:da789584-7748-4258-a2ff-36567bbedbc8::f:getRelativeJsPath][f:getRelativeJsPath]], that script itself sources folders that are in the wrong
 relative directory. Below is a sample of that hardcoded behavior (what ~lilac.js~
@@ -159,7 +159,7 @@ document.write('<script>goog.require("lilac.core");</script>');
 
 In [[(hardcoded-js-src-path)]], it tells the HTML source to pull from a child
 directory of ~js/cljs-dev/...~. This only works for HTML documents that sit under
-the ~base~ directory.
+the ~doc~ directory.
 
 This is not a problem for the [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68][Optimized production build]], because that build
 uses a self-contained, single JS file (and thus does not need to import other
@@ -278,9 +278,9 @@ that build.
 By default, Figwheel uses the [[https://github.com/ring-clojure/ring][Ring]] web library. It has a hardcoded default where
 the static files to be served by the web server process must be located in a
 folder named ~public~ somewhere along the classpath. However we don't want to use
-~public~ because we use a top-level folder already called ~base~ which is the base
+~public~ because we use a top-level folder already called ~doc~ which is the base
 of all of our LP documentation, which are woven into HTML files in that folder.
-And for simplicity we want to serve the ~base~ folder prefix, because this hides
+And for simplicity we want to serve the ~doc~ folder prefix, because this hides
 less information and is more transparent of what is being served. In order to do
 this, we have to write our own Ring handler.
 
