@@ -375,10 +375,10 @@ weaveObject object = doctypehtml_ $ do
           """
           window.MathJax = {
             tex: {
-                tags: 'ams' --
+                tags: 'ams'
             },
             options: {
-                ignoreHtmlClass: 'verbatim|code' --
+                ignoreHtmlClass: 'verbatim|code'
             }
           };
           """
