@@ -342,8 +342,8 @@ weaveObject object = doctypehtml_ $ do
       . toHtml --
       . fromMaybe "Untitled"
       $ lookup "title" object.orgDoc.meta
-    relativeCssPath <- getRelativeCssPath --
-    link_ [rel_ "stylesheet", href_ relativeCssPath]
+    cssPath <- getRootRelativePath "css/default.css" --
+    link_ [rel_ "stylesheet", href_ cssPath]
 
     link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
     link_
@@ -397,10 +397,10 @@ weaveObject object = doctypehtml_ $ do
     weaveMain object.orgDoc.meta lciCellPairs
     weaveSidebar . catMaybes $ map (getBlock . snd) lciCellPairs
     weaveHeadingAncestry lciCellPairs
-    relativeJsPath <- getRelativeJsPath
+    jsPath <- getRootRelativePath "js/lilac.js" --
     script_
       [ id_ "lilac-fe-script",
-        src_ relativeJsPath
+        src_ jsPath
       ]
       ("" :: Text)
   where
@@ -1220,35 +1220,18 @@ getRelativePathWithoutSymlinks src dest
     isDestChildOfSrc = dirsSrc == commonPathPrefix
     remainingDest = drop (length commonPathPrefix) dirsDest
 
-getRelativeCssPath :: HtmlWeaver Text
-getRelativeCssPath = do
+getRootRelativePath :: Text -> HtmlWeaver Text
+getRootRelativePath path = do
   weaveConf <- ask
-  let result :: Maybe String
-      result = do
-        objPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath
-        out <- P.encodeUtf $ decodeGPath weaveConf.outDir
-        cssDir <- P.encodeUtf "css"
-        css <- P.encodeUtf "default.css"
-        let cssPath = P.joinPath [out, cssDir, css]
-            relativeCssPath = getRelativePathWithoutSymlinks objPath cssPath
-        final <- P.decodeUtf relativeCssPath
-        pure final
-  pure . T.pack $ fromMaybe "css/default.css" result
-
-getRelativeJsPath :: HtmlWeaver Text
-getRelativeJsPath = do
-  weaveConf <- ask
-  let result :: Maybe String
-      result = do
-        objPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath
-        out <- P.encodeUtf $ decodeGPath weaveConf.outDir
-        jsDir <- P.encodeUtf "js"
-        js <- P.encodeUtf "lilac.js"
-        let jsPath = P.joinPath [out, jsDir, js]
-            relativeJsPath = getRelativePathWithoutSymlinks objPath jsPath
-        final <- P.decodeUtf relativeJsPath
-        pure final
-  pure . T.pack $ fromMaybe "lilac.js" result
+  let outDirRaw =
+        T.dropAround (== '/')
+          . T.pack
+          . decodeGPath
+          $ weaveConf.outDir
+      outDir
+        | outDirRaw == "." = "/"
+        | otherwise = "/" <> outDirRaw <> "/"
+  pure $ outDir <> path
 
 weaveFootnote :: LCI -> Footnote -> HtmlWeaver ()
 weaveFootnote lci footnote = do
