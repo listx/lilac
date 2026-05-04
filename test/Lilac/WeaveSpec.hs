@@ -78,7 +78,6 @@ import Relude
     (<>),
     (==),
   )
-import System.OsPath qualified as P
 import Test.Hspec
   ( Expectation,
     Spec,
@@ -138,42 +137,6 @@ spec = do
           </li>
         </ol>
         """
-      ]
-
-  it "0301-weave-external-links-common-prefix" $ do
-    mapM_
-      ( \(a, b, c) ->
-          ( P.joinPath
-              $ LW.commonPrefix
-                (P.splitDirectories $ P.unsafeEncodeUtf a)
-                (P.splitDirectories $ P.unsafeEncodeUtf b)
-          )
-            `shouldBe` (P.unsafeEncodeUtf c)
-      )
-      [ ("from.html", "to.html1", ""),
-        ("base/from.html", "base/to.html2", "base"),
-        ("1base/a/b/from.html", "1base/a/b/to.html3", "1base/a/b"),
-        ("2base/a/b/from.html", "2base/a/b/c/to.html4", "2base/a/b"),
-        ("3base/a/b/from.html", "3base/a/b/c/d/to.html5", "3base/a/b"),
-        ("a/b/c", "x/y/z", "")
-      ]
-
-  it "0301-weave-external-links" $ do
-    mapM_
-      ( \(a, b, c) ->
-          LW.getRelativePathWithoutSymlinks
-            (P.unsafeEncodeUtf a)
-            (P.unsafeEncodeUtf b)
-            `shouldBe` (P.unsafeEncodeUtf c)
-      )
-      [ ("from.html", "to.html1", "to.html1"),
-        ("base/from.html", "base/to.html2", "to.html2"),
-        ("base/a/b/from.html", "base/a/b/to.html3", "to.html3"),
-        ("base/a/b/from.html", "base/a/b/c/to.html4", "c/to.html4"),
-        ("base/a/b/from.html", "base/a/b/c/d/to.html5", "c/d/to.html5"),
-        ("base/a/b/from.html", "to.html6", "../../../to.html6"),
-        ("base/a/b/from.html", "base/a/c/to.html7", "../c/to.html7"),
-        ("base/a/b/c/d/from.html", "base/a/x/y/to.html8", "../../../x/y/to.html8")
       ]
 
   it "0305-gtoc-ancestor" $ do

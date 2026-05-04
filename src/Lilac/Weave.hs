@@ -1,7 +1,5 @@
 module Lilac.Weave
-  ( commonPrefix,
-    getRelativePathWithoutSymlinks,
-    isGtocAncestor,
+  ( isGtocAncestor,
     prepareCitations,
     renderAsText,
     weaveObject,
@@ -243,7 +241,6 @@ import Relude
   ( Bool (False, True),
     Char,
     Either (Right),
-    Eq,
     FilePath,
     IO,
     Identity,
@@ -294,7 +291,6 @@ import Relude
     otherwise,
     pure,
     repeat,
-    replicate,
     reverse,
     runReaderT,
     sequence_,
@@ -327,7 +323,6 @@ import Relude
 import Relude.Extra.Map (insert, keys, lookup, lookupDefault, toPairs)
 import Skylighting qualified as Sky
 import System.IO (utf8)
-import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 
@@ -787,7 +782,7 @@ getLinkToGCI weaveConf gci
               Just ("", linkAnchor, cellName)
             else do
               (linkAnchor, docName) <-
-                getRelativeOrgDocCellLink weaveConf gpath lci cell
+                getRootRelativeOrgDocCellLink gpath lci cell
               Just (docName, linkAnchor, cellName)
   | otherwise = Nothing
 
@@ -876,7 +871,7 @@ weaveLinkTarget insideBlock linkTarget = do
       | Just gci <- lookup linkOid weaveConf.archive.symbols,
         Just objPath <- gciToObjPath weaveConf.archive gci ->
           pure
-            $ getExternalRelPath linkOid objPath weaveConf.originObjectPath
+            $ getExternalRelPath linkOid objPath
             <> internalLineLabelTarget --
       | otherwise -> pure $ showBrokenLink linkOid
       where
@@ -899,7 +894,7 @@ weaveLinkTargetLinkOid linkOid = do
         pure
           $ if objPath == weaveConf.originObjectPath
             then "#top"
-            else getExternalRelPath linkOid objPath weaveConf.originObjectPath
+            else getExternalRelPath linkOid objPath
     | Just gci <- lookup linkOid weaveConf.archive.symbols,
       Just (docName, linkAnchor, _) <- getLinkToGCI weaveConf gci ->
         if docName == "" --
@@ -944,14 +939,15 @@ weaveLinkDisplayName link = do
           f acc _ = acc
   pure displayName
 
-getExternalRelPath :: LinkOid -> GPath -> GPath -> Text
-getExternalRelPath linkOid extPath intPath
+getExternalRelPath :: LinkOid -> GPath -> Text
+getExternalRelPath linkOid extPath
   | Just toObjPath <- P.encodeUtf $ decodeGPath extPath,
-    Just fromObjPath <- P.encodeUtf $ decodeGPath intPath,
+    Just serveRoot <- P.encodeUtf "/",
     Right str <-
       P.decodeWith utf8 utf8
+        . P.combine serveRoot
         $ P.replaceExtension
-          (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+          toObjPath
           htmlExt =
       T.pack str
   | otherwise = showBrokenLink linkOid
@@ -1198,28 +1194,6 @@ getHeaderRowIndex table =
       | tableCellLacks markingChars tableCell = Just row
       | otherwise = acc
 
-getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
-getRelativePathWithoutSymlinks src dest
-  | dirsSrc == dirsDest || isDestChildOfSrc =
-      P.joinPath $ remainingDest <> destFile
-  | null commonPathPrefix =
-      P.joinPath $ replicate (length dirsSrc) goUp <> destFile
-  | otherwise =
-      P.joinPath
-        $ replicate (length dirsSrc - length commonPathPrefix) goUp
-        <> drop (length commonPathPrefix) dirsDest
-        <> destFile
-  where
-    goUp = P.unsafeEncodeUtf ".."
-    destFile = [P.takeFileName dest]
-    dirSrc = P.takeDirectory src
-    dirDest = P.takeDirectory dest
-    dirsSrc = P.splitDirectories dirSrc
-    dirsDest = P.splitDirectories dirDest
-    commonPathPrefix = commonPrefix dirsSrc dirsDest
-    isDestChildOfSrc = dirsSrc == commonPathPrefix
-    remainingDest = drop (length commonPathPrefix) dirsDest
-
 getRootRelativePath :: Text -> HtmlWeaver Text
 getRootRelativePath path = do
   weaveConf <- ask
@@ -1304,9 +1278,6 @@ weaveGlossaryTerm lci glossaryTerm = do
   when (isLastGlossaryTerm) dlEnd --
   where
     linkAnchor = getLinkAnchor (Just lci) $ CGlossaryTerm glossaryTerm
-
-commonPrefix :: (Eq a) => [a] -> [a] -> [a]
-commonPrefix xs ys = map fst . takeWhile (\(x, y) -> (x == y)) $ zip xs ys
 
 renderAsText :: WeaveConf -> HtmlWeaver a -> Text
 renderAsText weaveConf weaver =
@@ -1589,8 +1560,7 @@ weaveCollectedGlossaryTerm (isFirstTerm, (lci, objPath)) = do
       Just externalCell <- extObj.orgDoc.cells !!? lci.unLCI,
       CGlossaryTerm glossaryTerm <- externalCell,
       Just (externalLinkAnchor, externalOrgDocName) <-
-        getRelativeOrgDocCellLink
-          weaveConf
+        getRootRelativeOrgDocCellLink
           objPath
           lci
           externalCell -> do
@@ -1615,15 +1585,14 @@ weaveCollectedGlossaryTerm (isFirstTerm, (lci, objPath)) = do
         then []
         else [class_ "inner-dt"]
 
-getRelativeOrgDocCellLink ::
-  WeaveConf ->
+getRootRelativeOrgDocCellLink ::
   GPath ->
   LCI ->
   Cell ->
   Maybe (Text, Text)
-getRelativeOrgDocCellLink weaveConf objPath lci externalCell
+getRootRelativeOrgDocCellLink objPath lci externalCell
   | Just (externalOrgDocName, externalOrgDocPath) <-
-      getRelativeOrgDocLink weaveConf objPath =
+      getRootRelativeOrgDocLink objPath =
       let externalLinkAnchor =
             externalOrgDocPath
               <> "#"
@@ -1631,19 +1600,21 @@ getRelativeOrgDocCellLink weaveConf objPath lci externalCell
        in Just (externalLinkAnchor, externalOrgDocName)
   | otherwise = Nothing
 
-getRelativeOrgDocLink :: WeaveConf -> GPath -> Maybe (Text, Text)
-getRelativeOrgDocLink weaveConf objPath
+getRootRelativeOrgDocLink :: GPath -> Maybe (Text, Text)
+getRootRelativeOrgDocLink objPath
   | Just toObjPath <- P.encodeUtf $ decodeGPath objPath,
-    Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+    Just serveRoot <- P.encodeUtf "/",
     Right externalOrgDocName <-
       P.decodeWith utf8 utf8
+        . P.combine serveRoot
         $ P.replaceExtension
-          (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+          toObjPath
           (P.unsafeEncodeUtf "org"),
     Right externalOrgDocPath <-
       P.decodeWith utf8 utf8
+        . P.combine serveRoot
         $ P.replaceExtension
-          (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+          toObjPath
           (P.unsafeEncodeUtf "html") =
       Just (T.pack externalOrgDocName, T.pack externalOrgDocPath)
   | otherwise = Nothing
@@ -1711,7 +1682,7 @@ weaveGtocTree (Node path children) = do
   weaveConf <- ask
   li_ [] $ do
     let (docName, docPath) =
-          case getRelativeOrgDocLink weaveConf path of
+          case getRootRelativeOrgDocLink path of
             Nothing ->
               ( "LILAC_ERROR_DOC_NAME_NOT_FOUND",
                 "LILAC_ERROR_DOC_LINK_NOT_FOUND"
@@ -1831,7 +1802,7 @@ weaveBreadcrumbs = do
       | Just _ <- lookup indexPath weaveConf.archive.objects -> do
           let (_, docPath) =
                 fromMaybe ("", "LILAC_ERROR_RELATIVE_LINK_ERROR")
-                  $ getRelativeOrgDocLink weaveConf indexPath
+                  $ getRootRelativeOrgDocLink indexPath
           a_ [href_ docPath] $ do
             weaveBreadcrumb dirName
       | otherwise -> weaveBreadcrumb dirName
@@ -1949,7 +1920,7 @@ weaveBacklinksForExternalObj (_, []) = toHtmlRaw @Text ""
 weaveBacklinksForExternalObj (externalObjGPath, edges) = do
   weaveConf <- ask
   --
-  case getRelativeOrgDocLink weaveConf externalObjGPath of
+  case getRootRelativeOrgDocLink externalObjGPath of
     Nothing -> pure ()
     Just (externalOrgDocName, externalOrgDocPath) -> do
       li_ [] $ do

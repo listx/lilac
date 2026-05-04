@@ -48,9 +48,7 @@ This module is responsible for generating the HTML from a [[id:25827c17-2015-434
 #+header: :tangle src/Lilac/Weave.hs
 #+begin_src haskell
 module Lilac.Weave
-  ( commonPrefix,
-    getRelativePathWithoutSymlinks,
-    isGtocAncestor,
+  ( isGtocAncestor,
     prepareCitations,
     renderAsText,
     weaveObject,
@@ -292,7 +290,6 @@ import Relude
   ( Bool (False, True),
     Char,
     Either (Right),
-    Eq,
     FilePath,
     IO,
     Identity,
@@ -343,7 +340,6 @@ import Relude
     otherwise,
     pure,
     repeat,
-    replicate,
     reverse,
     runReaderT,
     sequence_,
@@ -376,7 +372,6 @@ import Relude
 import Relude.Extra.Map (insert, keys, lookup, lookupDefault, toPairs)
 import Skylighting qualified as Sky
 import System.IO (utf8)
-import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 
@@ -429,12 +424,10 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveTableHead>>
 <<f:weaveTableBody>>
 <<f:getHeaderRowIndex>>
-<<f:getRelativePathWithoutSymlinks>>
 <<f:getRootRelativePath>>
 <<f:weaveFootnote>>
 <<f:weaveFootnoteBacklink>>
 <<f:weaveGlossaryTerm>>
-<<f:commonPrefix>>
 <<f:renderAsText>>
 <<f:proseToCslJsonText>>
 <<f:proseToMaybeCslJsonText>>
@@ -446,8 +439,8 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveBibliography>>
 <<f:weaveGlossary>>
 <<f:weaveCollectedGlossaryTerm>>
-<<f:getRelativeOrgDocCellLink>>
-<<f:getRelativeOrgDocLink>>
+<<f:getRootRelativeOrgDocCellLink>>
+<<f:getRootRelativeOrgDocLink>>
 <<f:toNormalizedText>>
 <<f:weaveToc>>
 <<f:weaveTocHeading>>
@@ -1153,8 +1146,8 @@ cssPath <- getRootRelativePath "css/default.css" -- (ref:Styles and fonts-relati
 link_ [rel_ "stylesheet", href_ cssPath]
 #+end_src
 
-[[f:getRootRelativePath]] [[(Styles and fonts-relative-css-path)]] gets the relative path
-to the CSS file (relative from the output folder).
+[[f:getRootRelativePath]] [[(Styles and fonts-relative-css-path)]] gets the relative
+path to the CSS file (relative from the output folder).
 
 #+name: f:getRootRelativePath
 #+begin_src haskell
@@ -1959,7 +1952,7 @@ weaveLinkTarget insideBlock linkTarget = do
       | Just gci <- lookup linkOid weaveConf.archive.symbols,
         Just objPath <- gciToObjPath weaveConf.archive gci ->
           pure
-            $ getExternalRelPath linkOid objPath weaveConf.originObjectPath
+            $ getExternalRelPath linkOid objPath
             <> internalLineLabelTarget -- (ref:f:weaveLinkTarget-external)
       | otherwise -> pure $ showBrokenLink linkOid
       where
@@ -2016,7 +2009,7 @@ weaveLinkTargetLinkOid linkOid = do
         pure
           $ if objPath == weaveConf.originObjectPath
             then "#top"
-            else getExternalRelPath linkOid objPath weaveConf.originObjectPath
+            else getExternalRelPath linkOid objPath
     | Just gci <- lookup linkOid weaveConf.archive.symbols,
       Just (docName, linkAnchor, _) <- getLinkToGCI weaveConf gci ->
         if docName == "" -- (ref:link-target-is-internal-cell)
@@ -2033,123 +2026,20 @@ external Org document we have to link to (for external links).
 
 #+name: f:getExternalRelPath
 #+begin_src haskell
-getExternalRelPath :: LinkOid -> GPath -> GPath -> Text
-getExternalRelPath linkOid extPath intPath
+getExternalRelPath :: LinkOid -> GPath -> Text
+getExternalRelPath linkOid extPath
   | Just toObjPath <- P.encodeUtf $ decodeGPath extPath,
-    Just fromObjPath <- P.encodeUtf $ decodeGPath intPath,
+    Just serveRoot <- P.encodeUtf "/",
     Right str <-
       P.decodeWith utf8 utf8
+        . P.combine serveRoot
         $ P.replaceExtension
-          (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+          toObjPath
           htmlExt =
       T.pack str
   | otherwise = showBrokenLink linkOid
   where
     htmlExt = P.unsafeEncodeUtf "html"
-#+end_src
-
-[[f:getRelativePathWithoutSymlinks]] takes two file paths. It tries to answer the
-question "assuming I am in the directory in the first file, how can I go to the
-directory containing the second file?" This assumes that the given paths have no
-symlinks (to avoid the pitfall described at [[https://hackage.haskell.org/package/filepath-1.5.4.0/docs/System-OsPath.html#v:makeRelative][System.OsPath.makeRelative]] and [[https://neilmitchell.blogspot.com/2015/10/filepaths-are-subtle-symlinks-are-hard.html][this
-blog post]]).
-
-We use the following algorithm:
-
-  1) If we're in the same directory, or if the destination is a child of the
-     source directory, then drop the common prefix of the
-     destination. ~a/b/c/src~ to ~a/b/c/dest~ is ~dest~. ~a/b/c/src~ to ~a/b/c/d/e/dest~
-     is ~d/e/dest~.
-
-  2) If we're not in the same directory, we have to go up N directories up until
-     we get to the common prefix.
-
-       - No common prefix: go up all the way to the root, then go to the
-         destination. ~a/b/c/src~ to ~d/dest~ is ~../../../d/dest~.
-
-       - Some common prefix: go up to the common prefix. ~a/b/c/dest~ to ~a/x/y/dest~
-         is ~../../x/y/dest~ because ~a~ is the common prefix. ~a/b/c/d/e/src~ to ~a/dest~
-         is ~../../../../dest~.
-
-#+name: f:getRelativePathWithoutSymlinks
-#+begin_src haskell
-getRelativePathWithoutSymlinks :: OsPath -> OsPath -> OsPath
-getRelativePathWithoutSymlinks src dest
-  | dirsSrc == dirsDest || isDestChildOfSrc =
-      P.joinPath $ remainingDest <> destFile
-  | null commonPathPrefix =
-      P.joinPath $ replicate (length dirsSrc) goUp <> destFile
-  | otherwise =
-      P.joinPath
-        $ replicate (length dirsSrc - length commonPathPrefix) goUp
-        <> drop (length commonPathPrefix) dirsDest
-        <> destFile
-  where
-    goUp = P.unsafeEncodeUtf ".."
-    destFile = [P.takeFileName dest]
-    dirSrc = P.takeDirectory src
-    dirDest = P.takeDirectory dest
-    dirsSrc = P.splitDirectories dirSrc
-    dirsDest = P.splitDirectories dirDest
-    commonPathPrefix = commonPrefix dirsSrc dirsDest
-    isDestChildOfSrc = dirsSrc == commonPathPrefix
-    remainingDest = drop (length commonPathPrefix) dirsDest
-#+end_src
-
-The [[f:commonPrefix]] helper returns the common prefix found in two lists.
-
-#+name: f:commonPrefix
-#+begin_src haskell
-commonPrefix :: (Eq a) => [a] -> [a] -> [a]
-commonPrefix xs ys = map fst . takeWhile (\(x, y) -> (x == y)) $ zip xs ys
-#+end_src
-
-#+name: t:0301-weave-external-links-common-prefix
-#+begin_src haskell
-it "0301-weave-external-links-common-prefix" $ do
-  mapM_
-    ( \(a, b, c) ->
-        ( P.joinPath
-            $ LW.commonPrefix
-              (P.splitDirectories $ P.unsafeEncodeUtf a)
-              (P.splitDirectories $ P.unsafeEncodeUtf b)
-        )
-          `shouldBe` (P.unsafeEncodeUtf c)
-    )
-    [ ("from.html", "to.html1", ""),
-      ("base/from.html", "base/to.html2", "base"),
-      ("1base/a/b/from.html", "1base/a/b/to.html3", "1base/a/b"),
-      ("2base/a/b/from.html", "2base/a/b/c/to.html4", "2base/a/b"),
-      ("3base/a/b/from.html", "3base/a/b/c/d/to.html5", "3base/a/b"),
-      ("a/b/c", "x/y/z", "")
-    ]
-#+end_src
-
-We use HTML file path examples in [[t:0301-weave-external-links-common-prefix]] to
-reflect the use case of [[f:getRelativePathWithoutSymlinks]] (to find the relative
-path to the external object's woven HTML file). The test cases in
-[[t:0301-weave-external-links]] check for some typical situations of such relative
-paths.
-
-#+name: t:0301-weave-external-links
-#+begin_src haskell
-it "0301-weave-external-links" $ do
-  mapM_
-    ( \(a, b, c) ->
-        LW.getRelativePathWithoutSymlinks
-          (P.unsafeEncodeUtf a)
-          (P.unsafeEncodeUtf b)
-          `shouldBe` (P.unsafeEncodeUtf c)
-    )
-    [ ("from.html", "to.html1", "to.html1"),
-      ("base/from.html", "base/to.html2", "to.html2"),
-      ("base/a/b/from.html", "base/a/b/to.html3", "to.html3"),
-      ("base/a/b/from.html", "base/a/b/c/to.html4", "c/to.html4"),
-      ("base/a/b/from.html", "base/a/b/c/d/to.html5", "c/d/to.html5"),
-      ("base/a/b/from.html", "to.html6", "../../../to.html6"),
-      ("base/a/b/from.html", "base/a/c/to.html7", "../c/to.html7"),
-      ("base/a/b/c/d/from.html", "base/a/x/y/to.html8", "../../../x/y/to.html8")
-    ]
 #+end_src
 
 [[f:isExternalLink]] checks if a given link target is external to the
@@ -3724,8 +3614,7 @@ weaveCollectedGlossaryTerm (isFirstTerm, (lci, objPath)) = do
       Just externalCell <- extObj.orgDoc.cells !!? lci.unLCI,
       CGlossaryTerm glossaryTerm <- externalCell,
       Just (externalLinkAnchor, externalOrgDocName) <-
-        getRelativeOrgDocCellLink
-          weaveConf
+        getRootRelativeOrgDocCellLink
           objPath
           lci
           externalCell -> do
@@ -3757,20 +3646,19 @@ multiple identical terms (these are not allowed within a single document).
 
 In contrast, [[(external-term)]] weaves external terms (terms that are defined in
 /another/ document). These may need disambiguation, so we weave the
-~externalOrgDocName~ [[(external-doc-name)]]. Getting the ~externalOrgDocName~ (and
-the link to it) is handled by [[f:getRelativeOrgDocCellLink]].
+~externalOrgDocName~ [[(external-doc-name)]]. Getting the ~externalOrgDocName~ (and the
+link to it) is handled by [[f:getRootRelativeOrgDocCellLink]].
 
-#+name: f:getRelativeOrgDocCellLink
+#+name: f:getRootRelativeOrgDocCellLink
 #+begin_src haskell
-getRelativeOrgDocCellLink ::
-  WeaveConf ->
+getRootRelativeOrgDocCellLink ::
   GPath ->
   LCI ->
   Cell ->
   Maybe (Text, Text)
-getRelativeOrgDocCellLink weaveConf objPath lci externalCell
+getRootRelativeOrgDocCellLink objPath lci externalCell
   | Just (externalOrgDocName, externalOrgDocPath) <-
-      getRelativeOrgDocLink weaveConf objPath =
+      getRootRelativeOrgDocLink objPath =
       let externalLinkAnchor =
             externalOrgDocPath
               <> "#"
@@ -3779,24 +3667,26 @@ getRelativeOrgDocCellLink weaveConf objPath lci externalCell
   | otherwise = Nothing
 #+end_src
 
-[[f:getRelativeOrgDocCellLink]] itself relies on [[f:getRelativeOrgDocLink]], because
-that's what gets us a link to the external Org document.
+[[f:getRootRelativeOrgDocCellLink]] itself relies on [[f:getRootRelativeOrgDocLink]],
+because that's what gets us a link to the external Org document.
 
-#+name: f:getRelativeOrgDocLink
+#+name: f:getRootRelativeOrgDocLink
 #+begin_src haskell
-getRelativeOrgDocLink :: WeaveConf -> GPath -> Maybe (Text, Text)
-getRelativeOrgDocLink weaveConf objPath
+getRootRelativeOrgDocLink :: GPath -> Maybe (Text, Text)
+getRootRelativeOrgDocLink objPath
   | Just toObjPath <- P.encodeUtf $ decodeGPath objPath,
-    Just fromObjPath <- P.encodeUtf $ decodeGPath weaveConf.originObjectPath,
+    Just serveRoot <- P.encodeUtf "/",
     Right externalOrgDocName <-
       P.decodeWith utf8 utf8
+        . P.combine serveRoot
         $ P.replaceExtension
-          (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+          toObjPath
           (P.unsafeEncodeUtf "org"),
     Right externalOrgDocPath <-
       P.decodeWith utf8 utf8
+        . P.combine serveRoot
         $ P.replaceExtension
-          (getRelativePathWithoutSymlinks fromObjPath toObjPath)
+          toObjPath
           (P.unsafeEncodeUtf "html") =
       Just (T.pack externalOrgDocName, T.pack externalOrgDocPath)
   | otherwise = Nothing
@@ -3823,7 +3713,7 @@ getLinkToGCI weaveConf gci
               Just ("", linkAnchor, cellName)
             else do
               (linkAnchor, docName) <-
-                getRelativeOrgDocCellLink weaveConf gpath lci cell
+                getRootRelativeOrgDocCellLink gpath lci cell
               Just (docName, linkAnchor, cellName)
   | otherwise = Nothing
 #+end_src
@@ -5376,7 +5266,7 @@ weaveGtocTree (Node path children) = do
   weaveConf <- ask
   li_ [] $ do
     let (docName, docPath) =
-          case getRelativeOrgDocLink weaveConf path of
+          case getRootRelativeOrgDocLink path of
             Nothing ->
               ( "LILAC_ERROR_DOC_NAME_NOT_FOUND",
                 "LILAC_ERROR_DOC_LINK_NOT_FOUND"
@@ -5529,7 +5419,7 @@ weaveBreadcrumbs = do
       | Just _ <- lookup indexPath weaveConf.archive.objects -> do
           let (_, docPath) =
                 fromMaybe ("", "LILAC_ERROR_RELATIVE_LINK_ERROR")
-                  $ getRelativeOrgDocLink weaveConf indexPath
+                  $ getRootRelativeOrgDocLink indexPath
           a_ [href_ docPath] $ do
             weaveBreadcrumb dirName
       | otherwise -> weaveBreadcrumb dirName
@@ -5754,8 +5644,8 @@ weaveBacklinksForExternalObj :: (GPath, [(GCI, GCI)]) -> HtmlWeaver ()
 weaveBacklinksForExternalObj (_, []) = toHtmlRaw @Text ""
 weaveBacklinksForExternalObj (externalObjGPath, edges) = do
   weaveConf <- ask
-  -- (ref:f:weaveBacklinks-getRelativeOrgDocLink)
-  case getRelativeOrgDocLink weaveConf externalObjGPath of
+  -- (ref:f:weaveBacklinks-getRootRelativeOrgDocLink)
+  case getRootRelativeOrgDocLink externalObjGPath of
     Nothing -> pure ()
     Just (externalOrgDocName, externalOrgDocPath) -> do
       li_ [] $ do
@@ -5789,8 +5679,8 @@ popular from external objects. So instead of ~[(1, 2), (5, 2), (4, 7)]~ we get
 to first sort by the number of external indices first, and then by the name of
 the internal cell being referenced.
 
-[[(f:weaveBacklinks-getRelativeOrgDocLink)]] uses [[f:getRelativeOrgDocLink]], to get
-the correct link back to the external document.
+[[(f:weaveBacklinks-getRootRelativeOrgDocLink)]] uses [[f:getRootRelativeOrgDocLink]],
+to get the correct link back to the external document.
 
 #+name: f:weaveBacklink
 #+begin_src haskell
@@ -6039,7 +5929,6 @@ import Relude
     (<>),
     (==),
   )
-import System.OsPath qualified as P
 import Test.Hspec
   ( Expectation,
     Spec,
@@ -6223,8 +6112,6 @@ expectCiteprocResult path expected = do
 #+begin_src haskell
 <<t:0300-weave-styled-text>>
 <<t:0300-weave-lists>>
-<<t:0301-weave-external-links-common-prefix>>
-<<t:0301-weave-external-links>>
 <<t:0305-gtoc-ancestor>>
 <<t:0400-citeproc-basic>>
 <<t:0400-citeproc-superscript>>
