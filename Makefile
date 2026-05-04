@@ -3,6 +3,7 @@ gitconfig:
 .PHONY: gitconfig
 
 org_files = \
+	index.org \
 	doc/index.org \
 	doc/cli.org \
 	doc/build.org \
