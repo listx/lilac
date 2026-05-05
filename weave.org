@@ -4430,7 +4430,7 @@ expectCiteprocResult
             PTokenDivStart "right-inline",
             ptext "C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 " [],
             ptext "Bell System Technical Journal" [Italic],
-            ptext ", vol. 27, no. 3, pp. 379\8211\&423, July 1948, doi: " [],
+            ptext ", vol. 27, no. 3, pp. 379\8211\&423, Jul. 1948, doi: " [],
             PTokenLink
               Link
                 { name =
@@ -4466,7 +4466,7 @@ Check usage of superscripts.
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-superscript
 #+begin_src org
 ,#+bibliography: bib.json
-,#+cite_export: csl ../../../csl-styles/vancouver-superscript.csl
+,#+cite_export: csl ../../../csl-styles/nlm-citation-sequence-superscript.csl
 
 [cite:@a]
 #+end_src
@@ -4513,10 +4513,10 @@ expectCiteprocResult
     Prose
       { unProse =
           [ PTokenDivStart "left-margin",
-            ptext "1. " [],
+            ptext "1." [],
             PTokenDivEnd,
             PTokenDivStart "right-inline",
-            ptext "Knuth DE. Literate programming. Stanford, Calif.: Center for the Study of Language; Information; 1992. (CSLI lecture notes)." [],
+            ptext "Knuth DE. Literate programming. Stanford, Calif.: Center for the Study of Language; Information; 1992. (CSLI lecture notes; no. 27)." [],
             PTokenDivEnd
           ]
       }

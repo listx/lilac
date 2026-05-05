@@ -310,7 +310,7 @@ spec = do
                         PTokenDivStart "right-inline",
                         ptext "C. E. Shannon, \8220A Mathematical Theory of Communication,\8221 " [],
                         ptext "Bell System Technical Journal" [Italic],
-                        ptext ", vol. 27, no. 3, pp. 379\8211\&423, July 1948, doi: " [],
+                        ptext ", vol. 27, no. 3, pp. 379\8211\&423, Jul. 1948, doi: " [],
                         PTokenLink
                           Link
                             { name =
@@ -369,10 +369,10 @@ spec = do
                 Prose
                   { unProse =
                       [ PTokenDivStart "left-margin",
-                        ptext "1. " [],
+                        ptext "1." [],
                         PTokenDivEnd,
                         PTokenDivStart "right-inline",
-                        ptext "Knuth DE. Literate programming. Stanford, Calif.: Center for the Study of Language; Information; 1992. (CSLI lecture notes)." [],
+                        ptext "Knuth DE. Literate programming. Stanford, Calif.: Center for the Study of Language; Information; 1992. (CSLI lecture notes; no. 27)." [],
                         PTokenDivEnd
                       ]
                   }
