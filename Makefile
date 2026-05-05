@@ -62,7 +62,7 @@ build: $(org_files) lilac.cabal
 LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
 build-release: $(org_files) lilac.cabal
 	nix-build ./nix/release.nix \
-	  --argstr lilacGitVersion $(LILAC_GIT_VERSION)
+		--argstr lilacGitVersion $(LILAC_GIT_VERSION)
 	touch build-release
 
 update-nix:

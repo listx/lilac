@@ -1384,7 +1384,7 @@ consumption, as a Nix package.
 LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
 build-release: $(org_files) lilac.cabal
 	nix-build ./nix/release.nix \
-	  --argstr lilacGitVersion $(LILAC_GIT_VERSION)
+		--argstr lilacGitVersion $(LILAC_GIT_VERSION)
 	touch build-release
 #+end_src
 
@@ -1486,7 +1486,11 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-[*.{sh},Makefile]
+[Makefile]
+indent_style = tab
+tab_width = 8
+
+[*.sh]
 indent_style = tab
 tab_width = 8
 
