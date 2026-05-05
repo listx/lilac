@@ -4,23 +4,21 @@ gitconfig:
 
 org_files = \
 	index.org \
-	doc/index.org \
-	doc/cli.org \
-	doc/build.org \
-	doc/compile.org \
-	doc/parse.org \
-	doc/tangle.org \
-	doc/types.org \
-	doc/weave.org \
-	doc/serve.org \
-	doc/fe.org \
-	doc/artifacts/index.org \
-	doc/artifacts/user-manual.org \
-	doc/artifacts/plan.org \
-	doc/artifacts/release-notes.org \
-	doc/artifacts/hello-world/index.org \
-	doc/artifacts/hello-world/doc/index.org
-backend_org_files = $(filter-out doc/fe.org,$(org_files))
+	cli.org \
+	build.org \
+	compile.org \
+	parse.org \
+	tangle.org \
+	types.org \
+	weave.org \
+	serve.org \
+	fe.org \
+	user-manual.org \
+	plan.org \
+	release-notes.org \
+	hello-world/index.org \
+	hello-world/doc/index.org
+backend_org_files = $(filter-out fe.org,$(org_files))
 
 test: $(org_files)
 	cabal test --test-show-details=direct --test-option=--format=progress
@@ -36,15 +34,15 @@ $(obj_files) &: $(org_files)
 	lilac compile $?
 	touch $(obj_files) #
 
-doc/lilac.larc: $(obj_files)
+lilac.larc: $(obj_files)
 	lilac archive $^ --out-file $@
 
-tangle: doc/lilac.larc
-	lilac tangle doc/lilac.larc --out-dir .
+tangle: lilac.larc
+	lilac tangle lilac.larc --out-dir .
 	touch tangle
 
-weave: doc/lilac.larc
-	lilac weave $< --out-dir doc --write-css #
+weave: lilac.larc
+	lilac weave $< --out-dir . --write-css #
 	touch weave
 
 dev-cljs:
@@ -54,7 +52,7 @@ dev-cljs:
 prod-cljs:
 	clojure -M -m figwheel.main --build-once lilac-prod
 
-	cp -f doc/js/lilac.js doc/js/lilac.js.injectme
+	cp -f js/lilac.js js/lilac.js.injectme
 .PHONY: prod-cljs
 
 build: $(org_files) lilac.cabal
@@ -73,7 +71,6 @@ update-nix:
 
 clean:
 	rm -rf \
-		doc/lilac.larc \
-		$(obj_files) \
-		site/*
+		lilac.larc \
+		$(obj_files)
 .PHONY: clean

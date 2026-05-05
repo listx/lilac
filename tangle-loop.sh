@@ -100,7 +100,7 @@ main()
 	fi
 	__ok_to_lint=1
 
-	readarray -t org_files < <(find doc -type f -regex '.+\.org$')
+	readarray -t org_files < <(find . -type f -regex '.+\.org$')
 	watch "${org_files[@]}"
 }
 

@@ -103,7 +103,7 @@ let
           *.nix
           *.sh
           *.toml
-          doc/image
+          image
           Makefile
           nix
         '';
@@ -179,7 +179,7 @@ let
         name = "lilac-lint";
         enable = true;
         always_run = true;
-        entry = "lilac lint doc/lilac.larc";
+        entry = "lilac lint lilac.larc";
         pass_filenames = false;
       };
 

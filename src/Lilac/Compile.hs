@@ -668,15 +668,15 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
       CBlock b
         | Just "index" <- lookup "name" b.meta -> do
             let rawText = T.concat $ map extractBTokenStringOnly b.body
-                indexPath = T.pack $ decodeGPath path -- doc/index.lobj
-                startingPath = T.dropEnd 10 indexPath -- doc/
+                indexPath = T.pack $ decodeGPath path -- dir/index.lobj
+                startingPath = T.dropEnd 10 indexPath -- dir/
                 paths = mapMaybe (toGPath startingPath) $ T.lines rawText
             results <- mapM lookupSingle paths
             pure $ acc <> catMaybes results
       _ -> pure acc
     toGPath :: Text -> Text -> Maybe GPath
     toGPath startingPath textPath =
-      let joinedPath = startingPath <> textPath -- doc/foo.org
+      let joinedPath = startingPath <> textPath -- dir/foo.org
           constructedPath =
             if ".org" `T.isSuffixOf` joinedPath
               then (T.dropEnd 3 joinedPath) <> "lobj"

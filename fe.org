@@ -98,8 +98,8 @@ compilation process.
 #+begin_src clojure
 {:main lilac.core
  :optimizations :none ; (ref:cfg:lilac-fe-build-none)
- :output-to "doc/js/lilac.js"
- :output-dir "doc/js/cljs-dev"
+ :output-to "js/lilac.js"
+ :output-dir "js/cljs-dev"
  :asset-path "js/cljs-dev"}
 #+end_src
 
@@ -111,7 +111,7 @@ clojure -M -m figwheel.main --build lilac --repl
 #+end_src
 
 This will create a REPL that can evaluate CLJS and run it as JS in the browser
-tab at http://localhost:8080/doc/index.html per the ~:open-url~ setting in
+tab at http://localhost:8080/index.html per the ~:open-url~ setting in
 [[cfg:figwheel-main.edn]]. The ~lilac~ in ~--build lilac~ comes from the ~lilac~ substring
 in the ~lilac.cljs.edn~ configuration file (this is a Figwheel convention).
 
@@ -134,7 +134,7 @@ dev-cljs:
 *** Known limitations
 
 We cannot load the development-mode JS in [[cfg:lilac-fe-build]] in documents
-outside of the ~doc~ directory, such as ~doc/artifacts/plan.org~ ([[id:48e76342-2498-44c5-9ed9-830cb80995fd][Plan]]) because
+outside of the ~doc~ directory, such as ~plan.org~ ([[id:48e76342-2498-44c5-9ed9-830cb80995fd][Plan]]) because
 although we can correctly see ~lilac.js~, that script itself sources folders that
 are in the wrong relative directory. Below is a sample of that hardcoded
 behavior (what ~lilac.js~ looks like):
@@ -157,8 +157,8 @@ document.write('<script>goog.require("lilac.core");</script>');
 #+end_src
 
 In [[(hardcoded-js-src-path)]], it tells the HTML source to pull from a child
-directory of ~js/cljs-dev/...~. This only works for HTML documents that sit under
-the ~doc~ directory, because that's where the ~js~ folder is located (~doc/js~).
+directory of ~js/cljs-dev/...~. This only works for HTML documents that are in the
+project root directory, because that's where the ~js~ folder is located.
 
 This is not a problem for the [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68][Optimized production build]], because that build
 uses a self-contained, single JS file (and thus does not need to import other
@@ -177,8 +177,8 @@ file.
 #+begin_src clojure
 {:main lilac.core
  :optimizations :advanced
- :output-to "doc/js/lilac.js"
- :output-dir "doc/js/cljs-prod"
+ :output-to "js/lilac.js"
+ :output-dir "js/cljs-prod"
  :asset-path "js/cljs-prod"}
 #+end_src
 
@@ -201,12 +201,12 @@ prod-cljs:
 #+end_src
 
 If we are readying Lilac for a production release, it will need to have the
-contents of the single JavaScript file (at ~doc/js/lilac.js~) injected into the
+contents of the single JavaScript file (at ~js/lilac.js~) injected into the
 CLI binary. To perform this injection, we have to
 
-  1) Run ~make prod-cljs~ to ensure we have the latest ~doc/js/lilac.js~ file. This
-     also creates a ~doc/js/lilac.js.injectme~ which is a copy of the
-     just-created (production) ~doc/js/lilac.js~ file, per [[sh:update-injectable]].
+  1) Run ~make prod-cljs~ to ensure we have the latest ~js/lilac.js~ file. This
+     also creates a ~js/lilac.js.injectme~ which is a copy of the
+     just-created (production) ~js/lilac.js~ file, per [[sh:update-injectable]].
 
   2) Recompile the CLI. This can be done with ~make tangle~ because tangling
      itself relies on the locally compiled version of the ~lilac~ CLI. Because we
@@ -214,19 +214,19 @@ CLI binary. To perform this injection, we have to
      [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]], Cabal will automatically detect whether the
      JavaScript file has changed and recompile the CLI if needed.
 
-[[sh:update-injectable]] just overwrites the path ~doc/js/lilac.js.injectme~ with
-what's in ~doc/js/lilac.js~.
+[[sh:update-injectable]] just overwrites the path ~js/lilac.js.injectme~ with
+what's in ~js/lilac.js~.
 
 #+name: sh:update-injectable
 #+begin_src sh
-cp -f doc/js/lilac.js doc/js/lilac.js.injectme
+cp -f js/lilac.js js/lilac.js.injectme
 #+end_src
 
-We cannot simply inject ~doc/js/lilac.js~ directly because the development
+We cannot simply inject ~js/lilac.js~ directly because the development
 environment also uses the same file path in [[cfg:lilac-fe-build]] (and the
 development version of this file path does /not/ have a self-contained JS file).
 
-We track the ~doc/js/lilac.js.injectme~ file in Git [[id:ae7b1a31-970d-41e4-b15a-8d7f383e1502::(.gitignore-js-injectme)][.gitignore]], because it's
+We track the ~js/lilac.js.injectme~ file in Git [[id:ae7b1a31-970d-41e4-b15a-8d7f383e1502::(.gitignore-js-injectme)][.gitignore]], because it's
 needed for compiling the Lilac CLI in [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]]. But don't want to
 see this file treated as regular text file (because it cannot be sensibly
 merged, and it doesn't make sense to show textual diffs of it between revisions
@@ -235,7 +235,7 @@ as it is minified JS). For this reason we treat it as a binary file for Git.
 #+name: .gitattributes
 #+header: :tangle .gitattributes
 #+begin_src gitattributes
-doc/js/lilac.js.injectme binary
+js/lilac.js.injectme binary
 #+end_src
 
 ** Figwheel configuration
@@ -250,11 +250,11 @@ across all build files.
 #+header: :tangle figwheel-main.edn
 #+begin_src clojure
 {:watch-dirs ["src/fe"]
- :css-dirs ["doc/css"]
+ :css-dirs ["css"]
  :ring-server-options {:host "localhost" :port 8080 :join? false}
  :ring-handler lilac.handler/development-app
- :open-url "http://localhost:8080/doc/index.html"
- :target-dir "doc/js"
+ :open-url "http://localhost:8080/index.html"
+ :target-dir "js"
  :clean-outputs true}
 #+end_src
 

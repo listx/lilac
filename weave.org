@@ -4254,7 +4254,7 @@ back to [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-basic
 #+begin_src org
 ,#+bibliography: bib.json
-,#+cite_export: csl ../../../doc/csl-styles/ieee.csl
+,#+cite_export: csl ../../../csl-styles/ieee.csl
 
 [cite:@a;@b;@c;@d]
 #+end_src
@@ -4466,7 +4466,7 @@ Check usage of superscripts.
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-superscript
 #+begin_src org
 ,#+bibliography: bib.json
-,#+cite_export: csl ../../../doc/csl-styles/vancouver-superscript.csl
+,#+cite_export: csl ../../../csl-styles/vancouver-superscript.csl
 
 [cite:@a]
 #+end_src
@@ -4530,7 +4530,7 @@ Check usage of small caps.
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-smallcaps
 #+begin_src org
 ,#+bibliography: bib.json
-,#+cite_export: csl ../../../doc/csl-styles/acm-siggraph.csl
+,#+cite_export: csl ../../../csl-styles/acm-siggraph.csl
 
 [cite:@a]
 #+end_src
@@ -4596,7 +4596,7 @@ bibliography as we did in [[ti:0400-citeproc-smallcaps]].
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-multiline
 #+begin_src org
 ,#+bibliography: bib.json
-,#+cite_export: csl ../../../doc/csl-styles/acm-siggraph.csl
+,#+cite_export: csl ../../../csl-styles/acm-siggraph.csl
 
 [cite:
 @a]
@@ -4623,7 +4623,7 @@ lines.
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-multiline-complex
 #+begin_src org
 ,#+bibliography: bib.json
-,#+cite_export: csl ../../../doc/csl-styles/acm-siggraph.csl
+,#+cite_export: csl ../../../csl-styles/acm-siggraph.csl
 
 [cite: *bold* /italic/
 @a and really
@@ -4682,7 +4682,7 @@ elements in the conversion to ~CslJson Text~.
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-multiline-complex-list-item
 #+begin_src org
 ,#+bibliography: bib.json
-,#+cite_export: csl ../../../doc/csl-styles/acm-siggraph.csl
+,#+cite_export: csl ../../../csl-styles/acm-siggraph.csl
 
   - List item [cite: global \(1 + 1
     = 2\) ;*bold* /italic/ [fn:@a]
@@ -4834,7 +4834,7 @@ variation simply suppresses the author name from inside the citation.
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-style-variations
 #+begin_src org
 ,#+bibliography: bib.json
-,#+cite_export: csl ../../../doc/csl-styles/acm-siggraph.csl
+,#+cite_export: csl ../../../csl-styles/acm-siggraph.csl
 
   - [cite/t:@a] discusses a great programming idea. On an unrelated note, Turing
     was a pioneer in computer science. He wrote about "computable numbers"
@@ -4905,7 +4905,7 @@ A citation may not be written across a cell boundary (double newline).
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-multiline-cell-boundary
 #+begin_src org
 ,#+bibliography: bib.json
-,#+cite_export: csl ../../../doc/csl-styles/acm-siggraph.csl
+,#+cite_export: csl ../../../csl-styles/acm-siggraph.csl
 
 [cite: *bold* /italic/
 @a and really
@@ -4927,7 +4927,7 @@ Same thing applies for list items as well.
 #+header: :tangle test/Lilac/WeaveSpec/0400-citeproc-multiline-cell-boundary-list-item
 #+begin_src org
 ,#+bibliography: bib.json
-,#+cite_export: csl ../../../doc/csl-styles/acm-siggraph.csl
+,#+cite_export: csl ../../../csl-styles/acm-siggraph.csl
 
   1) [cite: *bold* /italic/
      @a and really

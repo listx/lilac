@@ -142,11 +142,11 @@ spec = do
       nilOidOrgDocPrefix
       `shouldParse` (L.defaultOrgDoc nilOid [], defaultOrgParserState)
 
-  before (LU.readFrom "" "doc/index.org") $ do
+  before (LU.readFrom "" "index.org") $ do
     it "self-parse" $ \input -> do
       MP.runParser
         (runStateT L.orgDocParser defaultOrgParserState)
-        "doc/index.org"
+        "index.org"
         `shouldSucceedOn` input
 
   shouldParseWith
