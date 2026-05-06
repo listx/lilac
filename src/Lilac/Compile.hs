@@ -53,15 +53,15 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
-    Figure (meta, parentOid),
-    Footnote (name),
+    Figure (caption, link, meta, parentOid),
+    Footnote (body, name),
     GCI (GCI, unGCI),
     GPath,
     GTOC (GTOC),
     GlossaryTerm (definition, term),
     Heading (body, meta),
     LCI (LCI, unLCI),
-    Link (target),
+    Link (Link, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
@@ -85,7 +85,7 @@ import Lilac.Types
     Prose (Prose, unProse),
     PseudoEdge (PseudoEdge),
     Style (Verbatim),
-    Table (grid, meta, parentOid),
+    Table (caption, grid, meta, parentOid),
     decodeGPath,
     emptyGPath,
     encodeGPath,
@@ -154,6 +154,7 @@ import Relude
     (>),
   )
 import Relude.Extra.Map (elems, insertWith, lookup, member)
+import System.Directory.OsPath qualified as D
 import System.Exit (die)
 import System.FilePath (splitDirectories)
 import System.OsPath qualified as P
@@ -273,6 +274,7 @@ mkArchive pathObjs = do
       offsets = mkOffsets pathObjsNonEmpty
       backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols --
+  brokenFileLinks <- findBrokenFileLinks pathObjs
   (csls, bibs) <- getCitationDeps pathObjsNonEmpty
   if
     | brokenLinks /= [] ->
@@ -282,6 +284,13 @@ mkArchive pathObjs = do
           <> intercalate
             "\n"
             (map showBrokenLink brokenLinks)
+    | brokenFileLinks /= [] ->
+        pure
+          . Left
+          $ "Found broken file paths (from \"[[file:...]]\" links):\n"
+          <> intercalate
+            "\n"
+            (map showBrokenFileLink brokenFileLinks)
     | otherwise -> do
         gtoc <- case mkGTOC pathObjsNonEmpty of
           Left _ -> do
@@ -307,6 +316,9 @@ mkArchive pathObjs = do
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
+    showBrokenFileLink :: (GPath, FilePath) -> String
+    showBrokenFileLink (gPath, filePath) =
+      "  " <> (filePath) <> " (" <> (decodeGPath gPath) <> ")"
 
 combineSymbolsAndGlossary ::
   [(GPath, Object)] ->
@@ -371,6 +383,67 @@ findBrokenLinks pathObjs symbols =
         (\acc (gPath, obj) -> (zip (repeat gPath) obj.externalOids) <> acc)
         []
         pathObjs
+
+findBrokenFileLinks ::
+  [(GPath, Object)] ->
+  IO [(GPath, FilePath)]
+findBrokenFileLinks =
+  foldlM validateFilePath [] . allFilePaths
+  where
+    validateFilePath ::
+      [(GPath, FilePath)] ->
+      (GPath, FilePath) ->
+      IO [(GPath, FilePath)]
+    validateFilePath acc (objPath, filePath) = do
+      osPath <- P.encodeUtf filePath
+      exists <- D.doesPathExist osPath
+      if exists
+        then pure acc
+        else pure $ (objPath, filePath) : acc
+    allFilePaths :: [(GPath, Object)] -> [(GPath, FilePath)]
+    allFilePaths pathObjs =
+      foldl'
+        ( \acc (gPath, obj) ->
+            let result =
+                  zip
+                    (repeat gPath)
+                    (concatMap extractFilesFromCell obj.orgDoc.cells)
+             in acc <> result
+        )
+        []
+        pathObjs
+    extractFilesFromCell :: Cell -> [FilePath]
+    extractFilesFromCell = \case
+      CHeading heading -> extractFilesFromProse heading.body
+      CParagraph prose -> extractFilesFromProse prose
+      CGlossaryTerm glossaryTerm ->
+        concatMap
+          extractFilesFromProse
+          [ glossaryTerm.term,
+            glossaryTerm.definition
+          ]
+      CFigure figure ->
+        extractFilesFromProse
+          figure.caption
+          <> (maybeToList $ extractFileFromLink figure.link)
+      CTable table ->
+        extractFilesFromProse
+          table.caption
+          <> (concatMap extractFilesFromProse $ elems table.grid)
+      CFootnote footnote -> extractFilesFromProse footnote.body
+      CBlock {}
+      CMathFragment {}
+      CListItem {}
+      CCommand {} -> []
+    extractFilesFromProse :: Prose -> [FilePath]
+    extractFilesFromProse prose = mapMaybe extractFileFromPToken prose.unProse
+    extractFileFromPToken :: PToken -> Maybe FilePath
+    extractFileFromPToken = \case
+      PTokenLink link -> extractFileFromLink link
+      _ -> Nothing
+    extractFileFromLink :: Link -> Maybe FilePath
+    extractFileFromLink (Link _ (LinkTargetFilePath filePath)) = Just filePath
+    extractFileFromLink _ = Nothing
 
 getCitationDeps ::
   [(GPath, Object)] ->

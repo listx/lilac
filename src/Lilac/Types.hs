@@ -297,7 +297,7 @@ data LinkTarget
   | LinkTargetLineLabel LinkOid
   | LinkTargetFootnote Text
   | LinkTargetURI N.URI
-  | LinkTargetFilePath FilePath
+  | LinkTargetFilePath FilePath --
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 

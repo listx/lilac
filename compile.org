@@ -85,15 +85,15 @@ import Lilac.Types
         CParagraph,
         CTable
       ),
-    Figure (meta, parentOid),
-    Footnote (name),
+    Figure (caption, link, meta, parentOid),
+    Footnote (body, name),
     GCI (GCI, unGCI),
     GPath,
     GTOC (GTOC),
     GlossaryTerm (definition, term),
     Heading (body, meta),
     LCI (LCI, unLCI),
-    Link (target),
+    Link (Link, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
@@ -117,7 +117,7 @@ import Lilac.Types
     Prose (Prose, unProse),
     PseudoEdge (PseudoEdge),
     Style (Verbatim),
-    Table (grid, meta, parentOid),
+    Table (caption, grid, meta, parentOid),
     decodeGPath,
     emptyGPath,
     encodeGPath,
@@ -186,6 +186,7 @@ import Relude
     (>),
   )
 import Relude.Extra.Map (elems, insertWith, lookup, member)
+import System.Directory.OsPath qualified as D
 import System.Exit (die)
 import System.FilePath (splitDirectories)
 import System.OsPath qualified as P
@@ -200,6 +201,7 @@ import System.OsPath qualified as P
 <<f:mkOffsets>>
 <<f:prependOffsets>>
 <<f:findBrokenLinks>>
+<<f:findBrokenFileLinks>>
 <<f:getCitationDeps>>
 <<f:finalizeEdges>>
 <<f:mkBacklinks>>
@@ -847,6 +849,7 @@ mkArchive pathObjs = do
       offsets = mkOffsets pathObjsNonEmpty
       backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols -- (ref:f:mkArchive-brokenLinks)
+  brokenFileLinks <- findBrokenFileLinks pathObjs
   (csls, bibs) <- getCitationDeps pathObjsNonEmpty
   if
     | brokenLinks /= [] ->
@@ -856,6 +859,13 @@ mkArchive pathObjs = do
           <> intercalate
             "\n"
             (map showBrokenLink brokenLinks)
+    | brokenFileLinks /= [] ->
+        pure
+          . Left
+          $ "Found broken file paths (from \"[[file:...]]\" links):\n"
+          <> intercalate
+            "\n"
+            (map showBrokenFileLink brokenFileLinks)
     | otherwise -> do
         gtoc <- case mkGTOC pathObjsNonEmpty of
           Left _ -> do
@@ -881,6 +891,9 @@ mkArchive pathObjs = do
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
       "  " <> (T.unpack $ show link) <> " (" <> (decodeGPath gPath) <> ")"
+    showBrokenFileLink :: (GPath, FilePath) -> String
+    showBrokenFileLink (gPath, filePath) =
+      "  " <> (filePath) <> " (" <> (decodeGPath gPath) <> ")"
 #+end_src
 
 The first thing we do is remove any empty objects that don't have any content
@@ -1281,6 +1294,80 @@ expectArchiveOk
   [ "0401-broken-links-multi-ok-alternates-parent",
     "0401-broken-links-multi-ok-alternates-child"
   ]
+#+end_src
+
+** Broken file link detection
+
+Look at all ~file:~ links and see if they point to files that exist in the
+filesystem. This just looks at all links to check if a ~LinkTargetFilePath~
+([[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::(data:LinkTarget-LinkTargetFilePath)]])
+points to a path that actually exists on disk.
+
+We don't check for links inside code blocks, because code blocks cannot have
+~file:~ links ([[id:e3400781-57e7-409d-a65c-7c3d66847587::f:bTokenParser][f:bTokenParser]] does not construct any ~LinkTargetFilePath~ values).
+
+#+name: f:findBrokenFileLinks
+#+begin_src haskell
+findBrokenFileLinks ::
+  [(GPath, Object)] ->
+  IO [(GPath, FilePath)]
+findBrokenFileLinks =
+  foldlM validateFilePath [] . allFilePaths
+  where
+    validateFilePath ::
+      [(GPath, FilePath)] ->
+      (GPath, FilePath) ->
+      IO [(GPath, FilePath)]
+    validateFilePath acc (objPath, filePath) = do
+      osPath <- P.encodeUtf filePath
+      exists <- D.doesPathExist osPath
+      if exists
+        then pure acc
+        else pure $ (objPath, filePath) : acc
+    allFilePaths :: [(GPath, Object)] -> [(GPath, FilePath)]
+    allFilePaths pathObjs =
+      foldl'
+        ( \acc (gPath, obj) ->
+            let result =
+                  zip
+                    (repeat gPath)
+                    (concatMap extractFilesFromCell obj.orgDoc.cells)
+             in acc <> result
+        )
+        []
+        pathObjs
+    extractFilesFromCell :: Cell -> [FilePath]
+    extractFilesFromCell = \case
+      CHeading heading -> extractFilesFromProse heading.body
+      CParagraph prose -> extractFilesFromProse prose
+      CGlossaryTerm glossaryTerm ->
+        concatMap
+          extractFilesFromProse
+          [ glossaryTerm.term,
+            glossaryTerm.definition
+          ]
+      CFigure figure ->
+        extractFilesFromProse
+          figure.caption
+          <> (maybeToList $ extractFileFromLink figure.link)
+      CTable table ->
+        extractFilesFromProse
+          table.caption
+          <> (concatMap extractFilesFromProse $ elems table.grid)
+      CFootnote footnote -> extractFilesFromProse footnote.body
+      CBlock {}
+      CMathFragment {}
+      CListItem {}
+      CCommand {} -> []
+    extractFilesFromProse :: Prose -> [FilePath]
+    extractFilesFromProse prose = mapMaybe extractFileFromPToken prose.unProse
+    extractFileFromPToken :: PToken -> Maybe FilePath
+    extractFileFromPToken = \case
+      PTokenLink link -> extractFileFromLink link
+      _ -> Nothing
+    extractFileFromLink :: Link -> Maybe FilePath
+    extractFileFromLink (Link _ (LinkTargetFilePath filePath)) = Just filePath
+    extractFileFromLink _ = Nothing
 #+end_src
 
 ** Cycle detection for Noweb links
