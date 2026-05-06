@@ -44,16 +44,16 @@ The ~niv~ tool is available in our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][de
 pkgs.niv
 #+end_src
 
-The ~niv init~ updates the ~niv~-generated [[file:../nix/sources.nix]]. The ~niv update~
-updates the [[file:../nix/sources.json]].
+The ~niv init~ updates the ~niv~-generated [[file:nix/sources.nix]]. The ~niv update~
+updates the [[file:nix/sources.json]].
 
-In =niv='s terminology, the =nixpkgs= above is a "package" ([[file:../nix/sources.json]]
+In =niv='s terminology, the =nixpkgs= above is a "package" ([[file:nix/sources.json]]
 declares all /packages/ we want to use). The =--branch ...= flag tells =niv= to use a
 particular Git branch for the update (because [[https://github.com/NixOS/nixpkgs][Nixpkgs]] is a Git repository, we
 can use Git branches to track a particular version). Of course, the branch is
 mutable, so we have to also track the particular Git SHA that the branch was
 pointing to at the time of running the =niv update= command; this information is
-also stored in [[file:../nix/sources.json]]. For now we track the ~nixos-YY.MM~ release
+also stored in [[file:nix/sources.json]]. For now we track the ~nixos-YY.MM~ release
 branch because it's the stable branch.
 
 #+name: Nixpkgs version
@@ -61,12 +61,12 @@ branch because it's the stable branch.
 nixos-25.11
 #+end_src
 
-The [[file:../nix/]] folder houses Nix files for our development environment. The
-most important is [[file:../nix/sources.nix]] which is the starting point, as it
+The [[file:nix/]] folder houses Nix files for our development environment. The
+most important is [[file:nix/sources.nix]] which is the starting point, as it
 defines the universe of imported Nix functions and packages we want to use in
 order to set up our environment for Lilac.
 
-The [[file:../nix/sources.nix]] references [[file:../nix/sources.json]].
+The [[file:nix/sources.nix]] references [[file:nix/sources.json]].
 
 #+begin_example
 nix-repl> sources = import ./nix/sources.nix
@@ -77,7 +77,7 @@ nix-repl> sources
 
 Importing =sources.nix= gives us ~git-hooks.nix~, ~gitignore.nix~, and ~nixpkgs~ (we can
 ignore ~__functor~ as that appears to be an internal thing). This is because
-[[file:../nix/sources.json]] has those three entries (you use ~niv add~ to add new
+[[file:nix/sources.json]] has those three entries (you use ~niv add~ to add new
 entries). The latter is in quotes because it has a dot in its name (and the Nix
 language normally treats the dot as an attribute access operator).
 
@@ -165,7 +165,7 @@ sources.nix)]], and also defines our overlays.
 
 /Overlays/ are a standard Nix pattern for modifying existing Nix packages. In our
 case, we are importing the universe of all Nixpkgs packages from
-[[file:../nix/sources.nix]], and then injecting our own =lilac= package into it.
+[[file:nix/sources.nix]], and then injecting our own =lilac= package into it.
 
 The overlay in turn imports [[nix/packages.nix]] at [[(import packages.nix)]], which is
 where most of the heavy lifting is done. In the overlay, we inject a new Haskell
@@ -401,7 +401,7 @@ projectRoot = ../.;
 #+end_src
 
 We have to use the parent directory because the ~projectRoot~ is relative to the
-location of [[file:../nix/packages.nix]], which is itself in a child folder (=nix=)
+location of [[file:nix/packages.nix]], which is itself in a child folder (=nix=)
 in the actual project root.
 
 Anyway, we are now confronted with a new problem: this means Nix will use /all/
@@ -409,7 +409,7 @@ files in the project root. We have to pare it down to only those bits that
 actually matter for ~cabal~.
 
 We use the [[https://github.com/hercules-ci/gitignore.nix/blob/637db329424fd7e46cf4185293b9cc8c88c95394/docs/gitignoreFilter.md][gitignoreFilterWith]] function to filter out all paths that are already
-defined inside the existing [[file:../.gitignore]]. We also filter out additional
+defined inside the existing [[file:.gitignore]]. We also filter out additional
 files that are not needed for building Lilac, such as the woven HTML files in
 [[(nix:lilacSource-extraRules)]].
 
@@ -441,7 +441,7 @@ lilacSource = lib.cleanSourceWith {
 #+end_src
 
 The ~gnf~ at [[(gnf)]] stands for "gitignore Nix functions". As for the actual
-[[file:../.gitignore]] itself, we prefer to use a single ~.gitignore~ file at the root
+[[file:.gitignore]] itself, we prefer to use a single ~.gitignore~ file at the root
 of the project.
 
 #+name: .gitignore
