@@ -401,7 +401,7 @@ projectRoot = ../.;
 #+end_src
 
 We have to use the parent directory because the ~projectRoot~ is relative to the
-location of [[file:nix/packages.nix]], which is itself in a child folder (=nix=)
+location of [[nix/packages.nix]], which is itself in a child folder (=nix=)
 in the actual project root.
 
 Anyway, we are now confronted with a new problem: this means Nix will use /all/
@@ -409,7 +409,7 @@ files in the project root. We have to pare it down to only those bits that
 actually matter for ~cabal~.
 
 We use the [[https://github.com/hercules-ci/gitignore.nix/blob/637db329424fd7e46cf4185293b9cc8c88c95394/docs/gitignoreFilter.md][gitignoreFilterWith]] function to filter out all paths that are already
-defined inside the existing [[file:.gitignore]]. We also filter out additional
+defined inside the existing [[.gitignore]]. We also filter out additional
 files that are not needed for building Lilac, such as the woven HTML files in
 [[(nix:lilacSource-extraRules)]].
 
@@ -441,7 +441,7 @@ lilacSource = lib.cleanSourceWith {
 #+end_src
 
 The ~gnf~ at [[(gnf)]] stands for "gitignore Nix functions". As for the actual
-[[file:.gitignore]] itself, we prefer to use a single ~.gitignore~ file at the root
+[[.gitignore]] itself, we prefer to use a single ~.gitignore~ file at the root
 of the project.
 
 #+name: .gitignore
