@@ -53,6 +53,7 @@ import Clay
     flexDirection,
     float,
     floatLeft,
+    focus,
     fontFamily,
     fontSize,
     fontStyle,
@@ -94,6 +95,7 @@ import Clay
     ol,
     opacity,
     other,
+    outlineWidth,
     overflowX,
     overflowY,
     p,
@@ -290,6 +292,9 @@ defaultCss = do
     paddingLeft (px 50)
     p # ".main-bottom-spacer" ? do
       yx margin (px 40) 0
+    focus & do
+      --
+      (outlineWidth (px 0))
 
   aside ? do
     "grid-area" -: "sidebar"

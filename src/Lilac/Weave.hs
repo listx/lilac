@@ -216,6 +216,7 @@ import Lucid
     span_,
     src_,
     sup_,
+    tabindex_,
     table_,
     target_,
     tbody_,
@@ -1853,7 +1854,8 @@ weaveFooter = do
 
 weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
 weaveMain docMeta lciCellPairs = do
-  main_ $ do
+  --
+  main_ [id_ "main-content-column", tabindex_ "-1"] $ do
     weaveDocMeta docMeta
     forM_ lciCellPairs weaveCell
     p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""

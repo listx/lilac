@@ -265,6 +265,7 @@ import Lucid
     span_,
     src_,
     sup_,
+    tabindex_,
     table_,
     target_,
     tbody_,
@@ -593,6 +594,7 @@ import Clay
     flexDirection,
     float,
     floatLeft,
+    focus,
     fontFamily,
     fontSize,
     fontStyle,
@@ -634,6 +636,7 @@ import Clay
     ol,
     opacity,
     other,
+    outlineWidth,
     overflowX,
     overflowY,
     p,
@@ -1067,7 +1070,8 @@ then calls [[f:weaveCell]] to weave all of the cells.
 #+begin_src haskell
 weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
 weaveMain docMeta lciCellPairs = do
-  main_ $ do
+  -- (ref:f:weaveMain-autofocus)
+  main_ [id_ "main-content-column", tabindex_ "-1"] $ do
     weaveDocMeta docMeta
     forM_ lciCellPairs weaveCell
     p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
@@ -1077,6 +1081,10 @@ weaveMain docMeta lciCellPairs = do
     when (any isHeading $ map snd lciCellPairs)
       $ toHtmlRaw @Text "</div>" -- (ref:f:weaveMain-heading-container)
 #+end_src
+
+[[(f:weaveMain-autofocus)]] gives a unique ID ~main-content-column~, and also uses
+~tabindex_~ to make it programmatically focused. We do this focusing on the
+initial page load at [[id:07777b91-875c-424b-89cd-10f8a372889c::ns:lilac.autofocus][ns:lilac.autofocus]].
 
 The closing ~</div>~ tag is for closing up any heading container ~<div>~ elements
 that are created in [[(f:weaveHeading-heading-container)]].
@@ -1353,7 +1361,13 @@ main_ ? do
   paddingLeft (px 50)
   p # ".main-bottom-spacer" ? do
     yx margin (px 40) 0
+  focus & do
+    -- (ref:css:Main content-remove-focus-highlight)
+    (outlineWidth (px 0))
 #+end_src
+
+[[(css:Main content-remove-focus-highlight)]] removes the focus highlight around the
+main content, when it is automatically focused by [[id:07777b91-875c-424b-89cd-10f8a372889c::ns:lilac.autofocus][ns:lilac.autofocus]].
 
 * Identifying cells in HTML
 

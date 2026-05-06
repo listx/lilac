@@ -475,13 +475,15 @@ behavior.
 #+header: :tangle src/fe/lilac/core.cljs
 #+begin_src clojure
 (ns lilac.core
-  (:require [lilac.popstate-history :as history]
+  (:require [lilac.autofocus :as af]
+            [lilac.popstate-history :as history]
             [lilac.toc-active-entries :as tae]
             [lilac.lazy-scroll :as lazy-scroll]
             [lilac.toggle-block-metadata :as tbm]))
 
 <<f:toggle-refresh-pause!>>
 
+(af/init)
 (history/init)
 (tae/init)
 (lazy-scroll/init)
@@ -495,6 +497,28 @@ reloads it.
 
 #+begin_src sh
 clojure -M -m figwheel.main --compile lilac.core --repl
+#+end_src
+
+** Autofocus ~<main>~ on page load
+:PROPERTIES:
+:ID:       07777b91-875c-424b-89cd-10f8a372889c
+:END:
+
+Focus on the ~<main>~ element by default when loading the page. This way the user
+can use their keyboard to scroll without first needing to click on the ~<main>~
+area with their mouse.
+
+#+name: ns:lilac.autofocus
+#+header: :tangle src/fe/lilac/autofocus.cljs
+#+begin_src clojure
+(ns lilac.autofocus)
+
+(defn focus-main []
+  (some-> (.getElementById js/document "main-content-column")
+          (.focus)))
+
+(defn init []
+  (.addEventListener js/document "DOMContentLoaded" focus-main))
 #+end_src
 
 ** Anchor link history
