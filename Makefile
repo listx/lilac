@@ -24,7 +24,7 @@ test: $(org_files)
 	cabal test --test-show-details=direct --test-option=--format=progress
 	touch test
 
-lint: $(org_files)
+lint: lilac.larc
 	pre-commit run --all-files
 	touch lint #
 

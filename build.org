@@ -906,7 +906,7 @@ place, so that we can just use the ~pre-commit~ tool to execute them all. See
 
 #+name: make:Run linters
 #+begin_src makefile
-lint: $(org_files)
+lint: lilac.larc
 	pre-commit run --all-files
 	touch lint # (ref:touch lint)
 #+end_src
