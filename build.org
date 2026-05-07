@@ -344,14 +344,25 @@ haskellOverlays =
 heavyDeps = final: prev:
   let
     heavyPackages = [
+      "brick"
+      "fsnotify"
+      "pandoc-types"
+      "sandwich"
       "skylighting"
       "skylighting-core"
       "skylighting-format-ansi"
       "skylighting-format-blaze-html"
       "skylighting-format-latex"
+      "th-lift-instances"
       "unicode-collation"
       "unicode-transforms"
-      "pandoc-types"
+      "vty-crossplatform"
+      "wai"
+      "wai-app-static"
+      "wai-extra"
+      "wai-websockets"
+      "warp"
+      "websockets"
     ];
   in lib.genAttrs heavyPackages (name: buildForCI prev.${name});
 
