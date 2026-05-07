@@ -95,7 +95,7 @@ import Clay
     ol,
     opacity,
     other,
-    outlineWidth,
+    outline,
     overflowX,
     overflowY,
     p,
@@ -130,6 +130,7 @@ import Clay
     thead,
     top,
     tr,
+    transparent,
     ul,
     underline,
     vAlignSub,
@@ -295,7 +296,7 @@ defaultCss = do
       yx margin (px 40) 0
     focus & do
       --
-      (outlineWidth (px 0))
+      outline none (px 0) transparent
 
   aside ? do
     "grid-area" -: "sidebar"
