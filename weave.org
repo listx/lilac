@@ -665,6 +665,7 @@ import Clay
     smallCaps,
     solid,
     span,
+    sticky,
     stringContent,
     sup,
     table,
@@ -3027,12 +3028,19 @@ weaveTable lci table = do
   -- (ref:f:weaveTable-figure)
   figure_ [id_ linkAnchor] $ do
     weaveTableCaption lci table linkAnchor
-    table_ [] $ do
-      weaveTableColumnGroups table
-      weaveTableRows table
+    -- (ref:f:weaveTable-table-wrapper)
+    div_ [class_ "table-wrapper"] $ do
+      table_ [] $ do
+        weaveTableColumnGroups table
+        weaveTableRows table
   where
     linkAnchor = getLinkAnchor Nothing $ CTable table
 #+end_src
+
+The ~table-wrapper~ [[(f:weaveTable-table-wrapper)]] is there to hide a tiny gap when
+the sticky table header [[(css:Tables-th-sticky)]] takes effect (when the user
+scrolls down a long table). Instead of adding a border to the ~<table>~ element,
+we add one to the ~table-wrapper~ div instead.
 
 ** Caption
 
@@ -3352,12 +3360,17 @@ This demonstrates some of the complexities around ~markingCharacters~.
 
 #+name: css:Tables
 #+begin_src haskell
+".table-wrapper" & do
+  border (px 2) solid colorCodeBorder
+  yx margin (px 0) auto
+  width fitContent
 table ? do
   fontSans
   borderCollapse collapse
-  border (px 2) solid colorCodeBorder
-  yx margin (px 0) auto
   th ? do
+    position sticky -- (ref:css:Tables-th-sticky)
+    top (px 0)
+    backgroundColor colorCodeBg
     yx padding (px 4) (px 8)
   td ? do
     yx padding (px 4) (px 8)

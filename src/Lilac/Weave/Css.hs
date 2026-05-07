@@ -118,6 +118,7 @@ import Clay
     smallCaps,
     solid,
     span,
+    sticky,
     stringContent,
     sup,
     table,
@@ -600,12 +601,17 @@ defaultCss = do
       backgroundColor colorActiveBg
       ev borderRadius (px 5)
 
+  ".table-wrapper" & do
+    border (px 2) solid colorCodeBorder
+    yx margin (px 0) auto
+    width fitContent
   table ? do
     fontSans
     borderCollapse collapse
-    border (px 2) solid colorCodeBorder
-    yx margin (px 0) auto
     th ? do
+      position sticky --
+      top (px 0)
+      backgroundColor colorCodeBg
       yx padding (px 4) (px 8)
     td ? do
       yx padding (px 4) (px 8)

@@ -1022,9 +1022,11 @@ weaveTable lci table = do
   --
   figure_ [id_ linkAnchor] $ do
     weaveTableCaption lci table linkAnchor
-    table_ [] $ do
-      weaveTableColumnGroups table
-      weaveTableRows table
+    --
+    div_ [class_ "table-wrapper"] $ do
+      table_ [] $ do
+        weaveTableColumnGroups table
+        weaveTableRows table
   where
     linkAnchor = getLinkAnchor Nothing $ CTable table
 
