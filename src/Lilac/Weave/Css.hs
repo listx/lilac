@@ -611,7 +611,7 @@ defaultCss = do
     borderCollapse collapse
     th ? do
       position sticky --
-      top (px 0)
+      top (px $ -1) --
       backgroundColor colorCodeBg
       yx padding (px 4) (px 8)
     td ? do
@@ -623,18 +623,18 @@ defaultCss = do
     tbody ? do
       tr ? do
         ".table-horizontal-line" & do
-          borderTop (px 2) solid colorCodeBorder
+          borderTop (px 3) solid colorCodeBorder
           ev padding (px 0)
           td ? do
             backgroundColor colorCodeBorder
             yx padding (px 0) (px 0)
         ".table-body-row" & do
-          borderTop (px 1) solid colorCodeBorder
+          borderTop (px 2) solid colorCodeBorder
   ".table-vertical-thick-line-colgroup" & do
-    borderLeft (px 2) solid colorCodeBorder --
+    borderLeft (px 4) solid colorCodeBorder --
   ".table-vertical-thin-line-col" & do
     --
-    borderLeft (px 1) solid colorCodeBorder
+    borderLeft (px 2) solid colorCodeBorder
 
   ".bibliography" & do
     marginTop (rem 1)

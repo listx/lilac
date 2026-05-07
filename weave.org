@@ -3370,7 +3370,7 @@ table ? do
   borderCollapse collapse
   th ? do
     position sticky -- (ref:css:Tables-th-sticky)
-    top (px 0)
+    top (px $ -1) -- (ref:css:Tables-remove-gap)
     backgroundColor colorCodeBg
     yx padding (px 4) (px 8)
   td ? do
@@ -3382,19 +3382,24 @@ table ? do
   tbody ? do
     tr ? do
       ".table-horizontal-line" & do
-        borderTop (px 2) solid colorCodeBorder
+        borderTop (px 3) solid colorCodeBorder
         ev padding (px 0)
         td ? do
           backgroundColor colorCodeBorder
           yx padding (px 0) (px 0)
       ".table-body-row" & do
-        borderTop (px 1) solid colorCodeBorder
+        borderTop (px 2) solid colorCodeBorder
 ".table-vertical-thick-line-colgroup" & do
-  borderLeft (px 2) solid colorCodeBorder -- (ref:css:Tables-border-left-thick)
+  borderLeft (px 4) solid colorCodeBorder -- (ref:css:Tables-border-left-thick)
 ".table-vertical-thin-line-col" & do
   -- (ref:css:Tables-border-left-thin)
-  borderLeft (px 1) solid colorCodeBorder
+  borderLeft (px 2) solid colorCodeBorder
 #+end_src
+
+[[(css:Tables-remove-gap)]] sets the starting position of the header cell (~<th>~) to
+be -1, not 0, because -1 makes it hide a gap when scrolling down (due to the
+position being sticky). This is hacky, but there doesn't seem to be an
+alternative way to do this in native CSS.
 
 * Footnotes
 :PROPERTIES:
