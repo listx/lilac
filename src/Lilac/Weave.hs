@@ -1626,7 +1626,6 @@ getRootRelativeOrgDocLink objPath
     Just serveRoot <- P.encodeUtf "/",
     Right externalOrgDocName <-
       P.decodeWith utf8 utf8
-        . P.combine serveRoot
         $ P.replaceExtension
           toObjPath
           (P.unsafeEncodeUtf "org"),
