@@ -3,6 +3,7 @@ module Lilac.TangleSpec (spec) where
 import Data.Text qualified as T
 import Lilac.Compile qualified as LC
 import Lilac.Tangle qualified as LT
+import Lilac.Types (emptyProjectConf)
 import Relude
   ( Either (Left, Right),
     FilePath,
@@ -243,7 +244,7 @@ spec = do
 checkExpansion :: [FilePath] -> [(FilePath, Text)] -> Spec
 checkExpansion paths expectedExpansions = do
   pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/TangleSpec/" paths
-  maybeArchive <- runIO $ LC.mkArchive pathObjs
+  maybeArchive <- runIO $ LC.mkArchive emptyProjectConf pathObjs
   case maybeArchive of
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do

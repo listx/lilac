@@ -131,7 +131,13 @@ import Lilac.Types
         PTokenMathFragment,
         PTokenStyledText
       ),
-    ProjectConf (homepage, name, version),
+    ProjectConf
+      ( bibliography,
+        citationStyle,
+        homepage,
+        name,
+        version
+      ),
     Prose (Prose, unProse),
     Style
       ( Bold,
@@ -1437,21 +1443,32 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
       PTokenDivStart {}
       PTokenDivEnd {} -> []
 
-prepareCitations :: GPath -> Object -> Archive -> IO (CP.Result Prose)
-prepareCitations objGPath object archive = do
+prepareCitations ::
+  ProjectConf ->
+  GPath ->
+  Object ->
+  Archive ->
+  IO (CP.Result Prose)
+prepareCitations projectConf objGPath object archive = do
   bibPathsRelative <- makeRelativeToObjectPath objGPath object.orgDoc.bibPaths
   cslPathRelative <-
     listToMaybe
       <$> ( makeRelativeToObjectPath objGPath
               $ maybeToList object.orgDoc.cslPath
           )
-  let bibRefsFromOrgDoc =
+  let finalCslPath
+        | Just _ <- cslPathRelative = cslPathRelative
+        | Just _ <- projectConf.citationStyle = projectConf.citationStyle
+        | otherwise = Nothing
+      bibRefsFromOrgDoc =
         filter neededByCitations
           . concat
           . catMaybes
-          $ map (\bp -> lookup bp archive.bibs) bibPathsRelative
+          . map (\bp -> lookup bp archive.bibs)
+          $ projectConf.bibliography
+          <> bibPathsRelative
       CP.Result citations bibliography warnings =
-        f bibRefsFromOrgDoc cslPathRelative
+        f bibRefsFromOrgDoc finalCslPath
       resultWithProse =
         CP.Result
           { CP.resultCitations = map cslJsonTextToProse citations,
@@ -1475,8 +1492,8 @@ prepareCitations objGPath object archive = do
           CP.resultBibliography = [],
           CP.resultWarnings = ["BLANK CITATION RESULT"]
         }
-    f bibRefs cslPathRelative
-      | Just cslPath' <- cslPathRelative,
+    f bibRefs finalCslPath
+      | Just cslPath' <- finalCslPath,
         Just rawXML <- lookup cslPath' archive.csls,
         Right citeprocStyle <- parseCitationStyle rawXML =
           CP.citeproc

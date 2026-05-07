@@ -11,7 +11,18 @@ import Lilac.Types
   ( GTOC (GTOC),
     LinkOid (LinkOid, name, oid),
     Object,
+    ProjectConf
+      ( ProjectConf,
+        bibliography,
+        citationStyle,
+        homepage,
+        name,
+        nonTangledPathspecs,
+        repo,
+        version
+      ),
     decodeGPath,
+    emptyProjectConf,
     encodeGPath,
     fromWords,
   )
@@ -434,20 +445,20 @@ expectArchiveError :: [FilePath] -> String -> Spec
 expectArchiveError paths expected = do
   it (show paths) $ do
     pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-    maybeArchive <- LC.mkArchive pathObjs
+    maybeArchive <- LC.mkArchive emptyProjectConf pathObjs
     maybeArchive `shouldBe` (Left expected)
 
 expectArchiveOk :: [FilePath] -> Spec
 expectArchiveOk paths = do
   it (show paths) $ do
     pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-    maybeArchive <- LC.mkArchive pathObjs
+    maybeArchive <- LC.mkArchive emptyProjectConf pathObjs
     maybeArchive `shouldSatisfy` isRight
 
 checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
 checkCycles paths expectedCycles = do
   pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-  maybeArchive <- runIO $ LC.mkArchive pathObjs
+  maybeArchive <- runIO $ LC.mkArchive emptyProjectConf pathObjs
   case maybeArchive of
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do

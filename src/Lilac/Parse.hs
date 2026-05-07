@@ -2287,15 +2287,6 @@ collectValsFor key kvs =
 bibliographyLocationParser :: OrgParser Cell
 bibliographyLocationParser = do
   _ <- string "#+print_bibliography:"
-  pState <- get
-  when (pState.cslPath == Nothing)
-    . fail
-    $ "cannot print bibliography without '#+cite_export: csl <style>.csl' "
-    <> "in top-level document metadata"
-  when (pState.bibPaths == [])
-    . fail
-    $ "cannot print bibliography without '#+bibliography: "
-    <> "<bib_entries>.json' in top-level document metadata"
   pure $ CCommand PrintBibliography
 
 instance CiteprocOutput Prose where
@@ -2642,14 +2633,6 @@ citationParser = do
   failIfVerbatimOrCode
   pState <- get
   _ <- string "[cite"
-  when (pState.cslPath == Nothing)
-    . fail
-    $ "cannot parse citations without '#+cite_export: csl <style>.csl'"
-    <> " in top-level document metadata"
-  when (pState.bibPaths == [])
-    . fail
-    $ "cannot parse citations without '#+bibliography: <bib_entries>.json'"
-    <> " in top-level document metadata"
   modify (\s -> s {insideCitation = True})
   sv1 <- MP.optional $ char '/' >> MP.label "style variation 1" svParser
   sv2 <- MP.optional $ char '/' >> MP.label "style variation 2" svParser

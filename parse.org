@@ -1161,6 +1161,9 @@ lexeme = L.lexeme skipNewlinesAndComments
 #+end_src
 
 ** ~docMetaParser~
+:PROPERTIES:
+:ID:       39beba98-d4c3-4c6d-99f3-3848575a8300
+:END:
 
 An Org document's metadata is the first meaningful thing that could be parsed.
 Metadata can be created with a ~:PROPERTIES:~ drawer, or with a line that looks
@@ -4964,6 +4967,17 @@ shouldParseWithState
   defaultOrgParserState
 #+end_src
 
+*** Default CSL JSON
+
+You can also define a global bibliography file in the ~ProjectConf~
+([[id:df128041-ada8-4d77-a373-111416002dae::(data:ProjectConf-citationStyle)]]).
+Doing so will essentially create an automatic ~#+bibliography: ...~ line in all
+Org documents in the archive.
+
+If you choose to do this, then in Emacs you should set the
+~org-cite-global-bibliography~ variable to the same equivalent path, so that the
+interactive ~org-cite-insert~ command will know where to read bibliographies.
+
 ** Printing bibliographies
 :PROPERTIES:
 :ID:       e24de101-bf1d-418b-a18f-b1a98fea9696
@@ -4982,15 +4996,6 @@ processor, but for simplicity Lilac doesn't support any additional options here.
 bibliographyLocationParser :: OrgParser Cell
 bibliographyLocationParser = do
   _ <- string "#+print_bibliography:"
-  pState <- get
-  when (pState.cslPath == Nothing)
-    . fail
-    $ "cannot print bibliography without '#+cite_export: csl <style>.csl' "
-    <> "in top-level document metadata"
-  when (pState.bibPaths == [])
-    . fail
-    $ "cannot print bibliography without '#+bibliography: "
-    <> "<bib_entries>.json' in top-level document metadata"
   pure $ CCommand PrintBibliography
 #+end_src
 
@@ -5022,42 +5027,6 @@ shouldParseWithState
           ]
     }
   defaultOrgParserState
-#+end_src
-
-Trying to print the bibliography without a style specified should result in an
-error.
-
-#+name: ti:0014-citations-print-biblio-missing-csl-style
-#+header: :tangle test/Lilac/ParseSpec/0014-citations-print-biblio-missing-csl-style
-#+begin_src org
-,#+bibliography: a.json
-,#+print_bibliography:
-#+end_src
-
-#+name: t:0014-citations-print-biblio-missing-csl-style
-#+begin_src haskell
-shouldFailWithMessage
-  "0014-citations-print-biblio-missing-csl-style"
-  "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
-  44
-#+end_src
-
-Trying to print the bibliography without [[id:909c5265-065a-412c-9305-2cff398ad233][CSL JSON (bibliographical entries)]]
-should also result in an error.
-
-#+name: ti:0014-citations-print-biblio-missing-bib-entries
-#+header: :tangle test/Lilac/ParseSpec/0014-citations-print-biblio-missing-bib-entries
-#+begin_src org
-,#+cite_export: csl foo.csl
-,#+print_bibliography:
-#+end_src
-
-#+name: t:0014-citations-print-biblio-missing-bib-entries
-#+begin_src haskell
-shouldFailWithMessage
-  "0014-citations-print-biblio-missing-bib-entries"
-  "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
-  48
 #+end_src
 
 ** Citation data structures
@@ -5123,14 +5092,6 @@ citationParser = do
   failIfVerbatimOrCode
   pState <- get
   _ <- string "[cite"
-  when (pState.cslPath == Nothing)
-    . fail
-    $ "cannot parse citations without '#+cite_export: csl <style>.csl'"
-    <> " in top-level document metadata"
-  when (pState.bibPaths == [])
-    . fail
-    $ "cannot parse citations without '#+bibliography: <bib_entries>.json'"
-    <> " in top-level document metadata"
   modify (\s -> s {insideCitation = True})
   sv1 <- MP.optional $ char '/' >> MP.label "style variation 1" svParser
   sv2 <- MP.optional $ char '/' >> MP.label "style variation 2" svParser
@@ -6255,41 +6216,6 @@ shouldParseWithState
       headingLevel = 1,
       headingSectionNumber = [1]
     }
-#+end_src
-
-Trying to use citations when no export style or bibliography sources have been
-defined is an error.
-
-#+name: ti:0014-citations-missing-csl-style
-#+header: :tangle test/Lilac/ParseSpec/0014-citations-missing-csl-style
-#+begin_src org
-,#+bibliography: a.json
-[cite:@foo]
-#+end_src
-
-#+name: t:0014-citations-missing-csl-style
-#+begin_src haskell
-shouldFailWithMessage
-  "0014-citations-missing-csl-style"
-  "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
-  28
-#+end_src
-
-Trying to use citations without a CSL style file is an error.
-
-#+name: ti:0014-citations-missing-bib-entries
-#+header: :tangle test/Lilac/ParseSpec/0014-citations-missing-bib-entries
-#+begin_src org
-,#+cite_export: csl foo.csl
-[cite:@foo]
-#+end_src
-
-#+name: t:0014-citations-missing-bib-entries
-#+begin_src haskell
-shouldFailWithMessage
-  "0014-citations-missing-bib-entries"
-  "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
-  32
 #+end_src
 
 * Prose
@@ -13173,8 +13099,6 @@ Below are all of the individual test cases.
 <<t:0014-citations-csl-path>>
 <<t:0014-citations-csl-json-paths>>
 <<t:0014-citations-bibliography-location>>
-<<t:0014-citations-print-biblio-missing-csl-style>>
-<<t:0014-citations-print-biblio-missing-bib-entries>>
 <<t:0014-citations-single-cite>>
 <<t:0014-citations-locators>>
 <<t:0014-citations-locators-affixes>>
@@ -13188,8 +13112,6 @@ Below are all of the individual test cases.
 <<t:0014-citations-nested>>
 <<t:0014-citations-forbidden-in-verbatim-code>>
 <<t:0014-citations-forbidden-in-headings>>
-<<t:0014-citations-missing-csl-style>>
-<<t:0014-citations-missing-bib-entries>>
 <<Text to Prose round trip>>
 <<Drop text chars from Prose>>
 <<t:0015-glossary-duplicate-term>>

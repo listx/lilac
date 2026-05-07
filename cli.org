@@ -3,9 +3,6 @@
 :END:
 #+title: CLI
 
-#+bibliography: bib.json
-#+cite_export: csl csl-styles/ieee.csl
-
 * =Main= module
 :PROPERTIES:
 :ID:       fd90f502-c5bb-411b-b056-793e783f2c22
@@ -59,13 +56,23 @@ import Lilac.Types
     OrgDoc (cells),
     ProjectConf
       ( ProjectConf,
+        bibliography,
+        citationStyle,
         homepage,
         name,
         nonTangledPathspecs,
         repo,
         version
       ),
-    RawProjectConf (homepage, name, nonTangledPathspecs, repo, version),
+    RawProjectConf
+      ( bibliography,
+        citationStyle,
+        homepage,
+        name,
+        nonTangledPathspecs,
+        repo,
+        version
+      ),
     ServeOpts (ServeOpts, dir, port),
     Subcommand
       ( ComArchive,
@@ -151,6 +158,7 @@ import Relude
     concat,
     concatMap,
     fail,
+    fmap,
     foldlM,
     forM_,
     intercalate,
@@ -262,7 +270,7 @@ out into various subcommands.
 #+begin_src haskell
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
-  ComArchive archiveOpts -> lilacArchive archiveOpts
+  ComArchive archiveOpts -> lilacArchive globalOpts archiveOpts
   ComCompile compileOpts -> lilacCompile globalOpts compileOpts
   ComTangle tangleOpts -> lilacTangle globalOpts tangleOpts
   ComWeave weaveOpts -> lilacWeave globalOpts weaveOpts
@@ -345,7 +353,9 @@ data ProjectConf = ProjectConf
     homepage :: Maybe N.URI, -- (ref:data:ProjectConf-homepage)
     repo :: Maybe N.URI, -- (ref:data:ProjectConf-repo)
     version :: Maybe Text, -- (ref:data:ProjectConf-version)
-    nonTangledPathspecs :: [Text] -- (ref:data:ProjectConf-nonTangledPathspecs)
+    nonTangledPathspecs :: [Text], -- (ref:data:ProjectConf-nonTangledPathspecs)
+    bibliography :: [FilePath], -- (ref:data:ProjectConf-bibliography)
+    citationStyle :: Maybe FilePath -- (ref:data:ProjectConf-citationStyle)
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -372,6 +382,19 @@ The fields are:
     pathspecs to be sent to the ~git-ls-files~ command. This output is compared
     against all tangle paths in the Archive, and is used for linting.
 
+  - ~bibliography~ :: [[(data:ProjectConf-bibliography)]] The paths (relative to
+    where the ~lilac~ binary will be invoked) of default bibliography files to
+    use for citation references. Use this if you want to avoid typing relative
+    paths for commonly used ~#+bibliography: ...~ entries inside Org files.
+
+    Essentially this is Lilac's equivalent of the ~org-cite-global-bibliography~
+    variable in Emacs. See [[id:39beba98-d4c3-4c6d-99f3-3848575a8300::f:docMetaParser][f:docMetaParser]] and [[id:7874b9c5-ceac-4820-8804-7732e29f5c60::f:prepareCitations][f:prepareCitations]] for more
+    information.
+
+  - ~citationStyle~ :: [[(data:ProjectConf-citationStyle)]] Similar to ~bibliography~,
+    but for the CSL style file. Unlike ~bibliography~, his is just a single file
+    path, not a list of files.
+
 Project configuration isn't part of [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] because it may be the case in
 the future that a single project could be used for multiple archive files.
 
@@ -394,7 +417,9 @@ data RawProjectConf = RawProjectConf
     homepage :: Text,
     repo :: Text,
     version :: Text,
-    nonTangledPathspecs :: [Text]
+    nonTangledPathspecs :: [Text],
+    bibliography :: [Text],
+    citationStyle :: Maybe Text
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -424,9 +449,35 @@ parseProjectConf input = case parseRawProjectConf input of
             if T.null rawProjectConf.version
               then Nothing
               else Just rawProjectConf.version,
-          nonTangledPathspecs = rawProjectConf.nonTangledPathspecs
+          nonTangledPathspecs = rawProjectConf.nonTangledPathspecs,
+          bibliography = fmap T.unpack $ rawProjectConf.bibliography,
+          citationStyle = fmap T.unpack $ rawProjectConf.citationStyle
         }
 #+end_src
+
+*** Blank ~ProjectConf~
+:PROPERTIES:
+:ID:       7edb09bc-8f63-4583-8e87-ef1462e91af9
+:END:
+
+[[f:emptyProjectConf]] is an empty project configuration, useful mostly for test
+cases that need a blank one.
+
+#+name: f:emptyProjectConf
+#+begin_src haskell
+emptyProjectConf :: ProjectConf
+emptyProjectConf =
+  ProjectConf
+    { name = "Test Project",
+      homepage = Nothing,
+      repo = Nothing,
+      version = Nothing,
+      nonTangledPathspecs = [],
+      bibliography = [],
+      citationStyle = Nothing
+    }
+#+end_src
+
 ** Global and subcommand options
 :PROPERTIES:
 :ID:       f1ee45a1-10a7-4409-a7a4-78778476cb07
@@ -709,10 +760,11 @@ to disk based on the ~--out-file~ option.
 
 #+name: f:lilacArchive
 #+begin_src haskell
-lilacArchive :: ArchiveOpts -> IO ()
-lilacArchive archiveOpts = do
+lilacArchive :: GlobalOpts -> ArchiveOpts -> IO ()
+lilacArchive globalOpts archiveOpts = do
+  projectConf <- readProjectConf globalOpts.projectConf
   pathsObjects <- mapM readObjectDirectly archiveOpts.inputs
-  maybeArchive <- LC.mkArchive pathsObjects
+  maybeArchive <- LC.mkArchive projectConf pathsObjects
   case maybeArchive of
     Left errMsg -> die errMsg
     Right archive -> do
@@ -1112,7 +1164,7 @@ weaveToDisk projectConf outDir archive acc objPath obj =
       ext = P.unsafeEncodeUtf "html"
       outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
       action = do
-        result <- LW.prepareCitations objPath obj archive
+        result <- LW.prepareCitations projectConf objPath obj archive
         let weaveConf =
               WeaveConf
                 { projectConf = projectConf,

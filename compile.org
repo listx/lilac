@@ -3,9 +3,6 @@
 :END:
 #+title: Compile
 
-#+bibliography: bib.json
-#+cite_export: csl csl-styles/ieee.csl
-
 * Overview
 
 Compilation is the intermediate step we perform on Org files, such that they can
@@ -114,6 +111,7 @@ import Lilac.Types
         PTokenMathFragment,
         PTokenStyledText
       ),
+    ProjectConf (bibliography, citationStyle),
     Prose (Prose, unProse),
     PseudoEdge (PseudoEdge),
     Style (Verbatim),
@@ -185,7 +183,7 @@ import Relude
     (==),
     (>),
   )
-import Relude.Extra.Map (elems, insertWith, lookup, member)
+import Relude.Extra.Map (elems, insert, insertWith, lookup, member)
 import System.Directory.OsPath qualified as D
 import System.Exit (die)
 import System.FilePath (splitDirectories)
@@ -841,8 +839,8 @@ tangling does not involve tangling to relative paths).
 
 #+name: f:mkArchive
 #+begin_src haskell
-mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
-mkArchive pathObjs = do
+mkArchive :: ProjectConf -> [(GPath, Object)] -> IO (Either String Archive)
+mkArchive projectConf pathObjs = do
   let pathObjsNonEmpty =
         filter (\(_, obj) -> length obj.orgDoc.cells > 0) pathObjs -- (ref:f:mkArchive-remove-empty-objects)
       (symbols, glossary) = combineSymbolsAndGlossary pathObjsNonEmpty
@@ -850,7 +848,7 @@ mkArchive pathObjs = do
       backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols -- (ref:f:mkArchive-brokenLinks)
   brokenFileLinks <- findBrokenFileLinks pathObjs
-  (csls, bibs) <- getCitationDeps pathObjsNonEmpty
+  (csls, bibs) <- getCitationDeps projectConf pathObjsNonEmpty
   if
     | brokenLinks /= [] ->
         pure
@@ -2335,11 +2333,12 @@ the main workhorse, as the other functions in this section are just helpers to
 #+name: f:getCitationDeps
 #+begin_src haskell
 getCitationDeps ::
+  ProjectConf ->
   [(GPath, Object)] ->
   IO (Map FilePath Text, Map FilePath [CP.Reference (CslJson Text)])
-getCitationDeps pathObjs = do
-  csls <- getCitationStyles pathObjs
-  bibs <- getBibliographies pathObjs
+getCitationDeps projectConf pathObjs = do
+  csls <- getCitationStyles projectConf pathObjs
+  bibs <- getBibliographies projectConf pathObjs
   pure (csls, bibs)
 #+end_src
 
@@ -2355,8 +2354,8 @@ instance for the ~CP.Style~ type.
 
 #+name: f:getCitationStyles
 #+begin_src haskell
-getCitationStyles :: [(GPath, Object)] -> IO (Map FilePath Text)
-getCitationStyles pathObjs = do
+getCitationStyles :: ProjectConf -> [(GPath, Object)] -> IO (Map FilePath Text)
+getCitationStyles projectConf pathObjs = do
   allCslPaths <-
     concat
       <$> mapM
@@ -2366,13 +2365,28 @@ getCitationStyles pathObjs = do
         )
         pathObjs
   cslRawXMLs <- map fst <$> mapM getCitationStyle allCslPaths -- (ref:f:getCitationStyles-discard-parsed-content)
-  pure . fromList $ zip allCslPaths cslRawXMLs
+  let m = fromList $ zip allCslPaths cslRawXMLs
+  case projectConf.citationStyle of
+    Just cslPath -> do
+      (text, _) <- getCitationStyle cslPath
+      pure $ insert cslPath text m -- (ref:f:getCitationStyles-default-csl-path)
+    Nothing -> do
+      pure m
 #+end_src
 
+The returned type is a ~Map FilePath Text~ where the key is the path to the CSL
+file, and the ~Text~ is the contents of it. During weaving in [[id:7874b9c5-ceac-4820-8804-7732e29f5c60::f:prepareCitations][f:prepareCitations]],
+we do a lookup into this ~Map~.
+
+[[(f:getCitationStyles-default-csl-path)]] inserts the default CSL path, if any,
+into the response. This is used as a fallback in [[id:7874b9c5-ceac-4820-8804-7732e29f5c60::f:prepareCitations][f:prepareCitations]] if an Org
+doc does not specify a CSL style.
+
 [[f:makeRelativeToObjectPath]] [[(f:getCitationStyles-makeRelativeToObjectPath)]] gets a
-~[FilePath]~ and makes them relative to the given ~GPath~. This is useful for
-getting paths defined inside an Org doc (such as the path to a CSL style or
-bibliography JSON) to be relative to where the Org doc is located.
+~[FilePath]~ and makes them relative to the given ~GPath~ (by just combining the
+~GPath~ with the file paths). This is useful for getting paths defined inside an
+Org doc (such as the path to a CSL style or bibliography JSON) to be relative to
+where the Org doc is located.
 
 #+name: f:makeRelativeToObjectPath
 #+begin_src haskell
@@ -2427,16 +2441,17 @@ entries in them.
 #+name: f:getBibliographies
 #+begin_src haskell
 getBibliographies ::
+  ProjectConf ->
   [(GPath, Object)] ->
   IO (Map FilePath [CP.Reference (CslJson Text)])
-getBibliographies pathObjs = do
-  allBibPaths <-
+getBibliographies projectConf pathObjs = do
+  bibPaths <-
     concat
       <$> mapM
         (\(gPath, obj) -> makeRelativeToObjectPath gPath obj.orgDoc.bibPaths)
         pathObjs
-  bibs <- mapM getBibliography allBibPaths
-  pure . fromList $ zip allBibPaths bibs
+  let allBibPaths = projectConf.bibliography <> bibPaths
+  fromList <$> mapM (\p -> fmap (\b -> (p, b)) (getBibliography p)) allBibPaths
 #+end_src
 
 The [[f:getBibliography]] parses a single JSON file which has a list of references
@@ -2970,7 +2985,18 @@ import Lilac.Types
   ( GTOC (GTOC),
     LinkOid (LinkOid, name, oid),
     Object,
+    ProjectConf
+      ( ProjectConf,
+        bibliography,
+        citationStyle,
+        homepage,
+        name,
+        nonTangledPathspecs,
+        repo,
+        version
+      ),
     decodeGPath,
+    emptyProjectConf,
     encodeGPath,
     fromWords,
   )
@@ -3072,7 +3098,7 @@ expectArchiveError :: [FilePath] -> String -> Spec
 expectArchiveError paths expected = do
   it (show paths) $ do
     pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-    maybeArchive <- LC.mkArchive pathObjs
+    maybeArchive <- LC.mkArchive emptyProjectConf pathObjs
     maybeArchive `shouldBe` (Left expected)
 #+end_src
 
@@ -3085,7 +3111,7 @@ expectArchiveOk :: [FilePath] -> Spec
 expectArchiveOk paths = do
   it (show paths) $ do
     pathObjs <- LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-    maybeArchive <- LC.mkArchive pathObjs
+    maybeArchive <- LC.mkArchive emptyProjectConf pathObjs
     maybeArchive `shouldSatisfy` isRight
 #+end_src
 
@@ -3097,7 +3123,7 @@ constructed from the given Org documents has any cycles.
 checkCycles :: [FilePath] -> [G.Tree LinkOid] -> Spec
 checkCycles paths expectedCycles = do
   pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
-  maybeArchive <- runIO $ LC.mkArchive pathObjs
+  maybeArchive <- runIO $ LC.mkArchive emptyProjectConf pathObjs
   case maybeArchive of
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do

@@ -25,6 +25,8 @@ import Lilac.Types
       ),
     ProjectConf
       ( ProjectConf,
+        bibliography,
+        citationStyle,
         homepage,
         name,
         nonTangledPathspecs,
@@ -43,6 +45,7 @@ import Lilac.Types
         projectConf
       ),
     defaultOrgParserState,
+    emptyProjectConf,
     encodeGPath,
     nilOid,
     nilOidOrgDocPrefix,
@@ -734,22 +737,22 @@ getWovenPrettyFromPath path = do
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
       let object = LC.mkObject orgDoc
-      maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
+      maybeArchive <-
+        LC.mkArchive
+          emptyProjectConf
+          [(inputOrgFileGPath, object)]
       case maybeArchive of
         Left errMsg -> pure $ Left errMsg
         Right archive -> do
-          result <- LW.prepareCitations inputOrgFileGPath object archive
-          let projectConf =
-                ProjectConf
-                  { name = "Test Project",
-                    homepage = Nothing,
-                    repo = Nothing,
-                    version = Nothing,
-                    nonTangledPathspecs = []
-                  }
-              weaveConf =
+          result <-
+            LW.prepareCitations
+              emptyProjectConf
+              inputOrgFileGPath
+              object
+              archive
+          let weaveConf =
                 WeaveConf
-                  { projectConf = projectConf,
+                  { projectConf = emptyProjectConf,
                     archive = archive,
                     originObjectPath = inputOrgFileGPath,
                     outDir = outDir,
@@ -811,11 +814,19 @@ getCiteprocResultFromPath path = do
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
       let object = LC.mkObject orgDoc
-      maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
+      maybeArchive <-
+        LC.mkArchive
+          emptyProjectConf
+          [(inputOrgFileGPath, object)]
       case maybeArchive of
         Left errMsg -> pure $ Left errMsg
         Right archive ->
-          Right <$> LW.prepareCitations inputOrgFileGPath object archive
+          Right
+            <$> LW.prepareCitations
+              emptyProjectConf
+              inputOrgFileGPath
+              object
+              archive
 
 expectCiteprocResult :: FilePath -> Either String (CP.Result Prose) -> Spec
 expectCiteprocResult path expected = do

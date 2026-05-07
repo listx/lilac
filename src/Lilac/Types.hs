@@ -48,6 +48,7 @@ module Lilac.Types
     defaultOrgParserConf,
     defaultOrgParserState,
     emptyGPath,
+    emptyProjectConf,
     encodeGPath,
     Lilac.Types.fromText,
     fromWords,
@@ -750,7 +751,9 @@ data ProjectConf = ProjectConf
     homepage :: Maybe N.URI, --
     repo :: Maybe N.URI, --
     version :: Maybe Text, --
-    nonTangledPathspecs :: [Text] --
+    nonTangledPathspecs :: [Text], --
+    bibliography :: [FilePath], --
+    citationStyle :: Maybe FilePath --
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
@@ -761,10 +764,24 @@ data RawProjectConf = RawProjectConf
     homepage :: Text,
     repo :: Text,
     version :: Text,
-    nonTangledPathspecs :: [Text]
+    nonTangledPathspecs :: [Text],
+    bibliography :: [Text],
+    citationStyle :: Maybe Text
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
+
+emptyProjectConf :: ProjectConf
+emptyProjectConf =
+  ProjectConf
+    { name = "Test Project",
+      homepage = Nothing,
+      repo = Nothing,
+      version = Nothing,
+      nonTangledPathspecs = [],
+      bibliography = [],
+      citationStyle = Nothing
+    }
 
 type GlobalOpts :: Type
 data GlobalOpts = GlobalOpts

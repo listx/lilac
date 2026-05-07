@@ -180,7 +180,13 @@ import Lilac.Types
         PTokenMathFragment,
         PTokenStyledText
       ),
-    ProjectConf (homepage, name, version),
+    ProjectConf
+      ( bibliography,
+        citationStyle,
+        homepage,
+        name,
+        version
+      ),
     Prose (Prose, unProse),
     Style
       ( Bold,
@@ -4017,21 +4023,32 @@ finally converting them to HTML again.
 
 #+name: f:prepareCitations
 #+begin_src haskell
-prepareCitations :: GPath -> Object -> Archive -> IO (CP.Result Prose)
-prepareCitations objGPath object archive = do
+prepareCitations ::
+  ProjectConf ->
+  GPath ->
+  Object ->
+  Archive ->
+  IO (CP.Result Prose)
+prepareCitations projectConf objGPath object archive = do
   bibPathsRelative <- makeRelativeToObjectPath objGPath object.orgDoc.bibPaths
   cslPathRelative <-
     listToMaybe
       <$> ( makeRelativeToObjectPath objGPath
               $ maybeToList object.orgDoc.cslPath
           )
-  let bibRefsFromOrgDoc =
+  let finalCslPath
+        | Just _ <- cslPathRelative = cslPathRelative
+        | Just _ <- projectConf.citationStyle = projectConf.citationStyle
+        | otherwise = Nothing
+      bibRefsFromOrgDoc =
         filter neededByCitations
           . concat
           . catMaybes
-          $ map (\bp -> lookup bp archive.bibs) bibPathsRelative
+          . map (\bp -> lookup bp archive.bibs)
+          $ projectConf.bibliography
+          <> bibPathsRelative
       CP.Result citations bibliography warnings =
-        f bibRefsFromOrgDoc cslPathRelative
+        f bibRefsFromOrgDoc finalCslPath
       resultWithProse =
         CP.Result
           { CP.resultCitations = map cslJsonTextToProse citations,
@@ -4055,8 +4072,8 @@ prepareCitations objGPath object archive = do
           CP.resultBibliography = [],
           CP.resultWarnings = ["BLANK CITATION RESULT"]
         }
-    f bibRefs cslPathRelative
-      | Just cslPath' <- cslPathRelative,
+    f bibRefs finalCslPath
+      | Just cslPath' <- finalCslPath,
         Just rawXML <- lookup cslPath' archive.csls,
         Right citeprocStyle <- parseCitationStyle rawXML =
           CP.citeproc
@@ -5890,6 +5907,8 @@ import Lilac.Types
       ),
     ProjectConf
       ( ProjectConf,
+        bibliography,
+        citationStyle,
         homepage,
         name,
         nonTangledPathspecs,
@@ -5908,6 +5927,7 @@ import Lilac.Types
         projectConf
       ),
     defaultOrgParserState,
+    emptyProjectConf,
     encodeGPath,
     nilOid,
     nilOidOrgDocPrefix,
@@ -5989,22 +6009,22 @@ getWovenPrettyFromPath path = do
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
       let object = LC.mkObject orgDoc
-      maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
+      maybeArchive <-
+        LC.mkArchive
+          emptyProjectConf
+          [(inputOrgFileGPath, object)]
       case maybeArchive of
         Left errMsg -> pure $ Left errMsg
         Right archive -> do
-          result <- LW.prepareCitations inputOrgFileGPath object archive
-          let projectConf =
-                ProjectConf
-                  { name = "Test Project",
-                    homepage = Nothing,
-                    repo = Nothing,
-                    version = Nothing,
-                    nonTangledPathspecs = []
-                  }
-              weaveConf =
+          result <-
+            LW.prepareCitations
+              emptyProjectConf
+              inputOrgFileGPath
+              object
+              archive
+          let weaveConf =
                 WeaveConf
-                  { projectConf = projectConf,
+                  { projectConf = emptyProjectConf,
                     archive = archive,
                     originObjectPath = inputOrgFileGPath,
                     outDir = outDir,
@@ -6088,11 +6108,19 @@ getCiteprocResultFromPath path = do
     Left errBundle -> pure . Left $ MP.errorBundlePretty errBundle
     Right (orgDoc, _) -> do
       let object = LC.mkObject orgDoc
-      maybeArchive <- LC.mkArchive [(inputOrgFileGPath, object)]
+      maybeArchive <-
+        LC.mkArchive
+          emptyProjectConf
+          [(inputOrgFileGPath, object)]
       case maybeArchive of
         Left errMsg -> pure $ Left errMsg
         Right archive ->
-          Right <$> LW.prepareCitations inputOrgFileGPath object archive
+          Right
+            <$> LW.prepareCitations
+              emptyProjectConf
+              inputOrgFileGPath
+              object
+              archive
 #+end_src
 
 [[f:expectCiteprocResult]] takes an ~Either String (CP.Result Prose)~. If it's a ~Right~

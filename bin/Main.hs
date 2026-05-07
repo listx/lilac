@@ -36,13 +36,23 @@ import Lilac.Types
     OrgDoc (cells),
     ProjectConf
       ( ProjectConf,
+        bibliography,
+        citationStyle,
         homepage,
         name,
         nonTangledPathspecs,
         repo,
         version
       ),
-    RawProjectConf (homepage, name, nonTangledPathspecs, repo, version),
+    RawProjectConf
+      ( bibliography,
+        citationStyle,
+        homepage,
+        name,
+        nonTangledPathspecs,
+        repo,
+        version
+      ),
     ServeOpts (ServeOpts, dir, port),
     Subcommand
       ( ComArchive,
@@ -128,6 +138,7 @@ import Relude
     concat,
     concatMap,
     fail,
+    fmap,
     foldlM,
     forM_,
     intercalate,
@@ -427,7 +438,7 @@ main = do
 
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
-  ComArchive archiveOpts -> lilacArchive archiveOpts
+  ComArchive archiveOpts -> lilacArchive globalOpts archiveOpts
   ComCompile compileOpts -> lilacCompile globalOpts compileOpts
   ComTangle tangleOpts -> lilacTangle globalOpts tangleOpts
   ComWeave weaveOpts -> lilacWeave globalOpts weaveOpts
@@ -454,7 +465,9 @@ parseProjectConf input = case parseRawProjectConf input of
             if T.null rawProjectConf.version
               then Nothing
               else Just rawProjectConf.version,
-          nonTangledPathspecs = rawProjectConf.nonTangledPathspecs
+          nonTangledPathspecs = rawProjectConf.nonTangledPathspecs,
+          bibliography = fmap T.unpack $ rawProjectConf.bibliography,
+          citationStyle = fmap T.unpack $ rawProjectConf.citationStyle
         }
 
 parseRawProjectConf :: Text -> Either String RawProjectConf
@@ -485,10 +498,11 @@ lilacCompile _globalOpts compileOpts = do
         P.decodeUtf base
       encodeFile outPath obj
 
-lilacArchive :: ArchiveOpts -> IO ()
-lilacArchive archiveOpts = do
+lilacArchive :: GlobalOpts -> ArchiveOpts -> IO ()
+lilacArchive globalOpts archiveOpts = do
+  projectConf <- readProjectConf globalOpts.projectConf
   pathsObjects <- mapM readObjectDirectly archiveOpts.inputs
-  maybeArchive <- LC.mkArchive pathsObjects
+  maybeArchive <- LC.mkArchive projectConf pathsObjects
   case maybeArchive of
     Left errMsg -> die errMsg
     Right archive -> do
@@ -612,7 +626,7 @@ weaveToDisk projectConf outDir archive acc objPath obj =
       ext = P.unsafeEncodeUtf "html"
       outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
       action = do
-        result <- LW.prepareCitations objPath obj archive
+        result <- LW.prepareCitations projectConf objPath obj archive
         let weaveConf =
               WeaveConf
                 { projectConf = projectConf,

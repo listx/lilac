@@ -82,6 +82,7 @@ import Lilac.Types
         PTokenMathFragment,
         PTokenStyledText
       ),
+    ProjectConf (bibliography, citationStyle),
     Prose (Prose, unProse),
     PseudoEdge (PseudoEdge),
     Style (Verbatim),
@@ -153,7 +154,7 @@ import Relude
     (==),
     (>),
   )
-import Relude.Extra.Map (elems, insertWith, lookup, member)
+import Relude.Extra.Map (elems, insert, insertWith, lookup, member)
 import System.Directory.OsPath qualified as D
 import System.Exit (die)
 import System.FilePath (splitDirectories)
@@ -266,8 +267,8 @@ getSymbols docOid parentOid cellMeta lci =
             )
       | otherwise = Nothing
 
-mkArchive :: [(GPath, Object)] -> IO (Either String Archive)
-mkArchive pathObjs = do
+mkArchive :: ProjectConf -> [(GPath, Object)] -> IO (Either String Archive)
+mkArchive projectConf pathObjs = do
   let pathObjsNonEmpty =
         filter (\(_, obj) -> length obj.orgDoc.cells > 0) pathObjs --
       (symbols, glossary) = combineSymbolsAndGlossary pathObjsNonEmpty
@@ -275,7 +276,7 @@ mkArchive pathObjs = do
       backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols --
   brokenFileLinks <- findBrokenFileLinks pathObjs
-  (csls, bibs) <- getCitationDeps pathObjsNonEmpty
+  (csls, bibs) <- getCitationDeps projectConf pathObjsNonEmpty
   if
     | brokenLinks /= [] ->
         pure
@@ -446,11 +447,12 @@ findBrokenFileLinks =
     extractFileFromLink _ = Nothing
 
 getCitationDeps ::
+  ProjectConf ->
   [(GPath, Object)] ->
   IO (Map FilePath Text, Map FilePath [CP.Reference (CslJson Text)])
-getCitationDeps pathObjs = do
-  csls <- getCitationStyles pathObjs
-  bibs <- getBibliographies pathObjs
+getCitationDeps projectConf pathObjs = do
+  csls <- getCitationStyles projectConf pathObjs
+  bibs <- getBibliographies projectConf pathObjs
   pure (csls, bibs)
 
 finalizeEdges ::
@@ -768,8 +770,8 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
       BTokenString text -> text
       _ -> ""
 
-getCitationStyles :: [(GPath, Object)] -> IO (Map FilePath Text)
-getCitationStyles pathObjs = do
+getCitationStyles :: ProjectConf -> [(GPath, Object)] -> IO (Map FilePath Text)
+getCitationStyles projectConf pathObjs = do
   allCslPaths <-
     concat
       <$> mapM
@@ -779,7 +781,13 @@ getCitationStyles pathObjs = do
         )
         pathObjs
   cslRawXMLs <- map fst <$> mapM getCitationStyle allCslPaths --
-  pure . fromList $ zip allCslPaths cslRawXMLs
+  let m = fromList $ zip allCslPaths cslRawXMLs
+  case projectConf.citationStyle of
+    Just cslPath -> do
+      (text, _) <- getCitationStyle cslPath
+      pure $ insert cslPath text m --
+    Nothing -> do
+      pure m
 
 getCitationStyle :: FilePath -> IO (Text, (CP.Style (CslJson Text)))
 getCitationStyle filePath = do
@@ -797,16 +805,17 @@ parseCitationStyle input = do
     Right style -> Right style
 
 getBibliographies ::
+  ProjectConf ->
   [(GPath, Object)] ->
   IO (Map FilePath [CP.Reference (CslJson Text)])
-getBibliographies pathObjs = do
-  allBibPaths <-
+getBibliographies projectConf pathObjs = do
+  bibPaths <-
     concat
       <$> mapM
         (\(gPath, obj) -> makeRelativeToObjectPath gPath obj.orgDoc.bibPaths)
         pathObjs
-  bibs <- mapM getBibliography allBibPaths
-  pure . fromList $ zip allBibPaths bibs
+  let allBibPaths = projectConf.bibliography <> bibPaths
+  fromList <$> mapM (\p -> fmap (\b -> (p, b)) (getBibliography p)) allBibPaths
 
 getBibliography :: FilePath -> IO [CP.Reference (CslJson Text)]
 getBibliography filePath = do

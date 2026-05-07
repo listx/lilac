@@ -2468,16 +2468,6 @@ spec = do
       }
     defaultOrgParserState
 
-  shouldFailWithMessage
-    "0014-citations-print-biblio-missing-csl-style"
-    "cannot print bibliography without '#+cite_export: csl <style>.csl' in top-level document metadata"
-    44
-
-  shouldFailWithMessage
-    "0014-citations-print-biblio-missing-bib-entries"
-    "cannot print bibliography without '#+bibliography: <bib_entries>.json' in top-level document metadata"
-    48
-
   shouldParseWithState
     "0014-citations-single-cite"
     OrgDoc
@@ -3022,16 +3012,6 @@ spec = do
         headingLevel = 1,
         headingSectionNumber = [1]
       }
-
-  shouldFailWithMessage
-    "0014-citations-missing-csl-style"
-    "cannot parse citations without '#+cite_export: csl <style>.csl' in top-level document metadata"
-    28
-
-  shouldFailWithMessage
-    "0014-citations-missing-bib-entries"
-    "cannot parse citations without '#+bibliography: <bib_entries>.json' in top-level document metadata"
-    32
 
   describe "Text to Prose round trip" $ do
     checkTextToProseRoundTrip
