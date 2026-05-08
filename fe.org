@@ -251,9 +251,7 @@ across all build files.
 #+begin_src clojure
 {:watch-dirs ["src/fe"]
  :css-dirs ["css"]
- :ring-server-options {:host "localhost" :port 8080 :join? false}
- :ring-handler lilac.handler/development-app
- :open-url "http://localhost:8080/index.html"
+ :open-url false
  :target-dir "js"
  :clean-outputs true}
 #+end_src
@@ -269,199 +267,32 @@ using metadata. For example, you could do
 in [[cfg:lilac-fe-build]] and it would override the ~:css-dirs~ option only for
 that build.
 
-** Custom Ring handler
+** Using Figwheel in development
 :PROPERTIES:
 :ID:       385c2480-a748-4091-903e-5a48351de6e0
 :END:
 
-By default, Figwheel uses the [[https://github.com/ring-clojure/ring][Ring]] web library. It has a hardcoded default where
-the static files to be served by the web server process must be located in a
-folder named ~public~ somewhere along the classpath. However we don't want to use
-~public~ because we use a top-level folder already called ~doc~ which is the base
-of all of our LP documentation, which are woven into HTML files in that folder.
-And for simplicity we want to serve the ~doc~ folder prefix, because this hides
-less information and is more transparent of what is being served. In order to do
-this, we have to write our own Ring handler.
+Lilac can serve itself with ~lilac serve~ ([[id:b0033603-7251-449b-ba7d-be4a1a118fd0][Serving]]). So you can just open up
 
-#+name: ns:lilac.handler
-#+header: :tangle src/fe/lilac/handler.clj
-#+begin_src clojure
-(ns lilac.handler
-  (:require [ring.middleware.file :refer [wrap-file]]
-            [ring.middleware.not-modified :refer [wrap-not-modified]]
-            [ring.middleware.content-type :refer [wrap-content-type]]
-            [clojure.string :as str]))
-
-<<middleware:wrap-autorefresh>>
-
-(def development-app
-  (-> <<exp:404-fallback>> ; (ref:ns:lilac.handler-fallback)
-      <<exp:serve-files-from-project-root>> ; (ref:ns:lilac.handler-serve-from-project-root)
-      (wrap-content-type) ; (ref:wrap-content-type)
-      (wrap-not-modified) ; (ref:wrap-not-modified)
-      (wrap-autorefresh)))
+#+begin_src bash
+lilac serve .
 #+end_src
 
-We start out with the fallback [[(ns:lilac.handler-fallback)]], because this creates
-a default response if the request cannot be handled otherwise by any of the
-other middleware.
+in another terminal, and then do
 
-#+name: exp:404-fallback
-#+begin_src clojure
-(constantly {:status 404 :headers {} :body "Not Found"})
+#+begin_src bash
+make dev-cljs
 #+end_src
 
-[[exp:serve-files-from-project-root]] [[(ns:lilac.handler-serve-from-project-root)]]
-lets us serve all files starting from the project root.
+to start up Figwheel to make it handle the CSS and JS reloads. Finally you can
+run
 
-#+name: exp:serve-files-from-project-root
-#+begin_src clojure
-(wrap-file ".")
+#+begin_src bash
+./tangle-loop.sh
 #+end_src
 
-The ~wrap-content-type~ [[(wrap-content-type)]] adds the ~Content-Type~ header to the
-response, and ~wrap-not-modified~ [[(wrap-not-modified)]] sends a ~304 Not Modified~
-response if the browser's request is for the same file as what the browser
-already has.
-
-*** Automatic page refresh
-
-Now we come to [[middleware:wrap-autorefresh]], perhaps the most interesting
-middleware in our middleware stack. This middleware injects some JavaScript
-which refreshes the page every second (while keeping track of scroll positions
-to restore them post-refresh). This lets us see the HTML changes in the browser
-automatically (without having to perform a manual refresh); now we can run
-[[id:77786b08-6211-47b8-940d-6aaefc17ec47::tangle-loop.sh][tangle-loop.sh]] in the background (which also performs weaving) and edit the Org
-files in Emacs while seeing those HTML changes show up in the browser.
-
-#+name: middleware:wrap-autorefresh
-#+begin_src clojure
-(defn wrap-autorefresh [handler]
-  (fn [request]
-    (let [response (handler request)]
-      (if (and (= 200 (:status response)) ; (ref:HTML-response)
-               (clojure.string/includes?
-                 (get-in response [:headers "Content-Type"] "") "text/html"))
-        (let [body-str (slurp (:body response))
-              script
-              "<script>
-                <<hard-refresh>>
-              </script>"]
-          (-> response
-              (assoc :body
-                     (clojure.string/replace body-str "</body>"
-                                             (str script "</body>")))
-              (update :headers dissoc "Content-Length")))
-        response))))
-#+end_src
-
-The check at [[(HTML-response)]] guards it so that we only perform this injection
-into the response body if we're dealing with an HTML page.
-
-Now we get to the script which refreshes the page. We want to first load the
-scroll positions (that were saved from the previous invocation, if any), then
-save the current scroll positions (to local storage), and then finally do a hard
-refresh. The one other thing we do is avoid performing the hard refresh if
-either the page has been recently scrolled (if the user is interacting with the
-page by scrolling), or if the user has decided to cancel pausing by setting a
-separate ~dev-pause-refresh~ key to ~true~.
-
-#+name: hard-refresh
-#+begin_src js
-(function() {
-  const scrollSelectors = ['nav.toc', 'main', 'aside.sidebar']; // (ref:scrollSelectors)
-  const storageKey = 'dev-scroll-map';
-
-  let lastScrollTime = 0;
-  window.addEventListener('scroll', () => { // (ref:lastScrollTimeListener)
-    lastScrollTime = Date.now();
-  }, true);
-
-  function setScrollPositions(map) {
-    for (let sel in map) {
-      let el = document.querySelector(sel);
-      if (el) el.scrollTop = map[sel];
-    }
-  }
-
-  function getScrollPositions(selectors) {
-    let map = {};
-    selectors.forEach(sel => {
-      let el = document.querySelector(sel);
-      if (el) map[sel] = el.scrollTop;
-    });
-    return map;
-  }
-
-  const rawData = localStorage.getItem(storageKey);
-  if (rawData) {
-    const prevScrollPositions = JSON.parse(rawData);
-    setTimeout(() => {
-      setScrollPositions(prevScrollPositions); // (ref:restore-scroll-pos)
-      localStorage.removeItem(storageKey);
-    }, 200); // (ref:page-render-delay)
-  }
-
-  function refreshPage() {
-    const isPaused = localStorage.getItem('dev-pause-refresh') === 'true';
-    const recentlyScrolled = (Date.now() - lastScrollTime) < 1500; // (ref:recentlyScrolled)
-
-    if (isPaused || recentlyScrolled) { // (ref:cancel-if-recently-scrolled)
-      setTimeout(refreshPage, 500); // (ref:fast-refresh-delay)
-      return;
-    }
-
-    const currentScrollPositions = getScrollPositions(scrollSelectors);
-    localStorage.setItem(storageKey,
-                         JSON.stringify(currentScrollPositions)); // (ref:save-scroll-pos)
-
-    window.location.reload(); // (ref:hard-refresh)
-  }
-
-  setTimeout(refreshPage, 1000); // (ref:normal-refresh-delay)
-})();
-#+end_src
-
-The scrollable elements [[(scrollSelectors)]] are based on those top-level helpers
-described in [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb][Object]] and [[id:eda7626d-42fd-45d3-b0f8-940710413295][Page layout]]. The event listener at
-[[(lastScrollTimeListener)]] updates the value of ~lastScrollTime~ so that we can tell
-how recently the user scrolled anything on the page at [[(recentlyScrolled)]].
-
-Restoration of any previously saved scroll positions is handled at
-[[(restore-scroll-pos)]]. The 200 millisecond delay at [[(page-render-delay)]] gives the
-browser time to finish rendering the page before we attempt to restore the
-scroll positions (otherwise, the DOM may not have been parsed yet for the
-JavaScript to look at and manipulate).
-
-Now we get to the refreshing logic. If we have recently scrolled the window, we
-cancel the refresh at [[(cancel-if-recently-scrolled)]], because otherwise
-we'll get a surprise refresh as we're scrolling through some content ourselves.
-The other condition which cancels a refresh is if the developer explicitly
-requests it by invoking [[f:toggle-refresh-pause!]].
-
-Before refreshing, we save the scroll position of the scrollable elements at
-[[(save-scroll-pos)]]. The hard refresh [[(hard-refresh)]] guarantees that we clear the
-heap of any listeners and such on the current page. While we could forego a hard
-refresh and do a DOM replacement in JavaScript, such a strategy is tricky to
-avoid memory leaks. This is why we do a simple hard refresh.
-
-We wait one second [[(normal-refresh-delay)]] before refreshing by default. We wait
-just half a second [[(fast-refresh-delay)]] if the refresh was canceled, so that
-we're more responsive if the user either stops scrolling or if they invoke
-[[f:toggle-refresh-pause!]]. Running ~(lilac.core/toggle-refresh-pause!)~ in the
-ClojureScript REPL (which you get by running ~make dev-cljs~ from [[make:Start
-frontend development environment (CLJS REPL)]]) will result in pausing the refresh
-loop.
-
-#+name: f:toggle-refresh-pause!
-#+begin_src clojure
-(defn toggle-refresh-pause! []
-  (let [k "dev-pause-refresh"
-        current (.getItem js/localStorage k)
-        new-val (if (= current "true") "false" "true")]
-    (.setItem js/localStorage k new-val)
-    (if (= new-val "true") :PAUSED :ACTIVE)))
-#+end_src
+in a third terminal window to make Lilac tangle itself on every change
+([[id:77786b08-6211-47b8-940d-6aaefc17ec47::tangle-loop.sh][tangle-loop.sh]]).
 
 * =lilac.core= namespace
 :PROPERTIES:
@@ -480,8 +311,6 @@ behavior.
             [lilac.toc-active-entries :as tae]
             [lilac.lazy-scroll :as lazy-scroll]
             [lilac.toggle-block-metadata :as tbm]))
-
-<<f:toggle-refresh-pause!>>
 
 (af/init)
 (history/init)
