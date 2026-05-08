@@ -23,16 +23,6 @@ import Lilac.Types
         PTokenLink,
         PTokenMathFragment
       ),
-    ProjectConf
-      ( ProjectConf,
-        bibliography,
-        citationStyle,
-        homepage,
-        name,
-        nonTangledPathspecs,
-        repo,
-        version
-      ),
     Prose (Prose, unProse),
     Style (Bold, Code, Italic, Smallcaps, Superscript, Verbatim),
     StyledText (StyledText, body, style),

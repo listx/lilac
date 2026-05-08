@@ -11,16 +11,6 @@ import Lilac.Types
   ( GTOC (GTOC),
     LinkOid (LinkOid, name, oid),
     Object,
-    ProjectConf
-      ( ProjectConf,
-        bibliography,
-        citationStyle,
-        homepage,
-        name,
-        nonTangledPathspecs,
-        repo,
-        version
-      ),
     decodeGPath,
     emptyProjectConf,
     encodeGPath,
