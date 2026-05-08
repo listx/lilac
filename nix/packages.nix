@@ -25,6 +25,8 @@ let
 
     ourHaskell.ormolu
 
+    pkgs.parinfer-rust
+
     pkgs.vale
   ];
 
@@ -184,6 +186,14 @@ let
       shellcheck = {
         enable = true;
         package = devShellEnv;
+      };
+
+      parinfer-rust = {
+        name = "parinfer-rust";
+        enable = true;
+        always_run = true;
+        entry = "./parinfer-rust.sh";
+        files = "\\.(clj|cljs|cljc|edn)$";
       };
 
       lilac-lint = {

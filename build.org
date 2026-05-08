@@ -281,6 +281,7 @@ tools = [
   <<nix:tool-shfmt>>
   <<nix:tool-nixfmt>>
   <<nix:tool-ormolu>>
+  <<nix:tool-parinfer-rust>>
   <<nix:tool-vale>>
 ];
 #+end_src
@@ -1452,6 +1453,7 @@ pre-commit-check = gitHooksPkgs.run {
     <<hook-ormolu>>
     <<hook-shfmt>>
     <<hook-shellcheck>>
+    <<hook-parinfer-rust>>
     <<hook-lilac-lint>>
     <<hook-unit-test>>
     <<hook-vale>>
@@ -1611,6 +1613,49 @@ shellcheck = {
 #+name: nix:tool-shellcheck
 #+begin_src nix
 pkgs.shellcheck
+#+end_src
+
+** ClojureScript
+
+For ClojureScript we use [[https://github.com/eraserhd/parinfer-rust][=parinfer-rust=]] to check for indentation issues.
+
+#+name: nix:tool-parinfer-rust
+#+begin_src nix
+pkgs.parinfer-rust
+#+end_src
+
+#+name: hook-parinfer-rust
+#+begin_src nix
+parinfer-rust = {
+  name = "parinfer-rust";
+  enable = true;
+  always_run = true;
+  entry = "./parinfer-rust.sh";
+  files = "\\.(clj|cljs|cljc|edn)$";
+};
+#+end_src
+
+#+name: parinfer-rust.sh
+#+header: :tangle parinfer-rust.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src bash
+set -euo pipefail
+
+RET=0
+
+main()
+{
+	for file in "$@"; do
+		# shellcheck disable=SC2094
+		if ! parinfer-rust <"$file" | diff -u "$file" - 2>&1; then
+			RET=1
+		fi
+	done
+
+	exit ${RET}
+}
+
+main "$@"
 #+end_src
 
 ** Audit tangled vs tracked files
