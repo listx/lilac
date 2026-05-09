@@ -313,7 +313,8 @@ fsWatcher dir fsChan activePaths shutdownMVar fsWatcherDone verbose = do
             mgr
             normalizedDir
             isHtmlFsEvent
-            (debouncePerPath activePaths (signalFsEvent normalizedDir fsChan)) -- (ref:f:fsWatcher-debounced-events)
+            -- (ref:f:fsWatcher-debounced-events)
+            (debouncePerPath activePaths (signalFsEvent normalizedDir fsChan))
         logVerboseLn
           verbose
           $ "[fsWatcher] Listening to "
