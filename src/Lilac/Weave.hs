@@ -180,6 +180,7 @@ import Lucid
     alt_,
     aside_,
     async_,
+    autofocus_,
     body_,
     br_,
     button_,
@@ -1873,7 +1874,7 @@ weaveFooter = do
 weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
 weaveMain docMeta lciCellPairs = do
   --
-  main_ [id_ "main-content-column", tabindex_ "-1"] $ do
+  main_ [autofocus_, tabindex_ "-1"] $ do
     weaveDocMeta docMeta
     forM_ lciCellPairs weaveCell
     p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""

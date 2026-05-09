@@ -229,6 +229,7 @@ import Lucid
     alt_,
     aside_,
     async_,
+    autofocus_,
     body_,
     br_,
     button_,
@@ -1079,7 +1080,7 @@ then calls [[f:weaveCell]] to weave all of the cells.
 weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
 weaveMain docMeta lciCellPairs = do
   -- (ref:f:weaveMain-autofocus)
-  main_ [id_ "main-content-column", tabindex_ "-1"] $ do
+  main_ [autofocus_, tabindex_ "-1"] $ do
     weaveDocMeta docMeta
     forM_ lciCellPairs weaveCell
     p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
@@ -1090,9 +1091,11 @@ weaveMain docMeta lciCellPairs = do
       $ toHtmlRaw @Text "</div>" -- (ref:f:weaveMain-heading-container)
 #+end_src
 
-[[(f:weaveMain-autofocus)]] gives a unique ID ~main-content-column~, and also uses
-~tabindex_~ to make it programmatically focused. We do this focusing on the
-initial page load at [[id:07777b91-875c-424b-89cd-10f8a372889c::ns:lilac.autofocus][ns:lilac.autofocus]].
+[[(f:weaveMain-autofocus)]] makes the ~<main>~ element automatically focused on page
+load, with the ~autofocus~ [[https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/autofocus][attribute]] and the use of ~tabindex~. The possible values
+for ~tabindex~ are discussed in the [[https://html.spec.whatwg.org/multipage/interaction.html#tabindex-value][HTML standard]]. The whole point of this is so
+that arrow navigation keys on the keyboard work when trying to scroll down on a
+page, without first having to click on the ~<main>~ area with the mouse.
 
 The closing ~</div>~ tag is for closing up any heading container ~<div>~ elements
 that are created in [[(f:weaveHeading-heading-container)]].
@@ -1375,7 +1378,7 @@ main_ ? do
 #+end_src
 
 [[(css:Main content-remove-focus-highlight)]] removes the focus highlight around the
-main content, when it is automatically focused by [[id:07777b91-875c-424b-89cd-10f8a372889c::ns:lilac.autofocus][ns:lilac.autofocus]].
+main content, when it is automatically focused by [[(f:weaveMain-autofocus)]].
 
 * Identifying cells in HTML
 
