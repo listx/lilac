@@ -25,6 +25,7 @@ test: $(org_files)
 	touch test
 
 lint: lilac.larc
+	lilac lint lilac.larc
 	pre-commit run --all-files
 	touch lint #
 

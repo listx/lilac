@@ -908,6 +908,7 @@ place, so that we can just use the ~pre-commit~ tool to execute them all. See
 #+name: make:Run linters
 #+begin_src makefile
 lint: lilac.larc
+	<<make:lilac lint>>
 	pre-commit run --all-files
 	touch lint # (ref:touch lint)
 #+end_src
@@ -1454,7 +1455,6 @@ pre-commit-check = gitHooksPkgs.run {
     <<hook-shfmt>>
     <<hook-shellcheck>>
     <<hook-parinfer-rust>>
-    <<hook-lilac-lint>>
     <<hook-unit-test>>
     <<hook-vale>>
     <<hook-sort-file-contents>>
@@ -1673,23 +1673,17 @@ binary), binary files (like images), and metadata such as ~.gitmodules~. We
 account for these exceptions in the arguments to ~git-ls-files~ in [[id:4375ba0d-b917-4d32-92f4-884be63659fe::(json:RawProjectConfig-nonTangledPathspecs)]].
 
 The concerns above are addressed by the ~lint~ subcommand of the Lilac CLI, as
-described in [[id:a0b8abe5-5b1c-4dc4-b482-5dbd4b233471][Linting tangled paths]]. What we have below is just the integration
-with the pre-commit hooks system.
+described in [[id:a0b8abe5-5b1c-4dc4-b482-5dbd4b233471][Linting tangled paths]].
 
-#+name: hook-lilac-lint
-#+begin_src nix
-lilac-lint = {
-  name = "lilac-lint";
-  enable = true;
-  always_run = true;
-  entry = "lilac lint lilac.larc";
-  pass_filenames = false;
-};
+Originally we integrated ~lilac lint~ into ~pre-commit~, but then moved away
+from it because it was observed that ~pre-commit~'s invocation of ~lilac lint~ would
+bust the Cabal cache, even if there were no changes to Lilac's source code. So
+instead we just call it as a separate item in the Makefile.
+
+#+name: make:lilac lint
+#+begin_src makefile
+lilac lint lilac.larc
 #+end_src
-
-We set ~pass_filenames = false~ because we don't have to pass in any of the
-changed filenames to the ~lint~ subcommand of Lilac, because Lilac reads all
-tangled paths from the archive and also reads all tracked files from Git.
 
 ** Run lilac unit test before pushing
 :PROPERTIES:

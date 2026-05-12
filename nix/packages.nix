@@ -196,14 +196,6 @@ let
         files = "\\.(clj|cljs|cljc|edn)$";
       };
 
-      lilac-lint = {
-        name = "lilac-lint";
-        enable = true;
-        always_run = true;
-        entry = "lilac lint lilac.larc";
-        pass_filenames = false;
-      };
-
       unit-test = {
         name = "unit-test.sh";
         enable = true;
