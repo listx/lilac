@@ -542,7 +542,7 @@ The first line calls the expression in =default.nix= with the argument for
 ~lilacGitVersion~. The next line =x.lilacPkgs.lilac= accesses the ~lilac~ attribute
 which is just a derivation (an installable Nix package).
 
-** Optimized Haskell packages
+** Haskell packages
 
 *** ~buildFaster~ function
 
@@ -596,7 +596,7 @@ buildForCI = haskellPkg:
   in lib.pipe haskellPkg confFns;
 #+end_src
 
-** External Haskell packages from beyond Nixpkgs
+*** External Haskell packages from beyond Nixpkgs
 
 Sometimes we might want to use a Haskell package that's not in Nixpkgs (for
 example, if the version in Nixpkgs is broken and the fix for that package is
@@ -624,7 +624,7 @@ is still too old for us), we can put the following inside the
 For example, the above will override the default version of ~foo-bar~ with the one
 defined via Git.
 
-** Removing version bounds
+*** Removing version bounds
 
 You can remove version bound checks on package ~foo-package~ like this inside the
 ~jailbreaks~ section of [[nix:Haskell overlays]].
