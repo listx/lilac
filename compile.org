@@ -1422,6 +1422,29 @@ a self-loop. Whether an edge points back to an ancestor can be determined by
 finding strongly connected components with more than one vertex. And we can
 check for self-loops by just seeing if a block links to itself.
 
+#+name: fig:cycles
+#+caption: Possible cycles in a DAG. Node A is a cycle because it points to itself (the equivalent of Noweb link that refers to itself). Nodes B, C, and D form a cycle by forming a chain where one of the children refer back to an ancestor.
+#+type: figure
+[[file:image/cycles.svg]]
+
+#+name: fig:cycles.pikchr
+#+header: :tangle image/cycles.pikchr
+#+begin_src txt
+A: circle "A"
+B: circle "B" at A + (1.5, 0.5)
+C: circle "C" at B + (1, 0)
+D: circle "D" at B + (0.5, -0.9)
+
+Self: spline -> from A.n go up 0.3 then right 0.4 then 0.2 heading 160 to A.ne
+text "Self-loop" ljust at Self.w + (0.4, 0)
+
+arrow from B.e to C.w
+Mid: arrow <- from D.ne to C.s
+arrow from D.nw to B.s
+
+text "Strongly-connected" "component" at Mid + (0.7, -0.1)
+#+end_src
+
 Checking for strongly connected components can be done with the ~scc~ function
 provided by the ~Data.Graph~ library. This library also lets us create a /single/
 graph with all of the blocks in it because the library doesn't care whether the

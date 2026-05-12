@@ -68,7 +68,7 @@ run_all_checks()
 
 	echo "----------------------------------------"
 
-	if ((__ok_to_lint)); then
+	if ((__want_to_lint)) && ((__ok_to_lint)); then
 		make -C "${SCRIPT_ROOT}" lint || true
 	fi
 }
@@ -97,6 +97,11 @@ main()
 	__test_hs=1
 	if [[ "${1:-}" == "fe" ]]; then
 		__test_hs=0
+		shift
+	fi
+	if [[ "${1:-}" == "no-lint" ]]; then
+		__want_to_lint=0
+		shift
 	fi
 	__ok_to_lint=1
 

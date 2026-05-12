@@ -7,6 +7,10 @@ tasks:
   - lint: |
       cd lilac
       nix-shell --run "make lint"
+  - weave: |
+      cd lilac
+      rm -f image/*.svg
+      nix-shell --run "make weave"
   - build: |
       cd lilac
       nix-shell --run "make build-release"

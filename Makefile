@@ -42,7 +42,14 @@ tangle: lilac.larc
 	lilac tangle lilac.larc --out-dir .
 	touch tangle
 
-weave: lilac.larc
+image_sources = $(wildcard image/*.pikchr)
+image_svgs = $(image_sources:.pikchr=.svg)
+
+%.svg: %.pikchr
+	@echo "Compiling Pikchr diagram: $<"
+	pikchr --svg-only $< > $@
+
+weave: lilac.larc $(image_svgs)
 	lilac weave $< --out-dir . --write-css #
 	touch weave
 

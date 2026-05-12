@@ -78,6 +78,7 @@ We define the [[id:df128041-ada8-4d77-a373-111416002dae][Project configuration]]
         ":(exclude,top).gitmodules", (ref:tracked_files-generated-by-git)
         ":(exclude,top)LICENSE",
         ":(exclude,top)*.html",
+        ":(exclude,top,glob)image/*.svg",
         ":(exclude,top,glob)*.org",
         ":(exclude,top)hello-world/*.org",
         ":(exclude,top)image/PNG-Gradient.png", (ref:tracked_files-images)
@@ -267,6 +268,15 @@ version="$(awk \
 
 git commit -am "Lilac ${version}"
 git tag -a "v${version}" -m "Lilac ${version}"
+#+end_src
+
+* Miscellaneous
+
+#+name: .gitattributes
+#+header: :tangle .gitattributes
+#+begin_src gitattributes
+<<id:9880b982-b600-48d7-bb7b-55baa62501b9::gitattributes-ignore-svgs>>
+<<id:7e6758c8-a642-4cfa-9e03-498163d6ce68::gitattributes-ignore-compiled-js>>
 #+end_src
 
 * Glossary (Global)

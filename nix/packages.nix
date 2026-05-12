@@ -28,6 +28,8 @@ let
     pkgs.parinfer-rust
 
     pkgs.vale
+
+    pkgs.pikchr
   ];
 
   hlib = pkgs.haskell.lib;

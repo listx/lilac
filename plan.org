@@ -29,16 +29,15 @@ other sections as needed.
 Change [[id:0cf535d6-f852-4b97-8ef8-9d566ad32e51::.build.yml][.build.yml]] to use https://git.sr.ht/~listx/lilac instead of SSH (because
 it won't be a private repo).
 
-** TODO add diagrams
+** TODO woven HTML: teach figures to link to code blocks
 
-*** TODO strongly-connected-components and self-loops
+The use case is for diagrams that have accompanying source code. This source
+code would generally not be of immediate interest, but we should still link to
+them so the user can see the contents.
 
-See CLRS page 616 which shows a graph that has a self loop and
-strongly-connected-components.
-
-*** TODO relationship of subcommands
-
-*** TODO how live reload works
+Give figures a ~source-code~ or similar tag, and give it a link to a block. Then
+during weaving, we can look up the code block and inject the (hidden) code
+block. At the very least we can just add a link.
 
 * Backlog
 :PROPERTIES:
