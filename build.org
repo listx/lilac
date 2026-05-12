@@ -512,6 +512,36 @@ This memoizes the expensive part of the computation. If we don't do this, it
 will re-parse the ~.gitignore~ files it finds (recursively, from the project root)
 all over again each time it is called.
 
+** =lilac= attribute
+
+Recall that the [[nix:Haskell overlays]] added the Lilac package to the top-level
+Nixpkgs set of packages, which we named ~ourHaskell~ [[(nix:ourHaskell-ourHaskell)]].
+We expose it now as just ~lilac~.
+
+#+name: nix:Lilac derivation
+#+begin_src nix
+lilac = ourHaskell.lilac;
+#+end_src
+
+So this means any Nix expression that imports [[nix/packages.nix]] will be able to
+refer to the Lilac Haskell build as ~lilac~. This is what we do in [[nix/default.nix]]
+where we decide to name the attribute set from the evaluation of
+[[nix/packages.nix]] as ~lilacPkgs~ (so it would be ~lilacPkgs.lilac~). And
+consequently, [[nix/release.nix]] references ~lilacPkgs.lilac~ so that only this
+particular package gets built if we choose to feed this file into ~nix-build~.
+
+You can inspect the ~lilacPkgs.lilac~ derivation by running =nix repl= from the
+project root, then typing into the REPL the following example:
+
+#+begin_example
+x = import ./nix/default.nix { lilacGitVersion = "someversion"; }
+x.lilacPkgs.lilac
+#+end_example
+
+The first line calls the expression in =default.nix= with the argument for
+~lilacGitVersion~. The next line =x.lilacPkgs.lilac= accesses the ~lilac~ attribute
+which is just a derivation (an installable Nix package).
+
 ** Optimized Haskell packages
 
 *** ~buildFaster~ function
@@ -565,36 +595,6 @@ buildForCI = haskellPkg:
 
   in lib.pipe haskellPkg confFns;
 #+end_src
-
-** =lilac= attribute
-
-Recall that the [[nix:Haskell overlays]] added the Lilac package to the top-level
-Nixpkgs set of packages, which we named ~ourHaskell~ [[(nix:ourHaskell-ourHaskell)]].
-We expose it now as just ~lilac~.
-
-#+name: nix:Lilac derivation
-#+begin_src nix
-lilac = ourHaskell.lilac;
-#+end_src
-
-So this means any Nix expression that imports [[nix/packages.nix]] will be able to
-refer to the Lilac Haskell build as ~lilac~. This is what we do in [[nix/default.nix]]
-where we decide to name the attribute set from the evaluation of
-[[nix/packages.nix]] as ~lilacPkgs~ (so it would be ~lilacPkgs.lilac~). And
-consequently, [[nix/release.nix]] references ~lilacPkgs.lilac~ so that only this
-particular package gets built if we choose to feed this file into ~nix-build~.
-
-You can inspect the ~lilacPkgs.lilac~ derivation by running =nix repl= from the
-project root, then typing into the REPL the following example:
-
-#+begin_example
-x = import ./nix/default.nix { lilacGitVersion = "someversion"; }
-x.lilacPkgs.lilac
-#+end_example
-
-The first line calls the expression in =default.nix= with the argument for
-~lilacGitVersion~. The next line =x.lilacPkgs.lilac= accesses the ~lilac~ attribute
-which is just a derivation (an installable Nix package).
 
 ** External Haskell packages from beyond Nixpkgs
 
