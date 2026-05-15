@@ -79,6 +79,7 @@ import Clay
     italic,
     left,
     li,
+    lineHeight,
     listStyleType,
     main_,
     margin,
@@ -133,6 +134,7 @@ import Clay
     transparent,
     ul,
     underline,
+    unitless,
     vAlignSub,
     vAlignSuper,
     verticalAlign,
@@ -255,6 +257,10 @@ defaultCss = do
           marginLeft (rem $ -1.3)
           position absolute
           left (px 0)
+          top (px $ -2)
+          fontSize (px 24)
+          fontFamily ["Arial"] [sansSerif]
+          lineHeight $ unitless 1
       li # ".toc-level-2" ? do
         position relative
         before & do
@@ -262,6 +268,10 @@ defaultCss = do
           marginLeft (rem $ -1.3)
           position absolute
           left (px 0)
+          top (px $ -2)
+          fontSize (px 24)
+          fontFamily ["Arial"] [sansSerif]
+          lineHeight $ unitless 1
       div ? do
         paddingRight $ px 8
         paddingLeft $ px 20
@@ -342,13 +352,13 @@ defaultCss = do
         case n of
           1 -> do
             fontSize (pt 36)
-            headingPrefix "●" (rem $ -2.8) (px $ -3) --
+            headingPrefix "●" (px 67) (rem $ -2.8) (px $ -3) --
           2 -> do
             fontSize (pt 26)
-            headingPrefix "■" (rem $ -2.5) (px $ -3) --
+            headingPrefix "■" (px 44) (rem $ -2.5) (px $ -3) --
           3 -> do
             fontSize (pt 22)
-            headingPrefix "○" (rem $ -2.25) (px $ -1) --
+            headingPrefix "○" (px 39) (rem $ -2.25) (px $ -1) --
           4 -> do
             fontSize (pt 18)
           5 -> do
@@ -812,11 +822,14 @@ fontMono = do
   fontFamily ["Source Code Pro"] [monospace]
   fontSize (em 0.9)
 
-headingPrefix :: Text -> Size sz -> Size sz -> Css
-headingPrefix prefix spacing fromTop =
+headingPrefix :: Text -> Size sz -> Size sz -> Size sz -> Css
+headingPrefix prefix fSize spacing fromTop =
   before & do
     content $ stringContent prefix
     marginLeft spacing
     position absolute
     top fromTop
     left (px 0)
+    fontSize fSize
+    fontFamily ["Arial"] [sansSerif]
+    lineHeight $ unitless 1
