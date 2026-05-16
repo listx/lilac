@@ -7,6 +7,7 @@ module Lilac.Parse
     defaultOrgParserConf,
     genSectionNumber,
     genHeadingOidStack,
+    isLineLabel,
     isNumericText,
     maskToStyles,
     orgDocParser,
@@ -1448,16 +1449,19 @@ oidLinkParser = do
       implicitDisplayName
         | T.null name = "id:" <> T.show oid
         | otherwise = name
-      implicitDisplayNameStyledText =
-        StyledText
-          { body = implicitDisplayName,
-            style = mask
-          }
+      implicitDisplayNameStyledText
+        | isLineLabel name = []
+        | otherwise =
+            [ StyledText
+                { body = implicitDisplayName,
+                  style = mask
+                }
+            ]
 
   _ <- string "]"
   displayName <-
     MP.choice
-      [ MP.try $ string "]" >> pure [implicitDisplayNameStyledText],
+      [ MP.try $ string "]" >> pure implicitDisplayNameStyledText,
         MP.try linkDisplayNameParser --
       ]
   let linkOid =
@@ -1484,8 +1488,9 @@ oidLinkParser = do
         . map (MP.try . string)
         $ protocolsWeb
         <> protocolsEmacs
-    isLineLabel :: Text -> Bool --
-    isLineLabel s = T.take 1 s == "(" && T.takeEnd 1 s == ")"
+
+isLineLabel :: Text -> Bool
+isLineLabel s = T.take 1 s == "(" && T.takeEnd 1 s == ")"
 
 oidReferenceParser :: [Char] -> [Char] -> OrgParser (OID, Text)
 oidReferenceParser disallowedChars ending =

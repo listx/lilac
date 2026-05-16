@@ -535,6 +535,7 @@ module Lilac.Parse
     defaultOrgParserConf,
     genSectionNumber,
     genHeadingOidStack,
+    isLineLabel,
     isNumericText,
     maskToStyles,
     orgDocParser,
@@ -910,6 +911,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:nowebLinkTargetParser>>
 <<f:lineLabelParser>>
 <<f:oidLinkParser>>
+<<f:isLineLabel>>
 <<f:oidReferenceParser>>
 <<f:compressedTextParser>>
 <<f:ignoreSpecialCommas>>
@@ -3203,16 +3205,19 @@ oidLinkParser = do
       implicitDisplayName
         | T.null name = "id:" <> T.show oid
         | otherwise = name
-      implicitDisplayNameStyledText =
-        StyledText
-          { body = implicitDisplayName,
-            style = mask
-          }
+      implicitDisplayNameStyledText
+        | isLineLabel name = []
+        | otherwise =
+            [ StyledText
+                { body = implicitDisplayName,
+                  style = mask
+                }
+            ]
 
   _ <- string "]"
   displayName <-
     MP.choice
-      [ MP.try $ string "]" >> pure [implicitDisplayNameStyledText],
+      [ MP.try $ string "]" >> pure implicitDisplayNameStyledText,
         MP.try linkDisplayNameParser -- (ref:f:oidLinkParser-linkDisplayNameParser)
       ]
   let linkOid =
@@ -3239,15 +3244,19 @@ oidLinkParser = do
         . map (MP.try . string)
         $ protocolsWeb
         <> protocolsEmacs
-    isLineLabel :: Text -> Bool -- (ref:f:oidLinkParser-isLineLabel)
-    isLineLabel s = T.take 1 s == "(" && T.takeEnd 1 s == ")"
+#+end_src
+
+#+name: f:isLineLabel
+#+begin_src haskell
+isLineLabel :: Text -> Bool
+isLineLabel s = T.take 1 s == "(" && T.takeEnd 1 s == ")"
 #+end_src
 
 There are three main pieces involved here:
 
   1) [[f:oidReferenceParser]] [[(f:oidLinkParser-oidReferenceParser)]] for parsing the
      location of the linked item (anything that can be named, such as a code
-     block, line label [[(f:oidLinkParser-isLineLabel)]], figure, or table);
+     block, line label [[f:isLineLabel]], figure, or table);
 
   2) [[f:linkDisplayNameParser]] [[(f:oidLinkParser-linkDisplayNameParser)]] for parsing
      the display name of the link (if any); and

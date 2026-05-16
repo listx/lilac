@@ -693,19 +693,18 @@ weaveBlockBody block bodyBorder =
         let colorizedBody = renderAsText weaveConf $ colorizeText lang bodyText
             getLink = \case
               BTokenLinkTarget lt ->
-                let body' = case lt of
-                      LinkTargetOid (LinkOid _oid n) -> n
-                      LinkTargetLineLabel (LinkOid _oid n) -> n
-                      _ -> "weaveBlock error"
-                    name' =
-                      StyledText
-                        { body = body',
-                          style = styleMaskFrom []
-                        }
+                let styledName = case lt of
+                      LinkTargetOid (LinkOid _oid n) ->
+                        [ StyledText
+                            { body = n,
+                              style = styleMaskFrom []
+                            }
+                        ]
+                      _ -> []
                  in Just
                       $ Link
                         { target = lt,
-                          name = [name']
+                          name = styledName
                         }
               BTokenString {}
               BTokenPadding {} -> Nothing
@@ -916,6 +915,7 @@ weaveLinkDisplayName link = do
   let displayName =
         case link.target of
           LinkTargetLineLabel lineLabel
+            | link.name /= [] -> link.name
             | Just gci <- lookup lineLabel weaveConf.archive.symbols,
               Just (obj, _) <- gciToObjCell weaveConf.archive gci,
               Just num <-
