@@ -152,6 +152,52 @@ There are three main parts to make the above work, in order of increasing comple
      reload command to (it needs to pick the one that's looking at a stale HTML
      file).
 
+#+name: fig:lilac-serve
+#+caption: Call sequence (of interesting bits) for [[id:b0033603-7251-449b-ba7d-be4a1a118fd0::f:lilacServe]] (happy path). The ~heartbeatHandlerThread~ [[(f:handleClientConnection-heartbeatHandlerThread)]] and [[f:waitForMatch][=waitForMatch=]] boxes are separate looping threads. Dashed lines represent multiple actions.
+#+type: figure
+[[file:image/lilac-serve.svg]]
+
+#+name: fig:lilac-serve.pikchr
+#+header: :tangle image/lilac-serve.pikchr
+#+begin_src txt
+layer = 0
+$gap = 2
+Client: box "Client"
+Server: box "Server" at Client + ($gap, 0)
+FSW: box "FS watcher" "thread" "(in Server)" at Server + ($gap, 0)
+
+line from Client.s to Client.s + (0, -4)
+line from Server.s same
+line from FSW.s same
+
+layer = 1
+arrow "fsWatcher" mono above "(Watch files in dir)" above \
+  from Server.s + (0, -0.5) then right until even with FSW.s
+arrow "GET http://localhost/foo.html" above \
+  from Client.s + (0, -1) then right until even with Server.s
+arrow "liveReloadMiddleware" mono above "(Inject live reload JS)" above <- \
+  from Client.s + (0, -1.5) then right until even with Server.s
+arrow "ws://localhost/lilac-ws" mono above "(Send '/foo.html' path)" above \
+  from Client.s + (0, -2) then right until even with Server.s
+arrow "Subscribe to FS events" above "and drain any existing events" above \
+  from Server.s + (0, -2.5) then right until even with FSW.s
+
+ClientHeartbeatLoop: box radius 4px "heartbeatHandlerThread" mono \
+  "(Keep websocket alive)" fit fill white \
+  at Server.s + (0, -3)
+arrow dashed "Send heartbeats" above \
+  from Client.s + (0, -3) then right until even with ClientHeartbeatLoop.w
+
+FSLoop: box radius 4px "waitForMatch" mono \
+  "(FS event" "listener loop)" fit fill white \
+  at Server.s + (0, -3.6)
+arrow <- dashed \
+  "New FS events" above "for '/foo.html'" above "(debounced)" below \
+  from FSLoop.e then right until even with FSW.s
+arrow <- dashed "Send reload commands" above "over websocket" above \
+  from Client.s + (0, -3.6) then right until even with FSLoop.w
+#+end_src
+
 * Client JavaScript injection
 :PROPERTIES:
 :ID:       d1ad2493-3782-4db3-b334-8a165ec298c0
@@ -449,7 +495,7 @@ wsHandler fsChan verbose pending = do
 
 Most of the work falls to [[f:handleClientConnection]], which creates a separate
 thread for keeping the WebSocket alive (by processing the heartbeats sent by the
-client). As for the main thread, it just for filesystem events through [[f:waitForMatch]].
+client). As for the main thread, it just listens for filesystem events through [[f:waitForMatch]].
 
 #+name: f:handleClientConnection
 #+begin_src haskell

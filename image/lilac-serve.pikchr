@@ -1,0 +1,36 @@
+layer = 0
+$gap = 2
+Client: box "Client"
+Server: box "Server" at Client + ($gap, 0)
+FSW: box "FS watcher" "thread" "(in Server)" at Server + ($gap, 0)
+
+line from Client.s to Client.s + (0, -4)
+line from Server.s same
+line from FSW.s same
+
+layer = 1
+arrow "fsWatcher" mono above "(Watch files in dir)" above \
+  from Server.s + (0, -0.5) then right until even with FSW.s
+arrow "GET http://localhost/foo.html" above \
+  from Client.s + (0, -1) then right until even with Server.s
+arrow "liveReloadMiddleware" mono above "(Inject live reload JS)" above <- \
+  from Client.s + (0, -1.5) then right until even with Server.s
+arrow "ws://localhost/lilac-ws" mono above "(Send '/foo.html' path)" above \
+  from Client.s + (0, -2) then right until even with Server.s
+arrow "Subscribe to FS events" above "and drain any existing events" above \
+  from Server.s + (0, -2.5) then right until even with FSW.s
+
+ClientHeartbeatLoop: box radius 4px "heartbeatHandlerThread" mono \
+  "(Keep websocket alive)" fit fill white \
+  at Server.s + (0, -3)
+arrow dashed "Send heartbeats" above \
+  from Client.s + (0, -3) then right until even with ClientHeartbeatLoop.w
+
+FSLoop: box radius 4px "waitForMatch" mono \
+  "(FS event" "listener loop)" fit fill white \
+  at Server.s + (0, -3.6)
+arrow <- dashed \
+  "New FS events" above "for '/foo.html'" above "(debounced)" below \
+  from FSLoop.e then right until even with FSW.s
+arrow <- dashed "Send reload commands" above "over websocket" above \
+  from Client.s + (0, -3.6) then right until even with FSLoop.w
