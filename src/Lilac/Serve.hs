@@ -278,7 +278,7 @@ debouncePerPath genMap action e = do
     pure nextGen
 
   void . forkIO $ do
-    threadDelay 500_000 --
+    threadDelay 100_000 --
     shouldFire <- atomically $ do
       m <- readTVar genMap
       case lookup path m of --
