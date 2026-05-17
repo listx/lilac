@@ -3246,17 +3246,11 @@ oidLinkParser = do
         <> protocolsEmacs
 #+end_src
 
-#+name: f:isLineLabel
-#+begin_src haskell
-isLineLabel :: Text -> Bool
-isLineLabel s = T.take 1 s == "(" && T.takeEnd 1 s == ")"
-#+end_src
-
 There are three main pieces involved here:
 
   1) [[f:oidReferenceParser]] [[(f:oidLinkParser-oidReferenceParser)]] for parsing the
      location of the linked item (anything that can be named, such as a code
-     block, line label [[f:isLineLabel]], figure, or table);
+     block, line label, figure, or table);
 
   2) [[f:linkDisplayNameParser]] [[(f:oidLinkParser-linkDisplayNameParser)]] for parsing
      the display name of the link (if any); and
@@ -3275,7 +3269,8 @@ block.
 
 So in practice although we can just pattern match on this constructor to know
 whether the [[data:LinkOid]] contained within it is a line label or not, we still
-have to inspect the name if we're only dealing with the inner ~LinkOid~ type.
+have to inspect the name (with [[f:isLineLabel]]) if we're only dealing with the
+inner ~LinkOid~ type.
 
 Pseudo-edges are needed for [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4][backlink]] generation. Now let's look at the first two
 pieces in more detail.
@@ -3826,6 +3821,99 @@ shouldParseWith
       ]
       [PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "target name with newline and space is still treated as space"})]
   )
+#+end_src
+
+A link to a line label will only have a link display name if the user defines it
+explicitly. That is, ~[[(foo)]]~ won't have a name
+[[(t:0006-links-oids-line-labels-implicit-blank)]], but ~[[(foo)][explicit name]]~
+will have one [[(t:0006-links-oids-line-labels-explicit)]].
+
+#+name: ti:0006-links-oids-line-labels
+#+header: :tangle test/Lilac/ParseSpec/0006-links-oids-line-labels
+#+header: :line-label off
+#+begin_src org
+,#+begin_src txt
+(ref:foo)
+,#+end_src
+
+[[(foo)]] [[(foo)][explicit name]]
+#+end_src
+
+#+name: t:0006-links-oids-line-labels
+#+begin_src haskell
+shouldParseWithState
+  "0006-links-oids-line-labels"
+  ( OrgDoc
+      { oid = nilOid,
+        cells =
+          [ CBlock
+              Block
+                { parentOid = nilOid,
+                  meta =
+                    fromList
+                      [ ("__anon_block_number", "1"),
+                        ("__block_type", "src"),
+                        ("__src_language", "txt")
+                      ],
+                  body =
+                    [ BTokenLinkTarget
+                        $ LinkTargetLineLabel
+                          LinkOid {oid = nilOid, name = "(foo)"}
+                    ]
+                },
+            CParagraph
+              $ Prose
+                [ PTokenLink
+                    Link
+                      { name = [], -- (ref:t:0006-links-oids-line-labels-implicit-blank)
+                        target =
+                          LinkTargetLineLabel
+                            LinkOid {oid = nilOid, name = "(foo)"}
+                      },
+                  ptext " " [],
+                  PTokenLink
+                    Link
+                      { name =
+                          [ stext "explicit" [], -- (ref:t:0006-links-oids-line-labels-explicit)
+                            stext " " [],
+                            stext "name" []
+                          ],
+                        target =
+                          LinkTargetLineLabel
+                            LinkOid {oid = nilOid, name = "(foo)"}
+                      }
+                ]
+          ],
+        pseudoEdges =
+          [ PseudoEdge
+              ( LCI 1,
+                LinkOid
+                  { oid = nilOid,
+                    name = "(foo)"
+                  }
+              ),
+            PseudoEdge
+              ( LCI 1,
+                LinkOid
+                  { oid = nilOid,
+                    name = "(foo)"
+                  }
+              )
+          ],
+        footnoteRefs = M.empty,
+        glossary = M.empty,
+        lineLabels = fromList [("foo", 1)],
+        cslPath = Nothing,
+        bibPaths = [],
+        citations = [],
+        meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+      }
+  )
+  defaultOrgParserState
+    { anonBlockNumber = 1,
+      lineLabelNumber = 1,
+      lineLabels = fromList [("foo", 1)]
+    }
 #+end_src
 
 ** Links to recognized web protocols
@@ -4391,7 +4479,15 @@ with an opening parenthesis, so that ~[[(foo)]]~ always links to the line label
 named ~foo~, not a cell named ~(foo)~; this prohibition of an opening parenthesis is
 codified in [[f:metaEntryParser]] at [[(non-line-label name)]].
 
-Parsing of line label links is handled by [[f:oidLinkParser]].
+Parsing of line label links is handled by [[f:oidLinkParser]], which uses
+[[f:isLineLabel]] to inspect the name of the [[(data:LinkOid-name)][LinkOid]] to see whether we are dealing
+with a line label or not.
+
+#+name: f:isLineLabel
+#+begin_src haskell
+isLineLabel :: Text -> Bool
+isLineLabel s = T.take 1 s == "(" && T.takeEnd 1 s == ")"
+#+end_src
 
 Unlike other links that use the double bracket syntax, these line label links
 cannot be given a custom name for how they are displayed inside code blocks;
@@ -12673,6 +12769,7 @@ import Lilac.Types
     LinkTarget
       ( LinkTargetFilePath,
         LinkTargetFootnote,
+        LinkTargetLineLabel,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -12713,6 +12810,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSectionNumber,
+        lineLabelNumber,
         lineLabels,
         orgParserConf,
         prevCellIsFootnote,
@@ -13063,6 +13161,7 @@ Below are all of the individual test cases.
 <<t:0006-links-web-protocols>>
 <<t:0006-links-oids>>
 <<t:0006-links-oids-lenient-whitespace>>
+<<t:0006-links-oids-line-labels>>
 <<t:0006-unique-line-labels>>
 <<t:0007-block-src-without-lang>>
 <<t:0007-blocks-empty>>

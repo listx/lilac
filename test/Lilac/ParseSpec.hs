@@ -32,6 +32,7 @@ import Lilac.Types
     LinkTarget
       ( LinkTargetFilePath,
         LinkTargetFootnote,
+        LinkTargetLineLabel,
         LinkTargetOid,
         LinkTargetURI
       ),
@@ -72,6 +73,7 @@ import Lilac.Types
         headingLevel,
         headingOidStack,
         headingSectionNumber,
+        lineLabelNumber,
         lineLabels,
         orgParserConf,
         prevCellIsFootnote,
@@ -1135,6 +1137,80 @@ spec = do
         ]
         [PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "target name with newline and space is still treated as space"})]
     )
+
+  shouldParseWithState
+    "0006-links-oids-line-labels"
+    ( OrgDoc
+        { oid = nilOid,
+          cells =
+            [ CBlock
+                Block
+                  { parentOid = nilOid,
+                    meta =
+                      fromList
+                        [ ("__anon_block_number", "1"),
+                          ("__block_type", "src"),
+                          ("__src_language", "txt")
+                        ],
+                    body =
+                      [ BTokenLinkTarget
+                          $ LinkTargetLineLabel
+                            LinkOid {oid = nilOid, name = "(foo)"}
+                      ]
+                  },
+              CParagraph
+                $ Prose
+                  [ PTokenLink
+                      Link
+                        { name = [], --
+                          target =
+                            LinkTargetLineLabel
+                              LinkOid {oid = nilOid, name = "(foo)"}
+                        },
+                    ptext " " [],
+                    PTokenLink
+                      Link
+                        { name =
+                            [ stext "explicit" [], --
+                              stext " " [],
+                              stext "name" []
+                            ],
+                          target =
+                            LinkTargetLineLabel
+                              LinkOid {oid = nilOid, name = "(foo)"}
+                        }
+                  ]
+            ],
+          pseudoEdges =
+            [ PseudoEdge
+                ( LCI 1,
+                  LinkOid
+                    { oid = nilOid,
+                      name = "(foo)"
+                    }
+                ),
+              PseudoEdge
+                ( LCI 1,
+                  LinkOid
+                    { oid = nilOid,
+                      name = "(foo)"
+                    }
+                )
+            ],
+          footnoteRefs = M.empty,
+          glossary = M.empty,
+          lineLabels = fromList [("foo", 1)],
+          cslPath = Nothing,
+          bibPaths = [],
+          citations = [],
+          meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+        }
+    )
+    defaultOrgParserState
+      { anonBlockNumber = 1,
+        lineLabelNumber = 1,
+        lineLabels = fromList [("foo", 1)]
+      }
 
   shouldFailWithMessage
     "0006-unique-line-labels"
