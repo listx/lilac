@@ -267,6 +267,9 @@ server. We do several things over the WebSocket:
   4) When there's an error with the WebSocket itself, we close it ourselves
      [[(js:live-reload-close)]].
 
+  5) Of course, when the server tells us to reload, we do so by calling
+     [[(js:reload-page-reloadPage)][=reloadPage()=]] [[(js:live-reload-handle-reload-request)]].
+
 #+name: js:live-reload
 #+begin_src js
 (function() {
@@ -276,6 +279,8 @@ server. We do several things over the WebSocket:
                   + window.location.host
                   + '/lilac-ws';
 
+    <<js:reload-page>>
+
     function connectWebSocket() {
         const ws = new WebSocket(wsUrl); // (ref:js:live-reload-create-websocket)
 
@@ -283,7 +288,7 @@ server. We do several things over the WebSocket:
             if (!reloading) {
                 reloading = true;
                 console.log("Lilac: Initiating reload...");
-                window.location.reload();
+                reloadPage();
             }
         };
 
@@ -325,6 +330,93 @@ server. We do several things over the WebSocket:
     connectWebSocket();
 })();
 #+end_src
+
+Now we get to the script which refreshes the page. We can't just issue a raw
+~window.location.reload()~ by itself because we want to remember our scroll
+position in the page. Otherwise when the reload happens, unless we were at a
+link anchor, we would be move up to the very top of the page.
+
+We want to first load the scroll positions (that were saved from the previous
+invocation, if any), then save the current scroll positions (to local storage),
+and then finally do a hard refresh. The one other thing we do is avoid
+performing the hard refresh if either the page has been recently scrolled (if
+the user is interacting with the page by scrolling).
+
+#+name: js:reload-page
+#+begin_src js
+const scrollSelectors = ['nav.toc', 'main', 'aside.sidebar']; // (ref:scrollSelectors)
+const storageKey = 'dev-scroll-map';
+
+let lastScrollTime = 0;
+window.addEventListener('scroll', () => { // (ref:lastScrollTimeListener)
+  lastScrollTime = Date.now();
+}, true);
+
+function setScrollPositions(map) {
+  for (let sel in map) {
+    let el = document.querySelector(sel);
+    if (el) el.scrollTop = map[sel];
+  }
+}
+
+function getScrollPositions(selectors) {
+  let map = {};
+  selectors.forEach(sel => {
+    let el = document.querySelector(sel);
+    if (el) map[sel] = el.scrollTop;
+  });
+  return map;
+}
+
+const rawData = localStorage.getItem(storageKey);
+if (rawData) {
+  const prevScrollPositions = JSON.parse(rawData);
+  setTimeout(() => {
+    setScrollPositions(prevScrollPositions); // (ref:restore-scroll-pos)
+    localStorage.removeItem(storageKey);
+  }, 200); // (ref:page-render-delay)
+}
+
+// (ref:js:reload-page-reloadPage)
+function reloadPage() {
+  const recentlyScrolled = (Date.now() - lastScrollTime) < 1500; // (ref:recentlyScrolled)
+
+  if (recentlyScrolled) { // (ref:cancel-if-recently-scrolled)
+    setTimeout(reloadPage, 500); // (ref:fast-refresh-delay)
+    return;
+  }
+
+  const currentScrollPositions = getScrollPositions(scrollSelectors);
+  localStorage.setItem(storageKey,
+                       JSON.stringify(currentScrollPositions)); // (ref:save-scroll-pos)
+
+  window.location.reload(); // (ref:hard-refresh)
+}
+#+end_src
+
+The scrollable elements [[(scrollSelectors)]] are based on those top-level helpers
+described in [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb][Object]] and [[id:eda7626d-42fd-45d3-b0f8-940710413295][Page layout]]. The event listener at
+(lastScrollTimeListener)]] updates the value of ~lastScrollTime~ so that we can
+tell how recently the user scrolled anything on the page at [[(recentlyScrolled)]].
+
+Restoration of any previously saved scroll positions is handled at
+[[(restore-scroll-pos)]]. The 200 millisecond delay at [[(page-render-delay)]] gives the
+browser time to finish rendering the page before we attempt to restore the
+scroll positions (otherwise, the DOM may not have been parsed yet for the
+JavaScript to look at and manipulate).
+
+Now we get to the refreshing logic. If we have recently scrolled the window, we
+cancel the refresh at [[(cancel-if-recently-scrolled)]], because otherwise we'll get
+a surprise refresh as we're scrolling through some content ourselves.
+
+Before refreshing, we save the scroll position of the scrollable elements at
+[[(save-scroll-pos)]]. The hard refresh [[(hard-refresh)]] guarantees that we clear the
+heap of any listeners and such on the current page. While we could forego a hard
+refresh and do a DOM replacement in JavaScript, such a strategy is tricky to
+avoid memory leaks. This is why we do a simple hard refresh.
+
+We wait just half a second [[(fast-refresh-delay)]] if the refresh was canceled, so
+that we're more responsive if the user either stops scrolling.
 
 * Filesystem watcher
 :PROPERTIES:

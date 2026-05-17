@@ -119,6 +119,55 @@ liveReloadMiddleware root fsChan verbose baseApp req respond =
                               + window.location.host
                               + '/lilac-ws';
 
+                const scrollSelectors = ['nav.toc', 'main', 'aside.sidebar']; //
+                const storageKey = 'dev-scroll-map';
+
+                let lastScrollTime = 0;
+                window.addEventListener('scroll', () => { //
+                  lastScrollTime = Date.now();
+                }, true);
+
+                function setScrollPositions(map) {
+                  for (let sel in map) {
+                    let el = document.querySelector(sel);
+                    if (el) el.scrollTop = map[sel];
+                  }
+                }
+
+                function getScrollPositions(selectors) {
+                  let map = {};
+                  selectors.forEach(sel => {
+                    let el = document.querySelector(sel);
+                    if (el) map[sel] = el.scrollTop;
+                  });
+                  return map;
+                }
+
+                const rawData = localStorage.getItem(storageKey);
+                if (rawData) {
+                  const prevScrollPositions = JSON.parse(rawData);
+                  setTimeout(() => {
+                    setScrollPositions(prevScrollPositions); //
+                    localStorage.removeItem(storageKey);
+                  }, 200); //
+                }
+
+                //
+                function reloadPage() {
+                  const recentlyScrolled = (Date.now() - lastScrollTime) < 1500; //
+
+                  if (recentlyScrolled) { //
+                    setTimeout(reloadPage, 500); //
+                    return;
+                  }
+
+                  const currentScrollPositions = getScrollPositions(scrollSelectors);
+                  localStorage.setItem(storageKey,
+                                       JSON.stringify(currentScrollPositions)); //
+
+                  window.location.reload(); //
+                }
+
                 function connectWebSocket() {
                     const ws = new WebSocket(wsUrl); //
 
@@ -126,7 +175,7 @@ liveReloadMiddleware root fsChan verbose baseApp req respond =
                         if (!reloading) {
                             reloading = true;
                             console.log("Lilac: Initiating reload...");
-                            window.location.reload();
+                            reloadPage();
                         }
                     };
 
