@@ -309,9 +309,9 @@ waitForMatch conn fsPathChan browserLocation = do
       let time = "[" <> t <> "]"
           announcement =
             time
-              <> " FS event detected ("
+              <> " FS event detected, reloading "
               <> browserLocation
-              <> "), reloading."
+              <> "."
       putTextLn announcement
       WS.sendTextData conn ("reload" :: Text) --
     else
