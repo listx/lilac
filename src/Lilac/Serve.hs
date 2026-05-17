@@ -22,7 +22,8 @@ import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict (findWithDefault)
 import Data.Text qualified as T
 import Data.Text.IO qualified as T
-import Data.Time (defaultTimeLocale, formatTime, getCurrentTime)
+import Data.Time (defaultTimeLocale, formatTime)
+import Data.Time.LocalTime (getZonedTime)
 import Network.HTTP.Types (status200)
 import Network.Wai (Middleware, pathInfo, responseLBS)
 import Network.Wai.Handler.WebSockets (websocketsOr)
@@ -319,8 +320,8 @@ waitForMatch conn fsPathChan browserLocation = do
 
 getTimestamp :: IO Text
 getTimestamp = do
-  now <- getCurrentTime
-  let timeStr = formatTime defaultTimeLocale "%H:%M:%S" now
+  now <- getZonedTime
+  let timeStr = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%Ez" now
   pure $ T.pack timeStr
 
 logVerbose :: Bool -> Text -> IO ()
