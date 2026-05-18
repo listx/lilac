@@ -67,7 +67,7 @@ where we declare the dependency on Figwheel.
 #+begin_src clojure
 {:deps {com.bhauman/figwheel-main {:mvn/version "0.2.20"}
         com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
- :paths ["base" "src/fe"]}
+ :paths ["resources" "src/fe"]}
 #+end_src
 
 The ~:paths ["target"]~ is necessary for helping
@@ -111,7 +111,7 @@ clojure -M -m figwheel.main --build lilac --repl
 #+end_src
 
 This will create a REPL that can evaluate CLJS and run it as JS in the browser
-tab at http://localhost:8080/index.html per the ~:open-url~ setting in
+tab at http://localhost:9500 per the ~:open-url~ setting in
 [[cfg:figwheel-main.edn]]. The ~lilac~ in ~--build lilac~ comes from the ~lilac~ substring
 in the ~lilac.cljs.edn~ configuration file (this is a Figwheel convention).
 
@@ -250,7 +250,7 @@ across all build files.
 #+begin_src clojure
 {:watch-dirs ["src/fe"]
  :css-dirs ["css"]
- :open-url false
+ :open-url "http://localhost:9500"
  :target-dir "js"
  :clean-outputs true}
 #+end_src
