@@ -507,7 +507,7 @@ type GenMap = Map FilePath Int
 #+end_src
 
 [[f:debouncePerPath]] checks the generation number, starting with 0 or incrementing
-it by 1 [[(f:debouncePerPath-genNum)]]. After waiting for 100ms
+it by 1 [[(f:debouncePerPath-genNum)]]. After waiting for 500ms
 [[(f:debouncePerPath-wait)]], it looks up the generation number
 [[(f:debouncePerPath-genNum-lookup)]]. If no other thread has incremented it in that
 span of time, then the thread knows that it's safe to run the action. Otherwise,
@@ -528,7 +528,7 @@ debouncePerPath genMap action e = do
     pure nextGen
 
   void . forkIO $ do
-    threadDelay 100_000 -- (ref:f:debouncePerPath-wait)
+    threadDelay 500_000 -- (ref:f:debouncePerPath-wait)
     shouldFire <- atomically $ do
       m <- readTVar genMap
       case lookup path m of -- (ref:f:debouncePerPath-genNum-lookup)

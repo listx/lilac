@@ -5,8 +5,7 @@ module Lilac.Util
   )
 where
 
-import Control.Exception (bracketOnError, catch)
-import Data.ByteString qualified as BS
+import Control.Exception (catch)
 import Data.Text.Encoding qualified as TE
 import Relude
   ( Bool (True),
@@ -24,7 +23,6 @@ import Relude
   )
 import System.Directory.OsPath qualified as D
 import System.File.OsPath qualified as P.IO
-import System.IO (hClose, openBinaryTempFile)
 import System.IO.Error (IOError)
 import System.OsPath (OsPath)
 import System.OsPath qualified as P
@@ -46,28 +44,9 @@ readFileRobustly path
     readHandler _ = pure ""
 
 writeFileRobustly :: OsPath -> Text -> IO ()
-writeFileRobustly osPath contentToWrite = do
-  let dir = P.takeDirectory osPath
-  D.createDirectoryIfMissing True dir
-  catch (writeAtomically osPath contentToWrite) writeHandler
+writeFileRobustly path contentToWrite = do
+  D.createDirectoryIfMissing True $ P.takeDirectory path
+  catch (P.IO.writeFile' path $ TE.encodeUtf8 contentToWrite) writeHandler
   where
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
-
-writeAtomically :: OsPath -> Text -> IO ()
-writeAtomically targetPath contentToWrite = do
-  let errorPath (tmpPath, handle) = do
-        tmpOsPath <- P.encodeUtf tmpPath
-        D.removeFile tmpOsPath
-        hClose handle
-      happyPath (tmpPath, handle) = do
-        BS.hPut handle $ TE.encodeUtf8 contentToWrite
-        hClose handle
-        tmpOsPath <- P.encodeUtf tmpPath
-        D.renameFile tmpOsPath targetPath
-      dir = P.takeDirectory targetPath
-  dirPath <- P.decodeFS dir
-  bracketOnError --
-    (openBinaryTempFile dirPath "lilac-tmp-.html")
-    errorPath
-    happyPath

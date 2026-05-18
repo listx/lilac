@@ -1515,8 +1515,7 @@ module Lilac.Util
   )
 where
 
-import Control.Exception (bracketOnError, catch)
-import Data.ByteString qualified as BS
+import Control.Exception (catch)
 import Data.Text.Encoding qualified as TE
 import Relude
   ( Bool (True),
@@ -1534,7 +1533,6 @@ import Relude
   )
 import System.Directory.OsPath qualified as D
 import System.File.OsPath qualified as P.IO
-import System.IO (hClose, openBinaryTempFile)
 import System.IO.Error (IOError)
 import System.OsPath (OsPath)
 import System.OsPath qualified as P
@@ -1542,7 +1540,6 @@ import System.OsPath qualified as P
 <<f:readFrom>>
 <<f:readFileRobustly>>
 <<f:writeFileRobustly>>
-<<f:writeAtomically>>
 #+end_src
 
 [[f:readFrom]] reads a path from the given prefix, and returns a =Text=.
@@ -1575,45 +1572,15 @@ readFileRobustly path
 
 For writing, the main thing [[f:writeFileRobustly]] will do is create paths
 (directories) if they are missing. If the write operation itself otherwise
-fails, we print an error message but otherwise do nothing. It relies on [[f:writeAtomically]].
+fails, we print an error message but otherwise do nothing.
 
 #+name: f:writeFileRobustly
 #+begin_src haskell
 writeFileRobustly :: OsPath -> Text -> IO ()
-writeFileRobustly osPath contentToWrite = do
-  let dir = P.takeDirectory osPath
-  D.createDirectoryIfMissing True dir
-  catch (writeAtomically osPath contentToWrite) writeHandler
+writeFileRobustly path contentToWrite = do
+  D.createDirectoryIfMissing True $ P.takeDirectory path
+  catch (P.IO.writeFile' path $ TE.encodeUtf8 contentToWrite) writeHandler
   where
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
 #+end_src
-
-[[f:writeAtomically]] first writes to a temporary file in the same directory as the
-target path, then renames from the temp file to the target path. This is so
-that we guarantee that FS events to the target path are only raised when the
-file has new, fully-written content in it.
-
-#+name: f:writeAtomically
-#+begin_src haskell
-writeAtomically :: OsPath -> Text -> IO ()
-writeAtomically targetPath contentToWrite = do
-  let errorPath (tmpPath, handle) = do
-        tmpOsPath <- P.encodeUtf tmpPath
-        D.removeFile tmpOsPath
-        hClose handle
-      happyPath (tmpPath, handle) = do
-        BS.hPut handle $ TE.encodeUtf8 contentToWrite
-        hClose handle
-        tmpOsPath <- P.encodeUtf tmpPath
-        D.renameFile tmpOsPath targetPath
-      dir = P.takeDirectory targetPath
-  dirPath <- P.decodeFS dir
-  bracketOnError -- (ref:f:writeAtomically-bracketOnError)
-    (openBinaryTempFile dirPath "lilac-tmp-.html")
-    errorPath
-    happyPath
-#+end_src
-
-[[(f:writeAtomically-bracketOnError)]] ensures the temp file is cleaned up if the
-write or rename crashes.
