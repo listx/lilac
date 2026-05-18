@@ -308,12 +308,12 @@ behavior.
   (:require [lilac.popstate-history :as history]
             [lilac.toc-active-entries :as tae]
             [lilac.lazy-scroll :as lazy-scroll]
-            [lilac.toggle-block-metadata :as tbm]))
+            [lilac.code-block-controls :as cbc]))
 
 (history/init)
 (tae/init)
 (lazy-scroll/init)
-(tbm/init)
+(cbc/init)
 (js/console.log "Lilac loaded successfully.")
 #+end_src
 
@@ -845,10 +845,10 @@ We let the user toggle the display of a code block's metadata by clicking on the
 metadata button
 [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::(f:weaveBlock-metadata-button)]].
 
-#+name: ns:lilac.toggle-block-metadata
-#+header: :tangle src/fe/lilac/toggle_block_metadata.cljs
+#+name: ns:lilac.code-block-controls
+#+header: :tangle src/fe/lilac/code_block_controls.cljs
 #+begin_src clojure
-(ns lilac.toggle-block-metadata)
+(ns lilac.code-block-controls)
 
 <<f:init-toggle-buttons>>
 

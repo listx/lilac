@@ -1,4 +1,4 @@
-(ns lilac.toggle-block-metadata)
+(ns lilac.code-block-controls)
 
 (defn- init-toggle-buttons []
   (let [buttons (-> js/document
