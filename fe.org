@@ -850,10 +850,12 @@ metadata button
 #+begin_src clojure
 (ns lilac.code-block-controls)
 
+<<id:3d4c0326-ee40-43d5-b49b-ab72081ae91a::f:init-toggle-code-block-body>>
 <<f:init-toggle-buttons>>
 
 (defn init []
-  (init-toggle-buttons))
+  (init-toggle-buttons)
+  (init-toggle-code-block-body))
 #+end_src
 
 [[f:init-toggle-buttons]] adds a click event listener to the metadata button.

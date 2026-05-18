@@ -649,11 +649,14 @@ weaveBlock lci block = do
       let (rawBorder, bodyBorder)
             | Nothing <- lookup "name" block.meta,
               Nothing <- lookup "tangle" block.meta =
-                (" top-rounded", " fully-rounded") --
+                case lookup "collapsed" block.meta of
+                  Just "true" -> (" top-rounded", " bottom-rounded")
+                  _ -> (" top-rounded", " fully-rounded") --
             | otherwise = ("", "")
       div_ [class_ $ "code-block-meta-raw hidden" <> rawBorder] $ do
         --
         sequence_ . map weaveBlockMeta $ M.toList block.meta
+      weaveInlineBlockControls block --
       weaveBlockBody block bodyBorder
   where
     linkAnchor = getLinkAnchor Nothing $ CBlock block
@@ -683,9 +686,24 @@ weaveImportantMetadata block
                   toHtml path
         weaveBlockAncestry block
 
+weaveInlineBlockControls :: Block -> HtmlWeaver ()
+weaveInlineBlockControls block
+  | Just "true" <- lookup "collapsed" block.meta = do
+      let border
+            | Nothing <- lookup "name" block.meta,
+              Nothing <- lookup "tangle" block.meta =
+                " fully-rounded"
+            | otherwise = " bottom-rounded"
+      div_ [class_ $ "code-block-controls-inline" <> border] $ do
+        button_ [class_ "toggle-code-block-body"] $ pure ()
+  | otherwise = pure ()
+
 weaveBlockBody :: Block -> Text -> HtmlWeaver ()
-weaveBlockBody block bodyBorder =
-  pre_ [class_ $ "code-block-body" <> bodyBorder] $ do
+weaveBlockBody block bodyBorder = do
+  let maybeCollapsed
+        | Just "true" <- lookup "collapsed" block.meta = " collapsed" --
+        | otherwise = ""
+  pre_ [class_ $ "code-block-body" <> bodyBorder <> maybeCollapsed] $ do
     let bodyText = getBlockContentsWithoutLinks block.body
     case lookup "__src_language" block.meta of --
       Just lang -> do

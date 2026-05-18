@@ -40,6 +40,7 @@ file which is then tangled or woven as needed.
 
 #+name: fig:lilac-subcommands.pikchr
 #+header: :tangle image/lilac-subcommands.pikchr
+#+header: :collapsed true
 #+begin_src txt
 Org1: box "*.org" mono "files" fill white
 Org2: box at Org1.c + (2mm, -2mm) behind Org1 fill white
@@ -70,6 +71,11 @@ arrow "tangle"   mono bold above aligned <- from Code1.ne to Larc.s
 arrow "weave"    mono bold above aligned from Larc.s to StaticAssets.nw
 arrow " serve"   mono bold ljust dashed from StaticAssets.s to Site.n
 arrow "lint"     mono bold above aligned <-> dashed from Code1.n to Larc.w
+#+end_src
+
+#+header: :collapsed true
+#+begin_src txt
+testing anonymous
 #+end_src
 
 ** List item spacing required
@@ -119,6 +125,14 @@ this style for the following reasons:*
      When we only use ~#+name: ...~, we can choose any order we want, not just
      top-to-bottom (by naming the children and choosing how to order the
      exposition of these child blocks).
+
+** Expandable code blocks
+
+If you set ~#+header: :collapsed true~ for a code block, it will be collapsed in
+the woven output. You can then click on a button to expand it. This is useful
+when you have source code that generates figures (drawing), and you don't want
+the code to steal the attention away from the figure.
+[[fig:lilac-subcommands.pikchr]] is an example of this.
 
 ** Other unsupported Org features
 

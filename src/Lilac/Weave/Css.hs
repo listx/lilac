@@ -500,7 +500,11 @@ defaultCss = do
       display inlineBlock
       yx margin (px 2) 0
   forM_
-    [".code-block-meta", ".code-block-meta-raw", ".code-block-body"]
+    [ ".code-block-meta",
+      ".code-block-meta-raw",
+      ".code-block-controls-inline",
+      ".code-block-body"
+    ]
     $ \child -> do
       ".code-block-container" |> child ? do
         "grid-column" -: "2"
@@ -530,6 +534,23 @@ defaultCss = do
   (".code-block-container" # hover) |> ".code-block-controls" ? do
     visibility visible
     opacity 1
+
+  ".code-block-controls-inline" & do
+    yx padding (px 4) (px 8)
+    border (px 1) solid colorCodeBorder
+    fontSans
+    button # ".toggle-code-block-body" ? do
+      "::before" & do
+        "content" -: "\"Expand contents\"" --
+      "border" -: "0"
+      "cursor" -: "pointer"
+      ev borderRadius (px 2)
+      border (px 1) solid colorCodeBorder
+    button # ".toggle-code-block-body.action-collapse" ? do
+      "::before" & do
+        "content" -: "\"Collapse contents\"" --
+  ".active" ** ".code-block-controls-inline" ? do
+    border (px 1) solid colorActiveBorder
 
   ".code-block-meta" & do
     yx padding 0 (px 8)
@@ -580,6 +601,8 @@ defaultCss = do
   ".active" ** ".code-block-body" ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
+  ".collapsed" ? do
+    display displayNone
   ".code-block-body" ** ".sourceCode" ** ".active" ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
@@ -591,6 +614,13 @@ defaultCss = do
   ".top-rounded" & do
     borderTopLeftRadius (px 5) (px 5)
     borderTopRightRadius (px 5) (px 5)
+  ".bottom-rounded" & do
+    borderBottomLeftRadius (px 5) (px 5)
+    borderBottomRightRadius (px 5) (px 5)
+  ".hide-border-bottom" & do
+    borderBottom (px 0) solid colorCodeBorder
+  ".active" ** ".hide-border-bottom" ? do
+    borderBottom (px 0) solid colorCodeBorder
 
   ".figure-image" & do
     display block

@@ -29,22 +29,6 @@ other sections as needed.
 Change [[id:0cf535d6-f852-4b97-8ef8-9d566ad32e51::.build.yml][.build.yml]] to use https://git.sr.ht/~listx/lilac instead of SSH (because
 it won't be a private repo).
 
-** TODO woven HTML: teach code block bodies to be hidden based on a tag
-
-Generally speaking, most users would want to have the source code of diagrams
-colocated with the location of where the diagram is displayed. This source code
-would generally not be of immediate interest, so we would want to allow the
-hiding of code block bodies but still allow the user to see the body if they
-want to.
-
-Give code blocks a ~hidden~ or similar tag, which holds a boolean value. It is
-False by default. But setting it to True make the code block be woven with an
-extra container with an extra button (similar to the M button for displaying
-hidden metadata). This button toggles the unraveling of the code block body.
-
-We need to move the existing ~.hidden~ class (in [[id:85341b61-e725-4b75-a902-5a2a6cbdf07c::css:Block meta raw][css:Block meta raw]]) to the top
-level in CSS.
-
 * Backlog
 :PROPERTIES:
 :ID:       b27d3e53-ada2-4f9e-9f38-18e9252b8229
