@@ -190,6 +190,7 @@ import Lucid
     col_,
     colgroup_,
     crossorigin_,
+    data_,
     dd_,
     div_,
     doctypehtml_,
@@ -642,7 +643,12 @@ weaveBlock lci block = do
   wrapWithDiv lci $ do
     div_ [class_ "code-block-container", id_ linkAnchor] $ do
       div_ [class_ "code-block-controls"] $ do
-        button_ [class_ "toggle-code-block-meta-raw"] $ pure () --
+        --
+        button_
+          [ class_ "toggle-code-block-meta-raw",
+            data_ "action" "toggle-code-block-meta-raw"
+          ]
+          $ pure ()
         a_ [href_ $ "#" <> linkAnchor] $ do
           toHtmlRaw ("&#x1F517;" :: String)
       weaveImportantMetadata block --
@@ -650,8 +656,8 @@ weaveBlock lci block = do
             | Nothing <- lookup "name" block.meta,
               Nothing <- lookup "tangle" block.meta =
                 case lookup "collapsed" block.meta of
-                  Just "true" -> (" top-rounded", " bottom-rounded")
-                  _ -> (" top-rounded", " fully-rounded") --
+                  Just "true" -> (" top-rounded", " anonymous bottom-rounded")
+                  _ -> (" top-rounded", " anonymous fully-rounded") --
             | otherwise = ("", "")
       div_ [class_ $ "code-block-meta-raw hidden" <> rawBorder] $ do
         --
@@ -695,13 +701,20 @@ weaveInlineBlockControls block
                 " fully-rounded"
             | otherwise = " bottom-rounded"
       div_ [class_ $ "code-block-controls-inline" <> border] $ do
-        button_ [class_ "toggle-code-block-body"] $ pure ()
+        --
+        button_
+          [ class_ "toggle-code-block-body",
+            data_ "action" "toggle-code-block-body"
+          ]
+          $ pure ()
   | otherwise = pure ()
 
 weaveBlockBody :: Block -> Text -> HtmlWeaver ()
 weaveBlockBody block bodyBorder = do
   let maybeCollapsed
-        | Just "true" <- lookup "collapsed" block.meta = " collapsed" --
+        | Just "true" <-
+            lookup "collapsed" block.meta =
+            " collapsed collapsible" --
         | otherwise = ""
   pre_ [class_ $ "code-block-body" <> bodyBorder <> maybeCollapsed] $ do
     let bodyText = getBlockContentsWithoutLinks block.body

@@ -601,6 +601,7 @@ defaultCss = do
   ".active" ** ".code-block-body" ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
+  --
   ".collapsed" ? do
     display displayNone
   ".code-block-body" ** ".sourceCode" ** ".active" ? do
@@ -614,9 +615,11 @@ defaultCss = do
   ".top-rounded" & do
     borderTopLeftRadius (px 5) (px 5)
     borderTopRightRadius (px 5) (px 5)
+  --
   ".bottom-rounded" & do
     borderBottomLeftRadius (px 5) (px 5)
     borderBottomRightRadius (px 5) (px 5)
+  --
   ".hide-border-bottom" & do
     borderBottom (px 0) solid colorCodeBorder
   ".active" ** ".hide-border-bottom" ? do

@@ -239,6 +239,7 @@ import Lucid
     col_,
     colgroup_,
     crossorigin_,
+    data_,
     dd_,
     div_,
     doctypehtml_,
@@ -2365,7 +2366,12 @@ weaveBlock lci block = do
   wrapWithDiv lci $ do
     div_ [class_ "code-block-container", id_ linkAnchor] $ do
       div_ [class_ "code-block-controls"] $ do
-        button_ [class_ "toggle-code-block-meta-raw"] $ pure () -- (ref:f:weaveBlock-metadata-button)
+        -- (ref:f:weaveBlock-metadata-button)
+        button_
+          [ class_ "toggle-code-block-meta-raw",
+            data_ "action" "toggle-code-block-meta-raw"
+          ]
+          $ pure ()
         a_ [href_ $ "#" <> linkAnchor] $ do
           toHtmlRaw (<<HTML link symbol>> :: String)
       weaveImportantMetadata block -- (ref:f:weaveBlock-weaveImportantMetadata)
@@ -2373,8 +2379,8 @@ weaveBlock lci block = do
             | Nothing <- lookup "name" block.meta,
               Nothing <- lookup "tangle" block.meta =
                 case lookup "collapsed" block.meta of
-                  Just "true" -> (" top-rounded", " bottom-rounded")
-                  _ -> (" top-rounded", " fully-rounded") -- (ref:f:weaveBlock-corners)
+                  Just "true" -> (" top-rounded", " anonymous bottom-rounded")
+                  _ -> (" top-rounded", " anonymous fully-rounded") -- (ref:f:weaveBlock-corners)
             | otherwise = ("", "")
       div_ [class_ $ "code-block-meta-raw hidden" <> rawBorder] $ do
         -- (ref:f:weaveBlock-full-metadata)
@@ -2606,51 +2612,30 @@ weaveInlineBlockControls block
                 " fully-rounded"
             | otherwise = " bottom-rounded"
       div_ [class_ $ "code-block-controls-inline" <> border] $ do
-        button_ [class_ "toggle-code-block-body"] $ pure ()
+        -- (ref:f:weaveInlineBlockControls-body-toggle-button)
+        button_
+          [ class_ "toggle-code-block-body",
+            data_ "action" "toggle-code-block-body"
+          ]
+          $ pure ()
   | otherwise = pure ()
 #+end_src
 
-The behavior of the button click event is handled in
-[[f:init-toggle-code-block-body]].
-
-#+name: f:init-toggle-code-block-body
-#+begin_src clojure
-(defn- init-toggle-code-block-body []
-  (let [body-buttons ; (ref:f:init-toggle-buttons-toggle-code-block-body)
-          (.querySelectorAll js/document "button.toggle-code-block-body")]
-      (doseq [button body-buttons]
-        (.addEventListener button "click"
-          (fn [event]
-            (when-let [grandparent
-                         (some-> button (.-parentElement) (.-parentElement))]
-              (let [body (.querySelector grandparent ".code-block-body")
-                    is-anonymous
-                      (not (.querySelector grandparent ".code-block-meta"))
-                    border "bottom-rounded"
-                    controls-inline
-                      (.querySelector
-                       grandparent
-                       ".code-block-controls-inline")]
-                ; (ref:f:init-toggle-code-block-body-toggled-classes)
-                (.toggle (.-classList body) "collapsed")
-                (.toggle (.-classList button) "action-collapse")
-                (.toggle (.-classList controls-inline) "hide-border-bottom")
-                (.toggle (.-classList controls-inline) border))))))))
-#+end_src
-
-There are a few toggled CSS classes at
-[[(f:init-toggle-code-block-body-toggled-classes)]]. The classes have different
+There are a few toggled CSS classes. The classes have different
 effects, as described below:
 
-  - ~collapsed~: hides the display of the code block body
+  - ~collapsed~ [[(f:weaveBlockBody-collapsed)]] [[(css:Block body-collapsed)]]: hides the
+    display of the code block body
 
   - ~action-collapse~: controls whether we display the text ~Expand contents~
     [[(css:Block controls inline-msg-expand)]] or ~Collapse contents~ [[(css:Block
     controls inline-msg-collapse)]] in the button
 
   - ~hide-border-bottom~: hides the bottom border (for visual cosmetics)
+    [[(css:Block rounding-hide-border-bottom)]]
 
   - ~bottom-rounded~: rounds out the bottom border (for visual cosmetics)
+    [[(css:Block rounding-bottom-rounded)]]
 
 #+name: css:Block controls inline
 #+begin_src haskell
@@ -2682,7 +2667,9 @@ additional work for supporting syntax highlighting (see [[f:colorizeText]]).
 weaveBlockBody :: Block -> Text -> HtmlWeaver ()
 weaveBlockBody block bodyBorder = do
   let maybeCollapsed
-        | Just "true" <- lookup "collapsed" block.meta = " collapsed" -- (ref:f:weaveBlockBody-collapsed)
+        | Just "true" <-
+            lookup "collapsed" block.meta =
+            " collapsed collapsible" -- (ref:f:weaveBlockBody-collapsed)
         | otherwise = ""
   pre_ [class_ $ "code-block-body" <> bodyBorder <> maybeCollapsed] $ do
     let bodyText = getBlockContentsWithoutLinks block.body
@@ -2980,6 +2967,7 @@ code ? do
 ".active" ** ".code-block-body" ? do
   border (px 1) solid colorActiveBorder
   backgroundColor colorActiveBg
+-- (ref:css:Block body-collapsed)
 ".collapsed" ? do
   display displayNone
 <<css:Block line labels>>
@@ -2999,7 +2987,7 @@ index finger) symbol.
 
 The [[css:Block rounding]] is to handle cases where we may or may not need to round
 off the corners of the [[css:Block body]] and [[css:Block meta raw]]. See
-[[(f:weaveBlock-corners)]] and [[f:init-toggle-code-block-body]].
+[[(f:weaveBlock-corners)]].
 
 #+name: css:Block rounding
 #+begin_src haskell
@@ -3008,9 +2996,11 @@ off the corners of the [[css:Block body]] and [[css:Block meta raw]]. See
 ".top-rounded" & do
   borderTopLeftRadius (px 5) (px 5)
   borderTopRightRadius (px 5) (px 5)
+-- (ref:css:Block rounding-bottom-rounded)
 ".bottom-rounded" & do
   borderBottomLeftRadius (px 5) (px 5)
   borderBottomRightRadius (px 5) (px 5)
+-- (ref:css:Block rounding-hide-border-bottom)
 ".hide-border-bottom" & do
   borderBottom (px 0) solid colorCodeBorder
 ".active" ** ".hide-border-bottom" ? do

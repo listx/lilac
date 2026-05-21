@@ -1,45 +1,98 @@
 (ns lilac.code-block-controls)
 
-(defn- init-toggle-code-block-body []
-  (let [body-buttons ;
-          (.querySelectorAll js/document "button.toggle-code-block-body")]
-      (doseq [button body-buttons]
-        (.addEventListener button "click"
-          (fn [event]
-            (when-let [grandparent
-                         (some-> button (.-parentElement) (.-parentElement))]
-              (let [body (.querySelector grandparent ".code-block-body")
-                    is-anonymous
-                      (not (.querySelector grandparent ".code-block-meta"))
-                    border "bottom-rounded"
-                    controls-inline
-                      (.querySelector
-                       grandparent
-                       ".code-block-controls-inline")]
-                ;
-                (.toggle (.-classList body) "collapsed")
-                (.toggle (.-classList button) "action-collapse")
-                (.toggle (.-classList controls-inline) "hide-border-bottom")
-                (.toggle (.-classList controls-inline) border))))))))
+(defonce state
+  (atom {:block-ids {} ;
+         :updated-block-id nil})) ;
 
-(defn- init-toggle-buttons []
-  (let [buttons (-> js/document
-                    (.querySelectorAll "button.toggle-code-block-meta-raw"))]
-    (doseq [button buttons]
-      (.addEventListener button "click"
-        (fn [event]
-          (when-let [grandparent
-                       (some-> button
-                               (.-parentElement)
-                               (.-parentElement))]
-              (let [raw (.querySelector grandparent ".code-block-meta-raw")
-                    minimal-meta (.querySelector grandparent ".code-block-meta")
-                    body (.querySelector grandparent ".code-block-body")]
-                (.toggle (.-classList raw) "hidden")
-                (when (or (.contains (.-classList body) "fully-rounded")
-                          (nil? minimal-meta))
-                  (.toggle (.-classList body) "fully-rounded")))))))))
+;; Pure data calculation function: returns initial map from HTML markers
+(defn- calculate-initial-state [container]
+  (let [body (.querySelector container ".code-block-body")
+        is-collapsed? (.contains (.-classList body) "collapsed")
+        has-collapse-button? (.contains (.-classList body) "collapsible")
+        is-anonymous? (.contains (.-classList body) "anonymous")]
+    {:meta-visible?        false
+     :body-visible?        (not is-collapsed?)
+     :has-collapse-button? has-collapse-button?
+     :anonymous?           is-anonymous?}))
+
+(defn- ensure-block-state [st block-id block-el]
+  (if (contains? (:block-ids st) block-id)
+    st
+    (assoc-in st [:block-ids block-id] (calculate-initial-state block-el))))
+
+(defn- handle-click! [e]
+  (when-let [btn (.closest (.-target e) "[data-action]")]
+    (when-let [block (.closest btn ".code-block-container")]
+      (let [block-id (keyword (.-id block))
+            action  (.getAttribute btn "data-action")]
+
+        (case action
+          ("toggle-code-block-meta-raw" "toggle-code-block-body")
+          (let [state-key (if (= action "toggle-code-block-meta-raw") ;
+                            :meta-visible?
+                            :body-visible?)]
+            (swap! state #(-> % ;
+                              (ensure-block-state block-id block)
+                              (update-in [:block-ids block-id state-key] not)
+                              (assoc :updated-block-id block-id))))
+
+          (js/console.warn "[WARN] Unrecognized action:" action))))))
+
+(defn- toggle-class! [el class-name enable?]
+  (when el
+    (.toggle (.-classList el) class-name enable?)))
+
+(def rounding-styles
+  #{"fully-rounded" "top-rounded" "bottom-rounded" "not-rounded"})
+
+(defn- set-enum-class! [el all-variants target-variant]
+  (when el
+    (let [class-list (.-classList el)]
+      (doseq [variant all-variants]
+        (.remove class-list variant))
+      (when target-variant
+        (.add class-list target-variant)))))
+
+(defn- render-block! [block-id]
+  (if-let [container (.getElementById js/document (name block-id))]
+    (let [block-state (get-in @state [:block-ids block-id]) ;
+          anon?            (:anonymous? block-state)
+          body-vis?        (:body-visible? block-state)
+          collapse-button? (:has-collapse-button? block-state)
+          meta-vis?        (:meta-visible? block-state)
+
+          raw-meta (.querySelector container ".code-block-meta-raw")
+          body (.querySelector container ".code-block-body")
+          controls (.querySelector container ".code-block-controls-inline")
+
+          body-needs-full-rounding?
+            (and anon? (not meta-vis?) (not collapse-button?) body-vis?)
+
+          rounding-style ;
+            (cond
+              (and anon? meta-vis? body-vis?) "not-rounded"
+              (and anon? (not meta-vis?) (not body-vis?)) "fully-rounded"
+              (and anon? meta-vis? (not body-vis?)) "bottom-rounded"
+              (and anon? (not meta-vis?) body-vis?) "top-rounded"
+              (and (not anon?) meta-vis? body-vis?) "not-rounded"
+              (and (not anon?) (not meta-vis?) (not body-vis?)) "bottom-rounded"
+              (and (not anon?) meta-vis? (not body-vis?)) "bottom-rounded"
+              (and (not anon?) (not meta-vis?) body-vis?) "not-rounded"
+              :else nil)]
+
+      ;
+      (toggle-class! raw-meta "hidden" (not meta-vis?))
+      (toggle-class! body "collapsed" (not body-vis?))
+      (toggle-class! body "fully-rounded" body-needs-full-rounding?)
+      (toggle-class! controls "hide-border-bottom" body-vis?)
+      (set-enum-class! controls rounding-styles rounding-style))
+
+    (js/console.warn "[WARN] Render target not found for ID:"
+                     (name block-id))))
 
 (defn init []
-  (init-toggle-buttons)
-  (init-toggle-code-block-body))
+  (add-watch state :render
+    (fn [_ _ _ new-state]
+      (when-let [block-id (:updated-block-id new-state)]
+        (render-block! block-id)))) ;
+  (.addEventListener js/document "click" handle-click!)) ;
