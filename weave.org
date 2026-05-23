@@ -734,6 +734,7 @@ import Text.Megaparsec.Char (char)
 import Text.Megaparsec.Char.Lexer (hexadecimal)
 
 <<f:genCss>>
+<<f:rawCss>>
 <<f:kateLilac>>
 <<f:defaultCss>>
 <<f:roundedRectangleLink>>
@@ -767,7 +768,8 @@ genCss :: Text
 genCss =
   T.unlines
     [ T.pack $ Sky.styleToCss kateLilac, -- (ref:f:genCss-kateLilac)
-      TL.toStrict $ renderWith pretty [] defaultCss
+      TL.toStrict $ renderWith pretty [] defaultCss,
+      rawCss
     ]
 #+end_src
 
@@ -791,6 +793,18 @@ defaultCss = do
   <<css:Footnotes>>
   <<css:Glossary terms>>
   <<css:Document metadata>>
+#+end_src
+
+[[f:rawCss]] is any raw CSS we want to append, for any CSS areas that are not well
+supported by Clay.
+
+#+name: f:rawCss
+#+begin_src haskell
+rawCss :: Text
+rawCss =
+  """
+  /* rawCss */
+  """
 #+end_src
 
 ** Sizing

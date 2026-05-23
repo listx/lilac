@@ -187,8 +187,15 @@ genCss :: Text
 genCss =
   T.unlines
     [ T.pack $ Sky.styleToCss kateLilac, --
-      TL.toStrict $ renderWith pretty [] defaultCss
+      TL.toStrict $ renderWith pretty [] defaultCss,
+      rawCss
     ]
+
+rawCss :: Text
+rawCss =
+  """
+  /* rawCss */
+  """
 
 kateLilac :: Sky.Style
 kateLilac =
