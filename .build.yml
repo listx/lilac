@@ -11,6 +11,18 @@ tasks:
       cd lilac
       rm -f image/*.svg
       nix-shell --run "make weave"
+  - compile-prod-cljs: |
+      cd lilac
+      nix-shell --run "make prod-cljs"
+  - verify-git-health: |
+      cd lilac
+      git diff
+      if [[ -z "$(git status --porcelain)" ]]; then
+        echo "Clean (no untracked files either)."
+      else
+        echo "Modified or untracked files present."
+        exit 1
+      fi
   - build: |
       cd lilac
       nix-shell --run "make build-release"
