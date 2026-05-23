@@ -29,6 +29,41 @@ other sections as needed.
 Change [[id:0cf535d6-f852-4b97-8ef8-9d566ad32e51::.build.yml][.build.yml]] to use https://git.sr.ht/~listx/lilac instead of SSH (because
 it won't be a private repo).
 
+** TODO weave: make ~--out-dir~ use the leading dir prefix of path to Archive
+
+E.g., if we do
+
+#+begin_src sh
+lilac weave lilac.larc --out-dir site --write-css
+#+end_src
+
+from the project root, we don't actually get any of the HTML files written into
+the ~site~ folder, because the object paths in the archive don't have ~site~ in it.
+When writing the HTML, we just need to prefix the ~site~ path to all written HTML
+files.
+
+** TODO weave: add ~--root-relative-prefix~ option
+
+Prepend this path when pulling CSS and JS assets from the root. This way, we can
+decide how deeply nested we want to host the generated site artifacts. For
+example, a tarball of the site may be hosted at
+
+  - mysite.org
+
+  - mysite.org/blog
+
+  - mysite.org/personal/blog
+
+or some other folder.
+
+** TODO ci: add site publishing step
+
+  - Publish ~next~ branch to https://listx.srht.site/project/lilac/next.
+
+  - Publish ~main~ branch to https://listx.srht.site/project/lilac/main.
+
+** TODO user manual: add section about using Lilac as a static site generator
+
 * Backlog
 :PROPERTIES:
 :ID:       b27d3e53-ada2-4f9e-9f38-18e9252b8229
