@@ -98,7 +98,7 @@ contents themselves --- hence the type is ~(OsPath, Text)~.
 #+begin_src haskell
 expandRootBlocks :: Archive -> OsPath -> [(OsPath, Text)]
 expandRootBlocks archive outDir =
-  map (expandRootBlock archive outDir) rootBlocks
+  map (expandRootBlock archive) rootBlocks
   where
     rootBlocks =
       concat $ foldl' getRootBlocksFromObject [] archive.objects
@@ -124,9 +124,9 @@ block).
 
 #+name: f:expandRootBlock
 #+begin_src haskell
-expandRootBlock :: Archive -> OsPath -> (OsPath, Block) -> (OsPath, Text)
-expandRootBlock archive outDir (tanglePath, rootBlock) =
-  ( P.combine outDir tanglePath,
+expandRootBlock :: Archive -> (OsPath, Block) -> (OsPath, Text)
+expandRootBlock archive (tanglePath, rootBlock) =
+  ( tanglePath,
     maybeAddShebang rootBlock -- (ref:f:expandRootBlock-maybeAddShebang)
       . trimTrailingSpaces -- (ref:f:expandRootBlock-trimTrailingSpaces)
       $ expandBlock archive rootBlock ""

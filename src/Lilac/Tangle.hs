@@ -36,7 +36,7 @@ import System.OsPath qualified as P
 
 expandRootBlocks :: Archive -> OsPath -> [(OsPath, Text)]
 expandRootBlocks archive outDir =
-  map (expandRootBlock archive outDir) rootBlocks
+  map (expandRootBlock archive) rootBlocks
   where
     rootBlocks =
       concat $ foldl' getRootBlocksFromObject [] archive.objects
@@ -53,9 +53,9 @@ expandRootBlocks archive outDir =
           (P.combine outDir tOsPath, b) : acc
       | otherwise = acc
 
-expandRootBlock :: Archive -> OsPath -> (OsPath, Block) -> (OsPath, Text)
-expandRootBlock archive outDir (tanglePath, rootBlock) =
-  ( P.combine outDir tanglePath,
+expandRootBlock :: Archive -> (OsPath, Block) -> (OsPath, Text)
+expandRootBlock archive (tanglePath, rootBlock) =
+  ( tanglePath,
     maybeAddShebang rootBlock --
       . trimTrailingSpaces --
       $ expandBlock archive rootBlock ""
