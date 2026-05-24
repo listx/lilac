@@ -119,7 +119,6 @@ import Options.Applicative
     some,
     str,
     value,
-    (<*>),
   )
 import Options.Applicative.Builder (InfoMod)
 import Paths_lilac (version)
@@ -172,6 +171,7 @@ import Relude
     (/=),
     (<),
     (<$>),
+    (<*>),
     (<>),
     (=<<),
     (==),

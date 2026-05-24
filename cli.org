@@ -139,7 +139,6 @@ import Options.Applicative
     some,
     str,
     value,
-    (<*>),
   )
 import Options.Applicative.Builder (InfoMod)
 import Paths_lilac (version)
@@ -192,6 +191,7 @@ import Relude
     (/=),
     (<),
     (<$>),
+    (<*>),
     (<>),
     (=<<),
     (==),
@@ -392,7 +392,7 @@ The fields are:
     information.
 
   - ~citationStyle~ :: [[(data:ProjectConf-citationStyle)]] Similar to ~bibliography~,
-    but for the CSL style file. Unlike ~bibliography~, his is just a single file
+    but for the CSL style file. Unlike ~bibliography~, this is just a single file
     path, not a list of files.
 
 Project configuration isn't part of [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] because it may be the case in
@@ -422,8 +422,32 @@ data RawProjectConf = RawProjectConf
     citationStyle :: Maybe Text
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
+
+instance FromJSON RawProjectConf where
+  parseJSON = withObject "RawProjectConf" $ \v ->
+    RawProjectConf
+      <$> v
+      .: "name"
+      <*> v
+      .: "homepage"
+      <*> v
+      .: "repo"
+      <*> v
+      .: "version"
+      <*> v
+      .: "nonTangledPathspecs"
+      <*> v
+      .:? "bibliography"
+      .!= []
+      <*> v
+      .:? "citationStyle"
 #+end_src
+
+We can't use ~anyclass~ for ~FromJSON~, because doing so means that the reader will
+expect every key to exist. For the ~bibliography~ and ~citationStyle~ keys, we want
+to default them to reasonable empty values if they have not been specified by
+the user.
 
 #+name: f:parseRawProjectConf
 #+begin_src haskell

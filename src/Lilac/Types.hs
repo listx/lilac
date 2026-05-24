@@ -83,6 +83,10 @@ import Data.Aeson
     parseJSON,
     toJSON,
     toJSONKey,
+    withObject,
+    (.!=),
+    (.:),
+    (.:?),
   )
 import Data.Aeson.Types
   ( Parser,
@@ -146,6 +150,8 @@ import Relude
     (-),
     (.),
     (<),
+    (<$>),
+    (<*>),
     (<>),
     (>),
   )
@@ -769,7 +775,26 @@ data RawProjectConf = RawProjectConf
     citationStyle :: Maybe Text
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
+
+instance FromJSON RawProjectConf where
+  parseJSON = withObject "RawProjectConf" $ \v ->
+    RawProjectConf
+      <$> v
+      .: "name"
+      <*> v
+      .: "homepage"
+      <*> v
+      .: "repo"
+      <*> v
+      .: "version"
+      <*> v
+      .: "nonTangledPathspecs"
+      <*> v
+      .:? "bibliography"
+      .!= []
+      <*> v
+      .:? "citationStyle"
 
 emptyProjectConf :: ProjectConf
 emptyProjectConf =
