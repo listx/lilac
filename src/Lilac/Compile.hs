@@ -293,7 +293,7 @@ mkArchive projectConf pathObjs = do
             "\n"
             (map showBrokenFileLink brokenFileLinks)
     | otherwise -> do
-        gtoc <- case mkGTOC pathObjsNonEmpty of
+        gtoc <- case mkGTOC pathObjs of
           Left _ -> do
             pure . GTOC $ Node emptyGPath []
           Right gtoc -> pure gtoc
@@ -685,9 +685,9 @@ data PathState = PathState
   }
 
 mkGTOC :: [(GPath, Object)] -> Either String GTOC
-mkGTOC pathObjsNonEmpty
-  | Just pathObj <- findRootIndex pathObjsNonEmpty =
-      let objMap = fromList pathObjsNonEmpty
+mkGTOC pathObjs
+  | Just pathObj <- findRootIndex pathObjs =
+      let objMap = fromList pathObjs
           invalidPaths = [] :: [GPath]
           initialState = PathState objMap invalidPaths
           (gtoc, finalState) = runState (f pathObj) initialState
