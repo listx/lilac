@@ -626,6 +626,7 @@ weaveToDisk projectConf outDir archive acc objPath obj =
       ext = P.unsafeEncodeUtf "html"
       outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
       action = do
+        outDirOsPath <- P.encodeUtf $ decodeGPath outDir
         result <- LW.prepareCitations projectConf objPath obj archive
         let weaveConf =
               WeaveConf
@@ -635,7 +636,8 @@ weaveToDisk projectConf outDir archive acc objPath obj =
                   outDir = outDir,
                   citeprocResult = result
                 }
-        LU.writeFileRobustly outPath
+            outPathFinal = P.combine outDirOsPath outPath
+        LU.writeFileRobustly outPathFinal
           . LW.renderAsText weaveConf
           $ LW.weaveObject obj
    in action : acc
