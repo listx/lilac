@@ -89,12 +89,14 @@ import Lilac.Types
         citeprocResult,
         originObjectPath,
         outDir,
-        projectConf
+        projectConf,
+        rootRelativePrefix
       ),
     WeaveOpts
       ( WeaveOpts,
         inputs,
         outDir,
+        rootRelativePrefix,
         writeCss,
         writeJs
       ),
@@ -1079,6 +1081,7 @@ type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [OsPath],
     outDir :: OsPath,
+    rootRelativePrefix :: OsPath,
     writeCss :: Bool,
     writeJs :: Bool
   }
@@ -1105,6 +1108,22 @@ weaveOptsHandler =
                 <> help
                   """
                   Directory for saving the HTML files.
+                  """
+            )
+        )
+    <*> ( option
+            readOsPath
+            ( long "root-relative-prefix"
+                <> metavar "DIR"
+                <> value (P.unsafeEncodeUtf "/")
+                <> showDefault
+                <> help
+                  """
+                  Prefix to use for pulling static assets (CSS and JS). For
+                  example, CSS is pulled from
+                  "/<ROOT_RELATIVE_PREFIX>/css/default.css". This is useful if
+                  for example you want to host your contents in a subdirectory
+                  of your server root (instead of the root).
                   """
             )
         )
@@ -1161,10 +1180,17 @@ lilacWeave globalOpts weaveOpts = do
         Right archive -> do
           fp <- P.decodeUtf inputPath
           outDir' <- encodeGPath =<< P.decodeUtf outDir
+          rootRelativePrefix <-
+            encodeGPath =<< P.decodeUtf weaveOpts.rootRelativePrefix
           putStrLn $ "Weaving " <> fp
           sequence_
             $ M.foldlWithKey'
-              (weaveToDisk projectConf outDir' archive)
+              ( weaveToDisk
+                  projectConf
+                  outDir'
+                  rootRelativePrefix
+                  archive
+              )
               []
               archive.objects
           putStrLn "Finished weaving."
@@ -1178,12 +1204,13 @@ just a thin wrapper around [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObj
 weaveToDisk ::
   ProjectConf ->
   GPath ->
+  GPath ->
   Archive ->
   [IO ()] ->
   GPath ->
   Object ->
   [IO ()]
-weaveToDisk projectConf outDir archive acc objPath obj =
+weaveToDisk projectConf outDir rootRelativePrefix archive acc objPath obj =
   let fp = decodeGPath objPath
       ext = P.unsafeEncodeUtf "html"
       outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
@@ -1196,6 +1223,7 @@ weaveToDisk projectConf outDir archive acc objPath obj =
                   archive = archive,
                   originObjectPath = objPath,
                   outDir = outDir,
+                  rootRelativePrefix = rootRelativePrefix,
                   citeprocResult = result
                 }
             outPathFinal = P.combine outDirOsPath outPath

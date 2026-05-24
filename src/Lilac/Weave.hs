@@ -156,7 +156,8 @@ import Lilac.Types
         citeprocResult,
         originObjectPath,
         outDir,
-        projectConf
+        projectConf,
+        rootRelativePrefix
       ),
     decodeGPath,
     emptyGPath,
@@ -1238,15 +1239,15 @@ getHeaderRowIndex table =
 getRootRelativePath :: Text -> HtmlWeaver Text
 getRootRelativePath path = do
   weaveConf <- ask
-  let outDirRaw =
+  let rootRelRaw =
         T.dropAround (== '/')
           . T.pack
           . decodeGPath
-          $ weaveConf.outDir
-      outDir
-        | outDirRaw == "." = "/"
-        | otherwise = "/" <> outDirRaw <> "/"
-  pure $ outDir <> path
+          $ weaveConf.rootRelativePrefix
+      rootRelPrefix
+        | rootRelRaw == "" = "/"
+        | otherwise = "/" <> rootRelRaw <> "/"
+  pure $ rootRelPrefix <> path
 
 weaveFootnote :: LCI -> Footnote -> HtmlWeaver ()
 weaveFootnote lci footnote = do

@@ -647,6 +647,7 @@ data WeaveConf = WeaveConf
     archive :: Archive,
     originObjectPath :: GPath, --
     outDir :: GPath,
+    rootRelativePrefix :: GPath,
     citeprocResult :: CP.Result Prose
   }
 
@@ -857,6 +858,7 @@ type WeaveOpts :: Type
 data WeaveOpts = WeaveOpts
   { inputs :: [OsPath],
     outDir :: OsPath,
+    rootRelativePrefix :: OsPath,
     writeCss :: Bool,
     writeJs :: Bool
   }

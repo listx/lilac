@@ -32,7 +32,8 @@ import Lilac.Types
         citeprocResult,
         originObjectPath,
         outDir,
-        projectConf
+        projectConf,
+        rootRelativePrefix
       ),
     defaultOrgParserState,
     emptyProjectConf,
@@ -746,6 +747,7 @@ getWovenPrettyFromPath path = do
                     archive = archive,
                     originObjectPath = inputOrgFileGPath,
                     outDir = outDir,
+                    rootRelativePrefix = GPath "/",
                     citeprocResult = result
                   }
           pure

@@ -69,12 +69,14 @@ import Lilac.Types
         citeprocResult,
         originObjectPath,
         outDir,
-        projectConf
+        projectConf,
+        rootRelativePrefix
       ),
     WeaveOpts
       ( WeaveOpts,
         inputs,
         outDir,
+        rootRelativePrefix,
         writeCss,
         writeJs
       ),
@@ -323,6 +325,22 @@ weaveOptsHandler =
                 <> help
                   """
                   Directory for saving the HTML files.
+                  """
+            )
+        )
+    <*> ( option
+            readOsPath
+            ( long "root-relative-prefix"
+                <> metavar "DIR"
+                <> value (P.unsafeEncodeUtf "/")
+                <> showDefault
+                <> help
+                  """
+                  Prefix to use for pulling static assets (CSS and JS). For
+                  example, CSS is pulled from
+                  "/<ROOT_RELATIVE_PREFIX>/css/default.css". This is useful if
+                  for example you want to host your contents in a subdirectory
+                  of your server root (instead of the root).
                   """
             )
         )
@@ -605,10 +623,17 @@ lilacWeave globalOpts weaveOpts = do
         Right archive -> do
           fp <- P.decodeUtf inputPath
           outDir' <- encodeGPath =<< P.decodeUtf outDir
+          rootRelativePrefix <-
+            encodeGPath =<< P.decodeUtf weaveOpts.rootRelativePrefix
           putStrLn $ "Weaving " <> fp
           sequence_
             $ M.foldlWithKey'
-              (weaveToDisk projectConf outDir' archive)
+              ( weaveToDisk
+                  projectConf
+                  outDir'
+                  rootRelativePrefix
+                  archive
+              )
               []
               archive.objects
           putStrLn "Finished weaving."
@@ -616,12 +641,13 @@ lilacWeave globalOpts weaveOpts = do
 weaveToDisk ::
   ProjectConf ->
   GPath ->
+  GPath ->
   Archive ->
   [IO ()] ->
   GPath ->
   Object ->
   [IO ()]
-weaveToDisk projectConf outDir archive acc objPath obj =
+weaveToDisk projectConf outDir rootRelativePrefix archive acc objPath obj =
   let fp = decodeGPath objPath
       ext = P.unsafeEncodeUtf "html"
       outPath = P.replaceExtension (P.unsafeEncodeUtf fp) ext
@@ -634,6 +660,7 @@ weaveToDisk projectConf outDir archive acc objPath obj =
                   archive = archive,
                   originObjectPath = objPath,
                   outDir = outDir,
+                  rootRelativePrefix = rootRelativePrefix,
                   citeprocResult = result
                 }
             outPathFinal = P.combine outDirOsPath outPath
