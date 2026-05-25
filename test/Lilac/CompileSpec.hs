@@ -12,6 +12,7 @@ import Lilac.Types
     LinkOid (LinkOid, name, oid),
     Object,
     decodeGPath,
+    emptyGPath,
     emptyProjectConf,
     encodeGPath,
     fromWords,
@@ -377,7 +378,7 @@ spec = do
 
   expectGTOC
     ["0105/foo.org"]
-    (Left "root index.lobj not found")
+    (Right . GTOC $ Node emptyGPath [])
 
   expectGTOC
     [ "0105/foo.org",

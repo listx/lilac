@@ -292,27 +292,26 @@ mkArchive projectConf pathObjs = do
           <> intercalate
             "\n"
             (map showBrokenFileLink brokenFileLinks)
-    | otherwise -> do
-        gtoc <- case mkGTOC pathObjs of
-          Left _ -> do
-            pure . GTOC $ Node emptyGPath []
-          Right gtoc -> pure gtoc
-        let archive =
-              Archive
-                { objects = fromList pathObjsNonEmpty,
-                  symbols = symbols,
-                  ancestry = mempty,
-                  glossary = glossary,
-                  backlinks = backlinks,
-                  offsets = offsets,
-                  gtoc = gtoc,
-                  csls = csls,
-                  bibs = bibs
-                }
-            ancestry =
-              mkBlockAncestry archive
-                $ getBlockGCIsFromArchive archive --
-        pure $ Right archive {ancestry = ancestry}
+    | otherwise ->
+        case mkGTOC pathObjs of
+          Left err -> pure $ Left err
+          Right gtoc -> do
+            let archive =
+                  Archive
+                    { objects = fromList pathObjsNonEmpty,
+                      symbols = symbols,
+                      ancestry = mempty,
+                      glossary = glossary,
+                      backlinks = backlinks,
+                      offsets = offsets,
+                      gtoc = gtoc,
+                      csls = csls,
+                      bibs = bibs
+                    }
+                ancestry =
+                  mkBlockAncestry archive
+                    $ getBlockGCIsFromArchive archive --
+            pure $ Right archive {ancestry = ancestry}
   where
     showBrokenLink :: (GPath, LinkOid) -> String
     showBrokenLink (gPath, link) =
@@ -701,7 +700,7 @@ mkGTOC pathObjs
                in Left
                     $ "Invalid GTOC object paths:\n"
                     <> (T.unpack $ unlines paths)
-  | otherwise = Left "root index.lobj not found"
+  | otherwise = Right . GTOC $ Node emptyGPath []
   where
     f :: (GPath, Object) -> State PathState GTOC
     f pathObj = GTOC <$> unfoldTreeM generator pathObj --
