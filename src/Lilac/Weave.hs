@@ -1931,6 +1931,7 @@ weaveSidebar blocks = do
     weaveFooter
 
 weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
+weaveTangledBlocksList [] = pure ()
 weaveTangledBlocksList blocks = do
   div_ [class_ "tangled-blocks"] $ do
     p_ [class_ "widget-title"] $ do
@@ -1957,15 +1958,13 @@ weaveTangledBlocksList blocks = do
 weaveBacklinks :: HtmlWeaver ()
 weaveBacklinks = do
   weaveConf <- ask
-  div_ [class_ "backlinks"] $ do
-    p_ [class_ "widget-title"] $ do
-      toHtml @Text "Backlinks"
-    case lookup weaveConf.originObjectPath weaveConf.archive.backlinks of
-      Nothing -> do
-        p_ [] $ do
-          toHtml @Text "None"
-      --
-      Just backlinksByPath -> do
+  case lookup weaveConf.originObjectPath weaveConf.archive.backlinks of
+    Nothing -> pure ()
+    --
+    Just backlinksByPath -> do
+      div_ [class_ "backlinks"] $ do
+        p_ [class_ "widget-title"] $ do
+          toHtml @Text "Backlinks"
         ol_ [] $ do
           let sorted =
                 sortOn (\(_, links) -> -(length links)) --
@@ -2051,22 +2050,25 @@ weaveBacklink archive (externalGCIs@(externalGCI : _), internalGCI) = do
 weaveNamedCellsIndex :: HtmlWeaver ()
 weaveNamedCellsIndex = do
   weaveConf <- ask
-  div_ [class_ "named-cells-index"] $ do
-    p_ [class_ "widget-title"] $ do
-      let cells = do
-            obj <- lookup weaveConf.originObjectPath weaveConf.archive.objects
-            pure obj.orgDoc.cells
-          namedCells =
-            sort
-              $ [ (prose, cell)
-                | cell <- (fromMaybe [] cells),
-                  Just prose <- [getCellName cell]
-                ]
-          lenNamedCells = T.show $ length namedCells
-      toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
-      ol_ [] $ do
-        forM_ namedCells $ \(prose, cell) -> do
-          li_ [] $ do
-            let linkAnchor = "#" <> getLinkAnchor Nothing cell
-            a_ [href_ linkAnchor] $ do
-              weaveProse prose
+  let cells = do
+        obj <- lookup weaveConf.originObjectPath weaveConf.archive.objects
+        pure obj.orgDoc.cells
+      namedCells =
+        sort
+          $ [ (prose, cell)
+            | cell <- (fromMaybe [] cells),
+              Just prose <- [getCellName cell]
+            ]
+      lenNamedCells = T.show $ length namedCells
+  if length namedCells == 0
+    then pure ()
+    else do
+      div_ [class_ "named-cells-index"] $ do
+        p_ [class_ "widget-title"] $ do
+          toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
+          ol_ [] $ do
+            forM_ namedCells $ \(prose, cell) -> do
+              li_ [] $ do
+                let linkAnchor = "#" <> getLinkAnchor Nothing cell
+                a_ [href_ linkAnchor] $ do
+                  weaveProse prose
