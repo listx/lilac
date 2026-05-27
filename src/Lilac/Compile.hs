@@ -298,7 +298,7 @@ mkArchive projectConf pathObjs = do
           Right gtoc -> do
             let archive =
                   Archive
-                    { objects = fromList pathObjsNonEmpty,
+                    { objects = fromList pathObjs,
                       symbols = symbols,
                       ancestry = mempty,
                       glossary = glossary,
