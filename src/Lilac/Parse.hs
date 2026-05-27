@@ -386,7 +386,7 @@ orgDocParser = do
   pure
     $ OrgDoc
       { oid = docOid,
-        cells = filter meaningfulCell cells,
+        cells = meaningfulCells,
         pseudoEdges = pState.pseudoEdges,
         footnoteRefs = footnoteRefs,
         glossary = pState.glossary,
