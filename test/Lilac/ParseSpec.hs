@@ -2358,6 +2358,47 @@ spec = do
         tableNumber = 1
       }
 
+  shouldParseWithState
+    "0012-non-marking-char"
+    ( nilOrgDoc
+        [ CParagraph
+            $ Prose
+              [ ptext "#not a comment" []
+              ],
+          CTable
+            Table
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__table_number", "1")
+                    ],
+                caption = Prose [],
+                grid =
+                  fromList
+                    [ ( (1, 1),
+                        Prose [ptext "foo" []]
+                      ),
+                      ( (1, 2),
+                        Prose [ptext "bar" []]
+                      ),
+                      ( (2, 1),
+                        L.tableHorizontalLine
+                      ),
+                      ( (3, 1),
+                        Prose [ptext "#not a comment" []]
+                      ),
+                      ( (3, 2),
+                        Prose [ptext "#not-a-comment" []]
+                      )
+                    ]
+              }
+        ]
+        []
+    )
+    defaultOrgParserState
+      { tableNumber = 1
+      }
+
   shouldFailWithMessage
     "0013-footnotes-broken-link"
     "broken footnote links: hello"

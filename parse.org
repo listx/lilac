@@ -11840,11 +11840,12 @@ tableCellParser = do
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
     onlyMarkingCharacterParser :: OrgParser Prose -- (ref:f:tableCellParser-onlyMarkingCharacterParser)
     onlyMarkingCharacterParser = do
-      c <- MP.satisfy (`elem` markingChars)
       _ <- MP.try . MP.lookAhead $ do
+        _ <- MP.satisfy (`elem` markingChars)
         _ <- onlySpaces
         _ <- char '|'
         pure ()
+      c <- MP.satisfy (`elem` markingChars)
       pure
         $ Prose
           [ PTokenStyledText
@@ -12273,6 +12274,67 @@ shouldParseWithState
     [ LItemEnd,
       LOrderedEnd
     ]
+]
+#+end_src
+
+We shouldn't try to parse ~#not~ as a marking character.
+
+#+name: ti:0012-non-marking-char
+#+header: :tangle test/Lilac/ParseSpec/0012-non-marking-char
+#+begin_src org
+#not a comment
+
+| foo            | bar            |
+|----------------+----------------|
+| #not a comment | #not-a-comment |
+#+end_src
+
+#+name: t:0012-non-marking-char
+#+begin_src haskell
+shouldParseWithState
+  "0012-non-marking-char"
+  ( nilOrgDoc
+      <<Expected cells for 0012-non-marking-char>>
+      []
+  )
+  defaultOrgParserState
+    { tableNumber = 1
+    }
+#+end_src
+
+#+name: Expected cells for 0012-non-marking-char
+#+begin_src haskell
+[ CParagraph
+    $ Prose
+      [ ptext "#not a comment" []
+      ],
+  CTable
+    Table
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__table_number", "1")
+            ],
+        caption = Prose [],
+        grid =
+          fromList
+            [ ( (1, 1),
+                Prose [ptext "foo" []]
+              ),
+              ( (1, 2),
+                Prose [ptext "bar" []]
+              ),
+              ( (2, 1),
+                L.tableHorizontalLine
+              ),
+              ( (3, 1),
+                Prose [ptext "#not a comment" []]
+              ),
+              ( (3, 2),
+                Prose [ptext "#not-a-comment" []]
+              )
+            ]
+      }
 ]
 #+end_src
 
@@ -13200,6 +13262,7 @@ Below are all of the individual test cases.
 <<t:0011-figures-and-blocks>>
 <<t:0012-tables-and-prose>>
 <<t:0012-tables-inside-lists>>
+<<t:0012-non-marking-char>>
 <<t:0013-footnotes-broken-link>>
 <<t:0013-footnotes-unused-def>>
 <<t:0013-footnotes-simple>>

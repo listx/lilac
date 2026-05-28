@@ -2094,11 +2094,12 @@ tableCellParser = do
     tableCellContent = void $ MP.noneOf (" \n|" :: String)
     onlyMarkingCharacterParser :: OrgParser Prose --
     onlyMarkingCharacterParser = do
-      c <- MP.satisfy (`elem` markingChars)
       _ <- MP.try . MP.lookAhead $ do
+        _ <- MP.satisfy (`elem` markingChars)
         _ <- onlySpaces
         _ <- char '|'
         pure ()
+      c <- MP.satisfy (`elem` markingChars)
       pure
         $ Prose
           [ PTokenStyledText
