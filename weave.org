@@ -2760,7 +2760,7 @@ meant to be used for tangling.
 #+begin_src haskell
 colorizeText :: Text -> Text -> HtmlWeaver ()
 colorizeText lang txt
-  | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
+  | Just syntax <- Sky.lookupSyntax targetLang Sky.defaultSyntaxMap,
     Just lines <-
       foldMap' Just
         $ Sky.tokenize defaultTokeniserConfig syntax txt =
@@ -2769,8 +2769,15 @@ colorizeText lang txt
         $ Sky.formatHtmlInline Sky.defaultFormatOpts lines
   | otherwise = code_ $ toHtmlRaw txt
   where
+    targetLang
+      | lang `elem` ["emacs-lisp", "elisp"] = "lisp" -- (ref:f:colorizeText-elisp-hack)
+      | otherwise = lang
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 #+end_src
+
+[[(f:colorizeText-elisp-hack)]] is there because Kate (as of 2026) does not
+recognize Emacs Lisp (a pity). So we have to make do with a fallback to Common
+Lisp, which Skylighting recognizes as "lisp".
 
 Block colorization relies on the [[https://hackage.haskell.org/package/skylighting][=skylighting=]] syntax highlighting library. This
 library ignores the ~\NUL~ character, which is what we want. Once we have the

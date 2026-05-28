@@ -837,7 +837,7 @@ weaveBlockMeta (k, v) = do
 
 colorizeText :: Text -> Text -> HtmlWeaver ()
 colorizeText lang txt
-  | Just syntax <- Sky.lookupSyntax lang Sky.defaultSyntaxMap,
+  | Just syntax <- Sky.lookupSyntax targetLang Sky.defaultSyntaxMap,
     Just lines <-
       foldMap' Just
         $ Sky.tokenize defaultTokeniserConfig syntax txt =
@@ -846,6 +846,9 @@ colorizeText lang txt
         $ Sky.formatHtmlInline Sky.defaultFormatOpts lines
   | otherwise = code_ $ toHtmlRaw txt
   where
+    targetLang
+      | lang `elem` ["emacs-lisp", "elisp"] = "lisp" --
+      | otherwise = lang
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 
 spliceLinks :: Text -> [Link] -> HtmlWeaver Text
