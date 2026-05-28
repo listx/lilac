@@ -86,6 +86,7 @@ import Data.Char
   ( GeneralCategory (CurrencySymbol),
     generalCategory,
     isAsciiLower,
+    isAsciiUpper,
     isDigit,
     isSpace,
   )
@@ -429,7 +430,7 @@ docMetaEntryParser = do
   value <- MP.takeWhile1P (Just "(doc meta) value letter") (\c -> c /= '\n')
   pure (key, value)
   where
-    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, isAsciiUpper, (== '_')]
     avoidParsingBlockMetadata :: OrgParser ()
     avoidParsingBlockMetadata =
       mapM_
@@ -1263,7 +1264,7 @@ blockMetaEntryParser = do
   assertUniqueTanglePath key value o --
   pure (key, value)
   where
-    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')] --
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, isAsciiUpper, (== '-')] --
 
 assertUniqueTanglePath :: Text -> Text -> Int -> OrgParser ()
 assertUniqueTanglePath "tangle" path offset = do
@@ -1995,7 +1996,7 @@ metaEntryParser = do
         <> show key
   pure (key, value)
   where
-    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, isAsciiUpper, (== '_')]
     isValueLetter c = c /= '\n'
 
 tableParser :: OrgParser Cell

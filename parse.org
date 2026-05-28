@@ -614,6 +614,7 @@ import Data.Char
   ( GeneralCategory (CurrencySymbol),
     generalCategory,
     isAsciiLower,
+    isAsciiUpper,
     isDigit,
     isSpace,
   )
@@ -1187,7 +1188,7 @@ docMetaEntryParser = do
   value <- MP.takeWhile1P (Just "(doc meta) value letter") (\c -> c /= '\n')
   pure (key, value)
   where
-    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, isAsciiUpper, (== '_')]
     avoidParsingBlockMetadata :: OrgParser ()
     avoidParsingBlockMetadata =
       mapM_
@@ -8434,7 +8435,7 @@ metaEntryParser = do
         <> show key
   pure (key, value)
   where
-    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '_')]
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, isAsciiUpper, (== '_')]
     isValueLetter c = c /= '\n'
 #+end_src
 
@@ -8488,7 +8489,7 @@ blockMetaEntryParser = do
   assertUniqueTanglePath key value o -- (ref:blockMetaEntryParser-assertUniqueTanglePath)
   pure (key, value)
   where
-    isKeywordLetter c = or $ map ($ c) [isAsciiLower, (== '-')] -- (ref:blockMetaEntryParser-isKeywordLetter)
+    isKeywordLetter c = or $ map ($ c) [isAsciiLower, isAsciiUpper, (== '-')] -- (ref:blockMetaEntryParser-isKeywordLetter)
 #+end_src
 
 The keyword (~isKeywordLetter~ [[(blockMetaEntryParser-isKeywordLetter)]]) cannot have
