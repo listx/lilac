@@ -848,6 +848,7 @@ colorizeText lang txt
   where
     targetLang
       | lang `elem` ["emacs-lisp", "elisp"] = "lisp" --
+      | lang `elem` ["gitconfig"] = "ini" --
       | otherwise = lang
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 

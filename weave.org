@@ -2771,6 +2771,7 @@ colorizeText lang txt
   where
     targetLang
       | lang `elem` ["emacs-lisp", "elisp"] = "lisp" -- (ref:f:colorizeText-elisp-hack)
+      | lang `elem` ["gitconfig"] = "ini" -- (ref:f:colorizeText-gitconfig)
       | otherwise = lang
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 #+end_src
@@ -2778,6 +2779,8 @@ colorizeText lang txt
 [[(f:colorizeText-elisp-hack)]] is there because Kate (as of 2026) does not
 recognize Emacs Lisp (a pity). So we have to make do with a fallback to Common
 Lisp, which Skylighting recognizes as "lisp".
+
+[[(f:colorizeText-gitconfig)]] maps Git configuration to the INI file format syntax.
 
 Block colorization relies on the [[https://hackage.haskell.org/package/skylighting][=skylighting=]] syntax highlighting library. This
 library ignores the ~\NUL~ character, which is what we want. Once we have the
