@@ -195,6 +195,14 @@ rawCss :: Text
 rawCss =
   """
   /* rawCss */
+  @counter-style parenthesis {
+    system: extends decimal;
+    suffix: ") ";
+  }
+
+  main ol {
+    list-style-type: parenthesis;
+  }
   """
 
 kateLilac :: Sky.Style
@@ -476,20 +484,6 @@ defaultCss = do
         width (rem 1)
         height (rem 1)
         margin 0 (rem (-0.2)) 0 0
-
-  main_ ? do
-    ol ? do
-      "list-style" -: "none" --
-      "counter-reset" -: "custom-list-counter" --
-    ol |> li ? do
-      "counter-increment" -: "custom-list-counter" --
-      position relative
-      before & do
-        "content" -: "counter(custom-list-counter) \")\"" --
-        position absolute
-        left (rem (-2.4))
-        width (rem 2)
-        textAlign $ alignSide sideRight
 
   main_ ? do
     ol ? do
