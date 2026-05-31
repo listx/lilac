@@ -35,7 +35,6 @@ import Clay
     code,
     collapse,
     color,
-    column,
     content,
     dd,
     display,
@@ -49,11 +48,9 @@ import Clay
     figcaption,
     figure,
     fitContent,
-    flex,
-    flexDirection,
+    fixed,
     float,
     floatLeft,
-    focus,
     fontFamily,
     fontSize,
     fontStyle,
@@ -96,8 +93,6 @@ import Clay
     normal,
     ol,
     opacity,
-    other,
-    outline,
     overflow,
     overflowX,
     overflowY,
@@ -133,7 +128,6 @@ import Clay
     thead,
     top,
     tr,
-    transparent,
     ul,
     underline,
     unitless,
@@ -232,18 +226,22 @@ defaultCss = do
   body ? do
     minHeight (vh 100)
     display grid
-    gridTemplateColumns [px 300, px 800, other "minmax(300px, 1fr)"]
+    gridTemplateColumns [px 300, px 800]
     "grid-template-rows" -: "auto 1fr"
     "grid-template-areas"
       -: """
-         "navbar navbar navbar"
-         "tocs   main   sidebar"
+         "navbar navbar"
+         "tocs   main"
          """
     yx margin (px 0) auto
-    overflowY hidden
+    overflowY auto
   div # ".navbar" ? do
     "grid-area" -: "navbar"
     height $ rem 4
+    "width" -: "calc(100vw - 20px)"
+    top $ px 0
+    position sticky
+    "z-index" -: "1000"
     borderBottom (px 1) solid colorCodeBorder --
     backgroundColor colorBg
     div # ".breadcrumbs" ? do
@@ -261,6 +259,8 @@ defaultCss = do
          """
     width $ px 300
     fontSans
+    position fixed
+    "top" -: "calc(calc(4rem + 1px) + 1px)"
     borderRight (px 1) solid colorCodeBorder
     overflow hidden
     display grid
@@ -335,42 +335,20 @@ defaultCss = do
 
   main_ ? do
     "grid-area" -: "main"
-    marginLeft (px 17)
-    "height"
-      -: """
-         calc(100vh - calc(4rem + 1px))
-         """
+    marginLeft (px 37)
     overflowY auto
     padding (px 0) (px 20) (px 0) (px 20)
     paddingLeft (px 50)
-    p # ".main-bottom-spacer" ? do
-      yx margin (px 40) 0
-    focus & do
-      --
-      outline none (px 0) transparent
 
   aside ? do
-    "grid-area" -: "sidebar"
-    "height"
-      -: """
-         calc(100vh - calc(4rem + 1px))
-         """
-    overflowY auto
-    padding (px 0) (px 20) (px 0) (px 20)
     fontSans
-    borderLeft (px 1) solid colorCodeBorder
-    display flex
-    flexDirection column
     ol ? do
-      paddingLeft $ rem 1
       marginTop $ px 0
+      paddingLeft $ px 20
   footer ? do
-    marginLeft (px 20)
-    marginRight (px 20)
-    marginTop auto
     div # ".lilac-stamp" ? do
-      textAlign $ alignSide sideRight
       fontSans
+      fontStyle italic
       fontSize $ rem 0.9
       marginBottom (px 10) --
   p # ".widget-title" --

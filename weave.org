@@ -230,7 +230,6 @@ import Lucid
     alt_,
     aside_,
     async_,
-    autofocus_,
     body_,
     br_,
     button_,
@@ -274,7 +273,6 @@ import Lucid
     span_,
     src_,
     sup_,
-    tabindex_,
     table_,
     target_,
     tbody_,
@@ -588,7 +586,6 @@ import Clay
     code,
     collapse,
     color,
-    column,
     content,
     dd,
     display,
@@ -602,11 +599,9 @@ import Clay
     figcaption,
     figure,
     fitContent,
-    flex,
-    flexDirection,
+    fixed,
     float,
     floatLeft,
-    focus,
     fontFamily,
     fontSize,
     fontStyle,
@@ -649,8 +644,6 @@ import Clay
     normal,
     ol,
     opacity,
-    other,
-    outline,
     overflow,
     overflowX,
     overflowY,
@@ -686,7 +679,6 @@ import Clay
     thead,
     top,
     tr,
-    transparent,
     ul,
     underline,
     unitless,
@@ -1003,13 +995,8 @@ weaveObject object = doctypehtml_ $ do
     weaveNavbar
     weaveMain object.orgDoc.meta lciCellPairs
     weaveAllTocs lciCellPairs
-    weaveSidebar . catMaybes $ map (getBlock . snd) lciCellPairs
     weaveHeadingAncestry lciCellPairs
     <<ClojureScript frontend script>>
-  where
-    getBlock = \case
-      CBlock block -> Just block
-      _ -> Nothing
 #+end_src
 
 [[f:sortFootnoteCells]] sorts footnote definition cells by the order in which they
@@ -1103,23 +1090,21 @@ then calls [[f:weaveCell]] to weave all of the cells.
 #+begin_src haskell
 weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
 weaveMain docMeta lciCellPairs = do
-  -- (ref:f:weaveMain-autofocus)
-  main_ [autofocus_, tabindex_ "-1"] $ do
+  main_ [] $ do
     weaveDocMeta docMeta
     forM_ lciCellPairs weaveCell
-    p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
     let isHeading = \case
           CHeading {} -> True
           _ -> False
     when (any isHeading $ map snd lciCellPairs)
       $ toHtmlRaw @Text "</div>" -- (ref:f:weaveMain-heading-container)
+    let blocks = catMaybes $ map (getBlock . snd) lciCellPairs
+    weaveSidebar blocks
+  where
+    getBlock = \case
+      CBlock block -> Just block
+      _ -> Nothing
 #+end_src
-
-[[(f:weaveMain-autofocus)]] makes the ~<main>~ element automatically focused on page
-load, with the ~autofocus~ [[https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/autofocus][attribute]] and the use of ~tabindex~. The possible values
-for ~tabindex~ are discussed in the [[https://html.spec.whatwg.org/multipage/interaction.html#tabindex-value][HTML standard]]. The whole point of this is so
-that arrow navigation keys on the keyboard work when trying to scroll down on a
-page, without first having to click on the ~<main>~ area with the mouse.
 
 The closing ~</div>~ tag is for closing up any heading container ~<div>~ elements
 that are created in [[(f:weaveHeading-heading-container)]].
@@ -1330,15 +1315,15 @@ html ? do
 body ? do
   minHeight (vh 100)
   display grid
-  gridTemplateColumns [px 300, px 800, other "minmax(300px, 1fr)"]
+  gridTemplateColumns [px 300, px 800]
   "grid-template-rows" -: "auto 1fr"
   "grid-template-areas"
     -: """
-       "navbar navbar navbar"
-       "tocs   main   sidebar"
+       "navbar navbar"
+       "tocs   main"
        """
   yx margin (px 0) auto
-  overflowY hidden
+  overflowY auto
 <<css:navbar>>
 <<css:tocs>>
 <<css:page-toc>>
@@ -1394,30 +1379,10 @@ The main content's padding and such is defined in [[css:Main content]].
 #+begin_src haskell
 main_ ? do
   "grid-area" -: "main"
-  marginLeft (px 17)
-  <<css:Column under navbar>>
+  marginLeft (px 37)
+  overflowY auto
+  padding (px 0) (px 20) (px 0) (px 20)
   paddingLeft (px 50)
-  p # ".main-bottom-spacer" ? do
-    yx margin (px 40) 0
-  focus & do
-    -- (ref:css:Main content-remove-focus-highlight)
-    outline none (px 0) transparent
-#+end_src
-
-[[(css:Main content-remove-focus-highlight)]] removes the focus highlight around the
-main content, when it is automatically focused by [[(f:weaveMain-autofocus)]].
-
-Columns under the navbar each have their own scrollbars. In order to do this
-they need to have their ~height~ defined.
-
-#+name: css:Column under navbar
-#+begin_src haskell
-"height"
-  -: """
-     calc(100vh - <<css:navbar-height>>)
-     """
-overflowY auto
-padding (px 0) (px 20) (px 0) (px 20)
 #+end_src
 
 * Identifying cells in HTML
@@ -5193,6 +5158,8 @@ nav # ".tocs" ? do
        """
   width $ px 300
   fontSans
+  position fixed
+  "top" -: "calc(<<css:navbar-height>> + 1px)"
   borderRight (px 1) solid colorCodeBorder
   overflow hidden
   display grid
@@ -5730,6 +5697,10 @@ don't bother to handle that edge case here.
 div # ".navbar" ? do
   "grid-area" -: "navbar"
   height $ rem 4
+  "width" -: "calc(100vw - 20px)"
+  top $ px 0
+  position sticky
+  "z-index" -: "1000"
   borderBottom (px 1) solid colorCodeBorder -- (ref:css:navbar-1px)
   backgroundColor colorBg
   <<css:breadcrumbs>>
@@ -5789,6 +5760,8 @@ the far right of the screen (see [[css:Layout]]). It has the following parts:
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
   aside_ [class_ "sidebar"] $ do
+    h2_ [] $ do
+      toHtml ("Page stats" :: Text)
     weaveTangledBlocksList blocks
     weaveBacklinks
     weaveNamedCellsIndex
@@ -5807,7 +5780,7 @@ weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
 weaveTangledBlocksList [] = pure ()
 weaveTangledBlocksList blocks = do
   div_ [class_ "tangled-blocks"] $ do
-    p_ [class_ "widget-title"] $ do
+    h3_ [] $ do
       toHtml @Text "Tangled files"
     let tangledBlocks = catMaybes $ map getTangled blocks
     if (null tangledBlocks)
@@ -5848,7 +5821,7 @@ weaveBacklinks = do
     -- (ref:f:weaveBacklinks-backlinksByPath)
     Just backlinksByPath -> do
       div_ [class_ "backlinks"] $ do
-        p_ [class_ "widget-title"] $ do
+        h3_ [] $ do
           toHtml @Text "Backlinks"
         ol_ [] $ do
           let sorted =
@@ -6000,14 +5973,14 @@ weaveNamedCellsIndex = do
     then pure ()
     else do
       div_ [class_ "named-cells-index"] $ do
-        p_ [class_ "widget-title"] $ do
+        h3_ [] $ do
           toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
-          ol_ [] $ do
-            forM_ namedCells $ \(prose, cell) -> do
-              li_ [] $ do
-                let linkAnchor = "#" <> getLinkAnchor Nothing cell
-                a_ [href_ linkAnchor] $ do
-                  weaveProse prose
+        ol_ [] $ do
+          forM_ namedCells $ \(prose, cell) -> do
+            li_ [] $ do
+              let linkAnchor = "#" <> getLinkAnchor Nothing cell
+              a_ [href_ linkAnchor] $ do
+                weaveProse prose
 #+end_src
 
 ** Footer
@@ -6043,22 +6016,13 @@ weaveFooter = do
 :ID:       6db7e0d7-67e1-45c1-9908-a8fb055ec535
 :END:
 
-The sidebar should be similar to the TOC, in that it remains sticky in a fixed
-position, while still being independently scrollable from the main content. This
-is done by reusing the settings from [[css:Column under navbar]].
-
 #+name: css:Sidebar
 #+begin_src haskell
 aside ? do
-  "grid-area" -: "sidebar"
-  <<css:Column under navbar>>
   fontSans
-  borderLeft (px 1) solid colorCodeBorder
-  display flex
-  flexDirection column
   ol ? do
-    paddingLeft $ rem 1
     marginTop $ px 0
+    paddingLeft $ px 20
 #+end_src
 
 The lists of tangled file, backlinks, etc do not need any additional
@@ -6068,12 +6032,9 @@ additional tweaks.
 #+name: css:Footer
 #+begin_src haskell
 footer ? do
-  marginLeft (px 20)
-  marginRight (px 20)
-  marginTop auto
   div # ".lilac-stamp" ? do
-    textAlign $ alignSide sideRight
     fontSans
+    fontStyle italic
     fontSize $ rem 0.9
     marginBottom (px 10)
 #+end_src

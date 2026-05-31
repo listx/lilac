@@ -181,7 +181,6 @@ import Lucid
     alt_,
     aside_,
     async_,
-    autofocus_,
     body_,
     br_,
     button_,
@@ -225,7 +224,6 @@ import Lucid
     span_,
     src_,
     sup_,
-    tabindex_,
     table_,
     target_,
     tbody_,
@@ -400,7 +398,6 @@ weaveObject object = doctypehtml_ $ do
     weaveNavbar
     weaveMain object.orgDoc.meta lciCellPairs
     weaveAllTocs lciCellPairs
-    weaveSidebar . catMaybes $ map (getBlock . snd) lciCellPairs
     weaveHeadingAncestry lciCellPairs
     jsPath <- getRootRelativePath "js/lilac.js" --
     script_
@@ -408,10 +405,6 @@ weaveObject object = doctypehtml_ $ do
         src_ jsPath
       ]
       ("" :: Text)
-  where
-    getBlock = \case
-      CBlock block -> Just block
-      _ -> Nothing
 
 sortFootnoteCells :: Object -> [(LCI, Cell)]
 sortFootnoteCells object =
@@ -1921,20 +1914,26 @@ weaveFooter = do
 
 weaveMain :: Map Text Text -> [(LCI, Cell)] -> HtmlWeaver ()
 weaveMain docMeta lciCellPairs = do
-  --
-  main_ [autofocus_, tabindex_ "-1"] $ do
+  main_ [] $ do
     weaveDocMeta docMeta
     forM_ lciCellPairs weaveCell
-    p_ [class_ "main-bottom-spacer"] $ toHtml @Text ""
     let isHeading = \case
           CHeading {} -> True
           _ -> False
     when (any isHeading $ map snd lciCellPairs)
       $ toHtmlRaw @Text "</div>" --
+    let blocks = catMaybes $ map (getBlock . snd) lciCellPairs
+    weaveSidebar blocks
+  where
+    getBlock = \case
+      CBlock block -> Just block
+      _ -> Nothing
 
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
   aside_ [class_ "sidebar"] $ do
+    h2_ [] $ do
+      toHtml ("Page stats" :: Text)
     weaveTangledBlocksList blocks
     weaveBacklinks
     weaveNamedCellsIndex
@@ -1944,7 +1943,7 @@ weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
 weaveTangledBlocksList [] = pure ()
 weaveTangledBlocksList blocks = do
   div_ [class_ "tangled-blocks"] $ do
-    p_ [class_ "widget-title"] $ do
+    h3_ [] $ do
       toHtml @Text "Tangled files"
     let tangledBlocks = catMaybes $ map getTangled blocks
     if (null tangledBlocks)
@@ -1973,7 +1972,7 @@ weaveBacklinks = do
     --
     Just backlinksByPath -> do
       div_ [class_ "backlinks"] $ do
-        p_ [class_ "widget-title"] $ do
+        h3_ [] $ do
           toHtml @Text "Backlinks"
         ol_ [] $ do
           let sorted =
@@ -2074,11 +2073,11 @@ weaveNamedCellsIndex = do
     then pure ()
     else do
       div_ [class_ "named-cells-index"] $ do
-        p_ [class_ "widget-title"] $ do
+        h3_ [] $ do
           toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
-          ol_ [] $ do
-            forM_ namedCells $ \(prose, cell) -> do
-              li_ [] $ do
-                let linkAnchor = "#" <> getLinkAnchor Nothing cell
-                a_ [href_ linkAnchor] $ do
-                  weaveProse prose
+        ol_ [] $ do
+          forM_ namedCells $ \(prose, cell) -> do
+            li_ [] $ do
+              let linkAnchor = "#" <> getLinkAnchor Nothing cell
+              a_ [href_ linkAnchor] $ do
+                weaveProse prose
