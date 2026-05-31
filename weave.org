@@ -5779,15 +5779,15 @@ are tangled from the current document, and sorts them based on the tangled path.
 weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
 weaveTangledBlocksList [] = pure ()
 weaveTangledBlocksList blocks = do
-  div_ [class_ "tangled-blocks"] $ do
-    h3_ [] $ do
-      toHtml @Text "Tangled files"
-    let tangledBlocks = catMaybes $ map getTangled blocks
-    if (null tangledBlocks)
-      then do
-        p_ [] $ do
-          toHtml @Text "None"
-      else do
+  let tangledBlocks = catMaybes $ map getTangled blocks
+  if (null tangledBlocks)
+    then pure ()
+    else do
+      div_ [class_ "tangled-blocks"] $ do
+        h3_ [] $ do
+          toHtml @Text "Tangled files ("
+          toHtml . T.show $ length tangledBlocks
+          toHtml @Text ")"
         ol_ [] $ do
           forM_ (sort tangledBlocks) $ \(path, block) -> do
             li_ [] $ do
@@ -5822,7 +5822,11 @@ weaveBacklinks = do
     Just backlinksByPath -> do
       div_ [class_ "backlinks"] $ do
         h3_ [] $ do
-          toHtml @Text "Backlinks"
+          toHtml @Text "Backlinks ("
+          toHtml
+            . T.show
+            $ foldl' (\acc list -> acc + length list) 0 backlinksByPath
+          toHtml @Text ")"
         ol_ [] $ do
           let sorted =
                 sortOn (\(_, links) -> -(length links)) -- (ref:f:weaveBacklinks-sorted-by-num-links)
