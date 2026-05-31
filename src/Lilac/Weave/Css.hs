@@ -339,7 +339,7 @@ defaultCss = do
 
   main_ ? do
     "grid-area" -: "main"
-    marginLeft (px 37)
+    marginLeft (px 17)
     height auto
     overflowY visible
     padding (px 0) (px 20) (px 0) (px 20)
