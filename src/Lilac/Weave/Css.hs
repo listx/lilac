@@ -199,6 +199,10 @@ rawCss =
   main ol {
     list-style-type: parenthesis;
   }
+
+  html {
+    scroll-padding-top: calc(4rem + 1px + 10px);
+  }
   """
 
 kateLilac :: Sky.Style
@@ -336,7 +340,8 @@ defaultCss = do
   main_ ? do
     "grid-area" -: "main"
     marginLeft (px 37)
-    overflowY auto
+    height auto
+    overflowY visible
     padding (px 0) (px 20) (px 0) (px 20)
     paddingLeft (px 50)
 
