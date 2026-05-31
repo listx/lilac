@@ -242,9 +242,9 @@ defaultCss = do
   div # ".navbar" ? do
     "grid-area" -: "navbar"
     height $ rem 4
-    "width" -: "calc(100vw - 20px)"
+    "width" -: "100%"
     top $ px 0
-    position sticky
+    position fixed
     "z-index" -: "1000"
     borderBottom (px 1) solid colorCodeBorder --
     backgroundColor colorBg
