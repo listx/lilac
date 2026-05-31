@@ -276,6 +276,8 @@ defaultCss = do
          "toc-title"
          "toc"
          """
+    "z-index" -: "990"
+    backgroundColor colorBg
 
   ".toc-title" ? do
     "grid-area" -: "toc-title"
