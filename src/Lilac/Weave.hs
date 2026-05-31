@@ -1932,8 +1932,9 @@ weaveMain docMeta lciCellPairs = do
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
   aside_ [class_ "sidebar"] $ do
-    h2_ [] $ do
-      toHtml ("Page stats" :: Text)
+    h2_ [id_ "h-page-stats"] $ do
+      a_ [href_ $ "#h-page-stats"] $ do
+        toHtml ("Page stats" :: Text)
     weaveTangledBlocksList blocks
     weaveBacklinks
     weaveNamedCellsIndex
@@ -1947,10 +1948,11 @@ weaveTangledBlocksList blocks = do
     then pure ()
     else do
       div_ [class_ "tangled-blocks"] $ do
-        h3_ [] $ do
-          toHtml @Text "Tangled files ("
-          toHtml . T.show $ length tangledBlocks
-          toHtml @Text ")"
+        h3_ [id_ "h-tangled-files"] $ do
+          a_ [href_ $ "#h-tangled-files"] $ do
+            toHtml @Text "Tangled files ("
+            toHtml . T.show $ length tangledBlocks
+            toHtml @Text ")"
         ol_ [] $ do
           forM_ (sort tangledBlocks) $ \(path, block) -> do
             li_ [] $ do
@@ -1972,12 +1974,13 @@ weaveBacklinks = do
     --
     Just backlinksByPath -> do
       div_ [class_ "backlinks"] $ do
-        h3_ [] $ do
-          toHtml @Text "Backlinks ("
-          toHtml
-            . T.show
-            $ foldl' (\acc list -> acc + length list) 0 backlinksByPath
-          toHtml @Text ")"
+        h3_ [id_ "h-backlinks"] $ do
+          a_ [href_ $ "#h-backlinks"] $ do
+            toHtml @Text "Backlinks ("
+            toHtml
+              . T.show
+              $ foldl' (\acc list -> acc + length list) 0 backlinksByPath
+            toHtml @Text ")"
         ol_ [] $ do
           let sorted =
                 sortOn (\(_, links) -> -(length links)) --
@@ -2077,8 +2080,9 @@ weaveNamedCellsIndex = do
     then pure ()
     else do
       div_ [class_ "named-cells-index"] $ do
-        h3_ [] $ do
-          toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
+        h3_ [id_ "h-named-cells"] $ do
+          a_ [href_ $ "#h-named-cells"] $ do
+            toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
         ol_ [] $ do
           forM_ namedCells $ \(prose, cell) -> do
             li_ [] $ do
