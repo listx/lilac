@@ -87,6 +87,7 @@ import Clay
     marginLeft,
     marginRight,
     marginTop,
+    maxHeight,
     maxWidth,
     minHeight,
     monospace,
@@ -97,6 +98,7 @@ import Clay
     opacity,
     other,
     outline,
+    overflow,
     overflowX,
     overflowY,
     p,
@@ -235,7 +237,7 @@ defaultCss = do
     "grid-template-areas"
       -: """
          "navbar navbar navbar"
-         "toc    main   sidebar"
+         "tocs   main   sidebar"
          """
     yx margin (px 0) auto
     overflowY hidden
@@ -251,57 +253,81 @@ defaultCss = do
     span # ".breadcrumb-separator" ? do
       color colorBreadcrumbSeparator
 
-  nav # ".toc" ? do
-    "grid-area" -: "toc"
+  nav # ".tocs" ? do
+    "grid-area" -: "tocs"
     "height"
       -: """
          calc(100vh - calc(4rem + 1px))
          """
-    overflowY auto
-    padding (px 0) (px 20) (px 0) (px 20)
-    paddingLeft (px 30)
+    width $ px 300
     fontSans
-    ol ? do
-      marginTop $ px 0
-      paddingLeft $ rem 0
-      listStyleType none
-      li # ".toc-level-1" ? do
-        position relative
-        before & do
-          content $ stringContent "■" --
-          marginLeft (rem $ -1.3)
-          position absolute
-          left (px 0)
-          top (px $ -2)
-          fontSize (px 24)
-          fontFamily ["Arial"] [sansSerif]
-          lineHeight $ unitless 1
-      li # ".toc-level-2" ? do
-        position relative
-        before & do
-          content $ stringContent "○" --
-          marginLeft (rem $ -1.3)
-          position absolute
-          left (px 0)
-          top (px $ -2)
-          fontSize (px 24)
-          fontFamily ["Arial"] [sansSerif]
-          lineHeight $ unitless 1
-      div ? do
-        paddingRight $ px 8
-        paddingLeft $ px 20
-        marginLeft $ px (-20)
-        ".active" & do
-          backgroundColor colorTocActive
-          borderRight (px 4) solid colorNowebLinkFg
-          paddingRight $ px 4
-        ".active-ancestor" & do
-          backgroundColor colorTocActiveAncestor
-    span # ".toc-counter" ? do
-      marginRight $ rem 0.3
     borderRight (px 1) solid colorCodeBorder
+    overflow hidden
+    display grid
+    "grid-template-rows" -: "auto auto auto 1fr"
+    "grid-template-areas"
+      -: """
+         "gtoc-title"
+         "gtoc"
+         "toc-title"
+         "toc"
+         """
 
+  ".toc-title" ? do
+    "grid-area" -: "toc-title"
+    margin (px 0) (px 20) (px 10) (px 20)
+  nav # ".toc" ? do
+    "grid-area" -: "toc"
+    overflowY auto
+    div # ".toc-entries" ? do
+      paddingLeft $ px 30
+      ol ? do
+        marginTop $ px 0
+        paddingLeft $ rem 0
+        listStyleType none
+        li # ".toc-level-1" ? do
+          position relative
+          before & do
+            content $ stringContent "■" --
+            marginLeft (rem $ -1.3)
+            position absolute
+            left (px 0)
+            top (px $ -2)
+            fontSize (px 24)
+            fontFamily ["Arial"] [sansSerif]
+            lineHeight $ unitless 1
+        li # ".toc-level-2" ? do
+          position relative
+          before & do
+            content $ stringContent "○" --
+            marginLeft (rem $ -1.3)
+            position absolute
+            left (px 0)
+            top (px $ -2)
+            fontSize (px 24)
+            fontFamily ["Arial"] [sansSerif]
+            lineHeight $ unitless 1
+        div ? do
+          paddingRight $ px 8
+          paddingLeft $ px 20
+          marginLeft $ px (-20)
+          ".active" & do
+            backgroundColor colorTocActive
+            borderRight (px 4) solid colorNowebLinkFg
+            paddingRight $ px 4
+          ".active-ancestor" & do
+            backgroundColor colorTocActiveAncestor
+      span # ".toc-counter" ? do
+        marginRight $ rem 0.3
+
+  ".gtoc-title" ? do
+    "grid-area" -: "gtoc-title"
+    yx margin (px 10) (px 20)
   nav # ".gtoc" ? do
+    "grid-area" -: "gtoc"
+    maxHeight $ vh 50
+    paddingLeft $ px 20
+    overflowY auto
     fontSans
     ul ? do
       marginTop $ px 0
@@ -350,7 +376,8 @@ defaultCss = do
   p # ".widget-title" --
     ? do
       fontWeight bold
-      marginBottom $ px 0
+      marginBottom $ px 10
+      borderBottom (px 1) solid colorCodeBorder
   div ? do
     --
     ev margin $ px 0

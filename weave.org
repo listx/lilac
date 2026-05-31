@@ -453,6 +453,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:getRootRelativeOrgDocCellLink>>
 <<f:getRootRelativeOrgDocLink>>
 <<f:toNormalizedText>>
+<<f:weaveAllTocs>>
 <<f:weaveToc>>
 <<f:weaveTocHeading>>
 <<f:weaveGtoc>>
@@ -639,6 +640,7 @@ import Clay
     marginLeft,
     marginRight,
     marginTop,
+    maxHeight,
     maxWidth,
     minHeight,
     monospace,
@@ -649,6 +651,7 @@ import Clay
     opacity,
     other,
     outline,
+    overflow,
     overflowX,
     overflowY,
     p,
@@ -999,7 +1002,7 @@ weaveObject object = doctypehtml_ $ do
     let lciCellPairs = sortFootnoteCells object
     weaveNavbar
     weaveMain object.orgDoc.meta lciCellPairs
-    weaveToc $ map snd lciCellPairs
+    weaveAllTocs lciCellPairs
     weaveSidebar . catMaybes $ map (getBlock . snd) lciCellPairs
     weaveHeadingAncestry lciCellPairs
     <<ClojureScript frontend script>>
@@ -1332,20 +1335,22 @@ body ? do
   "grid-template-areas"
     -: """
        "navbar navbar navbar"
-       "toc    main   sidebar"
+       "tocs   main   sidebar"
        """
   yx margin (px 0) auto
   overflowY hidden
 <<css:navbar>>
-<<css:toc>>
-<<css:gtoc>>
+<<css:tocs>>
+<<css:page-toc>>
+<<css:site-toc>>
 <<css:Main content>>
 <<css:Sidebar>>
 <<css:Footer>> -- (ref:css:Layout-footer)
 p # ".widget-title" -- (ref:css:Layout-widget-title)
   ? do
     fontWeight bold
-    marginBottom $ px 0
+    marginBottom $ px 10
+    borderBottom (px 1) solid colorCodeBorder
 div ? do
   -- (ref:css:Layout-reset-div)
   ev margin $ px 0
@@ -1357,8 +1362,9 @@ The ~<body>~ uses a CSS grid layout to create four distinct areas:
      the homepage of the project
      [[id:df128041-ada8-4d77-a373-111416002dae::(data:ProjectConf-homepage)]].
 
-  2) Table of Contents (TOC) :: Summarizes all of the major headings (first two
-     levels) in the document.
+  2) Table of contents :: Holds both the /site/ contents and /page/ contents, which
+     give a macro and micro overview of the current document. See [[id:f1542ff8-548d-4967-ba0f-43e9fda35db6][Table of
+     contents (TOC)]].
 
   3) Main :: Holds all of the content of the document. The list of cells in the
      document are rendered one after another in here, top to bottom.
@@ -1400,6 +1406,19 @@ main_ ? do
 
 [[(css:Main content-remove-focus-highlight)]] removes the focus highlight around the
 main content, when it is automatically focused by [[(f:weaveMain-autofocus)]].
+
+Columns under the navbar each have their own scrollbars. In order to do this
+they need to have their ~height~ defined.
+
+#+name: css:Column under navbar
+#+begin_src haskell
+"height"
+  -: """
+     calc(100vh - <<css:navbar-height>>)
+     """
+overflowY auto
+padding (px 0) (px 20) (px 0) (px 20)
+#+end_src
 
 * Identifying cells in HTML
 
@@ -1768,9 +1787,9 @@ We use [[f:headingPrefix]] as shown in the table below.
 
 This prefixed text is not selectable (via text selection) by the user in the
 browser, so it's purely for decorative visual cues. We use separately named code
-blocks for the ~<h2>~ and ~<h3>~ symbols because they're also reused in [[css:toc]]
-[[(css:toc-h2)]] [[(css:toc-h3)]]. This makes it easier to quickly scan the TOC for the
-top-level headings.
+blocks for the ~<h2>~ and ~<h3>~ symbols because they're also reused in [[css:page-toc]]
+[[(css:page-toc-h2)]] [[(css:page-toc-h3)]]. This makes it easier to quickly scan the
+TOC for the top-level headings.
 
 #+name: symbol:h2
 #+begin_src txt
@@ -5142,14 +5161,55 @@ for the bibliographical entries when using ~#+print_bibliography:~.
   margin 0 0 0 (rem 2)
 #+end_src
 
-* Table of Contents (TOC)
+* Table of contents (TOC)
+:PROPERTIES:
+:ID:       f1542ff8-548d-4967-ba0f-43e9fda35db6
+:END:
+
+The /Table of Contents/ or TOC is automatically generated for both the headings of
+the current document (which we call /page/ contents for the user) and also the
+relationship of this document with others in the overall archive (which we call
+/site/ contents for the user, or GTOC for "global" table of contents internally).
+
+The page contents track the first three levels of headings.
+
+#+name: f:weaveAllTocs
+#+begin_src haskell
+weaveAllTocs :: [(LCI, Cell)] -> HtmlWeaver ()
+weaveAllTocs lciCellPairs = do
+  nav_ [class_ "tocs"] $ do
+    weaveConf <- ask
+    weaveGtoc weaveConf.archive.gtoc
+    weaveToc $ map snd lciCellPairs
+#+end_src
+
+#+name: css:tocs
+#+begin_src haskell
+nav # ".tocs" ? do
+  "grid-area" -: "tocs"
+  "height"
+    -: """
+       calc(100vh - <<css:navbar-height>>)
+       """
+  width $ px 300
+  fontSans
+  borderRight (px 1) solid colorCodeBorder
+  overflow hidden
+  display grid
+  "grid-template-rows" -: "auto auto auto 1fr"
+  "grid-template-areas"
+    -: """
+       "gtoc-title"
+       "gtoc"
+       "toc-title"
+       "toc"
+       """
+#+end_src
+
+** Page contents
 :PROPERTIES:
 :ID:       e38fb4d1-72e1-40e0-905e-95bc8be2bf0b
 :END:
-
-The /Table of Contents/ or TOC is automatically generated and inserted into the
-left sidebar. It serves as a navigation menu of the first three levels of
-headings.
 
 We convert the flat heading cells into a nested structure (with bullet points),
 because in the future we may decide to make TOC headings collapsible, and in
@@ -5164,10 +5224,11 @@ tags (with ~</ol>~).
 #+begin_src haskell
 weaveToc :: [Cell] -> HtmlWeaver ()
 weaveToc cells = do
+  p_ [class_ "widget-title toc-title"] $ do
+    toHtml @Text "Page contents"
   nav_ [class_ "toc"] $ do
-    p_ [class_ "widget-title"] $ do
-      toHtml @Text "Contents"
-    closeHeadingLevels =<< foldlM f 0 cells -- (ref:f:weaveToc-close-last-levels)
+    div_ [class_ "toc-entries"] $ do
+      closeHeadingLevels =<< foldlM f 0 cells -- (ref:f:weaveToc-close-last-levels)
   where
     f :: Int -> Cell -> HtmlWeaver Int
     f prevLevel = \case
@@ -5219,7 +5280,7 @@ weaveTocHeading heading = do
     linkAnchor = getLinkAnchor Nothing $ CHeading heading
 #+end_src
 
-** Heading ancestry
+*** Heading ancestry
 :PROPERTIES:
 :ID:       4651cdd2-5f79-46e0-af4a-5344d71c7ea6
 :END:
@@ -5320,81 +5381,65 @@ weaveHeadingAncestry lciCellPairs = do
     toHtmlRaw . TLE.decodeUtf8 $ encode headingAncestry
 #+end_src
 
-** CSS
+*** CSS
 :PROPERTIES:
 :ID:       c316d545-5f6c-4fea-8342-e6925be83dfe
 :END:
 
-The TOC is sticky and scrolls independently of the main content; it does this
-with [[css:Column under navbar]].
-
-#+name: css:toc
+#+name: css:page-toc
 #+begin_src haskell
+".toc-title" ? do
+  "grid-area" -: "toc-title"
+  margin (px 0) (px 20) (px 10) (px 20)
 nav # ".toc" ? do
   "grid-area" -: "toc"
-  <<css:Column under navbar>>
-  paddingLeft (px 30)
-  fontSans
-  ol ? do
-    marginTop $ px 0
-    paddingLeft $ rem 0
-    listStyleType none
-    li # ".toc-level-1" ? do
-      position relative
-      before & do
-        content $ stringContent "<<symbol:h2>>" -- (ref:css:toc-h2)
-        marginLeft (rem $ -1.3)
-        position absolute
-        left (px 0)
-        top (px $ -2)
-        fontSize (px 24)
-        fontFamily ["Arial"] [sansSerif]
-        lineHeight $ unitless 1
-    li # ".toc-level-2" ? do
-      position relative
-      before & do
-        content $ stringContent "<<symbol:h3>>" -- (ref:css:toc-h3)
-        marginLeft (rem $ -1.3)
-        position absolute
-        left (px 0)
-        top (px $ -2)
-        fontSize (px 24)
-        fontFamily ["Arial"] [sansSerif]
-        lineHeight $ unitless 1
-    div ? do
-      paddingRight $ px 8
-      paddingLeft $ px 20
-      marginLeft $ px (-20)
-      ".active" & do
-        backgroundColor colorTocActive
-        borderRight (px 4) solid colorNowebLinkFg
-        paddingRight $ px 4
-      ".active-ancestor" & do
-        backgroundColor colorTocActiveAncestor
-  span # ".toc-counter" ? do
-    marginRight $ rem 0.3
-  borderRight (px 1) solid colorCodeBorder
+  overflowY auto
+  div # ".toc-entries" ? do
+    paddingLeft $ px 30
+    ol ? do
+      marginTop $ px 0
+      paddingLeft $ rem 0
+      listStyleType none
+      li # ".toc-level-1" ? do
+        position relative
+        before & do
+          content $ stringContent "<<symbol:h2>>" -- (ref:css:page-toc-h2)
+          marginLeft (rem $ -1.3)
+          position absolute
+          left (px 0)
+          top (px $ -2)
+          fontSize (px 24)
+          fontFamily ["Arial"] [sansSerif]
+          lineHeight $ unitless 1
+      li # ".toc-level-2" ? do
+        position relative
+        before & do
+          content $ stringContent "<<symbol:h3>>" -- (ref:css:page-toc-h3)
+          marginLeft (rem $ -1.3)
+          position absolute
+          left (px 0)
+          top (px $ -2)
+          fontSize (px 24)
+          fontFamily ["Arial"] [sansSerif]
+          lineHeight $ unitless 1
+      div ? do
+        paddingRight $ px 8
+        paddingLeft $ px 20
+        marginLeft $ px (-20)
+        ".active" & do
+          backgroundColor colorTocActive
+          borderRight (px 4) solid colorNowebLinkFg
+          paddingRight $ px 4
+        ".active-ancestor" & do
+          backgroundColor colorTocActiveAncestor
+    span # ".toc-counter" ? do
+      marginRight $ rem 0.3
 #+end_src
 
-Columns under the navbar each have their own scrollbars. In order to do this
-they need to have their ~height~ defined.
+** Site contents
 
-#+name: css:Column under navbar
-#+begin_src haskell
-"height"
-  -: """
-     calc(100vh - <<css:navbar-height>>)
-     """
-overflowY auto
-padding (px 0) (px 20) (px 0) (px 20)
-#+end_src
-
-* Global Table of Contents (GTOC)
-
-The GTOC is at the bottom of the page, but we discuss it here just after the
-[[id:e38fb4d1-72e1-40e0-905e-95bc8be2bf0b][Table of Contents (TOC)]] because of the similarity to the user. The main
-difference between the two is that a GTOC uses a tree data structure, whereas
-the TOC uses a flat list of cells.
+The main difference between the two is that a GTOC uses a tree data structure,
+whereas the TOC uses a flat list of cells.
 
 The entrypoint is [[f:weaveGtoc]], which uses [[f:weaveGtocForest]] to recursively weave
 the tree into a nested structure of unordered list items (~<ul>...</ul>~).
@@ -5429,9 +5474,9 @@ typically be titled as "Introduction".
 #+begin_src haskell
 weaveGtoc :: GTOC -> HtmlWeaver ()
 weaveGtoc gtoc = do
+  p_ [class_ "widget-title gtoc-title"] $ do
+    toHtml @Text "Site contents" -- (ref:f:weaveGtoc-site-contents)
   nav_ [class_ "gtoc"] $ do
-    p_ [class_ "widget-title"] $ do
-      toHtml @Text "Site Contents" -- (ref:f:weaveGtoc-site-contents)
     let (Node rootNode forest) = gtoc.unGTOC
     ul_ [] $ do
       weaveGtocForest (Node rootNode [] : forest) -- (ref:f:weaveGtoc-root-node)
@@ -5525,11 +5570,18 @@ it "0305-gtoc-ancestor" $ do
     ]
 #+end_src
 
-** CSS
+*** CSS
 
-#+name: css:gtoc
+#+name: css:site-toc
 #+begin_src haskell
+".gtoc-title" ? do
+  "grid-area" -: "gtoc-title"
+  yx margin (px 10) (px 20)
 nav # ".gtoc" ? do
+  "grid-area" -: "gtoc"
+  maxHeight $ vh 50
+  paddingLeft $ px 20
+  overflowY auto
   fontSans
   ul ? do
     marginTop $ px 0
@@ -5736,9 +5788,7 @@ the far right of the screen (see [[css:Layout]]). It has the following parts:
 #+begin_src haskell
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
-  weaveConf <- ask
   aside_ [class_ "sidebar"] $ do
-    weaveGtoc weaveConf.archive.gtoc
     weaveTangledBlocksList blocks
     weaveBacklinks
     weaveNamedCellsIndex

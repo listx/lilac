@@ -399,7 +399,7 @@ weaveObject object = doctypehtml_ $ do
     let lciCellPairs = sortFootnoteCells object
     weaveNavbar
     weaveMain object.orgDoc.meta lciCellPairs
-    weaveToc $ map snd lciCellPairs
+    weaveAllTocs lciCellPairs
     weaveSidebar . catMaybes $ map (getBlock . snd) lciCellPairs
     weaveHeadingAncestry lciCellPairs
     jsPath <- getRootRelativePath "js/lilac.js" --
@@ -1686,12 +1686,20 @@ toNormalizedText prose =
     . stripStyles
     $ stripLinks prose
 
+weaveAllTocs :: [(LCI, Cell)] -> HtmlWeaver ()
+weaveAllTocs lciCellPairs = do
+  nav_ [class_ "tocs"] $ do
+    weaveConf <- ask
+    weaveGtoc weaveConf.archive.gtoc
+    weaveToc $ map snd lciCellPairs
+
 weaveToc :: [Cell] -> HtmlWeaver ()
 weaveToc cells = do
+  p_ [class_ "widget-title toc-title"] $ do
+    toHtml @Text "Page contents"
   nav_ [class_ "toc"] $ do
-    p_ [class_ "widget-title"] $ do
-      toHtml @Text "Contents"
-    closeHeadingLevels =<< foldlM f 0 cells --
+    div_ [class_ "toc-entries"] $ do
+      closeHeadingLevels =<< foldlM f 0 cells --
   where
     f :: Int -> Cell -> HtmlWeaver Int
     f prevLevel = \case
@@ -1730,9 +1738,9 @@ weaveTocHeading heading = do
 
 weaveGtoc :: GTOC -> HtmlWeaver ()
 weaveGtoc gtoc = do
+  p_ [class_ "widget-title gtoc-title"] $ do
+    toHtml @Text "Site contents" --
   nav_ [class_ "gtoc"] $ do
-    p_ [class_ "widget-title"] $ do
-      toHtml @Text "Site Contents" --
     let (Node rootNode forest) = gtoc.unGTOC
     ul_ [] $ do
       weaveGtocForest (Node rootNode [] : forest) --
@@ -1926,9 +1934,7 @@ weaveMain docMeta lciCellPairs = do
 
 weaveSidebar :: [Block] -> HtmlWeaver ()
 weaveSidebar blocks = do
-  weaveConf <- ask
   aside_ [class_ "sidebar"] $ do
-    weaveGtoc weaveConf.archive.gtoc
     weaveTangledBlocksList blocks
     weaveBacklinks
     weaveNamedCellsIndex

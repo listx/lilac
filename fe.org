@@ -567,7 +567,7 @@ entry.
 #+begin_src clojure
 (defn maybe-scroll-toc [visible-headings]
   (let [toc-entries (.querySelectorAll js/document ".toc-entry")
-        toc-container (.querySelector js/document ".toc")
+        toc-container (.querySelector js/document ".toc") ; (ref:f:maybe-scroll-toc-toc-container)
         all-active-entries
           (filter (fn [toc-entry]
                     (when-let [toc-entry-link (.querySelector toc-entry "a")]
@@ -602,6 +602,10 @@ entry.
 
           :else nil)))))
 #+end_src
+
+It's important to make sure that the ~toc-container~
+[[(f:maybe-scroll-toc-toc-container)]] is the element that has a scrollbar.
+Otherwise the scrolling actions will have no effect.
 
 We scroll up if we see that the /first/ active TOC entry is above the TOC
 container [[(f:maybe-scroll-toc-scroll-up)]]. This way we show /all/ active headings,

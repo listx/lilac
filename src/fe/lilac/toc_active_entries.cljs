@@ -54,7 +54,7 @@
 
 (defn maybe-scroll-toc [visible-headings]
   (let [toc-entries (.querySelectorAll js/document ".toc-entry")
-        toc-container (.querySelector js/document ".toc")
+        toc-container (.querySelector js/document ".toc") ;
         all-active-entries
           (filter (fn [toc-entry]
                     (when-let [toc-entry-link (.querySelector toc-entry "a")]
