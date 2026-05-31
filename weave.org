@@ -5161,7 +5161,7 @@ nav # ".tocs" ? do
   width $ px 300
   fontSans
   position fixed
-  "top" -: "calc(<<css:navbar-height>> + 1px)"
+  "top" -: "<<css:navbar-height>>"
   borderRight (px 1) solid colorCodeBorder
   overflow hidden
   display grid
@@ -5715,7 +5715,7 @@ The total height of the navbar is \(4\mathrm{em} + 1\mathrm{px}\) (and not just
 
 #+name: css:navbar-height
 #+begin_src txt
-calc(4rem + 1px)
+4rem
 #+end_src
 
 The navbar causes a problem for links that point to elements inside the page,

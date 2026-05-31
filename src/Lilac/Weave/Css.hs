@@ -259,12 +259,12 @@ defaultCss = do
     "grid-area" -: "tocs"
     "height"
       -: """
-         calc(100vh - calc(4rem + 1px))
+         calc(100vh - 4rem)
          """
     width $ px 300
     fontSans
     position fixed
-    "top" -: "calc(calc(4rem + 1px) + 1px)"
+    "top" -: "4rem"
     borderRight (px 1) solid colorCodeBorder
     overflow hidden
     display grid
