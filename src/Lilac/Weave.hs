@@ -1923,18 +1923,18 @@ weaveMain docMeta lciCellPairs = do
     when (any isHeading $ map snd lciCellPairs)
       $ toHtmlRaw @Text "</div>" --
     let blocks = catMaybes $ map (getBlock . snd) lciCellPairs
-    weaveSidebar blocks
+    weavePageMetrics blocks
   where
     getBlock = \case
       CBlock block -> Just block
       _ -> Nothing
 
-weaveSidebar :: [Block] -> HtmlWeaver ()
-weaveSidebar blocks = do
-  aside_ [class_ "sidebar"] $ do
-    h2_ [id_ "h-page-stats"] $ do
-      a_ [href_ $ "#h-page-stats"] $ do
-        toHtml ("Page stats" :: Text)
+weavePageMetrics :: [Block] -> HtmlWeaver ()
+weavePageMetrics blocks = do
+  aside_ [class_ "page-metrics"] $ do
+    h2_ [id_ "h-page-metrics"] $ do
+      a_ [href_ $ "#h-page-metrics"] $ do
+        toHtml ("Page metrics" :: Text)
     weaveTangledBlocksList blocks
     weaveBacklinks
     weaveNamedCellsIndex

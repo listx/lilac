@@ -464,7 +464,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveBreadcrumbs>>
 <<f:weaveFooter>>
 <<f:weaveMain>>
-<<f:weaveSidebar>>
+<<f:weavePageMetrics>>
 <<f:weaveTangledBlocksList>>
 <<f:weaveBacklinks>>
 <<f:weaveBacklinksForExternalObj>>
@@ -1099,7 +1099,7 @@ weaveMain docMeta lciCellPairs = do
     when (any isHeading $ map snd lciCellPairs)
       $ toHtmlRaw @Text "</div>" -- (ref:f:weaveMain-heading-container)
     let blocks = catMaybes $ map (getBlock . snd) lciCellPairs
-    weaveSidebar blocks
+    weavePageMetrics blocks
   where
     getBlock = \case
       CBlock block -> Just block
@@ -1134,7 +1134,7 @@ weaveCell (lci, cell) = case cell of
 
 [[(f:weaveCell-hide-index-block)]] does nothing if the code block is a
 magic "index" block, because this is low-level information which is already
-widely apparent by looking at the "Site Contents" in the sidebar
+widely apparent by looking at the "Site contents" in the left sidebar
 [[(f:weaveGtoc-site-contents)]].
 
 ** HTML head
@@ -1329,7 +1329,7 @@ body ? do
 <<css:page-toc>>
 <<css:site-toc>>
 <<css:Main content>>
-<<css:Sidebar>>
+<<css:page-metrics>>
 <<css:Footer>> -- (ref:css:Layout-footer)
 p # ".widget-title" -- (ref:css:Layout-widget-title)
   ? do
@@ -1354,7 +1354,8 @@ The ~<body>~ uses a CSS grid layout to create four distinct areas:
   3) Main :: Holds all of the content of the document. The list of cells in the
      document are rendered one after another in here, top to bottom.
 
-  4) Sidebar :: Holds various /widgets/ which aid in navigation. The widgets are:
+  4) Page metrics :: Holds various /widgets/ which aid in navigation. The widgets
+     are:
 
        1) Tangled files :: List of tangled files in the document.
 
@@ -1362,8 +1363,8 @@ The ~<body>~ uses a CSS grid layout to create four distinct areas:
 
        3) Named cells :: List of named cells in the current document.
 
-     The sidebar also holds a footer [[(css:Layout-footer)]]. See [[f:weaveFooter]] and
-     [[css:Footer]].
+     The page metrics also holds a footer [[(css:Layout-footer)]]. See [[f:weaveFooter]]
+     and [[css:Footer]].
 
 Widgets are small and require a much smaller heading; therefore they use a ~<p>~
 element instead of something like ~<h6>~. These widget titles are configured at
@@ -5744,10 +5745,11 @@ span # ".breadcrumb-separator" ? do
   color colorBreadcrumbSeparator
 #+end_src
 
-* Sidebar
+* Page metrics
 
-The sidebar shows additional information about the current document. It sits on
-the far right of the screen (see [[css:Layout]]). It has the following parts:
+The page metrics shows additional information about the current document. It
+sits on the bottom of the page (see [[css:Layout]]). It has the following
+parts:
 
   1) list of tangled files,
 
@@ -5757,14 +5759,14 @@ the far right of the screen (see [[css:Layout]]). It has the following parts:
 
   4) a footer.
 
-#+name: f:weaveSidebar
+#+name: f:weavePageMetrics
 #+begin_src haskell
-weaveSidebar :: [Block] -> HtmlWeaver ()
-weaveSidebar blocks = do
-  aside_ [class_ "sidebar"] $ do
-    h2_ [id_ "h-page-stats"] $ do
-      a_ [href_ $ "#h-page-stats"] $ do
-        toHtml ("Page stats" :: Text)
+weavePageMetrics :: [Block] -> HtmlWeaver ()
+weavePageMetrics blocks = do
+  aside_ [class_ "page-metrics"] $ do
+    h2_ [id_ "h-page-metrics"] $ do
+      a_ [href_ $ "#h-page-metrics"] $ do
+        toHtml ("Page metrics" :: Text)
     weaveTangledBlocksList blocks
     weaveBacklinks
     weaveNamedCellsIndex
@@ -5995,7 +5997,7 @@ weaveNamedCellsIndex = do
 
 ** Footer
 
-The footer is the element at the very bottom of the sidebar. This is not to be
+The footer is the element at the very bottom of the page. This is not to be
 confused with [[id:c3562660-a9ff-499d-9b10-c69bcba7f105][Footnotes]], which are a user-controlled thing (a page may or may
 not have footnotes, depending on usage).
 
@@ -6026,7 +6028,7 @@ weaveFooter = do
 :ID:       6db7e0d7-67e1-45c1-9908-a8fb055ec535
 :END:
 
-#+name: css:Sidebar
+#+name: css:page-metrics
 #+begin_src haskell
 aside ? do
   fontSans
