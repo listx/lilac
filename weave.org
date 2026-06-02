@@ -140,7 +140,7 @@ import Lilac.Types
     GPath,
     GTOC (unGTOC),
     GlossaryTerm (definition, term),
-    Heading (body, level, section),
+    Heading (Heading, body, level, meta, section),
     LCI (LCI, unLCI),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
@@ -228,7 +228,6 @@ import Lucid
     HtmlT,
     a_,
     alt_,
-    aside_,
     async_,
     body_,
     br_,
@@ -558,7 +557,6 @@ import Clay
     a,
     absolute,
     alignSide,
-    aside,
     auto,
     backgroundColor,
     before,
@@ -5195,11 +5193,15 @@ tags (with ~</ol>~).
 #+begin_src haskell
 weaveToc :: [Cell] -> HtmlWeaver ()
 weaveToc cells = do
+  -- (ref:f:weaveToc-pageMetricsCells)
+  let pageMetricsCells =
+        <<page-metrics-cells>>
+      cellsWithPageMetrics = cells <> pageMetricsCells
   p_ [class_ "widget-title toc-title"] $ do
     toHtml @Text "Page contents"
   nav_ [class_ "toc"] $ do
     div_ [class_ "toc-entries"] $ do
-      closeHeadingLevels =<< foldlM f 0 cells -- (ref:f:weaveToc-close-last-levels)
+      closeHeadingLevels =<< foldlM f 0 cellsWithPageMetrics -- (ref:f:weaveToc-close-last-levels)
   where
     f :: Int -> Cell -> HtmlWeaver Int
     f prevLevel = \case
@@ -5219,6 +5221,11 @@ weaveToc cells = do
         weaveListMarker LItemEnd
         weaveListMarker LOrderedEnd
 #+end_src
+
+[[(f:weaveToc-pageMetricsCells)]] constructs artificial heading cells for the page
+metrics, so that we get entries for these bits which are generated
+automatically. It's admittedly a bit hacky, because we have to also manually
+craft heading ancestry entries at [[f:weaveHeadingAncestry]].
 
 All of the business around using ~LItemEnd~ and ~LOrderedEnd~ is needed because when
 we nest levels, we /cannot/ close the current list item (because nested list items
@@ -5242,8 +5249,11 @@ weaveTocHeading heading = do
         Text
     )
   div_ [class_ "toc-entry"] $ do
-    span_ [class_ "toc-counter"] $ do
-      toHtml sectionText
+    if null heading.section
+      then pure ()
+      else do
+        span_ [class_ "toc-counter"] $ do
+          toHtml sectionText
     a_ [href_ $ "#" <> linkAnchor] $ do
       weaveProse heading.body
   where
@@ -5348,8 +5358,10 @@ reference it.
 weaveHeadingAncestry :: [(LCI, Cell)] -> HtmlWeaver ()
 weaveHeadingAncestry lciCellPairs = do
   let headingAncestry = genHeadingAncestry $ map snd lciCellPairs
+      -- (ref:f:weaveHeadingAncestry-pageMetricsAncestry)
+      <<pageMetricsAncestry>>
   script_ [id_ "heading-ancestry", type_ "application/json"] $ do
-    toHtmlRaw . TLE.decodeUtf8 $ encode headingAncestry
+    toHtmlRaw . TLE.decodeUtf8 . encode $ headingAncestry <> pageMetricsAncestry
 #+end_src
 
 *** CSS
@@ -5763,14 +5775,70 @@ parts:
 #+begin_src haskell
 weavePageMetrics :: [Block] -> HtmlWeaver ()
 weavePageMetrics blocks = do
-  aside_ [class_ "page-metrics"] $ do
-    h2_ [id_ "h-page-metrics"] $ do
-      a_ [href_ $ "#h-page-metrics"] $ do
-        toHtml ("Page metrics" :: Text)
-    weaveTangledBlocksList blocks
-    weaveBacklinks
-    weaveNamedCellsIndex
-    weaveFooter
+  div_
+    [ id_ "heading-container-h--Page-metrics",
+      class_ "heading-container page-metrics"
+    ]
+    $ do
+      h2_ [id_ "h--Page-metrics"] $ do
+        a_ [href_ $ "#h--Page-metrics"] $ do
+          toHtml ("Page metrics" :: Text)
+  weaveTangledBlocksList blocks
+  weaveBacklinks
+  weaveNamedCellsIndex
+  weaveFooter
+#+end_src
+
+Because these page metrics are generated, they won't have entries in the [[id:e38fb4d1-72e1-40e0-905e-95bc8be2bf0b][Page
+contents]] (because the user did not write these headings). So we have to inject
+artificial heading cells in [[f:weaveToc]] [[(f:weaveToc-pageMetricsCells)]].
+
+#+name: page-metrics-cells
+#+begin_src haskell
+[ CHeading
+    Heading
+      { level = 1,
+        section = [],
+        body = Prose [ptext "Page metrics" []],
+        meta = mempty
+      },
+  CHeading
+    Heading
+      { level = 2,
+        section = [],
+        body = Prose [ptext "Tangled files" []],
+        meta = mempty
+      },
+  CHeading
+    Heading
+      { level = 2,
+        section = [],
+        body = Prose [ptext "Backlinks" []],
+        meta = mempty
+      },
+  CHeading
+    Heading
+      { level = 2,
+        section = [],
+        body = Prose [ptext "Named cells" []],
+        meta = mempty
+      }
+]
+#+end_src
+
+Similarly, we have to construct the heading ancestry information as well
+[[(f:weaveHeadingAncestry-pageMetricsAncestry)]]:
+
+#+name: pageMetricsAncestry
+#+begin_src haskell
+pageMetricsAncestry :: Map Text [Text]
+pageMetricsAncestry =
+  M.fromList
+    [ ("h--Page-metrics", []),
+      ("h--Tangled-files", ["h--Page-metrics"]),
+      ("h--Backlinks", ["h--Page-metrics"]),
+      ("h--Named-cells", ["h--Page-metrics"])
+    ]
 #+end_src
 
 ** Tangled files list
@@ -5785,21 +5853,25 @@ weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
 weaveTangledBlocksList [] = pure ()
 weaveTangledBlocksList blocks = do
   let tangledBlocks = catMaybes $ map getTangled blocks
-  if (null tangledBlocks)
-    then pure ()
-    else do
-      div_ [class_ "tangled-blocks"] $ do
-        h3_ [id_ "h-tangled-files"] $ do
-          a_ [href_ $ "#h-tangled-files"] $ do
-            toHtml @Text "Tangled files ("
-            toHtml . T.show $ length tangledBlocks
-            toHtml @Text ")"
-        ol_ [] $ do
-          forM_ (sort tangledBlocks) $ \(path, block) -> do
-            li_ [] $ do
-              let linkAnchor = getLinkAnchor Nothing $ CBlock block
-              a_ [href_ $ "#" <> linkAnchor, class_ "verbatim"] $ do
-                toHtml path
+  div_
+    [ id_ "heading-container-h--Tangled-files",
+      class_ "heading-container tangled-blocks"
+    ]
+    $ do
+      h3_ [id_ "h--Tangled-files"] $ do
+        a_ [href_ $ "#h--Tangled-files"] $ do
+          toHtml @Text "Tangled files ("
+          toHtml . T.show $ length tangledBlocks
+          toHtml @Text ")"
+      if (null tangledBlocks)
+        then pure ()
+        else do
+          ol_ [] $ do
+            forM_ (sort tangledBlocks) $ \(path, block) -> do
+              li_ [] $ do
+                let linkAnchor = getLinkAnchor Nothing $ CBlock block
+                a_ [href_ $ "#" <> linkAnchor, class_ "verbatim"] $ do
+                  toHtml path
   where
     getTangled :: Block -> Maybe (Text, Block)
     getTangled b
@@ -5822,22 +5894,30 @@ current one.
 weaveBacklinks :: HtmlWeaver ()
 weaveBacklinks = do
   weaveConf <- ask
-  case lookup weaveConf.originObjectPath weaveConf.archive.backlinks of
-    Nothing -> pure ()
-    -- (ref:f:weaveBacklinks-backlinksByPath)
-    Just backlinksByPath -> do
-      div_ [class_ "backlinks"] $ do
-        h3_ [id_ "h-backlinks"] $ do
-          a_ [href_ $ "#h-backlinks"] $ do
-            toHtml @Text "Backlinks ("
-            toHtml
-              . T.show
-              $ foldl' (\acc list -> acc + length list) 0 backlinksByPath
-            toHtml @Text ")"
+  -- (ref:f:weaveBacklinks-backlinksByPath)
+  let backlinksByPath =
+        lookup weaveConf.originObjectPath weaveConf.archive.backlinks
+      numBacklinks =
+        foldl'
+          (\acc list -> acc + length list)
+          0
+          $ fromMaybe mempty backlinksByPath
+  div_
+    [ id_ "heading-container-h--Backlinks",
+      class_ "heading-container backlinks"
+    ]
+    $ do
+      h3_ [id_ "h--Backlinks"] $ do
+        a_ [href_ $ "#h--Backlinks"] $ do
+          toHtml @Text "Backlinks ("
+          toHtml $ T.show numBacklinks
+          toHtml @Text ")"
+      when (numBacklinks > 0) $ do
         ol_ [] $ do
           let sorted =
                 sortOn (\(_, links) -> -(length links)) -- (ref:f:weaveBacklinks-sorted-by-num-links)
-                  $ toPairs backlinksByPath
+                  . toPairs
+                  $ fromMaybe mempty backlinksByPath
           sequence_ $ map weaveBacklinksForExternalObj sorted
 #+end_src
 
@@ -5852,8 +5932,8 @@ Backlinks can be computed as follows:
   3) Discard the target vertex (cell belonging to current object). This just
      leaves us with cells from other external objects.
 
-  4) Group cells by object. This is ~backlinksByPath~
-     [[(f:weaveBacklinks-backlinksByPath)]].
+  4) Group cells by object. Each key of ~backlinksByPath~
+     [[(f:weaveBacklinks-backlinksByPath)]] is for one object.
 
   5) List each object, sorted by most number of backlinks
      [[(f:weaveBacklinks-sorted-by-num-links)]].
@@ -5980,13 +6060,15 @@ weaveNamedCellsIndex = do
               Just prose <- [getCellName cell]
             ]
       lenNamedCells = T.show $ length namedCells
-  if length namedCells == 0
-    then pure ()
-    else do
-      div_ [class_ "named-cells-index"] $ do
-        h3_ [id_ "h-named-cells"] $ do
-          a_ [href_ $ "#h-named-cells"] $ do
-            toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
+  div_
+    [ id_ "heading-container-h--Named-cells",
+      class_ "heading-container"
+    ]
+    $ do
+      h3_ [id_ "h--Named-cells"] $ do
+        a_ [href_ $ "#h--Named-cells"] $ do
+          toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
+      when (length namedCells > 0) $ do
         ol_ [] $ do
           forM_ namedCells $ \(prose, cell) -> do
             li_ [] $ do
@@ -6030,7 +6112,7 @@ weaveFooter = do
 
 #+name: css:page-metrics
 #+begin_src haskell
-aside ? do
+div # ".page-metrics" ? do
   fontSans
   ol ? do
     marginTop $ px 0

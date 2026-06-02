@@ -7,7 +7,6 @@ import Clay
     a,
     absolute,
     alignSide,
-    aside,
     auto,
     backgroundColor,
     before,
@@ -343,7 +342,7 @@ defaultCss = do
     padding (px 0) (px 20) (px 0) (px 20)
     paddingLeft (px 50)
 
-  aside ? do
+  div # ".page-metrics" ? do
     fontSans
     ol ? do
       marginTop $ px 0
