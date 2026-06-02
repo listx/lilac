@@ -99,7 +99,6 @@ import Clay
     p,
     padding,
     paddingLeft,
-    paddingRight,
     pct,
     position,
     pre,
@@ -314,13 +313,10 @@ defaultCss = do
             fontFamily ["Arial"] [sansSerif]
             lineHeight $ unitless 1
         div ? do
-          paddingRight $ px 8
-          paddingLeft $ px 20
-          marginLeft $ px (-20)
+          paddingLeft $ px 30
+          marginLeft $ px (-30)
           ".active" & do
             backgroundColor colorTocActive
-            borderRight (px 4) solid colorNowebLinkFg
-            paddingRight $ px 4
           ".active-ancestor" & do
             backgroundColor colorTocActiveAncestor
       span # ".toc-counter" ? do
