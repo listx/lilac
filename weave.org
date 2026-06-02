@@ -1326,7 +1326,7 @@ body ? do
 <<css:tocs>>
 <<css:page-toc>>
 <<css:site-toc>>
-<<css:Main content>>
+<<css:main-content>>
 <<css:page-metrics>>
 <<css:Footer>> -- (ref:css:Layout-footer)
 p # ".widget-title" -- (ref:css:Layout-widget-title)
@@ -1372,9 +1372,9 @@ The ~<div>~ element is used in many places to section off areas of content; to
 avoid repetition, we reset its margins to be 0 [[(css:Layout-reset-div)]] here for
 all ~<div>~ elements.
 
-The main content's padding and such is defined in [[css:Main content]].
+The main content's padding and such is defined in [[css:main-content]].
 
-#+name: css:Main content
+#+name: css:main-content
 #+begin_src haskell
 main_ ? do
   "grid-area" -: "main"
@@ -1383,6 +1383,8 @@ main_ ? do
   overflowY visible
   padding (px 0) (px 20) (px 0) (px 20)
   paddingLeft (px 50)
+  "position" -: "relative"
+  "top" -: "<<css:navbar-height>>"
 #+end_src
 
 * Identifying cells in HTML

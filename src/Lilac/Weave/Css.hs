@@ -341,6 +341,8 @@ defaultCss = do
     overflowY visible
     padding (px 0) (px 20) (px 0) (px 20)
     paddingLeft (px 50)
+    "position" -: "relative"
+    "top" -: "4rem"
 
   div # ".page-metrics" ? do
     fontSans
