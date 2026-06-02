@@ -95,6 +95,7 @@ watch()
 main()
 {
 	__test_hs=1
+	__want_to_lint=1
 	if [[ "${1:-}" == "fe" ]]; then
 		__test_hs=0
 		shift
