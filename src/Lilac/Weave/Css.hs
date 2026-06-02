@@ -599,7 +599,7 @@ defaultCss = do
   ".sourceCode" & do
     ev margin $ px 0
   ".code-block-body" & do
-    overflowX auto
+    overflowX visible
     fontMono
     fontSize (rem 0.9)
     backgroundColor colorCodeBg
