@@ -163,9 +163,12 @@ import Lilac.Types
     encodeGPath,
     gciToObjCell,
     gciToObjPath,
-    getCellName,
+    getBlock,
+    getNamedCells,
     getProseContents,
     getSectionNumber,
+    getTangled,
+    getTangledBlocks,
     markingChars,
     markingCharsInvisible,
     ptext,
@@ -1689,35 +1692,49 @@ weaveToc :: [Cell] -> HtmlWeaver ()
 weaveToc cells = do
   --
   let pageMetricsCells =
-        [ CHeading
-            Heading
-              { level = 1,
-                section = [],
-                body = Prose [ptext "Page metrics" []],
-                meta = mempty
-              },
-          CHeading
-            Heading
-              { level = 2,
-                section = [],
-                body = Prose [ptext "Tangled files" []],
-                meta = mempty
-              },
-          CHeading
-            Heading
-              { level = 2,
-                section = [],
-                body = Prose [ptext "Backlinks" []],
-                meta = mempty
-              },
-          CHeading
-            Heading
-              { level = 2,
-                section = [],
-                body = Prose [ptext "Named cells" []],
-                meta = mempty
-              }
-        ]
+        let haveTangled = not . null $ getTangledBlocks cells
+            haveNamedCells = not . null $ getNamedCells cells
+            defaultMetricsEntries =
+              [ CHeading
+                  Heading
+                    { level = 1,
+                      section = [],
+                      body = Prose [ptext "Page metrics" []],
+                      meta = mempty
+                    },
+                CHeading
+                  Heading
+                    { level = 2,
+                      section = [],
+                      body = Prose [ptext "Backlinks" []],
+                      meta = mempty
+                    }
+              ]
+            tangledFilesEntry =
+              if haveTangled
+                then
+                  [ CHeading
+                      Heading
+                        { level = 2,
+                          section = [],
+                          body = Prose [ptext "Tangled files" []],
+                          meta = mempty
+                        }
+                  ]
+                else []
+            namedCellsEntry =
+              if haveNamedCells
+                then
+                  [ CHeading
+                      Heading
+                        { level = 2,
+                          section = [],
+                          body = Prose [ptext "Named cells" []],
+                          meta = mempty
+                        }
+                  ]
+                else []
+         in defaultMetricsEntries <> tangledFilesEntry <> namedCellsEntry
       cellsWithPageMetrics = cells <> pageMetricsCells
   p_ [class_ "widget-title toc-title"] $ do
     toHtml @Text "Page contents"
@@ -1965,15 +1982,12 @@ weaveMain docMeta lciCellPairs = do
           _ -> False
     when (any isHeading $ map snd lciCellPairs)
       $ toHtmlRaw @Text "</div>" --
-    let blocks = catMaybes $ map (getBlock . snd) lciCellPairs
-    weavePageMetrics blocks
-  where
-    getBlock = \case
-      CBlock block -> Just block
-      _ -> Nothing
+    weavePageMetrics lciCellPairs
 
-weavePageMetrics :: [Block] -> HtmlWeaver ()
-weavePageMetrics blocks = do
+weavePageMetrics :: [(LCI, Cell)] -> HtmlWeaver ()
+weavePageMetrics lciCellPairs = do
+  let blocks = catMaybes $ map (getBlock . snd) lciCellPairs
+      tangledBlocks = catMaybes $ map getTangled blocks
   div_
     [ id_ "heading-container-h--Page-metrics",
       class_ "heading-container page-metrics"
@@ -1982,40 +1996,30 @@ weavePageMetrics blocks = do
       h2_ [id_ "h--Page-metrics"] $ do
         a_ [href_ $ "#h--Page-metrics"] $ do
           toHtml ("Page metrics" :: Text)
-  weaveTangledBlocksList blocks
   weaveBacklinks
-  weaveNamedCellsIndex
+  weaveTangledBlocksList tangledBlocks
+  weaveNamedCellsIndex $ map snd lciCellPairs
   weaveFooter
 
-weaveTangledBlocksList :: [Block] -> HtmlWeaver ()
-weaveTangledBlocksList [] = pure ()
-weaveTangledBlocksList blocks = do
-  let tangledBlocks = catMaybes $ map getTangled blocks
-  div_
-    [ id_ "heading-container-h--Tangled-files",
-      class_ "heading-container tangled-blocks"
-    ]
-    $ do
-      h3_ [id_ "h--Tangled-files"] $ do
-        a_ [href_ $ "#h--Tangled-files"] $ do
-          toHtml @Text "Tangled files ("
-          toHtml . T.show $ length tangledBlocks
-          toHtml @Text ")"
-      if (null tangledBlocks)
-        then pure ()
-        else do
-          ol_ [] $ do
-            forM_ (sort tangledBlocks) $ \(path, block) -> do
-              li_ [] $ do
-                let linkAnchor = getLinkAnchor Nothing $ CBlock block
-                a_ [href_ $ "#" <> linkAnchor, class_ "verbatim"] $ do
-                  toHtml path
-  where
-    getTangled :: Block -> Maybe (Text, Block)
-    getTangled b
-      | Just path <- lookup "tangle" b.meta =
-          Just (path, b)
-      | otherwise = Nothing
+weaveTangledBlocksList :: [(Text, Block)] -> HtmlWeaver ()
+weaveTangledBlocksList tangledBlocks = do
+  when (not $ null tangledBlocks) $ do
+    div_
+      [ id_ "heading-container-h--Tangled-files",
+        class_ "heading-container tangled-blocks"
+      ]
+      $ do
+        h3_ [id_ "h--Tangled-files"] $ do
+          a_ [href_ $ "#h--Tangled-files"] $ do
+            toHtml @Text "Tangled files ("
+            toHtml . T.show $ length tangledBlocks
+            toHtml @Text ")"
+        ol_ [] $ do
+          forM_ (sort tangledBlocks) $ \(path, block) -> do
+            li_ [] $ do
+              let linkAnchor = getLinkAnchor Nothing $ CBlock block
+              a_ [href_ $ "#" <> linkAnchor, class_ "verbatim"] $ do
+                toHtml path
 
 weaveBacklinks :: HtmlWeaver ()
 weaveBacklinks = do
@@ -2122,28 +2126,19 @@ weaveBacklink archive (externalGCIs@(externalGCI : _), internalGCI) = do
             then li_ [] $ externalLink
             else externalLink
 
-weaveNamedCellsIndex :: HtmlWeaver ()
-weaveNamedCellsIndex = do
-  weaveConf <- ask
-  let cells = do
-        obj <- lookup weaveConf.originObjectPath weaveConf.archive.objects
-        pure obj.orgDoc.cells
-      namedCells =
-        sort
-          $ [ (prose, cell)
-            | cell <- (fromMaybe [] cells),
-              Just prose <- [getCellName cell]
-            ]
+weaveNamedCellsIndex :: [Cell] -> HtmlWeaver ()
+weaveNamedCellsIndex cells = do
+  let namedCells = getNamedCells cells --
       lenNamedCells = T.show $ length namedCells
-  div_
-    [ id_ "heading-container-h--Named-cells",
-      class_ "heading-container"
-    ]
-    $ do
-      h3_ [id_ "h--Named-cells"] $ do
-        a_ [href_ $ "#h--Named-cells"] $ do
-          toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
-      when (length namedCells > 0) $ do
+  when (length namedCells > 0) $ do
+    div_
+      [ id_ "heading-container-h--Named-cells",
+        class_ "heading-container"
+      ]
+      $ do
+        h3_ [id_ "h--Named-cells"] $ do
+          a_ [href_ $ "#h--Named-cells"] $ do
+            toHtml @Text $ "Named cells (" <> lenNamedCells <> ")"
         ol_ [] $ do
           forM_ namedCells $ \(prose, cell) -> do
             li_ [] $ do

@@ -54,9 +54,13 @@ module Lilac.Types
     fromWords,
     gciToObjCell,
     gciToObjPath,
+    getBlock,
     getCellName,
+    getNamedCells,
     getProseContents,
     getSectionNumber,
+    getTangled,
+    getTangledBlocks,
     markingChars,
     markingCharsInvisible,
     nilOid,
@@ -136,6 +140,7 @@ import Relude
     foldl',
     fromEnum,
     map,
+    mapMaybe,
     maybe,
     mempty,
     otherwise,
@@ -192,6 +197,32 @@ data Cell
   | CCommand Command
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
+
+getTangledBlocks :: [Cell] -> [(Text, Block)]
+getTangledBlocks cells = mapMaybe f cells
+  where
+    f cell = do
+      block <- getBlock cell
+      getTangled block
+
+getBlock :: Cell -> Maybe Block
+getBlock = \case
+  CBlock block -> Just block
+  _ -> Nothing
+
+getTangled :: Block -> Maybe (Text, Block)
+getTangled b
+  | Just path <- lookup "tangle" b.meta =
+      Just (path, b)
+  | otherwise = Nothing
+
+getNamedCells :: [Cell] -> [(Prose, Cell)]
+getNamedCells cells =
+  sort
+    $ [ (prose, cell)
+      | cell <- cells,
+        Just prose <- [getCellName cell]
+      ]
 
 type Command :: Type
 data Command
