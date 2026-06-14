@@ -98,6 +98,7 @@ import Clay
     p,
     padding,
     paddingLeft,
+    paddingRight,
     pct,
     position,
     pre,
@@ -313,6 +314,7 @@ defaultCss = do
             lineHeight $ unitless 1
         div ? do
           paddingLeft $ px 30
+          paddingRight $ px 10
           marginLeft $ px (-30)
           ".active" & do
             backgroundColor colorTocActive
