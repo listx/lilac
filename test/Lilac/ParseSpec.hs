@@ -949,6 +949,20 @@ spec = do
                               N.uriFragment = ""
                             },
                       name = [stext "hello" []]
+                    },
+                ptext " " [],
+                PTokenLink
+                  Link
+                    { target =
+                        LinkTargetURI
+                          N.URI
+                            { N.uriScheme = "mailto:",
+                              N.uriAuthority = Nothing,
+                              N.uriPath = "x@foo.org",
+                              N.uriQuery = "",
+                              N.uriFragment = ""
+                            },
+                      name = [stext "email" []]
                     }
               ]
         ]

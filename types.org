@@ -456,15 +456,13 @@ internet.
 #+begin_src haskell
 protocolsWeb :: [Text]
 protocolsWeb =
-  map
-    (<> "://")
-    [ "http",
-      "https",
-      "file",
-      "ftp",
-      "mailto",
-      "tel"
-    ]
+  [ "http://",
+    "https://",
+    "file://",
+    "ftp://",
+    "mailto:",
+    "tel:"
+  ]
 #+end_src
 
 The [[f:protocolsEmacs]] contains protocols that are used as aliases for their

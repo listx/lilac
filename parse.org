@@ -3969,6 +3969,7 @@ protocolWebLinkParser = do
 [[http://foo.org]]
 [[https://foo.org]]
 [[https://foo.org][hello]]
+[[mailto:x@foo.org][email]]
 #+end_src
 
 #+name: t:0006-links-web-protocols
@@ -4036,6 +4037,20 @@ shouldParseWith
                             N.uriFragment = ""
                           },
                     name = [stext "hello" []]
+                  },
+              ptext " " [],
+              PTokenLink
+                Link
+                  { target =
+                      LinkTargetURI
+                        N.URI
+                          { N.uriScheme = "mailto:",
+                            N.uriAuthority = Nothing,
+                            N.uriPath = "x@foo.org",
+                            N.uriQuery = "",
+                            N.uriFragment = ""
+                          },
+                    name = [stext "email" []]
                   }
             ]
       ]

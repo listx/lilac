@@ -631,15 +631,13 @@ protocolsEmacs =
 
 protocolsWeb :: [Text]
 protocolsWeb =
-  map
-    (<> "://")
-    [ "http",
-      "https",
-      "file",
-      "ftp",
-      "mailto",
-      "tel"
-    ]
+  [ "http://",
+    "https://",
+    "file://",
+    "ftp://",
+    "mailto:",
+    "tel:"
+  ]
 
 type WeaveConf :: Type
 data WeaveConf = WeaveConf
