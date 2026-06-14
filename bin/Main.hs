@@ -467,7 +467,9 @@ readProjectConf :: OsPath -> IO ProjectConf
 readProjectConf path = do
   input <- LU.readFileRobustly path
   case parseProjectConf input of
-    Left errMsg -> die errMsg
+    Left errMsg -> do
+      putTextLn "Could not read .lilac.conf"
+      die errMsg
     Right projectConf -> pure projectConf
 
 parseProjectConf :: Text -> Either String ProjectConf
