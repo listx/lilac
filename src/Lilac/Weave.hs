@@ -155,7 +155,6 @@ import Lilac.Types
       ( archive,
         citeprocResult,
         originObjectPath,
-        outDir,
         projectConf,
         rootRelativePrefix
       ),
@@ -813,7 +812,7 @@ getLinkToGCI weaveConf gci
               Just ("", linkAnchor, cellName)
             else do
               (linkAnchor, docName) <-
-                getRootRelativeOrgDocCellLink weaveConf.outDir gpath lci cell
+                getRootRelativeOrgDocCellLink weaveConf gpath lci cell
               Just (docName, linkAnchor, cellName)
   | otherwise = Nothing
 
@@ -1610,7 +1609,7 @@ weaveCollectedGlossaryTerm (isFirstTerm, (lci, objPath)) = do
       CGlossaryTerm glossaryTerm <- externalCell,
       Just (externalLinkAnchor, externalOrgDocName) <-
         getRootRelativeOrgDocCellLink
-          weaveConf.outDir
+          weaveConf
           objPath
           lci
           externalCell -> do
@@ -1636,14 +1635,14 @@ weaveCollectedGlossaryTerm (isFirstTerm, (lci, objPath)) = do
         else [class_ "inner-dt"]
 
 getRootRelativeOrgDocCellLink ::
-  GPath ->
+  WeaveConf ->
   GPath ->
   LCI ->
   Cell ->
   Maybe (Text, Text)
-getRootRelativeOrgDocCellLink outDir objPath lci externalCell
+getRootRelativeOrgDocCellLink weaveConf objPath lci externalCell
   | Just (externalOrgDocName, externalOrgDocPath) <-
-      getRootRelativeOrgDocLink outDir objPath =
+      getRootRelativeOrgDocLink weaveConf objPath =
       let externalLinkAnchor =
             externalOrgDocPath
               <> "#"
@@ -1651,11 +1650,12 @@ getRootRelativeOrgDocCellLink outDir objPath lci externalCell
        in Just (externalLinkAnchor, externalOrgDocName)
   | otherwise = Nothing
 
-getRootRelativeOrgDocLink :: GPath -> GPath -> Maybe (Text, Text)
-getRootRelativeOrgDocLink outDir objPath
+getRootRelativeOrgDocLink :: WeaveConf -> GPath -> Maybe (Text, Text)
+getRootRelativeOrgDocLink weaveConf objPath
   | Just toObjPath <- P.encodeUtf $ decodeGPath objPath,
     Just serveRoot <- P.encodeUtf "/",
-    Just outDirOsPath <- P.encodeUtf $ decodeGPath outDir,
+    Just rootRelativePrefixOsPath <-
+      P.encodeUtf $ decodeGPath weaveConf.rootRelativePrefix,
     Right externalOrgDocName <-
       P.decodeWith utf8 utf8
         $ P.replaceExtension
@@ -1664,7 +1664,7 @@ getRootRelativeOrgDocLink outDir objPath
     Right externalOrgDocPath <-
       P.decodeWith utf8 utf8
         . P.combine serveRoot
-        . P.combine outDirOsPath
+        . P.combine rootRelativePrefixOsPath
         $ P.replaceExtension
           toObjPath
           (P.unsafeEncodeUtf "html") =
@@ -1777,7 +1777,7 @@ weaveGtocTree (Node path children) = do
   weaveConf <- ask
   li_ [] $ do
     let (docName, docPath) =
-          case getRootRelativeOrgDocLink weaveConf.outDir path of
+          case getRootRelativeOrgDocLink weaveConf path of
             Nothing ->
               ( "LILAC_ERROR_DOC_NAME_NOT_FOUND",
                 "LILAC_ERROR_DOC_LINK_NOT_FOUND"
@@ -1906,7 +1906,7 @@ weaveBreadcrumbs = do
       | Just _ <- lookup indexPath weaveConf.archive.objects -> do
           let (_, docPath) =
                 fromMaybe ("", "LILAC_ERROR_RELATIVE_LINK_ERROR")
-                  $ getRootRelativeOrgDocLink weaveConf.outDir indexPath
+                  $ getRootRelativeOrgDocLink weaveConf indexPath
           a_ [href_ docPath] $ do
             weaveBreadcrumb dirName
       | otherwise -> weaveBreadcrumb dirName
@@ -2051,7 +2051,7 @@ weaveBacklinksForExternalObj (_, []) = toHtmlRaw @Text ""
 weaveBacklinksForExternalObj (externalObjGPath, edges) = do
   weaveConf <- ask
   --
-  case getRootRelativeOrgDocLink weaveConf.outDir externalObjGPath of
+  case getRootRelativeOrgDocLink weaveConf externalObjGPath of
     Nothing -> pure ()
     Just (externalOrgDocName, externalOrgDocPath) -> do
       li_ [] $ do
