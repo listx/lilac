@@ -1358,8 +1358,13 @@ blockStartParser = do
     pure ("__src_language", src)
   when (blockType == "src" && srcLang == Nothing)
     $ fail "block type src requires a language specifier" --
+  let finalKVs =
+        --
+        if blockName == Just ("name", "index")
+          then insert "collapsed" "true" blockMetaKVs
+          else blockMetaKVs
   _ <- char '\n' --
-  pure (blockName, blockMetaKVs, blockType, srcLang)
+  pure (blockName, finalKVs, blockType, srcLang)
   where
     isSrcLanguageChar c = isAsciiLower c || c == '-'
 

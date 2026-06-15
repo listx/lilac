@@ -1118,9 +1118,7 @@ weaveCell (lci, cell) = case cell of
   CHeading heading -> weaveHeading lci heading
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> p_ [] $ wrapWith lci $ weaveProse prose
-  CBlock block
-    | Just "index" <- lookup "name" block.meta -> pure () -- (ref:f:weaveCell-hide-index-block)
-    | otherwise -> weaveBlock lci block
+  CBlock block -> weaveBlock lci block
   CMathFragment mathFragment -> weaveMathFragmentStandalone lci mathFragment
   CFigure figure -> weaveFigure lci figure
   CTable table -> weaveTable lci table
@@ -1130,11 +1128,6 @@ weaveCell (lci, cell) = case cell of
     PrintBibliography -> weaveBibliography lci
     PrintGlossary isGlobal -> weaveGlossary isGlobal
 #+end_src
-
-[[(f:weaveCell-hide-index-block)]] does nothing if the code block is a
-magic "index" block, because this is low-level information which is already
-widely apparent by looking at the "Site contents" in the left sidebar
-[[(f:weaveGtoc-site-contents)]].
 
 ** HTML head
 

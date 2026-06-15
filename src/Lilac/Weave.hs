@@ -437,9 +437,7 @@ weaveCell (lci, cell) = case cell of
   CHeading heading -> weaveHeading lci heading
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> p_ [] $ wrapWith lci $ weaveProse prose
-  CBlock block
-    | Just "index" <- lookup "name" block.meta -> pure () --
-    | otherwise -> weaveBlock lci block
+  CBlock block -> weaveBlock lci block
   CMathFragment mathFragment -> weaveMathFragmentStandalone lci mathFragment
   CFigure figure -> weaveFigure lci figure
   CTable table -> weaveTable lci table

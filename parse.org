@@ -8672,8 +8672,13 @@ blockStartParser = do
     pure ("__src_language", src)
   when (blockType == "src" && srcLang == Nothing)
     $ fail "block type src requires a language specifier" -- (ref:f:blockStartParser-require-lang)
+  let finalKVs =
+        -- (ref:f:blockStartParser-collapse-index-block)
+        if blockName == Just ("name", "index")
+          then insert "collapsed" "true" blockMetaKVs
+          else blockMetaKVs
   _ <- char '\n' -- (ref:f:blockStartParser-newline)
-  pure (blockName, blockMetaKVs, blockType, srcLang)
+  pure (blockName, finalKVs, blockType, srcLang)
   where
     isSrcLanguageChar c = isAsciiLower c || c == '-'
 #+end_src
@@ -8685,6 +8690,10 @@ true because other things (like figures) can have a ~#+name~ associated with the
 We fail the parse if we detect a ~#+begin_src~ block without an accompanying
 language [[(f:blockStartParser-require-lang)]]; see [[ti:0007-block-src-without-lang]]
 for an example.
+
+[[(f:blockStartParser-collapse-index-block)]] automatically makes "index" blocks
+collapsed, because their contents are not very interesting (they can be seen by
+looking at the left sidebar in the site contents).
 
 Back to [[f:blockParser]]. The ~nowebOff~ bit [[(f:blockParser-nowebOff)]] controls how we
 perceive text that looks like ~<<foo>>~; if we've disabled Noweb references, then
