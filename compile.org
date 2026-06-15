@@ -125,6 +125,7 @@ import Lilac.Types
     ptext,
     stripLinks,
   )
+import Lilac.Types.Internal (GPath (GPath))
 import Lilac.Util qualified as LU
 import Relude
   ( Bool,
@@ -139,6 +140,7 @@ import Relude
     Text,
     Type,
     abs,
+    any,
     catMaybes,
     concat,
     concatMap,
@@ -160,6 +162,7 @@ import Relude
     maybeToList,
     mempty,
     modify,
+    not,
     null,
     otherwise,
     pure,
@@ -169,6 +172,7 @@ import Relude
     snd,
     sort,
     unlines,
+    when,
     zip,
     (!!?),
     ($),
@@ -2644,7 +2648,20 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
             let rawText = T.concat $ map extractBTokenStringOnly b.body
                 indexPath = T.pack $ decodeGPath path -- (ref:f:getChildPaths-start)
                 startingPath = T.dropEnd 10 indexPath -- (ref:f:getChildPaths-drop10)
-                paths = mapMaybe (toGPath startingPath) $ T.lines rawText
+                rawChildPaths = T.lines rawText
+                isIndexPath :: Text -> Bool
+                isIndexPath = (== "index.org") -- (ref:f:getChildPaths-isIndexPath)
+                paths =
+                  mapMaybe (toGPath startingPath)
+                    $ filter (not . isIndexPath) rawChildPaths -- (ref:f:getChildPaths-avoid-infinite-recursion)
+            when (any isIndexPath rawChildPaths) $ do
+              let invalidIndexPaths =
+                    map (GPath . T.unpack) $ filter isIndexPath rawChildPaths
+              modify
+                $ \s ->
+                  s
+                    { invalidPaths = invalidIndexPaths <> s.invalidPaths
+                    }
             results <- mapM lookupSingle paths
             pure $ acc <> catMaybes results
       _ -> pure acc
@@ -2683,6 +2700,11 @@ The sequence of operations (with the state of the path at each step) is below:
   4) [[(f:getChildPaths-constructedPath)]] If ending in ~.org~, replace with ~.lobj~.
      Otherwise this is a directory, so add it and then also add a trailing
      ~/index.lobj~ to it.
+
+[[(f:getChildPaths-avoid-infinite-recursion)]] avoids recursing into another
+~index.org~ document, because that will lead to infinite recursion. The check at
+[[(f:getChildPaths-isIndexPath)]] doesn't take into account any directory slashes,
+because child paths may only refer to direct children within the same directory.
 
 *** Tests
 
@@ -2818,6 +2840,42 @@ expectGTOC
       Invalid GTOC object paths:
         test/Lilac/CompileSpec/0105/invalid-paths/README.lobj
         test/Lilac/CompileSpec/0105/invalid-paths/dir1/index.lobj
+
+      """
+  )
+#+end_src
+
+Listing ~index.org~ in the list of child paths is invalid.
+
+#+name: ti:0105-gtoc-invalid-paths-self
+#+header: :tangle test/Lilac/CompileSpec/0105/invalid-paths-self/index.org
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000f014
+:END:
+
+This is an index file.
+
+,#+name: index
+,#+begin_src txt
+index.org
+dir1
+README.org
+,#+end_src
+#+end_src
+
+#+name: t:0105-gtoc-invalid-paths-self
+#+begin_src haskell
+expectGTOC
+  [ "0105/invalid-paths-self/index.org"
+  ]
+  ( Left
+      """
+      Invalid GTOC object paths:
+        test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj
+        test/Lilac/CompileSpec/0105/invalid-paths-self/dir1/index.lobj
+        index.org
 
       """
   )
@@ -3234,6 +3292,7 @@ Below are all of the individual test cases.
 <<t:0105-gtoc-root-index-without-index-block>>
 <<t:0105-gtoc-basic>>
 <<t:0105-gtoc-invalid-paths>>
+<<t:0105-gtoc-invalid-paths-self>>
 <<t:0500-cumulativeOffsets-sanity>>
 #+end_src
 

@@ -412,6 +412,19 @@ spec = do
         """
     )
 
+  expectGTOC
+    [ "0105/invalid-paths-self/index.org"
+    ]
+    ( Left
+        """
+        Invalid GTOC object paths:
+          test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj
+          test/Lilac/CompileSpec/0105/invalid-paths-self/dir1/index.lobj
+          index.org
+
+        """
+    )
+
   describe "cumulativeOffsets sanity check" $ do
     it "works for empty case" $ do
       let input = [] :: [(Int, String)]

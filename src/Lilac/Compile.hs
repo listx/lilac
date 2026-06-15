@@ -96,6 +96,7 @@ import Lilac.Types
     ptext,
     stripLinks,
   )
+import Lilac.Types.Internal (GPath (GPath))
 import Lilac.Util qualified as LU
 import Relude
   ( Bool,
@@ -110,6 +111,7 @@ import Relude
     Text,
     Type,
     abs,
+    any,
     catMaybes,
     concat,
     concatMap,
@@ -131,6 +133,7 @@ import Relude
     maybeToList,
     mempty,
     modify,
+    not,
     null,
     otherwise,
     pure,
@@ -140,6 +143,7 @@ import Relude
     snd,
     sort,
     unlines,
+    when,
     zip,
     (!!?),
     ($),
@@ -748,7 +752,20 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
             let rawText = T.concat $ map extractBTokenStringOnly b.body
                 indexPath = T.pack $ decodeGPath path --
                 startingPath = T.dropEnd 10 indexPath --
-                paths = mapMaybe (toGPath startingPath) $ T.lines rawText
+                rawChildPaths = T.lines rawText
+                isIndexPath :: Text -> Bool
+                isIndexPath = (== "index.org") --
+                paths =
+                  mapMaybe (toGPath startingPath)
+                    $ filter (not . isIndexPath) rawChildPaths --
+            when (any isIndexPath rawChildPaths) $ do
+              let invalidIndexPaths =
+                    map (GPath . T.unpack) $ filter isIndexPath rawChildPaths
+              modify
+                $ \s ->
+                  s
+                    { invalidPaths = invalidIndexPaths <> s.invalidPaths
+                    }
             results <- mapM lookupSingle paths
             pure $ acc <> catMaybes results
       _ -> pure acc
