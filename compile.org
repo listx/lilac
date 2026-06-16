@@ -2660,7 +2660,7 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
               modify
                 $ \s ->
                   s
-                    { invalidPaths = invalidIndexPaths <> s.invalidPaths
+                    { invalidPaths = s.invalidPaths <> invalidIndexPaths
                     }
             results <- mapM lookupSingle paths
             pure $ acc <> catMaybes results
@@ -2680,7 +2680,7 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
       case lookup p st.objMap of
         Just o -> pure $ Just (p, o)
         Nothing -> do
-          modify $ \s -> s {invalidPaths = p : s.invalidPaths}
+          modify $ \s -> s {invalidPaths = s.invalidPaths <> [p]}
           pure Nothing
     extractBTokenStringOnly :: BToken -> Text
     extractBTokenStringOnly = \case
@@ -2838,8 +2838,8 @@ expectGTOC
   ( Left
       """
       Invalid GTOC object paths:
-        test/Lilac/CompileSpec/0105/invalid-paths/README.lobj
         test/Lilac/CompileSpec/0105/invalid-paths/dir1/index.lobj
+        test/Lilac/CompileSpec/0105/invalid-paths/README.lobj
 
       """
   )
@@ -2873,9 +2873,9 @@ expectGTOC
   ( Left
       """
       Invalid GTOC object paths:
-        test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj
-        test/Lilac/CompileSpec/0105/invalid-paths-self/dir1/index.lobj
         test/Lilac/CompileSpec/0105/invalid-paths-self/index.lobj
+        test/Lilac/CompileSpec/0105/invalid-paths-self/dir1/index.lobj
+        test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj
 
       """
   )

@@ -406,8 +406,8 @@ spec = do
     ( Left
         """
         Invalid GTOC object paths:
-          test/Lilac/CompileSpec/0105/invalid-paths/README.lobj
           test/Lilac/CompileSpec/0105/invalid-paths/dir1/index.lobj
+          test/Lilac/CompileSpec/0105/invalid-paths/README.lobj
 
         """
     )
@@ -418,9 +418,9 @@ spec = do
     ( Left
         """
         Invalid GTOC object paths:
-          test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj
+          test/Lilac/CompileSpec/0105/invalid-paths-self/index.lobj
           test/Lilac/CompileSpec/0105/invalid-paths-self/dir1/index.lobj
-          index.org
+          test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj
 
         """
     )

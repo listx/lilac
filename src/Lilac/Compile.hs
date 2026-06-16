@@ -759,11 +759,12 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
                     $ filter (not . isIndexPath) rawChildPaths --
             when (any isIndexPath rawChildPaths) $ do
               let invalidIndexPaths =
-                    map (GPath . T.unpack) $ filter isIndexPath rawChildPaths
+                    mapMaybe (toGPath startingPath)
+                      $ filter isIndexPath rawChildPaths
               modify
                 $ \s ->
                   s
-                    { invalidPaths = invalidIndexPaths <> s.invalidPaths
+                    { invalidPaths = s.invalidPaths <> invalidIndexPaths
                     }
             results <- mapM lookupSingle paths
             pure $ acc <> catMaybes results
@@ -783,7 +784,7 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
       case lookup p st.objMap of
         Just o -> pure $ Just (p, o)
         Nothing -> do
-          modify $ \s -> s {invalidPaths = p : s.invalidPaths}
+          modify $ \s -> s {invalidPaths = s.invalidPaths <> [p]}
           pure Nothing
     extractBTokenStringOnly :: BToken -> Text
     extractBTokenStringOnly = \case
