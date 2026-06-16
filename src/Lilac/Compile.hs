@@ -18,6 +18,7 @@ import Data.Aeson (eitherDecodeStrictText)
 import Data.Graph qualified as G
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Data.List (partition)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -110,7 +111,6 @@ import Relude
     Text,
     Type,
     abs,
-    any,
     catMaybes,
     concat,
     concatMap,
@@ -754,13 +754,11 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
                 rawChildPaths = T.lines rawText
                 isIndexPath :: Text -> Bool
                 isIndexPath = (== "index.org") --
-                paths =
-                  mapMaybe (toGPath startingPath)
-                    $ filter (not . isIndexPath) rawChildPaths --
-            when (any isIndexPath rawChildPaths) $ do
-              let invalidIndexPaths =
-                    mapMaybe (toGPath startingPath)
-                      $ filter isIndexPath rawChildPaths
+                (indexPaths, standardPaths) = partition isIndexPath rawChildPaths
+                toGPath' = mapMaybe (toGPath startingPath)
+                paths = toGPath' standardPaths --
+                invalidIndexPaths = toGPath' indexPaths
+            when (not $ null invalidIndexPaths) $ do
               modify
                 $ \s ->
                   s
