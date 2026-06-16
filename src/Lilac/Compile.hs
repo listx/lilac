@@ -96,7 +96,6 @@ import Lilac.Types
     ptext,
     stripLinks,
   )
-import Lilac.Types.Internal (GPath (GPath))
 import Lilac.Util qualified as LU
 import Relude
   ( Bool,

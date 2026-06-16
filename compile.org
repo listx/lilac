@@ -125,7 +125,6 @@ import Lilac.Types
     ptext,
     stripLinks,
   )
-import Lilac.Types.Internal (GPath (GPath))
 import Lilac.Util qualified as LU
 import Relude
   ( Bool,
@@ -2656,7 +2655,8 @@ getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells
                     $ filter (not . isIndexPath) rawChildPaths -- (ref:f:getChildPaths-avoid-infinite-recursion)
             when (any isIndexPath rawChildPaths) $ do
               let invalidIndexPaths =
-                    map (GPath . T.unpack) $ filter isIndexPath rawChildPaths
+                    mapMaybe (toGPath startingPath)
+                      $ filter isIndexPath rawChildPaths
               modify
                 $ \s ->
                   s
@@ -2875,7 +2875,7 @@ expectGTOC
       Invalid GTOC object paths:
         test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj
         test/Lilac/CompileSpec/0105/invalid-paths-self/dir1/index.lobj
-        index.org
+        test/Lilac/CompileSpec/0105/invalid-paths-self/index.lobj
 
       """
   )
