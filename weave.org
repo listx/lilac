@@ -1118,7 +1118,11 @@ weaveCell (lci, cell) = case cell of
   CHeading heading -> weaveHeading lci heading
   CListItem listMarkers -> sequence_ $ map weaveListMarker listMarkers
   CParagraph prose -> p_ [] $ wrapWith lci $ weaveProse prose
-  CBlock block -> weaveBlock lci block
+  CBlock block
+    | Just "index" <- lookup "name" block.meta,
+      Just "true" <- lookup "hidden" block.meta ->
+        pure () -- (ref:f:weaveCell-hide-index-block)
+    | otherwise -> weaveBlock lci block
   CMathFragment mathFragment -> weaveMathFragmentStandalone lci mathFragment
   CFigure figure -> weaveFigure lci figure
   CTable table -> weaveTable lci table
@@ -1128,6 +1132,12 @@ weaveCell (lci, cell) = case cell of
     PrintBibliography -> weaveBibliography lci
     PrintGlossary isGlobal -> weaveGlossary isGlobal
 #+end_src
+
+[[(f:weaveCell-hide-index-block)]] hides the block by not weaving it, if the code
+block is a magic "index" block which has been requested to be hidden, because
+this is low-level information which is already widely apparent by looking at the
+"Site contents" in the left sidebar [[(f:weaveGtoc-site-contents)]]. Index blocks
+are hidden [[id:e3400781-57e7-409d-a65c-7c3d66847587::(f:blockStartParser-hide-index-block)][by default]], unless the user specifies otherwise.
 
 ** HTML head
 

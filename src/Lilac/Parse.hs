@@ -1360,8 +1360,9 @@ blockStartParser = do
     $ fail "block type src requires a language specifier" --
   let finalKVs =
         --
-        if blockName == Just ("name", "index")
-          then insert "collapsed" "true" blockMetaKVs
+        if (blockName == Just ("name", "index"))
+          && (notMember "hidden" blockMetaKVs)
+          then insert "hidden" "true" blockMetaKVs
           else blockMetaKVs
   _ <- char '\n' --
   pure (blockName, finalKVs, blockType, srcLang)
