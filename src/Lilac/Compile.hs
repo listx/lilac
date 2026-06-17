@@ -398,8 +398,10 @@ findBrokenFileLinks =
       (GPath, FilePath) ->
       IO [(GPath, FilePath)]
     validateFilePath acc (objPath, filePath) = do
+      objOsPath <- P.encodeUtf $ decodeGPath objPath
+      let objDirOsPath = P.takeDirectory objOsPath
       osPath <- P.encodeUtf filePath
-      exists <- D.doesPathExist osPath
+      exists <- D.doesPathExist $ P.combine objDirOsPath osPath
       if exists
         then pure acc
         else pure $ (objPath, filePath) : acc
