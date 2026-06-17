@@ -6133,9 +6133,21 @@ getNamedCells cells =
   sort
     $ [ (prose, cell)
       | cell <- cells,
-        Just prose <- [getCellName cell]
+        Just prose <- [getCellName cell],
+        isNotHiddenBlock cell
       ]
+  where
+    -- (ref:f:getNamedCells-isNotHiddenBlock)
+    isNotHiddenBlock :: Cell -> Bool
+    isNotHiddenBlock = \case
+      CBlock block -> case lookup "hidden" block.meta of
+        Nothing -> True
+        Just val -> val /= "true"
+      _ -> True
 #+end_src
+
+[[(f:getNamedCells-isNotHiddenBlock)]] filters out blocks that have been hidden,
+such as index blocks [[(f:weaveCell-hide-index-block)]].
 
 ** Footer
 

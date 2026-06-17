@@ -111,7 +111,7 @@ import GHC.Generics (Generic)
 import Lilac.Types.Internal (GPath (GPath))
 import Network.URI qualified as N
 import Relude
-  ( Bool (False),
+  ( Bool (False, True),
     Char,
     Enum,
     Eq,
@@ -154,6 +154,7 @@ import Relude
     ($),
     (-),
     (.),
+    (/=),
     (<),
     (<$>),
     (<*>),
@@ -221,8 +222,17 @@ getNamedCells cells =
   sort
     $ [ (prose, cell)
       | cell <- cells,
-        Just prose <- [getCellName cell]
+        Just prose <- [getCellName cell],
+        isNotHiddenBlock cell
       ]
+  where
+    --
+    isNotHiddenBlock :: Cell -> Bool
+    isNotHiddenBlock = \case
+      CBlock block -> case lookup "hidden" block.meta of
+        Nothing -> True
+        Just val -> val /= "true"
+      _ -> True
 
 type Command :: Type
 data Command
