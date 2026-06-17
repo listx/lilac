@@ -29,6 +29,12 @@ other sections as needed.
 Change [[id:0cf535d6-f852-4b97-8ef8-9d566ad32e51::.build.yml][.build.yml]] to use https://git.sr.ht/~listx/lilac instead of SSH (because
 it won't be a private repo).
 
+** index blocks: hide them by default, but let the user unhide them if they want to
+
+Use a new "hidden" boolean in the block metadata. During parsing, set it to
+"true" for an index block, if there isn't a "hidden" metadata already in there.
+This way, the user can unhide one if they want to.
+
 ** TODO CI: add site publishing step
 
   - Publish ~next~ branch to https://listx.srht.site/project/lilac/next.
