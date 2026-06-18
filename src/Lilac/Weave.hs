@@ -603,7 +603,7 @@ isExternalLink = \case
   LinkTargetOid {}
   LinkTargetLineLabel {}
   LinkTargetFootnote {} -> False
-  LinkTargetFilePath {} -> True
+  LinkTargetFilePath path -> not . T.isSuffixOf ".html" $ T.pack path
   LinkTargetURI uri
     | "" <- uri.uriScheme,
       Nothing <- uri.uriAuthority,
