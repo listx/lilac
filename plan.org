@@ -29,6 +29,20 @@ other sections as needed.
 Change [[id:0cf535d6-f852-4b97-8ef8-9d566ad32e51::.build.yml][.build.yml]] to use https://git.sr.ht/~listx/lilac instead of SSH (because
 it won't be a private repo).
 
+** TODO allow user to add arbitrary HTML into the HTML head
+
+We have a problem. When hosting on SourceHut Pages, it blocks all CDNs. This
+means we are forced to include MathJax in our own domain, instead of grabbing it
+from a CDN.
+
+The easiest way to do this is to allow the user to specify custom HTML into the
+HTML head so that they can load custom scripts. In our case we want to let the
+user load a custom MathJax script.
+
+For implementation, we can let the user specify the custom HTML in the JSON.
+Because writing HTML inside a JSON string is cumbersome, we can let the user
+specify an HTML file, and we can just inject the HTML file contents directly.
+
 ** TODO CI: add site publishing step
 
   - Publish ~next~ branch to https://listx.srht.site/project/lilac/next.
