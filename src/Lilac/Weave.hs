@@ -391,7 +391,7 @@ weaveObject object = doctypehtml_ $ do
     script_
       [ id_ "MathJax-script",
         async_ "",
-        src_ "https://cdn.jsdelivr.net/npm/mathjax@3.0.1/es5/tex-mml-chtml.js"
+        src_ "https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"
       ]
       ("" :: Text)
   body_ $ do
