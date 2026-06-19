@@ -889,9 +889,7 @@ weaveLink insideBlock link = do
   where
     linkCategory target
       | isExternalLink link.target =
-          [ class_ "external-link", --
-            target_ "_blank",
-            rel_ "noopener noreferrer"
+          [ class_ "external-link"
           ]
       | "#ref-" `T.isPrefixOf` target = [] --
       | otherwise = [class_ "internal-link"]

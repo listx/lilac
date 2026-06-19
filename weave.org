@@ -1880,13 +1880,6 @@ we also need to keep track of the HTML ID of the link element for line labels
 [[(line label self-link)]] (the targets of line label links inside blocks just point
 to themselves via this HTML ID).
 
-For external links, we set the ~target~ attribute (not to be confused with the
-~href~ attribute for link targets) to ~_blank~ to make the browser open them in a
-new tab [[(f:weaveLink-external-link)]]. The ~noopener noreferrer~ bit is a security
-measure to sever connections from the new tab and the current window. This way,
-even if those external links get hijacked, they will not have access to the
-current window.
-
 Links to bibliographical entries (those starting with ~#ref-~
 [[(f:weaveLink-bib-entries)]]) are not given an ~internal-link~ class, because we want
 these links to be simple without any extra decorations
@@ -1916,9 +1909,7 @@ weaveLink insideBlock link = do
   where
     linkCategory target
       | isExternalLink link.target =
-          [ class_ "external-link", -- (ref:f:weaveLink-external-link)
-            target_ "_blank",
-            rel_ "noopener noreferrer"
+          [ class_ "external-link"
           ]
       | "#ref-" `T.isPrefixOf` target = [] -- (ref:f:weaveLink-bib-entries)
       | otherwise = [class_ "internal-link"]
