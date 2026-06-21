@@ -194,6 +194,30 @@ touch index.org
 Head on to the [[id:bf0da06e-1356-4a68-8b48-ae0e48756ae0][Hello World]] example to start with a basic starter ~index.org~ file,
 along with a Makefile to start tangling and weaving from the ~index.org~ file.
 
+* Using Lilac as a static site generator
+
+Because Lilac weaves output to HTML, it makes it suitable for use as a static
+content generator. An example is https://funloop.org/build.html (source code at
+https://git.sr.ht/~listx/personal-website).
+
+There are a couple flags for the ~weave~ subcommand which are worth mentioning for
+using Lilac as an SSG:
+
+  - ~--out-dir~ flag
+    [[id:21ccfaf6-cd49-46b6-9075-4952f3eea207::(f:weaveOptsHandler-out-dir)]]: Use
+    this to put all generated assets to a dedicated subdirectory. If you are
+    hosting your site on SourceHut, you'd want to use this option because you
+    need to upload a tarball of your static contents (and it's easier to create
+    a tarball from a subdirectory that only has static contents).
+
+  - ~--root-relative-prefix~ flag
+    [[id:21ccfaf6-cd49-46b6-9075-4952f3eea207::(f:weaveOptsHandler-root-relative-prefix)]]:
+    Use this if you don't have control over the server's root folder in
+    production. That is, by default Lilac will make every HTML page pull CSS and
+    JS from top-level ~css~ and ~js~ folders. However it may be the case that you
+    need to pull these from a subdirectory from the root. This subdirectory,
+    then, is what you'd specify for this flag.
+
 * Footnotes
 
 [fn:web-markup] For CWEB, it has the ~cweave~ utility which then converts this to

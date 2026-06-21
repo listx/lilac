@@ -322,9 +322,10 @@ weaveOptsHandler =
                 <> metavar "DIR"
                 <> value (P.unsafeEncodeUtf ".")
                 <> showDefault
-                <> help
+                <> help --
                   """
-                  Directory for saving the HTML files.
+                  Directory for saving the HTML files. CSS and JS are also saved
+                  inside this directory, if you use --write-css and --write-js.
                   """
             )
         )
@@ -334,7 +335,7 @@ weaveOptsHandler =
                 <> metavar "DIR"
                 <> value (P.unsafeEncodeUtf "/")
                 <> showDefault
-                <> help
+                <> help --
                   """
                   Prefix to use for pulling static assets (CSS and JS). For
                   example, CSS is pulled from
