@@ -1153,6 +1153,7 @@ head_ $ do
     . fromMaybe "Untitled"
     $ lookup "title" object.orgDoc.meta
   <<Load CSS>>
+  <<load-favicon>>
   <<Google Fonts>>
   <<MathJax customization>>
   <<MathJax script>>
@@ -1193,6 +1194,16 @@ getRootRelativePath path = do
         | rootRelRaw == "" = "/"
         | otherwise = "/" <> rootRelRaw <> "/"
   pure $ rootRelPrefix <> path
+#+end_src
+
+*** Favicon
+
+The favicon path is hardcoded to be at the root. It's up to the user whether
+they want to have one or not (and if they want one, it has to be ~favicon.png~).
+
+#+name: load-favicon
+#+begin_src haskell
+link_ [rel_ "shortcut icon", type_ "image/png", href_ "/favicon.png"]
 #+end_src
 
 *** Fonts

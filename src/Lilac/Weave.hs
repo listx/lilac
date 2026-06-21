@@ -349,6 +349,8 @@ weaveObject object = doctypehtml_ $ do
     cssPath <- getRootRelativePath "css/default.css" --
     link_ [rel_ "stylesheet", href_ cssPath]
 
+    link_ [rel_ "shortcut icon", type_ "image/png", href_ "/favicon.png"]
+
     link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
     link_
       [ rel_ "preconnect",
