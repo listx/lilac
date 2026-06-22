@@ -202,6 +202,10 @@ rawCss =
   html {
     scroll-padding-top: calc(4rem + 1px + 10px);
   }
+
+  html {
+    overscroll-behavior: none;
+  }
   """
 
 kateLilac :: Sky.Style

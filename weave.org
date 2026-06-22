@@ -803,6 +803,7 @@ rawCss =
   /* rawCss */
   <<css:counter-suffix-parenthesis>>
   <<css:navbar-link-target-adjustment>>
+  <<css:mobile-tearing-fix>>
   """
 #+end_src
 
@@ -1401,6 +1402,23 @@ main_ ? do
   "position" -: "relative"
   "top" -: "<<css:navbar-height>>"
 #+end_src
+
+*** Mobile tearing fix
+
+On mobile, we need to stop the browser from being able to "bounce" the page when
+the user gestures (drags) the page with their finger. This is because the ~<main>~
+element will get dragged around while the sidebar and breadcrumbs at the top
+will remain fixed.
+
+#+name: css:mobile-tearing-fix
+#+begin_src css
+html {
+  overscroll-behavior: none;
+}
+#+end_src
+
+By disabling the overscroll behavior completely, the ~<main>~ element will stay in
+position even if the user tries to drag it away.
 
 * Identifying cells in HTML
 
