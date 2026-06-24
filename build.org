@@ -480,7 +480,6 @@ result*
 !**/.gitattributes
 !**/.gitignore
 !**/.gitkeep
-!hello-world/.lilac.json
 !.build.yml
 
 <<gitignore:Makefile sentinels>>
@@ -1716,7 +1715,7 @@ anti-pattern and goes directly against LP principles.
 
 Of course, there can be exceptions, such as generated code (code spat out by a
 binary), binary files (like images), and metadata such as ~.gitmodules~. We
-account for these exceptions in the arguments to ~git-ls-files~ in [[id:4375ba0d-b917-4d32-92f4-884be63659fe::(json:RawProjectConfig-nonTangledPathspecs)]].
+account for these exceptions in the arguments to ~git-ls-files~ in [[id:4375ba0d-b917-4d32-92f4-884be63659fe::(toml:RawProjectConfig-nonTangledPathspecs)]].
 
 The concerns above are addressed by the ~lint~ subcommand of the Lilac CLI, as
 described in [[id:a0b8abe5-5b1c-4dc4-b482-5dbd4b233471][Linting tangled paths]].
@@ -2141,6 +2140,7 @@ library
     , fsnotify
     , http-types
     , lilac-internal
+    , toml-parser
     , lucid2
     , megaparsec
     , network-uri
@@ -2186,6 +2186,7 @@ executable lilac
     , relude
     , stm
     , text
+    , toml-parser
     , typed-process
     , wai-app-static
     , warp

@@ -188,6 +188,10 @@ import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import System.Process.Typed (proc, readProcessStdout_)
 import Text.Megaparsec qualified as MP
+import Toml (decode)
+import Toml.Schema
+  ( Result (Failure, Success),
+  )
 
 readOsPath :: ReadM OsPath
 readOsPath = f =<< str
@@ -213,11 +217,11 @@ globalOptionsHandler =
             readOsPath
             ( long "project-conf"
                 <> metavar "PROJECT_CONF"
-                <> value (P.unsafeEncodeUtf ".lilac.json")
+                <> value (P.unsafeEncodeUtf "Lilac.toml")
                 <> showDefault
                 <> help
                   """
-                  Project configuration file.
+                  Project configuration file, in TOML.
                   """
             )
         )
@@ -492,7 +496,10 @@ parseProjectConf input = case parseRawProjectConf input of
         }
 
 parseRawProjectConf :: Text -> Either String RawProjectConf
-parseRawProjectConf = eitherDecodeStrictText
+parseRawProjectConf input =
+  case Toml.decode input of
+    Failure errs -> Left ("TOML Error:\n" <> intercalate "\n" errs)
+    Success _ c -> Right c
 
 lilacCompile :: GlobalOpts -> CompileOpts -> IO ()
 lilacCompile _globalOpts compileOpts = do

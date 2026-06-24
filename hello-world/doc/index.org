@@ -19,22 +19,22 @@ the ~doc~ folder if you wish.
 
 * Project configuration
 
-#+header: :tangle hello-world/.lilac.json
-#+begin_src json
-{
-    "name": "Hello World",
-    "homepage": "https://localhost",
-    "repo": "https://localhost",
-    "version": "",
-    "nonTangledPathspecs": [ (ref:nonTangledPathspecs)
-        ":(exclude,top).gitmodules",
-        ":(exclude,top)LICENSE",
-        ":(exclude,top)doc/*.org",
-        ":(exclude,top)doc/*.html",
-        ":(exclude,top)doc/css",
-        ":(exclude,top)doc/js"
-    ]
-}
+#+header: :tangle hello-world/Lilac.toml
+#+begin_src toml
+homepage = "Hello World"
+repo = "https://localhost"
+version = "https://localhost"
+
+nonTangledPathspecs = [ # (ref:nonTangledPathspecs)
+    ":(exclude,top).gitmodules",
+    ":(exclude,top)LICENSE",
+    ":(exclude,top)doc/*.org",
+    ":(exclude,top)doc/*.html",
+    ":(exclude,top)doc/css",
+    ":(exclude,top)doc/js"
+]
+
+bibliography = []
 #+end_src
 
 The ~nonTangledPathspecs~ [[(nonTangledPathspecs)]] is used by Lilac's ~lint~

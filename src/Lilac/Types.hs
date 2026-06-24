@@ -87,10 +87,6 @@ import Data.Aeson
     parseJSON,
     toJSON,
     toJSONKey,
-    withObject,
-    (.!=),
-    (.:),
-    (.:?),
   )
 import Data.Aeson.Types
   ( Parser,
@@ -156,8 +152,6 @@ import Relude
     (.),
     (/=),
     (<),
-    (<$>),
-    (<*>),
     (<>),
     (>),
   )
@@ -165,6 +159,12 @@ import Relude.Extra.Map (keys, lookup)
 import System.OsPath (OsPath)
 import System.OsPath qualified as P
 import Text.Megaparsec qualified as MP
+import Toml.Schema
+  ( FromValue,
+    GenericTomlTable (GenericTomlTable),
+    ToTable,
+    ToValue,
+  )
 import Prelude qualified (show)
 
 type BToken :: Type
@@ -812,29 +812,10 @@ data RawProjectConf = RawProjectConf
     version :: Text,
     nonTangledPathspecs :: [Text],
     bibliography :: [Text],
-    citationStyle :: Maybe Text
+    citationStyle :: Maybe Text --
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (ToJSON)
-
-instance FromJSON RawProjectConf where
-  parseJSON = withObject "RawProjectConf" $ \v ->
-    RawProjectConf
-      <$> v
-      .: "name"
-      <*> v
-      .: "homepage"
-      <*> v
-      .: "repo"
-      <*> v
-      .: "version"
-      <*> v
-      .: "nonTangledPathspecs"
-      <*> v
-      .:? "bibliography"
-      .!= []
-      <*> v
-      .:? "citationStyle"
+  deriving (FromValue, ToValue, ToTable) via GenericTomlTable RawProjectConf
 
 emptyProjectConf :: ProjectConf
 emptyProjectConf =

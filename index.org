@@ -64,34 +64,34 @@ https://git.sr.ht/~listx/lilac
 :ID:       4375ba0d-b917-4d32-92f4-884be63659fe
 :END:
 
-We define the [[id:df128041-ada8-4d77-a373-111416002dae][Project configuration]] for Lilac itself in here, as a JSON file.
+We define the [[id:df128041-ada8-4d77-a373-111416002dae][Project configuration]] for Lilac itself in here, as a TOML file.
 
-#+name: json:RawProjectConfig
-#+header: :tangle .lilac.json
-#+begin_src json
-{
-    "name": "Lilac",
-    "homepage": "<<lilac-repo-url>>",
-    "repo": "<<lilac-repo-url>>",
-    "version": "<<Lilac version>>",
-    "nonTangledPathspecs": [ (ref:json:RawProjectConfig-nonTangledPathspecs)
-        ":(exclude,top).gitmodules", (ref:tracked_files-generated-by-git)
-        ":(exclude,top)LICENSE",
-        ":(exclude,top)*.html",
-        ":(exclude,top,glob)image/*.svg",
-        ":(exclude,top,glob)*.org",
-        ":(exclude,top)hello-world/*.org",
-        ":(exclude,top)image/PNG-Gradient.png", (ref:tracked_files-images)
-        ":(exclude,top)js/lilac.js.injectme", (ref:tracked_files-generated-js)
-        ":(exclude,top)bib.json", (ref:tracked_files-bibliographical-refs)
-        ":(exclude,top)csl-styles", (ref:tracked_files-csl-styles-repo)
-        ":(exclude,top)nix/sources.json", (ref:tracked_files-generated-by-niv)
-        ":(exclude,top)nix/sources.nix",
-        ":(exclude,top)resources/public" (ref:tracked_files-figwheel-serve-path)
-    ],
-    "bibliography": ["bib.json"],
-    "citationStyle": "csl-styles/ieee.csl"
-}
+#+name: toml:RawProjectConfig
+#+header: :tangle Lilac.toml
+#+begin_src toml
+name = "Lilac"
+homepage = "<<lilac-repo-url>>"
+repo = "<<lilac-repo-url>>"
+version = "<<Lilac version>>"
+
+nonTangledPathspecs = [ # (ref:toml:RawProjectConfig-nonTangledPathspecs)
+    ":(exclude,top).gitmodules", # (ref:tracked_files-generated-by-git)
+    ":(exclude,top)LICENSE",
+    ":(exclude,top)*.html",
+    ":(exclude,top,glob)image/*.svg",
+    ":(exclude,top,glob)*.org",
+    ":(exclude,top)hello-world/*.org",
+    ":(exclude,top)image/PNG-Gradient.png", # (ref:tracked_files-images)
+    ":(exclude,top)js/lilac.js.injectme", # (ref:tracked_files-generated-js)
+    ":(exclude,top)bib.json", # (ref:tracked_files-bibliographical-refs)
+    ":(exclude,top)csl-styles", # (ref:tracked_files-csl-styles-repo)
+    ":(exclude,top)nix/sources.json", # (ref:tracked_files-generated-by-niv)
+    ":(exclude,top)nix/sources.nix",
+    ":(exclude,top)resources/public" # (ref:tracked_files-figwheel-serve-path)
+]
+
+bibliography = ["bib.json"]
+citationStyle = "csl-styles/ieee.csl"
 #+end_src
 
 The ~nonTangledPathspecs~ are passed to Git to filter out some paths from
