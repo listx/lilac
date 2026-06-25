@@ -2135,7 +2135,7 @@ weaveNamedCellsIndex cells = do
   when (length namedCells > 0) $ do
     div_
       [ id_ "heading-container-h--Named-cells",
-        class_ "heading-container"
+        class_ "heading-container named-cells"
       ]
       $ do
         h3_ [id_ "h--Named-cells"] $ do

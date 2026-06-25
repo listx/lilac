@@ -350,16 +350,18 @@ defaultCss = do
     "position" -: "relative"
     "top" -: "4rem"
 
-  div # ".page-metrics" ? do
-    fontSans
-    ol ? do
-      marginTop $ px 0
-      paddingLeft $ px 20
+  forM_ [".backlinks", ".tangled-blocks", ".named-cells"] $ \metric -> do
+    div # metric ? do
+      fontSans
+      ol ? do
+        ev margin $ px 0
+        paddingLeft $ px 15
   footer ? do
     div # ".lilac-stamp" ? do
       fontSans
       fontStyle italic
       fontSize $ rem 0.9
+      marginTop (px 40)
       marginBottom (px 10) --
   p # ".widget-title" --
     ? do

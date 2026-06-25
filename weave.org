@@ -6132,7 +6132,7 @@ weaveNamedCellsIndex cells = do
   when (length namedCells > 0) $ do
     div_
       [ id_ "heading-container-h--Named-cells",
-        class_ "heading-container"
+        class_ "heading-container named-cells"
       ]
       $ do
         h3_ [id_ "h--Named-cells"] $ do
@@ -6207,11 +6207,12 @@ weaveFooter = do
 
 #+name: css:page-metrics
 #+begin_src haskell
-div # ".page-metrics" ? do
-  fontSans
-  ol ? do
-    marginTop $ px 0
-    paddingLeft $ px 20
+forM_ [".backlinks", ".tangled-blocks", ".named-cells"] $ \metric -> do
+  div # metric ? do
+    fontSans
+    ol ? do
+      ev margin $ px 0
+      paddingLeft $ px 15
 #+end_src
 
 The lists of tangled file, backlinks, etc do not need any additional
@@ -6225,6 +6226,7 @@ footer ? do
     fontSans
     fontStyle italic
     fontSize $ rem 0.9
+    marginTop (px 40)
     marginBottom (px 10)
 #+end_src
 
