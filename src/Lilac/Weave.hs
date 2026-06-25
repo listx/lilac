@@ -92,6 +92,11 @@ import Lilac.Types
     GTOC (unGTOC),
     GlossaryTerm (definition, term),
     Heading (Heading, body, level, meta, section),
+    HtmlHead
+      ( HtmlHead,
+        injection,
+        onlyLocalImports
+      ),
     LCI (LCI, unLCI),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
@@ -135,6 +140,7 @@ import Lilac.Types
       ( bibliography,
         citationStyle,
         homepage,
+        htmlHead,
         name,
         version
       ),
@@ -340,6 +346,7 @@ type HtmlWeaver a = HtmlT (ReaderT WeaveConf Identity) a
 
 weaveObject :: Object -> HtmlWeaver ()
 weaveObject object = doctypehtml_ $ do
+  weaveConf <- ask
   head_ $ do
     meta_ [charset_ "utf-8"]
     title_ --
@@ -350,13 +357,10 @@ weaveObject object = doctypehtml_ $ do
     link_ [rel_ "stylesheet", href_ cssPath]
 
     link_ [rel_ "shortcut icon", type_ "image/png", href_ "/favicon.png"]
-
-    link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
-    link_
-      [ rel_ "preconnect",
-        href_ "https://fonts.gstatic.com",
-        crossorigin_ "anonymous"
-      ]
+    let onlyLocalImports'
+          | Just htmlHead <- weaveConf.projectConf.htmlHead =
+              htmlHead.onlyLocalImports
+          | otherwise = False
     let fontsLink =
           T.intercalate
             ""
@@ -374,28 +378,48 @@ weaveObject object = doctypehtml_ $ do
               ",wght@0,8..60,200..900;1,8..60,200..900"
             )
           ]
-    link_ [rel_ "stylesheet", href_ fontsLink]
+        defaultGoogleFonts :: HtmlWeaver ()
+        defaultGoogleFonts = do
+          link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
+          link_
+            [ rel_ "preconnect",
+              href_ "https://fonts.gstatic.com",
+              crossorigin_ "anonymous"
+            ]
+          link_ [rel_ "stylesheet", href_ fontsLink]
+    when (not onlyLocalImports') $ defaultGoogleFonts --
 
-    let s :: Text
-        s =
+    --
+    let defaultMathJaxSettings :: Text
+        defaultMathJaxSettings =
           """
           window.MathJax = {
             tex: {
-                tags: 'ams'
+                tags: 'ams' //
             },
             options: {
-                ignoreHtmlClass: 'verbatim|code'
+                ignoreHtmlClass: 'verbatim|code' //
             }
           };
           """
-    script_ [] s
+    when (not onlyLocalImports') $ script_ [] defaultMathJaxSettings
 
-    script_
-      [ id_ "MathJax-script",
-        async_ "",
-        src_ "https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"
-      ]
-      ("" :: Text)
+    let defaultMathJaxImport :: HtmlWeaver ()
+        defaultMathJaxImport =
+          script_
+            [ id_ "MathJax-script",
+              async_ "",
+              src_ "https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"
+            ]
+            ("" :: Text)
+    when (not onlyLocalImports') $ defaultMathJaxImport --
+
+    --
+    if
+      | Just htmlHead <- weaveConf.projectConf.htmlHead,
+        Just injectMe <- htmlHead.injection ->
+          toHtmlRaw @Text injectMe
+      | otherwise -> pure ()
   body_ $ do
     let lciCellPairs = sortFootnoteCells object
     weaveNavbar

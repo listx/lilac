@@ -29,18 +29,6 @@ other sections as needed.
 Change [[id:0cf535d6-f852-4b97-8ef8-9d566ad32e51::.build.yml][.build.yml]] to use https://git.sr.ht/~listx/lilac instead of SSH (because
 it won't be a private repo).
 
-** TODO add "--html-head-local-imports" flag
-
-We have a problem. When hosting on SourceHut Pages, it blocks all CDNs. This
-means we are forced to include MathJax in our own domain, instead of grabbing it
-from a CDN. The same thing applies for the fonts we use by default.
-
-For MathJax, we can avoid pulling it over a CDN with a
-"--html-head-local-imports" flag, which will leave out all MathJax imports and
-such by default. A file name is expected as an argument, and Lilac will parse
-that file and inject its contents instead inside the <head> element. If the
-filename is the empty string, nothing will be injected.
-
 ** TODO CI: add site publishing step
 
   - Publish ~main~ branch to https://lilac.funloop.org/

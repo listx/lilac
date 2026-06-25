@@ -31,6 +31,11 @@ import Lilac.Types
         subcommand,
         verbose
       ),
+    HtmlHead
+      ( HtmlHead,
+        injection,
+        onlyLocalImports
+      ),
     LintOpts (LintOpts, inputs),
     Object (orgDoc),
     OrgDoc (cells),
@@ -39,6 +44,7 @@ import Lilac.Types
         bibliography,
         citationStyle,
         homepage,
+        htmlHead,
         name,
         nonTangledPathspecs,
         repo,
@@ -48,6 +54,7 @@ import Lilac.Types
       ( bibliography,
         citationStyle,
         homepage,
+        htmlHead,
         name,
         nonTangledPathspecs,
         repo,
@@ -492,7 +499,8 @@ parseProjectConf input = case parseRawProjectConf input of
               else Just rawProjectConf.version,
           nonTangledPathspecs = rawProjectConf.nonTangledPathspecs,
           bibliography = fmap T.unpack $ rawProjectConf.bibliography,
-          citationStyle = fmap T.unpack $ rawProjectConf.citationStyle
+          citationStyle = fmap T.unpack $ rawProjectConf.citationStyle,
+          htmlHead = rawProjectConf.htmlHead
         }
 
 parseRawProjectConf :: Text -> Either String RawProjectConf

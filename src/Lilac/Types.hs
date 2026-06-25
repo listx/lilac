@@ -16,6 +16,7 @@ module Lilac.Types
     GTOC (..),
     GlossaryTerm (..),
     Heading (..),
+    HtmlHead (..),
     LCI (..),
     Level (..),
     Link (..),
@@ -799,10 +800,18 @@ data ProjectConf = ProjectConf
     version :: Maybe Text, --
     nonTangledPathspecs :: [Text], --
     bibliography :: [FilePath], --
-    citationStyle :: Maybe FilePath --
+    citationStyle :: Maybe FilePath, --
+    htmlHead :: Maybe HtmlHead --
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
+
+type HtmlHead :: Type
+data HtmlHead = HtmlHead
+  { onlyLocalImports :: Bool, --
+    injection :: Maybe Text --
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving (FromValue, ToValue, ToTable) via GenericTomlTable HtmlHead
 
 type RawProjectConf :: Type
 data RawProjectConf = RawProjectConf
@@ -812,7 +821,8 @@ data RawProjectConf = RawProjectConf
     version :: Text,
     nonTangledPathspecs :: [Text],
     bibliography :: [Text],
-    citationStyle :: Maybe Text --
+    citationStyle :: Maybe Text, --
+    htmlHead :: Maybe HtmlHead
   }
   deriving stock (Eq, Generic, Show)
   deriving (FromValue, ToValue, ToTable) via GenericTomlTable RawProjectConf
@@ -826,7 +836,8 @@ emptyProjectConf =
       version = Nothing,
       nonTangledPathspecs = [],
       bibliography = [],
-      citationStyle = Nothing
+      citationStyle = Nothing,
+      htmlHead = Nothing
     }
 
 type GlobalOpts :: Type

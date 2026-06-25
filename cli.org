@@ -51,6 +51,11 @@ import Lilac.Types
         subcommand,
         verbose
       ),
+    HtmlHead
+      ( HtmlHead,
+        injection,
+        onlyLocalImports
+      ),
     LintOpts (LintOpts, inputs),
     Object (orgDoc),
     OrgDoc (cells),
@@ -59,6 +64,7 @@ import Lilac.Types
         bibliography,
         citationStyle,
         homepage,
+        htmlHead,
         name,
         nonTangledPathspecs,
         repo,
@@ -68,6 +74,7 @@ import Lilac.Types
       ( bibliography,
         citationStyle,
         homepage,
+        htmlHead,
         name,
         nonTangledPathspecs,
         repo,
@@ -361,10 +368,10 @@ data ProjectConf = ProjectConf
     version :: Maybe Text, -- (ref:data:ProjectConf-version)
     nonTangledPathspecs :: [Text], -- (ref:data:ProjectConf-nonTangledPathspecs)
     bibliography :: [FilePath], -- (ref:data:ProjectConf-bibliography)
-    citationStyle :: Maybe FilePath -- (ref:data:ProjectConf-citationStyle)
+    citationStyle :: Maybe FilePath, -- (ref:data:ProjectConf-citationStyle)
+    htmlHead :: Maybe HtmlHead -- (ref:data:ProjectConf-htmlHead)
   }
   deriving stock (Eq, Generic, Show)
-  deriving anyclass (FromJSON, ToJSON)
 #+end_src
 
 The fields are:
@@ -401,8 +408,40 @@ The fields are:
     but for the CSL style file. Unlike ~bibliography~, this is just a single file
     path, not a list of files.
 
+  - ~htmlHead~ :: [[(data:ProjectConf-htmlHead)]] Allows customization of the HTML
+    ~<head>~ element, enough to make Lilac's HTML assets completely static (no
+    dependencies on external CDNs). See [[id:5a874dab-0d5d-45e5-8862-8f959b26eecb][HTML ~<head>~ customization]].
+
 Project configuration isn't part of [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] because it may be the case in
 the future that a single project could be used for multiple archive files.
+
+*** HTML ~<head>~ customization
+:PROPERTIES:
+:ID:       5a874dab-0d5d-45e5-8862-8f959b26eecb
+:END:
+
+Lilac is hosted on SourceHut; SourceHut's content security policy (CSP) blocks
+CSS and JS imports from domains other than the current one. This means we cannot
+use the default CDNs for pulling in things like [[id:8cce5e4b-93b0-4b7c-9cd7-c6d6c1cf8bd4::MathJax script][MathJax]] or [[id:67e4f410-0931-4e18-b0c4-88b84ed30e35::Google Fonts][Google Fonts]]. Instead
+we have to vendor these assets and then serve them locally.
+
+[[data:HtmlHead]] allows the user to customize the HTML ~<head>~ to address the
+concerns stated above.
+
+#+name: data:HtmlHead
+#+begin_src haskell
+type HtmlHead :: Type
+data HtmlHead = HtmlHead
+  { onlyLocalImports :: Bool, -- (ref:data:HtmlHead-onlyLocalImports)
+    injection :: Maybe Text -- (ref:data:HtmlHead-injection)
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving (FromValue, ToValue, ToTable) via GenericTomlTable HtmlHead
+#+end_src
+
+~onlyLocalImports~ [[(data:HtmlHead-onlyLocalImports)]], if true, will disable the
+weaving of MathJax and Google fonts imports. The user can then specify their
+(vendored) replacements in the ~injection~ [[(data:HtmlHead-injection)]] field.
 
 *** Simple project configuration
 :PROPERTIES:
@@ -425,7 +464,8 @@ data RawProjectConf = RawProjectConf
     version :: Text,
     nonTangledPathspecs :: [Text],
     bibliography :: [Text],
-    citationStyle :: Maybe Text -- (ref:data:RawProjectConf-citationStyle)
+    citationStyle :: Maybe Text, -- (ref:data:RawProjectConf-citationStyle)
+    htmlHead :: Maybe HtmlHead
   }
   deriving stock (Eq, Generic, Show)
   deriving (FromValue, ToValue, ToTable) via GenericTomlTable RawProjectConf
@@ -463,7 +503,8 @@ parseProjectConf input = case parseRawProjectConf input of
               else Just rawProjectConf.version,
           nonTangledPathspecs = rawProjectConf.nonTangledPathspecs,
           bibliography = fmap T.unpack $ rawProjectConf.bibliography,
-          citationStyle = fmap T.unpack $ rawProjectConf.citationStyle
+          citationStyle = fmap T.unpack $ rawProjectConf.citationStyle,
+          htmlHead = rawProjectConf.htmlHead
         }
 #+end_src
 
@@ -486,7 +527,8 @@ emptyProjectConf =
       version = Nothing,
       nonTangledPathspecs = [],
       bibliography = [],
-      citationStyle = Nothing
+      citationStyle = Nothing,
+      htmlHead = Nothing
     }
 #+end_src
 

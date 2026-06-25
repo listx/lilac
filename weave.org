@@ -141,6 +141,11 @@ import Lilac.Types
     GTOC (unGTOC),
     GlossaryTerm (definition, term),
     Heading (Heading, body, level, meta, section),
+    HtmlHead
+      ( HtmlHead,
+        injection,
+        onlyLocalImports
+      ),
     LCI (LCI, unLCI),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
@@ -184,6 +189,7 @@ import Lilac.Types
       ( bibliography,
         citationStyle,
         homepage,
+        htmlHead,
         name,
         version
       ),
@@ -991,6 +997,7 @@ style sheets, etc), before finally delegating to various helper functions.
 #+begin_src haskell
 weaveObject :: Object -> HtmlWeaver ()
 weaveObject object = doctypehtml_ $ do
+  weaveConf <- ask
   <<HTML head>>
   body_ $ do
     let lciCellPairs = sortFootnoteCells object
@@ -1155,9 +1162,14 @@ head_ $ do
     $ lookup "title" object.orgDoc.meta
   <<Load CSS>>
   <<load-favicon>>
+  let onlyLocalImports'
+        | Just htmlHead <- weaveConf.projectConf.htmlHead =
+            htmlHead.onlyLocalImports
+        | otherwise = False
   <<Google Fonts>>
   <<MathJax customization>>
   <<MathJax script>>
+  <<custom-html-head>>
 #+end_src
 
 The use of ~toHtml~ [[(HTML head-toHtml)]] is to help Haskell infer the correct type.
@@ -1208,15 +1220,14 @@ link_ [rel_ "shortcut icon", type_ "image/png", href_ "/favicon.png"]
 #+end_src
 
 *** Fonts
+:PROPERTIES:
+:ID:       67e4f410-0931-4e18-b0c4-88b84ed30e35
+:END:
+
+We use the Source family of fonts (Source Code Pro, Source Sans, Source Serif).
 
 #+name: Google Fonts
 #+begin_src haskell
-link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
-link_
-  [ rel_ "preconnect",
-    href_ "https://fonts.gstatic.com",
-    crossorigin_ "anonymous"
-  ]
 let fontsLink =
       T.intercalate
         ""
@@ -1234,8 +1245,24 @@ let fontsLink =
           ",wght@0,8..60,200..900;1,8..60,200..900"
         )
       ]
-link_ [rel_ "stylesheet", href_ fontsLink]
+    defaultGoogleFonts :: HtmlWeaver ()
+    defaultGoogleFonts = do
+      link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
+      link_
+        [ rel_ "preconnect",
+          href_ "https://fonts.gstatic.com",
+          crossorigin_ "anonymous"
+        ]
+      link_ [rel_ "stylesheet", href_ fontsLink]
+when (not onlyLocalImports') $ defaultGoogleFonts -- (ref:Google Fonts-defaultGoogleFonts)
 #+end_src
+
+We only pull in these Google fonts over the network if the user has /not/
+specified that they want local imports [[(Google Fonts-defaultGoogleFonts)]]. The
+user is expected to supply these fonts themselves (host it themselves from the
+same domain where they are serving the woven HTML) if they request only local
+imports. See [[id:5a874dab-0d5d-45e5-8862-8f959b26eecb][HTML ~<head>~ customization]] for the configuration, and [[id:087e43d8-5163-4afd-add7-630c3371072c][Custom HTML
+head]] for how this is used during weaving.
 
 *** MathJax
 :PROPERTIES:
@@ -1247,31 +1274,51 @@ We use [[https://www.mathjax.org][MathJax]] to render mathematical expressions (
 
 #+name: MathJax script
 #+begin_src haskell
-script_
-  [ id_ "MathJax-script",
-    async_ "",
-    src_ "https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"
-  ]
-  ("" :: Text)
+let defaultMathJaxImport :: HtmlWeaver ()
+    defaultMathJaxImport =
+      script_
+        [ id_ "MathJax-script",
+          async_ "",
+          src_ "https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"
+        ]
+        ("" :: Text)
+when (not onlyLocalImports') $ defaultMathJaxImport -- (ref:MathJax script-onlyLocalImports)
 #+end_src
 
-MathJax is configurable, so we customize it in [[MathJax customization]].
+We only import MathJax over the CDN [[(MathJax script-onlyLocalImports)]] if the
+user does /not/ request to only have local imports, because the MathJax JS import
+pulls in JS over a CDN).
+
+MathJax is configurable, so we customize it in [[MathJax customization]]. Similarly,
+we disable this if the user requested local imports, with the understanding that
+they will provide their own configuration for MathJax. In practice, the user
+must also provide additional settings to tell MathJax not to use a CDN for
+importing fonts (because MathJax by default tries to pull fonts from a CDN).
 
 #+name: MathJax customization
 #+begin_src haskell
-let s :: Text
-    s =
+-- (ref:MathJax customization-defaultMathJaxSettings)
+let defaultMathJaxSettings :: Text
+    defaultMathJaxSettings =
       """
-      window.MathJax = {
-        tex: {
-            tags: 'ams' (ref:MathJax customization-numbering)
-        },
-        options: {
-            ignoreHtmlClass: 'verbatim|code' (ref:MathJax customization-ignoreHtmlClass)
-        }
-      };
+      <<Default MathJax settings>>
       """
-script_ [] s
+when (not onlyLocalImports') $ script_ [] defaultMathJaxSettings
+#+end_src
+
+[[Default MathJax settings]] [[(MathJax customization-defaultMathJaxSettings)]] is
+required to be defined before the script is imported.
+
+#+name: Default MathJax settings
+#+begin_src js
+window.MathJax = {
+  tex: {
+      tags: 'ams' // (ref:MathJax customization-numbering)
+  },
+  options: {
+      ignoreHtmlClass: 'verbatim|code' // (ref:MathJax customization-ignoreHtmlClass)
+  }
+};
 #+end_src
 
 [[(MathJax customization-numbering)]] turns on equation numbering.
@@ -1289,6 +1336,28 @@ should line up with what we have.
 
 [[(MathJax customization-ignoreHtmlClass)]] prohibits MathJax from acting on certain
 HTML element classes, namely verbatim and code styles from [[id:d6abea81-d620-4ede-9c2c-68f7ea07f847::f:weaveStyledText][f:weaveStyledText]].
+
+*** Custom HTML head
+:PROPERTIES:
+:ID:       087e43d8-5163-4afd-add7-630c3371072c
+:END:
+
+If there is any custom HTML that the user wants to inject into the HTML ~<head>~,
+we should inject it as is.
+
+#+name: custom-html-head
+#+begin_src haskell
+-- (ref:custom-html-head-suppress-ormolu-line-deletion)
+if
+  | Just htmlHead <- weaveConf.projectConf.htmlHead,
+    Just injectMe <- htmlHead.injection ->
+      toHtmlRaw @Text injectMe
+  | otherwise -> pure ()
+#+end_src
+
+The comment line at [[(custom-html-head-suppress-ormolu-line-deletion)]] is to
+suppress Ormolu's suggestion to delete an empty line there (the blank line gets
+added because of [[id:51f2edd8-5f8e-4c63-841f-da6c5c41680a::f:padConsecutiveNowebLinks][f:padConsecutiveNowebLinks]]).
 
 ** ClojureScript frontend
 :PROPERTIES:
