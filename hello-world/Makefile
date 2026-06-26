@@ -20,7 +20,7 @@ tangle: $(archive_file) #
 	touch tangle
 
 weave: $(archive_file) #
-	lilac weave $< --out-dir doc --write-css --write-js
+	lilac weave $< --out-dir site --write-css --write-js
 	touch weave
 
 lint: $(archive_file) #
