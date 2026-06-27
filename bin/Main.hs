@@ -149,6 +149,7 @@ import Relude
     fmap,
     foldlM,
     forM_,
+    fromMaybe,
     intercalate,
     length,
     map,
@@ -498,7 +499,7 @@ parseProjectConf input = case parseRawProjectConf input of
               then Nothing
               else Just rawProjectConf.version,
           nonTangledPathspecs = rawProjectConf.nonTangledPathspecs,
-          bibliography = fmap T.unpack $ rawProjectConf.bibliography,
+          bibliography = fmap T.unpack $ fromMaybe [] rawProjectConf.bibliography,
           citationStyle = fmap T.unpack $ rawProjectConf.citationStyle,
           htmlHead = rawProjectConf.htmlHead
         }

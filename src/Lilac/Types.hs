@@ -820,7 +820,7 @@ data RawProjectConf = RawProjectConf
     repo :: Text,
     version :: Text,
     nonTangledPathspecs :: [Text],
-    bibliography :: [Text],
+    bibliography :: Maybe [Text],
     citationStyle :: Maybe Text, --
     htmlHead :: Maybe HtmlHead
   }
