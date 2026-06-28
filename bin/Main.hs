@@ -481,7 +481,7 @@ readProjectConf path = do
   input <- LU.readFileRobustly path
   case parseProjectConf input of
     Left errMsg -> do
-      putTextLn "Could not read .lilac.conf"
+      putTextLn "Could not read Lilac.toml"
       die errMsg
     Right projectConf -> pure projectConf
 
