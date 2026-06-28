@@ -2,11 +2,14 @@ module Lilac.Util
   ( readFrom,
     readFileRobustly,
     writeFileRobustly,
+    writeOrWarn,
   )
 where
 
 import Control.Exception (catch)
+import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
+import Data.Text.IO qualified as T
 import Relude
   ( Bool (True),
     FilePath,
@@ -16,6 +19,7 @@ import Relude
     pure,
     putStrLn,
     show,
+    stderr,
     ($),
     (<$>),
     (<>),
@@ -50,3 +54,10 @@ writeFileRobustly path contentToWrite = do
   where
     writeHandler :: IOError -> IO ()
     writeHandler e = putStrLn $ "writeFileRobustly: " <> show e
+
+writeOrWarn :: OsPath -> Text -> IO ()
+writeOrWarn path contentToWrite = do
+  fileExists <- D.doesFileExist path
+  if fileExists
+    then T.hPutStrLn stderr $ "path " <> T.show path <> " already exists, skipping"
+    else writeFileRobustly path contentToWrite

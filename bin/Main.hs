@@ -12,6 +12,7 @@ import Data.FileEmbed (embedFile)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
+import Data.UUID.V4 (nextRandom)
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
@@ -36,6 +37,7 @@ import Lilac.Types
         injection,
         onlyLocalImports
       ),
+    InitOpts (InitOpts, pure),
     LintOpts (LintOpts, inputs),
     Object (orgDoc),
     OrgDoc (cells),
@@ -64,6 +66,7 @@ import Lilac.Types
     Subcommand
       ( ComArchive,
         ComCompile,
+        ComInit,
         ComLint,
         ComServe,
         ComTangle,
@@ -162,6 +165,7 @@ import Relude
     null,
     otherwise,
     pure,
+    putLBS,
     putMVar,
     putStr,
     putStrLn,
@@ -264,6 +268,7 @@ subcommandHandler =
     <> cmdWeave
     <> cmdServe
     <> cmdLint
+    <> cmdInit
   where
     cmdCompile =
       command
@@ -301,6 +306,12 @@ subcommandHandler =
         $ info
           (ComLint <$> lintOptsHandler)
           (progDesc "Look for tracked files that are not tangled by Lilac.")
+    cmdInit =
+      command
+        "init"
+        $ info
+          (ComInit <$> initOptsHandler)
+          (progDesc "Initialize a new (empty) Lilac project.")
 
 tangleOptsHandler :: OptionHandler TangleOpts
 tangleOptsHandler =
@@ -438,6 +449,23 @@ serveOptsHandler =
         Just _ -> Left "Port must be between 1 and 65535"
         Nothing -> Left "Must be a valid integer"
 
+initOptsHandler :: OptionHandler InitOpts
+initOptsHandler =
+  InitOpts
+    <$> ( flag
+            True
+            False
+            ( long "pure"
+                <> help
+                  """
+                  Download a local copy of MathJax and fonts so that they can be
+                  served locally. This way the woven HTML will refer to the
+                  local copy, instead of pulling these artifacts over the
+                  network via a CDN.
+                  """
+            )
+        )
+
 boldWhite :: [C.SGR]
 boldWhite =
   [ C.SetColor C.Foreground C.Vivid C.White,
@@ -475,6 +503,7 @@ lilac globalOpts = case globalOpts.subcommand of
   ComWeave weaveOpts -> lilacWeave globalOpts weaveOpts
   ComLint lintOpts -> lilacLint globalOpts lintOpts
   ComServe serveOpts -> lilacServe globalOpts serveOpts
+  ComInit initOpts -> lilacInit globalOpts initOpts
 
 readProjectConf :: OsPath -> IO ProjectConf
 readProjectConf path = do
@@ -727,6 +756,180 @@ lilacServe globalOpts serveOpts = do
 
   runSettings settings server --
     `finally` teardown --
+
+lilacInit :: GlobalOpts -> InitOpts -> IO ()
+lilacInit globalOpts initOpts = do
+  let write p = LU.writeOrWarn (P.unsafeEncodeUtf p)
+  uuid <- nextRandom --
+  when (globalOpts.verbose) $ do
+    putStrLn $ "Using UUID " <> show uuid <> " for index.org"
+  let indexOrg =
+        ":PROPERTIES:\n:ID:       "
+          <> show uuid
+          <> "\n:END:\n"
+          <> """
+             #+title: Introduction
+
+             * Project configuration
+
+             #+header: :tangle Lilac.toml
+             #+begin_src toml
+             name = "Hello World"
+             homepage = "https://localhost"
+             repo = "https://localhost"
+             version = "1.2.3"
+
+             nonTangledPathspecs = [
+                 ":(exclude,top).gitmodules",
+                 ":(exclude,top)LICENSE",
+                 ":(exclude,top)*.org",
+                 ":(exclude,top)*.html",
+                 ":(exclude,top)site"
+             ]
+             #+end_src
+
+             The ~nonTangledPathspecs~ is used by Lilac's ~lint~
+             subcommand, which checks for any differences between what is tangled and what is
+             tracked by Git. These two sets of files should mostly overlap. Any files that
+             are intentionally *not* tangled by Lilac should be listed in ~nonTangledPathspecs~.
+             These are fed to ~git-ls-files~ to ignore tracked files that are not tangled by
+             Lilac.
+
+             * Makefile
+
+             #+name: Makefile
+             #+header: :tangle Makefile
+             #+begin_src makefile
+             org_files = \\
+             \tindex.org
+
+             obj_files = $(org_files:%.org=%.lobj)
+
+             archive_file = hello-world.larc
+
+             all: tangle weave lint
+             .PHONY: all
+
+             $(obj_files) &: $(org_files)
+             \tlilac compile $?
+             \ttouch $(obj_files)
+
+             $(archive_file): $(obj_files)
+             \tlilac archive $^ --out-file $@
+
+             tangle: $(archive_file)
+             \tlilac tangle $< --out-dir .
+             \ttouch tangle
+
+             weave: $(archive_file)
+             \tlilac weave $< --out-dir site --write-css --write-js
+             \ttouch weave
+
+             lint: $(archive_file)
+             \tlilac lint $<
+             \ttouch lint
+
+             clean:
+             \trm -rf \\
+             \t\t$(archive_file) \\
+             \t\t$(obj_files)
+             .PHONY: clean
+
+             <<git-orderfile-gitconfig>>
+             #+end_src
+
+             * Git
+
+             ** ~.gitignore~
+
+             Ignore hidden files, but don't ignore some that we explicitly
+             tangle such as ~.gitattributes~.
+
+             #+header: :tangle .gitignore
+             #+begin_src gitignore
+             ,**/.*
+
+             !**.gitattributes
+             !**.gitignore
+             !**.git-orderfile
+             ,*.lobj
+             ,*.larc
+             lint
+             tangle
+             weave
+             site/
+             #+end_src
+
+             The ~*.lobj~ and ~*.larc~ files are generated by Lilac, so ignore them too. The
+             ~lint~, ~tangle~, and ~weave~ files are sentinel files used by the Makefile, so ignore
+             them too.
+
+             ** ~.gitttributes~
+
+             As the HTML files are generated (woven) by Lilac, ignore them from diffs. The
+             same goes for all woven content (~site~ folder) generated by Lilac.
+
+             #+header: :tangle .gitattributes
+             #+begin_src txt
+             ,*.html -diff
+             site/* -diff
+             #+end_src
+
+             ** Git orderfile
+
+             Make ~git-diff~ show the Org files first, because they serve as the source of
+             truth.
+
+             #+name: git-orderfile
+             #+header: :tangle .git-orderfile
+             #+begin_src txt
+             # Org files
+             index.org
+             ,*.org
+             #+end_src
+
+             As there is no standard filename for this, you have to tell Git to use it
+             explicitly.
+
+             #+name: git-orderfile-gitconfig
+             #+begin_src makefile
+             gitconfig:
+             \tgit config diff.orderfile .git-orderfile
+             .PHONY: gitconfig
+             #+end_src
+
+             """ --
+  when (globalOpts.verbose) $ do
+    putStrLn "Writing index.org"
+  write
+    "index.org"
+    indexOrg
+  when (globalOpts.verbose) $ do
+    putStrLn "Writing Lilac.toml"
+  write
+    "Lilac.toml"
+    """
+    name = "a"
+    homepage = "https://b"
+    repo = "https://c"
+    version = "0"
+
+    nonTangledPathspecs = []
+
+    """
+  when (globalOpts.verbose) $ do
+    putStrLn "Tangling files out of index.org"
+  bootstrapLilac
+
+bootstrapLilac :: IO ()
+bootstrapLilac = do
+  let runLilac :: [String] -> IO ()
+      runLilac args = do
+        outputLBS <- readProcessStdout_ $ proc "lilac" args
+        putLBS outputLBS
+  runLilac ["compile", "index.org"]
+  runLilac ["archive", "index.lobj", "--out-file", "hello-world.larc"]
+  runLilac ["tangle", "hello-world.larc", "--out-dir", "."] --
 
 lilacLint :: GlobalOpts -> LintOpts -> IO ()
 lilacLint globalOpts lintOpts = do

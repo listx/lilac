@@ -17,6 +17,7 @@ module Lilac.Types
     GlossaryTerm (..),
     Heading (..),
     HtmlHead (..),
+    InitOpts (..),
     LCI (..),
     Level (..),
     Link (..),
@@ -856,6 +857,7 @@ data Subcommand
   | ComWeave WeaveOpts
   | ComLint LintOpts
   | ComServe ServeOpts
+  | ComInit InitOpts
 
 type ArchiveOpts :: Type
 data ArchiveOpts = ArchiveOpts
@@ -892,6 +894,11 @@ data WeaveOpts = WeaveOpts
     rootRelativePrefix :: OsPath,
     writeCss :: Bool,
     writeJs :: Bool
+  }
+
+type InitOpts :: Type
+data InitOpts = InitOpts
+  { pure :: Bool --
   }
 
 markingChars :: [Char]
