@@ -854,29 +854,52 @@ ev f x = f x x x x
 #+end_src
 
 ** Fonts
+:PROPERTIES:
+:ID:       d9db3b15-7e70-493a-9cd9-b389d21adfa6
+:END:
 
 We use fonts from the open source "Source" family by Adobe: [[https://github.com/adobe-fonts/source-serif][Source Serif]], [[https://github.com/adobe-fonts/source-sans][Source
-Sans]], and [[https://github.com/adobe-fonts/source-code-pro][Source Code Pro]].
+Sans]], and [[https://github.com/adobe-fonts/source-code-pro][Source Code Pro]]:
+
+#+name: font-serif
+#+begin_src txt
+Source Serif 4
+#+end_src
+
+#+name: font-sans
+#+begin_src txt
+Source Sans 3
+#+end_src
+
+#+name: font-mono
+#+begin_src txt
+Source Code Pro
+#+end_src
+
+These font names are reused exactly in [[id:a7f65fb9-86bb-45ab-8c61-2fedfadb24fe::text:source-fonts.css][text:source-fonts.css]], which is why we
+parameterize them here as their own code blocks. This way we can guarantee that
+these stay in sync (regardless of whether we pull in the fonts from Google web
+fonts or from the vendored artifacts).
 
 #+name: f:fontSerif
 #+begin_src haskell
 fontSerif :: Css
 fontSerif = do
-  fontFamily ["Source Serif 4"] [serif]
+  fontFamily ["<<font-serif>>"] [serif]
 #+end_src
 
 #+name: f:fontSans
 #+begin_src haskell
 fontSans :: Css
 fontSans = do
-  fontFamily ["Source Sans 3"] [sansSerif]
+  fontFamily ["<<font-sans>>"] [sansSerif]
 #+end_src
 
 #+name: f:fontMono
 #+begin_src haskell
 fontMono :: Css
 fontMono = do
-  fontFamily ["Source Code Pro"] [monospace]
+  fontFamily ["<<font-mono>>"] [monospace]
   fontSize (em 0.9)
 #+end_src
 

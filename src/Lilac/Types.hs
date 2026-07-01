@@ -898,7 +898,7 @@ data WeaveOpts = WeaveOpts
 
 type InitOpts :: Type
 data InitOpts = InitOpts
-  { pure :: Bool --
+  { onlyLocalImports :: Bool --
   }
 
 markingChars :: [Char]

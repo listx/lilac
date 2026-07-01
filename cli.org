@@ -32,6 +32,7 @@ import Data.FileEmbed (embedFile)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
+import Data.UUID (UUID)
 import Data.UUID.V4 (nextRandom)
 import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
@@ -52,12 +53,7 @@ import Lilac.Types
         subcommand,
         verbose
       ),
-    HtmlHead
-      ( HtmlHead,
-        injection,
-        onlyLocalImports
-      ),
-    InitOpts (InitOpts, pure),
+    InitOpts (InitOpts, onlyLocalImports),
     LintOpts (LintOpts, inputs),
     Object (orgDoc),
     OrgDoc (cells),
@@ -242,6 +238,7 @@ import Toml.Schema
 <<f:lilacJs>>
 <<f:lilacServe>>
 <<f:lilacInit>>
+<<f:mkIndexOrg>>
 <<f:bootstrapLilac>>
 <<f:lilacLint>>
 <<f:gitLsFiles>>
@@ -1414,14 +1411,14 @@ using Lilac.
 #+begin_src haskell
 type InitOpts :: Type
 data InitOpts = InitOpts
-  { pure :: Bool -- (ref:data:InitOpts-pure)
+  { onlyLocalImports :: Bool -- (ref:data:InitOpts-onlyLocalImports)
   }
 #+end_src
 
-[[(data:InitOpts-pure)]] determines whether Lilac will generate a purely local
-(self-contained) set of woven artifacts. More specifically, this means that all
-of the JS and CSS (including MathJax and fonts) will be downloaded to be hosted
-locally (instead of reaching out to a CDN to get these assets).
+[[(data:InitOpts-onlyLocalImports)]] determines whether Lilac will generate a purely
+local (self-contained) set of woven artifacts. More specifically, this means
+that all of the JS and CSS (including MathJax and fonts) will be downloaded to
+be hosted locally (instead of reaching out to a CDN to get these assets).
 
 #+name: f:initOptsHandler
 #+begin_src haskell
@@ -1429,9 +1426,9 @@ initOptsHandler :: OptionHandler InitOpts
 initOptsHandler =
   InitOpts
     <$> ( flag
-            True
             False
-            ( long "pure"
+            True
+            ( long "only-local-imports"
                 <> help
                   """
                   Download a local copy of MathJax and fonts so that they can be
@@ -1467,6 +1464,11 @@ files we need to write:
      at a commit's diff. You'd almost always want this because the Org files are
      the source of truth.
 
+  7) ~vendor-mathjax.sh~: (Optional) Used to vendor (download) MathJax locally.
+
+  8) ~vendor-source-fonts.sh~: (Optional) Used to vendor (download) Source Sans,
+     Source Serif, and Source Code Pro fonts locally.
+
 Only the first two files need to be written by us. The others can be written by
 Lilac itself (by making Lilac call itself, with [[f:bootstrapLilac]]). If the first
 two files already exist though, we emit a warning and abort.
@@ -1475,17 +1477,11 @@ two files already exist though, we emit a warning and abort.
 #+begin_src haskell
 lilacInit :: GlobalOpts -> InitOpts -> IO ()
 lilacInit globalOpts initOpts = do
-  let write p = LU.writeOrWarn (P.unsafeEncodeUtf p)
+  let write p = LU.writeOrWarn (P.unsafeEncodeUtf p) -- (ref:f:lilacInit-writeOrWarn)
   uuid <- nextRandom -- (ref:f:lilacInit-uuid)
   when (globalOpts.verbose) $ do
     putStrLn $ "Using UUID " <> show uuid <> " for index.org"
-  let indexOrg =
-        ":PROPERTIES:\n:ID:       "
-          <> show uuid
-          <> "\n:END:\n"
-          <> """
-             <<text:index.org>>
-             """ -- (ref:f:lilacInit-triple-quote)
+  let indexOrg = mkIndexOrg initOpts uuid -- (ref:f:lilacInit-mkIndexOrg)
   when (globalOpts.verbose) $ do
     putStrLn "Writing index.org"
   write
@@ -1493,18 +1489,28 @@ lilacInit globalOpts initOpts = do
     indexOrg
   when (globalOpts.verbose) $ do
     putStrLn "Writing Lilac.toml"
+  let lilacToml =
+        """
+        <<text:Lilac.toml>>
+        """
+          <> if initOpts.onlyLocalImports
+            then
+              """
+              \n
+              <<text:Lilac.toml-htmlHead>>
+              \n
+              """
+            else ""
   write
     "Lilac.toml"
-    """
-    <<text:Lilac.toml>>
-    """
+    lilacToml
   when (globalOpts.verbose) $ do
     putStrLn "Tangling files out of index.org"
-  bootstrapLilac
+  bootstrapLilac initOpts -- (ref:f:lilacInit-bootstrapLilac)
 #+end_src
 
-[[f:writeOrWarn]] uses [[f:writeFileRobustly]] to either write the file content or skip
-if the file path already exists.
+[[f:writeOrWarn]] [[(f:lilacInit-writeOrWarn)]] uses [[f:writeFileRobustly]] to either write
+the file content or skip if the file path already exists.
 
 #+name: f:writeOrWarn
 #+begin_src haskell
@@ -1516,13 +1522,56 @@ writeOrWarn path contentToWrite = do
     else writeFileRobustly path contentToWrite
 #+end_src
 
-[[f:bootstrapLilac]] calls Lilac to tangle some files out of the ~index.org~ file
-(which is from [[text:index.org]]).
+[[f:mkIndexOrg]] [[(f:lilacInit-mkIndexOrg)]] constructs the all-important ~index.org~
+file.
+
+#+name: f:mkIndexOrg
+#+begin_src haskell
+mkIndexOrg :: InitOpts -> UUID -> Text
+mkIndexOrg initOpts uuid =
+  ":PROPERTIES:\n:ID:       "
+    <> show uuid
+    <> "\n:END:\n"
+    <> """
+       <<text:index.org>>
+       """ -- (ref:f:mkIndexOrg-triple-quote)
+    <> maybeHtmlHead
+    <> """
+       <<text:index.org-after-Lilac.toml>>
+       """
+    <> maybeVendorScripts
+  where
+    maybeHtmlHead =
+      if initOpts.onlyLocalImports
+        then
+          "\n"
+            <> """
+               <<text:Lilac.toml-htmlHead>>
+               """
+            <> "\n"
+        else ""
+    maybeVendorScripts =
+      if initOpts.onlyLocalImports
+        then
+          "\n"
+            <> """
+               <<text:vendor-mathjax>>
+               """
+            <> "\n\n"
+            <> """
+               <<text:vendor-source-fonts>>
+               """
+            <> "\n"
+        else ""
+#+end_src
+
+[[f:bootstrapLilac]] [[(f:lilacInit-bootstrapLilac)]] calls Lilac to tangle some files
+out of the ~index.org~ file (which is from [[text:index.org]]).
 
 #+name: f:bootstrapLilac
 #+begin_src haskell
-bootstrapLilac :: IO ()
-bootstrapLilac = do
+bootstrapLilac :: InitOpts -> IO ()
+bootstrapLilac initOpts = do
   let runLilac :: [String] -> IO ()
       runLilac args = do
         outputLBS <- readProcessStdout_ $ proc "lilac" args
@@ -1530,41 +1579,21 @@ bootstrapLilac = do
   runLilac ["compile", "index.org"]
   runLilac ["archive", "index.lobj", "--out-file", "hello-world.larc"]
   runLilac ["tangle", "hello-world.larc", "--out-dir", "."] -- (ref:f:bootstrapLilac-tangle)
+  when initOpts.onlyLocalImports $ do
+    putLBS =<< readProcessStdout_ (proc "bash" ["vendor-mathjax.sh"])
+    putLBS =<< readProcessStdout_ (proc "bash" ["vendor-source-fonts.sh"])
+  putLBS =<< readProcessStdout_ (proc "make" [])
 #+end_src
 
 ** Files to write
 
-The [[text:Lilac.toml]] technically doesn't have to match what's in [[text:index.org]],
-because the former will get overwritten by the latter [[(f:bootstrapLilac-tangle)]].
-That's why it's so short.
+*** ~Lilac.toml~
+
+[[text:Lilac.toml]] is a basic template; the user is expected to tweak this file
+first (inside the ~index.org~ file).
 
 #+name: text:Lilac.toml
 #+begin_src toml
-name = "a"
-homepage = "https://b"
-repo = "https://c"
-version = "0"
-
-nonTangledPathspecs = []
-
-#+end_src
-
-[[text:index.org]] has all of the files we need to bootstrap a Lilac project. The
-only thing missing from it is the unique UUID for the document; this is
-generated at [[(f:lilacInit-uuid)]] and prepended to it.
-
-We have to use a ~\t~ for the tab character and ~\\\\~ for the ~\\~ character, because
-that's what Haskell's triple quoting syntax requires [[(f:lilacInit-triple-quote)]].
-
-#+name: text:index.org
-#+header: :noweb off
-#+begin_src org
-,#+title: Introduction
-
-,* Project configuration
-
-,#+header: :tangle Lilac.toml
-,#+begin_src toml
 name = "Hello World"
 homepage = "https://localhost"
 repo = "https://localhost"
@@ -1577,6 +1606,66 @@ nonTangledPathspecs = [
     ":(exclude,top)*.html",
     ":(exclude,top)site"
 ]
+#+end_src
+
+If the user passes ~--only-local-imports~, then we have to tweak  the ~Lilac.toml~
+so that all woven HTML files know how to fetch the vendored artifacts.
+
+#+name: text:Lilac.toml-htmlHead
+#+begin_src toml
+[htmlHead]
+onlyLocalImports = true
+injection = \"\"\"
+<link rel="stylesheet" href="/vendor/source-fonts/source-fonts.css">
+<script>
+  window.MathJax = {
+      loader: { paths: { "mathjax-newcm": "/vendor/mathjax-newcm-font" } },
+      output: { font: "mathjax-newcm" },
+  tex: {
+      tags: 'ams'
+  },
+  options: {
+      ignoreHtmlClass: 'verbatim|code'
+  }
+};
+</script>
+<script id="MathJax-script" async="" src="/vendor/mathjax/tex-mml-chtml.js"></script>
+\"\"\"
+#+end_src
+
+*** ~index.org~
+
+[[text:index.org]] has all of the files we need to bootstrap a Lilac project. The
+only thing missing from it is the unique UUID for the document; this is
+generated at [[(f:lilacInit-uuid)]] and prepended to it.
+
+We have to use a ~\t~ for the tab character and ~\\\\~ for the ~\\~ character, because
+that's what Haskell's triple quoting syntax requires [[(f:mkIndexOrg-triple-quote)]].
+
+#+name: text:index.org
+#+begin_src org
+,#+title: Introduction
+
+Modify this file to suit your project's needs.
+
+,* Lilac configuration
+
+,#+header: :tangle Lilac.toml
+,#+begin_src toml
+<<text:Lilac.toml>>
+
+#+end_src
+
+[[text:index.org-after-Lilac.toml]] exists so that we can optionally append some
+extra text after [[text:Lilac.toml]] (namely [[text:Lilac.toml-htmlHead]]). That is,
+it's just a simple way to break up the long multiline string into multiple parts
+so that we can inject things in the middle of it. There are other ways to
+achieve the same effect (e.g., adding a magic string and replacing it), but this
+way is probably the simplest.
+
+#+name: text:index.org-after-Lilac.toml
+#+header: :noweb off
+#+begin_src org
 ,#+end_src
 
 The ~nonTangledPathspecs~ is used by Lilac's ~lint~
@@ -1614,6 +1703,8 @@ tangle: $(archive_file)
 
 weave: $(archive_file)
 \tlilac weave $< --out-dir site --write-css --write-js
+\trm -rf site/vendor
+\tcp -r vendor site
 \ttouch weave
 
 lint: $(archive_file)
@@ -1689,6 +1780,165 @@ gitconfig:
 .PHONY: gitconfig
 ,#+end_src
 
+#+end_src
+
+** Vendored assets
+
+*** MathJax
+
+[[text:vendor-mathjax]] is a little messy because it needs to escape tab characters
+and also ~\\~ with ~\\\\~, because this text is fed into Haskell's triple-quote
+multiline string.
+
+#+name: text:vendor-mathjax
+#+begin_src org
+,** MathJax
+
+For MathJax, we download it from NPM. We actually need 2 packages, the main
+MathJax code and also the font.
+
+,#+name: vendor-mathjax.sh
+,#+header: :tangle vendor-mathjax.sh
+,#+header: :shebang #!/usr/bin/env bash
+,#+begin_src bash
+set -euo pipefail
+
+MAIN_PACKAGE="mathjax"
+FONT_PACKAGE="mathjax-newcm-font"
+VERSION="4.1.2"
+MAIN_TARBALL="${MAIN_PACKAGE}-${VERSION}.tgz"
+FONT_TARBALL="${FONT_PACKAGE}-${VERSION}.tgz"
+
+mkdir -p vendor
+pushd vendor
+
+download_tarball()
+{
+\tlocal package
+\tlocal version
+\tlocal url_prefix
+\tlocal tarball
+\tpackage="${1:-}"
+\tversion="${2:-}"
+\ttarball="${package}-${version}.tgz"
+\turl_prefix="${3:-}"
+
+\tif [[ -d "${package}" ]]; then
+\t\techo "${package} directory already exists"
+\t\treturn 1
+\tfi
+
+\tcurl -OL "${url_prefix}/-/${tarball}"
+\ttar xzvf "${tarball}"
+\tmv package "${package}"
+\trm "${tarball}"
+}
+
+download_tarball \\
+\t"${MAIN_PACKAGE}" \\
+\t"${VERSION}" \\
+\t"https://registry.npmjs.org/mathjax"
+download_tarball \\
+\t"${FONT_PACKAGE}" \\
+\t"${VERSION}" \\
+\t"https://registry.npmjs.org/@mathjax/${FONT_PACKAGE}"
+,#+end_src
+#+end_src
+
+*** Source family of fonts
+:PROPERTIES:
+:ID:       a7f65fb9-86bb-45ab-8c61-2fedfadb24fe
+:END:
+
+We download variable weight fonts to keep things lightweight.
+
+#+name: text:vendor-source-fonts
+#+begin_src org
+,** Source family of fonts
+
+Lilac uses Google web fonts by default to pull these fonts dynamically at runtime. However, these fonts are all open source so we can just download them from their GitHub repos directly, which is what we do here.
+
+,#+name: vendor-source-fonts.sh
+,#+header: :tangle vendor-source-fonts.sh
+,#+header: :shebang #!/usr/bin/env bash
+,#+begin_src bash
+set -euo pipefail
+
+url_sans="https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R"
+url_serif="https://raw.githubusercontent.com/adobe-fonts/source-serif/4.005R"
+url_code="https://raw.githubusercontent.com/adobe-fonts/source-code-pro/2.042R-u%2F1.062R-i%2F1.026R-vf"
+
+mkdir -p vendor/source-fonts
+pushd vendor/source-fonts
+
+curl -OL "${url_sans}/WOFF2/VF/SourceSans3VF-Italic.otf.woff2"
+curl -OL "${url_sans}/WOFF2/VF/SourceSans3VF-Upright.otf.woff2"
+
+curl -OL "${url_serif}/WOFF2/VAR/SourceSerif4Variable-Italic.otf.woff2"
+curl -OL "${url_serif}/WOFF2/VAR/SourceSerif4Variable-Roman.otf.woff2"
+
+curl -OL "${url_code}/WOFF2/VF/SourceCodeVF-Italic.otf.woff2"
+curl -OL "${url_code}/WOFF2/VF/SourceCodeVF-Upright.otf.woff2"
+
+cat << EOF > source-fonts.css
+<<text:source-fonts.css>>
+EOF
+,#+end_src
+#+end_src
+
+Having [[text:source-fonts.css]] as a separate block lets gives us syntax
+highlighting (because there aren't any special characters that need to be
+escaped in Haskell's triple-quote multiline syntax).
+
+#+name: text:source-fonts.css
+#+begin_src css
+@font-face{
+    font-family: '<<id:d9db3b15-7e70-493a-9cd9-b389d21adfa6::font-mono>>';
+    font-weight: 200 900;
+    font-style: normal;
+    font-stretch: normal;
+    src: url('SourceCodeVF-Upright.otf.woff2') format('woff2');
+}
+
+@font-face{
+    font-family: '<<id:d9db3b15-7e70-493a-9cd9-b389d21adfa6::font-mono>>';
+    font-weight: 200 900;
+    font-style: italic;
+    font-stretch: normal;
+    src: url('SourceCodeVF-Italic.otf.woff2') format('woff2');
+}
+
+@font-face{
+    font-family: '<<id:d9db3b15-7e70-493a-9cd9-b389d21adfa6::font-sans>>';
+    font-weight: 200 900;
+    font-style: normal;
+    font-stretch: normal;
+    src: url('SourceSans3VF-Upright.otf.woff2') format('woff2');
+}
+
+@font-face{
+    font-family: '<<id:d9db3b15-7e70-493a-9cd9-b389d21adfa6::font-sans>>';
+    font-weight: 200 900;
+    font-style: italic;
+    font-stretch: normal;
+    src: url('SourceSans3VF-Italic.otf.woff2') format('woff2');
+}
+
+@font-face{
+    font-family: '<<id:d9db3b15-7e70-493a-9cd9-b389d21adfa6::font-serif>>';
+    font-weight: 200 900;
+    font-style: normal;
+    font-stretch: normal;
+    src: url('SourceSerif4Variable-Roman.otf.woff2') format('woff2');
+}
+
+@font-face{
+    font-family: '<<id:d9db3b15-7e70-493a-9cd9-b389d21adfa6::font-serif>>';
+    font-weight: 200 900;
+    font-style: italic;
+    font-stretch: normal;
+    src: url('SourceSerif4Variable-Italic.otf.woff2') format('woff2');
+}
 #+end_src
 
 * Git version injection
