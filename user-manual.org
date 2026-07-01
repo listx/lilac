@@ -183,16 +183,19 @@ Clone this repo. Install Nix and Cabal. Run ~cabal install
 --overwrite-policy=always --enable-optimization=2~ to install the ~lilac~ binary to
 disk.
 
-Go to your repo's documentation folder. We'll assume it is named ~doc~ at the
-repo root. Create an ~index.org~ file there.
+Now go to your repo where you want to use Lilac. Run
 
 #+begin_src sh
-cd doc
-touch index.org
+lilac init
 #+end_src
 
-Head on to the [[id:bf0da06e-1356-4a68-8b48-ae0e48756ae0][Hello World]] example to start with a basic starter ~index.org~ file,
-along with a Makefile to start tangling and weaving from the ~index.org~ file.
+to generate a starter ~Lilac.toml~ and ~index.org~. This will also give you a
+~Makefile~, which you can use to run ~make~ to start tangling and weaving. You can
+also do ~watch -n 1 make~ to constantly run ~make~ so that you don't have to keep
+running it yourself.
+
+At this point your ~index.org~ is your source of truth, so have a read through it,
+and adjust as needed.
 
 * Using Lilac as a static site generator
 

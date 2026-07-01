@@ -15,9 +15,7 @@ org_files = \
 	fe.org \
 	user-manual.org \
 	plan.org \
-	release-notes.org \
-	hello-world/index.org \
-	hello-world/doc/index.org
+	release-notes.org
 backend_org_files = $(filter-out fe.org,$(org_files))
 
 test: $(org_files)
