@@ -104,7 +104,7 @@ import Data.Map.Strict qualified as M
 import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.Tree (Tree)
-import Data.UUID.Types (UUID, fromText, fromWords64)
+import Data.UUID (UUID, fromText, fromWords64)
 import GHC.Generics (Generic)
 import Lilac.Types.Internal (GPath (GPath))
 import Network.URI qualified as N
@@ -640,7 +640,7 @@ fromWords :: Word64 -> Word64 -> OID
 fromWords w1 w2 = OID $ fromWords64 w1 w2
 
 fromText :: Text -> Maybe OID
-fromText t = case Data.UUID.Types.fromText t of
+fromText t = case Data.UUID.fromText t of
   Just uuid -> Just $ OID uuid
   Nothing -> Nothing
 
