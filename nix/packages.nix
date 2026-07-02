@@ -27,7 +27,7 @@ let
 
     pkgs.parinfer-rust
 
-    pkgs.vale
+    pkgs.cspell
 
     pkgs.pikchr
   ];
@@ -207,14 +207,15 @@ let
         stages = [ "pre-push" ]; # (ref:pre-push)
       };
 
-      vale = {
+      cspell = {
         enable = true;
         package = devShellEnv;
+        files = "\\.org$";
       };
 
       sort-file-contents = {
         enable = true;
-        files = "\\.vale/styles/config/vocabularies/Lilac/accept\\.txt$";
+        files = "^lilac-dict\\.txt$";
         settings = { ignore-case = true; };
       };
     };

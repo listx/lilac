@@ -1,0 +1,45 @@
+---
+$schema: https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json
+version: '0.2'
+dictionaryDefinitions:
+    - name: lilac-dict
+      path: './lilac-dict.txt'
+      addWords: true
+dictionaries:
+    - lilac-dict
+patterns:
+  - name: org-block
+    pattern: '^#\+begin_[\s\S]*?^#\+end_'
+  - name: org-metadata
+    pattern: '^#\+[\S]+[\s\S]*?$'
+  - name: org-links
+    pattern: '\[\[[\s\S]*?\]\]'
+  - name: org-emphasis-code
+    pattern: '~[^~\n]+?~'
+  - name: org-emphasis-verbatim
+    pattern: '=[^=\n]+?='
+  - name: org-citations
+    pattern: '\[cite[^\]]*\]'
+  - name: mathjax-display
+    pattern: '\\\[[\s\S]*?\\\]'
+  - name: mathjax-inline
+    pattern: '\\\([^\n]*?\\\)'
+
+overrides:
+  - filename: "**/*.org"
+    ignoreRegExpList:
+      - org-block
+      - org-metadata
+      - org-links
+      - org-emphasis-code
+      - org-emphasis-verbatim
+      - org-citations
+      - mathjax-display
+      - mathjax-inline
+
+ignorePaths:
+    - '**/*.cljs'
+    - '**/*.css'
+    - '**/*.hs'
+    - '**/*.js'
+    - '/lilac-dict.txt'
