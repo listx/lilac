@@ -42,11 +42,21 @@ let
   ourHaskell = pkgs.haskell.packages.${ghcVersion}.extend
     (lib.composeManyExtensions haskellOverlays);
 
-  ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.12.2";
+  ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.12.4";
   ghcVersion = "ghc" + ghcVersionWithoutDots;
 
-  haskellOverlays =
-    [ heavyDeps jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+  haskellOverlays = [
+    disableHaddockGlobally
+    heavyDeps
+    jailbreaks
+    injectExternalPackages
+    injectLilac
+    tweakLilacBuild
+  ];
+
+  disableHaddockGlobally = final: prev: {
+    mkDerivation = args: prev.mkDerivation (args // { doHaddock = false; });
+  };
 
   heavyDeps = final: prev:
     let
