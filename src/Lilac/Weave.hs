@@ -93,8 +93,7 @@ import Lilac.Types
     GlossaryTerm (definition, term),
     Heading (Heading, body, level, meta, section),
     HtmlHead
-      ( HtmlHead,
-        injection,
+      ( injection,
         onlyLocalImports
       ),
     LCI (LCI, unLCI),
