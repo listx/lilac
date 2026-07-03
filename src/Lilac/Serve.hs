@@ -240,12 +240,12 @@ readStableHtmlFile path logLock verbose = go (20 :: Int)
       if before == after && looksComplete
         then do
           logVerboseLn logLock verbose
-            $ "file stable: "
+            $ "[readStableHtmlFile] File stable: "
             <> pathText
           pure content
         else do
           logVerboseLn logLock verbose
-            $ "file unstable/incomplete, retrying "
+            $ "[readStableHtmlFile] File unstable/incomplete, retrying "
             <> pathText
           threadDelay 200_000
           go (n - 1)
