@@ -32,7 +32,8 @@ module Lilac.Serve
   )
 where
 
-import Control.Concurrent (forkIO, killThread, myThreadId, threadDelay)
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent.Async (withAsync)
 import Control.Concurrent.STM
   ( TChan,
     TVar,
@@ -614,29 +615,28 @@ handleClientConnection conn fsChan msg verbose = do
     chan <- dupTChan fsChan -- (ref:f:handleClientConnection-subscribe-fsChan)
     drainChannel chan
     pure chan
-  fsListenerThread <- myThreadId
+
+  -- (ref:f:handleClientConnection-waitForMatch)
+  let fsListenerThread = waitForMatch conn fsPathChan browserLocation
 
   -- (ref:f:handleClientConnection-heartbeatHandlerThread)
-  heartbeatHandlerThread <- forkIO $ do
-    let heartbeatHandler = do
-          heartbeat <- WS.receiveData conn :: IO Text
-          logVerboseLn
-            verbose
-            $ "[wsHandler] Ignored heartbeat: "
-            <> heartbeat
-          heartbeatHandler -- (ref:f:handleClientConnection-heartbeatHandler)
+  let heartbeatHandlerThread = do
+        heartbeat <- WS.receiveData conn :: IO Text
+        logVerboseLn
+          verbose
+          $ "[wsHandler] Ignored heartbeat: "
+          <> heartbeat
+        heartbeatHandlerThread -- (ref:f:handleClientConnection-heartbeatHandler)
 
-    -- (ref:f:handleClientConnection-browser-disconnect)
-    heartbeatHandler `catch` \(e :: WS.ConnectionException) -> do
+  -- (ref:f:handleClientConnection-browser-disconnect)
+  (withAsync fsListenerThread $ \_ -> heartbeatHandlerThread)
+    `catch` \(e :: WS.ConnectionException) -> do
       logVerboseLn verbose
         $ "[wsHandler] Browser disconnected: "
         <> browserLocation
         <> " (Reason: "
         <> T.pack (show e)
         <> ")"
-      killThread fsListenerThread -- (ref:f:handleClientConnection-fsListenerThread)
-  waitForMatch conn fsPathChan browserLocation -- (ref:f:handleClientConnection-waitForMatch)
-    `finally` killThread heartbeatHandlerThread
 #+end_src
 
 The first thing to do is read the very first message from the client
@@ -675,13 +675,13 @@ alive [[(f:handleClientConnection-heartbeatHandler)]] (otherwise, Warp may kill 
 connection on its own due to a timeout). It does this repeatedly in a long-lived
 ~heartbeatHandlerThread~ [[(f:handleClientConnection-heartbeatHandlerThread)]] until
 the browser tab is closed (whereupon we'll get a ~WS.ConnectionException~) and
-kill the ~fsListenerThread~ [[(f:handleClientConnection-fsListenerThread)]].
+kill the ~fsListenerThread~ (via ~withAsync~).
 
-The ~fsListenerThread~ is the main thread which listens to debounced filesystem
-events coming from [[(f:fsWatcher-debounced-events)]]. Its job is to react to
-filesystem events on the same path that the client sent, by subscribing to the
-filesystem channel with ~dupTChan~ [[(f:handleClientConnection-subscribe-fsChan)]]. It then goes
-into an infinite loop with [[f:waitForMatch]].
+~fsListenerThread~ listens to debounced filesystem events coming from
+[[(f:fsWatcher-debounced-events)]]. Its job is to react to filesystem events on the
+same path that the client sent, by subscribing to the filesystem channel with
+~dupTChan~ [[(f:handleClientConnection-subscribe-fsChan)]]. It then goes into an
+infinite loop with [[f:waitForMatch]].
 
 The call to [[f:drainChannel]] is there to get rid of filesystem events that have
 been queued up /before/ the WebSocket connection has been established; this can

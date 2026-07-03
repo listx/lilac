@@ -4,7 +4,8 @@ module Lilac.Serve
   )
 where
 
-import Control.Concurrent (forkIO, killThread, myThreadId, threadDelay)
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent.Async (withAsync)
 import Control.Concurrent.STM
   ( TChan,
     TVar,
@@ -326,29 +327,28 @@ handleClientConnection conn fsChan msg verbose = do
     chan <- dupTChan fsChan --
     drainChannel chan
     pure chan
-  fsListenerThread <- myThreadId
 
   --
-  heartbeatHandlerThread <- forkIO $ do
-    let heartbeatHandler = do
-          heartbeat <- WS.receiveData conn :: IO Text
-          logVerboseLn
-            verbose
-            $ "[wsHandler] Ignored heartbeat: "
-            <> heartbeat
-          heartbeatHandler --
+  let fsListenerThread = waitForMatch conn fsPathChan browserLocation
 
-    --
-    heartbeatHandler `catch` \(e :: WS.ConnectionException) -> do
+  --
+  let heartbeatHandlerThread = do
+        heartbeat <- WS.receiveData conn :: IO Text
+        logVerboseLn
+          verbose
+          $ "[wsHandler] Ignored heartbeat: "
+          <> heartbeat
+        heartbeatHandlerThread --
+
+  --
+  (withAsync fsListenerThread $ \_ -> heartbeatHandlerThread)
+    `catch` \(e :: WS.ConnectionException) -> do
       logVerboseLn verbose
         $ "[wsHandler] Browser disconnected: "
         <> browserLocation
         <> " (Reason: "
         <> T.pack (show e)
         <> ")"
-      killThread fsListenerThread --
-  waitForMatch conn fsPathChan browserLocation --
-    `finally` killThread heartbeatHandlerThread
 
 waitForMatch :: WS.Connection -> TChan FilePath -> Text -> IO ()
 waitForMatch conn fsPathChan browserLocation = do
