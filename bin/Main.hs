@@ -157,6 +157,7 @@ import Relude
     mapMaybe,
     mempty,
     newEmptyMVar,
+    newMVar,
     not,
     null,
     otherwise,
@@ -723,6 +724,7 @@ lilacServe globalOpts serveOpts = do
   activePaths <- newTVarIO mempty
   shutdownSignal <- newEmptyMVar
   fsWatcherDone <- newEmptyMVar
+  logLock <- newMVar ()
 
   _ <-
     forkIO
@@ -732,6 +734,7 @@ lilacServe globalOpts serveOpts = do
         activePaths
         shutdownSignal
         fsWatcherDone
+        logLock
         globalOpts.verbose
 
   putTextLn $ "Serving Lilac at http://localhost:" <> show serveOpts.port
@@ -742,6 +745,7 @@ lilacServe globalOpts serveOpts = do
         liveReloadMiddleware
           targetDir
           fsChan
+          logLock
           globalOpts.verbose
           $ staticApp (defaultFileServerSettings targetDir)
       teardown = do

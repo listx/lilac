@@ -4,7 +4,7 @@ module Lilac.Serve
   )
 where
 
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (forkIO, threadDelay, withMVar)
 import Control.Concurrent.Async (withAsync)
 import Control.Concurrent.STM
   ( TChan,
@@ -78,11 +78,11 @@ import System.IO (stderr)
 type GenMap :: Type
 type GenMap = Map FilePath Int
 
-liveReloadMiddleware :: FilePath -> TChan FilePath -> Bool -> Middleware
-liveReloadMiddleware root fsChan verbose baseApp req respond =
+liveReloadMiddleware :: FilePath -> TChan FilePath -> MVar () -> Bool -> Middleware
+liveReloadMiddleware root fsChan logLock verbose baseApp req respond =
   websocketsOr
     WS.defaultConnectionOptions
-    (wsHandler fsChan verbose)
+    (wsHandler fsChan logLock verbose)
     backupApp
     req
     respond
@@ -227,11 +227,12 @@ fsWatcher ::
   TVar GenMap ->
   MVar () ->
   MVar () ->
+  MVar () ->
   Bool ->
   IO ()
-fsWatcher dir fsChan activePaths shutdownMVar fsWatcherDone verbose = do
+fsWatcher dir fsChan activePaths shutdownMVar fsWatcherDone logLock verbose = do
   let signalThreadExit = do
-        logVerboseLn verbose "done."
+        logVerboseLn logLock verbose "done."
         putMVar fsWatcherDone ()
   fsAction `finally` signalThreadExit
   where
@@ -246,13 +247,14 @@ fsWatcher dir fsChan activePaths shutdownMVar fsWatcherDone verbose = do
             --
             (debouncePerPath activePaths (signalFsEvent normalizedDir fsChan))
         logVerboseLn
+          logLock
           verbose
           $ "[fsWatcher] Listening to "
           <> T.pack dir
           <> "..."
         readMVar shutdownMVar --
-        logVerboseLn verbose "[fsWatcher] Received shutdown signal."
-        logVerbose verbose "[fsWatcher] Cleaning up resources... "
+        logVerboseLn logLock verbose "[fsWatcher] Received shutdown signal."
+        logVerbose logLock verbose "[fsWatcher] Cleaning up resources... "
     --
     isHtmlFsEvent e = case e of
       Added {}
@@ -261,7 +263,7 @@ fsWatcher dir fsChan activePaths shutdownMVar fsWatcherDone verbose = do
     signalFsEvent :: FilePath -> TChan FilePath -> Event -> IO ()
     signalFsEvent watchedDir chan event = do
       let relPath = makeRelative watchedDir $ eventPath event
-      logVerboseLn verbose
+      logVerboseLn logLock verbose
         $ "[fsWatcher] Detected event: "
         <> T.pack relPath
         <> " ("
@@ -289,15 +291,15 @@ debouncePerPath genMap action e = do
         _ -> pure False --
     when shouldFire $ action e
 
-wsHandler :: TChan FilePath -> Bool -> WS.ServerApp
-wsHandler fsChan verbose pending = do
+wsHandler :: TChan FilePath -> MVar () -> Bool -> WS.ServerApp
+wsHandler fsChan logLock verbose pending = do
   conn <- WS.acceptRequest pending --
   msg <- WS.receiveData conn :: IO Text --
   if msg == "LILAC_WS_HEARTBEAT_FROM_JS_CLIENT"
     then do
-      logVerboseLn verbose $ "[wsHandler] Ignored heartbeat (ON INIT): " <> msg
+      logVerboseLn logLock verbose $ "[wsHandler] Ignored heartbeat (ON INIT): " <> msg
       WS.sendClose conn ("Path expected" :: Text) --
-    else handleClientConnection conn fsChan msg verbose
+    else handleClientConnection conn fsChan msg logLock verbose
 
 drainChannel :: TChan a -> STM ()
 drainChannel chan = do
@@ -310,15 +312,17 @@ handleClientConnection ::
   WS.Connection ->
   TChan FilePath ->
   Text ->
+  MVar () ->
   Bool ->
   IO ()
-handleClientConnection conn fsChan msg verbose = do
+handleClientConnection conn fsChan msg logLock verbose = do
   let browserLocation
         | T.null cleaned = "index.html"
         | otherwise = cleaned
         where
           cleaned = T.dropAround (== '/') msg
   logVerboseLn
+    logLock
     verbose
     $ "[wsHandler] Browser connected: "
     <> browserLocation
@@ -335,6 +339,7 @@ handleClientConnection conn fsChan msg verbose = do
   let heartbeatHandlerThread = do
         heartbeat <- WS.receiveData conn :: IO Text
         logVerboseLn
+          logLock
           verbose
           $ "[wsHandler] Ignored heartbeat: "
           <> heartbeat
@@ -343,7 +348,7 @@ handleClientConnection conn fsChan msg verbose = do
   --
   (withAsync fsListenerThread $ \_ -> heartbeatHandlerThread)
     `catch` \(e :: WS.ConnectionException) -> do
-      logVerboseLn verbose
+      logVerboseLn logLock verbose
         $ "[wsHandler] Browser disconnected: "
         <> browserLocation
         <> " (Reason: "
@@ -373,14 +378,14 @@ getTimestamp = do
   let timeStr = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%Ez" now
   pure $ T.pack timeStr
 
-logVerbose :: Bool -> Text -> IO ()
-logVerbose verbose msg = do
+logVerbose :: MVar () -> Bool -> Text -> IO ()
+logVerbose lock verbose msg = when verbose $ do
   t <- getTimestamp
-  when verbose $ do
+  withMVar lock $ \_ ->
     T.hPutStr stderr $ "[" <> t <> "] " <> msg
 
-logVerboseLn :: Bool -> Text -> IO ()
-logVerboseLn verbose msg = do
+logVerboseLn :: MVar () -> Bool -> Text -> IO ()
+logVerboseLn lock verbose msg = when verbose $ do
   t <- getTimestamp
-  when verbose $ do
+  withMVar lock $ \_ ->
     T.hPutStrLn stderr $ "[" <> t <> "] " <> msg
