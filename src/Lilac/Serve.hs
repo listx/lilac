@@ -53,14 +53,16 @@ import Relude
     void,
     when,
     ($),
+    (&&),
     (+),
+    (-),
     (.),
     (<$>),
     (<>),
     (==),
   )
 import Relude.Extra.Map (delete, insert, lookup)
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, getModificationTime)
 import System.FSNotify
   ( Event (Added, Modified),
     eventPath,
@@ -100,7 +102,7 @@ liveReloadMiddleware root fsChan logLock verbose baseApp req respond =
           else pure False
       if isHtmlFile
         then do
-          content <- LBS.readFile fullPath
+          content <- readStableHtmlFile fullPath logLock verbose --
           resp'
             $ responseLBS
               status200
@@ -222,6 +224,32 @@ liveReloadMiddleware root fsChan logLock verbose baseApp req respond =
        in if BS.null after
             then body
             else LBS.fromStrict before <> script <> LBS.fromStrict after
+
+readStableHtmlFile :: FilePath -> MVar () -> Bool -> IO LByteString
+readStableHtmlFile path logLock verbose = go (20 :: Int)
+  where
+    go 0 = LBS.readFile path
+    go n = do
+      before <- getModificationTime path
+      content <- LBS.readFile path
+      after <- getModificationTime path
+      let looksComplete =
+            not (LBS.null content)
+              && "</html>"
+              `BS.isInfixOf` LBS.toStrict content
+          pathText = T.pack path
+      if before == after && looksComplete
+        then do
+          logVerboseLn logLock verbose
+            $ "file stable: "
+            <> pathText
+          pure content
+        else do
+          logVerboseLn logLock verbose
+            $ "file unstable/incomplete, retrying "
+            <> pathText
+          threadDelay 200_000
+          go (n - 1)
 
 fsWatcher ::
   FilePath ->

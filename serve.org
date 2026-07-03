@@ -81,14 +81,16 @@ import Relude
     void,
     when,
     ($),
+    (&&),
     (+),
+    (-),
     (.),
     (<$>),
     (<>),
     (==),
   )
 import Relude.Extra.Map (delete, insert, lookup)
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, getModificationTime)
 import System.FSNotify
   ( Event (Added, Modified),
     eventPath,
@@ -105,6 +107,7 @@ import System.IO (stderr)
 
 <<type:GenMap>>
 <<f:liveReloadMiddleware>>
+<<f:readStableHtmlFile>>
 <<f:fsWatcher>>
 <<f:debouncePerPath>>
 <<f:wsHandler>>
@@ -233,7 +236,7 @@ liveReloadMiddleware root fsChan logLock verbose baseApp req respond =
           else pure False
       if isHtmlFile
         then do
-          content <- LBS.readFile fullPath
+          content <- readStableHtmlFile fullPath logLock verbose -- (ref:f:liveReloadMiddleware-readStableHtmlFile)
           resp'
             $ responseLBS
               status200
@@ -246,7 +249,7 @@ liveReloadMiddleware root fsChan logLock verbose baseApp req respond =
           script =
             """
             <script>
-            <<js:live-reload>>
+            <<js:live-reload>> (ref:f:liveReloadMiddleware-js:live-reload)
             </script>
             """
        in if BS.null after
@@ -254,8 +257,44 @@ liveReloadMiddleware root fsChan logLock verbose baseApp req respond =
             else LBS.fromStrict before <> script <> LBS.fromStrict after
 #+end_src
 
-[[js:live-reload]] is the one that initiates the creation of the WebSocket with the
-server. We do several things over the WebSocket:
+[[f:readStableHtmlFile]] [[(f:liveReloadMiddleware-readStableHtmlFile)]] reads the file
+until it stabilizes (not only has not been modified in 200ms, but has a ~</html>~
+tag inside it). This is needed because we cannot really predict exactly how the
+file will be saved by Lilac when it is overwritten (when woven), such as whether
+the file is truncated to 0 bytes first and then saved again.
+
+#+name: f:readStableHtmlFile
+#+begin_src haskell
+readStableHtmlFile :: FilePath -> MVar () -> Bool -> IO LByteString
+readStableHtmlFile path logLock verbose = go (20 :: Int)
+  where
+    go 0 = LBS.readFile path
+    go n = do
+      before <- getModificationTime path
+      content <- LBS.readFile path
+      after <- getModificationTime path
+      let looksComplete =
+            not (LBS.null content)
+              && "</html>"
+              `BS.isInfixOf` LBS.toStrict content
+          pathText = T.pack path
+      if before == after && looksComplete
+        then do
+          logVerboseLn logLock verbose
+            $ "file stable: "
+            <> pathText
+          pure content
+        else do
+          logVerboseLn logLock verbose
+            $ "file unstable/incomplete, retrying "
+            <> pathText
+          threadDelay 200_000
+          go (n - 1)
+#+end_src
+
+[[js:live-reload]] [[(f:liveReloadMiddleware-js:live-reload)]] is the one that initiates
+the creation of the WebSocket with the server. We do several things over the
+WebSocket:
 
   1) Initially, we tell the server about the path (specific HTML page) we're
      looking at [[(js:live-reload-send-path)]].
