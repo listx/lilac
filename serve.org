@@ -75,7 +75,6 @@ import Relude
     otherwise,
     pure,
     putMVar,
-    putTextLn,
     readMVar,
     show,
     void,
@@ -669,7 +668,8 @@ handleClientConnection conn fsChan msg logLock verbose = do
     pure chan
 
   -- (ref:f:handleClientConnection-waitForMatch)
-  let fsListenerThread = waitForMatch conn fsPathChan browserLocation
+  let fsListenerThread =
+        waitForMatch conn fsPathChan browserLocation logLock verbose
 
   -- (ref:f:handleClientConnection-heartbeatHandlerThread)
   let heartbeatHandlerThread = do
@@ -767,8 +767,8 @@ matches the path sent by the client. Otherwise it loops by calling itself again
 
 #+name: f:waitForMatch
 #+begin_src haskell
-waitForMatch :: WS.Connection -> TChan FilePath -> Text -> IO ()
-waitForMatch conn fsPathChan browserLocation = do
+waitForMatch :: WS.Connection -> TChan FilePath -> Text -> MVar () -> Bool -> IO ()
+waitForMatch conn fsPathChan browserLocation logLock _verbose = do
   modifiedFile <- T.pack <$> atomically (readTChan fsPathChan) -- (ref:f:waitForMatch-readTChan)
   if (browserLocation == modifiedFile)
     then do
@@ -779,10 +779,10 @@ waitForMatch conn fsPathChan browserLocation = do
               <> " FS event detected, reloading "
               <> browserLocation
               <> "."
-      putTextLn announcement
+      logVerboseLn logLock True announcement
       WS.sendTextData conn ("reload" :: Text) -- (ref:f:waitForMatch-send-reload-request)
     else
-      waitForMatch conn fsPathChan browserLocation -- (ref:f:waitForMatch-loop)
+      waitForMatch conn fsPathChan browserLocation logLock _verbose -- (ref:f:waitForMatch-loop)
 #+end_src
 
 * Logging

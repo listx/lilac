@@ -47,7 +47,6 @@ import Relude
     otherwise,
     pure,
     putMVar,
-    putTextLn,
     readMVar,
     show,
     void,
@@ -370,7 +369,8 @@ handleClientConnection conn fsChan msg logLock verbose = do
     pure chan
 
   --
-  let fsListenerThread = waitForMatch conn fsPathChan browserLocation
+  let fsListenerThread =
+        waitForMatch conn fsPathChan browserLocation logLock verbose
 
   --
   let heartbeatHandlerThread = do
@@ -392,8 +392,8 @@ handleClientConnection conn fsChan msg logLock verbose = do
         <> T.pack (show e)
         <> ")"
 
-waitForMatch :: WS.Connection -> TChan FilePath -> Text -> IO ()
-waitForMatch conn fsPathChan browserLocation = do
+waitForMatch :: WS.Connection -> TChan FilePath -> Text -> MVar () -> Bool -> IO ()
+waitForMatch conn fsPathChan browserLocation logLock _verbose = do
   modifiedFile <- T.pack <$> atomically (readTChan fsPathChan) --
   if (browserLocation == modifiedFile)
     then do
@@ -404,10 +404,10 @@ waitForMatch conn fsPathChan browserLocation = do
               <> " FS event detected, reloading "
               <> browserLocation
               <> "."
-      putTextLn announcement
+      logVerboseLn logLock True announcement
       WS.sendTextData conn ("reload" :: Text) --
     else
-      waitForMatch conn fsPathChan browserLocation --
+      waitForMatch conn fsPathChan browserLocation logLock _verbose --
 
 getTimestamp :: IO Text
 getTimestamp = do
