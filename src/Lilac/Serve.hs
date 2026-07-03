@@ -294,14 +294,21 @@ debouncePerPath genMap action e = do
     when shouldFire $ action e
 
 wsHandler :: TChan FilePath -> MVar () -> Bool -> WS.ServerApp
-wsHandler fsChan logLock verbose pending = do
-  conn <- WS.acceptRequest pending --
-  msg <- WS.receiveData conn :: IO Text --
-  if msg == "LILAC_WS_HEARTBEAT_FROM_JS_CLIENT"
-    then do
-      logVerboseLn logLock verbose $ "[wsHandler] Ignored heartbeat (ON INIT): " <> msg
-      WS.sendClose conn ("Path expected" :: Text) --
-    else handleClientConnection conn fsChan msg logLock verbose
+wsHandler fsChan logLock verbose pending =
+  f `catch` \(e :: WS.ConnectionException) ->
+    logVerboseLn logLock verbose
+      $ "[wsHandler] Connection dropped during handshake (Reason: "
+      <> T.pack (show e)
+      <> ")"
+  where
+    f = do
+      conn <- WS.acceptRequest pending --
+      msg <- WS.receiveData conn :: IO Text --
+      if msg == "LILAC_WS_HEARTBEAT_FROM_JS_CLIENT"
+        then do
+          logVerboseLn logLock verbose $ "[wsHandler] Ignored heartbeat (ON INIT): " <> msg
+          WS.sendClose conn ("Path expected" :: Text) --
+        else handleClientConnection conn fsChan msg logLock verbose
 
 drainChannel :: TChan a -> STM ()
 drainChannel chan = do

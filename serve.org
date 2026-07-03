@@ -582,14 +582,21 @@ handle a single WebSocket connection ~conn~ [[(f:wsHandler-ws-conn)]].
 #+name: f:wsHandler
 #+begin_src haskell
 wsHandler :: TChan FilePath -> MVar () -> Bool -> WS.ServerApp
-wsHandler fsChan logLock verbose pending = do
-  conn <- WS.acceptRequest pending -- (ref:f:wsHandler-ws-conn)
-  msg <- WS.receiveData conn :: IO Text -- (ref:f:wsHandler-read-first-msg)
-  if msg == "LILAC_WS_HEARTBEAT_FROM_JS_CLIENT"
-    then do
-      logVerboseLn logLock verbose $ "[wsHandler] Ignored heartbeat (ON INIT): " <> msg
-      WS.sendClose conn ("Path expected" :: Text) -- (ref:f:wsHandler-close-ws-conn)
-    else handleClientConnection conn fsChan msg logLock verbose
+wsHandler fsChan logLock verbose pending =
+  f `catch` \(e :: WS.ConnectionException) ->
+    logVerboseLn logLock verbose
+      $ "[wsHandler] Connection dropped during handshake (Reason: "
+      <> T.pack (show e)
+      <> ")"
+  where
+    f = do
+      conn <- WS.acceptRequest pending -- (ref:f:wsHandler-ws-conn)
+      msg <- WS.receiveData conn :: IO Text -- (ref:f:wsHandler-read-first-msg)
+      if msg == "LILAC_WS_HEARTBEAT_FROM_JS_CLIENT"
+        then do
+          logVerboseLn logLock verbose $ "[wsHandler] Ignored heartbeat (ON INIT): " <> msg
+          WS.sendClose conn ("Path expected" :: Text) -- (ref:f:wsHandler-close-ws-conn)
+        else handleClientConnection conn fsChan msg logLock verbose
 #+end_src
 
 Most of the work falls to [[f:handleClientConnection]], which creates a separate
