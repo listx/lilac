@@ -217,9 +217,11 @@ liveReloadMiddleware root fsChan logLock verbose baseApp req respond =
 
                 connectWebSocket();
             })();
-            </script></body>
+            </script>
             """
-       in if BS.null after then body else LBS.fromStrict before <> script
+       in if BS.null after
+            then body
+            else LBS.fromStrict before <> script <> LBS.fromStrict after
 
 fsWatcher ::
   FilePath ->

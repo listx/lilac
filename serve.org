@@ -247,9 +247,11 @@ liveReloadMiddleware root fsChan logLock verbose baseApp req respond =
             """
             <script>
             <<js:live-reload>>
-            </script></body>
+            </script>
             """
-       in if BS.null after then body else LBS.fromStrict before <> script
+       in if BS.null after
+            then body
+            else LBS.fromStrict before <> script <> LBS.fromStrict after
 #+end_src
 
 [[js:live-reload]] is the one that initiates the creation of the WebSocket with the
