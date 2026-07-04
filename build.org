@@ -836,7 +836,9 @@ outputs. See [[id:b649d761-1103-47be-86e4-56a7362a5ecc][Sentinels]] for a discus
 <<id:783de6bf-e36b-4c9e-a405-2a86d0897795::make:Start frontend development environment (CLJS REPL)>>
 <<id:7e6758c8-a642-4cfa-9e03-498163d6ce68::make:Build prod JS>>
 <<make:Build lilac with Cabal>>
+<<make:Install lilac with Cabal>>
 <<make:Build lilac with Nix>>
+<<make:Install lilac with Nix>>
 <<make:Update Nix dependencies>>
 <<make:Clean>>
 #+end_src
@@ -869,6 +871,8 @@ the listed dependencies.
 <<gitignore:Makefile sentinel:build-release>>
 <<gitignore:Makefile sentinel:tangle>>
 <<gitignore:Makefile sentinel:weave>>
+install
+install-release
 #+end_src
 
 ** Project setup
@@ -1463,6 +1467,32 @@ build-release
 
 You can run the version of Lilac built with Nix via ~result/bin/lilac~, which we
 wrap as ~lilac-nix~ in the [[nix/scripts.nix]] as well.
+
+** Install ~lilac~
+
+You can install Lilac with Cabal or Nix. If you're on Nix already, using Nix is
+probably better because it'll show up in your ~nix-env -q~.
+
+*** Cabal
+
+#+name: make:Install lilac with Cabal
+#+begin_src makefile
+install: $(org_files) lilac.cabal
+	cabal install --overwrite-policy=always
+	touch install
+#+end_src
+
+*** Nix
+
+For Nix, we just have to reuse what's already been built with [[make:Build lilac
+with Nix]].
+
+#+name: make:Install lilac with Nix
+#+begin_src makefile
+install-release: $(org_files) result build-release
+	nix-env -i ./result
+	touch install-release
+#+end_src
 
 * Linters via ~pre-commit~
 :PROPERTIES:

@@ -65,11 +65,19 @@ build: $(org_files) lilac.cabal
 	cabal build
 	touch build
 
+install: $(org_files) lilac.cabal
+	cabal install --overwrite-policy=always
+	touch install
+
 LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
 build-release: $(org_files) lilac.cabal
 	nix-build ./nix/release.nix \
 		--argstr lilacGitVersion $(LILAC_GIT_VERSION)
 	touch build-release
+
+install-release: $(org_files) result build-release
+	nix-env -i ./result
+	touch install-release
 
 update-nix:
 	niv init
