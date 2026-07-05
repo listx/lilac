@@ -1010,8 +1010,6 @@ mkIndexOrg initOpts uuid =
                MAIN_PACKAGE="mathjax"
                FONT_PACKAGE="mathjax-newcm-font"
                VERSION="4.1.2"
-               MAIN_TARBALL="${MAIN_PACKAGE}-${VERSION}.tgz"
-               FONT_TARBALL="${FONT_PACKAGE}-${VERSION}.tgz"
 
                mkdir -p vendor
                pushd vendor
