@@ -497,6 +497,9 @@ result*
 !**/.gitignore
 !**/.gitkeep
 !.build.yml
+site
+site.tar.gz
+vendor
 
 <<gitignore:Makefile sentinels>>
 #+end_src
@@ -833,6 +836,7 @@ outputs. See [[id:b649d761-1103-47be-86e4-56a7362a5ecc][Sentinels]] for a discus
 <<make:Tangle sources>>
 <<make:Generate SVGs>>
 <<make:Weave>>
+<<make:Publish>>
 <<id:783de6bf-e36b-4c9e-a405-2a86d0897795::make:Start frontend development environment (CLJS REPL)>>
 <<id:7e6758c8-a642-4cfa-9e03-498163d6ce68::make:Build prod JS>>
 <<make:Build lilac with Cabal>>
@@ -871,6 +875,7 @@ the listed dependencies.
 <<gitignore:Makefile sentinel:build-release>>
 <<gitignore:Makefile sentinel:tangle>>
 <<gitignore:Makefile sentinel:weave>>
+publish
 install
 install-release
 #+end_src
@@ -963,7 +968,7 @@ place, so that we can just use the ~pre-commit~ tool to execute them all. See
 
 #+name: make:Run linters
 #+begin_src makefile
-lint: lilac.larc
+lint: $(archive_file)
 	<<make:lilac lint>>
 	pre-commit run --all-files
 	touch lint # (ref:touch lint)
@@ -1069,7 +1074,9 @@ object files are missing or newer than ~lilac.larc~.
 
 #+name: make:Build archive
 #+begin_src makefile
-lilac.larc: $(obj_files)
+archive_file := lilac.larc
+
+$(archive_file): $(obj_files)
 	lilac archive $^ --out-file $@
 #+end_src
 
@@ -1084,7 +1091,7 @@ The ~clean~ rule cleans up compilation artifacts, for debugging.
 #+begin_src makefile
 clean:
 	rm -rf \
-		lilac.larc \
+		$(archive_file) \
 		$(obj_files)
 .PHONY: clean
 #+end_src
@@ -1100,8 +1107,8 @@ We can tangle Lilac with itself.
 
 #+name: make:Tangle sources
 #+begin_src makefile
-tangle: lilac.larc
-	lilac tangle lilac.larc --out-dir .
+tangle: $(archive_file)
+	lilac tangle $(archive_file) --out-dir .
 	touch tangle
 #+end_src
 
@@ -1354,7 +1361,7 @@ For weaving, we use the ~doc~ directory.
 
 #+name: make:Weave
 #+begin_src makefile
-weave: lilac.larc $(image_svgs)
+weave: $(archive_file) $(image_svgs)
 	lilac weave $< --out-dir . --write-css # (ref:weave-write-css)
 	touch weave
 #+end_src
@@ -1494,6 +1501,150 @@ install-release: $(org_files) result build-release
 	touch install-release
 #+end_src
 
+** Publish to ~lilac.funloop.org~
+:PROPERTIES:
+:ID:       4f0fc50e-b528-4d6e-82b4-4cd1c8c8881e
+:END:
+
+#+name: make:Publish
+#+begin_src makefile
+<<Makefile:create-tarball>>
+
+SRHT_TOKEN != cat .srht-pages-token 2>/dev/null || echo ""
+
+publish: weave site.tar.gz
+	@if [ -z "$(SRHT_TOKEN)" ]; then \
+		echo "Error: .srht-pages-token is empty or missing." >&2; \
+		exit 1; \
+	fi
+	@echo "Uploading site to SourceHut Pages..."
+	@curl --oauth2-bearer "$(SRHT_TOKEN)" \
+		-Fcontent=@site.tar.gz \
+		https://pages.sr.ht/publish/lilac.funloop.org
+	touch publish
+#+end_src
+
+The tarball is mainly composed of the site (woven contents) plus the vendored
+stuff.
+
+#+name: Makefile:create-tarball
+#+begin_src makefile
+site.tar.gz: $(archive_file) weave vendor/mathjax vendor/mathjax-newcm-font vendor/source-fonts
+	rm -f site.tar site.tar.gz
+	lilac weave $< --out-dir site --write-css --write-js
+	tar cvf site.tar -C site .
+	tar rvf site.tar vendor
+	gzip site.tar
+
+vendor/source-fonts:
+	./vendor-source-fonts.sh
+
+vendor/mathjax vendor/mathjax-newcm-font &:
+	./vendor-mathjax.sh
+#+end_src
+
+The vendoring is needed because SourceHut does not allow us to pull in
+scripts from CDNs. We have to be self-contained. Lilac has a ~lilac init
+--only-local-imports~ command which gives us some scripts to download MathJax and
+also Source fonts.
+
+#+name: vendor-mathjax.sh
+#+header: :tangle vendor-mathjax.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src bash
+set -euo pipefail
+
+MAIN_PACKAGE="mathjax"
+FONT_PACKAGE="mathjax-newcm-font"
+VERSION="4.1.2"
+
+mkdir -p vendor
+pushd vendor
+
+download_tarball()
+{
+	local package
+	local version
+	local url_prefix
+	local tarball
+	package="${1:-}"
+	version="${2:-}"
+	tarball="${package}-${version}.tgz"
+	url_prefix="${3:-}"
+
+	if [[ -d "${package}" ]]; then
+		echo "${package} directory already exists"
+		return 1
+	fi
+
+	curl -OL "${url_prefix}/-/${tarball}"
+	tar xzvf "${tarball}"
+	mv package "${package}"
+	rm "${tarball}"
+}
+
+download_tarball \
+	"${MAIN_PACKAGE}" \
+	"${VERSION}" \
+	"https://registry.npmjs.org/mathjax"
+download_tarball \
+	"${FONT_PACKAGE}" \
+	"${VERSION}" \
+	"https://registry.npmjs.org/@mathjax/${FONT_PACKAGE}"
+#+end_src
+
+#+name: vendor-source-fonts.sh
+#+header: :tangle vendor-source-fonts.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src bash
+set -euo pipefail
+
+url_sans="https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R"
+url_serif="https://raw.githubusercontent.com/adobe-fonts/source-serif/4.005R"
+url_code="https://raw.githubusercontent.com/adobe-fonts/source-code-pro/2.042R-u%2F1.062R-i%2F1.026R-vf"
+
+mkdir -p vendor/source-fonts
+pushd vendor/source-fonts
+
+curl -OL "${url_sans}/WOFF2/VF/SourceSans3VF-Italic.otf.woff2"
+curl -OL "${url_sans}/WOFF2/VF/SourceSans3VF-Upright.otf.woff2"
+
+curl -OL "${url_serif}/WOFF2/VAR/SourceSerif4Variable-Italic.otf.woff2"
+curl -OL "${url_serif}/WOFF2/VAR/SourceSerif4Variable-Roman.otf.woff2"
+
+curl -OL "${url_code}/WOFF2/VF/SourceCodeVF-Italic.otf.woff2"
+curl -OL "${url_code}/WOFF2/VF/SourceCodeVF-Upright.otf.woff2"
+
+cat <<EOF >source-fonts.css
+<<id:a7f65fb9-86bb-45ab-8c61-2fedfadb24fe::text:source-fonts.css>>
+EOF
+#+end_src
+
+Finally we need to actually use these vendored assets by referring to them in
+every woven HTML file. That's what we do in [[custom-html-head]].
+
+#+name: custom-html-head
+#+begin_src toml
+[htmlHead]
+onlyLocalImports = true
+injection = """
+<link rel="stylesheet" href="/vendor/source-fonts/source-fonts.css">
+<script>
+  window.MathJax = {
+      loader: { paths: { "mathjax-newcm": "/vendor/mathjax-newcm-font" } },
+      output: { font: "mathjax-newcm" },
+  tex: {
+      tags: 'ams'
+  },
+  options: {
+      ignoreHtmlClass: 'verbatim|code'
+  }
+};
+</script>
+<script id="MathJax-script" async="" src="/vendor/mathjax/tex-mml-chtml.js"></script>
+"""
+#+end_src
+
 * Linters via ~pre-commit~
 :PROPERTIES:
 :ID:       b4d2ace9-2d11-4606-b7a3-ce9ad7763c1a
@@ -1591,6 +1742,8 @@ tab_width = 8
 [*.sh]
 indent_style = tab
 tab_width = 8
+[vendor-source-fonts.sh]
+indent_style = unset
 
 [js/lilac.js.injectme] # (ref:.editorconfig-injectme-binary)
 insert_final_newline = false
@@ -1771,7 +1924,7 @@ instead we just call it as a separate item in the Makefile.
 
 #+name: make:lilac lint
 #+begin_src makefile
-lilac lint lilac.larc
+lilac lint $(archive_file)
 #+end_src
 
 ** Run lilac unit test before pushing

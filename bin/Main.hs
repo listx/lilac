@@ -1074,7 +1074,7 @@ mkIndexOrg initOpts uuid =
                curl -OL "${url_code}/WOFF2/VF/SourceCodeVF-Italic.otf.woff2"
                curl -OL "${url_code}/WOFF2/VF/SourceCodeVF-Upright.otf.woff2"
 
-               cat << EOF > source-fonts.css
+               cat <<EOF >source-fonts.css
                @font-face{
                    font-family: 'Source Code Pro';
                    font-weight: 200 900;

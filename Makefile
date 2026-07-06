@@ -22,8 +22,8 @@ test: $(org_files)
 	cabal test --test-show-details=direct --test-option=--format=progress
 	touch test
 
-lint: lilac.larc
-	lilac lint lilac.larc
+lint: $(archive_file)
+	lilac lint $(archive_file)
 	pre-commit run --all-files
 	touch lint #
 
@@ -33,11 +33,13 @@ $(obj_files) &: $(org_files)
 	lilac compile $?
 	touch $(obj_files) #
 
-lilac.larc: $(obj_files)
+archive_file := lilac.larc
+
+$(archive_file): $(obj_files)
 	lilac archive $^ --out-file $@
 
-tangle: lilac.larc
-	lilac tangle lilac.larc --out-dir .
+tangle: $(archive_file)
+	lilac tangle $(archive_file) --out-dir .
 	touch tangle
 
 image_sources = $(wildcard image/*.pikchr)
@@ -47,9 +49,35 @@ image_svgs = $(image_sources:.pikchr=.svg)
 	@echo "Compiling Pikchr diagram: $<"
 	pikchr --svg-only $< > $@
 
-weave: lilac.larc $(image_svgs)
+weave: $(archive_file) $(image_svgs)
 	lilac weave $< --out-dir . --write-css #
 	touch weave
+
+site.tar.gz: $(archive_file) weave vendor/mathjax vendor/mathjax-newcm-font vendor/source-fonts
+	rm -f site.tar site.tar.gz
+	lilac weave $< --out-dir site --write-css --write-js
+	tar cvf site.tar -C site .
+	tar rvf site.tar vendor
+	gzip site.tar
+
+vendor/source-fonts:
+	./vendor-source-fonts.sh
+
+vendor/mathjax vendor/mathjax-newcm-font &:
+	./vendor-mathjax.sh
+
+SRHT_TOKEN != cat .srht-pages-token 2>/dev/null || echo ""
+
+publish: weave site.tar.gz
+	@if [ -z "$(SRHT_TOKEN)" ]; then \
+		echo "Error: .srht-pages-token is empty or missing." >&2; \
+		exit 1; \
+	fi
+	@echo "Uploading site to SourceHut Pages..."
+	@curl --oauth2-bearer "$(SRHT_TOKEN)" \
+		-Fcontent=@site.tar.gz \
+		https://pages.sr.ht/publish/lilac.funloop.org
+	touch publish
 
 dev-cljs:
 	clojure -M -m figwheel.main --build lilac --repl
@@ -85,6 +113,6 @@ update-nix:
 
 clean:
 	rm -rf \
-		lilac.larc \
+		$(archive_file) \
 		$(obj_files)
 .PHONY: clean
