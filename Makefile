@@ -22,7 +22,7 @@ test: $(org_files)
 	cabal test --test-show-details=direct --test-option=--format=progress
 	touch test
 
-lint: $(archive_file)
+lint: $(archive_file) tangle
 	lilac lint $(archive_file)
 	pre-commit run --all-files
 	touch lint #
