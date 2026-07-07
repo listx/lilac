@@ -55,28 +55,7 @@ let
   };
 
   heavyDeps = final: prev:
-    let
-      heavyPackages = [
-        "brick"
-        "fsnotify"
-        "pandoc-types"
-        "sandwich"
-        "skylighting"
-        "skylighting-core"
-        "skylighting-format-ansi"
-        "skylighting-format-blaze-html"
-        "skylighting-format-latex"
-        "th-lift-instances"
-        "unicode-collation"
-        "unicode-transforms"
-        "vty-crossplatform"
-        "wai"
-        "wai-app-static"
-        "wai-extra"
-        "wai-websockets"
-        "warp"
-        "websockets"
-      ];
+    let heavyPackages = [ "citeproc" "unicode-collation" ];
     in lib.genAttrs heavyPackages (name: buildForCI prev.${name});
 
   jailbreaks = final: prev: {
