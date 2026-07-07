@@ -40,7 +40,7 @@ import Lilac.Types
         offsets,
         symbols
       ),
-    BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
+    BToken (BTokenLinkTarget, BTokenString),
     Block (body, meta, parentOid),
     Cell
       ( CBlock,
@@ -66,22 +66,15 @@ import Lilac.Types
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
-        LinkTargetFootnote,
         LinkTargetLineLabel,
-        LinkTargetOid,
-        LinkTargetURI
+        LinkTargetOid
       ),
     MathFragment (meta, parentOid),
     OID,
     Object (Object, externalOids, orgDoc, symbols),
     OrgDoc (bibPaths, cells, cslPath, glossary, oid, pseudoEdges),
     PToken
-      ( PTokenCitation,
-        PTokenDivEnd,
-        PTokenDivStart,
-        PTokenLink,
-        PTokenMathFragment,
-        PTokenStyledText
+      ( PTokenLink
       ),
     ProjectConf (bibliography, citationStyle),
     Prose (Prose, unProse),
@@ -217,11 +210,7 @@ mkSymbols orgDoc =
           table.parentOid
           table.meta
           lci
-      CFootnote {}
-      CListItem {}
-      CParagraph {}
-      CGlossaryTerm {}
-      CCommand {} -> [] --
+      _ -> [] --
 
 getLineLabels :: OID -> OID -> LCI -> Block -> [(LinkOid, LCI)]
 getLineLabels docOid parentOid lci block = foldl' f [] block.body
@@ -436,10 +425,7 @@ findBrokenFileLinks =
           table.caption
           <> (concatMap extractFilesFromProse $ elems table.grid)
       CFootnote footnote -> extractFilesFromProse footnote.body
-      CBlock {}
-      CMathFragment {}
-      CListItem {}
-      CCommand {} -> []
+      _ -> []
     extractFilesFromProse :: Prose -> [FilePath]
     extractFilesFromProse prose = mapMaybe extractFileFromPToken prose.unProse
     extractFileFromPToken :: PToken -> Maybe FilePath
@@ -540,9 +526,7 @@ buildGraph = G.graphFromEdges . foldl' f []
       | otherwise = acc
     getOutLinks = \case
       BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
-      BTokenLinkTarget {}
-      BTokenPadding {}
-      BTokenString {} -> Nothing
+      _ -> Nothing
 
 getBlocksFromArchive :: Archive -> [(OID, Block)]
 getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
@@ -552,15 +536,7 @@ getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
       | Just (obj, cell) <- gciToObjCell archive gci =
           case cell of
             CBlock b -> (obj.orgDoc.oid, b) : acc
-            CHeading {}
-            CListItem {}
-            CParagraph {}
-            CGlossaryTerm {}
-            CMathFragment {}
-            CFigure {}
-            CTable {}
-            CFootnote {}
-            CCommand {} -> acc
+            _ -> acc
       | otherwise = acc
 
 getBlockGCIsFromArchive :: Archive -> [GCI]
@@ -571,15 +547,7 @@ getBlockGCIsFromArchive archive = foldl' f [] $ elems archive.symbols
       | Just (_, cell) <- gciToObjCell archive gci =
           case cell of
             CBlock {} -> gci : acc
-            CHeading {}
-            CListItem {}
-            CParagraph {}
-            CGlossaryTerm {}
-            CMathFragment {}
-            CFigure {}
-            CTable {}
-            CFootnote {}
-            CCommand {} -> acc
+            _ -> acc
       | otherwise = acc
 
 mkBlockAncestry :: Archive -> [GCI] -> Map GCI [GCI]
@@ -608,9 +576,7 @@ mkBlockAncestry archive blockGCIs = foldl' f mempty blockGCIs
       | otherwise = acc
     getChildLinks = \case
       BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
-      BTokenLinkTarget {}
-      BTokenPadding {}
-      BTokenString {} -> Nothing
+      _ -> Nothing
 
 findCycles :: Archive -> [G.Tree LinkOid]
 findCycles archive = map (fmap toLinkOid) . foldl' f [] $ G.scc graph
@@ -652,22 +618,13 @@ findExternalOids orgDoc =
           (\acc prose -> foldl' getLinkFromPToken acc prose.unProse)
           []
           table.grid
-      CFigure {}
-      CFootnote {}
-      CListItem {}
-      CMathFragment {}
-      CCommand {} -> []
+      _ -> []
     getLinkFromBToken acc bToken = case bToken of --
       BTokenLinkTarget linkTarget -> keepIfExternal acc linkTarget
-      BTokenString {}
-      BTokenPadding -> acc
+      _ -> acc
     getLinkFromPToken acc pToken = case pToken of --
       PTokenLink link -> keepIfExternal acc link.target
-      PTokenStyledText {}
-      PTokenCitation {}
-      PTokenMathFragment {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> acc
+      _ -> acc
     symbols = mkSymbols orgDoc --
     keepIfExternal acc linkTarget = case linkTarget of --
       LinkTargetOid linkOid ->
@@ -678,9 +635,7 @@ findExternalOids orgDoc =
         if member linkOid symbols
           then acc
           else linkOid : acc
-      LinkTargetFootnote {}
-      LinkTargetFilePath {}
-      LinkTargetURI {} -> acc
+      _ -> acc
 
 type PathState :: Type
 data PathState = PathState
@@ -912,7 +867,7 @@ gciToName archive offset gci
           | Just eqNum <- lookup "__equation_anon_number" mathFragment.meta ->
               plain $ "Anonymous Equation " <> eqNum
           | otherwise -> plain "Math Fragment"
-        CListItem {}
+        CListItem {} -> Nothing
         CCommand {} -> Nothing
   | otherwise = Nothing
   where

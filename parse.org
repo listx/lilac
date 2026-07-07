@@ -682,8 +682,6 @@ import Lilac.Types
     OrgParserConf (maxHeadingLevel, maxListLevel),
     PToken
       ( PTokenCitation,
-        PTokenDivEnd,
-        PTokenDivStart,
         PTokenLink,
         PTokenMathFragment,
         PTokenStyledText
@@ -1016,16 +1014,7 @@ orgDocParser = do
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
-        CHeading {}
-        CListItem {}
-        CParagraph {}
-        CGlossaryTerm {}
-        CBlock {}
-        CMathFragment {}
-        CFigure {}
-        CTable {}
-        CFootnote {}
-        CCommand {} -> True
+        _ -> True
   let meaningfulCells = filter meaningfulCell cells -- (ref:drop-meaningless-cells)
   when (pState.cellNumber.unLCI /= length meaningfulCells)
     $ fail
@@ -2395,18 +2384,10 @@ slashSeparatedWords = do
       word <- wordParser
       pure $ "/" <> word
   when (lastWordIsMeaningless $ reverse remainingWords)
-    $ fail
-      """
-      last word is not meaningful; unlikely to be
-      intended as a slash-separated-word
-      """
+    $ fail "last word is not meaningful; unlikely to be intended as a slash-separated-word"
   let allWords = firstWord : remainingWords
   when (hasLinkDelimiter allWords)
-    $ fail
-      """
-      has link delimiter \"[[\"; unlikely to be
-      intended as a slash-separated-word
-      """
+    $ fail "has link delimiter \"[[\"; unlikely to be intended as a slash-separated-word"
   pure $ T.concat allWords
   where
     cannotStartWithClosingPunc :: OrgParser ()
@@ -6430,11 +6411,7 @@ proseParser spaceConsumer = do
     nonEmpty :: PToken -> Bool
     nonEmpty = \case
       PTokenStyledText styledText -> not $ T.null styledText.body
-      PTokenLink {}
-      PTokenMathFragment {}
-      PTokenCitation {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> True
+      _ -> True
 #+end_src
 
 We first parse among the non-whitespace parsers in ~baseParsers~
@@ -6666,14 +6643,12 @@ toText prose = foldl' f T.empty prose.unProse
   where
     f :: Text -> PToken -> Text
     f acc = \case
-      PTokenCitation {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> acc
       PTokenStyledText styledText
         | T.null styledText.body -> acc
         | otherwise -> acc <> unparseStyledText styledText
       PTokenLink link -> acc <> unparseLink link
       PTokenMathFragment mathFragment -> acc <> unparseMathFragment mathFragment
+      _ -> acc
 #+end_src
 
 We don't support converting [[data:Citation]] back into ~Text~, because that would
@@ -6706,8 +6681,8 @@ unparseStyledText styledText =
       Underline -> acc <> "_"
       Verbatim -> acc <> "="
       Code -> acc <> "~"
-      Subscript
-      Superscript
+      Subscript -> acc
+      Superscript -> acc
       Smallcaps -> acc
     escapeStyleMarkers = T.foldl' escape T.empty
     escape acc c
@@ -6823,11 +6798,7 @@ dropTextFromStyledText dropFromStart f prose =
                  in if T.null modifiedBody
                       then (acc, True)
                       else (modified : acc, True)
-          PTokenLink {}
-          PTokenMathFragment {}
-          PTokenCitation {}
-          PTokenDivStart {}
-          PTokenDivEnd {} -> (pToken : acc, pastFirst)
+          _ -> (pToken : acc, pastFirst)
     dropper = if dropFromStart then T.dropWhile else T.dropWhileEnd
 #+end_src
 
@@ -6858,11 +6829,7 @@ addFontStyle fontStyle prose = case fontStyle of
             { body = styledText.body,
               style = styleMaskFrom []
             }
-      PTokenLink {}
-      PTokenCitation {}
-      PTokenMathFragment {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> pToken
+      _ -> pToken
     italicize pToken = case pToken of
       PTokenStyledText styledText ->
         PTokenStyledText
@@ -6870,11 +6837,7 @@ addFontStyle fontStyle prose = case fontStyle of
             { body = styledText.body,
               style = styleMaskFrom $ Italic : maskToStyles styledText.style
             }
-      PTokenLink {}
-      PTokenCitation {}
-      PTokenMathFragment {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> pToken
+      _ -> pToken
 #+end_src
 
 For the font weight, we only have one weight, which is ~Bold~.
@@ -6893,11 +6856,7 @@ addFontWeight fontWeight prose = case fontWeight of
             { body = styledText.body,
               style = styleMaskFrom $ Bold : maskToStyles styledText.style
             }
-      PTokenLink {}
-      PTokenCitation {}
-      PTokenMathFragment {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> pToken
+      _ -> pToken
     unBold pToken = case pToken of
       PTokenStyledText styledText ->
         PTokenStyledText
@@ -6908,11 +6867,7 @@ addFontWeight fontWeight prose = case fontWeight of
                   . filter (/= Bold)
                   $ maskToStyles styledText.style
             }
-      PTokenLink {}
-      PTokenCitation {}
-      PTokenMathFragment {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> pToken
+      _ -> pToken
 #+end_src
 
 The ~addTextDecoration~ definition is straightforward enough, because there is no
@@ -6931,11 +6886,7 @@ addTextDecoration textDecoration prose = case textDecoration of
             { body = styledText.body,
               style = styleMaskFrom $ Underline : maskToStyles styledText.style
             }
-      PTokenLink {}
-      PTokenCitation {}
-      PTokenMathFragment {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> pToken
+      _ -> pToken
     noUnderline pToken = case pToken of
       PTokenStyledText styledText ->
         PTokenStyledText
@@ -6946,11 +6897,7 @@ addTextDecoration textDecoration prose = case textDecoration of
                   . filter (/= Underline)
                   $ maskToStyles styledText.style
             }
-      PTokenLink {}
-      PTokenCitation {}
-      PTokenMathFragment {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> pToken
+      _ -> pToken
 #+end_src
 
 We don't support adding vertical alignment, so we don't do anything here.
@@ -6958,8 +6905,8 @@ We don't support adding vertical alignment, so we don't do anything here.
 #+name: instance:CiteprocOutput Prose:addVerticalAlign
 #+begin_src haskell
 addVerticalAlign verticalAlign prose = case verticalAlign of
-  BaselineAlign
-  SupAlign
+  BaselineAlign -> prose
+  SupAlign -> prose
   SubAlign -> prose
 #+end_src
 
@@ -6971,12 +6918,12 @@ additional complexity.
 #+name: instance:CiteprocOutput Prose:addTextCase
 #+begin_src haskell
 addTextCase _ textCase prose = case textCase of
-  Lowercase
-  Uppercase
-  CapitalizeFirst
-  CapitalizeAll
-  SentenceCase
-  TitleCase
+  Lowercase -> prose
+  Uppercase -> prose
+  CapitalizeFirst -> prose
+  CapitalizeAll -> prose
+  SentenceCase -> prose
+  TitleCase -> prose
   PreserveCase -> prose
 #+end_src
 
@@ -6986,9 +6933,9 @@ indented, etc). This is presumably for the bibliography list only.
 #+name: instance:CiteprocOutput Prose:addDisplay
 #+begin_src haskell
 addDisplay displayStyle prose = case displayStyle of
-  DisplayBlock
-  DisplayLeftMargin
-  DisplayRightInline
+  DisplayBlock -> prose
+  DisplayLeftMargin -> prose
+  DisplayRightInline -> prose
   DisplayIndent -> prose
 #+end_src
 
@@ -7028,11 +6975,7 @@ movePunctuationInsideQuotes prose =
             { body = g styledText.body,
               style = styledText.style
             }
-      PTokenLink {}
-      PTokenCitation {}
-      PTokenMathFragment {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> pToken
+      _ -> pToken
     g s =
       let attempts = map (tryRearrange s) punctCombos
        in case find (\(mightHaveMore, _) -> mightHaveMore) attempts of
@@ -7077,11 +7020,7 @@ mapText f prose = Prose $ map g prose.unProse
             { body = f styledText.body,
               style = styledText.style
             }
-      PTokenLink {}
-      PTokenCitation {}
-      PTokenMathFragment {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> pToken
+      _ -> pToken
 #+end_src
 
 ~addHyperlink~ just adds a URL; we have a rich [[data:Link]] type for this, so that's
@@ -11443,11 +11382,6 @@ figureParser = do
   let newFigureNumber = pState.figureNumber + 1
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
-    LinkTargetOid {}
-    LinkTargetLineLabel {}
-    LinkTargetURI {}
-    LinkTargetFootnote {} ->
-        fail "'file:...' required for link to figures" -- (ref:f:figureParser-file-link-requirement)
     LinkTargetFilePath _ -> do
       modify (\s -> s {figureNumber = newFigureNumber})
       pure
@@ -11463,6 +11397,7 @@ figureParser = do
             caption = caption,
             link = link
           }
+    _ -> fail "'file:...' required for link to figures" -- (ref:f:figureParser-file-link-requirement)
   where
     endOfCell :: OrgParser () -- (ref:f:figureParser-endOfCell-definition)
     endOfCell =
@@ -13045,12 +12980,12 @@ document, as seen in [[t:empty-input]].
 #+begin_src haskell
 nilOidOrgDocPrefix :: Text
 nilOidOrgDocPrefix =
-  """
-  :PROPERTIES:
-  :ID:       00000000-0000-0000-0000-000000000000
-  :END:
-
-  """
+  T.unlines
+    [ ":PROPERTIES:",
+      ":ID:       00000000-0000-0000-0000-000000000000",
+      ":END:",
+      ""
+    ]
 #+end_src
 
 The [[f:nilOrgDoc]] helper is a basic "empty" Org document, used in many test cases

@@ -278,9 +278,7 @@ getProseContents prose = join $ foldl' f [] prose.unProse
                   link.name
          in linkText : acc
       PTokenMathFragment mathFragment -> mathFragment.body : acc
-      PTokenCitation {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> acc
+      _ -> acc
 
 getSectionNumber :: Heading -> Text
 getSectionNumber heading =
@@ -629,12 +627,12 @@ nilOid = fromWords 0 0
 
 nilOidOrgDocPrefix :: Text
 nilOidOrgDocPrefix =
-  """
-  :PROPERTIES:
-  :ID:       00000000-0000-0000-0000-000000000000
-  :END:
-
-  """
+  T.unlines
+    [ ":PROPERTIES:",
+      ":ID:       00000000-0000-0000-0000-000000000000",
+      ":END:",
+      ""
+    ]
 
 fromWords :: Word64 -> Word64 -> OID
 fromWords w1 w2 = OID $ fromWords64 w1 w2
@@ -778,11 +776,7 @@ getCellName = \case
     | Just name <- lookup "name" mathFragment.meta ->
         verbatim name
     | otherwise -> Nothing
-  CHeading {}
-  CParagraph {}
-  CGlossaryTerm {}
-  CListItem {}
-  CCommand {} -> Nothing
+  _ -> Nothing
   where
     verbatim body = Just $ Prose [ptext body [Verbatim]]
 

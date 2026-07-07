@@ -154,8 +154,6 @@ import Lilac.Types
     OrgParserConf (maxHeadingLevel, maxListLevel),
     PToken
       ( PTokenCitation,
-        PTokenDivEnd,
-        PTokenDivStart,
         PTokenLink,
         PTokenMathFragment,
         PTokenStyledText
@@ -366,16 +364,7 @@ orgDocParser = do
   let meaningfulCell :: Cell -> Bool
       meaningfulCell = \case
         CListItem [] -> False
-        CHeading {}
-        CListItem {}
-        CParagraph {}
-        CGlossaryTerm {}
-        CBlock {}
-        CMathFragment {}
-        CFigure {}
-        CTable {}
-        CFootnote {}
-        CCommand {} -> True
+        _ -> True
   let meaningfulCells = filter meaningfulCell cells --
   when (pState.cellNumber.unLCI /= length meaningfulCells)
     $ fail
@@ -701,11 +690,7 @@ proseParser spaceConsumer = do
     nonEmpty :: PToken -> Bool
     nonEmpty = \case
       PTokenStyledText styledText -> not $ T.null styledText.body
-      PTokenLink {}
-      PTokenMathFragment {}
-      PTokenCitation {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> True
+      _ -> True
 
 proseSpaceConsumer :: Int -> OrgParser Text
 proseSpaceConsumer expectedIndentLen = do
@@ -910,18 +895,10 @@ slashSeparatedWords = do
       word <- wordParser
       pure $ "/" <> word
   when (lastWordIsMeaningless $ reverse remainingWords)
-    $ fail
-      """
-      last word is not meaningful; unlikely to be
-      intended as a slash-separated-word
-      """
+    $ fail "last word is not meaningful; unlikely to be intended as a slash-separated-word"
   let allWords = firstWord : remainingWords
   when (hasLinkDelimiter allWords)
-    $ fail
-      """
-      has link delimiter \"[[\"; unlikely to be
-      intended as a slash-separated-word
-      """
+    $ fail "has link delimiter \"[[\"; unlikely to be intended as a slash-separated-word"
   pure $ T.concat allWords
   where
     cannotStartWithClosingPunc :: OrgParser ()
@@ -1934,11 +1911,6 @@ figureParser = do
   let newFigureNumber = pState.figureNumber + 1
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
-    LinkTargetOid {}
-    LinkTargetLineLabel {}
-    LinkTargetURI {}
-    LinkTargetFootnote {} ->
-        fail "'file:...' required for link to figures" --
     LinkTargetFilePath _ -> do
       modify (\s -> s {figureNumber = newFigureNumber})
       pure
@@ -1954,6 +1926,7 @@ figureParser = do
             caption = caption,
             link = link
           }
+    _ -> fail "'file:...' required for link to figures" --
   where
     endOfCell :: OrgParser () --
     endOfCell =
@@ -2307,14 +2280,12 @@ instance CiteprocOutput Prose where
     where
       f :: Text -> PToken -> Text
       f acc = \case
-        PTokenCitation {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> acc
         PTokenStyledText styledText
           | T.null styledText.body -> acc
           | otherwise -> acc <> unparseStyledText styledText
         PTokenLink link -> acc <> unparseLink link
         PTokenMathFragment mathFragment -> acc <> unparseMathFragment mathFragment
+        _ -> acc
 
   fromText input = case MP.runParser
     ( runStateT
@@ -2359,11 +2330,7 @@ instance CiteprocOutput Prose where
               { body = styledText.body,
                 style = styleMaskFrom []
               }
-        PTokenLink {}
-        PTokenCitation {}
-        PTokenMathFragment {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> pToken
+        _ -> pToken
       italicize pToken = case pToken of
         PTokenStyledText styledText ->
           PTokenStyledText
@@ -2371,11 +2338,7 @@ instance CiteprocOutput Prose where
               { body = styledText.body,
                 style = styleMaskFrom $ Italic : maskToStyles styledText.style
               }
-        PTokenLink {}
-        PTokenCitation {}
-        PTokenMathFragment {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> pToken
+        _ -> pToken
 
   addFontWeight fontWeight prose = case fontWeight of
     NormalWeight -> Prose $ map unBold prose.unProse
@@ -2389,11 +2352,7 @@ instance CiteprocOutput Prose where
               { body = styledText.body,
                 style = styleMaskFrom $ Bold : maskToStyles styledText.style
               }
-        PTokenLink {}
-        PTokenCitation {}
-        PTokenMathFragment {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> pToken
+        _ -> pToken
       unBold pToken = case pToken of
         PTokenStyledText styledText ->
           PTokenStyledText
@@ -2404,11 +2363,7 @@ instance CiteprocOutput Prose where
                     . filter (/= Bold)
                     $ maskToStyles styledText.style
               }
-        PTokenLink {}
-        PTokenCitation {}
-        PTokenMathFragment {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> pToken
+        _ -> pToken
 
   addTextDecoration textDecoration prose = case textDecoration of
     NoDecoration -> Prose $ map noUnderline prose.unProse
@@ -2421,11 +2376,7 @@ instance CiteprocOutput Prose where
               { body = styledText.body,
                 style = styleMaskFrom $ Underline : maskToStyles styledText.style
               }
-        PTokenLink {}
-        PTokenCitation {}
-        PTokenMathFragment {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> pToken
+        _ -> pToken
       noUnderline pToken = case pToken of
         PTokenStyledText styledText ->
           PTokenStyledText
@@ -2436,30 +2387,26 @@ instance CiteprocOutput Prose where
                     . filter (/= Underline)
                     $ maskToStyles styledText.style
               }
-        PTokenLink {}
-        PTokenCitation {}
-        PTokenMathFragment {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> pToken
+        _ -> pToken
 
   addVerticalAlign verticalAlign prose = case verticalAlign of
-    BaselineAlign
-    SupAlign
+    BaselineAlign -> prose
+    SupAlign -> prose
     SubAlign -> prose
 
   addTextCase _ textCase prose = case textCase of
-    Lowercase
-    Uppercase
-    CapitalizeFirst
-    CapitalizeAll
-    SentenceCase
-    TitleCase
+    Lowercase -> prose
+    Uppercase -> prose
+    CapitalizeFirst -> prose
+    CapitalizeAll -> prose
+    SentenceCase -> prose
+    TitleCase -> prose
     PreserveCase -> prose
 
   addDisplay displayStyle prose = case displayStyle of
-    DisplayBlock
-    DisplayLeftMargin
-    DisplayRightInline
+    DisplayBlock -> prose
+    DisplayLeftMargin -> prose
+    DisplayRightInline -> prose
     DisplayIndent -> prose
 
   addQuotes prose = Prose $ [quote] <> prose.unProse <> [quote]
@@ -2481,11 +2428,7 @@ instance CiteprocOutput Prose where
               { body = g styledText.body,
                 style = styledText.style
               }
-        PTokenLink {}
-        PTokenCitation {}
-        PTokenMathFragment {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> pToken
+        _ -> pToken
       g s =
         let attempts = map (tryRearrange s) punctCombos
          in case find (\(mightHaveMore, _) -> mightHaveMore) attempts of
@@ -2520,11 +2463,7 @@ instance CiteprocOutput Prose where
               { body = f styledText.body,
                 style = styledText.style
               }
-        PTokenLink {}
-        PTokenCitation {}
-        PTokenMathFragment {}
-        PTokenDivStart {}
-        PTokenDivEnd {} -> pToken
+        _ -> pToken
 
   addHyperlink url prose = Prose $ maybeToList link <> prose.unProse
     where
@@ -2560,8 +2499,8 @@ unparseStyledText styledText =
       Underline -> acc <> "_"
       Verbatim -> acc <> "="
       Code -> acc <> "~"
-      Subscript
-      Superscript
+      Subscript -> acc
+      Superscript -> acc
       Smallcaps -> acc
     escapeStyleMarkers = T.foldl' escape T.empty
     escape acc c
@@ -2634,11 +2573,7 @@ dropTextFromStyledText dropFromStart f prose =
                  in if T.null modifiedBody
                       then (acc, True)
                       else (modified : acc, True)
-          PTokenLink {}
-          PTokenMathFragment {}
-          PTokenCitation {}
-          PTokenDivStart {}
-          PTokenDivEnd {} -> (pToken : acc, pastFirst)
+          _ -> (pToken : acc, pastFirst)
     dropper = if dropFromStart then T.dropWhile else T.dropWhileEnd
 
 citationParser :: OrgParser Int

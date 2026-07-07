@@ -42,17 +42,13 @@ let
   ourHaskell = pkgs.haskell.packages.${ghcVersion}.extend
     (lib.composeManyExtensions haskellOverlays);
 
-  ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.12.4";
+  ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.10.3";
   ghcVersion = "ghc" + ghcVersionWithoutDots;
 
-  haskellOverlays = [
-    disableHaddockGlobally
-    heavyDeps
-    jailbreaks
-    injectExternalPackages
-    injectLilac
-    tweakLilacBuild
-  ];
+  ci = builtins.getEnv "JOB_URL" != "";
+
+  haskellOverlays = lib.optionals ci [ heavyDeps ]
+    ++ [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
 
   disableHaddockGlobally = final: prev: {
     mkDerivation = args: prev.mkDerivation (args // { doHaddock = false; });
@@ -131,6 +127,7 @@ let
           image
           Makefile
           nix
+          !src/**
         '';
       };
     in path: type: filterFunc path type;

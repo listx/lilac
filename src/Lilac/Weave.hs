@@ -35,6 +35,7 @@ import Citeproc.CslJson
   )
 import Data.Aeson (encode)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
+import Data.FileEmbed (embedFile)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List (groupBy, partition)
 import Data.Map.Strict qualified as M
@@ -253,6 +254,7 @@ import Network.URI
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
+    ByteString,
     Char,
     Either (Right),
     FilePath,
@@ -272,6 +274,7 @@ import Relude
     comparing,
     concat,
     concatMap,
+    decodeUtf8,
     drop,
     dropWhile,
     elem,
@@ -391,16 +394,10 @@ weaveObject object = doctypehtml_ $ do
     --
     let defaultMathJaxSettings :: Text
         defaultMathJaxSettings =
-          """
-          window.MathJax = {
-            tex: {
-                tags: 'ams' //
-            },
-            options: {
-                ignoreHtmlClass: 'verbatim|code' //
-            }
-          };
-          """
+          decodeUtf8
+            @Text
+            @ByteString
+            $(embedFile "src/Lilac/Weave/defaultMathJaxSettings.js")
     when (not onlyLocalImports') $ script_ [] defaultMathJaxSettings
 
     let defaultMathJaxImport :: HtmlWeaver ()
@@ -614,10 +611,7 @@ weavePToken = \case
     LinkTargetFootnote {} -> do
       sup_ [class_ "footnote-link"] $ do
         weaveLink False link
-    LinkTargetOid {}
-    LinkTargetLineLabel {}
-    LinkTargetFilePath {}
-    LinkTargetURI {} -> weaveLink False link
+    _ -> weaveLink False link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
   PTokenCitation n -> weaveCitation n
   PTokenDivStart t -> toHtmlRaw ("<div class=\"csl-" <> t <> "\">" :: Text)
@@ -625,9 +619,6 @@ weavePToken = \case
 
 isExternalLink :: LinkTarget -> Bool
 isExternalLink = \case
-  LinkTargetOid {}
-  LinkTargetLineLabel {}
-  LinkTargetFootnote {} -> False
   LinkTargetFilePath path -> not . T.isSuffixOf ".html" $ T.pack path
   LinkTargetURI uri
     | "" <- uri.uriScheme,
@@ -635,6 +626,7 @@ isExternalLink = \case
       "#ref-" `isPrefixOf` uri.uriPath ->
         False
     | otherwise -> True
+  _ -> False
 
 weaveStyledText :: StyledText -> HtmlWeaver ()
 weaveStyledText styledText = do
@@ -759,7 +751,7 @@ weaveBlockBody block bodyBorder = do
                         { target = lt,
                           name = styledName
                         }
-              BTokenString {}
+              BTokenString {} -> Nothing
               BTokenPadding {} -> Nothing
             links = catMaybes $ map getLink block.body
         toHtmlRaw =<< spliceLinks colorizedBody links
@@ -1193,11 +1185,7 @@ proseHas prefix prose = case prose.unProse of
     PTokenStyledText styledText ->
       (maskToStyles styledText.style == [])
         && T.isPrefixOf prefix styledText.body
-    PTokenLink {}
-    PTokenMathFragment {}
-    PTokenCitation {}
-    PTokenDivStart {}
-    PTokenDivEnd {} -> False
+    _ -> False
 
 weaveTableRows :: Table -> HtmlWeaver ()
 weaveTableRows table = do
@@ -1370,9 +1358,7 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
                 ("LILAC_MATH_FRAGMENT\NUL" <> unparseMathFragment mathFragment)
                 CslEmpty
          in acc <> encoded
-      PTokenCitation {}
-      PTokenDivStart {}
-      PTokenDivEnd -> acc
+      _ -> acc
     applyStyles :: CslJson Text -> [Style] -> CslJson Text
     applyStyles cslBody styles = foldl' applyStyle cslBody styles
     applyStyle :: CslJson Text -> Style -> CslJson Text
@@ -1495,11 +1481,7 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
     getStyledText [] = []
     getStyledText (pToken : rest) = case pToken of
       PTokenStyledText styledText -> styledText : getStyledText rest
-      PTokenLink {}
-      PTokenMathFragment {}
-      PTokenCitation {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> []
+      _ -> []
 
 prepareCitations ::
   ProjectConf ->

@@ -132,6 +132,7 @@ import Options.Applicative.Builder (InfoMod)
 import Paths_lilac (version)
 import Relude
   ( Bool (False, True),
+    ByteString,
     Either (Left, Right),
     FilePath,
     IO,
@@ -144,6 +145,7 @@ import Relude
     Type,
     concat,
     concatMap,
+    decodeUtf8,
     fail,
     fmap,
     foldlM,
@@ -174,6 +176,7 @@ import Relude
     show,
     sort,
     takeMVar,
+    toString,
     when,
     ($),
     (&&),
@@ -229,9 +232,7 @@ globalOptionsHandler =
                 <> value (P.unsafeEncodeUtf "Lilac.toml")
                 <> showDefault
                 <> help
-                  """
-                  Project configuration file, in TOML.
-                  """
+                  "Project configuration file, in TOML."
             )
         )
     <*> ( flag
@@ -239,9 +240,7 @@ globalOptionsHandler =
             False
             ( long "no-color"
                 <> help
-                  """
-                  Do not print in color (i.e., suppress ANSI escape codes).
-                  """
+                  "Do not print in color (i.e., suppress ANSI escape codes)."
             )
         )
     <*> ( flag
@@ -249,9 +248,7 @@ globalOptionsHandler =
             True
             ( long "verbose"
                 <> help
-                  """
-                  Be more descriptive about what's happening.
-                  """
+                  "Be more descriptive about what's happening."
             )
         )
 
@@ -321,14 +318,10 @@ tangleOptsHandler =
                 <> value mempty
                 <> showDefault
                 <> help
-                  """
-                  Directory used for tangling. It's the starting point from
-                  which all of the code blocks' ":tangle" header will be a
-                  child of. Typically you'd want this to point to your repo's
-                  root directory, so you can tangle a file in any location in
-                  the repo root, regardless of where your Org files are authored
-                  and checked into version control.
-                  """
+                  ( toString @String
+                      $ decodeUtf8
+                        $(embedFile "src/Lilac/cli/tangle/out-dir.txt")
+                  )
             )
         )
 
@@ -343,10 +336,10 @@ weaveOptsHandler =
                 <> value (P.unsafeEncodeUtf ".")
                 <> showDefault
                 <> help --
-                  """
-                  Directory for saving the HTML files. CSS and JS are also saved
-                  inside this directory, if you use --write-css and --write-js.
-                  """
+                  ( toString @String
+                      $ decodeUtf8
+                        $(embedFile "src/Lilac/cli/weave/out-dir.txt")
+                  )
             )
         )
     <*> ( option
@@ -356,13 +349,10 @@ weaveOptsHandler =
                 <> value (P.unsafeEncodeUtf "/")
                 <> showDefault
                 <> help --
-                  """
-                  Prefix to use for pulling static assets (CSS and JS). For
-                  example, CSS is pulled from
-                  "/<ROOT_RELATIVE_PREFIX>/css/default.css". This is useful if
-                  for example you want to host your contents in a subdirectory
-                  of your server root (instead of the root).
-                  """
+                  ( toString @String
+                      $ decodeUtf8
+                        $(embedFile "src/Lilac/cli/weave/root-relative-prefix.txt")
+                  )
             )
         )
     <*> ( flag
@@ -370,9 +360,7 @@ weaveOptsHandler =
             True
             ( long "write-css"
                 <> help
-                  """
-                  Write CSS file. This does not require Org mode input.
-                  """
+                  "Write CSS file. This does not require Org mode input."
             )
         )
     <*> ( flag
@@ -380,9 +368,7 @@ weaveOptsHandler =
             True
             ( long "write-js"
                 <> help
-                  """
-                  Write JS file. This does not require Org mode input.
-                  """
+                  "Write JS file. This does not require Org mode input."
             )
         )
 
@@ -399,9 +385,7 @@ archiveOptsHandler =
               readGPath
               ( metavar "OBJECTS..."
                   <> help
-                    """
-                    Objects to combine into an archive.
-                    """
+                    "Objects to combine into an archive."
               )
         )
     <*> ( option
@@ -411,9 +395,7 @@ archiveOptsHandler =
                 <> value (P.unsafeEncodeUtf "out.larc")
                 <> showDefault
                 <> help
-                  """
-                  Output file path for the archive.
-                  """
+                  "Output file path for the archive."
             )
         )
 
@@ -433,9 +415,7 @@ serveOptsHandler =
                 <> value 8080
                 <> showDefault
                 <> help
-                  """
-                  Port to serve over.
-                  """
+                  "Port to serve over."
             )
         )
   where
@@ -454,12 +434,10 @@ initOptsHandler =
             True
             ( long "only-local-imports"
                 <> help
-                  """
-                  Download a local copy of MathJax and fonts so that they can be
-                  served locally. This way the woven HTML will refer to the
-                  local copy, instead of pulling these artifacts over the
-                  network via a CDN.
-                  """
+                  ( toString @String
+                      $ decodeUtf8
+                        $(embedFile "src/Lilac/cli/init/only-local-imports.txt")
+                  )
             )
         )
 
@@ -482,9 +460,7 @@ main = do
     lilacDesc =
       fullDesc
         <> header
-          """
-          lilac - Literate programming with Orgmode and Noweb-style blocks.
-          """
+          "lilac - Literate programming with Orgmode and Noweb-style blocks."
     versionOptionHandler :: OptionHandler (a -> a)
     versionOptionHandler =
       let cabalVersion = version
@@ -772,44 +748,15 @@ lilacInit globalOpts initOpts = do
   when (globalOpts.verbose) $ do
     putStrLn "Writing Lilac.toml"
   let lilacToml =
-        """
-        name = "Hello World"
-        homepage = "https://localhost"
-        repo = "https://localhost"
-        version = "1.2.3"
-
-        nonTangledPathspecs = [
-            ":(exclude,top).gitmodules",
-            ":(exclude,top)LICENSE",
-            ":(exclude,top)*.org",
-            ":(exclude,top)*.html",
-            ":(exclude,top)site"
-        ]
-        """
+        decodeUtf8 @Text @ByteString $(embedFile "src/Lilac/init/Lilac.toml")
           <> if initOpts.onlyLocalImports
             then
-              """
-              \n
-              [htmlHead]
-              onlyLocalImports = true
-              injection = \"\"\"
-              <link rel="stylesheet" href="/vendor/source-fonts/source-fonts.css">
-              <script>
-                window.MathJax = {
-                    loader: { paths: { "mathjax-newcm": "/vendor/mathjax-newcm-font" } },
-                    output: { font: "mathjax-newcm" },
-                tex: {
-                    tags: 'ams'
-                },
-                options: {
-                    ignoreHtmlClass: 'verbatim|code'
-                }
-              };
-              </script>
-              <script id="MathJax-script" async="" src="/vendor/mathjax/tex-mml-chtml.js"></script>
-              \"\"\"
-              \n
-              """
+              "\n"
+                <> decodeUtf8
+                  @Text
+                  @ByteString
+                  $(embedFile "src/Lilac/init/Lilac.toml.htmlHead.toml")
+                <> "\n"
             else ""
   write
     "Lilac.toml"
@@ -823,308 +770,40 @@ mkIndexOrg initOpts uuid =
   ":PROPERTIES:\n:ID:       "
     <> show uuid
     <> "\n:END:\n"
-    <> """
-       #+title: Introduction
-
-       Modify this file to suit your project's needs.
-
-       * Lilac configuration
-
-       #+header: :tangle Lilac.toml
-       #+begin_src toml
-       name = "Hello World"
-       homepage = "https://localhost"
-       repo = "https://localhost"
-       version = "1.2.3"
-
-       nonTangledPathspecs = [
-           ":(exclude,top).gitmodules",
-           ":(exclude,top)LICENSE",
-           ":(exclude,top)*.org",
-           ":(exclude,top)*.html",
-           ":(exclude,top)site"
-       ]
-
-       """ --
+    <> decodeUtf8
+      @Text
+      @ByteString
+      $(embedFile "src/Lilac/init/index.org")
     <> maybeHtmlHead
-    <> """
-       #+end_src
-
-       The ~nonTangledPathspecs~ is used by Lilac's ~lint~
-       subcommand, which checks for any differences between what is tangled and what is
-       tracked by Git. These two sets of files should mostly overlap. Any files that
-       are intentionally *not* tangled by Lilac should be listed in ~nonTangledPathspecs~.
-       These are fed to ~git-ls-files~ to ignore tracked files that are not tangled by
-       Lilac.
-
-       * Makefile
-
-       #+name: Makefile
-       #+header: :tangle Makefile
-       #+begin_src makefile
-       org_files = \\
-       \tindex.org
-
-       obj_files = $(org_files:%.org=%.lobj)
-
-       archive_file = hello-world.larc
-
-       all: tangle weave lint
-       .PHONY: all
-
-       $(obj_files) &: $(org_files)
-       \tlilac compile $?
-       \ttouch $(obj_files)
-
-       $(archive_file): $(obj_files)
-       \tlilac archive $^ --out-file $@
-
-       tangle: $(archive_file)
-       \tlilac tangle $< --out-dir .
-       \ttouch tangle
-
-       weave: $(archive_file)
-       \tlilac weave $< --out-dir site --write-css --write-js
-       \trm -rf site/vendor
-       \tcp -r vendor site
-       \ttouch weave
-
-       lint: $(archive_file)
-       \tlilac lint $<
-       \ttouch lint
-
-       clean:
-       \trm -rf \\
-       \t\t$(archive_file) \\
-       \t\t$(obj_files)
-       .PHONY: clean
-
-       <<git-orderfile-gitconfig>>
-       #+end_src
-
-       * Git
-
-       ** ~.gitignore~
-
-       Ignore hidden files, but don't ignore some that we explicitly
-       tangle such as ~.gitattributes~.
-
-       #+header: :tangle .gitignore
-       #+begin_src gitignore
-       ,**/.*
-
-       !**.gitattributes
-       !**.gitignore
-       !**.git-orderfile
-       ,*.lobj
-       ,*.larc
-       lint
-       tangle
-       weave
-       site/
-       #+end_src
-
-       The ~*.lobj~ and ~*.larc~ files are generated by Lilac, so ignore them too. The
-       ~lint~, ~tangle~, and ~weave~ files are sentinel files used by the Makefile, so ignore
-       them too.
-
-       ** ~.gitttributes~
-
-       As the HTML files are generated (woven) by Lilac, ignore them from diffs. The
-       same goes for all woven content (~site~ folder) generated by Lilac.
-
-       #+header: :tangle .gitattributes
-       #+begin_src txt
-       ,*.html -diff
-       site/* -diff
-       #+end_src
-
-       ** Git orderfile
-
-       Make ~git-diff~ show the Org files first, because they serve as the source of
-       truth.
-
-       #+name: git-orderfile
-       #+header: :tangle .git-orderfile
-       #+begin_src txt
-       # Org files
-       index.org
-       ,*.org
-       #+end_src
-
-       As there is no standard filename for this, you have to tell Git to use it
-       explicitly.
-
-       #+name: git-orderfile-gitconfig
-       #+begin_src makefile
-       gitconfig:
-       \tgit config diff.orderfile .git-orderfile
-       .PHONY: gitconfig
-       #+end_src
-
-       """
+    <> decodeUtf8
+      @Text
+      @ByteString
+      $(embedFile "src/Lilac/init/index.org-after-Lilac.toml")
     <> maybeVendorScripts
   where
     maybeHtmlHead =
       if initOpts.onlyLocalImports
         then
           "\n"
-            <> """
-               [htmlHead]
-               onlyLocalImports = true
-               injection = \"\"\"
-               <link rel="stylesheet" href="/vendor/source-fonts/source-fonts.css">
-               <script>
-                 window.MathJax = {
-                     loader: { paths: { "mathjax-newcm": "/vendor/mathjax-newcm-font" } },
-                     output: { font: "mathjax-newcm" },
-                 tex: {
-                     tags: 'ams'
-                 },
-                 options: {
-                     ignoreHtmlClass: 'verbatim|code'
-                 }
-               };
-               </script>
-               <script id="MathJax-script" async="" src="/vendor/mathjax/tex-mml-chtml.js"></script>
-               \"\"\"
-               """
+            <> decodeUtf8
+              @Text
+              @ByteString
+              $(embedFile "src/Lilac/init/Lilac.toml.htmlHead.toml")
             <> "\n"
         else ""
     maybeVendorScripts =
       if initOpts.onlyLocalImports
         then
           "\n"
-            <> """
-               ** MathJax
-
-               For MathJax, we download it from NPM. We actually need 2 packages, the main
-               MathJax code and also the font.
-
-               #+name: vendor-mathjax.sh
-               #+header: :tangle vendor-mathjax.sh
-               #+header: :shebang #!/usr/bin/env bash
-               #+begin_src bash
-               set -euo pipefail
-
-               MAIN_PACKAGE="mathjax"
-               FONT_PACKAGE="mathjax-newcm-font"
-               VERSION="4.1.2"
-
-               mkdir -p vendor
-               pushd vendor
-
-               download_tarball()
-               {
-               \tlocal package
-               \tlocal version
-               \tlocal url_prefix
-               \tlocal tarball
-               \tpackage="${1:-}"
-               \tversion="${2:-}"
-               \ttarball="${package}-${version}.tgz"
-               \turl_prefix="${3:-}"
-
-               \tif [[ -d "${package}" ]]; then
-               \t\techo "${package} directory already exists"
-               \t\treturn 1
-               \tfi
-
-               \tcurl -OL "${url_prefix}/-/${tarball}"
-               \ttar xzvf "${tarball}"
-               \tmv package "${package}"
-               \trm "${tarball}"
-               }
-
-               download_tarball \\
-               \t"${MAIN_PACKAGE}" \\
-               \t"${VERSION}" \\
-               \t"https://registry.npmjs.org/mathjax"
-               download_tarball \\
-               \t"${FONT_PACKAGE}" \\
-               \t"${VERSION}" \\
-               \t"https://registry.npmjs.org/@mathjax/${FONT_PACKAGE}"
-               #+end_src
-               """
+            <> decodeUtf8
+              @Text
+              @ByteString
+              $(embedFile "src/Lilac/init/vendor-mathjax.org")
             <> "\n\n"
-            <> """
-               ** Source family of fonts
-
-               Lilac uses Google web fonts by default to pull these fonts dynamically at runtime. However, these fonts are all open source so we can just download them from their GitHub repos directly, which is what we do here.
-
-               #+name: vendor-source-fonts.sh
-               #+header: :tangle vendor-source-fonts.sh
-               #+header: :shebang #!/usr/bin/env bash
-               #+begin_src bash
-               set -euo pipefail
-
-               url_sans="https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R"
-               url_serif="https://raw.githubusercontent.com/adobe-fonts/source-serif/4.005R"
-               url_code="https://raw.githubusercontent.com/adobe-fonts/source-code-pro/2.042R-u%2F1.062R-i%2F1.026R-vf"
-
-               mkdir -p vendor/source-fonts
-               pushd vendor/source-fonts
-
-               curl -OL "${url_sans}/WOFF2/VF/SourceSans3VF-Italic.otf.woff2"
-               curl -OL "${url_sans}/WOFF2/VF/SourceSans3VF-Upright.otf.woff2"
-
-               curl -OL "${url_serif}/WOFF2/VAR/SourceSerif4Variable-Italic.otf.woff2"
-               curl -OL "${url_serif}/WOFF2/VAR/SourceSerif4Variable-Roman.otf.woff2"
-
-               curl -OL "${url_code}/WOFF2/VF/SourceCodeVF-Italic.otf.woff2"
-               curl -OL "${url_code}/WOFF2/VF/SourceCodeVF-Upright.otf.woff2"
-
-               cat <<EOF >source-fonts.css
-               @font-face{
-                   font-family: 'Source Code Pro';
-                   font-weight: 200 900;
-                   font-style: normal;
-                   font-stretch: normal;
-                   src: url('SourceCodeVF-Upright.otf.woff2') format('woff2');
-               }
-
-               @font-face{
-                   font-family: 'Source Code Pro';
-                   font-weight: 200 900;
-                   font-style: italic;
-                   font-stretch: normal;
-                   src: url('SourceCodeVF-Italic.otf.woff2') format('woff2');
-               }
-
-               @font-face{
-                   font-family: 'Source Sans 3';
-                   font-weight: 200 900;
-                   font-style: normal;
-                   font-stretch: normal;
-                   src: url('SourceSans3VF-Upright.otf.woff2') format('woff2');
-               }
-
-               @font-face{
-                   font-family: 'Source Sans 3';
-                   font-weight: 200 900;
-                   font-style: italic;
-                   font-stretch: normal;
-                   src: url('SourceSans3VF-Italic.otf.woff2') format('woff2');
-               }
-
-               @font-face{
-                   font-family: 'Source Serif 4';
-                   font-weight: 200 900;
-                   font-style: normal;
-                   font-stretch: normal;
-                   src: url('SourceSerif4Variable-Roman.otf.woff2') format('woff2');
-               }
-
-               @font-face{
-                   font-family: 'Source Serif 4';
-                   font-weight: 200 900;
-                   font-style: italic;
-                   font-stretch: normal;
-                   src: url('SourceSerif4Variable-Italic.otf.woff2') format('woff2');
-               }
-               EOF
-               #+end_src
-               """
+            <> decodeUtf8
+              @Text
+              @ByteString
+              $(embedFile "src/Lilac/init/vendor-source-fonts.org")
             <> "\n"
         else ""
 

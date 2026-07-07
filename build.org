@@ -340,14 +340,10 @@ output for the ~--version~ flag.
 #+name: nix:Haskell overlays
 #+header: :line-label tangle
 #+begin_src nix
-haskellOverlays = [
-  disableHaddockGlobally
-  heavyDeps
-  jailbreaks
-  injectExternalPackages
-  injectLilac
-  tweakLilacBuild
-];
+ci = builtins.getEnv "JOB_URL" != "";
+
+haskellOverlays = lib.optionals ci [ heavyDeps ]
+  ++ [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
 
 disableHaddockGlobally = final: prev: {
   mkDerivation = args: prev.mkDerivation (args // { doHaddock = false; });
@@ -460,6 +456,7 @@ lilacSource = lib.cleanSourceWith {
         image
         Makefile
         nix
+        !src/**
       '';
     };
   in path: type: filterFunc path type;
@@ -500,6 +497,7 @@ result*
 site
 site.tar.gz
 vendor
+!src/**
 
 <<gitignore:Makefile sentinels>>
 #+end_src
@@ -1546,79 +1544,9 @@ vendor/mathjax vendor/mathjax-newcm-font &:
 The vendoring is needed because SourceHut does not allow us to pull in
 scripts from CDNs. We have to be self-contained. Lilac has a ~lilac init
 --only-local-imports~ command which gives us some scripts to download MathJax and
-also Source fonts.
-
-#+name: vendor-mathjax.sh
-#+header: :tangle vendor-mathjax.sh
-#+header: :shebang #!/usr/bin/env bash
-#+begin_src bash
-set -euo pipefail
-
-MAIN_PACKAGE="mathjax"
-FONT_PACKAGE="mathjax-newcm-font"
-VERSION="4.1.2"
-
-mkdir -p vendor
-pushd vendor
-
-download_tarball()
-{
-	local package
-	local version
-	local url_prefix
-	local tarball
-	package="${1:-}"
-	version="${2:-}"
-	tarball="${package}-${version}.tgz"
-	url_prefix="${3:-}"
-
-	if [[ -d "${package}" ]]; then
-		echo "${package} directory already exists"
-		return 1
-	fi
-
-	curl -OL "${url_prefix}/-/${tarball}"
-	tar xzvf "${tarball}"
-	mv package "${package}"
-	rm "${tarball}"
-}
-
-download_tarball \
-	"${MAIN_PACKAGE}" \
-	"${VERSION}" \
-	"https://registry.npmjs.org/mathjax"
-download_tarball \
-	"${FONT_PACKAGE}" \
-	"${VERSION}" \
-	"https://registry.npmjs.org/@mathjax/${FONT_PACKAGE}"
-#+end_src
-
-#+name: vendor-source-fonts.sh
-#+header: :tangle vendor-source-fonts.sh
-#+header: :shebang #!/usr/bin/env bash
-#+begin_src bash
-set -euo pipefail
-
-url_sans="https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R"
-url_serif="https://raw.githubusercontent.com/adobe-fonts/source-serif/4.005R"
-url_code="https://raw.githubusercontent.com/adobe-fonts/source-code-pro/2.042R-u%2F1.062R-i%2F1.026R-vf"
-
-mkdir -p vendor/source-fonts
-pushd vendor/source-fonts
-
-curl -OL "${url_sans}/WOFF2/VF/SourceSans3VF-Italic.otf.woff2"
-curl -OL "${url_sans}/WOFF2/VF/SourceSans3VF-Upright.otf.woff2"
-
-curl -OL "${url_serif}/WOFF2/VAR/SourceSerif4Variable-Italic.otf.woff2"
-curl -OL "${url_serif}/WOFF2/VAR/SourceSerif4Variable-Roman.otf.woff2"
-
-curl -OL "${url_code}/WOFF2/VF/SourceCodeVF-Italic.otf.woff2"
-curl -OL "${url_code}/WOFF2/VF/SourceCodeVF-Upright.otf.woff2"
-
-cat <<EOF >source-fonts.css
-<<id:a7f65fb9-86bb-45ab-8c61-2fedfadb24fe::text:source-fonts.css>>
-EOF
-#+end_src
+also Source fonts. The vendoring scripts come from [[id:d166e21d-8ffb-490e-883d-25acf2e45faf][Vendored assets]] (they are
+tangled from that section to be embedded into the ~lilac init~ command, but also
+reused in [[Makefile:create-tarball]]).
 
 Finally we need to actually use these vendored assets by referring to them in
 every woven HTML file. That's what we do in [[custom-html-head]].
@@ -2221,7 +2149,7 @@ For the Haskell compiler, we use the following GHC version:
 
 #+name: GHC version
 #+begin_src txt
-9.12.4
+9.10.3
 #+end_src
 
 The above version is used throughout other configuration files and such
@@ -2245,6 +2173,21 @@ license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
   js/lilac.js.injectme
+  src/Lilac/cli/init/only-local-imports.txt
+  src/Lilac/cli/tangle/out-dir.txt
+  src/Lilac/cli/weave/out-dir.txt
+  src/Lilac/cli/weave/root-relative-prefix.txt
+  src/Lilac/init/index.org
+  src/Lilac/init/index.org-after-Lilac.toml
+  src/Lilac/init/Lilac.toml
+  src/Lilac/init/Lilac.toml.htmlHead.toml
+  src/Lilac/init/vendor-mathjax.org
+  src/Lilac/init/vendor-source-fonts.org
+  src/Lilac/Serve/liveReload.js
+  src/Lilac/Weave/Css/external-link.svg
+  src/Lilac/Weave/Css/raw.css
+  src/Lilac/Weave/defaultMathJaxSettings.js
+  src/Lilac/WeaveSpec/0300-weave-lists/raw.html
 
 library lilac-internal
   exposed-modules:
@@ -2279,6 +2222,7 @@ library
       src
   default-extensions:
       <<Default GHC extensions>>
+      TemplateHaskell
   ghc-options:
       <<GHC warning flags>>
   build-depends:
@@ -2293,6 +2237,7 @@ library
     , containers
     , directory
     , filepath
+    , file-embed
     , file-io
     , fsnotify
     , http-types
@@ -2364,6 +2309,7 @@ test-suite spec
       test
   default-extensions:
       <<Default GHC extensions>>
+      TemplateHaskell
   ghc-options:
       <<GHC warning flags>>
       <<GHC threaded flags>>
@@ -2372,6 +2318,7 @@ test-suite spec
     , citeproc
     , containers
     , filepath
+    , file-embed
     , hspec
     , hspec-megaparsec
     , lilac
@@ -2408,7 +2355,6 @@ FunctionalDependencies
 GeneralizedNewtypeDeriving
 ImportQualifiedPost
 InstanceSigs
-MultilineStrings
 MultiParamTypeClasses
 MultiWayIf
 NamedFieldPuns
@@ -2417,7 +2363,6 @@ NoImplicitPrelude
 NumDecimals
 NumericUnderscores
 LambdaCase
-OrPatterns
 OverloadedLabels
 OverloadedRecordDot
 OverloadedStrings

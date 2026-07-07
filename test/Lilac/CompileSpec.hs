@@ -31,6 +31,7 @@ import Relude
     map,
     pure,
     show,
+    toString,
     traverse,
     ($),
     (.),
@@ -78,28 +79,37 @@ spec = do
 
   expectArchiveError
     ["0401-broken-links-noweb"]
-    """
-    Found broken links:
-      id:00000000-0000-0000-0000-00000000d003::x (test/Lilac/CompileSpec/0401-broken-links-noweb)
-      id:00000000-0000-0000-0000-00000000d000::c (test/Lilac/CompileSpec/0401-broken-links-noweb)
-    """
+    ( toString
+        $ T.intercalate
+          "\n"
+          [ "Found broken links:",
+            "  id:00000000-0000-0000-0000-00000000d003::x (test/Lilac/CompileSpec/0401-broken-links-noweb)",
+            "  id:00000000-0000-0000-0000-00000000d000::c (test/Lilac/CompileSpec/0401-broken-links-noweb)"
+          ]
+    )
 
   expectArchiveError
     ["0401-broken-links-paragraph"]
-    """
-    Found broken links:
-      id:00000000-0000-0000-0000-00000000d004::foo (test/Lilac/CompileSpec/0401-broken-links-paragraph)
-    """
+    ( toString
+        $ T.intercalate
+          "\n"
+          [ "Found broken links:",
+            "  id:00000000-0000-0000-0000-00000000d004::foo (test/Lilac/CompileSpec/0401-broken-links-paragraph)"
+          ]
+    )
 
   expectArchiveOk
     ["0401-broken-links-paragraph-ok"]
 
   expectArchiveError
     ["0401-broken-links-line-label"]
-    """
-    Found broken links:
-      id:00000000-0000-0000-0000-00000000d004::(foo) (test/Lilac/CompileSpec/0401-broken-links-line-label)
-    """
+    ( toString
+        $ T.intercalate
+          "\n"
+          [ "Found broken links:",
+            "  id:00000000-0000-0000-0000-00000000d004::(foo) (test/Lilac/CompileSpec/0401-broken-links-line-label)"
+          ]
+    )
 
   expectArchiveOk
     [ "0401-broken-links-multi-ok",
@@ -404,25 +414,31 @@ spec = do
     [ "0105/invalid-paths/index.org"
     ]
     ( Left
-        """
-        Invalid GTOC object paths:
-          test/Lilac/CompileSpec/0105/invalid-paths/dir1/index.lobj
-          test/Lilac/CompileSpec/0105/invalid-paths/README.lobj
-
-        """
+        ( toString
+            $ T.intercalate
+              "\n"
+              [ "Invalid GTOC object paths:",
+                "  test/Lilac/CompileSpec/0105/invalid-paths/dir1/index.lobj",
+                "  test/Lilac/CompileSpec/0105/invalid-paths/README.lobj",
+                ""
+              ]
+        )
     )
 
   expectGTOC
     [ "0105/invalid-paths-self/index.org"
     ]
     ( Left
-        """
-        Invalid GTOC object paths:
-          test/Lilac/CompileSpec/0105/invalid-paths-self/index.lobj
-          test/Lilac/CompileSpec/0105/invalid-paths-self/dir1/index.lobj
-          test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj
-
-        """
+        ( toString
+            $ T.intercalate
+              "\n"
+              [ "Invalid GTOC object paths:",
+                "  test/Lilac/CompileSpec/0105/invalid-paths-self/index.lobj",
+                "  test/Lilac/CompileSpec/0105/invalid-paths-self/dir1/index.lobj",
+                "  test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj",
+                ""
+              ]
+        )
     )
 
   describe "cumulativeOffsets sanity check" $ do

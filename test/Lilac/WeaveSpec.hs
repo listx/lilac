@@ -4,6 +4,7 @@ import Citeproc
   ( Result (resultBibliography, resultCitations, resultWarnings),
   )
 import Citeproc qualified as CP
+import Data.FileEmbed (embedFile)
 import Data.Text qualified as T
 import Lilac.Compile qualified as LC
 import Lilac.Parse (styleMaskFrom)
@@ -49,12 +50,14 @@ import Lilac.Weave qualified as LW
 import Network.URI qualified as N
 import Relude
   ( Bool (False, True),
+    ByteString,
     Either (Left, Right),
     FilePath,
     IO,
     Maybe (Just, Nothing),
     String,
     Text,
+    decodeUtf8,
     foldl',
     fromList,
     fst,
@@ -104,33 +107,10 @@ spec = do
     "0300-weave-lists"
     $ map
       (T.intercalate "" . map T.strip . T.lines)
-      [ """
-        <ol>
-          <li>
-            <p>
-              <span id="c-1" class="cell-idx">
-                a
-              </span>
-            </p>
-            <ul>
-              <li>
-                <p>
-                  <span id="c-3" class="cell-idx">
-                    b
-                  </span>
-                </p>
-              </li>
-            </ul>
-          </li>
-          <li>
-            <p>
-              <span id="c-5" class="cell-idx">
-                c
-              </span>
-            </p>
-          </li>
-        </ol>
-        """
+      [ decodeUtf8
+          @Text
+          @ByteString
+          $(embedFile "src/Lilac/WeaveSpec/0300-weave-lists/raw.html")
       ]
 
   it "0305-gtoc-ancestor" $ do

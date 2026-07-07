@@ -48,6 +48,7 @@ import Control.Concurrent.STM
 import Control.Exception (catch, finally)
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as LBS
+import Data.FileEmbed (embedFile)
 import Data.Map.Strict (findWithDefault)
 import Data.Text qualified as T
 import Data.Text.IO qualified as T
@@ -77,6 +78,7 @@ import Relude
     putMVar,
     readMVar,
     show,
+    toLazy,
     void,
     when,
     ($),
@@ -246,11 +248,9 @@ liveReloadMiddleware root fsChan logLock verbose baseApp req respond =
       let (before, after) = BS.breakSubstring "</body>" (LBS.toStrict body)
           script :: LByteString
           script =
-            """
-            <script>
-            <<js:live-reload>> (ref:f:liveReloadMiddleware-js:live-reload)
-            </script>
-            """
+            "<script>"
+              <> toLazy $(embedFile "src/Lilac/Serve/liveReload.js") -- (ref:f:liveReloadMiddleware-js:live-reload)
+              <> "</script>"
        in if BS.null after
             then body
             else LBS.fromStrict before <> script <> LBS.fromStrict after
@@ -313,6 +313,7 @@ WebSocket:
      [[(js:reload-page-reloadPage)][=reloadPage()=]] [[(js:live-reload-handle-reload-request)]].
 
 #+name: js:live-reload
+#+header: :tangle src/Lilac/Serve/liveReload.js
 #+begin_src js
 (function() {
     let reloading = false;
@@ -508,7 +509,7 @@ fsWatcher dir fsChan activePaths shutdownMVar fsWatcherDone logLock verbose = do
         logVerbose logLock verbose "[fsWatcher] Cleaning up resources... "
     -- (ref:f:fsWatcher-isHtmlFsEvent)
     isHtmlFsEvent e = case e of
-      Added {}
+      Added {} -> takeExtension (eventPath e) == ".html"
       Modified {} -> takeExtension (eventPath e) == ".html"
       _ -> False
     signalFsEvent :: FilePath -> TChan FilePath -> Event -> IO ()

@@ -69,7 +69,7 @@ import Lilac.Types
         offsets,
         symbols
       ),
-    BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
+    BToken (BTokenLinkTarget, BTokenString),
     Block (body, meta, parentOid),
     Cell
       ( CBlock,
@@ -95,22 +95,15 @@ import Lilac.Types
     LinkOid (LinkOid, name, oid),
     LinkTarget
       ( LinkTargetFilePath,
-        LinkTargetFootnote,
         LinkTargetLineLabel,
-        LinkTargetOid,
-        LinkTargetURI
+        LinkTargetOid
       ),
     MathFragment (meta, parentOid),
     OID,
     Object (Object, externalOids, orgDoc, symbols),
     OrgDoc (bibPaths, cells, cslPath, glossary, oid, pseudoEdges),
     PToken
-      ( PTokenCitation,
-        PTokenDivEnd,
-        PTokenDivStart,
-        PTokenLink,
-        PTokenMathFragment,
-        PTokenStyledText
+      ( PTokenLink
       ),
     ProjectConf (bibliography, citationStyle),
     Prose (Prose, unProse),
@@ -406,11 +399,7 @@ mkSymbols orgDoc =
           table.parentOid
           table.meta
           lci
-      CFootnote {}
-      CListItem {}
-      CParagraph {}
-      CGlossaryTerm {}
-      CCommand {} -> [] -- (ref:f:mkSymbols-ignored-cells)
+      _ -> [] -- (ref:f:mkSymbols-ignored-cells)
 #+end_src
 
 [[f:getLineLabels]] [[(f:mkSymbols-getLineLabels)]] associates a link to a line label
@@ -529,22 +518,13 @@ findExternalOids orgDoc =
           (\acc prose -> foldl' getLinkFromPToken acc prose.unProse)
           []
           table.grid
-      CFigure {}
-      CFootnote {}
-      CListItem {}
-      CMathFragment {}
-      CCommand {} -> []
+      _ -> []
     getLinkFromBToken acc bToken = case bToken of -- (ref:f:findExternalOids-getLinkFromBToken)
       BTokenLinkTarget linkTarget -> keepIfExternal acc linkTarget
-      BTokenString {}
-      BTokenPadding -> acc
+      _ -> acc
     getLinkFromPToken acc pToken = case pToken of -- (ref:f:findExternalOids-getLinkFromPToken)
       PTokenLink link -> keepIfExternal acc link.target
-      PTokenStyledText {}
-      PTokenCitation {}
-      PTokenMathFragment {}
-      PTokenDivStart {}
-      PTokenDivEnd {} -> acc
+      _ -> acc
     symbols = mkSymbols orgDoc -- (ref:f:findExternalOids-symbols)
     keepIfExternal acc linkTarget = case linkTarget of -- (ref:f:findExternalOids-keepIfExternal)
       LinkTargetOid linkOid ->
@@ -555,9 +535,7 @@ findExternalOids orgDoc =
         if member linkOid symbols
           then acc
           else linkOid : acc
-      LinkTargetFootnote {}
-      LinkTargetFilePath {}
-      LinkTargetURI {} -> acc
+      _ -> acc
 #+end_src
 
 First we have to look at all areas where prose text can occur
@@ -1110,11 +1088,14 @@ b3
 #+begin_src haskell
 expectArchiveError
   ["0401-broken-links-noweb"]
-  """
-  Found broken links:
-    id:00000000-0000-0000-0000-00000000d003::x (test/Lilac/CompileSpec/0401-broken-links-noweb)
-    id:00000000-0000-0000-0000-00000000d000::c (test/Lilac/CompileSpec/0401-broken-links-noweb)
-  """
+  ( toString
+      $ T.intercalate
+        "\n"
+        [ "Found broken links:",
+          "  id:00000000-0000-0000-0000-00000000d003::x (test/Lilac/CompileSpec/0401-broken-links-noweb)",
+          "  id:00000000-0000-0000-0000-00000000d000::c (test/Lilac/CompileSpec/0401-broken-links-noweb)"
+        ]
+  )
 #+end_src
 
 Detect broken links in paragraphs. In this case, ~[[foo]]~ is not a named cell
@@ -1135,10 +1116,13 @@ anywhere.
 #+begin_src haskell
 expectArchiveError
   ["0401-broken-links-paragraph"]
-  """
-  Found broken links:
-    id:00000000-0000-0000-0000-00000000d004::foo (test/Lilac/CompileSpec/0401-broken-links-paragraph)
-  """
+  ( toString
+      $ T.intercalate
+        "\n"
+        [ "Found broken links:",
+          "  id:00000000-0000-0000-0000-00000000d004::foo (test/Lilac/CompileSpec/0401-broken-links-paragraph)"
+        ]
+  )
 #+end_src
 
 If we define the cell, the error goes away.
@@ -1187,10 +1171,13 @@ a named cell should result in an error.
 #+begin_src haskell
 expectArchiveError
   ["0401-broken-links-line-label"]
-  """
-  Found broken links:
-    id:00000000-0000-0000-0000-00000000d004::(foo) (test/Lilac/CompileSpec/0401-broken-links-line-label)
-  """
+  ( toString
+      $ T.intercalate
+        "\n"
+        [ "Found broken links:",
+          "  id:00000000-0000-0000-0000-00000000d004::(foo) (test/Lilac/CompileSpec/0401-broken-links-line-label)"
+        ]
+  )
 #+end_src
 
 Below is similar to [[t:0401-broken-links-noweb]], but the broken links have been
@@ -1357,10 +1344,7 @@ findBrokenFileLinks =
           table.caption
           <> (concatMap extractFilesFromProse $ elems table.grid)
       CFootnote footnote -> extractFilesFromProse footnote.body
-      CBlock {}
-      CMathFragment {}
-      CListItem {}
-      CCommand {} -> []
+      _ -> []
     extractFilesFromProse :: Prose -> [FilePath]
     extractFilesFromProse prose = mapMaybe extractFileFromPToken prose.unProse
     extractFileFromPToken :: PToken -> Maybe FilePath
@@ -1490,9 +1474,7 @@ buildGraph = G.graphFromEdges . foldl' f []
       | otherwise = acc
     getOutLinks = \case
       BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
-      BTokenLinkTarget {}
-      BTokenPadding {}
-      BTokenString {} -> Nothing
+      _ -> Nothing
 #+end_src
 
 The input blocks are paired with the document OID that contains them
@@ -1549,15 +1531,7 @@ getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
       | Just (obj, cell) <- gciToObjCell archive gci =
           case cell of
             CBlock b -> (obj.orgDoc.oid, b) : acc
-            CHeading {}
-            CListItem {}
-            CParagraph {}
-            CGlossaryTerm {}
-            CMathFragment {}
-            CFigure {}
-            CTable {}
-            CFootnote {}
-            CCommand {} -> acc
+            _ -> acc
       | otherwise = acc
 #+end_src
 
@@ -2238,9 +2212,7 @@ mkBlockAncestry archive blockGCIs = foldl' f mempty blockGCIs
       | otherwise = acc
     getChildLinks = \case
       BTokenLinkTarget (LinkTargetOid linkOid) -> Just linkOid
-      BTokenLinkTarget {}
-      BTokenPadding {}
-      BTokenString {} -> Nothing
+      _ -> Nothing
 #+end_src
 
 [[f:getBlockGCIsFromArchive]] gets all code blocks (by their [[newtype:GCI]]) from the
@@ -2256,15 +2228,7 @@ getBlockGCIsFromArchive archive = foldl' f [] $ elems archive.symbols
       | Just (_, cell) <- gciToObjCell archive gci =
           case cell of
             CBlock {} -> gci : acc
-            CHeading {}
-            CListItem {}
-            CParagraph {}
-            CGlossaryTerm {}
-            CMathFragment {}
-            CFigure {}
-            CTable {}
-            CFootnote {}
-            CCommand {} -> acc
+            _ -> acc
       | otherwise = acc
 #+end_src
 
@@ -2836,12 +2800,15 @@ expectGTOC
   [ "0105/invalid-paths/index.org"
   ]
   ( Left
-      """
-      Invalid GTOC object paths:
-        test/Lilac/CompileSpec/0105/invalid-paths/dir1/index.lobj
-        test/Lilac/CompileSpec/0105/invalid-paths/README.lobj
-
-      """
+      ( toString
+          $ T.intercalate
+            "\n"
+            [ "Invalid GTOC object paths:",
+              "  test/Lilac/CompileSpec/0105/invalid-paths/dir1/index.lobj",
+              "  test/Lilac/CompileSpec/0105/invalid-paths/README.lobj",
+              ""
+            ]
+      )
   )
 #+end_src
 
@@ -2871,13 +2838,16 @@ expectGTOC
   [ "0105/invalid-paths-self/index.org"
   ]
   ( Left
-      """
-      Invalid GTOC object paths:
-        test/Lilac/CompileSpec/0105/invalid-paths-self/index.lobj
-        test/Lilac/CompileSpec/0105/invalid-paths-self/dir1/index.lobj
-        test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj
-
-      """
+      ( toString
+          $ T.intercalate
+            "\n"
+            [ "Invalid GTOC object paths:",
+              "  test/Lilac/CompileSpec/0105/invalid-paths-self/index.lobj",
+              "  test/Lilac/CompileSpec/0105/invalid-paths-self/dir1/index.lobj",
+              "  test/Lilac/CompileSpec/0105/invalid-paths-self/README.lobj",
+              ""
+            ]
+      )
   )
 #+end_src
 
@@ -2946,7 +2916,7 @@ gciToName archive offset gci
           | Just eqNum <- lookup "__equation_anon_number" mathFragment.meta ->
               plain $ "Anonymous Equation " <> eqNum
           | otherwise -> plain "Math Fragment"
-        CListItem {}
+        CListItem {} -> Nothing
         CCommand {} -> Nothing
   | otherwise = Nothing
   where
@@ -3016,11 +2986,7 @@ getCellName = \case
     | Just name <- lookup "name" mathFragment.meta ->
         verbatim name
     | otherwise -> Nothing
-  CHeading {}
-  CParagraph {}
-  CGlossaryTerm {}
-  CListItem {}
-  CCommand {} -> Nothing
+  _ -> Nothing
   where
     verbatim body = Just $ Prose [ptext body [Verbatim]]
 #+end_src
@@ -3098,6 +3064,7 @@ import Relude
     map,
     pure,
     show,
+    toString,
     traverse,
     ($),
     (.),

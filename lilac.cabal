@@ -7,6 +7,21 @@ license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
   js/lilac.js.injectme
+  src/Lilac/cli/init/only-local-imports.txt
+  src/Lilac/cli/tangle/out-dir.txt
+  src/Lilac/cli/weave/out-dir.txt
+  src/Lilac/cli/weave/root-relative-prefix.txt
+  src/Lilac/init/index.org
+  src/Lilac/init/index.org-after-Lilac.toml
+  src/Lilac/init/Lilac.toml
+  src/Lilac/init/Lilac.toml.htmlHead.toml
+  src/Lilac/init/vendor-mathjax.org
+  src/Lilac/init/vendor-source-fonts.org
+  src/Lilac/Serve/liveReload.js
+  src/Lilac/Weave/Css/external-link.svg
+  src/Lilac/Weave/Css/raw.css
+  src/Lilac/Weave/defaultMathJaxSettings.js
+  src/Lilac/WeaveSpec/0300-weave-lists/raw.html
 
 library lilac-internal
   exposed-modules:
@@ -35,7 +50,6 @@ library lilac-internal
       GeneralizedNewtypeDeriving
       ImportQualifiedPost
       InstanceSigs
-      MultilineStrings
       MultiParamTypeClasses
       MultiWayIf
       NamedFieldPuns
@@ -44,7 +58,6 @@ library lilac-internal
       NumDecimals
       NumericUnderscores
       LambdaCase
-      OrPatterns
       OverloadedLabels
       OverloadedRecordDot
       OverloadedStrings
@@ -110,7 +123,6 @@ library
       GeneralizedNewtypeDeriving
       ImportQualifiedPost
       InstanceSigs
-      MultilineStrings
       MultiParamTypeClasses
       MultiWayIf
       NamedFieldPuns
@@ -119,7 +131,6 @@ library
       NumDecimals
       NumericUnderscores
       LambdaCase
-      OrPatterns
       OverloadedLabels
       OverloadedRecordDot
       OverloadedStrings
@@ -132,6 +143,7 @@ library
       TypeApplications
       TypeOperators
       ViewPatterns
+      TemplateHaskell
   ghc-options:
       -Weverything
 
@@ -153,6 +165,7 @@ library
     , containers
     , directory
     , filepath
+    , file-embed
     , file-io
     , fsnotify
     , http-types
@@ -203,7 +216,6 @@ executable lilac
       GeneralizedNewtypeDeriving
       ImportQualifiedPost
       InstanceSigs
-      MultilineStrings
       MultiParamTypeClasses
       MultiWayIf
       NamedFieldPuns
@@ -212,7 +224,6 @@ executable lilac
       NumDecimals
       NumericUnderscores
       LambdaCase
-      OrPatterns
       OverloadedLabels
       OverloadedRecordDot
       OverloadedStrings
@@ -296,7 +307,6 @@ test-suite spec
       GeneralizedNewtypeDeriving
       ImportQualifiedPost
       InstanceSigs
-      MultilineStrings
       MultiParamTypeClasses
       MultiWayIf
       NamedFieldPuns
@@ -305,7 +315,6 @@ test-suite spec
       NumDecimals
       NumericUnderscores
       LambdaCase
-      OrPatterns
       OverloadedLabels
       OverloadedRecordDot
       OverloadedStrings
@@ -318,6 +327,7 @@ test-suite spec
       TypeApplications
       TypeOperators
       ViewPatterns
+      TemplateHaskell
   ghc-options:
       -Weverything
 
@@ -336,6 +346,7 @@ test-suite spec
     , citeproc
     , containers
     , filepath
+    , file-embed
     , hspec
     , hspec-megaparsec
     , lilac
