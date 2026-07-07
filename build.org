@@ -2192,23 +2192,28 @@ extra-source-files:
   src/Lilac/Weave/defaultMathJaxSettings.js
   src/Lilac/WeaveSpec/0300-weave-lists/raw.html
 
+common shared-properties
+  default-language: <<Language edition>>
+  default-extensions:
+    <<Default GHC extensions>>
+  ghc-options:
+    <<GHC warning flags>>
+  build-depends:
+      base >=4.7 && <5
+    , relude
+
 library lilac-internal
+  import: shared-properties
   exposed-modules:
       Lilac.Types.Internal
   hs-source-dirs:
       src-internal
-  default-extensions:
-      <<Default GHC extensions>>
-  ghc-options:
-      <<GHC warning flags>>
   build-depends:
       aeson
-    , base >=4.7 && <5
-    , relude
     , text
-  default-language: <<Language edition>>
 
 library
+  import: shared-properties
   other-modules:
       Paths_lilac
   exposed-modules:
@@ -2224,14 +2229,10 @@ library
   hs-source-dirs:
       src
   default-extensions:
-      <<Default GHC extensions>>
       TemplateHaskell
-  ghc-options:
-      <<GHC warning flags>>
   build-depends:
       aeson
     , async
-    , base >=4.7 && <5
     , bitwise
     , blaze-html
     , bytestring
@@ -2250,7 +2251,6 @@ library
     , megaparsec
     , network-uri
     , process
-    , relude
     , skylighting
     , stm
     , template-haskell
@@ -2261,24 +2261,21 @@ library
     , wai
     , wai-websockets
     , websockets
-  default-language: <<Language edition>>
 
 executable lilac
+  import: shared-properties
   main-is: Main.hs
   other-modules:
       Paths_lilac
   hs-source-dirs:
       bin
   default-extensions:
-      <<Default GHC extensions>>
       TemplateHaskell
   ghc-options:
-      <<GHC warning flags>>
       <<GHC threaded flags>>
   build-depends:
       aeson
     , ansi-terminal
-    , base >=4.7 && <5
     , bytestring
     , containers
     , directory
@@ -2288,7 +2285,6 @@ executable lilac
     , network-uri
     , optparse-applicative
     , megaparsec
-    , relude
     , stm
     , text
     , toml-parser
@@ -2296,9 +2292,9 @@ executable lilac
     , uuid
     , wai-app-static
     , warp
-  default-language: <<Language edition>>
 
 test-suite spec
+  import: shared-properties
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
@@ -2311,14 +2307,11 @@ test-suite spec
   hs-source-dirs:
       test
   default-extensions:
-      <<Default GHC extensions>>
       TemplateHaskell
   ghc-options:
-      <<GHC warning flags>>
       <<GHC threaded flags>>
   build-depends:
-      base >=4.7 && <5
-    , citeproc
+      citeproc
     , containers
     , filepath
     , file-embed
@@ -2328,8 +2321,6 @@ test-suite spec
     , lilac-internal
     , megaparsec
     , network-uri
-    , relude
-  default-language: <<Language edition>>
 #+end_src
 
 We save ourselves some repetition (at least in the Org file) by declaring
