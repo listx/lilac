@@ -1,6 +1,11 @@
 image: nixos/26.05
 sources:
   - https://git.sr.ht/~listx/lilac
+oauth: pages.sr.ht/PAGES:RW
+environment:
+  site: lilac.funloop.org
+packages:
+- nixos.hut
 tasks:
   - lint: |
       cd lilac
@@ -29,3 +34,11 @@ tasks:
       nix-shell --run "make test" #
   - print_lilac_version: |
       lilac/result/bin/lilac --version
+  - publish: |
+      if [[ "$GIT_REF" != "refs/heads/main" ]]; then
+        echo "Skipping publishing step because current branch is '$GIT_REF' (not refs/heads/main)."
+        exit 0
+      fi
+      cd lilac
+      nix-shell --run "make site.tar.gz"
+      hut pages publish -d $site site.tar.gz

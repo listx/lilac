@@ -2090,7 +2090,9 @@ sort-file-contents = {
 :ID:       0cf535d6-f852-4b97-8ef8-9d566ad32e51
 :END:
 
-The CI runs the linter, builds the production binary, and also runs tests.
+The CI runs the linter, builds the production binary, and also runs tests. The
+last thing it does is publish the site to SourceHut pages (if it is the ~main~
+branch).
 
 #+name: .build.yml
 #+header: :tangle .build.yml
@@ -2098,6 +2100,11 @@ The CI runs the linter, builds the production binary, and also runs tests.
 image: nixos/<<id:55116425-5ad3-4540-98c3-53006f7dac3d::nixos-version>>
 sources:
   - https://git.sr.ht/~listx/lilac
+oauth: pages.sr.ht/PAGES:RW
+environment:
+  site: lilac.funloop.org
+packages:
+- nixos.hut
 tasks:
   - lint: |
       cd lilac
@@ -2126,6 +2133,14 @@ tasks:
       nix-shell --run "make test" # (ref:.build.yml-test)
   - print_lilac_version: |
       lilac/result/bin/lilac --version
+  - publish: |
+      if [[ "$GIT_REF" != "refs/heads/main" ]]; then
+        echo "Skipping publishing step because current branch is '$GIT_REF' (not refs/heads/main)."
+        exit 0
+      fi
+      cd lilac
+      nix-shell --run "make site.tar.gz"
+      hut pages publish -d $site site.tar.gz
 #+end_src
 
 Because the build-release rule involves building and running the test suite, the
