@@ -762,11 +762,14 @@ environment.
 #+begin_src nix
 { pkgs }:
 let
+  sources = import ./sources.nix;
   logo = pkgs.writeShellScriptBin "logo" ''
     set -euo pipefail
     echo -e "\n$(tput setaf 4)"
     echo Lilac | ${pkgs.figlet}/bin/figlet
     echo -e "$(tput sgr0)\n"
+    echo "Using nixpkgs commit: ${sources.nixpkgs.rev} ${pkgs.lib.version}"
+    echo
   '';
   lilac = pkgs.writeShellScriptBin "lilac" ''
     set -euo pipefail
