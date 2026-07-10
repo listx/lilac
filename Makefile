@@ -14,7 +14,7 @@ org_files = \
 	release-notes.org
 backend_org_files = $(filter-out fe.org,$(org_files))
 
-test: $(org_files)
+test: tangle
 	cabal test --test-show-details=direct --test-option=--format=progress
 	touch test
 
@@ -45,7 +45,7 @@ image_svgs = $(image_sources:.pikchr=.svg)
 	@echo "Compiling Pikchr diagram: $<"
 	pikchr --svg-only $< > $@
 
-weave: $(image_svgs) $(archive_file)
+weave: $(image_svgs) $(archive_file) tangle
 	lilac weave $(archive_file) --out-dir . --write-css #
 	touch weave
 
@@ -75,35 +75,35 @@ publish: weave site.tar.gz
 		https://pages.sr.ht/publish/lilac.funloop.org
 	touch publish
 
-dev-cljs:
+dev-cljs: tangle
 	clojure -M -m figwheel.main --build lilac --repl
-.PHONY: cljs
+.PHONY: dev-cljs
 
-prod-cljs:
+prod-cljs: tangle
 	clojure -M -m figwheel.main --build-once lilac-prod
 
 	cp -f js/lilac.js js/lilac.js.injectme
 .PHONY: prod-cljs
 
-build: $(org_files) lilac.cabal
+build: tangle lilac.cabal
 	cabal build
 	touch build
 
-install: $(org_files) lilac.cabal
+install: tangle lilac.cabal
 	cabal install --overwrite-policy=always
 	touch install
 
 LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
-build-release: $(org_files) lilac.cabal
+build-release: tangle lilac.cabal
 	nix-build ./nix/release.nix \
 		--argstr lilacGitVersion $(LILAC_GIT_VERSION)
 	touch build-release
 
-install-release: $(org_files) result build-release
+install-release: tangle result build-release
 	nix-env -i ./result
 	touch install-release
 
-update-nix:
+update-nix: tangle
 	niv init
 	niv update nixpkgs --branch nixos-26.05
 

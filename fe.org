@@ -126,9 +126,9 @@ instead.
 
 #+name: make:Start frontend development environment (CLJS REPL)
 #+begin_src makefile
-dev-cljs:
+dev-cljs: tangle
 	<<sh:invoke-dev-build-watcher>>
-.PHONY: cljs
+.PHONY: dev-cljs
 #+end_src
 
 *** Known limitations
@@ -194,7 +194,7 @@ invoke the following rule:
 
 #+name: make:Build prod JS
 #+begin_src makefile
-prod-cljs:
+prod-cljs: tangle
 	<<sh:gen-prod-cljs>>
 	<<sh:update-injectable>>
 .PHONY: prod-cljs

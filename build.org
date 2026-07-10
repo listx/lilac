@@ -32,7 +32,7 @@ periodically (for example, to use a newer [[GHC version]]).
 
 #+name: make:Update Nix dependencies
 #+begin_src makefile
-update-nix:
+update-nix: tangle
 	niv init
 	niv update nixpkgs --branch nixos-<<nixos-version>>
 #+end_src
@@ -938,7 +938,7 @@ too verbose to list all passing tests on each line (as is the default behavior).
 
 #+name: make:Run tests
 #+begin_src makefile
-test: $(org_files)
+test: tangle
 	cabal test --test-show-details=direct --test-option=--format=progress
 	touch test
 #+end_src
@@ -1344,7 +1344,7 @@ For weaving, we use the ~doc~ directory.
 
 #+name: make:Weave
 #+begin_src makefile
-weave: $(image_svgs) $(archive_file)
+weave: $(image_svgs) $(archive_file) tangle
 	lilac weave $(archive_file) --out-dir . --write-css # (ref:weave-write-css)
 	touch weave
 #+end_src
@@ -1401,7 +1401,7 @@ There are two ways to build =lilac=. The first option, ~build~, builds with
 
 #+name: make:Build lilac with Cabal
 #+begin_src makefile
-build: $(org_files) lilac.cabal
+build: tangle lilac.cabal
 	cabal build
 	touch build
 #+end_src
@@ -1444,7 +1444,7 @@ consumption, as a Nix package.
 #+name: make:Build lilac with Nix
 #+begin_src makefile
 LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
-build-release: $(org_files) lilac.cabal
+build-release: tangle lilac.cabal
 	nix-build ./nix/release.nix \
 		--argstr lilacGitVersion $(LILAC_GIT_VERSION)
 	touch build-release
@@ -1467,7 +1467,7 @@ probably better because it'll show up in your ~nix-env -q~.
 
 #+name: make:Install lilac with Cabal
 #+begin_src makefile
-install: $(org_files) lilac.cabal
+install: tangle lilac.cabal
 	cabal install --overwrite-policy=always
 	touch install
 #+end_src
@@ -1479,7 +1479,7 @@ with Nix]].
 
 #+name: make:Install lilac with Nix
 #+begin_src makefile
-install-release: $(org_files) result build-release
+install-release: tangle result build-release
 	nix-env -i ./result
 	touch install-release
 #+end_src
