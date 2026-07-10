@@ -811,6 +811,7 @@ outputs. See [[id:b649d761-1103-47be-86e4-56a7362a5ecc][Sentinels]] for a discus
 #+name: Makefile
 #+header: :tangle Makefile
 #+begin_src makefile
+<<make:All>>
 <<make:Org files>>
 <<make:Run tests>>
 <<make:Run linters>>
@@ -829,6 +830,30 @@ outputs. See [[id:b649d761-1103-47be-86e4-56a7362a5ecc][Sentinels]] for a discus
 <<make:Clean>>
 <<make:Project setup>>
 #+end_src
+
+** Default target ~all~
+
+This target performs most tasks, with the notable exception of publishing the
+site or installing the built package. It's a good rule if you want to just check
+that the repo is in a healthy state.
+
+#+name: make:All
+#+begin_src makefile
+define INSTALL_HELP
+To install Lilac, run either:
+	- 'make install' (Cabal)
+	- 'make install-release' (Nix)
+depending on how you want to install it.
+endef
+export INSTALL_HELP
+
+all: build test weave
+	@echo "$$INSTALL_HELP" | sed 's/^\t/  /'
+.PHONY: all
+#+end_src
+
+We use ~sed~ to reformat the tabs (required to make EditorConfig
+[[(.editorconfig-Makefile-tab)]] happy) in the ~INSTALL_HELP~ message as spaces.
 
 ** Sentinels
 :PROPERTIES:
@@ -1649,7 +1674,7 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 
 [Makefile]
-indent_style = tab
+indent_style = tab # (ref:.editorconfig-Makefile-tab)
 tab_width = 8
 
 [*.sh]

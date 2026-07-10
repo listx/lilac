@@ -1,3 +1,15 @@
+define INSTALL_HELP
+To install Lilac, run either:
+	- 'make install' (Cabal)
+	- 'make install-release' (Nix)
+depending on how you want to install it.
+endef
+export INSTALL_HELP
+
+all: build test weave
+	@echo "$$INSTALL_HELP" | sed 's/^\t/  /'
+.PHONY: all
+
 org_files = \
 	index.org \
 	cli.org \
