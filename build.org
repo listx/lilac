@@ -2088,6 +2088,9 @@ environment:
 packages:
 - nixos.hut
 tasks:
+  - tangle: |
+      cd lilac
+      nix-shell --run "make tangle"
   - build: |
       cd lilac
       nix-shell --run "make build-release"
