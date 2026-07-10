@@ -7,9 +7,14 @@ environment:
 packages:
 - nixos.hut
 tasks:
-  - lint: |
+  - build: |
       cd lilac
-      nix-shell --run "make lint"
+      nix-shell --run "make build-release"
+  - test: |
+      cd lilac
+      nix-shell --run "make test" #
+  - print_lilac_version: |
+      lilac/result/bin/lilac --version
   - weave: |
       cd lilac
       rm -f image/*.svg
@@ -26,14 +31,9 @@ tasks:
         echo "Modified or untracked files present."
         exit 1
       fi
-  - build: |
+  - lint: |
       cd lilac
-      nix-shell --run "make build-release"
-  - test: |
-      cd lilac
-      nix-shell --run "make test" #
-  - print_lilac_version: |
-      lilac/result/bin/lilac --version
+      nix-shell --run "make lint"
   - publish: |
       if [[ "$GIT_REF" != "refs/heads/main" ]]; then
         echo "Skipping publishing step because current branch is '$GIT_REF' (not refs/heads/main)."
