@@ -1,7 +1,3 @@
-gitconfig:
-	git config diff.orderfile .git-orderfile
-.PHONY: gitconfig
-
 org_files = \
 	index.org \
 	cli.org \
@@ -116,3 +112,7 @@ clean:
 		$(archive_file) \
 		$(obj_files)
 .PHONY: clean
+
+gitconfig:
+	git config diff.orderfile .git-orderfile
+.PHONY: gitconfig
