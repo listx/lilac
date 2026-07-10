@@ -1344,8 +1344,8 @@ For weaving, we use the ~doc~ directory.
 
 #+name: make:Weave
 #+begin_src makefile
-weave: $(archive_file) $(image_svgs)
-	lilac weave $< --out-dir . --write-css # (ref:weave-write-css)
+weave: $(image_svgs) $(archive_file)
+	lilac weave $(archive_file) --out-dir . --write-css # (ref:weave-write-css)
 	touch weave
 #+end_src
 
