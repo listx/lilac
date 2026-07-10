@@ -525,7 +525,7 @@ spec = do
             [ ptext "italic fraction 1/2" [Italic],
               ptext " foo and/or bar " [],
               ptext "A+/B-" [Italic],
-              ptext " +1/+2. key/value" []
+              ptext " +1/+2. key/value a/b/c" []
             ]
       ]
       []
@@ -715,6 +715,41 @@ spec = do
       [ CParagraph $ Prose [ptext "[hi]" []]
       ]
       []
+
+  shouldParseWithState
+    "0006-links-slashSeparatedWords"
+    OrgDoc
+      { oid = nilOid,
+        cells =
+          [ CParagraph
+              $ Prose
+                [ PTokenLink
+                    Link
+                      { target =
+                          LinkTargetOid
+                            LinkOid
+                              { oid = nilOid,
+                                name = "f:a"
+                              },
+                        name = [stext "a/b/c" []]
+                      }
+                ]
+          ],
+        pseudoEdges =
+          [ PseudoEdge (LCI 0, LinkOid {oid = fromWords 0 0, name = "f:a"})
+          ],
+        footnoteRefs = M.empty,
+        glossary = M.empty,
+        lineLabels = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        citations = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+    defaultOrgParserState
 
   shouldParseWith
     "0006-links-raw"

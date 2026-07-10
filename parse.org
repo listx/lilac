@@ -2399,7 +2399,7 @@ slashSeparatedWords = do
             string ")",
             string "]]"
           ]
-    isWordChar c = not (isSpace c) && c `notElem` (keys styleMarkers <> "\\")
+    isWordChar c = not (isSpace c) && c `notElem` (keys styleMarkers <> "\\]})") -- (ref:f:slashSeparatedWords-isWordChar)
     lastWordIsMeaningless :: [Text] -> Bool
     lastWordIsMeaningless = \case
       [] -> True
@@ -2412,9 +2412,12 @@ slashSeparatedWords = do
 #+end_src
 
 The rules inside [[f:slashSeparatedWords]] are a "best effort" attempt, not
-something that is always correct. For the cases where we need more flexibility,
-you can use escaped slashes like in
-[[ti:0005-styled-strings-escape-marker]].
+something that is always correct. For example, the ~isWordChar~ forbids a number
+of possibly special characters like ~]~ [[(f:slashSeparatedWords-isWordChar)]] because
+that's a cheap way to prevent it from being too greedy (see
+[[ti:0006-link-slashSeparatedWords]] which demonstrates why we'd want to make it
+less greedy). For the cases where we need more flexibility, you can use escaped
+slashes like in [[ti:0005-styled-strings-escape-marker]].
 
 See [[ti:0005-styled-strings-slash-separated-words]] for some real-world examples.
 
@@ -2788,7 +2791,7 @@ markers.
 #+name: ti:0005-styled-strings-slash-separated-words
 #+header: :tangle test/Lilac/ParseSpec/0005-styled-strings-slash-separated-words
 #+begin_src org
-/italic fraction 1/2/ foo and/or bar /A+/B-/ +1/+2. key/value
+/italic fraction 1/2/ foo and/or bar /A+/B-/ +1/+2. key/value a/b/c
 #+end_src
 
 #+name: t:0005-styled-strings-slash-separated-words
@@ -2808,7 +2811,7 @@ shouldParseWith
 [ ptext "italic fraction 1/2" [Italic],
   ptext " foo and/or bar " [],
   ptext "A+/B-" [Italic],
-  ptext " +1/+2. key/value" []
+  ptext " +1/+2. key/value a/b/c" []
 ]
 #+end_src
 
@@ -3548,6 +3551,54 @@ shouldParseWithState
       headingLevel = 1,
       headingSectionNumber = [1]
     }
+#+end_src
+
+A link's display text can have slashes in it, per [[f:slashSeparatedWords]] (where
+the word characters are not too greedy that they gobble up the trailing ~]]~
+string that marks the end of the link).
+
+#+name: ti:0006-link-slashSeparatedWords
+#+header: :tangle test/Lilac/ParseSpec/0006-links-slashSeparatedWords
+#+begin_src org
+[[f:a][a/b/c]]
+#+end_src
+
+#+name: t:0006-links-slashSeparatedWords
+#+begin_src haskell
+shouldParseWithState
+  "0006-links-slashSeparatedWords"
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        [ CParagraph
+            $ Prose
+              [ PTokenLink
+                  Link
+                    { target =
+                        LinkTargetOid
+                          LinkOid
+                            { oid = nilOid,
+                              name = "f:a"
+                            },
+                      name = [stext "a/b/c" []]
+                    }
+              ]
+        ],
+      pseudoEdges =
+        [ PseudoEdge (LCI 0, LinkOid {oid = fromWords 0 0, name = "f:a"})
+        ],
+      footnoteRefs = M.empty,
+      glossary = M.empty,
+      lineLabels = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      citations = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
+  defaultOrgParserState
 #+end_src
 
 Sometimes we have text that look like links initially but turn out to be
@@ -13179,6 +13230,7 @@ Below are all of the individual test cases.
 <<t:0005-styled-strings-escaping>>
 <<t:0006-links-inside-parentheses>>
 <<t:0006-links-nonlink>>
+<<t:0006-links-slashSeparatedWords>>
 <<t:0006-links-raw>>
 <<t:0006-links>>
 <<t:0006-links-web-protocols>>

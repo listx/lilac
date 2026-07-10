@@ -910,7 +910,7 @@ slashSeparatedWords = do
             string ")",
             string "]]"
           ]
-    isWordChar c = not (isSpace c) && c `notElem` (keys styleMarkers <> "\\")
+    isWordChar c = not (isSpace c) && c `notElem` (keys styleMarkers <> "\\]})") --
     lastWordIsMeaningless :: [Text] -> Bool
     lastWordIsMeaningless = \case
       [] -> True
