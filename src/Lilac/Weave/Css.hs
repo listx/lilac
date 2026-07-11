@@ -228,7 +228,7 @@ defaultCss = do
     overflowY auto
   div # ".navbar" ? do
     "grid-area" -: "navbar"
-    height $ rem 4
+    height $ rem 3
     "width" -: "100%"
     top $ px 0
     position fixed
@@ -238,18 +238,18 @@ defaultCss = do
     div # ".breadcrumbs" ? do
       fontSans
       fontSize $ rem 1.6
-      margin (px 12) 0 (px 10) (px 20)
+      margin (px 6) 0 0 (px 10)
     span # ".breadcrumb-separator" ? do
       color colorBreadcrumbSeparator
 
   nav # ".tocs" ? do
     "grid-area" -: "tocs"
     "height"
-      -: "calc(100vh - 4rem)"
+      -: "calc(100vh - 3rem)"
     width $ px 300
     fontSans
     position fixed
-    "top" -: "4rem"
+    "top" -: "3rem"
     borderRight (px 1) solid colorCodeBorder
     overflow hidden
     display grid
@@ -261,7 +261,7 @@ defaultCss = do
 
   ".toc-title" ? do
     "grid-area" -: "toc-title"
-    margin (px 0) (px 20) (px 10) (px 20)
+    margin (px 0) (px 14) (px 4) (px 14)
   nav # ".toc" ? do
     "grid-area" -: "toc"
     overflowY auto
@@ -306,16 +306,17 @@ defaultCss = do
 
   ".gtoc-title" ? do
     "grid-area" -: "gtoc-title"
-    yx margin (px 10) (px 20)
+    yx margin (px 4) (px 14)
   nav # ".gtoc" ? do
     "grid-area" -: "gtoc"
     maxHeight $ vh 50
-    paddingLeft $ px 20
+    paddingLeft $ px 16
     overflowY auto
     fontSans
     ul ? do
       marginTop $ px 0
-      paddingLeft $ rem 1
+      marginBottom $ px 8
+      paddingLeft $ px 14
 
   main_ ? do
     "grid-area" -: "main"
@@ -325,7 +326,7 @@ defaultCss = do
     padding (px 0) (px 20) (px 0) (px 20)
     paddingLeft (px 50)
     "position" -: "relative"
-    "top" -: "4rem"
+    "top" -: "3rem"
 
   forM_ [".backlinks", ".tangled-blocks", ".named-cells"] $ \metric -> do
     div # metric ? do
@@ -343,7 +344,6 @@ defaultCss = do
   p # ".widget-title" --
     ? do
       fontWeight bold
-      marginBottom $ px 10
       borderBottom (px 1) solid colorCodeBorder
   div ? do
     --

@@ -1449,7 +1449,6 @@ body ? do
 p # ".widget-title" -- (ref:css:Layout-widget-title)
   ? do
     fontWeight bold
-    marginBottom $ px 10
     borderBottom (px 1) solid colorCodeBorder
 div ? do
   -- (ref:css:Layout-reset-div)
@@ -5489,7 +5488,7 @@ weaveHeadingAncestry lciCellPairs = do
 #+begin_src haskell
 ".toc-title" ? do
   "grid-area" -: "toc-title"
-  margin (px 0) (px 20) (px 10) (px 20)
+  margin (px 0) (px 14) (px 4) (px 14)
 nav # ".toc" ? do
   "grid-area" -: "toc"
   overflowY auto
@@ -5673,16 +5672,17 @@ it "0305-gtoc-ancestor" $ do
 #+begin_src haskell
 ".gtoc-title" ? do
   "grid-area" -: "gtoc-title"
-  yx margin (px 10) (px 20)
+  yx margin (px 4) (px 14)
 nav # ".gtoc" ? do
   "grid-area" -: "gtoc"
   maxHeight $ vh 50
-  paddingLeft $ px 20
+  paddingLeft $ px 16
   overflowY auto
   fontSans
   ul ? do
     marginTop $ px 0
-    paddingLeft $ rem 1
+    marginBottom $ px 8
+    paddingLeft $ px 14
 #+end_src
 
 * Navigation bar
@@ -5826,7 +5826,7 @@ don't bother to handle that edge case here.
 #+begin_src haskell
 div # ".navbar" ? do
   "grid-area" -: "navbar"
-  height $ rem 4
+  height $ rem 3
   "width" -: "100%"
   top $ px 0
   position fixed
@@ -5836,12 +5836,12 @@ div # ".navbar" ? do
   <<css:breadcrumbs>>
 #+end_src
 
-The total height of the navbar is \(4\mathrm{em} + 1\mathrm{px}\) (and not just
-4em) because of the 1-pixel border at the bottom [[(css:navbar-1px)]].
+The total height of the navbar is \(3\mathrm{rem} + 1\mathrm{px}\) (and not just
+3rem) because of the 1-pixel border at the bottom [[(css:navbar-1px)]].
 
 #+name: css:navbar-height
 #+begin_src txt
-4rem
+3rem
 #+end_src
 
 The navbar causes a problem for links that point to elements inside the page,
@@ -5869,7 +5869,7 @@ the page.
 div # ".breadcrumbs" ? do
   fontSans
   fontSize $ rem 1.6
-  margin (px 12) 0 (px 10) (px 20)
+  margin (px 6) 0 0 (px 10)
 span # ".breadcrumb-separator" ? do
   color colorBreadcrumbSeparator
 #+end_src
