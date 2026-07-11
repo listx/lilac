@@ -87,6 +87,7 @@ import Lilac.Types
     gciToObjCell,
     getProseContents,
     getSectionNumber,
+    getTangledBlocks,
     ptext,
     stripLinks,
   )
@@ -267,6 +268,7 @@ mkArchive projectConf pathObjs = do
       offsets = mkOffsets pathObjsNonEmpty
       backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols --
+      duplicateTanglePaths = findDuplicateTanglePaths pathObjsNonEmpty --
   brokenFileLinks <- findBrokenFileLinks pathObjs
   (csls, bibs) <- getCitationDeps projectConf pathObjsNonEmpty
   if
@@ -284,6 +286,13 @@ mkArchive projectConf pathObjs = do
           <> intercalate
             "\n"
             (map showBrokenFileLink brokenFileLinks)
+    | duplicateTanglePaths /= [] ->
+        pure
+          . Left
+          $ "Found duplicate tangle paths:\n"
+          <> intercalate
+            "\n"
+            (map showDuplicateTanglePaths duplicateTanglePaths)
     | otherwise ->
         case mkGTOC pathObjs of
           Left err -> pure $ Left err
@@ -311,6 +320,9 @@ mkArchive projectConf pathObjs = do
     showBrokenFileLink :: (GPath, FilePath) -> String
     showBrokenFileLink (gPath, filePath) =
       "  " <> (filePath) <> " (" <> (decodeGPath gPath) <> ")"
+    showDuplicateTanglePaths :: ([GPath], Text) -> String
+    showDuplicateTanglePaths (gPaths, tanglePath) =
+      "  " <> (T.unpack tanglePath) <> " (" <> (show $ map decodeGPath gPaths) <> ")"
 
 combineSymbolsAndGlossary ::
   [(GPath, Object)] ->
@@ -375,6 +387,24 @@ findBrokenLinks pathObjs symbols =
         (\acc (gPath, obj) -> (zip (repeat gPath) obj.externalOids) <> acc)
         []
         pathObjs
+
+findDuplicateTanglePaths :: [(GPath, Object)] -> [([GPath], Text)]
+findDuplicateTanglePaths pathObjs =
+  g $ foldl' f [] pathObjs
+  where
+    f :: [(GPath, Text)] -> (GPath, Object) -> [(GPath, Text)]
+    f acc (gPath, obj) =
+      let paths = map fst $ getTangledBlocks obj.orgDoc.cells
+       in acc <> zip (repeat gPath) paths
+    g :: [(GPath, Text)] -> [([GPath], Text)]
+    g xs =
+      [ (fps, t)
+      | (t, fps) <- M.toList grouped,
+        length fps > 1
+      ]
+      where
+        grouped :: Map Text [GPath]
+        grouped = M.fromListWith (<>) [(t, [fp]) | (fp, t) <- xs]
 
 findBrokenFileLinks ::
   [(GPath, Object)] ->

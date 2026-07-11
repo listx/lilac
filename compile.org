@@ -116,6 +116,7 @@ import Lilac.Types
     gciToObjCell,
     getProseContents,
     getSectionNumber,
+    getTangledBlocks,
     ptext,
     stripLinks,
   )
@@ -195,6 +196,7 @@ import System.OsPath qualified as P
 <<f:mkOffsets>>
 <<f:prependOffsets>>
 <<f:findBrokenLinks>>
+<<f:findDuplicateTanglePaths>>
 <<f:findBrokenFileLinks>>
 <<f:getCitationDeps>>
 <<f:finalizeEdges>>
@@ -828,6 +830,7 @@ mkArchive projectConf pathObjs = do
       offsets = mkOffsets pathObjsNonEmpty
       backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols -- (ref:f:mkArchive-brokenLinks)
+      duplicateTanglePaths = findDuplicateTanglePaths pathObjsNonEmpty -- (ref:f:mkArchive-findDuplicateTanglePaths)
   brokenFileLinks <- findBrokenFileLinks pathObjs
   (csls, bibs) <- getCitationDeps projectConf pathObjsNonEmpty
   if
@@ -845,6 +848,13 @@ mkArchive projectConf pathObjs = do
           <> intercalate
             "\n"
             (map showBrokenFileLink brokenFileLinks)
+    | duplicateTanglePaths /= [] ->
+        pure
+          . Left
+          $ "Found duplicate tangle paths:\n"
+          <> intercalate
+            "\n"
+            (map showDuplicateTanglePaths duplicateTanglePaths)
     | otherwise ->
         case mkGTOC pathObjs of
           Left err -> pure $ Left err
@@ -872,6 +882,9 @@ mkArchive projectConf pathObjs = do
     showBrokenFileLink :: (GPath, FilePath) -> String
     showBrokenFileLink (gPath, filePath) =
       "  " <> (filePath) <> " (" <> (decodeGPath gPath) <> ")"
+    showDuplicateTanglePaths :: ([GPath], Text) -> String
+    showDuplicateTanglePaths (gPaths, tanglePath) =
+      "  " <> (T.unpack tanglePath) <> " (" <> (show $ map decodeGPath gPaths) <> ")"
 #+end_src
 
 The first thing we do is remove any empty objects that don't have any content
@@ -2163,6 +2176,79 @@ checkCycles
   ]
 #+end_src
 
+** Duplicate tangle paths detection (across objects)
+
+We already check for duplicate tangle paths with [[id:93c446fb-47f7-4eb0-b175-354b17436335::f:assertUniqueTanglePath][f:assertUniqueTanglePath]], but
+that only works within a single Org file. We need to also detect them across
+multiple files. That's what [[f:findDuplicateTanglePaths]] does.
+
+#+name: f:findDuplicateTanglePaths
+#+begin_src haskell
+findDuplicateTanglePaths :: [(GPath, Object)] -> [([GPath], Text)]
+findDuplicateTanglePaths pathObjs =
+  g $ foldl' f [] pathObjs
+  where
+    f :: [(GPath, Text)] -> (GPath, Object) -> [(GPath, Text)]
+    f acc (gPath, obj) =
+      let paths = map fst $ getTangledBlocks obj.orgDoc.cells
+       in acc <> zip (repeat gPath) paths
+    g :: [(GPath, Text)] -> [([GPath], Text)]
+    g xs =
+      [ (fps, t)
+      | (t, fps) <- M.toList grouped,
+        length fps > 1
+      ]
+      where
+        grouped :: Map Text [GPath]
+        grouped = M.fromListWith (<>) [(t, [fp]) | (fp, t) <- xs]
+#+end_src
+
+*** Tests
+
+Both Org files below try to tangle to the same ~foo/bar~ path, which will result
+in an archiving error.
+
+#+name: ti:0007-blocks-duplicate-tangle-paths-across-objs-a
+#+header: :tangle test/Lilac/CompileSpec/0007-blocks-duplicate-tangle-paths-across-objs-a
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000000a
+:END:
+
+,#+header: :tangle foo/bar
+,#+begin_src haskell
+hello
+,#+end_src
+#+end_src
+
+#+name: ti:0007-blocks-duplicate-tangle-paths-across-objs-b
+#+header: :tangle test/Lilac/CompileSpec/0007-blocks-duplicate-tangle-paths-across-objs-b
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000000b
+:END:
+
+,#+header: :tangle foo/bar
+,#+begin_src haskell
+world
+,#+end_src
+#+end_src
+
+#+name: t:0007-blocks-duplicate-tangle-paths-across-objs
+#+begin_src haskell
+expectArchiveError
+  [ "0007-blocks-duplicate-tangle-paths-across-objs-a",
+    "0007-blocks-duplicate-tangle-paths-across-objs-b"
+  ]
+  ( toString
+      $ T.intercalate
+        "\n"
+        [ "Found duplicate tangle paths:",
+          "  foo/bar ([\"test/Lilac/CompileSpec/0007-blocks-duplicate-tangle-paths-across-objs-a\",\"test/Lilac/CompileSpec/0007-blocks-duplicate-tangle-paths-across-objs-b\"])"
+        ]
+  )
+#+end_src
+
 ** Block ancestry
 
 [[f:mkBlockAncestry]] builds a "graph" similar to the one used in [[f:findCycles]], but
@@ -3244,6 +3330,7 @@ Below are all of the individual test cases.
 <<t:0401-broken-links-line-label>>
 <<t:0401-broken-links-multi-ok>>
 <<t:0401-broken-links-multi-ok-alternates>>
+<<t:0007-blocks-duplicate-tangle-paths-across-objs>>
 <<t:0100-dag-no-loops>>
 <<t:0100-dag-self-loop>>
 <<t:0100-dag-self-loop-heading>>

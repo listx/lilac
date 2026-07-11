@@ -121,6 +121,18 @@ spec = do
       "0401-broken-links-multi-ok-alternates-child"
     ]
 
+  expectArchiveError
+    [ "0007-blocks-duplicate-tangle-paths-across-objs-a",
+      "0007-blocks-duplicate-tangle-paths-across-objs-b"
+    ]
+    ( toString
+        $ T.intercalate
+          "\n"
+          [ "Found duplicate tangle paths:",
+            "  foo/bar ([\"test/Lilac/CompileSpec/0007-blocks-duplicate-tangle-paths-across-objs-a\",\"test/Lilac/CompileSpec/0007-blocks-duplicate-tangle-paths-across-objs-b\"])"
+          ]
+    )
+
   checkCycles
     ["0100-dag-no-loops"]
     []
