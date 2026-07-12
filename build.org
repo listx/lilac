@@ -1372,8 +1372,8 @@ assets like the ~image~ and ~vendor~ folders.
 #+begin_src makefile
 weave: $(image_svgs) $(archive_file) tangle
 	rm -rf site/image site/vendor
-	cp -r image vendor site
 	lilac weave $(archive_file) --out-dir site --write-css # (ref:weave-write-css)
+	cp -r image vendor site
 	touch weave
 #+end_src
 
