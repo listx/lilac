@@ -220,7 +220,7 @@ defaultCss = do
   body ? do
     minHeight (vh 100)
     display grid
-    gridTemplateColumns [px 300, px 800]
+    gridTemplateColumns [px 260, px 800]
     "grid-template-rows" -: "auto 1fr"
     "grid-template-areas"
       -: "\"navbar navbar\"\n\"tocs   main\""
@@ -246,7 +246,7 @@ defaultCss = do
     "grid-area" -: "tocs"
     "height"
       -: "calc(100vh - 3rem)"
-    width $ px 300
+    width $ px 260
     fontSans
     position fixed
     "top" -: "3rem"

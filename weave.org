@@ -1433,7 +1433,7 @@ html ? do
 body ? do
   minHeight (vh 100)
   display grid
-  gridTemplateColumns [px 300, px 800]
+  gridTemplateColumns [px <<css:tocs-width>>, px 800]
   "grid-template-rows" -: "auto 1fr"
   "grid-template-areas"
     -: "\"navbar navbar\"\n\"tocs   main\""
@@ -5270,13 +5270,21 @@ weaveAllTocs lciCellPairs = do
     weaveToc $ map snd lciCellPairs
 #+end_src
 
+The width of the TOC area is defined in [[css:tocs-width]]. It's reused in
+[[css:Layout]].
+
+#+name: css:tocs-width
+#+begin_src css
+260
+#+end_src
+
 #+name: css:tocs
 #+begin_src haskell
 nav # ".tocs" ? do
   "grid-area" -: "tocs"
   "height"
     -: "calc(100vh - <<css:navbar-height>>)"
-  width $ px 300
+  width $ px <<css:tocs-width>>
   fontSans
   position fixed
   "top" -: "<<css:navbar-height>>"
