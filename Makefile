@@ -57,14 +57,19 @@ image_svgs = $(image_sources:.pikchr=.svg)
 	@echo "Compiling Pikchr diagram: $<"
 	pikchr --svg-only $< > $@
 
-weave: $(image_svgs) $(archive_file) tangle vendor/mathjax vendor/mathjax-newcm-font vendor/source-fonts
-
+weave: $(image_svgs) $(archive_file) tangle $(vendored)
 	rm -rf site/image site/vendor
 	lilac weave $(archive_file) --out-dir site --write-css #
 	cp -r image vendor site
 	touch weave
 
-site.tar.gz: $(archive_file) weave vendor/mathjax vendor/mathjax-newcm-font vendor/source-fonts
+#
+vendored := \
+	vendor/source-fonts \
+	vendor/mathjax \
+	vendor/mathjax-newcm-font
+
+site.tar.gz: $(archive_file) weave $(vendored)
 	rm -f site.tar.gz
 	tar czvf site.tar.gz -C site .
 

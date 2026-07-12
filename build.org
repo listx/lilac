@@ -1370,7 +1370,7 @@ assets like the ~image~ and ~vendor~ folders.
 
 #+name: make:Weave
 #+begin_src makefile
-weave: $(image_svgs) $(archive_file) tangle vendor/mathjax vendor/mathjax-newcm-font vendor/source-fonts
+weave: $(image_svgs) $(archive_file) tangle $(vendored)
 	rm -rf site/image site/vendor
 	lilac weave $(archive_file) --out-dir site --write-css # (ref:weave-write-css)
 	cp -r image vendor site
@@ -1382,6 +1382,8 @@ written to ~css/default.css~. This ~css~ directory will not exist in CI (when
 Lilac is cloned and built on a fresh machine), so we have to create it.
 Otherwise, the [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::make:Build prod JS][make:Build prod JS]] rule will fail because the
 [[id:90d66ea1-a994-4fdb-b969-c28cec04352d::cfg:figwheel-main.edn][cfg:figwheel-main.edn]] expects the ~css~ directory to exist.
+
+The ~$(vendored)~ variable is defined at [[(Makefile:create-tarball-vendored)]].
 
 #+header: :tangle css/.gitkeep
 #+begin_src txt
@@ -1540,7 +1542,13 @@ stuff.
 
 #+name: Makefile:create-tarball
 #+begin_src makefile
-site.tar.gz: $(archive_file) weave vendor/mathjax vendor/mathjax-newcm-font vendor/source-fonts
+# (ref:Makefile:create-tarball-vendored)
+vendored := \
+	vendor/source-fonts \
+	vendor/mathjax \
+	vendor/mathjax-newcm-font
+
+site.tar.gz: $(archive_file) weave $(vendored)
 	rm -f site.tar.gz
 	tar czvf site.tar.gz -C site .
 
