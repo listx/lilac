@@ -882,8 +882,8 @@ mkArchive projectConf pathObjs = do
     showBrokenFileLink :: (GPath, FilePath) -> String
     showBrokenFileLink (gPath, filePath) =
       "  " <> (filePath) <> " (" <> (decodeGPath gPath) <> ")"
-    showDuplicateTanglePaths :: ([GPath], Text) -> String
-    showDuplicateTanglePaths (gPaths, tanglePath) =
+    showDuplicateTanglePaths :: (Text, [GPath]) -> String
+    showDuplicateTanglePaths (tanglePath, gPaths) =
       "  " <> (T.unpack tanglePath) <> " (" <> (show $ map decodeGPath gPaths) <> ")"
 #+end_src
 
@@ -2184,23 +2184,21 @@ multiple files. That's what [[f:findDuplicateTanglePaths]] does.
 
 #+name: f:findDuplicateTanglePaths
 #+begin_src haskell
-findDuplicateTanglePaths :: [(GPath, Object)] -> [([GPath], Text)]
+findDuplicateTanglePaths :: [(GPath, Object)] -> [(Text, [GPath])]
 findDuplicateTanglePaths pathObjs =
-  g $ foldl' f [] pathObjs
+  [ (tanglePath, gPaths)
+  | (tanglePath, gPaths) <- M.toList groupedByTanglePath,
+    length gPaths > 1
+  ]
   where
-    f :: [(GPath, Text)] -> (GPath, Object) -> [(GPath, Text)]
-    f acc (gPath, obj) =
-      let paths = map fst $ getTangledBlocks obj.orgDoc.cells
-       in acc <> zip (repeat gPath) paths
-    g :: [(GPath, Text)] -> [([GPath], Text)]
-    g xs =
-      [ (fps, t)
-      | (t, fps) <- M.toList grouped,
-        length fps > 1
-      ]
-      where
-        grouped :: Map Text [GPath]
-        grouped = M.fromListWith (<>) [(t, [fp]) | (fp, t) <- xs]
+    groupedByTanglePath :: Map Text [GPath]
+    groupedByTanglePath =
+      M.fromListWith
+        (<>)
+        [ (tanglePath, [gPath])
+        | (gPath, obj) <- pathObjs,
+          tanglePath <- map fst $ getTangledBlocks obj.orgDoc.cells
+        ]
 #+end_src
 
 *** Tests
