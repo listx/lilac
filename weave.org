@@ -245,6 +245,7 @@ import Lucid
     code_,
     col_,
     colgroup_,
+    content_,
     crossorigin_,
     data_,
     dd_,
@@ -270,6 +271,7 @@ import Lucid
     link_,
     main_,
     meta_,
+    name_,
     nav_,
     ol_,
     p_,
@@ -820,6 +822,7 @@ rawCss =
 <<css:counter-suffix-parenthesis>>
 <<css:navbar-link-target-adjustment>>
 <<css:mobile-tearing-fix>>
+<<css:mobile>>
 #+end_src
 
 ** Sizing
@@ -1188,6 +1191,7 @@ JS. It also sets the title of the page [[(HTML head-title)]].
 #+begin_src haskell
 head_ $ do
   meta_ [charset_ "utf-8"]
+  <<HTML-mobile-avoid-desktop-emulation>>
   title_ -- (ref:HTML head-title)
     . toHtml -- (ref:HTML head-toHtml)
     . fromMaybe "Untitled"
@@ -1429,7 +1433,7 @@ html ? do
   backgroundColor colorBg
   color colorText
   fontSerif
-  fontSize $ px 16
+  fontSize $ px 16 -- (ref:css:Layout-default-font-size)
 body ? do
   minHeight (vh 100)
   display grid
@@ -1502,6 +1506,50 @@ main_ ? do
   "position" -: "relative"
   "top" -: "<<css:navbar-height>>"
 #+end_src
+
+*** Mobile friendliness
+
+On mobile screens, the default font size is too small because of the "desktop
+emulation" behavior of assuming a width of 980px and then zooming out to make
+everything fit. To avoid this default width, we need to inject the following:
+
+#+name: HTML-mobile-avoid-desktop-emulation
+#+begin_src haskell
+meta_ [name_ "viewport", content_ "width=device-width, initial-scale=1.0"]
+#+end_src
+
+This then makes the text a bit too large, and so we need to scale things down a
+bit [[(css:mobile-scale)]]. Compare with [[(css:Layout-default-font-size)]].
+
+The other major thing is getting rid of the sidebar showing the TOC entries;
+this width takes up too much room so we have to disable it by default
+[[(css:mobile-disable-toc)]]. The other side of the coin for this is to make the
+body displayed as a ~block~ [[(css:mobile-body-block)]] instead of a ~grid~ (as one of
+the columns of the 2-column grid is gone, it no longer makes sense to display it
+as a grid).
+
+#+name: css:mobile
+#+begin_src css
+@media (max-width: 768px), (max-aspect-ratio: 1/1) {
+  html {
+    font-size: 12px; /* (ref:css:mobile-scale) */
+  }
+  nav.tocs {
+    display: none; /* (ref:css:mobile-disable-toc) */
+  }
+  body {
+    display: block; /* (ref:css:mobile-body-block) */
+    overflow-x: hidden;
+  }
+  .code-block-body {
+    overflow-x: auto; /* (ref:css:mobile-scroll-code) */
+  }
+}
+#+end_src
+
+The other bits are mainly for controlling how the main content looks. We only
+enable horizontal scrolling on the individual elements like code blocks
+[[(css:mobile-scroll-code)]].
 
 *** Mobile tearing fix
 
@@ -1975,10 +2023,12 @@ defined in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b::data:Style][data:Style]].
   textDecoration underline
 ".verbatim" & do
   fontMono
-  whiteSpace ClayText.pre
+  "white-space" -: "pre-wrap"
+  "word-break" -: "break-word" -- (ref:css:StyledTextStyles-word-break)
 ".code" & do
   fontMono
-  whiteSpace ClayText.pre
+  "white-space" -: "pre-wrap"
+  "word-break" -: "break-word"
   backgroundColor colorCodeBg
   border (px 1) solid colorCodeBorder
   ev borderRadius (rem 0.25)
@@ -1990,6 +2040,10 @@ defined in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b::data:Style][data:Style]].
 ".superscript" & do
   verticalAlign vAlignSuper
 #+end_src
+
+The ~word-break~ stuff [[(css:StyledTextStyles-word-break)]] is needed to prevent
+long, non-space-containing monospaced text from becoming unbreakable (such text
+ruins the mobile viewing experience).
 
 * Links
 :PROPERTIES:
@@ -2228,6 +2282,7 @@ hovers over them.
 a ? do
   color colorNowebLinkFg
   textDecoration none
+  "word-break" -: "break-word"
   ":hover" & do
     textDecoration underline
   ":visited" & do
@@ -3075,6 +3130,8 @@ code ? do
     roundedRectangleLink
     span ? do
       color colorNowebLinkFg
+  "white-space" -: "pre-wrap"
+  "word-break" -: "break-word"
 ".sourceCode" & do
   ev margin $ rem 0
 ".code-block-body" & do

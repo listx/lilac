@@ -196,6 +196,7 @@ import Lucid
     code_,
     col_,
     colgroup_,
+    content_,
     crossorigin_,
     data_,
     dd_,
@@ -221,6 +222,7 @@ import Lucid
     link_,
     main_,
     meta_,
+    name_,
     nav_,
     ol_,
     p_,
@@ -351,6 +353,7 @@ weaveObject object = doctypehtml_ $ do
   weaveConf <- ask
   head_ $ do
     meta_ [charset_ "utf-8"]
+    meta_ [name_ "viewport", content_ "width=device-width, initial-scale=1.0"]
     title_ --
       . toHtml --
       . fromMaybe "Untitled"

@@ -216,7 +216,7 @@ defaultCss = do
     backgroundColor colorBg
     color colorText
     fontSerif
-    fontSize $ px 16
+    fontSize $ px 16 --
   body ? do
     minHeight (vh 100)
     display grid
@@ -400,10 +400,12 @@ defaultCss = do
     textDecoration underline
   ".verbatim" & do
     fontMono
-    whiteSpace ClayText.pre
+    "white-space" -: "pre-wrap"
+    "word-break" -: "break-word" --
   ".code" & do
     fontMono
-    whiteSpace ClayText.pre
+    "white-space" -: "pre-wrap"
+    "word-break" -: "break-word"
     backgroundColor colorCodeBg
     border (px 1) solid colorCodeBorder
     ev borderRadius (rem 0.25)
@@ -418,6 +420,7 @@ defaultCss = do
   a ? do
     color colorNowebLinkFg
     textDecoration none
+    "word-break" -: "break-word"
     ":hover" & do
       textDecoration underline
     ":visited" & do
@@ -570,6 +573,8 @@ defaultCss = do
       roundedRectangleLink
       span ? do
         color colorNowebLinkFg
+    "white-space" -: "pre-wrap"
+    "word-break" -: "break-word"
   ".sourceCode" & do
     ev margin $ rem 0
   ".code-block-body" & do
