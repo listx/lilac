@@ -1116,10 +1116,10 @@ text in [[css:Document metadata]].
 #+begin_src haskell
 ".doc-meta-author" & do
   fontStyle italic
-  ev margin (px 2)
+  ev margin (rem 0.125)
 ".doc-meta-date" & do
   fontStyle italic
-  ev margin (px 2)
+  ev margin (rem 0.125)
 #+end_src
 
 ** Main content and cells
@@ -1424,8 +1424,8 @@ we compile (from [[id:783de6bf-e36b-4c9e-a405-2a86d0897795][Build configuration 
 #+name: css:Layout
 #+begin_src haskell
 html ? do
-  ev margin $ px 0
-  ev padding $ px 0
+  ev margin $ rem 0
+  ev padding $ rem 0
   backgroundColor colorBg
   color colorText
   fontSerif
@@ -1433,11 +1433,11 @@ html ? do
 body ? do
   minHeight (vh 100)
   display grid
-  gridTemplateColumns [px <<css:tocs-width>>, px 800]
+  gridTemplateColumns [rem <<css:tocs-width>>, rem 50]
   "grid-template-rows" -: "auto 1fr"
   "grid-template-areas"
     -: "\"navbar navbar\"\n\"tocs   main\""
-  yx margin (px 0) auto
+  yx margin (rem 0) auto
   overflowY auto
 <<css:navbar>>
 <<css:tocs>>
@@ -1452,7 +1452,7 @@ p # ".widget-title" -- (ref:css:Layout-widget-title)
     borderBottom (px 1) solid colorCodeBorder
 div ? do
   -- (ref:css:Layout-reset-div)
-  ev margin $ px 0
+  ev margin $ rem 0
 #+end_src
 
 The ~<body>~ uses a CSS grid layout to create four distinct areas:
@@ -1494,11 +1494,11 @@ The main content's padding and such is defined in [[css:main-content]].
 #+begin_src haskell
 main_ ? do
   "grid-area" -: "main"
-  marginLeft (px 17)
+  marginLeft (rem 1)
   height auto
   overflowY visible
-  padding (px 0) (px 20) (px 0) (px 20)
-  paddingLeft (px 50)
+  padding (rem 0) (rem 1.25) (rem 0) (rem 1.25)
+  paddingLeft (rem 3.125)
   "position" -: "relative"
   "top" -: "<<css:navbar-height>>"
 #+end_src
@@ -1839,13 +1839,13 @@ forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) -- (ref:css:Headings-loop)
       case n of
         1 -> do
           fontSize (rem 3)
-          headingPrefix "●" (rem 4) (rem $ -2.8) (px $ -3) -- (ref:css:Page title-symbol)
+          headingPrefix "●" (rem 4) (rem $ -2.8) (rem $ -0.1875) -- (ref:css:Page title-symbol)
         2 -> do
           fontSize (rem 2.4)
-          headingPrefix "<<symbol:h2>>" (rem 3) (rem $ -2.5) (px $ -3) -- (ref:css:Headings-h2-symbol)
+          headingPrefix "<<symbol:h2>>" (rem 3) (rem $ -2.5) (rem $ -0.1875) -- (ref:css:Headings-h2-symbol)
         3 -> do
           fontSize (rem 2)
-          headingPrefix "<<symbol:h3>>" (rem 2.35) (rem $ -2.25) (px $ -1) -- (ref:css:Headings-h3-symbol)
+          headingPrefix "<<symbol:h3>>" (rem 2.35) (rem $ -2.25) (rem $ -0.0625) -- (ref:css:Headings-h3-symbol)
         4 -> do
           fontSize (rem 1.6)
         5 -> do
@@ -1855,20 +1855,20 @@ forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) -- (ref:css:Headings-loop)
         _ -> pure ()
       position relative
       fontSans
-      marginTop (px 0)
-      marginBottom (px 0)
+      marginTop (rem 0)
+      marginBottom (rem 0)
       a ? do
         color $ colorFrom "#000000"
         ":visited" & do
           color colorText
       border (px 1) solid colorBg
-      yx padding 0 (px 5)
-      marginLeft (px (-7))
+      yx padding 0 (rem 0.3125)
+      marginLeft (rem (-0.4375))
       maxWidth fitContent
       ".active" & do
         border (px 1) solid colorActiveBorder
         backgroundColor colorActiveBg
-        ev borderRadius (px 5)
+        ev borderRadius (rem 0.3125)
 #+end_src
 
 We use [[f:headingPrefix]] as shown in the table below.
@@ -1905,7 +1905,7 @@ headingPrefix prefix fSize spacing fromTop =
     marginLeft spacing
     position absolute
     top fromTop
-    left (px 0)
+    left (rem 0)
     fontSize fSize
     fontFamily ["Arial"] [sansSerif]
     lineHeight $ unitless 1
@@ -1981,7 +1981,7 @@ defined in [[id:b616c1e2-6b42-41cf-8e5d-c1832f95b59b::data:Style][data:Style]].
   whiteSpace ClayText.pre
   backgroundColor colorCodeBg
   border (px 1) solid colorCodeBorder
-  ev borderRadius (px 4)
+  ev borderRadius (rem 0.25)
   yx padding 0 (em 0.2)
 ".smallcaps" & do
   fontVariant smallCaps
@@ -2258,8 +2258,8 @@ roundedRectangleLink :: Css
 roundedRectangleLink = do
   color colorNowebLinkFg
   backgroundColor colorNowebLinkBg
-  ev borderRadius (px 5)
-  yx padding (px 1) (px 3)
+  ev borderRadius (rem 0.25)
+  yx padding (rem 0.0625) (rem 0.1875)
   border (px 1) solid colorCodeBorder
   ":hover" & do
     border (px 1) solid colorNowebLinkFg
@@ -2752,7 +2752,7 @@ effects, as described below:
 #+name: css:Block controls inline
 #+begin_src haskell
 ".code-block-controls-inline" & do
-  yx padding (px 4) (px 8)
+  yx padding (rem 0.25) (rem 0.5)
   border (px 1) solid colorCodeBorder
   fontSans
   button # ".toggle-code-block-body" ? do
@@ -2760,7 +2760,7 @@ effects, as described below:
       "content" -: "\"Expand contents\"" -- (ref:css:Block controls inline-msg-expand)
     "border" -: "0"
     "cursor" -: "pointer"
-    ev borderRadius (px 2)
+    ev borderRadius (rem 0.125)
     border (px 1) solid colorCodeBorder
   button # ".toggle-code-block-body.action-collapse" ? do
     "::before" & do
@@ -2960,13 +2960,13 @@ Code blocks use a 2-column layout, with the first column being the
 #+begin_src haskell
 ".code-block-container" & do
   display grid
-  gridTemplateColumns [px 50, fr 1]
-  margin (px 16) 0 (px 16) (px (-50))
+  gridTemplateColumns [rem 3.125, fr 1]
+  margin (rem 1) 0 (rem 1) (rem (-3.125))
   position relative
   fontSize (rem 0.9)
   a ? do
     display inlineBlock
-    yx margin (px 2) 0
+    yx margin (rem 0.125) 0
 forM_
   [ ".code-block-meta",
     ".code-block-meta-raw",
@@ -2984,12 +2984,12 @@ over it or the overall container we display it.
 #+name: css:Block controls
 #+begin_src haskell
 ".code-block-controls" & do
-  padding (px 2) (px 5) 0 0
-  width (px 50)
+  padding (rem 0.125) (rem 0.3125) 0 0
+  width (rem 3.125)
   textAlign $ alignSide sideRight
   boxSizing borderBox
-  top (px 0)
-  bottom (px 0)
+  top (rem 0)
+  bottom (rem 0)
   position absolute
   "grid-column" -: "1"
   "grid-row" -: "1"
@@ -3012,10 +3012,10 @@ a # hover ? do
 button # ".toggle-code-block-meta-raw" ? do
   "::before" & do
     "content" -: "\"M\""
-  marginRight $ px 5
+  marginRight $ rem 0.3125
   "border" -: "0"
   "cursor" -: "pointer"
-  ev borderRadius (px 2)
+  ev borderRadius (rem 0.125)
   border (px 1) solid colorCodeBorder
 #+end_src
 
@@ -3035,11 +3035,11 @@ The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
 #+name: css:Block meta
 #+begin_src haskell
 ".code-block-meta" & do
-  yx padding 0 (px 8)
+  yx padding 0 (rem 0.5)
   border (px 1) solid colorCodeBorder
   borderBottomWidth 0
-  borderTopLeftRadius (px 5) (px 5)
-  borderTopRightRadius (px 5) (px 5)
+  borderTopLeftRadius (rem 0.3125) (rem 0.3125)
+  borderTopRightRadius (rem 0.3125) (rem 0.3125)
   fontSans
   a ? do
     ".parent-block-arrow" & do
@@ -3053,7 +3053,7 @@ The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
 #+name: css:Block meta raw
 #+begin_src haskell
 div # ".code-block-meta-raw" ? do
-  yx padding 0 (px 8)
+  yx padding 0 (rem 0.5)
   fontMono
   fontSize $ rem 0.9
   border (px 1) solid colorCodeBorder
@@ -3068,25 +3068,25 @@ div # ".code-block-meta-raw" ? do
 #+name: css:Block body
 #+begin_src haskell
 pre ? do
-  ev margin $ px 0
+  ev margin $ rem 0
 code ? do
-  ev margin $ px 0
+  ev margin $ rem 0
   a ? do
     roundedRectangleLink
     span ? do
       color colorNowebLinkFg
 ".sourceCode" & do
-  ev margin $ px 0
+  ev margin $ rem 0
 ".code-block-body" & do
   overflowX visible
   fontMono
   fontSize (rem 0.9)
   backgroundColor colorCodeBg
   color colorCodeFg
-  borderBottomLeftRadius (px 5) (px 5)
-  borderBottomRightRadius (px 5) (px 5)
+  borderBottomLeftRadius (rem 0.3125) (rem 0.3125)
+  borderBottomRightRadius (rem 0.3125) (rem 0.3125)
   border (px 1) solid colorCodeBorder
-  yx padding (px 2) (px 8)
+  yx padding (rem 0.125) (rem 0.5)
 ".active" ** ".code-block-body" ? do
   border (px 1) solid colorActiveBorder
   backgroundColor colorActiveBg
@@ -3115,19 +3115,19 @@ off the corners of the [[css:Block body]] and [[css:Block meta raw]]. See
 #+name: css:Block rounding
 #+begin_src haskell
 ".fully-rounded" & do
-  ev borderRadius (px 5)
+  ev borderRadius (rem 0.3125)
 ".top-rounded" & do
-  borderTopLeftRadius (px 5) (px 5)
-  borderTopRightRadius (px 5) (px 5)
+  borderTopLeftRadius (rem 0.3125) (rem 0.3125)
+  borderTopRightRadius (rem 0.3125) (rem 0.3125)
 -- (ref:css:Block rounding-bottom-rounded)
 ".bottom-rounded" & do
-  borderBottomLeftRadius (px 5) (px 5)
-  borderBottomRightRadius (px 5) (px 5)
+  borderBottomLeftRadius (rem 0.3125) (rem 0.3125)
+  borderBottomRightRadius (rem 0.3125) (rem 0.3125)
 -- (ref:css:Block rounding-hide-border-bottom)
 ".hide-border-bottom" & do
-  borderBottom (px 0) solid colorCodeBorder
+  borderBottom (rem 0) solid colorCodeBorder
 ".active" ** ".hide-border-bottom" ? do
-  borderBottom (px 0) solid colorCodeBorder
+  borderBottom (rem 0) solid colorCodeBorder
 #+end_src
 
 * Figures
@@ -3183,16 +3183,16 @@ weaveFigure lci figure = do
 #+begin_src haskell
 ".figure-image" & do
   display block
-  yx margin (px 0) auto
+  yx margin (rem 0) auto
 figcaption ? do
-  yx margin (px 10) auto
-  yx padding 0 (px 5)
+  yx margin (rem 0.625) auto
+  yx padding 0 (rem 0.3125)
   textAlign center
   fontSans
   maxWidth (pct 80)
   display displayTable
   border (px 1) solid colorBg
-  ev borderRadius (px 5)
+  ev borderRadius (rem 0.3125)
 ".caption-prefix" & do
   fontWeight bold
 <<css:active-figures>>
@@ -3208,7 +3208,7 @@ figure # ".active" ? do
   figcaption ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
-    ev borderRadius (px 5)
+    ev borderRadius (rem 0.3125)
 #+end_src
 
 * Math fragments
@@ -3604,7 +3604,7 @@ This demonstrates some of the complexities around ~markingCharacters~.
 #+begin_src haskell
 ".table-wrapper" & do
   border (px 2) solid colorCodeBorder
-  yx margin (px 0) auto
+  yx margin (rem 0) auto
   width fitContent
 table ? do
   fontSans
@@ -3613,9 +3613,9 @@ table ? do
     position sticky -- (ref:css:Tables-th-sticky)
     top (px $ -1) -- (ref:css:Tables-remove-gap)
     backgroundColor colorCodeBg
-    yx padding (px 4) (px 8)
+    yx padding (rem 0.25) (rem 0.5)
   td ? do
-    yx padding (px 4) (px 8)
+    yx padding (rem 0.25) (rem 0.5)
     ".table-cell-numeric" & do
       textAlign $ alignSide sideRight
   thead ? do
@@ -3624,10 +3624,10 @@ table ? do
     tr ? do
       ".table-horizontal-line" & do
         borderTop (px 3) solid colorCodeBorder
-        ev padding (px 0)
+        ev padding (rem 0)
         td ? do
           backgroundColor colorCodeBorder
-          yx padding (px 0) (px 0)
+          yx padding (rem 0) (rem 0)
       ".table-body-row" & do
         borderTop (px 2) solid colorCodeBorder
 ".table-vertical-thick-line-colgroup" & do
@@ -3711,9 +3711,9 @@ sup ? do
   ".footnote-link" & do
     a ? do
       borderStyle none
-      ev borderRadius (px 0)
-      yx padding 0 (px 0)
-      yx margin (px 0) 0
+      ev borderRadius (rem 0)
+      yx padding 0 (rem 0)
+      yx margin (rem 0) 0
       fontStyle normal
       ".internal-link" & do
         backgroundColor $ colorFrom "#ffffff"
@@ -3726,13 +3726,13 @@ sup ? do
             textDecoration underline
 p # ".footnote-definition" ? do
   border (px 1) solid colorBg
-  ev borderRadius (px 5)
-  marginLeft (px (-7))
-  yx padding 0 (px 5)
+  ev borderRadius (rem 0.3125)
+  marginLeft (rem (-0.4375))
+  yx padding 0 (rem 0.3125)
   ".active" & do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
-    ev borderRadius (px 5)
+    ev borderRadius (rem 0.3125)
   a # ".footnote-backlink" ? do
     display inlineBlock
 #+end_src
@@ -4031,11 +4031,11 @@ dd ? do
       textDecoration none
 div # ".glossary-term" ? do
   border (px 1) solid colorBg
-  yx padding (px 0) (px 5)
+  yx padding (rem 0) (rem 0.3125)
   ".active" & do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
-    ev borderRadius (px 5)
+    ev borderRadius (rem 0.3125)
 span # ".glossary-external-source" ? do
   fontSans
 #+end_src
@@ -5276,7 +5276,7 @@ The width of the TOC area is defined in [[css:tocs-width]]. It's reused in
 
 #+name: css:tocs-width
 #+begin_src css
-260
+16.25
 #+end_src
 
 #+name: css:tocs
@@ -5285,7 +5285,7 @@ nav # ".tocs" ? do
   "grid-area" -: "tocs"
   "height"
     -: "calc(100vh - <<css:navbar-height>>)"
-  width $ px <<css:tocs-width>>
+  width $ rem <<css:tocs-width>>
   fontSans
   position fixed
   "top" -: "<<css:navbar-height>>"
@@ -5497,14 +5497,14 @@ weaveHeadingAncestry lciCellPairs = do
 #+begin_src haskell
 ".toc-title" ? do
   "grid-area" -: "toc-title"
-  margin (px 0) (px 14) (px 4) (px 14)
+  margin (rem 0) (rem 0.875) (rem 0.25) (rem 0.875)
 nav # ".toc" ? do
   "grid-area" -: "toc"
   overflowY auto
   div # ".toc-entries" ? do
-    paddingLeft $ px 30
+    paddingLeft $ rem 1.875
     ol ? do
-      marginTop $ px 0
+      marginTop $ rem 0
       paddingLeft $ rem 0
       listStyleType none
       li # ".toc-level-1" ? do
@@ -5513,8 +5513,8 @@ nav # ".toc" ? do
           content $ stringContent "<<symbol:h2>>" -- (ref:css:page-toc-h2)
           marginLeft (rem $ -1.3)
           position absolute
-          left (px 0)
-          top (px $ -2)
+          left (rem 0)
+          top (rem $ -0.125)
           fontSize (rem 1.5)
           fontFamily ["Arial"] [sansSerif]
           lineHeight $ unitless 1
@@ -5524,15 +5524,15 @@ nav # ".toc" ? do
           content $ stringContent "<<symbol:h3>>" -- (ref:css:page-toc-h3)
           marginLeft (rem $ -1.3)
           position absolute
-          left (px 0)
-          top (px $ -2)
+          left (rem 0)
+          top (rem $ -0.125)
           fontSize (rem 1.5)
           fontFamily ["Arial"] [sansSerif]
           lineHeight $ unitless 1
       div ? do
-        paddingLeft $ px 30
-        paddingRight $ px 10
-        marginLeft $ px (-30)
+        paddingLeft $ rem 1.875
+        paddingRight $ rem 0.625
+        marginLeft $ rem (-1.875)
         ".active" & do
           backgroundColor colorTocActive
         ".active-ancestor" & do
@@ -5681,17 +5681,17 @@ it "0305-gtoc-ancestor" $ do
 #+begin_src haskell
 ".gtoc-title" ? do
   "grid-area" -: "gtoc-title"
-  yx margin (px 4) (px 14)
+  yx margin (rem 0.25) (rem 0.875)
 nav # ".gtoc" ? do
   "grid-area" -: "gtoc"
   maxHeight $ vh 50
-  paddingLeft $ px 16
+  paddingLeft $ rem 1
   overflowY auto
   fontSans
   ul ? do
-    marginTop $ px 0
-    marginBottom $ px 8
-    paddingLeft $ px 14
+    marginTop $ rem 0
+    marginBottom $ rem 0.5
+    paddingLeft $ rem 0.875
 #+end_src
 
 * Navigation bar
@@ -5837,7 +5837,7 @@ div # ".navbar" ? do
   "grid-area" -: "navbar"
   height $ rem 3
   "width" -: "100%"
-  top $ px 0
+  top $ rem 0
   position fixed
   "z-index" -: "1000"
   borderBottom (px 1) solid colorCodeBorder -- (ref:css:navbar-1px)
@@ -5861,7 +5861,7 @@ so that the navbar never hides something underneath it.
 #+name: css:navbar-link-target-adjustment
 #+begin_src css
 html {
-  scroll-padding-top: calc(4rem + 1px + 10px);
+  scroll-padding-top: calc(4rem + 1px + 0.625rem);
 }
 #+end_src
 
@@ -5878,7 +5878,7 @@ the page.
 div # ".breadcrumbs" ? do
   fontSans
   fontSize $ rem 1.6
-  margin (px 6) 0 0 (px 10)
+  margin (rem 0.375) 0 0 (rem 0.625)
 span # ".breadcrumb-separator" ? do
   color colorBreadcrumbSeparator
 #+end_src
@@ -6306,8 +6306,8 @@ forM_ [".backlinks", ".tangled-blocks", ".named-cells"] $ \metric -> do
   div # metric ? do
     fontSans
     ol ? do
-      ev margin $ px 0
-      paddingLeft $ px 15
+      ev margin $ rem 0
+      paddingLeft $ rem 0.9375
 #+end_src
 
 The lists of tangled file, backlinks, etc do not need any additional
@@ -6321,8 +6321,8 @@ footer ? do
     fontSans
     fontStyle italic
     fontSize $ rem 0.9
-    marginTop (px 40)
-    marginBottom (px 10)
+    marginTop (rem 2.5)
+    marginBottom (rem 0.625)
 #+end_src
 
 * Testing framework

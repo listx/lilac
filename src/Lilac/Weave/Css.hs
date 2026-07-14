@@ -211,8 +211,8 @@ kateLilac =
 defaultCss :: Css
 defaultCss = do
   html ? do
-    ev margin $ px 0
-    ev padding $ px 0
+    ev margin $ rem 0
+    ev padding $ rem 0
     backgroundColor colorBg
     color colorText
     fontSerif
@@ -220,17 +220,17 @@ defaultCss = do
   body ? do
     minHeight (vh 100)
     display grid
-    gridTemplateColumns [px 260, px 800]
+    gridTemplateColumns [rem 16.25, rem 50]
     "grid-template-rows" -: "auto 1fr"
     "grid-template-areas"
       -: "\"navbar navbar\"\n\"tocs   main\""
-    yx margin (px 0) auto
+    yx margin (rem 0) auto
     overflowY auto
   div # ".navbar" ? do
     "grid-area" -: "navbar"
     height $ rem 3
     "width" -: "100%"
-    top $ px 0
+    top $ rem 0
     position fixed
     "z-index" -: "1000"
     borderBottom (px 1) solid colorCodeBorder --
@@ -238,7 +238,7 @@ defaultCss = do
     div # ".breadcrumbs" ? do
       fontSans
       fontSize $ rem 1.6
-      margin (px 6) 0 0 (px 10)
+      margin (rem 0.375) 0 0 (rem 0.625)
     span # ".breadcrumb-separator" ? do
       color colorBreadcrumbSeparator
 
@@ -246,7 +246,7 @@ defaultCss = do
     "grid-area" -: "tocs"
     "height"
       -: "calc(100vh - 3rem)"
-    width $ px 260
+    width $ rem 16.25
     fontSans
     position fixed
     "top" -: "3rem"
@@ -261,14 +261,14 @@ defaultCss = do
 
   ".toc-title" ? do
     "grid-area" -: "toc-title"
-    margin (px 0) (px 14) (px 4) (px 14)
+    margin (rem 0) (rem 0.875) (rem 0.25) (rem 0.875)
   nav # ".toc" ? do
     "grid-area" -: "toc"
     overflowY auto
     div # ".toc-entries" ? do
-      paddingLeft $ px 30
+      paddingLeft $ rem 1.875
       ol ? do
-        marginTop $ px 0
+        marginTop $ rem 0
         paddingLeft $ rem 0
         listStyleType none
         li # ".toc-level-1" ? do
@@ -277,8 +277,8 @@ defaultCss = do
             content $ stringContent "■" --
             marginLeft (rem $ -1.3)
             position absolute
-            left (px 0)
-            top (px $ -2)
+            left (rem 0)
+            top (rem $ -0.125)
             fontSize (rem 1.5)
             fontFamily ["Arial"] [sansSerif]
             lineHeight $ unitless 1
@@ -288,15 +288,15 @@ defaultCss = do
             content $ stringContent "○" --
             marginLeft (rem $ -1.3)
             position absolute
-            left (px 0)
-            top (px $ -2)
+            left (rem 0)
+            top (rem $ -0.125)
             fontSize (rem 1.5)
             fontFamily ["Arial"] [sansSerif]
             lineHeight $ unitless 1
         div ? do
-          paddingLeft $ px 30
-          paddingRight $ px 10
-          marginLeft $ px (-30)
+          paddingLeft $ rem 1.875
+          paddingRight $ rem 0.625
+          marginLeft $ rem (-1.875)
           ".active" & do
             backgroundColor colorTocActive
           ".active-ancestor" & do
@@ -306,25 +306,25 @@ defaultCss = do
 
   ".gtoc-title" ? do
     "grid-area" -: "gtoc-title"
-    yx margin (px 4) (px 14)
+    yx margin (rem 0.25) (rem 0.875)
   nav # ".gtoc" ? do
     "grid-area" -: "gtoc"
     maxHeight $ vh 50
-    paddingLeft $ px 16
+    paddingLeft $ rem 1
     overflowY auto
     fontSans
     ul ? do
-      marginTop $ px 0
-      marginBottom $ px 8
-      paddingLeft $ px 14
+      marginTop $ rem 0
+      marginBottom $ rem 0.5
+      paddingLeft $ rem 0.875
 
   main_ ? do
     "grid-area" -: "main"
-    marginLeft (px 17)
+    marginLeft (rem 1)
     height auto
     overflowY visible
-    padding (px 0) (px 20) (px 0) (px 20)
-    paddingLeft (px 50)
+    padding (rem 0) (rem 1.25) (rem 0) (rem 1.25)
+    paddingLeft (rem 3.125)
     "position" -: "relative"
     "top" -: "3rem"
 
@@ -332,22 +332,22 @@ defaultCss = do
     div # metric ? do
       fontSans
       ol ? do
-        ev margin $ px 0
-        paddingLeft $ px 15
+        ev margin $ rem 0
+        paddingLeft $ rem 0.9375
   footer ? do
     div # ".lilac-stamp" ? do
       fontSans
       fontStyle italic
       fontSize $ rem 0.9
-      marginTop (px 40)
-      marginBottom (px 10) --
+      marginTop (rem 2.5)
+      marginBottom (rem 0.625) --
   p # ".widget-title" --
     ? do
       fontWeight bold
       borderBottom (px 1) solid colorCodeBorder
   div ? do
     --
-    ev margin $ px 0
+    ev margin $ rem 0
 
   hr ? do
     border (px 0) solid colorCodeBorder
@@ -361,13 +361,13 @@ defaultCss = do
         case n of
           1 -> do
             fontSize (rem 3)
-            headingPrefix "●" (rem 4) (rem $ -2.8) (px $ -3) --
+            headingPrefix "●" (rem 4) (rem $ -2.8) (rem $ -0.1875) --
           2 -> do
             fontSize (rem 2.4)
-            headingPrefix "■" (rem 3) (rem $ -2.5) (px $ -3) --
+            headingPrefix "■" (rem 3) (rem $ -2.5) (rem $ -0.1875) --
           3 -> do
             fontSize (rem 2)
-            headingPrefix "○" (rem 2.35) (rem $ -2.25) (px $ -1) --
+            headingPrefix "○" (rem 2.35) (rem $ -2.25) (rem $ -0.0625) --
           4 -> do
             fontSize (rem 1.6)
           5 -> do
@@ -377,20 +377,20 @@ defaultCss = do
           _ -> pure ()
         position relative
         fontSans
-        marginTop (px 0)
-        marginBottom (px 0)
+        marginTop (rem 0)
+        marginBottom (rem 0)
         a ? do
           color $ colorFrom "#000000"
           ":visited" & do
             color colorText
         border (px 1) solid colorBg
-        yx padding 0 (px 5)
-        marginLeft (px (-7))
+        yx padding 0 (rem 0.3125)
+        marginLeft (rem (-0.4375))
         maxWidth fitContent
         ".active" & do
           border (px 1) solid colorActiveBorder
           backgroundColor colorActiveBg
-          ev borderRadius (px 5)
+          ev borderRadius (rem 0.3125)
 
   ".bold" & do
     fontWeight bold
@@ -406,7 +406,7 @@ defaultCss = do
     whiteSpace ClayText.pre
     backgroundColor colorCodeBg
     border (px 1) solid colorCodeBorder
-    ev borderRadius (px 4)
+    ev borderRadius (rem 0.25)
     yx padding 0 (em 0.2)
   ".smallcaps" & do
     fontVariant smallCaps
@@ -475,13 +475,13 @@ defaultCss = do
 
   ".code-block-container" & do
     display grid
-    gridTemplateColumns [px 50, fr 1]
-    margin (px 16) 0 (px 16) (px (-50))
+    gridTemplateColumns [rem 3.125, fr 1]
+    margin (rem 1) 0 (rem 1) (rem (-3.125))
     position relative
     fontSize (rem 0.9)
     a ? do
       display inlineBlock
-      yx margin (px 2) 0
+      yx margin (rem 0.125) 0
   forM_
     [ ".code-block-meta",
       ".code-block-meta-raw",
@@ -493,12 +493,12 @@ defaultCss = do
         "grid-column" -: "2"
 
   ".code-block-controls" & do
-    padding (px 2) (px 5) 0 0
-    width (px 50)
+    padding (rem 0.125) (rem 0.3125) 0 0
+    width (rem 3.125)
     textAlign $ alignSide sideRight
     boxSizing borderBox
-    top (px 0)
-    bottom (px 0)
+    top (rem 0)
+    bottom (rem 0)
     position absolute
     "grid-column" -: "1"
     "grid-row" -: "1"
@@ -509,17 +509,17 @@ defaultCss = do
     button # ".toggle-code-block-meta-raw" ? do
       "::before" & do
         "content" -: "\"M\""
-      marginRight $ px 5
+      marginRight $ rem 0.3125
       "border" -: "0"
       "cursor" -: "pointer"
-      ev borderRadius (px 2)
+      ev borderRadius (rem 0.125)
       border (px 1) solid colorCodeBorder
   (".code-block-container" # hover) |> ".code-block-controls" ? do
     visibility visible
     opacity 1
 
   ".code-block-controls-inline" & do
-    yx padding (px 4) (px 8)
+    yx padding (rem 0.25) (rem 0.5)
     border (px 1) solid colorCodeBorder
     fontSans
     button # ".toggle-code-block-body" ? do
@@ -527,7 +527,7 @@ defaultCss = do
         "content" -: "\"Expand contents\"" --
       "border" -: "0"
       "cursor" -: "pointer"
-      ev borderRadius (px 2)
+      ev borderRadius (rem 0.125)
       border (px 1) solid colorCodeBorder
     button # ".toggle-code-block-body.action-collapse" ? do
       "::before" & do
@@ -536,11 +536,11 @@ defaultCss = do
     border (px 1) solid colorActiveBorder
 
   ".code-block-meta" & do
-    yx padding 0 (px 8)
+    yx padding 0 (rem 0.5)
     border (px 1) solid colorCodeBorder
     borderBottomWidth 0
-    borderTopLeftRadius (px 5) (px 5)
-    borderTopRightRadius (px 5) (px 5)
+    borderTopLeftRadius (rem 0.3125) (rem 0.3125)
+    borderTopRightRadius (rem 0.3125) (rem 0.3125)
     fontSans
     a ? do
       ".parent-block-arrow" & do
@@ -551,7 +551,7 @@ defaultCss = do
     borderBottomWidth 0
 
   div # ".code-block-meta-raw" ? do
-    yx padding 0 (px 8)
+    yx padding 0 (rem 0.5)
     fontMono
     fontSize $ rem 0.9
     border (px 1) solid colorCodeBorder
@@ -563,25 +563,25 @@ defaultCss = do
     borderBottomWidth 0
 
   pre ? do
-    ev margin $ px 0
+    ev margin $ rem 0
   code ? do
-    ev margin $ px 0
+    ev margin $ rem 0
     a ? do
       roundedRectangleLink
       span ? do
         color colorNowebLinkFg
   ".sourceCode" & do
-    ev margin $ px 0
+    ev margin $ rem 0
   ".code-block-body" & do
     overflowX visible
     fontMono
     fontSize (rem 0.9)
     backgroundColor colorCodeBg
     color colorCodeFg
-    borderBottomLeftRadius (px 5) (px 5)
-    borderBottomRightRadius (px 5) (px 5)
+    borderBottomLeftRadius (rem 0.3125) (rem 0.3125)
+    borderBottomRightRadius (rem 0.3125) (rem 0.3125)
     border (px 1) solid colorCodeBorder
-    yx padding (px 2) (px 8)
+    yx padding (rem 0.125) (rem 0.5)
   ".active" ** ".code-block-body" ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
@@ -595,43 +595,43 @@ defaultCss = do
       "content" -: "\" 👈\""
 
   ".fully-rounded" & do
-    ev borderRadius (px 5)
+    ev borderRadius (rem 0.3125)
   ".top-rounded" & do
-    borderTopLeftRadius (px 5) (px 5)
-    borderTopRightRadius (px 5) (px 5)
+    borderTopLeftRadius (rem 0.3125) (rem 0.3125)
+    borderTopRightRadius (rem 0.3125) (rem 0.3125)
   --
   ".bottom-rounded" & do
-    borderBottomLeftRadius (px 5) (px 5)
-    borderBottomRightRadius (px 5) (px 5)
+    borderBottomLeftRadius (rem 0.3125) (rem 0.3125)
+    borderBottomRightRadius (rem 0.3125) (rem 0.3125)
   --
   ".hide-border-bottom" & do
-    borderBottom (px 0) solid colorCodeBorder
+    borderBottom (rem 0) solid colorCodeBorder
   ".active" ** ".hide-border-bottom" ? do
-    borderBottom (px 0) solid colorCodeBorder
+    borderBottom (rem 0) solid colorCodeBorder
 
   ".figure-image" & do
     display block
-    yx margin (px 0) auto
+    yx margin (rem 0) auto
   figcaption ? do
-    yx margin (px 10) auto
-    yx padding 0 (px 5)
+    yx margin (rem 0.625) auto
+    yx padding 0 (rem 0.3125)
     textAlign center
     fontSans
     maxWidth (pct 80)
     display displayTable
     border (px 1) solid colorBg
-    ev borderRadius (px 5)
+    ev borderRadius (rem 0.3125)
   ".caption-prefix" & do
     fontWeight bold
   figure # ".active" ? do
     figcaption ? do
       border (px 1) solid colorActiveBorder
       backgroundColor colorActiveBg
-      ev borderRadius (px 5)
+      ev borderRadius (rem 0.3125)
 
   ".table-wrapper" & do
     border (px 2) solid colorCodeBorder
-    yx margin (px 0) auto
+    yx margin (rem 0) auto
     width fitContent
   table ? do
     fontSans
@@ -640,9 +640,9 @@ defaultCss = do
       position sticky --
       top (px $ -1) --
       backgroundColor colorCodeBg
-      yx padding (px 4) (px 8)
+      yx padding (rem 0.25) (rem 0.5)
     td ? do
-      yx padding (px 4) (px 8)
+      yx padding (rem 0.25) (rem 0.5)
       ".table-cell-numeric" & do
         textAlign $ alignSide sideRight
     thead ? do
@@ -651,10 +651,10 @@ defaultCss = do
       tr ? do
         ".table-horizontal-line" & do
           borderTop (px 3) solid colorCodeBorder
-          ev padding (px 0)
+          ev padding (rem 0)
           td ? do
             backgroundColor colorCodeBorder
-            yx padding (px 0) (px 0)
+            yx padding (rem 0) (rem 0)
         ".table-body-row" & do
           borderTop (px 2) solid colorCodeBorder
   ".table-vertical-thick-line-colgroup" & do
@@ -676,9 +676,9 @@ defaultCss = do
     ".footnote-link" & do
       a ? do
         borderStyle none
-        ev borderRadius (px 0)
-        yx padding 0 (px 0)
-        yx margin (px 0) 0
+        ev borderRadius (rem 0)
+        yx padding 0 (rem 0)
+        yx margin (rem 0) 0
         fontStyle normal
         ".internal-link" & do
           backgroundColor $ colorFrom "#ffffff"
@@ -691,13 +691,13 @@ defaultCss = do
               textDecoration underline
   p # ".footnote-definition" ? do
     border (px 1) solid colorBg
-    ev borderRadius (px 5)
-    marginLeft (px (-7))
-    yx padding 0 (px 5)
+    ev borderRadius (rem 0.3125)
+    marginLeft (rem (-0.4375))
+    yx padding 0 (rem 0.3125)
     ".active" & do
       border (px 1) solid colorActiveBorder
       backgroundColor colorActiveBg
-      ev borderRadius (px 5)
+      ev borderRadius (rem 0.3125)
     a # ".footnote-backlink" ? do
       display inlineBlock
 
@@ -721,27 +721,27 @@ defaultCss = do
         textDecoration none
   div # ".glossary-term" ? do
     border (px 1) solid colorBg
-    yx padding (px 0) (px 5)
+    yx padding (rem 0) (rem 0.3125)
     ".active" & do
       border (px 1) solid colorActiveBorder
       backgroundColor colorActiveBg
-      ev borderRadius (px 5)
+      ev borderRadius (rem 0.3125)
   span # ".glossary-external-source" ? do
     fontSans
 
   ".doc-meta-author" & do
     fontStyle italic
-    ev margin (px 2)
+    ev margin (rem 0.125)
   ".doc-meta-date" & do
     fontStyle italic
-    ev margin (px 2)
+    ev margin (rem 0.125)
 
 roundedRectangleLink :: Css
 roundedRectangleLink = do
   color colorNowebLinkFg
   backgroundColor colorNowebLinkBg
-  ev borderRadius (px 5)
-  yx padding (px 1) (px 3)
+  ev borderRadius (rem 0.25)
+  yx padding (rem 0.0625) (rem 0.1875)
   border (px 1) solid colorCodeBorder
   ":hover" & do
     border (px 1) solid colorNowebLinkFg
@@ -846,7 +846,7 @@ headingPrefix prefix fSize spacing fromTop =
     marginLeft spacing
     position absolute
     top fromTop
-    left (px 0)
+    left (rem 0)
     fontSize fSize
     fontFamily ["Arial"] [sansSerif]
     lineHeight $ unitless 1
