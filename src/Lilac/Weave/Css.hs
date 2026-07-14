@@ -103,7 +103,6 @@ import Clay
     position,
     pre,
     pretty,
-    pt,
     px,
     relative,
     rem,
@@ -217,6 +216,7 @@ defaultCss = do
     backgroundColor colorBg
     color colorText
     fontSerif
+    fontSize $ px 16
   body ? do
     minHeight (vh 100)
     display grid
@@ -279,7 +279,7 @@ defaultCss = do
             position absolute
             left (px 0)
             top (px $ -2)
-            fontSize (px 24)
+            fontSize (rem 1.5)
             fontFamily ["Arial"] [sansSerif]
             lineHeight $ unitless 1
         li # ".toc-level-2" ? do
@@ -290,7 +290,7 @@ defaultCss = do
             position absolute
             left (px 0)
             top (px $ -2)
-            fontSize (px 24)
+            fontSize (rem 1.5)
             fontFamily ["Arial"] [sansSerif]
             lineHeight $ unitless 1
         div ? do
@@ -360,20 +360,20 @@ defaultCss = do
       hN ? do
         case n of
           1 -> do
-            fontSize (pt 36)
-            headingPrefix "●" (px 67) (rem $ -2.8) (px $ -3) --
+            fontSize (rem 3)
+            headingPrefix "●" (rem 4) (rem $ -2.8) (px $ -3) --
           2 -> do
-            fontSize (pt 26)
-            headingPrefix "■" (px 44) (rem $ -2.5) (px $ -3) --
+            fontSize (rem 2.4)
+            headingPrefix "■" (rem 3) (rem $ -2.5) (px $ -3) --
           3 -> do
-            fontSize (pt 22)
-            headingPrefix "○" (px 39) (rem $ -2.25) (px $ -1) --
+            fontSize (rem 2)
+            headingPrefix "○" (rem 2.35) (rem $ -2.25) (px $ -1) --
           4 -> do
-            fontSize (pt 18)
+            fontSize (rem 1.6)
           5 -> do
-            fontSize (pt 16)
+            fontSize (rem 1.4)
           6 -> do
-            fontSize (pt 14)
+            fontSize (rem 1.2)
           _ -> pure ()
         position relative
         fontSans
@@ -553,6 +553,7 @@ defaultCss = do
   div # ".code-block-meta-raw" ? do
     yx padding 0 (px 8)
     fontMono
+    fontSize $ rem 0.9
     border (px 1) solid colorCodeBorder
     borderBottomWidth 0
     ".hidden" & do
@@ -715,7 +716,7 @@ defaultCss = do
       "content" -: "\"\\a\"" --
       whiteSpace ClayText.pre
     a # ".glossary-term-anchor" ? do
-      fontSize (em 0.7)
+      fontSize (rem 0.7)
       ":hover" & do
         textDecoration none
   div # ".glossary-term" ? do
