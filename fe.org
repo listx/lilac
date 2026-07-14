@@ -98,10 +98,15 @@ compilation process.
 #+begin_src clojure
 {:main lilac.core
  :optimizations :none ; (ref:cfg:lilac-fe-build-none)
- :output-to "js/lilac.js"
- :output-dir "js/cljs-dev"
- :asset-path "js/cljs-dev"}
+ :output-to "site/js/lilac.js"
+ :output-dir "site/js/cljs-dev"
+ :asset-path "js/cljs-dev"} ; (ref:cfg:lilac-fe-build-asset-path)
 #+end_src
+
+The ~:asset-path~ is where the HTML will try to load the various other JS files
+that the dev JS will depend on (dev JS is not a single JS file); because we will
+start the server inside the ~site~ folder (and ~resources/public~ is a symlink to
+the top-level ~site~ folder), we have to delete the leading ~site~ prefix.
 
 We can use the above like this:
 
@@ -177,9 +182,9 @@ file.
 #+begin_src clojure
 {:main lilac.core
  :optimizations :advanced
- :output-to "js/lilac.js"
- :output-dir "js/cljs-prod"
- :asset-path "js/cljs-prod"}
+ :output-to "site/js/lilac.js"
+ :output-dir "site/js/cljs-prod"
+ :asset-path "site/js/cljs-prod"}
 #+end_src
 
 You can run it like this:
@@ -201,11 +206,11 @@ prod-cljs: tangle
 #+end_src
 
 If we are readying Lilac for a production release, it will need to have the
-contents of the single JavaScript file (at ~js/lilac.js~) injected into the
+contents of the single JavaScript file (at ~site/js/lilac.js~) injected into the
 CLI binary. To perform this injection, we have to
 
   1) Run ~make prod-cljs~ to ensure we have the latest ~js/lilac.js~ file. This
-     also creates a ~js/lilac.js.injectme~ which is a copy of the
+     also creates a ~site/js/lilac.js.injectme~ which is a copy of the
      just-created (production) ~js/lilac.js~ file, per [[sh:update-injectable]].
 
   2) Recompile the CLI. This can be done with ~make tangle~ because tangling
@@ -214,27 +219,27 @@ CLI binary. To perform this injection, we have to
      [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]], Cabal will automatically detect whether the
      JavaScript file has changed and recompile the CLI if needed.
 
-[[sh:update-injectable]] just overwrites the path ~js/lilac.js.injectme~ with
-what's in ~js/lilac.js~.
+[[sh:update-injectable]] just overwrites the path ~site/js/lilac.js.injectme~ with
+what's in ~site/js/lilac.js~.
 
 #+name: sh:update-injectable
 #+begin_src sh
-cp -f js/lilac.js js/lilac.js.injectme
+cp -f site/js/lilac.js site/js/lilac.js.injectme
 #+end_src
 
-We cannot simply inject ~js/lilac.js~ directly because the development
+We cannot simply inject ~site/js/lilac.js~ directly because the development
 environment also uses the same file path in [[cfg:lilac-fe-build]] (and the
 development version of this file path does /not/ have a self-contained JS file).
 
-We track the ~js/lilac.js.injectme~ file in Git [[id:ae7b1a31-970d-41e4-b15a-8d7f383e1502::(.gitignore-js-injectme)][.gitignore]], because it's
-needed for compiling the Lilac CLI in [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]]. But don't want to
+Though the ~site/js/lilac.js.injectme~ file is
+needed for compiling the Lilac CLI in [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]], we don't want to
 see this file treated as regular text file (because it cannot be sensibly
 merged, and it doesn't make sense to show textual diffs of it between revisions
 as it is minified JS). For this reason we treat it as a binary file for Git.
 
 #+name: gitattributes-ignore-compiled-js
 #+begin_src gitattributes
-js/lilac.js.injectme binary
+site/js/lilac.js.injectme binary
 #+end_src
 
 ** Figwheel configuration
@@ -249,8 +254,8 @@ across all build files.
 #+header: :tangle figwheel-main.edn
 #+begin_src clojure
 {:watch-dirs ["src/fe"]
- :css-dirs ["css"]
- :open-url "http://localhost:9500"
+ :css-dirs ["site/css"]
+ :ring-server-options {:host "0.0.0.0" :port 8005 :join? false}
  :target-dir "js"
  :clean-outputs true}
 #+end_src
@@ -259,7 +264,7 @@ If you want to override these common ones in a build, you have to specify it
 using metadata. For example, you could do
 
 #+begin_src clojure
-^{:css-dirs ["css"]}
+^{:css-dirs ["site/css"]}
 {:main lilac.core}
 #+end_src
 

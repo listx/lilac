@@ -458,9 +458,6 @@ of the project.
 .hie
 .rebel_readline_history
 <<Generated pre-commit config>>
-js/*
-# (ref:.gitignore-js-injectme)
-!js/lilac.js.injectme
 cabal.config.nix
 cabal.project.local
 dist-newstyle
@@ -476,7 +473,13 @@ result*
 !**/.gitignore
 !**/.gitkeep
 !.build.yml
-site
+site/*.html
+site/css
+site/image
+site/vendor
+site/js/cljs-dev
+site/js/cljs-prod
+site/js/lilac.js
 site.tar.gz
 vendor
 !src/**
@@ -1378,14 +1381,12 @@ weave: $(image_svgs) $(archive_file) tangle $(vendored)
 #+end_src
 
 Because [[id:21ccfaf6-cd49-46b6-9075-4952f3eea207::f:lilacWeave][f:lilacWeave]] writes CSS to the ~css~ subdirectory, the CSS ends up getting
-written to ~css/default.css~. This ~css~ directory will not exist in CI (when
-Lilac is cloned and built on a fresh machine), so we have to create it.
-Otherwise, the [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::make:Build prod JS][make:Build prod JS]] rule will fail because the
-[[id:90d66ea1-a994-4fdb-b969-c28cec04352d::cfg:figwheel-main.edn][cfg:figwheel-main.edn]] expects the ~css~ directory to exist.
+written to ~site/css/default.css~. Otherwise, the [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::make:Build prod JS][make:Build prod JS]] rule will
+fail because the [[id:90d66ea1-a994-4fdb-b969-c28cec04352d::cfg:figwheel-main.edn][cfg:figwheel-main.edn]] expects the ~css~ directory to exist.
 
 The ~$(vendored)~ variable is defined at [[(Makefile:create-tarball-vendored)]].
 
-#+header: :tangle css/.gitkeep
+#+header: :tangle site/css/.gitkeep
 #+begin_src txt
 #+end_src
 
@@ -1399,7 +1400,7 @@ weave
 We add the ~--write-css~ flag at [[(weave-write-css)]] because we want to regenerate
 (every time) the CSS file from Haskell sources in [[id:7147b743-084d-4abc-8561-5417c7fe10b3::f:genCss][f:genCss]], in case anything in
 there changed. However we don't do the same for JavaScript (we don't supply
-~--write-js~), because we don't want to overwrite the same ~js/lilac.js~ path
+~--write-js~), because we don't want to overwrite the same ~site/js/lilac.js~ path
 used by [[id:783de6bf-e36b-4c9e-a405-2a86d0897795::make:Start frontend development environment (CLJS REPL)][make:Start frontend development environment (CLJS REPL)]].
 
 To clarify, there are 2 flavors of JavaScript artifacts, development and
@@ -1407,7 +1408,7 @@ production. The development version is not a single JavaScript file and is not
 optimized; this allows us to get a ClojureScript REPL where we can play around
 with a direct connection to a browser. The production flavor is a single,
 optimized JavaScript file and does not have ClojureScript REPL support. The
-production flavor is copied out to another file ~js/lilac.js.injectme~ by
+production flavor is copied out to another file ~site/js/lilac.js.injectme~ by
 [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::sh:update-injectable][sh:update-injectable]]. It is this separate file which is injected into Haskell in
 [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7::f:lilacJs][f:lilacJs]], so that Lilac is able to generate this file on its own.
 
@@ -1415,7 +1416,7 @@ When we're developing Lilac with Lilac, we generally want to only look at the
 development version of the JavaScript because this allows REPL interaction. This
 means we cannot use the ~--write-js~ flag to Lilac in [[make:Weave]], because doing so
 would make Lilac overwrite the development file (which shares the same
-~js/lilac.js~ target path that Lilac targets with the ~--write-js~ flag) with
+~site/js/lilac.js~ target path that Lilac targets with the ~--write-js~ flag) with
 its own (pre-baked) JS file.
 
 For serving the woven (development) HTML pages through a server (instead of
@@ -1691,7 +1692,7 @@ tab_width = 8
 [vendor-source-fonts.sh]
 indent_style = unset
 
-[js/lilac.js.injectme] # (ref:.editorconfig-injectme-binary)
+[site/js/lilac.js.injectme] # (ref:.editorconfig-injectme-binary)
 insert_final_newline = false
 trim_trailing_whitespace = false
 end_of_line = unset
@@ -2208,7 +2209,7 @@ license:        GPL-2.0-only
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
-  js/lilac.js.injectme
+  site/js/lilac.js.injectme
   src/Lilac/cli/init/only-local-imports.txt
   src/Lilac/cli/tangle/out-dir.txt
   src/Lilac/cli/weave/out-dir.txt

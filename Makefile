@@ -99,7 +99,7 @@ dev-cljs: tangle
 prod-cljs: tangle
 	clojure -M -m figwheel.main --build-once lilac-prod
 
-	cp -f js/lilac.js js/lilac.js.injectme
+	cp -f site/js/lilac.js site/js/lilac.js.injectme
 .PHONY: prod-cljs
 
 build: tangle lilac.cabal

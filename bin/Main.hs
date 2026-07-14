@@ -691,7 +691,7 @@ weaveToDisk projectConf outDir rootRelativePrefix archive acc objPath obj =
    in action : acc
 
 lilacJs :: Text
-lilacJs = TE.decodeUtf8 $(embedFile "js/lilac.js.injectme")
+lilacJs = TE.decodeUtf8 $(embedFile "site/js/lilac.js.injectme")
 
 lilacServe :: GlobalOpts -> ServeOpts -> IO ()
 lilacServe globalOpts serveOpts = do
