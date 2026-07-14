@@ -103,9 +103,14 @@ let
           *.nix
           *.sh
           *.toml
+          csl-styles/*
+          !csl-styles/acm-siggraph.csl
+          !csl-styles/ieee.csl
+          !csl-styles/nlm-citation-sequence-superscript.csl
           image
           Makefile
           nix
+          resources
           !src/**
         '';
       };
