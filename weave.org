@@ -1534,8 +1534,20 @@ as a grid).
   html {
     font-size: 12px; /* (ref:css:mobile-scale) */
   }
-  nav.tocs {
+  button#hamburger {
+    display: block;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1.6rem;
+    margin-left: 0.5rem;
+    margin-top: -0.25rem;
+  }
+  nav#tocs {
     display: none; /* (ref:css:mobile-disable-toc) */
+  }
+  nav#tocs.active {
+    display: grid;
   }
   body {
     display: block; /* (ref:css:mobile-body-block) */
@@ -5322,7 +5334,7 @@ The page contents track the first three levels of headings.
 #+begin_src haskell
 weaveAllTocs :: [(LCI, Cell)] -> HtmlWeaver ()
 weaveAllTocs lciCellPairs = do
-  nav_ [class_ "tocs"] $ do
+  nav_ [id_ "tocs"] $ do
     weaveConf <- ask
     weaveGtoc weaveConf.archive.gtoc
     weaveToc $ map snd lciCellPairs
@@ -5338,7 +5350,7 @@ The width of the TOC area is defined in [[css:tocs-width]]. It's reused in
 
 #+name: css:tocs
 #+begin_src haskell
-nav # ".tocs" ? do
+nav # "#tocs" ? do
   "grid-area" -: "tocs"
   "height"
     -: "calc(100vh - <<css:navbar-height>>)"
@@ -5752,6 +5764,9 @@ nav # ".gtoc" ? do
 #+end_src
 
 * Navigation bar
+:PROPERTIES:
+:ID:       35d768c0-3e2f-498a-8437-e4137c4500ba
+:END:
 
 The navigation bar is the horizontal bar at the top of the page.
 
@@ -5760,9 +5775,67 @@ The navigation bar is the horizontal bar at the top of the page.
 weaveNavbar :: HtmlWeaver ()
 weaveNavbar = do
   div_ [class_ "navbar"] $ do
+    -- (ref:f:weaveNavbar-hamburger)
+    button_ [id_ "hamburger", class_ "tocs-toggle-button"] $ do
+      toHtmlRaw ("&#x2630;" :: Text)
     div_ [class_ "breadcrumbs"] $ do
       weaveBreadcrumbs
 #+end_src
+
+#+name: css:navbar
+#+begin_src haskell
+div # ".navbar" ? do
+  "display" -: "flex"
+  "grid-area" -: "navbar"
+  height $ rem 3
+  "width" -: "100%"
+  top $ rem 0
+  position fixed
+  "z-index" -: "1000"
+  borderBottom (px 1) solid colorCodeBorder -- (ref:css:navbar-1px)
+  backgroundColor colorBg
+  <<css:hamburger>>
+  <<css:breadcrumbs>>
+#+end_src
+
+The total height of the navbar is \(3\mathrm{rem} + 1\mathrm{px}\) (and not just
+3rem) because of the 1-pixel border at the bottom [[(css:navbar-1px)]].
+
+#+name: css:navbar-height
+#+begin_src txt
+3rem
+#+end_src
+
+The navbar causes a problem for links that point to elements inside the page,
+because the browser will normally go to the target element by putting it at the
+top of the page, but the navbar will sit on top of it. So we have to adjust it
+so that the navbar never hides something underneath it.
+
+#+name: css:navbar-link-target-adjustment
+#+begin_src css
+html {
+  scroll-padding-top: calc(4rem + 1px + 0.625rem);
+}
+#+end_src
+
+** Hamburger button
+
+The hamburger button to toggle the TOC sidebar [[(f:weaveNavbar-hamburger)]] is only
+visible for mobile devices.
+
+#+name: css:hamburger
+#+begin_src haskell
+button # ".tocs-toggle-button" ? do
+  display displayNone
+#+end_src
+
+The JS that handles the toggling behavior is at [[id:f62e0e64-d9dc-44f6-acc2-54541dbf0e6d][Hamburger icon (toggle TOC
+sidebar)]].
+
+** Breadcrumbs
+:PROPERTIES:
+:ID:       649018db-d088-4a08-920c-0d64a0be27cd
+:END:
 
 One of the things in the navbar is the "breadcrumbs" area, which is the path
 that points to the current document. This path is constructed by starting with
@@ -5882,50 +5955,6 @@ it. If not, we leave it as a plaintext string.
 The reliance on ~originObjectPath~ assumes that the archive has object paths that
 are relative to the repository root. It could be that this is not true, but we
 don't bother to handle that edge case here.
-
-** CSS
-:PROPERTIES:
-:ID:       35d768c0-3e2f-498a-8437-e4137c4500ba
-:END:
-
-#+name: css:navbar
-#+begin_src haskell
-div # ".navbar" ? do
-  "grid-area" -: "navbar"
-  height $ rem 3
-  "width" -: "100%"
-  top $ rem 0
-  position fixed
-  "z-index" -: "1000"
-  borderBottom (px 1) solid colorCodeBorder -- (ref:css:navbar-1px)
-  backgroundColor colorBg
-  <<css:breadcrumbs>>
-#+end_src
-
-The total height of the navbar is \(3\mathrm{rem} + 1\mathrm{px}\) (and not just
-3rem) because of the 1-pixel border at the bottom [[(css:navbar-1px)]].
-
-#+name: css:navbar-height
-#+begin_src txt
-3rem
-#+end_src
-
-The navbar causes a problem for links that point to elements inside the page,
-because the browser will normally go to the target element by putting it at the
-top of the page, but the navbar will sit on top of it. So we have to adjust it
-so that the navbar never hides something underneath it.
-
-#+name: css:navbar-link-target-adjustment
-#+begin_src css
-html {
-  scroll-padding-top: calc(4rem + 1px + 0.625rem);
-}
-#+end_src
-
-*** Breadcrumbs
-:PROPERTIES:
-:ID:       649018db-d088-4a08-920c-0d64a0be27cd
-:END:
 
 The breadcrumbs ([[f:weaveBreadcrumbs]]) should be large and prominent at the top of
 the page.

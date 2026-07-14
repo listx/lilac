@@ -227,6 +227,7 @@ defaultCss = do
     yx margin (rem 0) auto
     overflowY auto
   div # ".navbar" ? do
+    "display" -: "flex"
     "grid-area" -: "navbar"
     height $ rem 3
     "width" -: "100%"
@@ -235,6 +236,9 @@ defaultCss = do
     "z-index" -: "1000"
     borderBottom (px 1) solid colorCodeBorder --
     backgroundColor colorBg
+    button # ".tocs-toggle-button" ? do
+      display displayNone
+
     div # ".breadcrumbs" ? do
       fontSans
       fontSize $ rem 1.6
@@ -242,7 +246,7 @@ defaultCss = do
     span # ".breadcrumb-separator" ? do
       color colorBreadcrumbSeparator
 
-  nav # ".tocs" ? do
+  nav # "#tocs" ? do
     "grid-area" -: "tocs"
     "height"
       -: "calc(100vh - 3rem)"

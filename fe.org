@@ -312,6 +312,7 @@ behavior.
 (ns lilac.core
   (:require [lilac.popstate-history :as history]
             [lilac.toc-active-entries :as tae]
+            [lilac.hamburger :as hamburger]
             [lilac.lazy-scroll :as lazy-scroll]
             [lilac.code-block-controls :as cbc]))
 
@@ -319,6 +320,7 @@ behavior.
 (tae/init)
 (lazy-scroll/init)
 (cbc/init)
+(hamburger/init)
 (js/console.log "Lilac loaded successfully.")
 #+end_src
 
@@ -623,6 +625,46 @@ equivalent thing for scrolling down (where we check for the bounding box of the
 When ClojureScript encounters ~#js~ [[(f:maybe-scroll-toc-js-reader-macro)]], it
 converts the Clojure data structure that follows it into its nearest JavaScript
 equivalent. So for Clojure maps, it creates a JSON object.
+
+** Hamburger icon (toggle TOC sidebar)
+:PROPERTIES:
+:ID:       f62e0e64-d9dc-44f6-acc2-54541dbf0e6d
+:END:
+
+Make the [[id:35d768c0-3e2f-498a-8437-e4137c4500ba::(f:weaveNavbar-hamburger)][hamburger icon]] toggle the sidebar, for mobile devices. Because the
+hamburger itself is only rendered for mobile devices via CSS, we don't have to
+worry at all about whether the device is mobile or not in the CLJS below.
+
+#+name: ns:lilac.hamburger
+#+header: :tangle src/fe/lilac/hamburger.cljs
+#+begin_src clojure
+(ns lilac.hamburger)
+
+(defn init-sidebar-for-mobile []
+  (let [sidebar (.getElementById js/document "tocs")
+        hamburger  (.getElementById js/document "hamburger")]
+
+    ; (ref:ns:lilac.hamburger-toggle-sidebar)
+    (.addEventListener hamburger "click"
+      (fn [e]
+        (.stopPropagation e)
+        (-> sidebar .-classList (.toggle "active"))))
+
+    ; (ref:ns:lilac.hamburger-close-sidebar)
+    (.addEventListener js/document "click"
+      (fn [e]
+        (when (and (-> sidebar .-classList (.contains "active"))
+                   (not (.contains sidebar (.-target e))))
+          (-> sidebar .-classList (.remove "active")))))))
+
+(defn init []
+  (.addEventListener js/document "DOMContentLoaded"
+    (fn [_] (init-sidebar-for-mobile))))
+#+end_src
+
+[[(ns:lilac.hamburger-toggle-sidebar)]] toggles the sidebar whenever we click on the
+hamburger icon. [[(ns:lilac.hamburger-close-sidebar)]] closes the sidebar whenever
+we click something in the document which isn't the sidebar.
 
 ** Lazy scroll
 

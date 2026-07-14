@@ -1693,7 +1693,7 @@ toNormalizedText prose =
 
 weaveAllTocs :: [(LCI, Cell)] -> HtmlWeaver ()
 weaveAllTocs lciCellPairs = do
-  nav_ [class_ "tocs"] $ do
+  nav_ [id_ "tocs"] $ do
     weaveConf <- ask
     weaveGtoc weaveConf.archive.gtoc
     weaveToc $ map snd lciCellPairs
@@ -1893,6 +1893,9 @@ weaveHeadingAncestry lciCellPairs = do
 weaveNavbar :: HtmlWeaver ()
 weaveNavbar = do
   div_ [class_ "navbar"] $ do
+    --
+    button_ [id_ "hamburger", class_ "tocs-toggle-button"] $ do
+      toHtmlRaw ("&#x2630;" :: Text)
     div_ [class_ "breadcrumbs"] $ do
       weaveBreadcrumbs
 
