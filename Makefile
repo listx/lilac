@@ -57,12 +57,6 @@ image_svgs = $(image_sources:.pikchr=.svg)
 	@echo "Compiling Pikchr diagram: $<"
 	pikchr --svg-only $< > $@
 
-weave: $(image_svgs) $(archive_file) tangle $(vendored)
-	rm -rf site/image site/vendor
-	lilac weave $(archive_file) --out-dir site --write-css #
-	cp -r image vendor site
-	touch weave
-
 #
 vendored := \
 	vendor/source-fonts \
@@ -91,6 +85,12 @@ publish: weave site.tar.gz
 		-Fcontent=@site.tar.gz \
 		https://pages.sr.ht/publish/lilac.funloop.org
 	touch publish
+
+weave: $(image_svgs) $(archive_file) tangle $(vendored)
+	rm -rf site/image site/vendor
+	lilac weave $(archive_file) --out-dir site --write-css #
+	cp -r image vendor site
+	touch weave
 
 dev-cljs: tangle
 	clojure -M -m figwheel.main --build lilac --repl
