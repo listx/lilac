@@ -172,10 +172,12 @@ import Lilac.Types
       ),
     StyleMask (StyleMask),
     StyledText (StyledText, body, style),
-    Table (Table, caption, grid, meta, parentOid),
+    Table (Table, caption, grid, meta, parentOid, textAlign),
+    TextAlign,
     defaultOrgParserConf,
     defaultOrgParserState,
     fromText,
+    isTextAlignMarker,
     markingChars,
     nilOid,
     protocolsEmacs,
@@ -261,7 +263,9 @@ import Relude
     many,
     map,
     mapM_,
+    maybe,
     maybeToList,
+    mempty,
     modify,
     not,
     notElem,
@@ -1991,6 +1995,7 @@ tableParser = do
   rows <- MP.some $ tableLineParser <|> tableRowParser
   _ <- MP.optional tableFormulaParser --
   let newTableNumber = pState.tableNumber + 1
+      grid = fromList $ rowsToTuples rows --
   modify (\s -> s {tableNumber = newTableNumber})
   pure
     . CTable
@@ -1999,7 +2004,8 @@ tableParser = do
           firstParentOid pState.docOid pState.headingOidStack,
         meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         caption = caption,
-        grid = fromList $ rowsToTuples rows --
+        textAlign = getTextAlign grid, --
+        grid = grid
       }
 
 tableFormulaParser :: OrgParser ()
@@ -2059,6 +2065,7 @@ tableCellParser :: OrgParser Prose
 tableCellParser = do
   prose <-
     onlyMarkingCharacterParser
+      <|> textAlignMarkerParser
       <|> (proseParser $ whitespaceCompressor spacesInsideProse)
   _ <- MP.optional onlySpaces
   _ <- char '|'
@@ -2084,6 +2091,38 @@ tableCellParser = do
           [ PTokenStyledText
               StyledText {body = T.singleton c, style = styleMaskFrom []}
           ]
+
+textAlignMarkerParser :: OrgParser Prose
+textAlignMarkerParser = do
+  let textAlignMarker :: OrgParser Char
+      textAlignMarker = do
+        _ <- char '<'
+        side <- MP.satisfy (`elem` ['c', 'l', 'r'])
+        _ <- MP.takeWhileP (Just "charWidth") isDigitChar
+        _ <- char '>'
+        pure side
+      tableCellBoundary = do
+        _ <- onlySpaces
+        _ <- char '|'
+        pure ()
+  _ <- MP.try $ MP.lookAhead (textAlignMarker >> tableCellBoundary)
+  side <- textAlignMarker
+  pure
+    $ Prose
+      [ PTokenStyledText
+          StyledText
+            { body = "text-align-" <> T.singleton side <> "\NUL", --
+              style = styleMaskFrom []
+            }
+      ]
+
+getTextAlign :: Map (Int, Int) Prose -> Map Int TextAlign
+getTextAlign grid = M.foldlWithKey' f mempty grid
+  where
+    f :: Map Int TextAlign -> (Int, Int) -> Prose -> Map Int TextAlign
+    f acc (_row, col) tableCell =
+      maybe acc (\v -> insert col v acc)
+        $ isTextAlignMarker tableCell
 
 rowsToTuples :: [[Prose]] -> [((Int, Int), Prose)]
 rowsToTuples rows = concatMap rowToTuples $ zip [1 ..] rows

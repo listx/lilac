@@ -205,7 +205,8 @@ import Lilac.Types
         Verbatim
       ),
     StyledText (StyledText, body, style),
-    Table (caption, grid, meta),
+    Table (caption, grid, meta, textAlign),
+    TextAlign (TextAlignCenter, TextAlignLeft, TextAlignRight),
     WeaveConf
       ( archive,
         citeprocResult,
@@ -224,6 +225,7 @@ import Lilac.Types
     getSectionNumber,
     getTangled,
     getTangledBlocks,
+    isTextAlignMarker,
     markingChars,
     markingCharsInvisible,
     ptext,
@@ -672,6 +674,8 @@ import Clay
     rgb,
     sansSerif,
     serif,
+    sideCenter,
+    sideLeft,
     sideRight,
     smallCaps,
     solid,
@@ -3538,6 +3542,9 @@ when we have variables like ~numCols~ [[(f:weaveTableColumnGroups-numCols)]] to 
 the /total/ number of columns.
 
 ** Rows
+:PROPERTIES:
+:ID:       3639163b-03e8-49a6-9f41-7a275780c1bb
+:END:
 
 The first row is the called the table "head" (for ~<thead>~) and the rest are the
 "body" (for ~<tbody>~).
@@ -3569,32 +3576,44 @@ The table body is more complicated, because of a few things:
 
   - checking whether the row is visible at all [[(f:weaveTableBody-visibleRow)]]
     (the marking characters in [[id:3b072b1b-c63e-4fca-ab56-9388d11aa3c0::f:markingCharsInvisible][f:markingCharsInvisible]] render the entire row
-    invisible), and
+    invisible),
 
   - checking whether the table cell is mostly numeric in nature
     [[(f:weaveTableBody-numeric)]], in which case we add the ~table-cell-numeric~
     class to make the text inside the cell right-aligned (so that the digits of
     the same unit (tens, hundreds, etc) line up vertically with other numeric
-    cells in the same column).
+    cells in the same column), and
+
+  - checking whether the table cell should be aligned a particular way
+    [[(f:weaveTableBody-textAlignMarkers)]], despite what we said above about
+    numeric cells.
 
 #+name: f:weaveTableBody
 #+begin_src haskell
 weaveTableBody :: Table -> [Prose] -> HtmlWeaver ()
 weaveTableBody table columnNames = do
   tbody_ [] $ do
-    forM_ (getRows visibleRows) $ \row ->
-      if row == [Prose []] -- (ref:f:weaveTableBody-hline)
-        then do
+    forM_ (getRows visibleRows) $ \row -> do
+      case row of
+        (hasTextAlignMarkers -> True) -> pure ()
+        -- (ref:f:weaveTableBody-hline)
+        [Prose []] -> do
           tr_ [class_ "table-horizontal-line"] $ do
             forM_ columnNames $ \_ -> do
               td_ [] $ toHtml @Text ""
-        else do
+        _ -> do
           tr_ [class_ "table-body-row"] $ do
-            forM_ row $ \prose -> do
-              let tdAttrs =
-                    if mostlyNumeric prose -- (ref:f:weaveTableBody-numeric)
-                      then [class_ "table-cell-numeric"]
-                      else []
+            forM_ (zip [1 ..] row) $ \(colNum, prose) -> do
+              let tdAttrs
+                    -- (ref:f:weaveTableBody-textAlignMarkers)
+                    | Just ta <- lookup colNum table.textAlign =
+                        case ta of
+                          TextAlignLeft -> [class_ "table-cell-text-align-left"]
+                          TextAlignCenter -> [class_ "table-cell-text-align-center"]
+                          TextAlignRight -> [class_ "table-cell-text-align-right"]
+                    -- (ref:f:weaveTableBody-numeric)
+                    | mostlyNumeric prose = [class_ "table-cell-numeric"]
+                    | otherwise = []
               td_ tdAttrs $ weaveProse prose
   where
     getRows rowNums = map (getTableCellsFromRow table) rowNums
@@ -3616,6 +3635,8 @@ weaveTableBody table columnNames = do
             PTokenStyledText styledText -> styledText.body
             _ -> ""
        in isNumericText rawText
+    hasTextAlignMarkers :: [Prose] -> Bool
+    hasTextAlignMarkers = any (isJust . isTextAlignMarker)
 #+end_src
 
 We get all visible rows by looking at all rows (up to the maximum (bottommost)
@@ -3704,6 +3725,12 @@ table ? do
 ".table-vertical-thin-line-col" & do
   -- (ref:css:Tables-border-left-thin)
   borderLeft (px 2) solid colorCodeBorder
+".table-cell-text-align-left" & do
+  textAlign $ alignSide sideLeft
+".table-cell-text-align-center" & do
+  textAlign $ alignSide sideCenter
+".table-cell-text-align-right" & do
+  textAlign $ alignSide sideRight
 #+end_src
 
 [[(css:Tables-remove-gap)]] sets the starting position of the header cell (~<th>~) to

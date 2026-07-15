@@ -700,10 +700,12 @@ import Lilac.Types
       ),
     StyleMask (StyleMask),
     StyledText (StyledText, body, style),
-    Table (Table, caption, grid, meta, parentOid),
+    Table (Table, caption, grid, meta, parentOid, textAlign),
+    TextAlign,
     defaultOrgParserConf,
     defaultOrgParserState,
     fromText,
+    isTextAlignMarker,
     markingChars,
     nilOid,
     protocolsEmacs,
@@ -789,7 +791,9 @@ import Relude
     many,
     map,
     mapM_,
+    maybe,
     maybeToList,
+    mempty,
     modify,
     not,
     notElem,
@@ -944,6 +948,8 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:tableHorizontalLine>>
 <<f:tableRowParser>>
 <<f:tableCellParser>>
+<<f:textAlignMarkerParser>>
+<<f:getTextAlign>>
 <<f:rowsToTuples>>
 <<f:rowToTuples>>
 <<f:footnoteLinkParser>>
@@ -11678,6 +11684,7 @@ data Table = Table
   { parentOid :: OID, -- (ref:data:Table-parentOid)
     meta :: Map Text Text,
     caption :: Prose, -- (ref:data:Table-caption)
+    textAlign :: Map Int TextAlign,
     grid :: Map (Int, Int) Prose -- (ref:data:Table-grid)
   }
   deriving stock (Eq, Ord, Generic, Show)
@@ -11728,6 +11735,7 @@ tableParser = do
   rows <- MP.some $ tableLineParser <|> tableRowParser
   _ <- MP.optional tableFormulaParser -- (ref:f:tableParser-tableFormulaParser)
   let newTableNumber = pState.tableNumber + 1
+      grid = fromList $ rowsToTuples rows -- (ref:f:tableParser-rowsToTuples)
   modify (\s -> s {tableNumber = newTableNumber})
   pure
     . CTable
@@ -11736,7 +11744,8 @@ tableParser = do
           firstParentOid pState.docOid pState.headingOidStack,
         meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         caption = caption,
-        grid = fromList $ rowsToTuples rows -- (ref:f:tableParser-rowsToTuples)
+        textAlign = getTextAlign grid, -- (ref:f:tableParser-getTextAlign)
+        grid = grid
       }
 #+end_src
 
@@ -11840,6 +11849,7 @@ tableCellParser :: OrgParser Prose
 tableCellParser = do
   prose <-
     onlyMarkingCharacterParser
+      <|> textAlignMarkerParser
       <|> (proseParser $ whitespaceCompressor spacesInsideProse)
   _ <- MP.optional onlySpaces
   _ <- char '|'
@@ -11925,6 +11935,106 @@ tableFormulaParser = do
   _ <- MP.takeWhile1P (Just "table formula") (/= '\n')
   _ <- char '\n'
   pure ()
+#+end_src
+
+** Text alignment
+:PROPERTIES:
+:ID:       856f7754-5259-4b5e-a3f1-47db1b0ace86
+:END:
+
+Orgmode allows you to manually set the text alignment of table columns, with a
+syntax like
+
+#+name: example:text-alignment-markers
+#+begin_src org
+| foo          |   bar    |           baz |
+|--------------+----------+---------------|
+| <l>          |   <c>    |           <r> |
+| left-aligned | centered | right-aligned |
+| ...          |   ...    |           ... |
+#+end_src
+
+where the left, center, or right alignment is denoted by ~<l>~, ~<c>~, or ~<r>~,
+respectively. You can also put a number after the letter, like ~<l20>~ to say that
+Orgmode should only show 20 characters of width in Emacs.
+
+[[data:TextAlign]] encodes the 3 alignment possibilities.
+
+#+name: data:TextAlign
+#+begin_src haskell
+type TextAlign :: Type
+data TextAlign
+  = TextAlignLeft
+  | TextAlignCenter
+  | TextAlignRight
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+We detect the alignment markers similar to [[f:tableLineParser]]; once we parse the
+markers, we return a special ~Prose~ string which can only be created by us (by
+having a ~\NUL~ byte in it [[(f:textAlignMarkerParser-nul-byte)]], just like for
+[[f:tableHorizontalLine]]).
+
+#+name: f:textAlignMarkerParser
+#+begin_src haskell
+textAlignMarkerParser :: OrgParser Prose
+textAlignMarkerParser = do
+  let textAlignMarker :: OrgParser Char
+      textAlignMarker = do
+        _ <- char '<'
+        side <- MP.satisfy (`elem` ['c', 'l', 'r'])
+        _ <- MP.takeWhileP (Just "charWidth") isDigitChar
+        _ <- char '>'
+        pure side
+      tableCellBoundary = do
+        _ <- onlySpaces
+        _ <- char '|'
+        pure ()
+  _ <- MP.try $ MP.lookAhead (textAlignMarker >> tableCellBoundary)
+  side <- textAlignMarker
+  pure
+    $ Prose
+      [ PTokenStyledText
+          StyledText
+            { body = "text-align-" <> T.singleton side <> "\NUL", -- (ref:f:textAlignMarkerParser-nul-byte)
+              style = styleMaskFrom []
+            }
+      ]
+#+end_src
+
+[[f:getTextAlign]] just loops through all key/value pairs and sees if any are the
+special ~Prose~ values. If so, it saves the column number and text alignment into
+a new map, which we use in [[f:tableParser]] [[(f:tableParser-getTextAlign)]].
+
+#+name: f:getTextAlign
+#+begin_src haskell
+getTextAlign :: Map (Int, Int) Prose -> Map Int TextAlign
+getTextAlign grid = M.foldlWithKey' f mempty grid
+  where
+    f :: Map Int TextAlign -> (Int, Int) -> Prose -> Map Int TextAlign
+    f acc (_row, col) tableCell =
+      maybe acc (\v -> insert col v acc)
+        $ isTextAlignMarker tableCell
+#+end_src
+
+[[f:isTextAlignMarker]] checks if a ~Prose~ value encodes the special value we used at
+[[(f:textAlignMarkerParser-nul-byte)]]. It is used in [[id:3639163b-03e8-49a6-9f41-7a275780c1bb::f:weaveTableBody][f:weaveTableBody]].
+
+#+name: f:isTextAlignMarker
+#+begin_src haskell
+isTextAlignMarker :: Prose -> Maybe TextAlign
+isTextAlignMarker tableCell = f tableCell.unProse
+  where
+    f :: [PToken] -> Maybe TextAlign
+    f pTokens
+      | [PTokenStyledText styledText] <- pTokens =
+          case styledText.body of
+            "text-align-l\NUL" -> Just TextAlignLeft
+            "text-align-c\NUL" -> Just TextAlignCenter
+            "text-align-r\NUL" -> Just TextAlignRight
+            _ -> Nothing
+      | otherwise = Nothing
 #+end_src
 
 ** Numeric table cells
@@ -12042,6 +12152,7 @@ shouldParseWithState
                     body = "E = mc^2"
                   }
             ],
+        textAlign = mempty,
         grid =
           fromList
             [ ( (1, 1),
@@ -12193,6 +12304,7 @@ shouldParseWithState
               ("__table_number", "1")
             ],
         caption = Prose [],
+        textAlign = mempty,
         grid =
           fromList
             [ ( (1, 1),
@@ -12330,6 +12442,7 @@ shouldParseWithState
             [ ("__table_number", "1")
             ],
         caption = Prose [],
+        textAlign = mempty,
         grid =
           fromList
             [ ( (1, 1),
@@ -12346,6 +12459,95 @@ shouldParseWithState
               ),
               ( (3, 2),
                 Prose [ptext "#not-a-comment" []]
+              )
+            ]
+      }
+]
+#+end_src
+
+Check parsing of text alignment markers.
+
+#+name: ti:0012-text-alignment-marker
+#+header: :tangle test/Lilac/ParseSpec/0012-text-alignment-marker
+#+begin_src org
+<<example:text-alignment-markers>>
+#+end_src
+
+#+name: t:0012-text-alignment-marker
+#+begin_src haskell
+shouldParseWithState
+  "0012-text-alignment-marker"
+  ( nilOrgDoc
+      <<Expected cells for 0012-text-alignment-marker>>
+      []
+  )
+  defaultOrgParserState
+    { tableNumber = 1
+    }
+#+end_src
+
+#+name: Expected cells for 0012-text-alignment-marker
+#+begin_src haskell
+[ CTable
+    Table
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__table_number", "1")
+            ],
+        caption = Prose [],
+        textAlign =
+          fromList
+            [ ( 1,
+                TextAlignLeft
+              ),
+              ( 2,
+                TextAlignCenter
+              ),
+              ( 3,
+                TextAlignRight
+              )
+            ],
+        grid =
+          fromList
+            [ ( (1, 1),
+                Prose [ptext "foo" []]
+              ),
+              ( (1, 2),
+                Prose [ptext "bar" []]
+              ),
+              ( (1, 3),
+                Prose [ptext "baz" []]
+              ),
+              ( (2, 1),
+                L.tableHorizontalLine
+              ),
+              ( (3, 1),
+                Prose [ptext "text-align-l\NUL" []]
+              ),
+              ( (3, 2),
+                Prose [ptext "text-align-c\NUL" []]
+              ),
+              ( (3, 3),
+                Prose [ptext "text-align-r\NUL" []]
+              ),
+              ( (4, 1),
+                Prose [ptext "left-aligned" []]
+              ),
+              ( (4, 2),
+                Prose [ptext "centered" []]
+              ),
+              ( (4, 3),
+                Prose [ptext "right-aligned" []]
+              ),
+              ( (5, 1),
+                Prose [ptext "..." []]
+              ),
+              ( (5, 2),
+                Prose [ptext "..." []]
+              ),
+              ( (5, 3),
+                Prose [ptext "..." []]
               )
             ]
       }
@@ -12899,7 +13101,8 @@ import Lilac.Types
     PseudoEdge (PseudoEdge),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
-    Table (Table, caption, grid, meta, parentOid),
+    Table (Table, caption, grid, meta, parentOid, textAlign),
+    TextAlign (TextAlignCenter, TextAlignLeft, TextAlignRight),
     defaultOrgParserState,
     fromWords,
     nilOid,
@@ -12922,6 +13125,7 @@ import Relude
     Type,
     forM_,
     fromList,
+    mempty,
     repeat,
     runStateT,
     show,
@@ -13278,6 +13482,7 @@ Below are all of the individual test cases.
 <<t:0012-tables-and-prose>>
 <<t:0012-tables-inside-lists>>
 <<t:0012-non-marking-char>>
+<<t:0012-text-alignment-marker>>
 <<t:0013-footnotes-broken-link>>
 <<t:0013-footnotes-unused-def>>
 <<t:0013-footnotes-simple>>

@@ -44,6 +44,7 @@ module Lilac.Types
     StyledText (..),
     Table (..),
     TangleOpts (..),
+    TextAlign (..),
     WeaveConf (..),
     WeaveOpts (..),
     decodeGPath,
@@ -63,6 +64,7 @@ module Lilac.Types
     getSectionNumber,
     getTangled,
     getTangledBlocks,
+    isTextAlignMarker,
     markingChars,
     markingCharsInvisible,
     nilOid,
@@ -546,10 +548,32 @@ data Table = Table
   { parentOid :: OID, --
     meta :: Map Text Text,
     caption :: Prose, --
+    textAlign :: Map Int TextAlign,
     grid :: Map (Int, Int) Prose --
   }
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
+
+type TextAlign :: Type
+data TextAlign
+  = TextAlignLeft
+  | TextAlignCenter
+  | TextAlignRight
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
+isTextAlignMarker :: Prose -> Maybe TextAlign
+isTextAlignMarker tableCell = f tableCell.unProse
+  where
+    f :: [PToken] -> Maybe TextAlign
+    f pTokens
+      | [PTokenStyledText styledText] <- pTokens =
+          case styledText.body of
+            "text-align-l\NUL" -> Just TextAlignLeft
+            "text-align-c\NUL" -> Just TextAlignCenter
+            "text-align-r\NUL" -> Just TextAlignRight
+            _ -> Nothing
+      | otherwise = Nothing
 
 instance Show StyleMask where
   show (StyleMask a) = "styleMaskFrom " <> x

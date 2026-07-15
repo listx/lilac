@@ -110,6 +110,8 @@ import Clay
     rgb,
     sansSerif,
     serif,
+    sideCenter,
+    sideLeft,
     sideRight,
     smallCaps,
     solid,
@@ -671,6 +673,12 @@ defaultCss = do
   ".table-vertical-thin-line-col" & do
     --
     borderLeft (px 2) solid colorCodeBorder
+  ".table-cell-text-align-left" & do
+    textAlign $ alignSide sideLeft
+  ".table-cell-text-align-center" & do
+    textAlign $ alignSide sideCenter
+  ".table-cell-text-align-right" & do
+    textAlign $ alignSide sideRight
 
   ".bibliography" & do
     marginTop (rem 1)

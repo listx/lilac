@@ -85,7 +85,8 @@ import Lilac.Types
     PseudoEdge (PseudoEdge),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
-    Table (Table, caption, grid, meta, parentOid),
+    Table (Table, caption, grid, meta, parentOid, textAlign),
+    TextAlign (TextAlignCenter, TextAlignLeft, TextAlignRight),
     defaultOrgParserState,
     fromWords,
     nilOid,
@@ -108,6 +109,7 @@ import Relude
     Type,
     forM_,
     fromList,
+    mempty,
     repeat,
     runStateT,
     show,
@@ -2175,6 +2177,7 @@ spec = do
                             body = "E = mc^2"
                           }
                     ],
+                textAlign = mempty,
                 grid =
                   fromList
                     [ ( (1, 1),
@@ -2301,6 +2304,7 @@ spec = do
                       ("__table_number", "1")
                     ],
                 caption = Prose [],
+                textAlign = mempty,
                 grid =
                   fromList
                     [ ( (1, 1),
@@ -2422,6 +2426,7 @@ spec = do
                     [ ("__table_number", "1")
                     ],
                 caption = Prose [],
+                textAlign = mempty,
                 grid =
                   fromList
                     [ ( (1, 1),
@@ -2438,6 +2443,79 @@ spec = do
                       ),
                       ( (3, 2),
                         Prose [ptext "#not-a-comment" []]
+                      )
+                    ]
+              }
+        ]
+        []
+    )
+    defaultOrgParserState
+      { tableNumber = 1
+      }
+
+  shouldParseWithState
+    "0012-text-alignment-marker"
+    ( nilOrgDoc
+        [ CTable
+            Table
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__table_number", "1")
+                    ],
+                caption = Prose [],
+                textAlign =
+                  fromList
+                    [ ( 1,
+                        TextAlignLeft
+                      ),
+                      ( 2,
+                        TextAlignCenter
+                      ),
+                      ( 3,
+                        TextAlignRight
+                      )
+                    ],
+                grid =
+                  fromList
+                    [ ( (1, 1),
+                        Prose [ptext "foo" []]
+                      ),
+                      ( (1, 2),
+                        Prose [ptext "bar" []]
+                      ),
+                      ( (1, 3),
+                        Prose [ptext "baz" []]
+                      ),
+                      ( (2, 1),
+                        L.tableHorizontalLine
+                      ),
+                      ( (3, 1),
+                        Prose [ptext "text-align-l\NUL" []]
+                      ),
+                      ( (3, 2),
+                        Prose [ptext "text-align-c\NUL" []]
+                      ),
+                      ( (3, 3),
+                        Prose [ptext "text-align-r\NUL" []]
+                      ),
+                      ( (4, 1),
+                        Prose [ptext "left-aligned" []]
+                      ),
+                      ( (4, 2),
+                        Prose [ptext "centered" []]
+                      ),
+                      ( (4, 3),
+                        Prose [ptext "right-aligned" []]
+                      ),
+                      ( (5, 1),
+                        Prose [ptext "..." []]
+                      ),
+                      ( (5, 2),
+                        Prose [ptext "..." []]
+                      ),
+                      ( (5, 3),
+                        Prose [ptext "..." []]
                       )
                     ]
               }

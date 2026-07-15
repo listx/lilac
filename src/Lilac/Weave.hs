@@ -156,7 +156,8 @@ import Lilac.Types
         Verbatim
       ),
     StyledText (StyledText, body, style),
-    Table (caption, grid, meta),
+    Table (caption, grid, meta, textAlign),
+    TextAlign (TextAlignCenter, TextAlignLeft, TextAlignRight),
     WeaveConf
       ( archive,
         citeprocResult,
@@ -175,6 +176,7 @@ import Lilac.Types
     getSectionNumber,
     getTangled,
     getTangledBlocks,
+    isTextAlignMarker,
     markingChars,
     markingCharsInvisible,
     ptext,
@@ -1206,19 +1208,27 @@ weaveTableHead columnNames = do
 weaveTableBody :: Table -> [Prose] -> HtmlWeaver ()
 weaveTableBody table columnNames = do
   tbody_ [] $ do
-    forM_ (getRows visibleRows) $ \row ->
-      if row == [Prose []] --
-        then do
+    forM_ (getRows visibleRows) $ \row -> do
+      case row of
+        (hasTextAlignMarkers -> True) -> pure ()
+        --
+        [Prose []] -> do
           tr_ [class_ "table-horizontal-line"] $ do
             forM_ columnNames $ \_ -> do
               td_ [] $ toHtml @Text ""
-        else do
+        _ -> do
           tr_ [class_ "table-body-row"] $ do
-            forM_ row $ \prose -> do
-              let tdAttrs =
-                    if mostlyNumeric prose --
-                      then [class_ "table-cell-numeric"]
-                      else []
+            forM_ (zip [1 ..] row) $ \(colNum, prose) -> do
+              let tdAttrs
+                    --
+                    | Just ta <- lookup colNum table.textAlign =
+                        case ta of
+                          TextAlignLeft -> [class_ "table-cell-text-align-left"]
+                          TextAlignCenter -> [class_ "table-cell-text-align-center"]
+                          TextAlignRight -> [class_ "table-cell-text-align-right"]
+                    --
+                    | mostlyNumeric prose = [class_ "table-cell-numeric"]
+                    | otherwise = []
               td_ tdAttrs $ weaveProse prose
   where
     getRows rowNums = map (getTableCellsFromRow table) rowNums
@@ -1240,6 +1250,8 @@ weaveTableBody table columnNames = do
             PTokenStyledText styledText -> styledText.body
             _ -> ""
        in isNumericText rawText
+    hasTextAlignMarkers :: [Prose] -> Bool
+    hasTextAlignMarkers = any (isJust . isTextAlignMarker)
 
 getHeaderRowIndex :: Table -> Int
 getHeaderRowIndex table =
