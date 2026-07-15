@@ -14,7 +14,6 @@ import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Data.UUID (UUID)
 import Data.UUID.V4 (nextRandom)
-import Data.Version (showVersion)
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Serve (fsWatcher, liveReloadMiddleware)
@@ -129,7 +128,6 @@ import Options.Applicative
     value,
   )
 import Options.Applicative.Builder (InfoMod)
-import Paths_lilac (version)
 import Relude
   ( Bool (False, True),
     ByteString,
@@ -463,10 +461,9 @@ main = do
           "lilac - Literate programming with Orgmode and Noweb-style blocks."
     versionOptionHandler :: OptionHandler (a -> a)
     versionOptionHandler =
-      let cabalVersion = version
-       in infoOption
-            (concat [showVersion cabalVersion, "-", $(lilacVersion)])
-            (long "version" <> short 'v' <> help "Show version.")
+      infoOption
+        $(lilacVersion)
+        (long "version" <> short 'v' <> help "Show version.")
 
 lilac :: GlobalOpts -> IO ()
 lilac globalOpts = case globalOpts.subcommand of
