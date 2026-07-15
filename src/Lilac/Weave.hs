@@ -247,7 +247,7 @@ import Lucid
     ul_,
     width_,
   )
-import Lucid.Base (hoistHtmlT)
+import Lucid.Base (hoistHtmlT, makeAttributes)
 import Network.URI
   ( uriAuthority,
     uriPath,
@@ -1894,8 +1894,12 @@ weaveNavbar :: HtmlWeaver ()
 weaveNavbar = do
   div_ [class_ "navbar"] $ do
     --
-    button_ [id_ "hamburger", class_ "tocs-toggle-button"] $ do
-      toHtmlRaw ("&#x2630;" :: Text)
+    button_
+      [ id_ "hamburger",
+        class_ "tocs-toggle-button",
+        makeAttributes "aria-label" "Toggle table of contents sidebar"
+      ]
+      $ toHtmlRaw ("&#x2630;" :: Text)
     div_ [class_ "breadcrumbs"] $ do
       weaveBreadcrumbs
 
