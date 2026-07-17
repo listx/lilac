@@ -651,7 +651,7 @@ defaultCss = do
     borderCollapse collapse
     th ? do
       position sticky --
-      top (px $ -1) --
+      "top" -: "3rem" --
       backgroundColor colorCodeBg
       yx padding (rem 0.25) (rem 0.5)
     td ? do

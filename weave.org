@@ -3703,7 +3703,7 @@ table ? do
   borderCollapse collapse
   th ? do
     position sticky -- (ref:css:Tables-th-sticky)
-    top (px $ -1) -- (ref:css:Tables-remove-gap)
+    "top" -: "<<css:navbar-height>>" -- (ref:css:Tables-stay-out-of-navbar)
     backgroundColor colorCodeBg
     yx padding (rem 0.25) (rem 0.5)
   td ? do
@@ -3735,10 +3735,10 @@ table ? do
   textAlign $ alignSide sideRight
 #+end_src
 
-[[(css:Tables-remove-gap)]] sets the starting position of the header cell (~<th>~) to
-be -1, not 0, because -1 makes it hide a gap when scrolling down (due to the
-position being sticky). This is hacky, but there doesn't seem to be an
-alternative way to do this in native CSS.
+[[(css:Tables-stay-out-of-navbar)]] sets the starting position of the header cell
+(~<th>~) to the navbar height, so that it stays sticky /before/ it goes under the
+navbar when scrolling down. IOW, if we don't do this, the navbar will cover up
+the header cell.
 
 * Footnotes
 :PROPERTIES:
