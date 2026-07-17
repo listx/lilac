@@ -84,7 +84,8 @@ readability in raw Org (plaintext) form.
 ** Noweb links can reference blocks from other files
 
 You can reference code blocks in other files, as long as those files are also
-compiled (into objects) and become part of the archive.
+compiled (into objects) and become part of the archive. For example, see
+[[id:af82950f-ec4a-46e1-9af5-995222cd35e3::module:Lilac.Types][module:Lilac.Types]] where many of the Noweb links point to blocks in other files.
 
 ** No ~#+include~ support
 
@@ -95,11 +96,17 @@ the linked page separately to see what was actually included).
 ** Headings must be linked via their ID (UUID)
 
 You cannot link to headings by their name, or by a "search" of a file path. You
-must instead always use UUID links.
+must instead always use UUID links. See [[id:518106d0-9b79-4221-9a37-13db371c1d48::ti:0004-properties-drawer-not-empty][ti:0004-properties-drawer-not-empty]] for
+an example (or, if you are reading this document from the raw Org file, just
+grep for ~:ID:~)
 
 By the same token, all documents require a UUID, so that even if you don't have
 a heading, other documents can still reference a named code block in your doc
 via the top-level document UUID.
+
+You probably don't want to type these ID values by hand. In Emacs, you can use
+~M-x org-store-link~ to get the heading or document's ID (or create one
+automatically in the process if one doesn't exist yet).
 
 ** No implicit concatenation of multiple blocks sharing the same name when tangling
 
