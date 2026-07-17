@@ -620,6 +620,8 @@ defaultCss = do
   ".active" ** ".hide-border-bottom" ? do
     borderBottom (rem 0) solid colorCodeBorder
 
+  figure ? do
+    yx margin (rem 1) 0
   ".figure-image" & do
     display block
     yx margin (rem 0) auto
