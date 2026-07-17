@@ -358,8 +358,6 @@ defaultCss = do
   hr ? do
     border (px 0) solid colorCodeBorder
     borderBottom (px 1) solid colorCodeBorder
-    ".title-underline" & do
-      marginBottom (rem 1)
 
   forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) --
     $ \(n, hN) -> do
