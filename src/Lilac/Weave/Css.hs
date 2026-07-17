@@ -362,8 +362,11 @@ defaultCss = do
   forM_ (zip [(1 :: Int) ..] [h1, h2, h3, h4, h5, h6]) --
     $ \(n, hN) -> do
       hN ? do
+        marginTop (rem 0)
+        marginBottom (rem 0)
         case n of
           1 -> do
+            marginTop (rem 0.5)
             fontSize (rem 3)
             headingPrefix "●" (rem 4) (rem $ -2.5) (rem $ -0.1875) --
           2 -> do
@@ -381,8 +384,6 @@ defaultCss = do
           _ -> pure ()
         position relative
         fontSans
-        marginTop (rem 0)
-        marginBottom (rem 0)
         a ? do
           color $ colorFrom "#000000"
           ":visited" & do
