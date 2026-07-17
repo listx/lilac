@@ -330,7 +330,7 @@ defaultCss = do
     height auto
     overflowY visible
     padding (rem 0) (rem 1.25) (rem 0) (rem 1.25)
-    paddingLeft (rem 3.125)
+    paddingLeft (rem 2.5)
     "position" -: "relative"
     "top" -: "3rem"
 
@@ -367,13 +367,13 @@ defaultCss = do
         case n of
           1 -> do
             fontSize (rem 3)
-            headingPrefix "●" (rem 4) (rem $ -2.8) (rem $ -0.1875) --
+            headingPrefix "●" (rem 4) (rem $ -2.5) (rem $ -0.1875) --
           2 -> do
             fontSize (rem 2.4)
-            headingPrefix "■" (rem 3) (rem $ -2.5) (rem $ -0.1875) --
+            headingPrefix "■" (rem 3) (rem $ -2.2) (rem $ -0.1875) --
           3 -> do
             fontSize (rem 2)
-            headingPrefix "○" (rem 2.35) (rem $ -2.25) (rem $ -0.0625) --
+            headingPrefix "○" (rem 2.35) (rem $ -1.95) (rem $ -0.0625) --
           4 -> do
             fontSize (rem 1.6)
           5 -> do
