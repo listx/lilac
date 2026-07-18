@@ -1608,7 +1608,7 @@ weaveGlossary isGlobal = do
                       (comparing (toNormalizedText . CP.fromText . fst)) --
                     $ M.toList originObj.orgDoc.glossary
             terms' = zip (True : repeat False) terms
-        when (terms' /= []) $ toHtmlRaw @Text "<dl>"
+        when (terms' /= []) $ toHtmlRaw @Text "<dl class='global-glossary'>"
         forM_ terms' weaveCollectedGlossaryTerm
         when (terms' /= []) $ toHtmlRaw @Text "</dl>"
     | otherwise -> pure ()

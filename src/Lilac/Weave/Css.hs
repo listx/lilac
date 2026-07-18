@@ -720,16 +720,21 @@ defaultCss = do
       display inlineBlock
 
   dl ? do
-    marginTop $ rem 1
+    margin (rem 0.5) (rem 0) (rem 0.5) (rem 0)
+  dl # ".global-glossary" ? do
+    margin (rem 0.5) (rem 0) (rem 0.5) (rem 1.5) --
   dt ? do
     display inlineBlock
+    marginLeft $ rem (-1.5) --
     fontWeight bold
     fontSans
     ".inner-dt" & do
       marginTop $ rem 1
   dd ? do
     display inline
-    marginLeft (rem 0.5)
+    marginLeft $ rem 0
+    "::before" & do
+      "content" -: "\" ‣ \""
     "::after" & do
       "content" -: "\"\\a\"" --
       whiteSpace ClayText.pre
@@ -739,7 +744,7 @@ defaultCss = do
         textDecoration none
   div # ".glossary-term" ? do
     border (px 1) solid colorBg
-    yx padding (rem 0) (rem 0.3125)
+    padding (rem 0) (rem 0.3125) (rem 0) (rem 1.8125) --
     ".active" & do
       border (px 1) solid colorActiveBorder
       backgroundColor colorActiveBg

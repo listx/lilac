@@ -3936,7 +3936,7 @@ weaveGlossary isGlobal = do
                       (comparing (toNormalizedText . CP.fromText . fst)) -- (ref:glossary-term-compare-visible)
                     $ M.toList originObj.orgDoc.glossary
             terms' = zip (True : repeat False) terms
-        when (terms' /= []) $ toHtmlRaw @Text "<dl>"
+        when (terms' /= []) $ toHtmlRaw @Text "<dl class='global-glossary'>"
         forM_ terms' weaveCollectedGlossaryTerm
         when (terms' /= []) $ toHtmlRaw @Text "</dl>"
     | otherwise -> pure ()
@@ -4110,16 +4110,21 @@ in CSS) after a ~<dd>~ at [[(newline-after-dd)]].
 #+name: css:Glossary terms
 #+begin_src haskell
 dl ? do
-  marginTop $ rem 1
+  margin (rem 0.5) (rem 0) (rem 0.5) (rem 0)
+dl # ".global-glossary" ? do
+  margin (rem 0.5) (rem 0) (rem 0.5) (rem 1.5) -- (ref:css:Glossary terms-overall-indent)
 dt ? do
   display inlineBlock
+  marginLeft $ rem (-1.5) -- (ref:css:Glossary terms-negative-indent-first-line)
   fontWeight bold
   fontSans
   ".inner-dt" & do
     marginTop $ rem 1
 dd ? do
   display inline
-  marginLeft (rem 0.5)
+  marginLeft $ rem 0
+  "::before" & do
+    "content" -: "\" ‣ \""
   "::after" & do
     "content" -: "\"\\a\"" -- (ref:newline-after-dd)
     whiteSpace ClayText.pre
@@ -4129,7 +4134,7 @@ dd ? do
       textDecoration none
 div # ".glossary-term" ? do
   border (px 1) solid colorBg
-  yx padding (rem 0) (rem 0.3125)
+  padding (rem 0) (rem 0.3125) (rem 0) (rem 1.8125) -- (ref:css:Glossary terms-positive-indent-rest)
   ".active" & do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
@@ -4137,6 +4142,19 @@ div # ".glossary-term" ? do
 span # ".glossary-external-source" ? do
   fontSans
 #+end_src
+
+[[(css:Glossary terms-negative-indent-first-line)]] and [[(css:Glossary
+terms-positive-indent-rest)]] combine to create a hanging indentation effect (the
+1.8125 rem units has within it the extra 1.5 rem units to compensate for the
+negative margin from [[(css:Glossary terms-negative-indent-first-line)]]). This
+makes it slightly easier to visually scan the entries (this is stolen from the
+style of typical English dictionaries).
+
+The overall left indent for the ~<dl>~ element [[(css:Glossary terms-overall-indent)]]
+moves the entire definition list to the right, because otherwise the ~<dt>~
+elements will start at the end; this is only for the global glossary (from
+[[f:weaveGlossary]]), because glossary terms defined by the user will sit inside a
+list item, and therefore do not need additional indentation.
 
 See [[https://stackoverflow.com/a/66030381/437583][this StackOverflow post]] for more discussion around styling description lists
 this way.
