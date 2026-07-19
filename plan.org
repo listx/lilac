@@ -24,6 +24,29 @@ other sections as needed.
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
+** TODO code block pain points
+
+*** TODO code blocks: add "Used by" footer
+
+When we change code in code blocks, it's hard to tell if other places in the
+repo still refer to the old version of the code (in the prose). The "Used by"
+footer is the traditional way to let the reader know what other things use the
+code block, so adopt it for Lilac. The one difference is that we'll note the
+type of the referrer (whether it's another code block, paragraph, or something
+else that's referring to the current code block).
+
+We first considered making the Backlinks section sorted by the named cells in
+the current document, instead of the external document. But then we realized
+that we should just put this backlink info under the code blocks directly.
+
+*** TODO code block: deprecate the "up" arrows after the name
+
+These won't be needed when the "Use by" section is implemented.
+
+*** TODO code block: move "M" and link anchor away from left margin
+
+This will save some spaced in the left margin.
+
 * Backlog
 :PROPERTIES:
 :ID:       b27d3e53-ada2-4f9e-9f38-18e9252b8229
