@@ -103,6 +103,8 @@ let
           *.nix
           *.sh
           *.toml
+          /*.org
+          !index.org
           csl-styles/*
           !csl-styles/acm-siggraph.csl
           !csl-styles/ieee.csl
