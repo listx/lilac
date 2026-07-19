@@ -120,6 +120,9 @@ install-release: tangle result build-release
 	nix-env -i ./result
 	touch install-release
 
+push-release: build-release
+	cachix push funloop ./result
+
 update-nix: tangle
 	niv init
 	niv update nixpkgs --branch nixos-26.05

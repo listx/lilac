@@ -834,6 +834,7 @@ outputs. See [[id:b649d761-1103-47be-86e4-56a7362a5ecc][Sentinels]] for a discus
 <<make:Install lilac with Cabal>>
 <<make:Build lilac with Nix>>
 <<make:Install lilac with Nix>>
+<<make:Push binary to Cachix>>
 <<make:Update Nix dependencies>>
 <<make:Clean>>
 <<make:Project setup>>
@@ -1494,6 +1495,52 @@ build-release
 You can run the version of Lilac built with Nix via ~result/bin/lilac~, which we
 wrap as ~lilac-nix~ in the [[nix/scripts.nix]] as well.
 
+*** Pushing to Cachix
+
+Because Lilac isn't widely adopted yet, it's not in Nixpkgs. And because of this
+there is no publicly available binary cache for it. So we have to set it up
+ourselves with [[https://docs.cachix.org/][Cachix]] which comes with a free tier for open source projects. We
+push up builds to Cachix so that other projects can use Lilac in CI (without
+having to clone and build Lilac from scratch, which would be possible but also
+quite wasteful and slow).
+
+#+name: make:Push binary to Cachix
+#+begin_src makefile
+push-release: build-release
+	cachix push funloop ./result
+#+end_src
+
+In order for the above to work, you have to first run
+
+#+name: sh:cachix-init
+#+begin_src bash
+cachix use funloop
+#+end_src
+
+and also set up the authentication token with
+
+#+begin_src bash
+cachix authtoken TOKEN
+#+end_src
+
+where TOKEN is the secret in plaintext. For CI we've set this up as a secret
+with ID
+
+#+name: cachix-token-secret-id
+#+begin_src txt
+42190600-c8b3-4aba-ac91-ade479361ac9
+#+end_src
+
+which is saved to
+
+#+name: cachix-token-secret-file
+#+begin_src txt
+~/.secret-cachix-token
+#+end_src
+
+Both [[cachix-token-secret-id]] and [[cachix-token-secret-file]] are settings defined in
+SourceHut's [[https://builds.sr.ht/secrets][secrets dashboard page]].
+
 ** Install ~lilac~
 
 You can install Lilac with Cabal or Nix. If you're on Nix already, using Nix is
@@ -2052,6 +2099,7 @@ Aeson
 attrset
 backlink
 backlinks
+Cachix
 Citeproc
 Citeproc's
 combinators
@@ -2119,14 +2167,19 @@ branch).
 #+header: :tangle .build.yml
 #+begin_src yaml
 image: nixos/<<id:55116425-5ad3-4540-98c3-53006f7dac3d::nixos-version>>
+secrets:
+  - <<cachix-token-secret-id>>
 sources:
   - https://git.sr.ht/~listx/lilac
 oauth: pages.sr.ht/PAGES:RW
 environment:
   site: lilac.funloop.org
 packages:
+- nixos.cachix
 - nixos.hut
 tasks:
+  - cachix-init: |
+      <<sh:cachix-init>>
   - tangle: |
       cd lilac
       nix-shell --run "make tangle"
@@ -2157,6 +2210,12 @@ tasks:
   - lint: |
       cd lilac
       nix-shell --run "make lint"
+  - cachix-push: |
+      cd lilac
+      set +x
+      cachix authtoken "$(cat <<cachix-token-secret-file>>)"
+      set -x
+      nix-shell --run "make push-release"
   - publish: |
       if [[ "$GIT_REF" != "refs/heads/main" ]]; then
         echo "Skipping publishing step because current branch is '$GIT_REF' (not refs/heads/main)."

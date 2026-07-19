@@ -1,12 +1,17 @@
 image: nixos/26.05
+secrets:
+  - 42190600-c8b3-4aba-ac91-ade479361ac9
 sources:
   - https://git.sr.ht/~listx/lilac
 oauth: pages.sr.ht/PAGES:RW
 environment:
   site: lilac.funloop.org
 packages:
+- nixos.cachix
 - nixos.hut
 tasks:
+  - cachix-init: |
+      cachix use funloop
   - tangle: |
       cd lilac
       nix-shell --run "make tangle"
@@ -37,6 +42,12 @@ tasks:
   - lint: |
       cd lilac
       nix-shell --run "make lint"
+  - cachix-push: |
+      cd lilac
+      set +x
+      cachix authtoken "$(cat ~/.secret-cachix-token)"
+      set -x
+      nix-shell --run "make push-release"
   - publish: |
       if [[ "$GIT_REF" != "refs/heads/main" ]]; then
         echo "Skipping publishing step because current branch is '$GIT_REF' (not refs/heads/main)."
