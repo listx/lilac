@@ -37,7 +37,7 @@ import Data.Aeson (encode)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.FileEmbed (embedFile)
 import Data.IntMap.Strict qualified as IntMap
-import Data.List (groupBy, partition)
+import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
@@ -293,6 +293,7 @@ import Relude
     fst,
     id,
     inits,
+    intersperse,
     isJust,
     isPrefixOf,
     length,
@@ -665,8 +666,8 @@ weaveBlock lci block = do
       div_ [class_ "code-block-controls"] $ do
         --
         button_
-          [ class_ "toggle-code-block-meta-raw",
-            data_ "action" "toggle-code-block-meta-raw"
+          [ class_ "toggle-code-block-meta-other",
+            data_ "action" "toggle-code-block-meta-other"
           ]
           $ pure ()
         a_ [href_ $ "#" <> linkAnchor] $ do
@@ -679,9 +680,16 @@ weaveBlock lci block = do
                   Just "true" -> (" top-rounded", " anonymous bottom-rounded")
                   _ -> (" top-rounded", " anonymous fully-rounded") --
             | otherwise = ("", "")
-      div_ [class_ $ "code-block-meta-raw hidden" <> rawBorder] $ do
+      div_ [class_ $ "code-block-meta-other hidden" <> rawBorder] $ do
+        weaveBlockAncestry block
         --
-        sequence_ . map weaveBlockMeta $ M.toList block.meta
+        p_ [] $ do
+          toHtml @Text "Other metadata key/value pairs:"
+        ul_ [] $ do
+          sequence_
+            . map weaveBlockMeta
+            . filter (\(k, _) -> k `notElem` ["name", "tangle"])
+            $ M.toList block.meta
       weaveInlineBlockControls block --
       weaveBlockBody block bodyBorder
   where
@@ -710,7 +718,6 @@ weaveImportantMetadata block
                 span_ [class_ "bold"] $ do
                   toHtmlRaw @Text "&#x1F3AF; "
                   toHtml path
-        weaveBlockAncestry block
 
 weaveInlineBlockControls :: Block -> HtmlWeaver ()
 weaveInlineBlockControls block
@@ -784,7 +791,7 @@ weaveBlockAncestry block = case lookup "name" block.meta of
         parentGCIs = do
           selfGCI <- lookup selfLinkOid archive.symbols
           lookup selfGCI archive.ancestry
-        parents = mapMaybe f $ fromMaybe [] parentGCIs
+        parents = sortOn getName . mapMaybe f $ fromMaybe [] parentGCIs
         f :: GCI -> Maybe (GCI, [GCI], GPath, Block, Prose)
         f parentGCI = do
           grandParentGCIs <-
@@ -797,35 +804,34 @@ weaveBlockAncestry block = case lookup "name" block.meta of
           (offset, path) <- IntMap.lookupLE parentGCI.unGCI archive.offsets
           prose <- gciToName archive offset parentGCI
           pure (parentGCI, grandParentGCIs, path, parentBlock, prose)
-        (roots, nonRoots) =
-          partition (\(_, ancestors, _, _, _) -> null ancestors) parents
         getName :: (GCI, [GCI], GPath, Block, Prose) -> Text
         getName (_, _, _, b, _) =
           T.toLower . fromMaybe "" $ lookup "name" b.meta
-        roots' = sortOn getName roots
-        nonRoots' = sortOn getName nonRoots
-    forM_ roots' weaveParentBlock
-    forM_ nonRoots' weaveParentBlock
+    when (not $ null parents) $ do
+      p_ [] $ do
+        toHtml @Text "Used by "
+        sequence_
+          $ intersperse (toHtml @Text ", ")
+          $ map weaveParentBlock parents
+        toHtml @Text "."
 
 weaveParentBlock ::
   (GCI, [GCI], GPath, Block, Prose) ->
   HtmlWeaver ()
-weaveParentBlock (gci, ancestors, objPath, _, _) = do
+weaveParentBlock (gci, _, objPath, _, name) = do
   weaveConf <- ask
   case getLinkToGCI weaveConf gci of
     Nothing -> pure ()
-    Just (_externalOrgDocName, linkAnchor, _) ->
-      if objPath == weaveConf.originObjectPath
+    Just (docName, linkAnchor, _) -> do
+      if objPath /= weaveConf.originObjectPath
         then do
-          a_ [href_ $ "#" <> linkAnchor, class_ "parent-block-arrow"] $ do
-            if null ancestors
-              then toHtml @Text " ⇑"
-              else toHtml @Text " ↑"
+          toHtml docName
+          toHtml @Text "→"
+          a_ [href_ linkAnchor, class_ "internal-link"]
+            $ weaveProse name
         else do
-          a_ [href_ linkAnchor, class_ "parent-block-arrow"] $ do
-            if null ancestors
-              then toHtml @Text " ⇪"
-              else toHtml @Text " ⇧"
+          a_ [href_ $ "#" <> linkAnchor, class_ "internal-link"]
+            $ weaveProse name
 
 getLinkToGCI :: WeaveConf -> GCI -> Maybe (Text, Text, Prose)
 getLinkToGCI weaveConf gci
@@ -846,13 +852,13 @@ getLinkToGCI weaveConf gci
 
 weaveBlockMeta :: (Text, Text) -> HtmlWeaver ()
 weaveBlockMeta (k, v) = do
-  div_ [class_ "block-meta-key-value"] $ do
-    span_ [class_ "block-meta-key"] $ do
-      toHtml k
-    span_ [class_ "block-meta-separator"] $ do
+  li_ [] $ do
+    p_ [] $ do
+      span_ [class_ "code"] $ do
+        toHtml k
       toHtmlRaw @Text " = "
-    span_ [class_ "block-meta-value"] $ do
-      toHtml v
+      span_ [class_ "code"] $ do
+        toHtml v
 
 colorizeText :: Text -> Text -> HtmlWeaver ()
 colorizeText lang txt

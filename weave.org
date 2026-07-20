@@ -86,7 +86,7 @@ import Data.Aeson (encode)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.FileEmbed (embedFile)
 import Data.IntMap.Strict qualified as IntMap
-import Data.List (groupBy, partition)
+import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
@@ -342,6 +342,7 @@ import Relude
     fst,
     id,
     inits,
+    intersperse,
     isJust,
     isPrefixOf,
     length,
@@ -2551,8 +2552,8 @@ weaveBlock lci block = do
       div_ [class_ "code-block-controls"] $ do
         -- (ref:f:weaveBlock-metadata-button)
         button_
-          [ class_ "toggle-code-block-meta-raw",
-            data_ "action" "toggle-code-block-meta-raw"
+          [ class_ "toggle-code-block-meta-other",
+            data_ "action" "toggle-code-block-meta-other"
           ]
           $ pure ()
         a_ [href_ $ "#" <> linkAnchor] $ do
@@ -2565,9 +2566,16 @@ weaveBlock lci block = do
                   Just "true" -> (" top-rounded", " anonymous bottom-rounded")
                   _ -> (" top-rounded", " anonymous fully-rounded") -- (ref:f:weaveBlock-corners)
             | otherwise = ("", "")
-      div_ [class_ $ "code-block-meta-raw hidden" <> rawBorder] $ do
+      div_ [class_ $ "code-block-meta-other hidden" <> rawBorder] $ do
+        weaveBlockAncestry block
         -- (ref:f:weaveBlock-full-metadata)
-        sequence_ . map weaveBlockMeta $ M.toList block.meta
+        p_ [] $ do
+          toHtml @Text "Other metadata key/value pairs:"
+        ul_ [] $ do
+          sequence_
+            . map weaveBlockMeta
+            . filter (\(k, _) -> k `notElem` ["name", "tangle"])
+            $ M.toList block.meta
       weaveInlineBlockControls block -- (ref:f:weaveBlock-weaveInlineBlockControls)
       weaveBlockBody block bodyBorder
   where
@@ -2621,6 +2629,9 @@ all metadata defined by the user (in manual fashion in the Org mode file). We
 also have some automatically generated metadata (ancestry).
 
 *** Name and tangle path
+:PROPERTIES:
+:ID:       c5a40150-b1e1-4794-bd82-18bb4319185a
+:END:
 
 Because the /name/ and /tangle path/ are of such importance, they are always
 displayed (if they exist for the block) via [[f:weaveImportantMetadata]]
@@ -2651,7 +2662,6 @@ weaveImportantMetadata block
                 span_ [class_ "bold"] $ do
                   toHtmlRaw @Text "&#x1F3AF; "
                   toHtml path
-        weaveBlockAncestry block
 #+end_src
 
 [[f:weaveImportantMetadata]] weaves nothing if both the name and tangle paths are
@@ -2676,13 +2686,13 @@ called serially for all such pairs at [[(f:weaveBlock-full-metadata)]].
 #+begin_src haskell
 weaveBlockMeta :: (Text, Text) -> HtmlWeaver ()
 weaveBlockMeta (k, v) = do
-  div_ [class_ "block-meta-key-value"] $ do
-    span_ [class_ "block-meta-key"] $ do
-      toHtml k
-    span_ [class_ "block-meta-separator"] $ do
+  li_ [] $ do
+    p_ [] $ do
+      span_ [class_ "code"] $ do
+        toHtml k
       toHtmlRaw @Text " = "
-    span_ [class_ "block-meta-value"] $ do
-      toHtml v
+      span_ [class_ "code"] $ do
+        toHtml v
 #+end_src
 
 *** Ancestry
@@ -2694,8 +2704,7 @@ The block ancestry answers the question "what other blocks refer to this
 block?". This is handled by [[f:weaveBlockAncestry]] which looks at a block and sees
 if it's a dependency of any other block, by using the ~ancestry~ field in
 [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]. If other blocks do depend on this block, we link back to those
-blocks, which we call "parents", with [[f:weaveParentBlock]]. If the parent block
-itself does not have any parents, we call it a "root" block.
+blocks, which we call "parents", with [[f:weaveParentBlock]].
 
 #+name: f:weaveBlockAncestry
 #+begin_src haskell
@@ -2709,7 +2718,7 @@ weaveBlockAncestry block = case lookup "name" block.meta of
         parentGCIs = do
           selfGCI <- lookup selfLinkOid archive.symbols
           lookup selfGCI archive.ancestry
-        parents = mapMaybe f $ fromMaybe [] parentGCIs
+        parents = sortOn getName . mapMaybe f $ fromMaybe [] parentGCIs
         f :: GCI -> Maybe (GCI, [GCI], GPath, Block, Prose)
         f parentGCI = do
           grandParentGCIs <-
@@ -2722,46 +2731,44 @@ weaveBlockAncestry block = case lookup "name" block.meta of
           (offset, path) <- IntMap.lookupLE parentGCI.unGCI archive.offsets
           prose <- gciToName archive offset parentGCI
           pure (parentGCI, grandParentGCIs, path, parentBlock, prose)
-        (roots, nonRoots) =
-          partition (\(_, ancestors, _, _, _) -> null ancestors) parents
         getName :: (GCI, [GCI], GPath, Block, Prose) -> Text
         getName (_, _, _, b, _) =
           T.toLower . fromMaybe "" $ lookup "name" b.meta
-        roots' = sortOn getName roots
-        nonRoots' = sortOn getName nonRoots
-    forM_ roots' weaveParentBlock
-    forM_ nonRoots' weaveParentBlock
+    when (not $ null parents) $ do
+      p_ [] $ do
+        toHtml @Text "Used by "
+        sequence_
+          $ intersperse (toHtml @Text ", ")
+          $ map weaveParentBlock parents
+        toHtml @Text "."
 #+end_src
 
 If a block is anonymous (does not have a name) (at [[(anonymous-orphan)]]), then it
 cannot have any parents because no block would be able to name it (via a [[id:d9b8b9d6-0334-4d9a-9146-d6bd158f0d77][Noweb
 reference]]) as a child.
 
-[[f:weaveParentBlock]] makes two distinctions: whether a block belongs to the
-current document being woven, and whether that block itself has any parents of
-its own.
+[[f:weaveParentBlock]] makes a distinction whether a block belongs to the
+current document being woven.
 
 #+name: f:weaveParentBlock
 #+begin_src haskell
 weaveParentBlock ::
   (GCI, [GCI], GPath, Block, Prose) ->
   HtmlWeaver ()
-weaveParentBlock (gci, ancestors, objPath, _, _) = do
+weaveParentBlock (gci, _, objPath, _, name) = do
   weaveConf <- ask
   case getLinkToGCI weaveConf gci of
     Nothing -> pure ()
-    Just (_externalOrgDocName, linkAnchor, _) ->
-      if objPath == weaveConf.originObjectPath
+    Just (docName, linkAnchor, _) -> do
+      if objPath /= weaveConf.originObjectPath
         then do
-          a_ [href_ $ "#" <> linkAnchor, class_ "parent-block-arrow"] $ do
-            if null ancestors
-              then toHtml @Text " ⇑"
-              else toHtml @Text " ↑"
+          toHtml docName
+          toHtml @Text "→"
+          a_ [href_ linkAnchor, class_ "internal-link"]
+            $ weaveProse name
         else do
-          a_ [href_ linkAnchor, class_ "parent-block-arrow"] $ do
-            if null ancestors
-              then toHtml @Text " ⇪"
-              else toHtml @Text " ⇧"
+          a_ [href_ $ "#" <> linkAnchor, class_ "internal-link"]
+            $ weaveProse name
 #+end_src
 
 ** Body toggle (expand/collapse) button
@@ -3019,7 +3026,7 @@ kateLilac =
 <<css:Block controls>>
 <<css:Block controls inline>>
 <<css:Block meta>>
-<<css:Block meta raw>>
+<<css:Block meta other>>
 <<css:Block body>>
 <<css:Block rounding>>
 #+end_src
@@ -3040,7 +3047,7 @@ Code blocks use a 2-column layout, with the first column being the
     yx margin (rem 0.125) 0
 forM_
   [ ".code-block-meta",
-    ".code-block-meta-raw",
+    ".code-block-meta-other",
     ".code-block-controls-inline",
     ".code-block-body"
   ]
@@ -3080,7 +3087,7 @@ layout, while opacity hides it visually.
 #+begin_src haskell
 a # hover ? do
   textDecoration none
-button # ".toggle-code-block-meta-raw" ? do
+button # ".toggle-code-block-meta-other" ? do
   "::before" & do
     "content" -: "\"M\""
   marginRight $ rem 0.3125
@@ -3095,10 +3102,13 @@ The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
   1) ~.code-block-meta~ :: The name or tangle path. These attributes are so common
      (and important) that we always display them where possible.
 
-  2) ~.code-block-meta-raw~ :: Other metadata such as the programming language
+  2) ~.code-block-meta-other~ :: Other metadata such as the programming language
      syntax of the code block. These attributes are typically not as
      interesting, and so require the user to press a button (labeled ~M~) in the
      ~.code-block-controls~ container to reveal them.
+
+     This also includes the ancestry of the block (links to other blocks that
+     use this block as a child block).
 
   3) ~.code-block-body~ :: Main body of the block, which contains the actual code
      that have been fenced by ~#+begin_...~ and ~#+end_...~.
@@ -3112,26 +3122,27 @@ The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
   borderTopLeftRadius (rem 0.3125) (rem 0.3125)
   borderTopRightRadius (rem 0.3125) (rem 0.3125)
   fontSans
-  a ? do
-    ".parent-block-arrow" & do
-      marginLeft (em 0.25)
 ".active" ** ".code-block-meta" ? do
   fontWeight bold
   border (px 1) solid colorActiveBorder
   borderBottomWidth 0
 #+end_src
 
-#+name: css:Block meta raw
+#+name: css:Block meta other
 #+begin_src haskell
-div # ".code-block-meta-raw" ? do
+div # ".code-block-meta-other" ? do
+  p ? do
+    yx margin (rem 0.25) 0
+  ul ? do
+    yx margin (rem 0.5) 0
   yx padding 0 (rem 0.5)
-  fontMono
+  fontSans
   fontSize $ rem 0.9
   border (px 1) solid colorCodeBorder
   borderBottomWidth 0
   ".hidden" & do
     display displayNone
-".active" ** ".code-block-meta-raw" ? do
+".active" ** ".code-block-meta-other" ? do
   border (px 1) solid colorActiveBorder
   borderBottomWidth 0
 #+end_src
@@ -3182,7 +3193,7 @@ index finger) symbol.
 #+end_src
 
 The [[css:Block rounding]] is to handle cases where we may or may not need to round
-off the corners of the [[css:Block body]] and [[css:Block meta raw]]. See
+off the corners of the [[css:Block body]] and [[css:Block meta other]]. See
 [[(f:weaveBlock-corners)]].
 
 #+name: css:Block rounding
@@ -4076,9 +4087,15 @@ getRootRelativeOrgDocLink weaveConf objPath
 
 [[f:getLinkToGCI]] is a basic building block for linking out to cells (whether
 internal or external) based on their global cell index. It returns a tuple of
-~(linkText, externalOrgDocName)~, where ~linkText~ is what we can put in the ~href~
-(of the form ~#foo~ for internal cells and ~path/to/doc.html#foo~ for external
-cells). The ~externalOrgDocName~ is blank for internal cells.
+~(docName, linkAnchor, cellName)~, where
+
+  - ~docName~ is the name of the external Org document that contains the cell
+    (where if the cell is internal, this is blank), and
+
+  - ~linkAnchor~ is what we can put in the ~href~ (of the form ~#foo~ for internal
+    cells and ~path/to/doc.html#foo~ for external cells),
+
+  - ~cellName~ is the human-friendly name of the cell
 
 #+name: f:getLinkToGCI
 #+begin_src haskell

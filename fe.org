@@ -966,8 +966,8 @@ on the action, it toggles just the ~:meta-visible?~ or ~:body-visible?~ boolean
             action  (.getAttribute btn "data-action")]
 
         (case action
-          ("toggle-code-block-meta-raw" "toggle-code-block-body")
-          (let [state-key (if (= action "toggle-code-block-meta-raw") ; (ref:f:handle-click!-toggle-boolean)
+          ("toggle-code-block-meta-other" "toggle-code-block-body")
+          (let [state-key (if (= action "toggle-code-block-meta-other") ; (ref:f:handle-click!-toggle-boolean)
                             :meta-visible?
                             :body-visible?)]
             (swap! state #(-> % ; (ref:f:handle-click!-update-state-atom)
@@ -1039,7 +1039,7 @@ we round the border corners of the various pieces involved
           collapse-button? (:has-collapse-button? block-state)
           meta-vis?        (:meta-visible? block-state)
 
-          raw-meta (.querySelector container ".code-block-meta-raw")
+          other-meta (.querySelector container ".code-block-meta-other")
           body (.querySelector container ".code-block-body")
           controls (.querySelector container ".code-block-controls-inline")
 
@@ -1059,7 +1059,7 @@ we round the border corners of the various pieces involved
               :else nil)]
 
       ; (ref:f:render-block!-modify-classes)
-      (toggle-class! raw-meta "hidden" (not meta-vis?))
+      (toggle-class! other-meta "hidden" (not meta-vis?))
       (toggle-class! body "collapsed" (not body-vis?))
       (toggle-class! body "fully-rounded" body-needs-full-rounding?)
       (toggle-class! controls "hide-border-bottom" body-vis?)

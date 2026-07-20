@@ -492,7 +492,7 @@ defaultCss = do
       yx margin (rem 0.125) 0
   forM_
     [ ".code-block-meta",
-      ".code-block-meta-raw",
+      ".code-block-meta-other",
       ".code-block-controls-inline",
       ".code-block-body"
     ]
@@ -514,7 +514,7 @@ defaultCss = do
     opacity 0 --
     a # hover ? do
       textDecoration none
-    button # ".toggle-code-block-meta-raw" ? do
+    button # ".toggle-code-block-meta-other" ? do
       "::before" & do
         "content" -: "\"M\""
       marginRight $ rem 0.3125
@@ -550,23 +550,24 @@ defaultCss = do
     borderTopLeftRadius (rem 0.3125) (rem 0.3125)
     borderTopRightRadius (rem 0.3125) (rem 0.3125)
     fontSans
-    a ? do
-      ".parent-block-arrow" & do
-        marginLeft (em 0.25)
   ".active" ** ".code-block-meta" ? do
     fontWeight bold
     border (px 1) solid colorActiveBorder
     borderBottomWidth 0
 
-  div # ".code-block-meta-raw" ? do
+  div # ".code-block-meta-other" ? do
+    p ? do
+      yx margin (rem 0.25) 0
+    ul ? do
+      yx margin (rem 0.5) 0
     yx padding 0 (rem 0.5)
-    fontMono
+    fontSans
     fontSize $ rem 0.9
     border (px 1) solid colorCodeBorder
     borderBottomWidth 0
     ".hidden" & do
       display displayNone
-  ".active" ** ".code-block-meta-raw" ? do
+  ".active" ** ".code-block-meta-other" ? do
     border (px 1) solid colorActiveBorder
     borderBottomWidth 0
 

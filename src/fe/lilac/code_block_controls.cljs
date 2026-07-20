@@ -27,8 +27,8 @@
             action  (.getAttribute btn "data-action")]
 
         (case action
-          ("toggle-code-block-meta-raw" "toggle-code-block-body")
-          (let [state-key (if (= action "toggle-code-block-meta-raw") ;
+          ("toggle-code-block-meta-other" "toggle-code-block-body")
+          (let [state-key (if (= action "toggle-code-block-meta-other") ;
                             :meta-visible?
                             :body-visible?)]
             (swap! state #(-> % ;
@@ -61,7 +61,7 @@
           collapse-button? (:has-collapse-button? block-state)
           meta-vis?        (:meta-visible? block-state)
 
-          raw-meta (.querySelector container ".code-block-meta-raw")
+          other-meta (.querySelector container ".code-block-meta-other")
           body (.querySelector container ".code-block-body")
           controls (.querySelector container ".code-block-controls-inline")
 
@@ -81,7 +81,7 @@
               :else nil)]
 
       ;
-      (toggle-class! raw-meta "hidden" (not meta-vis?))
+      (toggle-class! other-meta "hidden" (not meta-vis?))
       (toggle-class! body "collapsed" (not body-vis?))
       (toggle-class! body "fully-rounded" body-needs-full-rounding?)
       (toggle-class! controls "hide-border-bottom" body-vis?)
