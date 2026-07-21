@@ -482,6 +482,14 @@ defaultCss = do
         empty & do
           minHeight (rem 2.2)
 
+  main_ ? do
+    ol ? do
+      p ? do
+        yx margin (rem 0.5) 0
+    ul ? do
+      p ? do
+        yx margin (rem 0.5) 0
+
   ".code-block-container" & do
     display grid
     gridTemplateColumns [rem 3.125, fr 1]

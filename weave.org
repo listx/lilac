@@ -2494,6 +2494,7 @@ weaveExpect
 #+name: css:List items
 #+begin_src haskell
 <<css:List item minimum height>>
+<<css:List item vertical spacing>>
 #+end_src
 
 *** Ordered list items
@@ -2520,6 +2521,21 @@ Thankfully, there isn't really anything to do here; the defaults from the
 browser (at least in Firefox) line up with the indentation style in the raw Org
 syntax already --- namely, the list item is always indented more than the
 preceding paragraph.
+
+*** Spacing between list items
+
+Reduce paragraph spacing when inside list items.
+
+#+name: css:List item vertical spacing
+#+begin_src haskell
+main_ ? do
+  ol ? do
+    p ? do
+      yx margin (rem 0.5) 0
+  ul ? do
+    p ? do
+      yx margin (rem 0.5) 0
+#+end_src
 
 *** Empty list items
 
