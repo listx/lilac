@@ -330,7 +330,7 @@ defaultCss = do
     height auto
     overflowY visible
     padding (rem 0) (rem 1.25) (rem 0) (rem 1.25)
-    paddingLeft (rem 2.5)
+    paddingLeft (rem 1.5)
     "position" -: "relative"
     "top" -: "3rem"
 
@@ -366,15 +366,16 @@ defaultCss = do
         marginBottom (rem 0)
         case n of
           1 -> do
+            lineHeight $ unitless 1
             marginTop (rem 0.5)
             fontSize (rem 3)
-            headingPrefix "●" (rem 4) (rem $ -2.5) (rem $ -0.1875) --
+            headingPrefix "●" (rem 3) (rem $ -1.8) (rem $ -0.1875) --
           2 -> do
             fontSize (rem 2.4)
-            headingPrefix "■" (rem 3) (rem $ -2.2) (rem $ -0.1875) --
+            headingPrefix "■" (rem 2) (rem $ -1.5) (rem 0.375) --
           3 -> do
             fontSize (rem 2)
-            headingPrefix "○" (rem 2.35) (rem $ -1.95) (rem $ -0.0625) --
+            headingPrefix "○" (rem 2) (rem $ -1.5) (rem 0.25) --
           4 -> do
             fontSize (rem 1.6)
           5 -> do
@@ -512,12 +513,13 @@ defaultCss = do
     "grid-row" -: "1"
     visibility hidden --
     opacity 0 --
+    a ? do
+      display block
     a # hover ? do
       textDecoration none
     button # ".toggle-code-block-meta-other" ? do
       "::before" & do
         "content" -: "\"M\""
-      marginRight $ rem 0.3125
       "border" -: "0"
       "cursor" -: "pointer"
       ev borderRadius (rem 0.125)
