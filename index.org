@@ -259,13 +259,25 @@ to match ~next~. The process is:
 :ID:       1fe40405-2fc3-4cf8-8352-974e5cfee33b
 :END:
 
-[[stamp-new-version.sh]] takes the Lilac version by searching for it from this Org file, and creates a commit.
+[[stamp-new-version.sh]] takes the Lilac version by searching for it from this Org
+file (specifically [[Lilac version]]), and creates a commit. It checks the [[id:1b7255d6-5d8a-4082-8d84-4852f66333dc][Release
+Notes]] first though, in case there are any unfinished notes with at ~COMMIT~ string
+(these are meant to be replaced with their final resting commit hashes just
+prior to being versioned).
+
+You should first bump the version at [[Lilac version]], and then run
+[[stamp-new-version.sh]] to pick up the version bump diff as part of the new commit.
 
 #+name: stamp-new-version.sh
 #+header: :tangle stamp-new-version.sh
 #+header: :shebang #!/usr/bin/env bash
 #+begin_src bash
 set -euo pipefail
+
+if awk '/ COMMIT$/ { found=1; exit } END { exit !found }' release-notes.org; then
+	echo >&2 "'COMMIT' found in release-notes.org; please update it first."
+	exit 1
+fi
 
 version="$(awk \
 	'/^#\+name: Lilac version$/{getline; getline; print}' index.org)"
