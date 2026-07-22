@@ -42,3 +42,50 @@ html {
     overflow-x: auto; /*  */
   }
 }
+
+@media print {
+  @media print {
+    div.navbar {
+      position: static;
+      grid-area: auto;
+    }
+    main {
+      top: 0; /*  */
+    }
+  }
+
+  body {
+    display: block;
+  }
+  nav#tocs {
+    display: none;
+  }
+
+  /*  */
+  .code-block-controls {
+    display: none;
+  }
+
+  /*  */
+  .code-block-container,
+  .code-block-body,
+  .code-block-meta,
+  .cell-idx {
+    display: block;
+  }
+
+  .code-block-container {
+    margin-left: 0; /*  */
+    width: 50rem;
+  }
+
+  /*  */
+  pre > code.sourceCode > span {
+    text-indent: 0;
+    padding-left: 0;
+  }
+
+  table th {
+    top: 0;
+  }
+}

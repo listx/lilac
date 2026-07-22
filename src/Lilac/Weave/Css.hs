@@ -493,7 +493,7 @@ defaultCss = do
   ".code-block-container" & do
     display grid
     gridTemplateColumns [rem 3.125, fr 1]
-    margin (rem 1) 0 (rem 1) (rem (-3.125))
+    margin (rem 1) 0 (rem 1) (rem (-3.125)) --
     position relative
     fontSize (rem 0.9)
     a ? do

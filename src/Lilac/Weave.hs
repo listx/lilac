@@ -426,8 +426,8 @@ weaveObject object = doctypehtml_ $ do
   body_ $ do
     let lciCellPairs = sortFootnoteCells object
     weaveNavbar
-    weaveMain object.orgDoc.meta lciCellPairs
     weaveAllTocs lciCellPairs
+    weaveMain object.orgDoc.meta lciCellPairs
     weaveHeadingAncestry lciCellPairs
     jsPath <- getRootRelativePath "js/lilac.js" --
     script_
