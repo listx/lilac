@@ -11,27 +11,34 @@ Improvements:
 
   - Block ancestors are no longer just arrow symbols. Instead we print the full
     name of the block (and the Org doc where it's from if it's external), inside
-    the hidden metadata area. COMMIT
+    the hidden metadata area. 5d5bc75d (block ancestry: use full parent
+    (ancestor) name, instead of just arrows, 2026-07-22)
 
     We also filter out the redundant ~name~ and ~tangle~ metadata keys because they
     are already displayed in the [[id:c5a40150-b1e1-4794-bd82-18bb4319185a][Name and tangle path]] part of the block at the
     very top.
 
-  - Binaries are now pushed to Cachix. COMMIT
+  - Binaries are now pushed to Cachix. d481eb94 (Makefile: push Nix-built binary
+    to Cachix, 2026-07-19)
 
-  - Hanging indentation for glossary terms. COMMIT
+  - Hanging indentation for glossary terms. 4722cff7 (css: improve readability
+    of glossary items, 2026-07-19)
 
   - Reduce excess whitespace in the woven output.
 
-      - Less vertical spacing between list items. COMMIT
+      - Less vertical spacing between list items. 7bdbb841 (css: reduce vertical
+        whitespace between list item paragraphs, 2026-07-22)
 
-      - Reduced left margin. COMMIT
+      - Reduced left margin. 74520ba7 (weave: reduce space in left margin,
+        2026-07-22)
 
   - Make [[id:1fe40405-2fc3-4cf8-8352-974e5cfee33b::stamp-new-version.sh][stamp-new-version.sh]] check for a ~COMMIT~ string in the release notes
     (this doc) first. Now we can remember more easily which set of preparatory
-    notes need to be paired with Git commit descriptions.
+    notes need to be paired with Git commit descriptions. d7e65bf0
+    (stamp-new-version.sh: learn to check against a "COMMIT" string, 2026-07-22)
 
-  - Various CSS fixes to the print preview. COMMIT
+  - Various CSS fixes to the print preview. 2c944ade (css: various print preview
+    fixes, 2026-07-23)
 
   - Various doc improvements.
 
