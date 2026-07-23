@@ -8,20 +8,17 @@ import Control.Monad.Trans.Cont
     callCC,
     evalContT,
   )
-import Data.Time.LocalTime (getZonedTime)
 import Language.Haskell.TH (Exp, Q, runIO, stringE)
 import Relude
   ( IO,
     MonadTrans,
     String,
-    concat,
     filter,
     fromMaybe,
     lift,
     not,
     null,
     pure,
-    show,
     when,
     ($),
     (/=),
@@ -32,16 +29,7 @@ import System.Environment (lookupEnv)
 import System.Process (readProcess)
 
 lilacVersion :: Q Exp
-lilacVersion = stringE =<< runIO getCombinedVersion
-
-getCombinedVersion :: IO String
-getCombinedVersion = do
-  gitVersion <- filter (/= '\n') <$> getGitVersion
-  timestamp <- getTimestamp
-  pure $ concat [gitVersion, " (", timestamp, ")"]
-
-getTimestamp :: IO String
-getTimestamp = show <$> getZonedTime
+lilacVersion = stringE =<< runIO (filter (/= '\n') <$> getGitVersion)
 
 getGitVersion :: IO String
 getGitVersion = evalContT $ callCC $ \escapeWith -> do

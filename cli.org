@@ -2009,20 +2009,17 @@ import Control.Monad.Trans.Cont
     callCC,
     evalContT,
   )
-import Data.Time.LocalTime (getZonedTime)
 import Language.Haskell.TH (Exp, Q, runIO, stringE)
 import Relude
   ( IO,
     MonadTrans,
     String,
-    concat,
     filter,
     fromMaybe,
     lift,
     not,
     null,
     pure,
-    show,
     when,
     ($),
     (/=),
@@ -2040,23 +2037,13 @@ import System.Process (readProcess)
 <<f:getEnv>>
 #+end_src
 
-The entrypoint is [[f:lilacVersion]], which combines Git information with the
-timestamp of when the binary was built. That in turn calls [[f:getGitVersion]] where
-most of the heavy lifting happens.
+The entrypoint is [[f:lilacVersion]], which gets the Git information. That in turn
+calls [[f:getGitVersion]] where most of the heavy lifting happens.
 
 #+name: f:lilacVersion
 #+begin_src haskell
 lilacVersion :: Q Exp
-lilacVersion = stringE =<< runIO getCombinedVersion
-
-getCombinedVersion :: IO String
-getCombinedVersion = do
-  gitVersion <- filter (/= '\n') <$> getGitVersion
-  timestamp <- getTimestamp
-  pure $ concat [gitVersion, " (", timestamp, ")"]
-
-getTimestamp :: IO String
-getTimestamp = show <$> getZonedTime
+lilacVersion = stringE =<< runIO (filter (/= '\n') <$> getGitVersion)
 #+end_src
 
 In [[f:getGitVersion]] we use the continuation monad transformer to make the IO
