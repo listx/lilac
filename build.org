@@ -2160,7 +2160,7 @@ tasks:
       nix-shell --run "make tangle"
   - build: |
       cd lilac
-      nix-shell --run "make build-release"
+      nix-shell --run "make build-release" # (ref:.build.yml-build-release)
   - test: |
       cd lilac
       nix-shell --run "make test" # (ref:.build.yml-test)
@@ -2201,9 +2201,10 @@ tasks:
       hut pages publish -d $site site.tar.gz
 #+end_src
 
-Because the build-release rule involves building and running the test suite, the
-test task [[(.build.yml-test)]] results in a NOP. However we still keep it here just
-in case the behavior of [[id:d8a6d891-5e3c-44cc-ac43-38d8090ebfbd::make:Build lilac with Nix][make:Build lilac with Nix]] changes.
+Because the ~build-release~ [[(.build.yml-build-release)]] rule involves building and
+running the test suite, the test task [[(.build.yml-test)]] is redundant. However we
+still keep it here just in case the behavior of [[id:d8a6d891-5e3c-44cc-ac43-38d8090ebfbd::make:Build lilac with Nix][make:Build lilac with Nix]]
+changes.
 
 * Cabal configuration
 :PROPERTIES:
