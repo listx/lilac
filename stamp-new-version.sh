@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if awk '/^\*+ .*\yWIP\y/ { found=1; exit } END { exit !found }' release-notes.org; then
+	echo >&2 "'WIP' found in release-notes.org heading; please update it first."
+	exit 1
+fi
+
 if awk '/ COMMIT$/ { found=1; exit } END { exit !found }' release-notes.org; then
 	echo >&2 "'COMMIT' found in release-notes.org; please update it first."
 	exit 1
