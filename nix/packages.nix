@@ -45,10 +45,8 @@ let
   ghcVersionWithoutDots = lib.replaceStrings [ "." ] [ "" ] "9.10.3";
   ghcVersion = "ghc" + ghcVersionWithoutDots;
 
-  ci = builtins.getEnv "JOB_URL" != "";
-
-  haskellOverlays = lib.optionals ci [ heavyDeps ]
-    ++ [ jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+  haskellOverlays =
+    [ heavyDeps jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
 
   disableHaddockGlobally = final: prev: {
     mkDerivation = args: prev.mkDerivation (args // { doHaddock = false; });
@@ -56,14 +54,14 @@ let
 
   heavyDeps = final: prev:
     let heavyPackages = [ "citeproc" "unicode-collation" ];
-    in lib.genAttrs heavyPackages (name: buildForCI prev.${name});
+    in lib.genAttrs heavyPackages (name: buildSmaller prev.${name});
 
   jailbreaks = final: prev: {
     unicode-data = pkgs.haskell.lib.dontCheck prev.unicode-data;
   };
 
   injectExternalPackages = final: prev: {
-    citeproc = buildFaster (prev.callCabal2nix "citeproc" (let
+    citeproc = buildSmaller (prev.callCabal2nix "citeproc" (let
       repo = fetchFromGitHub {
         owner = "jgm";
         repo = "citeproc";
@@ -74,7 +72,7 @@ let
   };
 
   injectLilac = final: prev: { # (ref:injectLilac)
-    lilac = buildFaster (prev.callCabal2nix "lilac" lilacSource { });
+    lilac = buildSmaller (prev.callCabal2nix "lilac" lilacSource { });
   };
 
   tweakLilacBuild = final: prev: {
@@ -119,27 +117,13 @@ let
     in path: type: filterFunc path type;
   };
 
-  buildForCI = haskellPkg:
+  buildSmaller = haskellPkg:
     let
       confFns = [
         hlib.dontHyperlinkSource
         hlib.dontCoverage
         hlib.dontHaddock
         hlib.disableExecutableProfiling
-        hlib.dontCheck
-        hlib.dontBenchmark
-      ];
-
-    in lib.pipe haskellPkg confFns;
-
-  buildFaster = haskellPkg:
-    let
-      confFns = [
-        hlib.dontHyperlinkSource
-        hlib.dontCoverage
-        hlib.dontHaddock
-        hlib.disableExecutableProfiling
-        hlib.disableLibraryProfiling
         hlib.dontBenchmark
       ];
 
