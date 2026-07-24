@@ -90,7 +90,7 @@ let
     import (import ./sources.nix)."gitignore.nix" { inherit lib; }; # (ref:gnf)
   lilacSource = lib.cleanSourceWith {
     src = projectRoot;
-    name = baseNameOf projectRoot + "-src"; # (ref:lilacSource name)
+    name = "lilac-src"; # (ref:lilacSource name)
     filter = let # (ref:gnf-memoization)
       filterFunc = gnf.gitignoreFilterWith {
         basePath = projectRoot;

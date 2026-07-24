@@ -421,7 +421,7 @@ gnf =
   import (import ./sources.nix)."gitignore.nix" { inherit lib; }; # (ref:gnf)
 lilacSource = lib.cleanSourceWith {
   src = projectRoot;
-  name = baseNameOf projectRoot + "-src"; # (ref:lilacSource name)
+  name = "lilac-src"; # (ref:lilacSource name)
   filter = let # (ref:gnf-memoization)
     filterFunc = gnf.gitignoreFilterWith {
       basePath = projectRoot;
@@ -502,10 +502,9 @@ nix-repl> builtins.attrNames gnf
 [ "gitignoreFilter" "gitignoreFilterWith" "gitignoreSource" "gitignoreSourceWith" ]
 #+end_example
 
-Back to ~lilacSource~, it has a ~name~ at [[(lilacSource name)]] consisting of the
-project root folder, plus a =-src= suffix. When building Lilac, this name will be
-used for generating a Nix store entry for all of the source code used for
-building the project:
+Back to ~lilacSource~, it has a ~name~ of ~lilac-src~ at [[(lilacSource name)]]. When
+building Lilac, this name will be used for generating a Nix store entry for all
+of the source code used for building the project:
 
 #+begin_example
 ...
