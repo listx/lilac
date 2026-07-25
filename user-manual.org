@@ -83,7 +83,7 @@ readability in raw Org (plaintext) form.
 
 ** Noweb links can reference blocks from other files
 
-You can reference code blocks in other files, as long as those files are also
+You can reference blocks in other files, as long as those files are also
 compiled (into objects) and become part of the archive. For example, see
 [[id:af82950f-ec4a-46e1-9af5-995222cd35e3::module:Lilac.Types][module:Lilac.Types]] where many of the Noweb links point to blocks in other files.
 
@@ -101,7 +101,7 @@ an example (or, if you are reading this document from the raw Org file, just
 grep for ~:ID:~)
 
 By the same token, all documents require a UUID, so that even if you don't have
-a heading, other documents can still reference a named code block in your doc
+a heading, other documents can still reference a named block in your doc
 via the top-level document UUID.
 
 You probably don't want to type these ID values by hand. In Emacs, you can use
@@ -110,8 +110,8 @@ automatically in the process if one doesn't exist yet).
 
 ** No implicit concatenation of multiple blocks sharing the same name when tangling
 
-Orgmode allows multiple code blocks all sharing the same ~#+header: :noweb-ref
-bar~ metadata, where during tangling these code blocks will be concatenated
+Orgmode allows multiple blocks all sharing the same ~#+header: :noweb-ref
+bar~ metadata, where during tangling these blocks will be concatenated
 together, in the order that they appear in the doc. *However, we do not allow
 this style for the following reasons:*
 
@@ -119,7 +119,7 @@ this style for the following reasons:*
      ~org-babel-goto-named-src-block~ only supports ~#+name: ...~ metadata.
 
   2) Using this style can lead to anonymous blocks that don't have a name. IOW,
-     avoiding this style forces us to provide a name for all code blocks, and
+     avoiding this style forces us to provide a name for all blocks, and
      naming everything is generally not a bad thing, because explicit is better
      than implicit.
 
@@ -128,9 +128,9 @@ this style for the following reasons:*
      top-to-bottom (by naming the children and choosing how to order the
      exposition of these child blocks).
 
-** Expandable code blocks
+** Expandable blocks
 
-If you set ~#+header: :collapsed true~ for a code block, it will be collapsed in
+If you set ~#+header: :collapsed true~ for a block, it will be collapsed in
 the woven output. You can then click on a button to expand it. This is useful
 when you have source code that generates figures (drawing), and you don't want
 the code to steal the attention away from the figure.
@@ -157,7 +157,7 @@ The features below are not supported (and are not planned to be supported).
   - Strike-through formatting. Lilac does not support +strike-through+ formatting
     (the ~+~ signs are ignored).
 
-  - Syntax highlighting of code blocks based on the Emacs theme being used (if
+  - Syntax highlighting of blocks based on the Emacs theme being used (if
     one were to export an Org file to HTML from Emacs). Lilac uses a variation
     of the ~kate~ theme (see [[id:33dc521a-2096-4088-9ccc-e55a2119bbfa][Syntax highlighting theme]]).
 

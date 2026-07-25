@@ -774,7 +774,7 @@ lilacCompile _globalOpts compileOpts = do
 The ~archive~ subcommand writes an archive (=*.larc=) file for the given set of
 Lilac object files (generated with the =compile= subcommand). See [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]] for
 details; essentially this is just a collection of multiple [[id:01da95fe-ba23-4481-9833-428423392f5f::data:Object][data:Object]] files to
-allow for multi-Org-file tangling (where code blocks from one Org file can
+allow for multi-Org-file tangling (where blocks from one Org file can
 reference blocks from other files).
 
 #+name: data:ArchiveOpts
@@ -854,7 +854,7 @@ lilacArchive globalOpts archiveOpts = do
 :ID:       27b05a30-83ff-4c47-b320-f53747424a68
 :END:
 
-The ~tangle~ subcommand runs [[f:lilacTangle]]. It can tangle all code blocks (which
+The ~tangle~ subcommand runs [[f:lilacTangle]]. It can tangle all blocks (which
 have been marked for tangling) found in all archives specified with the ~inputs~
 field.
 
@@ -894,7 +894,7 @@ tangleOptsHandler =
 #+header: :tangle src/Lilac/cli/tangle/out-dir.txt
 #+begin_src txt
 Directory used for tangling. It's the starting point from
-which all of the code blocks' ":tangle" header will be a
+which each blocks' ":tangle" header will be a
 child of. Typically you'd want this to point to your repo's
 root directory, so you can tangle a file in any location in
 the repo root, regardless of where your Org files are authored
@@ -985,7 +985,7 @@ scenarios) is fine because it will most likely result in the comparison
 
 In Literate Programming (LP), it's an anti-pattern to write code directly
 without explaining it in detail. In other words, most of the files in a
-repository using LP should be able to be traced back to code block in a larger
+repository using LP should be able to be traced back to blocks in a larger
 literate document. We can check for this by comparing all tangled paths against
 what's tracked in version control by Git (listed by ~git-ls-files~). The two
 should be mostly equivalent.
@@ -1014,7 +1014,7 @@ lintOptsHandler =
     <$> (some $ argument readOsPath (metavar "ARCHIVES..."))
 #+end_src
 
-[[f:lilacLint]] just reads all tangled paths in code blocks across all cells in all
+[[f:lilacLint]] just reads all tangled paths in blocks across all cells in all
 objects in all archives, as ~tangledFiles~ [[(f:lilacLint-tangledFiles)]]. It compares
 this to the list of tracked files, which are obtained by asking Git via
 [[f:gitLsFiles]]. The final diff is displayed with [[f:diffSorted]].

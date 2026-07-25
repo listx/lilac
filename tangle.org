@@ -72,10 +72,10 @@ import System.OsPath qualified as P
 
 Tangling essentially boils down to the following:
 
-  1) find all code blocks that need to get tangled (they have
+  1) find all blocks that need to get tangled (they have
      ~#+header: :tangle ...~ in their metadata), which we call /root blocks/, and
 
-  2) for each of these code blocks expand any Noweb references in them until
+  2) for each of these blocks expand any Noweb references in them until
      none are left, and finally
 
   3) write the files to disk (but only for those files that are different than
@@ -119,7 +119,7 @@ expandRootBlocks archive outDir =
 [[f:expandRootBlocks]] is mainly concerned with collecting all of the root blocks
 first [[(f:expandRootBlocks-getRootBlock)]] before handing them off to
 [[f:expandRootBlock]] for the actual block expansions (where "expansion" just means
-converting any Noweb links we find with the actual contents of that linked code
+converting any Noweb links we find with the actual contents of that linked
 block).
 
 #+name: f:expandRootBlock
@@ -265,7 +265,7 @@ it "loses information" $ do
 :ID:       c78d3f21-b295-4f19-b720-ab50dedb3252
 :END:
 
-Expand a single code block.
+Expand a single block.
 
 #+name: ti:0101-block-expansion
 #+header: :tangle test/Lilac/TangleSpec/0101-block-expansion
@@ -303,7 +303,7 @@ checkExpansion
   ]
 #+end_src
 
-Expand many code blocks in the same place, but the number of repeated expansions
+Expand many blocks in the same place, but the number of repeated expansions
 shouldn't result in a cumulative number of newlines; we should expect just one
 newline for the expanded content.
 
@@ -976,7 +976,7 @@ checkExpansion
   ]
 #+end_src
 
-We allow two files to refer to each other's code blocks as well, as long as
+We allow two files to refer to each other's blocks as well, as long as
 there isn't a cycle.
 
 #+name: ti:0101-block-expansion-external-mutual-a
@@ -1067,7 +1067,7 @@ spec = do
 <<f:checkExpansion>>
 #+end_src
 
-The [[f:checkExpansion]] function expands all source code blocks (found in the
+The [[f:checkExpansion]] function expands all source blocks (found in the
 collection of Org documents, first converted into a [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]]) and compares
 them with the expected output.
 

@@ -22,7 +22,7 @@ cell can be a
 
   - ordered or unordered [[id:58f69993-599d-4389-ba47-3056b1bb2350][list item]] (can be nested),
 
-  - [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][block]] (code block, quotation, example, etc),
+  - [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][block]] (source code, quotation, example, etc),
 
   - [[id:d0f60631-8b30-4ae1-992d-49c7b0ea38fb][table]],
 
@@ -196,8 +196,8 @@ later, much like citations.
 *** ~lineLabels~
 
 The ~lineLabels~ [[(data:OrgDoc-lineLabels)]] are for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]] (named positions /inside/ a
-code block, which you can link to from the prose text). We reset the numbering
-of these back to 1 every time we see a new code block, so we keep track of the
+block, which you can link to from the prose text). We reset the numbering
+of these back to 1 every time we see a new block, so we keep track of the
 assigned numbers here with a map.
 
 *** Citations
@@ -292,7 +292,7 @@ data OrgParserState = OrgParserState
     cellNumber :: LCI, -- (ref:data:OrgParserState-cellNumber)
     pseudoEdges :: [PseudoEdge], -- (ref:data:OrgParserState-pseudoEdges)
     tanglePaths :: Set Text, -- (ref:data:OrgParserState-tanglePaths)
-    insideCodeBlock :: Bool, -- (ref:data:OrgParserState-insideCodeBlock)
+    insideBlock :: Bool, -- (ref:data:OrgParserState-insideBlock)
     anonBlockNumber :: Int, -- (ref:data:OrgParserState-anonBlockNumber)
     lineLabelNumber :: Int, -- (ref:data:OrgParserState-lineLabelNumber)
     lineLabels :: Map Text Int, -- (ref:data:OrgParserState-lineLabels)
@@ -341,7 +341,7 @@ defaultOrgParserState =
       cellNumber = LCI 0,
       pseudoEdges = [],
       tanglePaths = Set.empty,
-      insideCodeBlock = False,
+      insideBlock = False,
       anonBlockNumber = 0,
       lineLabelNumber = 0,
       lineLabels = M.empty,
@@ -395,7 +395,7 @@ The fields below mostly deal with one of these two concerns.
 The ~docOid~ [[(data:OrgParserState-docOid)]] is what becomes the ~oid~ [[(data:OrgDoc-oid)]] of
 [[data:OrgDoc]]. If there are no headings, then this ~docOid~ is what is used as a
 unique prefix to identify named cells (any cell with a ~#+name: ...~, such as a
-code block) from other Org files.
+block) from other Org files.
 
 The ~headingOidStack~ [[(data:OrgParserState-headingOidStack)]] is a stack of OIDs, with the
 first one being the ~docOid~ and later ones being OIDs of headings encountered at
@@ -429,13 +429,13 @@ All cells, even if they are not named, are sequentially numbered in ~cellNumber~
 [[(data:OrgParserState-cellNumber)]]. This is used to encode the starting vertex of each edge
 in ~pseudoEdges~ [[(data:OrgParserState-pseudoEdges)]] (see [[id:3dcdfd21-5e2e-45bf-90bd-3a6a919724c5][~pseudoEdges~]]).
 
-*** Fields for code blocks
+*** Fields for blocks
 
 The ~tanglePaths~ [[(data:OrgParserState-tanglePaths)]] is used in [[f:assertUniqueTanglePath]] to
 check that no two blocks tangle to the same filesystem path.
 
-The ~insideCodeBlock~ boolean [[(data:OrgParserState-insideCodeBlock)]] tracks whether we're
-inside a code block; see [[f:compressedTextParser]] for how this is used.
+The ~insideBlock~ boolean [[(data:OrgParserState-insideBlock)]] tracks whether we're
+inside a block; see [[f:compressedTextParser]] for how this is used.
 
 The ~anonBlockNumber~ [[(data:OrgParserState-anonBlockNumber)]] is used to keep track of all
 anonymous blocks. Anonymous blocks can link out to other named blocks, and for
@@ -446,10 +446,10 @@ number (a sequential counter). See [[f:blockParser]] for details.
 *** Fields for line labels
 
 The ~lineLabelNumber~ [[(data:OrgParserState-lineLabelNumber)]] is a sequential counter for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line
-labels]] which is reset at every code block.
+labels]] which is reset at every block.
 
 The ~lineLabels~ map [[(data:OrgParserState-lineLabels)]] associates the label with the label
-number, and this number is used to display the link in the text (source) as well as the code block (destination).
+number, and this number is used to display the link in the text (source) as well as the block (destination).
 
 *** Fields for prose text
 
@@ -734,9 +734,9 @@ import Lilac.Types as OrgParserState
         headingLevel,
         headingOidStack,
         headingSectionNumber,
+        insideBlock,
         insideCitation,
         insideCitePrefix,
-        insideCodeBlock,
         insideFootnoteDefinition,
         insideHeading,
         insideLinkDisplayName,
@@ -1063,7 +1063,7 @@ We now look at some of the less obvious parts (other than [[f:cellParser]] for
   - *Reconciliation of some data structures*. Once we've finished parsing the
     entire document, we can then make assertions such as "all footnote
     references must have a corresponding definition" or "all referenced line
-    labels must exist in code blocks". We call this process /reconciliation/ and
+    labels must exist in blocks". We call this process /reconciliation/ and
     this is done for footnotes and line labels.
 
   - *Resetting of some stateful fields*. Some of our unit tests check for the
@@ -1200,10 +1200,10 @@ docMetaEntryParser = do
     avoidParsingLilacExtensions = MP.notFollowedBy $ string "#+lilac_"
 #+end_src
 
-We have to tiptoe around code blocks by checking that it is not looking at
+We have to tiptoe around blocks by checking that it is not looking at
 block-related metadata syntax with ~avoidParsingBlockMetadata~
 [[(avoidParsingBlockMetadata)]]. This is important because otherwise if an Org
-document begins with a [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code block]] as the first thing (before [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][headings]] or
+document begins with a [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][block]] as the first thing (before [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31][headings]] or
 anything else), we may consume that as part of ~docMetaParser~ and fail because we
 think we are expecting ~: ~ followed by a value when we encounter ~#+begin_src
 ...~.
@@ -2273,7 +2273,7 @@ For the verbatim and code styles, we replace newlines with spaces with calls to
 ~newlineToSpace~ [[(call-newlineToSpace)]], because in practice newlines can get
 inserted only because we're wrapping the source text (in Org mode) at 80
 columns. If the user wants to put in a piece of multiline text with specific
-newlines, they should just use a source code block instead of an inline verbatim
+newlines, they should just use a source block instead of an inline verbatim
 or code style.
 
 The verbatim and code styles rely on [[f:verbatimCodeParser]] to parse text inside
@@ -3010,25 +3010,25 @@ to. For now, this data structure only supports the following cases:
      document or another (external) Org document. "External" doesn't mean any
      Org document; it must be compiled inside the same [[id:25827c17-2015-434b-b686-db3d72b2ee4d::data:Archive][data:Archive]].
 
-     These are also used for Noweb reference inside another code block (because
-     code blocks are just cells). They can be used to also link to figures,
+     These are also used for Noweb reference inside another block (because
+     blocks are just cells). They can be used to also link to figures,
      which are also cells. [[fig:PNG image][Example]]
 
-     When inside code blocks, these use angle brackets (e.g., ~<<foo>>~). This can
-     reference code blocks in other files by the [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org ID (OID)]], where the syntax
+     When inside blocks, these use angle brackets (e.g., ~<<foo>>~). This can
+     reference blocks in other files by the [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][Org ID (OID)]], where the syntax
      is ~<<id:...::foo>>~ where ~...~ is the OID and ~foo~ is the name of the code
      block at that OID (either using the top-level OID of the document or the
      OID of the closest enclosing heading). We have to use an OID-to-file map
      data structure (which is parsed [[id:96f8cbda-abca-48bd-bb89-512aaac61ca8][here]]).
 
-     When used outside of code blocks, square brackets are used (e.g.,
+     When used outside of blocks, square brackets are used (e.g.,
      ~[[target]]~ or ~[[target][name]]~) where ~target~ is just a plain text string
      (such as a URL or some other entity in the document), and ~name~ is what is
      displayed to the user when the link is rendered.
 
-  2) A [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][line label]], which is a link that points to a reference /inside/ a code
-     block. This is useful for referring to different areas inside a code block,
-     without having to break up the code block into multiple separate parts.
+  2) A [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][line label]], which is a link that points to a reference /inside/ a
+     block. This is useful for referring to different areas inside a block,
+     without having to break up the block into multiple separate parts.
 
   3) A [[id:4127feee-755d-430e-8fef-192e95143790][footnote definition]]. These also use [[data:LinkOid]] internally,
      and always refer to footnote definitions within the same Org document.
@@ -3068,7 +3068,7 @@ data LinkTarget
 The [[data:LinkOid]] is made up of the Org ID and the name. This is used pervasively
 as it is the only way to refer to headings (within the same doc or in an
 external Org doc). It is also required for constructing Noweb links that refer
-to code blocks from external documents. See [[f:oidReferenceParser]] to see the
+to blocks from external documents. See [[f:oidReferenceParser]] to see the
 expected format of these links.
 
 #+name: data:LinkOid
@@ -3173,7 +3173,7 @@ other parsers (such as [[f:styledTextParser]]) to succeed (see [[f:proseParser]]
 interaction of this parser with these other parsers).
 
 Note that in [[f:linkParser]] we don't parse [[id:81e1c841-5de8-4111-9b18-f33bea904122][Noweb links]] here because they can only
-exist inside [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code blocks]].
+exist inside [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][blocks]].
 
 ** OID links
 :PROPERTIES:
@@ -3182,7 +3182,7 @@ exist inside [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f][code blocks]].
 
 The [[f:oidLinkParser]] closely resembles the [[f:nowebLinkTargetParser]], because they
 both encode a [[data:LinkOid]], the only difference being where they are used (Noweb
-links are used exclusively inside code blocks to refer to other code blocks).
+links are used exclusively inside blocks to refer to other blocks).
 
 #+name: f:oidLinkParser
 #+begin_src haskell
@@ -3378,13 +3378,13 @@ compressedTextParser disallowedChars ending = do
   tn <-
     proseParser'
       $ proseSpaceConsumer'
-        pState.insideCodeBlock
+        pState.insideBlock
   pure $ compressWhitespace tn
   where
     compressWhitespace = T.unwords . T.words
     proseSpaceConsumer' :: Bool -> OrgParser Text -- (ref:proseSpaceConsumer')
-    proseSpaceConsumer' insideCodeBlock
-      | insideCodeBlock = onlySpaces
+    proseSpaceConsumer' insideBlock
+      | insideBlock = onlySpaces
       | otherwise =
           MP.choice
             [ string "\n",
@@ -3435,7 +3435,7 @@ Now we could punish the user for having erroneous indentation, but because
 ~org-toggle-link-display~ can hide this error caused by ~fill-paragraph~ (and
 because the link target contents will be hidden), we take the approach of being
 a bit lenient here. We still disallow newlines inside the link target inside
-code blocks, which is why ~insideCodeBlock~ is still a parameter for
+blocks, which is why ~insideBlock~ is still a parameter for
 ~proseSpaceConsumer'~. See [[ti:0006-links-oids-lenient-whitespace]].
 
 *** Link display names
@@ -4387,7 +4387,7 @@ shouldParseWith
 :ID:       81e1c841-5de8-4111-9b18-f33bea904122
 :END:
 
-Noweb links, or references, are ~LinkOid~ links to other code blocks. We've been
+Noweb links, or references, are ~LinkOid~ links to other blocks. We've been
 using Noweb references already in this document, but here's an isolated example.
 
 #+begin_src sh
@@ -4411,7 +4411,7 @@ current Org file or any other Org file (as long as those other Org files are
 [[id:c80fd6a6-7eb2-4672-99cc-a5a10c1fda69][compiled]] and [[id:75173d6f-c210-46a0-8acf-689deeacd250][archived]] together).
 
 The ability for Noweb links to reference blocks in other files is not part of
-Orgmode and is Lilac's own extension. This allows source code blocks to be
+Orgmode and is Lilac's own extension. This allows source blocks to be
 defined across multiple Org files if needed. One simple example is version
 information that we might want to define /once/ in a single place, but which might
 be referenced in other places, across multiple Org files. This is exactly what
@@ -4424,7 +4424,7 @@ example.
 :END:
 
 Line labels are embedded inside a block, and can be linked to from outside the
-block. Below is an example; we give two code blocks, the first with the line
+block. Below is an example; we give two blocks, the first with the line
 labels disabled and the second with the same content but with line labels
 enabled, so that you can see the full syntax if you're reading this from HTML:
 
@@ -4443,7 +4443,7 @@ The ~(ref:a)~ and ~(ref:foo)~ will become targets that can be linked to via ~[[(
 and ~[[(foo)]]~. So now you can write [[(a)]] and [[(foo)]] to refer to specific lines in
 the example above.
 
-*** Parsing of labels inside code blocks
+*** Parsing of labels inside blocks
 
 The line label must start with a ~(ref:~ and end with a closing parenthesis ~)~;
 this is the syntax that Orgmode uses, and which we also adopt in
@@ -4544,11 +4544,11 @@ isLineLabel s = T.take 1 s == "(" && T.takeEnd 1 s == ")"
 #+end_src
 
 Unlike other links that use the double bracket syntax, these line label links
-cannot be given a custom name for how they are displayed inside code blocks;
+cannot be given a custom name for how they are displayed inside blocks;
 instead they are always named numerically when woven (see [[id:a63d2021-2596-4c43-81e3-d08e90077f75::f:weaveLink][f:weaveLink]]), although
 when referring to a line label in an /external/ document we also include the name
-of the code block for additional context
-[[id:a63d2021-2596-4c43-81e3-d08e90077f75::(f:weaveLinkDisplayName-name-of-code-block)]].
+of the block for additional context
+[[id:a63d2021-2596-4c43-81e3-d08e90077f75::(f:weaveLinkDisplayName-name-of-block)]].
 
 During weaving, line labels are numbered starting at ~1~, and
 increment upwards. The ~lineLabels~ and ~lineLabelNumber~ fields in
@@ -4589,7 +4589,7 @@ You can do that with
 ,#+header: :line-label tangle
 #+end_src
 
-for the source code block in question. See [[id:2804111e-fa41-4cbe-9480-2666dd4a02e5::nix/release.nix][nix\/release.nix]] for an example.
+for the source block in question. See [[id:2804111e-fa41-4cbe-9480-2666dd4a02e5::nix/release.nix][nix\/release.nix]] for an example.
 
 ** Footnotes
 :PROPERTIES:
@@ -8232,8 +8232,8 @@ for details). All cells that can be named (not just blocks, such as tables and
 figures as stated above) have an equivalent ~parentOid~ field to assist with this,
 for this same reason.
 
-Lastly, the ~body~ field [[(data:Block-body)]] stores the actual contents of the code
-block. Briefly, the body can have either text or links to other code blocks ---
+Lastly, the ~body~ field [[(data:Block-body)]] stores the actual contents of the
+block. Briefly, the body can have either text or links to other blocks ---
 also known as Noweb references. See [[id:e3400781-57e7-409d-a65c-7c3d66847587][Body]] for details.
 
 ** Metadata
@@ -8249,12 +8249,12 @@ There are two kinds of metadata formats that blocks accept:
      (not just for blocks but also for [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][Figures]]).
 
   2) The ~#+header: :key value~ format. The most common ones here is
-     ~#+header: :tangle ...~ which specifies the tangle path of the code block.
+     ~#+header: :tangle ...~ which specifies the tangle path of the block.
      [[f:blockMetaEntryParser]] is used to parse these ones.
 
 The reason why blocks have two separate formats like this is because that's what
 Orgmode uses as well. The test case below has some examples of valid (empty)
-code blocks with some typical metadata.
+blocks with some typical metadata.
 
 #+name: ti:0007-blocks-empty
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-empty
@@ -8516,7 +8516,7 @@ seen in [[Expected blocks for 0007-blocks-empty]].
 
 The [[f:assertUniqueTanglePath]] function
 [[(blockMetaEntryParser-assertUniqueTanglePath)]] checks that all tangle paths are
-unique; that is, no two code blocks may share the same tangle path.
+unique; that is, no two blocks may share the same tangle path.
 
 #+name: f:assertUniqueTanglePath
 #+begin_src haskell
@@ -8535,7 +8535,7 @@ assertUniqueTanglePath _ _ _ = pure ()
 #+end_src
 
 The tangle path is important for literate programming because it's the way in
-which code blocks actually get written to disk. Forcing tangle paths to be
+which blocks actually get written to disk. Forcing tangle paths to be
 unique guarantees that there are no clashes (one block may not overwrite
 another).
 
@@ -8574,7 +8574,7 @@ quite similar to [[newtype:Prose]] (a list of [[data:PToken]] types). A ~BToken~
 either some raw piece of text, or a link. The link is only for the case of Noweb
 references. For example, if a block contains a Noweb reference, then it needs to
 be a link such that the Noweb reference can be dereferenced, and its contents
-replaced with the source of the referenced code block during tangling.
+replaced with the source of the referenced block during tangling.
 
 #+name: data:BToken
 #+begin_src haskell
@@ -8602,7 +8602,7 @@ blockParser = do
       lineLabelOff =
         (== Just "off")
           $ lookup "line-label" metaKVs
-  modify (\s -> s {insideCodeBlock = True})
+  modify (\s -> s {insideBlock = True})
   bTokens <- -- (ref:f:blockParser-bTokens)
     MP.choice -- (ref:f:blockParser-bTokens-choice)
       [ zeroBTokensParser blockType,
@@ -8632,7 +8632,7 @@ blockParser = do
     ( \s ->
         s
           { anonBlockNumber = newAnonBlockNumber,
-            insideCodeBlock = False
+            insideBlock = False
           }
     )
   pure $ CBlock block
@@ -8773,7 +8773,7 @@ trailing newlines as ~BToken~ values, these newlines would build up every time w
 nested into a block (e.g., [[id:c78d3f21-b295-4f19-b720-ab50dedb3252::t:0101-block-expansion-deeply-nested][t:0101-block-expansion-deeply-nested]]).
 
 [[f:someBTokensParser]] relies on [[f:bTokenParser]] to do the actual parsing of ~BToken~
-values, which form the contents of the code block. These ~BToken~ values can be
+values, which form the contents of the block. These ~BToken~ values can be
 either text (~BTokenString~) or a Noweb link (~BTokenLinkTarget~). Essentially all
 of the complexity around [[f:bTokenParser]] is due to the need to detect Noweb
 references in a robust way.
@@ -8887,7 +8887,7 @@ Non-special commas stay put:
 ,#+end_src
 #+end_src
 
-If you are reading this (and the above code block) from Emacs Orgmode, realize
+If you are reading this (and the above block) from Emacs Orgmode, realize
 that we have to do escaping ourselves here, which can be a bit confusing. See
 [[file:test/Lilac/ParseSpec/0007-blocks-special-commas]] for the raw text to see
 what it really looks like. The woven HTML version agrees with the raw text, so
@@ -8967,7 +8967,7 @@ compressBTokens = reverse . foldl' f []
 To understand [[f:padConsecutiveNowebLinks]] [[(f:blockParser-bTokens-transforms)]] in
 [[f:blockParser]], we have to first look at how we parse Noweb references, aka
 links. We use the term /reference/ and /link/ somewhat interchangeably here, because
-the only way to refer to another code block is with a Noweb /reference/, which
+the only way to refer to another block is with a Noweb /reference/, which
 automatically becomes a /link/ upon weaving.
 
 A Noweb reference is a reference to another block of code. During tangling, the
@@ -9633,8 +9633,8 @@ List bodies may have cells of the following type:
 
       - Example nested item.
 
-Vanilla Org allows more cell types like code blocks inside list bodies, but
-Lilac does not. List items should be simple, and things like code blocks just
+Vanilla Org allows more cell types like blocks inside list bodies, but
+Lilac does not. List items should be simple, and things like blocks just
 makes list items more complicated. The fact that we support tables and
 standalone math fragments in list bodies is an accident, not a product of
 design. Indeed, for typical use cases, you shouldn't need anything more than
@@ -12598,9 +12598,9 @@ another cell.
 
 Use the first form for a standalone equation like this
 
-# Note: these code blocks for the math bits are needed for HTML audiences,
+# Note: these blocks for the math bits are needed for HTML audiences,
 # because otherwise the markers like "\begin{equation}" and "\[" get removed by
-# MathJax. That is, without these code blocks, HTML audiences will only see the
+# MathJax. That is, without these blocks, HTML audiences will only see the
 # rendered 2 + 2 = 4 output and not what goes into the inputs to generate them.
 
 #+begin_src latex

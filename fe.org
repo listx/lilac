@@ -314,12 +314,12 @@ behavior.
             [lilac.toc-active-entries :as tae]
             [lilac.hamburger :as hamburger]
             [lilac.lazy-scroll :as lazy-scroll]
-            [lilac.code-block-controls :as cbc]))
+            [lilac.block-controls :as bc]))
 
 (history/init)
 (tae/init)
 (lazy-scroll/init)
-(cbc/init)
+(bc/init)
 (hamburger/init)
 (js/console.log "Lilac loaded successfully.")
 #+end_src
@@ -882,20 +882,20 @@ classes.
     (.remove class-list "active")))
 #+end_src
 
-** Code block controls
+** Block controls
 :PROPERTIES:
 :ID:       9c8e1074-edfb-4f89-bedf-07527981835d
 :END:
 
-Code blocks can have two possible buttons:
+Blocks can have two possible buttons:
 
   1) ~M~ (for metadata): This is for displaying all raw metadata (most of which is
      uninteresting, and which by default is hidden). See [[id:55af9189-9fb5-4ed9-bbf6-eed970a2e0a5][Hidden (raw) metadata]].
-     This button is available on all code blocks on hover.
+     This button is available on all blocks on hover.
 
      The button is generated [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::(f:weaveBlock-metadata-button)][here]].
 
-  2) ~Expand contents~ (for expanding code block body text): This is for showing
+  2) ~Expand contents~ (for expanding block body text): This is for showing
      the body text, but only when it is hidden. This button is optional, and is
      only displayed if you have ~#+header: :collapsed true~ for your block.
      [[id:9078b9d4-b331-499c-89f8-4b3a355f3c72::fig:lilac-subcommands.pikchr][Example]].
@@ -907,16 +907,16 @@ being hidden or displayed. There is additional complication in that the way
 these buttons interact with each other results in how we round out borders
 [[(f:render-block!-rounding-style)]].
 
-[[ns:lilac.code-block-controls]] contains logic for dealing with the concerns raised
-above. The key is that it keeps track of each code block's state (whether
-something is visible or not, whether the code block is anonymous, etc) in an
+[[ns:lilac.block-controls]] contains logic for dealing with the concerns raised
+above. The key is that it keeps track of each block's state (whether
+something is visible or not, whether the block is anonymous, etc) in an
 atom in [[f:state]], and then every time that state changes it re-renders the
-changed code block in [[f:render-block!]].
+changed block in [[f:render-block!]].
 
-#+name: ns:lilac.code-block-controls
-#+header: :tangle src/fe/lilac/code_block_controls.cljs
+#+name: ns:lilac.block-controls
+#+header: :tangle src/fe/lilac/block_controls.cljs
 #+begin_src clojure
-(ns lilac.code-block-controls)
+(ns lilac.block-controls)
 
 <<f:state>>
 <<f:calculate-initial-state>>
@@ -931,8 +931,8 @@ changed code block in [[f:render-block!]].
   (add-watch state :render
     (fn [_ _ _ new-state]
       (when-let [block-id (:updated-block-id new-state)]
-        (render-block! block-id)))) ; (ref:ns:lilac.code-block-controls-render-callback)
-  (.addEventListener js/document "click" handle-click!)) ; (ref:ns:lilac.code-block-controls-init-addEventListener)
+        (render-block! block-id)))) ; (ref:ns:lilac.block-controls-render-callback)
+  (.addEventListener js/document "click" handle-click!)) ; (ref:ns:lilac.block-controls-init-addEventListener)
 #+end_src
 
 *** State handling
@@ -951,7 +951,7 @@ which needs to get re-rendered.
 #+end_src
 
 [[f:handle-click!]] is the entrypoint for state handling. It looks at the
-~data-action=...~ attribute to the nearest code block, and then figures out which
+~data-action=...~ attribute to the nearest block, and then figures out which
 exact button was clicked by looking at value of the ~data-action~ part. Depending
 on the action, it toggles just the ~:meta-visible?~ or ~:body-visible?~ boolean
 [[(f:handle-click!-toggle-boolean)]]. Then it performs the update to the ~state~ atom
@@ -961,13 +961,13 @@ on the action, it toggles just the ~:meta-visible?~ or ~:body-visible?~ boolean
 #+begin_src clojure
 (defn- handle-click! [e]
   (when-let [btn (.closest (.-target e) "[data-action]")]
-    (when-let [block (.closest btn ".code-block-container")]
+    (when-let [block (.closest btn ".block-container")]
       (let [block-id (keyword (.-id block))
             action  (.getAttribute btn "data-action")]
 
         (case action
-          ("toggle-code-block-meta-other" "toggle-code-block-body")
-          (let [state-key (if (= action "toggle-code-block-meta-other") ; (ref:f:handle-click!-toggle-boolean)
+          ("toggle-block-meta-other" "toggle-block-body")
+          (let [state-key (if (= action "toggle-block-meta-other") ; (ref:f:handle-click!-toggle-boolean)
                             :meta-visible?
                             :body-visible?)]
             (swap! state #(-> % ; (ref:f:handle-click!-update-state-atom)
@@ -1001,7 +1001,7 @@ the boolean state values we will use to keep track of it.
 #+begin_src clojure
 ;; Pure data calculation function: returns initial map from HTML markers
 (defn- calculate-initial-state [container]
-  (let [body (.querySelector container ".code-block-body")
+  (let [body (.querySelector container ".block-body")
         is-collapsed? (.contains (.-classList body) "collapsed")
         has-collapse-button? (.contains (.-classList body) "collapsible")
         is-anonymous? (.contains (.-classList body) "anonymous")]
@@ -1012,15 +1012,15 @@ the boolean state values we will use to keep track of it.
 #+end_src
 
 Finally, we associate the change of the [[f:state]] atom with a callback to
-[[f:render-block!]] at [[(ns:lilac.code-block-controls-render-callback)]], before wiring
+[[f:render-block!]] at [[(ns:lilac.block-controls-render-callback)]], before wiring
 up the click event lister on the document to [[f:handle-click!]]
-[[(ns:lilac.code-block-controls-init-addEventListener)]].
+[[(ns:lilac.block-controls-init-addEventListener)]].
 
 Now we are ready to talk about rendering the block based on the state.
 
 *** Rendering
 
-[[f:render-block!]] is the main entrypoint for rendering a changed code block. It
+[[f:render-block!]] is the main entrypoint for rendering a changed block. It
 examines the state of the block in the ~state~ atom by dereferencing it
 [[(f:render-block!-atom-deref)]], then modifies the CSS classes depending on the
 situation [[(f:render-block!-modify-classes)]].
@@ -1039,9 +1039,9 @@ we round the border corners of the various pieces involved
           collapse-button? (:has-collapse-button? block-state)
           meta-vis?        (:meta-visible? block-state)
 
-          other-meta (.querySelector container ".code-block-meta-other")
-          body (.querySelector container ".code-block-body")
-          controls (.querySelector container ".code-block-controls-inline")
+          other-meta (.querySelector container ".block-meta-other")
+          body (.querySelector container ".block-body")
+          controls (.querySelector container ".block-controls-inline")
 
           body-needs-full-rounding?
             (and anon? (not meta-vis?) (not collapse-button?) body-vis?)
@@ -1080,7 +1080,7 @@ important because not all blocks have all controls.
 #+end_src
 
 [[f:rounding-styles]] captures all possible rounding styles for the
-~.code-block-controls-inline~ DIV. In a sense this is like an ~enum~ data type found
+~.block-controls-inline~ DIV. In a sense this is like an ~enum~ data type found
 in other programming languages. In our case it's a Clojure set ~#{...}~.
 
 #+name: f:rounding-styles

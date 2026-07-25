@@ -1,4 +1,4 @@
-(ns lilac.code-block-controls)
+(ns lilac.block-controls)
 
 (defonce state
   (atom {:block-ids {} ;
@@ -6,7 +6,7 @@
 
 ;; Pure data calculation function: returns initial map from HTML markers
 (defn- calculate-initial-state [container]
-  (let [body (.querySelector container ".code-block-body")
+  (let [body (.querySelector container ".block-body")
         is-collapsed? (.contains (.-classList body) "collapsed")
         has-collapse-button? (.contains (.-classList body) "collapsible")
         is-anonymous? (.contains (.-classList body) "anonymous")]
@@ -22,13 +22,13 @@
 
 (defn- handle-click! [e]
   (when-let [btn (.closest (.-target e) "[data-action]")]
-    (when-let [block (.closest btn ".code-block-container")]
+    (when-let [block (.closest btn ".block-container")]
       (let [block-id (keyword (.-id block))
             action  (.getAttribute btn "data-action")]
 
         (case action
-          ("toggle-code-block-meta-other" "toggle-code-block-body")
-          (let [state-key (if (= action "toggle-code-block-meta-other") ;
+          ("toggle-block-meta-other" "toggle-block-body")
+          (let [state-key (if (= action "toggle-block-meta-other") ;
                             :meta-visible?
                             :body-visible?)]
             (swap! state #(-> % ;
@@ -61,9 +61,9 @@
           collapse-button? (:has-collapse-button? block-state)
           meta-vis?        (:meta-visible? block-state)
 
-          other-meta (.querySelector container ".code-block-meta-other")
-          body (.querySelector container ".code-block-body")
-          controls (.querySelector container ".code-block-controls-inline")
+          other-meta (.querySelector container ".block-meta-other")
+          body (.querySelector container ".block-body")
+          controls (.querySelector container ".block-controls-inline")
 
           body-needs-full-rounding?
             (and anon? (not meta-vis?) (not collapse-button?) body-vis?)

@@ -206,9 +206,9 @@ import Lilac.Types as OrgParserState
         headingLevel,
         headingOidStack,
         headingSectionNumber,
+        insideBlock,
         insideCitation,
         insideCitePrefix,
-        insideCodeBlock,
         insideFootnoteDefinition,
         insideHeading,
         insideLinkDisplayName,
@@ -1270,7 +1270,7 @@ blockParser = do
       lineLabelOff =
         (== Just "off")
           $ lookup "line-label" metaKVs
-  modify (\s -> s {insideCodeBlock = True})
+  modify (\s -> s {insideBlock = True})
   bTokens <- --
     MP.choice --
       [ zeroBTokensParser blockType,
@@ -1300,7 +1300,7 @@ blockParser = do
     ( \s ->
         s
           { anonBlockNumber = newAnonBlockNumber,
-            insideCodeBlock = False
+            insideBlock = False
           }
     )
   pure $ CBlock block
@@ -1515,13 +1515,13 @@ compressedTextParser disallowedChars ending = do
   tn <-
     proseParser'
       $ proseSpaceConsumer'
-        pState.insideCodeBlock
+        pState.insideBlock
   pure $ compressWhitespace tn
   where
     compressWhitespace = T.unwords . T.words
     proseSpaceConsumer' :: Bool -> OrgParser Text --
-    proseSpaceConsumer' insideCodeBlock
-      | insideCodeBlock = onlySpaces
+    proseSpaceConsumer' insideBlock
+      | insideBlock = onlySpaces
       | otherwise =
           MP.choice
             [ string "\n",

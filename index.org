@@ -25,7 +25,7 @@ release-notes.org
 :END:
 
 Lilac is a [[https://en.wikipedia.org/wiki/Literate_programming][literate programming]] [cite:@knuth_literate_1984] (LP) tool.
-Specifically it can read Orgmode files to tangle (i.e., extract) code blocks
+Specifically it can read Orgmode files to tangle (i.e., extract) blocks
 using [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][Noweb]] [cite:@ramsey_literate_1994] references (see [[id:6ef55b7a-28f8-45cd-aa9b-7d9e10a3ab52][Literate programming
 and Noweb]]), and also weave (i.e., publish) the same files to HTML for a more
 pleasant reading experience. You can use Lilac as a static site generator (and
@@ -181,9 +181,9 @@ surrounding the Lilac project, not just how it's implemented.
 :ID:       6ef55b7a-28f8-45cd-aa9b-7d9e10a3ab52
 :END:
 
-This is a literate document, so prose explanations are mixed in with code.
-Typically, all of the content of a code block will be explained by nearby prose.
-Code blocks will typically make use of Noweb references.
+This is a literate document, so prose explanations are mixed in with code blocks
+(which we just call /blocks/). Typically, the content of a block will be explained
+by nearby prose. Blocks will typically make use of Noweb references.
 
 For example, in
 
@@ -206,17 +206,17 @@ which, if you're viewing this in HTML, should show a link for the ~Lilac version
 part.
 
 If a Noweb reference is not explained nearby, search for it to find where it is
-defined. A Noweb reference is a single code block with the ~#+name: foo~ metadata
+defined. A Noweb reference is a single block with the ~#+name: foo~ metadata
 where ~foo~ is the name of the Noweb reference (this is the name other blocks use
 to refer to it).
 
-*** Code block naming conventions
+*** Block naming conventions
 
-We follow a particular naming convention when referring to code blocks. Because
+We follow a particular naming convention when referring to blocks. Because
 Lilac is mostly written in Haskell, many of these prefixes are specific to the
 Haskell programming language.
 
-#+caption: Naming convention of code blocks.
+#+caption: Naming convention of blocks.
 | Naming prefix | Meaning                     | Example                     |
 |---------------+-----------------------------+-----------------------------|
 | ~data~          | Haskell ~data~ declaration    | [[id:5df15f17-c630-4ddf-bade-66084c430a07::data:OrgDoc][data:OrgDoc]]                 |

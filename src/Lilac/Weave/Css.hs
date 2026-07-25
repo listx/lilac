@@ -490,7 +490,7 @@ defaultCss = do
       p ? do
         yx margin (rem 0.5) 0
 
-  ".code-block-container" & do
+  ".block-container" & do
     display grid
     gridTemplateColumns [rem 3.125, fr 1]
     margin (rem 1) 0 (rem 1) (rem (-3.125)) --
@@ -500,16 +500,16 @@ defaultCss = do
       display inlineBlock
       yx margin (rem 0.125) 0
   forM_
-    [ ".code-block-meta",
-      ".code-block-meta-other",
-      ".code-block-controls-inline",
-      ".code-block-body"
+    [ ".block-meta",
+      ".block-meta-other",
+      ".block-controls-inline",
+      ".block-body"
     ]
     $ \child -> do
-      ".code-block-container" |> child ? do
+      ".block-container" |> child ? do
         "grid-column" -: "2"
 
-  ".code-block-controls" & do
+  ".block-controls" & do
     padding (rem 0.125) (rem 0.3125) 0 0
     width (rem 3.125)
     textAlign $ alignSide sideRight
@@ -525,47 +525,47 @@ defaultCss = do
       display block
     a # hover ? do
       textDecoration none
-    button # ".toggle-code-block-meta-other" ? do
+    button # ".toggle-block-meta-other" ? do
       "::before" & do
         "content" -: "\"M\""
       "border" -: "0"
       "cursor" -: "pointer"
       ev borderRadius (rem 0.125)
       border (px 1) solid colorCodeBorder
-  (".code-block-container" # hover) |> ".code-block-controls" ? do
+  (".block-container" # hover) |> ".block-controls" ? do
     visibility visible
     opacity 1
 
-  ".code-block-controls-inline" & do
+  ".block-controls-inline" & do
     yx padding (rem 0.25) (rem 0.5)
     border (px 1) solid colorCodeBorder
     fontSans
-    button # ".toggle-code-block-body" ? do
+    button # ".toggle-block-body" ? do
       "::before" & do
         "content" -: "\"Expand contents\"" --
       "border" -: "0"
       "cursor" -: "pointer"
       ev borderRadius (rem 0.125)
       border (px 1) solid colorCodeBorder
-    button # ".toggle-code-block-body.action-collapse" ? do
+    button # ".toggle-block-body.action-collapse" ? do
       "::before" & do
         "content" -: "\"Collapse contents\"" --
-  ".active" ** ".code-block-controls-inline" ? do
+  ".active" ** ".block-controls-inline" ? do
     border (px 1) solid colorActiveBorder
 
-  ".code-block-meta" & do
+  ".block-meta" & do
     yx padding 0 (rem 0.5)
     border (px 1) solid colorCodeBorder
     borderBottomWidth 0
     borderTopLeftRadius (rem 0.3125) (rem 0.3125)
     borderTopRightRadius (rem 0.3125) (rem 0.3125)
     fontSans
-  ".active" ** ".code-block-meta" ? do
+  ".active" ** ".block-meta" ? do
     fontWeight bold
     border (px 1) solid colorActiveBorder
     borderBottomWidth 0
 
-  div # ".code-block-meta-other" ? do
+  div # ".block-meta-other" ? do
     p ? do
       yx margin (rem 0.25) 0
     ul ? do
@@ -577,7 +577,7 @@ defaultCss = do
     borderBottomWidth 0
     ".hidden" & do
       display displayNone
-  ".active" ** ".code-block-meta-other" ? do
+  ".active" ** ".block-meta-other" ? do
     border (px 1) solid colorActiveBorder
     borderBottomWidth 0
 
@@ -593,7 +593,7 @@ defaultCss = do
     "word-break" -: "break-word"
   ".sourceCode" & do
     ev margin $ rem 0
-  ".code-block-body" & do
+  ".block-body" & do
     overflowX visible
     fontMono
     fontSize (rem 0.9)
@@ -603,13 +603,13 @@ defaultCss = do
     borderBottomRightRadius (rem 0.3125) (rem 0.3125)
     border (px 1) solid colorCodeBorder
     yx padding (rem 0.125) (rem 0.5)
-  ".active" ** ".code-block-body" ? do
+  ".active" ** ".block-body" ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
   --
   ".collapsed" ? do
     display displayNone
-  ".code-block-body" ** ".sourceCode" ** ".active" ? do
+  ".block-body" ** ".sourceCode" ** ".active" ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
     "::after" & do

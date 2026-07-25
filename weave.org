@@ -773,7 +773,7 @@ import Text.Megaparsec.Char.Lexer (hexadecimal)
 
 [[f:genCss]] is the main top-level function which generates the CSS. There are two
 main parts: one is the [[id:33dc521a-2096-4088-9ccc-e55a2119bbfa][Syntax highlighting theme]] [[(f:genCss-kateLilac)]] used in
-[[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1][Code blocks]], and the other is the rest of Lilac ([[f:defaultCss]]) which uses the
+[[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1][Blocks]], and the other is the rest of Lilac ([[f:defaultCss]]) which uses the
 [[https://hackage.haskell.org/package/clay][Clay]] CSS preprocessor. These two parts are concatenated together in [[f:genCss]], so
 that Lilac's settings take precedence if there are any conflicts with the
 =Skylighting= parts.
@@ -802,7 +802,7 @@ defaultCss = do
   <<css:StyledTextStyles>>
   <<css:Links>>
   <<css:List items>>
-  <<css:Code blocks>>
+  <<css:Blocks>>
   <<css:Figures>>
   <<css:Tables>>
   <<css:Citations>>
@@ -896,7 +896,7 @@ Source Code Pro
 #+end_src
 
 These font names are reused exactly in [[id:a7f65fb9-86bb-45ab-8c61-2fedfadb24fe::text:source-fonts.css][text:source-fonts.css]], which is why we
-parameterize them here as their own code blocks. This way we can guarantee that
+parameterize them here as separate blocks. This way we can guarantee that
 these stay in sync (regardless of whether we pull in the fonts from Google web
 fonts or from the vendored artifacts).
 
@@ -1513,7 +1513,7 @@ main_ ? do
 #+end_src
 
 [[css:page-width]] is 50 rem units, which is encoded below so that it can be reused
-in [[css:print-preview-code-blocks]].
+in [[css:print-preview-blocks]].
 
 #+name: css:page-width
 #+begin_src css
@@ -1566,14 +1566,14 @@ as a grid).
     display: block; /* (ref:css:mobile-body-block) */
     overflow-x: hidden;
   }
-  .code-block-body {
+  .block-body {
     overflow-x: auto; /* (ref:css:mobile-scroll-code) */
   }
 }
 #+end_src
 
 The other bits are mainly for controlling how the main content looks. We only
-enable horizontal scrolling on the individual elements like code blocks
+enable horizontal scrolling on the individual elements like blocks
 [[(css:mobile-scroll-code)]].
 
 *** Mobile tearing fix
@@ -1596,14 +1596,14 @@ position even if the user tries to drag it away.
 *** Print preview
 
 A number of things change for the print preview, namely the navbar, the sidebar,
-and the code blocks.
+and the blocks.
 
 #+name: css:print-preview
 #+begin_src css
 @media print {
   <<css:print-preview-navbar>>
   <<css:print-preview-tocs-sidebar>>
-  <<css:print-preview-code-blocks>>
+  <<css:print-preview-blocks>>
   <<css:print-preview-table>>
 }
 #+end_src
@@ -1640,50 +1640,50 @@ nav#tocs {
 }
 #+end_src
 
-The code blocks need to avoid the grid display stuff to guarantee that the child
+The blocks need to avoid the grid display stuff to guarantee that the child
 DIVs are displayed contiguously (to avoid page breaks in the middle of the code
 block between child DIVs).
 
-#+name: css:print-preview-code-blocks
+#+name: css:print-preview-blocks
 #+begin_src css
-/* (ref:css:print-preview-code-blocks-hide-buttons) */
-.code-block-controls {
+/* (ref:css:print-preview-blocks-hide-buttons) */
+.block-controls {
   display: none;
 }
 
-/* (ref:css:print-preview-code-blocks-display-as-block) */
-.code-block-container,
-.code-block-body,
-.code-block-meta,
+/* (ref:css:print-preview-blocks-display-as-block) */
+.block-container,
+.block-body,
+.block-meta,
 .cell-idx {
   display: block;
 }
 
-.code-block-container {
-  margin-left: 0; /* (ref:css:print-preview-code-blocks-reset-left-margin) */
+.block-container {
+  margin-left: 0; /* (ref:css:print-preview-blocks-reset-left-margin) */
   width: <<css:page-width>>rem;
 }
 
-/* (ref:css:print-preview-code-blocks-span-tweak) */
+/* (ref:css:print-preview-blocks-span-tweak) */
 pre > code.sourceCode > span {
   text-indent: 0;
   padding-left: 0;
 }
 #+end_src
 
-[[(css:print-preview-code-blocks-hide-buttons)]] hides the metadata buttons (they're
+[[(css:print-preview-blocks-hide-buttons)]] hides the metadata buttons (they're
 useless in the non-interactive print preview).
 
-[[(css:print-preview-code-blocks-display-as-block)]] keeps the different parts of
+[[(css:print-preview-blocks-display-as-block)]] keeps the different parts of
 the block together (otherwise the browser will be happy to insert page breaks in
 between the different DIVs).
 
-[[(css:print-preview-code-blocks-reset-left-margin)]] resets the left margin,
-because the ~code-block-controls~ are not visible see [[(css:Block grid
+[[(css:print-preview-blocks-reset-left-margin)]] resets the left margin,
+because the ~block-controls~ are not visible see [[(css:Block grid
 layout-negative-left-margin)]].
 
-Without [[(css:print-preview-code-blocks-span-tweak)]], we end up with code with
-lots of extra whitespace (as if the text in the code blocks are almost
+Without [[(css:print-preview-blocks-span-tweak)]], we end up with code with
+lots of extra whitespace (as if the text in the blocks are almost
 justified). Ideally we wouldn't have to tweak generated CSS (the ~.sourceCode~
 stuff is generated by Skylighting, not us), but it works well enough for now.
 
@@ -2183,7 +2183,7 @@ ruins the mobile viewing experience).
 :END:
 
 [[f:weaveLink]] is the main workhorse for links. This is used for prose and also
-code blocks (Noweb links and line labels). Other than the link target address
+blocks (Noweb links and line labels). Other than the link target address
 (where we want to take the reader, determined by [[f:weaveLinkTarget]]), and the
 name of link shown to them (via [[f:weaveLinkDisplayName]]),
 we also need to keep track of the HTML ID of the link element for line labels
@@ -2228,11 +2228,11 @@ weaveLink insideBlock link = do
 Let's look at link display names first before looking at how we get the link
 targets. For the most part, the link display name is just the ~name~ field of a
 link [[(f:weaveLinkDisplayName-link-name)]]. Most of the complications involve line
-labels. For internal line labels (line labels that are in code blocks in the
+labels. For internal line labels (line labels that are in blocks in the
 current document), we just use the line label number
 [[(f:weaveLinkDisplayName-internal-line-label)]]. But for links to line labels in
-external code blocks, we also weave the name of that external code block
-[[(f:weaveLinkDisplayName-name-of-code-block)]].
+external blocks, we also weave the name of that external block
+[[(f:weaveLinkDisplayName-name-of-block)]].
 
 #+name: f:weaveLinkDisplayName
 #+begin_src haskell
@@ -2260,7 +2260,7 @@ weaveLinkDisplayName link = do
                         gci.unGCI
                         weaveConf.archive.offsets,
                     Just prose <- gciToName weaveConf.archive offset gci ->
-                      (extractStyledText prose) -- (ref:f:weaveLinkDisplayName-name-of-code-block)
+                      (extractStyledText prose) -- (ref:f:weaveLinkDisplayName-name-of-block)
                         <> [stext " → " [], stext (T.show num) [Bold]]
                   | otherwise ->
                       [stext (T.show num) [Bold]] -- (ref:f:weaveLinkDisplayName-internal-line-label)
@@ -2310,7 +2310,7 @@ For weaving the target to [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels
 
   1) The actual labels themselves. This is where they are defined /inside/ a code
      block, where we have to make them link to themselves
-     [[(f:weaveLinkTarget-self-link)]] (similar to how headings and code blocks can
+     [[(f:weaveLinkTarget-self-link)]] (similar to how headings and blocks can
      link to themselves for the user to easily save the link to it).
 
   2) Internal line labels [[(f:weaveLinkTarget-internal)]]. This is simple because
@@ -2665,12 +2665,12 @@ main_ ? do
         minHeight (rem 2.2)
 #+end_src
 
-* Code blocks
+* Blocks
 :PROPERTIES:
 :ID:       4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1
 :END:
 
-Code blocks (also just called /blocks/) have two major parts: the code (with any
+Blocks have two major parts: the code (with any
 Noweb links inside them), which we call the /body/, along with any /metadata/ (such
 as the name of the block and the tangle path).
 
@@ -2679,12 +2679,12 @@ as the name of the block and the tangle path).
 weaveBlock :: LCI -> Block -> HtmlWeaver ()
 weaveBlock lci block = do
   wrapWithDiv lci $ do
-    div_ [class_ "code-block-container", id_ linkAnchor] $ do
-      div_ [class_ "code-block-controls"] $ do
+    div_ [class_ "block-container", id_ linkAnchor] $ do
+      div_ [class_ "block-controls"] $ do
         -- (ref:f:weaveBlock-metadata-button)
         button_
-          [ class_ "toggle-code-block-meta-other",
-            data_ "action" "toggle-code-block-meta-other"
+          [ class_ "toggle-block-meta-other",
+            data_ "action" "toggle-block-meta-other"
           ]
           $ pure ()
         a_ [href_ $ "#" <> linkAnchor] $ do
@@ -2697,7 +2697,7 @@ weaveBlock lci block = do
                   Just "true" -> (" top-rounded", " anonymous bottom-rounded")
                   _ -> (" top-rounded", " anonymous fully-rounded") -- (ref:f:weaveBlock-corners)
             | otherwise = ("", "")
-      div_ [class_ $ "code-block-meta-other hidden" <> rawBorder] $ do
+      div_ [class_ $ "block-meta-other hidden" <> rawBorder] $ do
         weaveBlockAncestry block
         -- (ref:f:weaveBlock-full-metadata)
         p_ [] $ do
@@ -2716,18 +2716,18 @@ weaveBlock lci block = do
 There are several additional things worth mentioning, all having to do with how
 we display each block:
 
-  - ~code-block-controls~ DIV, which has a button [[(f:weaveBlock-metadata-button)]]
+  - ~block-controls~ DIV, which has a button [[(f:weaveBlock-metadata-button)]]
     to reveal all of the raw metadata, as well as a self-link to the block
     itself. This DIV is only displayed on hover, and also includes the
     [[id:e2c26658-d4c7-4ebe-ad2e-79eff60a82cf][Self-linked anchor symbol]].
 
   - [[f:weaveImportantMetadata]] which weaves the name and tangle path (if any).
     This also weaves the block [[id:5b38fec8-43fb-4b72-8ea1-a86175fe9267][Ancestry]], which is automatically generated
-    (unlike the other metadata which the user must supply for each code block in
+    (unlike the other metadata which the user must supply for each block in
     the underlying Org file).
 
   - [[f:weaveInlineBlockControls]] [[(f:weaveBlock-weaveInlineBlockControls)]] which
-    weaves the button for toggling the display of the code block body.
+    weaves the button for toggling the display of the block body.
 
   - [[id:33dc521a-2096-4088-9ccc-e55a2119bbfa][Syntax highlighting theme]] for the block body. There is some complication
     around making the highlighting work with links (see [[f:weaveBlockBody]]).
@@ -2739,11 +2739,11 @@ We will cover all of these points in the subsections that follow.
 :ID:       e2c26658-d4c7-4ebe-ad2e-79eff60a82cf
 :END:
 
-We want users to link to code blocks; that is, code blocks should be linkable
+We want users to link to blocks; that is, blocks should be linkable
 just like [[id:c036cf17-0f61-4f07-bf76-bbe8b4eeb12e][Headings]]. We could use the name of the block for this (much like
 headings where the heading itself is a clickable link to itself), however this
 wouldn't work for anonymous blocks which have no name. This is why we use the
-link anchor symbol "🔗" with Unicode code point ~U+1F517~ for code blocks and
+link anchor symbol "🔗" with Unicode code point ~U+1F517~ for blocks and
 glossary terms (see [[f:weaveGlossaryTerm]]). We display this link symbol whenever
 the mouse hovers over the block.
 
@@ -2776,7 +2776,7 @@ weaveImportantMetadata block
     Nothing <- lookup "tangle" block.meta =
       pure ()
   | otherwise = do
-      div_ [class_ "code-block-meta"] $ do
+      div_ [class_ "block-meta"] $ do
         if
           | Just name <- lookup "name" block.meta,
             Just path <- lookup "tangle" block.meta -> do
@@ -2807,7 +2807,7 @@ missing. [[(f:weaveImportantMetadata-target-icon)]] encodes a "direct hit" or
 The user may also be interested in seeing
 /all/ of the metadata, but because this is uncommon, the full metadata
 [[(f:weaveBlock-full-metadata)]] is hidden behind a button press
-[[(f:weaveBlock-metadata-button)]]. See [[id:9c8e1074-edfb-4f89-bedf-07527981835d][Toggle code block metadata]] to see how we
+[[(f:weaveBlock-metadata-button)]]. See [[id:9c8e1074-edfb-4f89-bedf-07527981835d][Block controls]] to see how we
 make the button interactive.
 
 [[f:weaveBlockMeta]] just weaves a single key and value pair of the metadata; it is
@@ -2917,10 +2917,10 @@ This button is only rendered if the user sets the ~collapsed~ metadata value to
 ,#+end_src
 #+end_src
 
-This makes the code block body area hidden by default, by making
+This makes the block body area hidden by default, by making
 [[f:weaveBlockBody]] start out in "collapsed" form [[(f:weaveBlockBody-collapsed)]].
-[[f:weaveInlineBlockControls]] weaves the ~toggle-code-block-body~ button to allow the
-showing (and hiding) of the code block body.
+[[f:weaveInlineBlockControls]] weaves the ~toggle-block-body~ button to allow the
+showing (and hiding) of the block body.
 
 #+name: f:weaveInlineBlockControls
 #+begin_src haskell
@@ -2932,11 +2932,11 @@ weaveInlineBlockControls block
               Nothing <- lookup "tangle" block.meta =
                 " fully-rounded"
             | otherwise = " bottom-rounded"
-      div_ [class_ $ "code-block-controls-inline" <> border] $ do
+      div_ [class_ $ "block-controls-inline" <> border] $ do
         -- (ref:f:weaveInlineBlockControls-body-toggle-button)
         button_
-          [ class_ "toggle-code-block-body",
-            data_ "action" "toggle-code-block-body"
+          [ class_ "toggle-block-body",
+            data_ "action" "toggle-block-body"
           ]
           $ pure ()
   | otherwise = pure ()
@@ -2946,7 +2946,7 @@ There are a few toggled CSS classes. The classes have different
 effects, as described below:
 
   - ~collapsed~ [[(f:weaveBlockBody-collapsed)]] [[(css:Block body-collapsed)]]: hides the
-    display of the code block body
+    display of the block body
 
   - ~action-collapse~: controls whether we display the text ~Expand contents~
     [[(css:Block controls inline-msg-expand)]] or ~Collapse contents~ [[(css:Block
@@ -2960,27 +2960,27 @@ effects, as described below:
 
 #+name: css:Block controls inline
 #+begin_src haskell
-".code-block-controls-inline" & do
+".block-controls-inline" & do
   yx padding (rem 0.25) (rem 0.5)
   border (px 1) solid colorCodeBorder
   fontSans
-  button # ".toggle-code-block-body" ? do
+  button # ".toggle-block-body" ? do
     "::before" & do
       "content" -: "\"Expand contents\"" -- (ref:css:Block controls inline-msg-expand)
     "border" -: "0"
     "cursor" -: "pointer"
     ev borderRadius (rem 0.125)
     border (px 1) solid colorCodeBorder
-  button # ".toggle-code-block-body.action-collapse" ? do
+  button # ".toggle-block-body.action-collapse" ? do
     "::before" & do
       "content" -: "\"Collapse contents\"" -- (ref:css:Block controls inline-msg-collapse)
-".active" ** ".code-block-controls-inline" ? do
+".active" ** ".block-controls-inline" ? do
   border (px 1) solid colorActiveBorder
 #+end_src
 
 ** Body
 
-Finally we come to weaving the body of the code block. The body requires some
+Finally we come to weaving the body of the block. The body requires some
 additional work for supporting syntax highlighting (see [[f:colorizeText]]).
 
 #+name: f:weaveBlockBody
@@ -2992,7 +2992,7 @@ weaveBlockBody block bodyBorder = do
             lookup "collapsed" block.meta =
             " collapsed collapsible" -- (ref:f:weaveBlockBody-collapsed)
         | otherwise = ""
-  pre_ [class_ $ "code-block-body" <> bodyBorder <> maybeCollapsed] $ do
+  pre_ [class_ $ "block-body" <> bodyBorder <> maybeCollapsed] $ do
     let bodyText = getBlockContentsWithoutLinks block.body
     case lookup "__src_language" block.meta of -- (ref:f:weaveBlockBody-lang)
       Just lang -> do
@@ -3151,7 +3151,7 @@ kateLilac =
 :ID:       85341b61-e725-4b75-a902-5a2a6cbdf07c
 :END:
 
-#+name: css:Code blocks
+#+name: css:Blocks
 #+begin_src haskell
 <<css:Block grid layout>>
 <<css:Block controls>>
@@ -3162,12 +3162,12 @@ kateLilac =
 <<css:Block rounding>>
 #+end_src
 
-Code blocks use a 2-column layout, with the first column being the
-~.code-block-controls~ and the second column being all the rest.
+Blocks use a 2-column layout, with the first column being the
+~.block-controls~ and the second column being all the rest.
 
 #+name: css:Block grid layout
 #+begin_src haskell
-".code-block-container" & do
+".block-container" & do
   display grid
   gridTemplateColumns [rem 3.125, fr 1]
   margin (rem 1) 0 (rem 1) (rem (-3.125)) -- (ref:css:Block grid layout-negative-left-margin)
@@ -3177,22 +3177,22 @@ Code blocks use a 2-column layout, with the first column being the
     display inlineBlock
     yx margin (rem 0.125) 0
 forM_
-  [ ".code-block-meta",
-    ".code-block-meta-other",
-    ".code-block-controls-inline",
-    ".code-block-body"
+  [ ".block-meta",
+    ".block-meta-other",
+    ".block-controls-inline",
+    ".block-body"
   ]
   $ \child -> do
-    ".code-block-container" |> child ? do
+    ".block-container" |> child ? do
       "grid-column" -: "2"
 #+end_src
 
-Initially, the ~.code-block-controls~ in the first column are hidden. On hovering
+Initially, the ~.block-controls~ in the first column are hidden. On hovering
 over it or the overall container we display it.
 
 #+name: css:Block controls
 #+begin_src haskell
-".code-block-controls" & do
+".block-controls" & do
   padding (rem 0.125) (rem 0.3125) 0 0
   width (rem 3.125)
   textAlign $ alignSide sideRight
@@ -3205,7 +3205,7 @@ over it or the overall container we display it.
   visibility hidden -- (ref:css-visibility)
   opacity 0 -- (ref:css-opacity)
   <<css:Block controls buttons>>
-(".code-block-container" # hover) |> ".code-block-controls" ? do
+(".block-container" # hover) |> ".block-controls" ? do
   visibility visible
   opacity 1
 #+end_src
@@ -3220,7 +3220,7 @@ a ? do
   display block
 a # hover ? do
   textDecoration none
-button # ".toggle-code-block-meta-other" ? do
+button # ".toggle-block-meta-other" ? do
   "::before" & do
     "content" -: "\"M\""
   "border" -: "0"
@@ -3231,30 +3231,30 @@ button # ".toggle-code-block-meta-other" ? do
 
 The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
 
-  1) ~.code-block-meta~ :: The name or tangle path. These attributes are so common
+  1) ~.block-meta~ :: The name or tangle path. These attributes are so common
      (and important) that we always display them where possible.
 
-  2) ~.code-block-meta-other~ :: Other metadata such as the programming language
-     syntax of the code block. These attributes are typically not as
-     interesting, and so require the user to press a button (labeled ~M~) in the
-     ~.code-block-controls~ container to reveal them.
+  2) ~.block-meta-other~ :: Other metadata such as the programming language syntax
+     of the block (for source code blocks). These attributes are typically not
+     as interesting, and so require the user to press a button (labeled ~M~) in
+     the ~.block-controls~ container to reveal them.
 
      This also includes the ancestry of the block (links to other blocks that
      use this block as a child block).
 
-  3) ~.code-block-body~ :: Main body of the block, which contains the actual code
+  3) ~.block-body~ :: Main body of the block, which contains the actual code
      that have been fenced by ~#+begin_...~ and ~#+end_...~.
 
 #+name: css:Block meta
 #+begin_src haskell
-".code-block-meta" & do
+".block-meta" & do
   yx padding 0 (rem 0.5)
   border (px 1) solid colorCodeBorder
   borderBottomWidth 0
   borderTopLeftRadius (rem 0.3125) (rem 0.3125)
   borderTopRightRadius (rem 0.3125) (rem 0.3125)
   fontSans
-".active" ** ".code-block-meta" ? do
+".active" ** ".block-meta" ? do
   fontWeight bold
   border (px 1) solid colorActiveBorder
   borderBottomWidth 0
@@ -3262,7 +3262,7 @@ The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
 
 #+name: css:Block meta other
 #+begin_src haskell
-div # ".code-block-meta-other" ? do
+div # ".block-meta-other" ? do
   p ? do
     yx margin (rem 0.25) 0
   ul ? do
@@ -3274,7 +3274,7 @@ div # ".code-block-meta-other" ? do
   borderBottomWidth 0
   ".hidden" & do
     display displayNone
-".active" ** ".code-block-meta-other" ? do
+".active" ** ".block-meta-other" ? do
   border (px 1) solid colorActiveBorder
   borderBottomWidth 0
 #+end_src
@@ -3293,7 +3293,7 @@ code ? do
   "word-break" -: "break-word"
 ".sourceCode" & do
   ev margin $ rem 0
-".code-block-body" & do
+".block-body" & do
   overflowX visible
   fontMono
   fontSize (rem 0.9)
@@ -3303,7 +3303,7 @@ code ? do
   borderBottomRightRadius (rem 0.3125) (rem 0.3125)
   border (px 1) solid colorCodeBorder
   yx padding (rem 0.125) (rem 0.5)
-".active" ** ".code-block-body" ? do
+".active" ** ".block-body" ? do
   border (px 1) solid colorActiveBorder
   backgroundColor colorActiveBg
 -- (ref:css:Block body-collapsed)
@@ -3317,7 +3317,7 @@ index finger) symbol.
 
 #+name: css:Block line labels
 #+begin_src haskell
-".code-block-body" ** ".sourceCode" ** ".active" ? do
+".block-body" ** ".sourceCode" ** ".active" ? do
   border (px 1) solid colorActiveBorder
   backgroundColor colorActiveBg
   "::after" & do
@@ -6301,7 +6301,7 @@ pageMetricsAncestry =
 :END:
 
 To better support Literate Programming, we list all files that are tangled from
-here in [[f:weaveTangledBlocksList]]. This goes through all code blocks that
+here in [[f:weaveTangledBlocksList]]. This goes through all blocks that
 are tangled from the current document, and sorts them based on the tangled path.
 
 #+name: f:weaveTangledBlocksList

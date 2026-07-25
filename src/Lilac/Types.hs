@@ -419,7 +419,7 @@ data OrgParserState = OrgParserState
     cellNumber :: LCI, --
     pseudoEdges :: [PseudoEdge], --
     tanglePaths :: Set Text, --
-    insideCodeBlock :: Bool, --
+    insideBlock :: Bool, --
     anonBlockNumber :: Int, --
     lineLabelNumber :: Int, --
     lineLabels :: Map Text Int, --
@@ -462,7 +462,7 @@ defaultOrgParserState =
       cellNumber = LCI 0,
       pseudoEdges = [],
       tanglePaths = Set.empty,
-      insideCodeBlock = False,
+      insideBlock = False,
       anonBlockNumber = 0,
       lineLabelNumber = 0,
       lineLabels = M.empty,

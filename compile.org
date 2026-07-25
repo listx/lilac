@@ -15,7 +15,7 @@ reliably.
     Org document. Uses file extension ~*.lobj~, and is encoded as JSON.
 
   - archive :: A self-contained collection of objects. All objects inside an
-    archive can link to each other (headings, code blocks, etc) without any
+    archive can link to each other (headings, blocks, etc) without any
     issues. Uses file extension ~*.larc~, and is encoded as JSON.
 
 We use JSON as the underlying format because it's easy to debug and is widely
@@ -406,9 +406,9 @@ mkSymbols orgDoc =
 #+end_src
 
 [[f:getLineLabels]] [[(f:mkSymbols-getLineLabels)]] associates a link to a line label
-with the code block cell that contains that line label. We use this information
-in [[id:a63d2021-2596-4c43-81e3-d08e90077f75::f:weaveLink][f:weaveLink]] to look up the containing code block's name when the line label
-is contained in an external doc (because the name of the code block gives
+with the block cell that contains that line label. We use this information
+in [[id:a63d2021-2596-4c43-81e3-d08e90077f75::f:weaveLink][f:weaveLink]] to look up the containing block's name when the line label
+is contained in an external doc (because the name of the block gives
 additional context).
 
 #+name: f:getLineLabels
@@ -556,7 +556,7 @@ the name [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::(data:LinkOid-name)]] part,
 because there won't be any local symbols for it. And then these links will get
 picked up as broken links in [[f:mkArchive]].
 
-Links to code blocks within the same document, whether explicitly defined with
+Links to blocks within the same document, whether explicitly defined with
 an OID or not, shouldn't result in external links.
 
 #+name: ti:0400-no-external-symbols-code-blocks
@@ -1024,7 +1024,7 @@ to do:
 
   1) For tangling, we care about broken links because block expansion in
      [[id:ae65f87f-a236-48ed-aa63-8cc7bc5fa7ba::f:expandBlock][f:expandBlock]] depends on expanding all Noweb links with the contents of the
-     code blocks they link to.
+     blocks they link to.
 
   2) For weaving, we care about any broken link ([[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]]) to a cell,
      because otherwise we will not be able to generate the HTML link tag (~<a>~)
@@ -1304,7 +1304,7 @@ filesystem. This just looks at all links to check if a ~LinkTargetFilePath~
 ([[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::(data:LinkTarget-LinkTargetFilePath)]])
 points to a path that actually exists on disk.
 
-We don't check for links inside code blocks, because code blocks cannot have
+We don't check for links inside blocks, because blocks cannot have
 ~file:~ links ([[id:e3400781-57e7-409d-a65c-7c3d66847587::f:bTokenParser][f:bTokenParser]] does not construct any ~LinkTargetFilePath~ values).
 
 #+name: f:findBrokenFileLinks
@@ -1375,7 +1375,7 @@ findBrokenFileLinks =
 :ID:       ff5876bf-a144-4a08-bba4-15638e3590d5
 :END:
 
-All Noweb links (for code blocks) inside an [[data:Archive][Archive]] must be such that they do
+All Noweb links (for blocks) inside an [[data:Archive][Archive]] must be such that they do
 not form a cycle. This is because we have to expand (replace with the actual
 text) Noweb links during the tangling process, and we don't want to be in the
 position of expanding things forever.
@@ -1454,7 +1454,7 @@ graph with all of the blocks in it because the library doesn't care whether the
 edges we feed into it are connected (i.e., you can have as many disconnected
 "islands" of nodes as you want in the same graph).
 
-The [[f:buildGraph]] function looks at all code blocks and generates the necessary
+The [[f:buildGraph]] function looks at all blocks and generates the necessary
 edges to build up a directed graph. It does this by constructing edges that have
 the [[id:f8254d58-7a3d-4595-a265-e0d6255e6ab5::data:LinkOid][data:LinkOid]] of the starting block as one vertex, and the Noweb links found
 inside the body as the other vertices.
@@ -1668,8 +1668,8 @@ in [[ti:0100-dag-self-loop]] because when we add the two vertices for this case 
 [[f:buildGraph]], both vertices will link out to the same document OID (implicitly)
 as an out link when they are parsed in at
 [[id:80637e01-1065-40b0-932c-8ffa2376c863::(f:oidReferenceParser-docOid)]]. So from
-the cycle detection algorithm it's as if we linked from the code block (vertex)
-in the test to another code block that sits above the heading, which them links
+the cycle detection algorithm it's as if we linked from the block (vertex)
+in the test to another block that sits above the heading, which them links
 to itself forming a 2-block cycle.
 
 Check whether we can detect two independent self-loops.
@@ -2300,7 +2300,7 @@ mkBlockAncestry archive blockGCIs = foldl' f mempty blockGCIs
       _ -> Nothing
 #+end_src
 
-[[f:getBlockGCIsFromArchive]] gets all code blocks (by their [[newtype:GCI]]) from the
+[[f:getBlockGCIsFromArchive]] gets all blocks (by their [[newtype:GCI]]) from the
 archive. This is used for calling [[f:mkBlockAncestry]] [[(f:mkArchive-ancestry)]].
 
 #+name: f:getBlockGCIsFromArchive
@@ -2317,7 +2317,7 @@ getBlockGCIsFromArchive archive = foldl' f [] $ elems archive.symbols
       | otherwise = acc
 #+end_src
 
-The line ~elems archive.symbols~ just gets all code blocks from the ~symbols~ field
+The line ~elems archive.symbols~ just gets all blocks from the ~symbols~ field
 of the [[data:Archive]] (perhaps ~elems~ is a poor name and should have been called
 ~values~ instead, but that's probably because "values" from "keys and values"
 shadows the "values" in "types vs values").
@@ -2561,7 +2561,7 @@ parseBibliography = eitherDecodeStrictText
 :END:
 
 GTOC construction needs to find all ~index.org~ objects, and the special ~index~
-code block inside each one. We have to then construct a single large tree out of
+block inside each one. We have to then construct a single large tree out of
 this, where the values in the leaf nodes are ~GPath~ strings of objects in the
 archive.
 
@@ -2596,7 +2596,7 @@ As for the details around growing the tree itself, it is as follows:
 
   1) Find the root ~index.org~ object (along with its ~GPath~).
 
-  2) Find the ~index~ code block and get a list of all paths.
+  2) Find the ~index~ block and get a list of all paths.
 
   3) Convert each path in the list with a new (synthetic) ~GPath~.
 
@@ -2681,7 +2681,7 @@ findRootIndex pathObjs =
             else acc
 #+end_src
 
-[[f:getChildPaths]] gets all the paths inside an ~index~ code block. These paths are
+[[f:getChildPaths]] gets all the paths inside an ~index~ block. These paths are
 "incomplete" in a way, because they only hold the name of the directory or file
 at the current level. So we have to complete the path by merging it with the
 path information of the parent object.
@@ -2777,7 +2777,7 @@ expectGTOC
   (Right . GTOC $ Node emptyGPath [])
 #+end_src
 
-Root ~index.lobj~ exists, but without an ~index~ code block.
+Root ~index.lobj~ exists, but without an ~index~ block.
 
 #+name: ti:0105-gtoc-root-index-without-index-block
 #+header: :tangle test/Lilac/CompileSpec/0105/index.org
@@ -2799,7 +2799,7 @@ expectGTOC
   (Right . GTOC $ Node (GPath "test/Lilac/CompileSpec/0105/index.lobj") [])
 #+end_src
 
-Root ~index.lobj~ exists, with a basic ~index~ code block.
+Root ~index.lobj~ exists, with a basic ~index~ block.
 
 #+name: ti:0105-gtoc-basic-foo
 #+header: :tangle test/Lilac/CompileSpec/0105/basic/foo.org
@@ -2857,8 +2857,8 @@ expectGTOC
   )
 #+end_src
 
-Invalid paths specified in the ~index~ code block, but which do not exist in the
-Archive's list of object paths should show up as an error. In the code block, we
+Invalid paths specified in the ~index~ block, but which do not exist in the
+Archive's list of object paths should show up as an error. In the block, we
 specify a directory named ~dir1~ and an Org file ~README.org~, but neither are
 present in the given list of paths.
 

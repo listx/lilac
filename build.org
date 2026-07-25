@@ -982,7 +982,7 @@ lint
 Lilac can compile Org files into object files (=*.lobj=) and use those object
 files to create archive files (=*.larc=). Compilation helps us catch errors within
 object files, especially for finding broken (internal) links to other Org file
-headings, code blocks, etc. See [[id:b9c034c1-5499-44e6-855c-6c16e1693cb8][Compile]] for a deeper discussion.
+headings, blocks, etc. See [[id:b9c034c1-5499-44e6-855c-6c16e1693cb8][Compile]] for a deeper discussion.
 
 *** Object files
 
@@ -1265,11 +1265,11 @@ tangle()
 
 [[f:tangle-loop:tangle]] tangles source code; however it also resets the
 ~tangled_program_files~ global variable, because it may be the case that the
-program files are slightly different than before when we tangle new code blocks
+program files are slightly different than before when we tangle new blocks
 from an Org file.
 
 If anything goes wrong during tangling, we call [[f:tangle-loop:reset_everything]]
-to reset all tangled code blocks to their previously known (good) state in
+to reset all tangled blocks to their previously known (good) state in
 [[f:tangle-loop:reset_tangled_program_files]], and also delete any intermediate
 build artifacts to get us to a clean state.
 
@@ -1319,7 +1319,7 @@ Note that the ~tangled_program_files~ is created by calling
 [[f:tangle-loop:get_tangled_program_files]] at [[(tangled-files-array)]], which only
 looks at the tangled Cabal, Haskell, Nix, or shell files. This means you can
 make changes to the original Org files to make Lilac compile or pass tests
-again, as needed, by tweaking those code blocks responsible for these file
+again, as needed, by tweaking those blocks responsible for these file
 types.
 
 #+name: f:tangle-loop:get_tangled_program_files
@@ -1652,7 +1652,7 @@ defined inside our [[id:73b60692-f369-4707-a7ee-434cc7a4549f][development shell 
 ~git-hooks~ to reuse those same tools.
 
 While formatting isn't important for tangling (the computer doesn't care about
-formatting), it's important for weaving because we want code blocks in woven
+formatting), it's important for weaving because we want blocks in woven
 output to still look decent and consistent.
 
 #+name: nix:pre-commit-checks
