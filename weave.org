@@ -586,6 +586,7 @@ import Clay
     borderBottomWidth,
     borderBox,
     borderCollapse,
+    borderColor,
     borderLeft,
     borderRadius,
     borderRight,
@@ -2679,7 +2680,8 @@ as the name of the block and the tangle path).
 weaveBlock :: LCI -> Block -> HtmlWeaver ()
 weaveBlock lci block = do
   wrapWithDiv lci $ do
-    div_ [class_ "block-container", id_ linkAnchor] $ do
+    let blockType = fromMaybe "" $ lookup "__block_type" block.meta
+    div_ [class_ $ "block-container " <> blockType, id_ linkAnchor] $ do
       div_ [class_ "block-controls"] $ do
         -- (ref:f:weaveBlock-metadata-button)
         button_
@@ -3160,6 +3162,7 @@ kateLilac =
 <<css:Block meta other>>
 <<css:Block body>>
 <<css:Block rounding>>
+<<css:Misc blocks>>
 #+end_src
 
 Blocks use a 2-column layout, with the first column being the
@@ -3345,6 +3348,69 @@ off the corners of the [[css:Block body]] and [[css:Block meta other]]. See
 ".active" ** ".hide-border-bottom" ? do
   borderBottom (rem 0) solid colorCodeBorder
 #+end_src
+
+*** Miscellaneous blocks
+
+Lilac recognizes the following blocks other than ~#+begin_src~:
+
+  - ~#+begin_example~ :: Contains examples.
+
+  - ~#+begin_quote~ :: Quotations. Meant to be verbatim text from another source.
+
+  - ~#+begin_note~ :: Special bits of information, worth emphasizing inside its
+    own block.
+
+  - ~#+begin_warning~ :: Warnings to watch out for.
+
+The above get woven with special CSS considerations in [[css:Misc blocks]].
+
+#+name: css:Misc blocks
+#+begin_src haskell
+".example .block-body" ? do
+  backgroundColor $ colorFrom "#ddeeff"
+".example.active .block-body" ? do
+  borderColor $ colorFrom "#0000aa"
+".example.active .block-controls-inline" ? do
+  borderColor $ colorFrom "#0000aa"
+".example.active .block-meta-other" ? do
+  borderColor $ colorFrom "#0000aa"
+".quote .block-body" ? do
+  fontStyle italic
+".note .block-body" ? do
+  backgroundColor $ colorFrom "#ffffbb"
+".note.active .block-body" ? do
+  borderColor $ colorFrom "#aaaa00"
+".note.active .block-controls-inline" ? do
+  borderColor $ colorFrom "#aaaa00"
+".note.active .block-meta-other" ? do
+  borderColor $ colorFrom "#aaaa00"
+".warning .block-body" ? do
+  backgroundColor $ colorFrom "#ffdddd"
+".warning.active .block-body" ? do
+  borderColor $ colorFrom "#ff3333"
+".warning.active .block-controls-inline" ? do
+  borderColor $ colorFrom "#ff3333"
+".warning.active .block-meta-other" ? do
+  borderColor $ colorFrom "#ff3333"
+#+end_src
+
+Below are examples of these advisory blocks.
+
+#+begin_example
+This is an example.
+#+end_example
+
+#+begin_quote
+This is a quote.
+#+end_quote
+
+#+begin_note
+This is a note.
+#+end_note
+
+#+begin_warning
+This is a warning.
+#+end_warning
 
 * Figures
 :PROPERTIES:

@@ -20,6 +20,7 @@ import Clay
     borderBottomWidth,
     borderBox,
     borderCollapse,
+    borderColor,
     borderLeft,
     borderRadius,
     borderRight,
@@ -629,6 +630,33 @@ defaultCss = do
     borderBottom (rem 0) solid colorCodeBorder
   ".active" ** ".hide-border-bottom" ? do
     borderBottom (rem 0) solid colorCodeBorder
+
+  ".example .block-body" ? do
+    backgroundColor $ colorFrom "#ddeeff"
+  ".example.active .block-body" ? do
+    borderColor $ colorFrom "#0000aa"
+  ".example.active .block-controls-inline" ? do
+    borderColor $ colorFrom "#0000aa"
+  ".example.active .block-meta-other" ? do
+    borderColor $ colorFrom "#0000aa"
+  ".quote .block-body" ? do
+    fontStyle italic
+  ".note .block-body" ? do
+    backgroundColor $ colorFrom "#ffffbb"
+  ".note.active .block-body" ? do
+    borderColor $ colorFrom "#aaaa00"
+  ".note.active .block-controls-inline" ? do
+    borderColor $ colorFrom "#aaaa00"
+  ".note.active .block-meta-other" ? do
+    borderColor $ colorFrom "#aaaa00"
+  ".warning .block-body" ? do
+    backgroundColor $ colorFrom "#ffdddd"
+  ".warning.active .block-body" ? do
+    borderColor $ colorFrom "#ff3333"
+  ".warning.active .block-controls-inline" ? do
+    borderColor $ colorFrom "#ff3333"
+  ".warning.active .block-meta-other" ? do
+    borderColor $ colorFrom "#ff3333"
 
   figure ? do
     yx margin (rem 1) 0

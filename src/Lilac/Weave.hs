@@ -662,7 +662,8 @@ weaveListMarker =
 weaveBlock :: LCI -> Block -> HtmlWeaver ()
 weaveBlock lci block = do
   wrapWithDiv lci $ do
-    div_ [class_ "block-container", id_ linkAnchor] $ do
+    let blockType = fromMaybe "" $ lookup "__block_type" block.meta
+    div_ [class_ $ "block-container " <> blockType, id_ linkAnchor] $ do
       div_ [class_ "block-controls"] $ do
         --
         button_
