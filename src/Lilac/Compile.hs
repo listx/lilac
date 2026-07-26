@@ -52,6 +52,7 @@ import Lilac.Types
         CListItem,
         CMathFragment,
         CParagraph,
+        CRichBlock,
         CTable
       ),
     Figure (caption, link, meta, parentOid),
@@ -896,6 +897,7 @@ gciToName archive offset gci
               plain $ "Anonymous Equation " <> eqNum
           | otherwise -> plain "Math Fragment"
         CListItem {} -> Nothing
+        CRichBlock {} -> Nothing
         CCommand {} -> Nothing
   | otherwise = Nothing
   where

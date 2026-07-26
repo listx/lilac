@@ -37,6 +37,8 @@ module Lilac.Types
     Prose (..),
     PseudoEdge (..),
     RawProjectConf (..),
+    RichBlock (..),
+    RichBlockDelimiter (..),
     ServeOpts (..),
     Subcommand (..),
     Style (..),
@@ -188,12 +190,28 @@ data Block = Block
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 
+type RichBlock :: Type
+data RichBlock = RichBlock
+  { meta :: Map Text Text, --
+    marker :: RichBlockDelimiter --
+  }
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
+type RichBlockDelimiter :: Type
+data RichBlockDelimiter
+  = RBStart
+  | RBEnd
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
 type Cell :: Type
 data Cell
   = CHeading Heading
   | CListItem [ListMarker]
   | CParagraph Prose
   | CBlock Block
+  | CRichBlock RichBlock
   | CMathFragment MathFragment
   | CFigure Figure
   | CTable Table
@@ -420,7 +438,9 @@ data OrgParserState = OrgParserState
     pseudoEdges :: [PseudoEdge], --
     tanglePaths :: Set Text, --
     insideBlock :: Bool, --
+    activeRichBlock :: Text, --
     anonBlockNumber :: Int, --
+    anonRichBlockNumber :: Int, --
     lineLabelNumber :: Int, --
     lineLabels :: Map Text Int, --
     styleMask :: StyleMask, --
@@ -463,7 +483,9 @@ defaultOrgParserState =
       pseudoEdges = [],
       tanglePaths = Set.empty,
       insideBlock = False,
+      activeRichBlock = "",
       anonBlockNumber = 0,
+      anonRichBlockNumber = 0,
       lineLabelNumber = 0,
       lineLabels = M.empty,
       styleMask = styleMaskFrom [],

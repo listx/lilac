@@ -293,7 +293,9 @@ data OrgParserState = OrgParserState
     pseudoEdges :: [PseudoEdge], -- (ref:data:OrgParserState-pseudoEdges)
     tanglePaths :: Set Text, -- (ref:data:OrgParserState-tanglePaths)
     insideBlock :: Bool, -- (ref:data:OrgParserState-insideBlock)
+    activeRichBlock :: Text, -- (ref:data:OrgParserState-activeRichBlock)
     anonBlockNumber :: Int, -- (ref:data:OrgParserState-anonBlockNumber)
+    anonRichBlockNumber :: Int, -- (ref:data:OrgParserState-anonRichBlockNumber)
     lineLabelNumber :: Int, -- (ref:data:OrgParserState-lineLabelNumber)
     lineLabels :: Map Text Int, -- (ref:data:OrgParserState-lineLabels)
     styleMask :: StyleMask, -- (ref:data:OrgParserState-styleMask)
@@ -342,7 +344,9 @@ defaultOrgParserState =
       pseudoEdges = [],
       tanglePaths = Set.empty,
       insideBlock = False,
+      activeRichBlock = "",
       anonBlockNumber = 0,
+      anonRichBlockNumber = 0,
       lineLabelNumber = 0,
       lineLabels = M.empty,
       styleMask = styleMaskFrom [],
@@ -442,6 +446,15 @@ anonymous blocks. Anonymous blocks can link out to other named blocks, and for
 such links we have to refer back to the anonymous block. As these blocks are
 anonymous we have to give them an artificial name, which is the anonymous block
 number (a sequential counter). See [[f:blockParser]] for details.
+
+*** Fields for rich blocks
+
+The ~activeRichBlock~ field [[(data:OrgParserState-activeRichBlock)]] tracks whether
+we're inside a [[id:33346065-dd99-46a6-b026-be676aa09d4c][rich block]]. It records the type of the rich block, so that we can
+generate a more useful error message; see [[f:richBlockStartParser]].
+
+The ~anonRichBlockNumber~ [[(data:OrgParserState-anonRichBlockNumber)]] is the same as
+the [[(data:OrgParserState-anonBlockNumber)]], but for rich blocks.
 
 *** Fields for line labels
 
@@ -635,6 +648,7 @@ import Lilac.Types
         CListItem,
         CMathFragment,
         CParagraph,
+        CRichBlock,
         CTable
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
@@ -688,6 +702,8 @@ import Lilac.Types
       ),
     Prose (Prose, unProse),
     PseudoEdge (PseudoEdge),
+    RichBlock (RichBlock),
+    RichBlockDelimiter (RBEnd, RBStart),
     Style
       ( Bold,
         Code,
@@ -714,8 +730,10 @@ import Lilac.Types
   )
 import Lilac.Types as OrgParserState
   ( OrgParserState
-      ( anonBlockNumber,
+      ( activeRichBlock,
+        anonBlockNumber,
         anonEquationNumber,
+        anonRichBlockNumber,
         bibPaths,
         bracketBalance,
         cellNames,
@@ -923,6 +941,9 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:getLinkPaddingBools>>
 <<f:nowebLinkAtEndOfLine>>
 <<f:getBlockContents>>
+<<f:richBlockStartParser>>
+<<f:richBlockEndParser>>
+<<f:failIfActiveRichBlock>>
 <<f:zeroIndent>>
 <<f:someIndent>>
 <<f:getContinuationIndentForLevel>>
@@ -1012,6 +1033,7 @@ orgDocParser = do
   (docOid, cslPath, bibPaths, meta) <- docMetaParser -- (ref:doc-metadata-parsing)
   _ <- lilacExtensionsParser
   cells <- many cellParser
+  failIfActiveRichBlock -- (ref:f:orgDocParser-failIfActiveRichBlock)
   MP.eof
   footnoteRefs <- reconcileFootnotes
   citations <- collectCitations
@@ -1446,6 +1468,7 @@ data Cell
   | CListItem [ListMarker]
   | CParagraph Prose
   | CBlock Block
+  | CRichBlock RichBlock
   | CMathFragment MathFragment
   | CFigure Figure
   | CTable Table
@@ -1487,6 +1510,8 @@ cellParser = do
         [ toggleFootnote False $ listItemStartParser,
           toggleFootnote False $ listItemsEndParser,
           toggleFootnote False $ resetIndent headingParser,
+          toggleFootnote False $ resetIndent richBlockStartParser,
+          toggleFootnote False $ resetIndent richBlockEndParser,
           toggleFootnote False $ resetIndent blockParser,
           toggleFootnote False $ resetIndent figureParser,
           toggleFootnote False $ resetIndent tableParser,
@@ -7375,19 +7400,48 @@ paragraph.
 #+begin_src haskell
 paragraphParser :: OrgParser Cell
 paragraphParser = do
+  MP.notFollowedBy
+    . MP.choice
+    $ map
+      string
+      [ "#+end_", -- (ref:f:paragraphParser-avoid-parsing-rich-block-end)
+        "#+begin" -- (ref:f:paragraphParser-avoid-parsing-block-start)
+      ]
   pState <- get
   modify (\s -> s {insideParagraph = True, glossaryTermOffset = 0})
   prose <-
     proseParser
       . whitespaceCompressor
       $ proseSpaceConsumer pState.continuationIndent -- (ref:paragraphParser-proseSpaceConsumer)
-  failIfLeftoverActiveStyles
+  failIfLeftoverActiveStyles -- (ref:f:paragraphParser-failIfLeftoverActiveStyles)
   pState' <- get
   modify (\s -> s {insideParagraph = False})
   if pState'.glossaryTermOffset > 0
     then convertToGlossaryTerm prose pState'.glossaryTermOffset -- (ref:check-for-glossaryTerm)
     else pure . CParagraph $ compressProse prose
 #+end_src
+
+[[(f:paragraphParser-avoid-parsing-rich-block-end)]] makes this avoid parsing a
+~#+end_...~ string. The goal is to avoid parsing syntax errors that /look/ like the
+end of a rich block, such as a rich block end delimiter followed by some other
+non-space text (that is, the only way to properly end a rich block is to have
+~#+end_...~ (one word) and not ~#+end_... some other word~). If we have an improper
+end of a rich block, then the paragraph parser will consume it, unless we tell
+it to avoid such text, which is what we do in
+[[(f:paragraphParser-avoid-parsing-rich-block-end)]]. This is the only way we can
+let the [[f:failIfActiveRichBlock]] check bubble up its error; if we omit
+[[(f:paragraphParser-avoid-parsing-rich-block-end)]] then we will instead get
+[[f:failIfLeftoverActiveStyles]] [[(f:paragraphParser-failIfLeftoverActiveStyles)]]
+instead because we will parse the underscore in the ~#+end_...~ and treat that as
+regular text. While this succeeds in failing the parse, it fails it for the
+wrong reason, which is why we have
+[[(f:paragraphParser-avoid-parsing-rich-block-end)]].
+
+Similarly, [[(f:paragraphParser-avoid-parsing-block-start)]] avoids parsing the
+start of a block, so that we can let the nesting error at
+[[(f:richBlockStartParser-nesting-error)]] surface. If we don't avoid the start of a
+block, then the paragraph parser will greedily parse it, preventing the nesting
+error from getting triggered.
 
 The check at [[(check-for-glossaryTerm)]] is for seeing if the current paragraph
 qualifies as a [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][glossary term]]. If not, we parse it as a normal paragraph.
@@ -7439,6 +7493,11 @@ indentation for lines of a paragraph.
 newlineAndIndentParser :: Int -> OrgParser Text
 newlineAndIndentParser expectedIndentLen = do
   MP.notFollowedBy cellBoundary -- (ref:newlineAndIndentParser-cell-boundary)
+  pState <- get
+  -- (ref:f:newlineAndIndentParser-rich-block-boundary)
+  when (pState.activeRichBlock /= "") $ do
+    let richBlockEnd = "\n#+end_" <> pState.activeRichBlock
+    MP.notFollowedBy $ string richBlockEnd
   _ <- string "\n"
   maybeIndent -- (ref:newlineAndIndentParser-maybeIndent)
   pure " "
@@ -7471,6 +7530,11 @@ be true if the newline was part of a cell boundary.
 cellBoundary :: OrgParser Text
 cellBoundary = string "\n\n"
 #+end_src
+
+When we're inside an active rich block, we want to make sure we don't (greedily)
+parse the rich block end delimiter (see [[f:richBlockEndParser]]). So
+[[(f:newlineAndIndentParser-rich-block-boundary)]] makes this parser fail if it sees
+the delimiter up ahead. That way [[f:richBlockEndParser]] can pick it up.
 
 The ~maybeIndent~ [[(newlineAndIndentParser-maybeIndent)]] handles the case where
 there is no indentation (with ~nonSpace~), or where there is indentation (with
@@ -8414,7 +8478,10 @@ toes of [[f:blockMetaEntryParser]], and similarly we have to check that each
 metadata line does not start with ~#+begin_~
 [[(f:metaEntryParser-avoid-certain-prefixes)]] because otherwise this will be too
 greedy and rob [[f:blockStartParser]] the chance to see the ~#+begin_~ string to
-denote the start of the block.
+denote the start of the block. Similarly, we have to avoid parsing the ~#+end_~
+substring, because [[f:richBlockEndParser]] needs to see it (we don't need to avoid
+~#+end_~ for parsing regular blocks, because it parses this string to terminate
+the block body).
 
 #+name: f:metaEntryParser
 #+begin_src haskell
@@ -8425,6 +8492,7 @@ metaEntryParser = do
     $ map
       string
       [ "#+begin_", -- (ref:f:metaEntryParser-avoid-certain-prefixes)
+        "#+end_",
         "#+header:",
         "#+print_bibliography:",
         "#+print_glossary:"
@@ -8653,21 +8721,33 @@ blockStartParser ::
       Maybe (Text, Text)
     )
 blockStartParser = do
-  let blockMetaParser = many $ lexeme blockMetaEntryParser
+  let blockTypeParser :: OrgParser Text
+      blockTypeParser =
+        MP.choice
+          $ map
+            string
+            [ "src",
+              "example",
+              "export",
+              "quote",
+              "verse"
+            ]
+      blockMetaParser = many $ lexeme blockMetaEntryParser
   _ <-
     MP.try
       . MP.lookAhead
       $ do
         _ <- metaParser
         _ <- blockMetaParser
-        string "#+begin_" -- (ref:f:blockStartParser-lookAhead)
+        _ <- string "#+begin_" -- (ref:f:blockStartParser-lookAhead)
+        blockTypeParser
   metaKVs <- metaParser
   let blockName = case lookup "name" metaKVs of
         Just name -> Just ("name", name)
         Nothing -> Nothing
   blockMetaKVs <- fromList <$> blockMetaParser
   _ <- string "#+begin_"
-  blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
+  blockType <- blockTypeParser
   srcLang <- MP.optional $ do
     _ <- MP.skipSome $ char ' '
     src <- MP.takeWhile1P (Just "src language") isSrcLanguageChar
@@ -9561,6 +9641,604 @@ shouldParseWithState
             ],
         body = [BTokenString "#+end_example"]
       }
+]
+#+end_src
+
+Parse all known non-rich-blocks (including ~#+begin_comment~); the result should
+have regular blocks, not [[id:33346065-dd99-46a6-b026-be676aa09d4c][Rich blocks]].
+
+#+name: ti:0007-blocks-non-rich
+#+header: :tangle test/Lilac/ParseSpec/0007-blocks-non-rich
+#+begin_src org
+,#+name: src block
+,#+begin_src sh
+foo
+,#+end_src
+
+,#+begin_comment
+This is a comment.
+,#+end_comment
+
+,#+name: example block
+,#+begin_example
+bar
+,#+end_example
+
+,#+name: export block
+,#+begin_export html
+baz
+,#+end_export
+
+,#+name: verse
+,#+begin_verse
+quux
+,#+end_verse
+#+end_src
+
+#+name: t:0007-blocks-non-rich
+#+begin_src haskell
+shouldParseWithState
+  "0007-blocks-non-rich"
+  ( nilOrgDoc
+      <<Expected blocks for 0007-blocks-non-rich>>
+      []
+  )
+  defaultOrgParserState
+    { cellNames =
+        Set.fromList
+          [ "src block",
+            "example block",
+            "export block",
+            "verse"
+          ]
+    }
+#+end_src
+
+#+name: Expected blocks for 0007-blocks-non-rich
+#+begin_src haskell
+[ CBlock
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "src"),
+              ("__src_language", "sh"),
+              ("name", "src block")
+            ],
+        body = [BTokenString "foo"]
+      },
+  CBlock
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "example"),
+              ("name", "example block")
+            ],
+        body = [BTokenString "bar"]
+      },
+  CBlock
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "export"),
+              ("__src_language", "html"),
+              ("name", "export block")
+            ],
+        body = [BTokenString "baz"]
+      },
+  CBlock
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__block_type", "verse"),
+              ("name", "verse")
+            ],
+        body = [BTokenString "quux"]
+      }
+]
+#+end_src
+
+* Rich blocks
+:PROPERTIES:
+:ID:       33346065-dd99-46a6-b026-be676aa09d4c
+:END:
+
+A /rich/ block is essentially a thin wrapper around other cells, similar to [[id:58f69993-599d-4389-ba47-3056b1bb2350][List
+items]]. Rich blocks exist to simulate what other systems call /advisory/ blocks,
+/admonitions/, or /callouts/, which are basically boxes that have "Warning" or
+"Note" and have some text inside them.
+
+While the user can just use a regular block, the big downside is that those
+blocks cannot contain links to other cells (except for other blocks, to support
+Literate Programming). Plus, the contents are always written in monospaced text.
+A rich block can contain other cells though, which is why they would be
+preferred for writing special warnings or notes.
+
+#+name: data:RichBlock
+#+begin_src haskell
+type RichBlock :: Type
+data RichBlock = RichBlock
+  { meta :: Map Text Text, -- (ref:data:RichBlock-meta)
+    marker :: RichBlockDelimiter -- (ref:data:RichBlock-marker)
+  }
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+The ~meta~ field captures any metadata associated with the block, and uses the same
+syntax as for [[id:dc13dd01-13c4-42a6-910e-4b6d66be428b][regular blocks]].
+
+The ~marker~ field [[(data:RichBlock-marker)]] encodes whether this is the start or end of a
+rich block.
+
+#+name: data:RichBlockDelimiter
+#+begin_src haskell
+type RichBlockDelimiter :: Type
+data RichBlockDelimiter
+  = RBStart
+  | RBEnd
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+** Parser
+
+#+name: f:richBlockStartParser
+#+begin_src haskell
+richBlockStartParser :: OrgParser Cell
+richBlockStartParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> startDelimiter)
+  metaKVs <- metaParser
+  _ <- string "#+begin_"
+  pState <- get
+  when (pState.activeRichBlock /= "")
+    $ fail
+      ( "nesting of rich blocks are not allowed; already inside a #+begin_"
+          <> (T.unpack pState.activeRichBlock) -- (ref:f:richBlockStartParser-nesting-error)
+      )
+  richBlockType <- richBlockTypeParser
+  let richBlockName = lookup "name" metaKVs
+      newAnonRichBlockNumber = case richBlockName of
+        Just _ -> pState.anonRichBlockNumber
+        Nothing -> pState.anonRichBlockNumber + 1
+      anonRichBlockMeta = case richBlockName of
+        Just _ -> Nothing
+        Nothing -> Just ("__anon_rich_block_number", T.show newAnonRichBlockNumber)
+      finalMetaKVs =
+        foldl'
+          (\acc (k, v) -> insert k v acc)
+          (insert "__rich_block_type" richBlockType metaKVs)
+          $ concatMap maybeToList [anonRichBlockMeta]
+  modify
+    ( \s ->
+        s
+          { anonRichBlockNumber = newAnonRichBlockNumber,
+            activeRichBlock = richBlockType
+          }
+    )
+  pure
+    . CRichBlock
+    $ RichBlock finalMetaKVs RBStart
+  where
+    richBlockTypeParser :: OrgParser Text
+    richBlockTypeParser = do
+      richBlockType <- MP.takeWhile1P (Just "rich block type") isAsciiLower
+      _ <- string "\n"
+      pure richBlockType
+    startDelimiter :: OrgParser Text
+    startDelimiter = do
+      _ <-
+        MP.notFollowedBy
+          $ MP.choice
+            [ string "#+begin_example",
+              string "#+begin_export",
+              string "#+begin_quote",
+              string "#+begin_src",
+              string "#+begin_verse"
+            ]
+      MP.choice
+        [ string "#+begin_" >> richBlockTypeParser
+        ]
+#+end_src
+
+We have to keep track of which rich block has started, if any, so far in the
+document, because we do not allow nesting of rich blocks. Also if a rich block
+has started, it must be terminated by a matching ~#+end_...~ at some point in the
+document (no dangling rich block markers), at the beginning of a line.
+
+#+name: f:richBlockEndParser
+#+begin_src haskell
+richBlockEndParser :: OrgParser Cell
+richBlockEndParser = do
+  pState <- get
+  when (pState.activeRichBlock == "")
+    $ fail "no rich block to close"
+  _ <- string $ T.concat ["#+end_", pState.activeRichBlock, "\n"]
+  modify (\s -> s {activeRichBlock = ""})
+  pure . CRichBlock $ RichBlock mempty RBEnd
+#+end_src
+
+If an Org document declares the start of a rich text block but never closes it
+[[(f:orgDocParser-failIfActiveRichBlock)]], it should be an error.
+
+#+name: f:failIfActiveRichBlock
+#+begin_src haskell
+failIfActiveRichBlock :: OrgParser ()
+failIfActiveRichBlock = do
+  pState <- get
+  when (pState.activeRichBlock /= "") $ do
+    fail
+      $ "active rich block has not been closed properly: "
+      <> (show $ "#+begin_" <> pState.activeRichBlock)
+#+end_src
+
+** Tests
+
+Parse some basic rich blocks.
+
+#+name: ti:0017-rich-blocks-basic
+#+header: :tangle test/Lilac/ParseSpec/0017-rich-blocks-basic
+#+begin_src org
+,#+name: empty note
+,#+begin_note
+,#+end_note
+
+,#+name: blank note
+,#+begin_note
+
+,#+end_note
+
+,#+name: blank warning
+,#+begin_warning
+
+,#+end_warning
+
+,#+name: warning with paragraph
+,#+begin_warning
+Be careful!
+,#+end_warning
+#+end_src
+
+#+name: t:0017-rich-blocks-basic
+#+begin_src haskell
+shouldParseWithState
+  "0017-rich-blocks-basic"
+  ( nilOrgDoc
+      <<Expected blocks for 0017-rich-blocks-basic>>
+      []
+  )
+  defaultOrgParserState
+    { cellNames =
+        Set.fromList
+          [ "empty note",
+            "blank note",
+            "blank warning",
+            "warning with paragraph"
+          ]
+    }
+#+end_src
+
+#+name: Expected blocks for 0017-rich-blocks-basic
+#+begin_src haskell
+[ CRichBlock
+    RichBlock
+      { meta =
+          fromList
+            [ ("__rich_block_type", "note"),
+              ("name", "empty note")
+            ],
+        marker = RBStart
+      },
+  CRichBlock $ RichBlock mempty RBEnd,
+  CRichBlock
+    RichBlock
+      { meta =
+          fromList
+            [ ("__rich_block_type", "note"),
+              ("name", "blank note")
+            ],
+        marker = RBStart
+      },
+  CRichBlock $ RichBlock mempty RBEnd,
+  CRichBlock
+    RichBlock
+      { meta =
+          fromList
+            [ ("__rich_block_type", "warning"),
+              ("name", "blank warning")
+            ],
+        marker = RBStart
+      },
+  CRichBlock $ RichBlock mempty RBEnd,
+  CRichBlock
+    RichBlock
+      { meta =
+          fromList
+            [ ("__rich_block_type", "warning"),
+              ("name", "warning with paragraph")
+            ],
+        marker = RBStart
+      },
+  CParagraph
+    $ Prose
+      [ ptext "Be careful!" []
+      ],
+  CRichBlock $ RichBlock mempty RBEnd
+]
+#+end_src
+
+Check that the ending of a rich block is well-formed (no extra text after it).
+In [[ti:0017-rich-blocks-clean-ending]], there is a word ~bar~ after the ~#+end_warning~
+which makes that an improper ending delimiter.
+
+#+name: ti:0017-rich-blocks-clean-ending
+#+header: :tangle test/Lilac/ParseSpec/0017-rich-blocks-clean-ending
+#+begin_src org
+,#+begin_warning
+foo
+,#+end_warning bar
+#+end_src
+
+#+name: t:0017-rich-blocks-clean-ending
+#+begin_src haskell
+shouldFailWithMessage
+  "0017-rich-blocks-clean-ending"
+  "active rich block has not been closed properly: \"#+begin_warning\""
+  20
+#+end_src
+
+If we have a malformed rich block ending in the middle of the document (followed
+by a proper ending), we should still fail the parse because the malformed text
+should not be able to be parsed by any other parse.
+
+#+name: ti:0017-rich-blocks-clean-ending-malformed-middle
+#+header: :tangle test/Lilac/ParseSpec/0017-rich-blocks-clean-ending-malformed-middle
+#+begin_src org
+,#+begin_warning
+foo
+,#+end_warning bar
+,#+end_warning
+#+end_src
+
+#+name: t:0017-rich-blocks-clean-ending-malformed-middle
+#+begin_src haskell
+shouldFailWithMessage
+  "0017-rich-blocks-clean-ending-malformed-middle"
+  "active rich block has not been closed properly: \"#+begin_warning\""
+  20
+#+end_src
+
+If you try to close a rich block more than once, that is also an error.
+
+#+name: ti:0017-rich-blocks-clean-ending-multiple-endings
+#+header: :tangle test/Lilac/ParseSpec/0017-rich-blocks-clean-ending-multiple-endings
+#+begin_src org
+,#+begin_warning
+foo
+,#+end_warning
+,#+end_warning
+#+end_src
+
+#+name: t:0017-rich-blocks-clean-ending-multiple-endings
+#+begin_src haskell
+shouldFailWithError
+  "0017-rich-blocks-clean-ending-multiple-endings"
+  (utoks "#" <> eeof)
+  34
+#+end_src
+
+Similarly if you try to open a rich block more than once (essentially trying to
+nest them), that is an error.
+
+#+name: ti:0017-rich-blocks-nesting
+#+header: :tangle test/Lilac/ParseSpec/0017-rich-blocks-nesting
+#+begin_src org
+,#+begin_warning
+foo
+
+,#+begin_note
+bar
+,#+end_note
+
+,#+end_warning
+#+end_src
+
+#+name: t:0017-rich-blocks-nesting
+#+begin_src haskell
+shouldFailWithMessage
+  "0017-rich-blocks-nesting"
+  "nesting of rich blocks are not allowed; already inside a #+begin_warning"
+  29
+#+end_src
+
+Now for a more practical example. When you use a rich block, you should be able
+to have list items, tables, and math inside it.
+
+#+name: ti:0017-rich-blocks-complex
+#+header: :tangle test/Lilac/ParseSpec/0017-rich-blocks-complex
+#+begin_src org
+,#+name: list and table
+,#+begin_note
+Some items:
+
+  - foo
+
+  - bar
+
+Here's a table:
+
+| baz | quux |
+|-----+------|
+|   1 |    2 |
+,#+end_note
+
+,#+name: math
+,#+begin_warning
+Everyone knows \(2 + 2 = 4\). But do they know
+
+\[
+4 + 4 = 8
+\]
+
+?
+,#+end_warning
+
+,#+begin_note
+,#+begin_src sh
+echo hello world
+,#+end_src
+,#+end_note
+#+end_src
+
+#+name: t:0017-rich-blocks-complex
+#+begin_src haskell
+shouldParseWithState
+  "0017-rich-blocks-complex"
+  ( nilOrgDoc
+      <<Expected blocks for 0017-rich-blocks-complex>>
+      []
+  )
+  defaultOrgParserState
+    { cellNames =
+        Set.fromList
+          [ "list and table",
+            "math"
+          ],
+      tableNumber = 1,
+      anonEquationNumber = 1,
+      anonBlockNumber = 1,
+      anonRichBlockNumber = 1
+    }
+#+end_src
+
+#+name: Expected blocks for 0017-rich-blocks-complex
+#+begin_src haskell
+[ CRichBlock
+    RichBlock
+      { meta =
+          fromList
+            [ ("__rich_block_type", "note"),
+              ("name", "list and table")
+            ],
+        marker = RBStart
+      },
+  CParagraph
+    $ Prose
+      [ ptext "Some items:" []
+      ],
+  CListItem
+    [ LUnorderedStart,
+      LItemStart
+    ],
+  CParagraph
+    $ Prose
+      [ ptext "foo" []
+      ],
+  CListItem
+    [ LItemEnd,
+      LItemStart
+    ],
+  CParagraph
+    $ Prose
+      [ ptext "bar" []
+      ],
+  CListItem
+    [ LItemEnd,
+      LUnorderedEnd
+    ],
+  CParagraph
+    $ Prose
+      [ ptext "Here's a table:" []
+      ],
+  CTable
+    Table
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__table_number", "1")
+            ],
+        caption = Prose [],
+        textAlign = mempty,
+        grid =
+          fromList
+            [ ( (1, 1),
+                Prose [ptext "baz" []]
+              ),
+              ( (1, 2),
+                Prose [ptext "quux" []]
+              ),
+              ( (2, 1),
+                Prose [ptext "horizontal-line\NUL" []]
+              ),
+              ( (3, 1),
+                Prose [ptext "1" []]
+              ),
+              ( (3, 2),
+                Prose [ptext "2" []]
+              )
+            ]
+      },
+  CRichBlock $ RichBlock mempty RBEnd,
+  CRichBlock
+    RichBlock
+      { meta =
+          fromList
+            [ ("__rich_block_type", "warning"),
+              ("name", "math")
+            ],
+        marker = RBStart
+      },
+  CParagraph
+    $ Prose
+      [ ptext "Everyone knows " [],
+        PTokenMathFragment
+          MathFragment
+            { parentOid = nilOid,
+              meta =
+                fromList
+                  [],
+              body = "2 + 2 = 4"
+            },
+        ptext ". But do they know" []
+      ],
+  CMathFragment
+    MathFragment
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__equation_anon_number", "1")
+            ],
+        body = "4 + 4 = 8"
+      },
+  CParagraph
+    $ Prose
+      [ ptext "?" []
+      ],
+  CRichBlock $ RichBlock mempty RBEnd,
+  CRichBlock
+    RichBlock
+      { meta =
+          fromList
+            [ ("__rich_block_type", "note"),
+              ("__anon_rich_block_number", "1")
+            ],
+        marker = RBStart
+      },
+  CBlock
+    Block
+      { parentOid = nilOid,
+        meta =
+          fromList
+            [ ("__anon_block_number", "1"),
+              ("__block_type", "src"),
+              ("__src_language", "sh")
+            ],
+        body = [BTokenString "echo hello world"]
+      },
+  CRichBlock $ RichBlock mempty RBEnd
 ]
 #+end_src
 
@@ -11936,6 +12614,7 @@ able to parse it in order to ignore it (otherwise we will think that the
 #+begin_src haskell
 tableFormulaParser :: OrgParser ()
 tableFormulaParser = do
+  _ <- MP.try . MP.lookAhead . MP.choice $ map string ["#+tblfm: ", "#+TBLFM: "]
   _ <- string "#+"
   _ <- string "tblfm: " <|> string "TBLFM: "
   _ <- MP.takeWhile1P (Just "table formula") (/= '\n')
@@ -13040,6 +13719,7 @@ import Lilac.Types
         CListItem,
         CMathFragment,
         CParagraph,
+        CRichBlock,
         CTable
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
@@ -13084,6 +13764,7 @@ import Lilac.Types
     OrgParserState
       ( anonBlockNumber,
         anonEquationNumber,
+        anonRichBlockNumber,
         cellNames,
         docOid,
         equationNumber,
@@ -13105,6 +13786,8 @@ import Lilac.Types
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose (Prose),
     PseudoEdge (PseudoEdge),
+    RichBlock (RichBlock, marker, meta),
+    RichBlockDelimiter (RBEnd, RBStart),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, caption, grid, meta, parentOid, textAlign),
@@ -13145,6 +13828,7 @@ import Relude
 import Test.Hspec (Spec, before, describe, it, shouldBe)
 import Test.Hspec.Megaparsec
   ( ET,
+    eeof,
     elabel,
     err,
     errFancy,
@@ -13461,6 +14145,7 @@ Below are all of the individual test cases.
 <<t:0007-blocks-duplicate-tangle-paths>>
 <<t:0007-blocks-special-commas>>
 <<t:0007-blocks-no-name-with-opening-parenthesis>>
+<<t:0007-blocks-non-rich>>
 <<t:0008-indentation-comment>>
 <<t:0008-indentation-headings>>
 <<t:0008-indentation-paragraph>>
@@ -13516,6 +14201,12 @@ Below are all of the individual test cases.
 <<t:0015-glossary-location>>
 <<t:0015-glossary-location-global>>
 <<t:0016-metadata-reserved-underscores>>
+<<t:0017-rich-blocks-basic>>
+<<t:0017-rich-blocks-complex>>
+<<t:0017-rich-blocks-clean-ending>>
+<<t:0017-rich-blocks-clean-ending-malformed-middle>>
+<<t:0017-rich-blocks-clean-ending-multiple-endings>>
+<<t:0017-rich-blocks-nesting>>
 #+end_src
 
 * Glossary

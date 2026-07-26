@@ -18,6 +18,7 @@ import Lilac.Types
         CListItem,
         CMathFragment,
         CParagraph,
+        CRichBlock,
         CTable
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
@@ -62,6 +63,7 @@ import Lilac.Types
     OrgParserState
       ( anonBlockNumber,
         anonEquationNumber,
+        anonRichBlockNumber,
         cellNames,
         docOid,
         equationNumber,
@@ -83,6 +85,8 @@ import Lilac.Types
     PToken (PTokenCitation, PTokenLink, PTokenMathFragment, PTokenStyledText),
     Prose (Prose),
     PseudoEdge (PseudoEdge),
+    RichBlock (RichBlock, marker, meta),
+    RichBlockDelimiter (RBEnd, RBStart),
     Style (Bold, Code, Italic, Underline, Verbatim),
     StyledText (StyledText, body, style),
     Table (Table, caption, grid, meta, parentOid, textAlign),
@@ -123,6 +127,7 @@ import Relude
 import Test.Hspec (Spec, before, describe, it, shouldBe)
 import Test.Hspec.Megaparsec
   ( ET,
+    eeof,
     elabel,
     err,
     errFancy,
@@ -1573,6 +1578,64 @@ spec = do
     "0007-blocks-no-name-with-opening-parenthesis"
     (utoks "(" <> etoks " ")
     8
+
+  shouldParseWithState
+    "0007-blocks-non-rich"
+    ( nilOrgDoc
+        [ CBlock
+            Block
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__block_type", "src"),
+                      ("__src_language", "sh"),
+                      ("name", "src block")
+                    ],
+                body = [BTokenString "foo"]
+              },
+          CBlock
+            Block
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__block_type", "example"),
+                      ("name", "example block")
+                    ],
+                body = [BTokenString "bar"]
+              },
+          CBlock
+            Block
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__block_type", "export"),
+                      ("__src_language", "html"),
+                      ("name", "export block")
+                    ],
+                body = [BTokenString "baz"]
+              },
+          CBlock
+            Block
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__block_type", "verse"),
+                      ("name", "verse")
+                    ],
+                body = [BTokenString "quux"]
+              }
+        ]
+        []
+    )
+    defaultOrgParserState
+      { cellNames =
+          Set.fromList
+            [ "src block",
+              "example block",
+              "export block",
+              "verse"
+            ]
+      }
 
   shouldFailWithMessage
     "0008-indentation-comment"
@@ -3515,6 +3578,227 @@ spec = do
     "0016-metadata-reserved-underscores"
     "cannot use leading double underscores for metadata key: \"__block_type\""
     2
+
+  shouldParseWithState
+    "0017-rich-blocks-basic"
+    ( nilOrgDoc
+        [ CRichBlock
+            RichBlock
+              { meta =
+                  fromList
+                    [ ("__rich_block_type", "note"),
+                      ("name", "empty note")
+                    ],
+                marker = RBStart
+              },
+          CRichBlock $ RichBlock mempty RBEnd,
+          CRichBlock
+            RichBlock
+              { meta =
+                  fromList
+                    [ ("__rich_block_type", "note"),
+                      ("name", "blank note")
+                    ],
+                marker = RBStart
+              },
+          CRichBlock $ RichBlock mempty RBEnd,
+          CRichBlock
+            RichBlock
+              { meta =
+                  fromList
+                    [ ("__rich_block_type", "warning"),
+                      ("name", "blank warning")
+                    ],
+                marker = RBStart
+              },
+          CRichBlock $ RichBlock mempty RBEnd,
+          CRichBlock
+            RichBlock
+              { meta =
+                  fromList
+                    [ ("__rich_block_type", "warning"),
+                      ("name", "warning with paragraph")
+                    ],
+                marker = RBStart
+              },
+          CParagraph
+            $ Prose
+              [ ptext "Be careful!" []
+              ],
+          CRichBlock $ RichBlock mempty RBEnd
+        ]
+        []
+    )
+    defaultOrgParserState
+      { cellNames =
+          Set.fromList
+            [ "empty note",
+              "blank note",
+              "blank warning",
+              "warning with paragraph"
+            ]
+      }
+
+  shouldParseWithState
+    "0017-rich-blocks-complex"
+    ( nilOrgDoc
+        [ CRichBlock
+            RichBlock
+              { meta =
+                  fromList
+                    [ ("__rich_block_type", "note"),
+                      ("name", "list and table")
+                    ],
+                marker = RBStart
+              },
+          CParagraph
+            $ Prose
+              [ ptext "Some items:" []
+              ],
+          CListItem
+            [ LUnorderedStart,
+              LItemStart
+            ],
+          CParagraph
+            $ Prose
+              [ ptext "foo" []
+              ],
+          CListItem
+            [ LItemEnd,
+              LItemStart
+            ],
+          CParagraph
+            $ Prose
+              [ ptext "bar" []
+              ],
+          CListItem
+            [ LItemEnd,
+              LUnorderedEnd
+            ],
+          CParagraph
+            $ Prose
+              [ ptext "Here's a table:" []
+              ],
+          CTable
+            Table
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__table_number", "1")
+                    ],
+                caption = Prose [],
+                textAlign = mempty,
+                grid =
+                  fromList
+                    [ ( (1, 1),
+                        Prose [ptext "baz" []]
+                      ),
+                      ( (1, 2),
+                        Prose [ptext "quux" []]
+                      ),
+                      ( (2, 1),
+                        Prose [ptext "horizontal-line\NUL" []]
+                      ),
+                      ( (3, 1),
+                        Prose [ptext "1" []]
+                      ),
+                      ( (3, 2),
+                        Prose [ptext "2" []]
+                      )
+                    ]
+              },
+          CRichBlock $ RichBlock mempty RBEnd,
+          CRichBlock
+            RichBlock
+              { meta =
+                  fromList
+                    [ ("__rich_block_type", "warning"),
+                      ("name", "math")
+                    ],
+                marker = RBStart
+              },
+          CParagraph
+            $ Prose
+              [ ptext "Everyone knows " [],
+                PTokenMathFragment
+                  MathFragment
+                    { parentOid = nilOid,
+                      meta =
+                        fromList
+                          [],
+                      body = "2 + 2 = 4"
+                    },
+                ptext ". But do they know" []
+              ],
+          CMathFragment
+            MathFragment
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__equation_anon_number", "1")
+                    ],
+                body = "4 + 4 = 8"
+              },
+          CParagraph
+            $ Prose
+              [ ptext "?" []
+              ],
+          CRichBlock $ RichBlock mempty RBEnd,
+          CRichBlock
+            RichBlock
+              { meta =
+                  fromList
+                    [ ("__rich_block_type", "note"),
+                      ("__anon_rich_block_number", "1")
+                    ],
+                marker = RBStart
+              },
+          CBlock
+            Block
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__anon_block_number", "1"),
+                      ("__block_type", "src"),
+                      ("__src_language", "sh")
+                    ],
+                body = [BTokenString "echo hello world"]
+              },
+          CRichBlock $ RichBlock mempty RBEnd
+        ]
+        []
+    )
+    defaultOrgParserState
+      { cellNames =
+          Set.fromList
+            [ "list and table",
+              "math"
+            ],
+        tableNumber = 1,
+        anonEquationNumber = 1,
+        anonBlockNumber = 1,
+        anonRichBlockNumber = 1
+      }
+
+  shouldFailWithMessage
+    "0017-rich-blocks-clean-ending"
+    "active rich block has not been closed properly: \"#+begin_warning\""
+    20
+
+  shouldFailWithMessage
+    "0017-rich-blocks-clean-ending-malformed-middle"
+    "active rich block has not been closed properly: \"#+begin_warning\""
+    20
+
+  shouldFailWithError
+    "0017-rich-blocks-clean-ending-multiple-endings"
+    (utoks "#" <> eeof)
+    34
+
+  shouldFailWithMessage
+    "0017-rich-blocks-nesting"
+    "nesting of rich blocks are not allowed; already inside a #+begin_warning"
+    29
 
 type Parser :: Type -> Type
 type Parser = MP.ParsecT Void Text Identity --

@@ -107,6 +107,7 @@ import Lilac.Types
         CListItem,
         CMathFragment,
         CParagraph,
+        CRichBlock,
         CTable
       ),
     Citation (Citation, cites, noteNumber, prefix, styleVariation, suffix),
@@ -160,6 +161,8 @@ import Lilac.Types
       ),
     Prose (Prose, unProse),
     PseudoEdge (PseudoEdge),
+    RichBlock (RichBlock),
+    RichBlockDelimiter (RBEnd, RBStart),
     Style
       ( Bold,
         Code,
@@ -186,8 +189,10 @@ import Lilac.Types
   )
 import Lilac.Types as OrgParserState
   ( OrgParserState
-      ( anonBlockNumber,
+      ( activeRichBlock,
+        anonBlockNumber,
         anonEquationNumber,
+        anonRichBlockNumber,
         bibPaths,
         bracketBalance,
         cellNames,
@@ -360,6 +365,7 @@ orgDocParser = do
   (docOid, cslPath, bibPaths, meta) <- docMetaParser --
   _ <- lilacExtensionsParser
   cells <- many cellParser
+  failIfActiveRichBlock --
   MP.eof
   footnoteRefs <- reconcileFootnotes
   citations <- collectCitations
@@ -511,6 +517,8 @@ cellParser = do
         [ toggleFootnote False $ listItemStartParser,
           toggleFootnote False $ listItemsEndParser,
           toggleFootnote False $ resetIndent headingParser,
+          toggleFootnote False $ resetIndent richBlockStartParser,
+          toggleFootnote False $ resetIndent richBlockEndParser,
           toggleFootnote False $ resetIndent blockParser,
           toggleFootnote False $ resetIndent figureParser,
           toggleFootnote False $ resetIndent tableParser,
@@ -1196,13 +1204,20 @@ mathFragmentInlineParser = do
 
 paragraphParser :: OrgParser Cell
 paragraphParser = do
+  MP.notFollowedBy
+    . MP.choice
+    $ map
+      string
+      [ "#+end_", --
+        "#+begin" --
+      ]
   pState <- get
   modify (\s -> s {insideParagraph = True, glossaryTermOffset = 0})
   prose <-
     proseParser
       . whitespaceCompressor
       $ proseSpaceConsumer pState.continuationIndent --
-  failIfLeftoverActiveStyles
+  failIfLeftoverActiveStyles --
   pState' <- get
   modify (\s -> s {insideParagraph = False})
   if pState'.glossaryTermOffset > 0
@@ -1212,6 +1227,11 @@ paragraphParser = do
 newlineAndIndentParser :: Int -> OrgParser Text
 newlineAndIndentParser expectedIndentLen = do
   MP.notFollowedBy cellBoundary --
+  pState <- get
+  --
+  when (pState.activeRichBlock /= "") $ do
+    let richBlockEnd = "\n#+end_" <> pState.activeRichBlock
+    MP.notFollowedBy $ string richBlockEnd
   _ <- string "\n"
   maybeIndent --
   pure " "
@@ -1318,21 +1338,33 @@ blockStartParser ::
       Maybe (Text, Text)
     )
 blockStartParser = do
-  let blockMetaParser = many $ lexeme blockMetaEntryParser
+  let blockTypeParser :: OrgParser Text
+      blockTypeParser =
+        MP.choice
+          $ map
+            string
+            [ "src",
+              "example",
+              "export",
+              "quote",
+              "verse"
+            ]
+      blockMetaParser = many $ lexeme blockMetaEntryParser
   _ <-
     MP.try
       . MP.lookAhead
       $ do
         _ <- metaParser
         _ <- blockMetaParser
-        string "#+begin_" --
+        _ <- string "#+begin_" --
+        blockTypeParser
   metaKVs <- metaParser
   let blockName = case lookup "name" metaKVs of
         Just name -> Just ("name", name)
         Nothing -> Nothing
   blockMetaKVs <- fromList <$> blockMetaParser
   _ <- string "#+begin_"
-  blockType <- MP.takeWhile1P (Just "block type") isAsciiLower
+  blockType <- blockTypeParser
   srcLang <- MP.optional $ do
     _ <- MP.skipSome $ char ' '
     src <- MP.takeWhile1P (Just "src language") isSrcLanguageChar
@@ -1651,6 +1683,78 @@ getBlockContents blockBody = T.concat $ map bTokenToText blockBody
         "\NUL_link"
       BTokenLinkTarget {} -> ""
 
+richBlockStartParser :: OrgParser Cell
+richBlockStartParser = do
+  _ <- MP.try $ MP.lookAhead (metaParser >> startDelimiter)
+  metaKVs <- metaParser
+  _ <- string "#+begin_"
+  pState <- get
+  when (pState.activeRichBlock /= "")
+    $ fail
+      ( "nesting of rich blocks are not allowed; already inside a #+begin_"
+          <> (T.unpack pState.activeRichBlock) --
+      )
+  richBlockType <- richBlockTypeParser
+  let richBlockName = lookup "name" metaKVs
+      newAnonRichBlockNumber = case richBlockName of
+        Just _ -> pState.anonRichBlockNumber
+        Nothing -> pState.anonRichBlockNumber + 1
+      anonRichBlockMeta = case richBlockName of
+        Just _ -> Nothing
+        Nothing -> Just ("__anon_rich_block_number", T.show newAnonRichBlockNumber)
+      finalMetaKVs =
+        foldl'
+          (\acc (k, v) -> insert k v acc)
+          (insert "__rich_block_type" richBlockType metaKVs)
+          $ concatMap maybeToList [anonRichBlockMeta]
+  modify
+    ( \s ->
+        s
+          { anonRichBlockNumber = newAnonRichBlockNumber,
+            activeRichBlock = richBlockType
+          }
+    )
+  pure
+    . CRichBlock
+    $ RichBlock finalMetaKVs RBStart
+  where
+    richBlockTypeParser :: OrgParser Text
+    richBlockTypeParser = do
+      richBlockType <- MP.takeWhile1P (Just "rich block type") isAsciiLower
+      _ <- string "\n"
+      pure richBlockType
+    startDelimiter :: OrgParser Text
+    startDelimiter = do
+      _ <-
+        MP.notFollowedBy
+          $ MP.choice
+            [ string "#+begin_example",
+              string "#+begin_export",
+              string "#+begin_quote",
+              string "#+begin_src",
+              string "#+begin_verse"
+            ]
+      MP.choice
+        [ string "#+begin_" >> richBlockTypeParser
+        ]
+
+richBlockEndParser :: OrgParser Cell
+richBlockEndParser = do
+  pState <- get
+  when (pState.activeRichBlock == "")
+    $ fail "no rich block to close"
+  _ <- string $ T.concat ["#+end_", pState.activeRichBlock, "\n"]
+  modify (\s -> s {activeRichBlock = ""})
+  pure . CRichBlock $ RichBlock mempty RBEnd
+
+failIfActiveRichBlock :: OrgParser ()
+failIfActiveRichBlock = do
+  pState <- get
+  when (pState.activeRichBlock /= "") $ do
+    fail
+      $ "active rich block has not been closed properly: "
+      <> (show $ "#+begin_" <> pState.activeRichBlock)
+
 zeroIndent :: OrgParser (Int, Int)
 zeroIndent = do
   pState <- get
@@ -1955,6 +2059,7 @@ metaEntryParser = do
     $ map
       string
       [ "#+begin_", --
+        "#+end_",
         "#+header:",
         "#+print_bibliography:",
         "#+print_glossary:"
@@ -2010,6 +2115,7 @@ tableParser = do
 
 tableFormulaParser :: OrgParser ()
 tableFormulaParser = do
+  _ <- MP.try . MP.lookAhead . MP.choice $ map string ["#+tblfm: ", "#+TBLFM: "]
   _ <- string "#+"
   _ <- string "tblfm: " <|> string "TBLFM: "
   _ <- MP.takeWhile1P (Just "table formula") (/= '\n')
