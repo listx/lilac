@@ -53,6 +53,13 @@ Ideally the backlog would use something like a Story Map to encode both time and
 priority as two separate dimensions. However we just have a flat list of items
 for now because we don't have a good way of representing story maps.
 
+** TODO (Git integration) add raw git links
+If there is text like 68541ad (capture unhandled edge case for parsing styled
+text, 2025-01-26) (hash, parenthetical with a YYYY-MM-DD date at the end),
+convert it to a link. You'd need to have a "default Git repo" setting somewhere,
+probably in the doc metadata, and Lilac would simply construct a link to that
+commit (no need to look it up ourselves with Git).
+
 * Icebox
 :PROPERTIES:
 :ID:       dcfbeff2-5a2e-4a84-bdb7-dae80e867838
@@ -241,16 +248,3 @@ Allow users to disable automatic padding per-block.
 ** TODO doc: teach "pad-consecutive-noweb" (?) boolean metadata
 Allow users to set document-wide default for disabling automatic padding (which
 can be overridden at the block level)
-
-** TODO (Git integration) add raw git links
-If there is text like 68541ad (capture unhandled edge case for parsing styled
-text, 2025-01-26) (hash, parenthetical with a YYYY-MM-DD date at the end),
-convert it to a link. You'd need to have a "default Git repo" setting somewhere,
-probably in the doc metadata, and Lilac would have to learn how to read out this
-information locally using Git CLI or something else.
-
-This may be avoided if we can just copy out the Org-formatted info directly out
-of =tig= where we get this info. Then we can just paste out of =tig= directly into
-here (with the right link that points to GitHub for example), and we're fine.
-The only downside with this is if we change Git hosting providers, in which case
-our existing links would point to the wrong (older) provider.
