@@ -24,27 +24,7 @@ other sections as needed.
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
-** IN-PROGRESS allow misc blocks to include prose text and list items
-
-Currently all block bodies use raw text or links (see [[id:e3400781-57e7-409d-a65c-7c3d66847587::data:BToken][data:BToken]]). This is too
-limiting; we need to be able to include prose text, because that's what Org mode
-already supports.
-
-Looking at the Linux Kernel documentation project (where they use reST), it
-appears that they also make liberal use of list items in their advisory blocks.
-And this is where we draw the line (prose paragraphs and list items). If you
-need more (nested source code blocks, tables, figures, etc) then you should use
-a dedicated section.
-
-reST supports arbitrary content inside these blocks, but that's overkill.
-
-In terms of implementation, instead of expanding the [[id:cae993e5-02bd-4f89-a6d3-20b41adaff8f::data:Block][data:Block]] type, we can
-treat the ~#+begin_...~ and ~#+end...~ bits similar to how we parse list item markers
-in [[id:a6f3fbe8-3b9e-452b-8e32-14e88792c6fb][Indentation and ~ListMarker~]]. In other words, we can just reuse our existing
-cell parsers as is. The only cost is creating a new (mostly empty) cell
-constructor (maybe ~CRichBlock~).
-
-*** TODO forbid headings inside rich blocks
+** TODO forbid headings inside rich blocks
 
 * Backlog
 :PROPERTIES:

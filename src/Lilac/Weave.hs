@@ -81,6 +81,7 @@ import Lilac.Types
         CListItem,
         CMathFragment,
         CParagraph,
+        CRichBlock,
         CTable
       ),
     Citation (cites, noteNumber, prefix, styleVariation, suffix),
@@ -145,6 +146,8 @@ import Lilac.Types
         version
       ),
     Prose (Prose, unProse),
+    RichBlock (marker, meta),
+    RichBlockDelimiter (RBEnd, RBStart),
     Style
       ( Bold,
         Code,
@@ -471,6 +474,7 @@ weaveCell (lci, cell) = case cell of
       Just "true" <- lookup "hidden" block.meta ->
         pure () --
     | otherwise -> weaveBlock lci block
+  CRichBlock richBlock -> weaveRichBlock lci richBlock
   CMathFragment mathFragment -> weaveMathFragmentStandalone lci mathFragment
   CFigure figure -> weaveFigure lci figure
   CTable table -> weaveTable lci table
@@ -549,6 +553,18 @@ getLinkAnchor maybeLCI = \case
      in T.intercalate
           "-"
           [ "b",
+            toSafeHtmlId ref
+          ]
+  CRichBlock richBlock ->
+    let ref
+          | Just name <- lookup "name" richBlock.meta =
+              name
+          | Just anonRichBlockNum <- lookup "__anon_rich_block_number" richBlock.meta =
+              anonRichBlockNum
+          | otherwise = "anon-rich-block-error"
+     in T.intercalate
+          "-"
+          [ "rb",
             toSafeHtmlId ref
           ]
   CMathFragment mathFragment ->
@@ -896,6 +912,36 @@ spliceLinks colorized links = do
     . fst
     . foldl' f (take 1 colorizedStrs, links)
     $ drop 1 colorizedStrs
+
+weaveRichBlock :: LCI -> RichBlock -> HtmlWeaver ()
+weaveRichBlock lci richBlock = case richBlock.marker of
+  RBStart -> do
+    let linkAnchor = getLinkAnchor Nothing $ CRichBlock richBlock
+        openingDivs :: Text
+        openingDivs =
+          T.concat
+            [ "<div id=\"c-",
+              T.show lci.unLCI,
+              "\" class=\"cell-idx\">",
+              "<div id=\"",
+              linkAnchor,
+              "\" class=\"rich-block-container ",
+              fromMaybe "" $ lookup "__rich_block_type" richBlock.meta,
+              "\">"
+            ]
+    toHtmlRaw openingDivs
+    div_ [class_ "rich-block-meta"] $ do
+      let richBlockType :: Text
+          richBlockType = case lookup "__rich_block_type" richBlock.meta of
+            Nothing -> "Note"
+            Just "warning" -> "Warning"
+            Just "note" -> "Note"
+            _ -> "Note"
+      a_ [href_ $ "#" <> linkAnchor] $ do
+        span_ [class_ "rich-block-title"] $ do
+          toHtml richBlockType
+    toHtmlRaw @Text "<div class=\"rich-block-body\">"
+  RBEnd -> toHtmlRaw @Text "</div></div></div>"
 
 weaveLink :: Bool -> Link -> HtmlWeaver ()
 weaveLink insideBlock link = do

@@ -130,6 +130,7 @@ import Lilac.Types
         CListItem,
         CMathFragment,
         CParagraph,
+        CRichBlock,
         CTable
       ),
     Citation (cites, noteNumber, prefix, styleVariation, suffix),
@@ -194,6 +195,8 @@ import Lilac.Types
         version
       ),
     Prose (Prose, unProse),
+    RichBlock (marker, meta),
+    RichBlockDelimiter (RBEnd, RBStart),
     Style
       ( Bold,
         Code,
@@ -426,6 +429,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveBlockMeta>>
 <<f:colorizeText>>
 <<f:spliceLinks>>
+<<f:weaveRichBlock>>
 <<f:weaveLink>>
 <<f:weaveLinkTarget>>
 <<f:weaveLinkTargetLinkOid>>
@@ -653,6 +657,7 @@ import Clay
     maxHeight,
     maxWidth,
     minHeight,
+    minWidth,
     monospace,
     nav,
     none,
@@ -804,6 +809,7 @@ defaultCss = do
   <<css:Links>>
   <<css:List items>>
   <<css:Blocks>>
+  <<css:RichBlocks>>
   <<css:Figures>>
   <<css:Tables>>
   <<css:Citations>>
@@ -1172,6 +1178,7 @@ weaveCell (lci, cell) = case cell of
       Just "true" <- lookup "hidden" block.meta ->
         pure () -- (ref:f:weaveCell-hide-index-block)
     | otherwise -> weaveBlock lci block
+  CRichBlock richBlock -> weaveRichBlock lci richBlock
   CMathFragment mathFragment -> weaveMathFragmentStandalone lci mathFragment
   CFigure figure -> weaveFigure lci figure
   CTable table -> weaveTable lci table
@@ -1765,6 +1772,18 @@ getLinkAnchor maybeLCI = \case
      in T.intercalate
           "-"
           [ "b",
+            toSafeHtmlId ref
+          ]
+  CRichBlock richBlock ->
+    let ref
+          | Just name <- lookup "name" richBlock.meta =
+              name
+          | Just anonRichBlockNum <- lookup "__anon_rich_block_number" richBlock.meta =
+              anonRichBlockNum
+          | otherwise = "anon-rich-block-error"
+     in T.intercalate
+          "-"
+          [ "rb",
             toSafeHtmlId ref
           ]
   CMathFragment mathFragment ->
@@ -3263,8 +3282,9 @@ The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
   borderBottomWidth 0
   borderTopLeftRadius (rem 0.3125) (rem 0.3125)
   borderTopRightRadius (rem 0.3125) (rem 0.3125)
+  backgroundColor colorBg
   fontSans
-".active" ** ".block-meta" ? do
+".active.block-container" ** ".block-meta" ? do
   fontWeight bold
   border (px 1) solid colorActiveBorder
   borderBottomWidth 0
@@ -3272,7 +3292,7 @@ The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
 
 #+name: css:Block meta other
 #+begin_src haskell
-div # ".block-meta-other" ? do
+".block-meta-other" & do
   p ? do
     yx margin (rem 0.25) 0
   ul ? do
@@ -3281,10 +3301,11 @@ div # ".block-meta-other" ? do
   fontSans
   fontSize $ rem 0.9
   border (px 1) solid colorCodeBorder
+  backgroundColor colorBg
   borderBottomWidth 0
   ".hidden" & do
     display displayNone
-".active" ** ".block-meta-other" ? do
+".active.block-container" ** ".block-meta-other" ? do
   border (px 1) solid colorActiveBorder
   borderBottomWidth 0
 #+end_src
@@ -3313,7 +3334,7 @@ code ? do
   borderBottomRightRadius (rem 0.3125) (rem 0.3125)
   border (px 1) solid colorCodeBorder
   yx padding (rem 0.125) (rem 0.5)
-".active" ** ".block-body" ? do
+".active.block-container" ** ".block-body" ? do
   border (px 1) solid colorActiveBorder
   backgroundColor colorActiveBg
 -- (ref:css:Block body-collapsed)
@@ -3364,11 +3385,6 @@ Lilac recognizes the following blocks other than ~#+begin_src~:
 
   - ~#+begin_quote~ :: Quotations. Meant to be verbatim text from another source.
 
-  - ~#+begin_note~ :: Special bits of information, worth emphasizing inside its
-    own block.
-
-  - ~#+begin_warning~ :: Warnings to watch out for.
-
 The above get woven with special CSS considerations in [[css:Misc blocks]].
 
 #+name: css:Misc blocks
@@ -3383,22 +3399,6 @@ The above get woven with special CSS considerations in [[css:Misc blocks]].
   borderColor $ colorFrom "#0000aa"
 ".quote .block-body" ? do
   fontStyle italic
-".note .block-body" ? do
-  backgroundColor $ colorFrom "#ffffbb"
-".note.active .block-body" ? do
-  borderColor $ colorFrom "#aaaa00"
-".note.active .block-controls-inline" ? do
-  borderColor $ colorFrom "#aaaa00"
-".note.active .block-meta-other" ? do
-  borderColor $ colorFrom "#aaaa00"
-".warning .block-body" ? do
-  backgroundColor $ colorFrom "#ffdddd"
-".warning.active .block-body" ? do
-  borderColor $ colorFrom "#ff3333"
-".warning.active .block-controls-inline" ? do
-  borderColor $ colorFrom "#ff3333"
-".warning.active .block-meta-other" ? do
-  borderColor $ colorFrom "#ff3333"
 #+end_src
 
 Below are examples of these advisory blocks.
@@ -3411,13 +3411,136 @@ This is an example.
 This is a quote.
 #+end_quote
 
+* Rich blocks
+
+Rich blocks are trickier to weave than regular blocks because we don't have the
+full block with us; instead we only see the start or end of it at a time. This
+means we have to weave the outermost DIV manually using ~toHtmlRaw~.
+
+#+name: f:weaveRichBlock
+#+begin_src haskell
+weaveRichBlock :: LCI -> RichBlock -> HtmlWeaver ()
+weaveRichBlock lci richBlock = case richBlock.marker of
+  RBStart -> do
+    let linkAnchor = getLinkAnchor Nothing $ CRichBlock richBlock
+        openingDivs :: Text
+        openingDivs =
+          T.concat
+            [ "<div id=\"c-",
+              T.show lci.unLCI,
+              "\" class=\"cell-idx\">",
+              "<div id=\"",
+              linkAnchor,
+              "\" class=\"rich-block-container ",
+              fromMaybe "" $ lookup "__rich_block_type" richBlock.meta,
+              "\">"
+            ]
+    toHtmlRaw openingDivs
+    div_ [class_ "rich-block-meta"] $ do
+      let richBlockType :: Text
+          richBlockType = case lookup "__rich_block_type" richBlock.meta of
+            Nothing -> "Note"
+            Just "warning" -> "Warning"
+            Just "note" -> "Note"
+            _ -> "Note"
+      a_ [href_ $ "#" <> linkAnchor] $ do
+        span_ [class_ "rich-block-title"] $ do
+          toHtml richBlockType
+    toHtmlRaw @Text "<div class=\"rich-block-body\">"
+  RBEnd -> toHtmlRaw @Text "</div></div></div>"
+#+end_src
+
+Below are some examples of rich blocks (assuming you are reading this in HTML):
+
 #+begin_note
-This is a note.
+This is a note. *Bold text*.
+
+#+caption: Hello world.
+| foo | bar |
+|-----+-----|
+|   1 |   2 |
+
+\[
+2 + 2 = 4
+\]
+
+List items:
+
+  - foo
+
+  - bar
+
+      1) baz
+
+      2) quux
 #+end_note
 
 #+begin_warning
 This is a warning.
+
+#+name: baz
+#+begin_src bash
+echo hello world >/dev/null
+echo this is a very long line which is longer than 80 characters, it will make the warning block stick out to the right
+#+end_src
 #+end_warning
+
+** CSS
+
+A rich block is just a thin wrapper around other cells.
+
+#+name: css:RichBlocks
+#+begin_src haskell
+<<css:RichBlock container>>
+<<css:RichBlock meta>>
+<<css:RichBlock body>>
+#+end_src
+
+The ~rich-block-container~ CSS class is the main thin wrapper.
+
+#+name: css:RichBlock container
+#+begin_src haskell
+".rich-block-container" & do
+  ev borderRadius (rem 0.3125)
+  yx margin (rem 1) (rem 0)
+  yx padding (rem 0.5) (rem 1)
+  minWidth fitContent
+  border (px 1) solid colorCodeBorder
+  p ? do
+    marginBottom $ rem 0.5
+#+end_src
+
+The ~rich-block-meta~ class stores the title of the block.
+
+#+name: css:RichBlock meta
+#+begin_src haskell
+".rich-block-meta" & do
+  span # ".rich-block-title" ? do
+    fontSans
+    fontSize (rem 1.25)
+    "font-variant" -: "small-caps"
+  a ? do
+    color colorText
+    ":visited" & do
+      color colorText
+#+end_src
+
+Finally we have the rich block body. This is mostly about the colors of the
+different types of recognized rich blocks.
+
+#+name: css:RichBlock body
+#+begin_src haskell
+".note.rich-block-container" & do
+  backgroundColor $ colorFrom "#ffffee"
+".note.active.rich-block-container" & do
+  backgroundColor $ colorFrom "#ffffcc"
+  borderColor $ colorFrom "#aaaa00"
+".warning.rich-block-container" & do
+  backgroundColor $ colorFrom "#ffeeee"
+".warning.active.rich-block-container" & do
+  backgroundColor $ colorFrom "#ffdddd"
+  borderColor $ colorFrom "#ff3333"
+#+end_src
 
 * Figures
 :PROPERTIES:
@@ -3912,6 +4035,7 @@ This demonstrates some of the complexities around ~markingCharacters~.
 #+begin_src haskell
 ".table-wrapper" & do
   border (px 2) solid colorCodeBorder
+  backgroundColor colorBg
   yx margin (rem 0) auto
   width fitContent
 table ? do

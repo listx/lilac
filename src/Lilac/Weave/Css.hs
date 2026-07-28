@@ -87,6 +87,7 @@ import Clay
     maxHeight,
     maxWidth,
     minHeight,
+    minWidth,
     monospace,
     nav,
     none,
@@ -566,13 +567,14 @@ defaultCss = do
     borderBottomWidth 0
     borderTopLeftRadius (rem 0.3125) (rem 0.3125)
     borderTopRightRadius (rem 0.3125) (rem 0.3125)
+    backgroundColor colorBg
     fontSans
-  ".active" ** ".block-meta" ? do
+  ".active.block-container" ** ".block-meta" ? do
     fontWeight bold
     border (px 1) solid colorActiveBorder
     borderBottomWidth 0
 
-  div # ".block-meta-other" ? do
+  ".block-meta-other" & do
     p ? do
       yx margin (rem 0.25) 0
     ul ? do
@@ -581,10 +583,11 @@ defaultCss = do
     fontSans
     fontSize $ rem 0.9
     border (px 1) solid colorCodeBorder
+    backgroundColor colorBg
     borderBottomWidth 0
     ".hidden" & do
       display displayNone
-  ".active" ** ".block-meta-other" ? do
+  ".active.block-container" ** ".block-meta-other" ? do
     border (px 1) solid colorActiveBorder
     borderBottomWidth 0
 
@@ -610,7 +613,7 @@ defaultCss = do
     borderBottomRightRadius (rem 0.3125) (rem 0.3125)
     border (px 1) solid colorCodeBorder
     yx padding (rem 0.125) (rem 0.5)
-  ".active" ** ".block-body" ? do
+  ".active.block-container" ** ".block-body" ? do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg
   --
@@ -647,21 +650,35 @@ defaultCss = do
     borderColor $ colorFrom "#0000aa"
   ".quote .block-body" ? do
     fontStyle italic
-  ".note .block-body" ? do
-    backgroundColor $ colorFrom "#ffffbb"
-  ".note.active .block-body" ? do
+
+  ".rich-block-container" & do
+    ev borderRadius (rem 0.3125)
+    yx margin (rem 1) (rem 0)
+    yx padding (rem 0.5) (rem 1)
+    minWidth fitContent
+    border (px 1) solid colorCodeBorder
+    p ? do
+      marginBottom $ rem 0.5
+
+  ".rich-block-meta" & do
+    span # ".rich-block-title" ? do
+      fontSans
+      fontSize (rem 1.25)
+      "font-variant" -: "small-caps"
+    a ? do
+      color colorText
+      ":visited" & do
+        color colorText
+
+  ".note.rich-block-container" & do
+    backgroundColor $ colorFrom "#ffffee"
+  ".note.active.rich-block-container" & do
+    backgroundColor $ colorFrom "#ffffcc"
     borderColor $ colorFrom "#aaaa00"
-  ".note.active .block-controls-inline" ? do
-    borderColor $ colorFrom "#aaaa00"
-  ".note.active .block-meta-other" ? do
-    borderColor $ colorFrom "#aaaa00"
-  ".warning .block-body" ? do
+  ".warning.rich-block-container" & do
+    backgroundColor $ colorFrom "#ffeeee"
+  ".warning.active.rich-block-container" & do
     backgroundColor $ colorFrom "#ffdddd"
-  ".warning.active .block-body" ? do
-    borderColor $ colorFrom "#ff3333"
-  ".warning.active .block-controls-inline" ? do
-    borderColor $ colorFrom "#ff3333"
-  ".warning.active .block-meta-other" ? do
     borderColor $ colorFrom "#ff3333"
 
   figure ? do
@@ -688,6 +705,7 @@ defaultCss = do
 
   ".table-wrapper" & do
     border (px 2) solid colorCodeBorder
+    backgroundColor colorBg
     yx margin (rem 0) auto
     width fitContent
   table ? do
