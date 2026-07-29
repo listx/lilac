@@ -2608,6 +2608,7 @@ weaveExpect
 
 #+name: css:List items
 #+begin_src haskell
+<<css:List item indentation>>
 <<css:List item minimum height>>
 <<css:List item vertical spacing>>
 #+end_src
@@ -2632,10 +2633,16 @@ main ol {
 *** List item indentation
 
 We want to make indentation match (roughly) what we see in the raw Org syntax.
-Thankfully, there isn't really anything to do here; the defaults from the
-browser (at least in Firefox) line up with the indentation style in the raw Org
-syntax already --- namely, the list item is always indented more than the
-preceding paragraph.
+This means making the list items indented a bit more than regular paragraphs.
+
+#+name: css:List item indentation
+#+begin_src haskell
+main_ ? do
+  ol ? do
+    paddingLeft (rem 2)
+  ul ? do
+    paddingLeft (rem 2)
+#+end_src
 
 *** Spacing between list items
 

@@ -479,6 +479,12 @@ defaultCss = do
 
   main_ ? do
     ol ? do
+      paddingLeft (rem 2)
+    ul ? do
+      paddingLeft (rem 2)
+
+  main_ ? do
+    ol ? do
       li ? do
         empty & do
           minHeight (rem 2.2)
