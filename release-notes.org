@@ -5,7 +5,7 @@
 
 * Versions
 
-** v0.1.0.8 (WIP)
+** v0.1.0.8
 
 Improvements:
 
@@ -13,27 +13,35 @@ Improvements:
     other cells (except headings) inside a box. These are also called alerts,
     callouts, admonition blocks, or advisory blocks in other systems. Only the
     note and warning types get different colors. If you add an unrecognized rich
-    block like ~#+begin_hello~, it will look plain. COMMIT
+    block like ~#+begin_hello~, it will look plain.
 
-  - Explain how to bring in Lilac into a Nix configuration. COMMIT
+      - commit c048d2ab ("parser: support rich blocks", 2026-08-01)
 
-  - Stylize example, note, and warning blocks. COMMIT
+      - commit b11b691d ("weave: support rich blocks", 2026-08-01)
+
+  - Explain how to bring in Lilac into a Nix configuration. commit 4a440910
+    ("user manual: explain how to install Lilac from a Nix config", 2026-07-24)
+
+  - Stylize example, note, and warning blocks. commit 76249feb ("weave: stylize
+    miscellaneous blocks", 2026-07-26)
 
 Changes:
 
-  - Prefer "block" instead of "code block" to refer to ~#+begin_... / #+end_...~
-    constructs. COMMIT
+  - Prefer "block" instead of "code block" to refer to ~#+begin_...~ and ~#+end_...~
+    constructs. commit 67ab56e2 ("rename "code-block" to just "block"",
+    2026-07-25)
 
-  - Slightly reduce indentation of list items. COMMIT
+  - Slightly reduce indentation of list items. commit aa827501 ("css: slightly
+    reduce indentation of list items", 2026-07-30)
 
 ** v0.1.0.7
 
 Fixes:
 
-  - Don't use a generated name for the sources. Finally, we can refer to Lilac
-    from other projects and leverage the Cachix binary cache. Reproducibility is
-    hard, even with Nix! cf08519c (build: simplify the lilac source folder name,
-    2026-07-24)
+  - Don't use a generated name for the Lilac sources that are fed to Nix.
+    Finally, we can refer to Lilac from other projects and leverage the Cachix
+    binary cache. Reproducibility is hard, even with Nix! cf08519c (build:
+    simplify the lilac source folder name, 2026-07-24)
 
 ** v0.1.0.6
 
