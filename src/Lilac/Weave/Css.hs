@@ -681,6 +681,10 @@ defaultCss = do
     backgroundColor $ colorFrom "#ffdddd"
     borderColor $ colorFrom "#ff3333"
 
+  ".active.unrecognized-rich-block-type" ? do
+    border (px 1) solid colorActiveBorder
+    backgroundColor colorActiveBg
+
   figure ? do
     yx margin (rem 1) 0
   ".figure-image" & do

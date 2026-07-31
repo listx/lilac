@@ -561,6 +561,7 @@ headingParser = do
   _ <- MP.try $ MP.lookAhead (starsParser >> char ' ')
   let opc = pState.orgParserConf
   stars <- starsParser
+  o <- MP.getOffset
   when (opc.maxHeadingLevel < 0) $ do
     fail
       $ "headings prohibited because lilac_maxHeadingLevel < 0"
@@ -579,6 +580,9 @@ headingParser = do
   prose <- proseParser $ whitespaceCompressor onlySpaces
   _ <- char '\n'
   failIfLeftoverActiveStyles
+  when (pState.activeRichBlock /= "") $ do
+    MP.setOffset o
+    fail "headings are not allowed inside rich blocks"
   props <- propertiesDrawerParser
   let newHeadingSection = genSectionNumber lenStars pState.headingSectionNumber
       newHeadingOidStack =

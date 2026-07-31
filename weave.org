@@ -3423,6 +3423,11 @@ weaveRichBlock :: LCI -> RichBlock -> HtmlWeaver ()
 weaveRichBlock lci richBlock = case richBlock.marker of
   RBStart -> do
     let linkAnchor = getLinkAnchor Nothing $ CRichBlock richBlock
+        richBlockType :: Text
+        richBlockType = case lookup "__rich_block_type" richBlock.meta of
+          Nothing -> "Note"
+          Just word -> T.toTitle word
+        recognizedRichBlockType = richBlockType `elem` ["Note", "Warning"]
         openingDivs :: Text
         openingDivs =
           T.concat
@@ -3433,16 +3438,11 @@ weaveRichBlock lci richBlock = case richBlock.marker of
               linkAnchor,
               "\" class=\"rich-block-container ",
               fromMaybe "" $ lookup "__rich_block_type" richBlock.meta,
+              if recognizedRichBlockType then "" else " unrecognized-rich-block-type",
               "\">"
             ]
     toHtmlRaw openingDivs
     div_ [class_ "rich-block-meta"] $ do
-      let richBlockType :: Text
-          richBlockType = case lookup "__rich_block_type" richBlock.meta of
-            Nothing -> "Note"
-            Just "warning" -> "Warning"
-            Just "note" -> "Note"
-            _ -> "Note"
       a_ [href_ $ "#" <> linkAnchor] $ do
         span_ [class_ "rich-block-title"] $ do
           toHtml richBlockType
@@ -3485,6 +3485,10 @@ echo this is a very long line which is longer than 80 characters, it will make t
 #+end_src
 #+end_warning
 
+#+begin_something
+This is an "unrecognized" rich block (not "note" or "warning").
+#+end_something
+
 ** CSS
 
 A rich block is just a thin wrapper around other cells.
@@ -3494,6 +3498,7 @@ A rich block is just a thin wrapper around other cells.
 <<css:RichBlock container>>
 <<css:RichBlock meta>>
 <<css:RichBlock body>>
+<<css:RichBlock body unrecognized>>
 #+end_src
 
 The ~rich-block-container~ CSS class is the main thin wrapper.
@@ -3525,7 +3530,7 @@ The ~rich-block-meta~ class stores the title of the block.
       color colorText
 #+end_src
 
-Finally we have the rich block body. This is mostly about the colors of the
+Now we have the rich block body. This is mostly about the colors of the
 different types of recognized rich blocks.
 
 #+name: css:RichBlock body
@@ -3540,6 +3545,15 @@ different types of recognized rich blocks.
 ".warning.active.rich-block-container" & do
   backgroundColor $ colorFrom "#ffdddd"
   borderColor $ colorFrom "#ff3333"
+#+end_src
+
+Unrecognized rich block types get highlighted in similar fashion to code blocks.
+
+#+name: css:RichBlock body unrecognized
+#+begin_src haskell
+".active.unrecognized-rich-block-type" ? do
+  border (px 1) solid colorActiveBorder
+  backgroundColor colorActiveBg
 #+end_src
 
 * Figures

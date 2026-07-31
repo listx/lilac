@@ -3800,6 +3800,11 @@ spec = do
     "nesting of rich blocks are not allowed; already inside a #+begin_warning"
     29
 
+  shouldFailWithMessage
+    "0017-rich-blocks-no-headings"
+    "headings are not allowed inside rich blocks"
+    22
+
 type Parser :: Type -> Type
 type Parser = MP.ParsecT Void Text Identity --
 

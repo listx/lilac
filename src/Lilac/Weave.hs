@@ -917,6 +917,11 @@ weaveRichBlock :: LCI -> RichBlock -> HtmlWeaver ()
 weaveRichBlock lci richBlock = case richBlock.marker of
   RBStart -> do
     let linkAnchor = getLinkAnchor Nothing $ CRichBlock richBlock
+        richBlockType :: Text
+        richBlockType = case lookup "__rich_block_type" richBlock.meta of
+          Nothing -> "Note"
+          Just word -> T.toTitle word
+        recognizedRichBlockType = richBlockType `elem` ["Note", "Warning"]
         openingDivs :: Text
         openingDivs =
           T.concat
@@ -927,16 +932,11 @@ weaveRichBlock lci richBlock = case richBlock.marker of
               linkAnchor,
               "\" class=\"rich-block-container ",
               fromMaybe "" $ lookup "__rich_block_type" richBlock.meta,
+              if recognizedRichBlockType then "" else " unrecognized-rich-block-type",
               "\">"
             ]
     toHtmlRaw openingDivs
     div_ [class_ "rich-block-meta"] $ do
-      let richBlockType :: Text
-          richBlockType = case lookup "__rich_block_type" richBlock.meta of
-            Nothing -> "Note"
-            Just "warning" -> "Warning"
-            Just "note" -> "Note"
-            _ -> "Note"
       a_ [href_ $ "#" <> linkAnchor] $ do
         span_ [class_ "rich-block-title"] $ do
           toHtml richBlockType

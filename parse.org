@@ -7681,6 +7681,7 @@ headingParser = do
   _ <- MP.try $ MP.lookAhead (starsParser >> char ' ')
   let opc = pState.orgParserConf
   stars <- starsParser
+  o <- MP.getOffset
   when (opc.maxHeadingLevel < 0) $ do
     fail
       $ "headings prohibited because lilac_maxHeadingLevel < 0"
@@ -7699,6 +7700,9 @@ headingParser = do
   prose <- proseParser $ whitespaceCompressor onlySpaces
   _ <- char '\n'
   failIfLeftoverActiveStyles
+  when (pState.activeRichBlock /= "") $ do
+    MP.setOffset o
+    fail "headings are not allowed inside rich blocks"
   props <- propertiesDrawerParser
   let newHeadingSection = genSectionNumber lenStars pState.headingSectionNumber
       newHeadingOidStack =
@@ -10240,6 +10244,29 @@ shouldParseWithState
       },
   CRichBlock $ RichBlock mempty RBEnd
 ]
+#+end_src
+
+While many kinds of cells are allowed inside a rich block, headings are not
+allowed.
+
+#+name: ti:0017-rich-blocks-no-headings
+#+header: :tangle test/Lilac/ParseSpec/0017-rich-blocks-no-headings
+#+begin_src org
+,#+begin_warning
+foo
+
+,* Heading
+
+bar
+,#+end_warning
+#+end_src
+
+#+name: t:0017-rich-blocks-no-headings
+#+begin_src haskell
+shouldFailWithMessage
+  "0017-rich-blocks-no-headings"
+  "headings are not allowed inside rich blocks"
+  22
 #+end_src
 
 * List items
@@ -14207,6 +14234,7 @@ Below are all of the individual test cases.
 <<t:0017-rich-blocks-clean-ending-malformed-middle>>
 <<t:0017-rich-blocks-clean-ending-multiple-endings>>
 <<t:0017-rich-blocks-nesting>>
+<<t:0017-rich-blocks-no-headings>>
 #+end_src
 
 * Glossary
