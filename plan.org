@@ -33,6 +33,20 @@ Ideally the backlog would use something like a Story Map to encode both time and
 priority as two separate dimensions. However we just have a flat list of items
 for now because we don't have a good way of representing story maps.
 
+** TODO make glossary terms look less indented where they are defined
+
+We parse them inside list items and keep the list item structure. This results
+in weaving singleton-list definition lists inside each unordered list item. It
+would be nice to skip the list items so that we can just weave only the glossary
+terms (purely as a definition list).
+
+The edge cases can be tricky. E.g., if we have some list items that are glossary
+terms and some that are not, all within the same list.
+
+Looks like CSS has the ~:has()~ parent selector which can select parents with
+certain child elements. We can use this to select a list item which has a
+glossary item inside it to make the list less indented.
+
 ** TODO (Git integration) add raw git links
 If there is text like 68541ad (capture unhandled edge case for parsing styled
 text, 2025-01-26) (hash, parenthetical with a YYYY-MM-DD date at the end),
