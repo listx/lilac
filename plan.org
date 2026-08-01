@@ -24,6 +24,138 @@ other sections as needed.
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
+** TODO make glossary terms more flexible
+
+Currently we only allow a glossary term to be defined with just 1 paragraph.
+However in vanilla Orgmode you can use other elements too (everything in the
+list element itself, including children, are considered part of the definition).
+This means we have to do an aggressive refactor to allow for additional cells to
+be part of the definition.
+
+The main benefit for us is being able to use more than one paragraph. See the
+"offsets" glossary term at [[id:25827c17-2015-434b-b686-db3d72b2ee4d][Archives]], which uses 2 paragraphs.
+
+We currently just convert a regular paragraph to a glossary term, which is a
+single Cell. What we need is to convert [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480::data:GlossaryTerm][data:GlossaryTerm]] into a ~[Cell]~. But it
+can only have certain cells in it (no headings, no other glossary terms to
+prevent nesting, no code blocks). So, we need to create a new ~BCell~ (to mean
+"body" cell).
+
+#+name: BCell
+#+begin_src haskell
+type BCell :: Type
+data BCell
+  = BCListItem [ListMarker]
+  | BCParagraph Prose
+  | BCMathFragment MathFragment
+  | BCTable Table
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+
+type GlossaryTerm :: Type
+data GlossaryTerm = GlossaryTerm
+  { term :: Prose, -- (ref:BCell-term)
+    definition :: [BCell]
+  }
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+There is some room for "convention" here. Vanilla Orgmode will silently remove
+the terms if the first list item is not a term. It will also let you nest terms
+(which is probably doesn't work well in practice). We will enforce a rule that
+says glossary term lists must only have such glossary terms (and also no nesting
+of term definitions is allowed, via the allowed constructors of the ~BCell~ type).
+
+One consequence of using more than 1 cell for the glossary is that we have to
+tweak the ~glossary~ field in [[id:5df15f17-c630-4ddf-bade-66084c430a07::(data:OrgDoc-glossary)][data:OrgDoc-glossary]]. Currently that just references
+a single cell number (inserted by [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480::f:assertUniqueGlossaryTerm][f:assertUniqueGlossaryTerm]], and woven by
+[[id:587b019b-74c0-4af1-8144-29fcb920cd56::f:weaveCollectedGlossaryTerm][f:weaveCollectedGlossaryTerm]]). Instead we need to start referencing the start
+and end cell indices (or, at least the *number* of cells we need to weave after
+the starting cell).
+
+There are some new concerns because a glossary term is no longer a single cell (paragraph):
+
+  - [[(BCell-term)]] is a part of the paragraph. However the definition is a list of
+    separate cells. So this sort of breaks the notion we've had so far of having
+    a blank line as a cell boundary.
+
+  - We treat the ~CGlossaryTerm~ as a single ~Cell~ in [[id:5df15f17-c630-4ddf-bade-66084c430a07::(data:OrgDoc-cells)][data:OrgDoc-cells]], but
+    because it is composed of different cells inside it, we have to now call
+    [[id:79c70a44-4428-4859-a881-baceda3267e1::f:weaveCell][f:weaveCell]] on it. That one expects an LCI, but now this is wrong because
+    ~CGlossaryTerm~ is just one cell. FIXME: How to fix this? Maybe just store the
+    cell numbers... We need to know how many contiguous cells make up a single
+    glossary term. The fact that the first cell of a glossary item will be its
+    term and definition is just a special case. Hmm this is sounding more like
+    the type of a non-empty list, where the first cell is the required paragraph
+    with a term and start of a definition, and any subsequent cells (of type
+    ~BCell~) are optional. But because we can have the parser complain loudly
+    whenever we encounter an invalid cell, we can guarantee that the glossary
+    term only has the allowed cells in it, even if we don't use the ~BCell~ type.
+    And there is probably no need to store the contents at all --- we can just
+    store the LCI of the first cell and the number of subsequent cells that form
+    the single glossary term.
+
+So the type of ~GlossaryTerm~ can be
+
+#+begin_src haskell
+type GlossaryTerm :: Type
+data GlossaryTerm = GlossaryTerm
+  { term :: Prose,
+    definition :: Prose,
+    size :: Int
+  }
+  deriving stock (Eq, Ord, Generic, Show)
+  deriving anyclass (FromJSON, ToJSON)
+#+end_src
+
+where the ~size~ is just the total number of extra cells that comes after the
+initial paragraph cell. Now we don't have to change [[id:5df15f17-c630-4ddf-bade-66084c430a07::(data:OrgDoc-glossary)][data:OrgDoc-glossary]] because
+that can continue to store the starting cell index (and once we have that, we
+can do a lookup inside the ~GlossaryTerm~ to figure out its ~size~). Now we have
+enough info to grab all glossary terms and their definitions even if their
+definitions go beyond just the required paragraph.
+
+One big consequence now though is that the weaving should probably be stateful.
+That's because after we go past the first ~GlossaryTerm~ cell, we have to still
+know whether we've finished with the glossary or not (we need to know when to
+put in a raw ~</div>~ to enclose a single glossary term).
+
+How do we avoid weaving the (redundant) list structure? Maybe we need to know
+(when we're weaving) whether the current index is 1 less than a known LCI of a
+glossary term...? We'll have cells like:
+
+#+begin_src txt
+ListMarkers
+GlossaryTerm
+Paragraph
+ListMarkers
+GlossaryTerm
+Paragraph
+Paragraph
+Paragraph
+ListMarkers
+#+end_src
+
+and need to avoid weaving the ~ListMarkers~. This is the tricky part... as a rough
+approximation, if we also record the start and end cell indices of /groups/ of
+glossary items, then we can know for how long we can /skip/ weaving of list
+markers. Maybe we need something like
+
+#+begin_src haskell
+glossaryTermGroups :: [(LCI, LCI)]
+#+end_src
+
+to know these (inclusive of list markers) boundaries! Once we have something
+like this, when we weave we can know to skip those list markers that fall inside
+this range. When parsing we can construct these boundaries as we enter and leave
+list indentation that have glossary terms. We can use a
+~insideGlossaryTermDefinitions~ boolean to check whether we should have a stricter
+parser (disallowing headings, recursive glossary term definitions, etc).
+
+We have to update the ~Map Text Int~ glossary data structure to include the
+ending boundary LCI, not just the starting LCI.
+
 * Backlog
 :PROPERTIES:
 :ID:       b27d3e53-ada2-4f9e-9f38-18e9252b8229
