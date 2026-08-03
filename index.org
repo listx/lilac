@@ -261,9 +261,10 @@ to match ~next~. The process is:
 
 [[stamp-new-version.sh]] takes the Lilac version by searching for it from this Org
 file (specifically [[Lilac version]]), and creates a commit. It checks the [[id:1b7255d6-5d8a-4082-8d84-4852f66333dc][Release
-Notes]] first though, in case there are any unfinished notes with at ~COMMIT~ string
+Notes]] first though, in case there are any unfinished notes with a ~COMMIT~ string
 (these are meant to be replaced with their final resting commit hashes just
-prior to being versioned).
+prior to being versioned), or if we signaled that an unreleased version is still
+~WIP~.
 
 You should first bump the version at [[Lilac version]], and then run
 [[stamp-new-version.sh]] to pick up the version bump diff as part of the new commit.
