@@ -2371,7 +2371,7 @@ assertUniqueGlossaryTerm term offset = do
       { OrgParserState.glossary =
           insert
             term
-            pState.cellNumber
+            (pState.cellNumber, pState.cellNumber)
             pState.glossary
       }
 

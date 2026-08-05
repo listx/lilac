@@ -4278,14 +4278,14 @@ weaveGlossary isGlobal = do
         let terms :: [(LCI, GPath)]
             terms
               | isGlobal =
-                  map (\((_term, path), lci) -> (lci, path))
+                  map (\((_term, path), lciPair) -> (fst lciPair, path))
                     $ sortBy
                       ( comparing (toNormalizedText . CP.fromText . fst . fst)
                           <> comparing (snd . fst)
                       )
                     $ M.toList weaveConf.archive.glossary
               | otherwise =
-                  map (\(_term, lci) -> (lci, weaveConf.originObjectPath))
+                  map (\(_term, lciPair) -> (fst lciPair, weaveConf.originObjectPath))
                     $ sortBy
                       (comparing (toNormalizedText . CP.fromText . fst)) -- (ref:glossary-term-compare-visible)
                     $ M.toList originObj.orgDoc.glossary

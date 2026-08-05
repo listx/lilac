@@ -64,7 +64,7 @@ data OrgDoc = OrgDoc
     cells :: [Cell], -- (ref:data:OrgDoc-cells)
     pseudoEdges :: [PseudoEdge], -- (ref:data:OrgDoc-pseudoEdges)
     footnoteRefs :: Map Text (Int, LCI), -- (ref:data:OrgDoc-footnoteRefs)
-    glossary :: Map Text LCI, -- (ref:data:OrgDoc-glossary)
+    glossary :: Map Text (LCI, LCI), -- (ref:data:OrgDoc-glossary)
     lineLabels :: Map Text Int, -- (ref:data:OrgDoc-lineLabels)
     cslPath :: Maybe FilePath, -- (ref:data:OrgDoc-cslPath)
     bibPaths :: [FilePath], -- (ref:data:OrgDoc-bibPaths)
@@ -319,7 +319,7 @@ data OrgParserState = OrgParserState
     footnoteDefinitions :: Map Text Prose, -- (ref:data:OrgParserState-footnoteDefinitions)
     insideFootnoteDefinition :: Maybe Text, -- (ref:data:OrgParserState-insideFootnoteDefinition)
     prevCellIsFootnote :: Bool, -- (ref:data:OrgParserState-prevCellIsFootnote)
-    glossary :: Map Text LCI, -- (ref:data:OrgParserState-glossary)
+    glossary :: Map Text (LCI, LCI), -- (ref:data:OrgParserState-glossary)
     glossaryTermOffset :: Int, -- (ref:data:OrgParserState-glossaryTermOffset)
     cslPath :: Maybe FilePath, -- (ref:data:OrgParserState-cslPath)
     bibPaths :: [FilePath], -- (ref:data:OrgParserState-bibPaths)
@@ -11952,7 +11952,7 @@ assertUniqueGlossaryTerm term offset = do
       { OrgParserState.glossary =
           insert
             term
-            pState.cellNumber
+            (pState.cellNumber, pState.cellNumber)
             pState.glossary
       }
 #+end_src

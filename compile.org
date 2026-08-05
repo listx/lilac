@@ -708,7 +708,7 @@ data Archive = Archive
   { objects :: Map GPath Object, -- (ref:data:Archive-objects)
     symbols :: Map LinkOid GCI, -- (ref:data:Archive-symbols)
     ancestry :: Map GCI [GCI], -- (ref:data:Archive-ancestry)
-    glossary :: Map (Text, GPath) LCI, -- (ref:data:Archive-glossary)
+    glossary :: Map (Text, GPath) (LCI, LCI), -- (ref:data:Archive-glossary)
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), -- (ref:data:Archive-backlinks)
     offsets :: IntMap GPath, -- (ref:data:Archive-offsets)
     gtoc :: GTOC, -- (ref:data:Archive-gtoc)
@@ -906,14 +906,14 @@ is done in [[f:combineSymbolsAndGlossary]].
 #+begin_src haskell
 combineSymbolsAndGlossary ::
   [(GPath, Object)] ->
-  (Map LinkOid GCI, Map (Text, GPath) LCI)
+  (Map LinkOid GCI, Map (Text, GPath) (LCI, LCI))
 combineSymbolsAndGlossary pathObjs =
   foldl' f (docOidsToSymbols pathObjs, mempty) $ prependOffsets pathObjs
   where
     f ::
-      (Map LinkOid GCI, Map (Text, GPath) LCI) ->
+      (Map LinkOid GCI, Map (Text, GPath) (LCI, LCI)) ->
       (Int, (GPath, Object)) ->
-      (Map LinkOid GCI, Map (Text, GPath) LCI)
+      (Map LinkOid GCI, Map (Text, GPath) (LCI, LCI))
     f (accSyms, accGloss) (offset, (path, obj)) =
       ( (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) -- (ref:f:combineSymbolsAndGlossary-gci-creation)
           <> accSyms,

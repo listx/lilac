@@ -396,7 +396,7 @@ data OrgDoc = OrgDoc
     cells :: [Cell], --
     pseudoEdges :: [PseudoEdge], --
     footnoteRefs :: Map Text (Int, LCI), --
-    glossary :: Map Text LCI, --
+    glossary :: Map Text (LCI, LCI), --
     lineLabels :: Map Text Int, --
     cslPath :: Maybe FilePath, --
     bibPaths :: [FilePath], --
@@ -454,7 +454,7 @@ data OrgParserState = OrgParserState
     footnoteDefinitions :: Map Text Prose, --
     insideFootnoteDefinition :: Maybe Text, --
     prevCellIsFootnote :: Bool, --
-    glossary :: Map Text LCI, --
+    glossary :: Map Text (LCI, LCI), --
     glossaryTermOffset :: Int, --
     cslPath :: Maybe FilePath, --
     bibPaths :: [FilePath], --
@@ -750,7 +750,7 @@ data Archive = Archive
   { objects :: Map GPath Object, --
     symbols :: Map LinkOid GCI, --
     ancestry :: Map GCI [GCI], --
-    glossary :: Map (Text, GPath) LCI, --
+    glossary :: Map (Text, GPath) (LCI, LCI), --
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), --
     offsets :: IntMap GPath, --
     gtoc :: GTOC, --

@@ -327,14 +327,14 @@ mkArchive projectConf pathObjs = do
 
 combineSymbolsAndGlossary ::
   [(GPath, Object)] ->
-  (Map LinkOid GCI, Map (Text, GPath) LCI)
+  (Map LinkOid GCI, Map (Text, GPath) (LCI, LCI))
 combineSymbolsAndGlossary pathObjs =
   foldl' f (docOidsToSymbols pathObjs, mempty) $ prependOffsets pathObjs
   where
     f ::
-      (Map LinkOid GCI, Map (Text, GPath) LCI) ->
+      (Map LinkOid GCI, Map (Text, GPath) (LCI, LCI)) ->
       (Int, (GPath, Object)) ->
-      (Map LinkOid GCI, Map (Text, GPath) LCI)
+      (Map LinkOid GCI, Map (Text, GPath) (LCI, LCI))
     f (accSyms, accGloss) (offset, (path, obj)) =
       ( (M.map (\lci -> GCI $ lci.unLCI + offset) obj.symbols) --
           <> accSyms,
