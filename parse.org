@@ -187,6 +187,16 @@ definitions so that they are woven in the order they are referenced, not the
 order in which they are defined (parsed). This is unlike every other cell where
 the order of parsing them (cell-by-cell) is preserved during weaving.
 
+For the type
+
+#+begin_src haskell
+footnoteRefs :: Map Text (Int, LCI)
+#+end_src
+
+the ~Int~ is the footnote number (1, 2, 3, etc) and the ~LCI~ is the current cell
+being parsed. See [[f:footnoteLinkParser]] to see how we construct the ~footenoteRefs~
+during parsing, and [[id:c3562660-a9ff-499d-9b10-c69bcba7f105::f:weaveFootnoteBacklink][f:weaveFootnoteBacklink]] to see how we use the ~LCI~.
+
 *** ~glossary~
 
 For the ~glossary~ [[(data:OrgDoc-glossary)]], see [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Description lists, aka glossary terms]]. We
