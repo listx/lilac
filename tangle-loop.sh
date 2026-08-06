@@ -106,7 +106,7 @@ main()
 	fi
 	__ok_to_lint=1
 
-	readarray -t org_files < <(find . -type f -regex '.+\.org$')
+	readarray -t org_files < <(find . -maxdepth 1 -type f -name "*.org" && find ./design -type f -name "*.org")
 	watch "${org_files[@]}"
 }
 

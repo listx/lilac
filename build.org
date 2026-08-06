@@ -884,26 +884,20 @@ gitconfig:
 
 ** Org files
 
-The Org files are all of the files that make up this project. We could discover
-these files like in [[tangle-loop.sh]], but we list them out here explicitly for
-now.
+The Org files are all of the files that make up this project. We discover these
+files in [[sh:find-org-files]] and reuse the same ~find~ invocation in [[tangle-loop.sh]].
+
+#+name: sh:find-org-files
+#+begin_src sh
+find . -maxdepth 1 -type f -name "*.org" && find ./design -type f -name "*.org"
+#+end_src
+
+We can't just find all Org files recursively from the root, because some files
+are used in tests and are not part of the set of Org files we normally use.
 
 #+name: make:Org files
 #+begin_src makefile
-org_files = \
-	index.org \
-	cli.org \
-	build.org \
-	compile.org \
-	parse.org \
-	tangle.org \
-	types.org \
-	weave.org \
-	serve.org \
-	fe.org \
-	user-manual.org \
-	plan.org \
-	release-notes.org
+org_files := $(shell <<sh:find-org-files>>)
 backend_org_files = $(filter-out fe.org,$(org_files))
 #+end_src
 
@@ -1158,7 +1152,7 @@ main()
 	fi
 	__ok_to_lint=1
 
-	readarray -t org_files < <(find . -type f -regex '.+\.org$')
+	readarray -t org_files < <(<<sh:find-org-files>>)
 	watch "${org_files[@]}"
 }
 

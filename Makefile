@@ -10,20 +10,7 @@ all: build test weave
 	@echo "$$INSTALL_HELP" | sed 's/^\t/  /'
 .PHONY: all
 
-org_files = \
-	index.org \
-	cli.org \
-	build.org \
-	compile.org \
-	parse.org \
-	tangle.org \
-	types.org \
-	weave.org \
-	serve.org \
-	fe.org \
-	user-manual.org \
-	plan.org \
-	release-notes.org
+org_files := $(shell find . -maxdepth 1 -type f -name "*.org" && find ./design -type f -name "*.org")
 backend_org_files = $(filter-out fe.org,$(org_files))
 
 test: tangle
