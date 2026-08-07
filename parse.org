@@ -321,6 +321,7 @@ data OrgParserState = OrgParserState
     prevCellIsFootnote :: Bool, -- (ref:data:OrgParserState-prevCellIsFootnote)
     glossary :: Map Text (LCI, LCI), -- (ref:data:OrgParserState-glossary)
     glossaryTermOffset :: Int, -- (ref:data:OrgParserState-glossaryTermOffset)
+    glossaryTermLevel :: Maybe (Text, Level),
     cslPath :: Maybe FilePath, -- (ref:data:OrgParserState-cslPath)
     bibPaths :: [FilePath], -- (ref:data:OrgParserState-bibPaths)
     insideCitation :: Bool, -- (ref:data:OrgParserState-insideCitation)
@@ -372,6 +373,7 @@ defaultOrgParserState =
       prevCellIsFootnote = False,
       glossary = M.empty,
       glossaryTermOffset = 0,
+      glossaryTermLevel = Nothing,
       cslPath = Nothing,
       bibPaths = [],
       insideCitation = False,
@@ -758,6 +760,7 @@ import Lilac.Types as OrgParserState
         footnoteNumber,
         footnoteRefs,
         glossary,
+        glossaryTermLevel,
         glossaryTermOffset,
         headingLevel,
         headingOidStack,
@@ -958,6 +961,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:someIndent>>
 <<f:getContinuationIndentForLevel>>
 <<f:listItemsEndParser>>
+<<f:markEndOfActiveGlossaryTerm>>
 <<f:getEndingListMarkers>>
 <<f:listHeadIndentLevelParser>>
 <<f:orderedHeadParser>>
@@ -10764,23 +10768,27 @@ listItemsEndParser = do
   when (null pState.listMarkers) $ do
     fail "no pending ListMarker objects to close off" -- (ref:list-items-end-failure-with-no-input)
   when (pState.continuationIndent /= 0) $ do
-    fail "not at beginning of line"
+    fail "not at beginning of line" -- (ref:f:listItemsEndParser-bol)
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
   let markers = getEndingListMarkers levelsToDrop pState.listLevels
       markersToDrop = levelsToDrop * 2 -- (ref:f:listItemsEndParser-markersToDrop)
+      levelsRemaining = drop levelsToDrop pState.listLevels
+      listMarkersRemaining = drop markersToDrop pState.listMarkers
   put
     pState
-      { listLevels = drop levelsToDrop pState.listLevels,
-        listMarkers = drop markersToDrop pState.listMarkers,
+      { listLevels = levelsRemaining,
+        listMarkers = listMarkersRemaining,
         continuationIndent = continuationIndent
       }
+  markEndOfActiveGlossaryTerm continuationIndent -- (ref:f:listItemsEndParser-markEndOfActiveGlossaryTerm)
   pure $ CListItem markers
 #+end_src
 
 In [[f:listItemsEndParser]], we initially fail the parser if there are no pending
-~ListMarker~ objects (no list levels to close off), or if we're not at the
-beginning of the line (because otherwise we cannot measure indentation
-accurately), by checking ~pState.continuationIndent~. This check of
+~ListMarker~ objects (no list levels to close off
+[[(list-items-end-failure-with-no-input)]]), or if we're not at the beginning of the
+line (because otherwise we cannot measure indentation accurately), by checking
+~pState.continuationIndent~ [[(f:listItemsEndParser-bol)]]. This check of
 ~pState.continuationIndent~ is required because there is no easy way to check for
 the just-parsed token (or character) in Megaparsec --- all parsers only see
 what's in front of it. So then it's up to other parsers to set this to some
@@ -10813,6 +10821,51 @@ getEndingListMarkers levelsToDrop = concatMap f . take levelsToDrop
       Nothing -> [LItemEnd, LUnorderedEnd]
       Just _ -> [LItemEnd, LOrderedEnd]
 #+end_src
+
+*** Closing off active glossary terms
+:PROPERTIES:
+:ID:       dfbf7d1f-c296-4917-a855-928eecaee446
+:END:
+
+[[f:markEndOfActiveGlossaryTerm]] determines if there was an
+active glossary term definition, and if the amount of indentation we've detected
+means that we'll have to finish off that definition.
+
+#+name: f:markEndOfActiveGlossaryTerm
+#+begin_src haskell
+markEndOfActiveGlossaryTerm :: Int -> OrgParser ()
+markEndOfActiveGlossaryTerm continuationIndent = do
+  pState <- get
+  if
+    | Just (term, glossaryLevel) <- pState.glossaryTermLevel,
+      True <- continuationIndent < getContinuationIndentForLevel glossaryLevel,
+      Just (startLCI, _) <- lookup term pState.glossary -> do
+        let updatedGlossary =
+              insert
+                term
+                (startLCI, LCI $ pState.cellNumber.unLCI - 1) -- (ref:f:markEndOfActiveGlossaryTerm-offByOne)
+                pState.glossary
+        modify $ \s ->
+          s
+            { glossaryTermLevel = Nothing,
+              glossary = updatedGlossary
+            }
+    | otherwise -> pure ()
+#+end_src
+
+We use this in
+[[f:listItemsEndParser]] [[(f:listItemsEndParser-markEndOfActiveGlossaryTerm)]] and
+[[f:listItemFitter]] [[(f:listItemFitter-markEndOfActiveGlossaryTerm)]]. That's because
+neither one exclusively handles the closing off of list items (in particular,
+[[f:listItemFitter]] only works when there's a new list item being parsed --- so if
+a paragraph or some other cell ends a list, [[f:listItemsEndParser]] needs to step
+in).
+
+[[(f:markEndOfActiveGlossaryTerm-offByOne)]] subtracts by 1 because the current cell
+number in both [[f:listItemsEndParser]] and [[f:listItemFitter]] point to the list
+markers cell, not the actual content which comes just before it.
+
+See [[id:fb732179-1420-43b9-a20d-4bb9882becf2][Tests (parsing)]] for tests around glossary terms.
 
 ** Parsing list heads
 
@@ -11042,19 +11095,19 @@ listItemFitter level levels =
       | isJust level.number && isJust lvl.number ->
           let expectedNum = fmap (+ 1) lvl.number
            in if level.number == expectedNum
-                then fitter levelsToDrop
+                then fitter levelsToDrop lvl.indent
                 else
                   fail
                     $ "expected incremented list head "
                     <> (show . fromJust $ expectedNum)
                     <> " but got "
                     <> (show . fromJust $ level.number)
-      | isNothing level.number && isNothing lvl.number -> fitter levelsToDrop
+      | isNothing level.number && isNothing lvl.number -> fitter levelsToDrop lvl.indent
       | isJust lvl.number -> fail "expected ORDERED list item at this level"
       | otherwise -> fail "expected UNORDERED list item at this level"
   where
-    fitter :: Int -> OrgParser [ListMarker]
-    fitter levelsToDrop = do
+    fitter :: Int -> Int -> OrgParser [ListMarker]
+    fitter levelsToDrop continuationIndent = do
       pState <- get
       let markers = getEndingListMarkers levelsToDrop pState.listLevels
       put
@@ -11063,12 +11116,16 @@ listItemFitter level levels =
               level : drop (levelsToDrop + 1) pState.listLevels, -- (ref:f:listItemFitter-extra-level-drop)
             listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
+      markEndOfActiveGlossaryTerm continuationIndent -- (ref:f:listItemFitter-markEndOfActiveGlossaryTerm)
       pure $ markers <> [LItemEnd, LItemStart]
 #+end_src
 
 We use [[f:listItemStartParser]] and [[f:listItemsEndParser]] inside [[f:cellParser]]; the
 former identifies the beginnings of list items, while the latter recognizes
 their (complete) end when there is no more indentation.
+
+[[(f:listItemFitter-markEndOfActiveGlossaryTerm)]] marks the end of an active
+glossary term (if any). See [[id:dfbf7d1f-c296-4917-a855-928eecaee446][Closing off active glossary terms]].
 
 ** Tests
 
@@ -11828,7 +11885,7 @@ to HTML as
 In HTML it is perfectly valid to have multiple ~<dt>~ (term) elements, or multiple
 ~<dd>~ (definition) elements, or both.
 
-There are three differences worth noting for Lilac:
+There are several differences worth noting for Lilac:
 
    1) Only one term and one description is allowed. If multiple terms mean the
       same thing, there should be multiple entries and all but one should
@@ -11842,14 +11899,23 @@ There are three differences worth noting for Lilac:
       terms" (or simply "terms") because that's what they are used for most of
       the time.
 
-   3) Lilac treats each key-value pair as a single [[data:Cell]], so you can write
-      them anywhere a cell is expected. So whereas Orgmode only allows glossary
-      terms them inside unordered lists, in Lilac you can write them as their
-      own independent paragraphs, or in ordered lists, etc.
+   3) Lilac parses a paragraph cell to check if it is the start of a glossary
+      term, so you can write them anywhere a paragraph is expected. So whereas
+      Orgmode only allows glossary terms them inside unordered lists, in Lilac
+      you can write them as their own independent paragraphs, or in ordered
+      lists, etc.
 
-      This way Lilac can mix and match glossary terms with other items (it does
-      not need the [[https://emacs.stackexchange.com/questions/17244/org-mode-list-with-a-mix-of-unordered-and-description-list-items][Orgmode workarounds described here]]). See [[id:eee95795-b51b-4de5-b39d-8dda436da451][how glossary terms
-      are woven]] to see how this plays out during HTML export.
+      However, if the paragraph is at the very beginning of the line (no
+      indentation), Lilac will limit your definition to that same paragraph.
+      This is unlike glossary terms defined inside list items, which can have
+      any number of nested cells as long as there is no nesting of glossary
+      definitions; this is because when using list items, we can easily tell
+      when a list item ends based on indentation.
+
+   4) When defining glossary terms in a list, that list level must only have
+      other glossary items (compare with vanilla [[https://emacs.stackexchange.com/questions/17244/org-mode-list-with-a-mix-of-unordered-and-description-list-items][Orgmode which doesn't enforce
+      this restriction]]). See [[id:eee95795-b51b-4de5-b39d-8dda436da451][how glossary terms are woven]] to see how this plays
+      out during HTML export.
 
 With those things out of the way, let's look at [[data:GlossaryTerm]], our take on
 definition list entries:
@@ -11881,7 +11947,7 @@ convertToGlossaryTerm prose offset =
           if isGlossaryTermDelimiter pToken -- (ref:f:convertToGlossaryTerm-isGlossaryTermDelimiter)
             then
               ( termPTokens,
-                Prose . reverse $ dropWhitespacePToken termPTokens,
+                compressProse . Prose . reverse $ dropWhitespacePToken termPTokens,
                 def
               )
             else (pToken : termPTokens, term', def)
@@ -11895,8 +11961,23 @@ convertToGlossaryTerm prose offset =
       | otherwise = tokens
     toGlossaryTerm :: ([PToken], Prose, [PToken]) -> OrgParser Cell
     toGlossaryTerm (_, term', def) = do
+      pState <- get
       let proseDefinition = compressProse . Prose $ reverse def
-      assertUniqueGlossaryTerm (toText term') offset -- (ref:f:convertToGlossaryTerm-assertUniqueGlossaryTerm)
+          term = (toText term')
+          glossaryTermLevel =
+            case pState.listLevels of
+              (level : _) -> Just (term, level)
+              [] -> Nothing
+      assertUniqueGlossaryTerm term offset -- (ref:f:convertToGlossaryTerm-assertUniqueGlossaryTerm)
+      put
+        pState
+          { OrgParserState.glossary =
+              insert
+                term
+                (pState.cellNumber, pState.cellNumber)
+                pState.glossary,
+            glossaryTermLevel = glossaryTermLevel
+          }
       pure
         $ CGlossaryTerm
           GlossaryTerm
@@ -11947,14 +12028,6 @@ assertUniqueGlossaryTerm term offset = do
       $ "glossary term "
       <> show term
       <> " is not unique"
-  put
-    pState
-      { OrgParserState.glossary =
-          insert
-            term
-            (pState.cellNumber, pState.cellNumber)
-            pState.glossary
-      }
 #+end_src
 
 #+name: ti:0015-glossary-duplicate-term
@@ -11982,6 +12055,143 @@ a failure in [[f:cellParser]], namely in [[f:listItemsEndParser]]
 ([[(list-items-end-failure-with-no-input)]]). In order to suppress that error, we
 changed [[f:textParser]] to set a ~glossaryTermOffset~ if it detected the glossary
 term delimiter ([[(glossary-term-delimiter-detection)]]) [fn:megaparsec-errors].
+
+** Tests (parsing)
+:PROPERTIES:
+:ID:       fb732179-1420-43b9-a20d-4bb9882becf2
+:END:
+
+#+name: ti:0015-glossary-bounds-individual
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-bounds-individual
+#+begin_src org
+paragraph :: a
+
+x
+
+  - item 1 :: b
+
+    hello
+
+  - item 2 :: c
+
+    world
+
+      - foo
+
+    apple
+
+  - item 3 :: d
+
+    \[
+    1 + 1 = 2
+    \]
+
+y
+
+  1) ordered item 1 :: e
+
+     banana
+
+  2) ordered item 2 :: f
+#+end_src
+
+#+name: t:0015-glossary-bounds-individual
+#+begin_src haskell
+shouldParseWithState
+  "0015-glossary-bounds-individual"
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        [ CGlossaryTerm -- 0
+            GlossaryTerm
+              { term = Prose [ptext "paragraph" []],
+                definition = Prose [ptext " a" []]
+              },
+          CParagraph $ Prose [ptext "x" []], -- 1
+          CListItem [LUnorderedStart, LItemStart], -- 2
+          CGlossaryTerm -- 3
+            GlossaryTerm
+              { term = Prose [ptext "item 1" []],
+                definition = Prose [ptext " b" []]
+              },
+          CParagraph $ Prose [ptext "hello" []], -- 4
+          CListItem [LItemEnd, LItemStart], -- 5
+          CGlossaryTerm -- 6
+            GlossaryTerm
+              { term = Prose [ptext "item 2" []],
+                definition = Prose [ptext " c" []]
+              },
+          CParagraph $ Prose [ptext "world" []], -- 7
+          CListItem [LUnorderedStart, LItemStart], -- 8
+          CParagraph $ Prose [ptext "foo" []], -- 9
+          CListItem [LItemEnd, LUnorderedEnd], -- 10
+          CParagraph $ Prose [ptext "apple" []], -- 11
+          CListItem [LItemEnd, LItemStart], -- 12
+          CGlossaryTerm -- 13
+            GlossaryTerm
+              { term = Prose [ptext "item 3" []],
+                definition = Prose [ptext " d" []]
+              },
+          CMathFragment -- 14
+            MathFragment
+              { parentOid = nilOid,
+                meta =
+                  fromList
+                    [ ("__equation_anon_number", "1")
+                    ],
+                body = "1 + 1 = 2"
+              },
+          CListItem [LItemEnd, LUnorderedEnd], -- 15
+          CParagraph $ Prose [ptext "y" []], -- 16
+          CListItem [LOrderedStart, LItemStart], -- 17
+          CGlossaryTerm -- 18
+            GlossaryTerm
+              { term = Prose [ptext "ordered item 1" []],
+                definition = Prose [ptext " e" []]
+              },
+          CParagraph $ Prose [ptext "banana" []], -- 19
+          CListItem [LItemEnd, LItemStart], -- 20
+          CGlossaryTerm -- 21
+            GlossaryTerm
+              { term = Prose [ptext "ordered item 2" []],
+                definition = Prose [ptext " f" []]
+              },
+          CListItem [LItemEnd, LOrderedEnd] -- 22
+        ],
+      pseudoEdges = [],
+      footnoteRefs = M.empty,
+      glossary =
+        fromList
+          [ ("item 1", (LCI 3, LCI 4)),
+            ("item 2", (LCI 6, LCI 11)),
+            ("item 3", (LCI 13, LCI 14)),
+            ("ordered item 1", (LCI 18, LCI 19)),
+            ("ordered item 2", (LCI 21, LCI 21)),
+            ("paragraph", (LCI 0, LCI 0))
+          ],
+      lineLabels = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      citations = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
+  defaultOrgParserState
+    { glossary =
+        fromList
+          [ ("item 1", (LCI 3, LCI 4)),
+            ("item 2", (LCI 6, LCI 11)),
+            ("item 3", (LCI 13, LCI 14)),
+            ("ordered item 1", (LCI 18, LCI 19)),
+            ("ordered item 2", (LCI 21, LCI 21)),
+            ("paragraph", (LCI 0, LCI 0))
+          ],
+      glossaryTermOffset = 275,
+      anonEquationNumber = 1
+    }
+#+end_src
 
 ** Printing glossaries
 :PROPERTIES:
@@ -13752,6 +13962,7 @@ import Lilac.Types
         CCommand,
         CFigure,
         CFootnote,
+        CGlossaryTerm,
         CHeading,
         CListItem,
         CMathFragment,
@@ -13764,6 +13975,7 @@ import Lilac.Types
     Command (PrintBibliography, PrintGlossary),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
+    GlossaryTerm (GlossaryTerm, definition, term),
     Heading (Heading, body, level, meta, section),
     LCI (LCI),
     Link (Link, name, target),
@@ -13810,6 +14022,7 @@ import Lilac.Types
         footnoteNumber,
         footnoteRefs,
         glossary,
+        glossaryTermOffset,
         headingLevel,
         headingOidStack,
         headingSectionNumber,
@@ -14235,6 +14448,7 @@ Below are all of the individual test cases.
 <<Text to Prose round trip>>
 <<Drop text chars from Prose>>
 <<t:0015-glossary-duplicate-term>>
+<<t:0015-glossary-bounds-individual>>
 <<t:0015-glossary-location>>
 <<t:0015-glossary-location-global>>
 <<t:0016-metadata-reserved-underscores>>

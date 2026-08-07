@@ -456,6 +456,7 @@ data OrgParserState = OrgParserState
     prevCellIsFootnote :: Bool, --
     glossary :: Map Text (LCI, LCI), --
     glossaryTermOffset :: Int, --
+    glossaryTermLevel :: Maybe (Text, Level),
     cslPath :: Maybe FilePath, --
     bibPaths :: [FilePath], --
     insideCitation :: Bool, --
@@ -501,6 +502,7 @@ defaultOrgParserState =
       prevCellIsFootnote = False,
       glossary = M.empty,
       glossaryTermOffset = 0,
+      glossaryTermLevel = Nothing,
       cslPath = Nothing,
       bibPaths = [],
       insideCitation = False,

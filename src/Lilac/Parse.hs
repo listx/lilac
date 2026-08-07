@@ -207,6 +207,7 @@ import Lilac.Types as OrgParserState
         footnoteNumber,
         footnoteRefs,
         glossary,
+        glossaryTermLevel,
         glossaryTermOffset,
         headingLevel,
         headingOidStack,
@@ -1803,17 +1804,39 @@ listItemsEndParser = do
   when (null pState.listMarkers) $ do
     fail "no pending ListMarker objects to close off" --
   when (pState.continuationIndent /= 0) $ do
-    fail "not at beginning of line"
+    fail "not at beginning of line" --
   (levelsToDrop, continuationIndent) <- zeroIndent <|> someIndent
   let markers = getEndingListMarkers levelsToDrop pState.listLevels
       markersToDrop = levelsToDrop * 2 --
+      levelsRemaining = drop levelsToDrop pState.listLevels
+      listMarkersRemaining = drop markersToDrop pState.listMarkers
   put
     pState
-      { listLevels = drop levelsToDrop pState.listLevels,
-        listMarkers = drop markersToDrop pState.listMarkers,
+      { listLevels = levelsRemaining,
+        listMarkers = listMarkersRemaining,
         continuationIndent = continuationIndent
       }
+  markEndOfActiveGlossaryTerm continuationIndent --
   pure $ CListItem markers
+
+markEndOfActiveGlossaryTerm :: Int -> OrgParser ()
+markEndOfActiveGlossaryTerm continuationIndent = do
+  pState <- get
+  if
+    | Just (term, glossaryLevel) <- pState.glossaryTermLevel,
+      True <- continuationIndent < getContinuationIndentForLevel glossaryLevel,
+      Just (startLCI, _) <- lookup term pState.glossary -> do
+        let updatedGlossary =
+              insert
+                term
+                (startLCI, LCI $ pState.cellNumber.unLCI - 1) --
+                pState.glossary
+        modify $ \s ->
+          s
+            { glossaryTermLevel = Nothing,
+              glossary = updatedGlossary
+            }
+    | otherwise -> pure ()
 
 getEndingListMarkers :: Int -> [Level] -> [ListMarker]
 getEndingListMarkers levelsToDrop = concatMap f . take levelsToDrop
@@ -1920,19 +1943,19 @@ listItemFitter level levels =
       | isJust level.number && isJust lvl.number ->
           let expectedNum = fmap (+ 1) lvl.number
            in if level.number == expectedNum
-                then fitter levelsToDrop
+                then fitter levelsToDrop lvl.indent
                 else
                   fail
                     $ "expected incremented list head "
                     <> (show . fromJust $ expectedNum)
                     <> " but got "
                     <> (show . fromJust $ level.number)
-      | isNothing level.number && isNothing lvl.number -> fitter levelsToDrop
+      | isNothing level.number && isNothing lvl.number -> fitter levelsToDrop lvl.indent
       | isJust lvl.number -> fail "expected ORDERED list item at this level"
       | otherwise -> fail "expected UNORDERED list item at this level"
   where
-    fitter :: Int -> OrgParser [ListMarker]
-    fitter levelsToDrop = do
+    fitter :: Int -> Int -> OrgParser [ListMarker]
+    fitter levelsToDrop continuationIndent = do
       pState <- get
       let markers = getEndingListMarkers levelsToDrop pState.listLevels
       put
@@ -1941,6 +1964,7 @@ listItemFitter level levels =
               level : drop (levelsToDrop + 1) pState.listLevels, --
             listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
+      markEndOfActiveGlossaryTerm continuationIndent --
       pure $ markers <> [LItemEnd, LItemStart]
 
 mathFragmentNumberedParser :: OrgParser MathFragment
@@ -2334,7 +2358,7 @@ convertToGlossaryTerm prose offset =
           if isGlossaryTermDelimiter pToken --
             then
               ( termPTokens,
-                Prose . reverse $ dropWhitespacePToken termPTokens,
+                compressProse . Prose . reverse $ dropWhitespacePToken termPTokens,
                 def
               )
             else (pToken : termPTokens, term', def)
@@ -2348,8 +2372,23 @@ convertToGlossaryTerm prose offset =
       | otherwise = tokens
     toGlossaryTerm :: ([PToken], Prose, [PToken]) -> OrgParser Cell
     toGlossaryTerm (_, term', def) = do
+      pState <- get
       let proseDefinition = compressProse . Prose $ reverse def
-      assertUniqueGlossaryTerm (toText term') offset --
+          term = (toText term')
+          glossaryTermLevel =
+            case pState.listLevels of
+              (level : _) -> Just (term, level)
+              [] -> Nothing
+      assertUniqueGlossaryTerm term offset --
+      put
+        pState
+          { OrgParserState.glossary =
+              insert
+                term
+                (pState.cellNumber, pState.cellNumber)
+                pState.glossary,
+            glossaryTermLevel = glossaryTermLevel
+          }
       pure
         $ CGlossaryTerm
           GlossaryTerm
@@ -2366,14 +2405,6 @@ assertUniqueGlossaryTerm term offset = do
       $ "glossary term "
       <> show term
       <> " is not unique"
-  put
-    pState
-      { OrgParserState.glossary =
-          insert
-            term
-            (pState.cellNumber, pState.cellNumber)
-            pState.glossary
-      }
 
 isGlossaryTermDelimiter :: PToken -> Bool
 isGlossaryTermDelimiter = \case

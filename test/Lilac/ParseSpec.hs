@@ -14,6 +14,7 @@ import Lilac.Types
         CCommand,
         CFigure,
         CFootnote,
+        CGlossaryTerm,
         CHeading,
         CListItem,
         CMathFragment,
@@ -26,6 +27,7 @@ import Lilac.Types
     Command (PrintBibliography, PrintGlossary),
     Figure (Figure, caption, link, meta, parentOid),
     Footnote (Footnote, body, name),
+    GlossaryTerm (GlossaryTerm, definition, term),
     Heading (Heading, body, level, meta, section),
     LCI (LCI),
     Link (Link, name, target),
@@ -72,6 +74,7 @@ import Lilac.Types
         footnoteNumber,
         footnoteRefs,
         glossary,
+        glossaryTermOffset,
         headingLevel,
         headingOidStack,
         headingSectionNumber,
@@ -3535,6 +3538,101 @@ spec = do
     "0015-glossary-duplicate-term"
     "glossary term \"foo\" is not unique"
     14
+
+  shouldParseWithState
+    "0015-glossary-bounds-individual"
+    OrgDoc
+      { oid = nilOid,
+        cells =
+          [ CGlossaryTerm -- 0
+              GlossaryTerm
+                { term = Prose [ptext "paragraph" []],
+                  definition = Prose [ptext " a" []]
+                },
+            CParagraph $ Prose [ptext "x" []], -- 1
+            CListItem [LUnorderedStart, LItemStart], -- 2
+            CGlossaryTerm -- 3
+              GlossaryTerm
+                { term = Prose [ptext "item 1" []],
+                  definition = Prose [ptext " b" []]
+                },
+            CParagraph $ Prose [ptext "hello" []], -- 4
+            CListItem [LItemEnd, LItemStart], -- 5
+            CGlossaryTerm -- 6
+              GlossaryTerm
+                { term = Prose [ptext "item 2" []],
+                  definition = Prose [ptext " c" []]
+                },
+            CParagraph $ Prose [ptext "world" []], -- 7
+            CListItem [LUnorderedStart, LItemStart], -- 8
+            CParagraph $ Prose [ptext "foo" []], -- 9
+            CListItem [LItemEnd, LUnorderedEnd], -- 10
+            CParagraph $ Prose [ptext "apple" []], -- 11
+            CListItem [LItemEnd, LItemStart], -- 12
+            CGlossaryTerm -- 13
+              GlossaryTerm
+                { term = Prose [ptext "item 3" []],
+                  definition = Prose [ptext " d" []]
+                },
+            CMathFragment -- 14
+              MathFragment
+                { parentOid = nilOid,
+                  meta =
+                    fromList
+                      [ ("__equation_anon_number", "1")
+                      ],
+                  body = "1 + 1 = 2"
+                },
+            CListItem [LItemEnd, LUnorderedEnd], -- 15
+            CParagraph $ Prose [ptext "y" []], -- 16
+            CListItem [LOrderedStart, LItemStart], -- 17
+            CGlossaryTerm -- 18
+              GlossaryTerm
+                { term = Prose [ptext "ordered item 1" []],
+                  definition = Prose [ptext " e" []]
+                },
+            CParagraph $ Prose [ptext "banana" []], -- 19
+            CListItem [LItemEnd, LItemStart], -- 20
+            CGlossaryTerm -- 21
+              GlossaryTerm
+                { term = Prose [ptext "ordered item 2" []],
+                  definition = Prose [ptext " f" []]
+                },
+            CListItem [LItemEnd, LOrderedEnd] -- 22
+          ],
+        pseudoEdges = [],
+        footnoteRefs = M.empty,
+        glossary =
+          fromList
+            [ ("item 1", (LCI 3, LCI 4)),
+              ("item 2", (LCI 6, LCI 11)),
+              ("item 3", (LCI 13, LCI 14)),
+              ("ordered item 1", (LCI 18, LCI 19)),
+              ("ordered item 2", (LCI 21, LCI 21)),
+              ("paragraph", (LCI 0, LCI 0))
+            ],
+        lineLabels = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        citations = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
+    defaultOrgParserState
+      { glossary =
+          fromList
+            [ ("item 1", (LCI 3, LCI 4)),
+              ("item 2", (LCI 6, LCI 11)),
+              ("item 3", (LCI 13, LCI 14)),
+              ("ordered item 1", (LCI 18, LCI 19)),
+              ("ordered item 2", (LCI 21, LCI 21)),
+              ("paragraph", (LCI 0, LCI 0))
+            ],
+        glossaryTermOffset = 275,
+        anonEquationNumber = 1
+      }
 
   shouldParseWithState
     "0015-glossary-location"
