@@ -313,6 +313,7 @@ data OrgParserState = OrgParserState
     insideParagraph :: Bool, -- (ref:data:OrgParserState-insideParagraph)
     listLevels :: [Level], -- (ref:data:OrgParserState-listLevels)
     listMarkers :: [ListMarker], -- (ref:data:OrgParserState-listMarkers)
+    prevCellHasListHeadMarker :: Bool, -- (ref:data:OrgParserState-prevCellHasListHeadMarker)
     continuationIndent :: Int, -- (ref:data:OrgParserState-continuationIndent)
     footnoteNumber :: Int, -- (ref:data:OrgParserState-footnoteNumber)
     footnoteRefs :: Map Text (Int, LCI), -- (ref:data:OrgParserState-footnoteRefs)
@@ -321,7 +322,7 @@ data OrgParserState = OrgParserState
     prevCellIsFootnote :: Bool, -- (ref:data:OrgParserState-prevCellIsFootnote)
     glossary :: Map Text (LCI, LCI), -- (ref:data:OrgParserState-glossary)
     glossaryTermOffset :: Int, -- (ref:data:OrgParserState-glossaryTermOffset)
-    glossaryTermLevel :: Maybe (Text, Level),
+    glossaryTermLevel :: Maybe (Text, Level), -- (ref:data:OrgParserState-glossaryTermLevel)
     cslPath :: Maybe FilePath, -- (ref:data:OrgParserState-cslPath)
     bibPaths :: [FilePath], -- (ref:data:OrgParserState-bibPaths)
     insideCitation :: Bool, -- (ref:data:OrgParserState-insideCitation)
@@ -365,6 +366,7 @@ defaultOrgParserState =
       insideParagraph = False,
       listLevels = [],
       listMarkers = [],
+      prevCellHasListHeadMarker = False,
       continuationIndent = 0,
       footnoteNumber = 0,
       footnoteRefs = M.empty,
@@ -514,6 +516,9 @@ this is checked with ~prevCellIsFootnote~ [[(data:OrgParserState-prevCellIsFootn
 [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Description lists, aka glossary terms]] are tracked with the ~glossary~
 [[(data:OrgParserState-glossary)]]. The ~glossaryTermOffset~ [[(data:OrgParserState-glossaryTermOffset)]] is
 used to improve error messages (see [[t:0015-glossary-duplicate-term]]).
+
+The ~glossaryTermLevel~ [[(data:OrgParserState-glossaryTermLevel)]] remembers what the
+currently active glossary term is. It's used in [[f:markEndOfActiveGlossaryTerm]].
 
 *** Fields for citations
 
@@ -777,6 +782,7 @@ import Lilac.Types as OrgParserState
         listLevels,
         listMarkers,
         orgParserConf,
+        prevCellHasListHeadMarker,
         prevCellIsFootnote,
         pseudoEdges,
         styleMask,
@@ -1521,19 +1527,19 @@ cellParser = do
   cell <-
     lexeme
       $ MP.choice
-        [ toggleFootnote False $ listItemStartParser,
-          toggleFootnote False $ listItemsEndParser,
-          toggleFootnote False $ resetIndent headingParser,
-          toggleFootnote False $ resetIndent richBlockStartParser,
-          toggleFootnote False $ resetIndent richBlockEndParser,
-          toggleFootnote False $ resetIndent blockParser,
-          toggleFootnote False $ resetIndent figureParser,
-          toggleFootnote False $ resetIndent tableParser,
-          toggleFootnote False $ resetIndent mathFragmentStandaloneParser,
-          toggleFootnote True $ resetIndent footnoteDefinitionParser,
-          toggleFootnote False $ resetIndent bibliographyLocationParser,
-          toggleFootnote False $ resetIndent glossaryLocationParser,
-          toggleFootnote False $ resetIndent paragraphParser,
+        [ toggle False True $ listItemStartParser,
+          toggle False False $ listItemsEndParser,
+          toggle False False $ resetIndent headingParser,
+          toggle False False $ resetIndent richBlockStartParser,
+          toggle False False $ resetIndent richBlockEndParser,
+          toggle False False $ resetIndent blockParser,
+          toggle False False $ resetIndent figureParser,
+          toggle False False $ resetIndent tableParser,
+          toggle False False $ resetIndent mathFragmentStandaloneParser,
+          toggle True False $ resetIndent footnoteDefinitionParser,
+          toggle False False $ resetIndent bibliographyLocationParser,
+          toggle False False $ resetIndent glossaryLocationParser,
+          toggle False False $ resetIndent paragraphParser,
           detectInvalidIndentation
         ]
   modify (\s -> s {bracketBalance = 0}) -- (ref:f:cellParser-bracketBalance-reset)
@@ -1546,10 +1552,14 @@ cellParser = do
       a <- p
       modify (\s -> s {continuationIndent = 0})
       pure a
-    toggleFootnote :: Bool -> OrgParser a -> OrgParser a
-    toggleFootnote b p = do
+    toggle :: Bool -> Bool -> OrgParser a -> OrgParser a
+    toggle prevCellIsFootnote prevCellHasListHeadMarker p = do
       a <- p
-      modify (\s -> s {prevCellIsFootnote = b})
+      modify $ \s ->
+        s
+          { prevCellIsFootnote = prevCellIsFootnote,
+            prevCellHasListHeadMarker = prevCellHasListHeadMarker
+          }
       pure a
 #+end_src
 
@@ -2262,12 +2272,16 @@ textParser styleMask
       let haveNotSeenGlossaryTermDelimiterYet =
             pState.insideParagraph && pState.glossaryTermOffset == 0
           wordIsGlossaryTermDelimiter = word == "::" && isEmptyMask styleMask
-      when
-        ( haveNotSeenGlossaryTermDelimiterYet
-            && wordIsGlossaryTermDelimiter
-        )
-        $ do
-          modify (\s -> s {glossaryTermOffset = o}) -- (ref:glossary-term-delimiter-detection)
+          glossaryTermDefined =
+            haveNotSeenGlossaryTermDelimiterYet
+              && wordIsGlossaryTermDelimiter
+              && pState.prevCellHasListHeadMarker
+      when glossaryTermDefined $ do
+        if
+          | (level : _) <- pState.listLevels,
+            Nothing <- level.number ->
+              modify (\s -> s {glossaryTermOffset = o}) -- (ref:glossary-term-delimiter-detection)
+          | otherwise -> pure ()
       pure word
   where
     newlineToSpace c = if c == '\n' then ' ' else c
@@ -11900,19 +11914,21 @@ There are several differences worth noting for Lilac:
       the time.
 
    3) Lilac parses a paragraph cell to check if it is the start of a glossary
-      term, so you can write them anywhere a paragraph is expected. So whereas
-      Orgmode only allows glossary terms them inside unordered lists, in Lilac
-      you can write them as their own independent paragraphs, or in ordered
-      lists, etc.
+      term, so a glossary term must start with a paragraph. And similar to
+      vanilla Orgmode, this paragraph must be the first paragraph of the list
+      item.
 
-      However, if the paragraph is at the very beginning of the line (no
-      indentation), Lilac will limit your definition to that same paragraph.
-      This is unlike glossary terms defined inside list items, which can have
-      any number of nested cells as long as there is no nesting of glossary
-      definitions; this is because when using list items, we can easily tell
-      when a list item ends based on indentation.
+      The limitation of using glossary terms only inside unordered lists is
+      there because this is the only way to cleanly define the beginning and end
+      of glossary term definitions. For example, if you allowed glossary terms
+      to be defined anywhere a paragraph can be written, it could get messy.
 
-   4) When defining glossary terms in a list, that list level must only have
+   4) Glossary terms can have any number of nested cells (as other list items)
+      as long as there is *no nesting of glossary terms*; this is because when
+      using list items, we can easily tell when a list item ends based on
+      indentation.
+
+   5) When defining glossary terms in a list, that list level must only have
       other glossary items (compare with vanilla [[https://emacs.stackexchange.com/questions/17244/org-mode-list-with-a-mix-of-unordered-and-description-list-items][Orgmode which doesn't enforce
       this restriction]]). See [[id:eee95795-b51b-4de5-b39d-8dda436da451][how glossary terms are woven]] to see how this plays
       out during HTML export.
@@ -12033,9 +12049,9 @@ assertUniqueGlossaryTerm term offset = do
 #+name: ti:0015-glossary-duplicate-term
 #+header: :tangle test/Lilac/ParseSpec/0015-glossary-duplicate-term
 #+begin_src org
-foo :: 1
+  - foo :: 1
 
-foo :: 2
+  - foo :: 2
 #+end_src
 
 #+name: t:0015-glossary-duplicate-term
@@ -12043,7 +12059,7 @@ foo :: 2
 shouldFailWithMessage
   "0015-glossary-duplicate-term"
   "glossary term \"foo\" is not unique"
-  14
+  22
 #+end_src
 
 Originally we naively set the [[(glossary-term-offset)]] to be the beginning of the
@@ -12061,13 +12077,62 @@ term delimiter ([[(glossary-term-delimiter-detection)]]) [fn:megaparsec-errors].
 :ID:       fb732179-1420-43b9-a20d-4bb9882becf2
 :END:
 
+A glossary term must begin as the first cell (as a paragraph) of an unordered
+list item. Otherwise we don't recognize it as a glossary term.
+
+#+name: ti:0015-glossary-not-first-paragraph-in-item
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-not-first-paragraph-in-item
+#+begin_src org
+  - x
+
+    foo :: 1
+
+foo :: 1
+
+  1) foo :: 1
+#+end_src
+
+The ~foo :: 1~ is parsed as a regular paragraph
+[[(t:0015-glossary-not-first-paragraph-in-item-foo)]], much like the other "glossary
+term wannabes" [[(t:0015-glossary-not-first-paragraph-in-item-wannabe1)]]
+[[(t:0015-glossary-not-first-paragraph-in-item-wannabe2)]] in there.
+
+#+name: t:0015-glossary-not-first-paragraph-in-item
+#+begin_src haskell
+shouldParseWith
+  "0015-glossary-not-first-paragraph-in-item"
+  OrgDoc
+    { oid = nilOid,
+      cells =
+        [ CListItem [LUnorderedStart, LItemStart],
+          CParagraph $ Prose [ptext "x" []],
+          CParagraph $ Prose [ptext "foo :: 1" []], -- (ref:t:0015-glossary-not-first-paragraph-in-item-foo)
+          CListItem [LItemEnd, LUnorderedEnd],
+          CParagraph $ Prose [ptext "foo :: 1" []], -- (ref:t:0015-glossary-not-first-paragraph-in-item-wannabe1)
+          CListItem [LOrderedStart, LItemStart],
+          CParagraph $ Prose [ptext "foo :: 1" []], -- (ref:t:0015-glossary-not-first-paragraph-in-item-wannabe2)
+          CListItem [LItemEnd, LOrderedEnd]
+        ],
+      pseudoEdges = [],
+      footnoteRefs = M.empty,
+      glossary = M.empty,
+      lineLabels = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      citations = [],
+      meta =
+        fromList
+          [ ("ID", "00000000-0000-0000-0000-000000000000")
+          ]
+    }
+#+end_src
+
+The bounds of a glossary term (and its definition) must encompass all of the
+cells inside that list item.
+
 #+name: ti:0015-glossary-bounds-individual
 #+header: :tangle test/Lilac/ParseSpec/0015-glossary-bounds-individual
 #+begin_src org
-paragraph :: a
-
-x
-
   - item 1 :: b
 
     hello
@@ -12085,14 +12150,6 @@ x
     \[
     1 + 1 = 2
     \]
-
-y
-
-  1) ordered item 1 :: e
-
-     banana
-
-  2) ordered item 2 :: f
 #+end_src
 
 #+name: t:0015-glossary-bounds-individual
@@ -12102,37 +12159,31 @@ shouldParseWithState
   OrgDoc
     { oid = nilOid,
       cells =
-        [ CGlossaryTerm -- 0
-            GlossaryTerm
-              { term = Prose [ptext "paragraph" []],
-                definition = Prose [ptext " a" []]
-              },
-          CParagraph $ Prose [ptext "x" []], -- 1
-          CListItem [LUnorderedStart, LItemStart], -- 2
-          CGlossaryTerm -- 3
+        [ CListItem [LUnorderedStart, LItemStart], -- 0
+          CGlossaryTerm -- 1
             GlossaryTerm
               { term = Prose [ptext "item 1" []],
                 definition = Prose [ptext " b" []]
               },
-          CParagraph $ Prose [ptext "hello" []], -- 4
-          CListItem [LItemEnd, LItemStart], -- 5
-          CGlossaryTerm -- 6
+          CParagraph $ Prose [ptext "hello" []], -- 2
+          CListItem [LItemEnd, LItemStart], -- 3
+          CGlossaryTerm -- 4
             GlossaryTerm
               { term = Prose [ptext "item 2" []],
                 definition = Prose [ptext " c" []]
               },
-          CParagraph $ Prose [ptext "world" []], -- 7
-          CListItem [LUnorderedStart, LItemStart], -- 8
-          CParagraph $ Prose [ptext "foo" []], -- 9
-          CListItem [LItemEnd, LUnorderedEnd], -- 10
-          CParagraph $ Prose [ptext "apple" []], -- 11
-          CListItem [LItemEnd, LItemStart], -- 12
-          CGlossaryTerm -- 13
+          CParagraph $ Prose [ptext "world" []], -- 5
+          CListItem [LUnorderedStart, LItemStart], -- 6
+          CParagraph $ Prose [ptext "foo" []], -- 7
+          CListItem [LItemEnd, LUnorderedEnd], -- 8
+          CParagraph $ Prose [ptext "apple" []], -- 9
+          CListItem [LItemEnd, LItemStart], -- 10
+          CGlossaryTerm -- 11
             GlossaryTerm
               { term = Prose [ptext "item 3" []],
                 definition = Prose [ptext " d" []]
               },
-          CMathFragment -- 14
+          CMathFragment -- 12
             MathFragment
               { parentOid = nilOid,
                 meta =
@@ -12141,33 +12192,15 @@ shouldParseWithState
                     ],
                 body = "1 + 1 = 2"
               },
-          CListItem [LItemEnd, LUnorderedEnd], -- 15
-          CParagraph $ Prose [ptext "y" []], -- 16
-          CListItem [LOrderedStart, LItemStart], -- 17
-          CGlossaryTerm -- 18
-            GlossaryTerm
-              { term = Prose [ptext "ordered item 1" []],
-                definition = Prose [ptext " e" []]
-              },
-          CParagraph $ Prose [ptext "banana" []], -- 19
-          CListItem [LItemEnd, LItemStart], -- 20
-          CGlossaryTerm -- 21
-            GlossaryTerm
-              { term = Prose [ptext "ordered item 2" []],
-                definition = Prose [ptext " f" []]
-              },
-          CListItem [LItemEnd, LOrderedEnd] -- 22
+          CListItem [LItemEnd, LUnorderedEnd] -- 13
         ],
       pseudoEdges = [],
       footnoteRefs = M.empty,
       glossary =
         fromList
-          [ ("item 1", (LCI 3, LCI 4)),
-            ("item 2", (LCI 6, LCI 11)),
-            ("item 3", (LCI 13, LCI 14)),
-            ("ordered item 1", (LCI 18, LCI 19)),
-            ("ordered item 2", (LCI 21, LCI 21)),
-            ("paragraph", (LCI 0, LCI 0))
+          [ ("item 1", (LCI 1, LCI 2)),
+            ("item 2", (LCI 4, LCI 9)),
+            ("item 3", (LCI 11, LCI 12))
           ],
       lineLabels = M.empty,
       cslPath = Nothing,
@@ -12181,14 +12214,11 @@ shouldParseWithState
   defaultOrgParserState
     { glossary =
         fromList
-          [ ("item 1", (LCI 3, LCI 4)),
-            ("item 2", (LCI 6, LCI 11)),
-            ("item 3", (LCI 13, LCI 14)),
-            ("ordered item 1", (LCI 18, LCI 19)),
-            ("ordered item 2", (LCI 21, LCI 21)),
-            ("paragraph", (LCI 0, LCI 0))
+          [ ("item 1", (LCI 1, LCI 2)),
+            ("item 2", (LCI 4, LCI 9)),
+            ("item 3", (LCI 11, LCI 12))
           ],
-      glossaryTermOffset = 275,
+      glossaryTermOffset = 159,
       anonEquationNumber = 1
     }
 #+end_src
@@ -14448,6 +14478,7 @@ Below are all of the individual test cases.
 <<Text to Prose round trip>>
 <<Drop text chars from Prose>>
 <<t:0015-glossary-duplicate-term>>
+<<t:0015-glossary-not-first-paragraph-in-item>>
 <<t:0015-glossary-bounds-individual>>
 <<t:0015-glossary-location>>
 <<t:0015-glossary-location-global>>

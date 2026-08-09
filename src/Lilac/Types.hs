@@ -448,6 +448,7 @@ data OrgParserState = OrgParserState
     insideParagraph :: Bool, --
     listLevels :: [Level], --
     listMarkers :: [ListMarker], --
+    prevCellHasListHeadMarker :: Bool, --
     continuationIndent :: Int, --
     footnoteNumber :: Int, --
     footnoteRefs :: Map Text (Int, LCI), --
@@ -456,7 +457,7 @@ data OrgParserState = OrgParserState
     prevCellIsFootnote :: Bool, --
     glossary :: Map Text (LCI, LCI), --
     glossaryTermOffset :: Int, --
-    glossaryTermLevel :: Maybe (Text, Level),
+    glossaryTermLevel :: Maybe (Text, Level), --
     cslPath :: Maybe FilePath, --
     bibPaths :: [FilePath], --
     insideCitation :: Bool, --
@@ -494,6 +495,7 @@ defaultOrgParserState =
       insideParagraph = False,
       listLevels = [],
       listMarkers = [],
+      prevCellHasListHeadMarker = False,
       continuationIndent = 0,
       footnoteNumber = 0,
       footnoteRefs = M.empty,

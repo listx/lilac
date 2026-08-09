@@ -224,6 +224,7 @@ import Lilac.Types as OrgParserState
         listLevels,
         listMarkers,
         orgParserConf,
+        prevCellHasListHeadMarker,
         prevCellIsFootnote,
         pseudoEdges,
         styleMask,
@@ -515,19 +516,19 @@ cellParser = do
   cell <-
     lexeme
       $ MP.choice
-        [ toggleFootnote False $ listItemStartParser,
-          toggleFootnote False $ listItemsEndParser,
-          toggleFootnote False $ resetIndent headingParser,
-          toggleFootnote False $ resetIndent richBlockStartParser,
-          toggleFootnote False $ resetIndent richBlockEndParser,
-          toggleFootnote False $ resetIndent blockParser,
-          toggleFootnote False $ resetIndent figureParser,
-          toggleFootnote False $ resetIndent tableParser,
-          toggleFootnote False $ resetIndent mathFragmentStandaloneParser,
-          toggleFootnote True $ resetIndent footnoteDefinitionParser,
-          toggleFootnote False $ resetIndent bibliographyLocationParser,
-          toggleFootnote False $ resetIndent glossaryLocationParser,
-          toggleFootnote False $ resetIndent paragraphParser,
+        [ toggle False True $ listItemStartParser,
+          toggle False False $ listItemsEndParser,
+          toggle False False $ resetIndent headingParser,
+          toggle False False $ resetIndent richBlockStartParser,
+          toggle False False $ resetIndent richBlockEndParser,
+          toggle False False $ resetIndent blockParser,
+          toggle False False $ resetIndent figureParser,
+          toggle False False $ resetIndent tableParser,
+          toggle False False $ resetIndent mathFragmentStandaloneParser,
+          toggle True False $ resetIndent footnoteDefinitionParser,
+          toggle False False $ resetIndent bibliographyLocationParser,
+          toggle False False $ resetIndent glossaryLocationParser,
+          toggle False False $ resetIndent paragraphParser,
           detectInvalidIndentation
         ]
   modify (\s -> s {bracketBalance = 0}) --
@@ -540,10 +541,14 @@ cellParser = do
       a <- p
       modify (\s -> s {continuationIndent = 0})
       pure a
-    toggleFootnote :: Bool -> OrgParser a -> OrgParser a
-    toggleFootnote b p = do
+    toggle :: Bool -> Bool -> OrgParser a -> OrgParser a
+    toggle prevCellIsFootnote prevCellHasListHeadMarker p = do
       a <- p
-      modify (\s -> s {prevCellIsFootnote = b})
+      modify $ \s ->
+        s
+          { prevCellIsFootnote = prevCellIsFootnote,
+            prevCellHasListHeadMarker = prevCellHasListHeadMarker
+          }
       pure a
 
 detectInvalidIndentation :: OrgParser Cell
@@ -815,12 +820,16 @@ textParser styleMask
       let haveNotSeenGlossaryTermDelimiterYet =
             pState.insideParagraph && pState.glossaryTermOffset == 0
           wordIsGlossaryTermDelimiter = word == "::" && isEmptyMask styleMask
-      when
-        ( haveNotSeenGlossaryTermDelimiterYet
-            && wordIsGlossaryTermDelimiter
-        )
-        $ do
-          modify (\s -> s {glossaryTermOffset = o}) --
+          glossaryTermDefined =
+            haveNotSeenGlossaryTermDelimiterYet
+              && wordIsGlossaryTermDelimiter
+              && pState.prevCellHasListHeadMarker
+      when glossaryTermDefined $ do
+        if
+          | (level : _) <- pState.listLevels,
+            Nothing <- level.number ->
+              modify (\s -> s {glossaryTermOffset = o}) --
+          | otherwise -> pure ()
       pure word
   where
     newlineToSpace c = if c == '\n' then ' ' else c

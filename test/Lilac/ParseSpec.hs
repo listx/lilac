@@ -3537,44 +3537,65 @@ spec = do
   shouldFailWithMessage
     "0015-glossary-duplicate-term"
     "glossary term \"foo\" is not unique"
-    14
+    22
+
+  shouldParseWith
+    "0015-glossary-not-first-paragraph-in-item"
+    OrgDoc
+      { oid = nilOid,
+        cells =
+          [ CListItem [LUnorderedStart, LItemStart],
+            CParagraph $ Prose [ptext "x" []],
+            CParagraph $ Prose [ptext "foo :: 1" []], --
+            CListItem [LItemEnd, LUnorderedEnd],
+            CParagraph $ Prose [ptext "foo :: 1" []], --
+            CListItem [LOrderedStart, LItemStart],
+            CParagraph $ Prose [ptext "foo :: 1" []], --
+            CListItem [LItemEnd, LOrderedEnd]
+          ],
+        pseudoEdges = [],
+        footnoteRefs = M.empty,
+        glossary = M.empty,
+        lineLabels = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        citations = [],
+        meta =
+          fromList
+            [ ("ID", "00000000-0000-0000-0000-000000000000")
+            ]
+      }
 
   shouldParseWithState
     "0015-glossary-bounds-individual"
     OrgDoc
       { oid = nilOid,
         cells =
-          [ CGlossaryTerm -- 0
-              GlossaryTerm
-                { term = Prose [ptext "paragraph" []],
-                  definition = Prose [ptext " a" []]
-                },
-            CParagraph $ Prose [ptext "x" []], -- 1
-            CListItem [LUnorderedStart, LItemStart], -- 2
-            CGlossaryTerm -- 3
+          [ CListItem [LUnorderedStart, LItemStart], -- 0
+            CGlossaryTerm -- 1
               GlossaryTerm
                 { term = Prose [ptext "item 1" []],
                   definition = Prose [ptext " b" []]
                 },
-            CParagraph $ Prose [ptext "hello" []], -- 4
-            CListItem [LItemEnd, LItemStart], -- 5
-            CGlossaryTerm -- 6
+            CParagraph $ Prose [ptext "hello" []], -- 2
+            CListItem [LItemEnd, LItemStart], -- 3
+            CGlossaryTerm -- 4
               GlossaryTerm
                 { term = Prose [ptext "item 2" []],
                   definition = Prose [ptext " c" []]
                 },
-            CParagraph $ Prose [ptext "world" []], -- 7
-            CListItem [LUnorderedStart, LItemStart], -- 8
-            CParagraph $ Prose [ptext "foo" []], -- 9
-            CListItem [LItemEnd, LUnorderedEnd], -- 10
-            CParagraph $ Prose [ptext "apple" []], -- 11
-            CListItem [LItemEnd, LItemStart], -- 12
-            CGlossaryTerm -- 13
+            CParagraph $ Prose [ptext "world" []], -- 5
+            CListItem [LUnorderedStart, LItemStart], -- 6
+            CParagraph $ Prose [ptext "foo" []], -- 7
+            CListItem [LItemEnd, LUnorderedEnd], -- 8
+            CParagraph $ Prose [ptext "apple" []], -- 9
+            CListItem [LItemEnd, LItemStart], -- 10
+            CGlossaryTerm -- 11
               GlossaryTerm
                 { term = Prose [ptext "item 3" []],
                   definition = Prose [ptext " d" []]
                 },
-            CMathFragment -- 14
+            CMathFragment -- 12
               MathFragment
                 { parentOid = nilOid,
                   meta =
@@ -3583,33 +3604,15 @@ spec = do
                       ],
                   body = "1 + 1 = 2"
                 },
-            CListItem [LItemEnd, LUnorderedEnd], -- 15
-            CParagraph $ Prose [ptext "y" []], -- 16
-            CListItem [LOrderedStart, LItemStart], -- 17
-            CGlossaryTerm -- 18
-              GlossaryTerm
-                { term = Prose [ptext "ordered item 1" []],
-                  definition = Prose [ptext " e" []]
-                },
-            CParagraph $ Prose [ptext "banana" []], -- 19
-            CListItem [LItemEnd, LItemStart], -- 20
-            CGlossaryTerm -- 21
-              GlossaryTerm
-                { term = Prose [ptext "ordered item 2" []],
-                  definition = Prose [ptext " f" []]
-                },
-            CListItem [LItemEnd, LOrderedEnd] -- 22
+            CListItem [LItemEnd, LUnorderedEnd] -- 13
           ],
         pseudoEdges = [],
         footnoteRefs = M.empty,
         glossary =
           fromList
-            [ ("item 1", (LCI 3, LCI 4)),
-              ("item 2", (LCI 6, LCI 11)),
-              ("item 3", (LCI 13, LCI 14)),
-              ("ordered item 1", (LCI 18, LCI 19)),
-              ("ordered item 2", (LCI 21, LCI 21)),
-              ("paragraph", (LCI 0, LCI 0))
+            [ ("item 1", (LCI 1, LCI 2)),
+              ("item 2", (LCI 4, LCI 9)),
+              ("item 3", (LCI 11, LCI 12))
             ],
         lineLabels = M.empty,
         cslPath = Nothing,
@@ -3623,14 +3626,11 @@ spec = do
     defaultOrgParserState
       { glossary =
           fromList
-            [ ("item 1", (LCI 3, LCI 4)),
-              ("item 2", (LCI 6, LCI 11)),
-              ("item 3", (LCI 13, LCI 14)),
-              ("ordered item 1", (LCI 18, LCI 19)),
-              ("ordered item 2", (LCI 21, LCI 21)),
-              ("paragraph", (LCI 0, LCI 0))
+            [ ("item 1", (LCI 1, LCI 2)),
+              ("item 2", (LCI 4, LCI 9)),
+              ("item 3", (LCI 11, LCI 12))
             ],
-        glossaryTermOffset = 275,
+        glossaryTermOffset = 159,
         anonEquationNumber = 1
       }
 
