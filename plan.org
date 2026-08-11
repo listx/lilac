@@ -47,6 +47,13 @@ Looks like CSS has the ~:has()~ parent selector which can select parents with
 certain child elements. We can use this to select a list item which has a
 glossary item inside it to make the list less indented.
 
+** TODO blocks: make ancestor links link back to the exact place the child block is used
+
+This is actually pretty simple: just use something like ~<PARENT>-<CHILD>~ in the
+HTML ID. If there is more than 1 instance of ~<CHILD>~ in the parent, give the 2nd
+and subsequent ones a numeric suffix. This way we always link back to the first
+usage of ~<CHILD>~ in the parent block.
+
 ** TODO (Git integration) add raw git links
 If there is text like 68541ad (capture unhandled edge case for parsing styled
 text, 2025-01-26) (hash, parenthetical with a YYYY-MM-DD date at the end),
