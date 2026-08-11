@@ -118,7 +118,7 @@ import Lilac.Types
     GlossaryTerm (GlossaryTerm, definition, term),
     Heading (Heading, body, level, meta, section),
     LCI (LCI, unLCI),
-    Level (Level, indent, number),
+    Level (Level, indent, number, onlyGlossaryTerms),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
@@ -296,6 +296,7 @@ import Relude
     void,
     when,
     zip,
+    (!!?),
     ($),
     (&&),
     (*),
@@ -516,19 +517,19 @@ cellParser = do
   cell <-
     lexeme
       $ MP.choice
-        [ toggle False True $ listItemStartParser,
-          toggle False False $ listItemsEndParser,
-          toggle False False $ resetIndent headingParser,
-          toggle False False $ resetIndent richBlockStartParser,
-          toggle False False $ resetIndent richBlockEndParser,
-          toggle False False $ resetIndent blockParser,
-          toggle False False $ resetIndent figureParser,
-          toggle False False $ resetIndent tableParser,
-          toggle False False $ resetIndent mathFragmentStandaloneParser,
-          toggle True False $ resetIndent footnoteDefinitionParser,
-          toggle False False $ resetIndent bibliographyLocationParser,
-          toggle False False $ resetIndent glossaryLocationParser,
-          toggle False False $ resetIndent paragraphParser,
+        [ toggle False True False $ listItemStartParser,
+          toggle False False False $ listItemsEndParser,
+          toggle False False True $ resetIndent headingParser,
+          toggle False False True $ resetIndent richBlockStartParser,
+          toggle False False True $ resetIndent richBlockEndParser,
+          toggle False False True $ resetIndent blockParser,
+          toggle False False True $ resetIndent figureParser,
+          toggle False False True $ resetIndent tableParser,
+          toggle False False True $ resetIndent mathFragmentStandaloneParser,
+          toggle True False True $ resetIndent footnoteDefinitionParser,
+          toggle False False True $ resetIndent bibliographyLocationParser,
+          toggle False False True $ resetIndent glossaryLocationParser,
+          toggle False False False $ resetIndent paragraphParser,
           detectInvalidIndentation
         ]
   modify (\s -> s {bracketBalance = 0}) --
@@ -541,9 +542,10 @@ cellParser = do
       a <- p
       modify (\s -> s {continuationIndent = 0})
       pure a
-    toggle :: Bool -> Bool -> OrgParser a -> OrgParser a
-    toggle prevCellIsFootnote prevCellHasListHeadMarker p = do
+    toggle :: Bool -> Bool -> Bool -> OrgParser a -> OrgParser a
+    toggle prevCellIsFootnote prevCellHasListHeadMarker nonGlossaryTermAssertion p = do
       a <- p
+      when nonGlossaryTermAssertion $ failIfUnexpectedNonGlossaryTerm
       modify $ \s ->
         s
           { prevCellIsFootnote = prevCellIsFootnote,
@@ -1241,7 +1243,25 @@ paragraphParser = do
   modify (\s -> s {insideParagraph = False})
   if pState'.glossaryTermOffset > 0
     then convertToGlossaryTerm prose pState'.glossaryTermOffset --
-    else pure . CParagraph $ compressProse prose
+    else do
+      failIfUnexpectedNonGlossaryTerm
+      pure . CParagraph $ compressProse prose
+
+failIfUnexpectedNonGlossaryTerm :: OrgParser ()
+failIfUnexpectedNonGlossaryTerm = do
+  pState <- get
+  let expectingOnlyGlossaryTerm =
+        (((.onlyGlossaryTerms) =<< (pState.listLevels !!? 0)) == Just True)
+  when (pState.prevCellHasListHeadMarker && expectingOnlyGlossaryTerm) $ do
+    fail $ "all list items at this level must be a glossary term, because the first list item is a glossary term"
+  let updatedListLevels =
+        case pState.listLevels of
+          (level : rest)
+            | pState.prevCellHasListHeadMarker && level.onlyGlossaryTerms == Nothing ->
+                level {onlyGlossaryTerms = Just False} : rest
+            | otherwise -> pState.listLevels
+          [] -> []
+  modify (\s -> s {listLevels = updatedListLevels})
 
 newlineAndIndentParser :: Int -> OrgParser Text
 newlineAndIndentParser expectedIndentLen = do
@@ -1868,7 +1888,8 @@ listHeadIndentLevelParser = do
   let level =
         Level
           { indent = T.length spaces,
-            number = listHead
+            number = listHead,
+            onlyGlossaryTerms = Nothing
           }
   afterListHead level
   pure level
@@ -1972,10 +1993,13 @@ listItemFitter level levels =
     fitter levelsToDrop continuationIndent = do
       pState <- get
       let markers = getEndingListMarkers levelsToDrop pState.listLevels
+          onlyGlossaryTerms =
+            (.onlyGlossaryTerms) =<< (pState.listLevels !!? levelsToDrop)
+          continuedLevel = level {onlyGlossaryTerms = onlyGlossaryTerms}
       put
         pState
           { listLevels =
-              level : drop (levelsToDrop + 1) pState.listLevels, --
+              continuedLevel : drop (levelsToDrop + 1) pState.listLevels, --
             listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
       markEndOfActiveGlossaryTerm continuationIndent --
@@ -2394,6 +2418,18 @@ convertToGlossaryTerm prose offset =
               (level : _) -> Just (term, level)
               [] -> Nothing
       assertUniqueGlossaryTerm term offset --
+      let expectingNonGlossaryTerm =
+            (((.onlyGlossaryTerms) =<< (pState.listLevels !!? 0)) == Just False)
+      when (pState.prevCellHasListHeadMarker && expectingNonGlossaryTerm) $ do
+        MP.setOffset offset
+        fail $ "all list items at this level must be a non-glossary term, because the first list item is not a glossary term"
+      let updatedListLevels =
+            case pState.listLevels of
+              (level : rest)
+                | pState.prevCellHasListHeadMarker && level.onlyGlossaryTerms == Nothing ->
+                    level {onlyGlossaryTerms = Just True} : rest
+                | otherwise -> pState.listLevels
+              [] -> []
       put
         pState
           { OrgParserState.glossary =
@@ -2401,7 +2437,8 @@ convertToGlossaryTerm prose offset =
                 term
                 (pState.cellNumber, pState.cellNumber)
                 pState.glossary,
-            glossaryTermLevel = glossaryTermLevel
+            glossaryTermLevel = glossaryTermLevel,
+            listLevels = updatedListLevels
           }
       pure
         $ CGlossaryTerm

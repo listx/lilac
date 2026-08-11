@@ -310,7 +310,8 @@ getSectionNumber heading =
 type Level :: Type
 data Level = Level
   { indent :: Int,
-    number :: Maybe Int
+    number :: Maybe Int,
+    onlyGlossaryTerms :: Maybe Bool
   }
   deriving stock (Eq, Show)
 

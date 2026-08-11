@@ -676,7 +676,7 @@ import Lilac.Types
     GlossaryTerm (GlossaryTerm, definition, term),
     Heading (Heading, body, level, meta, section),
     LCI (LCI, unLCI),
-    Level (Level, indent, number),
+    Level (Level, indent, number, onlyGlossaryTerms),
     Link (Link, name, target),
     LinkOid (LinkOid, name, oid),
     LinkTarget
@@ -854,6 +854,7 @@ import Relude
     void,
     when,
     zip,
+    (!!?),
     ($),
     (&&),
     (*),
@@ -938,6 +939,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 <<f:rawLinkParser>>
 <<f:mathFragmentInlineParser>>
 <<f:paragraphParser>>
+<<f:failIfUnexpectedNonGlossaryTerm>>
 <<f:newlineAndIndentParser>>
 <<f:cellBoundary>>
 <<f:blockMetaEntryParser>>
@@ -1527,19 +1529,19 @@ cellParser = do
   cell <-
     lexeme
       $ MP.choice
-        [ toggle False True $ listItemStartParser,
-          toggle False False $ listItemsEndParser,
-          toggle False False $ resetIndent headingParser,
-          toggle False False $ resetIndent richBlockStartParser,
-          toggle False False $ resetIndent richBlockEndParser,
-          toggle False False $ resetIndent blockParser,
-          toggle False False $ resetIndent figureParser,
-          toggle False False $ resetIndent tableParser,
-          toggle False False $ resetIndent mathFragmentStandaloneParser,
-          toggle True False $ resetIndent footnoteDefinitionParser,
-          toggle False False $ resetIndent bibliographyLocationParser,
-          toggle False False $ resetIndent glossaryLocationParser,
-          toggle False False $ resetIndent paragraphParser,
+        [ toggle False True False $ listItemStartParser,
+          toggle False False False $ listItemsEndParser,
+          toggle False False True $ resetIndent headingParser,
+          toggle False False True $ resetIndent richBlockStartParser,
+          toggle False False True $ resetIndent richBlockEndParser,
+          toggle False False True $ resetIndent blockParser,
+          toggle False False True $ resetIndent figureParser,
+          toggle False False True $ resetIndent tableParser,
+          toggle False False True $ resetIndent mathFragmentStandaloneParser,
+          toggle True False True $ resetIndent footnoteDefinitionParser,
+          toggle False False True $ resetIndent bibliographyLocationParser,
+          toggle False False True $ resetIndent glossaryLocationParser,
+          toggle False False False $ resetIndent paragraphParser,
           detectInvalidIndentation
         ]
   modify (\s -> s {bracketBalance = 0}) -- (ref:f:cellParser-bracketBalance-reset)
@@ -1552,9 +1554,10 @@ cellParser = do
       a <- p
       modify (\s -> s {continuationIndent = 0})
       pure a
-    toggle :: Bool -> Bool -> OrgParser a -> OrgParser a
-    toggle prevCellIsFootnote prevCellHasListHeadMarker p = do
+    toggle :: Bool -> Bool -> Bool -> OrgParser a -> OrgParser a
+    toggle prevCellIsFootnote prevCellHasListHeadMarker nonGlossaryTermAssertion p = do
       a <- p
+      when nonGlossaryTermAssertion $ failIfUnexpectedNonGlossaryTerm
       modify $ \s ->
         s
           { prevCellIsFootnote = prevCellIsFootnote,
@@ -7451,7 +7454,9 @@ paragraphParser = do
   modify (\s -> s {insideParagraph = False})
   if pState'.glossaryTermOffset > 0
     then convertToGlossaryTerm prose pState'.glossaryTermOffset -- (ref:check-for-glossaryTerm)
-    else pure . CParagraph $ compressProse prose
+    else do
+      failIfUnexpectedNonGlossaryTerm
+      pure . CParagraph $ compressProse prose
 #+end_src
 
 [[(f:paragraphParser-avoid-parsing-rich-block-end)]] makes this avoid parsing a
@@ -10603,7 +10608,8 @@ during parsing, which we encode with ~Level~ (used by ~listLevels~
 type Level :: Type
 data Level = Level
   { indent :: Int,
-    number :: Maybe Int
+    number :: Maybe Int,
+    onlyGlossaryTerms :: Maybe Bool
   }
   deriving stock (Eq, Show)
 #+end_src
@@ -10936,7 +10942,8 @@ listHeadIndentLevelParser = do
   let level =
         Level
           { indent = T.length spaces,
-            number = listHead
+            number = listHead,
+            onlyGlossaryTerms = Nothing
           }
   afterListHead level
   pure level
@@ -11076,6 +11083,9 @@ list. The rest of the function just updates the ~pState~ to have the additional
 [[(f:listItemNester-update-pState)]].
 
 ** Fitting the list item into an existing level
+:PROPERTIES:
+:ID:       701892bd-e777-4ddf-98c9-f46bacbaa5aa
+:END:
 
 The goal of [[f:listItemFitter]] is twofold:
 
@@ -11132,10 +11142,13 @@ listItemFitter level levels =
     fitter levelsToDrop continuationIndent = do
       pState <- get
       let markers = getEndingListMarkers levelsToDrop pState.listLevels
+          onlyGlossaryTerms =
+            (.onlyGlossaryTerms) =<< (pState.listLevels !!? levelsToDrop)
+          continuedLevel = level {onlyGlossaryTerms = onlyGlossaryTerms}
       put
         pState
           { listLevels =
-              level : drop (levelsToDrop + 1) pState.listLevels, -- (ref:f:listItemFitter-extra-level-drop)
+              continuedLevel : drop (levelsToDrop + 1) pState.listLevels, -- (ref:f:listItemFitter-extra-level-drop)
             listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
       markEndOfActiveGlossaryTerm continuationIndent -- (ref:f:listItemFitter-markEndOfActiveGlossaryTerm)
@@ -11993,6 +12006,18 @@ convertToGlossaryTerm prose offset =
               (level : _) -> Just (term, level)
               [] -> Nothing
       assertUniqueGlossaryTerm term offset -- (ref:f:convertToGlossaryTerm-assertUniqueGlossaryTerm)
+      let expectingNonGlossaryTerm =
+            (((.onlyGlossaryTerms) =<< (pState.listLevels !!? 0)) == Just False)
+      when (pState.prevCellHasListHeadMarker && expectingNonGlossaryTerm) $ do
+        MP.setOffset offset
+        fail $ "all list items at this level must be a non-glossary term, because the first list item is not a glossary term"
+      let updatedListLevels =
+            case pState.listLevels of
+              (level : rest)
+                | pState.prevCellHasListHeadMarker && level.onlyGlossaryTerms == Nothing ->
+                    level {onlyGlossaryTerms = Just True} : rest
+                | otherwise -> pState.listLevels
+              [] -> []
       put
         pState
           { OrgParserState.glossary =
@@ -12000,7 +12025,8 @@ convertToGlossaryTerm prose offset =
                 term
                 (pState.cellNumber, pState.cellNumber)
                 pState.glossary,
-            glossaryTermLevel = glossaryTermLevel
+            glossaryTermLevel = glossaryTermLevel,
+            listLevels = updatedListLevels
           }
       pure
         $ CGlossaryTerm
@@ -12079,6 +12105,29 @@ a failure in [[f:cellParser]], namely in [[f:listItemsEndParser]]
 ([[(list-items-end-failure-with-no-input)]]). In order to suppress that error, we
 changed [[f:textParser]] to set a ~glossaryTermOffset~ if it detected the glossary
 term delimiter ([[(glossary-term-delimiter-detection)]]) [fn:megaparsec-errors].
+
+[[f:failIfUnexpectedNonGlossaryTerm]] fails the parse if the current list level
+expects there to be only a glossary term (it's assumed that this is only called
+from non-glossary term parsers). See [[f:cellParser]] to see how it's used.
+
+#+name: f:failIfUnexpectedNonGlossaryTerm
+#+begin_src haskell
+failIfUnexpectedNonGlossaryTerm :: OrgParser ()
+failIfUnexpectedNonGlossaryTerm = do
+  pState <- get
+  let expectingOnlyGlossaryTerm =
+        (((.onlyGlossaryTerms) =<< (pState.listLevels !!? 0)) == Just True)
+  when (pState.prevCellHasListHeadMarker && expectingOnlyGlossaryTerm) $ do
+    fail $ "all list items at this level must be a glossary term, because the first list item is a glossary term"
+  let updatedListLevels =
+        case pState.listLevels of
+          (level : rest)
+            | pState.prevCellHasListHeadMarker && level.onlyGlossaryTerms == Nothing ->
+                level {onlyGlossaryTerms = Just False} : rest
+            | otherwise -> pState.listLevels
+          [] -> []
+  modify (\s -> s {listLevels = updatedListLevels})
+#+end_src
 
 ** Tests (parsing)
 :PROPERTIES:
@@ -12247,6 +12296,126 @@ shouldFailWithMessage
   "0015-glossary-no-nesting"
   "cannot nest glossary terms; finish your definition of \"foo\" first"
   28
+#+end_src
+
+*** Uniformity rule
+
+If a list item starts with a glossary term, then all items at that level must
+also be a glossary term. Conversely, if the first item is not a glossary term
+than all subsequent items at that level cannot be glossary terms. This is what
+we call the "uniformity rule", and the idea is to make it so that we can display
+glossary terms without list item bullets.
+
+#+name: ti:0015-glossary-uniform-glossary-basic
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-uniform-glossary-basic
+#+begin_src org
+  - foo :: 1
+
+  - baz
+#+end_src
+
+#+name: t:0015-glossary-uniform-glossary-basic
+#+begin_src haskell
+shouldFailWithMessage
+  "0015-glossary-uniform-glossary-basic"
+  "all list items at this level must be a glossary term, because the first list item is a glossary term"
+  22
+#+end_src
+
+#+name: ti:0015-glossary-uniform-glossary-multicell
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-uniform-glossary-multicell
+#+begin_src org
+  - foo :: 1
+
+    bar
+
+  - baz
+#+end_src
+
+#+name: t:0015-glossary-uniform-glossary-multicell
+#+begin_src haskell
+shouldFailWithMessage
+  "0015-glossary-uniform-glossary-multicell"
+  "all list items at this level must be a glossary term, because the first list item is a glossary term"
+  31
+#+end_src
+
+#+name: ti:0015-glossary-uniform-glossary-multicell-math
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-uniform-glossary-multicell-math
+#+begin_src org
+  - foo :: 1
+
+    \[
+
+      2 + 2 = 4
+
+    \]
+
+  - baz
+#+end_src
+
+#+name: t:0015-glossary-uniform-glossary-multicell-math
+#+begin_src haskell
+shouldFailWithMessage
+  "0015-glossary-uniform-glossary-multicell-math"
+  "all list items at this level must be a glossary term, because the first list item is a glossary term"
+  55
+#+end_src
+
+#+name: ti:0015-glossary-uniform-nonglossary-basic
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-uniform-nonglossary-basic
+#+begin_src org
+  - foo
+
+  - baz :: 1
+#+end_src
+
+#+name: t:0015-glossary-uniform-nonglossary-basic
+#+begin_src haskell
+shouldFailWithMessage
+  "0015-glossary-uniform-nonglossary-basic"
+  "all list items at this level must be a non-glossary term, because the first list item is not a glossary term"
+  17
+#+end_src
+
+#+name: ti:0015-glossary-uniform-nonglossary-multicell
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-uniform-nonglossary-multicell
+#+begin_src org
+  - foo
+
+    bar
+
+  - baz :: 1
+#+end_src
+
+#+name: t:0015-glossary-uniform-nonglossary-multicell
+#+begin_src haskell
+shouldFailWithMessage
+  "0015-glossary-uniform-nonglossary-multicell"
+  "all list items at this level must be a non-glossary term, because the first list item is not a glossary term"
+  26
+#+end_src
+
+#+name: ti:0015-glossary-uniform-nonglossary-multicell-math
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-uniform-nonglossary-multicell-math
+#+begin_src org
+  - foo
+
+    \[
+
+      2 + 2 = 4
+
+    \]
+
+  - baz :: 1
+#+end_src
+
+#+name: t:0015-glossary-uniform-nonglossary-multicell-math
+#+begin_src haskell
+shouldFailWithMessage
+  "0015-glossary-uniform-nonglossary-multicell-math"
+  "all list items at this level must be a non-glossary term, because the first list item is not a glossary term"
+  50
 #+end_src
 
 ** Printing glossaries
@@ -14507,6 +14676,12 @@ Below are all of the individual test cases.
 <<t:0015-glossary-not-first-paragraph-in-item>>
 <<t:0015-glossary-bounds-individual>>
 <<t:0015-glossary-no-nesting>>
+<<t:0015-glossary-uniform-glossary-basic>>
+<<t:0015-glossary-uniform-glossary-multicell>>
+<<t:0015-glossary-uniform-glossary-multicell-math>>
+<<t:0015-glossary-uniform-nonglossary-basic>>
+<<t:0015-glossary-uniform-nonglossary-multicell>>
+<<t:0015-glossary-uniform-nonglossary-multicell-math>>
 <<t:0015-glossary-location>>
 <<t:0015-glossary-location-global>>
 <<t:0016-metadata-reserved-underscores>>

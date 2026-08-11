@@ -134,22 +134,21 @@ glossary terms are allowed at that same level for the remainder of that level.
 Conversely if the list level begins with a glossary term, all subsequent items
 at that level must be a glossary term.
 
-Example:
-
+#+begin_example
   - x
 
   - a :: 1 (invalid because 'x' started above without a glossary term)
 
   - b :: 2
+#+end_example
 
-Example:
-
+#+begin_example
   - c :: 3
 
   - b (invalid because this must be a glossary term)
+#+end_example
 
-Example:
-
+#+begin_example
   - a
 
       - x :: 0
@@ -161,6 +160,7 @@ Example:
       - c
 
           - z :: 2 (also OK)
+#+end_example
 
 Let's call this the *uniformity* rule. It's similar to the rule we already have
 about no mixing of ordered and unordered lists (without intervening cells) at

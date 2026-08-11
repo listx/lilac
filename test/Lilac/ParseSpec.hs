@@ -3639,6 +3639,36 @@ spec = do
     "cannot nest glossary terms; finish your definition of \"foo\" first"
     28
 
+  shouldFailWithMessage
+    "0015-glossary-uniform-glossary-basic"
+    "all list items at this level must be a glossary term, because the first list item is a glossary term"
+    22
+
+  shouldFailWithMessage
+    "0015-glossary-uniform-glossary-multicell"
+    "all list items at this level must be a glossary term, because the first list item is a glossary term"
+    31
+
+  shouldFailWithMessage
+    "0015-glossary-uniform-glossary-multicell-math"
+    "all list items at this level must be a glossary term, because the first list item is a glossary term"
+    55
+
+  shouldFailWithMessage
+    "0015-glossary-uniform-nonglossary-basic"
+    "all list items at this level must be a non-glossary term, because the first list item is not a glossary term"
+    17
+
+  shouldFailWithMessage
+    "0015-glossary-uniform-nonglossary-multicell"
+    "all list items at this level must be a non-glossary term, because the first list item is not a glossary term"
+    26
+
+  shouldFailWithMessage
+    "0015-glossary-uniform-nonglossary-multicell-math"
+    "all list items at this level must be a non-glossary term, because the first list item is not a glossary term"
+    50
+
   shouldParseWithState
     "0015-glossary-location"
     OrgDoc
