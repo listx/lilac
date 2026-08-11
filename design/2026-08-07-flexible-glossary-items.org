@@ -169,6 +169,15 @@ the same level.
 The point of this rule is to encourage (well, force) the user to adopt a uniform
 style.
 
+In terms of implementation, we'd have to remember some state at each level.
+Whenever we enter a new level ([[id:3121a209-456d-4bd1-83cd-c37e1cca7249::f:listItemNester][f:listItemNester]]), we can designate it as a
+~Nothing~ (undefined) state. Then when we parse the next cell, if it's a glossary
+term we can set it to ~Just True~ to mean "glossary only", and if it's anything
+else we can set it to ~Just False~ to mean "non-glossary list level". This state
+can be a single field embedded inside the existing [[id:a6f3fbe8-3b9e-452b-8e32-14e88792c6fb::data:Level][data:Level]] type. Then
+whenever we create a new list item (for the same level), we can check whether
+the level expects the first cell of the list item to be a glossary item or not.
+
 * Alternatives considered
 
 ** Use new ~BCell~ type to create a subset of cell values allowed inside glossary terms
