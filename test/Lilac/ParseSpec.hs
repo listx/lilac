@@ -3634,6 +3634,11 @@ spec = do
         anonEquationNumber = 1
       }
 
+  shouldFailWithMessage
+    "0015-glossary-no-nesting"
+    "cannot nest glossary terms; finish your definition of \"foo\" first"
+    28
+
   shouldParseWithState
     "0015-glossary-location"
     OrgDoc

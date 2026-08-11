@@ -826,6 +826,11 @@ textParser styleMask
               && pState.prevCellHasListHeadMarker
       when glossaryTermDefined $ do
         if
+          | Just (term, _) <- pState.glossaryTermLevel ->
+              fail
+                $ "cannot nest glossary terms; finish your definition of "
+                <> show term
+                <> " first"
           | (level : _) <- pState.listLevels,
             Nothing <- level.number ->
               modify (\s -> s {glossaryTermOffset = o}) --

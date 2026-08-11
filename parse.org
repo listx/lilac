@@ -2278,6 +2278,11 @@ textParser styleMask
               && pState.prevCellHasListHeadMarker
       when glossaryTermDefined $ do
         if
+          | Just (term, _) <- pState.glossaryTermLevel ->
+              fail
+                $ "cannot nest glossary terms; finish your definition of "
+                <> show term
+                <> " first"
           | (level : _) <- pState.listLevels,
             Nothing <- level.number ->
               modify (\s -> s {glossaryTermOffset = o}) -- (ref:glossary-term-delimiter-detection)
@@ -12223,6 +12228,24 @@ shouldParseWithState
     }
 #+end_src
 
+Nesting of glossary term definitions is not allowed.
+
+#+name: ti:0015-glossary-no-nesting
+#+header: :tangle test/Lilac/ParseSpec/0015-glossary-no-nesting
+#+begin_src org
+  - foo :: 1
+
+      - bar :: 2
+#+end_src
+
+#+name: t:0015-glossary-no-nesting
+#+begin_src haskell
+shouldFailWithMessage
+  "0015-glossary-no-nesting"
+  "cannot nest glossary terms; finish your definition of \"foo\" first"
+  28
+#+end_src
+
 ** Printing glossaries
 :PROPERTIES:
 :ID:       e8ad30e5-5305-40e7-80ed-78bcec636ec1
@@ -14480,6 +14503,7 @@ Below are all of the individual test cases.
 <<t:0015-glossary-duplicate-term>>
 <<t:0015-glossary-not-first-paragraph-in-item>>
 <<t:0015-glossary-bounds-individual>>
+<<t:0015-glossary-no-nesting>>
 <<t:0015-glossary-location>>
 <<t:0015-glossary-location-global>>
 <<t:0016-metadata-reserved-underscores>>
