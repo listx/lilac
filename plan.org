@@ -40,7 +40,17 @@ CLOSED: [2026-08-14 Fri 12:54]
     is glossary term (or, no glossary terms allowed at this level if not
     glossary term).
 
-*** TODO handle weaving of glossary terms with more than 1 cell
+*** TODO handle weaving of glossary terms with more than 1 cell [0/3]
+
+  - [ ] Weave multicell glossary items (start/end definition just once across
+    multiple cells for the same glossary item).
+
+  - [ ] Add org state field to track ranges of groups (to know when a definition
+    list should start/end).
+
+  - [ ] When weaving glossary definitions, use the group range info to know when
+    to avoid parsing the list item bullets (reduce indentation). Also see [[id:c4ac1d70-5d1b-420b-bce4-cf39142a47b1][make
+    glossary terms look less indented where they are defined]].
 
 * Backlog
 :PROPERTIES:
@@ -52,6 +62,9 @@ priority as two separate dimensions. However we just have a flat list of items
 for now because we don't have a good way of representing story maps.
 
 ** TODO make glossary terms look less indented where they are defined
+:PROPERTIES:
+:ID:       c4ac1d70-5d1b-420b-bce4-cf39142a47b1
+:END:
 
 We parse them inside list items and keep the list item structure. This results
 in weaving singleton-list definition lists inside each unordered list item. It
@@ -59,7 +72,9 @@ would be nice to skip the list items so that we can just weave only the glossary
 terms (purely as a definition list).
 
 The edge cases can be tricky. E.g., if we have some list items that are glossary
-terms and some that are not, all within the same list.
+terms and some that are not, all within the same list (actually this is no
+longer the case since we implemented the uniformity rule, see [[id:5a7a9462-83e3-4096-b65e-18b33420f528][Uniformity of list
+items that define glossary terms]]).
 
 Looks like CSS has the ~:has()~ parent selector which can select parents with
 certain child elements. We can use this to select a list item which has a
