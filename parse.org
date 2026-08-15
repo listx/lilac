@@ -687,7 +687,11 @@ import Lilac.Types
         LinkTargetURI
       ),
     ListMarker
-      ( LItemEnd,
+      ( LGlossaryGroupEnd,
+        LGlossaryGroupStart,
+        LGlossaryItemEnd,
+        LGlossaryItemStart,
+        LItemEnd,
         LItemStart,
         LOrderedEnd,
         LOrderedStart,
@@ -7452,7 +7456,10 @@ paragraphParser = do
   failIfLeftoverActiveStyles -- (ref:f:paragraphParser-failIfLeftoverActiveStyles)
   pState' <- get
   modify (\s -> s {insideParagraph = False})
-  if pState'.glossaryTermOffset > 0
+  let isUnorderedList = case pState.listLevels of
+        (level : _) -> isNothing level.number -- (ref:f:paragraphParser-unordered-list)
+        [] -> False
+  if pState'.glossaryTermOffset > 0 && isUnorderedList
     then convertToGlossaryTerm prose pState'.glossaryTermOffset -- (ref:check-for-glossaryTerm)
     else do
       failIfUnexpectedNonGlossaryTerm
@@ -10637,6 +10644,10 @@ data ListMarker
   | LUnorderedEnd
   | LItemStart
   | LItemEnd
+  | LGlossaryGroupStart
+  | LGlossaryGroupEnd
+  | LGlossaryItemStart
+  | LGlossaryItemEnd
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 #+end_src
@@ -10842,9 +10853,12 @@ getEndingListMarkers :: Int -> [Level] -> [ListMarker]
 getEndingListMarkers levelsToDrop = concatMap f . take levelsToDrop
   where
     f :: Level -> [ListMarker]
-    f level = case level.number of
-      Nothing -> [LItemEnd, LUnorderedEnd]
-      Just _ -> [LItemEnd, LOrderedEnd]
+    f level
+      | Just True <- level.onlyGlossaryTerms =
+          [LGlossaryItemEnd, LGlossaryGroupEnd]
+      | otherwise = case level.number of
+          Nothing -> [LItemEnd, LUnorderedEnd]
+          Just _ -> [LItemEnd, LOrderedEnd]
 #+end_src
 
 *** Closing off active glossary terms
@@ -10934,7 +10948,7 @@ the end to separate the list head from the body. This is what
 
 #+name: f:listHeadIndentLevelParser
 #+begin_src haskell
-listHeadIndentLevelParser :: OrgParser Level
+listHeadIndentLevelParser :: OrgParser (Level, Bool)
 listHeadIndentLevelParser = do
   minimalIndentation -- (ref:f:listHeadIndentLevelParser-minimalIndentation)
   spaces <- onlySpaces
@@ -10945,8 +10959,8 @@ listHeadIndentLevelParser = do
             number = listHead,
             onlyGlossaryTerms = Nothing
           }
-  afterListHead level
-  pure level
+  nextCellIsGlossaryTerm <- afterListHead level
+  pure (level, nextCellIsGlossaryTerm)
   where
     minimalIndentation :: OrgParser ()
     minimalIndentation =
@@ -10955,25 +10969,43 @@ listHeadIndentLevelParser = do
         . MP.lookAhead
         . MP.label "minimal indentation"
         $ MP.count 2 (char ' ')
-    afterListHead :: Level -> OrgParser () -- (ref:f:listHeadIndentLevelParser-afterListHead)
+    afterListHead :: Level -> OrgParser Bool -- (ref:f:listHeadIndentLevelParser-afterListHead)
     afterListHead level =
-      void
-        $ MP.choice
-          [ MP.eof,
-            void $ string "\n",
-            void $ seeingContentAfterListHead level
-          ]
-    seeingContentAfterListHead :: Level -> OrgParser ()
+      MP.choice
+        [ MP.eof >> pure False,
+          string "\n" >> pure False,
+          seeingContentAfterListHead level
+        ]
+    seeingContentAfterListHead :: Level -> OrgParser Bool
     seeingContentAfterListHead level = do
       _ <- char ' '
       MP.notFollowedBy (char ' ')
       modify
         (\s -> s {continuationIndent = getContinuationIndentForLevel level})
+      pState <- get
+      modify $ \s ->
+        s
+          { prevCellHasListHeadMarker = True, -- (ref:f:listHeadIndentLevelParser-pretend-we-parsed-a-level)
+            glossaryTermLevel = Nothing,
+            listLevels = level : pState.listLevels
+          }
+      result <- MP.optional $ MP.lookAhead paragraphParser
+      nextCellIsGlossaryTerm <- case result of
+        Just (CGlossaryTerm _) -> pure True
+        _ -> pure False
+      put pState
+      pure nextCellIsGlossaryTerm
 #+end_src
 
 The ~minimalIndentation~ [[(f:listHeadIndentLevelParser-minimalIndentation)]] expects
 there to be at least 2 spaces preceding a list item. This follows Rule 1 from
 [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][Ordered list items]].
+
+[[(f:listHeadIndentLevelParser-pretend-we-parsed-a-level)]] temporarily modifies the
+state of the parser to allow [[f:convertToGlossaryTerm]] to possibly succeed. For
+example, that parser requires there to be an unordered list item level that was
+already parsed [[(f:paragraphParser-unordered-list)]], so we construct one
+temporarily at [[(f:listHeadIndentLevelParser-pretend-we-parsed-a-level)]].
 
 The ~afterListHead~ parser [[(f:listHeadIndentLevelParser-afterListHead)]]
 preemptively checks what's in the input /after/ parsing the list head. In the case
@@ -11010,10 +11042,10 @@ listItemStartParser = do
   _ <- MP.try $ MP.lookAhead listHeadIndentLevelParser -- (ref:f:listItemStartParser-lookAhead)
   pState <- get
   let levels = pState.listLevels
-  level <- listHeadIndentLevelParser -- (ref:f:listItemStartParser-listHeadIndentLevelParser)
+  (level, nextCellIsGlossaryTerm) <- listHeadIndentLevelParser -- (ref:f:listItemStartParser-listHeadIndentLevelParser)
   listMarkers <-
     if nestsBeyond levels level
-      then listItemNester level levels
+      then listItemNester level levels nextCellIsGlossaryTerm
       else listItemFitter level levels
   pure $ CListItem listMarkers
   where
@@ -11052,16 +11084,18 @@ markers with [[f:getEndingListMarkers]]. The other place we use ~listMarkers~ is
 
 #+name: f:listItemNester
 #+begin_src haskell
-listItemNester :: Level -> [Level] -> OrgParser [ListMarker]
-listItemNester level levels = do
+listItemNester :: Level -> [Level] -> Bool -> OrgParser [ListMarker]
+listItemNester level levels nextCellIsGlossaryTerm = do
   case level.number of
     Just 1 -> pure ()
     Just n -> fail $ "starting list head number must be 1; got " <> show n
     Nothing -> pure ()
   pState <- get
-  let newMarker = case level.number of
-        Just _ -> LOrderedStart
-        Nothing -> LUnorderedStart
+  let (listGroupMarker, listItemMarker)
+        | nextCellIsGlossaryTerm = (LGlossaryGroupStart, LGlossaryItemStart)
+        | otherwise = case level.number of
+            Just _ -> (LOrderedStart, LItemStart)
+            Nothing -> (LUnorderedStart, LItemStart)
       opc = pState.orgParserConf
   when (opc.maxListLevel > 0 && length levels == opc.maxListLevel) $ do
     fail
@@ -11071,9 +11105,9 @@ listItemNester level levels = do
   put
     pState -- (ref:f:listItemNester-update-pState)
       { listLevels = level : levels,
-        listMarkers = LItemStart : newMarker : pState.listMarkers
+        listMarkers = listItemMarker : listGroupMarker : pState.listMarkers
       }
-  pure [newMarker, LItemStart]
+  pure [listGroupMarker, listItemMarker]
 #+end_src
 
 We enforce some additional rules here, such as forcing the nesting list head to
@@ -11141,10 +11175,13 @@ listItemFitter level levels =
     fitter :: Int -> Int -> OrgParser [ListMarker]
     fitter levelsToDrop continuationIndent = do
       pState <- get
-      let markers = getEndingListMarkers levelsToDrop pState.listLevels
+      let closingMarkers = getEndingListMarkers levelsToDrop pState.listLevels
           onlyGlossaryTerms =
             (.onlyGlossaryTerms) =<< (pState.listLevels !!? levelsToDrop)
           continuedLevel = level {onlyGlossaryTerms = onlyGlossaryTerms}
+          continuationMarkers = case onlyGlossaryTerms of
+            Just True -> [LGlossaryItemEnd, LGlossaryItemStart]
+            _ -> [LItemEnd, LItemStart]
       put
         pState
           { listLevels =
@@ -11152,7 +11189,7 @@ listItemFitter level levels =
             listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
       markEndOfActiveGlossaryTerm continuationIndent -- (ref:f:listItemFitter-markEndOfActiveGlossaryTerm)
-      pure $ markers <> [LItemEnd, LItemStart]
+      pure $ closingMarkers <> continuationMarkers
 #+end_src
 
 We use [[f:listItemStartParser]] and [[f:listItemsEndParser]] inside [[f:cellParser]]; the
@@ -12216,14 +12253,14 @@ shouldParseWithState
   OrgDoc
     { oid = nilOid,
       cells =
-        [ CListItem [LUnorderedStart, LItemStart], -- 0
+        [ CListItem [LGlossaryGroupStart, LGlossaryItemStart], -- 0
           CGlossaryTerm -- 1
             GlossaryTerm
               { term = Prose [ptext "item 1" []],
                 definition = Prose [ptext " b" []]
               },
           CParagraph $ Prose [ptext "hello" []], -- 2
-          CListItem [LItemEnd, LItemStart], -- 3
+          CListItem [LGlossaryItemEnd, LGlossaryItemStart], -- 3
           CGlossaryTerm -- 4
             GlossaryTerm
               { term = Prose [ptext "item 2" []],
@@ -12234,7 +12271,7 @@ shouldParseWithState
           CParagraph $ Prose [ptext "foo" []], -- 7
           CListItem [LItemEnd, LUnorderedEnd], -- 8
           CParagraph $ Prose [ptext "apple" []], -- 9
-          CListItem [LItemEnd, LItemStart], -- 10
+          CListItem [LGlossaryItemEnd, LGlossaryItemStart], -- 10
           CGlossaryTerm -- 11
             GlossaryTerm
               { term = Prose [ptext "item 3" []],
@@ -12249,7 +12286,7 @@ shouldParseWithState
                     ],
                 body = "1 + 1 = 2"
               },
-          CListItem [LItemEnd, LUnorderedEnd] -- 13
+          CListItem [LGlossaryItemEnd, LGlossaryGroupEnd] -- 13
         ],
       pseudoEdges = [],
       footnoteRefs = M.empty,
@@ -14213,7 +14250,11 @@ import Lilac.Types
         LinkTargetURI
       ),
     ListMarker
-      ( LItemEnd,
+      ( LGlossaryGroupEnd,
+        LGlossaryGroupStart,
+        LGlossaryItemEnd,
+        LGlossaryItemStart,
+        LItemEnd,
         LItemStart,
         LOrderedEnd,
         LOrderedStart,

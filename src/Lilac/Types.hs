@@ -378,6 +378,10 @@ data ListMarker
   | LUnorderedEnd
   | LItemStart
   | LItemEnd
+  | LGlossaryGroupStart
+  | LGlossaryGroupEnd
+  | LGlossaryItemStart
+  | LGlossaryItemEnd
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (FromJSON, ToJSON)
 

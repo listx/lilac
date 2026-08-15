@@ -40,7 +40,11 @@ import Lilac.Types
         LinkTargetURI
       ),
     ListMarker
-      ( LItemEnd,
+      ( LGlossaryGroupEnd,
+        LGlossaryGroupStart,
+        LGlossaryItemEnd,
+        LGlossaryItemStart,
+        LItemEnd,
         LItemStart,
         LOrderedEnd,
         LOrderedStart,
@@ -3571,14 +3575,14 @@ spec = do
     OrgDoc
       { oid = nilOid,
         cells =
-          [ CListItem [LUnorderedStart, LItemStart], -- 0
+          [ CListItem [LGlossaryGroupStart, LGlossaryItemStart], -- 0
             CGlossaryTerm -- 1
               GlossaryTerm
                 { term = Prose [ptext "item 1" []],
                   definition = Prose [ptext " b" []]
                 },
             CParagraph $ Prose [ptext "hello" []], -- 2
-            CListItem [LItemEnd, LItemStart], -- 3
+            CListItem [LGlossaryItemEnd, LGlossaryItemStart], -- 3
             CGlossaryTerm -- 4
               GlossaryTerm
                 { term = Prose [ptext "item 2" []],
@@ -3589,7 +3593,7 @@ spec = do
             CParagraph $ Prose [ptext "foo" []], -- 7
             CListItem [LItemEnd, LUnorderedEnd], -- 8
             CParagraph $ Prose [ptext "apple" []], -- 9
-            CListItem [LItemEnd, LItemStart], -- 10
+            CListItem [LGlossaryItemEnd, LGlossaryItemStart], -- 10
             CGlossaryTerm -- 11
               GlossaryTerm
                 { term = Prose [ptext "item 3" []],
@@ -3604,7 +3608,7 @@ spec = do
                       ],
                   body = "1 + 1 = 2"
                 },
-            CListItem [LItemEnd, LUnorderedEnd] -- 13
+            CListItem [LGlossaryItemEnd, LGlossaryGroupEnd] -- 13
           ],
         pseudoEdges = [],
         footnoteRefs = M.empty,

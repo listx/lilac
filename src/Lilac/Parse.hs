@@ -129,7 +129,11 @@ import Lilac.Types
         LinkTargetURI
       ),
     ListMarker
-      ( LItemEnd,
+      ( LGlossaryGroupEnd,
+        LGlossaryGroupStart,
+        LGlossaryItemEnd,
+        LGlossaryItemStart,
+        LItemEnd,
         LItemStart,
         LOrderedEnd,
         LOrderedStart,
@@ -1241,7 +1245,10 @@ paragraphParser = do
   failIfLeftoverActiveStyles --
   pState' <- get
   modify (\s -> s {insideParagraph = False})
-  if pState'.glossaryTermOffset > 0
+  let isUnorderedList = case pState.listLevels of
+        (level : _) -> isNothing level.number --
+        [] -> False
+  if pState'.glossaryTermOffset > 0 && isUnorderedList
     then convertToGlossaryTerm prose pState'.glossaryTermOffset --
     else do
       failIfUnexpectedNonGlossaryTerm
@@ -1876,11 +1883,14 @@ getEndingListMarkers :: Int -> [Level] -> [ListMarker]
 getEndingListMarkers levelsToDrop = concatMap f . take levelsToDrop
   where
     f :: Level -> [ListMarker]
-    f level = case level.number of
-      Nothing -> [LItemEnd, LUnorderedEnd]
-      Just _ -> [LItemEnd, LOrderedEnd]
+    f level
+      | Just True <- level.onlyGlossaryTerms =
+          [LGlossaryItemEnd, LGlossaryGroupEnd]
+      | otherwise = case level.number of
+          Nothing -> [LItemEnd, LUnorderedEnd]
+          Just _ -> [LItemEnd, LOrderedEnd]
 
-listHeadIndentLevelParser :: OrgParser Level
+listHeadIndentLevelParser :: OrgParser (Level, Bool)
 listHeadIndentLevelParser = do
   minimalIndentation --
   spaces <- onlySpaces
@@ -1891,8 +1901,8 @@ listHeadIndentLevelParser = do
             number = listHead,
             onlyGlossaryTerms = Nothing
           }
-  afterListHead level
-  pure level
+  nextCellIsGlossaryTerm <- afterListHead level
+  pure (level, nextCellIsGlossaryTerm)
   where
     minimalIndentation :: OrgParser ()
     minimalIndentation =
@@ -1901,20 +1911,32 @@ listHeadIndentLevelParser = do
         . MP.lookAhead
         . MP.label "minimal indentation"
         $ MP.count 2 (char ' ')
-    afterListHead :: Level -> OrgParser () --
+    afterListHead :: Level -> OrgParser Bool --
     afterListHead level =
-      void
-        $ MP.choice
-          [ MP.eof,
-            void $ string "\n",
-            void $ seeingContentAfterListHead level
-          ]
-    seeingContentAfterListHead :: Level -> OrgParser ()
+      MP.choice
+        [ MP.eof >> pure False,
+          string "\n" >> pure False,
+          seeingContentAfterListHead level
+        ]
+    seeingContentAfterListHead :: Level -> OrgParser Bool
     seeingContentAfterListHead level = do
       _ <- char ' '
       MP.notFollowedBy (char ' ')
       modify
         (\s -> s {continuationIndent = getContinuationIndentForLevel level})
+      pState <- get
+      modify $ \s ->
+        s
+          { prevCellHasListHeadMarker = True, --
+            glossaryTermLevel = Nothing,
+            listLevels = level : pState.listLevels
+          }
+      result <- MP.optional $ MP.lookAhead paragraphParser
+      nextCellIsGlossaryTerm <- case result of
+        Just (CGlossaryTerm _) -> pure True
+        _ -> pure False
+      put pState
+      pure nextCellIsGlossaryTerm
 
 orderedHeadParser :: OrgParser (Maybe Int)
 orderedHeadParser = do
@@ -1935,10 +1957,10 @@ listItemStartParser = do
   _ <- MP.try $ MP.lookAhead listHeadIndentLevelParser --
   pState <- get
   let levels = pState.listLevels
-  level <- listHeadIndentLevelParser --
+  (level, nextCellIsGlossaryTerm) <- listHeadIndentLevelParser --
   listMarkers <-
     if nestsBeyond levels level
-      then listItemNester level levels
+      then listItemNester level levels nextCellIsGlossaryTerm
       else listItemFitter level levels
   pure $ CListItem listMarkers
   where
@@ -1947,16 +1969,18 @@ listItemStartParser = do
     nestsBeyond (deepestLevel : _) level =
       getContinuationIndentForLevel deepestLevel + 2 == level.indent
 
-listItemNester :: Level -> [Level] -> OrgParser [ListMarker]
-listItemNester level levels = do
+listItemNester :: Level -> [Level] -> Bool -> OrgParser [ListMarker]
+listItemNester level levels nextCellIsGlossaryTerm = do
   case level.number of
     Just 1 -> pure ()
     Just n -> fail $ "starting list head number must be 1; got " <> show n
     Nothing -> pure ()
   pState <- get
-  let newMarker = case level.number of
-        Just _ -> LOrderedStart
-        Nothing -> LUnorderedStart
+  let (listGroupMarker, listItemMarker)
+        | nextCellIsGlossaryTerm = (LGlossaryGroupStart, LGlossaryItemStart)
+        | otherwise = case level.number of
+            Just _ -> (LOrderedStart, LItemStart)
+            Nothing -> (LUnorderedStart, LItemStart)
       opc = pState.orgParserConf
   when (opc.maxListLevel > 0 && length levels == opc.maxListLevel) $ do
     fail
@@ -1966,9 +1990,9 @@ listItemNester level levels = do
   put
     pState --
       { listLevels = level : levels,
-        listMarkers = LItemStart : newMarker : pState.listMarkers
+        listMarkers = listItemMarker : listGroupMarker : pState.listMarkers
       }
-  pure [newMarker, LItemStart]
+  pure [listGroupMarker, listItemMarker]
 
 listItemFitter :: Level -> [Level] -> OrgParser [ListMarker]
 listItemFitter level levels =
@@ -1992,10 +2016,13 @@ listItemFitter level levels =
     fitter :: Int -> Int -> OrgParser [ListMarker]
     fitter levelsToDrop continuationIndent = do
       pState <- get
-      let markers = getEndingListMarkers levelsToDrop pState.listLevels
+      let closingMarkers = getEndingListMarkers levelsToDrop pState.listLevels
           onlyGlossaryTerms =
             (.onlyGlossaryTerms) =<< (pState.listLevels !!? levelsToDrop)
           continuedLevel = level {onlyGlossaryTerms = onlyGlossaryTerms}
+          continuationMarkers = case onlyGlossaryTerms of
+            Just True -> [LGlossaryItemEnd, LGlossaryItemStart]
+            _ -> [LItemEnd, LItemStart]
       put
         pState
           { listLevels =
@@ -2003,7 +2030,7 @@ listItemFitter level levels =
             listMarkers = drop (levelsToDrop * 2) pState.listMarkers
           }
       markEndOfActiveGlossaryTerm continuationIndent --
-      pure $ markers <> [LItemEnd, LItemStart]
+      pure $ closingMarkers <> continuationMarkers
 
 mathFragmentNumberedParser :: OrgParser MathFragment
 mathFragmentNumberedParser = do
