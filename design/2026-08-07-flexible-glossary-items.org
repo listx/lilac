@@ -53,24 +53,25 @@ to define glossary terms.
 
 Although we use the unordered list to define glossary terms, we don't want to
 weave these list structures because it's redundant. That is because in HTML we
-already put the glossary terms in an HTML /definition list/.
+already put the glossary terms in an HTML /description list/.
 
 So when we have cells like
 
+#+name: ex:list-markers
 #+begin_src txt
-[ListMarker]
+CListItem [LUnorderedStart,LItemStart]
 GlossaryTerm
 Paragraph
-[ListMarker]
+CListItem [LItemEnd,LItemStart]
 GlossaryTerm
 Paragraph
 Paragraph
 Paragraph
-[ListMarker]
+CListItem [LItemEnd,LUnorderedEnd]
 #+end_src
 
 we want to avoid weaving the ~ListMarkers~ because we want the glossary terms to
-be in the same (single) definition list.
+be in the same (single) description list.
 
 * Solution Design
 
@@ -82,41 +83,13 @@ We just need to record two new bits of information:
      *glossary term boundary*. These are bounds that enclose a single glossary
      term, no matter how long its definition (in cells).
 
-  2) The LCIs of /groups/ of glossary terms, which will encode the *boundaries of
-     contiguous groups of glossary terms*. This can be used to determine when
-     the overall definition list (which encompasses one more more glossary
-     terms) can be created/closed. It can also be used to know when we can skip
-     weaving of any intervening list markers we may have parsed between glossary
-     terms.
-
-Both the glossary term boundary and glossary group boundaries can be a tuple of
-LCIs, like ~(LCI, LCI)~. Using LCIs (integers) is lightweight and doesn't require
-major changes to how we parse cells.
-
-To understand whether we are inside a glossary definition boundary or group
-boundary, we can convert the tuples into an ~IntMap~ and use ~lookupLE~, like this:
-
-#+begin_src haskell
-import qualified Data.Map.Strict as M
-
-type GlossaryGroupBoundaries = M.Map Int Int -- Map Start End
-
--- Find if an LCI (x) falls into any boundary (assuming the boundaries are
--- non-overlapping).
-checkBoundary :: Int -> GlossaryGroupBoundaries -> Maybe GlossaryPosition
-checkBoundary x m = case M.lookupLE x m of
-  -- Here "start" is <= x, but there is no guarantee that x <= end
-  Just (start, end)
-    | x == start && x == end -> Just Singleton
-    | x == start -> Just Start
-    | x < end -> Just Inside
-    | x == end -> Just End
-    | otherwise -> Nothing
-  Nothing -> Nothing
-#+end_src
-
-Then when we weave we can know to skip those list markers that fall inside a
-range.
+  2) Locations of where glossary /groups/ (contiguous ranges of one or more
+     glossary terms and their definitions) start and end. We can use the
+     existing pattern around unordered/ordered list item markers, to create new
+     list markers which we can decorate around glossary terms and definitions.
+     This way, weaving the glossary items becomes trivial because we just weave
+     the new list markers. Parsing will take care of accurately preparing these
+     new markers.
 
 ** Parsing changes
 
@@ -181,7 +154,109 @@ can be a single field embedded inside the existing [[id:a6f3fbe8-3b9e-452b-8e32-
 whenever we create a new list item (for the same level), we can check whether
 the level expects the first cell of the list item to be a glossary item or not.
 
+*** New list markers for glossary terms
+
+The aforementioned stricter parsing rules simplifies things for us, because we
+don't have to worry about edge cases. Simply put, whenever we see a glossary
+item, we know that we can be in a description list (of possibly more glossary
+items).
+
+The description list in HTML uses this construct:
+
+#+begin_src html
+<dl>
+  <dt>...</dt>
+  <dd>...</dd>
+
+  <dt>...</dt>
+  <dd>...</dd>
+
+  ...
+</dl>
+#+end_src
+
+Each glossary term will have a term (~<dt>~) and a definition (~<dd>~). Even though
+the HTML treats these as siblings, for us we will want to enclose them inside a
+single entity, as ~GlossaryItemStart~ and ~GlossaryItemEnd~.
+
+| HTML  | New List Marker     | Purpose                                         |
+|-------+---------------------+-------------------------------------------------|
+| ~<dl>~  | ~LGlossaryGroupStart~ | Marks beginning of (contiguous) glossary items. |
+| ~</dl>~ | ~LGlossaryGroupEnd~   | Marks end of (contiguous) glossary items.       |
+| N/A   | ~LGlossaryItemStart~  | Marks the start of a single glossary item.      |
+| N/A   | ~LGlossaryItemEnd~    | Marks the end of a single glossary item.        |
+| ~<dt>~  | N/A                 | No need to have new list marker for this.       |
+| ~</dt>~ | N/A                 | No need to have new list marker for this.       |
+| ~<dd>~  | N/A                 | No need to have new list marker for this.       |
+| ~</dd>~ | N/A                 | No need to have new list marker for this.       |
+
+We don't need new list item markers for ~<dt>~ and ~<dd>~ because they can be
+derived by looking at the contents of an existing [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480::data:GlossaryTerm][data:GlossaryTerm]].
+
+With these new list markers, the example from [[ex:list-markers]] simply becomes
+
+#+name: ex:list-markers-new
+#+begin_src txt
+CListItem [LGlossaryGroupStart,LGlossaryItemStart]
+GlossaryTerm
+Paragraph
+CListItem [LGlossaryItemEnd,LGlossaryItemStart]
+GlossaryTerm
+Paragraph
+Paragraph
+Paragraph
+CListItem [LGlossaryItemEnd,LGlossaryGroupEnd]
+#+end_src
+
+And now we no longer have to worry about avoiding
+to parse regular list item markers, because we use the ~LGlossary*~ variants
+instead. Also there is just a single ~LGlossaryGroup*~, so we can easily weave
+these as a single description list.
+
 * Alternatives considered
+
+** Use ~LCI~ pairs to record glossary group ranges
+
+We considered storing ranges of ~LCI~ values, to denote /groups/ of glossary terms,
+which will encode the *boundaries of contiguous groups of glossary terms*. This
+can be used to determine when the overall description list (which encompasses one
+more more glossary terms) can be created/closed. It can also be used to know
+when we can skip weaving of any intervening list markers we may have parsed
+between glossary terms.
+
+Using LCIs (integers) is lightweight and doesn't require major changes to how we parse cells.
+
+To understand whether we are inside a glossary definition boundary or group
+boundary, we can convert the tuples into an ~IntMap~ and use ~lookupLE~, like this:
+
+#+begin_src haskell
+import qualified Data.Map.Strict as M
+
+type GlossaryGroupBoundaries = M.Map Int Int -- Map Start End
+
+-- Find if an LCI (x) falls into any boundary (assuming the boundaries are
+-- non-overlapping).
+checkBoundary :: Int -> GlossaryGroupBoundaries -> Maybe GlossaryPosition
+checkBoundary x m = case M.lookupLE x m of
+  -- Here "start" is <= x, but there is no guarantee that x <= end
+  Just (start, end)
+    | x == start && x == end -> Just Singleton
+    | x == start -> Just Start
+    | x < end -> Just Inside
+    | x == end -> Just End
+    | otherwise -> Nothing
+  Nothing -> Nothing
+#+end_src
+
+Then when we weave we can know to skip those list markers that fall inside a
+range.
+
+However, this approach was rejected because during weaving we would have to
+check every single cell index against this ~checkBoundary~ function. And weaving
+gets even more complicated because we have to avoid weaving list item markers
+around the glossary items (where they are defined), all using just this range
+information. It's much easier if we just have glossary list item markers
+instead, because then we don't have to do any lookups.
 
 ** Use new ~BCell~ type to create a subset of cell values allowed inside glossary terms
 
