@@ -95,13 +95,6 @@ When parsing, we can build up a map about all referenced line labels (and which
 local cell is referencing it). Then during weaving we can just reference this
 map.
 
-** TODO (Git integration) add raw git links
-If there is text like 68541ad (capture unhandled edge case for parsing styled
-text, 2025-01-26) (hash, parenthetical with a YYYY-MM-DD date at the end),
-convert it to a link. You'd need to have a "default Git repo" setting somewhere,
-probably in the doc metadata, and Lilac would simply construct a link to that
-commit (no need to look it up ourselves with Git).
-
 * Icebox
 :PROPERTIES:
 :ID:       dcfbeff2-5a2e-4a84-bdb7-dae80e867838
@@ -114,6 +107,13 @@ commit (no need to look it up ourselves with Git).
 
 This way, Nix users can just install it with Nix without having to clone the
 source repo.
+
+** TODO (Git integration) add raw git links
+If there is text like 68541ad (capture unhandled edge case for parsing styled
+text, 2025-01-26) (hash, parenthetical with a YYYY-MM-DD date at the end),
+convert it to a link. You'd need to have a "default Git repo" setting somewhere,
+probably in the doc metadata, and Lilac would simply construct a link to that
+commit (no need to look it up ourselves with Git).
 
 ** TODO code blocks: add "copy" button
 
