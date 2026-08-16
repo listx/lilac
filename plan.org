@@ -78,12 +78,22 @@ Looks like CSS has the ~:has()~ parent selector which can select parents with
 certain child elements. We can use this to select a list item which has a
 glossary item inside it to make the list less indented.
 
-** TODO blocks: make ancestor links link back to the exact place the child block is used
+** DONE blocks: make ancestor links link back to the exact place the child block is used
+CLOSED: [2026-08-16 Sun 23:59]
 
 This is actually pretty simple: just use something like ~<PARENT>-<CHILD>~ in the
 HTML ID. If there is more than 1 instance of ~<CHILD>~ in the parent, give the 2nd
 and subsequent ones a numeric suffix. This way we always link back to the first
 usage of ~<CHILD>~ in the parent block.
+
+How to deal with cross-file references? To do this correctly we'd need to
+include the UUID of the (external) child block; however we let the user use
+either the UUID of the closest heading or the top-level document UUID. And we
+can't tell, from the perspective of the child, which one the parent chose.
+However in practice this concern is not really a problem because just the name
+of the child is almost always unique inside a parent's body (it's confusing to
+link to two different children with the same name). So using just the child's
+name is good enough.
 
 ** TODO line labels: add a link to the first reference to it (within the same doc)
 

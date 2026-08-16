@@ -636,8 +636,8 @@ weavePToken = \case
   PTokenLink link -> case link.target of
     LinkTargetFootnote {} -> do
       sup_ [class_ "footnote-link"] $ do
-        weaveLink False link
-    _ -> weaveLink False link
+        weaveLink Nothing link
+    _ -> weaveLink Nothing link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
   PTokenCitation n -> weaveCitation n
   PTokenDivStart t -> toHtmlRaw ("<div class=\"csl-" <> t <> "\">" :: Text)
@@ -791,7 +791,7 @@ weaveBlockBody block bodyBorder = do
               BTokenString {} -> Nothing
               BTokenPadding {} -> Nothing
             links = catMaybes $ map getLink block.body
-        toHtmlRaw =<< spliceLinks colorizedBody links
+        toHtmlRaw =<< spliceLinks colorizedBody links block
       Nothing -> code_ $ toHtml bodyText
 
 getBlockContentsWithoutLinks :: [BToken] -> Text
@@ -836,25 +836,28 @@ weaveBlockAncestry block = case lookup "name" block.meta of
         toHtml @Text "Used by "
         sequence_
           $ intersperse (toHtml @Text ", ")
-          $ map weaveParentBlock parents
+          $ map (weaveParentBlock block) parents
         toHtml @Text "."
 
 weaveParentBlock ::
+  Block ->
   (GCI, [GCI], GPath, Block, Prose) ->
   HtmlWeaver ()
-weaveParentBlock (gci, _, objPath, _, name) = do
+weaveParentBlock childBlock (gci, _, objPath, _, name) = do
   weaveConf <- ask
   case getLinkToGCI weaveConf gci of
     Nothing -> pure ()
     Just (docName, linkAnchor, _) -> do
+      let childName = getLinkAnchor Nothing $ CBlock childBlock
+          linkAnchorWithChild = linkAnchor <> "-" <> childName --
       if objPath /= weaveConf.originObjectPath
         then do
           toHtml docName
           toHtml @Text "→"
-          a_ [href_ linkAnchor, class_ "internal-link"]
+          a_ [href_ linkAnchorWithChild, class_ "internal-link"]
             $ weaveProse name
         else do
-          a_ [href_ $ "#" <> linkAnchor, class_ "internal-link"]
+          a_ [href_ $ "#" <> linkAnchorWithChild, class_ "internal-link"]
             $ weaveProse name
 
 getLinkToGCI :: WeaveConf -> GCI -> Maybe (Text, Text, Prose)
@@ -901,15 +904,15 @@ colorizeText lang txt
       | otherwise = lang
     defaultTokeniserConfig = Sky.TokenizerConfig Sky.defaultSyntaxMap False
 
-spliceLinks :: Text -> [Link] -> HtmlWeaver Text
-spliceLinks colorized links = do
+spliceLinks :: Text -> [Link] -> Block -> HtmlWeaver Text
+spliceLinks colorized links block = do
   weaveConf <- ask
   let colorizedStrs = T.splitOn "\NUL" colorized
       f :: ([Text], [Link]) -> Text -> ([Text], [Link])
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
-            : (renderAsText weaveConf $ weaveLink True link)
+            : (renderAsText weaveConf $ weaveLink (Just block) link)
             : acc,
           links'
         )
@@ -950,21 +953,27 @@ weaveRichBlock lci richBlock = case richBlock.marker of
     toHtmlRaw @Text "<div class=\"rich-block-body\">"
   RBEnd -> toHtmlRaw @Text "</div></div></div>"
 
-weaveLink :: Bool -> Link -> HtmlWeaver ()
-weaveLink insideBlock link = do
-  wovenLinkTarget <- weaveLinkTarget insideBlock link.target
+weaveLink :: Maybe Block -> Link -> HtmlWeaver ()
+weaveLink maybeParentBlock link = do
+  wovenLinkTarget <- weaveLinkTarget (isJust maybeParentBlock) link.target
   linkDisplayName <- weaveLinkDisplayName link
   let attrs =
         [href_ wovenLinkTarget]
           <> linkCategory wovenLinkTarget
-          <> lineLabelAttr
-      lineLabelAttr =
+          <> defaultId
+      --
+      defaultId =
         case link.target of
           LinkTargetLineLabel lineLabel ->
-            if insideBlock
+            if isJust maybeParentBlock
               then [id_ ("ll-" <> toSafeHtmlId lineLabel.name)] --
               else []
-          _ -> []
+          _ -> case maybeParentBlock of
+            Just parentBlock ->
+              let parentBlockId = getLinkAnchor Nothing $ CBlock parentBlock
+                  childBlockId = T.takeWhileEnd (/= '#') wovenLinkTarget
+               in [id_ $ parentBlockId <> "-" <> childBlockId]
+            Nothing -> []
   a_
     attrs
     $ sequence_

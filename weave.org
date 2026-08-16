@@ -2013,8 +2013,8 @@ weavePToken = \case
   PTokenLink link -> case link.target of
     LinkTargetFootnote {} -> do
       sup_ [class_ "footnote-link"] $ do
-        weaveLink False link
-    _ -> weaveLink False link
+        weaveLink Nothing link
+    _ -> weaveLink Nothing link
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
   PTokenCitation n -> weaveCitation n
   PTokenDivStart t -> toHtmlRaw ("<div class=\"csl-" <> t <> "\">" :: Text)
@@ -2219,21 +2219,27 @@ these links to be simple without any extra decorations
 
 #+name: f:weaveLink
 #+begin_src haskell
-weaveLink :: Bool -> Link -> HtmlWeaver ()
-weaveLink insideBlock link = do
-  wovenLinkTarget <- weaveLinkTarget insideBlock link.target
+weaveLink :: Maybe Block -> Link -> HtmlWeaver ()
+weaveLink maybeParentBlock link = do
+  wovenLinkTarget <- weaveLinkTarget (isJust maybeParentBlock) link.target
   linkDisplayName <- weaveLinkDisplayName link
   let attrs =
         [href_ wovenLinkTarget]
           <> linkCategory wovenLinkTarget
-          <> lineLabelAttr
-      lineLabelAttr =
+          <> defaultId
+      -- (ref:f:weaveLink-defaultId)
+      defaultId =
         case link.target of
           LinkTargetLineLabel lineLabel ->
-            if insideBlock
+            if isJust maybeParentBlock
               then [id_ ("ll-" <> toSafeHtmlId lineLabel.name)] -- (ref:line label self-link)
               else []
-          _ -> []
+          _ -> case maybeParentBlock of
+            Just parentBlock ->
+              let parentBlockId = getLinkAnchor Nothing $ CBlock parentBlock
+                  childBlockId = T.takeWhileEnd (/= '#') wovenLinkTarget
+               in [id_ $ parentBlockId <> "-" <> childBlockId]
+            Nothing -> []
   a_
     attrs
     $ sequence_
@@ -2246,6 +2252,12 @@ weaveLink insideBlock link = do
       | "#ref-" `T.isPrefixOf` target = [] -- (ref:f:weaveLink-bib-entries)
       | otherwise = [class_ "internal-link"]
 #+end_src
+
+[[(f:weaveLink-defaultId)]] encodes both the enclosing parent block's name as well
+as the name of the child block, so that when we weave a link back to the parent
+block at [[f:weaveParentBlock]], we can targe the exact link to the child block
+(instead of just linking broadly to the entire parent block). See
+[[(f:weaveParentBlock-linkAnchorWithChild)]].
 
 Let's look at link display names first before looking at how we get the link
 targets. For the most part, the link display name is just the ~name~ field of a
@@ -2908,7 +2920,7 @@ weaveBlockAncestry block = case lookup "name" block.meta of
         toHtml @Text "Used by "
         sequence_
           $ intersperse (toHtml @Text ", ")
-          $ map weaveParentBlock parents
+          $ map (weaveParentBlock block) parents
         toHtml @Text "."
 #+end_src
 
@@ -2922,21 +2934,24 @@ current document being woven.
 #+name: f:weaveParentBlock
 #+begin_src haskell
 weaveParentBlock ::
+  Block ->
   (GCI, [GCI], GPath, Block, Prose) ->
   HtmlWeaver ()
-weaveParentBlock (gci, _, objPath, _, name) = do
+weaveParentBlock childBlock (gci, _, objPath, _, name) = do
   weaveConf <- ask
   case getLinkToGCI weaveConf gci of
     Nothing -> pure ()
     Just (docName, linkAnchor, _) -> do
+      let childName = getLinkAnchor Nothing $ CBlock childBlock
+          linkAnchorWithChild = linkAnchor <> "-" <> childName -- (ref:f:weaveParentBlock-linkAnchorWithChild)
       if objPath /= weaveConf.originObjectPath
         then do
           toHtml docName
           toHtml @Text "→"
-          a_ [href_ linkAnchor, class_ "internal-link"]
+          a_ [href_ linkAnchorWithChild, class_ "internal-link"]
             $ weaveProse name
         else do
-          a_ [href_ $ "#" <> linkAnchor, class_ "internal-link"]
+          a_ [href_ $ "#" <> linkAnchorWithChild, class_ "internal-link"]
             $ weaveProse name
 #+end_src
 
@@ -3054,7 +3069,7 @@ weaveBlockBody block bodyBorder = do
               BTokenString {} -> Nothing
               BTokenPadding {} -> Nothing
             links = catMaybes $ map getLink block.body
-        toHtmlRaw =<< spliceLinks colorizedBody links
+        toHtmlRaw =<< spliceLinks colorizedBody links block
       Nothing -> code_ $ toHtml bodyText
 #+end_src
 
@@ -3134,15 +3149,15 @@ the woven link HTML fragments.
 
 #+name: f:spliceLinks
 #+begin_src haskell
-spliceLinks :: Text -> [Link] -> HtmlWeaver Text
-spliceLinks colorized links = do
+spliceLinks :: Text -> [Link] -> Block -> HtmlWeaver Text
+spliceLinks colorized links block = do
   weaveConf <- ask
   let colorizedStrs = T.splitOn "\NUL" colorized
       f :: ([Text], [Link]) -> Text -> ([Text], [Link])
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
-            : (renderAsText weaveConf $ weaveLink True link)
+            : (renderAsText weaveConf $ weaveLink (Just block) link)
             : acc,
           links'
         )
