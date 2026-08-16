@@ -158,7 +158,11 @@ import Lilac.Types
         LinkTargetURI
       ),
     ListMarker
-      ( LItemEnd,
+      ( LGlossaryGroupEnd,
+        LGlossaryGroupStart,
+        LGlossaryItemEnd,
+        LGlossaryItemStart,
+        LItemEnd,
         LItemStart,
         LOrderedEnd,
         LOrderedStart,
@@ -365,7 +369,6 @@ import Relude
     on,
     otherwise,
     pure,
-    repeat,
     reverse,
     runReaderT,
     sequence_,
@@ -467,6 +470,7 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveBibliography>>
 <<f:weaveGlossary>>
 <<f:weaveCollectedGlossaryTerm>>
+<<f:weaveRemainingGlossaryDefinition>>
 <<f:getRootRelativeOrgDocCellLink>>
 <<f:getRootRelativeOrgDocLink>>
 <<f:toNormalizedText>>
@@ -709,7 +713,6 @@ import Clay
     vh,
     visibility,
     visible,
-    whiteSpace,
     width,
     (#),
     (&),
@@ -718,7 +721,6 @@ import Clay
     (?),
     (|>),
   )
-import Clay.Text qualified as ClayText
 import Data.Bits
   ( shiftR,
     (.&.),
@@ -2567,7 +2569,15 @@ weaveListMarker =
     LUnorderedEnd -> "</ul>"
     LItemStart -> "<li>"
     LItemEnd -> "</li>"
+    LGlossaryGroupStart -> "<dl>"
+    LGlossaryGroupEnd -> "</dl>"
+    LGlossaryItemStart -> "" -- (ref:f:weaveListMarker-LGlossaryItemStart)
+    LGlossaryItemEnd -> "</dd></div></div>" -- (ref:f:weaveListMarker-LGlossaryItemEnd)
 #+end_src
+
+[[(f:weaveListMarker-LGlossaryItemStart)]] does not weave anything, because we use 2
+DIV elements at [[(f:weaveGlossaryTerm-openingDivs)]]. Those 2 DIV elements are
+closed at [[(f:weaveListMarker-LGlossaryItemEnd)]].
 
 There isn't much to test here, because these markers are so simple.
 
@@ -4202,62 +4212,35 @@ the work.
 #+begin_src haskell
 weaveGlossaryTerm :: LCI -> GlossaryTerm -> HtmlWeaver ()
 weaveGlossaryTerm lci glossaryTerm = do
-  weaveConf <- ask
-  let dlStart :: HtmlWeaver ()
-      dlStart = toHtmlRaw @Text "<dl>"
-      dlEnd :: HtmlWeaver ()
-      dlEnd = toHtmlRaw @Text "</dl>"
-      isGlossaryTerm lci' -- (ref:isGlossaryTerm)
-        | Just originObj <-
-            lookup weaveConf.originObjectPath weaveConf.archive.objects,
-          Just internalCell <- originObj.orgDoc.cells !!? lci'.unLCI,
-          CGlossaryTerm _ <- internalCell =
-            True
-        | otherwise = False
-      isFirstGlossaryTerm = not . isGlossaryTerm . LCI $ lci.unLCI - 1
-      isLastGlossaryTerm = not . isGlossaryTerm . LCI $ lci.unLCI + 1
-  when (isFirstGlossaryTerm) dlStart -- (ref:use-dlStart)
-  wrapWithDiv lci $ do
-    div_ [id_ linkAnchor, class_ "glossary-term"] $ do
-      let maybeInnerVerticalMargin
-            | isFirstGlossaryTerm = []
-            | otherwise = [class_ "inner-dt"]
-      dt_ maybeInnerVerticalMargin $ do
-        weaveProse glossaryTerm.term
-      dd_ $ do
-        a_ [href_ $ "#" <> linkAnchor, class_ "glossary-term-anchor"] $ do
-          toHtmlRaw @Text <<HTML link symbol>>
-        weaveProse glossaryTerm.definition
-  when (isLastGlossaryTerm) dlEnd -- (ref:use-dlEnd)
+  let openingDivs :: Text -- (ref:f:weaveGlossaryTerm-openingDivs)
+      openingDivs =
+        T.concat
+          [ "<div id=\"c-",
+            T.show lci.unLCI,
+            "\" class=\"cell-idx\">",
+            "<div id=\"",
+            linkAnchor,
+            "\" class=\"glossary-term\">"
+          ]
+  toHtmlRaw openingDivs
+  dt_ [] $ do
+    weaveProse glossaryTerm.term
+  toHtmlRaw @Text "<dd>"
+  a_ [href_ $ "#" <> linkAnchor, class_ "glossary-term-anchor"] $ do
+    toHtmlRaw @Text <<HTML link symbol>>
+  weaveProse glossaryTerm.definition
   where
     linkAnchor = getLinkAnchor (Just lci) $ CGlossaryTerm glossaryTerm
 #+end_src
 
-We don't wrap everything inside a ~<dl>~ tag because it may be the case that many
-more glossary terms exist after this (current) cell being woven. In that case,
-we want to close off the ~<dl>~ only at the very end. That's what [[(use-dlStart)]]
-and [[(use-dlEnd)]] are for. The ~isGlossaryTerm~ helper [[(isGlossaryTerm)]] checks if
-the given cell index points to a glossary term cell inside the current object
-being woven.
+The DIV elements at [[(f:weaveGlossaryTerm-openingDivs)]] are not closed here, but
+rather at [[(f:weaveListMarker-LGlossaryItemEnd)]]. We have to do it this way
+because only we know about the unique link anchor (which [[f:weaveListMarker]] can't
+know about because it is woven first before [[f:weaveGlossaryTerm]], as the
+~LGlossaryItemStart~ marker will come before the ~GlossaryTerm~ cell).
 
-The ~dlStart~ and ~dlEnd~ bits don't really mean much if we have glossary terms
-inside list items, because each list item marker in between each item will break
-up the continuity of glossary terms. So we'll end up with multiple singleton
-description lists (each with just one glossary term in it) instead of just one
-description list tag with multiple terms. This is not the most elegant result,
-but it is what it is.
-
-For example, look at the HTML for the following:
-
-  - a :: This is in its own ~<dl>~ tag.
-
-  - b :: This is also in its own (separate) ~<dl>~ tag.
-
-Contrast this with the following which share the same ~<dl>~ tag:
-
-c :: x
-
-d :: y
+The weaving of the ~<dl>~ and ~</dl>~ elements (which must enclose the ~<dt>~ and ~<dd>~
+elements) is handled in [[f:weaveListMarker]].
 
 ** Weaving all glossary terms
 :PROPERTIES:
@@ -4275,24 +4258,23 @@ weaveGlossary isGlobal = do
   if
     | Just originObj <-
         lookup weaveConf.originObjectPath weaveConf.archive.objects -> do
-        let terms :: [(LCI, GPath)]
+        let terms :: [((LCI, LCI), GPath)]
             terms
               | isGlobal =
-                  map (\((_term, path), lciPair) -> (fst lciPair, path))
+                  map (\((_term, path), lciPair) -> (lciPair, path))
                     $ sortBy
                       ( comparing (toNormalizedText . CP.fromText . fst . fst)
                           <> comparing (snd . fst)
                       )
                     $ M.toList weaveConf.archive.glossary
               | otherwise =
-                  map (\(_term, lciPair) -> (fst lciPair, weaveConf.originObjectPath))
+                  map (\(_term, lciPair) -> (lciPair, weaveConf.originObjectPath))
                     $ sortBy
                       (comparing (toNormalizedText . CP.fromText . fst)) -- (ref:glossary-term-compare-visible)
                     $ M.toList originObj.orgDoc.glossary
-            terms' = zip (True : repeat False) terms
-        when (terms' /= []) $ toHtmlRaw @Text "<dl class=\"global-glossary\">"
-        forM_ terms' weaveCollectedGlossaryTerm
-        when (terms' /= []) $ toHtmlRaw @Text "</dl>"
+        when (terms /= []) $ toHtmlRaw @Text "<dl class=\"global-glossary\">"
+        forM_ terms weaveCollectedGlossaryTerm
+        when (terms /= []) $ toHtmlRaw @Text "</dl>"
     | otherwise -> pure ()
 #+end_src
 
@@ -4325,52 +4307,51 @@ to give the user additional context.
 
 #+name: f:weaveCollectedGlossaryTerm
 #+begin_src haskell
-weaveCollectedGlossaryTerm :: (Bool, (LCI, GPath)) -> HtmlWeaver ()
-weaveCollectedGlossaryTerm (isFirstTerm, (lci, objPath)) = do
+weaveCollectedGlossaryTerm :: ((LCI, LCI), GPath) -> HtmlWeaver ()
+weaveCollectedGlossaryTerm (lciPair@(lciStart, _), objPath) = do
   weaveConf <- ask
   if
     | True <- objPath == weaveConf.originObjectPath, -- (ref:internal-term)
       Just originObj <-
         lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just internalCell <- originObj.orgDoc.cells !!? lci.unLCI,
+      Just internalCell <- originObj.orgDoc.cells !!? lciStart.unLCI,
       CGlossaryTerm glossaryTerm <- internalCell -> do
-        let linkAnchor = getLinkAnchor (Just lci) internalCell
-        dt_ maybeInnerVerticalMargin $ do
-          weaveProse glossaryTerm.term
-        dd_ $ do
-          a_ [href_ $ "#" <> linkAnchor] $ do
-            toHtml @Text "↑"
-          weaveProse glossaryTerm.definition
+        let linkAnchor = getLinkAnchor (Just lciStart) internalCell
+        div_ [class_ "glossary-term"] $ do
+          dt_ [] $ do
+            weaveProse glossaryTerm.term
+          dd_ $ do
+            a_ [href_ $ "#" <> linkAnchor] $ do
+              toHtml @Text "↑"
+            weaveProse glossaryTerm.definition
+            weaveRemainingGlossaryDefinition lciPair originObj.orgDoc.cells
     | True <- objPath /= weaveConf.originObjectPath, -- (ref:external-term)
       Just extObj <- lookup objPath weaveConf.archive.objects,
-      Just externalCell <- extObj.orgDoc.cells !!? lci.unLCI,
+      Just externalCell <- extObj.orgDoc.cells !!? lciStart.unLCI,
       CGlossaryTerm glossaryTerm <- externalCell,
       Just (externalLinkAnchor, externalOrgDocName) <-
         getRootRelativeOrgDocCellLink
           weaveConf
           objPath
-          lci
+          lciStart
           externalCell -> do
-        dt_ maybeInnerVerticalMargin $ do
-          weaveProse glossaryTerm.term
-        dd_ $ do
-          a_ [href_ externalLinkAnchor] $ do
-            span_ [class_ "glossary-external-source"] $ do
-              weaveProse
-                $ Prose
-                  [ PTokenStyledText
-                      StyledText
-                        { body = "[" <> externalOrgDocName <> "]", -- (ref:external-doc-name)
-                          style = styleMaskFrom []
-                        }
-                  ]
-          weaveProse glossaryTerm.definition
+        div_ [class_ "glossary-term"] $ do
+          dt_ [] $ do
+            weaveProse glossaryTerm.term
+          dd_ $ do
+            a_ [href_ externalLinkAnchor] $ do
+              span_ [class_ "glossary-external-source"] $ do
+                weaveProse
+                  $ Prose
+                    [ PTokenStyledText
+                        StyledText
+                          { body = "[" <> externalOrgDocName <> "]", -- (ref:external-doc-name)
+                            style = styleMaskFrom []
+                          }
+                    ]
+            weaveProse glossaryTerm.definition
+            weaveRemainingGlossaryDefinition lciPair extObj.orgDoc.cells
     | otherwise -> toHtml @Text "error: glossary term processing error"
-  where
-    maybeInnerVerticalMargin =
-      if isFirstTerm
-        then []
-        else [class_ "inner-dt"]
 #+end_src
 
 The branch of code at [[(internal-term)]] weaves internal terms (terms that are
@@ -4460,12 +4441,32 @@ getLinkToGCI weaveConf gci
   | otherwise = Nothing
 #+end_src
 
+Going back to [[f:weaveCollectedGlossaryTerm]], [[f:weaveRemainingGlossaryDefinition]]
+weaves all cells that belong to a glossary, except for the first cell, with
+[[f:weaveCell]]. That's because the first one is expected to be woven by
+[[f:weaveCollectedGlossaryTerm]]. Because [[f:weaveCell]] is simple, we'll get repeated
+HTML IDs and such (because at least for internal glossary items we'll be
+effectively weaving them twice, first in their original location and again as a
+separate collection in [[f:weaveCollectedGlossaryTerm]]), but that's probably fine
+for now. Also if there are any internal links, they will break (unless they use
+the document or heading UUID).
+
+#+name: f:weaveRemainingGlossaryDefinition
+#+begin_src haskell
+weaveRemainingGlossaryDefinition :: (LCI, LCI) -> [Cell] -> HtmlWeaver ()
+weaveRemainingGlossaryDefinition (lciStart, lciEnd) cells = do
+  let start = lciStart.unLCI
+      end = lciEnd.unLCI
+      selected = take (end - start + 1) $ drop start cells
+      remaining = drop 1 $ zip (map LCI [start .. end]) selected
+  forM_ remaining weaveCell
+#+end_src
+
 ** CSS
 
 For glossary terms, we want to place the definition (~<dd>~) on the /same line/ as
-the term (~<dt>~). Because this is not the default behavior (by default the two
-are placed each on their own lines) we place a newline character (the string ~\a~
-in CSS) after a ~<dd>~ at [[(newline-after-dd)]].
+the term (~<dt>~). This is accomplished with the inline ~display~ settings
+[[(css:Glossary terms-inline-dt)]] [[(css:Glossary terms-inline-dd)]].
 
 #+name: css:Glossary terms
 #+begin_src haskell
@@ -4474,27 +4475,26 @@ dl ? do
 dl # ".global-glossary" ? do
   margin (rem 0.5) (rem 0) (rem 0.5) (rem 1.5) -- (ref:css:Glossary terms-overall-indent)
 dt ? do
-  display inlineBlock
+  display inlineBlock -- (ref:css:Glossary terms-inline-dt)
+  marginTop $ rem 0.5
   marginLeft $ rem (-1.5) -- (ref:css:Glossary terms-negative-indent-first-line)
   fontWeight bold
   fontSans
-  ".inner-dt" & do
-    marginTop $ rem 1
 dd ? do
-  display inline
+  display inline -- (ref:css:Glossary terms-inline-dd)
   marginLeft $ rem 0
   "::before" & do
     "content" -: "\" ‣ \""
-  "::after" & do
-    "content" -: "\"\\a\"" -- (ref:newline-after-dd)
-    whiteSpace ClayText.pre
   a # ".glossary-term-anchor" ? do
     fontSize (rem 0.7)
     ":hover" & do
       textDecoration none
+  p ? do
+    marginTop $ rem 0.5
+    marginBottom $ rem 0
 div # ".glossary-term" ? do
   border (px 1) solid colorBg
-  padding (rem 0) (rem 0.3125) (rem 0) (rem 1.8125) -- (ref:css:Glossary terms-positive-indent-rest)
+  padding (rem 0) (rem 0.3125) (rem 0.5) (rem 1.8125) -- (ref:css:Glossary terms-positive-indent-rest)
   ".active" & do
     border (px 1) solid colorActiveBorder
     backgroundColor colorActiveBg

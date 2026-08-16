@@ -139,7 +139,6 @@ import Clay
     vh,
     visibility,
     visible,
-    whiteSpace,
     width,
     (#),
     (&),
@@ -148,7 +147,6 @@ import Clay
     (?),
     (|>),
   )
-import Clay.Text qualified as ClayText
 import Data.Bits
   ( shiftR,
     (.&.),
@@ -791,27 +789,26 @@ defaultCss = do
   dl # ".global-glossary" ? do
     margin (rem 0.5) (rem 0) (rem 0.5) (rem 1.5) --
   dt ? do
-    display inlineBlock
+    display inlineBlock --
+    marginTop $ rem 0.5
     marginLeft $ rem (-1.5) --
     fontWeight bold
     fontSans
-    ".inner-dt" & do
-      marginTop $ rem 1
   dd ? do
-    display inline
+    display inline --
     marginLeft $ rem 0
     "::before" & do
       "content" -: "\" ‣ \""
-    "::after" & do
-      "content" -: "\"\\a\"" --
-      whiteSpace ClayText.pre
     a # ".glossary-term-anchor" ? do
       fontSize (rem 0.7)
       ":hover" & do
         textDecoration none
+    p ? do
+      marginTop $ rem 0.5
+      marginBottom $ rem 0
   div # ".glossary-term" ? do
     border (px 1) solid colorBg
-    padding (rem 0) (rem 0.3125) (rem 0) (rem 1.8125) --
+    padding (rem 0) (rem 0.3125) (rem 0.5) (rem 1.8125) --
     ".active" & do
       border (px 1) solid colorActiveBorder
       backgroundColor colorActiveBg

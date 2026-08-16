@@ -109,7 +109,11 @@ import Lilac.Types
         LinkTargetURI
       ),
     ListMarker
-      ( LItemEnd,
+      ( LGlossaryGroupEnd,
+        LGlossaryGroupStart,
+        LGlossaryItemEnd,
+        LGlossaryItemStart,
+        LItemEnd,
         LItemStart,
         LOrderedEnd,
         LOrderedStart,
@@ -316,7 +320,6 @@ import Relude
     on,
     otherwise,
     pure,
-    repeat,
     reverse,
     runReaderT,
     sequence_,
@@ -674,6 +677,10 @@ weaveListMarker =
     LUnorderedEnd -> "</ul>"
     LItemStart -> "<li>"
     LItemEnd -> "</li>"
+    LGlossaryGroupStart -> "<dl>"
+    LGlossaryGroupEnd -> "</dl>"
+    LGlossaryItemStart -> "" --
+    LGlossaryItemEnd -> "</dd></div></div>" --
 
 weaveBlock :: LCI -> Block -> HtmlWeaver ()
 weaveBlock lci block = do
@@ -1371,33 +1378,23 @@ weaveFootnoteBacklink lci = do
 
 weaveGlossaryTerm :: LCI -> GlossaryTerm -> HtmlWeaver ()
 weaveGlossaryTerm lci glossaryTerm = do
-  weaveConf <- ask
-  let dlStart :: HtmlWeaver ()
-      dlStart = toHtmlRaw @Text "<dl>"
-      dlEnd :: HtmlWeaver ()
-      dlEnd = toHtmlRaw @Text "</dl>"
-      isGlossaryTerm lci' --
-        | Just originObj <-
-            lookup weaveConf.originObjectPath weaveConf.archive.objects,
-          Just internalCell <- originObj.orgDoc.cells !!? lci'.unLCI,
-          CGlossaryTerm _ <- internalCell =
-            True
-        | otherwise = False
-      isFirstGlossaryTerm = not . isGlossaryTerm . LCI $ lci.unLCI - 1
-      isLastGlossaryTerm = not . isGlossaryTerm . LCI $ lci.unLCI + 1
-  when (isFirstGlossaryTerm) dlStart --
-  wrapWithDiv lci $ do
-    div_ [id_ linkAnchor, class_ "glossary-term"] $ do
-      let maybeInnerVerticalMargin
-            | isFirstGlossaryTerm = []
-            | otherwise = [class_ "inner-dt"]
-      dt_ maybeInnerVerticalMargin $ do
-        weaveProse glossaryTerm.term
-      dd_ $ do
-        a_ [href_ $ "#" <> linkAnchor, class_ "glossary-term-anchor"] $ do
-          toHtmlRaw @Text "&#x1F517;"
-        weaveProse glossaryTerm.definition
-  when (isLastGlossaryTerm) dlEnd --
+  let openingDivs :: Text --
+      openingDivs =
+        T.concat
+          [ "<div id=\"c-",
+            T.show lci.unLCI,
+            "\" class=\"cell-idx\">",
+            "<div id=\"",
+            linkAnchor,
+            "\" class=\"glossary-term\">"
+          ]
+  toHtmlRaw openingDivs
+  dt_ [] $ do
+    weaveProse glossaryTerm.term
+  toHtmlRaw @Text "<dd>"
+  a_ [href_ $ "#" <> linkAnchor, class_ "glossary-term-anchor"] $ do
+    toHtmlRaw @Text "&#x1F517;"
+  weaveProse glossaryTerm.definition
   where
     linkAnchor = getLinkAnchor (Just lci) $ CGlossaryTerm glossaryTerm
 
@@ -1646,72 +1643,78 @@ weaveGlossary isGlobal = do
   if
     | Just originObj <-
         lookup weaveConf.originObjectPath weaveConf.archive.objects -> do
-        let terms :: [(LCI, GPath)]
+        let terms :: [((LCI, LCI), GPath)]
             terms
               | isGlobal =
-                  map (\((_term, path), lciPair) -> (fst lciPair, path))
+                  map (\((_term, path), lciPair) -> (lciPair, path))
                     $ sortBy
                       ( comparing (toNormalizedText . CP.fromText . fst . fst)
                           <> comparing (snd . fst)
                       )
                     $ M.toList weaveConf.archive.glossary
               | otherwise =
-                  map (\(_term, lciPair) -> (fst lciPair, weaveConf.originObjectPath))
+                  map (\(_term, lciPair) -> (lciPair, weaveConf.originObjectPath))
                     $ sortBy
                       (comparing (toNormalizedText . CP.fromText . fst)) --
                     $ M.toList originObj.orgDoc.glossary
-            terms' = zip (True : repeat False) terms
-        when (terms' /= []) $ toHtmlRaw @Text "<dl class=\"global-glossary\">"
-        forM_ terms' weaveCollectedGlossaryTerm
-        when (terms' /= []) $ toHtmlRaw @Text "</dl>"
+        when (terms /= []) $ toHtmlRaw @Text "<dl class=\"global-glossary\">"
+        forM_ terms weaveCollectedGlossaryTerm
+        when (terms /= []) $ toHtmlRaw @Text "</dl>"
     | otherwise -> pure ()
 
-weaveCollectedGlossaryTerm :: (Bool, (LCI, GPath)) -> HtmlWeaver ()
-weaveCollectedGlossaryTerm (isFirstTerm, (lci, objPath)) = do
+weaveCollectedGlossaryTerm :: ((LCI, LCI), GPath) -> HtmlWeaver ()
+weaveCollectedGlossaryTerm (lciPair@(lciStart, _), objPath) = do
   weaveConf <- ask
   if
     | True <- objPath == weaveConf.originObjectPath, --
       Just originObj <-
         lookup weaveConf.originObjectPath weaveConf.archive.objects,
-      Just internalCell <- originObj.orgDoc.cells !!? lci.unLCI,
+      Just internalCell <- originObj.orgDoc.cells !!? lciStart.unLCI,
       CGlossaryTerm glossaryTerm <- internalCell -> do
-        let linkAnchor = getLinkAnchor (Just lci) internalCell
-        dt_ maybeInnerVerticalMargin $ do
-          weaveProse glossaryTerm.term
-        dd_ $ do
-          a_ [href_ $ "#" <> linkAnchor] $ do
-            toHtml @Text "↑"
-          weaveProse glossaryTerm.definition
+        let linkAnchor = getLinkAnchor (Just lciStart) internalCell
+        div_ [class_ "glossary-term"] $ do
+          dt_ [] $ do
+            weaveProse glossaryTerm.term
+          dd_ $ do
+            a_ [href_ $ "#" <> linkAnchor] $ do
+              toHtml @Text "↑"
+            weaveProse glossaryTerm.definition
+            weaveRemainingGlossaryDefinition lciPair originObj.orgDoc.cells
     | True <- objPath /= weaveConf.originObjectPath, --
       Just extObj <- lookup objPath weaveConf.archive.objects,
-      Just externalCell <- extObj.orgDoc.cells !!? lci.unLCI,
+      Just externalCell <- extObj.orgDoc.cells !!? lciStart.unLCI,
       CGlossaryTerm glossaryTerm <- externalCell,
       Just (externalLinkAnchor, externalOrgDocName) <-
         getRootRelativeOrgDocCellLink
           weaveConf
           objPath
-          lci
+          lciStart
           externalCell -> do
-        dt_ maybeInnerVerticalMargin $ do
-          weaveProse glossaryTerm.term
-        dd_ $ do
-          a_ [href_ externalLinkAnchor] $ do
-            span_ [class_ "glossary-external-source"] $ do
-              weaveProse
-                $ Prose
-                  [ PTokenStyledText
-                      StyledText
-                        { body = "[" <> externalOrgDocName <> "]", --
-                          style = styleMaskFrom []
-                        }
-                  ]
-          weaveProse glossaryTerm.definition
+        div_ [class_ "glossary-term"] $ do
+          dt_ [] $ do
+            weaveProse glossaryTerm.term
+          dd_ $ do
+            a_ [href_ externalLinkAnchor] $ do
+              span_ [class_ "glossary-external-source"] $ do
+                weaveProse
+                  $ Prose
+                    [ PTokenStyledText
+                        StyledText
+                          { body = "[" <> externalOrgDocName <> "]", --
+                            style = styleMaskFrom []
+                          }
+                    ]
+            weaveProse glossaryTerm.definition
+            weaveRemainingGlossaryDefinition lciPair extObj.orgDoc.cells
     | otherwise -> toHtml @Text "error: glossary term processing error"
-  where
-    maybeInnerVerticalMargin =
-      if isFirstTerm
-        then []
-        else [class_ "inner-dt"]
+
+weaveRemainingGlossaryDefinition :: (LCI, LCI) -> [Cell] -> HtmlWeaver ()
+weaveRemainingGlossaryDefinition (lciStart, lciEnd) cells = do
+  let start = lciStart.unLCI
+      end = lciEnd.unLCI
+      selected = take (end - start + 1) $ drop start cells
+      remaining = drop 1 $ zip (map LCI [start .. end]) selected
+  forM_ remaining weaveCell
 
 getRootRelativeOrgDocCellLink ::
   WeaveConf ->
