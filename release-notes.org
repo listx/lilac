@@ -15,10 +15,23 @@ Changes:
     list items; if they are written anywhere else, they are parsed as regular
     paragraphs. COMMIT
 
+    Glossary terms may no longer be nested.
+
+    If the first item of an unordered list is a glossary term, then all
+    subsequent items at that list level must also be glossary terms. Conversely
+    if the first item is not a glossary term, then none of the list items at
+    that level may be a glossary term. This is called the uniformity rule, see
+    [[id:5a7a9462-83e3-4096-b65e-18b33420f528][Uniformity of list items that define glossary terms]].
+
     Glossary terms are also more flexible now, because you can use multiple
     cells to define them (this is unlike before where we only allowed a single
     paragraph). The inspiration comes from our work on rich blocks in v0.1.0.8.
     COMMIT
+
+    When glossary terms are first woven (at the site where they are defined), we
+    no longer weave the unordered list bullets next to them (no more weaving
+    glossary terms inside singleton ~<dl>~ lists). This reduces unnecessary
+    indentation. COMMIT
 
 ** v0.1.0.8
 
