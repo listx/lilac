@@ -65,7 +65,7 @@ data OrgDoc = OrgDoc
     pseudoEdges :: [PseudoEdge], -- (ref:data:OrgDoc-pseudoEdges)
     footnoteRefs :: Map Text (Int, LCI), -- (ref:data:OrgDoc-footnoteRefs)
     glossary :: Map Text (LCI, LCI), -- (ref:data:OrgDoc-glossary)
-    lineLabels :: Map Text Int, -- (ref:data:OrgDoc-lineLabels)
+    lineLabels :: Map Text (Int, Maybe LCI), -- (ref:data:OrgDoc-lineLabels)
     cslPath :: Maybe FilePath, -- (ref:data:OrgDoc-cslPath)
     bibPaths :: [FilePath], -- (ref:data:OrgDoc-bibPaths)
     citations :: [Citation] -- (ref:data:OrgDoc-citations)
@@ -307,7 +307,7 @@ data OrgParserState = OrgParserState
     anonBlockNumber :: Int, -- (ref:data:OrgParserState-anonBlockNumber)
     anonRichBlockNumber :: Int, -- (ref:data:OrgParserState-anonRichBlockNumber)
     lineLabelNumber :: Int, -- (ref:data:OrgParserState-lineLabelNumber)
-    lineLabels :: Map Text Int, -- (ref:data:OrgParserState-lineLabels)
+    lineLabels :: Map Text (Int, Maybe LCI), -- (ref:data:OrgParserState-lineLabels)
     styleMask :: StyleMask, -- (ref:data:OrgParserState-styleMask)
     insideLinkDisplayName :: Bool, -- (ref:data:OrgParserState-insideLinkDisplayName)
     insideParagraph :: Bool, -- (ref:data:OrgParserState-insideParagraph)
@@ -475,8 +475,14 @@ the [[(data:OrgParserState-anonBlockNumber)]], but for rich blocks.
 The ~lineLabelNumber~ [[(data:OrgParserState-lineLabelNumber)]] is a sequential counter for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line
 labels]] which is reset at every block.
 
-The ~lineLabels~ map [[(data:OrgParserState-lineLabels)]] associates the label with the label
-number, and this number is used to display the link in the text (source) as well as the block (destination).
+The ~lineLabels~ map [[(data:OrgParserState-lineLabels)]] associates the label with
+the label number and also the first local cell index which references this line
+label. The label number is used to display the link in the text (source) as well
+as the block (destination). The cell index is used to make the line label link
+back to the cell where it is referenced (this is useful when it's not
+immediately obvious from the surrounding text where the line label is
+referenced, especially in cases where the line label is discussed somewhere else
+in the doc).
 
 *** Fields for prose text
 
@@ -3286,6 +3292,20 @@ oidLinkParser = do
           then LinkTargetLineLabel -- (ref:f:oidLinkParser-line-label-constructor)
           else LinkTargetOid
       edge = PseudoEdge (pState.cellNumber, linkOid) -- (ref:f:oidLinkParser-PseudoEdge)
+  if
+    | LinkTargetLineLabel _ <- linkTargetConstructor linkOid,
+      Just (num, Nothing) <- lookup name pState.lineLabels -> do
+        modify
+          ( \s ->
+              s
+                { OrgParserState.lineLabels =
+                    insert
+                      name
+                      (num, Just pState.cellNumber)
+                      pState.lineLabels
+                }
+          )
+    | otherwise -> pure ()
   modify (\s -> s {OrgParserState.pseudoEdges = edge : s.pseudoEdges})
   pure
     $ Link
@@ -4006,7 +4026,7 @@ shouldParseWithState
           ],
         footnoteRefs = M.empty,
         glossary = M.empty,
-        lineLabels = fromList [("foo", 1)],
+        lineLabels = fromList [("(foo)", (1, Just $ LCI 1))],
         cslPath = Nothing,
         bibPaths = [],
         citations = [],
@@ -4016,7 +4036,7 @@ shouldParseWithState
   defaultOrgParserState
     { anonBlockNumber = 1,
       lineLabelNumber = 1,
-      lineLabels = fromList [("foo", 1)]
+      lineLabels = fromList [("(foo)", (1, Just $ LCI 1))]
     }
 #+end_src
 
@@ -4525,13 +4545,14 @@ lineLabelParser = do
         ending = ">>" :: [Char]
     MP.label "line label" $ compressedTextParser disallowedChars ending
   _ <- string ")"
-  assertUniqueLineLabel lineLabel o
+  let lineLabelFinal = "(" <> lineLabel <> ")"
+  assertUniqueLineLabel lineLabelFinal o
   pState <- get
   pure
     $ LinkTargetLineLabel
       LinkOid
         { oid = pState.docOid,
-          name = "(" <> lineLabel <> ")"
+          name = lineLabelFinal
         }
 #+end_src
 
@@ -4551,7 +4572,7 @@ assertUniqueLineLabel lineLabel offset = do
     MP.setOffset offset
     fail
       $ "line label "
-      <> show lineLabel
+      <> (show . T.drop 1 $ T.dropEnd 1 lineLabel)
       <> " is not unique"
   let num = pState.lineLabelNumber + 1
   put
@@ -4559,7 +4580,7 @@ assertUniqueLineLabel lineLabel offset = do
       { lineLabels =
           insert
             lineLabel
-            num
+            (num, Nothing)
             pState.lineLabels,
         lineLabelNumber = num
       }
@@ -4621,7 +4642,7 @@ increment upwards. The ~lineLabels~ and ~lineLabelNumber~ fields in
 
 #+name: f:reconcileLineLabels
 #+begin_src haskell
-reconcileLineLabels :: OrgParser (Map Text Int)
+reconcileLineLabels :: OrgParser (Map Text (Int, Maybe LCI))
 reconcileLineLabels = do
   pState <- get
   let referenced = pState.lineLabelReferences

@@ -402,7 +402,7 @@ data OrgDoc = OrgDoc
     pseudoEdges :: [PseudoEdge], --
     footnoteRefs :: Map Text (Int, LCI), --
     glossary :: Map Text (LCI, LCI), --
-    lineLabels :: Map Text Int, --
+    lineLabels :: Map Text (Int, Maybe LCI), --
     cslPath :: Maybe FilePath, --
     bibPaths :: [FilePath], --
     citations :: [Citation] --
@@ -447,7 +447,7 @@ data OrgParserState = OrgParserState
     anonBlockNumber :: Int, --
     anonRichBlockNumber :: Int, --
     lineLabelNumber :: Int, --
-    lineLabels :: Map Text Int, --
+    lineLabels :: Map Text (Int, Maybe LCI), --
     styleMask :: StyleMask, --
     insideLinkDisplayName :: Bool, --
     insideParagraph :: Bool, --

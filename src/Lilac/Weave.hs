@@ -967,7 +967,9 @@ weaveLink maybeParentBlock link = do
           LinkTargetLineLabel lineLabel ->
             if isJust maybeParentBlock
               then [id_ ("ll-" <> toSafeHtmlId lineLabel.name)] --
-              else []
+              else
+                let compositeId = "xxxx"
+                 in [id_ compositeId]
           _ -> case maybeParentBlock of
             Just parentBlock ->
               let parentBlockId = getLinkAnchor Nothing $ CBlock parentBlock
@@ -992,7 +994,16 @@ weaveLinkTarget insideBlock linkTarget = do
   case linkTarget of
     LinkTargetOid linkOid -> weaveLinkTargetLinkOid linkOid
     LinkTargetLineLabel linkOid
-      | insideBlock -> pure internalLineLabelTarget --
+      | Just originObj <-
+          lookup weaveConf.originObjectPath weaveConf.archive.objects,
+        True <- insideBlock,
+        Just (_, maybeLCI) <- lookup linkOid.name originObj.orgDoc.lineLabels -> do
+          if
+            | Just lci <- maybeLCI,
+              Just cell <- originObj.orgDoc.cells !!? lci.unLCI -> do
+                let linkAnchor = getLinkAnchor (Just lci) cell
+                pure $ "#" <> linkAnchor
+            | otherwise -> pure internalLineLabelTarget --
       | Just originObj <-
           lookup weaveConf.originObjectPath weaveConf.archive.objects,
         originObj.orgDoc.oid == linkOid.oid ->
@@ -1040,9 +1051,9 @@ weaveLinkDisplayName link = do
             | link.name /= [] -> link.name
             | Just gci <- lookup lineLabel weaveConf.archive.symbols,
               Just (obj, _) <- gciToObjCell weaveConf.archive gci,
-              Just num <-
+              Just (num, _) <-
                 lookup
-                  (T.drop 1 $ T.dropEnd 1 lineLabel.name)
+                  lineLabel.name
                   obj.orgDoc.lineLabels ->
                 if
                   | Just originObj <-

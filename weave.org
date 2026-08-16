@@ -2233,7 +2233,9 @@ weaveLink maybeParentBlock link = do
           LinkTargetLineLabel lineLabel ->
             if isJust maybeParentBlock
               then [id_ ("ll-" <> toSafeHtmlId lineLabel.name)] -- (ref:line label self-link)
-              else []
+              else
+                let compositeId = "xxxx"
+                 in [id_ compositeId]
           _ -> case maybeParentBlock of
             Just parentBlock ->
               let parentBlockId = getLinkAnchor Nothing $ CBlock parentBlock
@@ -2279,9 +2281,9 @@ weaveLinkDisplayName link = do
             | link.name /= [] -> link.name
             | Just gci <- lookup lineLabel weaveConf.archive.symbols,
               Just (obj, _) <- gciToObjCell weaveConf.archive gci,
-              Just num <-
+              Just (num, _) <-
                 lookup
-                  (T.drop 1 $ T.dropEnd 1 lineLabel.name)
+                  lineLabel.name
                   obj.orgDoc.lineLabels ->
                 if
                   | Just originObj <-
@@ -2319,7 +2321,16 @@ weaveLinkTarget insideBlock linkTarget = do
   case linkTarget of
     LinkTargetOid linkOid -> weaveLinkTargetLinkOid linkOid
     LinkTargetLineLabel linkOid
-      | insideBlock -> pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-self-link)
+      | Just originObj <-
+          lookup weaveConf.originObjectPath weaveConf.archive.objects,
+        True <- insideBlock,
+        Just (_, maybeLCI) <- lookup linkOid.name originObj.orgDoc.lineLabels -> do
+          if
+            | Just lci <- maybeLCI,
+              Just cell <- originObj.orgDoc.cells !!? lci.unLCI -> do
+                let linkAnchor = getLinkAnchor (Just lci) cell
+                pure $ "#" <> linkAnchor
+            | otherwise -> pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-self-link)
       | Just originObj <-
           lookup weaveConf.originObjectPath weaveConf.archive.objects,
         originObj.orgDoc.oid == linkOid.oid ->
@@ -2343,7 +2354,8 @@ weaveLinkTarget insideBlock linkTarget = do
 For weaving the target to [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]], there are three cases:
 
   1) The actual labels themselves. This is where they are defined /inside/ a code
-     block, where we have to make them link to themselves
+     block, where we have to make them link to the first cell where that label
+     is used (if any). If no cell refers to it, then we just make it link to itself
      [[(f:weaveLinkTarget-self-link)]] (similar to how headings and blocks can
      link to themselves for the user to easily save the link to it).
 

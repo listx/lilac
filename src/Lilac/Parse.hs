@@ -1048,7 +1048,7 @@ assertUniqueLineLabel lineLabel offset = do
     MP.setOffset offset
     fail
       $ "line label "
-      <> show lineLabel
+      <> (show . T.drop 1 $ T.dropEnd 1 lineLabel)
       <> " is not unique"
   let num = pState.lineLabelNumber + 1
   put
@@ -1056,7 +1056,7 @@ assertUniqueLineLabel lineLabel offset = do
       { lineLabels =
           insert
             lineLabel
-            num
+            (num, Nothing)
             pState.lineLabels,
         lineLabelNumber = num
       }
@@ -1496,13 +1496,14 @@ lineLabelParser = do
         ending = ">>" :: [Char]
     MP.label "line label" $ compressedTextParser disallowedChars ending
   _ <- string ")"
-  assertUniqueLineLabel lineLabel o
+  let lineLabelFinal = "(" <> lineLabel <> ")"
+  assertUniqueLineLabel lineLabelFinal o
   pState <- get
   pure
     $ LinkTargetLineLabel
       LinkOid
         { oid = pState.docOid,
-          name = "(" <> lineLabel <> ")"
+          name = lineLabelFinal
         }
 
 oidLinkParser :: OrgParser Link
@@ -1540,6 +1541,20 @@ oidLinkParser = do
           then LinkTargetLineLabel --
           else LinkTargetOid
       edge = PseudoEdge (pState.cellNumber, linkOid) --
+  if
+    | LinkTargetLineLabel _ <- linkTargetConstructor linkOid,
+      Just (num, Nothing) <- lookup name pState.lineLabels -> do
+        modify
+          ( \s ->
+              s
+                { OrgParserState.lineLabels =
+                    insert
+                      name
+                      (num, Just pState.cellNumber)
+                      pState.lineLabels
+                }
+          )
+    | otherwise -> pure ()
   modify (\s -> s {OrgParserState.pseudoEdges = edge : s.pseudoEdges})
   pure
     $ Link

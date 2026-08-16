@@ -1262,7 +1262,7 @@ spec = do
             ],
           footnoteRefs = M.empty,
           glossary = M.empty,
-          lineLabels = fromList [("foo", 1)],
+          lineLabels = fromList [("(foo)", (1, Just $ LCI 1))],
           cslPath = Nothing,
           bibPaths = [],
           citations = [],
@@ -1272,7 +1272,7 @@ spec = do
     defaultOrgParserState
       { anonBlockNumber = 1,
         lineLabelNumber = 1,
-        lineLabels = fromList [("foo", 1)]
+        lineLabels = fromList [("(foo)", (1, Just $ LCI 1))]
       }
 
   shouldFailWithMessage
