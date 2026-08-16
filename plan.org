@@ -85,6 +85,16 @@ HTML ID. If there is more than 1 instance of ~<CHILD>~ in the parent, give the 2
 and subsequent ones a numeric suffix. This way we always link back to the first
 usage of ~<CHILD>~ in the parent block.
 
+** TODO line labels: add a link to the first reference to it (within the same doc)
+
+Sometimes it's not obvious where in the prose a line label is discussed. So we
+should allow the user to click on a line label to go to that discussion (the
+first one).
+
+When parsing, we can build up a map about all referenced line labels (and which
+local cell is referencing it). Then during weaving we can just reference this
+map.
+
 ** TODO (Git integration) add raw git links
 If there is text like 68541ad (capture unhandled edge case for parsing styled
 text, 2025-01-26) (hash, parenthetical with a YYYY-MM-DD date at the end),
