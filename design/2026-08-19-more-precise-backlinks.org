@@ -1,0 +1,246 @@
+:PROPERTIES:
+:ID:       ef49217c-71c7-4975-8c76-35407ab73441
+:END:
+#+title: Toward Bidirectionality: More Precise Backlinks
+
+Status: Proposed
+
+* Objective
+
+Decorate certain links with more precise backlinks, so that you can tell
+(easily) which other things refer back to this link. This gives us
+/bidirectionality/ for these links, which is a useful property.
+
+* Background
+:PROPERTIES:
+:ID:       05e53daf-dabd-4608-90c2-5e0f70164f17
+:END:
+
+There are several use cases of bidirectional links:
+
+  1) line labels (for going from the block body to the line label link in prose)
+
+  2) backlinks (for making each backlink go back to the exact link used in the
+     prose, instead of "Cell 12" or "Table 1")
+
+  3) footnotes (for going from the footnote definition back to the footnote link
+     superscript in prose)
+
+Originally we encountered a problem where sometimes, it's not clear which body
+of text uses the line label in a code block. This can happen if the code block
+is very large, or if the explanation that uses the line label sits a bit further
+away from the code block itself (the explanation could even be in another file).
+So when readers look at a lonely looking line label, they have to manually
+search for the line label link in the text.
+
+The same thing is true for backlinks --- most backlinks currently point to
+paragraph cells, but that's the finest granularity we have. You still have to
+look inside the paragraph (after clicking the backlink) to find the location
+of the backlink.
+
+A similar issue exists for footnotes (where we want to see, from the footnote
+definition at the bottom of the page) exactly where the footnote definition is
+referenced in the prose (via a superscript). While it's easy to click on a
+footnote superscript to go its definition at the bottom of the page, it's hard
+going the other way (if you start from the footnote definitions at the bottom,
+it's hard to see where these superscripts are used in the overall page).
+
+* Problem
+
+Line labels, backlinks, and footnotes are all unidirectional, when in practice
+they should be bidirectional (so that you can start from either end of the
+link). The lack of bidirectionality currently makes some links a bit mysterious
+for the reader. Mystery is the opposite of what we want from Literate
+Programming!
+
+* Constraints
+
+** Keep IDs unique
+:PROPERTIES:
+:ID:       43ff3af7-db40-4cec-92a7-e14c88856368
+:END:
+
+In our woven HTML, we want to avoid duplicating any unique IDs (each link, if it
+has an ID associated with it, must be unique in the doc).
+
+* Solution Design
+
+What we want is a kind of generalized backlink. Currently we store backlinks
+using this data structure in the Archive:
+
+#+begin_src haskell
+backlinks :: Map GPath (Map GPath [(GCI, GCI)])
+#+end_src
+
+Backlinks are a *cell-to-cell* adjacency list. The key is the GCI pair, which is
+simply an edge from the source cell to the target cell.
+
+#+begin_src txt
+Map GPath (Map GPath [(GCI, GCI)])
+      |          |       |
+      |          |       `---> List of edges (source GCI, target GCI)
+      |          `---> Source object path
+      `----> Target object path
+#+end_src
+
+This is constructed in the Archive by looking at document-level /pseudo/ edges,
+which is
+
+#+begin_src haskell
+(LCI, LinkOid)
+#+end_src
+
+going from a source cell to some named target. The idea is that a ~LinkOid~
+resolves to a named destination cell, giving us cell-to-cell edges.
+
+Unfortunately this is too coarse because the starting vertex (LCI) is only as
+accurate as the current cell, and the ~LinkOid~ is limited because it is not the
+only thing used for link targets:
+
+#+begin_src haskell
+data LinkTarget
+  = LinkTargetOid LinkOid
+  | LinkTargetLineLabel LinkOid
+  | LinkTargetFootnote Text
+  | LinkTargetURI N.URI
+  | LinkTargetFilePath FilePath
+#+end_src
+
+Instead of using cell indices as vertices, we want to use more granular things.
+For the destination vertex, we can use a /link index/, which is just an integer
+which we increment every time we see a link. This gives each link a unique
+"address" within a single document.
+
+#+begin_src haskell
+type LLI = Int
+#+end_src
+
+~LLI~ stands for /local/ link index. Similar to the mechanism as we already have for
+cell indices, namely ~LCI~ and ~GCI~ (which is just ~LCI~ with offsets), we can have a
+~LLI~ and ~GLI~ for local and global link indices.
+
+That takes care of the starting vertex. The destination vertex can be a
+~LinkTarget~, so our edge could be
+
+#+begin_src haskell
+(GLI, LinkTarget)
+#+end_src
+
+Using these more granular edges, we can now know for any given link
+target, what the backlinks are for it.
+
+There is some special consideration for footnotes:
+unlike ~LinkOid~ which embeds the OID (UUID) and are unique across files,
+~LinkTargetFootnote Text~ does not have this. This is because Orgmode does
+not support linking to footnotes across files. Because of this, whenever we see
+an edge that points to a footnote, we can use the ~GLI~ to know which document's
+footnote we are talking about (that is, the ~GLI~ and the ~LinkTargetFootnote~ are
+always assumed to be from the same document).
+
+Similar to backlinks, we can use a nested map structure like
+
+#+begin_src txt
+Map GPath (Map GPath [(GLI, LinkTarget)])
+      |          |       |
+      |          |       `---> List of edges (source GLI, target LinkTarget)
+      |          `---> Source object path
+      `----> Target object path
+#+end_src
+
+to capture all (granular) backlinks.
+
+All links in the document can be given a ~LLI~ index number to form a unique ID
+for that link, so that we can precisely target these links. This satisfies the
+constraint at [[id:43ff3af7-db40-4cec-92a7-e14c88856368][Keep IDs unique]].
+
+* Alternatives considered
+
+** Enrich links with cell index information
+
+If every link knows about the cell it resides in, then we can refer back
+(precisely) to this link. Consider the following:
+
+#+begin_src html
+...some prose in a cell...
+<a id="LINK_DATA--CELL_IDX" href="...">...</a>
+...some prose in a cell...
+#+end_src
+
+If the above link sits inside cell index 22, then we can weave it as
+
+#+begin_src html
+...some prose in a cell...
+<a id="LINK_DATA--cell-22" href="...">...</a>
+...some prose in a cell...
+#+end_src
+
+and we can use the content of the link itself (what is destination is) to
+construct the ~LINK_DATA~ part. So for example for line labels we can have
+
+#+begin_src html
+...some prose in a cell...
+<a id="line-label-foo--cell-22" href="...">...</a>
+...some prose in a cell...
+#+end_src
+
+And now when we come across the definition site of a line label in a code block
+during weave time, assuming we have a list of all links in the document, we can
+compute which cells have links that refer back to this line label. So next to
+the line label in the coe block, we can create a link like
+
+#+begin_src html
+foo <a href="line-label-foo--cell-22">...</a>
+#+end_src
+
+However, there is a problem: if we have 2 such links in the same cell, then this
+ID scheme breaks down because 2 IDs cannot have the same value (that would break
+HTML semantics). That is, we cannot have in cell 22 the following link elements
+
+#+begin_src html
+...some prose in cell 22...
+<a id="line-label-foo--cell-22" href="...">...</a>
+...some prose in cell 22...
+<a id="line-label-foo--cell-22" href="...">...</a>
+...some prose in cell 22...
+#+end_src
+
+because now those 2 links in cell 22 share the same ID.
+
+* Future work
+
+** Deprecate existing backlinks
+
+It may be the case that we can safely deprecate the old cell-to-cell backlink
+data structure, because the more granular one is always superior (it can take us
+to the exact starting link).
+
+** Add performance benchmarks
+
+It would be nice to have performance benchmarks so that we can more easily tell
+the effect of adding new features (like the one propose in this design).
+
+** Use ~local~ for the current Object being woven
+
+While orthogonal to this design doc, this idea was discoverd in the process of
+writing this design.
+
+Currently when weaving we have lots of areas where we do something like
+
+#+begin_src haskell
+  | Just originObj <-
+     lookup
+       weaveConf.originObjectPath
+       weaveConf.archive.objects,
+#+end_src
+
+in a guard, to extract the currently-being-woven Object. However this can also
+be cleaned up with the use of ~local~, so that it just becomes
+
+#+begin_src haskell
+  | Just originObj <- weaveConf.currentObj
+#+end_src
+
+#+begin_note
+Maybe we should also change the ~originObj~ naming to be ~currentObj~ or ~curObj~
+because the latter is simpler. Same for ~originObjectPath~.
+#+end_note
