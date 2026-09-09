@@ -225,6 +225,7 @@ import Lilac.Types as OrgParserState
         insideParagraph,
         lineLabelNumber,
         lineLabels,
+        linkNumber,
         listLevels,
         listMarkers,
         orgParserConf,
@@ -1065,13 +1066,23 @@ linkParser :: OrgParser Link
 linkParser = do
   failIfVerbatimOrCode
 
-  MP.choice
-    [ MP.try oidLinkParser,
-      MP.try protocolWebLinkParser,
-      MP.try fileLinkParser,
-      MP.try footnoteLinkParser,
-      MP.try rawLinkParser
-    ]
+  link <-
+    MP.choice
+      [ MP.try oidLinkParser,
+        MP.try protocolWebLinkParser,
+        MP.try fileLinkParser,
+        MP.try footnoteLinkParser,
+        MP.try rawLinkParser
+      ]
+
+  modify
+    ( \s ->
+        s
+          { linkNumber = s.linkNumber + 1
+          }
+    )
+
+  pure link
 
 linkDisplayNameParser :: OrgParser [StyledText]
 linkDisplayNameParser = do
@@ -2128,7 +2139,14 @@ figureParser = do
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetFilePath _ -> do
-      modify (\s -> s {figureNumber = newFigureNumber})
+      modify
+        ( \s ->
+            s
+              { figureNumber = newFigureNumber,
+                linkNumber = s.linkNumber + 1
+              }
+        )
+
       pure
         . CFigure
         $ Figure
@@ -2924,7 +2942,8 @@ resetState =
         OrgParserState.citations = [],
         OrgParserState.cslPath = Nothing,
         OrgParserState.cellNumber = LCI 0,
-        OrgParserState.pseudoEdges = []
+        OrgParserState.pseudoEdges = [],
+        OrgParserState.linkNumber = 0
       }
 
 deleteRedundantKeys :: (Ord k) => Map k v -> [k] -> Map k v

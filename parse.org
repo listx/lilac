@@ -301,6 +301,7 @@ data OrgParserState = OrgParserState
     cellNames :: Set Text, -- (ref:data:OrgParserState-cellNames)
     cellNumber :: LCI, -- (ref:data:OrgParserState-cellNumber)
     pseudoEdges :: [PseudoEdge], -- (ref:data:OrgParserState-pseudoEdges)
+    linkNumber :: Int,
     tanglePaths :: Set Text, -- (ref:data:OrgParserState-tanglePaths)
     insideBlock :: Bool, -- (ref:data:OrgParserState-insideBlock)
     activeRichBlock :: Text, -- (ref:data:OrgParserState-activeRichBlock)
@@ -354,6 +355,7 @@ defaultOrgParserState =
       cellNames = Set.empty,
       cellNumber = LCI 0,
       pseudoEdges = [],
+      linkNumber = 0,
       tanglePaths = Set.empty,
       insideBlock = False,
       activeRichBlock = "",
@@ -789,6 +791,7 @@ import Lilac.Types as OrgParserState
         insideParagraph,
         lineLabelNumber,
         lineLabels,
+        linkNumber,
         listLevels,
         listMarkers,
         orgParserConf,
@@ -1457,7 +1460,8 @@ resetState =
         OrgParserState.citations = [],
         OrgParserState.cslPath = Nothing,
         OrgParserState.cellNumber = LCI 0,
-        OrgParserState.pseudoEdges = []
+        OrgParserState.pseudoEdges = [],
+        OrgParserState.linkNumber = 0
       }
 #+end_src
 
@@ -3215,13 +3219,23 @@ linkParser :: OrgParser Link
 linkParser = do
   failIfVerbatimOrCode
 
-  MP.choice
-    [ MP.try oidLinkParser,
-      MP.try protocolWebLinkParser,
-      MP.try fileLinkParser,
-      MP.try footnoteLinkParser,
-      MP.try rawLinkParser
-    ]
+  link <-
+    MP.choice
+      [ MP.try oidLinkParser,
+        MP.try protocolWebLinkParser,
+        MP.try fileLinkParser,
+        MP.try footnoteLinkParser,
+        MP.try rawLinkParser
+      ]
+
+  modify
+    ( \s ->
+        s
+          { linkNumber = s.linkNumber + 1
+          }
+    )
+
+  pure link
 #+end_src
 
 The call to [[f:failIfVerbatimOrCode]] fails the parser if either the [[f:isVerbatim][verbatim or
@@ -12657,7 +12671,14 @@ figureParser = do
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetFilePath _ -> do
-      modify (\s -> s {figureNumber = newFigureNumber})
+      modify
+        ( \s ->
+            s
+              { figureNumber = newFigureNumber,
+                linkNumber = s.linkNumber + 1
+              }
+        )
+
       pure
         . CFigure
         $ Figure

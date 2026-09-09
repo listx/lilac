@@ -441,6 +441,7 @@ data OrgParserState = OrgParserState
     cellNames :: Set Text, --
     cellNumber :: LCI, --
     pseudoEdges :: [PseudoEdge], --
+    linkNumber :: Int,
     tanglePaths :: Set Text, --
     insideBlock :: Bool, --
     activeRichBlock :: Text, --
@@ -488,6 +489,7 @@ defaultOrgParserState =
       cellNames = Set.empty,
       cellNumber = LCI 0,
       pseudoEdges = [],
+      linkNumber = 0,
       tanglePaths = Set.empty,
       insideBlock = False,
       activeRichBlock = "",
