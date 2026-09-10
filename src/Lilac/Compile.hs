@@ -459,7 +459,7 @@ findBrokenFileLinks =
     extractFilesFromProse prose = mapMaybe extractFileFromPToken prose.unProse
     extractFileFromPToken :: PToken -> Maybe FilePath
     extractFileFromPToken = \case
-      PTokenLink link -> extractFileFromLink link
+      PTokenLink link _ -> extractFileFromLink link
       _ -> Nothing
     extractFileFromLink :: Link -> Maybe FilePath
     extractFileFromLink (Link _ (LinkTargetFilePath filePath)) = Just filePath
@@ -652,7 +652,7 @@ findExternalOids orgDoc =
       BTokenLinkTarget linkTarget -> keepIfExternal acc linkTarget
       _ -> acc
     getLinkFromPToken acc pToken = case pToken of --
-      PTokenLink link -> keepIfExternal acc link.target
+      PTokenLink link _ -> keepIfExternal acc link.target
       _ -> acc
     symbols = mkSymbols orgDoc --
     keepIfExternal acc linkTarget = case linkTarget of --

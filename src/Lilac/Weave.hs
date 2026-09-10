@@ -633,7 +633,7 @@ weaveProse prose = sequence_ $ map weavePToken prose.unProse
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink link -> case link.target of
+  PTokenLink link _ -> case link.target of
     LinkTargetFootnote {} -> do
       sup_ [class_ "footnote-link"] $ do
         weaveLink Nothing link
@@ -1433,7 +1433,7 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
         let styles = maskToStyles styledText.style
             body = parseCslJson mempty styledText.body
          in acc <> applyStyles body styles
-      PTokenLink link ->
+      PTokenLink link _ ->
         --
         let encoded = CslLink ("LILAC_LINK\NUL" <> unparseLink link) CslEmpty
          in acc <> encoded
@@ -1557,13 +1557,13 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
                     }
                 target = LinkTargetURI uri
                 name = compressStyledText . getStyledText $ f s a
-             in [PTokenLink Link {target = target, name = name}]
+             in [PTokenLink Link {target = target, name = name} (-1)]
         | otherwise -> case (N.parseURI $ T.unpack t) of
             Nothing -> []
             Just uri ->
               let target = LinkTargetURI uri
                   name = compressStyledText . getStyledText $ f s a
-               in [PTokenLink Link {target = target, name = name}]
+               in [PTokenLink Link {target = target, name = name} (-1)]
     getStyledText [] = []
     getStyledText (pToken : rest) = case pToken of
       PTokenStyledText styledText -> styledText : getStyledText rest

@@ -3003,7 +3003,8 @@ shouldParseWith
               name =
                 [ stext "hello" []
                 ]
-            },
+            }
+          1,
         ptext " there" []
       ],
   CParagraph
@@ -3612,6 +3613,7 @@ shouldParseWithState
                           },
                     name = [stext "link-target-only" []]
                   }
+                1
             ],
         CHeading
           Heading
@@ -3629,6 +3631,7 @@ shouldParseWithState
                                 },
                           name = [stext "link-name" []]
                         }
+                      2
                   ],
               meta = fromList []
             },
@@ -3643,11 +3646,13 @@ shouldParseWithState
                             name = "a"
                           },
                     name = [stext "a" []]
-                  },
+                  }
+                3,
               ptext " b" []
             ]
       ]
       [ PseudoEdge (LCI 2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "a"}),
+        PseudoEdge (LCI 1, LinkOid {oid = fromWords 0 0, name = "link-target"}),
         PseudoEdge (LCI 0, LinkOid {oid = fromWords 0 0, name = "link-target-only"})
       ]
   )
@@ -3687,6 +3692,7 @@ shouldParseWithState
                             },
                       name = [stext "a/b/c" []]
                     }
+                  1
               ]
         ],
       pseudoEdges =
@@ -3773,7 +3779,8 @@ shouldParseWith
                     name =
                       [ stext "id:442c807f-c9d9-45a7-88bf-ffffffffffff" []
                       ]
-                  },
+                  }
+                1,
               ptext " " [],
               PTokenLink
                 Link
@@ -3786,7 +3793,8 @@ shouldParseWith
                     name =
                       [ stext "bar" []
                       ]
-                  },
+                  }
+                2,
               ptext " " [],
               PTokenLink
                 Link
@@ -3801,7 +3809,8 @@ shouldParseWith
                         stext " " [],
                         stext "[]" [Verbatim]
                       ]
-                  },
+                  }
+                3,
               ptext " " [],
               PTokenLink
                 Link
@@ -3816,7 +3825,8 @@ shouldParseWith
                         stext " " [],
                         stext "ok" []
                       ]
-                  },
+                  }
+                4,
               ptext " " [],
               PTokenLink
                 Link
@@ -3827,7 +3837,8 @@ shouldParseWith
                             name = "foo"
                           },
                     name = [stext "abc" []]
-                  },
+                  }
+                5,
               ptext " " [],
               PTokenLink
                 Link
@@ -3839,6 +3850,7 @@ shouldParseWith
                           },
                     name = [stext "abc" []]
                   }
+                6
             ],
         CListItem
           [ LUnorderedStart,
@@ -3865,6 +3877,7 @@ shouldParseWith
                             name = "foo"
                           }
                   }
+                7
             ],
         CListItem
           [ LItemEnd,
@@ -3883,6 +3896,7 @@ shouldParseWith
                             name = "foo bar baz"
                           }
                   }
+                8
             ],
         CListItem
           [ LItemEnd,
@@ -3901,6 +3915,7 @@ shouldParseWith
                             name = "a b c"
                           }
                   }
+                9
             ],
         CListItem
           [ LItemEnd,
@@ -3955,6 +3970,7 @@ shouldParseWith
                           },
                     name = [stext "foo" []]
                   }
+                1
             ]
       ]
       [PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "target name with newline and space is still treated as space"})]
@@ -4007,7 +4023,8 @@ shouldParseWithState
                         target =
                           LinkTargetLineLabel
                             LinkOid {oid = nilOid, name = "(foo)"}
-                      },
+                      }
+                    1,
                   ptext " " [],
                   PTokenLink
                     Link
@@ -4020,6 +4037,7 @@ shouldParseWithState
                           LinkTargetLineLabel
                             LinkOid {oid = nilOid, name = "(foo)"}
                       }
+                    2
                 ]
           ],
         pseudoEdges =
@@ -4134,7 +4152,8 @@ shouldParseWith
                             N.uriFragment = ""
                           },
                     name = [stext "http://foo.org" []]
-                  },
+                  }
+                1,
               ptext " " [],
               PTokenLink
                 Link
@@ -4154,7 +4173,8 @@ shouldParseWith
                             N.uriFragment = ""
                           },
                     name = [stext "https://foo.org" []]
-                  },
+                  }
+                2,
               ptext " " [],
               PTokenLink
                 Link
@@ -4174,7 +4194,8 @@ shouldParseWith
                             N.uriFragment = ""
                           },
                     name = [stext "hello" []]
-                  },
+                  }
+                3,
               ptext " " [],
               PTokenLink
                 Link
@@ -4189,6 +4210,7 @@ shouldParseWith
                           },
                     name = [stext "email" []]
                   }
+                4
             ]
       ]
       []
@@ -4271,7 +4293,8 @@ shouldParseWith
               Link
                 { target = LinkTargetFilePath "foo/bar",
                   name = [stext "foo/bar" []]
-                },
+                }
+              1,
             ptext ")" []
           ]
     ]
@@ -4395,7 +4418,8 @@ shouldParseWith
                           N.uriFragment = ""
                         },
                   name = [stext "https://foo.org" []]
-                },
+                }
+              1,
             ptext ", or " [],
             PTokenLink
               Link
@@ -4415,7 +4439,8 @@ shouldParseWith
                           N.uriFragment = ""
                         },
                   name = [stext "https://bar.net" []]
-                },
+                }
+              2,
             ptext ". Try " [],
             PTokenLink
               Link
@@ -4435,7 +4460,8 @@ shouldParseWith
                           N.uriFragment = ""
                         },
                   name = [stext "http://localhost:3000" []]
-                },
+                }
+              3,
             ptext "? Go to " [],
             PTokenLink
               Link
@@ -4455,7 +4481,8 @@ shouldParseWith
                           N.uriFragment = ""
                         },
                   name = [stext "ftp://10.0.0.1" []]
-                },
+                }
+              4,
             ptext "! " [],
             PTokenLink
               Link
@@ -4476,6 +4503,7 @@ shouldParseWith
                         },
                   name = [stext "https://a.com/path/to/something/" []]
                 }
+              5
           ]
     ]
     []
@@ -4909,7 +4937,8 @@ Hello [fn:hello] world.
           Link
             { target = LinkTargetFootnote "hello",
               name = [stext "1" []]
-            },
+            }
+          1,
         ptext " world." []
       ],
   CFootnote
@@ -4979,13 +5008,15 @@ Hello [fn:a] world. [fn:b]
           Link
             { target = LinkTargetFootnote "a",
               name = [stext "1" []]
-            },
+            }
+          1,
         ptext " world." [],
         PTokenLink
           Link
             { target = LinkTargetFootnote "b",
               name = [stext "2" []]
             }
+          2
       ],
   CFootnote
     Footnote
@@ -6506,7 +6537,7 @@ to the list of all citations in the entire document, collected in
 type PToken :: Type
 data PToken
   = PTokenStyledText StyledText
-  | PTokenLink Link
+  | PTokenLink Link Int
   | PTokenCitation Int
   | PTokenMathFragment MathFragment
   | PTokenDivStart Text
@@ -6553,14 +6584,14 @@ proseParser spaceConsumer = do
           StyledText {body = s, style = st.styleMask}
     baseParsers avoidCitations
       | avoidCitations =
-          [ PTokenLink <$> linkParser,
+          [ parseLink,
             PTokenMathFragment <$> mathFragmentInlineParser,
             PTokenStyledText <$> styleMarkerParser,
             PTokenStyledText <$> styledTextParser
           ]
       | otherwise =
           [ PTokenCitation <$> citationParser,
-            PTokenLink <$> linkParser,
+            parseLink,
             PTokenMathFragment <$> mathFragmentInlineParser,
             PTokenStyledText <$> styleMarkerParser,
             PTokenStyledText <$> styledTextParser
@@ -6569,6 +6600,11 @@ proseParser spaceConsumer = do
     nonEmpty = \case
       PTokenStyledText styledText -> not $ T.null styledText.body
       _ -> True
+    parseLink :: OrgParser PToken
+    parseLink = do
+      link <- linkParser
+      s <- get
+      pure $ PTokenLink link s.linkNumber
 #+end_src
 
 We first parse among the non-whitespace parsers in ~baseParsers~
@@ -6757,7 +6793,7 @@ the parsing first.
 fromText input = case MP.runParser
   ( runStateT
       customProseParser -- (ref:citeproc-customProseParser)
-      defaultOrgParserState
+      defaultOrgParserState {linkNumber = -1000}
   )
   ""
   input of
@@ -6803,7 +6839,7 @@ toText prose = foldl' f T.empty prose.unProse
       PTokenStyledText styledText
         | T.null styledText.body -> acc
         | otherwise -> acc <> unparseStyledText styledText
-      PTokenLink link -> acc <> unparseLink link
+      PTokenLink link _ -> acc <> unparseLink link
       PTokenMathFragment mathFragment -> acc <> unparseMathFragment mathFragment
       _ -> acc
 #+end_src
@@ -7201,6 +7237,7 @@ addHyperlink url prose = Prose $ maybeToList link <> prose.unProse
                   ],
                 target = LinkTargetURI uri
               }
+            (-1)
 #+end_src
 
 We don't support localization of quotes.
@@ -7272,6 +7309,7 @@ describe "Text to Prose round trip" $ do
                           name = ""
                         }
                 }
+              (-999)
           ]
       ),
       ( "[[id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2][*foo*]]",
@@ -7286,6 +7324,7 @@ describe "Text to Prose round trip" $ do
                           name = ""
                         }
                 }
+              (-999)
           ]
       ),
       ( "[[id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3::abc][/bar/]]",
@@ -7300,6 +7339,7 @@ describe "Text to Prose round trip" $ do
                           name = "abc"
                         }
                 }
+              (-999)
           ]
       )
     ]
@@ -7312,6 +7352,7 @@ describe "Text to Prose round trip" $ do
                 { name = [stext "1" []],
                   target = LinkTargetFootnote "abc"
                 }
+              (-999)
           ]
       ),
       ( "[fn:abc][fn:xyz][fn:abc]",
@@ -7320,17 +7361,20 @@ describe "Text to Prose round trip" $ do
               Link
                 { name = [stext "1" []],
                   target = LinkTargetFootnote "abc"
-                },
+                }
+              (-999),
             PTokenLink
               Link
                 { name = [stext "2" []],
                   target = LinkTargetFootnote "xyz"
-                },
+                }
+              (-998),
             PTokenLink
               Link
                 { name = [stext "1" []],
                   target = LinkTargetFootnote "abc"
                 }
+              (-997)
           ]
       )
     ]
@@ -7357,6 +7401,7 @@ describe "Text to Prose round trip" $ do
                           N.uriFragment = ""
                         }
                 }
+              (-999)
           ]
       ),
       ( "https://foo2.org",
@@ -7380,6 +7425,7 @@ describe "Text to Prose round trip" $ do
                           N.uriFragment = ""
                         }
                 }
+              (-999)
           ]
       )
     ]
@@ -7392,6 +7438,7 @@ describe "Text to Prose round trip" $ do
                 { name = [stext "foo/bar" []],
                   target = LinkTargetFilePath "foo/bar"
                 }
+              (-999)
           ]
       ),
       ( "[[file:foo/bar][baz]]",
@@ -7401,6 +7448,7 @@ describe "Text to Prose round trip" $ do
                 { name = [stext "baz" []],
                   target = LinkTargetFilePath "foo/bar"
                 }
+              (-999)
           ]
       )
     ]
@@ -7790,13 +7838,15 @@ headingParser = do
           (lookup "ID" props)
           lenStars
           pState.headingOidStack
-  put
-    pState
-      { headingLevel = lenStars,
-        headingSectionNumber = newHeadingSection,
-        headingOidStack = newHeadingOidStack,
-        insideHeading = False
-      }
+  modify
+    ( \s ->
+        s
+          { headingLevel = lenStars,
+            headingSectionNumber = newHeadingSection,
+            headingOidStack = newHeadingOidStack,
+            insideHeading = False
+          }
+    )
   pure
     $ CHeading
       Heading
@@ -12659,15 +12709,17 @@ figureParser = do
             >> endOfCell -- (ref:f:figureParser-endOfCell)
         )
   metaKVs <- metaParser -- (ref:f:figureParser-metadata)
+  pState' <- get
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
-  caption <- case lookup "caption" metaKVs of -- (ref:f:figureParser-caption)
-    Nothing -> pure $ Prose []
-    Just s -> case MP.runParser (runStateT captionParser pState) "" s of
+  (caption, pStateNew) <- case lookup "caption" metaKVs of -- (ref:f:figureParser-caption)
+    Nothing -> pure (Prose [], pState')
+    Just s -> case MP.runParser (runStateT captionParser pState') "" s of
       Left err -> fail $ MP.errorBundlePretty err
-      Right (prose, _pState) -> pure prose
+      Right res -> pure res
+  put pStateNew
   link <- fileLinkParser -- (ref:f:figureParser-link)
-  let newFigureNumber = pState.figureNumber + 1
+  let newFigureNumber = pStateNew.figureNumber + 1
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetFilePath _ -> do
@@ -12683,7 +12735,7 @@ figureParser = do
         . CFigure
         $ Figure
           { parentOid =
-              firstParentOid pState.docOid pState.headingOidStack,
+              firstParentOid pStateNew.docOid pStateNew.headingOidStack,
             meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
@@ -12824,6 +12876,7 @@ shouldParseWithState
                   { target = LinkTargetFilePath "not-figure",
                     name = [stext "not-figure" []]
                   }
+                3
             ],
         CListItem
           [ LItemEnd,
@@ -12836,6 +12889,7 @@ shouldParseWithState
                   { target = LinkTargetFilePath "not-a-figure-2",
                     name = [stext "not-a-figure-2" []]
                   }
+                4
             ],
         CParagraph
           $ Prose
@@ -12849,6 +12903,7 @@ shouldParseWithState
                           },
                     name = [stext "not a figure" []]
                   }
+                5
             ],
         CFigure
           Figure
@@ -12959,24 +13014,25 @@ The [[f:tableParser]] parses tables.
 #+begin_src haskell
 tableParser :: OrgParser Cell
 tableParser = do
-  pState <- get
   _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
   metaKVs <- metaParser
-  caption <- case lookup "caption" metaKVs of
-    Nothing -> pure $ Prose []
+  pState <- get
+  (caption, pStateNew) <- case lookup "caption" metaKVs of
+    Nothing -> pure (Prose [], pState)
     Just s -> case MP.runParser (runStateT captionParser pState) "" s of -- (ref:f:tableParser-MP.runParser)
       Left err -> fail $ MP.errorBundlePretty err
-      Right (prose, _pState) -> pure prose
+      Right res -> pure res
+  put pStateNew
   rows <- MP.some $ tableLineParser <|> tableRowParser
   _ <- MP.optional tableFormulaParser -- (ref:f:tableParser-tableFormulaParser)
-  let newTableNumber = pState.tableNumber + 1
+  let newTableNumber = pStateNew.tableNumber + 1
       grid = fromList $ rowsToTuples rows -- (ref:f:tableParser-rowsToTuples)
   modify (\s -> s {tableNumber = newTableNumber})
   pure
     . CTable
     $ Table
       { parentOid =
-          firstParentOid pState.docOid pState.headingOidStack,
+          firstParentOid pStateNew.docOid pStateNew.headingOidStack,
         meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         caption = caption,
         textAlign = getTextAlign grid, -- (ref:f:tableParser-getTextAlign)
@@ -13339,7 +13395,8 @@ shouldParseWithState
   "0012-tables-and-prose"
   ( nilOrgDoc
       <<Expected cells for 0012-tables-and-prose>>
-      []
+      [ PseudoEdge (LCI 0, LinkOid {oid = fromWords 0 0, name = "tbl:famous-eqs"})
+      ]
   )
   defaultOrgParserState
     { cellNames =
@@ -13378,7 +13435,8 @@ shouldParseWithState
                     target =
                       LinkTargetOid
                         LinkOid {oid = nilOid, name = "tbl:famous-eqs"}
-                  },
+                  }
+                1,
               ptext "." [],
               ptext " " [],
               PTokenMathFragment
@@ -13437,6 +13495,7 @@ shouldParseWithState
                                 },
                           name = [stext "Wiki" []]
                         }
+                      2
                   ]
               ),
               ( (4, 1),
@@ -13476,6 +13535,7 @@ shouldParseWithState
                                 },
                           name = [stext "Wiki" []]
                         }
+                      3
                   ]
               ),
               ((5, 1), Prose [ptext "Unknown" []]),
@@ -13589,6 +13649,7 @@ shouldParseWithState
                                 },
                           name = [stext "Wiki" []]
                         }
+                      1
                   ]
               ),
               ( (4, 1),
@@ -13628,6 +13689,7 @@ shouldParseWithState
                                 },
                           name = [stext "Wiki" []]
                         }
+                      2
                   ]
               )
             ]

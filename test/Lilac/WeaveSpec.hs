@@ -146,7 +146,8 @@ spec = do
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
-                          },
+                          }
+                        (-1),
                       ptext ", " [],
                       PTokenLink
                         Link
@@ -160,7 +161,8 @@ spec = do
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
-                          },
+                          }
+                        (-1),
                       ptext ", " [],
                       PTokenLink
                         Link
@@ -174,7 +176,8 @@ spec = do
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
-                          },
+                          }
+                        (-1),
                       ptext ", " [],
                       PTokenLink
                         Link
@@ -189,6 +192,7 @@ spec = do
                                     N.uriFragment = ""
                                   }
                           }
+                        (-1)
                     ]
                 }
             ],
@@ -235,7 +239,8 @@ spec = do
                                       N.uriQuery = "",
                                       N.uriFragment = ""
                                     }
-                            },
+                            }
+                          (-1),
                         ptext "." [],
                         PTokenDivEnd
                       ]
@@ -269,7 +274,8 @@ spec = do
                                       N.uriQuery = "",
                                       N.uriFragment = ""
                                     }
-                            },
+                            }
+                          (-1),
                         ptext "." [],
                         PTokenDivEnd
                       ]
@@ -305,7 +311,8 @@ spec = do
                                       N.uriQuery = "",
                                       N.uriFragment = ""
                                     }
-                            },
+                            }
+                          (-1),
                         ptext "." [],
                         PTokenDivEnd
                       ]
@@ -335,6 +342,7 @@ spec = do
                                     N.uriFragment = ""
                                   }
                           }
+                        (-1)
                     ]
                 }
             ],
@@ -375,7 +383,8 @@ spec = do
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
-                          },
+                          }
+                        (-1),
                       ptext "]" []
                     ]
                 }
@@ -415,7 +424,8 @@ spec = do
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
-                          },
+                          }
+                        (-1),
                       ptext "]" []
                     ]
                 }
@@ -458,7 +468,8 @@ spec = do
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
-                          },
+                          }
+                        (-1),
                       ptext "and really " [],
                       ptext "amazing" [Code],
                       ptext "global suffix]" []
@@ -501,7 +512,8 @@ spec = do
                         Link
                           { name = [stext "1" []],
                             target = LinkTargetFootnote "@a"
-                          },
+                          }
+                        (-999),
                       PTokenLink
                         Link
                           { name = [stext "Knuth 1992" []],
@@ -514,7 +526,8 @@ spec = do
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
-                          },
+                          }
+                        (-1),
                       ptext "and really " [],
                       ptext "amazing" [Code],
                       ptext "; some bit of " [],
@@ -532,7 +545,8 @@ spec = do
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
-                          },
+                          }
+                        (-1),
                       ptext "thing global suffix with OID link " [],
                       PTokenLink
                         Link
@@ -543,7 +557,8 @@ spec = do
                                   { oid = nilOid,
                                     name = "foo"
                                   }
-                          },
+                          }
+                        (-999),
                       ptext "]" []
                     ]
                 }
@@ -582,7 +597,8 @@ spec = do
                                       N.uriQuery = "",
                                       N.uriFragment = ""
                                     }
-                            },
+                            }
+                          (-1),
                         ptext ". " [],
                         ptext "Proceedings of the London Mathematical Society" [Italic],
                         ptext " " [],
@@ -623,7 +639,8 @@ spec = do
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
-                          },
+                          }
+                        (-1),
                       ptext "]" []
                     ]
                 },
@@ -642,7 +659,8 @@ spec = do
                                     N.uriQuery = "",
                                     N.uriFragment = ""
                                   }
-                          },
+                          }
+                        (-1),
                       ptext "]" []
                     ]
                 }
@@ -681,7 +699,8 @@ spec = do
                                       N.uriQuery = "",
                                       N.uriFragment = ""
                                     }
-                            },
+                            }
+                          (-1),
                         ptext ". " [],
                         ptext "Proceedings of the London Mathematical Society" [Italic],
                         ptext " " [],

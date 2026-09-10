@@ -289,7 +289,7 @@ getProseContents prose = join $ foldl' f [] prose.unProse
     join = T.intercalate "" . reverse
     f acc = \case
       PTokenStyledText styledText -> styledText.body : acc
-      PTokenLink link ->
+      PTokenLink link _ ->
         let linkText =
               join
                 $ foldl'
@@ -541,7 +541,7 @@ instance Monoid Prose where
 type PToken :: Type
 data PToken
   = PTokenStyledText StyledText
-  | PTokenLink Link
+  | PTokenLink Link Int
   | PTokenCitation Int
   | PTokenMathFragment MathFragment
   | PTokenDivStart Text
@@ -799,7 +799,7 @@ stripLinks (Prose pTokens) = Prose (concatMap stripLink pTokens)
   where
     stripLink :: PToken -> [PToken]
     stripLink = \case
-      PTokenLink link -> map (PTokenStyledText $) link.name
+      PTokenLink link _ -> map (PTokenStyledText $) link.name
       pToken -> [pToken]
 
 stripStyles :: Prose -> Prose

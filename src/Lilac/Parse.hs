@@ -603,13 +603,15 @@ headingParser = do
           (lookup "ID" props)
           lenStars
           pState.headingOidStack
-  put
-    pState
-      { headingLevel = lenStars,
-        headingSectionNumber = newHeadingSection,
-        headingOidStack = newHeadingOidStack,
-        insideHeading = False
-      }
+  modify
+    ( \s ->
+        s
+          { headingLevel = lenStars,
+            headingSectionNumber = newHeadingSection,
+            headingOidStack = newHeadingOidStack,
+            insideHeading = False
+          }
+    )
   pure
     $ CHeading
       Heading
@@ -704,14 +706,14 @@ proseParser spaceConsumer = do
           StyledText {body = s, style = st.styleMask}
     baseParsers avoidCitations
       | avoidCitations =
-          [ PTokenLink <$> linkParser,
+          [ parseLink,
             PTokenMathFragment <$> mathFragmentInlineParser,
             PTokenStyledText <$> styleMarkerParser,
             PTokenStyledText <$> styledTextParser
           ]
       | otherwise =
           [ PTokenCitation <$> citationParser,
-            PTokenLink <$> linkParser,
+            parseLink,
             PTokenMathFragment <$> mathFragmentInlineParser,
             PTokenStyledText <$> styleMarkerParser,
             PTokenStyledText <$> styledTextParser
@@ -720,6 +722,11 @@ proseParser spaceConsumer = do
     nonEmpty = \case
       PTokenStyledText styledText -> not $ T.null styledText.body
       _ -> True
+    parseLink :: OrgParser PToken
+    parseLink = do
+      link <- linkParser
+      s <- get
+      pure $ PTokenLink link s.linkNumber
 
 proseSpaceConsumer :: Int -> OrgParser Text
 proseSpaceConsumer expectedIndentLen = do
@@ -2127,15 +2134,17 @@ figureParser = do
             >> endOfCell --
         )
   metaKVs <- metaParser --
+  pState' <- get
   when (lookup "type" metaKVs /= Just "figure")
     $ fail "type must be 'figure'"
-  caption <- case lookup "caption" metaKVs of --
-    Nothing -> pure $ Prose []
-    Just s -> case MP.runParser (runStateT captionParser pState) "" s of
+  (caption, pStateNew) <- case lookup "caption" metaKVs of --
+    Nothing -> pure (Prose [], pState')
+    Just s -> case MP.runParser (runStateT captionParser pState') "" s of
       Left err -> fail $ MP.errorBundlePretty err
-      Right (prose, _pState) -> pure prose
+      Right res -> pure res
+  put pStateNew
   link <- fileLinkParser --
-  let newFigureNumber = pState.figureNumber + 1
+  let newFigureNumber = pStateNew.figureNumber + 1
       figureNumberMeta = ("__figure_number", T.show newFigureNumber)
   case link.target of
     LinkTargetFilePath _ -> do
@@ -2151,7 +2160,7 @@ figureParser = do
         . CFigure
         $ Figure
           { parentOid =
-              firstParentOid pState.docOid pState.headingOidStack,
+              firstParentOid pStateNew.docOid pStateNew.headingOidStack,
             meta =
               foldl'
                 (\acc (k, v) -> insert k v acc)
@@ -2215,24 +2224,25 @@ metaEntryParser = do
 
 tableParser :: OrgParser Cell
 tableParser = do
-  pState <- get
   _ <- MP.try $ MP.lookAhead (metaParser >> tableRowParser)
   metaKVs <- metaParser
-  caption <- case lookup "caption" metaKVs of
-    Nothing -> pure $ Prose []
+  pState <- get
+  (caption, pStateNew) <- case lookup "caption" metaKVs of
+    Nothing -> pure (Prose [], pState)
     Just s -> case MP.runParser (runStateT captionParser pState) "" s of --
       Left err -> fail $ MP.errorBundlePretty err
-      Right (prose, _pState) -> pure prose
+      Right res -> pure res
+  put pStateNew
   rows <- MP.some $ tableLineParser <|> tableRowParser
   _ <- MP.optional tableFormulaParser --
-  let newTableNumber = pState.tableNumber + 1
+  let newTableNumber = pStateNew.tableNumber + 1
       grid = fromList $ rowsToTuples rows --
   modify (\s -> s {tableNumber = newTableNumber})
   pure
     . CTable
     $ Table
       { parentOid =
-          firstParentOid pState.docOid pState.headingOidStack,
+          firstParentOid pStateNew.docOid pStateNew.headingOidStack,
         meta = insert "__table_number" (T.show newTableNumber) metaKVs,
         caption = caption,
         textAlign = getTextAlign grid, --
@@ -2574,14 +2584,14 @@ instance CiteprocOutput Prose where
         PTokenStyledText styledText
           | T.null styledText.body -> acc
           | otherwise -> acc <> unparseStyledText styledText
-        PTokenLink link -> acc <> unparseLink link
+        PTokenLink link _ -> acc <> unparseLink link
         PTokenMathFragment mathFragment -> acc <> unparseMathFragment mathFragment
         _ -> acc
 
   fromText input = case MP.runParser
     ( runStateT
         customProseParser --
-        defaultOrgParserState
+        defaultOrgParserState {linkNumber = -1000}
     )
     ""
     input of
@@ -2772,6 +2782,7 @@ instance CiteprocOutput Prose where
                     ],
                   target = LinkTargetURI uri
                 }
+              (-1)
 
   localizeQuotes _ prose = prose
 

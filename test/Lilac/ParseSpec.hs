@@ -659,7 +659,8 @@ spec = do
                     name =
                       [ stext "hello" []
                       ]
-                  },
+                  }
+                1,
               ptext " there" []
             ],
         CParagraph
@@ -717,7 +718,8 @@ spec = do
                 Link
                   { target = LinkTargetFilePath "foo/bar",
                     name = [stext "foo/bar" []]
-                  },
+                  }
+                1,
               ptext ")" []
             ]
       ]
@@ -747,6 +749,7 @@ spec = do
                               },
                         name = [stext "a/b/c" []]
                       }
+                    1
                 ]
           ],
         pseudoEdges =
@@ -789,7 +792,8 @@ spec = do
                             N.uriFragment = ""
                           },
                     name = [stext "https://foo.org" []]
-                  },
+                  }
+                1,
               ptext ", or " [],
               PTokenLink
                 Link
@@ -809,7 +813,8 @@ spec = do
                             N.uriFragment = ""
                           },
                     name = [stext "https://bar.net" []]
-                  },
+                  }
+                2,
               ptext ". Try " [],
               PTokenLink
                 Link
@@ -829,7 +834,8 @@ spec = do
                             N.uriFragment = ""
                           },
                     name = [stext "http://localhost:3000" []]
-                  },
+                  }
+                3,
               ptext "? Go to " [],
               PTokenLink
                 Link
@@ -849,7 +855,8 @@ spec = do
                             N.uriFragment = ""
                           },
                     name = [stext "ftp://10.0.0.1" []]
-                  },
+                  }
+                4,
               ptext "! " [],
               PTokenLink
                 Link
@@ -870,6 +877,7 @@ spec = do
                           },
                     name = [stext "https://a.com/path/to/something/" []]
                   }
+                5
             ]
       ]
       []
@@ -890,6 +898,7 @@ spec = do
                             },
                       name = [stext "link-target-only" []]
                     }
+                  1
               ],
           CHeading
             Heading
@@ -907,6 +916,7 @@ spec = do
                                   },
                             name = [stext "link-name" []]
                           }
+                        2
                     ],
                 meta = fromList []
               },
@@ -921,11 +931,13 @@ spec = do
                               name = "a"
                             },
                       name = [stext "a" []]
-                    },
+                    }
+                  3,
                 ptext " b" []
               ]
         ]
         [ PseudoEdge (LCI 2, LinkOid {oid = fromWords 0x0000000000000000 0x0000000000000000, name = "a"}),
+          PseudoEdge (LCI 1, LinkOid {oid = fromWords 0 0, name = "link-target"}),
           PseudoEdge (LCI 0, LinkOid {oid = fromWords 0 0, name = "link-target-only"})
         ]
     )
@@ -958,7 +970,8 @@ spec = do
                               N.uriFragment = ""
                             },
                       name = [stext "http://foo.org" []]
-                    },
+                    }
+                  1,
                 ptext " " [],
                 PTokenLink
                   Link
@@ -978,7 +991,8 @@ spec = do
                               N.uriFragment = ""
                             },
                       name = [stext "https://foo.org" []]
-                    },
+                    }
+                  2,
                 ptext " " [],
                 PTokenLink
                   Link
@@ -998,7 +1012,8 @@ spec = do
                               N.uriFragment = ""
                             },
                       name = [stext "hello" []]
-                    },
+                    }
+                  3,
                 ptext " " [],
                 PTokenLink
                   Link
@@ -1013,6 +1028,7 @@ spec = do
                             },
                       name = [stext "email" []]
                     }
+                  4
               ]
         ]
         []
@@ -1034,7 +1050,8 @@ spec = do
                       name =
                         [ stext "id:442c807f-c9d9-45a7-88bf-ffffffffffff" []
                         ]
-                    },
+                    }
+                  1,
                 ptext " " [],
                 PTokenLink
                   Link
@@ -1047,7 +1064,8 @@ spec = do
                       name =
                         [ stext "bar" []
                         ]
-                    },
+                    }
+                  2,
                 ptext " " [],
                 PTokenLink
                   Link
@@ -1062,7 +1080,8 @@ spec = do
                           stext " " [],
                           stext "[]" [Verbatim]
                         ]
-                    },
+                    }
+                  3,
                 ptext " " [],
                 PTokenLink
                   Link
@@ -1077,7 +1096,8 @@ spec = do
                           stext " " [],
                           stext "ok" []
                         ]
-                    },
+                    }
+                  4,
                 ptext " " [],
                 PTokenLink
                   Link
@@ -1088,7 +1108,8 @@ spec = do
                               name = "foo"
                             },
                       name = [stext "abc" []]
-                    },
+                    }
+                  5,
                 ptext " " [],
                 PTokenLink
                   Link
@@ -1100,6 +1121,7 @@ spec = do
                             },
                       name = [stext "abc" []]
                     }
+                  6
               ],
           CListItem
             [ LUnorderedStart,
@@ -1126,6 +1148,7 @@ spec = do
                               name = "foo"
                             }
                     }
+                  7
               ],
           CListItem
             [ LItemEnd,
@@ -1144,6 +1167,7 @@ spec = do
                               name = "foo bar baz"
                             }
                     }
+                  8
               ],
           CListItem
             [ LItemEnd,
@@ -1162,6 +1186,7 @@ spec = do
                               name = "a b c"
                             }
                     }
+                  9
               ],
           CListItem
             [ LItemEnd,
@@ -1196,6 +1221,7 @@ spec = do
                             },
                       name = [stext "foo" []]
                     }
+                  1
               ]
         ]
         [PseudoEdge (LCI 0, LinkOid {oid = fromWords 0x442c807fc9d945a7 0x88bfffffffffffff, name = "target name with newline and space is still treated as space"})]
@@ -1229,7 +1255,8 @@ spec = do
                           target =
                             LinkTargetLineLabel
                               LinkOid {oid = nilOid, name = "(foo)"}
-                        },
+                        }
+                      1,
                     ptext " " [],
                     PTokenLink
                       Link
@@ -1242,6 +1269,7 @@ spec = do
                             LinkTargetLineLabel
                               LinkOid {oid = nilOid, name = "(foo)"}
                         }
+                      2
                   ]
             ],
           pseudoEdges =
@@ -2155,6 +2183,7 @@ spec = do
                     { target = LinkTargetFilePath "not-figure",
                       name = [stext "not-figure" []]
                     }
+                  3
               ],
           CListItem
             [ LItemEnd,
@@ -2167,6 +2196,7 @@ spec = do
                     { target = LinkTargetFilePath "not-a-figure-2",
                       name = [stext "not-a-figure-2" []]
                     }
+                  4
               ],
           CParagraph
             $ Prose
@@ -2180,6 +2210,7 @@ spec = do
                             },
                       name = [stext "not a figure" []]
                     }
+                  5
               ],
           CFigure
             Figure
@@ -2237,7 +2268,8 @@ spec = do
                             target =
                               LinkTargetOid
                                 LinkOid {oid = nilOid, name = "tbl:famous-eqs"}
-                          },
+                          }
+                        1,
                       ptext "." [],
                       ptext " " [],
                       PTokenMathFragment
@@ -2296,6 +2328,7 @@ spec = do
                                         },
                                   name = [stext "Wiki" []]
                                 }
+                              2
                           ]
                       ),
                       ( (4, 1),
@@ -2335,6 +2368,7 @@ spec = do
                                         },
                                   name = [stext "Wiki" []]
                                 }
+                              3
                           ]
                       ),
                       ((5, 1), Prose [ptext "Unknown" []]),
@@ -2346,7 +2380,8 @@ spec = do
                     ]
               }
         ]
-        []
+        [ PseudoEdge (LCI 0, LinkOid {oid = fromWords 0 0, name = "tbl:famous-eqs"})
+        ]
     )
     defaultOrgParserState
       { cellNames =
@@ -2423,6 +2458,7 @@ spec = do
                                         },
                                   name = [stext "Wiki" []]
                                 }
+                              1
                           ]
                       ),
                       ( (4, 1),
@@ -2462,6 +2498,7 @@ spec = do
                                         },
                                   name = [stext "Wiki" []]
                                 }
+                              2
                           ]
                       )
                     ]
@@ -2618,7 +2655,8 @@ spec = do
                     Link
                       { target = LinkTargetFootnote "hello",
                         name = [stext "1" []]
-                      },
+                      }
+                    1,
                   ptext " world." []
                 ],
             CFootnote
@@ -2668,13 +2706,15 @@ spec = do
                     Link
                       { target = LinkTargetFootnote "a",
                         name = [stext "1" []]
-                      },
+                      }
+                    1,
                   ptext " world." [],
                   PTokenLink
                     Link
                       { target = LinkTargetFootnote "b",
                         name = [stext "2" []]
                       }
+                    2
                 ],
             CFootnote
               Footnote
@@ -3372,6 +3412,7 @@ spec = do
                             name = ""
                           }
                   }
+                (-999)
             ]
         ),
         ( "[[id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2][*foo*]]",
@@ -3386,6 +3427,7 @@ spec = do
                             name = ""
                           }
                   }
+                (-999)
             ]
         ),
         ( "[[id:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3::abc][/bar/]]",
@@ -3400,6 +3442,7 @@ spec = do
                             name = "abc"
                           }
                   }
+                (-999)
             ]
         )
       ]
@@ -3412,6 +3455,7 @@ spec = do
                   { name = [stext "1" []],
                     target = LinkTargetFootnote "abc"
                   }
+                (-999)
             ]
         ),
         ( "[fn:abc][fn:xyz][fn:abc]",
@@ -3420,17 +3464,20 @@ spec = do
                 Link
                   { name = [stext "1" []],
                     target = LinkTargetFootnote "abc"
-                  },
+                  }
+                (-999),
               PTokenLink
                 Link
                   { name = [stext "2" []],
                     target = LinkTargetFootnote "xyz"
-                  },
+                  }
+                (-998),
               PTokenLink
                 Link
                   { name = [stext "1" []],
                     target = LinkTargetFootnote "abc"
                   }
+                (-997)
             ]
         )
       ]
@@ -3457,6 +3504,7 @@ spec = do
                             N.uriFragment = ""
                           }
                   }
+                (-999)
             ]
         ),
         ( "https://foo2.org",
@@ -3480,6 +3528,7 @@ spec = do
                             N.uriFragment = ""
                           }
                   }
+                (-999)
             ]
         )
       ]
@@ -3492,6 +3541,7 @@ spec = do
                   { name = [stext "foo/bar" []],
                     target = LinkTargetFilePath "foo/bar"
                   }
+                (-999)
             ]
         ),
         ( "[[file:foo/bar][baz]]",
@@ -3501,6 +3551,7 @@ spec = do
                   { name = [stext "baz" []],
                     target = LinkTargetFilePath "foo/bar"
                   }
+                (-999)
             ]
         )
       ]

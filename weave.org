@@ -1973,7 +1973,7 @@ getProseContents prose = join $ foldl' f [] prose.unProse
     join = T.intercalate "" . reverse
     f acc = \case
       PTokenStyledText styledText -> styledText.body : acc
-      PTokenLink link ->
+      PTokenLink link _ ->
         let linkText =
               join
                 $ foldl'
@@ -2010,7 +2010,7 @@ Each [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] value
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink link -> case link.target of
+  PTokenLink link _ -> case link.target of
     LinkTargetFootnote {} -> do
       sup_ [class_ "footnote-link"] $ do
         weaveLink Nothing link
@@ -4586,7 +4586,7 @@ proseToCslJsonText prose = foldl' f CslEmpty prose.unProse
         let styles = maskToStyles styledText.style
             body = parseCslJson mempty styledText.body
          in acc <> applyStyles body styles
-      PTokenLink link ->
+      PTokenLink link _ ->
         -- (ref:f:proseToCslJsonText-CslLink)
         let encoded = CslLink ("LILAC_LINK\NUL" <> unparseLink link) CslEmpty
          in acc <> encoded
@@ -4753,13 +4753,13 @@ cslJsonTextToProse cslJsonText = compressProse . Prose $ f [] cslJsonText
                     }
                 target = LinkTargetURI uri
                 name = compressStyledText . getStyledText $ f s a
-             in [PTokenLink Link {target = target, name = name}]
+             in [PTokenLink Link {target = target, name = name} (-1)]
         | otherwise -> case (N.parseURI $ T.unpack t) of
             Nothing -> []
             Just uri ->
               let target = LinkTargetURI uri
                   name = compressStyledText . getStyledText $ f s a
-               in [PTokenLink Link {target = target, name = name}]
+               in [PTokenLink Link {target = target, name = name} (-1)]
     getStyledText [] = []
     getStyledText (pToken : rest) = case pToken of
       PTokenStyledText styledText -> styledText : getStyledText rest
@@ -5081,7 +5081,8 @@ expectCiteprocResult
                         N.uriQuery = "",
                         N.uriFragment = ""
                       }
-              },
+              }
+            (-1),
           ptext ", " [],
           PTokenLink
             Link
@@ -5095,7 +5096,8 @@ expectCiteprocResult
                         N.uriQuery = "",
                         N.uriFragment = ""
                       }
-              },
+              }
+            (-1),
           ptext ", " [],
           PTokenLink
             Link
@@ -5109,7 +5111,8 @@ expectCiteprocResult
                         N.uriQuery = "",
                         N.uriFragment = ""
                       }
-              },
+              }
+            (-1),
           ptext ", " [],
           PTokenLink
             Link
@@ -5124,6 +5127,7 @@ expectCiteprocResult
                         N.uriFragment = ""
                       }
               }
+            (-1)
         ]
     }
 ]
@@ -5173,7 +5177,8 @@ expectCiteprocResult
                           N.uriQuery = "",
                           N.uriFragment = ""
                         }
-                },
+                }
+              (-1),
             ptext "." [],
             PTokenDivEnd
           ]
@@ -5207,7 +5212,8 @@ expectCiteprocResult
                           N.uriQuery = "",
                           N.uriFragment = ""
                         }
-                },
+                }
+              (-1),
             ptext "." [],
             PTokenDivEnd
           ]
@@ -5243,7 +5249,8 @@ expectCiteprocResult
                           N.uriQuery = "",
                           N.uriFragment = ""
                         }
-                },
+                }
+              (-1),
             ptext "." [],
             PTokenDivEnd
           ]
@@ -5294,6 +5301,7 @@ expectCiteprocResult
                         N.uriFragment = ""
                       }
               }
+            (-1)
         ]
     }
 ]
@@ -5358,7 +5366,8 @@ expectCiteprocResult
                         N.uriQuery = "",
                         N.uriFragment = ""
                       }
-              },
+              }
+            (-1),
           ptext "]" []
         ]
     }
@@ -5457,7 +5466,8 @@ expectCiteprocResult
                         N.uriQuery = "",
                         N.uriFragment = ""
                       }
-              },
+              }
+            (-1),
           ptext "and really " [],
           ptext "amazing" [Code],
           ptext "global suffix]" []
@@ -5521,7 +5531,8 @@ expectCiteprocResult
             Link
               { name = [stext "1" []],
                 target = LinkTargetFootnote "@a"
-              },
+              }
+            (-999),
           PTokenLink
             Link
               { name = [stext "Knuth 1992" []],
@@ -5534,7 +5545,8 @@ expectCiteprocResult
                         N.uriQuery = "",
                         N.uriFragment = ""
                       }
-              },
+              }
+            (-1),
           ptext "and really " [],
           ptext "amazing" [Code],
           ptext "; some bit of " [],
@@ -5552,7 +5564,8 @@ expectCiteprocResult
                         N.uriQuery = "",
                         N.uriFragment = ""
                       }
-              },
+              }
+            (-1),
           ptext "thing global suffix with OID link " [],
           PTokenLink
             Link
@@ -5563,7 +5576,8 @@ expectCiteprocResult
                       { oid = nilOid,
                         name = "foo"
                       }
-              },
+              }
+            (-999),
           ptext "]" []
         ]
     }
@@ -5605,7 +5619,8 @@ expectCiteprocResult
                           N.uriQuery = "",
                           N.uriFragment = ""
                         }
-                },
+                }
+              (-1),
             ptext ". " [],
             ptext "Proceedings of the London Mathematical Society" [Italic],
             ptext " " [],
@@ -5665,7 +5680,8 @@ expectCiteprocResult
                         N.uriQuery = "",
                         N.uriFragment = ""
                       }
-              },
+              }
+            (-1),
           ptext "]" []
         ]
     },
@@ -5684,7 +5700,8 @@ expectCiteprocResult
                         N.uriQuery = "",
                         N.uriFragment = ""
                       }
-              },
+              }
+            (-1),
           ptext "]" []
         ]
     }
