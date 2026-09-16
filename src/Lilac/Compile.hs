@@ -38,6 +38,7 @@ import Lilac.Types
         gtoc,
         objects,
         offsets,
+        preciseBacklinks,
         symbols
       ),
     BToken (BTokenLinkTarget, BTokenString),
@@ -61,7 +62,7 @@ import Lilac.Types
     GPath,
     GTOC (GTOC),
     GlossaryTerm (definition, term),
-    Heading (body, meta),
+    Heading (body, meta, section),
     LCI (LCI, unLCI),
     Link (Link, target),
     LinkOid (LinkOid, name, oid),
@@ -268,6 +269,7 @@ mkArchive projectConf pathObjs = do
       (symbols, glossary) = combineSymbolsAndGlossary pathObjsNonEmpty
       offsets = mkOffsets pathObjsNonEmpty
       backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
+      preciseBacklinks = mkPreciseBacklinks pathObjsNonEmpty
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols --
       duplicateTanglePaths = findDuplicateTanglePaths pathObjsNonEmpty --
   brokenFileLinks <- findBrokenFileLinks pathObjs
@@ -305,6 +307,7 @@ mkArchive projectConf pathObjs = do
                       ancestry = mempty,
                       glossary = glossary,
                       backlinks = backlinks,
+                      preciseBacklinks = preciseBacklinks,
                       offsets = offsets,
                       gtoc = gtoc,
                       csls = csls,
@@ -512,6 +515,72 @@ mkBacklinks pathObjs symbols offsets =
         fromPath /= toPath =
           M.insertWith (<>) toPath [(fromPath, [(from, to)])] acc
       | otherwise = acc
+
+mkPreciseBacklinks ::
+  [(GPath, Object)] ->
+  Map LinkTarget [(GPath, [Int], Int)]
+mkPreciseBacklinks pathObjs =
+  foldl' f mempty pathObjs
+  where
+    f ::
+      Map LinkTarget [(GPath, [Int], Int)] ->
+      (GPath, Object) ->
+      Map LinkTarget [(GPath, [Int], Int)]
+    f acc (gPath, obj) =
+      (\(_, _, c) -> c)
+        . foldl' g (gPath, [], acc)
+        $ obj.orgDoc.cells
+    g (gPath, hSection, acc) cell = case cell of
+      CHeading heading ->
+        foldl'
+          processLinkFromPToken
+          (gPath, heading.section, acc)
+          heading.body.unProse
+      CParagraph prose ->
+        foldl' processLinkFromPToken (gPath, hSection, acc) prose.unProse
+      CGlossaryTerm glossaryTerm ->
+        foldl'
+          processLinkFromPToken
+          (gPath, hSection, acc)
+          glossaryTerm.definition.unProse
+      CTable table ->
+        (\triple -> foldl' processLinkFromPToken triple table.caption.unProse)
+          $ foldl'
+            ( \triple prose ->
+                foldl'
+                  processLinkFromPToken
+                  triple
+                  prose.unProse
+            )
+            (gPath, hSection, acc)
+            table.grid
+      CFigure figure ->
+        foldl'
+          processLinkFromPToken
+          (gPath, hSection, acc)
+          figure.caption.unProse
+      CFootnote footnote ->
+        foldl'
+          processLinkFromPToken
+          (gPath, hSection, acc)
+          footnote.body.unProse
+      _ -> (gPath, hSection, acc)
+    processLinkFromPToken ::
+      (GPath, [Int], Map LinkTarget [(GPath, [Int], Int)]) ->
+      PToken ->
+      (GPath, [Int], Map LinkTarget [(GPath, [Int], Int)])
+    processLinkFromPToken (gPath, hSection, acc) pToken = case pToken of
+      PTokenLink link idx
+        | idx > 0 ->
+            let newAcc =
+                  insertWith
+                    (\old new -> old <> new)
+                    link.target
+                    [(gPath, hSection, idx)]
+                    acc
+             in (gPath, hSection, newAcc)
+        | otherwise -> (gPath, hSection, acc)
+      _ -> (gPath, hSection, acc)
 
 readObjectsFrom :: FilePath -> [FilePath] -> IO [(GPath, Object)]
 readObjectsFrom parentDir = foldlM f []

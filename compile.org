@@ -67,6 +67,7 @@ import Lilac.Types
         gtoc,
         objects,
         offsets,
+        preciseBacklinks,
         symbols
       ),
     BToken (BTokenLinkTarget, BTokenString),
@@ -90,7 +91,7 @@ import Lilac.Types
     GPath,
     GTOC (GTOC),
     GlossaryTerm (definition, term),
-    Heading (body, meta),
+    Heading (body, meta, section),
     LCI (LCI, unLCI),
     Link (Link, target),
     LinkOid (LinkOid, name, oid),
@@ -202,6 +203,7 @@ import System.OsPath qualified as P
 <<f:getCitationDeps>>
 <<f:finalizeEdges>>
 <<f:mkBacklinks>>
+<<f:mkPreciseBacklinks>>
 <<f:readObjectsFrom>>
 <<f:buildGraph>>
 <<f:getBlocksFromArchive>>
@@ -710,6 +712,7 @@ data Archive = Archive
     ancestry :: Map GCI [GCI], -- (ref:data:Archive-ancestry)
     glossary :: Map (Text, GPath) (LCI, LCI), -- (ref:data:Archive-glossary)
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), -- (ref:data:Archive-backlinks)
+    preciseBacklinks :: Map LinkTarget [(GPath, [Int], Int)],
     offsets :: IntMap GPath, -- (ref:data:Archive-offsets)
     gtoc :: GTOC, -- (ref:data:Archive-gtoc)
     csls :: Map FilePath Text, -- (ref:data:Archive-csls)
@@ -831,6 +834,7 @@ mkArchive projectConf pathObjs = do
       (symbols, glossary) = combineSymbolsAndGlossary pathObjsNonEmpty
       offsets = mkOffsets pathObjsNonEmpty
       backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
+      preciseBacklinks = mkPreciseBacklinks pathObjsNonEmpty
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols -- (ref:f:mkArchive-brokenLinks)
       duplicateTanglePaths = findDuplicateTanglePaths pathObjsNonEmpty -- (ref:f:mkArchive-findDuplicateTanglePaths)
   brokenFileLinks <- findBrokenFileLinks pathObjs
@@ -868,6 +872,7 @@ mkArchive projectConf pathObjs = do
                       ancestry = mempty,
                       glossary = glossary,
                       backlinks = backlinks,
+                      preciseBacklinks = preciseBacklinks,
                       offsets = offsets,
                       gtoc = gtoc,
                       csls = csls,
@@ -2398,6 +2403,104 @@ finalizeEdges symbols acc (offset, (_, obj)) =
         Just targetGCI -> Just (GCI $ lci.unLCI + offset, targetGCI) -- (ref:f:finalizeEdges-lci-gci-conversion)
    in (catMaybes $ map f obj.orgDoc.pseudoEdges) <> acc
 #+end_src
+
+** Fine-grained backlinks
+
+Every link in a [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] has a unique positive number associated with it
+(modulo some negative numbers related to citations --- but these are rare enough
+in practice to ignore).
+
+We can look at all links found in all documents in the Archive, and see where
+each link points to. The target can be the key, and the value a list of links
+(globally) that share the same target.
+
+  1) For all objects, go through all cells to find all instances of ~PTokenLink~.
+
+  2) For every link, inspect the target, and save it to a Map (hashmap) as the
+     *key*. For now, let's ignore the fact that a nameable thing can use the OID
+     of the closest parent heading or the document, because we can look up both
+     variations at weave time.
+
+  3) Append the link index from the ~PTokenLink~ and also the current heading
+     section (if any) as a single *value* into the Map. This way, when we do a
+     lookup of the key, we'll get a value that tells us not just the link index,
+     but also the heading information so that we have a bit more context about
+     the location of the link.
+
+Note that this is only concerned about /prose/ text, so the (Noweb) links inside
+code blocks are ignored.
+
+#+name: f:mkPreciseBacklinks
+#+begin_src haskell
+mkPreciseBacklinks ::
+  [(GPath, Object)] ->
+  Map LinkTarget [(GPath, [Int], Int)]
+mkPreciseBacklinks pathObjs =
+  foldl' f mempty pathObjs
+  where
+    f ::
+      Map LinkTarget [(GPath, [Int], Int)] ->
+      (GPath, Object) ->
+      Map LinkTarget [(GPath, [Int], Int)]
+    f acc (gPath, obj) =
+      (\(_, _, c) -> c)
+        . foldl' g (gPath, [], acc)
+        $ obj.orgDoc.cells
+    g (gPath, hSection, acc) cell = case cell of
+      CHeading heading ->
+        foldl'
+          processLinkFromPToken
+          (gPath, heading.section, acc)
+          heading.body.unProse
+      CParagraph prose ->
+        foldl' processLinkFromPToken (gPath, hSection, acc) prose.unProse
+      CGlossaryTerm glossaryTerm ->
+        foldl'
+          processLinkFromPToken
+          (gPath, hSection, acc)
+          glossaryTerm.definition.unProse
+      CTable table ->
+        (\triple -> foldl' processLinkFromPToken triple table.caption.unProse)
+          $ foldl'
+            ( \triple prose ->
+                foldl'
+                  processLinkFromPToken
+                  triple
+                  prose.unProse
+            )
+            (gPath, hSection, acc)
+            table.grid
+      CFigure figure ->
+        foldl'
+          processLinkFromPToken
+          (gPath, hSection, acc)
+          figure.caption.unProse
+      CFootnote footnote ->
+        foldl'
+          processLinkFromPToken
+          (gPath, hSection, acc)
+          footnote.body.unProse
+      _ -> (gPath, hSection, acc)
+    processLinkFromPToken ::
+      (GPath, [Int], Map LinkTarget [(GPath, [Int], Int)]) ->
+      PToken ->
+      (GPath, [Int], Map LinkTarget [(GPath, [Int], Int)])
+    processLinkFromPToken (gPath, hSection, acc) pToken = case pToken of
+      PTokenLink link idx
+        | idx > 0 ->
+            let newAcc =
+                  insertWith
+                    (\old new -> old <> new)
+                    link.target
+                    [(gPath, hSection, idx)]
+                    acc
+             in (gPath, hSection, newAcc)
+        | otherwise -> (gPath, hSection, acc)
+      _ -> (gPath, hSection, acc)
+#+end_src
+
+[[f:mkPreciseBacklinks]] is similar to [[f:findExternalOids]] in how it looks at all
+cells to extract link information, so its definition looks similar.
 
 ** Citation dependencies
 :PROPERTIES:

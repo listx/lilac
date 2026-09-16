@@ -3138,7 +3138,7 @@ data LinkTarget
   | LinkTargetURI N.URI
   | LinkTargetFilePath FilePath -- (ref:data:LinkTarget-LinkTargetFilePath)
   deriving stock (Eq, Generic, Ord, Show)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (FromJSON, FromJSONKey, ToJSON, ToJSONKey)
 #+end_src
 
 The [[data:LinkOid]] is made up of the Org ID and the name. This is used pervasively

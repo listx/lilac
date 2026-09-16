@@ -368,7 +368,7 @@ data LinkTarget
   | LinkTargetURI N.URI
   | LinkTargetFilePath FilePath --
   deriving stock (Eq, Generic, Ord, Show)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (FromJSON, FromJSONKey, ToJSON, ToJSONKey)
 
 type ListMarker :: Type
 data ListMarker
@@ -763,6 +763,7 @@ data Archive = Archive
     ancestry :: Map GCI [GCI], --
     glossary :: Map (Text, GPath) (LCI, LCI), --
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), --
+    preciseBacklinks :: Map LinkTarget [(GPath, [Int], Int)],
     offsets :: IntMap GPath, --
     gtoc :: GTOC, --
     csls :: Map FilePath Text, --
