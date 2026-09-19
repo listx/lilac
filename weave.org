@@ -6403,8 +6403,21 @@ div # ".breadcrumbs" ? do
   fontSans
   fontSize $ rem 1.6
   margin (rem 0.375) 0 0 (rem 0.625)
+  <<css:breadcrumbs-truncation>>
 span # ".breadcrumb-separator" ? do
   color colorBreadcrumbSeparator
+#+end_src
+
+[[css:breadcrumbs-truncation]] truncates the breadcrumbs to the left if there isn't
+enough horizontal space to render all breadcrumbs (such as on mobile).
+
+#+name: css:breadcrumbs-truncation
+#+begin_src haskell
+"white-space" -: "nowrap"
+"overflow" -: "hidden"
+"text-overflow" -: "ellipsis"
+"direction" -: "rtl"
+"text-align" -: "left"
 #+end_src
 
 * Page metrics

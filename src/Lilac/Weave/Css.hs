@@ -245,6 +245,11 @@ defaultCss = do
       fontSans
       fontSize $ rem 1.6
       margin (rem 0.375) 0 0 (rem 0.625)
+      "white-space" -: "nowrap"
+      "overflow" -: "hidden"
+      "text-overflow" -: "ellipsis"
+      "direction" -: "rtl"
+      "text-align" -: "left"
     span # ".breadcrumb-separator" ? do
       color colorBreadcrumbSeparator
 
