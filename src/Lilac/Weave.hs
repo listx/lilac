@@ -2005,7 +2005,7 @@ weaveBreadcrumbs = do
           $ decodeGPath weaveConf.originObjectPath
       breadcrumbLast =
         osPathDecoder
-          . flip P.replaceExtensions (P.unsafeEncodeUtf "org")
+          . flip P.replaceExtension (P.unsafeEncodeUtf "org")
           . P.takeFileName
           . P.unsafeEncodeUtf
           $ decodeGPath weaveConf.originObjectPath
