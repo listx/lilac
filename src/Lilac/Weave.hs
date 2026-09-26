@@ -34,12 +34,14 @@ import Citeproc.CslJson
     parseCslJson,
   )
 import Data.Aeson (encode)
+import Data.ByteString.Lazy.Char8 qualified as LBS
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.FileEmbed (embedFile)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
+import Data.Text.Encoding qualified as TE
 import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding qualified as TLE
 import Data.Tree
@@ -67,6 +69,7 @@ import Lilac.Types
         gtoc,
         objects,
         offsets,
+        preciseBacklinks,
         symbols
       ),
     BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
@@ -633,11 +636,11 @@ weaveProse prose = sequence_ $ map weavePToken prose.unProse
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink link _ -> case link.target of
+  PTokenLink link linkNumber -> case link.target of
     LinkTargetFootnote {} -> do
       sup_ [class_ "footnote-link"] $ do
-        weaveLink Nothing link
-    _ -> weaveLink Nothing link
+        weaveLink Nothing link linkNumber
+    _ -> weaveLink Nothing link linkNumber
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
   PTokenCitation n -> weaveCitation n
   PTokenDivStart t -> toHtmlRaw ("<div class=\"csl-" <> t <> "\">" :: Text)
@@ -912,7 +915,7 @@ spliceLinks colorized links block = do
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
-            : (renderAsText weaveConf $ weaveLink (Just block) link)
+            : (renderAsText weaveConf $ weaveLink (Just block) link (-1))
             : acc,
           links'
         )
@@ -953,33 +956,47 @@ weaveRichBlock lci richBlock = case richBlock.marker of
     toHtmlRaw @Text "<div class=\"rich-block-body\">"
   RBEnd -> toHtmlRaw @Text "</div></div></div>"
 
-weaveLink :: Maybe Block -> Link -> HtmlWeaver ()
-weaveLink maybeParentBlock link = do
+weaveLink :: Maybe Block -> Link -> Int -> HtmlWeaver ()
+weaveLink maybeParentBlock link linkNumber = do
   wovenLinkTarget <- weaveLinkTarget (isJust maybeParentBlock) link.target
   linkDisplayName <- weaveLinkDisplayName link
   let attrs =
         [href_ wovenLinkTarget]
           <> linkCategory wovenLinkTarget
-          <> defaultId
+          <> linkId
       --
-      defaultId =
+      linkId =
         case link.target of
           LinkTargetLineLabel lineLabel ->
             if isJust maybeParentBlock
               then [id_ ("ll-" <> toSafeHtmlId lineLabel.name)] --
-              else
-                let compositeId = "xxxx"
-                 in [id_ compositeId]
+              else [id_ proseLinkId]
           _ -> case maybeParentBlock of
             Just parentBlock ->
               let parentBlockId = getLinkAnchor Nothing $ CBlock parentBlock
                   childBlockId = T.takeWhileEnd (/= '#') wovenLinkTarget
                in [id_ $ parentBlockId <> "-" <> childBlockId]
-            Nothing -> []
+            Nothing -> [id_ proseLinkId]
+      proseLinkId = "linkNumber-" <> show linkNumber
   a_
     attrs
     $ sequence_
     $ map weaveStyledText linkDisplayName
+  weaveConf <- ask
+  if
+    | LinkTargetLineLabel _ <- link.target,
+      Just _ <- maybeParentBlock -> do
+        let attrsBacklinkPopup =
+              [ class_ "button-popup-backlinks",
+                data_ "backlinks" backlinksJSON
+              ]
+            backlinksJSON = TE.decodeUtf8 . LBS.toStrict $ encode backlinks
+            backlinks :: [(GPath, [Int], Int)]
+            backlinks =
+              lookupDefault [] link.target weaveConf.archive.preciseBacklinks
+        toHtml (" " :: Text)
+        a_ attrsBacklinkPopup "←" --
+    | otherwise -> pure ()
   where
     linkCategory target
       | isExternalLink link.target =
@@ -994,16 +1011,8 @@ weaveLinkTarget insideBlock linkTarget = do
   case linkTarget of
     LinkTargetOid linkOid -> weaveLinkTargetLinkOid linkOid
     LinkTargetLineLabel linkOid
-      | Just originObj <-
-          lookup weaveConf.originObjectPath weaveConf.archive.objects,
-        True <- insideBlock,
-        Just (_, maybeLCI) <- lookup linkOid.name originObj.orgDoc.lineLabels -> do
-          if
-            | Just lci <- maybeLCI,
-              Just cell <- originObj.orgDoc.cells !!? lci.unLCI -> do
-                let linkAnchor = getLinkAnchor (Just lci) cell
-                pure $ "#" <> linkAnchor
-            | otherwise -> pure internalLineLabelTarget --
+      | True <- insideBlock -> do
+          pure internalLineLabelTarget --
       | Just originObj <-
           lookup weaveConf.originObjectPath weaveConf.archive.objects,
         originObj.orgDoc.oid == linkOid.oid ->

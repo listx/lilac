@@ -8,6 +8,7 @@ import Clay
     absolute,
     alignSide,
     auto,
+    background,
     backgroundColor,
     before,
     block,
@@ -480,6 +481,30 @@ defaultCss = do
         width (rem 1)
         height (rem 1)
         margin 0 (rem (-0.2)) 0 0
+
+  a ? do
+    ".button-popup-backlinks" & do
+      fontSize (em 0.9)
+      borderStyle none
+      background (none :: Color)
+      "cursor" -: "pointer"
+      "user-select" -: "none"
+      "text-decoration" -: "none"
+      ":hover" & do
+        borderStyle none
+      ":visited" & do
+        ":hover" & do
+          borderStyle none
+  ".popup-backlinks" & do
+    "position" -: "fixed"
+    display displayNone
+    backgroundColor colorBg
+    border (px 1) solid colorCodeBorder
+    ev borderRadius (rem 0.3125)
+    ev padding $ px 8
+    "z-index" -: "1000"
+    ".active" & do
+      display block
 
   main_ ? do
     ol ? do

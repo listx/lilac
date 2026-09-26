@@ -83,12 +83,14 @@ import Citeproc.CslJson
     parseCslJson,
   )
 import Data.Aeson (encode)
+import Data.ByteString.Lazy.Char8 qualified as LBS
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.FileEmbed (embedFile)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List (groupBy)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
+import Data.Text.Encoding qualified as TE
 import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding qualified as TLE
 import Data.Tree
@@ -116,6 +118,7 @@ import Lilac.Types
         gtoc,
         objects,
         offsets,
+        preciseBacklinks,
         symbols
       ),
     BToken (BTokenLinkTarget, BTokenPadding, BTokenString),
@@ -582,6 +585,7 @@ import Clay
     absolute,
     alignSide,
     auto,
+    background,
     backgroundColor,
     before,
     block,
@@ -2010,11 +2014,11 @@ Each [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]] value
 weavePToken :: PToken -> HtmlWeaver ()
 weavePToken = \case
   PTokenStyledText styledText -> weaveStyledText styledText
-  PTokenLink link _ -> case link.target of
+  PTokenLink link linkNumber -> case link.target of
     LinkTargetFootnote {} -> do
       sup_ [class_ "footnote-link"] $ do
-        weaveLink Nothing link
-    _ -> weaveLink Nothing link
+        weaveLink Nothing link linkNumber
+    _ -> weaveLink Nothing link linkNumber
   PTokenMathFragment mathFragment -> weaveMathFragmentInline mathFragment
   PTokenCitation n -> weaveCitation n
   PTokenDivStart t -> toHtmlRaw ("<div class=\"csl-" <> t <> "\">" :: Text)
@@ -2219,33 +2223,47 @@ these links to be simple without any extra decorations
 
 #+name: f:weaveLink
 #+begin_src haskell
-weaveLink :: Maybe Block -> Link -> HtmlWeaver ()
-weaveLink maybeParentBlock link = do
+weaveLink :: Maybe Block -> Link -> Int -> HtmlWeaver ()
+weaveLink maybeParentBlock link linkNumber = do
   wovenLinkTarget <- weaveLinkTarget (isJust maybeParentBlock) link.target
   linkDisplayName <- weaveLinkDisplayName link
   let attrs =
         [href_ wovenLinkTarget]
           <> linkCategory wovenLinkTarget
-          <> defaultId
+          <> linkId
       -- (ref:f:weaveLink-defaultId)
-      defaultId =
+      linkId =
         case link.target of
           LinkTargetLineLabel lineLabel ->
             if isJust maybeParentBlock
               then [id_ ("ll-" <> toSafeHtmlId lineLabel.name)] -- (ref:line label self-link)
-              else
-                let compositeId = "xxxx"
-                 in [id_ compositeId]
+              else [id_ proseLinkId]
           _ -> case maybeParentBlock of
             Just parentBlock ->
               let parentBlockId = getLinkAnchor Nothing $ CBlock parentBlock
                   childBlockId = T.takeWhileEnd (/= '#') wovenLinkTarget
                in [id_ $ parentBlockId <> "-" <> childBlockId]
-            Nothing -> []
+            Nothing -> [id_ proseLinkId]
+      proseLinkId = "linkNumber-" <> show linkNumber
   a_
     attrs
     $ sequence_
     $ map weaveStyledText linkDisplayName
+  weaveConf <- ask
+  if
+    | LinkTargetLineLabel _ <- link.target,
+      Just _ <- maybeParentBlock -> do
+        let attrsBacklinkPopup =
+              [ class_ "button-popup-backlinks",
+                data_ "backlinks" backlinksJSON
+              ]
+            backlinksJSON = TE.decodeUtf8 . LBS.toStrict $ encode backlinks
+            backlinks :: [(GPath, [Int], Int)]
+            backlinks =
+              lookupDefault [] link.target weaveConf.archive.preciseBacklinks
+        toHtml (" " :: Text)
+        a_ attrsBacklinkPopup "←" -- (ref:f:weaveLink-precise-backlinks-popup)
+    | otherwise -> pure ()
   where
     linkCategory target
       | isExternalLink link.target =
@@ -2257,7 +2275,7 @@ weaveLink maybeParentBlock link = do
 
 [[(f:weaveLink-defaultId)]] encodes both the enclosing parent block's name as well
 as the name of the child block, so that when we weave a link back to the parent
-block at [[f:weaveParentBlock]], we can targe the exact link to the child block
+block at [[f:weaveParentBlock]], we can target the exact link to the child block
 (instead of just linking broadly to the entire parent block). See
 [[(f:weaveParentBlock-linkAnchorWithChild)]].
 
@@ -2321,16 +2339,8 @@ weaveLinkTarget insideBlock linkTarget = do
   case linkTarget of
     LinkTargetOid linkOid -> weaveLinkTargetLinkOid linkOid
     LinkTargetLineLabel linkOid
-      | Just originObj <-
-          lookup weaveConf.originObjectPath weaveConf.archive.objects,
-        True <- insideBlock,
-        Just (_, maybeLCI) <- lookup linkOid.name originObj.orgDoc.lineLabels -> do
-          if
-            | Just lci <- maybeLCI,
-              Just cell <- originObj.orgDoc.cells !!? lci.unLCI -> do
-                let linkAnchor = getLinkAnchor (Just lci) cell
-                pure $ "#" <> linkAnchor
-            | otherwise -> pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-self-link)
+      | True <- insideBlock -> do
+          pure internalLineLabelTarget -- (ref:f:weaveLinkTarget-self-link)
       | Just originObj <-
           lookup weaveConf.originObjectPath weaveConf.archive.objects,
         originObj.orgDoc.oid == linkOid.oid ->
@@ -2353,22 +2363,23 @@ weaveLinkTarget insideBlock linkTarget = do
 
 For weaving the target to [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]], there are three cases:
 
-  1) The actual labels themselves. This is where they are defined /inside/ a code
-     block, where we have to make them link to the first cell where that label
-     is used (if any). If no cell refers to it, then we just make it link to itself
-     [[(f:weaveLinkTarget-self-link)]] (similar to how headings and blocks can
-     link to themselves for the user to easily save the link to it).
+  1) We are weaving the line label itself inside the code block, where it is
+     defined. We just make it link to itself [[(f:weaveLinkTarget-self-link)]]
+     (similar to how headings and blocks can link to themselves for the user to
+     easily save the link to it).
 
-  2) Internal line labels [[(f:weaveLinkTarget-internal)]]. This is simple because
-     we know that all line labels inside a document are unique, so we can just
-     weave with the name of the label (modulo an ~ll-~ prefix to mean "line
-     label") [[(f:weaveLinkTarget-line-label-prefix)]].
+  2) We are weaving a link to an internal line label
+     [[(f:weaveLinkTarget-internal)]]. This is simple because we know that all line
+     labels inside a document are unique, so we can just weave with the name of
+     the label (modulo an ~ll-~ prefix to mean "line label")
+     [[(f:weaveLinkTarget-line-label-prefix)]].
 
-  3) External line labels [[(f:weaveLinkTarget-external)]]. We can't use
-     [[f:weaveLinkTargetLinkOid]] because it will try to do a coarse cell-level
-     lookup. Line labels are finer-grained than cells. We need to get the
-     external relative path, and then skip cell-wise operations and just slap on
-     the name of the line label (modulo the ~ll-~ prefix) to the external path.
+  3) We are weaving a link to an external line label
+     [[(f:weaveLinkTarget-external)]]. We can't use [[f:weaveLinkTargetLinkOid]] because
+     it will try to do a coarse cell-level lookup. Line labels are finer-grained
+     than cells. We need to get the external relative path, and then skip
+     cell-wise operations and just slap on the name of the line label (modulo
+     the ~ll-~ prefix) to the external path.
 
 [[f:showBrokenLink]] just encodes a basic "error message" into the link itself if
 the target cannot be determined.
@@ -2478,6 +2489,7 @@ a ? do
     fontMono
     roundedRectangleLink -- (ref:css:Links-internal-link)
   <<css:Links (external)>>
+<<css:precise-backlinks>>
 #+end_src
 
 *** Internal links
@@ -2568,6 +2580,39 @@ the latter here).
 0-0.6-0.2-0.8z"></path>
 
 </svg>
+#+end_src
+
+*** Precise backlinks
+
+Precise backlink data are embedded inside the attributes of a link element, so
+that they could be used for the contents of a popup when clicked on
+[[(f:weaveLink-precise-backlinks-popup)]].
+
+#+name: css:precise-backlinks
+#+begin_src haskell
+a ? do
+  ".button-popup-backlinks" & do
+    fontSize (em 0.9)
+    borderStyle none
+    background (none :: Color)
+    "cursor" -: "pointer"
+    "user-select" -: "none"
+    "text-decoration" -: "none"
+    ":hover" & do
+      borderStyle none
+    ":visited" & do
+      ":hover" & do
+        borderStyle none
+".popup-backlinks" & do
+  "position" -: "fixed"
+  display displayNone
+  backgroundColor colorBg
+  border (px 1) solid colorCodeBorder
+  ev borderRadius (rem 0.3125)
+  ev padding $ px 8
+  "z-index" -: "1000"
+  ".active" & do
+    display block
 #+end_src
 
 * List markers
@@ -3169,7 +3214,7 @@ spliceLinks colorized links block = do
       f (acc, []) colorizedStr = (colorizedStr : acc, [])
       f (acc, link : links') colorizedStr =
         ( colorizedStr
-            : (renderAsText weaveConf $ weaveLink (Just block) link)
+            : (renderAsText weaveConf $ weaveLink (Just block) link (-1))
             : acc,
           links'
         )
