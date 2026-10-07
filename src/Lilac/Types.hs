@@ -766,8 +766,8 @@ data Archive = Archive
     ancestry :: Map GCI [GCI], --
     glossary :: Map (Text, GPath) (LCI, LCI), --
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), --
-    preciseBacklinks :: Map LinkTarget [(GPath, [Int], Int)],
-    oidAliases :: Map OID OID,
+    preciseBacklinks :: Map LinkTarget [(Maybe GCI, GCI, Int)],
+    oidAliases :: Map OID OID, --
     offsets :: IntMap GPath, --
     gtoc :: GTOC, --
     csls :: Map FilePath Text, --

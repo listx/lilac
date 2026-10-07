@@ -63,7 +63,7 @@ import Lilac.Types
     GPath,
     GTOC (GTOC),
     GlossaryTerm (definition, term),
-    Heading (body, meta, section),
+    Heading (body, meta),
     LCI (LCI, unLCI),
     Link (Link, target),
     LinkOid (LinkOid, name, oid),
@@ -522,67 +522,61 @@ mkBacklinks pathObjs symbols offsets =
 mkPreciseBacklinks ::
   [(GPath, Object)] ->
   Map OID OID ->
-  Map LinkTarget [(GPath, [Int], Int)]
+  Map LinkTarget [(Maybe GCI, GCI, Int)]
 mkPreciseBacklinks pathObjs oidAliases =
-  foldl' f mempty pathObjs
+  fst . foldl' f (mempty, 0) $ sort pathObjs
   where
     f ::
-      Map LinkTarget [(GPath, [Int], Int)] ->
+      (Map LinkTarget [(Maybe GCI, GCI, Int)], Int) ->
       (GPath, Object) ->
-      Map LinkTarget [(GPath, [Int], Int)]
-    f acc (gPath, obj) =
-      (\(_, _, c) -> c)
-        . foldl' g (gPath, [], acc)
-        $ obj.orgDoc.cells
-    g (gPath, hSection, acc) cell = case cell of
+      (Map LinkTarget [(Maybe GCI, GCI, Int)], Int)
+    f (acc, gciNum) (_, obj) =
+      let (_, finalAcc) =
+            foldl' g (Nothing, acc) $ zip [gciNum ..] obj.orgDoc.cells
+       in (finalAcc, gciNum + length obj.orgDoc.cells)
+    g ::
+      (Maybe GCI, Map LinkTarget [(Maybe GCI, GCI, Int)]) ->
+      (Int, Cell) ->
+      (Maybe GCI, Map LinkTarget [(Maybe GCI, GCI, Int)])
+    g (maybeHeadingGci, acc) (gciNum, cell) = case cell of
       CHeading heading ->
-        foldl'
-          processLinkFromPToken
-          (gPath, heading.section, acc)
-          heading.body.unProse
-      CParagraph prose ->
-        foldl' processLinkFromPToken (gPath, hSection, acc) prose.unProse
-      CGlossaryTerm glossaryTerm ->
-        foldl'
-          processLinkFromPToken
-          (gPath, hSection, acc)
-          glossaryTerm.definition.unProse
-      CTable table ->
-        (\triple -> foldl' processLinkFromPToken triple table.caption.unProse)
-          $ foldl'
-            ( \triple prose ->
-                foldl'
-                  processLinkFromPToken
-                  triple
-                  prose.unProse
-            )
-            (gPath, hSection, acc)
-            table.grid
-      CFigure figure ->
-        foldl'
-          processLinkFromPToken
-          (gPath, hSection, acc)
-          figure.caption.unProse
-      CFootnote footnote ->
-        foldl'
-          processLinkFromPToken
-          (gPath, hSection, acc)
-          footnote.body.unProse
-      _ -> (gPath, hSection, acc)
+        let newHeading = Just (GCI gciNum)
+            newAcc =
+              foldl'
+                (processLinkFromPToken newHeading (GCI gciNum))
+                acc
+                heading.body.unProse
+         in (newHeading, newAcc)
+      _ ->
+        let h = processLinkFromPToken maybeHeadingGci (GCI gciNum)
+            newAcc = case cell of
+              CParagraph prose ->
+                foldl' h acc prose.unProse
+              CGlossaryTerm glossaryTerm ->
+                foldl' h acc glossaryTerm.definition.unProse
+              CTable table ->
+                let gridAcc =
+                      foldl'
+                        (\a prose -> foldl' h a prose.unProse)
+                        acc
+                        table.grid
+                 in foldl' h gridAcc table.caption.unProse
+              CFigure figure ->
+                foldl' h acc figure.caption.unProse
+              CFootnote footnote ->
+                foldl' h acc footnote.body.unProse
+              _ -> acc
+         in (maybeHeadingGci, newAcc)
     processLinkFromPToken ::
-      (GPath, [Int], Map LinkTarget [(GPath, [Int], Int)]) ->
+      Maybe GCI ->
+      GCI ->
+      Map LinkTarget [(Maybe GCI, GCI, Int)] ->
       PToken ->
-      (GPath, [Int], Map LinkTarget [(GPath, [Int], Int)])
-    processLinkFromPToken (gPath, hSection, acc) pToken = case pToken of
+      Map LinkTarget [(Maybe GCI, GCI, Int)]
+    processLinkFromPToken activeHeading cellGci acc pToken = case pToken of
       PTokenLink link idx
         | idx > 0 ->
-            let newAcc =
-                  insertWith
-                    (\old new -> old <> new)
-                    resolvedLinkTarget
-                    [(gPath, hSection, idx)]
-                    acc
-                resolvedLinkOid (LinkOid oid name) =
+            let resolvedLinkOid (LinkOid oid name) =
                   let resolvedOid = lookupDefault oid oid oidAliases
                    in LinkOid resolvedOid name
                 resolvedLinkTarget = case link.target of
@@ -591,9 +585,13 @@ mkPreciseBacklinks pathObjs oidAliases =
                   LinkTargetLineLabel linkOid ->
                     LinkTargetLineLabel $ resolvedLinkOid linkOid
                   _ -> link.target
-             in (gPath, hSection, newAcc)
-        | otherwise -> (gPath, hSection, acc)
-      _ -> (gPath, hSection, acc)
+             in insertWith
+                  (\old new -> old <> new)
+                  resolvedLinkTarget
+                  [(activeHeading, cellGci, idx)]
+                  acc
+        | otherwise -> acc
+      _ -> acc
 
 mkOidAliases :: [(GPath, Object)] -> Map OID OID
 mkOidAliases pathObjs =

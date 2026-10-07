@@ -991,7 +991,7 @@ weaveLink maybeParentBlock link linkNumber = do
                 data_ "backlinks" backlinksJSON
               ]
             backlinksJSON = TE.decodeUtf8 . LBS.toStrict $ encode backlinks
-            backlinks :: [(GPath, [Int], Int)]
+            backlinks :: [(Maybe GCI, GCI, Int)] --
             backlinks =
               lookupDefault [] link.target weaveConf.archive.preciseBacklinks
         toHtml (" " :: Text)

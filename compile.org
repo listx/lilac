@@ -92,7 +92,7 @@ import Lilac.Types
     GPath,
     GTOC (GTOC),
     GlossaryTerm (definition, term),
-    Heading (body, meta, section),
+    Heading (body, meta),
     LCI (LCI, unLCI),
     Link (Link, target),
     LinkOid (LinkOid, name, oid),
@@ -714,8 +714,8 @@ data Archive = Archive
     ancestry :: Map GCI [GCI], -- (ref:data:Archive-ancestry)
     glossary :: Map (Text, GPath) (LCI, LCI), -- (ref:data:Archive-glossary)
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), -- (ref:data:Archive-backlinks)
-    preciseBacklinks :: Map LinkTarget [(GPath, [Int], Int)],
-    oidAliases :: Map OID OID,
+    preciseBacklinks :: Map LinkTarget [(Maybe GCI, GCI, Int)],
+    oidAliases :: Map OID OID, -- (ref:data:Archive-oidAliases)
     offsets :: IntMap GPath, -- (ref:data:Archive-offsets)
     gtoc :: GTOC, -- (ref:data:Archive-gtoc)
     csls :: Map FilePath Text, -- (ref:data:Archive-csls)
@@ -2422,12 +2422,12 @@ each link points to. The target can be the key, and the value a list of links
   1) For all objects, go through all cells to find all instances of ~PTokenLink~.
 
   2) For every link, inspect the target, and save it to a Map (hashmap) as the
-     *key*. For now, let's ignore the fact that a nameable thing can use the OID
-     of the closest parent heading or the document, because we can look up both
-     variations at weave time.
+     *key*. We can ignore the fact that a nameable thing can use the OID of the
+     closest parent heading or the document, because we make use of
+     [[(data:Archive-oidAliases)]].
 
   3) Append the link index from the ~PTokenLink~ and also the current heading
-     section (if any) as a single *value* into the Map. This way, when we do a
+     GCI (if any) as a single *value* into the Map. This way, when we do a
      lookup of the key, we'll get a value that tells us not just the link index,
      but also the heading information so that we have a bit more context about
      the location of the link.
@@ -2440,67 +2440,61 @@ code blocks are ignored.
 mkPreciseBacklinks ::
   [(GPath, Object)] ->
   Map OID OID ->
-  Map LinkTarget [(GPath, [Int], Int)]
+  Map LinkTarget [(Maybe GCI, GCI, Int)]
 mkPreciseBacklinks pathObjs oidAliases =
-  foldl' f mempty pathObjs
+  fst . foldl' f (mempty, 0) $ sort pathObjs
   where
     f ::
-      Map LinkTarget [(GPath, [Int], Int)] ->
+      (Map LinkTarget [(Maybe GCI, GCI, Int)], Int) ->
       (GPath, Object) ->
-      Map LinkTarget [(GPath, [Int], Int)]
-    f acc (gPath, obj) =
-      (\(_, _, c) -> c)
-        . foldl' g (gPath, [], acc)
-        $ obj.orgDoc.cells
-    g (gPath, hSection, acc) cell = case cell of
+      (Map LinkTarget [(Maybe GCI, GCI, Int)], Int)
+    f (acc, gciNum) (_, obj) =
+      let (_, finalAcc) =
+            foldl' g (Nothing, acc) $ zip [gciNum ..] obj.orgDoc.cells
+       in (finalAcc, gciNum + length obj.orgDoc.cells)
+    g ::
+      (Maybe GCI, Map LinkTarget [(Maybe GCI, GCI, Int)]) ->
+      (Int, Cell) ->
+      (Maybe GCI, Map LinkTarget [(Maybe GCI, GCI, Int)])
+    g (maybeHeadingGci, acc) (gciNum, cell) = case cell of
       CHeading heading ->
-        foldl'
-          processLinkFromPToken
-          (gPath, heading.section, acc)
-          heading.body.unProse
-      CParagraph prose ->
-        foldl' processLinkFromPToken (gPath, hSection, acc) prose.unProse
-      CGlossaryTerm glossaryTerm ->
-        foldl'
-          processLinkFromPToken
-          (gPath, hSection, acc)
-          glossaryTerm.definition.unProse
-      CTable table ->
-        (\triple -> foldl' processLinkFromPToken triple table.caption.unProse)
-          $ foldl'
-            ( \triple prose ->
-                foldl'
-                  processLinkFromPToken
-                  triple
-                  prose.unProse
-            )
-            (gPath, hSection, acc)
-            table.grid
-      CFigure figure ->
-        foldl'
-          processLinkFromPToken
-          (gPath, hSection, acc)
-          figure.caption.unProse
-      CFootnote footnote ->
-        foldl'
-          processLinkFromPToken
-          (gPath, hSection, acc)
-          footnote.body.unProse
-      _ -> (gPath, hSection, acc)
+        let newHeading = Just (GCI gciNum)
+            newAcc =
+              foldl'
+                (processLinkFromPToken newHeading (GCI gciNum))
+                acc
+                heading.body.unProse
+         in (newHeading, newAcc)
+      _ ->
+        let h = processLinkFromPToken maybeHeadingGci (GCI gciNum)
+            newAcc = case cell of
+              CParagraph prose ->
+                foldl' h acc prose.unProse
+              CGlossaryTerm glossaryTerm ->
+                foldl' h acc glossaryTerm.definition.unProse
+              CTable table ->
+                let gridAcc =
+                      foldl'
+                        (\a prose -> foldl' h a prose.unProse)
+                        acc
+                        table.grid
+                 in foldl' h gridAcc table.caption.unProse
+              CFigure figure ->
+                foldl' h acc figure.caption.unProse
+              CFootnote footnote ->
+                foldl' h acc footnote.body.unProse
+              _ -> acc
+         in (maybeHeadingGci, newAcc)
     processLinkFromPToken ::
-      (GPath, [Int], Map LinkTarget [(GPath, [Int], Int)]) ->
+      Maybe GCI ->
+      GCI ->
+      Map LinkTarget [(Maybe GCI, GCI, Int)] ->
       PToken ->
-      (GPath, [Int], Map LinkTarget [(GPath, [Int], Int)])
-    processLinkFromPToken (gPath, hSection, acc) pToken = case pToken of
+      Map LinkTarget [(Maybe GCI, GCI, Int)]
+    processLinkFromPToken activeHeading cellGci acc pToken = case pToken of
       PTokenLink link idx
         | idx > 0 ->
-            let newAcc =
-                  insertWith
-                    (\old new -> old <> new)
-                    resolvedLinkTarget
-                    [(gPath, hSection, idx)]
-                    acc
-                resolvedLinkOid (LinkOid oid name) =
+            let resolvedLinkOid (LinkOid oid name) =
                   let resolvedOid = lookupDefault oid oid oidAliases
                    in LinkOid resolvedOid name
                 resolvedLinkTarget = case link.target of
@@ -2509,13 +2503,21 @@ mkPreciseBacklinks pathObjs oidAliases =
                   LinkTargetLineLabel linkOid ->
                     LinkTargetLineLabel $ resolvedLinkOid linkOid
                   _ -> link.target
-             in (gPath, hSection, newAcc)
-        | otherwise -> (gPath, hSection, acc)
-      _ -> (gPath, hSection, acc)
+             in insertWith
+                  (\old new -> old <> new)
+                  resolvedLinkTarget
+                  [(activeHeading, cellGci, idx)]
+                  acc
+        | otherwise -> acc
+      _ -> acc
 #+end_src
 
 [[f:mkPreciseBacklinks]] is similar to [[f:findExternalOids]] in how it looks at all
 cells to extract link information, so its definition looks similar.
+
+The output map records the currently active heading, if any. This is used to
+generate more meaningful backlink text for the user at
+[[id:a63d2021-2596-4c43-81e3-d08e90077f75::(f:weaveLink-precise-backlinks-data)]].
 
 ** OID Aliases
 
