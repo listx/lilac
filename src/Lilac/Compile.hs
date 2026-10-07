@@ -38,6 +38,7 @@ import Lilac.Types
         gtoc,
         objects,
         offsets,
+        oidAliases,
         preciseBacklinks,
         symbols
       ),
@@ -74,7 +75,7 @@ import Lilac.Types
     MathFragment (meta, parentOid),
     OID,
     Object (Object, externalOids, orgDoc, symbols),
-    OrgDoc (bibPaths, cells, cslPath, glossary, oid, pseudoEdges),
+    OrgDoc (bibPaths, cells, cslPath, glossary, headingOids, oid, pseudoEdges),
     PToken
       ( PTokenLink
       ),
@@ -153,7 +154,7 @@ import Relude
     (==),
     (>),
   )
-import Relude.Extra.Map (elems, insert, insertWith, lookup, member)
+import Relude.Extra.Map (elems, insert, insertWith, lookup, lookupDefault, member)
 import System.Directory.OsPath qualified as D
 import System.Exit (die)
 import System.FilePath (splitDirectories)
@@ -269,7 +270,8 @@ mkArchive projectConf pathObjs = do
       (symbols, glossary) = combineSymbolsAndGlossary pathObjsNonEmpty
       offsets = mkOffsets pathObjsNonEmpty
       backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
-      preciseBacklinks = mkPreciseBacklinks pathObjsNonEmpty
+      preciseBacklinks = mkPreciseBacklinks pathObjsNonEmpty oidAliases
+      oidAliases = mkOidAliases pathObjsNonEmpty
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols --
       duplicateTanglePaths = findDuplicateTanglePaths pathObjsNonEmpty --
   brokenFileLinks <- findBrokenFileLinks pathObjs
@@ -308,6 +310,7 @@ mkArchive projectConf pathObjs = do
                       glossary = glossary,
                       backlinks = backlinks,
                       preciseBacklinks = preciseBacklinks,
+                      oidAliases = oidAliases,
                       offsets = offsets,
                       gtoc = gtoc,
                       csls = csls,
@@ -518,8 +521,9 @@ mkBacklinks pathObjs symbols offsets =
 
 mkPreciseBacklinks ::
   [(GPath, Object)] ->
+  Map OID OID ->
   Map LinkTarget [(GPath, [Int], Int)]
-mkPreciseBacklinks pathObjs =
+mkPreciseBacklinks pathObjs oidAliases =
   foldl' f mempty pathObjs
   where
     f ::
@@ -575,12 +579,38 @@ mkPreciseBacklinks pathObjs =
             let newAcc =
                   insertWith
                     (\old new -> old <> new)
-                    link.target
+                    resolvedLinkTarget
                     [(gPath, hSection, idx)]
                     acc
+                resolvedLinkOid (LinkOid oid name) =
+                  let resolvedOid = lookupDefault oid oid oidAliases
+                   in LinkOid resolvedOid name
+                resolvedLinkTarget = case link.target of
+                  LinkTargetOid linkOid ->
+                    LinkTargetOid $ resolvedLinkOid linkOid
+                  LinkTargetLineLabel linkOid ->
+                    LinkTargetLineLabel $ resolvedLinkOid linkOid
+                  _ -> link.target
              in (gPath, hSection, newAcc)
         | otherwise -> (gPath, hSection, acc)
       _ -> (gPath, hSection, acc)
+
+mkOidAliases :: [(GPath, Object)] -> Map OID OID
+mkOidAliases pathObjs =
+  foldl' f mempty pathObjs
+  where
+    f ::
+      Map OID OID ->
+      (GPath, Object) ->
+      Map OID OID
+    f acc (_, obj) =
+      foldl' g acc obj.orgDoc.headingOids
+      where
+        g ::
+          Map OID OID ->
+          OID ->
+          Map OID OID
+        g acc' headingOid = insert headingOid obj.orgDoc.oid acc'
 
 readObjectsFrom :: FilePath -> [FilePath] -> IO [(GPath, Object)]
 readObjectsFrom parentDir = foldlM f []

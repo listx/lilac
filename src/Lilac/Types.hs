@@ -677,7 +677,7 @@ data Cite = Cite
 type OID :: Type
 newtype OID = OID UUID
   deriving stock (Eq, Ord, Generic)
-  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
+  deriving anyclass (FromJSON, FromJSONKey, ToJSON, ToJSONKey)
 
 instance Show OID where
   show (OID uuid) = Prelude.show uuid
@@ -767,6 +767,7 @@ data Archive = Archive
     glossary :: Map (Text, GPath) (LCI, LCI), --
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), --
     preciseBacklinks :: Map LinkTarget [(GPath, [Int], Int)],
+    oidAliases :: Map OID OID,
     offsets :: IntMap GPath, --
     gtoc :: GTOC, --
     csls :: Map FilePath Text, --

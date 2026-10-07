@@ -67,6 +67,7 @@ import Lilac.Types
         gtoc,
         objects,
         offsets,
+        oidAliases,
         preciseBacklinks,
         symbols
       ),
@@ -103,7 +104,7 @@ import Lilac.Types
     MathFragment (meta, parentOid),
     OID,
     Object (Object, externalOids, orgDoc, symbols),
-    OrgDoc (bibPaths, cells, cslPath, glossary, oid, pseudoEdges),
+    OrgDoc (bibPaths, cells, cslPath, glossary, headingOids, oid, pseudoEdges),
     PToken
       ( PTokenLink
       ),
@@ -182,7 +183,7 @@ import Relude
     (==),
     (>),
   )
-import Relude.Extra.Map (elems, insert, insertWith, lookup, member)
+import Relude.Extra.Map (elems, insert, insertWith, lookup, lookupDefault, member)
 import System.Directory.OsPath qualified as D
 import System.Exit (die)
 import System.FilePath (splitDirectories)
@@ -204,6 +205,7 @@ import System.OsPath qualified as P
 <<f:finalizeEdges>>
 <<f:mkBacklinks>>
 <<f:mkPreciseBacklinks>>
+<<f:mkOidAliases>>
 <<f:readObjectsFrom>>
 <<f:buildGraph>>
 <<f:getBlocksFromArchive>>
@@ -713,6 +715,7 @@ data Archive = Archive
     glossary :: Map (Text, GPath) (LCI, LCI), -- (ref:data:Archive-glossary)
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), -- (ref:data:Archive-backlinks)
     preciseBacklinks :: Map LinkTarget [(GPath, [Int], Int)],
+    oidAliases :: Map OID OID,
     offsets :: IntMap GPath, -- (ref:data:Archive-offsets)
     gtoc :: GTOC, -- (ref:data:Archive-gtoc)
     csls :: Map FilePath Text, -- (ref:data:Archive-csls)
@@ -834,7 +837,8 @@ mkArchive projectConf pathObjs = do
       (symbols, glossary) = combineSymbolsAndGlossary pathObjsNonEmpty
       offsets = mkOffsets pathObjsNonEmpty
       backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
-      preciseBacklinks = mkPreciseBacklinks pathObjsNonEmpty
+      preciseBacklinks = mkPreciseBacklinks pathObjsNonEmpty oidAliases
+      oidAliases = mkOidAliases pathObjsNonEmpty
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols -- (ref:f:mkArchive-brokenLinks)
       duplicateTanglePaths = findDuplicateTanglePaths pathObjsNonEmpty -- (ref:f:mkArchive-findDuplicateTanglePaths)
   brokenFileLinks <- findBrokenFileLinks pathObjs
@@ -873,6 +877,7 @@ mkArchive projectConf pathObjs = do
                       glossary = glossary,
                       backlinks = backlinks,
                       preciseBacklinks = preciseBacklinks,
+                      oidAliases = oidAliases,
                       offsets = offsets,
                       gtoc = gtoc,
                       csls = csls,
@@ -2434,8 +2439,9 @@ code blocks are ignored.
 #+begin_src haskell
 mkPreciseBacklinks ::
   [(GPath, Object)] ->
+  Map OID OID ->
   Map LinkTarget [(GPath, [Int], Int)]
-mkPreciseBacklinks pathObjs =
+mkPreciseBacklinks pathObjs oidAliases =
   foldl' f mempty pathObjs
   where
     f ::
@@ -2491,9 +2497,18 @@ mkPreciseBacklinks pathObjs =
             let newAcc =
                   insertWith
                     (\old new -> old <> new)
-                    link.target
+                    resolvedLinkTarget
                     [(gPath, hSection, idx)]
                     acc
+                resolvedLinkOid (LinkOid oid name) =
+                  let resolvedOid = lookupDefault oid oid oidAliases
+                   in LinkOid resolvedOid name
+                resolvedLinkTarget = case link.target of
+                  LinkTargetOid linkOid ->
+                    LinkTargetOid $ resolvedLinkOid linkOid
+                  LinkTargetLineLabel linkOid ->
+                    LinkTargetLineLabel $ resolvedLinkOid linkOid
+                  _ -> link.target
              in (gPath, hSection, newAcc)
         | otherwise -> (gPath, hSection, acc)
       _ -> (gPath, hSection, acc)
@@ -2501,6 +2516,32 @@ mkPreciseBacklinks pathObjs =
 
 [[f:mkPreciseBacklinks]] is similar to [[f:findExternalOids]] in how it looks at all
 cells to extract link information, so its definition looks similar.
+
+** OID Aliases
+
+[[f:mkOidAliases]] treats all heading OIDs as aliases of the top-level document OID.
+This lets us form a "canonical" representation of an OID link, which is always
+resolved to the document OID.
+
+#+name: f:mkOidAliases
+#+begin_src haskell
+mkOidAliases :: [(GPath, Object)] -> Map OID OID
+mkOidAliases pathObjs =
+  foldl' f mempty pathObjs
+  where
+    f ::
+      Map OID OID ->
+      (GPath, Object) ->
+      Map OID OID
+    f acc (_, obj) =
+      foldl' g acc obj.orgDoc.headingOids
+      where
+        g ::
+          Map OID OID ->
+          OID ->
+          Map OID OID
+        g acc' headingOid = insert headingOid obj.orgDoc.oid acc'
+#+end_src
 
 ** Citation dependencies
 :PROPERTIES:

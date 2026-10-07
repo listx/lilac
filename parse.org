@@ -108,7 +108,7 @@ concrete details of a UUID in the rest of the program.
 type OID :: Type
 newtype OID = OID UUID
   deriving stock (Eq, Ord, Generic)
-  deriving anyclass (FromJSON, FromJSONKey, ToJSON)
+  deriving anyclass (FromJSON, FromJSONKey, ToJSON, ToJSONKey)
 #+end_src
 
 There are some helpers in [[id:5908cefc-0e82-41a5-84ac-1c8c826f5e62][Org ID (OID)]] for this type, which plays a big role in
