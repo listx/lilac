@@ -60,6 +60,7 @@ import Lilac.Types
         cslPath,
         footnoteRefs,
         glossary,
+        headingOids,
         lineLabels,
         meta,
         oid,
@@ -414,21 +415,31 @@ spec = do
 
   shouldParseWithState
     "0004-properties-drawer-not-empty"
-    ( nilOrgDoc
-        [ CHeading
-            Heading
-              { level = 1,
-                section = [1],
-                body = Prose [ptext "foo" []],
-                meta =
-                  fromList
-                    [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6"),
-                      ("FOO", "BAR")
-                    ]
-              }
-        ]
-        []
-    )
+    OrgDoc
+      { oid = nilOid,
+        headingOids = [fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
+        cells =
+          [ CHeading
+              Heading
+                { level = 1,
+                  section = [1],
+                  body = Prose [ptext "foo" []],
+                  meta =
+                    fromList
+                      [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6"),
+                        ("FOO", "BAR")
+                      ]
+                }
+          ],
+        pseudoEdges = [],
+        footnoteRefs = M.empty,
+        glossary = M.empty,
+        lineLabels = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        citations = [],
+        meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+      }
     defaultOrgParserState
       { headingOidStack =
           [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
@@ -438,20 +449,30 @@ spec = do
 
   shouldParseWithState
     "0004-properties-drawer-not-empty-with-comments"
-    ( nilOrgDoc
-        [ CHeading
-            Heading
-              { level = 1,
-                section = [1],
-                body = Prose [ptext "foo" []],
-                meta =
-                  fromList
-                    [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
-                    ]
-              }
-        ]
-        []
-    )
+    OrgDoc
+      { oid = nilOid,
+        headingOids = [fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
+        cells =
+          [ CHeading
+              Heading
+                { level = 1,
+                  section = [1],
+                  body = Prose [ptext "foo" []],
+                  meta =
+                    fromList
+                      [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                      ]
+                }
+          ],
+        pseudoEdges = [],
+        footnoteRefs = M.empty,
+        glossary = M.empty,
+        lineLabels = M.empty,
+        cslPath = Nothing,
+        bibPaths = [],
+        citations = [],
+        meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+      }
     defaultOrgParserState
       { headingOidStack =
           [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
@@ -736,6 +757,7 @@ spec = do
     "0006-links-slashSeparatedWords"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CParagraph
               $ Prose
@@ -1231,6 +1253,7 @@ spec = do
     "0006-links-oids-line-labels"
     ( OrgDoc
         { oid = nilOid,
+          headingOids = [],
           cells =
             [ CBlock
                 Block
@@ -2647,6 +2670,7 @@ spec = do
     "0013-footnotes-simple"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CParagraph
               $ Prose
@@ -2698,6 +2722,7 @@ spec = do
     "0013-footnotes-complex"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CParagraph
               $ Prose
@@ -2766,6 +2791,7 @@ spec = do
     "0014-citations-csl-path"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells = [],
         pseudoEdges = [],
         footnoteRefs = M.empty,
@@ -2785,6 +2811,7 @@ spec = do
     "0014-citations-csl-json-paths"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells = [],
         pseudoEdges = [],
         footnoteRefs = M.empty,
@@ -2807,6 +2834,7 @@ spec = do
     "0014-citations-bibliography-location"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells = [CCommand PrintBibliography],
         pseudoEdges = [],
         footnoteRefs = M.empty,
@@ -2826,6 +2854,7 @@ spec = do
     "0014-citations-single-cite"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CParagraph
               $ Prose
@@ -2865,6 +2894,7 @@ spec = do
     "0014-citations-locators"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CParagraph
               $ Prose
@@ -2984,6 +3014,7 @@ spec = do
     "0014-citations-locators-affixes"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CParagraph
               $ Prose
@@ -3141,6 +3172,7 @@ spec = do
     "0014-citations-worg"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CParagraph
               $ Prose
@@ -3314,6 +3346,7 @@ spec = do
     "0014-citations-forbidden-in-verbatim-code"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CParagraph
               $ Prose
@@ -3340,6 +3373,7 @@ spec = do
     "0014-citations-forbidden-in-headings"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CHeading
               Heading
@@ -3598,6 +3632,7 @@ spec = do
     "0015-glossary-not-first-paragraph-in-item"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CListItem [LUnorderedStart, LItemStart],
             CParagraph $ Prose [ptext "x" []],
@@ -3625,6 +3660,7 @@ spec = do
     "0015-glossary-bounds-individual"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CListItem [LGlossaryGroupStart, LGlossaryItemStart], -- 0
             CGlossaryTerm -- 1
@@ -3728,6 +3764,7 @@ spec = do
     "0015-glossary-location"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells = [CCommand $ PrintGlossary False],
         pseudoEdges = [],
         footnoteRefs = M.empty,
@@ -3747,6 +3784,7 @@ spec = do
     "0015-glossary-location-global"
     OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells = [CCommand $ PrintGlossary True],
         pseudoEdges = [],
         footnoteRefs = M.empty,
@@ -4096,6 +4134,7 @@ nilOrgDoc :: [Cell] -> [PseudoEdge] -> OrgDoc
 nilOrgDoc cells pseudoEdges =
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells = cells,
       pseudoEdges = pseudoEdges,
       footnoteRefs = M.empty,

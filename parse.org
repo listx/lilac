@@ -60,6 +60,7 @@ parsing a raw Org file.
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID, -- (ref:data:OrgDoc-oid)
+    headingOids :: [OID],
     meta :: Map Text Text, -- (ref:data:OrgDoc-meta)
     cells :: [Cell], -- (ref:data:OrgDoc-cells)
     pseudoEdges :: [PseudoEdge], -- (ref:data:OrgDoc-pseudoEdges)
@@ -295,6 +296,7 @@ type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { docOid :: OID, -- (ref:data:OrgParserState-docOid)
     headingOidStack :: [Maybe OID], -- (ref:data:OrgParserState-headingOidStack)
+    headingOids :: [OID],
     headingLevel :: Int, -- (ref:data:OrgParserState-headingLevel)
     headingSectionNumber :: [Int], -- (ref:data:OrgParserState-headingSectionNumber)
     insideHeading :: Bool, -- (ref:data:OrgParserState-insideHeading)
@@ -349,6 +351,7 @@ defaultOrgParserState =
   OrgParserState
     { docOid = nilOid,
       headingOidStack = [],
+      headingOids = [],
       headingLevel = 0,
       headingSectionNumber = [],
       insideHeading = False,
@@ -716,6 +719,7 @@ import Lilac.Types
         cslPath,
         footnoteRefs,
         glossary,
+        headingOids,
         lineLabels,
         meta,
         oid,
@@ -781,6 +785,7 @@ import Lilac.Types as OrgParserState
         glossaryTermOffset,
         headingLevel,
         headingOidStack,
+        headingOids,
         headingSectionNumber,
         insideBlock,
         insideCitation,
@@ -1089,6 +1094,7 @@ orgDocParser = do
   pure
     $ OrgDoc
       { oid = docOid,
+        headingOids = pState.headingOids,
         cells = meaningfulCells,
         pseudoEdges = pState.pseudoEdges,
         footnoteRefs = footnoteRefs,
@@ -1461,7 +1467,8 @@ resetState =
         OrgParserState.cslPath = Nothing,
         OrgParserState.cellNumber = LCI 0,
         OrgParserState.pseudoEdges = [],
-        OrgParserState.linkNumber = 0
+        OrgParserState.linkNumber = 0,
+        OrgParserState.headingOids = []
       }
 #+end_src
 
@@ -1669,6 +1676,7 @@ defaultOrgDoc :: OID -> [(Text, Text)] -> OrgDoc
 defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
+      headingOids = [],
       cells = [],
       pseudoEdges = [],
       footnoteRefs = M.empty,
@@ -3679,6 +3687,7 @@ shouldParseWithState
   "0006-links-slashSeparatedWords"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         [ CParagraph
             $ Prose
@@ -3999,6 +4008,7 @@ shouldParseWithState
   "0006-links-oids-line-labels"
   ( OrgDoc
       { oid = nilOid,
+        headingOids = [],
         cells =
           [ CBlock
               Block
@@ -4955,6 +4965,7 @@ shouldParseWithState
   "0013-footnotes-simple"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         <<Expected cells for 0013-footnotes-simple>>,
       pseudoEdges = [],
@@ -5037,6 +5048,7 @@ shouldParseWithState
   "0013-footnotes-complex"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         <<Expected cells for 0013-footnotes-complex>>,
       pseudoEdges = [],
@@ -5178,6 +5190,7 @@ shouldParseWithState
   "0014-citations-csl-path"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells = [],
       pseudoEdges = [],
       footnoteRefs = M.empty,
@@ -5238,6 +5251,7 @@ shouldParseWithState
   "0014-citations-csl-json-paths"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells = [],
       pseudoEdges = [],
       footnoteRefs = M.empty,
@@ -5303,6 +5317,7 @@ shouldParseWithState
   "0014-citations-bibliography-location"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells = [CCommand PrintBibliography],
       pseudoEdges = [],
       footnoteRefs = M.empty,
@@ -5767,6 +5782,7 @@ shouldParseWithState
   "0014-citations-single-cite"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         <<Expected prose for 0014-citations-single-cite>>,
       pseudoEdges = [],
@@ -5829,6 +5845,7 @@ shouldParseWithState
   "0014-citations-locators"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         <<Expected prose for 0014-citations-locators>>,
       pseudoEdges = [],
@@ -5971,6 +5988,7 @@ shouldParseWithState
   "0014-citations-locators-affixes"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         <<Expected prose for 0014-citations-locators-affixes>>,
       pseudoEdges = [],
@@ -6151,6 +6169,7 @@ shouldParseWithState
   "0014-citations-worg"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         <<Expected prose for 0014-citations-worg>>,
       pseudoEdges = [],
@@ -6437,6 +6456,7 @@ shouldParseWithState
   "0014-citations-forbidden-in-verbatim-code"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         <<Expected prose for 0014-citations-forbidden-in-verbatim-code>>,
       pseudoEdges = [],
@@ -6480,6 +6500,7 @@ shouldParseWithState
   "0014-citations-forbidden-in-headings"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         [ CHeading
             Heading
@@ -7832,18 +7853,25 @@ headingParser = do
     MP.setOffset o
     fail "headings are not allowed inside rich blocks"
   props <- propertiesDrawerParser
-  let newHeadingSection = genSectionNumber lenStars pState.headingSectionNumber
+  let maybeHeadingOid = lookup "ID" props
+      newHeadingSection = genSectionNumber lenStars pState.headingSectionNumber
       newHeadingOidStack =
         genHeadingOidStack
-          (lookup "ID" props)
+          maybeHeadingOid
           lenStars
           pState.headingOidStack
+      recordHeadingOid maybeText oids
+        | Just headingOidText <- maybeText,
+          Just headingOid <- Lilac.Types.fromText headingOidText =
+            headingOid : oids
+        | otherwise = oids
   modify
     ( \s ->
         s
           { headingLevel = lenStars,
             headingSectionNumber = newHeadingSection,
             headingOidStack = newHeadingOidStack,
+            headingOids = recordHeadingOid maybeHeadingOid s.headingOids,
             insideHeading = False
           }
     )
@@ -8312,21 +8340,31 @@ Check we can pick up keys and values from the ~:PROPERTIES:~ drawer.
 #+begin_src haskell
 shouldParseWithState
   "0004-properties-drawer-not-empty"
-  ( nilOrgDoc
-      [ CHeading
-          Heading
-            { level = 1,
-              section = [1],
-              body = Prose [ptext "foo" []],
-              meta =
-                fromList
-                  [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6"),
-                    ("FOO", "BAR")
-                  ]
-            }
-      ]
-      []
-  )
+  OrgDoc
+    { oid = nilOid,
+      headingOids = [fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
+      cells =
+        [ CHeading
+            Heading
+              { level = 1,
+                section = [1],
+                body = Prose [ptext "foo" []],
+                meta =
+                  fromList
+                    [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6"),
+                      ("FOO", "BAR")
+                    ]
+              }
+        ],
+      pseudoEdges = [],
+      footnoteRefs = M.empty,
+      glossary = M.empty,
+      lineLabels = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      citations = [],
+      meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+    }
   defaultOrgParserState
     { headingOidStack =
         [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
@@ -8360,20 +8398,30 @@ This ":KEY:" ignored because it's inside a comment block.
 #+begin_src haskell
 shouldParseWithState
   "0004-properties-drawer-not-empty-with-comments"
-  ( nilOrgDoc
-      [ CHeading
-          Heading
-            { level = 1,
-              section = [1],
-              body = Prose [ptext "foo" []],
-              meta =
-                fromList
-                  [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
-                  ]
-            }
-      ]
-      []
-  )
+  OrgDoc
+    { oid = nilOid,
+      headingOids = [fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
+      cells =
+        [ CHeading
+            Heading
+              { level = 1,
+                section = [1],
+                body = Prose [ptext "foo" []],
+                meta =
+                  fromList
+                    [ ("ID", "b949ea2e-e6d1-453d-9352-5e85a82cd4e6")
+                    ]
+              }
+        ],
+      pseudoEdges = [],
+      footnoteRefs = M.empty,
+      glossary = M.empty,
+      lineLabels = M.empty,
+      cslPath = Nothing,
+      bibPaths = [],
+      citations = [],
+      meta = fromList [("ID", "00000000-0000-0000-0000-000000000000")]
+    }
   defaultOrgParserState
     { headingOidStack =
         [Just $ fromWords 0xb949ea2ee6d1453d 0x93525e85a82cd4e6],
@@ -12282,6 +12330,7 @@ shouldParseWith
   "0015-glossary-not-first-paragraph-in-item"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         [ CListItem [LUnorderedStart, LItemStart],
           CParagraph $ Prose [ptext "x" []],
@@ -12337,6 +12386,7 @@ shouldParseWithState
   "0015-glossary-bounds-individual"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells =
         [ CListItem [LGlossaryGroupStart, LGlossaryItemStart], -- 0
           CGlossaryTerm -- 1
@@ -12578,6 +12628,7 @@ shouldParseWithState
   "0015-glossary-location"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells = [CCommand $ PrintGlossary False],
       pseudoEdges = [],
       footnoteRefs = M.empty,
@@ -12606,6 +12657,7 @@ shouldParseWithState
   "0015-glossary-location-global"
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells = [CCommand $ PrintGlossary True],
       pseudoEdges = [],
       footnoteRefs = M.empty,
@@ -14374,6 +14426,7 @@ import Lilac.Types
         cslPath,
         footnoteRefs,
         glossary,
+        headingOids,
         lineLabels,
         meta,
         oid,
@@ -14565,6 +14618,7 @@ nilOrgDoc :: [Cell] -> [PseudoEdge] -> OrgDoc
 nilOrgDoc cells pseudoEdges =
   OrgDoc
     { oid = nilOid,
+      headingOids = [],
       cells = cells,
       pseudoEdges = pseudoEdges,
       footnoteRefs = M.empty,

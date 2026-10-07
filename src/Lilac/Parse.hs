@@ -150,6 +150,7 @@ import Lilac.Types
         cslPath,
         footnoteRefs,
         glossary,
+        headingOids,
         lineLabels,
         meta,
         oid,
@@ -215,6 +216,7 @@ import Lilac.Types as OrgParserState
         glossaryTermOffset,
         headingLevel,
         headingOidStack,
+        headingOids,
         headingSectionNumber,
         insideBlock,
         insideCitation,
@@ -394,6 +396,7 @@ orgDocParser = do
   pure
     $ OrgDoc
       { oid = docOid,
+        headingOids = pState.headingOids,
         cells = meaningfulCells,
         pseudoEdges = pState.pseudoEdges,
         footnoteRefs = footnoteRefs,
@@ -409,6 +412,7 @@ defaultOrgDoc :: OID -> [(Text, Text)] -> OrgDoc
 defaultOrgDoc oid metas =
   OrgDoc
     { oid = oid,
+      headingOids = [],
       cells = [],
       pseudoEdges = [],
       footnoteRefs = M.empty,
@@ -597,18 +601,25 @@ headingParser = do
     MP.setOffset o
     fail "headings are not allowed inside rich blocks"
   props <- propertiesDrawerParser
-  let newHeadingSection = genSectionNumber lenStars pState.headingSectionNumber
+  let maybeHeadingOid = lookup "ID" props
+      newHeadingSection = genSectionNumber lenStars pState.headingSectionNumber
       newHeadingOidStack =
         genHeadingOidStack
-          (lookup "ID" props)
+          maybeHeadingOid
           lenStars
           pState.headingOidStack
+      recordHeadingOid maybeText oids
+        | Just headingOidText <- maybeText,
+          Just headingOid <- Lilac.Types.fromText headingOidText =
+            headingOid : oids
+        | otherwise = oids
   modify
     ( \s ->
         s
           { headingLevel = lenStars,
             headingSectionNumber = newHeadingSection,
             headingOidStack = newHeadingOidStack,
+            headingOids = recordHeadingOid maybeHeadingOid s.headingOids,
             insideHeading = False
           }
     )
@@ -2954,7 +2965,8 @@ resetState =
         OrgParserState.cslPath = Nothing,
         OrgParserState.cellNumber = LCI 0,
         OrgParserState.pseudoEdges = [],
-        OrgParserState.linkNumber = 0
+        OrgParserState.linkNumber = 0,
+        OrgParserState.headingOids = []
       }
 
 deleteRedundantKeys :: (Ord k) => Map k v -> [k] -> Map k v
