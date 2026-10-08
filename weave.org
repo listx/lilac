@@ -495,6 +495,8 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 <<f:weaveBacklinks>>
 <<f:weaveBacklinksForExternalObj>>
 <<f:weaveBacklink>>
+<<f:embedPreciseBacklinks>>
+<<f:renderPreciseBacklink>>
 <<f:weaveNamedCellsIndex>>
 #+end_src
 
@@ -2253,16 +2255,8 @@ weaveLink maybeParentBlock link linkNumber = do
   if
     | LinkTargetLineLabel _ <- link.target,
       Just _ <- maybeParentBlock -> do
-        let attrsBacklinkPopup =
-              [ class_ "button-popup-backlinks",
-                data_ "backlinks" backlinksJSON
-              ]
-            backlinksJSON = TE.decodeUtf8 . LBS.toStrict $ encode backlinks
-            backlinks :: [(Maybe GCI, GCI, Int)] -- (ref:f:weaveLink-precise-backlinks-data)
-            backlinks =
-              lookupDefault [] link.target weaveConf.archive.preciseBacklinks
         toHtml (" " :: Text)
-        a_ attrsBacklinkPopup "←" -- (ref:f:weaveLink-precise-backlinks-popup)
+        embedPreciseBacklinks weaveConf link.target
     | otherwise -> pure ()
   where
     linkCategory target
@@ -6927,6 +6921,75 @@ footer ? do
     fontSize $ rem 0.9
     marginTop (rem 2.5)
     marginBottom (rem 0.625)
+#+end_src
+
+* Precise backlinks
+:PROPERTIES:
+:ID:       36a3a700-a7f7-4770-a99c-2de26f43eb5c
+:END:
+
+Precise backlinks are rendered as text and embedded as raw data, to be
+interpreted by the frontend.
+
+#+name: f:embedPreciseBacklinks
+#+begin_src haskell
+embedPreciseBacklinks :: WeaveConf -> LinkTarget -> HtmlWeaver ()
+embedPreciseBacklinks weaveConf linkTarget = do
+  let attrsBacklinkPopup =
+        [ class_ "button-popup-backlinks",
+          data_ "backlinks" backlinksJSON
+        ]
+      backlinksJSON = TE.decodeUtf8 . LBS.toStrict $ encode backlinks
+      backlinks :: [(Text, Text)] -- (ref:f:weaveLink-precise-backlinks-data)
+      backlinks =
+        map (renderPreciseBacklink weaveConf)
+          $ lookupDefault [] linkTarget weaveConf.archive.preciseBacklinks
+  a_ attrsBacklinkPopup "←" -- (ref:f:weaveLink-precise-backlinks-popup)
+#+end_src
+
+[[f:renderPreciseBacklink]] is the main workhorse. Its main job is to figure out the
+exact link anchor and link display name of the precise backlink. It knows how to
+handle both internal and external GCIs.
+
+#+name: f:renderPreciseBacklink
+#+begin_src haskell
+renderPreciseBacklink :: WeaveConf -> (Maybe GCI, GCI, Int) -> (Text, Text)
+renderPreciseBacklink weaveConf (maybeHeadingGci, cellGci, linkNumber) =
+  (backlinkHref, backlinkDisplayName)
+  where
+    backlinkHref =
+      case getLinkToGCI weaveConf cellGci of
+        Just (_, linkAnchorToGCI, _) ->
+          let anchorWithoutHash gci
+                | gciIsInternal weaveConf.originObjectPath weaveConf.archive gci = ""
+                | otherwise = T.takeWhile (/= '#') linkAnchorToGCI
+           in anchorWithoutHash cellGci
+                <> "#linkNumber-"
+                <> T.show linkNumber
+        Nothing -> "???"
+    gciIsInternal :: GPath -> Archive -> GCI -> Bool
+    gciIsInternal originObjectPath archive gci =
+      case gciToObjPath archive gci of
+        Just path -> path == originObjectPath
+        Nothing -> False
+    backlinkDisplayName =
+      case maybeHeadingGci of
+        Just headingGci
+          | headingGci == cellGci -> displayName cellGci
+          | otherwise ->
+              displayName headingGci
+                <> " ~ "
+                <> displayName cellGci
+        Nothing -> displayName cellGci
+    displayName gci =
+      renderAsText weaveConf
+        . weaveProse
+        . fromMaybe (Prose [])
+        $ gciToName weaveConf.archive offset gci
+    offset =
+      case IntMap.lookupLE cellGci.unGCI weaveConf.archive.offsets of
+        Just (o, _) -> o
+        Nothing -> 0
 #+end_src
 
 * Testing framework

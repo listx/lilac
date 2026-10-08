@@ -986,16 +986,8 @@ weaveLink maybeParentBlock link linkNumber = do
   if
     | LinkTargetLineLabel _ <- link.target,
       Just _ <- maybeParentBlock -> do
-        let attrsBacklinkPopup =
-              [ class_ "button-popup-backlinks",
-                data_ "backlinks" backlinksJSON
-              ]
-            backlinksJSON = TE.decodeUtf8 . LBS.toStrict $ encode backlinks
-            backlinks :: [(Maybe GCI, GCI, Int)] --
-            backlinks =
-              lookupDefault [] link.target weaveConf.archive.preciseBacklinks
         toHtml (" " :: Text)
-        a_ attrsBacklinkPopup "←" --
+        embedPreciseBacklinks weaveConf link.target
     | otherwise -> pure ()
   where
     linkCategory target
@@ -2245,6 +2237,57 @@ weaveBacklink archive (externalGCIs@(externalGCI : _), internalGCI) = do
           if asListItem
             then li_ [] $ externalLink
             else externalLink
+
+embedPreciseBacklinks :: WeaveConf -> LinkTarget -> HtmlWeaver ()
+embedPreciseBacklinks weaveConf linkTarget = do
+  let attrsBacklinkPopup =
+        [ class_ "button-popup-backlinks",
+          data_ "backlinks" backlinksJSON
+        ]
+      backlinksJSON = TE.decodeUtf8 . LBS.toStrict $ encode backlinks
+      backlinks :: [(Text, Text)] --
+      backlinks =
+        map (renderPreciseBacklink weaveConf)
+          $ lookupDefault [] linkTarget weaveConf.archive.preciseBacklinks
+  a_ attrsBacklinkPopup "←" --
+
+renderPreciseBacklink :: WeaveConf -> (Maybe GCI, GCI, Int) -> (Text, Text)
+renderPreciseBacklink weaveConf (maybeHeadingGci, cellGci, linkNumber) =
+  (backlinkHref, backlinkDisplayName)
+  where
+    backlinkHref =
+      case getLinkToGCI weaveConf cellGci of
+        Just (_, linkAnchorToGCI, _) ->
+          let anchorWithoutHash gci
+                | gciIsInternal weaveConf.originObjectPath weaveConf.archive gci = ""
+                | otherwise = T.takeWhile (/= '#') linkAnchorToGCI
+           in anchorWithoutHash cellGci
+                <> "#linkNumber-"
+                <> T.show linkNumber
+        Nothing -> "???"
+    gciIsInternal :: GPath -> Archive -> GCI -> Bool
+    gciIsInternal originObjectPath archive gci =
+      case gciToObjPath archive gci of
+        Just path -> path == originObjectPath
+        Nothing -> False
+    backlinkDisplayName =
+      case maybeHeadingGci of
+        Just headingGci
+          | headingGci == cellGci -> displayName cellGci
+          | otherwise ->
+              displayName headingGci
+                <> " ~ "
+                <> displayName cellGci
+        Nothing -> displayName cellGci
+    displayName gci =
+      renderAsText weaveConf
+        . weaveProse
+        . fromMaybe (Prose [])
+        $ gciToName weaveConf.archive offset gci
+    offset =
+      case IntMap.lookupLE cellGci.unGCI weaveConf.archive.offsets of
+        Just (o, _) -> o
+        Nothing -> 0
 
 weaveNamedCellsIndex :: [Cell] -> HtmlWeaver ()
 weaveNamedCellsIndex cells = do
