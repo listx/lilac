@@ -1137,12 +1137,17 @@ a popup tooltip).
   (let [raw-data (.getAttribute trigger "data-backlinks")] ; (ref:ns:lilac.precise-backlinks-data-backlinks)
     (js/JSON.parse (or raw-data "[]"))))
 
-(defn- build-backlinks-list [triples]
+(defn- build-backlinks-list [tuples]
   (let [ul (js/document.createElement "ul")]
-    (if (pos? (.-length triples))
-      (doseq [item (array-seq triples)]
-        (let [li (js/document.createElement "li")]
-          (set! (.-textContent li) (js/JSON.stringify item))
+    (if (pos? (.-length tuples))
+      (doseq [item (array-seq tuples)]
+        (let [href (aget item 0)
+              html-label (aget item 1)
+              li (js/document.createElement "li")
+              a (js/document.createElement "a")]
+          (set! (.-href a) href)
+          (set! (.-innerHTML a) html-label)
+          (.appendChild li a)
           (.appendChild ul li)))
       (set! (.-textContent ul) "No backlinks found."))
     ul))
@@ -1174,12 +1179,23 @@ a popup tooltip).
   (.remove (.-classList popup) "active")
   (reset! active-trigger-atom nil))
 
+(defn- extract-id [href]
+  (when href
+    (let [idx (.lastIndexOf href "#")]
+      (when (>= idx 0)
+        (.substring href (inc idx))))))
+
+(defn- activate-target-element! [href]
+  (when-let [id-str (extract-id href)]
+    (when-let [target-el (js/document.getElementById id-str)]
+      (.toggle (.-classList target-el) "active"))))
+
 (defn- open-popup! [popup trigger x y active-trigger-atom]
   (when-not (.-parentNode popup)
     (.appendChild js/document.body popup))
   (set! (.-innerHTML popup) "")
-  (let [triples (parse-backlinks trigger)
-        list-el (build-backlinks-list triples)]
+  (let [tuples (parse-backlinks trigger)
+        list-el (build-backlinks-list tuples)]
     (.appendChild popup list-el)
 
     ;; Make visible first so offsetWidth / offsetHeight can be measured.
@@ -1200,23 +1216,32 @@ a popup tooltip).
       (fn [e]
         (let [target (.-target e)
               trigger (extract-trigger target ".button-popup-backlinks") ; (ref:ns:lilac.precise-backlinks-button-popup-backlinks)
+              popup-link (.closest target "a")
+              is-inside-popup? (and (.-parentNode popup) (.contains popup target))
               is-open? (.contains (.-classList popup) "active")
               is-same-trigger? (and trigger is-open? (= @active-trigger trigger))]
           (cond
+            ;; Clicked a link inside the popup: toggle 'active' on target ID
+            ;; element and close popup.
+            (and is-inside-popup? popup-link)
+            (let [href (.getAttribute popup-link "href")]
+              (activate-target-element! href)
+              (close!))
+
             ;; Close popup if clicking on the active trigger.
             is-same-trigger?
             (do (.preventDefault e)
                 (.stopPropagation e)
                 (close!))
 
-            ;; Close popup if clicking on an inactive trigger.
+            ;; Open popup if clicking on an inactive trigger.
             trigger
             (do (.preventDefault e)
                 (.stopPropagation e)
                 (open-popup! popup trigger (.-clientX e) (.-clientY e) active-trigger))
 
             ;; Close popup if clicking anywhere outside.
-            (and (.-parentNode popup) (not (.contains popup target)))
+            (and (.-parentNode popup) (not is-inside-popup?))
             (close!)))))))
 #+end_src
 

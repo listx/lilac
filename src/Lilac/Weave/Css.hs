@@ -506,6 +506,12 @@ defaultCss = do
     ".active" & do
       display block
 
+  "a.active" ? do
+    border (px 1) solid colorActiveBorder
+    backgroundColor colorActiveBg
+    "::after" & do
+      "content" -: "\" 👈\""
+
   main_ ? do
     ol ? do
       paddingLeft (rem 2)
@@ -647,11 +653,6 @@ defaultCss = do
   --
   ".collapsed" ? do
     display displayNone
-  ".block-body" ** ".sourceCode" ** ".active" ? do
-    border (px 1) solid colorActiveBorder
-    backgroundColor colorActiveBg
-    "::after" & do
-      "content" -: "\" 👈\""
 
   ".fully-rounded" & do
     ev borderRadius (rem 0.3125)

@@ -2484,6 +2484,19 @@ a ? do
     roundedRectangleLink -- (ref:css:Links-internal-link)
   <<css:Links (external)>>
 <<css:precise-backlinks>>
+<<css:active-links>>
+#+end_src
+
+Active link elements get a special highlight with a [[https://en.wikipedia.org/wiki/Manicule][manicule]] (hand pointing with
+index finger) symbol.
+
+#+name: css:active-links
+#+begin_src haskell
+"a.active" ? do
+  border (px 1) solid colorActiveBorder
+  backgroundColor colorActiveBg
+  "::after" & do
+    "content" -: "\" 👈\""
 #+end_src
 
 *** Internal links
@@ -3416,19 +3429,6 @@ code ? do
 -- (ref:css:Block body-collapsed)
 ".collapsed" ? do
   display displayNone
-<<css:Block line labels>>
-#+end_src
-
-Active line labels get a special highlight with a [[https://en.wikipedia.org/wiki/Manicule][manicule]] (hand pointing with
-index finger) symbol.
-
-#+name: css:Block line labels
-#+begin_src haskell
-".block-body" ** ".sourceCode" ** ".active" ? do
-  border (px 1) solid colorActiveBorder
-  backgroundColor colorActiveBg
-  "::after" & do
-    "content" -: "\" 👈\""
 #+end_src
 
 The [[css:Block rounding]] is to handle cases where we may or may not need to round
