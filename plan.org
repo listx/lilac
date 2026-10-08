@@ -24,31 +24,6 @@ other sections as needed.
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
-** DONE make glossary terms more flexible
-CLOSED: [2026-08-16 Sun 23:08]
-
-See [[id:f6347c2d-e4fd-4741-8404-aa6a43784820][Multicell Glossary Items]].
-
-*** DONE handle edge cases [3/3]
-CLOSED: [2026-08-14 Fri 12:54]
-
-  - [X] (implement, add test) ONLY allow glossary items in unordered lists. This
-    is a breaking change.
-
-  - [X] (add test) No nesting of glossary terms.
-
-  - [X] (implement (?), add test) Exclusiveness of glossary terms if first item
-    is glossary term (or, no glossary terms allowed at this level if not
-    glossary term).
-
-*** DONE handle weaving of glossary terms with more than 1 cell [2/2]
-CLOSED: [2026-08-16 Sun 22:54]
-
-  - [X] Use new list markers to parse glossary terms.
-
-  - [X] Weave multicell glossary items (start/end definition just once across
-    multiple cells for the same glossary item).
-
 * Backlog
 :PROPERTIES:
 :ID:       b27d3e53-ada2-4f9e-9f38-18e9252b8229
@@ -58,48 +33,11 @@ Ideally the backlog would use something like a Story Map to encode both time and
 priority as two separate dimensions. However we just have a flat list of items
 for now because we don't have a good way of representing story maps.
 
-** DONE make glossary terms look less indented where they are defined
-CLOSED: [2026-08-16 Sun 23:08]
-:PROPERTIES:
-:ID:       c4ac1d70-5d1b-420b-bce4-cf39142a47b1
-:END:
-
-We parse them inside list items and keep the list item structure. This results
-in weaving singleton-list definition lists inside each unordered list item. It
-would be nice to skip the list items so that we can just weave only the glossary
-terms (purely as a definition list).
-
-The edge cases can be tricky. E.g., if we have some list items that are glossary
-terms and some that are not, all within the same list (actually this is no
-longer the case since we implemented the uniformity rule, see [[id:5a7a9462-83e3-4096-b65e-18b33420f528][Uniformity of list
-items that define glossary terms]]).
-
-Looks like CSS has the ~:has()~ parent selector which can select parents with
-certain child elements. We can use this to select a list item which has a
-glossary item inside it to make the list less indented.
-
-** DONE blocks: make ancestor links link back to the exact place the child block is used
-CLOSED: [2026-08-16 Sun 23:59]
-
-This is actually pretty simple: just use something like ~<PARENT>-<CHILD>~ in the
-HTML ID. If there is more than 1 instance of ~<CHILD>~ in the parent, give the 2nd
-and subsequent ones a numeric suffix. This way we always link back to the first
-usage of ~<CHILD>~ in the parent block.
-
-How to deal with cross-file references? To do this correctly we'd need to
-include the UUID of the (external) child block; however we let the user use
-either the UUID of the closest heading or the top-level document UUID. And we
-can't tell, from the perspective of the child, which one the parent chose.
-However in practice this concern is not really a problem because just the name
-of the child is almost always unique inside a parent's body (it's confusing to
-link to two different children with the same name). So using just the child's
-name is good enough.
-
-** IN-PROGRESS line labels: add a link to the first reference to it (within the same doc)
+** DONE line labels: show a popup of all references to it (precise backlinks)
+CLOSED: [2026-10-09 Fri 06:00]
 
 Sometimes it's not obvious where in the prose a line label is discussed. So we
-should allow the user to click on a line label to go to that discussion (the
-first one).
+should allow the user to click on a line label to go to that discussion.
 
 When parsing, we can build up a map about all referenced line labels (and which
 local cell is referencing it). Then during weaving we can just reference this

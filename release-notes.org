@@ -5,42 +5,85 @@
 
 * Versions
 
-** v0.2.0.0 WIP
+** v0.2.0.0
 :PROPERTIES:
 :ID:       12bb374a-b146-4fbc-84fa-84b86a614f06
 :END:
 
 Changes:
 
+  - Line labels now have a popup link next to them, such that clicking on it
+    shows you a list of all references to it. This ended up being a surprising
+    amount of work because it touched every part of the pipeline, from parsing
+    to the frontend:
+
+      - Create the concept of unique link indexes (similar to cell indexes)
+        during parsing.
+
+          - commit 3d017e44 ("parse: track the current link number (index) with
+            linkNumber", 2026-09-25)
+
+          - commit 61770c80 ("parser: PTokenLink: track link index (incrementing
+            number)", 2026-09-25)
+
+      - Construct OID aliases and precise backlinks during compilation. commit
+        10cd3625 ("compile: generate fine-grained backlinks", 2026-09-26)
+
+      - Embed precise backlink data into line labels during weaving. commit
+        1b9c29e3 ("weave: encode precise backlinks for line labels", 2026-10-09)
+
+      - Construct popups in frontend. commit 32fa69d4 ("frontend: fully render
+        precise backlinks in popups", 2026-10-09)
+
+    This work also exposed a design flaw with out data structures --- namely
+    that we have a somewhat inadequate representation of links. Doing a larger
+    refactor here is probably too much work (where if we decided to do this, we
+    might consider rewriting the entire program).
+
   - Links from child blocks to parent blocks now target the exact location where
     the child block was referenced. Previously, the child block referenced the
     entire parent block, which meant that it could be hard to see where the
     child was used (especially for larger parent blocks with many different
-    child blocks). COMMIT
+    child blocks). commit 0baad1dc ("weave blocks: link back to parent blocks
+    more precisely", 2026-08-17)
 
-  - Glossary terms are both more strictly parsed, but also more flexible.
+  - Glossary terms are both more strictly parsed, but also more flexible. See
+    [[id:f6347c2d-e4fd-4741-8404-aa6a43784820][Multicell Glossary Items]].
 
     The most notable difference is that they must be written inside unordered
     list items; if they are written anywhere else, they are parsed as regular
-    paragraphs. COMMIT
+    paragraphs. commit e88c1d94 ("glossary terms: only recognize them in
+    unordered list items", 2026-08-11)
 
-    Glossary terms may no longer be nested.
+    Glossary terms may no longer be nested. commit 72e973c9 ("glossary: forbid
+    nesting of glossary terms", 2026-08-11)
 
     If the first item of an unordered list is a glossary term, then all
     subsequent items at that list level must also be glossary terms. Conversely
     if the first item is not a glossary term, then none of the list items at
     that level may be a glossary term. This is called the uniformity rule, see
-    [[id:5a7a9462-83e3-4096-b65e-18b33420f528][Uniformity of list items that define glossary terms]].
+    [[id:5a7a9462-83e3-4096-b65e-18b33420f528][Uniformity of list items that define glossary terms]]. commit c94f41be
+    ("glossary terms: implement uniformity rule", 2026-08-16)
 
     Glossary terms are also more flexible now, because you can use multiple
     cells to define them (this is unlike before where we only allowed a single
     paragraph). The inspiration comes from our work on rich blocks in v0.1.0.8.
-    COMMIT
+    commit 2b38bfd3 ("weave: weave multicell glossary terms", 2026-08-16)
 
     When glossary terms are first woven (at the site where they are defined), we
     no longer weave the unordered list bullets next to them (no more weaving
     glossary terms inside singleton ~<dl>~ lists). This reduces unnecessary
-    indentation. COMMIT
+    indentation. commit 2b38bfd3 ("weave: weave multicell glossary terms",
+    2026-08-16)
+
+Fixes:
+
+  - Long breadcrumbs are truncated if needed. They no longer bleed over the
+    navbar if they're too long. commit 8b6f6cb5 ("weave: optionally truncate
+    long breadcrumbs", 2026-09-20)
+
+  - Replace the correct extension for filenames in breadcrumbs. commit ce89e7f9
+    ("weave: only replace the last extension of the breadcrumb", 2026-09-25)
 
 ** v0.1.0.8
 
