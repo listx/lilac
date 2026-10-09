@@ -501,10 +501,14 @@ defaultCss = do
     backgroundColor colorBg
     border (px 1) solid colorCodeBorder
     ev borderRadius (rem 0.3125)
-    ev padding $ px 8
     "z-index" -: "1000"
     ".active" & do
       display block
+    ul ? do
+      yx margin 0 (rem 0.5)
+      paddingLeft (rem 1)
+      p ? do
+        yx margin (rem 0.5) 0
 
   "a.active" ? do
     border (px 1) solid colorActiveBorder
