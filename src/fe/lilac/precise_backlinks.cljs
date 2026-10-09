@@ -1,9 +1,9 @@
 (ns lilac.precise-backlinks)
 
 (defn- ensure-popup! []
-  (or (js/document.getElementById "backlinks-popup")
+  (or (js/document.getElementById "popup-backlinks-active")
       (let [popup (js/document.createElement "div")]
-        (set! (.-id popup) "backlinks-popup")
+        (set! (.-id popup) "popup-backlinks-active") ;
         (.add (.-classList popup) "popup-backlinks")
         popup)))
 

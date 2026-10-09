@@ -1107,7 +1107,7 @@ values first, before adding the one we want to enable.
 
 ** Precise backlink popups
 
-Look for elements that have a button-popup-backlinks class
+Look for elements that have a ~button-popup-backlinks~ class
 [[(ns:lilac.precise-backlinks-button-popup-backlinks)]], and generate a DIV for each
 one based on the ~data-backlinks~ [[(ns:lilac.precise-backlinks-data-backlinks)]]
 inside it. Clicking on the button will make the generated DIV visible (acting as
@@ -1119,9 +1119,9 @@ a popup tooltip).
 (ns lilac.precise-backlinks)
 
 (defn- ensure-popup! []
-  (or (js/document.getElementById "backlinks-popup")
+  (or (js/document.getElementById "popup-backlinks-active")
       (let [popup (js/document.createElement "div")]
-        (set! (.-id popup) "backlinks-popup")
+        (set! (.-id popup) "popup-backlinks-active") ; (ref:ns:lilac.precise-backlinks-popup-backlinks-active)
         (.add (.-classList popup) "popup-backlinks")
         popup)))
 
@@ -1244,6 +1244,11 @@ a popup tooltip).
             (and (.-parentNode popup) (not is-inside-popup?))
             (close!)))))))
 #+end_src
+
+[[(ns:lilac.precise-backlinks-popup-backlinks-active)]] sets a single
+~popup-backlinks-active~ ID for the currently activated popup (there can be only 1
+in the document at a time). It's not used for CSS, it's only used to check if
+there is an active one or not.
 
 * Glossary
 
