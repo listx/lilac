@@ -26,10 +26,12 @@
         (let [href (aget item 0)
               html-label (aget item 1)
               li (js/document.createElement "li")
+              p (js/document.createElement "p")
               a (js/document.createElement "a")]
           (set! (.-href a) href)
           (set! (.-innerHTML a) html-label)
-          (.appendChild li a)
+          (.appendChild p a)
+          (.appendChild li p)
           (.appendChild ul li)))
       (set! (.-textContent ul) "No backlinks found."))
     ul))
