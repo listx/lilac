@@ -1107,11 +1107,10 @@ values first, before adding the one we want to enable.
 
 ** Precise backlink popups
 
-Look for elements that have a ~button-popup-backlinks~ class
-[[(ns:lilac.precise-backlinks-button-popup-backlinks)]], and generate a DIV for each
-one based on the ~data-backlinks~ [[(ns:lilac.precise-backlinks-data-backlinks)]]
-inside it. Clicking on the button will make the generated DIV visible (acting as
-a popup tooltip).
+For elements that have a ~button-popup-backlinks~ class
+[[(ns:lilac.precise-backlinks-button-popup-backlinks)]], assign a click handler so
+that clicking on one of these generates a popup based on the ~data-backlinks~
+[[(ns:lilac.precise-backlinks-data-backlinks)]] inside it.
 
 #+name: ns:lilac.precise-backlinks
 #+header: :tangle src/fe/lilac/precise_backlinks.cljs
