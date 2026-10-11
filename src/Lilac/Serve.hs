@@ -294,11 +294,8 @@ waitForMatch conn fsPathChan browserLocation logLock _verbose = do
   modifiedFile <- T.pack <$> atomically (readTChan fsPathChan) --
   if (browserLocation == modifiedFile)
     then do
-      t <- getTimestamp
-      let time = "[" <> t <> "]"
-          announcement =
-            time
-              <> " FS event detected, reloading "
+      let announcement =
+            "FS event detected, reloading "
               <> browserLocation
               <> "."
       logVerboseLn logLock True announcement
