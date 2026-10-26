@@ -60,17 +60,23 @@ vendor/source-fonts:
 vendor/mathjax vendor/mathjax-newcm-font &:
 	./vendor-mathjax.sh
 
-SRHT_TOKEN != cat .srht-pages-token 2>/dev/null || echo ""
+PAGES_BRANCH := gh-pages
+PAGES_DOMAIN := lilac.funloop.org
+PAGES_REMOTE ?= $(shell git remote get-url $$(git config branch.main.remote) || git remote get-url origin)
+PAGES_GIT_NAME  ?= $(or $(shell git config user.name),pages-publisher)
+PAGES_GIT_EMAIL ?= $(or $(shell git config user.email),pages-publisher@localhost)
 
-publish: weave site.tar.gz
-	@if [ -z "$(SRHT_TOKEN)" ]; then \
-		echo "Error: .srht-pages-token is empty or missing." >&2; \
-		exit 1; \
-	fi
-	@echo "Uploading site to SourceHut Pages..."
-	@curl --oauth2-bearer "$(SRHT_TOKEN)" \
-		-Fcontent=@site.tar.gz \
-		https://pages.sr.ht/publish/lilac.funloop.org
+publish: $(archive_file) weave $(vendored)
+	rm -rf site/vendor
+	cp -r vendor site
+	touch site/.nojekyll
+	echo $(PAGES_DOMAIN) > site/CNAME
+	cd site && \
+		git add -A && \
+		{ git diff --cached --quiet || \
+			git -c user.name="$(PAGES_GIT_NAME)" -c user.email="$(PAGES_GIT_EMAIL)" \
+			commit -q -m "update"; } && \
+		git push -f "$(PAGES_REMOTE)" $(PAGES_BRANCH)
 	touch publish
 
 weave: $(image_svgs) $(archive_file) tangle $(vendored)
@@ -86,7 +92,7 @@ dev-cljs: tangle
 prod-cljs: tangle
 	clojure -M -m figwheel.main --build-once lilac-prod
 
-	cp -f site/js/lilac.js site/js/lilac.js.injectme
+	cp -f site/js/lilac.js lilac.js.injectme
 .PHONY: prod-cljs
 
 build: tangle lilac.cabal

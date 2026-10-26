@@ -210,7 +210,7 @@ contents of the single JavaScript file (at ~site/js/lilac.js~) injected into the
 CLI binary. To perform this injection, we have to
 
   1) Run ~make prod-cljs~ to ensure we have the latest ~js/lilac.js~ file. This
-     also creates a ~site/js/lilac.js.injectme~ which is a copy of the
+     also creates a ~lilac.js.injectme~ which is a copy of the
      just-created (production) ~js/lilac.js~ file, per [[sh:update-injectable]].
 
   2) Recompile the CLI. This can be done with ~make tangle~ because tangling
@@ -219,19 +219,19 @@ CLI binary. To perform this injection, we have to
      [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]], Cabal will automatically detect whether the
      JavaScript file has changed and recompile the CLI if needed.
 
-[[sh:update-injectable]] just overwrites the path ~site/js/lilac.js.injectme~ with
+[[sh:update-injectable]] just overwrites the path ~lilac.js.injectme~ with
 what's in ~site/js/lilac.js~.
 
 #+name: sh:update-injectable
 #+begin_src sh
-cp -f site/js/lilac.js site/js/lilac.js.injectme
+cp -f site/js/lilac.js lilac.js.injectme
 #+end_src
 
 We cannot simply inject ~site/js/lilac.js~ directly because the development
 environment also uses the same file path in [[cfg:lilac-fe-build]] (and the
 development version of this file path does /not/ have a self-contained JS file).
 
-Though the ~site/js/lilac.js.injectme~ file is
+Though the ~lilac.js.injectme~ file is
 needed for compiling the Lilac CLI in [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7][JavaScript injection]], we don't want to
 see this file treated as regular text file (because it cannot be sensibly
 merged, and it doesn't make sense to show textual diffs of it between revisions
@@ -239,7 +239,7 @@ as it is minified JS). For this reason we treat it as a binary file for Git.
 
 #+name: gitattributes-ignore-compiled-js
 #+begin_src gitattributes
-site/js/lilac.js.injectme binary
+lilac.js.injectme binary
 #+end_src
 
 ** Figwheel configuration

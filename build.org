@@ -477,13 +477,7 @@ result*
 !**/.gitignore
 !**/.gitkeep
 !.build.yml
-site/*.html
-site/css
-site/image
-site/vendor
-site/js/cljs-dev
-site/js/cljs-prod
-site/js/lilac.js
+site/
 site.tar.gz
 vendor
 !src/**
@@ -1360,10 +1354,6 @@ fail because the [[id:90d66ea1-a994-4fdb-b969-c28cec04352d::cfg:figwheel-main.ed
 
 The ~$(vendored)~ variable is defined at [[(Makefile:create-tarball-vendored)]].
 
-#+header: :tangle site/css/.gitkeep
-#+begin_src txt
-#+end_src
-
 We make Git ignore the ~weave~ file because it's a [[id:b649d761-1103-47be-86e4-56a7362a5ecc][sentinel file]].
 
 #+name: gitignore:Makefile sentinel:weave
@@ -1382,7 +1372,7 @@ production. The development version is not a single JavaScript file and is not
 optimized; this allows us to get a ClojureScript REPL where we can play around
 with a direct connection to a browser. The production flavor is a single,
 optimized JavaScript file and does not have ClojureScript REPL support. The
-production flavor is copied out to another file ~site/js/lilac.js.injectme~ by
+production flavor is copied out to another file ~lilac.js.injectme~ by
 [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::sh:update-injectable][sh:update-injectable]]. It is this separate file which is injected into Haskell in
 [[id:e31aed94-98f5-4c47-b9ab-e82a529e5be7::f:lilacJs][f:lilacJs]], so that Lilac is able to generate this file on its own.
 
@@ -1544,17 +1534,23 @@ install-release: tangle result build-release
 #+begin_src makefile
 <<Makefile:create-tarball>>
 
-SRHT_TOKEN != cat .srht-pages-token 2>/dev/null || echo ""
+PAGES_BRANCH := gh-pages
+PAGES_DOMAIN := lilac.funloop.org
+PAGES_REMOTE ?= $(shell git remote get-url $$(git config branch.main.remote) || git remote get-url origin)
+PAGES_GIT_NAME  ?= $(or $(shell git config user.name),pages-publisher)
+PAGES_GIT_EMAIL ?= $(or $(shell git config user.email),pages-publisher@localhost)
 
-publish: weave site.tar.gz
-	@if [ -z "$(SRHT_TOKEN)" ]; then \
-		echo "Error: .srht-pages-token is empty or missing." >&2; \
-		exit 1; \
-	fi
-	@echo "Uploading site to SourceHut Pages..."
-	@curl --oauth2-bearer "$(SRHT_TOKEN)" \
-		-Fcontent=@site.tar.gz \
-		https://pages.sr.ht/publish/lilac.funloop.org
+publish: $(archive_file) weave $(vendored)
+	rm -rf site/vendor
+	cp -r vendor site
+	touch site/.nojekyll
+	echo $(PAGES_DOMAIN) > site/CNAME
+	cd site && \
+		git add -A && \
+		{ git diff --cached --quiet || \
+			git -c user.name="$(PAGES_GIT_NAME)" -c user.email="$(PAGES_GIT_EMAIL)" \
+			commit -q -m "update"; } && \
+		git push -f "$(PAGES_REMOTE)" $(PAGES_BRANCH)
 	touch publish
 #+end_src
 
@@ -1712,7 +1708,7 @@ tab_width = 8
 [vendor-source-fonts.sh]
 indent_style = unset
 
-[site/js/lilac.js.injectme] # (ref:.editorconfig-injectme-binary)
+[lilac.js.injectme] # (ref:.editorconfig-injectme-binary)
 insert_final_newline = false
 trim_trailing_whitespace = false
 end_of_line = unset
@@ -2244,7 +2240,7 @@ license:        GPL-2.0-only
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
-  site/js/lilac.js.injectme
+  lilac.js.injectme
   src/Lilac/cli/init/only-local-imports.txt
   src/Lilac/cli/tangle/out-dir.txt
   src/Lilac/cli/weave/out-dir.txt
