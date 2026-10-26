@@ -473,6 +473,7 @@ result*
 ,*.larc
 ,*.lobj
 ,**/.*
+!.github/
 !**/.gitattributes
 !**/.gitignore
 !**/.gitkeep
@@ -1481,23 +1482,7 @@ and also set up the authentication token with
 cachix authtoken TOKEN
 #+end_src
 
-where TOKEN is the secret in plaintext. For CI we've set this up as a secret
-with ID
-
-#+name: cachix-token-secret-id
-#+begin_src txt
-42190600-c8b3-4aba-ac91-ade479361ac9
-#+end_src
-
-which is saved to
-
-#+name: cachix-token-secret-file
-#+begin_src txt
-~/.secret-cachix-token
-#+end_src
-
-Both [[cachix-token-secret-id]] and [[cachix-token-secret-file]] are settings defined in
-SourceHut's [[https://builds.sr.ht/secrets][secrets dashboard page]].
+where TOKEN is the secret in plaintext. For CI we've set this up as a repository secret.
 
 ** Install ~lilac~
 
@@ -2120,82 +2105,103 @@ sort-file-contents = {
 };
 #+end_src
 
-* SourceHut CI builds
+* GitHub CI builds
 :PROPERTIES:
 :ID:       0cf535d6-f852-4b97-8ef8-9d566ad32e51
 :END:
 
 The CI runs the linter, builds the production binary, and also runs tests. The
-last thing it does is publish the site to SourceHut pages (if it is the ~main~
+last thing it does is publish the site to GitHub pages (if it is the ~main~
 branch).
 
-#+name: .build.yml
-#+header: :tangle .build.yml
+#+name: GHA-publish
+#+header: :tangle .github/workflows/build-and-publish-site.yml
 #+begin_src yaml
-image: nixos/<<id:55116425-5ad3-4540-98c3-53006f7dac3d::nixos-version>>
-secrets:
-  - <<cachix-token-secret-id>>
-sources:
-  - https://git.sr.ht/~listx/lilac
-oauth: pages.sr.ht/PAGES:RW
-environment:
-  site: lilac.funloop.org
-packages:
-- nixos.cachix
-- nixos.hut
-tasks:
-  - cachix-init: |
-      <<sh:cachix-init>>
-  - tangle: |
-      cd lilac
-      nix-shell --run "make tangle"
-  - build: |
-      cd lilac
-      nix-shell --run "make build-release" # (ref:.build.yml-build-release)
-  - test: |
-      cd lilac
-      nix-shell --run "make test" # (ref:.build.yml-test)
-  - print_lilac_version: |
-      lilac/result/bin/lilac --version
-  - weave: |
-      cd lilac
-      rm -f image/*.svg
-      nix-shell --run "make weave"
-  - compile-prod-cljs: |
-      cd lilac
-      nix-shell --run "make prod-cljs"
-  - verify-git-health: |
-      cd lilac
-      git diff
-      if [[ -z "$(git status --porcelain)" ]]; then
-        echo "Clean (no untracked files either)."
-      else
-        echo "Modified or untracked files present."
-        exit 1
-      fi
-  - lint: |
-      cd lilac
-      nix-shell --run "make lint"
-  - cachix-push: |
-      cd lilac
-      set +x
-      cachix authtoken "$(cat <<cachix-token-secret-file>>)"
-      set -x
-      nix-shell --run "make push-release"
-  - publish: |
-      if [[ "$GIT_REF" != "refs/heads/main" ]]; then
-        echo "Skipping publishing step because current branch is '$GIT_REF' (not refs/heads/main)."
-        exit 0
-      fi
-      cd lilac
-      nix-shell --run "make site.tar.gz"
-      hut pages publish -d $site site.tar.gz
-#+end_src
+name: Build and publish site
 
-Because the ~build-release~ [[(.build.yml-build-release)]] rule involves building and
-running the test suite, the test task [[(.build.yml-test)]] is redundant. However we
-still keep it here just in case the behavior of [[id:d8a6d891-5e3c-44cc-ac43-38d8090ebfbd::make:Build lilac with Nix][make:Build lilac with Nix]]
-changes.
+on:
+  push:
+    branches: [main, next]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-and-publish-site-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SITE: lilac.funloop.org
+
+jobs:
+  site:
+    name: Build, test, and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Set up Cachix
+        uses: cachix/cachix-action@v17
+        with:
+          name: funloop
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true # We push explicitly via `make push-release`.
+
+      - name: Tangle
+        run: nix-shell --run "make tangle"
+
+      - name: Build (release)
+        run: nix-shell --run "make build-release"
+
+      - name: Test
+        run: nix-shell --run "make test"
+
+      - name: Print lilac version
+        run: result/bin/lilac --version
+
+      - name: Weave
+        run: |
+          rm -f image/*.svg
+          nix-shell --run "make weave"
+
+      - name: Compile production ClojureScript
+        run: nix-shell --run "make prod-cljs"
+
+      - name: Check for uncommitted changes
+        run: |
+          git diff
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "Clean (no untracked files either)."
+          else
+            echo "Modified or untracked files present."
+            exit 1
+          fi
+
+      - name: Lint
+        run: nix-shell --run "make lint"
+
+      - name: Push release build to Cachix
+        if: github.event_name != 'pull_request'
+        run: nix-shell --run "make push-release"
+
+      - name: Publish to gh-pages
+        if: github.ref == 'refs/heads/main'
+        env:
+          PAGES_REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          PAGES_GIT_NAME: github-actions[bot]
+          PAGES_GIT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          git -C site init -q -b gh-pages
+          nix-shell --run "make publish"
+#+end_src
 
 * Cabal configuration
 :PROPERTIES:

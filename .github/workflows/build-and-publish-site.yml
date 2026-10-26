@@ -1,0 +1,84 @@
+name: Build and publish site
+
+on:
+  push:
+    branches: [main, next]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-and-publish-site-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SITE: lilac.funloop.org
+
+jobs:
+  site:
+    name: Build, test, and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Set up Cachix
+        uses: cachix/cachix-action@v17
+        with:
+          name: funloop
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true # We push explicitly via `make push-release`.
+
+      - name: Tangle
+        run: nix-shell --run "make tangle"
+
+      - name: Build (release)
+        run: nix-shell --run "make build-release"
+
+      - name: Test
+        run: nix-shell --run "make test"
+
+      - name: Print lilac version
+        run: result/bin/lilac --version
+
+      - name: Weave
+        run: |
+          rm -f image/*.svg
+          nix-shell --run "make weave"
+
+      - name: Compile production ClojureScript
+        run: nix-shell --run "make prod-cljs"
+
+      - name: Check for uncommitted changes
+        run: |
+          git diff
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "Clean (no untracked files either)."
+          else
+            echo "Modified or untracked files present."
+            exit 1
+          fi
+
+      - name: Lint
+        run: nix-shell --run "make lint"
+
+      - name: Push release build to Cachix
+        if: github.event_name != 'pull_request'
+        run: nix-shell --run "make push-release"
+
+      - name: Publish to gh-pages
+        if: github.ref == 'refs/heads/main'
+        env:
+          PAGES_REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          PAGES_GIT_NAME: github-actions[bot]
+          PAGES_GIT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          git -C site init -q -b gh-pages
+          nix-shell --run "make publish"
