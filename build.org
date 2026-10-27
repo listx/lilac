@@ -116,9 +116,19 @@ Lilac.
 #+header: :tangle nix/release.nix
 #+header: :line-label tangle
 #+begin_src nix
-{ lilacGitVersion ? "unknown" }:
+{ lilacGitVersion ? null, rev ? null }:
 let
-  pkgs = import ./default.nix { inherit lilacGitVersion; }; # (ref:default.nix)
+  version = if lilacGitVersion != null then
+    lilacGitVersion
+  else if rev != null then
+    import ./version.nix {
+      cabalFile = ../lilac.cabal;
+      inherit rev;
+    }
+  else
+    "unknown";
+  pkgs =
+    import ./default.nix { lilacGitVersion = version; }; # (ref:default.nix)
 in pkgs.lilacPkgs.lilac
 #+end_src
 
@@ -1437,16 +1447,23 @@ build
 Another option is to build with Nix, which wraps everything up for public
 consumption, as a Nix package.
 
-#+name: make:Build lilac with Nix
-#+begin_src makefile
-LILAC_CABAL_VERSION = $(shell sed -n 's/^[Vv]ersion:[[:space:]]*//p' lilac.cabal | head -n1)
-LILAC_GIT_COMMIT    = $(shell git rev-parse --short=10 HEAD)
-LILAC_GIT_DIRTY     = $(shell git diff-index --quiet HEAD -- || echo -dirty)
-LILAC_GIT_VERSION   = v$(LILAC_CABAL_VERSION)-g$(LILAC_GIT_COMMIT)$(LILAC_GIT_DIRTY)
-build-release: tangle lilac.cabal
-	nix-build ./nix/release.nix \
-		--argstr lilacGitVersion $(LILAC_GIT_VERSION)
-	touch build-release
+[[nix:version]] builds lilac's version string, e.g. ~v0.2.0.1-a1b2c3d4e5~. ~cabalFile~
+is the path to lilac.cabal. ~rev~ is the full commit hash, optionally suffixed
+with ~-dirty~.
+
+#+name: nix:version
+#+header: :tangle nix/version.nix
+#+begin_src nix
+{ cabalFile, rev }:
+let
+  lines = builtins.filter builtins.isString
+    (builtins.split "\n" (builtins.readFile cabalFile));
+  matches = builtins.filter (m: m != null)
+    (map (builtins.match "[Vv]ersion:[[:space:]]*([^[:space:]]+).*") lines);
+  cabalVersion = builtins.head (builtins.head matches);
+  dirty = if builtins.match ".*-dirty" rev != null then "-dirty" else "";
+  commit = builtins.substring 0 10 rev;
+in "v${cabalVersion}-g${commit}${dirty}"
 #+end_src
 
 We manually generate a version string like ~v0.2.0.1-ga1b2c3d4e5~ (or ~...-dirty~
@@ -1454,6 +1471,40 @@ with local changes). This mimics what ~git describe~ will give us, but uses the
 version string from Cabal, not a Git tag. Doing it this way lets us avoid
 needing to pull the full history in CI to generate the correct version string
 which we would normally get with a full checkout.
+
+Also, by doing it from Nix, consumers of Lilac can more easily specify the
+version string (if it relied on a non-Nix mechanism, then consumers would have
+to run it outside of Nix, then feed that to Nix, which is extra work).
+
+For example, a consumer can do
+
+#+begin_src nix
+lilacSrc = builtins.fetchGit {
+  url = "https://github.com/listx/lilac";
+  ref = "refs/tags/v0.2.0.1"; # (ref:ref)
+  name = "lilac";
+  submodules = true;
+};
+
+lilacPkg = import "${lilacSrc}/nix/release.nix" { rev = lilacSrc.rev; };
+#+end_src
+
+They could even use ~rev = "<sha>";~ instead of [[(ref)]], if they wanted to build at a
+particular commit SHA.
+
+Back to version generation. In [[make:Build lilac with Nix]], ~LILAC_GIT_REV~ is the
+full commit hash, with ~-dirty~ appended if tracked files have changes.
+[[nix:version]] turns this into the version string.
+
+#+name: make:Build lilac with Nix
+#+begin_src makefile
+LILAC_GIT_REV = $(shell git rev-parse HEAD)$(shell git diff-index --quiet HEAD -- || echo -dirty)
+
+build-release: tangle lilac.cabal
+	nix-build ./nix/release.nix \
+		--argstr rev $(LILAC_GIT_REV)
+	touch build-release
+#+end_src
 
 #+name: gitignore:Makefile sentinel:build-release
 #+begin_src gitignore
