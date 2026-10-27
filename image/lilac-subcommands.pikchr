@@ -1,0 +1,29 @@
+Org1: box "*.org" mono "files" fill white
+Org2: box at Org1.c + (2mm, -2mm) behind Org1 fill white
+Org3: box at Org2.c + (2mm, -2mm) behind Org2 fill white
+
+Lobj1: box "*.lobj" mono "files" at Org1.c + (0, -3cm) fill white
+Lobj2: box at Lobj1.c + (2mm, -2mm) behind Lobj1 fill white
+Lobj3: box at Lobj2.c + (2mm, -2mm) behind Lobj2 fill white
+
+Larc: box "foo.larc" mono at Lobj1.c + (0, -3cm) fill white
+
+Code1: box "Extracted" "source" "code" at Larc + (-3cm, -3cm) fill white
+Code2: box at Code1.c + (2mm, -2mm) behind Code1 fill white
+Code3: box at Code2.c + (2mm, -2mm) behind Code2 fill white
+
+Html1: box "*.html" mono "files" at Larc + (3cm, -3cm) fill white
+Html2: box at Html1.c + (2mm, -2mm) behind Html1 fill white
+Html3: box at Html2.c + (2mm, -2mm) behind Html2 fill white
+CSS: box "CSS" at Html1.c + (2cm, 0) fit fill white
+JS: box "JS" at CSS.c + (0, -0.7cm) fit fill white
+StaticAssets: box width 4cm height 2.2cm at Html1.c + (0.7cm, -0.2cm)
+
+Site: box "http://localhost:8080" fit at StaticAssets + (0, -2.5cm) fill white
+
+arrow " compile" mono bold ljust from Org1.s to Lobj1.n
+arrow " archive" mono bold ljust from Lobj1.s to Larc.n
+arrow "tangle"   mono bold above aligned <- from Code1.ne to Larc.s
+arrow "weave"    mono bold above aligned from Larc.s to StaticAssets.nw
+arrow " serve"   mono bold ljust dashed from StaticAssets.s to Site.n
+arrow "lint"     mono bold above aligned <-> dashed from Code1.n to Larc.w

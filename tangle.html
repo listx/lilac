@@ -1,0 +1,694 @@
+<!DOCTYPE HTML><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Tangle</title><link rel="stylesheet" href="/css/default.css"><link rel="shortcut icon" type="image/png" href="/favicon.png"><link rel="stylesheet" href="/vendor/source-fonts/source-fonts.css">
+<script>
+  window.MathJax = {
+      loader: { paths: { "mathjax-newcm": "/vendor/mathjax-newcm-font" } },
+      output: { font: "mathjax-newcm" },
+  tex: {
+      tags: 'ams'
+  },
+  options: {
+      ignoreHtmlClass: 'verbatim|code'
+  }
+};
+</script>
+<script id="MathJax-script" async="" src="/vendor/mathjax/tex-mml-chtml.js"></script>
+</head><body><div class="navbar"><button id="hamburger" class="tocs-toggle-button" aria-label="Toggle table of contents sidebar">&#x2630;</button><div class="breadcrumbs"><a href="https://lilac.funloop.org"><span class="breadcrumb">Lilac</span></a> 0.2.0.3 <span class="breadcrumb-separator">/</span> <a href="#top"><span class="breadcrumb">tangle.org</span></a></div></div><nav id="tocs"><p class="widget-title gtoc-title">Site contents</p><nav class="gtoc"><ul><li><a href="/index.html">Introduction</a></li><li><a href="/cli.html">CLI</a></li><li><a href="/build.html">Build and development environment</a></li><li><a href="/parse.html">Parse</a></li><li><a href="/compile.html">Compile</a></li><li><a href="/types.html">Types</a></li><li><a href="/tangle.html" class="bold">Tangle</a></li><li><a href="/weave.html">Weave</a></li><li><a href="/fe.html">Frontend</a></li><li><a href="/serve.html">Serve</a></li><li><a href="/user-manual.html">User Manual</a></li><li><a href="/plan.html">Plan</a></li><li><a href="/design/index.html">Design Docs</a></li><li><a href="/release-notes.html">Release Notes</a></li></ul></nav><p class="widget-title toc-title">Page contents</p><nav class="toc"><div class="toc-entries"><ol><li class="toc-level-1"><div class="toc-entry"><span class="toc-counter">1</span><a href="#h-1-Overview">Overview</a></div></li><li class="toc-level-1"><div class="toc-entry"><span class="toc-counter">2</span><a href="#h-2-Lilac.Tangle-module"><span class="verbatim">Lilac.Tangle</span> module</a></div></li><li class="toc-level-1"><div class="toc-entry"><span class="toc-counter">3</span><a href="#h-3-Tangling-algorithm">Tangling algorithm</a></div><ol><li class="toc-level-2"><div class="toc-entry"><span class="toc-counter">3.1</span><a href="#h-3.1-Block-expansion">Block expansion</a></div></li><li class="toc-level-2"><div class="toc-entry"><span class="toc-counter">3.2</span><a href="#h-3.2-Tests">Tests</a></div></li></ol></li><li class="toc-level-1"><div class="toc-entry"><span class="toc-counter">4</span><a href="#h-4-Testing-framework">Testing framework</a></div><ol><li class="toc-level-2"><div class="toc-entry"><span class="toc-counter">4.1</span><a href="#h-4.1-Test-module-and-helpers">Test module and helpers</a></div></li><li class="toc-level-2"><div class="toc-entry"><span class="toc-counter">4.2</span><a href="#h-4.2-All-test-cases">All test cases</a></div></li></ol></li><li class="toc-level-1"><div class="toc-entry"><a href="#h--Page-metrics">Page metrics</a></div><ol><li class="toc-level-2"><div class="toc-entry"><a href="#h--Backlinks">Backlinks</a></div></li><li class="toc-level-2"><div class="toc-entry"><a href="#h--Tangled-files">Tangled files</a></div></li><li class="toc-level-2"><div class="toc-entry"><a href="#h--Named-cells">Named cells</a></div></li></ol></li></ol></div></nav></nav><main><h1 id="top">Tangle</h1><hr class="title-underline"><div id="heading-container-h-1-Overview" class="heading-container"><h2 id="h-1-Overview"><span id="c-0" class="cell-idx"><a href="#h-1-Overview">1&ensp;Overview</a></span></h2><p><span id="c-1" class="cell-idx">In Literate Programming, <span class="italic">tangling</span> is the act of extracting just the source code out of a document. It is the opposite of documentation generation found in many programming language environments, such as <span class="code">javadoc</span>, where documentation is extracted from source code.</span></p></div><div id="heading-container-h-2-Lilac.Tangle-module" class="heading-container"><h2 id="h-2-Lilac.Tangle-module"><span id="c-2" class="cell-idx"><a href="#h-2-Lilac.Tangle-module">2&ensp;<span class="verbatim">Lilac.Tangle</span> module</a></span></h2><p><span id="c-3" class="cell-idx">This module is quite short, because much of the hard work around validation (no broken links, no cycles) are handled in <a href="/compile.html" class="internal-link" id="linkNumber-1">Compile</a>.</span></p><div id="c-4" class="cell-idx"><div class="block-container src" id="b-module:Lilac.Tangle"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-module:Lilac.Tangle">&#x1F517;</a></div><div class="block-meta"><code>module:Lilac.Tangle</code><br><code><span class="bold">&#x1F3AF; src/Lilac/Tangle.hs</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="kw">module</span> <span class="dt">Lilac.Tangle</span> (expandRootBlocks) <span class="kw">where</span>
+
+<span class="kw">import</span> <span class="dt">Data.Text</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">T</span>
+<span class="kw">import</span> <span class="dt">Lilac.Types</span>
+  ( <span class="dt">Archive</span> (objects, symbols),
+    <span class="dt">BToken</span> (<span class="dt">BTokenLinkTarget</span>, <span class="dt">BTokenPadding</span>, <span class="dt">BTokenString</span>),
+    <span class="dt">Block</span> (body, meta),
+    <span class="dt">Cell</span> (<span class="dt">CBlock</span>),
+    <span class="dt">LCI</span> (unLCI),
+    <span class="dt">LinkOid</span> (name),
+    <span class="dt">LinkTarget</span> (<span class="dt">LinkTargetLineLabel</span>, <span class="dt">LinkTargetOid</span>),
+    <span class="dt">Object</span> (orgDoc, symbols),
+    <span class="dt">OrgDoc</span> (cells),
+    gciToObjCell,
+  )
+<span class="kw">import</span> <span class="dt">Relude</span>
+  ( <span class="dt">Bool</span> (<span class="dt">False</span>, <span class="dt">True</span>),
+    <span class="dt">Maybe</span> (<span class="dt">Just</span>),
+    <span class="dt">Text</span>,
+    <span class="fu">concat</span>,
+    foldl&#39;,
+    <span class="fu">fst</span>,
+    <span class="fu">map</span>,
+    <span class="fu">otherwise</span>,
+    <span class="fu">reverse</span>,
+    (<span class="op">!!?</span>),
+    (<span class="op">$</span>),
+    (<span class="op">.</span>),
+    (<span class="op">/=</span>),
+    (<span class="op">&lt;&gt;</span>),
+    (<span class="op">==</span>),
+  )
+<span class="kw">import</span> <span class="dt">Relude.Extra.Map</span> (lookup)
+<span class="kw">import</span> <span class="dt">System.OsPath</span> (<span class="dt">OsPath</span>)
+<span class="kw">import</span> <span class="dt">System.OsPath</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">P</span>
+
+<a href="#b-f:expandRootBlocks" class="internal-link" id="b-module:Lilac.Tangle-b-f:expandRootBlocks">f:expandRootBlocks</a>
+<a href="#b-f:expandRootBlock" class="internal-link" id="b-module:Lilac.Tangle-b-f:expandRootBlock">f:expandRootBlock</a>
+<a href="#b-f:expandBlock" class="internal-link" id="b-module:Lilac.Tangle-b-f:expandBlock">f:expandBlock</a>
+<a href="#b-f:getPrefix" class="internal-link" id="b-module:Lilac.Tangle-b-f:getPrefix">f:getPrefix</a>
+<a href="#b-f:prependExistingPrefix" class="internal-link" id="b-module:Lilac.Tangle-b-f:prependExistingPrefix">f:prependExistingPrefix</a>
+<a href="#b-f:prefixTailLines" class="internal-link" id="b-module:Lilac.Tangle-b-f:prefixTailLines">f:prefixTailLines</a></code></pre></div></div></div><div id="heading-container-h-3-Tangling-algorithm" class="heading-container"><h2 id="h-3-Tangling-algorithm"><span id="c-5" class="cell-idx"><a href="#h-3-Tangling-algorithm">3&ensp;Tangling algorithm</a></span></h2><p><span id="c-6" class="cell-idx">Tangling essentially boils down to the following:</span></p><ol><li><p><span id="c-8" class="cell-idx">find all blocks that need to get tangled (they have <span class="code">#+header: :tangle ...</span> in their metadata), which we call <span class="italic">root blocks</span>, and</span></p></li><li><p><span id="c-10" class="cell-idx">for each of these blocks expand any Noweb references in them until none are left, and finally</span></p></li><li><p><span id="c-12" class="cell-idx">write the files to disk (but only for those files that are different than what we already have on disk).</span></p></li></ol><p><span id="c-14" class="cell-idx">The first two steps are the bare minimum required in order to feed source code to the computer for interpretation by it. The third step only writes files if they&#39;re different than what&#39;s on the disk, because otherwise the modification timestamps will change; this is not good if we are using a Makefile (because they use those timestamps to determine whether a rule needs to be run again).</span></p></div><div id="heading-container-h-3.1-Block-expansion" class="heading-container"><h3 id="h-3.1-Block-expansion"><span id="c-15" class="cell-idx"><a href="#h-3.1-Block-expansion">3.1&ensp;Block expansion</a></span></h3><p><span id="c-16" class="cell-idx">We examine the given <a href="/compile.html#b-data:Archive" class="internal-link" id="linkNumber-2">data:Archive</a> for all of the root blocks in it, and expand each one in <a href="#b-f:expandRootBlocks" class="internal-link" id="linkNumber-3">f:expandRootBlocks</a>. The output is a list of tuples, where each tuple encodes the filesystem path where we want to write content (text), and the contents themselves --- hence the type is <span class="code">(OsPath, Text)</span>.</span></p><div id="c-17" class="cell-idx"><div class="block-container src" id="b-f:expandRootBlocks"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:expandRootBlocks">&#x1F517;</a></div><div class="block-meta"><code>f:expandRootBlocks</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Tangle-b-f:expandRootBlocks" class="internal-link"><span class="verbatim">module:Lilac.Tangle</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">expandRootBlocks ::</span> <span class="dt">Archive</span> <span class="ot">-&gt;</span> <span class="dt">OsPath</span> <span class="ot">-&gt;</span> [(<span class="dt">OsPath</span>, <span class="dt">Text</span>)]
+expandRootBlocks archive outDir <span class="ot">=</span>
+  <span class="fu">map</span> (expandRootBlock archive) rootBlocks
+  <span class="kw">where</span>
+    rootBlocks <span class="ot">=</span>
+      <span class="fu">concat</span> <span class="op">$</span> foldl&#39; getRootBlocksFromObject [] archive<span class="op">.</span>objects
+<span class="ot">    getRootBlocksFromObject ::</span>
+      [[(<span class="dt">OsPath</span>, <span class="dt">Block</span>)]] <span class="ot">-&gt;</span>
+      <span class="dt">Object</span> <span class="ot">-&gt;</span>
+      [[(<span class="dt">OsPath</span>, <span class="dt">Block</span>)]]
+    getRootBlocksFromObject acc object <span class="ot">=</span>
+      foldl&#39; (getRootBlock object<span class="op">.</span>orgDoc<span class="op">.</span>cells) [] object<span class="op">.</span>symbols <span class="op">:</span> acc
+    getRootBlock cells acc lci <span class="co">-- <a href="#ll--f:expandRootBlocks-getRootBlock-" class="internal-link" id="ll--f:expandRootBlocks-getRootBlock-"><span class="bold">1</span></a> <a class="button-popup-backlinks" data-backlinks="[[&quot;#linkNumber-5&quot;,&quot;§ 3.1 Block expansion ~ ¶ (&lt;span class=\&quot;verbatim\&quot;&gt;Cell 18&lt;/span&gt;)&quot;]]">←</a></span>
+      <span class="op">|</span> <span class="dt">Just</span> (<span class="dt">CBlock</span> b) <span class="ot">&lt;-</span> cells <span class="op">!!?</span> lci<span class="op">.</span>unLCI,
+        <span class="dt">Just</span> tPath <span class="ot">&lt;-</span> <span class="fu">lookup</span> <span class="st">&quot;tangle&quot;</span> b<span class="op">.</span>meta,
+        <span class="dt">Just</span> tOsPath <span class="ot">&lt;-</span> P.encodeUtf <span class="op">$</span> T.unpack tPath <span class="ot">=</span>
+          (P.combine outDir tOsPath, b) <span class="op">:</span> acc
+      <span class="op">|</span> <span class="fu">otherwise</span> <span class="ot">=</span> acc</code></pre></div></div><p><span id="c-18" class="cell-idx"><a href="#b-f:expandRootBlocks" class="internal-link" id="linkNumber-4">f:expandRootBlocks</a> is mainly concerned with collecting all of the root blocks first <a href="#ll--f:expandRootBlocks-getRootBlock-" class="internal-link" id="linkNumber-5"><span class="bold">1</span></a> before handing them off to <a href="#b-f:expandRootBlock" class="internal-link" id="linkNumber-6">f:expandRootBlock</a> for the actual block expansions (where &quot;expansion&quot; just means converting any Noweb links we find with the actual contents of that linked block).</span></p><div id="c-19" class="cell-idx"><div class="block-container src" id="b-f:expandRootBlock"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:expandRootBlock">&#x1F517;</a></div><div class="block-meta"><code>f:expandRootBlock</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Tangle-b-f:expandRootBlock" class="internal-link"><span class="verbatim">module:Lilac.Tangle</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">expandRootBlock ::</span> <span class="dt">Archive</span> <span class="ot">-&gt;</span> (<span class="dt">OsPath</span>, <span class="dt">Block</span>) <span class="ot">-&gt;</span> (<span class="dt">OsPath</span>, <span class="dt">Text</span>)
+expandRootBlock archive (tanglePath, rootBlock) <span class="ot">=</span>
+  ( tanglePath,
+    maybeAddShebang rootBlock <span class="co">-- <a href="#ll--f:expandRootBlock-maybeAddShebang-" class="internal-link" id="ll--f:expandRootBlock-maybeAddShebang-"><span class="bold">2</span></a> <a class="button-popup-backlinks" data-backlinks="[[&quot;#linkNumber-7&quot;,&quot;§ 3.1 Block expansion ~ ¶ (&lt;span class=\&quot;verbatim\&quot;&gt;Cell 20&lt;/span&gt;)&quot;]]">←</a></span>
+      <span class="op">.</span> trimTrailingSpaces <span class="co">-- <a href="#ll--f:expandRootBlock-trimTrailingSpaces-" class="internal-link" id="ll--f:expandRootBlock-trimTrailingSpaces-"><span class="bold">3</span></a> <a class="button-popup-backlinks" data-backlinks="[[&quot;#linkNumber-9&quot;,&quot;§ 3.1 Block expansion ~ ¶ (&lt;span class=\&quot;verbatim\&quot;&gt;Cell 21&lt;/span&gt;)&quot;]]">←</a></span>
+      <span class="op">$</span> expandBlock archive rootBlock <span class="st">&quot;&quot;</span>
+  )
+  <span class="kw">where</span>
+<span class="ot">    trimTrailingSpaces ::</span> <span class="dt">Text</span> <span class="ot">-&gt;</span> <span class="dt">Text</span>
+    trimTrailingSpaces text <span class="ot">=</span>
+      T.unlines
+        <span class="op">.</span> <span class="fu">map</span> (T.dropWhileEnd (<span class="op">==</span> <span class="ch">&#39; &#39;</span>))
+        <span class="op">$</span> T.lines text
+<span class="ot">    maybeAddShebang ::</span> <span class="dt">Block</span> <span class="ot">-&gt;</span> <span class="dt">Text</span> <span class="ot">-&gt;</span> <span class="dt">Text</span>
+    maybeAddShebang block text
+      <span class="op">|</span> <span class="dt">Just</span> shebang <span class="ot">&lt;-</span> <span class="fu">lookup</span> <span class="st">&quot;shebang&quot;</span> block<span class="op">.</span>meta <span class="ot">=</span>
+          shebang <span class="op">&lt;&gt;</span> <span class="st">&quot;\n&quot;</span> <span class="op">&lt;&gt;</span> text
+      <span class="op">|</span> <span class="fu">otherwise</span> <span class="ot">=</span> text</code></pre></div></div><p><span id="c-20" class="cell-idx">We add a special shebang line at the beginning of the file <a href="#ll--f:expandRootBlock-maybeAddShebang-" class="internal-link" id="linkNumber-7"><span class="bold">2</span></a>, if one was specified using the <span class="code">:shebang</span> header. See <a href="/build.html#b-unit-test.sh" class="internal-link" id="linkNumber-8">unit-test.sh</a> for an example.</span></p><p><span id="c-21" class="cell-idx">We also trim lines with only spaces in them <a href="#ll--f:expandRootBlock-trimTrailingSpaces-" class="internal-link" id="linkNumber-9"><span class="bold">3</span></a>, because these can happen from the <span class="code">prependExistingPrefix</span> function in <a href="#b-f:expandBlock" class="internal-link" id="linkNumber-10">f:expandBlock</a>.</span></p><p><span id="c-22" class="cell-idx">Finally in <a href="#b-f:expandBlock" class="internal-link" id="linkNumber-11">f:expandBlock</a>, we recursively expand all Noweb links (<span class="code">linkOid</span>) until there are none <a href="#ll--f:expandBlock-recursion-" class="internal-link" id="linkNumber-12"><span class="bold">5</span></a>.</span></p><div id="c-23" class="cell-idx"><div class="block-container src" id="b-f:expandBlock"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:expandBlock">&#x1F517;</a></div><div class="block-meta"><code>f:expandBlock</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Tangle-b-f:expandBlock" class="internal-link"><span class="verbatim">module:Lilac.Tangle</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">expandBlock ::</span> <span class="dt">Archive</span> <span class="ot">-&gt;</span> <span class="dt">Block</span> <span class="ot">-&gt;</span> <span class="dt">Text</span> <span class="ot">-&gt;</span> <span class="dt">Text</span>
+expandBlock archive block existingPrefix <span class="ot">=</span>
+  <span class="kw">let</span> acc <span class="ot">=</span> <span class="st">&quot;&quot;</span><span class="ot"> ::</span> <span class="dt">Text</span>
+      prefix <span class="ot">=</span> <span class="st">&quot;&quot;</span><span class="ot"> ::</span> <span class="dt">Text</span>
+   <span class="kw">in</span> <span class="fu">fst</span> <span class="op">$</span> foldl&#39; expand (acc, prefix) block<span class="op">.</span>body
+  <span class="kw">where</span>
+    expand (acc, _) <span class="dt">BTokenPadding</span> <span class="ot">=</span>
+      (acc <span class="op">&lt;&gt;</span> <span class="st">&quot;\n&quot;</span>, <span class="st">&quot;&quot;</span>)
+    expand (acc, _) (<span class="dt">BTokenString</span> text) <span class="ot">=</span>
+      (acc <span class="op">&lt;&gt;</span> prependExistingPrefix existingPrefix text, getPrefix text) <span class="co">-- <a href="#ll--f:expandBlock-getPrefix-" class="internal-link" id="ll--f:expandBlock-getPrefix-"><span class="bold">4</span></a> <a class="button-popup-backlinks" data-backlinks="[[&quot;#linkNumber-15&quot;,&quot;§ 3.1 Block expansion ~ ¶ (&lt;span class=\&quot;verbatim\&quot;&gt;Cell 28&lt;/span&gt;)&quot;]]">←</a></span>
+    expand (acc, prefix) (<span class="dt">BTokenLinkTarget</span> (<span class="dt">LinkTargetOid</span> linkOid)) <span class="co">-- <a href="#ll--f:expandBlock-recursion-" class="internal-link" id="ll--f:expandBlock-recursion-"><span class="bold">5</span></a> <a class="button-popup-backlinks" data-backlinks="[[&quot;#linkNumber-12&quot;,&quot;§ 3.1 Block expansion ~ ¶ (&lt;span class=\&quot;verbatim\&quot;&gt;Cell 22&lt;/span&gt;)&quot;]]">←</a></span>
+      <span class="op">|</span> <span class="dt">Just</span> gci <span class="ot">&lt;-</span> <span class="fu">lookup</span> linkOid archive<span class="op">.</span>symbols,
+        <span class="dt">Just</span> (_, (<span class="dt">CBlock</span> targetBlock)) <span class="ot">&lt;-</span> gciToObjCell archive gci <span class="ot">=</span>
+          ( acc <span class="op">&lt;&gt;</span> (expandBlock archive targetBlock <span class="op">$</span> existingPrefix <span class="op">&lt;&gt;</span> prefix),
+            prefix
+          )
+      <span class="op">|</span> <span class="fu">otherwise</span> <span class="ot">=</span> (acc, prefix)
+    expand (acc, prefix) (<span class="dt">BTokenLinkTarget</span> (<span class="dt">LinkTargetLineLabel</span> lineLabel))
+      <span class="op">|</span> <span class="dt">Just</span> <span class="st">&quot;tangle&quot;</span> <span class="ot">&lt;-</span> <span class="fu">lookup</span> <span class="st">&quot;line-label&quot;</span> block<span class="op">.</span>meta <span class="ot">=</span>
+          ( acc <span class="op">&lt;&gt;</span> <span class="st">&quot;(ref:&quot;</span> <span class="op">&lt;&gt;</span> (T.drop <span class="dv">1</span> <span class="op">$</span> T.dropEnd <span class="dv">1</span> lineLabel<span class="op">.</span>name) <span class="op">&lt;&gt;</span> <span class="st">&quot;)&quot;</span>,
+            prefix
+          )
+      <span class="op">|</span> <span class="fu">otherwise</span> <span class="ot">=</span> (acc, prefix)
+    expand (acc, prefix) _ <span class="ot">=</span> (acc, prefix)</code></pre></div></div><p><span id="c-24" class="cell-idx">The other main concern of <a href="#b-f:expandBlock" class="internal-link" id="linkNumber-13">f:expandBlock</a> is the business around prefixes. Essentially, whenever we expand a Noweb link, we want to treat any preceding text on the same line as the link as a special prefix that we use for all expanded lines. For example, in the following block</span></p><div id="c-25" class="cell-idx"><div class="block-container src" id="b-1"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-1">&#x1F517;</a></div><div class="block-meta-other hidden top-rounded"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__anon_block_number</span> = <span class="code">1</span></p></li><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">txt</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body anonymous fully-rounded"><code class="sourceCode">    &lt;&lt;foo&gt;&gt;</code></pre></div></div><p><span id="c-26" class="cell-idx">all of the lines inside the <span class="code">&lt;&lt;foo&gt;&gt;</span> block should inherit the 4-space indentation, which we call a <span class="italic">prefix</span> here because it can also take into account non-space characters.</span></p><div id="c-27" class="cell-idx"><div class="block-container src" id="b-f:getPrefix"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:getPrefix">&#x1F517;</a></div><div class="block-meta"><code>f:getPrefix</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Tangle-b-f:getPrefix" class="internal-link"><span class="verbatim">module:Lilac.Tangle</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">getPrefix ::</span> <span class="dt">Text</span> <span class="ot">-&gt;</span> <span class="dt">Text</span>
+getPrefix text <span class="ot">=</span> T.takeWhileEnd (<span class="op">/=</span> <span class="ch">&#39;\n&#39;</span>) text</code></pre></div></div><p><span id="c-28" class="cell-idx">When we encounter a <span class="code">BTokenString</span> token in <a href="#b-f:expandBlock" class="internal-link" id="linkNumber-14">f:expandBlock</a> <a href="#ll--f:expandBlock-getPrefix-" class="internal-link" id="linkNumber-15"><span class="bold">4</span></a> we search for a prefix with <a href="#b-f:getPrefix" class="internal-link" id="linkNumber-16">f:getPrefix</a>. See <a href="#b-ti:0101-block-expansion-prefix" class="internal-link" id="linkNumber-17">ti:0101-block-expansion-prefix</a> and <a href="#b-ti:0101-block-expansion-prefix-nested" class="internal-link" id="linkNumber-18">ti:0101-block-expansion-prefix-nested</a> for examples using indentation as prefixes, and <a href="#b-ti:0101-block-expansion-prefix-nonspace" class="internal-link" id="linkNumber-19">ti:0101-block-expansion-prefix-nonspace</a> and <a href="#b-ti:0101-block-expansion-prefix-nonspace-nested" class="internal-link" id="linkNumber-20">ti:0101-block-expansion-prefix-nonspace-nested</a> for examples of non-space-based prefixes.</span></p><p><span id="c-29" class="cell-idx"><a href="#b-f:prependExistingPrefix" class="internal-link" id="linkNumber-21">f:prependExistingPrefix</a> splits up the given text, and injects the prefix on every line in the text except the very first line.</span></p><div id="c-30" class="cell-idx"><div class="block-container src" id="b-f:prependExistingPrefix"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:prependExistingPrefix">&#x1F517;</a></div><div class="block-meta"><code>f:prependExistingPrefix</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Tangle-b-f:prependExistingPrefix" class="internal-link"><span class="verbatim">module:Lilac.Tangle</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">prependExistingPrefix ::</span> <span class="dt">Text</span> <span class="ot">-&gt;</span> <span class="dt">Text</span> <span class="ot">-&gt;</span> <span class="dt">Text</span>
+prependExistingPrefix existingPrefix text <span class="ot">=</span>
+  T.intercalate <span class="st">&quot;\n&quot;</span>
+    <span class="op">.</span> <span class="fu">reverse</span>
+    <span class="op">.</span> <span class="fu">fst</span>
+    <span class="op">.</span> foldl&#39; (prefixTailLines existingPrefix) ([], <span class="dt">True</span>)
+    <span class="op">$</span> T.split (<span class="op">==</span> <span class="ch">&#39;\n&#39;</span>) text</code></pre></div></div><p><span id="c-31" class="cell-idx">We need this function because given the text</span></p><div id="c-32" class="cell-idx"><div class="block-container src" id="b-2"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-2">&#x1F517;</a></div><div class="block-meta-other hidden top-rounded"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__anon_block_number</span> = <span class="code">2</span></p></li><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">txt</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body anonymous fully-rounded"><code class="sourceCode">xx&lt;&lt;a&gt;&gt;</code></pre></div></div><p><span id="c-33" class="cell-idx">where <span class="code">xx</span> is the prefix, we only want to give this prefix to the lines in <span class="code">&lt;&lt;a&gt;&gt;</span> except the first line (because the first line of <span class="code">&lt;&lt;a&gt;&gt;</span> is already prefixed (from the outer block) with <span class="code">xx</span>); so only the lines after the first line in <span class="code">&lt;&lt;a&gt;&gt;</span> need the <span class="code">xx</span> prefix. This is what we do in <a href="#b-f:prefixTailLines" class="internal-link" id="linkNumber-22">f:prefixTailLines</a>, where we avoid adding the prefix to the &quot;head&quot;, and instead only add it to the &quot;tail.&quot;</span></p><div id="c-34" class="cell-idx"><div class="block-container src" id="b-f:prefixTailLines"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:prefixTailLines">&#x1F517;</a></div><div class="block-meta"><code>f:prefixTailLines</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Tangle-b-f:prefixTailLines" class="internal-link"><span class="verbatim">module:Lilac.Tangle</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">prefixTailLines ::</span> <span class="dt">Text</span> <span class="ot">-&gt;</span> ([<span class="dt">Text</span>], <span class="dt">Bool</span>) <span class="ot">-&gt;</span> <span class="dt">Text</span> <span class="ot">-&gt;</span> ([<span class="dt">Text</span>], <span class="dt">Bool</span>)
+prefixTailLines existingPrefix (acc, isFirstLine) line
+  <span class="op">|</span> isFirstLine <span class="ot">=</span> (line <span class="op">:</span> acc, <span class="dt">False</span>)
+  <span class="op">|</span> <span class="fu">otherwise</span> <span class="ot">=</span> (T.append existingPrefix line <span class="op">:</span> acc, <span class="dt">False</span>)</code></pre></div></div><p><span id="c-35" class="cell-idx">Going back to <a href="#b-f:prependExistingPrefix" class="internal-link" id="linkNumber-23">f:prependExistingPrefix</a>, we use <span class="code">T.intercalate</span> and <span class="code">T.split</span>, to avoid losing any information about the exact locations of newlines. If we used <span class="code">T.lines</span> we would lose information about whether the last line actually had a trailing newline, because <span class="code">T.lines &quot;a\nb&quot;</span> and <span class="code">T.lines &quot;a\nb\n&quot;</span> both give <span class="code">[&quot;a&quot;, &quot;b&quot;]</span>. For a demonstration of this lossy behavior, see the test case below.</span></p><div id="c-36" class="cell-idx"><div class="block-container src" id="b-t:lines-unlines-info-loss"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:lines-unlines-info-loss">&#x1F517;</a></div><div class="block-meta"><code>t:lines-unlines-info-loss</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:lines-unlines-info-loss" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">it <span class="st">&quot;loses information&quot;</span> <span class="op">$</span> <span class="kw">do</span>
+  <span class="kw">let</span> withoutNewline <span class="ot">=</span> T.lines <span class="st">&quot;a\nb&quot;</span>
+      withNewline <span class="ot">=</span> T.lines <span class="st">&quot;a\nb\n&quot;</span>
+  T.unlines withoutNewline <span class="ot">`shouldBe`</span> T.unlines withNewline</code></pre></div></div></div><div id="heading-container-h-3.2-Tests" class="heading-container"><h3 id="h-3.2-Tests"><span id="c-37" class="cell-idx"><a href="#h-3.2-Tests">3.2&ensp;Tests</a></span></h3><p><span id="c-38" class="cell-idx">Expand a single block.</span></p><div id="c-39" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e007</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1
+&lt;&lt;b&gt;&gt;
+a2
+#+end_src
+
+#+name: b
+#+begin_src haskell
+b
+#+end_src</code></pre></div></div><div id="c-40" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [<span class="st">&quot;0101-block-expansion&quot;</span>]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;b&quot;</span>,
+          <span class="st">&quot;a2&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-41" class="cell-idx">Expand many blocks in the same place, but the number of repeated expansions shouldn&#39;t result in a cumulative number of newlines; we should expect just one newline for the expanded content.</span></p><div id="c-42" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-deeply-nested"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-deeply-nested">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-deeply-nested</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-deeply-nested</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e008</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1
+&lt;&lt;b&gt;&gt;
+a2
+#+end_src
+
+#+name: b
+#+begin_src haskell
+&lt;&lt;c&gt;&gt;
+#+end_src
+
+#+name: c
+#+begin_src haskell
+&lt;&lt;d&gt;&gt;
+#+end_src
+
+#+name: d
+#+begin_src haskell
+&lt;&lt;e&gt;&gt;
+#+end_src
+
+#+name: e
+#+begin_src haskell
+e
+#+end_src</code></pre></div></div><div id="c-43" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion-deeply-nested"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion-deeply-nested">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion-deeply-nested</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion-deeply-nested" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [<span class="st">&quot;0101-block-expansion-deeply-nested&quot;</span>]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;e&quot;</span>,
+          <span class="st">&quot;a2&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-44" class="cell-idx">If the link name is indented, we have to indent the contents of that block.</span></p><div id="c-45" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-prefix"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-prefix">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-prefix</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-prefix</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e009</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+  &lt;&lt;b&gt;&gt;
+a1
+  &lt;&lt;b&gt;&gt;
+#+end_src
+
+#+name: b
+#+begin_src haskell
+b1
+b2
+b3
+#+end_src</code></pre></div></div><div id="c-46" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion-prefix"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion-prefix">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion-prefix</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion-prefix" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [<span class="st">&quot;0101-block-expansion-prefix&quot;</span>]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;  b1&quot;</span>,
+          <span class="st">&quot;  b2&quot;</span>,
+          <span class="st">&quot;  b3&quot;</span>,
+          <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;  b1&quot;</span>,
+          <span class="st">&quot;  b2&quot;</span>,
+          <span class="st">&quot;  b3&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-47" class="cell-idx">The indentation can be nested. For example if the named block itself links to other blocks with an indent, those inner blocks should be indented with the sum of the indent found in the current and outer surrounding blocks.</span></p><div id="c-48" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-prefix-nested"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-prefix-nested">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-prefix-nested</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-prefix-nested</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e00a</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1
+  &lt;&lt;b&gt;&gt;
+#+end_src
+
+#+name: b
+#+begin_src haskell
+b1
+b2
+b3
+  &lt;&lt;c&gt;&gt;
+#+end_src
+
+#+name: c
+#+begin_src haskell
+c1
+c2
+#+end_src</code></pre></div></div><div id="c-49" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion-prefix-nested"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion-prefix-nested">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion-prefix-nested</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion-prefix-nested" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [<span class="st">&quot;0101-block-expansion-prefix-nested&quot;</span>]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;  b1&quot;</span>,
+          <span class="st">&quot;  b2&quot;</span>,
+          <span class="st">&quot;  b3&quot;</span>,
+          <span class="st">&quot;    c1&quot;</span>,
+          <span class="st">&quot;    c2&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-50" class="cell-idx">The prefix is any string, up to the (preceding) newline. So this mean it can have non-space characters in it as well.</span></p><div id="c-51" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-prefix-nonspace"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-prefix-nonspace">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-prefix-nonspace</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-prefix-nonspace</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e00b</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1
+  -&gt; &lt;&lt;b&gt;&gt;
+#+end_src
+
+#+name: b
+#+begin_src haskell
+b1
+b2
+b3
+#+end_src</code></pre></div></div><div id="c-52" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion-prefix-nonspace"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion-prefix-nonspace">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion-prefix-nonspace</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion-prefix-nonspace" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [<span class="st">&quot;0101-block-expansion-prefix-nonspace&quot;</span>]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;  -&gt; b1&quot;</span>,
+          <span class="st">&quot;  -&gt; b2&quot;</span>,
+          <span class="st">&quot;  -&gt; b3&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-53" class="cell-idx">Non-space prefixes can also be nested.</span></p><div id="c-54" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-prefix-nonspace-nested"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-prefix-nonspace-nested">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-prefix-nonspace-nested</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-prefix-nonspace-nested</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e00c</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1
+  -&gt; &lt;&lt;b&gt;&gt;
+#+end_src
+
+#+name: b
+#+begin_src haskell
+b1
+b2
+b3
+-- &lt;&lt;c&gt;&gt;
+#+end_src
+
+#+name: c
+#+begin_src haskell
+c1
+c2
+#+end_src</code></pre></div></div><div id="c-55" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion-prefix-nonspace-nested"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion-prefix-nonspace-nested">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion-prefix-nonspace-nested</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion-prefix-nonspace-nested" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [<span class="st">&quot;0101-block-expansion-prefix-nonspace-nested&quot;</span>]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;  -&gt; b1&quot;</span>,
+          <span class="st">&quot;  -&gt; b2&quot;</span>,
+          <span class="st">&quot;  -&gt; b3&quot;</span>,
+          <span class="st">&quot;  -&gt; -- c1&quot;</span>,
+          <span class="st">&quot;  -&gt; -- c2&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-56" class="cell-idx">The following test case has some complex expansions.</span></p><div id="c-57" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-complex"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-complex">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-complex</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-complex</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e00d</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1
+&lt;&lt;b&gt;&gt;
+a2
+  &lt;&lt;c&gt;&gt;
+a3
+&lt;&lt;g&gt;&gt;
+&lt;&lt;h&gt;&gt;
+#+end_src
+
+#+name: b
+#+begin_src haskell
+b
+#+end_src
+
+#+name: c
+#+begin_src haskell
+c
+c
+  &lt;&lt;d&gt;&gt;
+c
+#+end_src
+
+#+name: d
+#+begin_src haskell
+d
+
+d
+&lt;&lt;e&gt;&gt;
+#+end_src
+
+#+name: e
+#+begin_src haskell
+e &lt;&lt;f&gt;&gt;!
+#+end_src
+
+#+name: f
+#+begin_src haskell
+hello
+#+end_src
+
+#+name: g
+#+begin_src haskell
+g
+#+end_src
+
+#+name: h
+#+begin_src haskell
+h
+#+end_src</code></pre></div></div><div id="c-58" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion-complex"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion-complex">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion-complex</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion-complex" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [<span class="st">&quot;0101-block-expansion-complex&quot;</span>]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;b&quot;</span>,
+          <span class="st">&quot;a2&quot;</span>,
+          <span class="st">&quot;  c&quot;</span>,
+          <span class="st">&quot;  c&quot;</span>,
+          <span class="st">&quot;    d&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;    d&quot;</span>,
+          <span class="st">&quot;    e hello!&quot;</span>,
+          <span class="st">&quot;  c&quot;</span>,
+          <span class="st">&quot;a3&quot;</span>,
+          <span class="st">&quot;g&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;h&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-59" class="cell-idx">Due to <a href="/parse.html#b-f:padConsecutiveNowebLinks" class="internal-link" id="linkNumber-24">f:padConsecutiveNowebLinks</a>, insert extra newlines between consecutive Noweb links.</span></p><div id="c-60" class="cell-idx"><div class="block-container src" id="b-ti:0102-pad-between-consecutive-links"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0102-pad-between-consecutive-links">&#x1F517;</a></div><div class="block-meta"><code>ti:0102-pad-between-consecutive-links</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0102-pad-between-consecutive-links</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e00e</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1
+&lt;&lt;b1&gt;&gt;
+&lt;&lt;b2&gt;&gt;
+a2
+  &lt;&lt;b1&gt;&gt;
+  &lt;&lt;b2&gt;&gt;
+  &lt;&lt;b3&gt;&gt;
+Even if indentation is different, still pad between them.
+  &lt;&lt;b1&gt;&gt;
+    &lt;&lt;b2&gt;&gt;
+      &lt;&lt;b3&gt;&gt;
+Even pad for the same block repeated multiple times.
+  &lt;&lt;b1&gt;&gt;
+  &lt;&lt;b1&gt;&gt;
+  &lt;&lt;b1&gt;&gt;
+Lines with multiple links still count as being consecutive.
+  &lt;&lt;b3&gt;&gt;
+  &lt;&lt;b3&gt;&gt;
+  &lt;&lt;b1&gt;&gt; &lt;&lt;b2&gt;&gt;
+  &lt;&lt;b3&gt;&gt;
+  &lt;&lt;b3&gt;&gt;
+No padding if only one link...
+  &lt;&lt;b1&gt;&gt;
+...is by itself.
+#+end_src
+
+#+name: b1
+#+begin_src haskell
+b1
+#+end_src
+
+#+name: b2
+#+begin_src haskell
+b2
+#+end_src
+
+#+name: b3
+#+begin_src haskell
+b3
+#+end_src</code></pre></div></div><div id="c-61" class="cell-idx"><div class="block-container src" id="b-t:0102-pad-between-consecutive-links"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0102-pad-between-consecutive-links">&#x1F517;</a></div><div class="block-meta"><code>t:0102-pad-between-consecutive-links</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0102-pad-between-consecutive-links" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [<span class="st">&quot;0102-pad-between-consecutive-links&quot;</span>]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;b1&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;b2&quot;</span>,
+          <span class="st">&quot;a2&quot;</span>,
+          <span class="st">&quot;  b1&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;  b2&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;  b3&quot;</span>,
+          <span class="st">&quot;Even if indentation is different, still pad between them.&quot;</span>,
+          <span class="st">&quot;  b1&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;    b2&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;      b3&quot;</span>,
+          <span class="st">&quot;Even pad for the same block repeated multiple times.&quot;</span>,
+          <span class="st">&quot;  b1&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;  b1&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;  b1&quot;</span>,
+          <span class="st">&quot;Lines with multiple links still count as being consecutive.&quot;</span>,
+          <span class="st">&quot;  b3&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;  b3&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;  b1 b2&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;  b3&quot;</span>,
+          <span class="st">&quot;&quot;</span>,
+          <span class="st">&quot;  b3&quot;</span>,
+          <span class="st">&quot;No padding if only one link...&quot;</span>,
+          <span class="st">&quot;  b1&quot;</span>,
+          <span class="st">&quot;...is by itself.&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-62" class="cell-idx">Sometimes we want to use Noweb links on the same line as existing code, surrounded by other text. In these cases we shouldn&#39;t do any padding, because adding padding makes sense only when the link is at the very end (otherwise, we could end up introducing a newline right in the middle of a line). In the test case below the links to <span class="code">&lt;&lt;b1&gt;&gt;</span> and <span class="code">&lt;&lt;b2&gt;&gt;</span> have a trailing comma, so it doesn&#39;t make sense to add a newline between the link and the comma.</span></p><div id="c-63" class="cell-idx"><div class="block-container src" id="b-ti:0102-pad-between-consecutive-links-except-embedded"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0102-pad-between-consecutive-links-except-embedded">&#x1F517;</a></div><div class="block-meta"><code>ti:0102-pad-between-consecutive-links-except-embedded</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0102-pad-between-consecutive-links-except-embedded</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e00e</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1 &lt;&lt;b1&gt;&gt;,
+a2 &lt;&lt;b2&gt;&gt;,
+a3 &lt;&lt;b3&gt;&gt;
+#+end_src
+
+#+name: b1
+#+begin_src haskell
+b1
+#+end_src
+
+#+name: b2
+#+begin_src haskell
+b2
+#+end_src
+
+#+name: b3
+#+begin_src haskell
+b3
+#+end_src</code></pre></div></div><div id="c-64" class="cell-idx"><div class="block-container src" id="b-t:0102-pad-between-consecutive-links-except-embedded"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0102-pad-between-consecutive-links-except-embedded">&#x1F517;</a></div><div class="block-meta"><code>t:0102-pad-between-consecutive-links-except-embedded</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0102-pad-between-consecutive-links-except-embedded" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [<span class="st">&quot;0102-pad-between-consecutive-links-except-embedded&quot;</span>]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1 b1,&quot;</span>,
+          <span class="st">&quot;a2 b2,&quot;</span>,
+          <span class="st">&quot;a3 b3&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-65" class="cell-idx">Insert shebang lines if the user specifies them with the <span class="code">:shebang</span> header.</span></p><div id="c-66" class="cell-idx"><div class="block-container src" id="b-ti:0103-shebang"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0103-shebang">&#x1F517;</a></div><div class="block-meta"><code>ti:0103-shebang</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0103-shebang</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e00f</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle a.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src sh
+a1
+#+end_src</code></pre></div></div><div id="c-67" class="cell-idx"><div class="block-container src" id="b-t:0103-shebang"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0103-shebang">&#x1F517;</a></div><div class="block-meta"><code>t:0103-shebang</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0103-shebang" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [<span class="st">&quot;0103-shebang&quot;</span>]
+  [ ( <span class="st">&quot;a.sh&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;#!/usr/bin/env bash&quot;</span>,
+          <span class="st">&quot;a1&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-68" class="cell-idx">Expand blocks even if they have Noweb links that point to a block from an external file.</span></p><div id="c-69" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-external-parent"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-external-parent">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-external-parent</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-external-parent</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e010</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1
+&lt;&lt;id:00000000-0000-0000-0000-00000000f000::a&gt;&gt;
+a2
+#+end_src</code></pre></div></div><div id="c-70" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-external-child"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-external-child">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-external-child</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-external-child</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000f000</span>
+<span class="in">:END:</span>
+#+name: a
+#+begin_src haskell
+hello from child
+#+end_src</code></pre></div></div><div id="c-71" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion-external"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion-external">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion-external</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion-external" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [ <span class="st">&quot;0101-block-expansion-external-parent&quot;</span>,
+    <span class="st">&quot;0101-block-expansion-external-child&quot;</span>
+  ]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;hello from child&quot;</span>,
+          <span class="st">&quot;a2&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-72" class="cell-idx">The expansion should work for external Noweb links which refer to a block using a heading&#39;s ID, not the ID that&#39;s set at the file level.</span></p><div id="c-73" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-external-headingchild-parent"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-external-headingchild-parent">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-external-headingchild-parent</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-external-headingchild-parent</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e011</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1
+&lt;&lt;id:00000000-0000-0000-0000-00000000f00a::a&gt;&gt;
+a2
+#+end_src</code></pre></div></div><div id="c-74" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-external-headingchild"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-external-headingchild">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-external-headingchild</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-external-headingchild</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000f009</span>
+<span class="in">:END:</span>
+
+<span class="fu">* A heading</span>
+<span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000f00a</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+begin_src haskell
+hello from child
+#+end_src</code></pre></div></div><div id="c-75" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion-external-headingchild"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion-external-headingchild">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion-external-headingchild</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion-external-headingchild" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [ <span class="st">&quot;0101-block-expansion-external-headingchild-parent&quot;</span>,
+    <span class="st">&quot;0101-block-expansion-external-headingchild&quot;</span>
+  ]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;hello from child&quot;</span>,
+          <span class="st">&quot;a2&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-76" class="cell-idx">An external block itself can refer to another external block. In <a href="#b-t:0101-block-expansion-external-2-hops" class="internal-link" id="linkNumber-25">t:0101-block-expansion-external-2-hops</a> we use a <a href="#b-ti:0101-block-expansion-external-2-hops-middleman" class="internal-link" id="linkNumber-26">middleman</a> that itself refers to the <a href="#b-ti:0101-block-expansion-external-child" class="internal-link" id="linkNumber-27">external child block</a> from <a href="#b-t:0101-block-expansion-external" class="internal-link" id="linkNumber-28">t:0101-block-expansion-external</a>.</span></p><div id="c-77" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-external-2-hops-parent"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-external-2-hops-parent">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-external-2-hops-parent</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-external-2-hops-parent</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000e012</span>
+<span class="in">:END:</span>
+
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+a1
+&lt;&lt;id:00000000-0000-0000-0000-00000000f001::a&gt;&gt;
+a2
+#+end_src</code></pre></div></div><div id="c-78" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-external-2-hops-middleman"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-external-2-hops-middleman">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-external-2-hops-middleman</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-external-2-hops-middleman</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000f001</span>
+<span class="in">:END:</span>
+#+name: a
+#+begin_src haskell
+hello from middleman
+&lt;&lt;id:00000000-0000-0000-0000-00000000f000::a&gt;&gt;
+#+end_src</code></pre></div></div><div id="c-79" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion-external-2-hops"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion-external-2-hops">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion-external-2-hops</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion-external-2-hops" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [ <span class="st">&quot;0101-block-expansion-external-2-hops-parent&quot;</span>,
+    <span class="st">&quot;0101-block-expansion-external-2-hops-middleman&quot;</span>,
+    <span class="st">&quot;0101-block-expansion-external-child&quot;</span>
+  ]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;a1&quot;</span>,
+          <span class="st">&quot;hello from middleman&quot;</span>,
+          <span class="st">&quot;hello from child&quot;</span>,
+          <span class="st">&quot;a2&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div><p><span id="c-80" class="cell-idx">We allow two files to refer to each other&#39;s blocks as well, as long as there isn&#39;t a cycle.</span></p><div id="c-81" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-external-mutual-a"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-external-mutual-a">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-external-mutual-a</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-external-mutual-a</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000f002</span>
+<span class="in">:END:</span>
+#+name: a
+#+header: :tangle equations.txt
+#+begin_src haskell
+hello from a
+&lt;&lt;id:00000000-0000-0000-0000-00000000f003::b&gt;&gt;
+#+end_src
+
+#+name: c
+#+begin_src haskell
+hello from c
+#+end_src</code></pre></div></div><div id="c-82" class="cell-idx"><div class="block-container src" id="b-ti:0101-block-expansion-external-mutual-b"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-ti:0101-block-expansion-external-mutual-b">&#x1F517;</a></div><div class="block-meta"><code>ti:0101-block-expansion-external-mutual-b</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec/0101-block-expansion-external-mutual-b</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">org</span></p></li><li><p><span class="code">noweb</span> = <span class="code">off</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="in">:PROPERTIES:</span>
+<span class="in">:ID:       00000000-0000-0000-0000-00000000f003</span>
+<span class="in">:END:</span>
+#+name: b
+#+begin_src haskell
+hello from b
+&lt;&lt;id:00000000-0000-0000-0000-00000000f002::c&gt;&gt;
+#+end_src</code></pre></div></div><div id="c-83" class="cell-idx"><div class="block-container src" id="b-t:0101-block-expansion-external-mutual"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-t:0101-block-expansion-external-mutual">&#x1F517;</a></div><div class="block-meta"><code>t:0101-block-expansion-external-mutual</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-All-test-cases-b-t:0101-block-expansion-external-mutual" class="internal-link"><span class="verbatim">All test cases</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode">checkExpansion
+  [ <span class="st">&quot;0101-block-expansion-external-mutual-a&quot;</span>,
+    <span class="st">&quot;0101-block-expansion-external-mutual-b&quot;</span>
+  ]
+  [ ( <span class="st">&quot;equations.txt&quot;</span>,
+      T.unlines
+        [ <span class="st">&quot;hello from a&quot;</span>,
+          <span class="st">&quot;hello from b&quot;</span>,
+          <span class="st">&quot;hello from c&quot;</span>
+        ]
+    )
+  ]</code></pre></div></div></div><div id="heading-container-h-4-Testing-framework" class="heading-container"><h2 id="h-4-Testing-framework"><span id="c-84" class="cell-idx"><a href="#h-4-Testing-framework">4&ensp;Testing framework</a></span></h2><p><span id="c-85" class="cell-idx">The testing framework here is modeled closely after <a href="/parse.html#b-module:Lilac.ParseSpec" class="internal-link" id="linkNumber-29">module:Lilac.ParseSpec</a>.</span></p></div><div id="heading-container-h-4.1-Test-module-and-helpers" class="heading-container"><h3 id="h-4.1-Test-module-and-helpers"><span id="c-86" class="cell-idx"><a href="#h-4.1-Test-module-and-helpers">4.1&ensp;Test module and helpers</a></span></h3><div id="c-87" class="cell-idx"><div class="block-container src" id="b-module:Lilac.TangleSpec"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-module:Lilac.TangleSpec">&#x1F517;</a></div><div class="block-meta"><code>module:Lilac.TangleSpec</code><br><code><span class="bold">&#x1F3AF; test/Lilac/TangleSpec.hs</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="kw">module</span> <span class="dt">Lilac.TangleSpec</span> (spec) <span class="kw">where</span>
+
+<span class="kw">import</span> <span class="dt">Data.Text</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">T</span>
+<span class="kw">import</span> <span class="dt">Lilac.Compile</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">LC</span>
+<span class="kw">import</span> <span class="dt">Lilac.Tangle</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">LT</span>
+<span class="kw">import</span> <span class="dt">Lilac.Types</span> (emptyProjectConf)
+<span class="kw">import</span> <span class="dt">Relude</span>
+  ( <span class="dt">Either</span> (<span class="dt">Left</span>, <span class="dt">Right</span>),
+    <span class="dt">FilePath</span>,
+    <span class="dt">Text</span>,
+    first,
+    <span class="fu">fmap</span>,
+    <span class="fu">mempty</span>,
+    <span class="fu">show</span>,
+    (<span class="op">$</span>),
+  )
+<span class="kw">import</span> <span class="dt">System.OsPath</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">P</span>
+<span class="kw">import</span> <span class="dt">Test.Hspec</span> (<span class="dt">Spec</span>, expectationFailure, it, runIO, shouldBe)
+
+<span class="ot">spec ::</span> <span class="dt">Spec</span>
+spec <span class="ot">=</span> <span class="kw">do</span>
+  <a href="#b-All-test-cases" class="internal-link" id="b-module:Lilac.TangleSpec-b-All-test-cases">All test cases</a>
+
+<a href="#b-f:checkExpansion" class="internal-link" id="b-module:Lilac.TangleSpec-b-f:checkExpansion">f:checkExpansion</a></code></pre></div></div><p><span id="c-88" class="cell-idx">The <a href="#b-f:checkExpansion" class="internal-link" id="linkNumber-30">f:checkExpansion</a> function expands all source blocks (found in the collection of Org documents, first converted into a <a href="/compile.html#b-data:Archive" class="internal-link" id="linkNumber-31">data:Archive</a>) and compares them with the expected output.</span></p><div id="c-89" class="cell-idx"><div class="block-container src" id="b-f:checkExpansion"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:checkExpansion">&#x1F517;</a></div><div class="block-meta"><code>f:checkExpansion</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.TangleSpec-b-f:checkExpansion" class="internal-link"><span class="verbatim">module:Lilac.TangleSpec</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">checkExpansion ::</span> [<span class="dt">FilePath</span>] <span class="ot">-&gt;</span> [(<span class="dt">FilePath</span>, <span class="dt">Text</span>)] <span class="ot">-&gt;</span> <span class="dt">Spec</span>
+checkExpansion paths expectedExpansions <span class="ot">=</span> <span class="kw">do</span>
+  pathObjs <span class="ot">&lt;-</span> runIO <span class="op">$</span> LC.readObjectsFrom <span class="st">&quot;test/Lilac/TangleSpec/&quot;</span> paths
+  maybeArchive <span class="ot">&lt;-</span> runIO <span class="op">$</span> LC.mkArchive emptyProjectConf pathObjs
+  <span class="kw">case</span> maybeArchive <span class="kw">of</span>
+    <span class="dt">Left</span> errMsg <span class="ot">-&gt;</span> it <span class="st">&quot;programmer error&quot;</span> <span class="op">$</span> expectationFailure errMsg
+    <span class="dt">Right</span> archive <span class="ot">-&gt;</span> it (<span class="fu">show</span> paths) <span class="op">$</span> <span class="kw">do</span>
+      (<span class="dt">LT</span><span class="op">.</span>expandRootBlocks archive <span class="fu">mempty</span>)
+        <span class="ot">`shouldBe`</span> (<span class="fu">fmap</span> (first P.unsafeEncodeUtf) expectedExpansions)</code></pre></div></div></div><div id="heading-container-h-4.2-All-test-cases" class="heading-container"><h3 id="h-4.2-All-test-cases"><span id="c-90" class="cell-idx"><a href="#h-4.2-All-test-cases">4.2&ensp;All test cases</a></span></h3><p><span id="c-91" class="cell-idx">Below are all of the individual test cases.</span></p><div id="c-92" class="cell-idx"><div class="block-container src" id="b-All-test-cases"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-All-test-cases">&#x1F517;</a></div><div class="block-meta"><code>All test cases</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.TangleSpec-b-All-test-cases" class="internal-link"><span class="verbatim">module:Lilac.TangleSpec</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><a href="#b-t:0101-block-expansion" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion">t:0101-block-expansion</a>
+<a href="#b-t:0101-block-expansion-deeply-nested" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion-deeply-nested">t:0101-block-expansion-deeply-nested</a>
+<a href="#b-t:0101-block-expansion-prefix" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion-prefix">t:0101-block-expansion-prefix</a>
+<a href="#b-t:0101-block-expansion-prefix-nested" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion-prefix-nested">t:0101-block-expansion-prefix-nested</a>
+<a href="#b-t:0101-block-expansion-prefix-nonspace" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion-prefix-nonspace">t:0101-block-expansion-prefix-nonspace</a>
+<a href="#b-t:0101-block-expansion-prefix-nonspace-nested" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion-prefix-nonspace-nested">t:0101-block-expansion-prefix-nonspace-nested</a>
+<a href="#b-t:0101-block-expansion-complex" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion-complex">t:0101-block-expansion-complex</a>
+<a href="#b-t:0101-block-expansion-external" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion-external">t:0101-block-expansion-external</a>
+<a href="#b-t:0101-block-expansion-external-headingchild" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion-external-headingchild">t:0101-block-expansion-external-headingchild</a>
+<a href="#b-t:0101-block-expansion-external-2-hops" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion-external-2-hops">t:0101-block-expansion-external-2-hops</a>
+<a href="#b-t:0101-block-expansion-external-mutual" class="internal-link" id="b-All-test-cases-b-t:0101-block-expansion-external-mutual">t:0101-block-expansion-external-mutual</a>
+<a href="#b-t:lines-unlines-info-loss" class="internal-link" id="b-All-test-cases-b-t:lines-unlines-info-loss">t:lines-unlines-info-loss</a>
+<a href="#b-t:0102-pad-between-consecutive-links" class="internal-link" id="b-All-test-cases-b-t:0102-pad-between-consecutive-links">t:0102-pad-between-consecutive-links</a>
+<a href="#b-t:0102-pad-between-consecutive-links-except-embedded" class="internal-link" id="b-All-test-cases-b-t:0102-pad-between-consecutive-links-except-embedded">t:0102-pad-between-consecutive-links-except-embedded</a>
+<a href="#b-t:0103-shebang" class="internal-link" id="b-All-test-cases-b-t:0103-shebang">t:0103-shebang</a></code></pre></div></div></div><div id="heading-container-h--Page-metrics" class="heading-container page-metrics"><h2 id="h--Page-metrics"><a href="#h--Page-metrics">Page metrics</a></h2></div><div id="heading-container-h--Backlinks" class="heading-container backlinks"><h3 id="h--Backlinks"><a href="#h--Backlinks">Backlinks (11)</a></h3><ol><li><a href="/parse.html">parse.org (7)</a><ol><li><a href="#b-f:expandBlock"><span class="verbatim">f:expandBlock</span> (3)</a><ol><li><a href="/parse.html#c-548">¶ (<span class="verbatim">Cell 548</span>)</a></li><li><a href="/parse.html#c-969">¶ (<span class="verbatim">Cell 969</span>)</a></li><li><a href="/parse.html#c-987">¶ (<span class="verbatim">Cell 987</span>)</a></li></ol></li><li><a href="#b-ti:0102-pad-between-consecutive-links-except-embedded"><span class="verbatim">ti:0102-pad-between-consecutive-links-except-embedded</span> (2)</a><ol><li><a href="/parse.html#c-1037">¶ (<span class="verbatim">Cell 1037</span>)</a></li><li><a href="/parse.html#c-1045">¶ (<span class="verbatim">Cell 1045</span>)</a></li></ol></li><li><a href="#b-t:0101-block-expansion-deeply-nested"><span class="verbatim">t:0101-block-expansion-deeply-nested</span></a><span class="verbatim"> &#x2190; </span><a href="/parse.html#c-969">¶ (<span class="verbatim">Cell 969</span>)</a></li><li><a href="#b-ti:0102-pad-between-consecutive-links"><span class="verbatim">ti:0102-pad-between-consecutive-links</span></a><span class="verbatim"> &#x2190; </span><a href="/parse.html#c-1043">¶ (<span class="verbatim">Cell 1043</span>)</a></li></ol></li><li><a href="/compile.html">compile.org (2)</a><ol><li><a href="#b-f:expandBlock"><span class="verbatim">f:expandBlock</span></a><span class="verbatim"> &#x2190; </span><a href="/compile.html#c-106">¶ (<span class="verbatim">Cell 106</span>)</a></li><li><a href="#b-f:expandRootBlocks"><span class="verbatim">f:expandRootBlocks</span></a><span class="verbatim"> &#x2190; </span><a href="/compile.html#c-42">¶ (<span class="verbatim">Cell 42</span>)</a></li></ol></li><li><a href="/cli.html">cli.org (1)</a><ol><li><a href="#b-f:expandRootBlocks"><span class="verbatim">f:expandRootBlocks</span></a><span class="verbatim"> &#x2190; </span><a href="/cli.html#c-94">¶ (<span class="verbatim">Cell 94</span>)</a></li></ol></li><li><a href="/index.html">index.org (1)</a><ol><li><a href="#top">^ Top</a><span class="verbatim"> &#x2190; </span><a href="/index.html#glossary-c-38--tangle.org-">✿ <span class="verbatim">tangle.org</span></a></li></ol></li></ol></div><div id="heading-container-h--Tangled-files" class="heading-container tangled-blocks"><h3 id="h--Tangled-files"><a href="#h--Tangled-files">Tangled files (20)</a></h3><ol><li><a href="#b-module:Lilac.Tangle" class="verbatim">src/Lilac/Tangle.hs</a></li><li><a href="#b-module:Lilac.TangleSpec" class="verbatim">test/Lilac/TangleSpec.hs</a></li><li><a href="#b-ti:0101-block-expansion" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion</a></li><li><a href="#b-ti:0101-block-expansion-complex" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-complex</a></li><li><a href="#b-ti:0101-block-expansion-deeply-nested" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-deeply-nested</a></li><li><a href="#b-ti:0101-block-expansion-external-2-hops-middleman" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-external-2-hops-middleman</a></li><li><a href="#b-ti:0101-block-expansion-external-2-hops-parent" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-external-2-hops-parent</a></li><li><a href="#b-ti:0101-block-expansion-external-child" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-external-child</a></li><li><a href="#b-ti:0101-block-expansion-external-headingchild" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-external-headingchild</a></li><li><a href="#b-ti:0101-block-expansion-external-headingchild-parent" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-external-headingchild-parent</a></li><li><a href="#b-ti:0101-block-expansion-external-mutual-a" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-external-mutual-a</a></li><li><a href="#b-ti:0101-block-expansion-external-mutual-b" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-external-mutual-b</a></li><li><a href="#b-ti:0101-block-expansion-external-parent" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-external-parent</a></li><li><a href="#b-ti:0101-block-expansion-prefix" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-prefix</a></li><li><a href="#b-ti:0101-block-expansion-prefix-nested" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-prefix-nested</a></li><li><a href="#b-ti:0101-block-expansion-prefix-nonspace" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-prefix-nonspace</a></li><li><a href="#b-ti:0101-block-expansion-prefix-nonspace-nested" class="verbatim">test/Lilac/TangleSpec/0101-block-expansion-prefix-nonspace-nested</a></li><li><a href="#b-ti:0102-pad-between-consecutive-links" class="verbatim">test/Lilac/TangleSpec/0102-pad-between-consecutive-links</a></li><li><a href="#b-ti:0102-pad-between-consecutive-links-except-embedded" class="verbatim">test/Lilac/TangleSpec/0102-pad-between-consecutive-links-except-embedded</a></li><li><a href="#b-ti:0103-shebang" class="verbatim">test/Lilac/TangleSpec/0103-shebang</a></li></ol></div><div id="heading-container-h--Named-cells" class="heading-container named-cells"><h3 id="h--Named-cells"><a href="#h--Named-cells">Named cells (43)</a></h3><ol><li><a href="#b-All-test-cases"><span class="verbatim">All test cases</span></a></li><li><a href="#b-f:checkExpansion"><span class="verbatim">f:checkExpansion</span></a></li><li><a href="#b-f:expandBlock"><span class="verbatim">f:expandBlock</span></a></li><li><a href="#b-f:expandRootBlock"><span class="verbatim">f:expandRootBlock</span></a></li><li><a href="#b-f:expandRootBlocks"><span class="verbatim">f:expandRootBlocks</span></a></li><li><a href="#b-f:getPrefix"><span class="verbatim">f:getPrefix</span></a></li><li><a href="#b-f:prefixTailLines"><span class="verbatim">f:prefixTailLines</span></a></li><li><a href="#b-f:prependExistingPrefix"><span class="verbatim">f:prependExistingPrefix</span></a></li><li><a href="#b-module:Lilac.Tangle"><span class="verbatim">module:Lilac.Tangle</span></a></li><li><a href="#b-module:Lilac.TangleSpec"><span class="verbatim">module:Lilac.TangleSpec</span></a></li><li><a href="#b-t:0101-block-expansion"><span class="verbatim">t:0101-block-expansion</span></a></li><li><a href="#b-t:0101-block-expansion-complex"><span class="verbatim">t:0101-block-expansion-complex</span></a></li><li><a href="#b-t:0101-block-expansion-deeply-nested"><span class="verbatim">t:0101-block-expansion-deeply-nested</span></a></li><li><a href="#b-t:0101-block-expansion-external"><span class="verbatim">t:0101-block-expansion-external</span></a></li><li><a href="#b-t:0101-block-expansion-external-2-hops"><span class="verbatim">t:0101-block-expansion-external-2-hops</span></a></li><li><a href="#b-t:0101-block-expansion-external-headingchild"><span class="verbatim">t:0101-block-expansion-external-headingchild</span></a></li><li><a href="#b-t:0101-block-expansion-external-mutual"><span class="verbatim">t:0101-block-expansion-external-mutual</span></a></li><li><a href="#b-t:0101-block-expansion-prefix"><span class="verbatim">t:0101-block-expansion-prefix</span></a></li><li><a href="#b-t:0101-block-expansion-prefix-nested"><span class="verbatim">t:0101-block-expansion-prefix-nested</span></a></li><li><a href="#b-t:0101-block-expansion-prefix-nonspace"><span class="verbatim">t:0101-block-expansion-prefix-nonspace</span></a></li><li><a href="#b-t:0101-block-expansion-prefix-nonspace-nested"><span class="verbatim">t:0101-block-expansion-prefix-nonspace-nested</span></a></li><li><a href="#b-t:0102-pad-between-consecutive-links"><span class="verbatim">t:0102-pad-between-consecutive-links</span></a></li><li><a href="#b-t:0102-pad-between-consecutive-links-except-embedded"><span class="verbatim">t:0102-pad-between-consecutive-links-except-embedded</span></a></li><li><a href="#b-t:0103-shebang"><span class="verbatim">t:0103-shebang</span></a></li><li><a href="#b-t:lines-unlines-info-loss"><span class="verbatim">t:lines-unlines-info-loss</span></a></li><li><a href="#b-ti:0101-block-expansion"><span class="verbatim">ti:0101-block-expansion</span></a></li><li><a href="#b-ti:0101-block-expansion-complex"><span class="verbatim">ti:0101-block-expansion-complex</span></a></li><li><a href="#b-ti:0101-block-expansion-deeply-nested"><span class="verbatim">ti:0101-block-expansion-deeply-nested</span></a></li><li><a href="#b-ti:0101-block-expansion-external-2-hops-middleman"><span class="verbatim">ti:0101-block-expansion-external-2-hops-middleman</span></a></li><li><a href="#b-ti:0101-block-expansion-external-2-hops-parent"><span class="verbatim">ti:0101-block-expansion-external-2-hops-parent</span></a></li><li><a href="#b-ti:0101-block-expansion-external-child"><span class="verbatim">ti:0101-block-expansion-external-child</span></a></li><li><a href="#b-ti:0101-block-expansion-external-headingchild"><span class="verbatim">ti:0101-block-expansion-external-headingchild</span></a></li><li><a href="#b-ti:0101-block-expansion-external-headingchild-parent"><span class="verbatim">ti:0101-block-expansion-external-headingchild-parent</span></a></li><li><a href="#b-ti:0101-block-expansion-external-mutual-a"><span class="verbatim">ti:0101-block-expansion-external-mutual-a</span></a></li><li><a href="#b-ti:0101-block-expansion-external-mutual-b"><span class="verbatim">ti:0101-block-expansion-external-mutual-b</span></a></li><li><a href="#b-ti:0101-block-expansion-external-parent"><span class="verbatim">ti:0101-block-expansion-external-parent</span></a></li><li><a href="#b-ti:0101-block-expansion-prefix"><span class="verbatim">ti:0101-block-expansion-prefix</span></a></li><li><a href="#b-ti:0101-block-expansion-prefix-nested"><span class="verbatim">ti:0101-block-expansion-prefix-nested</span></a></li><li><a href="#b-ti:0101-block-expansion-prefix-nonspace"><span class="verbatim">ti:0101-block-expansion-prefix-nonspace</span></a></li><li><a href="#b-ti:0101-block-expansion-prefix-nonspace-nested"><span class="verbatim">ti:0101-block-expansion-prefix-nonspace-nested</span></a></li><li><a href="#b-ti:0102-pad-between-consecutive-links"><span class="verbatim">ti:0102-pad-between-consecutive-links</span></a></li><li><a href="#b-ti:0102-pad-between-consecutive-links-except-embedded"><span class="verbatim">ti:0102-pad-between-consecutive-links-except-embedded</span></a></li><li><a href="#b-ti:0103-shebang"><span class="verbatim">ti:0103-shebang</span></a></li></ol></div><footer><div class="lilac-stamp">Generated by <a href="https://lilac.funloop.org" class="external-link" target="_blank" rel="noopener noreferrer">Lilac</a></div></footer></main><script id="heading-ancestry" type="application/json">{"h--Backlinks":["h--Page-metrics"],"h--Named-cells":["h--Page-metrics"],"h--Page-metrics":[],"h--Tangled-files":["h--Page-metrics"],"h-1-Overview":[],"h-2-Lilac.Tangle-module":[],"h-3-Tangling-algorithm":[],"h-3.1-Block-expansion":["h-3-Tangling-algorithm"],"h-3.2-Tests":["h-3-Tangling-algorithm"],"h-4-Testing-framework":[],"h-4.1-Test-module-and-helpers":["h-4-Testing-framework"],"h-4.2-All-test-cases":["h-4-Testing-framework"]}</script><script id="lilac-fe-script" src="/js/lilac.js"></script></body></html>

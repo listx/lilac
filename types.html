@@ -1,0 +1,359 @@
+<!DOCTYPE HTML><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Types</title><link rel="stylesheet" href="/css/default.css"><link rel="shortcut icon" type="image/png" href="/favicon.png"><link rel="stylesheet" href="/vendor/source-fonts/source-fonts.css">
+<script>
+  window.MathJax = {
+      loader: { paths: { "mathjax-newcm": "/vendor/mathjax-newcm-font" } },
+      output: { font: "mathjax-newcm" },
+  tex: {
+      tags: 'ams'
+  },
+  options: {
+      ignoreHtmlClass: 'verbatim|code'
+  }
+};
+</script>
+<script id="MathJax-script" async="" src="/vendor/mathjax/tex-mml-chtml.js"></script>
+</head><body><div class="navbar"><button id="hamburger" class="tocs-toggle-button" aria-label="Toggle table of contents sidebar">&#x2630;</button><div class="breadcrumbs"><a href="https://lilac.funloop.org"><span class="breadcrumb">Lilac</span></a> 0.2.0.3 <span class="breadcrumb-separator">/</span> <a href="#top"><span class="breadcrumb">types.org</span></a></div></div><nav id="tocs"><p class="widget-title gtoc-title">Site contents</p><nav class="gtoc"><ul><li><a href="/index.html">Introduction</a></li><li><a href="/cli.html">CLI</a></li><li><a href="/build.html">Build and development environment</a></li><li><a href="/parse.html">Parse</a></li><li><a href="/compile.html">Compile</a></li><li><a href="/types.html" class="bold">Types</a></li><li><a href="/tangle.html">Tangle</a></li><li><a href="/weave.html">Weave</a></li><li><a href="/fe.html">Frontend</a></li><li><a href="/serve.html">Serve</a></li><li><a href="/user-manual.html">User Manual</a></li><li><a href="/plan.html">Plan</a></li><li><a href="/design/index.html">Design Docs</a></li><li><a href="/release-notes.html">Release Notes</a></li></ul></nav><p class="widget-title toc-title">Page contents</p><nav class="toc"><div class="toc-entries"><ol><li class="toc-level-1"><div class="toc-entry"><span class="toc-counter">1</span><a href="#h-1-Lilac.Types-module"><span class="verbatim">Lilac.Types</span> module</a></div><ol><li class="toc-level-2"><div class="toc-entry"><span class="toc-counter">1.1</span><a href="#h-1.1-Lilac.Types.Internal-module"><span class="verbatim">Lilac.Types.Internal</span> module</a></div></li></ol></li><li class="toc-level-1"><div class="toc-entry"><span class="toc-counter">2</span><a href="#h-2-Miscellaneous-helpers">Miscellaneous helpers</a></div><ol><li class="toc-level-2"><div class="toc-entry"><span class="toc-counter">2.1</span><a href="#h-2.1-Org-ID--OID-">Org ID (OID)</a></div></li><li class="toc-level-2"><div class="toc-entry"><span class="toc-counter">2.2</span><a href="#h-2.2-GPath--an-OsPath-wrapper"><span class="code">GPath</span>, an <span class="code">OsPath</span> wrapper</a></div><ol><li class="toc-level-3"><div class="toc-entry"><span class="toc-counter">2.2.1</span><a href="#h-2.2.1-Succinct-construction">Succinct construction</a></div></li></ol></li><li class="toc-level-2"><div class="toc-entry"><span class="toc-counter">2.3</span><a href="#h-2.3-Protocols">Protocols</a></div></li><li class="toc-level-2"><div class="toc-entry"><span class="toc-counter">2.4</span><a href="#h-2.4-Marking-characters">Marking characters</a></div></li></ol></li><li class="toc-level-1"><div class="toc-entry"><a href="#h--Page-metrics">Page metrics</a></div><ol><li class="toc-level-2"><div class="toc-entry"><a href="#h--Backlinks">Backlinks</a></div></li><li class="toc-level-2"><div class="toc-entry"><a href="#h--Tangled-files">Tangled files</a></div></li><li class="toc-level-2"><div class="toc-entry"><a href="#h--Named-cells">Named cells</a></div></li></ol></li></ol></div></nav></nav><main><h1 id="top">Types</h1><hr class="title-underline"><p><span id="c-0" class="cell-idx">We define the types we use in one place.</span></p><div id="heading-container-h-1-Lilac.Types-module" class="heading-container"><h2 id="h-1-Lilac.Types-module"><span id="c-1" class="cell-idx"><a href="#h-1-Lilac.Types-module">1&ensp;<span class="verbatim">Lilac.Types</span> module</a></span></h2><p><span id="c-2" class="cell-idx">This module defines the core types and some helper functions (those named with a <span class="code">default*</span> prefix). Most of the discussions of the actual types themselves are done in <a href="/parse.html#h-1-Overview" class="internal-link" id="linkNumber-1">the Org parser</a>, because that module requires these types to perform the parsing (and it is in this capacity that most of these types first come into existence in the system). For this reason, many of the blocks are defined (and discussed) there.</span></p><div id="c-3" class="cell-idx"><div class="block-container src" id="b-module:Lilac.Types"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-module:Lilac.Types">&#x1F517;</a></div><div class="block-meta"><code>module:Lilac.Types</code><br><code><span class="bold">&#x1F3AF; src/Lilac/Types.hs</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="kw">module</span> <span class="dt">Lilac.Types</span>
+  ( <span class="dt">Archive</span> (<span class="op">..</span>),
+    <span class="dt">ArchiveOpts</span> (<span class="op">..</span>),
+    <span class="dt">Block</span> (<span class="op">..</span>),
+    <span class="dt">BToken</span> (<span class="op">..</span>),
+    <span class="dt">Cell</span> (<span class="op">..</span>),
+    <span class="dt">Citation</span> (<span class="op">..</span>),
+    <span class="dt">Cite</span> (<span class="op">..</span>),
+    <span class="dt">Command</span> (<span class="op">..</span>),
+    <span class="dt">CompileOpts</span> (<span class="op">..</span>),
+    <span class="dt">Figure</span> (<span class="op">..</span>),
+    <span class="dt">Footnote</span> (<span class="op">..</span>),
+    <span class="dt">GCI</span> (<span class="op">..</span>),
+    <span class="dt">GlobalOpts</span> (<span class="op">..</span>),
+    <span class="dt">GPath</span>,
+    <span class="dt">GTOC</span> (<span class="op">..</span>),
+    <span class="dt">GlossaryTerm</span> (<span class="op">..</span>),
+    <span class="dt">Heading</span> (<span class="op">..</span>),
+    <span class="dt">HtmlHead</span> (<span class="op">..</span>),
+    <span class="dt">InitOpts</span> (<span class="op">..</span>),
+    <span class="dt">LCI</span> (<span class="op">..</span>),
+    <span class="dt">Level</span> (<span class="op">..</span>),
+    <span class="dt">Link</span> (<span class="op">..</span>),
+    <span class="dt">LinkOid</span> (<span class="op">..</span>),
+    <span class="dt">LinkTarget</span> (<span class="op">..</span>),
+    <span class="dt">LintOpts</span> (<span class="op">..</span>),
+    <span class="dt">ListMarker</span> (<span class="op">..</span>),
+    <span class="dt">MathFragment</span> (<span class="op">..</span>),
+    <span class="dt">Object</span> (<span class="op">..</span>),
+    <span class="dt">OID</span> (<span class="op">..</span>),
+    <span class="dt">OrgDoc</span> (<span class="op">..</span>),
+    <span class="dt">OrgParser</span>,
+    <span class="dt">OrgParserConf</span> (<span class="op">..</span>),
+    <span class="dt">OrgParserState</span> (<span class="op">..</span>),
+    <span class="dt">PToken</span> (<span class="op">..</span>),
+    <span class="dt">ProjectConf</span> (<span class="op">..</span>),
+    <span class="dt">Prose</span> (<span class="op">..</span>),
+    <span class="dt">PseudoEdge</span> (<span class="op">..</span>),
+    <span class="dt">RawProjectConf</span> (<span class="op">..</span>),
+    <span class="dt">RichBlock</span> (<span class="op">..</span>),
+    <span class="dt">RichBlockDelimiter</span> (<span class="op">..</span>),
+    <span class="dt">ServeOpts</span> (<span class="op">..</span>),
+    <span class="dt">Subcommand</span> (<span class="op">..</span>),
+    <span class="dt">Style</span> (<span class="op">..</span>),
+    <span class="dt">StyleMask</span> (<span class="op">..</span>),
+    <span class="dt">StyledText</span> (<span class="op">..</span>),
+    <span class="dt">Table</span> (<span class="op">..</span>),
+    <span class="dt">TangleOpts</span> (<span class="op">..</span>),
+    <span class="dt">TextAlign</span> (<span class="op">..</span>),
+    <span class="dt">WeaveConf</span> (<span class="op">..</span>),
+    <span class="dt">WeaveOpts</span> (<span class="op">..</span>),
+    decodeGPath,
+    defaultOrgParserConf,
+    defaultOrgParserState,
+    emptyGPath,
+    emptyProjectConf,
+    encodeGPath,
+    Lilac.Types.fromText,
+    fromWords,
+    gciToObjCell,
+    gciToObjPath,
+    getBlock,
+    getCellName,
+    getNamedCells,
+    getProseContents,
+    getSectionNumber,
+    getTangled,
+    getTangledBlocks,
+    isTextAlignMarker,
+    markingChars,
+    markingCharsInvisible,
+    nilOid,
+    nilOidOrgDocPrefix,
+    protocolsEmacs,
+    protocolsWeb,
+    ptext,
+    stext,
+    stripLinks,
+    stripStyles,
+    styleMaskFrom,
+  )
+<span class="kw">where</span>
+
+<span class="kw">import</span> <span class="dt">Citeproc</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">CP</span>
+<span class="kw">import</span> <span class="dt">Citeproc.CslJson</span> (<span class="dt">CslJson</span>)
+<span class="kw">import</span> <span class="dt">Data.Aeson</span>
+  ( <span class="dt">FromJSON</span>,
+    <span class="dt">FromJSONKey</span>,
+    <span class="dt">FromJSONKeyFunction</span> (<span class="dt">FromJSONKeyTextParser</span>),
+    <span class="dt">ToJSON</span>,
+    <span class="dt">ToJSONKey</span>,
+    fromJSONKey,
+    parseJSON,
+    toJSON,
+    toJSONKey,
+  )
+<span class="kw">import</span> <span class="dt">Data.Aeson.Types</span>
+  ( <span class="dt">Parser</span>,
+    <span class="dt">Value</span> (<span class="dt">String</span>),
+    toJSONKeyText,
+    withText,
+  )
+<span class="kw">import</span> <span class="dt">Data.Bits</span> (setBit)
+<span class="kw">import</span> <span class="dt">Data.Bits.Bitwise</span> (toListLE)
+<span class="kw">import</span> <span class="dt">Data.IntMap.Strict</span> (<span class="dt">IntMap</span>)
+<span class="kw">import</span> <span class="dt">Data.IntMap.Strict</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">IntMap</span>
+<span class="kw">import</span> <span class="dt">Data.Map.Strict</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">M</span>
+<span class="kw">import</span> <span class="dt">Data.Set</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">Set</span>
+<span class="kw">import</span> <span class="dt">Data.Text</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">T</span>
+<span class="kw">import</span> <span class="dt">Data.Tree</span> (<span class="dt">Tree</span>)
+<span class="kw">import</span> <span class="dt">Data.UUID</span> (<span class="dt">UUID</span>, fromText, fromWords64)
+<span class="kw">import</span> <span class="dt">GHC.Generics</span> (<span class="dt">Generic</span>)
+<span class="kw">import</span> <span class="dt">Lilac.Types.Internal</span> (<span class="dt">GPath</span> (<span class="dt">GPath</span>))
+<span class="kw">import</span> <span class="dt">Network.URI</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">N</span>
+<span class="kw">import</span> <span class="dt">Relude</span>
+  ( <span class="dt">Bool</span> (<span class="dt">False</span>, <span class="dt">True</span>),
+    <span class="dt">Char</span>,
+    <span class="dt">Enum</span>,
+    <span class="dt">Eq</span>,
+    <span class="dt">FilePath</span>,
+    <span class="dt">Hashable</span>,
+    <span class="dt">Identity</span>,
+    <span class="dt">Int</span>,
+    <span class="dt">Map</span>,
+    <span class="dt">Maybe</span> (<span class="dt">Just</span>, <span class="dt">Nothing</span>),
+    <span class="dt">MonadFail</span>,
+    <span class="dt">Monoid</span>,
+    <span class="dt">Ord</span>,
+    <span class="dt">Semigroup</span>,
+    <span class="dt">Set</span>,
+    <span class="dt">Show</span>,
+    <span class="dt">StateT</span>,
+    <span class="dt">Text</span>,
+    <span class="dt">Type</span>,
+    <span class="dt">Void</span>,
+    <span class="dt">Word64</span>,
+    <span class="dt">Word8</span>,
+    <span class="fu">abs</span>,
+    catMaybes,
+    <span class="fu">concatMap</span>,
+    <span class="fu">fail</span>,
+    foldl&#39;,
+    <span class="fu">fromEnum</span>,
+    <span class="fu">map</span>,
+    mapMaybe,
+    <span class="fu">maybe</span>,
+    <span class="fu">mempty</span>,
+    <span class="fu">otherwise</span>,
+    <span class="fu">pure</span>,
+    <span class="fu">reverse</span>,
+    <span class="fu">show</span>,
+    <span class="fu">sort</span>,
+    <span class="fu">toEnum</span>,
+    <span class="fu">zip</span>,
+    (<span class="op">!!?</span>),
+    (<span class="op">$</span>),
+    (<span class="op">-</span>),
+    (<span class="op">.</span>),
+    (<span class="op">/=</span>),
+    (<span class="op">&lt;</span>),
+    (<span class="op">&lt;&gt;</span>),
+    (<span class="op">&gt;</span>),
+  )
+<span class="kw">import</span> <span class="dt">Relude.Extra.Map</span> (keys, lookup)
+<span class="kw">import</span> <span class="dt">System.OsPath</span> (<span class="dt">OsPath</span>)
+<span class="kw">import</span> <span class="dt">System.OsPath</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">P</span>
+<span class="kw">import</span> <span class="dt">Text.Megaparsec</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">MP</span>
+<span class="kw">import</span> <span class="dt">Toml.Schema</span>
+  ( <span class="dt">FromValue</span>,
+    <span class="dt">GenericTomlTable</span> (<span class="dt">GenericTomlTable</span>),
+    <span class="dt">ToTable</span>,
+    <span class="dt">ToValue</span>,
+  )
+<span class="kw">import</span> <span class="dt">Prelude</span> <span class="kw">qualified</span> (show)
+
+<a href="/parse.html#b-data:BToken" class="internal-link" id="b-module:Lilac.Types-b-data:BToken">data:BToken</a>
+<a href="/parse.html#b-data:Block" class="internal-link" id="b-module:Lilac.Types-b-data:Block">data:Block</a>
+<a href="/parse.html#b-data:RichBlock" class="internal-link" id="b-module:Lilac.Types-b-data:RichBlock">data:RichBlock</a>
+<a href="/parse.html#b-data:RichBlockDelimiter" class="internal-link" id="b-module:Lilac.Types-b-data:RichBlockDelimiter">data:RichBlockDelimiter</a>
+<a href="/parse.html#b-data:Cell" class="internal-link" id="b-module:Lilac.Types-b-data:Cell">data:Cell</a>
+<a href="/weave.html#b-f:getTangledBlocks" class="internal-link" id="b-module:Lilac.Types-b-f:getTangledBlocks">f:getTangledBlocks</a>
+<a href="/weave.html#b-f:getBlock" class="internal-link" id="b-module:Lilac.Types-b-f:getBlock">f:getBlock</a>
+<a href="/weave.html#b-f:getTangled" class="internal-link" id="b-module:Lilac.Types-b-f:getTangled">f:getTangled</a>
+<a href="/weave.html#b-f:getNamedCells" class="internal-link" id="b-module:Lilac.Types-b-f:getNamedCells">f:getNamedCells</a>
+<a href="/parse.html#b-data:Command" class="internal-link" id="b-module:Lilac.Types-b-data:Command">data:Command</a>
+<a href="/parse.html#b-data:Figure" class="internal-link" id="b-module:Lilac.Types-b-data:Figure">data:Figure</a>
+<a href="/parse.html#b-data:Heading" class="internal-link" id="b-module:Lilac.Types-b-data:Heading">data:Heading</a>
+<a href="/weave.html#b-f:getProseContents" class="internal-link" id="b-module:Lilac.Types-b-f:getProseContents">f:getProseContents</a>
+<a href="/weave.html#b-f:getSectionNumber" class="internal-link" id="b-module:Lilac.Types-b-f:getSectionNumber">f:getSectionNumber</a>
+<a href="/parse.html#b-data:Level" class="internal-link" id="b-module:Lilac.Types-b-data:Level">data:Level</a>
+<a href="/parse.html#b-data:Link" class="internal-link" id="b-module:Lilac.Types-b-data:Link">data:Link</a>
+<a href="/parse.html#b-data:LinkOid" class="internal-link" id="b-module:Lilac.Types-b-data:LinkOid">data:LinkOid</a>
+<a href="/compile.html#b-instance:ToJSON-LinkOid" class="internal-link" id="b-module:Lilac.Types-b-instance:ToJSON-LinkOid">instance:ToJSON LinkOid</a>
+<a href="/compile.html#b-instance:ToJSONKey-LinkOid" class="internal-link" id="b-module:Lilac.Types-b-instance:ToJSONKey-LinkOid">instance:ToJSONKey LinkOid</a>
+<a href="/compile.html#b-instance:FromJSON-LinkOid" class="internal-link" id="b-module:Lilac.Types-b-instance:FromJSON-LinkOid">instance:FromJSON LinkOid</a>
+<a href="/compile.html#b-instance:FromJSONKey-LinkOid" class="internal-link" id="b-module:Lilac.Types-b-instance:FromJSONKey-LinkOid">instance:FromJSONKey LinkOid</a>
+<a href="/parse.html#b-instance:Show-LinkOid" class="internal-link" id="b-module:Lilac.Types-b-instance:Show-LinkOid">instance:Show LinkOid</a>
+<a href="/compile.html#b-f:parseJSONLinkOid" class="internal-link" id="b-module:Lilac.Types-b-f:parseJSONLinkOid">f:parseJSONLinkOid</a>
+<a href="/parse.html#b-data:LinkTarget" class="internal-link" id="b-module:Lilac.Types-b-data:LinkTarget">data:LinkTarget</a>
+<a href="/parse.html#b-data:ListMarker" class="internal-link" id="b-module:Lilac.Types-b-data:ListMarker">data:ListMarker</a>
+<a href="/parse.html#b-data:MathFragment" class="internal-link" id="b-module:Lilac.Types-b-data:MathFragment">data:MathFragment</a>
+<a href="/parse.html#b-data:OrgDoc" class="internal-link" id="b-module:Lilac.Types-b-data:OrgDoc">data:OrgDoc</a>
+<a href="/parse.html#b-newtype:LCI" class="internal-link" id="b-module:Lilac.Types-b-newtype:LCI">newtype:LCI</a>
+<a href="/parse.html#b-data:OrgParserConf" class="internal-link" id="b-module:Lilac.Types-b-data:OrgParserConf">data:OrgParserConf</a>
+<a href="/parse.html#b-f:defaultOrgParserConf" class="internal-link" id="b-module:Lilac.Types-b-f:defaultOrgParserConf">f:defaultOrgParserConf</a>
+<a href="/parse.html#b-data:OrgParserState" class="internal-link" id="b-module:Lilac.Types-b-data:OrgParserState">data:OrgParserState</a>
+<a href="/parse.html#b-f:defaultOrgParserState" class="internal-link" id="b-module:Lilac.Types-b-f:defaultOrgParserState">f:defaultOrgParserState</a>
+<a href="/parse.html#b-newtype:Prose" class="internal-link" id="b-module:Lilac.Types-b-newtype:Prose">newtype:Prose</a>
+<a href="/parse.html#b-instance:Semigroup-Prose" class="internal-link" id="b-module:Lilac.Types-b-instance:Semigroup-Prose">instance:Semigroup Prose</a>
+<a href="/parse.html#b-instance:Monoid-Prose" class="internal-link" id="b-module:Lilac.Types-b-instance:Monoid-Prose">instance:Monoid Prose</a>
+<a href="/parse.html#b-data:PToken" class="internal-link" id="b-module:Lilac.Types-b-data:PToken">data:PToken</a>
+<a href="/parse.html#b-data:Style" class="internal-link" id="b-module:Lilac.Types-b-data:Style">data:Style</a>
+<a href="/parse.html#b-data:StyledText" class="internal-link" id="b-module:Lilac.Types-b-data:StyledText">data:StyledText</a>
+<a href="/parse.html#b-f:stext" class="internal-link" id="b-module:Lilac.Types-b-f:stext">f:stext</a>
+<a href="/parse.html#b-f:ptext" class="internal-link" id="b-module:Lilac.Types-b-f:ptext">f:ptext</a>
+<a href="/parse.html#b-data:Table" class="internal-link" id="b-module:Lilac.Types-b-data:Table">data:Table</a>
+<a href="/parse.html#b-data:TextAlign" class="internal-link" id="b-module:Lilac.Types-b-data:TextAlign">data:TextAlign</a>
+<a href="/parse.html#b-f:isTextAlignMarker" class="internal-link" id="b-module:Lilac.Types-b-f:isTextAlignMarker">f:isTextAlignMarker</a>
+<a href="/parse.html#b-instance:Show-Stylemask" class="internal-link" id="b-module:Lilac.Types-b-instance:Show-Stylemask">instance:Show Stylemask</a>
+<a href="/parse.html#b-newtype:StyleMask" class="internal-link" id="b-module:Lilac.Types-b-newtype:StyleMask">newtype:StyleMask</a>
+<a href="/parse.html#b-f:styleMaskFrom" class="internal-link" id="b-module:Lilac.Types-b-f:styleMaskFrom">f:styleMaskFrom</a>
+<a href="/parse.html#b-data:Footnote" class="internal-link" id="b-module:Lilac.Types-b-data:Footnote">data:Footnote</a>
+<a href="/parse.html#b-data:GlossaryTerm" class="internal-link" id="b-module:Lilac.Types-b-data:GlossaryTerm">data:GlossaryTerm</a>
+<a href="/parse.html#b-data:Citation" class="internal-link" id="b-module:Lilac.Types-b-data:Citation">data:Citation</a>
+<a href="/parse.html#b-data:Cite" class="internal-link" id="b-module:Lilac.Types-b-data:Cite">data:Cite</a>
+
+<a href="/parse.html#b-newtype:OID" class="internal-link" id="b-module:Lilac.Types-b-newtype:OID">newtype:OID</a>
+<a href="#b-instance:Show-OID" class="internal-link" id="b-module:Lilac.Types-b-instance:Show-OID">instance:Show OID</a>
+<a href="#b-f:nilOid" class="internal-link" id="b-module:Lilac.Types-b-f:nilOid">f:nilOid</a>
+<a href="/parse.html#b-f:nilOidOrgDocPrefix" class="internal-link" id="b-module:Lilac.Types-b-f:nilOidOrgDocPrefix">f:nilOidOrgDocPrefix</a>
+<a href="#b-f:fromWords" class="internal-link" id="b-module:Lilac.Types-b-f:fromWords">f:fromWords</a>
+<a href="#b-f:fromText" class="internal-link" id="b-module:Lilac.Types-b-f:fromText">f:fromText</a>
+
+<a href="/parse.html#b-newtype:PseudoEdge" class="internal-link" id="b-module:Lilac.Types-b-newtype:PseudoEdge">newtype:PseudoEdge</a>
+
+<a href="/parse.html#b-type:OrgParser" class="internal-link" id="b-module:Lilac.Types-b-type:OrgParser">type:OrgParser</a>
+
+<a href="#b-f:encodeGPath" class="internal-link" id="b-module:Lilac.Types-b-f:encodeGPath">f:encodeGPath</a>
+<a href="#b-f:decodeGPath" class="internal-link" id="b-module:Lilac.Types-b-f:decodeGPath">f:decodeGPath</a>
+<a href="#b-f:emptyGPath" class="internal-link" id="b-module:Lilac.Types-b-f:emptyGPath">f:emptyGPath</a>
+
+<a href="#b-f:protocolsEmacs" class="internal-link" id="b-module:Lilac.Types-b-f:protocolsEmacs">f:protocolsEmacs</a>
+<a href="#b-f:protocolsWeb" class="internal-link" id="b-module:Lilac.Types-b-f:protocolsWeb">f:protocolsWeb</a>
+
+<a href="/weave.html#b-data:WeaveConf" class="internal-link" id="b-module:Lilac.Types-b-data:WeaveConf">data:WeaveConf</a>
+
+<a href="/compile.html#b-data:Object" class="internal-link" id="b-module:Lilac.Types-b-data:Object">data:Object</a>
+<a href="/compile.html#b-data:Archive" class="internal-link" id="b-module:Lilac.Types-b-data:Archive">data:Archive</a>
+<a href="/compile.html#b-newtype:GCI" class="internal-link" id="b-module:Lilac.Types-b-newtype:GCI">newtype:GCI</a>
+<a href="/compile.html#b-f:gciToObjCell" class="internal-link" id="b-module:Lilac.Types-b-f:gciToObjCell">f:gciToObjCell</a>
+<a href="/compile.html#b-f:gciToObjPath" class="internal-link" id="b-module:Lilac.Types-b-f:gciToObjPath">f:gciToObjPath</a>
+<a href="/compile.html#b-f:stripLinks" class="internal-link" id="b-module:Lilac.Types-b-f:stripLinks">f:stripLinks</a>
+<a href="/compile.html#b-f:stripStyles" class="internal-link" id="b-module:Lilac.Types-b-f:stripStyles">f:stripStyles</a>
+<a href="/compile.html#b-f:getCellName" class="internal-link" id="b-module:Lilac.Types-b-f:getCellName">f:getCellName</a>
+<a href="/compile.html#b-newtype:GTOC" class="internal-link" id="b-module:Lilac.Types-b-newtype:GTOC">newtype:GTOC</a>
+
+<a href="/cli.html#b-data:ProjectConf" class="internal-link" id="b-module:Lilac.Types-b-data:ProjectConf">data:ProjectConf</a>
+<a href="/cli.html#b-data:HtmlHead" class="internal-link" id="b-module:Lilac.Types-b-data:HtmlHead">data:HtmlHead</a>
+<a href="/cli.html#b-data:RawProjectConf" class="internal-link" id="b-module:Lilac.Types-b-data:RawProjectConf">data:RawProjectConf</a>
+<a href="/cli.html#b-f:emptyProjectConf" class="internal-link" id="b-module:Lilac.Types-b-f:emptyProjectConf">f:emptyProjectConf</a>
+<a href="/cli.html#b-data:GlobalOpts" class="internal-link" id="b-module:Lilac.Types-b-data:GlobalOpts">data:GlobalOpts</a>
+<a href="/cli.html#b-data:Subcommand" class="internal-link" id="b-module:Lilac.Types-b-data:Subcommand">data:Subcommand</a>
+<a href="/cli.html#b-data:ArchiveOpts" class="internal-link" id="b-module:Lilac.Types-b-data:ArchiveOpts">data:ArchiveOpts</a>
+<a href="/cli.html#b-data:CompileOpts" class="internal-link" id="b-module:Lilac.Types-b-data:CompileOpts">data:CompileOpts</a>
+<a href="/cli.html#b-data:LintOpts" class="internal-link" id="b-module:Lilac.Types-b-data:LintOpts">data:LintOpts</a>
+<a href="/cli.html#b-data:ServeOpts" class="internal-link" id="b-module:Lilac.Types-b-data:ServeOpts">data:ServeOpts</a>
+<a href="/cli.html#b-data:TangleOpts" class="internal-link" id="b-module:Lilac.Types-b-data:TangleOpts">data:TangleOpts</a>
+<a href="/cli.html#b-data:WeaveOpts" class="internal-link" id="b-module:Lilac.Types-b-data:WeaveOpts">data:WeaveOpts</a>
+<a href="/cli.html#b-data:InitOpts" class="internal-link" id="b-module:Lilac.Types-b-data:InitOpts">data:InitOpts</a>
+
+<a href="#b-f:markingChars" class="internal-link" id="b-module:Lilac.Types-b-f:markingChars">f:markingChars</a>
+<a href="#b-f:markingCharsInvisible" class="internal-link" id="b-module:Lilac.Types-b-f:markingCharsInvisible">f:markingCharsInvisible</a></code></pre></div></div></div><div id="heading-container-h-1.1-Lilac.Types.Internal-module" class="heading-container"><h3 id="h-1.1-Lilac.Types.Internal-module"><span id="c-4" class="cell-idx"><a href="#h-1.1-Lilac.Types.Internal-module">1.1&ensp;<span class="verbatim">Lilac.Types.Internal</span> module</a></span></h3><div id="c-5" class="cell-idx"><div class="block-container src" id="b-module:Lilac.Types.Internal"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-module:Lilac.Types.Internal">&#x1F517;</a></div><div class="block-meta"><code>module:Lilac.Types.Internal</code><br><code><span class="bold">&#x1F3AF; src-internal/Lilac/Types/Internal.hs</span></code></div><div class="block-meta-other hidden"><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="kw">module</span> <span class="dt">Lilac.Types.Internal</span>
+  ( <span class="dt">GPath</span> (<span class="op">..</span>),
+  )
+<span class="kw">where</span>
+
+<span class="kw">import</span> <span class="dt">Data.Aeson</span>
+  ( <span class="dt">FromJSON</span>,
+    <span class="dt">FromJSONKey</span>,
+    <span class="dt">FromJSONKeyFunction</span> (<span class="dt">FromJSONKeyTextParser</span>),
+    <span class="dt">ToJSON</span>,
+    <span class="dt">ToJSONKey</span>,
+    fromJSONKey,
+    parseJSON,
+    toJSONKey,
+  )
+<span class="kw">import</span> <span class="dt">Data.Aeson.Types</span>
+  ( toJSONKeyText,
+    withText,
+  )
+<span class="kw">import</span> <span class="dt">Data.Text</span> <span class="kw">qualified</span> <span class="kw">as</span> <span class="dt">T</span>
+<span class="kw">import</span> <span class="dt">GHC.Generics</span> (<span class="dt">Generic</span>)
+<span class="kw">import</span> <span class="dt">Relude</span>
+  ( <span class="dt">Eq</span>,
+    <span class="dt">FilePath</span>,
+    <span class="dt">Hashable</span>,
+    <span class="dt">Ord</span>,
+    <span class="dt">Show</span>,
+    <span class="dt">Type</span>,
+    <span class="fu">pure</span>,
+    (<span class="op">$</span>),
+    (<span class="op">.</span>),
+  )
+
+<a href="#b-newtype:GPath" class="internal-link" id="b-module:Lilac.Types.Internal-b-newtype:GPath">newtype:GPath</a>
+<a href="#b-instance:ToJSONKey-GPath" class="internal-link" id="b-module:Lilac.Types.Internal-b-instance:ToJSONKey-GPath">instance:ToJSONKey GPath</a>
+<a href="#b-instance:FromJSON-GPath" class="internal-link" id="b-module:Lilac.Types.Internal-b-instance:FromJSON-GPath">instance:FromJSON GPath</a>
+<a href="#b-instance:FromJSONKey-GPath" class="internal-link" id="b-module:Lilac.Types.Internal-b-instance:FromJSONKey-GPath">instance:FromJSONKey GPath</a></code></pre></div></div></div><div id="heading-container-h-2-Miscellaneous-helpers" class="heading-container"><h2 id="h-2-Miscellaneous-helpers"><span id="c-6" class="cell-idx"><a href="#h-2-Miscellaneous-helpers">2&ensp;Miscellaneous helpers</a></span></h2></div><div id="heading-container-h-2.1-Org-ID--OID-" class="heading-container"><h3 id="h-2.1-Org-ID--OID-"><span id="c-7" class="cell-idx"><a href="#h-2.1-Org-ID--OID-">2.1&ensp;Org ID (OID)</a></span></h3><p><span id="c-8" class="cell-idx">Org IDs (see <a href="/parse.html#b-newtype:OID" class="internal-link" id="linkNumber-2">newtype:OID</a>, <a href="/parse.html#h-5-Links" class="internal-link" id="linkNumber-3">Links</a>, and <a href="/parse.html#b-data:LinkOid" class="internal-link" id="linkNumber-4">data:LinkOid</a>) are UUIDs underneath. The functions here manipulate this type.</span></p><p><span id="c-9" class="cell-idx"><a href="#b-f:fromWords" class="internal-link" id="linkNumber-5">f:fromWords</a> constructs an <span class="code">OID</span> from two 64-bit words.</span></p><div id="c-10" class="cell-idx"><div class="block-container src" id="b-f:fromWords"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:fromWords">&#x1F517;</a></div><div class="block-meta"><code>f:fromWords</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-f:fromWords" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">fromWords ::</span> <span class="dt">Word64</span> <span class="ot">-&gt;</span> <span class="dt">Word64</span> <span class="ot">-&gt;</span> <span class="dt">OID</span>
+fromWords w1 w2 <span class="ot">=</span> <span class="dt">OID</span> <span class="op">$</span> fromWords64 w1 w2</code></pre></div></div><p><span id="c-11" class="cell-idx"><a href="#b-f:fromText" class="internal-link" id="linkNumber-6">f:fromText</a> constructs a <span class="code">Maybe OID</span> from text.</span></p><div id="c-12" class="cell-idx"><div class="block-container src" id="b-f:fromText"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:fromText">&#x1F517;</a></div><div class="block-meta"><code>f:fromText</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-f:fromText" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">fromText ::</span> <span class="dt">Text</span> <span class="ot">-&gt;</span> <span class="dt">Maybe</span> <span class="dt">OID</span>
+fromText t <span class="ot">=</span> <span class="kw">case</span> Data.UUID.fromText t <span class="kw">of</span>
+  <span class="dt">Just</span> uuid <span class="ot">-&gt;</span> <span class="dt">Just</span> <span class="op">$</span> <span class="dt">OID</span> uuid
+  <span class="dt">Nothing</span> <span class="ot">-&gt;</span> <span class="dt">Nothing</span></code></pre></div></div><p><span id="c-13" class="cell-idx"><a href="#b-instance:Show-OID" class="internal-link" id="linkNumber-7">instance:Show OID</a> avoids printing the <span class="code">OID</span> text because it&#39;s simpler to just have the raw UUID by itself.</span></p><div id="c-14" class="cell-idx"><div class="block-container src" id="b-instance:Show-OID"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-instance:Show-OID">&#x1F517;</a></div><div class="block-meta"><code>instance:Show OID</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-instance:Show-OID" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">OID</span> <span class="kw">where</span>
+  <span class="fu">show</span> (<span class="dt">OID</span> uuid) <span class="ot">=</span> Prelude.show uuid</code></pre></div></div><p><span id="c-15" class="cell-idx">The <a href="#b-f:nilOid" class="internal-link" id="linkNumber-8">f:nilOid</a> is a special zero-value <span class="code">OID</span>. We use it for things like the <a href="/parse.html#b-f:defaultOrgParserState" class="internal-link" id="linkNumber-9">f:defaultOrgParserState</a> and also in many of the <a href="/parse.html#b-All-test-cases" class="internal-link" id="linkNumber-10">test cases</a> for parsing.</span></p><div id="c-16" class="cell-idx"><div class="block-container src" id="b-f:nilOid"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:nilOid">&#x1F517;</a></div><div class="block-meta"><code>f:nilOid</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-f:nilOid" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">nilOid ::</span> <span class="dt">OID</span>
+nilOid <span class="ot">=</span> fromWords <span class="dv">0</span> <span class="dv">0</span></code></pre></div></div></div><div id="heading-container-h-2.2-GPath--an-OsPath-wrapper" class="heading-container"><h3 id="h-2.2-GPath--an-OsPath-wrapper"><span id="c-17" class="cell-idx"><a href="#h-2.2-GPath--an-OsPath-wrapper">2.2&ensp;<span class="code">GPath</span>, an <span class="code">OsPath</span> wrapper</a></span></h3><p><span id="c-18" class="cell-idx"><a href="#b-newtype:GPath" class="internal-link" id="linkNumber-11">newtype:GPath</a> is a custom type that <span class="bold">guarantees</span> that it can only contain a <span class="code">FilePath</span> which can be converted (without errors) into a valid <span class="code">OsPath</span>. It is named <span class="code">GPath</span> to mean &quot;guaranteed path&quot;.</span></p><div id="c-19" class="cell-idx"><div class="block-container src" id="b-newtype:GPath"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-newtype:GPath">&#x1F517;</a></div><div class="block-meta"><code>newtype:GPath</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types.Internal-b-newtype:GPath" class="internal-link"><span class="verbatim">module:Lilac.Types.Internal</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="kw">type</span> <span class="dt">GPath</span><span class="ot"> ::</span> <span class="dt">Type</span>
+<span class="kw">newtype</span> <span class="dt">GPath</span> <span class="ot">=</span> <span class="dt">GPath</span> <span class="dt">FilePath</span>
+  <span class="kw">deriving</span> stock (<span class="dt">Eq</span>, <span class="dt">Ord</span>, <span class="dt">Generic</span>, <span class="dt">Show</span>)
+  <span class="kw">deriving</span> anyclass (<span class="dt">ToJSON</span>)
+  <span class="kw">deriving</span> <span class="kw">newtype</span> (<span class="dt">Hashable</span>)</code></pre></div></div><p><span id="c-20" class="cell-idx">Similar to <a href="/compile.html#b-instance:ToJSONKey-LinkOid" class="internal-link" id="linkNumber-12">instance:ToJSONKey LinkOid</a>, we want to encode and decode <span class="code">GPath</span> values in a succinct way. Because this is a <span class="code">newtype</span> wrapper, by default <span class="code">Data.Aeson</span> will try to write it as <span class="code">&quot;GPath&quot; \&quot;...\&quot;&quot;</span> in JSON, which is ugly. To simplify this we have custom <span class="code">ToJSONKey</span> and <span class="code">FromJSONKey</span> instances.</span></p><p><span id="c-21" class="cell-idx"><a href="#b-instance:ToJSONKey-GPath" class="internal-link" id="linkNumber-13">instance:ToJSONKey GPath</a> tells <span class="code">Data.Aeson</span> to only write the <span class="code">FilePath</span> part of the <span class="code">GPath</span>.</span></p><div id="c-22" class="cell-idx"><div class="block-container src" id="b-instance:ToJSONKey-GPath"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-instance:ToJSONKey-GPath">&#x1F517;</a></div><div class="block-meta"><code>instance:ToJSONKey GPath</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types.Internal-b-instance:ToJSONKey-GPath" class="internal-link"><span class="verbatim">module:Lilac.Types.Internal</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="kw">instance</span> <span class="dt">ToJSONKey</span> <span class="dt">GPath</span> <span class="kw">where</span>
+  toJSONKey <span class="ot">=</span> toJSONKeyText <span class="op">$</span> \(<span class="dt">GPath</span> p) <span class="ot">-&gt;</span> T.pack p</code></pre></div></div><p><span id="c-23" class="cell-idx">Both <a href="#b-instance:FromJSON-GPath" class="internal-link" id="linkNumber-14">instance:FromJSON GPath</a> and <a href="#b-instance:FromJSONKey-GPath" class="internal-link" id="linkNumber-15">instance:FromJSONKey GPath</a> understand how to parse a <span class="code">GPath</span> from a <span class="code">Text</span> value. The <span class="code">FromJSONKey</span> instance also requires a <span class="code">FromJSON</span> instance, which is why we have both of them here.</span></p><div id="c-24" class="cell-idx"><div class="block-container src" id="b-instance:FromJSONKey-GPath"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-instance:FromJSONKey-GPath">&#x1F517;</a></div><div class="block-meta"><code>instance:FromJSONKey GPath</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types.Internal-b-instance:FromJSONKey-GPath" class="internal-link"><span class="verbatim">module:Lilac.Types.Internal</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="kw">instance</span> <span class="dt">FromJSONKey</span> <span class="dt">GPath</span> <span class="kw">where</span>
+  fromJSONKey <span class="ot">=</span> <span class="dt">FromJSONKeyTextParser</span> <span class="op">$</span> \t <span class="ot">-&gt;</span> <span class="kw">do</span>
+    <span class="fu">pure</span> <span class="op">.</span> <span class="dt">GPath</span> <span class="op">$</span> T.unpack t</code></pre></div></div><div id="c-25" class="cell-idx"><div class="block-container src" id="b-instance:FromJSON-GPath"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-instance:FromJSON-GPath">&#x1F517;</a></div><div class="block-meta"><code>instance:FromJSON GPath</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types.Internal-b-instance:FromJSON-GPath" class="internal-link"><span class="verbatim">module:Lilac.Types.Internal</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="kw">instance</span> <span class="dt">FromJSON</span> <span class="dt">GPath</span> <span class="kw">where</span>
+  parseJSON <span class="ot">=</span> withText <span class="st">&quot;GPath&quot;</span> <span class="op">$</span> \t <span class="ot">-&gt;</span> <span class="kw">do</span>
+    <span class="fu">pure</span> <span class="op">.</span> <span class="dt">GPath</span> <span class="op">$</span> T.unpack t</code></pre></div></div><p><span id="c-26" class="cell-idx"><a href="#b-f:encodeGPath" class="internal-link" id="linkNumber-16">f:encodeGPath</a> is the only way one is allowed to construct a <a href="#b-newtype:GPath" class="internal-link" id="linkNumber-17">newtype:GPath</a>.</span></p><div id="c-27" class="cell-idx"><div class="block-container src" id="b-f:encodeGPath"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:encodeGPath">&#x1F517;</a></div><div class="block-meta"><code>f:encodeGPath</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-f:encodeGPath" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">encodeGPath ::</span> (<span class="dt">MonadFail</span> m) <span class="ot">=&gt;</span> <span class="dt">FilePath</span> <span class="ot">-&gt;</span> m <span class="dt">GPath</span>
+encodeGPath fp
+  <span class="op">|</span> <span class="dt">Just</span> osp <span class="ot">&lt;-</span> P.encodeUtf fp,
+    P.isValid osp <span class="ot">=</span>
+      <span class="fu">pure</span> <span class="op">$</span> <span class="dt">GPath</span> fp
+  <span class="op">|</span> <span class="fu">otherwise</span> <span class="ot">=</span> <span class="fu">fail</span> <span class="op">$</span> <span class="st">&quot;invalid file path: &quot;</span> <span class="op">&lt;&gt;</span> <span class="fu">show</span> fp</code></pre></div></div><p><span id="c-28" class="cell-idx"><a href="#b-f:decodeGPath" class="internal-link" id="linkNumber-18">f:decodeGPath</a> takes a <span class="code">GPath</span> and converts it back into the <span class="code">FilePath</span> that it is based on.</span></p><div id="c-29" class="cell-idx"><div class="block-container src" id="b-f:decodeGPath"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:decodeGPath">&#x1F517;</a></div><div class="block-meta"><code>f:decodeGPath</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-f:decodeGPath" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">decodeGPath ::</span> <span class="dt">GPath</span> <span class="ot">-&gt;</span> <span class="dt">FilePath</span>
+decodeGPath (<span class="dt">GPath</span> fp) <span class="ot">=</span> fp</code></pre></div></div><p><span id="c-30" class="cell-idx"><a href="#b-f:emptyGPath" class="internal-link" id="linkNumber-19">f:emptyGPath</a> is an empty <span class="code">GPath</span>.</span></p><div id="c-31" class="cell-idx"><div class="block-container src" id="b-f:emptyGPath"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:emptyGPath">&#x1F517;</a></div><div class="block-meta"><code>f:emptyGPath</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-f:emptyGPath" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">emptyGPath ::</span> <span class="dt">GPath</span>
+emptyGPath <span class="ot">=</span> <span class="dt">GPath</span> <span class="st">&quot;&quot;</span></code></pre></div></div></div><div id="heading-container-h-2.2.1-Succinct-construction" class="heading-container"><h4 id="h-2.2.1-Succinct-construction"><span id="c-32" class="cell-idx"><a href="#h-2.2.1-Succinct-construction">2.2.1&ensp;Succinct construction</a></span></h4><p><span id="c-33" class="cell-idx">In tests and other scenarios, we want to be able to succinctly construct <span class="code">GPath</span> values without being encumbered by the monadic type of <a href="#b-f:encodeGPath" class="internal-link" id="linkNumber-20">f:encodeGPath</a>. For this purpose we have a separate internal-only module which exposes the <span class="code">GPath</span> constructor.</span></p></div><div id="heading-container-h-2.3-Protocols" class="heading-container"><h3 id="h-2.3-Protocols"><span id="c-34" class="cell-idx"><a href="#h-2.3-Protocols">2.3&ensp;Protocols</a></span></h3><p><span id="c-35" class="cell-idx">The <a href="#b-f:protocolsWeb" class="internal-link" id="linkNumber-21">f:protocolsWeb</a> are the typical protocols found in links on the internet.</span></p><div id="c-36" class="cell-idx"><div class="block-container src" id="b-f:protocolsWeb"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:protocolsWeb">&#x1F517;</a></div><div class="block-meta"><code>f:protocolsWeb</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-f:protocolsWeb" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">protocolsWeb ::</span> [<span class="dt">Text</span>]
+protocolsWeb <span class="ot">=</span>
+  [ <span class="st">&quot;http://&quot;</span>,
+    <span class="st">&quot;https://&quot;</span>,
+    <span class="st">&quot;file://&quot;</span>,
+    <span class="st">&quot;ftp://&quot;</span>,
+    <span class="st">&quot;mailto:&quot;</span>,
+    <span class="st">&quot;tel:&quot;</span>
+  ]</code></pre></div></div><p><span id="c-37" class="cell-idx">The <a href="#b-f:protocolsEmacs" class="internal-link" id="linkNumber-22">f:protocolsEmacs</a> contains protocols that are used as aliases for their more traditional protocols in <a href="#b-f:protocolsWeb" class="internal-link" id="linkNumber-23">f:protocolsWeb</a>.</span></p><div id="c-38" class="cell-idx"><div class="block-container src" id="b-f:protocolsEmacs"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:protocolsEmacs">&#x1F517;</a></div><div class="block-meta"><code>f:protocolsEmacs</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-f:protocolsEmacs" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">protocolsEmacs ::</span> [<span class="dt">Text</span>]
+protocolsEmacs <span class="ot">=</span>
+  <span class="fu">map</span>
+    (<span class="op">&lt;&gt;</span> <span class="st">&quot;:&quot;</span>)
+    [ <span class="st">&quot;file&quot;</span>
+    ]</code></pre></div></div></div><div id="heading-container-h-2.4-Marking-characters" class="heading-container"><h3 id="h-2.4-Marking-characters"><span id="c-39" class="cell-idx"><a href="#h-2.4-Marking-characters">2.4&ensp;Marking characters</a></span></h3><p><span id="c-40" class="cell-idx">Marking characters are used in <a href="/parse.html#h-16-Tables" class="internal-link" id="linkNumber-24">Tables</a> as special characters (see <a href="https://orgmode.org/manual/Advanced-features.html" class="external-link" id="linkNumber-25">this page</a> for more information). See <a href="/parse.html#b-f:tableCellParser" class="internal-link" id="linkNumber-26">f:tableCellParser</a> and <a href="/weave.html#b-f:weaveTable" class="internal-link" id="linkNumber-27">f:weaveTable</a> for how Lilac deals with them.</span></p><div id="c-41" class="cell-idx"><div class="block-container src" id="b-f:markingChars"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:markingChars">&#x1F517;</a></div><div class="block-meta"><code>f:markingChars</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-f:markingChars" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">markingChars ::</span> [<span class="dt">Char</span>]
+markingChars <span class="ot">=</span> <span class="st">&quot;#*&quot;</span> <span class="op">&lt;&gt;</span> markingCharsInvisible</code></pre></div></div><p><span id="c-42" class="cell-idx">Some marking characters are purely for metadata and signal entire rows that are not meant to be displayed to the user directly. These are defined separately.</span></p><div id="c-43" class="cell-idx"><div class="block-container src" id="b-f:markingCharsInvisible"><div class="block-controls"><button class="toggle-block-meta-other" data-action="toggle-block-meta-other"></button><a href="#b-f:markingCharsInvisible">&#x1F517;</a></div><div class="block-meta"><code>f:markingCharsInvisible</code></div><div class="block-meta-other hidden"><p>Used by <a href="#b-module:Lilac.Types-b-f:markingCharsInvisible" class="internal-link"><span class="verbatim">module:Lilac.Types</span></a>.</p><p>Other metadata key/value pairs:</p><ul><li><p><span class="code">__block_type</span> = <span class="code">src</span></p></li><li><p><span class="code">__src_language</span> = <span class="code">haskell</span></p></li></ul></div><pre class="block-body"><code class="sourceCode"><span class="ot">markingCharsInvisible ::</span> [<span class="dt">Char</span>]
+markingCharsInvisible <span class="ot">=</span> <span class="st">&quot;!^_$/&quot;</span></code></pre></div></div></div><div id="heading-container-h--Page-metrics" class="heading-container page-metrics"><h2 id="h--Page-metrics"><a href="#h--Page-metrics">Page metrics</a></h2></div><div id="heading-container-h--Backlinks" class="heading-container backlinks"><h3 id="h--Backlinks"><a href="#h--Backlinks">Backlinks (11)</a></h3><ol><li><a href="/index.html">index.org (3)</a><ol><li><a href="#top">^ Top</a><span class="verbatim"> &#x2190; </span><a href="/index.html#glossary-c-34--types.org-">✿ <span class="verbatim">types.org</span></a></li><li><a href="#b-instance:Show-OID"><span class="verbatim">instance:Show OID</span></a><span class="verbatim"> &#x2190; </span><a href="/index.html#tbl-1">Table 1</a></li><li><a href="#b-module:Lilac.Types"><span class="verbatim">module:Lilac.Types</span></a><span class="verbatim"> &#x2190; </span><a href="/index.html#tbl-1">Table 1</a></li></ol></li><li><a href="/parse.html">parse.org (3)</a><ol><li><a href="#b-f:fromText"><span class="verbatim">f:fromText</span></a><span class="verbatim"> &#x2190; </span><a href="/parse.html#c-168">¶ (<span class="verbatim">Cell 168</span>)</a></li><li><a href="#b-f:markingChars"><span class="verbatim">f:markingChars</span></a><span class="verbatim"> &#x2190; </span><a href="/parse.html#c-1506">¶ (<span class="verbatim">Cell 1506</span>)</a></li><li><a href="#h-2.1-Org-ID--OID-">§ 2.1 Org ID (OID)</a><span class="verbatim"> &#x2190; </span><a href="/parse.html#c-33">¶ (<span class="verbatim">Cell 33</span>)</a></li></ol></li><li><a href="/weave.html">weave.org (2)</a><ol><li><a href="#b-f:markingChars"><span class="verbatim">f:markingChars</span></a><span class="verbatim"> &#x2190; </span><a href="/weave.html#c-501">¶ (<span class="verbatim">Cell 501</span>)</a></li><li><a href="#b-f:markingCharsInvisible"><span class="verbatim">f:markingCharsInvisible</span></a><span class="verbatim"> &#x2190; </span><a href="/weave.html#c-492">¶ (<span class="verbatim">Cell 492</span>)</a></li></ol></li><li><a href="/cli.html">cli.org (1)</a><ol><li><a href="#b-newtype:GPath"><span class="verbatim">newtype:GPath</span></a><span class="verbatim"> &#x2190; </span><a href="/cli.html#c-15">¶ (<span class="verbatim">Cell 15</span>)</a></li></ol></li><li><a href="/compile.html">compile.org (1)</a><ol><li><a href="#b-newtype:GPath"><span class="verbatim">newtype:GPath</span></a><span class="verbatim"> &#x2190; </span><a href="/compile.html#c-62">¶ (<span class="verbatim">Cell 62</span>)</a></li></ol></li><li><a href="/user-manual.html">user-manual.org (1)</a><ol><li><a href="#b-module:Lilac.Types"><span class="verbatim">module:Lilac.Types</span></a><span class="verbatim"> &#x2190; </span><a href="/user-manual.html#c-15">¶ (<span class="verbatim">Cell 15</span>)</a></li></ol></li></ol></div><div id="heading-container-h--Tangled-files" class="heading-container tangled-blocks"><h3 id="h--Tangled-files"><a href="#h--Tangled-files">Tangled files (2)</a></h3><ol><li><a href="#b-module:Lilac.Types.Internal" class="verbatim">src-internal/Lilac/Types/Internal.hs</a></li><li><a href="#b-module:Lilac.Types" class="verbatim">src/Lilac/Types.hs</a></li></ol></div><div id="heading-container-h--Named-cells" class="heading-container named-cells"><h3 id="h--Named-cells"><a href="#h--Named-cells">Named cells (17)</a></h3><ol><li><a href="#b-f:decodeGPath"><span class="verbatim">f:decodeGPath</span></a></li><li><a href="#b-f:emptyGPath"><span class="verbatim">f:emptyGPath</span></a></li><li><a href="#b-f:encodeGPath"><span class="verbatim">f:encodeGPath</span></a></li><li><a href="#b-f:fromText"><span class="verbatim">f:fromText</span></a></li><li><a href="#b-f:fromWords"><span class="verbatim">f:fromWords</span></a></li><li><a href="#b-f:markingChars"><span class="verbatim">f:markingChars</span></a></li><li><a href="#b-f:markingCharsInvisible"><span class="verbatim">f:markingCharsInvisible</span></a></li><li><a href="#b-f:nilOid"><span class="verbatim">f:nilOid</span></a></li><li><a href="#b-f:protocolsEmacs"><span class="verbatim">f:protocolsEmacs</span></a></li><li><a href="#b-f:protocolsWeb"><span class="verbatim">f:protocolsWeb</span></a></li><li><a href="#b-instance:FromJSON-GPath"><span class="verbatim">instance:FromJSON GPath</span></a></li><li><a href="#b-instance:FromJSONKey-GPath"><span class="verbatim">instance:FromJSONKey GPath</span></a></li><li><a href="#b-instance:Show-OID"><span class="verbatim">instance:Show OID</span></a></li><li><a href="#b-instance:ToJSONKey-GPath"><span class="verbatim">instance:ToJSONKey GPath</span></a></li><li><a href="#b-module:Lilac.Types"><span class="verbatim">module:Lilac.Types</span></a></li><li><a href="#b-module:Lilac.Types.Internal"><span class="verbatim">module:Lilac.Types.Internal</span></a></li><li><a href="#b-newtype:GPath"><span class="verbatim">newtype:GPath</span></a></li></ol></div><footer><div class="lilac-stamp">Generated by <a href="https://lilac.funloop.org" class="external-link" target="_blank" rel="noopener noreferrer">Lilac</a></div></footer></main><script id="heading-ancestry" type="application/json">{"h--Backlinks":["h--Page-metrics"],"h--Named-cells":["h--Page-metrics"],"h--Page-metrics":[],"h--Tangled-files":["h--Page-metrics"],"h-1-Lilac.Types-module":[],"h-1.1-Lilac.Types.Internal-module":["h-1-Lilac.Types-module"],"h-2-Miscellaneous-helpers":[],"h-2.1-Org-ID--OID-":["h-2-Miscellaneous-helpers"],"h-2.2-GPath--an-OsPath-wrapper":["h-2-Miscellaneous-helpers"],"h-2.2.1-Succinct-construction":["h-2.2-GPath--an-OsPath-wrapper","h-2-Miscellaneous-helpers"],"h-2.3-Protocols":["h-2-Miscellaneous-helpers"],"h-2.4-Marking-characters":["h-2-Miscellaneous-helpers"]}</script><script id="lilac-fe-script" src="/js/lilac.js"></script></body></html>
