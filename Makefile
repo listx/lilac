@@ -103,7 +103,10 @@ install: tangle lilac.cabal
 	cabal install --overwrite-policy=always
 	touch install
 
-LILAC_GIT_VERSION := $(shell git describe --abbrev=10 --always --dirty)
+LILAC_CABAL_VERSION = $(shell sed -n 's/^[Vv]ersion:[[:space:]]*//p' lilac.cabal | head -n1)
+LILAC_GIT_COMMIT    = $(shell git rev-parse --short=10 HEAD)
+LILAC_GIT_DIRTY     = $(shell git diff-index --quiet HEAD -- || echo -dirty)
+LILAC_GIT_VERSION   = v$(LILAC_CABAL_VERSION)-g$(LILAC_GIT_COMMIT)$(LILAC_GIT_DIRTY)
 build-release: tangle lilac.cabal
 	nix-build ./nix/release.nix \
 		--argstr lilacGitVersion $(LILAC_GIT_VERSION)
