@@ -976,7 +976,7 @@ The function [[id:85a464eb-e220-40d7-ae49-5edc349ee6b4::f:readFileRobustly][f:re
 error encountered while reading the file. One common scenario is if the file
 does not exist yet. Returning the empty string in this (or other error-raising
 scenarios) is fine because it will most likely result in the comparison
-~existingContent /= contentToWrite~ in [[f:tangle]] failing (assuming the
+~existingContent /= contentToWrite~ in [[f:tangle]] being true (assuming the
 ~contentToWrite~ is not empty), resulting in the file being marked for tangling.
 
 ** Linting tangled paths
