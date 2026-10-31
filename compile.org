@@ -791,6 +791,12 @@ inside it:
     constructed in [[id:dabccd5e-930e-4571-899f-1bfbdeab3d5e::f:oidLinkParser][f:oidLinkParser]]. See [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]] for how they are used
     during weaving.
 
+  - ~preciseBacklinks~ :: A map from each link target to the links which point
+    to it. See [[f:mkPreciseBacklinks]].
+
+  - ~oidAliases~ :: [[(data:Archive-oidAliases)]] A map from heading OIDs to the OID
+    of the containing document. See [[f:mkOidAliases]].
+
   - ~ancestry~ :: [[(data:Archive-ancestry)]] A map of global cell indices of blocks
     to their parents (a block can have multiple parents because more than one
     block can refer to the same child block). This is created by
