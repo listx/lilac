@@ -101,6 +101,7 @@ let
           *.nix
           *.sh
           *.toml
+          CLAUDE.md
           /*.org
           !index.org
           csl-styles/*

@@ -442,6 +442,7 @@ lilacSource = lib.cleanSourceWith {
         ,*.nix
         ,*.sh
         ,*.toml
+        CLAUDE.md
         /*.org
         !index.org
         csl-styles/*
@@ -2651,6 +2652,56 @@ This file is needed for Cabal.
 import Distribution.Simple
 
 main = defaultMain
+#+end_src
+
+* ~CLAUDE.md~
+
+Coding agents tend to treat whatever file they are looking at as the thing to
+change. In this project that is almost always wrong, because the next tangle
+silently discards edits made to tangled files. Claude Code loads ~CLAUDE.md~ from
+the project root at the start of every session, so we use that file to state the
+rule up front, before any editing begins.
+
+The file is itself tangled from here, which keeps it subject to the very rule it
+describes. It only states what is specific to this repository; how Lilac syntax
+works is left to the rest of these documents, so that there is only one place to
+keep up to date.
+
+#+name: CLAUDE.md
+#+header: :tangle CLAUDE.md
+#+begin_src markdown
+# This repository must always use literate programming
+
+Lilac is written in Lilac. The Org files (`*.org` and `design/*.org`) are the
+source of truth. Source files such as `src/**/*.hs`, `lilac.cabal`, `Makefile`,
+`nix/*.nix`, and this `CLAUDE.md` are tangled output, and `make tangle`
+overwrites them. This applies to every change, however small, and even if the
+request names a tangled file (for example "fix this bug in `src/Foo.hs`").
+
+## Rules
+
+- Never edit a tangled file directly, and never create a new source file by
+  hand. Change the Org block that produces it. To create a new file, add a root
+  block with a `:tangle` header.
+- Before changing any file, find out where its contents come from: search the
+  Org files for its `:tangle` path and for the code itself, because most code
+  reaches its file through Noweb references. Only the paths excluded by
+  `nonTangledPathspecs` in `Lilac.toml` are not tangled.
+- The prose is part of the program. Explain why the code is shaped the way it
+  is, and update nearby prose so that it remains true.
+- Search the Org files, not tangled output. The `.rgignore` file already hides
+  most tangled files from `rg`.
+- Commit the Org change together with its regenerated tangled files.
+- If tangling does not work (for example `lilac` is not on `PATH`; the Nix dev
+  shell provides it), fix that or report it. Do not hand-edit tangled files to
+  compensate.
+
+## Checking a change
+
+1. Run `make tangle` to regenerate the tangled files.
+2. Run `make test` and `make lint`. `lilac lint` reports tracked files that no
+   Org block produces.
+3. Check `git status` to see that only the expected tangled files changed.
 #+end_src
 
 * Searching with =ripgrep=
