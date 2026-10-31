@@ -551,8 +551,8 @@ type GenMap :: Type
 type GenMap = Map FilePath Int
 #+end_src
 
-[[f:debouncePerPath]] checks the generation number, starting with 0 or incrementing
-it by 1 [[(f:debouncePerPath-genNum)]]. After waiting for 500ms
+[[f:debouncePerPath]] increments the generation number by 1, treating a path it
+hasn't seen as having 0 [[(f:debouncePerPath-genNum)]]. After waiting for 500ms
 [[(f:debouncePerPath-wait)]], it looks up the generation number
 [[(f:debouncePerPath-genNum-lookup)]]. If no other thread has incremented it in that
 span of time, then the thread knows that it's safe to run the action. Otherwise,
