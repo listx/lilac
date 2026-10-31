@@ -11253,6 +11253,8 @@ listItemNester level levels nextCellIsGlossaryTerm = do
             Just _ -> (LOrderedStart, LItemStart)
             Nothing -> (LUnorderedStart, LItemStart)
       opc = pState.orgParserConf
+  when (opc.maxListLevel < 0) $ do
+    fail "lists prohibited because lilac_maxListLevel < 0"
   when (opc.maxListLevel > 0 && length levels == opc.maxListLevel) $ do
     fail
       $ "max nesting depth exceeded: cannot have more than "
@@ -11608,7 +11610,7 @@ We can prohibit list items entirely, much like how we can prohibit them in
 #+name: t:0009-lists-prohibited
 #+begin_src haskell
 shouldFailWithMessage
-  "0009-list-prohibited"
+  "0009-lists-prohibited"
   "lists prohibited because lilac_maxListLevel < 0"
   29
 #+end_src
@@ -14895,6 +14897,7 @@ Below are all of the individual test cases.
 <<t:0009-list-items-need-blank-line-separator>>
 <<t:0009-lists-cannot-be-mixed-on-their-own-ordered>>
 <<t:0009-lists-cannot-be-mixed-on-their-own>>
+<<t:0009-lists-prohibited>>
 <<t:0009-lists-require-precise-indentation>>
 <<t:0009-ordered-lists-require-increment>>
 <<t:0009-ordered-lists-start-from-1>>

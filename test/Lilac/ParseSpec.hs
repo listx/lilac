@@ -1896,6 +1896,11 @@ spec = do
     23
 
   shouldFailWithMessage
+    "0009-lists-prohibited"
+    "lists prohibited because lilac_maxListLevel < 0"
+    29
+
+  shouldFailWithMessage
     "0009-lists-require-precise-indentation"
     "list item: invalid indentation"
     15

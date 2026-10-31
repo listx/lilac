@@ -2036,6 +2036,8 @@ listItemNester level levels nextCellIsGlossaryTerm = do
             Just _ -> (LOrderedStart, LItemStart)
             Nothing -> (LUnorderedStart, LItemStart)
       opc = pState.orgParserConf
+  when (opc.maxListLevel < 0) $ do
+    fail "lists prohibited because lilac_maxListLevel < 0"
   when (opc.maxListLevel > 0 && length levels == opc.maxListLevel) $ do
     fail
       $ "max nesting depth exceeded: cannot have more than "
