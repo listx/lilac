@@ -388,9 +388,10 @@ nilOid = fromWords 0 0
 :ID:       2d98229c-e318-434b-916b-364c04021306
 :END:
 
-[[newtype:GPath]] is a custom type that *guarantees* that it can only contain a
-~FilePath~ which can be converted (without errors) into a valid ~OsPath~. It is
-named ~GPath~ to mean "guaranteed path".
+[[newtype:GPath]] is a custom type for a ~FilePath~ which is expected to convert
+(without errors) into a valid ~OsPath~. It is named ~GPath~ to mean "guaranteed
+path", but this is only guaranteed for values from [[f:encodeGPath]]. For example,
+values decoded from JSON are not validated.
 
 #+name: newtype:GPath
 #+begin_src haskell
@@ -433,7 +434,9 @@ instance FromJSON GPath where
     pure . GPath $ T.unpack t
 #+end_src
 
-[[f:encodeGPath]] is the only way one is allowed to construct a [[newtype:GPath]].
+[[f:encodeGPath]] is the only way to construct a [[newtype:GPath]] with validation. The
+other ways are the JSON instances above, [[f:emptyGPath]], and the constructor
+exposed by [[module:Lilac.Types.Internal]].
 
 #+name: f:encodeGPath
 #+begin_src haskell
