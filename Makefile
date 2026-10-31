@@ -110,7 +110,7 @@ build-release: tangle lilac.cabal
 		--argstr rev $(LILAC_GIT_REV)
 	touch build-release
 
-install-release: tangle result build-release
+install-release: tangle build-release
 	nix-env -i ./result
 	touch install-release
 
