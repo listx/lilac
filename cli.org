@@ -1281,9 +1281,8 @@ weaveToDisk projectConf outDir rootRelativePrefix archive acc objPath obj =
    in action : acc
 #+end_src
 
-Unlike tangling where we chose which output directory to use for the tangled
-outputs, here for weaving we always use the same path where the object files are
-located, and then change the extension to be ~.html~.
+The path of each HTML file is the path of its object file with the extension
+changed to ~.html~, placed under the directory given by ~--out-dir~.
 
 ** JavaScript injection
 :PROPERTIES:
