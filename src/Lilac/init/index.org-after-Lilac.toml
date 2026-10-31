@@ -12,8 +12,8 @@ Lilac.
 #+name: Makefile
 #+header: :tangle Makefile
 #+begin_src makefile
-org_files = \\
-\tindex.org
+org_files = \
+	index.org
 
 obj_files = $(org_files:%.org=%.lobj)
 
@@ -23,30 +23,30 @@ all: tangle weave lint
 .PHONY: all
 
 $(obj_files) &: $(org_files)
-\tlilac compile $?
-\ttouch $(obj_files)
+	lilac compile $?
+	touch $(obj_files)
 
 $(archive_file): $(obj_files)
-\tlilac archive $^ --out-file $@
+	lilac archive $^ --out-file $@
 
 tangle: $(archive_file)
-\tlilac tangle $< --out-dir .
-\ttouch tangle
+	lilac tangle $< --out-dir .
+	touch tangle
 
 weave: $(archive_file)
-\tlilac weave $< --out-dir site --write-css --write-js
-\trm -rf site/vendor
-\tcp -r vendor site
-\ttouch weave
+	lilac weave $< --out-dir site --write-css --write-js
+	rm -rf site/vendor
+	if [ -d vendor ]; then cp -r vendor site; fi
+	touch weave
 
 lint: $(archive_file)
-\tlilac lint $<
-\ttouch lint
+	lilac lint $<
+	touch lint
 
 clean:
-\trm -rf \\
-\t\t$(archive_file) \\
-\t\t$(obj_files)
+	rm -rf \
+		$(archive_file) \
+		$(obj_files)
 .PHONY: clean
 
 <<git-orderfile-gitconfig>>
@@ -108,6 +108,6 @@ explicitly.
 #+name: git-orderfile-gitconfig
 #+begin_src makefile
 gitconfig:
-\tgit config diff.orderfile .git-orderfile
+	git config diff.orderfile .git-orderfile
 .PHONY: gitconfig
 #+end_src
