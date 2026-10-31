@@ -734,8 +734,8 @@ kill the ~fsListenerThread~ (via ~withAsync~).
 ~fsListenerThread~ listens to debounced filesystem events coming from
 [[(f:fsWatcher-debounced-events)]]. Its job is to react to filesystem events on the
 same path that the client sent, by subscribing to the filesystem channel with
-~dupTChan~ [[(f:handleClientConnection-subscribe-fsChan)]]. It then goes into an
-infinite loop with [[f:waitForMatch]].
+~dupTChan~ [[(f:handleClientConnection-subscribe-fsChan)]]. It then loops in
+[[f:waitForMatch]] until it sees an event on that path.
 
 The call to [[f:drainChannel]] is there to get rid of filesystem events that have
 been queued up /before/ the WebSocket connection has been established; this can
@@ -754,11 +754,14 @@ drainChannel chan = do
 
 It's also worth noting that if the browser disconnects
 [[(f:handleClientConnection-browser-disconnect)]], this would make the heartbeat
-handling thread catch a ~WS.ConnectionException~ and kill the filesystem listener
-thread. Conversely, if the filesystem thread dies because it sent a reload
-request to the client [[(f:waitForMatch-send-reload-request)]], it will kill the
-heartbeat handling thread [[(f:handleClientConnection-waitForMatch)]]. This way
-these threads are not leaked over the life of the server process.
+handling thread get a ~WS.ConnectionException~, and ~withAsync~ would then kill the
+filesystem listener thread. The reverse is not true, because ~withAsync~ does not
+watch the thread that it spawns. If the filesystem thread finishes because it
+sent a reload request to the client [[(f:waitForMatch-send-reload-request)]], the
+heartbeat handling thread [[(f:handleClientConnection-heartbeatHandlerThread)]]
+keeps running until the page closes its side of the connection as part of
+reloading. So neither thread outlives the connection, and they are not leaked
+over the life of the server process.
 
 [[f:waitForMatch]] reads from the subscribed filesystem events channel
 [[(f:waitForMatch-readTChan)]], and only sends the ~reload~ command to the client
