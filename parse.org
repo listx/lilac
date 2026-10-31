@@ -11135,8 +11135,9 @@ listHeadIndentLevelParser = do
 #+end_src
 
 The ~minimalIndentation~ [[(f:listHeadIndentLevelParser-minimalIndentation)]] expects
-there to be at least 2 spaces preceding a list item. This follows Rule 1 from
-[[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][Ordered list items]].
+there to be at least 2 spaces preceding a list item, because nested items have
+more. Top-level items must have exactly 2 (Rule 1 from [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][Ordered list items]]), which
+is checked by [[f:listItemNester]].
 
 [[(f:listHeadIndentLevelParser-pretend-we-parsed-a-level)]] temporarily modifies the
 state of the parser to allow [[f:convertToGlossaryTerm]] to possibly succeed. For
