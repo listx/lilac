@@ -476,8 +476,8 @@ data RawProjectConf = RawProjectConf
   deriving (FromValue, ToValue, ToTable) via GenericTomlTable RawProjectConf
 #+end_src
 
-All keys are expected, except those that use ~Maybe~. So ~citationStyle~
-[[(data:RawProjectConf-citationStyle)]] is optional.
+All keys are expected, except those that use ~Maybe~. So ~bibliography~,
+~citationStyle~ [[(data:RawProjectConf-citationStyle)]], and ~htmlHead~ are optional.
 
 #+name: f:parseRawProjectConf
 #+begin_src haskell
