@@ -49,10 +49,6 @@ vendored := \
 	vendor/mathjax \
 	vendor/mathjax-newcm-font
 
-site.tar.gz: $(archive_file) weave $(vendored)
-	rm -f site.tar.gz
-	tar czvf site.tar.gz -C site .
-
 vendor/source-fonts:
 	./vendor-source-fonts.sh
 
