@@ -41,7 +41,7 @@ of the backlink.
 A similar issue exists for footnotes (where we want to see, from the footnote
 definition at the bottom of the page) exactly where the footnote definition is
 referenced in the prose (via a superscript). While it's easy to click on a
-footnote superscript to go its definition at the bottom of the page, it's hard
+footnote superscript to go to its definition at the bottom of the page, it's hard
 going the other way (if you start from the footnote definitions at the bottom,
 it's hard to see where these superscripts are used in the overall page).
 
@@ -107,7 +107,7 @@ data LinkTarget
 #+end_src
 
 Instead of using cell indices as vertices, we want to use more granular things.
-For the destination vertex, we can use a /link index/, which is just an integer
+For the starting vertex, we can use a /link index/, which is just an integer
 which we increment every time we see a link. This gives each link a unique
 "address" within a single document.
 
@@ -174,7 +174,7 @@ If the above link sits inside cell index 22, then we can weave it as
 ...some prose in a cell...
 #+end_src
 
-and we can use the content of the link itself (what is destination is) to
+and we can use the content of the link itself (what its destination is) to
 construct the ~LINK_DATA~ part. So for example for line labels we can have
 
 #+begin_src html
@@ -186,7 +186,7 @@ construct the ~LINK_DATA~ part. So for example for line labels we can have
 And now when we come across the definition site of a line label in a code block
 during weave time, assuming we have a list of all links in the document, we can
 compute which cells have links that refer back to this line label. So next to
-the line label in the coe block, we can create a link like
+the line label in the code block, we can create a link like
 
 #+begin_src html
 foo <a href="line-label-foo--cell-22">...</a>
@@ -217,11 +217,11 @@ to the exact starting link).
 ** Add performance benchmarks
 
 It would be nice to have performance benchmarks so that we can more easily tell
-the effect of adding new features (like the one propose in this design).
+the effect of adding new features (like the one proposed in this design).
 
 ** Use ~local~ for the current Object being woven
 
-While orthogonal to this design doc, this idea was discoverd in the process of
+While orthogonal to this design doc, this idea was discovered in the process of
 writing this design.
 
 Currently when weaving we have lots of areas where we do something like

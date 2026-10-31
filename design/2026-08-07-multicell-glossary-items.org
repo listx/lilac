@@ -222,7 +222,7 @@ these as a single description list.
 We considered storing ranges of ~LCI~ values, to denote /groups/ of glossary terms,
 which will encode the *boundaries of contiguous groups of glossary terms*. This
 can be used to determine when the overall description list (which encompasses one
-more more glossary terms) can be created/closed. It can also be used to know
+or more glossary terms) can be created/closed. It can also be used to know
 when we can skip weaving of any intervening list markers we may have parsed
 between glossary terms.
 
@@ -288,7 +288,7 @@ data GlossaryTerm = GlossaryTerm
 
 There is some room for "convention" here. Vanilla Orgmode will silently remove
 the terms if the first list item is not a term. It will also let you nest terms
-(which is probably doesn't work well in practice). We will enforce a rule that
+(which probably doesn't work well in practice). We will enforce a rule that
 says glossary term lists must only have such glossary terms (and also no nesting
 of term definitions is allowed, via the allowed constructors of the ~BCell~ type).
 
@@ -313,12 +313,12 @@ There are some new concerns because a glossary term is no longer a single cell (
   - Because we can have the parser complain loudly whenever we encounter an
     invalid cell, we can guarantee that the glossary term only has the allowed
     cells in it, even if we don't use the ~BCell~ type. So the ~BCell~ type is
-    not strictly unnecessary.
+    not strictly necessary.
 
   - There is probably no need to store the contents of a glossary term's child
     cells into the glossary term value at all (it is rather repetitive to do so)
     --- instead we can just store the LCIs of the first and last cells that make
-    upe the glossary term's definition.
+    up the glossary term's definition.
 
 For these reasons, we've abandoned this approach.
 
