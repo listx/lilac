@@ -148,9 +148,9 @@ We add a special shebang line at the beginning of the file
 [[(f:expandRootBlock-maybeAddShebang)]], if one was specified using the ~:shebang~
 header. See [[id:caa38bf7-52ae-4246-8be0-8b2c9e58ccc2::unit-test.sh][unit-test.sh]] for an example.
 
-We also trim lines with only spaces in them
-[[(f:expandRootBlock-trimTrailingSpaces)]], because these can happen from the
-~prependExistingPrefix~ function in [[f:expandBlock]].
+We also trim trailing spaces from all lines
+[[(f:expandRootBlock-trimTrailingSpaces)]], because lines with only spaces in them
+can happen from the ~prependExistingPrefix~ function in [[f:expandBlock]].
 
 Finally in [[f:expandBlock]], we recursively expand all Noweb links (~linkOid~) until
 there are none [[(f:expandBlock-recursion)]].
