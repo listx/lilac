@@ -10651,6 +10651,8 @@ file, not the woven HTML format.
 
         - [[ti:0012-tables-inside-lists]]
 
+        - [[ti:0012-table-on-list-head-line]]
+
   14) Similarly, a list item may include mathematical equations. However, such
       an equation must be on a separate line from the list item head, just like
       for tables (see Rule 13 above).
@@ -11178,12 +11180,20 @@ listItemStartParser = do
   pState <- get
   let levels = pState.listLevels
   (level, nextCellIsGlossaryTerm) <- listHeadIndentLevelParser -- (ref:f:listItemStartParser-listHeadIndentLevelParser)
+  failIfTableOnSameLine -- (ref:f:listItemStartParser-failIfTableOnSameLine)
   listMarkers <-
     if nestsBeyond levels level
       then listItemNester level levels nextCellIsGlossaryTerm
       else listItemFitter level levels
   pure $ CListItem listMarkers
   where
+    failIfTableOnSameLine :: OrgParser ()
+    failIfTableOnSameLine = do
+      pState <- get
+      when (pState.continuationIndent /= 0) $ do
+        table <- MP.optional . MP.try . MP.lookAhead $ metaParser >> tableRowParser -- (ref:f:listItemStartParser-content-follows-head)
+        when (isJust table) $ do
+          fail "a table cannot be on the same line as a list item head"
     nestsBeyond :: [Level] -> Level -> Bool -- (ref:f:listItemStartParser-nestsBeyond)
     nestsBeyond [] _ = True
     nestsBeyond (deepestLevel : _) level =
@@ -11195,6 +11205,15 @@ otherwise as soon as Megaparsec sees any indentation (as part of invoking
 [[f:listHeadIndentLevelParser]]) it will expect to see a list head; obviously this
 is not always the case as not all indentation leads to a list head. This is why
 we have to perform this look-ahead preemptively.
+
+We have to reject a table on the same line as the list head here
+[[(f:listItemStartParser-failIfTableOnSameLine)]], and not in [[f:tableParser]]. This is
+because if [[f:tableParser]] fails without consuming any input, [[f:cellParser]] just
+moves on to [[f:paragraphParser]], which would silently treat the table as prose.
+Here we have already consumed the list head, so the error sticks. A nonzero
+~continuationIndent~ [[(f:listItemStartParser-content-follows-head)]] tells us that
+there is something else on the same line as the list head (see
+[[f:listHeadIndentLevelParser]]). See also Rule 13 in [[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][Ordered list items]].
 
 The ~nestsBeyond~ function [[(f:listItemStartParser-nestsBeyond)]] just checks whether
 the indentation we found in the (just-parsed) level is the same as the
@@ -13626,6 +13645,23 @@ shouldParseWithState
 ]
 #+end_src
 
+A table inside a list item must start on its own line, not on the same line as
+the list head.
+
+#+name: ti:0012-table-on-list-head-line
+#+header: :tangle test/Lilac/ParseSpec/0012-table-on-list-head-line
+#+begin_src org
+  - | foo | bar |
+#+end_src
+
+#+name: t:0012-table-on-list-head-line
+#+begin_src haskell
+shouldFailWithMessage
+  "0012-table-on-list-head-line"
+  "a table cannot be on the same line as a list item head"
+  4
+#+end_src
+
 Below is the same as [[ti:0012-tables-and-prose]], but for the case where we are
 indented as a list item.
 
@@ -14871,6 +14907,7 @@ Below are all of the individual test cases.
 <<t:0010-inline-math>>
 <<t:0011-figures-and-blocks>>
 <<t:0012-tables-and-prose>>
+<<t:0012-table-on-list-head-line>>
 <<t:0012-tables-inside-lists>>
 <<t:0012-non-marking-char>>
 <<t:0012-text-alignment-marker>>

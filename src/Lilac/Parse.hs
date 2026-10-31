@@ -2002,12 +2002,20 @@ listItemStartParser = do
   pState <- get
   let levels = pState.listLevels
   (level, nextCellIsGlossaryTerm) <- listHeadIndentLevelParser --
+  failIfTableOnSameLine --
   listMarkers <-
     if nestsBeyond levels level
       then listItemNester level levels nextCellIsGlossaryTerm
       else listItemFitter level levels
   pure $ CListItem listMarkers
   where
+    failIfTableOnSameLine :: OrgParser ()
+    failIfTableOnSameLine = do
+      pState <- get
+      when (pState.continuationIndent /= 0) $ do
+        table <- MP.optional . MP.try . MP.lookAhead $ metaParser >> tableRowParser --
+        when (isJust table) $ do
+          fail "a table cannot be on the same line as a list item head"
     nestsBeyond :: [Level] -> Level -> Bool --
     nestsBeyond [] _ = True
     nestsBeyond (deepestLevel : _) level =

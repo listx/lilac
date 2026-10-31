@@ -2419,6 +2419,11 @@ spec = do
         tableNumber = 1
       }
 
+  shouldFailWithMessage
+    "0012-table-on-list-head-line"
+    "a table cannot be on the same line as a list item head"
+    4
+
   shouldParseWithState
     "0012-tables-inside-lists"
     ( nilOrgDoc
