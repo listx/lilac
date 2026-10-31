@@ -639,8 +639,9 @@ wsHandler fsChan logLock verbose pending =
 #+end_src
 
 Most of the work falls to [[f:handleClientConnection]], which creates a separate
-thread for keeping the WebSocket alive (by processing the heartbeats sent by the
-client). As for the main thread, it just listens for filesystem events through [[f:waitForMatch]].
+thread that listens for filesystem events through [[f:waitForMatch]]. As for the
+main thread, it keeps the WebSocket alive (by processing the heartbeats sent by
+the client).
 
 #+name: f:handleClientConnection
 #+begin_src haskell
