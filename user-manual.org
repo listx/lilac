@@ -375,6 +375,10 @@ to generate a starter ~Lilac.toml~ and ~index.org~. This will also give you a
 also do ~watch -cn 1 make~ to constantly run ~make~ so that you don't have to keep
 running it yourself.
 
+~lilac init~ ends by running ~make tangle weave~, but it doesn't run the ~lint~ step,
+because that step fails until the generated files are tracked by Git. Run ~git
+add~ on the generated files, and then run ~make~ to do all three steps.
+
 At this point your ~index.org~ is your source of truth, so have a read through it,
 and adjust as needed.
 

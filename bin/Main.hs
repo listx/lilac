@@ -816,7 +816,9 @@ bootstrapLilac initOpts = do
   when initOpts.onlyLocalImports $ do
     putLBS =<< readProcessStdout_ (proc "bash" ["vendor-mathjax.sh"])
     putLBS =<< readProcessStdout_ (proc "bash" ["vendor-source-fonts.sh"])
-  putLBS =<< readProcessStdout_ (proc "make" [])
+  putLBS =<< readProcessStdout_ (proc "make" ["tangle", "weave"]) --
+  putTextLn
+    "Done. Run `git add` on the generated files, and then run `make` to tangle, weave, and lint."
 
 lilacLint :: GlobalOpts -> LintOpts -> IO ()
 lilacLint globalOpts lintOpts = do

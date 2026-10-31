@@ -1596,8 +1596,18 @@ bootstrapLilac initOpts = do
   when initOpts.onlyLocalImports $ do
     putLBS =<< readProcessStdout_ (proc "bash" ["vendor-mathjax.sh"])
     putLBS =<< readProcessStdout_ (proc "bash" ["vendor-source-fonts.sh"])
-  putLBS =<< readProcessStdout_ (proc "make" [])
+  putLBS =<< readProcessStdout_ (proc "make" ["tangle", "weave"]) -- (ref:f:bootstrapLilac-make)
+  putTextLn
+    "Done. Run `git add` on the generated files, and then run `make` to tangle, weave, and lint."
 #+end_src
+
+We call ~make~ [[(f:bootstrapLilac-make)]] with only the ~tangle~ and ~weave~ targets,
+and not the default ~all~ target. That target also runs ~lint~, which fails in a
+new repo because none of the generated files are tracked by Git yet. A failing
+~make~ would make ~lilac init~ exit with an error and a backtrace even though it
+had generated every file, so we leave linting to the user. We don't run ~git add~
+for them, because ~lilac init~ shouldn't change the Git index without being
+asked. Instead we tell them what to do next.
 
 ** Files to write
 
