@@ -73,13 +73,108 @@ arrow " serve"   mono bold ljust dashed from StaticAssets.s to Site.n
 arrow "lint"     mono bold above aligned <-> dashed from Code1.n to Larc.w
 #+end_src
 
-** List item spacing required
+** Stricter list syntax
 
-List items /must/ be indented from the main text with two leading spaces, and also
-must have an empty blank line. See [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]].
+Lilac is much pickier about lists than Orgmode. Indentation is exact, and is
+deeper than you might be used to. These requirements were determined to be
+necessary in order to maximize readability in raw Org (plaintext) form. In
+exchange, every list in a Lilac document has the same shape, and most mistakes
+are reported as compilation errors.
 
-These spacing requirements were determined to be necessary in order to maximize
-readability in raw Org (plaintext) form.
+#+name: tbl:list-syntax-differences
+#+caption: List syntax in Orgmode and Lilac.
+| Feature             | Orgmode                       | Lilac                                |
+|---------------------+-------------------------------+--------------------------------------|
+| Leading indentation | Optional                      | Required (two spaces)                |
+| Between items       | Blank line optional           | Blank line required                  |
+| Unordered bullets   | ~-~, ~+~, or ~*~                 | ~-~ only                               |
+| Ordered bullets     | ~1)~ or ~1.~ (optionally ~a)~)    | ~1)~ only                              |
+| Numbering           | Any; can be set with ~[@5]~     | Starts at 1, and increases by 1      |
+| After the bullet    | One or more spaces            | Exactly one space                    |
+| Wrapped lines       | Flexible                      | Must line up with the first line     |
+| Nested items        | Any deeper indentation        | Exactly 2 spaces past parent text    |
+| Nesting depth       | Effectively unlimited         | 3 levels by default                  |
+| Inside an item      | Almost anything, even blocks  | Paragraphs, tables, equations, lists |
+| Checkboxes          | ~[ ]~ tracks state              | ~[ ]~ is plain text                    |
+
+Here is a list which follows all of these rules:
+
+#+begin_src org
+  1) The text of this item starts after 5 spaces, and so if we wrap this line,
+     the next line also needs 5 spaces.
+
+     A second paragraph in the same item also uses 5 spaces.
+
+       - A child item goes 2 spaces beyond the text of its parent, so this dash
+         comes after 7 spaces and this wrapped line needs 9.
+
+     This paragraph has 5 spaces again, so it belongs to item 1, and not to the
+     child item above it.
+
+  2) Items are separated by a blank line.
+#+end_src
+
+*** Working out the indentation
+
+The text of a list item starts just after its bullet and a single space. All
+wrapped lines and other paragraphs in that item must start at that same position.
+A child item's bullet then goes exactly 2 spaces beyond it.
+
+#+name: tbl:list-indentation
+#+caption: Number of leading spaces needed for various list items.
+| Item               | Spaces before bullet | Spaces before item's text | Spaces before child's bullet |
+|--------------------+----------------------+---------------------------+------------------------------|
+| Top-level ~-~        |                    2 |                         4 |                            6 |
+| Top-level ~1)~       |                    2 |                         5 |                            7 |
+| Top-level ~10)~      |                    2 |                         6 |                            8 |
+| ~-~ nested under a ~-~ |                    6 |                         8 |                           10 |
+
+Note how the extra digit in ~10)~ pushes the text over by one space, unlike in
+items ~1)~ through ~9)~. So a list which grows to 10 items has wrapped lines
+and children which are indented differently starting with its tenth item.
+
+In particular, lining up a child's bullet with its parent's text is an error,
+even though this is common in Orgmode:
+
+#+begin_src org
+  - parent
+
+    - child (error: invalid indentation; this dash needs 6 spaces)
+#+end_src
+
+*** Other things to look out for
+
+  - No indentation means no list. If you forget the two leading spaces, you don't
+    get an error. Instead, each ~- foo~ or ~1) foo~ becomes a plain paragraph with
+    the bullet showing as literal text. If your list looks wrong in the woven
+    output, check this first.
+
+  - The numbers don't get fixed up for you. Unlike in Orgmode (or Markdown), an
+    out-of-sequence number is an error, so reordering items means renumbering
+    them by hand.
+
+  - A list ends at anything with less indentation that doesn't belong to one of
+    its items, such as an unindented paragraph, a heading, or a block. A list
+    after that point is a new list, so it starts again from ~1)~. This means that
+    you cannot put a block in the middle of a list.
+
+  - Ordered and unordered items can't be mixed in the same list, although either
+    can be a child of the other. To use both at the same indentation, put
+    something else between them (such as a paragraph).
+
+  - Tables and equations inside a list item go on their own lines (lined up with
+    the item's text), not on the same line as the bullet.
+
+  - To allow deeper nesting, put a ~#+lilac_maxListLevel~ line with the desired
+    number of levels (or ~0~ for no limit) in the metadata at the top of the
+    document, next to ~#+title~.
+
+  - [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Glossary terms]] (~- term :: definition~) are only recognized in unordered lists;
+    in an ordered list the ~::~ is plain text. Every item at that level must be a
+    glossary term, each term must be unique, and terms can't be nested inside
+    other terms.
+
+For the full set of rules with links to test cases, see [[id:58f69993-599d-4389-ba47-3056b1bb2350][List items]].
 
 ** Noweb links can reference blocks from other files
 
