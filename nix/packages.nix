@@ -48,10 +48,6 @@ let
   haskellOverlays =
     [ heavyDeps jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
 
-  disableHaddockGlobally = final: prev: {
-    mkDerivation = args: prev.mkDerivation (args // { doHaddock = false; });
-  };
-
   heavyDeps = final: prev:
     let heavyPackages = [ "citeproc" "unicode-collation" ];
     in lib.genAttrs heavyPackages (name: buildSmaller prev.${name});

@@ -356,10 +356,6 @@ output for the ~--version~ flag.
 haskellOverlays =
   [ heavyDeps jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
 
-disableHaddockGlobally = final: prev: {
-  mkDerivation = args: prev.mkDerivation (args // { doHaddock = false; });
-};
-
 heavyDeps = final: prev:
   let heavyPackages = [ "citeproc" "unicode-collation" ];
   in lib.genAttrs heavyPackages (name: buildSmaller prev.${name});
@@ -385,12 +381,6 @@ tweakLilacBuild = final: prev: {
   });
 };
 #+end_src
-
-When our Nixpkgs channel (26.11? 27.05?) begins using GHC 9.12 as the default
-compiler version, we can drop ~disableHaddockGlobally~ because we'll be able to
-use the binary cache. That is, the only reason we have ~disableHaddockGlobally~ is
-because our compiler version does not have pre-built packages on Nix because
-it's too new (Nix does not build Haskell packages for newer GHC versions).
 
 The ~lilacSource~ at [[(injectLilac)]] is the source code needed to build Lilac, and
 ~buildSmaller~ is some Haskell build configuration options we pass in to
