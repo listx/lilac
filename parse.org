@@ -1125,9 +1125,8 @@ We now look at some of the less obvious parts (other than [[f:cellParser]] for
 
   - *Reconciliation of some data structures*. Once we've finished parsing the
     entire document, we can then make assertions such as "all footnote
-    references must have a corresponding definition" or "all referenced line
-    labels must exist in blocks". We call this process /reconciliation/ and
-    this is done for footnotes and line labels.
+    references must have a corresponding definition". We call this process
+    /reconciliation/ and this is done for footnotes.
 
   - *Resetting of some stateful fields*. Some of our unit tests check for the
     state of the [[data:OrgParserState]] with the [[f:shouldParseWithState]] helper;
@@ -4691,25 +4690,6 @@ of the block for additional context
 During weaving, line labels are numbered starting at ~1~, and
 increment upwards. The ~lineLabels~ and ~lineLabelNumber~ fields in
 [[data:OrgParserState]] keep track of this numbering.
-
-#+name: f:reconcileLineLabels
-#+begin_src haskell
-reconcileLineLabels :: OrgParser (Map Text (Int, Maybe LCI))
-reconcileLineLabels = do
-  pState <- get
-  let referenced = pState.lineLabelReferences
-      defined = M.keysSet pState.lineLabels
-      brokenLinks = Set.difference referenced defined
-      unusedDefs = Set.difference defined referenced
-      hasBrokenLinks = length brokenLinks /= 0
-      hasUnusedDefs = length unusedDefs /= 0
-      brokenLinksMsg = T.unpack . unwords $ toList brokenLinks
-      unusedDefsMsg = T.unpack . unwords $ toList unusedDefs
-  if
-    | hasBrokenLinks -> fail $ "broken line label links: " <> brokenLinksMsg
-    | hasUnusedDefs -> fail $ "unused line labels: " <> unusedDefsMsg
-    | otherwise -> pure pState.lineLabels
-#+end_src
 
 *** Tangling behavior
 :PROPERTIES:
