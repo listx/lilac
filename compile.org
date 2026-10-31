@@ -3244,8 +3244,9 @@ gciToObjCell archive gci
   | otherwise = Nothing
 #+end_src
 
-[[f:gciToObjPath]] gets the path of the object by the negative GCI index; it is in
-this sense the opposite of [[f:docOidsToSymbols]].
+[[f:gciToObjPath]] gets the path of the object for a GCI. For a negative GCI index it
+is in this sense the opposite of [[f:docOidsToSymbols]]; for any other GCI it finds
+the object that contains that cell.
 
 #+name: f:gciToObjPath
 #+begin_src haskell
