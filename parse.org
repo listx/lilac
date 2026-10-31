@@ -10537,14 +10537,16 @@ ordered list items with links to test cases as examples. The discussions around
 space characters and indentation only make sense when viewed in the raw Org
 file, not the woven HTML format.
 
-  1) List items start out with 2-space indentation. This makes them easier to
-     read from the raw Org file. The amount of additional indentation (in order
-     to have nested list items) depends on where the text began in the parent
-     item.
+  1) List items start out with exactly 2 spaces of indentation. This makes them
+     easier to read from the raw Org file. The amount of additional indentation
+     (in order to have nested list items) depends on where the text began in the
+     parent item.
 
        - [[ti:0009-list-indentation-no-indent]]
 
        - [[ti:0009-list-indentation-proper-indent]]
+
+       - [[ti:0009-list-indentation-top-level-too-deep]]
 
   2) List items must be separated from each other with an empty blank line. This
      makes them easier to read when reading the Org file in plain text.
@@ -11219,6 +11221,8 @@ markers with [[f:getEndingListMarkers]]. The other place we use ~listMarkers~ is
 #+begin_src haskell
 listItemNester :: Level -> [Level] -> Bool -> OrgParser [ListMarker]
 listItemNester level levels nextCellIsGlossaryTerm = do
+  when (null levels && level.indent /= 2) $ do
+    fail "top-level list items must have exactly 2 spaces of indentation" -- (ref:f:listItemNester-top-level-indent)
   case level.number of
     Just 1 -> pure ()
     Just n -> fail $ "starting list head number must be 1; got " <> show n
@@ -11243,9 +11247,12 @@ listItemNester level levels nextCellIsGlossaryTerm = do
   pure [listGroupMarker, listItemMarker]
 #+end_src
 
-We enforce some additional rules here, such as forcing the nesting list head to
-start off with 1 (see [[t:0009-ordered-lists-start-from-1]]) if it is an ordered
-list. The rest of the function just updates the ~pState~ to have the additional
+We enforce some additional rules here, such as requiring exactly 2 spaces of
+indentation for the first item of a top-level list
+[[(f:listItemNester-top-level-indent)]], and forcing the nesting list head to start
+off with 1 (see [[t:0009-ordered-lists-start-from-1]]) if it is an ordered list.
+Later items of a top-level list must line up with the first one, which
+[[f:listItemFitter]] checks. The rest of the function just updates the ~pState~ to have the additional
 ~level~ and also grows the ~listMarkers~ accordingly
 [[(f:listItemNester-update-pState)]].
 
@@ -11389,6 +11396,24 @@ shouldParseWith
         ]
     ]
     []
+#+end_src
+
+Using more than 2 spaces for a top-level list is an error, even though this would
+still leave the list items easy to recognize. Allowing it would mean that lists
+could look different from one document (or one part of a document) to the next.
+
+#+name: ti:0009-list-indentation-top-level-too-deep
+#+header: :tangle test/Lilac/ParseSpec/0009-list-indentation-top-level-too-deep
+#+begin_src org
+   - a
+#+end_src
+
+#+name: t:0009-list-indentation-top-level-too-deep
+#+begin_src haskell
+shouldFailWithMessage
+  "0009-list-indentation-top-level-too-deep"
+  "top-level list items must have exactly 2 spaces of indentation"
+  5
 #+end_src
 
 Ordered lists require a closing parenthesis ~)~ after the number.
@@ -12092,37 +12117,37 @@ In HTML it is perfectly valid to have multiple ~<dt>~ (term) elements, or multip
 
 There are several differences worth noting for Lilac:
 
-   1) Only one term and one description is allowed. If multiple terms mean the
-      same thing, there should be multiple entries and all but one should
-      redirect the user to look up the canonical entry that has the full
-      definition. Multiple definitions for a single term are not allowed.
-      Instead, you should use terms like ~foo (1) :: ...~ and ~foo (2) :: ...~ to
-      define two different definitions for the same term.
+  1) Only one term and one description is allowed. If multiple terms mean the
+     same thing, there should be multiple entries and all but one should
+     redirect the user to look up the canonical entry that has the full
+     definition. Multiple definitions for a single term are not allowed.
+     Instead, you should use terms like ~foo (1) :: ...~ and ~foo (2) :: ...~ to
+     define two different definitions for the same term.
 
-   2) We don't call these description lists because that language is
-      too close to the implementation detail. Instead we call them "glossary
-      terms" (or simply "terms") because that's what they are used for most of
-      the time.
+  2) We don't call these description lists because that language is
+     too close to the implementation detail. Instead we call them "glossary
+     terms" (or simply "terms") because that's what they are used for most of
+     the time.
 
-   3) Lilac parses a paragraph cell to check if it is the start of a glossary
-      term, so a glossary term must start with a paragraph. And similar to
-      vanilla Orgmode, this paragraph must be the first paragraph of the list
-      item.
+  3) Lilac parses a paragraph cell to check if it is the start of a glossary
+     term, so a glossary term must start with a paragraph. And similar to
+     vanilla Orgmode, this paragraph must be the first paragraph of the list
+     item.
 
-      The limitation of using glossary terms only inside unordered lists is
-      there because this is the only way to cleanly define the beginning and end
-      of glossary term definitions. For example, if you allowed glossary terms
-      to be defined anywhere a paragraph can be written, it could get messy.
+     The limitation of using glossary terms only inside unordered lists is
+     there because this is the only way to cleanly define the beginning and end
+     of glossary term definitions. For example, if you allowed glossary terms
+     to be defined anywhere a paragraph can be written, it could get messy.
 
-   4) Glossary terms can have any number of nested cells (as other list items)
-      as long as there is *no nesting of glossary terms*; this is because when
-      using list items, we can easily tell when a list item ends based on
-      indentation.
+  4) Glossary terms can have any number of nested cells (as other list items)
+     as long as there is *no nesting of glossary terms*; this is because when
+     using list items, we can easily tell when a list item ends based on
+     indentation.
 
-   5) When defining glossary terms in a list, that list level must only have
-      other glossary items (compare with vanilla [[https://emacs.stackexchange.com/questions/17244/org-mode-list-with-a-mix-of-unordered-and-description-list-items][Orgmode which doesn't enforce
-      this restriction]]). See [[id:eee95795-b51b-4de5-b39d-8dda436da451][how glossary terms are woven]] to see how this plays
-      out during HTML export.
+  5) When defining glossary terms in a list, that list level must only have
+     other glossary items (compare with vanilla [[https://emacs.stackexchange.com/questions/17244/org-mode-list-with-a-mix-of-unordered-and-description-list-items][Orgmode which doesn't enforce
+     this restriction]]). See [[id:eee95795-b51b-4de5-b39d-8dda436da451][how glossary terms are woven]] to see how this plays
+     out during HTML export.
 
 With those things out of the way, let's look at [[data:GlossaryTerm]], our take on
 definition list entries:
@@ -14830,6 +14855,7 @@ Below are all of the individual test cases.
 <<t:0009-list-nesting-max-8>>
 <<t:0009-list-indentation-no-indent>>
 <<t:0009-list-indentation-proper-indent>>
+<<t:0009-list-indentation-top-level-too-deep>>
 <<t:0009-list-items-need-blank-line-separator>>
 <<t:0009-lists-cannot-be-mixed-on-their-own-ordered>>
 <<t:0009-lists-cannot-be-mixed-on-their-own>>

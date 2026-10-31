@@ -1865,6 +1865,11 @@ spec = do
       ]
       []
 
+  shouldFailWithMessage
+    "0009-list-indentation-top-level-too-deep"
+    "top-level list items must have exactly 2 spaces of indentation"
+    5
+
   shouldParseWith
     "0009-list-items-need-blank-line-separator"
     $ nilOrgDoc

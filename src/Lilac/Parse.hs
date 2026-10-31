@@ -2015,6 +2015,8 @@ listItemStartParser = do
 
 listItemNester :: Level -> [Level] -> Bool -> OrgParser [ListMarker]
 listItemNester level levels nextCellIsGlossaryTerm = do
+  when (null levels && level.indent /= 2) $ do
+    fail "top-level list items must have exactly 2 spaces of indentation" --
   case level.number of
     Just 1 -> pure ()
     Just n -> fail $ "starting list head number must be 1; got " <> show n
