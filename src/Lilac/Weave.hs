@@ -1119,8 +1119,7 @@ weaveFigure lci figure = do
           _ -> ". " :: Text
         weaveProse figure.caption
     img_
-      $ [ id_ linkAnchor,
-          src_ wovenLinkTarget,
+      $ [ src_ wovenLinkTarget,
           class_ "figure-image"
         ]
       <> ( catMaybes
