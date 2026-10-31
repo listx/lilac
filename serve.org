@@ -724,7 +724,7 @@ client re-establish the WebSocket in the normal "happy path" order
 
   7) Server enters [[f:waitForMatch]] [[(f:handleClientConnection-waitForMatch)]]
 
-[[f:wsHandler]] also reads heartbeat messages from the client to keep the connection
+[[f:handleClientConnection]] also reads heartbeat messages from the client to keep the connection
 alive [[(f:handleClientConnection-heartbeatHandler)]] (otherwise, Warp may kill the
 connection on its own due to a timeout). It does this repeatedly in a long-lived
 ~heartbeatHandlerThread~ [[(f:handleClientConnection-heartbeatHandlerThread)]] until
