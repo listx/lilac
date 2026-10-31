@@ -11,7 +11,6 @@ all: build test weave
 .PHONY: all
 
 org_files := $(shell find . -maxdepth 1 -type f -name "*.org" && find ./design -type f -name "*.org")
-backend_org_files = $(filter-out fe.org,$(org_files))
 
 test: tangle
 	cabal test --test-show-details=direct --test-option=--format=progress

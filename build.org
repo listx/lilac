@@ -892,13 +892,7 @@ are used in tests and are not part of the set of Org files we normally use.
 #+name: make:Org files
 #+begin_src makefile
 org_files := $(shell <<sh:find-org-files>>)
-backend_org_files = $(filter-out fe.org,$(org_files))
 #+end_src
-
-Because we tangle Lilac with itself, we want to separate out just the tangling
-mechanism from the rest. For this purpose we have ~backend_org_files~. This way,
-we can isolate whether Lilac can tangle itself correctly before worrying about
-also tangling the frontend bits. See [[id:77786b08-6211-47b8-940d-6aaefc17ec47::make:Tangle sources][make:Tangle sources]] for this separation.
 
 ** Run tests
 
