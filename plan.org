@@ -70,11 +70,11 @@ was configured, and only fell back to Lilac's repo URL otherwise. So for other
 projects using Lilac, the link might not have led to Lilac. Now it always goes to
 Lilac's homepage.
 
-** TODO build: stop tangle-loop.sh checks if tangling fails
+** DONE build: stop tangle-loop.sh checks if tangling fails
 
 The prose says that later steps abort if an earlier one fails, but in
-[[id:77786b08-6211-47b8-940d-6aaefc17ec47::f:tangle-loop:run_all_checks][f:tangle-loop:run_all_checks]] a failed tangle only skips the tests and still goes on to weave.
-We should probably add the abort (or otherwise correct the prose).
+[[id:77786b08-6211-47b8-940d-6aaefc17ec47::f:tangle-loop:run_all_checks][f:tangle-loop:run_all_checks]] a failed tangle only skipped the tests and still went on to weave.
+Now a failed tangle skips the later steps, without ending the loop.
 
 * Backlog
 :PROPERTIES:

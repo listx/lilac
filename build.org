@@ -1179,15 +1179,17 @@ modification timestamp change.
 #+begin_src bash
 run_all_checks()
 {
-	tangle || true  # (ref:tangle-one)
-	if tangle; then # (ref:tangle-two)
-		if ((__test_hs)); then
-			if ! make -C "${SCRIPT_ROOT}" test; then # (ref:unit-tests)
-				reset_everything
-				return
-			else
-				__ok_to_lint=1
-			fi
+	tangle || true    # (ref:tangle-one)
+	if ! tangle; then # (ref:tangle-two)
+		return
+	fi
+
+	if ((__test_hs)); then
+		if ! make -C "${SCRIPT_ROOT}" test; then # (ref:unit-tests)
+			reset_everything
+			return
+		else
+			__ok_to_lint=1
 		fi
 	fi
 
@@ -1209,8 +1211,9 @@ run_all_checks()
 #+end_src
 
 [[f:tangle-loop:run_all_checks]] tangles first, runs all tests, weaves, and finally
-runs the linter. If any of the earlier steps fail, then the later steps abort
-execution.
+runs the linter. If any of the earlier steps fail, we return early to skip the
+later steps. We only return from [[f:tangle-loop:run_all_checks]], not exit the
+script, so that [[f:tangle-loop:watch]] can try again on the next change.
 
 [[f:tangle-loop:run_all_checks]] calls ~tangle()~ twice (at [[(tangle-one)]]
 and [[(tangle-two)]]), because if we modify Lilac's behavior (by editing a Haskell
@@ -1220,9 +1223,10 @@ itself again. It's a simple (albeit ugly) way of ensuring that we're always
 tangling with the latest Lilac version.
 
 [[f:tangle-loop:run_all_checks]] also runs the unit tests at [[(unit-tests)]], as a
-convenience function, but only if the previous call to ~tangle~ succeeds. This
-way, we only try to run the unit tests if Lilac can tangle itself. If the unit
-tests fail, we call [[f:tangle-loop:reset_everything]] and return early, without
+convenience function. We only get this far if the second call to ~tangle~ succeeds,
+because this way we only try to run the unit tests if Lilac can tangle itself.
+There is no need to call [[f:tangle-loop:reset_everything]] when tangling fails,
+because [[f:tangle-loop:tangle]] already does that. If the unit tests fail, we call [[f:tangle-loop:reset_everything]] and return early, without
 breaking out of the ~while~ loop. The linter's exit code is ignored with ~|| true~
 for the same reason (otherwise ~set -e~ would end the loop).
 

@@ -45,15 +45,17 @@ tangle()
 
 run_all_checks()
 {
-	tangle || true  #
-	if tangle; then #
-		if ((__test_hs)); then
-			if ! make -C "${SCRIPT_ROOT}" test; then #
-				reset_everything
-				return
-			else
-				__ok_to_lint=1
-			fi
+	tangle || true    #
+	if ! tangle; then #
+		return
+	fi
+
+	if ((__test_hs)); then
+		if ! make -C "${SCRIPT_ROOT}" test; then #
+			reset_everything
+			return
+		else
+			__ok_to_lint=1
 		fi
 	fi
 
