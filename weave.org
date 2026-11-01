@@ -3068,7 +3068,8 @@ effects, as described below:
 
   - ~action-collapse~: controls whether we display the text ~Expand contents~
     [[(css:Block controls inline-msg-expand)]] or ~Collapse contents~ [[(css:Block
-    controls inline-msg-collapse)]] in the button
+    controls inline-msg-collapse)]] in the button. Blocks start out collapsed, so we
+    don't weave this class; [[id:9c8e1074-edfb-4f89-bedf-07527981835d::f:render-block!][f:render-block!]] sets it when the body is visible.
 
   - ~hide-border-bottom~: hides the bottom border (for visual cosmetics)
     [[(css:Block rounding-hide-border-bottom)]]

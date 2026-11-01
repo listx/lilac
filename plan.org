@@ -47,17 +47,18 @@ truthy), so the ~#top~ fallback never applies. Making it work could be harmful
 because [[id:48d6dc87-f5fc-4a36-bef4-85b9d4207f05::f:maybe-scroll-by-hash][f:maybe-scroll-by-hash]] also calls this function on page load, and
 woven pages have an element with the ~top~ ID. Test any fix in a browser.
 
-** TODO weave: make the collapse button label change
-
-[[id:3d4c0326-ee40-43d5-b49b-ab72081ae91a::css:Block controls inline][css:Block controls inline]] changes the button label to "Collapse contents" if the
-button has the ~action-collapse~ class, but nothing ever sets this class. So the button says
-"Expand contents" even when the block is expanded.
-
 ** TODO compile: detect broken links in more cells
 
 [[id:01da95fe-ba23-4481-9833-428423392f5f::f:findExternalOids][f:findExternalOids]] doesn't look inside footnote bodies, glossary terms, or figure
 and table captions. A broken link in these places passes [[id:a9bad6d4-5b1c-48de-8f09-178724859381::f:findBrokenLinks][f:findBrokenLinks]] and
 is woven by [[id:a63d2021-2596-4c43-81e3-d08e90077f75::f:showBrokenLink][f:showBrokenLink]] as ~LILAC_BROKEN_LINK~. Fixing this may reveal existing broken links in our docs.
+
+** DONE weave: make the collapse button label change
+
+[[id:3d4c0326-ee40-43d5-b49b-ab72081ae91a::css:Block controls inline][css:Block controls inline]] changes the button label to "Collapse contents" if the
+button has the ~action-collapse~ class, but nothing ever set this class. So the button said
+"Expand contents" even when the block was expanded. Now [[id:9c8e1074-edfb-4f89-bedf-07527981835d::f:render-block!][f:render-block!]] sets it
+whenever the body is visible.
 
 ** DONE weave: avoid duplicate HTML IDs for figures
 

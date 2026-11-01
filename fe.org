@@ -897,9 +897,10 @@ Blocks can have two possible buttons:
 
      The button is generated [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1::(f:weaveBlock-metadata-button)][here]].
 
-  2) ~Expand contents~ (for expanding block body text): This is for showing
-     the body text, but only when it is hidden. This button is optional, and is
-     only displayed if you have ~#+header: :collapsed true~ for your block.
+  2) ~Expand contents~ or ~Collapse contents~ (for toggling block body text): This
+     is for showing the body text when it is hidden, and for hiding it again
+     afterwards. This button is optional, and is only displayed if you have
+     ~#+header: :collapsed true~ for your block.
      [[id:9078b9d4-b331-499c-89f8-4b3a355f3c72::fig:lilac-subcommands.pikchr][Example]].
 
      The button is generated [[id:3d4c0326-ee40-43d5-b49b-ab72081ae91a::(f:weaveInlineBlockControls-body-toggle-button)][here]].
@@ -1029,7 +1030,10 @@ situation [[(f:render-block!-modify-classes)]].
 
 There are some intricate CSS class selection rules involved, mainly due to how
 we round the border corners of the various pieces involved
-[[(f:render-block!-rounding-style)]].
+[[(f:render-block!-rounding-style)]]. The body toggle button gets its label from
+CSS, so we also set the ~action-collapse~ class on it whenever the body is visible
+[[(f:render-block!-body-toggle-label)]]. This makes the button offer the opposite of
+what the block is showing now.
 
 #+name: f:render-block!
 #+begin_src clojure
@@ -1044,6 +1048,7 @@ we round the border corners of the various pieces involved
           other-meta (.querySelector container ".block-meta-other")
           body (.querySelector container ".block-body")
           controls (.querySelector container ".block-controls-inline")
+          body-toggle (.querySelector container ".toggle-block-body")
 
           body-needs-full-rounding?
             (and anon? (not meta-vis?) (not collapse-button?) body-vis?)
@@ -1065,6 +1070,7 @@ we round the border corners of the various pieces involved
       (toggle-class! body "collapsed" (not body-vis?))
       (toggle-class! body "fully-rounded" body-needs-full-rounding?)
       (toggle-class! controls "hide-border-bottom" body-vis?)
+      (toggle-class! body-toggle "action-collapse" body-vis?) ; (ref:f:render-block!-body-toggle-label)
       (set-enum-class! controls rounding-styles rounding-style))
 
     (js/console.warn "[WARN] Render target not found for ID:"

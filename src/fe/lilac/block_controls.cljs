@@ -64,6 +64,7 @@
           other-meta (.querySelector container ".block-meta-other")
           body (.querySelector container ".block-body")
           controls (.querySelector container ".block-controls-inline")
+          body-toggle (.querySelector container ".toggle-block-body")
 
           body-needs-full-rounding?
             (and anon? (not meta-vis?) (not collapse-button?) body-vis?)
@@ -85,6 +86,7 @@
       (toggle-class! body "collapsed" (not body-vis?))
       (toggle-class! body "fully-rounded" body-needs-full-rounding?)
       (toggle-class! controls "hide-border-bottom" body-vis?)
+      (toggle-class! body-toggle "action-collapse" body-vis?) ;
       (set-enum-class! controls rounding-styles rounding-style))
 
     (js/console.warn "[WARN] Render target not found for ID:"
