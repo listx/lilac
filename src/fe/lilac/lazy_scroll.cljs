@@ -1,12 +1,8 @@
 (ns lilac.lazy-scroll
-  (:require [lilac.focus :refer [activate activate-element deactivate-element]]
-            [clojure.string :as str]))
+  (:require [lilac.focus :refer [activate activate-element deactivate-element]]))
 
 (defn- href->id [href]
-  (let [href (.-hash (.-location js/window))
-        href-final (if str/blank? href "#top")
-        id (.substring href-final 1)]
-    id))
+  (.substring href 1))
 
 (defn- get-breadcrumbs-height []
   (or (some-> js/document

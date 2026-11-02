@@ -679,8 +679,7 @@ prevention of unconditional scrolling is handled in [[ns:lilac.lazy-scroll]].
 #+header: :tangle src/fe/lilac/lazy_scroll.cljs
 #+begin_src clojure
 (ns lilac.lazy-scroll
-  (:require [lilac.focus :refer [activate activate-element deactivate-element]]
-            [clojure.string :as str]))
+  (:require [lilac.focus :refer [activate activate-element deactivate-element]]))
 
 <<f:href->id>>
 <<f:get-breadcrumbs-height>>
@@ -770,15 +769,15 @@ starts with a hash like ~#foo~ in ~href=#foo~), and then:
       (maybe-scroll target-element)))) ; (ref:call-maybe-scroll)
 #+end_src
 
-[[f:href->id]] [[(f:maybe-scroll-by-hash-get-anchor)]] just retrieves the anchor.
+[[f:href->id]] [[(f:maybe-scroll-by-hash-get-anchor)]] just drops the leading ~#~ from
+the anchor. If the anchor is empty, we get the empty string, which doesn't match
+any element. We don't fall back to the ~top~ ID here, because then every page
+loaded without an anchor would activate its title.
 
 #+name: f:href->id
 #+begin_src clojure
 (defn- href->id [href]
-  (let [href (.-hash (.-location js/window))
-        href-final (if str/blank? href "#top")
-        id (.substring href-final 1)]
-    id))
+  (.substring href 1))
 #+end_src
 
 [[f:maybe-scroll]] only scrolls to the target element if it is out view (outside the
