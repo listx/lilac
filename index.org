@@ -284,6 +284,14 @@ prior to being versioned), or if we signaled that an unreleased version is still
 You should first bump the version at [[Lilac version]], and then run
 [[stamp-new-version.sh]] to pick up the version bump diff as part of the new commit.
 
+If the repo uses [[https://jj-vcs.github.io/jj/][Jujutsu]], we have to create the commit with ~jj~ [[(stamp-jj-commit)]]. Otherwise
+~git commit~ leaves behind a stray duplicate, because Jujutsu has already snapshotted
+the same diff in its working-copy commit. Unlike ~git commit~, ~jj commit~ is happy to
+create an empty commit, so we have to check for a missing version bump ourselves
+[[(stamp-jj-empty-check)]]. It also doesn't run the pre-commit hooks, so run ~make lint~
+first. Jujutsu can't create annotated tags, so we always use ~git tag~. This works
+because ~jj commit~ moves Git's ~HEAD~ to the new commit in a colocated repo.
+
 #+name: stamp-new-version.sh
 #+header: :tangle stamp-new-version.sh
 #+header: :shebang #!/usr/bin/env bash
@@ -303,7 +311,15 @@ fi
 version="$(awk \
 	'/^#\+name: Lilac version$/{getline; getline; print}' index.org)"
 
-git commit -am "Lilac ${version}"
+if [[ -d .jj ]]; then
+	if [[ -z "$(jj diff --summary)" ]]; then # (ref:stamp-jj-empty-check)
+		echo >&2 "nothing to commit; please bump the version first."
+		exit 1
+	fi
+	jj commit -m "Lilac ${version}" # (ref:stamp-jj-commit)
+else
+	git commit -am "Lilac ${version}"
+fi
 git tag -a "v${version}" -m "Lilac ${version}"
 #+end_src
 

@@ -14,5 +14,13 @@ fi
 version="$(awk \
 	'/^#\+name: Lilac version$/{getline; getline; print}' index.org)"
 
-git commit -am "Lilac ${version}"
+if [[ -d .jj ]]; then
+	if [[ -z "$(jj diff --summary)" ]]; then #
+		echo >&2 "nothing to commit; please bump the version first."
+		exit 1
+	fi
+	jj commit -m "Lilac ${version}" #
+else
+	git commit -am "Lilac ${version}"
+fi
 git tag -a "v${version}" -m "Lilac ${version}"
