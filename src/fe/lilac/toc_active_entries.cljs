@@ -103,13 +103,4 @@
           observer
             (new js/IntersectionObserver update-visible-headings options)] ;
       (doseq [heading-container heading-containers]
-        (.observe observer heading-container))) ;
-
-    (let [toc-entry-links (.querySelectorAll js/document ".toc-entry a")]
-      (doseq [link toc-entry-links]
-        (.addEventListener
-           link "click" ;
-           (fn [event]
-             (let [clicked-link (.-currentTarget event)]
-               (when-not (.contains (.-classList clicked-link) "active") ;
-                 #(reset! visible-headings #{}))))))))) ;
+        (.observe observer heading-container))))) ;

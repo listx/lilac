@@ -415,19 +415,10 @@ information, which is woven in as a JSON object in the HTML inside
           observer
             (new js/IntersectionObserver update-visible-headings options)] ; (ref:ns:lilac.toc-active-entries-update-visible-headings)
       (doseq [heading-container heading-containers]
-        (.observe observer heading-container))) ; (ref:watch-heading-containers)
-
-    (let [toc-entry-links (.querySelectorAll js/document ".toc-entry a")]
-      (doseq [link toc-entry-links]
-        (.addEventListener
-           link "click" ; (ref:ns:lilac.toc-active-entries-click-handlers)
-           (fn [event]
-             (let [clicked-link (.-currentTarget event)]
-               (when-not (.contains (.-classList clicked-link) "active") ; (ref:ns:lilac.toc-active-entries-reset-atom)
-                 #(reset! visible-headings #{}))))))))) ; (ref:reset-headings-on-click)
+        (.observe observer heading-container))))) ; (ref:watch-heading-containers)
 #+end_src
 
-The ~init~ function [[(ns:lilac.toc-active-entries-init)]] has four parts:
+The ~init~ function [[(ns:lilac.toc-active-entries-init)]] has three parts:
 
   1) Read in the heading ancestry JSON (as a native Clojure map), via
      [[f:get-heading-ancestry]] at [[(read-ancestry)]].
@@ -441,20 +432,6 @@ The ~init~ function [[(ns:lilac.toc-active-entries-init)]] has four parts:
      longer becomes) visible in the viewport
      [[(ns:lilac.toc-active-entries-update-visible-headings)]].
      [[f:update-visible-headings]] modifies the ~visible-headings~ atom.
-
-  4) Assign click handlers to TOC entry links
-     [[(ns:lilac.toc-active-entries-click-handlers)]], so that if a user clicks on a
-     link from the TOC, we trigger a reset of the ~visible-headings~ atom at
-     [[(reset-headings-on-click)]]. This is so that the Intersection Observer API
-     can populate that atom again in its callback. This way, we cleanly separate
-     what the user does in the main viewport (scrolling it to trigger the
-     Intersection Observer API), and what the user does in the TOC by clicking
-     on links. If we don't have these click handlers in the TOC, then clicking
-     on the TOC can potentially end up with weird snapping behavior.
-
-     Note that the reset of the atom is only done if the heading that is clicked
-     on is not already active [[(ns:lilac.toc-active-entries-reset-atom)]] (that is,
-     we don't do anything if the heading is already visible).
 
 The ~:rootMargin "0px 0px 0px 0px"~ [[(ns:lilac.toc-active-entries-rootMargin)]] just
 makes the entire viewport the thing to check intersections against, and the
