@@ -517,16 +517,20 @@ findExternalOids orgDoc =
   where
     searchInsideProse cell = case cell of -- (ref:f:findExternalOids-searchInsideProse)
       CBlock block -> foldl' getLinkFromBToken [] block.body
-      CHeading heading -> foldl' getLinkFromPToken [] heading.body.unProse
-      CParagraph prose -> foldl' getLinkFromPToken [] prose.unProse
+      CHeading heading -> getLinksFromProse [] heading.body
+      CParagraph prose -> getLinksFromProse [] prose
       CGlossaryTerm glossaryTerm ->
-        foldl' getLinkFromPToken [] glossaryTerm.definition.unProse
+        getLinksFromProse
+          (getLinksFromProse [] glossaryTerm.term)
+          glossaryTerm.definition
       CTable table ->
-        foldl'
-          (\acc prose -> foldl' getLinkFromPToken acc prose.unProse)
-          []
-          table.grid
+        getLinksFromProse
+          (foldl' getLinksFromProse [] table.grid)
+          table.caption
+      CFigure figure -> getLinksFromProse [] figure.caption
+      CFootnote footnote -> getLinksFromProse [] footnote.body
       _ -> []
+    getLinksFromProse acc prose = foldl' getLinkFromPToken acc prose.unProse
     getLinkFromBToken acc bToken = case bToken of -- (ref:f:findExternalOids-getLinkFromBToken)
       BTokenLinkTarget linkTarget -> keepIfExternal acc linkTarget
       _ -> acc
@@ -547,7 +551,10 @@ findExternalOids orgDoc =
 #+end_src
 
 First we have to look at all areas where prose text can occur
-[[(f:findExternalOids-searchInsideProse)]]. The prose-like containers fall into two
+[[(f:findExternalOids-searchInsideProse)]], including the less obvious ones like
+glossary terms, footnote bodies, and the captions of figures and tables. If we
+miss one of these, then a broken link inside it will not get reported, and will
+instead get woven as a dead link by [[id:a63d2021-2596-4c43-81e3-d08e90077f75::f:showBrokenLink][f:showBrokenLink]]. The prose-like containers fall into two
 categories: [[id:e3400781-57e7-409d-a65c-7c3d66847587::data:BToken][data:BToken]] and [[id:c8616126-215d-49be-8874-c2aca7d93a54::data:PToken][data:PToken]]; these are handled by ~getLinkFromBToken~
 [[(f:findExternalOids-getLinkFromBToken)]] and ~getLinkFromPToken~
 [[(f:findExternalOids-getLinkFromPToken)]] respectively, which harvest the links out
@@ -1125,6 +1132,52 @@ expectArchiveError
         [ "Found broken links:",
           "  id:00000000-0000-0000-0000-00000000d003::x (test/Lilac/CompileSpec/0401-broken-links-noweb)",
           "  id:00000000-0000-0000-0000-00000000d000::c (test/Lilac/CompileSpec/0401-broken-links-noweb)"
+        ]
+  )
+#+end_src
+
+Detect broken links in all of the other cells that have prose in them.
+
+#+name: ti:0401-broken-links-prose-cells
+#+header: :tangle test/Lilac/CompileSpec/0401-broken-links-prose-cells
+#+header: :noweb off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d010
+:END:
+
+Hello [fn:note] world.
+
+  - [[term]] :: [[definition]]
+
+,#+name: fig:hello
+,#+caption: [[figure-caption]]
+,#+type: figure
+[[file:image/hello.png]]
+
+,#+name: tbl:hello
+,#+caption: [[table-caption]]
+| Name   |
+|--------|
+| [[table-cell]] |
+
+[fn:note] [[footnote]]
+#+end_src
+
+#+name: t:0401-broken-links-prose-cells
+#+begin_src haskell
+expectArchiveError
+  ["0401-broken-links-prose-cells"]
+  ( toString
+      $ T.intercalate
+        "\n"
+        [ "Found broken links:",
+          "  id:00000000-0000-0000-0000-00000000d010::term (test/Lilac/CompileSpec/0401-broken-links-prose-cells)",
+          "  id:00000000-0000-0000-0000-00000000d010::table-cell (test/Lilac/CompileSpec/0401-broken-links-prose-cells)",
+          "  id:00000000-0000-0000-0000-00000000d010::table-caption (test/Lilac/CompileSpec/0401-broken-links-prose-cells)",
+          "  id:00000000-0000-0000-0000-00000000d010::footnote (test/Lilac/CompileSpec/0401-broken-links-prose-cells)",
+          "  id:00000000-0000-0000-0000-00000000d010::figure-caption (test/Lilac/CompileSpec/0401-broken-links-prose-cells)",
+          "  id:00000000-0000-0000-0000-00000000d010::definition (test/Lilac/CompileSpec/0401-broken-links-prose-cells)"
         ]
   )
 #+end_src
@@ -3479,6 +3532,7 @@ Below are all of the individual test cases.
 <<t:0400-external-symbols>>
 <<t:0400-external-symbols-newlines>>
 <<t:0401-broken-links-noweb>>
+<<t:0401-broken-links-prose-cells>>
 <<t:0401-broken-links-paragraph>>
 <<t:0401-broken-links-paragraph-ok>>
 <<t:0401-broken-links-line-label>>

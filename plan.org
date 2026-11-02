@@ -24,11 +24,12 @@ other sections as needed.
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
-** TODO compile: detect broken links in more cells
+** DONE compile: detect broken links in more cells
 
-[[id:01da95fe-ba23-4481-9833-428423392f5f::f:findExternalOids][f:findExternalOids]] doesn't look inside footnote bodies, glossary terms, or figure
-and table captions. A broken link in these places passes [[id:a9bad6d4-5b1c-48de-8f09-178724859381::f:findBrokenLinks][f:findBrokenLinks]] and
-is woven by [[id:a63d2021-2596-4c43-81e3-d08e90077f75::f:showBrokenLink][f:showBrokenLink]] as ~LILAC_BROKEN_LINK~. Fixing this may reveal existing broken links in our docs.
+[[id:01da95fe-ba23-4481-9833-428423392f5f::f:findExternalOids][f:findExternalOids]] didn't look inside footnote bodies, glossary terms, or figure
+and table captions. A broken link in these places passed [[id:a9bad6d4-5b1c-48de-8f09-178724859381::f:findBrokenLinks][f:findBrokenLinks]] and
+was woven by [[id:a63d2021-2596-4c43-81e3-d08e90077f75::f:showBrokenLink][f:showBrokenLink]] as ~LILAC_BROKEN_LINK~. Now it looks in these places too.
+This didn't reveal any broken links in our docs.
 
 ** DONE frontend: remove the TOC click handler
 

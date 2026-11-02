@@ -735,16 +735,20 @@ findExternalOids orgDoc =
   where
     searchInsideProse cell = case cell of --
       CBlock block -> foldl' getLinkFromBToken [] block.body
-      CHeading heading -> foldl' getLinkFromPToken [] heading.body.unProse
-      CParagraph prose -> foldl' getLinkFromPToken [] prose.unProse
+      CHeading heading -> getLinksFromProse [] heading.body
+      CParagraph prose -> getLinksFromProse [] prose
       CGlossaryTerm glossaryTerm ->
-        foldl' getLinkFromPToken [] glossaryTerm.definition.unProse
+        getLinksFromProse
+          (getLinksFromProse [] glossaryTerm.term)
+          glossaryTerm.definition
       CTable table ->
-        foldl'
-          (\acc prose -> foldl' getLinkFromPToken acc prose.unProse)
-          []
-          table.grid
+        getLinksFromProse
+          (foldl' getLinksFromProse [] table.grid)
+          table.caption
+      CFigure figure -> getLinksFromProse [] figure.caption
+      CFootnote footnote -> getLinksFromProse [] footnote.body
       _ -> []
+    getLinksFromProse acc prose = foldl' getLinkFromPToken acc prose.unProse
     getLinkFromBToken acc bToken = case bToken of --
       BTokenLinkTarget linkTarget -> keepIfExternal acc linkTarget
       _ -> acc

@@ -89,6 +89,21 @@ spec = do
     )
 
   expectArchiveError
+    ["0401-broken-links-prose-cells"]
+    ( toString
+        $ T.intercalate
+          "\n"
+          [ "Found broken links:",
+            "  id:00000000-0000-0000-0000-00000000d010::term (test/Lilac/CompileSpec/0401-broken-links-prose-cells)",
+            "  id:00000000-0000-0000-0000-00000000d010::table-cell (test/Lilac/CompileSpec/0401-broken-links-prose-cells)",
+            "  id:00000000-0000-0000-0000-00000000d010::table-caption (test/Lilac/CompileSpec/0401-broken-links-prose-cells)",
+            "  id:00000000-0000-0000-0000-00000000d010::footnote (test/Lilac/CompileSpec/0401-broken-links-prose-cells)",
+            "  id:00000000-0000-0000-0000-00000000d010::figure-caption (test/Lilac/CompileSpec/0401-broken-links-prose-cells)",
+            "  id:00000000-0000-0000-0000-00000000d010::definition (test/Lilac/CompileSpec/0401-broken-links-prose-cells)"
+          ]
+    )
+
+  expectArchiveError
     ["0401-broken-links-paragraph"]
     ( toString
         $ T.intercalate
