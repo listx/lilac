@@ -11,6 +11,8 @@ if awk '/ COMMIT$/ { found=1; exit } END { exit !found }' release-notes.org; the
 	exit 1
 fi
 
+./check-commit-shas.sh #
+
 version="$(awk \
 	'/^#\+name: Lilac version$/{getline; getline; print}' index.org)"
 

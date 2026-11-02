@@ -308,6 +308,8 @@ if awk '/ COMMIT$/ { found=1; exit } END { exit !found }' release-notes.org; the
 	exit 1
 fi
 
+./check-commit-shas.sh # (ref:stamp-check-commit-shas)
+
 version="$(awk \
 	'/^#\+name: Lilac version$/{getline; getline; print}' index.org)"
 
@@ -321,6 +323,63 @@ else
 	git commit -am "Lilac ${version}"
 fi
 git tag -a "v${version}" -m "Lilac ${version}"
+#+end_src
+
+*** Check commit hashes cited in commit messages
+
+Rewriting history changes the hash of every rewritten commit and its
+descendants, so commit messages can end up citing hashes that are no longer in
+our history. Once a release is tagged those messages are effectively permanent,
+so [[stamp-new-version.sh]] runs [[check-commit-shas.sh]] first
+[[(stamp-check-commit-shas)]]. It checks every commit message since the latest
+annotated tag.
+
+The old commit objects can stay in the repo long after a rewrite (Jujutsu keeps
+them around for its operation log), so merely looking up a hash isn't enough.
+Instead we require each cited commit to be an ancestor of ~HEAD~ [[(check-is-ancestor)]].
+This also rejects hashes that Git has never heard of, because then
+~git merge-base~ fails with an error.
+
+We only look at message bodies, because titles don't cite other commits. We skip
+lines indented by 4 spaces [[(check-skip-indented)]], because these hold copied text
+such as logs, which can contain hashes from other repositories.
+
+We recognize a citation by its shape instead of guessing whether a word looks
+like a hash, because a hash can be made up of only letters or only digits. A
+citation is 7 to 40 hexadecimal digits followed by a parenthesized title
+[[(check-find-shas)]], as in ~0123abcd (title, date)~, which is the style that
+~git log --format=reference~ prints. Wrapping can put the hash and the title on
+different lines, so we first join each paragraph into a single line
+[[(check-join-paragraphs)]].
+
+#+name: check-commit-shas.sh
+#+header: :tangle check-commit-shas.sh
+#+header: :shebang #!/usr/bin/env bash
+#+begin_src bash
+set -euo pipefail
+
+cited_shas()
+{
+	git log -1 --format=%b "$1" \
+		| sed 's/^    .*//' \ (ref:check-skip-indented)
+		| awk 'BEGIN { RS = "" } { gsub(/\n */, " "); print }' \ (ref:check-join-paragraphs)
+		| grep -oE '\b[0-9a-f]{7,40} \(' \ (ref:check-find-shas)
+		| cut -d' ' -f1
+}
+
+tag="$(git describe --abbrev=0)"
+status=0
+
+while read -r commit; do
+	while read -r sha; do
+		if ! git merge-base --is-ancestor "$sha" HEAD 2>/dev/null; then # (ref:check-is-ancestor)
+			echo >&2 "$(git log -1 --format='%h ("%s")' "$commit") cites ${sha}, which is not in the history."
+			status=1
+		fi
+	done < <(cited_shas "$commit")
+done < <(git rev-list "${tag}..HEAD")
+
+exit "$status"
 #+end_src
 
 * Contributing
