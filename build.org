@@ -679,8 +679,8 @@ citeproc = buildSmaller (prev.callCabal2nix "citeproc" (let
 in "${repo}") { });
 #+end_src
 
-We also have to jailbreak (disable tests) for =unicode-data= (a dependency of
-=citeproc=), because otherwise it fails like [[build-failure:unicode-data]]:
+We also have to disable tests for =unicode-data= (a dependency of =citeproc=),
+because otherwise it fails like [[build-failure:unicode-data]]:
 
 #+name: jailbreaks:unicode-data
 #+begin_src nix
