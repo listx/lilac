@@ -72,7 +72,7 @@ Paragraph
 CListItem [LItemEnd,LUnorderedEnd]
 #+end_src
 
-we want to avoid weaving the ~ListMarkers~ because we want the glossary terms to
+we want to avoid weaving the ~ListMarker~ values because we want the glossary terms to
 be in the same (single) description list.
 
 * Solution Design
@@ -179,7 +179,7 @@ The description list in HTML uses this construct:
 
 Each glossary term will have a term (~<dt>~) and a definition (~<dd>~). Even though
 the HTML treats these as siblings, for us we will want to enclose them inside a
-single entity, as ~GlossaryItemStart~ and ~GlossaryItemEnd~.
+single entity, as ~LGlossaryItemStart~ and ~LGlossaryItemEnd~.
 
 | HTML  | New List Marker     | Purpose                                         |
 |-------+---------------------+-------------------------------------------------|
@@ -229,7 +229,7 @@ between glossary terms.
 Using LCIs (integers) is lightweight and doesn't require major changes to how we parse cells.
 
 To understand whether we are inside a glossary definition boundary or group
-boundary, we can convert the tuples into an ~IntMap~ and use ~lookupLE~, like this:
+boundary, we can convert the tuples into a ~Map~ and use ~lookupLE~, like this:
 
 #+begin_src haskell
 import qualified Data.Map.Strict as M
