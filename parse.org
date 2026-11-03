@@ -211,9 +211,9 @@ later, much like citations.
 *** ~lineLabels~
 
 The ~lineLabels~ [[(data:OrgDoc-lineLabels)]] are for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line labels]] (named positions /inside/ a
-block, which you can link to from the prose text). We reset the numbering
-of these back to 1 every time we see a new block, so we keep track of the
-assigned numbers here with a map.
+block, which you can link to from the prose text). We number these sequentially
+across the whole document, and keep track of the assigned numbers here with a
+map.
 
 *** Citations
 :PROPERTIES:
@@ -482,7 +482,7 @@ the [[(data:OrgParserState-anonBlockNumber)]], but for rich blocks.
 *** Fields for line labels
 
 The ~lineLabelNumber~ [[(data:OrgParserState-lineLabelNumber)]] is a sequential counter for [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][Line
-labels]] which is reset at every block.
+labels]] across the whole document.
 
 The ~lineLabels~ map [[(data:OrgParserState-lineLabels)]] associates the label with
 the label number and also the first local cell index which references this line
