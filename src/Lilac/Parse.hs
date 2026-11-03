@@ -588,7 +588,7 @@ headingParser = do
     fail
       $ "found "
       <> show lenStars
-      <> " asterisks found for this heading, but "
+      <> " asterisks for this heading, but "
       <> "lilac_maxHeadingLevel = "
       <> show opc.maxHeadingLevel
   failIfHeadingNestsWithoutDirectParent currentHeadingLevel lenStars
@@ -1781,7 +1781,7 @@ richBlockStartParser = do
   pState <- get
   when (pState.activeRichBlock /= "")
     $ fail
-      ( "nesting of rich blocks are not allowed; already inside a #+begin_"
+      ( "nesting of rich blocks is not allowed; already inside a #+begin_"
           <> (T.unpack pState.activeRichBlock) --
       )
   richBlockType <- richBlockTypeParser

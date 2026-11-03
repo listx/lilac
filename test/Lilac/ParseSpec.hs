@@ -261,7 +261,7 @@ spec = do
 
   shouldFailWithMessage
     "0004-headings"
-    "found 4 asterisks found for this heading, but lilac_maxHeadingLevel = 3"
+    "found 4 asterisks for this heading, but lilac_maxHeadingLevel = 3"
     19
 
   shouldParseWithState
@@ -316,7 +316,7 @@ spec = do
 
   shouldFailWithMessage
     "0004-headings-limited"
-    "found 3 asterisks found for this heading, but lilac_maxHeadingLevel = 2"
+    "found 3 asterisks for this heading, but lilac_maxHeadingLevel = 2"
     39
 
   shouldFailWithMessage
@@ -4038,7 +4038,7 @@ spec = do
 
   shouldFailWithMessage
     "0017-rich-blocks-nesting"
-    "nesting of rich blocks are not allowed; already inside a #+begin_warning"
+    "nesting of rich blocks is not allowed; already inside a #+begin_warning"
     29
 
   shouldFailWithMessage
