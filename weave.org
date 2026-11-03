@@ -1344,7 +1344,7 @@ when (not onlyLocalImports') $ defaultMathJaxImport -- (ref:MathJax script-onlyL
 
 We only import MathJax over the CDN [[(MathJax script-onlyLocalImports)]] if the
 user does /not/ request to only have local imports, because the MathJax JS import
-pulls in JS over a CDN).
+pulls in JS over a CDN.
 
 MathJax is configurable, so we customize it in [[MathJax customization]]. Similarly,
 we disable this if the user requested local imports, with the understanding that
@@ -1695,7 +1695,7 @@ the block together (otherwise the browser will be happy to insert page breaks in
 between the different DIVs).
 
 [[(css:print-preview-blocks-reset-left-margin)]] resets the left margin,
-because the ~block-controls~ are not visible see [[(css:Block grid
+because the ~block-controls~ are not visible; see [[(css:Block grid
 layout-negative-left-margin)]].
 
 Without [[(css:print-preview-blocks-span-tweak)]], we end up with code with
@@ -1751,7 +1751,7 @@ toSafeHtmlId = T.map onlyKeepSomeChars
 #+end_src
 
 The [[f:getLinkAnchor]] function generates the unique, human-friendly ID of a
-[[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Cell][data:Cell]]. It uses the cell's metadata where appropriate it can. For paragraphs,
+[[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::data:Cell][data:Cell]]. It uses the cell's metadata where it can. For paragraphs,
 because they cannot have metadata we just use the local cell index
 [[(f:getLinkAnchor-paragraph-lci)]].
 
@@ -3246,7 +3246,7 @@ language specified for it [[(f:weaveBlockBody-lang)]].
 :END:
 
 We use a modified variation of the ~kate~ theme from [[https://hackage.haskell.org/package/skylighting][=Skylighting=]] (see
-[[f:colorizeText]]) which we call [[f:kateLilac]] We make some tweaks to make some
+[[f:colorizeText]]) which we call [[f:kateLilac]]. We make some tweaks to make some
 colors easier on the eyes. In particular, the ~ExtensionTok~ by default is too
 bright, so we darken it a bit here [[(f:kateLilac-ExtensionTok)]].
 
@@ -3924,7 +3924,7 @@ getFirstColumnCells table =
 This row is then fed into the helper function
 [[(f:weaveTableColumnGroups-colgroups-helper)]] which uses [[f:getTableCellsFromRow]] to
 get the (visible) cells from the row we're interested in (it drops the cell in
-the first column if it has a making character in it).
+the first column if it has a marking character in it).
 
 #+name: f:getTableCellsFromRow
 #+begin_src haskell
@@ -3981,7 +3981,7 @@ the /total/ number of columns.
 :ID:       3639163b-03e8-49a6-9f41-7a275780c1bb
 :END:
 
-The first row is the called the table "head" (for ~<thead>~) and the rest are the
+The first row is called the table "head" (for ~<thead>~) and the rest are the
 "body" (for ~<tbody>~).
 
 #+name: f:weaveTableRows
@@ -4317,7 +4317,7 @@ elements) is handled in [[f:weaveListMarker]].
 :ID:       587b019b-74c0-4af1-8144-29fcb920cd56
 :END:
 
-A user may want to have a combine list of all glossary terms defined in the
+A user may want to have a combined list of all glossary terms defined in the
 document, as discussed in [[id:e8ad30e5-5305-40e7-80ed-78bcec636ec1][Printing glossaries]].
 
 #+name: f:weaveGlossary
@@ -5873,7 +5873,7 @@ that scenario it would feel much more natural to have a nested structure. The
 spirit of this is very similar to how we computed the section numbers for each
 heading in [[id:16a68a74-d4cc-41a4-ac77-cbca77de2a31::f:headingParser][f:headingParser]]. Every time we enter a nesting level, we'll have to
 create a new ordered list tag (~<ol>~), and every time we leave a level (and we
-may leave more than one level at once), we have to close those unordered list
+may leave more than one level at once), we have to close those ordered list
 tags (with ~</ol>~).
 
 #+name: f:weaveToc
@@ -7248,7 +7248,7 @@ getCiteprocResultFromPath path = do
 #+end_src
 
 [[f:expectCiteprocResult]] takes an ~Either String (CP.Result Prose)~. If it's a ~Right~
-values, it checks the citations and bibliography for a given Org doc in the
+value, it checks the citations and bibliography for a given Org doc in the
 ~test/Lilac/WeaveSpec~ folder. If it's a ~Left~ value, it expects the operation to
 fail, and expects to find a substring.
 
