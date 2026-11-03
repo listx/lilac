@@ -267,7 +267,7 @@ devShellEnv = pkgs.buildEnv {
 
 There are three main things we want to add to the ~PATH~: scripts, tools, and GHC.
 
-The ~scripts~ are the custom shell scripts we defined earlier in [[nix/scripts.nix]].
+The ~scripts~ are the custom shell scripts we define later in [[nix/scripts.nix]].
 
 #+name: nix:scripts
 #+begin_src nix
@@ -857,7 +857,7 @@ thing: dep1 dep2
 #+end_src
 
 =make= will assume that the output of ~do-something~ will be a file named =thing= and
-will only run ~do-something~ if either =dep1= =dep2= have a newer timestamp than
+will only run ~do-something~ if either =dep1= or =dep2= have a newer timestamp than
 =thing=.
 
 For cases where ~do-something~ does /not/ result in generating the file =thing=, we
@@ -1672,7 +1672,7 @@ separately for each formatter or linter, so it's nice to let ~pre-commit~ handle
 it for us.
 
 In addition, ~pre-commit~ supports all of the usual Git hooks, not just
-=pre-commit=. This can come in handy..
+=pre-commit=. This can come in handy.
 
 ** =git-hooks.nix=
 :PROPERTIES:
