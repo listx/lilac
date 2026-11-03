@@ -1644,7 +1644,7 @@ The ~bracketBalance~ is set to 0 [[(f:cellParser-bracketBalance-reset)]] in
 [[f:cellParser]] after a cell is parsed, because we're not interested in cross-cell
 issues about unbalanced brackets. See [[f:failIfUnbalancedBrackets]].
 
-The rest of the top-level headings this document is mainly concerned with
+The rest of the top-level headings in this document are mainly concerned with
 describing all of the different building blocks used for constructing cells.
 
 ** Tests
@@ -2043,7 +2043,7 @@ data Style
 #+end_src
 
 The [[f:styleMarkers]] keeps track of the characters that activate and deactivate
-each style. It has the syntactic characters we use to /mark/ text with the a
+each style. It has the syntactic characters we use to /mark/ text with a
 supported /style/.
 
 We don't actually allow users to use the ~Smallcaps~, ~Subscript~, or ~Superscript~
@@ -3392,7 +3392,7 @@ The first one, ~[[foo]]~, is called an /implicit/ link; it links to some other c
 (block, table, figure, etc) within the /current/ document, without (explicitly)
 specifying the OID of the current document. All documents must have an OID, and
 it is parsed in [[f:docMetaParser]]. Implicit links only specify the target (in this
-example, ~foo~.
+example, ~foo~).
 
 The second one, ~[[id:62a7d69a-7aa7-4607-b93e-7ed382a5f256][link display name]]~,
 refers to an OID explicitly. The OID could be either a document itself (the
@@ -3407,7 +3407,7 @@ newlines in it.
 
 For all three examples, the part in the first set of brackets (~foo~,
 ~id:62a7d69a-7aa7-4607-b93e-7ed382a5f256~, and
-~id:62a7d69a-7aa7-4607-b93e-7ed382a5f256::name of target item~) are all parsed by
+~id:62a7d69a-7aa7-4607-b93e-7ed382a5f256::target name~) are all parsed by
 [[f:oidReferenceParser]].
 
 #+name: f:oidReferenceParser
@@ -4238,7 +4238,7 @@ where ~foo~ is a path on the local filesystem (you can select the path using
 completion from Emacs). These links are useful for linking out to a file which
 you can open up using Emacs.
 
-Practically speaking, in only makes sense to use these links to point to files
+Practically speaking, it only makes sense to use these links to point to files
 that are already tracked by the Git repo that we're in (if we're using Lilac as
 a static site generator), because otherwise we might risk creating a broken link
 (assuming that the published site only includes files that are tracked in Git).
@@ -4850,7 +4850,7 @@ footnoteDefinitionParser = do
 
 When we have finished parsing the document, it's expected that all footnote
 links and definitions line up with each other (that there is an exact 1:1
-match). If there are either links that don't have an associated reference or a
+match). If there are either links that don't have an associated definition or a
 definition without an associated link, it's considered an error.
 
 #+name: f:reconcileFootnotes
@@ -6856,7 +6856,7 @@ here, if we wanted to round trip back from ~Text~ into [[newtype:Prose]] we woul
 because [[f:proseParser]] does not support parsing these markers.
 
 Converting a [[data:StyledText]] back into a ~Text~ is straightforward. We simply
-surround the bold text with the appropriate style markers.
+surround the text with the appropriate style markers.
 
 #+name: f:unparseStyledText
 #+begin_src haskell
@@ -7149,7 +7149,7 @@ addQuotes prose = Prose $ [quote] <> prose.unProse <> [quote]
 
 The ~movePunctuationInsideQuotes~ function moves all commas and periods to come
 just /before/ the quote, instead of after it. For example, ~"a".~ would be converted
-into ~"b."~. Because of the way styles are handled though, a [[data:PToken]] can only
+into ~"a."~. Because of the way styles are handled though, a [[data:PToken]] can only
 see text that have the same style; if there are two of them, and they each have
 a piece of the punctuation combination we are concerned about, this won't work.
 However, such cases should be rare, and even if we did support that case, it
@@ -7766,9 +7766,9 @@ shouldFailWithMessage
 
 The number of asterisks determine the nesting level. By default there can be
 only 3 levels (maximum of 3 asterisks for a heading), although you can raise
-this number with [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extensions]]). Still, there should be probably no more than
+this number with [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extensions]]. Still, there should be probably no more than
 6 asterisks for a heading because HTML heading tags ~<h1>~, ~<h2>~, etc only go up
-to ~<h6>~). This Org document itself only uses 3 sections.
+to ~<h6>~. This Org document itself only uses 3 sections.
 
 The heading may also have some metadata associated with it. In practice this
 will be keys and values from a ~:PROPERTIES:~ [[https://orgmode.org/manual/Drawers.html][drawer]], although other drawers are
@@ -8436,7 +8436,7 @@ data Block = Block
 The type of block (such as ~src~ or ~example~ as discussed above) is stored in the
 metadata map ~meta~ [[(data:Block-meta)]], with the ~__block_type~ key. See [[Expected
 blocks for 0007-blocks-empty]] for examples, as well as the [[id:dc13dd01-13c4-42a6-910e-4b6d66be428b][Metadata]] section for
-more a more detailed discussion.
+a more detailed discussion.
 
 The ~parentOid~ [[(data:Block-parentOid)]] is the closest heading which has a ~:ID:~
 property (aka OID), or the [[newtype:OID][OID of the document]] if none of the headings have an
@@ -8471,10 +8471,10 @@ There are two kinds of metadata formats that blocks accept:
 
   1) The ~#+key: value~ format. The most common (and probably important) one is
      the ~#+name: ...~ metadata, as it allows blocks to be referenced by other
-     blacks by its name. The generic [[f:metaParser]] is used to parse these values
+     blocks by its name. The generic [[f:metaParser]] is used to parse these values
      (not just for blocks but also for [[id:a090bf9c-0e52-422b-b0f0-51e3b1bf1698][Figures]]).
 
-  2) The ~#+header: :key value~ format. The most common ones here is
+  2) The ~#+header: :key value~ format. The most common one here is
      ~#+header: :tangle ...~ which specifies the tangle path of the block.
      [[f:blockMetaEntryParser]] is used to parse these ones.
 
@@ -8686,7 +8686,7 @@ metaEntryParser = do
 For the ~#+name~ key, we prohibit the use of the opening parenthesis as the first
 character of the name at [[(non-line-label name)]], because then that would make
 ~[[(foo)]]~ ambiguous (it could refer to either something named ~(foo)~, or it could
-refer to a [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][line label]] ~(ref:foo)~.
+refer to a [[id:da4aa2a7-3896-4969-aa5e-5e3d842c35db][line label]] ~(ref:foo)~).
 
 #+name: ti:0007-blocks-no-name-with-opening-parenthesis
 #+header: :tangle test/Lilac/ParseSpec/0007-blocks-no-name-with-opening-parenthesis
@@ -8799,7 +8799,7 @@ shouldFailWithMessage
 :ID:       e3400781-57e7-409d-a65c-7c3d66847587
 :END:
 
-The contents or ~body~ of a [[data:Block]] is list of [[data:BToken]] values, which are
+The contents or ~body~ of a [[data:Block]] is a list of [[data:BToken]] values, which are
 quite similar to [[newtype:Prose]] (a list of [[data:PToken]] types). A ~BToken~ can be
 either some raw piece of text, or a link. The link is only for the case of Noweb
 references. For example, if a block contains a Noweb reference, then it needs to
@@ -9628,7 +9628,7 @@ nowebLinkAtEndOfLine line = <<link-marker>> `T.isSuffixOf` line
 #+end_src
 
 For the list of booleans we get from [[f:getLinkPaddingBools]], all we have to do is
-go through all of the links in the block, adding a ~BTokenPaddding~ every time we
+go through all of the links in the block, adding a ~BTokenPadding~ every time we
 see a ~True~ boolean (~padLink~).
 
 #+name: f:padConsecutiveNowebLinks
@@ -10154,7 +10154,7 @@ shouldFailWithMessage
 
 If we have a malformed rich block ending in the middle of the document (followed
 by a proper ending), we should still fail the parse because the malformed text
-should not be able to be parsed by any other parse.
+should not be able to be parsed by any other parser.
 
 #+name: ti:0017-rich-blocks-clean-ending-malformed-middle
 #+header: :tangle test/Lilac/ParseSpec/0017-rich-blocks-clean-ending-malformed-middle
@@ -10796,7 +10796,7 @@ https://markkarpov.com/tutorial/megaparsec.html#nested-indented-list).
 :END:
 
 Before getting into parsing the list items and taking into account all of the
-[[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][rules]], let's first consider case where we just want to /close off/ the
+[[id:32d34523-2148-4f2f-b2f3-2a2543a7d57c][rules]], let's first consider the case where we just want to /close off/ the
 list items, as this is simpler than creating list items. We want to do this
 every time we parse initial indentation where there is no list head. For
 example, in the following
@@ -12501,7 +12501,7 @@ shouldFailWithMessage
 
 If a list item starts with a glossary term, then all items at that level must
 also be a glossary term. Conversely, if the first item is not a glossary term
-than all subsequent items at that level cannot be glossary terms. This is what
+then all subsequent items at that level cannot be glossary terms. This is what
 we call the "uniformity rule", and the idea is to make it so that we can display
 glossary terms without list item bullets.
 
@@ -13977,10 +13977,10 @@ data MathFragment = MathFragment
 #+end_src
 
 There are three ways to write math fragments: using ~\begin{equation}~ and
-~\end{equation}~, ~\[ ... \]~, or ~\( ... \)~. The first two ways requires them to
+~\end{equation}~, ~\[ ... \]~, or ~\( ... \)~. The first two ways require them to
 start at the beginning of the line, while the third way allows them to be
 embedded inside prose text (and displayed inside the paragraph). The third way
-has is discussed in [[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][Inline math fragments]].
+is discussed in [[id:216e94b7-e037-4f3e-856a-2040d0d0a75a][Inline math fragments]].
 
 We limit our discussion here to parsing the first two ways, which are /standalone/
 math fragments. They are called standalone because they are their own [[data:Cell][cells]] (as
@@ -14376,7 +14376,7 @@ shouldParseWithState
 The tests here are all designed to read from mostly fully-fledged Org source
 documents. (We say "mostly fully-fledged" because many of the test inputs don't
 have the required document OID in it (because it is redundant and largely
-meaningless for test cases that don't are about the document OID); these tests
+meaningless for test cases that aren't about the document OID); these tests
 rely on [[f:nilOidOrgDocPrefix]] to be prefixed to the input.)
 
 Anyway, there are some benefits of writing test inputs as self-contained Org
