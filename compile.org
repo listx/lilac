@@ -2704,7 +2704,8 @@ getCitationStyle filePath = do
 #+end_src
 
 [[f:parseCitationStyle]] just delegates most of the work to ~parseStyle~ from
-~Citeproc.Style~. We expect the contents to be in ~CslJson Text~ format.
+~Citeproc.Style~. The input is the raw XML of the CSL style file, and the parsed
+style produces its output as ~CslJson Text~.
 
 #+name: f:parseCitationStyle
 #+begin_src haskell
