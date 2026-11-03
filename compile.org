@@ -3197,8 +3197,8 @@ stripStyles (Prose pTokens) = Prose (concatMap stripStyle pTokens)
 #+end_src
 
 [[f:getCellName]] is similar to [[f:gciToName]], but it only returns a
-~Just~ value if the cell is a block, figure, table, footnote, or math fragment
-that has a ~#+name: ...~.
+~Just~ value if the cell is a footnote, or if it is a block, figure, table, or
+math fragment that has a ~#+name: ...~.
 
 #+name: f:getCellName
 #+begin_src haskell
