@@ -3122,17 +3122,9 @@ to. For now, this data structure only supports the following cases:
 
   4) URI (a typical web link, most common example being ~https://...~).
 
-  5) File path. These links are only useful because they let you go open that
-     file on disk locally in Emacs. On weaving these links are checked if they
-     refer to a path inside the current Git repo. If they are inside, then we
-     calculate what the link /should/ target (based on the weaving configuration),
-     assuming that the entire Git repo is also being served somewhere on the
-     internet.
-
-     If the file path is pointing to a place outside the Git repo, then upon
-     weaving we display it as a path description (and not as a link), because
-     the link will be broken anyway (again, assuming that only the content
-     inside the Git repo is accessible by a link).
+  5) File path. These links let you go open that file on disk locally in Emacs.
+     On weaving, these links target the given path as is (with URI escaping), so
+     they only work if that path is also being served.
 
 There are also [[id:8fe81206-f50d-4200-a95e-99278e0ad410][Raw links]] which is prose text that looks like a URL. For example,
 https://www.haskell.org is an example of a raw link. This is a convenience
