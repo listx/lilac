@@ -712,8 +712,8 @@ spec = do
           resultWarnings = []
         }
 
-getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
-getWovenPrettyFromPath path = do
+getWovenFromPath :: FilePath -> IO (Either String Text)
+getWovenFromPath path = do
   inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
@@ -781,7 +781,7 @@ searchOrderedNeedles haystackRaw needles =
 
 weaveExpect :: FilePath -> [Text] -> Spec
 weaveExpect path needles = do
-  result <- runIO $ getWovenPrettyFromPath path
+  result <- runIO $ getWovenFromPath path
   describe path $ do
     case result of
       Right haystack -> do

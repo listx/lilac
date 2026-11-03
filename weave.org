@@ -7100,21 +7100,21 @@ spec :: Spec
 spec = do
   <<All test cases>>
 
-<<f:getWovenPrettyFromPath>>
+<<f:getWovenFromPath>>
 <<f:searchOrderedNeedles>>
 <<f:weaveExpect>>
 <<f:getCiteprocResultFromPath>>
 <<f:expectCiteprocResult>>
 #+end_src
 
-[[f:getWovenPrettyFromPath]] weaves the given Org file to a =Text=, by first compiling
+[[f:getWovenFromPath]] weaves the given Org file to a =Text=, by first compiling
 it to an object. Then in our test cases we can check for expected substrings
 inside it.
 
-#+name: f:getWovenPrettyFromPath
+#+name: f:getWovenFromPath
 #+begin_src haskell
-getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
-getWovenPrettyFromPath path = do
+getWovenFromPath :: FilePath -> IO (Either String Text)
+getWovenFromPath path = do
   inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
   let parseResult =
@@ -7198,7 +7198,7 @@ inside the woven result.
 #+begin_src haskell
 weaveExpect :: FilePath -> [Text] -> Spec
 weaveExpect path needles = do
-  result <- runIO $ getWovenPrettyFromPath path
+  result <- runIO $ getWovenFromPath path
   describe path $ do
     case result of
       Right haystack -> do
@@ -7207,7 +7207,7 @@ weaveExpect path needles = do
       Left errMsg -> it "programmer error" $ expectationFailure errMsg
 #+end_src
 
-[[f:getCiteprocResultFromPath]] is like [[f:getWovenPrettyFromPath]], but it only
+[[f:getCiteprocResultFromPath]] is like [[f:getWovenFromPath]], but it only
 returns the result of calling [[f:prepareCitations]].
 
 #+name: f:getCiteprocResultFromPath
