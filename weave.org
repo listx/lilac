@@ -2625,9 +2625,9 @@ a ? do
 
 * List markers
 
-The =blaze-html= library we use expects to take care of the starting and closing
+The =lucid2= library we use expects to take care of the starting and closing
 tags for us automatically when we use its HTML tag functions. However, for
-list items we cannot use these functions (~H.ol~, ~H.ul~, ~H.li~) because they
+list items we cannot use these functions (~ol_~, ~ul_~, ~li_~) because they
 require our existing data structure to be nested as well (like a tree).
 
 But the cells we have are flat, and so we cannot use those functions. On the
@@ -7109,9 +7109,7 @@ spec = do
 
 [[f:getWovenPrettyFromPath]] weaves the given Org file to a =Text=, by first compiling
 it to an object. Then in our test cases we can check for expected substrings
-inside it. Note how it uses =renderHtml= from the =Text.Blaze.Html.Renderer.Pretty=
-module, because we want to be able to write test cases where we write expected
-HTML substrings in a prettified way (for readability).
+inside it.
 
 #+name: f:getWovenPrettyFromPath
 #+begin_src haskell
