@@ -721,7 +721,7 @@ data Archive = Archive
     ancestry :: Map GCI [GCI], -- (ref:data:Archive-ancestry)
     glossary :: Map (Text, GPath) (LCI, LCI), -- (ref:data:Archive-glossary)
     backlinks :: Map GPath (Map GPath [(GCI, GCI)]), -- (ref:data:Archive-backlinks)
-    preciseBacklinks :: Map LinkTarget [(Maybe GCI, GCI, Int)],
+    preciseBacklinks :: Map LinkTarget [(Maybe GCI, GCI, Int)], -- (ref:data:Archive-preciseBacklinks)
     oidAliases :: Map OID OID, -- (ref:data:Archive-oidAliases)
     offsets :: IntMap GPath, -- (ref:data:Archive-offsets)
     gtoc :: GTOC, -- (ref:data:Archive-gtoc)
@@ -798,8 +798,8 @@ inside it:
     constructed in [[id:dabccd5e-930e-4571-899f-1bfbdeab3d5e::f:oidLinkParser][f:oidLinkParser]]. See [[id:b1057136-48d5-402e-8e55-5a7e6a08efe4::f:weaveBacklinks][f:weaveBacklinks]] for how they are used
     during weaving.
 
-  - ~preciseBacklinks~ :: A map from each link target to the links which point
-    to it. See [[f:mkPreciseBacklinks]].
+  - ~preciseBacklinks~ :: [[(data:Archive-preciseBacklinks)]] A map from each link
+    target to the links which point to it. See [[f:mkPreciseBacklinks]].
 
   - ~oidAliases~ :: [[(data:Archive-oidAliases)]] A map from heading OIDs to the OID
     of the containing document. See [[f:mkOidAliases]].
