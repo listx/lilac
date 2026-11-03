@@ -983,7 +983,7 @@ on the action, it toggles just the ~:meta-visible?~ or ~:body-visible?~ boolean
 [[f:ensure-block-state]] just makes sure that we have an entry for the specific
 block that has been clicked on. If we don't have an entry for it, it creates the
 initial state for it with [[f:calculate-initial-state]]. The primary reason behind
-using these functions is to lazily load each block's state is it is clicked on
+using these functions is to lazily load each block's state as it is clicked on
 by the user; if the user doesn't click on anything then the ~state~ atom will
 remain empty. If we were to eagerly load each block's state, that would
 introduce unnecessary computation on page load.
@@ -1015,7 +1015,7 @@ the boolean state values we will use to keep track of it.
 
 Finally, we associate the change of the [[f:state]] atom with a callback to
 [[f:render-block!]] at [[(ns:lilac.block-controls-render-callback)]], before wiring
-up the click event lister on the document to [[f:handle-click!]]
+up the click event listener on the document to [[f:handle-click!]]
 [[(ns:lilac.block-controls-init-addEventListener)]].
 
 Now we are ready to talk about rendering the block based on the state.
