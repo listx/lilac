@@ -6753,9 +6753,9 @@ unfinished implementation would provide a solid starting point.
 
 ~CiteprocOutput~ requires the type variable to also be an
 instance of ~Semigroup~ and ~Monoid~. Because a [[newtype:Prose]] is just a wrapper
-around a list of [[data:PToken]] values, we don't have to actually define anything
-ourselves here (as the operations have already been defined for the list (~[]~)
-type) [fn:semigroup-monoid-for-list].
+around a list of [[data:PToken]] values, our instances just unwrap the lists and
+reuse the operations already defined for the list (~[]~) type
+[fn:semigroup-monoid-for-list].
 
 #+name: instance:Semigroup Prose
 #+begin_src haskell
