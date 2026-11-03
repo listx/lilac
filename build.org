@@ -344,7 +344,7 @@ ghcVersion = "ghc" + ghcVersionWithoutDots;
 #+end_src
 
 Going back to ~ourHaskell~, the ~haskellOverlays~ are straightforward enough. The
-first three overlays, ~heavyDeps~, ~jailbreaks~, and ~injectExternalPackages~, adjust
+first three overlays, ~heavyDeps~, ~fixDeps~, and ~injectExternalPackages~, adjust
 our dependencies. Then ~injectLilac~ adds a new Haskell package called ~lilac~. The
 last one is ~tweakLilacBuild~ which adjusts the build process so that the [[id:3c576a02-418b-431b-ab96-e4936e977fb7][Template
 Haskell code]] can use the ~LILAC_GIT_VERSION~ environment variable to use as the
@@ -354,14 +354,14 @@ output for the ~--version~ flag.
 #+header: :line-label tangle
 #+begin_src nix
 haskellOverlays =
-  [ heavyDeps jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+  [ heavyDeps fixDeps injectExternalPackages injectLilac tweakLilacBuild ];
 
 heavyDeps = final: prev:
   let heavyPackages = [ "citeproc" "unicode-collation" ];
   in lib.genAttrs heavyPackages (name: buildSmaller prev.${name});
 
-jailbreaks = final: prev: {
-  <<jailbreaks:unicode-data>>
+fixDeps = final: prev: {
+  <<fixDeps:unicode-data>>
 };
 
 injectExternalPackages = final: prev: {
@@ -603,7 +603,8 @@ defined via Git.
 *** Removing version bounds
 
 You can remove version bound checks on package ~foo-package~ like this inside the
-~jailbreaks~ section of [[nix:Haskell overlays]].
+~fixDeps~ section of [[nix:Haskell overlays]], which is where we put fixes to the
+builds of our dependencies (such as [[fixDeps:unicode-data]], which skips its tests).
 
 #+begin_src nix
 foo-package = pkgs.haskell.lib.doJailbreak(prev.foo-package);
@@ -673,7 +674,7 @@ in "${repo}") { });
 We also have to disable tests for =unicode-data= (a dependency of =citeproc=),
 because otherwise it fails like [[build-failure:unicode-data]]:
 
-#+name: jailbreaks:unicode-data
+#+name: fixDeps:unicode-data
 #+begin_src nix
 unicode-data = pkgs.haskell.lib.dontCheck prev.unicode-data;
 #+end_src

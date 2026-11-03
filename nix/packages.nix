@@ -46,13 +46,13 @@ let
   ghcVersion = "ghc" + ghcVersionWithoutDots;
 
   haskellOverlays =
-    [ heavyDeps jailbreaks injectExternalPackages injectLilac tweakLilacBuild ];
+    [ heavyDeps fixDeps injectExternalPackages injectLilac tweakLilacBuild ];
 
   heavyDeps = final: prev:
     let heavyPackages = [ "citeproc" "unicode-collation" ];
     in lib.genAttrs heavyPackages (name: buildSmaller prev.${name});
 
-  jailbreaks = final: prev: {
+  fixDeps = final: prev: {
     unicode-data = pkgs.haskell.lib.dontCheck prev.unicode-data;
   };
 
