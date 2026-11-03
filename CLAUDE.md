@@ -23,6 +23,11 @@ request names a tangled file (for example "fix this bug in `src/Foo.hs`").
 - If tangling does not work (for example `lilac` is not on `PATH`; the Nix dev
   shell provides it), fix that or report it. Do not hand-edit tangled files to
   compensate.
+- `lilac` builds itself from the tangled sources, so it cannot run if they fail
+  to compile. In that case, fix the Org file and run
+  `make -B tangle LILAC=lilac-nix`, which uses the Lilac binary built by Nix.
+  Then run `make -B tangle` to go back to the usual binary. Don't restore old
+  tangled files to get `lilac` working again.
 
 ## Checking a change
 

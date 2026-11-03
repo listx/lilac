@@ -10,6 +10,8 @@ all: build test weave
 	@echo "$$INSTALL_HELP" | sed 's/^\t/  /'
 .PHONY: all
 
+LILAC ?= lilac
+
 org_files := $(shell find . -maxdepth 1 -type f -name "*.org" && find ./design -type f -name "*.org")
 
 test: tangle
@@ -17,23 +19,23 @@ test: tangle
 	touch test
 
 lint: $(archive_file) tangle
-	lilac lint $(archive_file)
+	$(LILAC) lint $(archive_file)
 	pre-commit run --all-files
 	touch lint #
 
 obj_files = $(org_files:%.org=%.lobj)
 
 $(obj_files) &: $(org_files)
-	lilac compile $?
+	$(LILAC) compile $?
 	touch $(obj_files) #
 
 archive_file := lilac.larc
 
 $(archive_file): $(obj_files)
-	lilac archive $^ --out-file $@
+	$(LILAC) archive $^ --out-file $@
 
 tangle: $(archive_file)
-	lilac tangle $(archive_file) --out-dir .
+	$(LILAC) tangle $(archive_file) --out-dir .
 	touch tangle
 
 image_sources = $(wildcard image/*.pikchr)
@@ -76,7 +78,7 @@ publish: $(archive_file) weave $(vendored)
 
 weave: $(image_svgs) $(archive_file) tangle $(vendored)
 	rm -rf site/image site/vendor
-	lilac weave $(archive_file) --out-dir site --write-css #
+	$(LILAC) weave $(archive_file) --out-dir site --write-css #
 	cp -r image vendor site
 	touch weave
 

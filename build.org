@@ -790,6 +790,7 @@ outputs. See [[id:b649d761-1103-47be-86e4-56a7362a5ecc][Sentinels]] for a discus
 #+header: :tangle Makefile
 #+begin_src makefile
 <<make:All>>
+<<make:Lilac binary>>
 <<make:Org files>>
 <<make:Run tests>>
 <<make:Run linters>>
@@ -877,6 +878,32 @@ gitconfig:
 	git config diff.orderfile .git-orderfile
 .PHONY: gitconfig
 #+end_src
+
+** Lilac binary
+
+All rules that run Lilac go through the ~LILAC~ variable. By default this is the
+~lilac~ wrapper from [[nix/scripts.nix]], which builds Lilac from the current
+(tangled) sources with ~cabal run~ before running it.
+
+#+name: make:Lilac binary
+#+begin_src makefile
+LILAC ?= lilac
+#+end_src
+
+This has a bootstrapping problem: if a change to an Org file makes the tangled
+Haskell sources fail to compile, then ~lilac~ cannot run, so it cannot tangle the
+fixed Org file either. To get out of this, fix the Org file and tangle with the
+Lilac binary built by Nix instead (~lilac-nix~, see [[make:Build lilac with Nix]]):
+
+#+begin_src sh
+make -B tangle LILAC=lilac-nix
+#+end_src
+
+The ~-B~ flag makes ~make~ rebuild all object files and the archive with this
+binary, instead of mixing them with ones made by the other binary. Afterwards,
+run ~make -B tangle~ once more to go back to the usual binary. Note that
+~lilac-nix~ is only as new as the last ~make build-release~, so it may not
+understand Org syntax or settings that were added after that.
 
 ** Org files
 
@@ -982,7 +1009,7 @@ The naive way of building object files involves a rule like this:
 
 #+begin_src makefile
 %.lobj: %.org
-	lilac compile $<
+	$(LILAC) compile $<
 #+end_src
 
 But this doesn't work well, because it will invoke the ~lilac~ CLI multiple times,
@@ -992,7 +1019,7 @@ individual targets. This is why we have [[make:Batch compile Org files]] instead
 #+name: make:Batch compile Org files
 #+begin_src makefile
 $(obj_files) &: $(org_files)
-	lilac compile $?
+	$(LILAC) compile $?
 	touch $(obj_files) # (ref:touch obj_files)
 #+end_src
 
@@ -1052,7 +1079,7 @@ object files are missing or newer than ~lilac.larc~.
 archive_file := lilac.larc
 
 $(archive_file): $(obj_files)
-	lilac archive $^ --out-file $@
+	$(LILAC) archive $^ --out-file $@
 #+end_src
 
 In order to create the ~lilac.larc~ archive file of the entire Lilac project, for
@@ -1083,7 +1110,7 @@ We can tangle Lilac with itself.
 #+name: make:Tangle sources
 #+begin_src makefile
 tangle: $(archive_file)
-	lilac tangle $(archive_file) --out-dir .
+	$(LILAC) tangle $(archive_file) --out-dir .
 	touch tangle
 #+end_src
 
@@ -1344,7 +1371,7 @@ assets like the ~image~ and ~vendor~ folders.
 #+begin_src makefile
 weave: $(image_svgs) $(archive_file) tangle $(vendored)
 	rm -rf site/image site/vendor
-	lilac weave $(archive_file) --out-dir site --write-css # (ref:weave-write-css)
+	$(LILAC) weave $(archive_file) --out-dir site --write-css # (ref:weave-write-css)
 	cp -r image vendor site
 	touch weave
 #+end_src
@@ -1918,7 +1945,7 @@ instead we just call it as a separate item in the Makefile.
 
 #+name: make:lilac lint
 #+begin_src makefile
-lilac lint $(archive_file)
+$(LILAC) lint $(archive_file)
 #+end_src
 
 ** Run lilac unit test before pushing
@@ -2662,6 +2689,11 @@ request names a tangled file (for example "fix this bug in `src/Foo.hs`").
 - If tangling does not work (for example `lilac` is not on `PATH`; the Nix dev
   shell provides it), fix that or report it. Do not hand-edit tangled files to
   compensate.
+- `lilac` builds itself from the tangled sources, so it cannot run if they fail
+  to compile. In that case, fix the Org file and run
+  `make -B tangle LILAC=lilac-nix`, which uses the Lilac binary built by Nix.
+  Then run `make -B tangle` to go back to the usual binary. Don't restore old
+  tangled files to get `lilac` working again.
 
 ## Checking a change
 
