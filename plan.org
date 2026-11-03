@@ -175,16 +175,13 @@ let the user choose different "flavors" of GTOC:
 
   - root GTOC only (only expect root index.org, any others are optional)
 
-  - no GTOC (skip all GTOC generation --- this is the default)
+  - no GTOC (skip all GTOC generation)
 
-By default we expect no GTOC at all (this makes sense because this whole concept
-is not a native Orgmode thing). This is good, but needs to be done *after*
-implementing GTOC, because we have to also move the [[id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf][data:ProjectConf]] to the
-compilation step (a bit more "upstream" than weaving, which is arguably at the
-very end).
-
-We need to read the project configuration during compilation, so that we can
-affect archive generation.
+Today [[id:de5d3c6a-e133-4bb5-88d8-c78297b312a6::f:mkGTOC][f:mkGTOC]] behaves like the root-only flavor, and it doesn't complain if
+there is no root index.org either. The project configuration is already
+available when we create the archive ([[id:fb503792-b075-4bd2-a215-8e64b9ee6cb4::f:mkArchive][f:mkArchive]] takes it as an argument), so
+the preference only needs to be added to [[id:df128041-ada8-4d77-a373-111416002dae::data:ProjectConf][data:ProjectConf]] and passed on to
+[[id:de5d3c6a-e133-4bb5-88d8-c78297b312a6::f:mkGTOC][f:mkGTOC]].
 
 *** TODO add test case for missing index.org files (given the relevant project config)
 
