@@ -2265,8 +2265,8 @@ writeFileRobustly path contentToWrite = do
 * Footnotes
 
 [fn:whether-to-track-html] Whether or not you want to track your HTML artifacts
-generally depends on your deployment situation. For example, if you are hosting
-on SourceHut, you don't need to track these artifacts because you can publish by
-uploading a tarball of them. On the other hand, if you are hosting on GitHub
-Pages, you need to upload a repo that has these artifacts so you should track
-the artifacts (either in the same repo or another one).
+generally depends on your deployment situation. For example, if your host lets
+you upload the files (such as a tarball, or an artifact from a CI job), you
+don't need to track them. On the other hand, if you publish by pushing a Git
+branch, as Lilac does for GitHub Pages, you have to commit the artifacts to that
+branch (in the same repo or another one).
