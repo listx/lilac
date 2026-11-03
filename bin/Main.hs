@@ -73,7 +73,6 @@ import Lilac.Types
         archive,
         citeprocResult,
         originObjectPath,
-        outDir,
         projectConf,
         rootRelativePrefix
       ),
@@ -677,7 +676,6 @@ weaveToDisk projectConf outDir rootRelativePrefix archive acc objPath obj =
                 { projectConf = projectConf,
                   archive = archive,
                   originObjectPath = objPath,
-                  outDir = outDir,
                   rootRelativePrefix = rootRelativePrefix,
                   citeprocResult = result
                 }

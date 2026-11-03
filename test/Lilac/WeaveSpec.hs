@@ -32,7 +32,6 @@ import Lilac.Types
         archive,
         citeprocResult,
         originObjectPath,
-        outDir,
         projectConf,
         rootRelativePrefix
       ),
@@ -717,7 +716,6 @@ getWovenPrettyFromPath :: FilePath -> IO (Either String Text)
 getWovenPrettyFromPath path = do
   inputOrgFileGPath <- encodeGPath $ "test/Lilac/WeaveSpec/" <> path
   inputOrgFile <- LU.readFrom "test/Lilac/WeaveSpec/" path
-  outDir <- encodeGPath "test/Lilac/WeaveSpec/"
   let parseResult =
         MP.runParser
           (runStateT LP.orgDocParser defaultOrgParserState)
@@ -745,7 +743,6 @@ getWovenPrettyFromPath path = do
                   { projectConf = emptyProjectConf,
                     archive = archive,
                     originObjectPath = inputOrgFileGPath,
-                    outDir = outDir,
                     rootRelativePrefix = GPath "/",
                     citeprocResult = result
                   }

@@ -745,7 +745,6 @@ data WeaveConf = WeaveConf
   { projectConf :: ProjectConf,
     archive :: Archive,
     originObjectPath :: GPath, --
-    outDir :: GPath,
     rootRelativePrefix :: GPath,
     citeprocResult :: CP.Result Prose
   }
