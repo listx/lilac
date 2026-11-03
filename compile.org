@@ -847,9 +847,9 @@ mkArchive :: ProjectConf -> [(GPath, Object)] -> IO (Either String Archive)
 mkArchive projectConf pathObjs = do
   let pathObjsNonEmpty =
         filter (\(_, obj) -> length obj.orgDoc.cells > 0) pathObjs -- (ref:f:mkArchive-remove-empty-objects)
-      (symbols, glossary) = combineSymbolsAndGlossary pathObjsNonEmpty
+      (symbols, glossary) = combineSymbolsAndGlossary pathObjs -- (ref:f:mkArchive-combineSymbolsAndGlossary)
       offsets = mkOffsets pathObjsNonEmpty
-      backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
+      backlinks = mkBacklinks pathObjs symbols offsets -- (ref:f:mkArchive-mkBacklinks)
       preciseBacklinks = mkPreciseBacklinks pathObjsNonEmpty oidAliases
       oidAliases = mkOidAliases pathObjsNonEmpty
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols -- (ref:f:mkArchive-brokenLinks)
@@ -918,6 +918,13 @@ probably introduce bugs into offset calculation in [[f:mkOffsets]]. Then the mai
 thing is to see that there are no broken links within this collection of objects
 [[(f:mkArchive-brokenLinks)]]; see [[id:a9bad6d4-5b1c-48de-8f09-178724859381][Broken link detection]] and [[f:findBrokenLinks]].
 
+[[(f:mkArchive-combineSymbolsAndGlossary)]] and [[(f:mkArchive-mkBacklinks)]] are the
+exceptions, and get all objects. Each document gets a negative ~GCI~ from its
+position among the objects (see [[f:docOidsToSymbols]]), and [[f:gciToObjPath]] turns
+it back into a path by looking at all objects in the archive. So the empty
+objects have to be counted here too. They have no cells, so they don't change the
+offsets of the other objects in these two functions.
+
 Other than the checks, the other concern is to combine the different parts of an
 object together with other objects. Some parts of an object can be simply
 combined together with the same parts in another object (there's not much more
@@ -954,9 +961,9 @@ whole, not to any one of its constituent cells) in [[f:docOidsToSymbols]]. This 
 only be done at the archiving stage because an object by itself has no
 understanding of how many other objects there are in the archive, and hence,
 which index position it has relative to those other objects. These index
-positions are determined by sorting the objects by their path and using negative
-numbers so as not to clash with the positive ~GCI~ numbers from symbols targeting
-typical cell indices.
+positions are determined by sorting all objects (including empty ones) by their
+path and using negative numbers so as not to clash with the positive ~GCI~
+numbers from symbols targeting typical cell indices.
 
 #+name: f:docOidsToSymbols
 #+begin_src haskell
@@ -3313,6 +3320,82 @@ gciToObjPath archive gci
   | otherwise = Nothing
 #+end_src
 
+Because ~archive.objects~ also has the empty objects, [[f:docOidsToSymbols]] has to
+count them too (see [[f:mkArchive]]). [[t:0402-doc-symbols-empty-object]] checks that
+each document's symbol leads back to its own path, in an archive where the empty
+document comes first.
+
+#+name: ti:0402-doc-symbols-empty-object-a
+#+header: :tangle test/Lilac/CompileSpec/0402-doc-symbols-empty-object-a
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d00a
+:END:
+#+end_src
+
+#+name: ti:0402-doc-symbols-empty-object-b
+#+header: :tangle test/Lilac/CompileSpec/0402-doc-symbols-empty-object-b
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d00b
+:END:
+
+Hello
+#+end_src
+
+#+name: t:0402-doc-symbols-empty-object
+#+begin_src haskell
+checkDocSymbols
+  [ "0402-doc-symbols-empty-object-a",
+    "0402-doc-symbols-empty-object-b"
+  ]
+#+end_src
+
+[[f:mkBacklinks]] also turns a negative GCI back into a path, so it has to see
+the empty objects too. [[t:0403-backlinks-empty-object]] links from one document
+to both an empty document and a non-empty one, and checks that each backlink
+lands on the document it points to.
+
+#+name: ti:0403-backlinks-empty-object-a
+#+header: :tangle test/Lilac/CompileSpec/0403-backlinks-empty-object-a
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d03a
+:END:
+#+end_src
+
+#+name: ti:0403-backlinks-empty-object-b
+#+header: :tangle test/Lilac/CompileSpec/0403-backlinks-empty-object-b
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d03b
+:END:
+
+[[id:00000000-0000-0000-0000-00000000d03a][a]] and [[id:00000000-0000-0000-0000-00000000d03c][c]]
+#+end_src
+
+#+name: ti:0403-backlinks-empty-object-c
+#+header: :tangle test/Lilac/CompileSpec/0403-backlinks-empty-object-c
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000d03c
+:END:
+
+Hello
+#+end_src
+
+#+name: t:0403-backlinks-empty-object
+#+begin_src haskell
+checkBacklinkPaths
+  [ "0403-backlinks-empty-object-a",
+    "0403-backlinks-empty-object-b",
+    "0403-backlinks-empty-object-c"
+  ]
+  [ ("0403-backlinks-empty-object-a", ["0403-backlinks-empty-object-b"]),
+    ("0403-backlinks-empty-object-c", ["0403-backlinks-empty-object-b"])
+  ]
+#+end_src
+
 * Testing framework
 
 The testing framework here is modeled closely after [[id:906bcb25-4380-4e41-a941-e57cbcf7d2a1::module:Lilac.ParseSpec][module:Lilac.ParseSpec]].
@@ -3335,14 +3418,17 @@ import Data.Tree
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( GTOC (GTOC),
+  ( Archive (backlinks, symbols),
+    GTOC (GTOC),
     LinkOid (LinkOid, name, oid),
-    Object,
+    Object (orgDoc),
+    OrgDoc (oid),
     decodeGPath,
     emptyGPath,
     emptyProjectConf,
     encodeGPath,
     fromWords,
+    gciToObjPath,
   )
 import Lilac.Types.Internal (GPath (GPath))
 import Lilac.Util qualified as LU
@@ -3354,16 +3440,20 @@ import Relude
     MonadFail,
     String,
     fail,
+    fst,
     isRight,
     map,
     pure,
     show,
+    snd,
     toString,
     traverse,
     ($),
     (.),
     (<>),
   )
+import Relude.Extra.Map (keys, lookup, toPairs)
+import System.FilePath (takeFileName)
 import Test.Hspec
   ( Spec,
     describe,
@@ -3390,6 +3480,8 @@ helpers.
 <<f:expectArchiveError>>
 <<f:expectArchiveOk>>
 <<f:checkCycles>>
+<<f:checkDocSymbols>>
+<<f:checkBacklinkPaths>>
 <<f:expectGTOC>>
 #+end_src
 
@@ -3475,6 +3567,49 @@ checkCycles paths expectedCycles = do
       (LC.findCycles archive) `shouldBe` expectedCycles
 #+end_src
 
+[[f:checkDocSymbols]] checks that the symbol for each whole document (with an
+empty name) leads back to the path of that document with [[f:gciToObjPath]].
+
+#+name: f:checkDocSymbols
+#+begin_src haskell
+checkDocSymbols :: [FilePath] -> Spec
+checkDocSymbols paths = do
+  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
+  maybeArchive <- runIO $ LC.mkArchive emptyProjectConf pathObjs
+  case maybeArchive of
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    Right archive -> it (show paths) $ do
+      map (getDocPath archive . snd) pathObjs
+        `shouldBe` map (Just . fst) pathObjs
+  where
+    getDocPath :: Archive -> Object -> Maybe GPath
+    getDocPath archive obj = do
+      gci <- lookup (LinkOid {oid = obj.orgDoc.oid, name = ""}) archive.symbols
+      gciToObjPath archive gci
+#+end_src
+
+[[f:checkBacklinkPaths]] checks which documents link to which, by turning the
+backlinks of the archive into file names. It leaves out the GCIs of the
+individual links.
+
+#+name: f:checkBacklinkPaths
+#+begin_src haskell
+checkBacklinkPaths :: [FilePath] -> [(FilePath, [FilePath])] -> Spec
+checkBacklinkPaths paths expected = do
+  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
+  maybeArchive <- runIO $ LC.mkArchive emptyProjectConf pathObjs
+  case maybeArchive of
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    Right archive -> it (show paths) $ do
+      map
+        (\(to, froms) -> (fileName to, map fileName (keys froms)))
+        (toPairs archive.backlinks)
+        `shouldBe` expected
+  where
+    fileName :: GPath -> FilePath
+    fileName = takeFileName . decodeGPath
+#+end_src
+
 [[f:expectGTOC]] looks at file paths and checks the result of running [[f:mkGTOC]]
 against them.
 
@@ -3539,6 +3674,8 @@ Below are all of the individual test cases.
 <<t:0401-broken-links-line-label>>
 <<t:0401-broken-links-multi-ok>>
 <<t:0401-broken-links-multi-ok-alternates>>
+<<t:0402-doc-symbols-empty-object>>
+<<t:0403-backlinks-empty-object>>
 <<t:0007-blocks-duplicate-tangle-paths-across-objs>>
 <<t:0100-dag-no-loops>>
 <<t:0100-dag-self-loop>>

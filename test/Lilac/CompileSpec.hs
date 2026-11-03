@@ -8,14 +8,17 @@ import Data.Tree
 import Lilac.Compile qualified as LC
 import Lilac.Parse qualified as LP
 import Lilac.Types
-  ( GTOC (GTOC),
+  ( Archive (backlinks, symbols),
+    GTOC (GTOC),
     LinkOid (LinkOid, name, oid),
-    Object,
+    Object (orgDoc),
+    OrgDoc (oid),
     decodeGPath,
     emptyGPath,
     emptyProjectConf,
     encodeGPath,
     fromWords,
+    gciToObjPath,
   )
 import Lilac.Types.Internal (GPath (GPath))
 import Lilac.Util qualified as LU
@@ -27,16 +30,20 @@ import Relude
     MonadFail,
     String,
     fail,
+    fst,
     isRight,
     map,
     pure,
     show,
+    snd,
     toString,
     traverse,
     ($),
     (.),
     (<>),
   )
+import Relude.Extra.Map (keys, lookup, toPairs)
+import System.FilePath (takeFileName)
 import Test.Hspec
   ( Spec,
     describe,
@@ -134,6 +141,20 @@ spec = do
   expectArchiveOk
     [ "0401-broken-links-multi-ok-alternates-parent",
       "0401-broken-links-multi-ok-alternates-child"
+    ]
+
+  checkDocSymbols
+    [ "0402-doc-symbols-empty-object-a",
+      "0402-doc-symbols-empty-object-b"
+    ]
+
+  checkBacklinkPaths
+    [ "0403-backlinks-empty-object-a",
+      "0403-backlinks-empty-object-b",
+      "0403-backlinks-empty-object-c"
+    ]
+    [ ("0403-backlinks-empty-object-a", ["0403-backlinks-empty-object-b"]),
+      ("0403-backlinks-empty-object-c", ["0403-backlinks-empty-object-b"])
     ]
 
   expectArchiveError
@@ -510,6 +531,36 @@ checkCycles paths expectedCycles = do
     Left errMsg -> it "programmer error" $ expectationFailure errMsg
     Right archive -> it (show paths) $ do
       (LC.findCycles archive) `shouldBe` expectedCycles
+
+checkDocSymbols :: [FilePath] -> Spec
+checkDocSymbols paths = do
+  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
+  maybeArchive <- runIO $ LC.mkArchive emptyProjectConf pathObjs
+  case maybeArchive of
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    Right archive -> it (show paths) $ do
+      map (getDocPath archive . snd) pathObjs
+        `shouldBe` map (Just . fst) pathObjs
+  where
+    getDocPath :: Archive -> Object -> Maybe GPath
+    getDocPath archive obj = do
+      gci <- lookup (LinkOid {oid = obj.orgDoc.oid, name = ""}) archive.symbols
+      gciToObjPath archive gci
+
+checkBacklinkPaths :: [FilePath] -> [(FilePath, [FilePath])] -> Spec
+checkBacklinkPaths paths expected = do
+  pathObjs <- runIO $ LC.readObjectsFrom "test/Lilac/CompileSpec/" paths
+  maybeArchive <- runIO $ LC.mkArchive emptyProjectConf pathObjs
+  case maybeArchive of
+    Left errMsg -> it "programmer error" $ expectationFailure errMsg
+    Right archive -> it (show paths) $ do
+      map
+        (\(to, froms) -> (fileName to, map fileName (keys froms)))
+        (toPairs archive.backlinks)
+        `shouldBe` expected
+  where
+    fileName :: GPath -> FilePath
+    fileName = takeFileName . decodeGPath
 
 expectGTOC :: [FilePath] -> Either String GTOC -> Spec
 expectGTOC paths expected = do

@@ -281,7 +281,6 @@ import Relude
     String,
     Text,
     Type,
-    abs,
     any,
     ask,
     catMaybes,
@@ -1034,8 +1033,7 @@ weaveLinkTargetLinkOid linkOid = do
   if
     | Just gci <- lookup linkOid weaveConf.archive.symbols,
       gci.unGCI < 0,
-      Just objPath <-
-        (sort $ keys weaveConf.archive.objects) !!? (abs gci.unGCI - 1) ->
+      Just objPath <- gciToObjPath weaveConf.archive gci ->
         pure
           $ if objPath == weaveConf.originObjectPath
             then "#top"

@@ -32,14 +32,15 @@ wrote the block text into the HTML without escaping it. So a ~gitignore~ block
 with ~a<b>c & d~ in it got a real ~<b>~ tag, and our own woven ~build.org~ had a
 raw ~base >=4.7 && <5~ in it. Now the fallback uses ~toHtml~.
 
-** TODO compile: fix document links in archives with empty objects
+** DONE compile: fix document links in archives with empty objects
 
-[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:mkArchive][f:mkArchive]] drops objects without any cells before
-[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:docOidsToSymbols][f:docOidsToSymbols]] gives each document its negative ~GCI~. But
-[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:gciToObjPath][f:gciToObjPath]] and [[id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7::f:weaveLinkTargetLinkOid][f:weaveLinkTargetLinkOid]] turn a negative ~GCI~ back into
-a path by indexing into ~sort $ keys archive.objects~, which still has the empty
-objects. So if an archive has an empty ~a.org~, a link to all of ~b.org~ points
-to ~/a.html~ instead.
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:mkArchive][f:mkArchive]] dropped objects without any cells before
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:docOidsToSymbols][f:docOidsToSymbols]] gave each document its negative ~GCI~. But
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:gciToObjPath][f:gciToObjPath]] and [[id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7::f:weaveLinkTargetLinkOid][f:weaveLinkTargetLinkOid]] turned a negative ~GCI~ back into
+a path by indexing into ~sort $ keys archive.objects~, which still had the empty
+objects. So if an archive had an empty ~a.org~, a link to all of ~b.org~ pointed
+to ~/a.html~ instead. Now every object gets its negative ~GCI~, including the
+empty ones, so links to an empty document work too.
 
 ** TODO cli: drop the unused repo setting
 

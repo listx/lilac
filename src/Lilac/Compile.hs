@@ -267,9 +267,9 @@ mkArchive :: ProjectConf -> [(GPath, Object)] -> IO (Either String Archive)
 mkArchive projectConf pathObjs = do
   let pathObjsNonEmpty =
         filter (\(_, obj) -> length obj.orgDoc.cells > 0) pathObjs --
-      (symbols, glossary) = combineSymbolsAndGlossary pathObjsNonEmpty
+      (symbols, glossary) = combineSymbolsAndGlossary pathObjs --
       offsets = mkOffsets pathObjsNonEmpty
-      backlinks = mkBacklinks pathObjsNonEmpty symbols offsets
+      backlinks = mkBacklinks pathObjs symbols offsets --
       preciseBacklinks = mkPreciseBacklinks pathObjsNonEmpty oidAliases
       oidAliases = mkOidAliases pathObjsNonEmpty
       brokenLinks = findBrokenLinks pathObjsNonEmpty symbols --
