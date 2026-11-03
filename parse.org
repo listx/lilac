@@ -1904,8 +1904,9 @@ shouldParseWithState
     }
 #+end_src
 
-If the ~:ID:~ is missing, we assign a nil (all zero bits) OID. We reuse the same
-test case file ([[ti:0001-blankline]]) from [[t:0001-blankline]].
+If the ~:ID:~ is missing, the [[f:parseAs]] test helper prefixes the input with a nil
+(all zero bits) OID. We reuse the same test case file ([[ti:0001-blankline]]) from
+[[t:0001-blankline]].
 
 #+name: t:0002-doc-metadata-properties-drawer-empty
 #+begin_src haskell
