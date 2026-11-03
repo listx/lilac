@@ -344,8 +344,9 @@ ghcVersion = "ghc" + ghcVersionWithoutDots;
 #+end_src
 
 Going back to ~ourHaskell~, the ~haskellOverlays~ are straightforward enough. The
-first overlay ~injectLilac~ adds a new Haskell package called ~lilac~. The other one
-is ~tweakLilacBuild~ which adjusts the build process so that the [[id:3c576a02-418b-431b-ab96-e4936e977fb7][Template
+first three overlays, ~heavyDeps~, ~jailbreaks~, and ~injectExternalPackages~, adjust
+our dependencies. Then ~injectLilac~ adds a new Haskell package called ~lilac~. The
+last one is ~tweakLilacBuild~ which adjusts the build process so that the [[id:3c576a02-418b-431b-ab96-e4936e977fb7][Template
 Haskell code]] can use the ~LILAC_GIT_VERSION~ environment variable to use as the
 output for the ~--version~ flag.
 
