@@ -3478,8 +3478,8 @@ checkCycles paths expectedCycles = do
 [[f:expectGTOC]] looks at file paths and checks the result of running [[f:mkGTOC]]
 against them.
 
-Normally, Lilac users would compile the Org files into objects, then feed those
-objects into [[f:mkArchive]] which would result in the ~.lobj~ filename extensions.
+Normally, Lilac users would compile the Org files into objects (which gives them
+the ~.lobj~ filename extensions), then feed those objects into [[f:mkArchive]].
 However for testing purposes we take a shortcut and perform this ~.lobj~
 conversion by simply replacing ~.org~ with ~.lobj~. This business with extensions
 matters because [[f:mkGTOC]] expects file paths to end in ~.lobj~.
