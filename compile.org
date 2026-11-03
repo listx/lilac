@@ -3199,7 +3199,7 @@ gciToName archive offset gci
         CBlock block
           | Just name <- lookup "name" block.meta ->
               verbatim name
-          | otherwise -> plain $ "Anonymous Block" <> cellRef
+          | otherwise -> plain $ "Anonymous Block " <> cellRef
         CMathFragment mathFragment
           | Just name <- lookup "name" mathFragment.meta ->
               verbatim name
