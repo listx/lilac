@@ -6663,7 +6663,7 @@ whitespaceCompressor spaceConsumer = do
   MP.lookAhead
     $ MP.choice
       [ MP.eof >> pure "",
-        footnoteReferenceParser >> pure "", -- (ref:foonote-ref-whitespace)
+        footnoteReferenceParser >> pure "", -- (ref:footnote-ref-whitespace)
         MP.anySingle >> pure " "
       ]
 #+end_src
@@ -6675,7 +6675,7 @@ decides to report 0 or 1 space characters depending on what follows
 the body.
 
 Whitespace compression also happens when we detect [[id:4127feee-755d-430e-8fef-192e95143790][footnote]] references
-[[(foonote-ref-whitespace)]]. Specifically, if there is a prose token, some
+[[(footnote-ref-whitespace)]]. Specifically, if there is a prose token, some
 whitespace, and then a footnote reference, we ignore the whitespace. For
 example, if we have
 
