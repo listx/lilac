@@ -3192,7 +3192,12 @@ colorizeText lang txt
       toHtmlRaw
         . Text.Blaze.Html.Renderer.Text.renderHtml
         $ Sky.formatHtmlInline Sky.defaultFormatOpts lines
-  | otherwise = code_ $ toHtmlRaw txt
+  | otherwise =
+      code_
+        . sequence_
+        . intersperse (toHtmlRaw @Text "\NUL") -- (ref:f:colorizeText-fallback-NUL)
+        . map toHtml -- (ref:f:colorizeText-fallback)
+        $ T.splitOn "\NUL" txt
   where
     targetLang
       | lang `elem` ["emacs-lisp", "elisp"] = "lisp" -- (ref:f:colorizeText-elisp-hack)
@@ -3206,6 +3211,42 @@ recognize Emacs Lisp (a pity). So we have to make do with a fallback to Common
 Lisp, which Skylighting recognizes as "lisp".
 
 [[(f:colorizeText-gitconfig)]] maps Git configuration to the INI file format syntax.
+
+If Skylighting doesn't know the language at all (such as ~gitignore~), we fall
+back to the plain text. This text still has to be escaped at
+[[(f:colorizeText-fallback)]], just like the output of the highlighter, because
+otherwise characters like ~<~ and ~&~ in the block would be read as HTML. But
+Lucid's escaping also drops control characters, including the ~\NUL~ characters
+that mark where the links go. So we only escape the text between them, and put
+them back unescaped at [[(f:colorizeText-fallback-NUL)]].
+[[t:0300-weave-block-unknown-language]] checks both of these things. It uses a
+made-up language, so that the test keeps exercising this fallback even if
+Skylighting learns about more languages later.
+
+#+name: ti:0300-weave-block-unknown-language
+#+header: :tangle test/Lilac/WeaveSpec/0300-weave-block-unknown-language
+#+header: :noweb off
+#+begin_src org
+,#+name: y
+,#+begin_src some-weird-language
+y
+,#+end_src
+
+,#+name: x
+,#+begin_src some-weird-language
+a<b>c & d
+<<y>>
+,#+end_src
+#+end_src
+
+#+name: t:0300-weave-block-unknown-language
+#+begin_src haskell
+weaveExpect
+  "0300-weave-block-unknown-language"
+  [ "<code>a&lt;b&gt;c &amp; d\n",
+    "<a href=\"#b-y\" class=\"internal-link\" id=\"b-x-b-y\">y</a></code>"
+  ]
+#+end_src
 
 Block colorization relies on the [[https://hackage.haskell.org/package/skylighting][=skylighting=]] syntax highlighting library. This
 library ignores the ~\NUL~ character, which is what we want. Once we have the
@@ -7271,6 +7312,7 @@ expectCiteprocResult path expected = do
 #+begin_src haskell
 <<t:0300-weave-styled-text>>
 <<t:0300-weave-lists>>
+<<t:0300-weave-block-unknown-language>>
 <<t:0305-gtoc-ancestor>>
 <<t:0400-citeproc-basic>>
 <<t:0400-citeproc-superscript>>

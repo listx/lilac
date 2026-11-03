@@ -112,6 +112,12 @@ spec = do
           $(embedFile "src/Lilac/WeaveSpec/0300-weave-lists/raw.html")
       ]
 
+  weaveExpect
+    "0300-weave-block-unknown-language"
+    [ "<code>a&lt;b&gt;c &amp; d\n",
+      "<a href=\"#b-y\" class=\"internal-link\" id=\"b-x-b-y\">y</a></code>"
+    ]
+
   it "0305-gtoc-ancestor" $ do
     mapM_
       ( \(path, originObjectPath, expectation) ->

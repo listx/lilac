@@ -898,7 +898,12 @@ colorizeText lang txt
       toHtmlRaw
         . Text.Blaze.Html.Renderer.Text.renderHtml
         $ Sky.formatHtmlInline Sky.defaultFormatOpts lines
-  | otherwise = code_ $ toHtmlRaw txt
+  | otherwise =
+      code_
+        . sequence_
+        . intersperse (toHtmlRaw @Text "\NUL") --
+        . map toHtml --
+        $ T.splitOn "\NUL" txt
   where
     targetLang
       | lang `elem` ["emacs-lisp", "elisp"] = "lisp" --

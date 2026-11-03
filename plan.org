@@ -24,13 +24,13 @@ other sections as needed.
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
-** TODO weave: escape blocks in languages that Skylighting doesn't know
+** DONE weave: escape blocks in languages that Skylighting doesn't know
 
-When Skylighting doesn't know a block's language (such as ~gitignore~ or
-~haskell-cabal~), [[id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7::f:colorizeText][f:colorizeText]] falls back to ~code_ $ toHtmlRaw txt~, which
-writes the block text into the HTML without escaping it. So a ~gitignore~ block
-with ~a<b>c & d~ in it gets a real ~<b>~ tag, and our own woven ~build.org~ has a
-raw ~base >=4.7 && <5~ in it. The fallback should use ~toHtml~ instead.
+When Skylighting didn't know a block's language (such as ~gitignore~ or
+~haskell-cabal~), [[id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7::f:colorizeText][f:colorizeText]] fell back to ~code_ $ toHtmlRaw txt~, which
+wrote the block text into the HTML without escaping it. So a ~gitignore~ block
+with ~a<b>c & d~ in it got a real ~<b>~ tag, and our own woven ~build.org~ had a
+raw ~base >=4.7 && <5~ in it. Now the fallback uses ~toHtml~.
 
 ** TODO compile: fix document links in archives with empty objects
 
