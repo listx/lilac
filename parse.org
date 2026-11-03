@@ -5376,7 +5376,7 @@ level, which are for the entire citation.
 The most important field for [[data:Cite]] is the ~id~ [[(cite-id)]], which refers to a
 unique bibliographical work. It's expected that this ID is found in one of the
 [[id:909c5265-065a-412c-9305-2cff398ad233][CSL JSON]] files. Orgmode calls this the [[https://orgmode.org/manual/Citations.html][key]], but we prefer ~id~ because there is no
-immediate hashmap data structure here where we use it as a key.
+immediate map data structure here where we use it as a key.
 
 The [[f:citationParser]] parses citations in the text.
 
@@ -7784,7 +7784,7 @@ The heading may also have some metadata associated with it. These are keys and
 values from a ~:PROPERTIES:~ [[https://orgmode.org/manual/Drawers.html][drawer]], which is the only type of drawer we parse.
 Drawers are discussed separately [[id:ca12051e-cd17-4d8d-996a-767695441d48][here]].
 
-We store these keys and values inside the ~meta~ hashmap [[(data:Heading-meta)]].
+We store these keys and values inside the ~meta~ map [[(data:Heading-meta)]].
 
 Other than the level, each heading is made up of [[id:c8616126-215d-49be-8874-c2aca7d93a54][Prose]] text.
 
@@ -8454,7 +8454,7 @@ parent heading (creating a property drawer, adding the ~:ID:~ key, etc) if it
 doesn't already have an ~:ID:~.
 
 We need to store the ~parentOid~ here because ultimately, we need to build up a
-hashmap of symbols in [[id:91613519-f745-4cd8-9e88-125786ff0d33::f:mkSymbols][f:mkSymbols]], which uses the ~parentOid~ as a building block.
+map of symbols in [[id:91613519-f745-4cd8-9e88-125786ff0d33::f:mkSymbols][f:mkSymbols]], which uses the ~parentOid~ as a building block.
 Once we have all the symbols (using ~parentOid~ fields) defined such that we know
 what they point to, we are able to look at a [[data:LinkOid]] and are able to
 determine what that link actually points to (whether it's a block, table,
