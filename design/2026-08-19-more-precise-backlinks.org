@@ -72,8 +72,9 @@ using this data structure in the Archive:
 backlinks :: Map GPath (Map GPath [(GCI, GCI)])
 #+end_src
 
-Backlinks are a *cell-to-cell* adjacency list. The key is the GCI pair, which is
-simply an edge from the source cell to the target cell.
+Backlinks are a *cell-to-cell* adjacency list. The keys are object paths, and
+each GCI pair in the values is simply an edge from the source cell to the target
+cell.
 
 #+begin_src txt
 Map GPath (Map GPath [(GCI, GCI)])
