@@ -2156,9 +2156,10 @@ sort-file-contents = {
 :ID:       0cf535d6-f852-4b97-8ef8-9d566ad32e51
 :END:
 
-The CI runs the linter, builds the production binary, and also runs tests. The
-last thing it does is publish the site to GitHub pages (if it is the ~main~
-branch).
+The CI runs the linter, builds the production binary, and also runs tests. Unless
+the run is for a pull request, it then pushes the binary to Cachix (see
+[[make:Push binary to Cachix]]). The last thing it does is publish the site to
+GitHub pages (if it is the ~main~ branch).
 
 #+name: GHA-publish
 #+header: :tangle .github/workflows/build-and-publish-site.yml
