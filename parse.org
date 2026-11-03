@@ -10766,18 +10766,23 @@ data ListMarker
 
 We take this model from HTML, which uses ~<ol>~ and ~</ol>~ to encode the start and
 end of ordered lists (~<ul>~ and ~</ul>~ for unordered lists), and ~<li>~ and ~</li>~ to
-mark the start and end of a single list item.
+mark the start and end of a single list item. [[id:73acf466-6941-4c3b-9d6d-e0843d9b0480][Glossary terms]] get their own
+markers, which become a description list (~<dl>~ and ~</dl>~) instead.
 
 #+name: tbl:List markers
 #+caption: ~ListMarker~ values and their HTML equivalents.
-| ListMarker      | HTML equivalent |
-|-----------------+-----------------|
-| ~LOrderedStart~   | ~<ol>~            |
-| ~LOrderedEnd~     | ~</ol>~           |
-| ~LUnorderedStart~ | ~<ul>~            |
-| ~LUnorderedEnd~   | ~</ul>~           |
-| ~LItemStart~      | ~<li>~            |
-| ~LItemEnd~        | ~</li>~           |
+| ListMarker          | HTML equivalent                                           |
+|---------------------+-----------------------------------------------------------|
+| ~LOrderedStart~       | ~<ol>~                                                      |
+| ~LOrderedEnd~         | ~</ol>~                                                     |
+| ~LUnorderedStart~     | ~<ul>~                                                      |
+| ~LUnorderedEnd~       | ~</ul>~                                                     |
+| ~LItemStart~          | ~<li>~                                                      |
+| ~LItemEnd~            | ~</li>~                                                     |
+| ~LGlossaryGroupStart~ | ~<dl>~                                                      |
+| ~LGlossaryGroupEnd~   | ~</dl>~                                                     |
+| ~LGlossaryItemStart~  | ~<dt>~ and ~</dt>~ for the term, ~<dd>~ for the definition body |
+| ~LGlossaryItemEnd~    | ~</dd>~                                                     |
 
 In summary when we parse a list item, we parse it as a combination of ~CListItem~
 and other cell types for the list structure and content, respectively. This lets
