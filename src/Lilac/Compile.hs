@@ -157,7 +157,7 @@ import Relude
 import Relude.Extra.Map (elems, insert, insertWith, lookup, lookupDefault, member)
 import System.Directory.OsPath qualified as D
 import System.Exit (die)
-import System.FilePath (splitDirectories)
+import System.FilePath (splitDirectories, takeFileName)
 import System.OsPath qualified as P
 
 mkObject :: OrgDoc -> Object
@@ -827,7 +827,7 @@ findRootIndex pathObjs =
             else acc
 
 isIndexObjPath :: GPath -> Bool
-isIndexObjPath gpath = "index.lobj" `T.isSuffixOf` (T.pack $ decodeGPath gpath)
+isIndexObjPath gpath = takeFileName (decodeGPath gpath) == "index.lobj"
 
 getChildPaths :: (GPath, Object) -> State PathState [(GPath, Object)]
 getChildPaths (path, obj) = foldlM f [] obj.orgDoc.cells

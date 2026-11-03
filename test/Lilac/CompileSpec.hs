@@ -493,6 +493,20 @@ spec = do
         )
     )
 
+  expectGTOC
+    [ "0105/index-suffix/index.org",
+      "0105/index-suffix/appendix-index.org",
+      "0105/index-suffix/foo.org"
+    ]
+    ( Right
+        . GTOC
+        $ Node
+          (GPath "test/Lilac/CompileSpec/0105/index-suffix/index.lobj")
+          [ Node (GPath "test/Lilac/CompileSpec/0105/index-suffix/appendix-index.lobj") [],
+            Node (GPath "test/Lilac/CompileSpec/0105/index-suffix/foo.lobj") []
+          ]
+    )
+
   describe "cumulativeOffsets sanity check" $ do
     it "works for empty case" $ do
       let input = [] :: [(Int, String)]

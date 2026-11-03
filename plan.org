@@ -68,12 +68,12 @@ loss of information going from ~Text~ to ~Prose~ and back. But
 or ~\~~ inside code text, so such text did not survive the round trip. Now it
 escapes the same characters that the parser accepts after a backslash.
 
-** TODO compile: only treat index.org as an index
+** DONE compile: only treat index.org as an index
 
-[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:isIndexObjPath][f:isIndexObjPath]] only checks that the path ends in ~index.lobj~, so a file like
-~appendix-index.org~ is treated as an index too, and then
-[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:getChildPaths][f:getChildPaths]] drops the wrong prefix when it removes the last 10
-characters. It should check the file name instead.
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:isIndexObjPath][f:isIndexObjPath]] only checked that the path ends in ~index.lobj~, so a file like
+~appendix-index.org~ was treated as an index too, and then
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:getChildPaths][f:getChildPaths]] dropped the wrong prefix when it removed the last 10
+characters. Now it checks the file name instead.
 
 ** DONE compile: detect broken links in more cells
 
