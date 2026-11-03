@@ -4599,8 +4599,8 @@ For weaving citations, we use a 4-step process:
 
   1) Convert the [[id:c8616126-215d-49be-8874-c2aca7d93a54::newtype:Prose][newtype:Prose]] contents of [[id:6fd068e3-cc95-41a4-8126-bc7bd17c79bb::data:Citation][data:Citation]] into ~CslJson Text~,
      while preserving the information of non-text things like links and math
-     fragments by embedding them as ~CslLink~ for things that ~CslJson Text~ does
-     not support.
+     fragments by embedding them as ~CslLink~ or ~CslDiv~ for things that ~CslJson
+     Text~ does not support.
 
   2) Call into =Citeproc.citeproc= to get the transformed ~CslJson Text~ back out.
 
@@ -4815,8 +4815,9 @@ most likely used by =Citeproc= to handle case-changing transformations, and is
 probably not meant to be used directly by consumers.
 
 The ~CslDiv~ is used to wrap bibliographical entries inside printed bibliography
-for formatting purposes. We ignore them for now, except for those ~LILAC_STYLE...~
-bits that we've encoded in [[f:proseToCslJsonText]].
+for formatting purposes. We keep them as ~PTokenDivStart~ and ~PTokenDivEnd~, except
+for those ~LILAC_STYLE...~ and ~LILAC_MATH_FRAGMENT...~ bits that we've encoded in
+[[f:proseToCslJsonText]].
 
 Now we have all of the pieces needed to process citations. The idea is to
 process all citations found inside an Org document at once, just before the
