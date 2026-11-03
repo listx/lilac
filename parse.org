@@ -1366,10 +1366,10 @@ like other document metadata; they must come *after* the other (typical) Org met
 Below is a list of supported extensions:
 
   - ~lilac_maxHeadingLevel~ :: [[f:maxHeadingLevelParser]] This takes an integer as a
-    value. Using ~-1~ means no headings are allowed at all. Using ~0~ means headings
-    can have as many asterisks as desired. Using a positive integer means
-    headings may only have that many (or less) asterisks; otherwise Lilac will
-    fail the parse.
+    value. Using a negative number (such as ~-1~) means no headings are allowed at
+    all. Using ~0~ means headings can have as many asterisks as desired. Using a
+    positive integer means headings may only have that many (or fewer)
+    asterisks; otherwise Lilac will fail the parse.
 
   - ~lilac_maxListLevel~ :: [[f:maxListLevelParser]] This has the same semantics as
     ~lilac_maxHeadingLevel~ but is for list items, not headings.
